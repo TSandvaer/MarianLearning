@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* iPad PWA: disable text/tap callouts so Melody feels like an app, not a webpage */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
