@@ -120,6 +120,24 @@ export interface PlayGreetLineOptions {
 
 export interface PreRecordedAudio {
   loadGreetAudio: () => Promise<Record<GreetLineKey, HowlLike>>
+  /**
+   * Play a single Greet line by key. Returns a promise that resolves on
+   * Howl `end` and rejects on `loaderror` / `playerror` / synchronous
+   * `play()` throw / cancellation.
+   *
+   * **Caller responsibility for rejections (ticket 86c9gr43t).** This module
+   * is intentionally minimal — it does not retry, fall back, or surface UI
+   * on a load/play failure. The caller MUST attach a `.catch` (or surface
+   * via an orchestrator hook like `runGreetSequence.onLineError`) and
+   * decide the recovery story. Pre-86c9gr43t callers swallowed the
+   * rejection in an empty catch, which produced GBUG-7's silent-halt
+   * behaviour: a single bad MP3 froze the entire Greet sequence with no
+   * UI signal.
+   *
+   * The rejection's `Error.message` includes the offending source URL
+   * (e.g. `[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"`)
+   * so iPad QA can trace which file failed without console access.
+   */
   playGreetLine: (
     key: GreetLineKey,
     opts?: PlayGreetLineOptions,

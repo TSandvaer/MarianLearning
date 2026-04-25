@@ -270,6 +270,107 @@ describe('useAudioUnlockGate', () => {
     })
   })
 
+  describe('reportSpeechError (ticket 86c9gr43t — Howler load/play failure)', () => {
+    it('transitions pending → relock immediately on reportSpeechError', () => {
+      // Pre-onstart failure path: the engine never even acknowledged the
+      // call, then rejected. Skip the watchdog entirely; flip straight to
+      // relock so Marian sees the ring before the 1.5s window even elapses.
+      const { result } = renderHook(() =>
+        useAudioUnlockGate({ watchdogMs: 1_500 }),
+      )
+
+      act(() => {
+        result.current.wrapSpeak(() => {})
+      })
+      expect(result.current.state).toBe('pending')
+
+      act(() => {
+        result.current.reportSpeechError()
+      })
+      expect(result.current.state).toBe('relock')
+      expect(result.current.showGate).toBe(true)
+    })
+
+    it('transitions unlocked → relock on reportSpeechError (mid-sequence MP3 failure)', () => {
+      // The actual GBUG-7 surface: line 0 played fine (gate reached
+      // unlocked), but line 2's MP3 failed to load. The orchestrator
+      // forwards the rejection to us; we need to surface relock just as
+      // cleanly as if line 0 had silently missed.
+      const { result } = renderHook(() => useAudioUnlockGate())
+
+      act(() => {
+        result.current.wrapSpeak(() => {})
+      })
+      act(() => {
+        result.current.reportSpeechStart()
+      })
+      expect(result.current.state).toBe('unlocked')
+
+      act(() => {
+        result.current.reportSpeechError()
+      })
+      expect(result.current.state).toBe('relock')
+    })
+
+    it('clears the in-flight watchdog so a late expiry does not redundantly fire', () => {
+      // Defensive: post-error we're already in `relock`. The watchdog's
+      // expiry no-ops in the current impl (it only flips pending → relock)
+      // but leaving a live handle around is sloppy and would surface as a
+      // leaked timer in a more aggressive test harness.
+      const { result } = renderHook(() =>
+        useAudioUnlockGate({ watchdogMs: 100 }),
+      )
+
+      act(() => {
+        result.current.wrapSpeak(() => {})
+      })
+      act(() => {
+        result.current.reportSpeechError()
+      })
+      // Past the would-be watchdog window: still relock, no thrash.
+      act(() => {
+        vi.advanceTimersByTime(500)
+      })
+      expect(result.current.state).toBe('relock')
+    })
+
+    it('a registered retry is preserved across reportSpeechError → dispatchGesture', () => {
+      // The whole point of the relock path: the next gesture should fire
+      // the registered retry. Make sure reportSpeechError doesn't clobber
+      // the retryRef the way reset() does.
+      const { result } = renderHook(() => useAudioUnlockGate())
+      const retry = vi.fn()
+
+      act(() => {
+        result.current.registerRetry(retry)
+        result.current.wrapSpeak(() => {})
+        result.current.reportSpeechError()
+      })
+      expect(result.current.state).toBe('relock')
+
+      let consumed: boolean | undefined
+      act(() => {
+        consumed = result.current.dispatchGesture()
+      })
+      expect(consumed).toBe(true)
+      expect(retry).toHaveBeenCalledTimes(1)
+    })
+
+    it('reportSpeechError from idle is a no-op-ish forced relock (defensive)', () => {
+      // Edge case: caller invokes reportSpeechError without ever wrapping a
+      // speak. Not a real production path, but we don't want a thrown error
+      // — just put us in relock so the next gesture has somewhere to go.
+      // (If a future call site introduces this pattern, this test catches
+      // any silent regression to the no-op behaviour.)
+      const { result } = renderHook(() => useAudioUnlockGate())
+
+      act(() => {
+        result.current.reportSpeechError()
+      })
+      expect(result.current.state).toBe('relock')
+    })
+  })
+
   it('a second wrapSpeak before the first has resolved cancels the prior watchdog', () => {
     const { result } = renderHook(() => useAudioUnlockGate({ watchdogMs: 100 }))
 

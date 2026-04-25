@@ -120,6 +120,22 @@ export interface AudioUnlockGate {
    */
   reportSpeechStart: () => void
   /**
+   * Call this from your audio layer when a play attempt rejects (Howler
+   * `loaderror` / `playerror`, or any other terminal failure). Clears the
+   * watchdog and transitions immediately to `relock` regardless of the
+   * current state — so a mid-sequence MP3 failure surfaces the relock UI
+   * just as cleanly as a pre-onstart silent miss does.
+   *
+   * Provenance: ticket 86c9gr43t (GBUG-7). Before this method existed, a
+   * Howler `loaderror` after the gate had already reached `unlocked` had
+   * no transition path home — the orchestrator just halted silently and
+   * the heart never appeared. Now the rejection is the signal: gate flips
+   * back to relock, ring re-shows, the registered retry callback is what
+   * the next gesture invokes (typically `cancel + start` of a fresh
+   * sequence so the same line is retried — agency over silence).
+   */
+  reportSpeechError: () => void
+  /**
    * Register a synchronous retry callback. While `state === 'relock'`, the
    * hook will invoke this callback the next time `dispatchGesture()` is
    * called. The callback should itself be a synchronous `wrapSpeak()`
@@ -234,6 +250,19 @@ export function useAudioUnlockGate(
     setState('unlocked')
   }, [clearWatchdog])
 
+  const reportSpeechError = useCallback(() => {
+    // Cancel the watchdog — its expiry would otherwise no-op (we're already
+    // moving away from `pending`) but leaving a dead handle around is sloppy.
+    clearWatchdog()
+    // Force `relock` regardless of whether the gate had reached `unlocked`
+    // or was still `pending`. This is the unconditional version of the
+    // watchdog's transition; the watchdog only flips pending → relock,
+    // because pre-rejection it couldn't tell the difference between
+    // "silent miss" and "engine actively errored". Once the engine *does*
+    // tell us via a rejection, we treat any state as eligible to relock.
+    setState('relock')
+  }, [clearWatchdog])
+
   const registerRetry = useCallback((cb: (() => void) | null): void => {
     retryRef.current = cb
   }, [])
@@ -260,6 +289,7 @@ export function useAudioUnlockGate(
     showGate: state === 'relock',
     wrapSpeak,
     reportSpeechStart,
+    reportSpeechError,
     registerRetry,
     dispatchGesture,
     reset,
