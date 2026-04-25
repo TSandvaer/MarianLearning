@@ -29,13 +29,20 @@ import {
  *
  * iPad QA usage
  * -------------
- *  1. Visit https://marian-learning.vercel.app/?debug=1 (or add `?debug=1`
- *     to whatever PR-preview URL you have).
- *  2. Tap-to-add to home screen (Safari → Share → Add to Home Screen). The
- *     installed PWA preserves the query string in its scope manifest, so the
- *     standalone tile also runs in debug mode. To turn debug off, reinstall
- *     without the query string.
- *  3. Watch the panel as Marian taps Wake. Screenshot it if TTS doesn't fire.
+ * Test in Safari tab mode only — DO NOT install to home screen for debug
+ * runs. The PWA manifest's `start_url` is `/` (no query string), so an
+ * installed-from-home-screen tile will strip `?debug=1` and launch the
+ * production build with no overlay. (`scope` only constrains service-worker
+ * interception; it does not preserve query strings on the launcher.) Since
+ * the iPad TTS bug repros in BOTH Safari tab and installed PWA modes
+ * (Thomas confirmed this 2026-04-25), Safari-tab-only testing loses no
+ * diagnostic signal.
+ *
+ *  1. Open https://marian-learning.vercel.app/?debug=1 (or the PR-preview
+ *     URL with `?debug=1` appended) in a Safari TAB on iPad. Do not Add to
+ *     Home Screen.
+ *  2. Walk through Splash → Greet → tap the wake target.
+ *  3. Watch the bottom-left overlay panel. Screenshot it if TTS doesn't fire.
  *
  * Reading the panel after a silent fail
  * -------------------------------------
