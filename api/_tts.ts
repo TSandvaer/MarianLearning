@@ -120,21 +120,44 @@ export function buildSpeechConfigMessage(): string {
   )
 }
 
-/** Build the SSML message for a single utterance. */
+/** Build the SSML message for a single utterance. All four attribute fields
+ *  (voice/rate/pitch/volume) are XML-escaped in addition to `text`. Today
+ *  these all come from the hardcoded `MELODY_VOICE_CONFIG`, but
+ *  `buildSsmlMessage` is exported and `TtsRequest` accepts arbitrary strings
+ *  — escaping is cheap defense-in-depth against a future caller passing
+ *  user-derived prosody values into a single-quoted attribute slot. */
 export function buildSsmlMessage(req: TtsRequest, requestId: string): string {
   const ssml =
     `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>` +
-    `<voice name='${req.voice}'>` +
-    `<prosody pitch='${req.pitch}' rate='${req.rate}' volume='${req.volume}'>` +
+    `<voice name='${escapeSsml(req.voice)}'>` +
+    `<prosody pitch='${escapeSsml(req.pitch)}' rate='${escapeSsml(req.rate)}' volume='${escapeSsml(req.volume)}'>` +
     `${escapeSsml(req.text)}` +
     `</prosody></voice></speak>`
+  // X-Timestamp must be a single ISO-8601 + Z, not double-Z. `toISOString()`
+  // already terminates with Z; an earlier draft of this file appended a second
+  // Z and the Edge endpoint silently tolerated it. Match the speech.config
+  // message format above (and edge-tts/communicate.py upstream).
   return (
     `X-RequestId:${requestId.replace(/-/g, '')}\r\n` +
     `Content-Type:application/ssml+xml\r\n` +
-    `X-Timestamp:${new Date().toISOString()}Z\r\n` +
+    `X-Timestamp:${new Date().toISOString()}\r\n` +
     `Path:ssml\r\n\r\n` +
     ssml
   )
+}
+
+/** Parse `\r\n`-separated `key:value` header lines into a record. Shared
+ *  between the binary-frame parser (where headers live in a length-prefixed
+ *  block) and the text-frame parser (where headers live before `\r\n\r\n`). */
+function parseHeaderBlock(headerText: string): Record<string, string> {
+  const headers: Record<string, string> = {}
+  for (const line of headerText.split('\r\n')) {
+    const idx = line.indexOf(':')
+    if (idx > 0) {
+      headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
+    }
+  }
+  return headers
 }
 
 /** Parse a binary frame returned by the service. The first 2 bytes are a
@@ -150,15 +173,26 @@ export function parseBinaryFrame(buf: Uint8Array): {
   const headerLength = (buf[0]! << 8) | buf[1]!
   const headerBytes = buf.subarray(2, 2 + headerLength)
   const headerText = Buffer.from(headerBytes).toString('utf8')
-  const headers: Record<string, string> = {}
-  for (const line of headerText.split('\r\n')) {
-    const idx = line.indexOf(':')
-    if (idx > 0) {
-      headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
-    }
-  }
+  const headers = parseHeaderBlock(headerText)
   const payload = buf.subarray(2 + headerLength)
   return { headers, payload }
+}
+
+/** Parse a text frame: headers separated from body by `\r\n\r\n`. If the
+ *  separator is missing, the whole string is treated as headers (the body is
+ *  optional for our purposes — we only ever read `Path`). */
+export function parseTextFrame(text: string): {
+  headers: Record<string, string>
+  body: string
+} {
+  const sep = text.indexOf('\r\n\r\n')
+  if (sep < 0) {
+    return { headers: parseHeaderBlock(text), body: '' }
+  }
+  return {
+    headers: parseHeaderBlock(text.slice(0, sep)),
+    body: text.slice(sep + 4),
+  }
 }
 
 /** Minimal duck-type for the WebSocket we depend on. Lets tests inject a
@@ -282,9 +316,12 @@ export function synthesizeUtterance(
         return
       }
 
-      // Text frame.
+      // Text frame. Parse the header block properly rather than substring-
+      // matching on `Path:turn.end` — a malformed body that happened to
+      // contain that literal would otherwise false-trigger the resolve.
       const text = String(data)
-      if (text.includes('Path:turn.end')) {
+      const { headers: textHeaders } = parseTextFrame(text)
+      if (textHeaders['Path'] === 'turn.end') {
         const total = audioChunks.reduce((n, c) => n + c.length, 0)
         const merged = new Uint8Array(total)
         let offset = 0

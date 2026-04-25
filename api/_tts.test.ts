@@ -11,10 +11,29 @@ import {
   escapeSsml,
   generateSecMsGec,
   parseBinaryFrame,
+  parseTextFrame,
   synthesizeUtterance,
   uint8ToBase64,
   type WebSocketLike,
 } from './_tts'
+
+// Strict ISO-8601 + single-Z timestamp shape. The earlier double-Z bug
+// (`...sssZZ`) shipped under tests that only asserted substring presence
+// of `X-Timestamp:`; this regex is what catches it on a future regression.
+//   YYYY-MM-DDTHH:mm:ss.sssZ — exactly one trailing Z.
+const ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+
+function extractHeader(msg: string, name: string): string | null {
+  const idx = msg.indexOf('\r\n\r\n')
+  const headerBlock = idx >= 0 ? msg.slice(0, idx) : msg
+  for (const line of headerBlock.split('\r\n')) {
+    const sep = line.indexOf(':')
+    if (sep > 0 && line.slice(0, sep).trim() === name) {
+      return line.slice(sep + 1).trim()
+    }
+  }
+  return null
+}
 
 describe('escapeSsml', () => {
   it('escapes the five XML metacharacters', () => {
@@ -74,6 +93,13 @@ describe('buildSpeechConfigMessage', () => {
       'audio-24khz-48kbitrate-mono-mp3',
     )
   })
+
+  it('writes X-Timestamp as a single ISO-8601 + Z (no double-Z)', () => {
+    const ts = extractHeader(buildSpeechConfigMessage(), 'X-Timestamp')
+    expect(ts).not.toBeNull()
+    expect(ts).toMatch(ISO_TIMESTAMP_RE)
+    expect(ts!.endsWith('ZZ')).toBe(false)
+  })
 })
 
 describe('buildSsmlMessage', () => {
@@ -96,6 +122,84 @@ describe('buildSsmlMessage', () => {
     expect(msg).toContain("volume='+0%'")
     expect(msg).toContain('What&apos;s &lt;2+2&gt;?')
     expect(msg).not.toContain("What's <2+2>?")
+  })
+
+  it('writes X-Timestamp as a single ISO-8601 + Z (no double-Z)', () => {
+    // Regression for the `${toISOString()}Z` double-Z bug. `toISOString()`
+    // already terminates with Z; appending another Z produces `...sssZZ`,
+    // which the Edge endpoint silently tolerates today but is a one-char
+    // protocol bug. The earlier test only asserted substring presence and
+    // missed it — this regex is what would have caught it.
+    const msg = buildSsmlMessage(
+      {
+        text: 'x',
+        voice: 'en-US-AnaNeural',
+        rate: '-10%',
+        pitch: '+0Hz',
+        volume: '+0%',
+      },
+      'req-1',
+    )
+    const ts = extractHeader(msg, 'X-Timestamp')
+    expect(ts).not.toBeNull()
+    expect(ts).toMatch(ISO_TIMESTAMP_RE)
+    expect(ts!.endsWith('ZZ')).toBe(false)
+    // Belt-and-braces: literal scan for the regression pattern.
+    expect(msg).not.toMatch(/X-Timestamp:[^\r\n]*ZZ/)
+  })
+
+  it('XML-escapes voice/rate/pitch/volume attribute values (defense-in-depth)', () => {
+    // Future caller might pass user-derived prosody values into a
+    // single-quoted attribute slot; escapeSsml on those four fields blocks
+    // attribute injection. None of the metacharacters should reach the
+    // wire raw.
+    const msg = buildSsmlMessage(
+      {
+        text: 'x',
+        voice: `evil' onerror='`,
+        rate: `<rate>`,
+        pitch: `&pitch;`,
+        volume: `"vol"`,
+      },
+      'req-2',
+    )
+    expect(msg).toContain(`voice name='evil&apos; onerror=&apos;'`)
+    expect(msg).toContain(`rate='&lt;rate&gt;'`)
+    expect(msg).toContain(`pitch='&amp;pitch;'`)
+    expect(msg).toContain(`volume='&quot;vol&quot;'`)
+    // Raw single-quote inside the voice attribute would close it early —
+    // verify it's gone after escaping.
+    expect(msg).not.toContain(`voice name='evil' onerror=''`)
+  })
+})
+
+describe('parseTextFrame', () => {
+  it('parses headers + body separated by \\r\\n\\r\\n', () => {
+    const frame =
+      'X-RequestId:abc\r\nContent-Type:application/json\r\nPath:turn.end\r\n\r\n{"foo":1}'
+    const { headers, body } = parseTextFrame(frame)
+    expect(headers['Path']).toBe('turn.end')
+    expect(headers['X-RequestId']).toBe('abc')
+    expect(headers['Content-Type']).toBe('application/json')
+    expect(body).toBe('{"foo":1}')
+  })
+
+  it('treats the whole frame as headers when there is no body separator', () => {
+    const { headers, body } = parseTextFrame('Path:turn.end\r\n')
+    expect(headers['Path']).toBe('turn.end')
+    expect(body).toBe('')
+  })
+
+  it('does NOT confuse a body containing the literal Path:turn.end with a real header', () => {
+    // If the parser substring-matched on `Path:turn.end`, this innocent
+    // metadata frame whose body happens to mention the literal would
+    // false-trigger downstream logic. The header-block parser must only
+    // look at the bytes BEFORE \r\n\r\n.
+    const frame =
+      'Path:response\r\nContent-Type:application/json\r\n\r\n{"note":"Path:turn.end is just text here"}'
+    const { headers } = parseTextFrame(frame)
+    expect(headers['Path']).toBe('response')
+    expect(headers['Path']).not.toBe('turn.end')
   })
 })
 
@@ -303,6 +407,37 @@ describe('synthesizeUtterance', () => {
     expect(scheduled).toBeTypeOf('function')
     scheduled!()
     await expect(promise).rejects.toThrow(/timeout after 100ms/)
+  })
+
+  it('does NOT resolve on a non-turn.end text frame whose body mentions Path:turn.end', async () => {
+    // Regression for the substring-match parsing: a `response` text frame
+    // whose JSON body mentions the literal `Path:turn.end` must not be
+    // mistaken for the real terminator. The audio buffer must still be
+    // resolved by the real terminator that arrives after.
+    const ws = makeFakeWs()
+    const promise = synthesizeUtterance(
+      {
+        text: 'x',
+        voice: 'en-US-AnaNeural',
+        rate: '-10%',
+        pitch: '+0Hz',
+        volume: '+0%',
+      },
+      { webSocketFactory: () => ws },
+    )
+    ws.__fire('open')
+    ws.__fire('message', makeAudioFrame(new Uint8Array([0x11])))
+    // Innocent `response` frame — must NOT resolve.
+    ws.__fire(
+      'message',
+      'X-RequestId:def\r\nContent-Type:application/json\r\nPath:response\r\n\r\n{"note":"Path:turn.end mentioned in body"}',
+    )
+    // Audio still streaming — caller is still awaiting.
+    ws.__fire('message', makeAudioFrame(new Uint8Array([0x22])))
+    // Real terminator now resolves.
+    ws.__fire('message', 'Path:turn.end\r\n')
+    const result = await promise
+    expect(Array.from(result.audio)).toEqual([0x11, 0x22])
   })
 
   it('only treats binary frames with Path:audio as audio chunks', async () => {
