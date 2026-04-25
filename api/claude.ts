@@ -41,9 +41,18 @@ import { renderSessionAudio } from './_session'
 
 /**
  * Cold-start runtime assertion. Throws at module load if the function is
- * not running on Node — `_tts.ts` would crash on `import { WebSocket } from 'ws'`
- * and `node:crypto` anyway, but this throw produces a clear message at the
- * top of the stack instead of a cryptic "ws is not defined".
+ * not running on Node.
+ *
+ * Caveat: this fires AFTER the static `import { WebSocket } from 'ws'` and
+ * `node:crypto` imports above are resolved. On a pure Edge runtime those
+ * imports would themselves fail first with "Cannot find module 'ws'" — so
+ * this assertion does NOT add coverage there. What it DOES add coverage
+ * for is the in-between cases that exist in the Vercel ecosystem: hybrid
+ * runtimes (Edge with Node compat shims), partial polyfills, or a future
+ * Vercel build target that resolves the imports but still lacks
+ * `process.versions.node`. In those cases the imports succeed but the
+ * function would later mis-behave; this throw makes the failure loud and
+ * named at the top of the stack.
  *
  * Edge runtime: `globalThis.process` is undefined.
  * Node runtime: `process.versions.node` is always a string (e.g. "22.11.0").
