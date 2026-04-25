@@ -112,6 +112,50 @@ describe('runGreetSequence', () => {
     expect(h.calls[0].text).toBe(GREET_LINES[GREET_LINES.length - 1])
   })
 
+  // Ticket 86c9gr43t round-2 (Kevin's review of PR #29):
+  // Math.max(0, Math.min(NaN, n)) returns NaN, which slips past the
+  // `index >= GREET_LINES.length` guard (NaN >= 4 is false) and reaches
+  // speak(GREET_LINES[NaN]) === speak(undefined). The production
+  // playLineAdapter throws on undefined text. Contract per JSDoc is
+  // graceful clamping to a valid index — anything not finite goes to 0.
+  it('start(NaN) clamps to line 0 instead of speak(undefined)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start(Number.NaN)
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+    expect(h.calls[0].text).toBe('Hi!')
+  })
+
+  it('start(undefined) clamps to line 0 (parameter default path)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    // Cast to satisfy the typed signature; runtime behaviour is what we
+    // care about — bad callers must not crash the gesture handler.
+    handle.start(undefined as unknown as number)
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+  })
+
+  it('start(non-numeric) clamps to line 0 instead of producing speak(undefined)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start('foo' as unknown as number)
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+  })
+
+  it('start(Infinity) clamps to the last line (Number.isFinite excludes Infinity)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start(Number.POSITIVE_INFINITY)
+    expect(h.calls).toHaveLength(1)
+    // Infinity is not finite, so the guard sends us to 0 (the safe default).
+    // Documented behaviour: anything not finite -> 0. That's the contract
+    // future callers can rely on; no surprise jumps to the end of the list.
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+  })
+
   it('start() after cancel() is a no-op', () => {
     const h = makeSpeakHarness()
     const handle = runGreetSequence({ speak: h.speak })

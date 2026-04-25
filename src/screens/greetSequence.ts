@@ -154,7 +154,9 @@ export interface GreetSequenceHandle {
    * calls `start(failedIndex)` so Marian retries the failed line rather
    * than re-hearing every earlier line. Out-of-range indices (`< 0` or
    * `>= GREET_LINES.length`) are treated as 0 and length-1 respectively;
-   * the orchestrator never throws on a bad seed.
+   * the orchestrator never throws on a bad seed. Anything non-finite
+   * (NaN, ±Infinity, or non-numeric junk passed via a typed-any cast)
+   * collapses to 0 — same "never crash the gesture handler" rule.
    */
   start: (fromIndex?: number) => void
   /**
@@ -255,7 +257,18 @@ export function runGreetSequence(
       // seed — callers might pass `failedIndex` from an unrelated context
       // and a hard error in the gesture handler would be worse than a
       // graceful no-op restart at line 0 (or the final line).
-      const seed = Math.max(0, Math.min(fromIndex, GREET_LINES.length - 1))
+      //
+      // Number.isFinite gate (added in PR #29 round-2 review): without it,
+      // Math.min(NaN, n) returns NaN, which then slips past speakLine's
+      // `index >= GREET_LINES.length` guard (NaN >= n is always false) and
+      // calls opts.speak(GREET_LINES[NaN]) — i.e. speak(undefined). The
+      // production playLineAdapter throws on undefined text, which would
+      // re-introduce the silent-halt this whole ticket was meant to kill.
+      // Anything not finite (NaN, ±Infinity, non-numeric junk via a typed
+      // any-cast) collapses to 0 — the safe default the JSDoc promises.
+      const seed = Number.isFinite(fromIndex)
+        ? Math.max(0, Math.min(fromIndex, GREET_LINES.length - 1))
+        : 0
       speakLine(seed)
     },
     cancel(): void {

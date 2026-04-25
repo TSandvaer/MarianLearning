@@ -36,6 +36,21 @@
  * integrity guard — Jessica's manual QA covers tone, and the runtime word-
  * tick code reads `howl.duration()` so a wildly off duration would surface
  * as caption drift, not as a silent halt.
+ *
+ * Also explicitly NOT covered (Kevin's PR #29 review, nit #3):
+ *  - Mid-stream corruption with a valid frame-sync header. We only inspect
+ *    the first two bytes; a file whose middle is shredded (network truncation,
+ *    bad sync on an SD card) will pass header validation and surface only at
+ *    runtime via Howler `playerror`. The runtime relock-retry path catches it.
+ *  - File-swap (greet-01-hi.mp3 actually containing the audio for line 3).
+ *    Both are valid MP3s with valid headers; nothing here would notice. A
+ *    hash-pinning test would catch it but adds churn every time we re-record.
+ *
+ * Both are accepted gaps: header-only validation is by design — fully
+ * validating MP3 frame structure / matching audio to filename would need
+ * ffprobe in CI, which we don't ship. This test catches the realistic
+ * failure modes (git-LFS pointer files, accidentally-empty commits, ID3-
+ * tagged re-encodes from the wrong pipeline, runaway re-encode bloat).
  */
 
 import { readFileSync, statSync } from 'node:fs'
