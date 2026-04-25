@@ -7,6 +7,8 @@
 **Session length target:** 4–6 minutes (first-run only; later sessions run the full 10–15 min)
 
 > **Updated 2026-04-25** with Thomas decisions on Q1 / Q2 / Q4 (phoneme audio budget, CSS-filter twilight, gentle-ramp distractors). Original Q3 / Q5 / Q6 / Q7 / Q8 remain as non-blocking TODOs at the bottom.
+>
+> **Updated 2026-04-25 (Kyle, ticket `86c9gp99a`)** to resolve the iPad Safari TTS gesture-gate bug. Greet now requires a single tap-anywhere to wake Melody up; Splash retains its no-skip behavior. See **Foundational Decisions → iPad Safari audio constraint** below and the rewritten Screen 2 entry/intro states.
 
 ---
 
@@ -28,6 +30,7 @@
 - **TTS captions:** every Melody line is mirrored as on-screen text in a speech-ribbon below/beside her, **revealed word-by-word synced to TTS `boundary` events** (passive reading exposure). If `boundary` events don't fire (Safari quirk — common on iPad, our primary device), fall back to a **synthetic word-paced reveal at configurable WPM** (default 165, derived from Melody's `rate: 0.9`). See implementation notes for full fallback contract.
 - **No red X, ever.** Wrong answers trigger puzzled-tilt + "poof" SFX + retry — see Error Path in each exercise screen.
 - **No streak/XP counter is visible in Session 1.** First-run is about meeting Melody, not earning points.
+- **iPad Safari audio constraint (read this before designing any screen with TTS).** iPad Safari blocks `speechSynthesis.speak()` and any new `Audio` / `Howl` playback until the current execution context has received a user gesture (tap, touchend, click, keydown). The unlock is **per-app-session**, not per-utterance — once any user gesture has run synchronously alongside an audio call, the context stays unlocked for the rest of the session. **Implication for design:** every session must contain a gesture before its first audio cue. Session 1 places that gesture on Screen 2 (see **Screen 2 → Wake state**). Future surfaces (Math, Word Song, Reward, returning-user greeting) inherit the unlocked context for the rest of the session and do not need their own gate. **Caveat for long-idle sessions:** if Marian backgrounds the PWA and returns after the OS has aggressively suspended audio (observed on iPadOS after >~5 min background), the context may relock. Treat the next screen mount as a soft re-gate: if `speechSynthesis.speak()` returns without firing `onstart` within 250ms, surface the same "tap Melody to wake her up" affordance used on Screen 2 in-place. Implementation contract for Kevin/Devon under Implementation Notes.
 
 ---
 
@@ -104,60 +107,65 @@ On-screen text: **"Melody"** (wordmark only).
 Marian meets Melody for the first time. Melody does not know her name. Warm, short, ends with a single forward action.
 
 ## User state entering this screen
-Splash just faded. She's seen the Melody wordmark. Cream background is already present from Screen 1.
+Splash just faded. She's seen the Melody wordmark. Cream background is already present from Screen 1. **Audio context is locked** (no user gesture has occurred yet) — Melody cannot speak until Marian taps. See Wake state below.
 
 ## Visual layout
 
 ```
-+----------------------------------+
-|        [safe area top]           |
-|                                  |
-|         ~ sky pattern ~          |  <- soft cloud bg fades in
-|                                  |
-|      ( Melody - idle / smile )   |  <- 60% of viewport height
-|                                  |  <- slides in from bottom-left
-|                                  |
-|   +-------------------------+    |
-|   |  "Hi! I'm Melody."      |    |  <- speech ribbon, word-by-word
-|   |  (captions mirror TTS)  |    |
-|   +-------------------------+    |
-|                                  |
-|                                  |
-|        [ PINK HEART BUTTON ]     |  <- thumb zone, 88pt tall
-|         (appears at line 3)      |
-|                                  |
-|        [safe area bottom]        |
-+----------------------------------+
+WAKE STATE (pre-tap, audio locked)         INTRO STATE (post-tap, audio unlocked)
++----------------------------------+       +----------------------------------+
+|        [safe area top]           |       |        [safe area top]           |
+|                                  |       |                                  |
+|         ~ sky pattern ~          |       |         ~ sky pattern ~          |
+|                                  |       |                                  |
+|        ( ( Melody - idle ) )     |       |      ( Melody - idle / smile )   |
+|         soft pink ready ring     |       |                                  |
+|         pulses around her        |       |   +-------------------------+    |
+|                                  |       |   |  "Hi! I'm Melody."      |    |
+|         (entire viewport         |       |   |  (captions mirror TTS)  |    |
+|          is the tap target)      |       |   +-------------------------+    |
+|                                  |       |                                  |
+|                                  |       |        [ PINK HEART BUTTON ]     |
+|                                  |       |         (appears at line 3)      |
+|                                  |       |                                  |
+|        [safe area bottom]        |       |        [safe area bottom]        |
++----------------------------------+       +----------------------------------+
 ```
 
 - Background: `bg-clouds.svg` — soft cream-to-pink wash with 3 stylized clouds, fades in over 600ms.
 - Melody: centered horizontally, fills ~60% of viewport height, bottom-aligned to speech ribbon.
-- Speech ribbon: white rounded rect (`border-radius: 24pt`), 88% viewport width, 16pt pink border, soft shadow. Centered under Melody.
-- Primary CTA: giant pink heart button, 88pt tall × 120pt wide, centered in bottom thumb zone (bottom 20% of viewport). Icon-only — **no text label.** Melody tells her what it does via TTS.
+- Speech ribbon: white rounded rect (`border-radius: 24pt`), 88% viewport width, 16pt pink border, soft shadow. Centered under Melody. **Hidden during Wake state.**
+- Primary CTA: giant pink heart button, 88pt tall × 120pt wide, centered in bottom thumb zone (bottom 20% of viewport). Icon-only — **no text label.** Melody tells her what it does via TTS. **Hidden during Wake state.**
+- **Ready ring (Wake state only):** a soft pink concentric ring (`--my-pink` at 40% alpha, 6pt stroke) drawn around Melody's silhouette, ~24pt outside her bounding circle. Pulses opacity 0.4 → 0.9 → 0.4 over 1.4s, `repeat: Infinity`. Purely visual cue that Melody is "waiting to be greeted." Disappears the instant a tap is detected. **The ring itself is not the touch target** — see below.
+- **Wake-state tap target:** the *entire viewport* (full safe-area rect, behind everything else) is a transparent tap surface. Any tap anywhere unlocks audio and starts the intro sequence. No icon affordance required because the full screen is hot — and Melody being visibly idle + the ready ring carry the "I'm waiting for you" read. Rationale under Open Questions / Foundational Decisions.
 
 ## Copy / TTS script
 
-Melody speaks on first appearance. Lines separated by ~400ms natural pauses.
+**Wake state (pre-tap):** silent. Melody is on-screen idle with the ready ring; no TTS, no SFX. **Do not call `speak()` here** — iPad Safari will silently reject it and the line will be lost.
 
-1. **(0.0s)** "Hi!" *(ear-wiggle cue on this word)*
+**Intro state (post-tap):** Melody speaks the lines below. `t = 0.0s` is **the moment of the unlocking tap.** Lines separated by ~400ms natural pauses.
+
+1. **(0.0s)** "Hi!" *(ear-wiggle cue on this word; fired in the same synchronous tap handler that unlocks audio — see Implementation Notes)*
 2. **(0.8s)** "I'm Melody."
 3. **(2.2s)** "It's so nice to meet you."
 4. **(4.0s)** "Tap the heart when you're ready."
 
 **Word-count check (against 200-word cap):** `hi, i'm, melody, it's, so, nice, to, meet, you, tap, the, heart, when, you're, ready` — 15 unique words. All within cap. "Melody" is the character name (always allowed).
 
-On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon.
+On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon. Ribbon does not appear until line 1 starts.
 
 ## Motion
 
 - **Clouds bg:** fades in 0→1 opacity over 600ms, `ease: "easeOut"`. Very subtle horizontal drift (`x: [0, 10, 0]` over 20s, `repeat: Infinity`) — slow enough to feel alive, not frantic. Disabled if `prefers-reduced-motion`.
-- **Melody entrance:** slides in from off-screen bottom-left.
+- **Melody entrance (Wake state, on screen mount):** slides in from off-screen bottom-left.
   ```
   initial={{ x: -120, y: 60, opacity: 0 }}
   animate={{ x: 0, y: 0, opacity: 1 }}
   transition={{ type: "spring", stiffness: 220, damping: 22, delay: 0.3 }}
   ```
-  Total entrance ~700ms. Spring settles without bounce-past (damping 22 keeps it calm, not cartoonish).
+  Total entrance ~700ms. Spring settles without bounce-past (damping 22 keeps it calm, not cartoonish). She lands in idle pose and **breathes**: `scale: [1, 1.05, 1]` over 2.4s, `repeat: Infinity`, `ease: "easeInOut"`. Reads as clearly alive at iPad viewport scale — earlier draft used `1.015` which Dave's consult flagged as too subtle to perceive (would read as frozen by 4–5s on a child's first look).
+- **Ready ring (Wake state):** scales in 0.9 → 1 + opacity 0 → 0.4 with 200ms ease-out, **starting at +900ms** (after Melody settles). Then opacity-pulses 0.4 → 0.9 → 0.4 over 1.4s, `repeat: Infinity`. Disabled if `prefers-reduced-motion` (held at static 0.5 opacity).
+- **Wake → Intro transition (on first tap):** ring scales out + fades over 250ms; same tap synchronously dispatches `speak(line1)` (see Implementation Notes for the exact handler shape). Melody's breathing loop continues uninterrupted.
 - **Ear-wiggle** on "Hi!" word boundary: sprite swap idle → happy for 600ms, then back. If no sprite system, CSS rotation of ear layer `rotate: [0, -8, 6, 0]` over 500ms.
 - **Speech ribbon:** scales in from 0.9 → 1 on first TTS `start` event, spring `{ stiffness: 260, damping: 20 }`.
 - **Caption word reveal:** each word fades in with `opacity: 0 → 1` over 150ms, synced to TTS `boundary` events. Previous words stay visible.
@@ -171,36 +179,47 @@ On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon
 
 ## States
 
-- **Idle / first visit:** full greeting sequence plays. Heart button appears at ~4s mark and pulses gently.
+- **Wake (pre-tap, audio locked):** Melody is on-screen in idle pose, breathing. Ready ring pulses around her. Speech ribbon hidden. Heart button hidden. No TTS, no SFX. Full viewport is a transparent tap target.
+- **Wake re-prompt (no tap for 8s):** A small finger-tap icon (48pt, `--my-rose` fill, `--ink` outline) fades in centered on the ready ring (`opacity: 0 → 1` over 300ms) and pulses once (`scale: 1 → 1.1 → 1` over 600ms). Simultaneously, Melody plays a single ear-wiggle wave (sprite swap for 600ms, then back to idle). Icon fades out 2.5s after pulse completes (`opacity: 1 → 0` over 400ms). Ring continues pulsing. **No TTS** (still locked). This is the *only* re-prompt; the screen sits indefinitely without further prompts. Rationale (Dave's 2026-04-25 consult, citations in PR #15 history): research-backed sustained-attention ranges put 8s at the upper bound for an 8-year-old's "screen is alive" tolerance on a low-arousal screen. The ear-wiggle communicates "I'm alive"; the finger-tap icon communicates "tap here" — both are needed because, alone, neither does the affordance work for a low-literacy child. One nudge, then patience — no nag loop.
+- **Intro (post-tap, audio unlocked):** full greeting sequence plays. Heart button appears at ~4s mark (after line 3 completes) and pulses gently.
 - **Heart tapped (happy path):** heart does a single quick squish (`scale: [1, 1.15, 0.95, 1]` over 250ms), soft chime SFX, then transition out to Screen 3.
-- **No tap for 20 seconds:** Melody re-prompts once — "Tap the heart when you're ready." (reuses existing line, no new TTS generation needed). **Does not re-prompt again** — if she walks away, that's fine. No nag loop.
+- **No heart tap for 20 seconds (post-intro, after line 4 finishes):** Melody re-prompts once — "Tap the heart when you're ready." (reuses existing line, no new TTS generation needed). **Does not re-prompt again** — if she walks away, that's fine. No nag loop. **This timer is independent of the Wake re-prompt timer; it starts only after line 4 completes.**
 - **Error path:** not applicable (nothing to get wrong).
-- **Return user:** Not applicable in Session 1. (Note for later: from Session 2 on, this screen is skipped and she lands directly on the home/session-start screen. Flag for Matt.)
+- **Return user:** Not applicable in Session 1. (Note for later: from Session 2 on, this screen is skipped and she lands directly on the home/session-start screen. Flag for Matt. **The audio-unlock gesture still has to happen somewhere on the new entry screen** — Session 2+ greeting design needs to inherit this constraint.)
 - **Transition out:** Melody waves (ear-wiggle sprite) while background cross-fades to Number Garden scene. Melody's position persists across screens — she's the constant.
 
 ## Assets required
 
 - `melody-idle.png` (or sprite) — Melody smiling, neutral pose. **2x and 3x for Retina.** Target 800×800px @2x. ~80 KB PNG or ~20 KB WebP.
-- `melody-happy.png` — ear-wiggle pose (ears slightly up/angled). Same dims. ~80 KB.
+- `melody-happy.png` — ear-wiggle pose (ears slightly up/angled). Same dims. ~80 KB. **Reused for the Wake re-prompt wave at 8s.**
+- `icon-finger-tap.svg` — **NEW.** Small finger-tap icon used in the Wake re-prompt. ~2 KB target. Soft-pink fill (`--my-rose`) on `--ink` outline, child-friendly proportions (rounded fingertip, no realistic detailing). Designed to read at 48pt on iPad viewport. May ship inline in the Greet component instead of as a standalone file if Devon prefers — visual outcome is identical. Author: Kyle (or Devon if inline).
 - `bg-clouds.svg` — cream/pink cloud background. **NEW.** Target <15 KB.
 - `heart-button.svg` — pink heart icon, filled. Target <4 KB.
+- **Ready ring** — render as a pure CSS/SVG element inline (concentric circle, `--my-pink` 40% alpha, 6pt stroke, no fill). **No asset file needed**; this is a one-line component. Documenting here so it doesn't get forgotten in implementation. If it ends up wanting heart/flower garnish (e.g., 3 small hearts orbiting the ring), that's an added asset request — flag in PR review and route to ticket `86c9gp979` (Melody character asset redo) so it lands in the same bundle Thomas is reviewing. **Default for Session 1: plain ring, no garnish.**
 - `sfx-chime-soft.mp3` — soft single chime, 400ms, ~8 KB. Used on heart tap.
-- TTS lines 1–4 generated live via Web Speech API. **No audio file needed.** (Optionally: pre-generate + cache for v2 if voice consistency matters.)
+- TTS lines 1–4 generated live via Web Speech API. **No audio file needed.** (Optionally: pre-generate + cache for v2 if voice consistency matters.) **Critical:** line 1's `speak()` call must be synchronous within the tap handler that unlocks audio — see Implementation Notes.
 
 ## Acceptance criteria
 
 - [ ] Background clouds fade in over 600ms
-- [ ] Melody slides in from bottom-left with spring, landing position center
-- [ ] Melody's 4 TTS lines play in order with ~400ms gaps, total ~5–6s
+- [ ] Melody slides in from bottom-left with spring, landing position center, then enters a subtle breathing loop
+- [ ] **Wake state:** ready ring appears around Melody at +900ms after mount and pulses 0.4 → 0.9 → 0.4 over 1.4s on infinite loop
+- [ ] **Wake state:** no TTS is queued or attempted; `speechSynthesis.speak()` is NOT called before the user tap. Verify by inspecting the speech-synthesis queue — it must be empty until first tap
+- [ ] **Wake state:** the entire viewport (within safe-area insets) is a single tap target; tapping any pixel transitions to Intro state
+- [ ] **Wake re-prompt:** at 8s of no tap, a finger-tap icon (48pt, `--my-rose` fill, `--ink` outline) fades in centered on the ready ring (`opacity: 0 → 1` over 300ms), pulses once (`scale: 1 → 1.1 → 1` over 600ms), then fades out 2.5s later (`opacity: 1 → 0` over 400ms). Simultaneously Melody plays a single ear-wiggle wave (sprite swap for 600ms). Triggers exactly once. No TTS during this re-prompt
+- [ ] **Wake state tap target is full viewport:** taps register on any pixel inside the safe-area rect — Melody, ring, icon, blank cream space all behave identically as the gesture-unlock trigger
+- [ ] **Wake → Intro transition:** the same synchronous tap handler that unlocks audio also calls `speechSynthesis.speak(line1Utterance)`. Confirm via `onstart` firing within 250ms of the tap event on iPad Safari
+- [ ] **Intro state:** ring fades out over 250ms, speech ribbon scales in, Melody's 4 TTS lines play in order with ~400ms gaps, total ~5–6s from tap
 - [ ] Ear-wiggle triggers on the word "Hi!"
 - [ ] Caption text appears word-by-word in sync with TTS boundary events; if boundary events do not fire, falls back to synthetic word-paced reveal at the configured WPM (default 165), still word-by-word
 - [ ] Heart button does NOT appear until line 3 completes
 - [ ] Heart button pulses gently after appearing
 - [ ] Tapping heart plays chime SFX, animates squish, transitions to Screen 3 within 400ms
-- [ ] If no tap occurs for 20s, Melody re-prompts once and only once
+- [ ] If no heart tap occurs for 20s **after line 4 completes**, Melody re-prompts once and only once with line 4's text. The 20s timer starts at line-4-end, not at screen mount
 - [ ] No text is shown that Melody doesn't also say
-- [ ] With Reduce Motion enabled, Melody fades in instead of sliding; no cloud drift; no heart bob
+- [ ] With Reduce Motion enabled, Melody fades in instead of sliding; no cloud drift; no heart bob; ready ring is held at static 0.5 opacity (no pulse)
 - [ ] Caption text is legible at arm's length (≥28pt)
+- [ ] **Verified on iPad Safari (deployed PWA install):** Melody's first TTS line ("Hi!") fires audibly within 250ms of the user's first tap. No silent rejection. No empty-caption-ribbon failure mode
 
 ---
 
@@ -717,6 +736,23 @@ The 5 non-blocking items from the original spec. Two I'm answering myself; three
 
 ## Implementation notes for Kevin & Devon
 
+- **iPad Safari audio unlock (Screen 2 Wake → Intro).** The first audio call of the session MUST be inside the synchronous body of a user-gesture handler (`onPointerDown`, `onTouchEnd`, or `onClick` on the Wake-state tap surface). Do not `await` anything before calling `speak()` / `Howl.play()` — async gaps break the gesture-context association on Safari. Concrete pattern:
+  ```ts
+  function handleWakeTap() {
+    // Synchronous, in the same call frame as the gesture:
+    const u = new SpeechSynthesisUtterance("Hi!");
+    u.rate = 0.9; u.pitch = 1.1;
+    u.onstart = () => setIntroState("speaking");
+    u.onend = () => queueLine2();
+    speechSynthesis.speak(u);
+    // Also kick a silent Howl to unlock the WebAudio context for SFX:
+    silentUnlockHowl.play();
+    setWakeState("intro");
+  }
+  ```
+  Do NOT call `speak()` from a `useEffect`, a `setTimeout`, or after a `Promise` resolution — Safari treats those as a fresh execution context and rejects the call silently. Subsequent `speak()` calls (lines 2–4) can happen in async handlers (`onend` callbacks, timers) — once the context is unlocked it stays unlocked for the session.
+- **Soft re-gate for relock-after-background.** On every screen mount that calls `speak()`, attach a 250ms timeout: if `onstart` doesn't fire, assume the audio context relocked (iPadOS suspended it during a long background) and surface the same Wake-state ring + tap-anywhere affordance in-place. Reuse the Screen 2 ring component. Treat this as a quiet recovery, not an error state — no copy, no animation beyond the ring. Implementation can ship behind a feature flag for v1 if it adds risk; document the flag in the PR.
+- **First-utterance retry contract (Dave's 2026-04-25 consult).** Specifically for the *first* `speak(line1)` call right after the Wake tap on Screen 2: iOS Safari occasionally doesn't honour the gesture-context association on the very first call (rare; observed inconsistently across iPadOS minor versions). If the Wake-tap's `speak(line1)` does not fire `onstart` within **2 seconds**, do NOT immediately fall back to the soft re-gate above. Instead: silently mark the unlock as pending, and on the *next* user interaction within the same session (the heart button tap is itself a gesture-bearing handler), retry `speak(line1)` with a *fresh* `SpeechSynthesisUtterance` synchronously inside that handler. No copy shown to Marian — she experiences a slightly delayed Melody, not an error. If the retry also fails (extremely rare), only then fall back to the soft re-gate pattern above. Acceptance test: simulate by mocking `speechSynthesis.speak` to no-op once, then confirm the next user interaction successfully fires `onstart`.
 - **Framer Motion setup:** wrap `<App>` in `<LazyMotion features={domAnimation}>` + `<MotionConfig reducedMotion="user">`. Use `<m.div>` everywhere, NOT `<motion.div>`, to stay in the 4.6 KB budget.
 - **Shared Melody element across screens:** use `layoutId="melody"` on Melody's wrapper in Screens 2–5 so her position transitions animate for free. Keep her in a single component that re-parents via React state, not unmount/remount.
 - **AnimatePresence gotcha:** AnimatePresence must wrap the conditional, not be wrapped by it. Applies to particles, transitions between screens, and the teaser card.
