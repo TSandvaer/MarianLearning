@@ -3,7 +3,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { cancel as cancelTts, speak } from '../lib/tts'
 import { createSfx, type Sfx } from '../lib/sfx'
 import { useAudioUnlockGate } from '../lib/audio'
-import { recordTap } from '../lib/debug'
+import { recordRawTapEvent, recordTap } from '../lib/debug'
 import {
   GREET_LINES,
   REPROMPT_AFTER_MS,
@@ -215,6 +215,25 @@ export default function Greet({
   const wakeIconRepromptUsedRef = useRef(false)
   const sequenceRef = useRef<GreetSequenceHandle | null>(null)
   /**
+   * DOM ref for the wake-tap target. We attach native `addEventListener`
+   * handlers directly (in addition to React's onClick / onTouchEnd /
+   * onPointerDown) for two distinct reasons:
+   *
+   *   1. **Raw-event diagnostics.** The native handler fires BEFORE
+   *      React's synthetic-event system runs. Recording into the debug
+   *      bus from there lets us tell apart "iPad isn't delivering events
+   *      to this element at all" from "events arrive but React's binding
+   *      isn't catching them" — a distinction that's been load-bearing in
+   *      this ticket's debugging.
+   *   2. **iPad Safari touch-handling 'wake-up'.** A documented Webkit
+   *      quirk: certain elements only start receiving touch events
+   *      reliably once *some* listener has been attached via the native
+   *      `addEventListener('touchstart', ...)` API. The React synthetic
+   *      `onTouchStart` doesn't always trigger this internal wake-up.
+   *      A no-op native touchstart listener is the standard workaround.
+   */
+  const wakeTapTargetRef = useRef<HTMLButtonElement | null>(null)
+  /**
    * Same-tick wake-tap guard. Because we bind THREE event handlers
    * (onClick + onTouchEnd + onPointerDown) on the wake-tap target for
    * maximum iPad Safari compatibility, a single user tap can fire the
@@ -405,6 +424,73 @@ export default function Greet({
     scheduleWakeReprompt()
     return cancelWakeReprompt
   }, [cancelWakeReprompt, scheduleWakeReprompt, screenState])
+
+  // Belt-and-braces reset of the same-tick wake-tap guard (Kevin's NIT 1
+  // from PR #21 review). The ref is cleared here on every screen-state
+  // transition so a future refactor — or some unanticipated mount-time
+  // synthetic event — can't leave it stuck `true` and silently swallow
+  // every subsequent user tap. Functionally redundant on the happy path
+  // (the only writer is `handleWakeTap` itself) but cheap insurance for
+  // an iPad-Safari path we've already been bitten by once. The ref is
+  // also reset by the gate-driven retry pathway, so this effect doesn't
+  // override that — it just ensures any state transition (wake → intro,
+  // intro → wake on relock-and-back, etc.) starts with a clean slate.
+  useEffect(() => {
+    wakeTapInFlightRef.current = false
+  }, [screenState])
+
+  // --- Raw-event shadow-recording on the wake-tap target -------------------
+  //
+  // Diagnostic-only. Whenever the wake-tap target is mounted, attach native
+  // listeners that record each event to the debug bus BEFORE React's
+  // synthetic-event system runs. The handlers themselves are no-ops (the
+  // actual tap logic still flows through React's onClick/onTouchEnd/
+  // onPointerDown), so this is purely additive — it cannot suppress or
+  // alter the synthetic-event path.
+  //
+  // The native touchstart handler also serves as the iPad-Safari "wake-up"
+  // workaround: a documented Webkit quirk where certain elements only
+  // start delivering touch events reliably once a native (not React-
+  // synthetic) listener has been attached.
+  useEffect(() => {
+    const node = wakeTapTargetRef.current
+    if (!node) return
+
+    const onTouchStart = () => {
+      recordRawTapEvent('touchstart', 'greet-wake-tap-target')
+    }
+    const onTouchEnd = () => {
+      recordRawTapEvent('touchend', 'greet-wake-tap-target')
+    }
+    const onPointerDown = () => {
+      recordRawTapEvent('pointerdown', 'greet-wake-tap-target')
+    }
+    const onClick = () => {
+      recordRawTapEvent('click', 'greet-wake-tap-target')
+    }
+
+    // `passive: true` so the native listener never blocks the browser's
+    // default touch handling. We don't preventDefault from these listeners
+    // in any case — we only observe.
+    node.addEventListener('touchstart', onTouchStart, { passive: true })
+    node.addEventListener('touchend', onTouchEnd, { passive: true })
+    node.addEventListener('pointerdown', onPointerDown, { passive: true })
+    node.addEventListener('click', onClick)
+
+    return () => {
+      node.removeEventListener('touchstart', onTouchStart)
+      node.removeEventListener('touchend', onTouchEnd)
+      node.removeEventListener('pointerdown', onPointerDown)
+      node.removeEventListener('click', onClick)
+    }
+    // Re-bind whenever the target's mount state flips so the listeners are
+    // attached to the live DOM node, not a stale ref. The conditional
+    // render gates on `screenState === 'wake' || gate.showGate` (see
+    // tapTargetActive below); we depend on the same inputs so this effect
+    // re-runs across mount/unmount cycles and any intervening re-render
+    // doesn't leave dangling listeners. (gate.showGate is a derived
+    // boolean stable across renders within a state.)
+  }, [screenState, gate.showGate])
 
   // --- Wake-tap handler -----------------------------------------------------
   //
@@ -609,9 +695,20 @@ export default function Greet({
           loop). Spec line 166 — the value 1.05 was specifically chosen
           (Dave's consult: 1.015 was rejected as imperceptibly subtle on
           iPad scale and read as frozen). */}
+      {/*
+        `pointer-events: none` on the melody-slot wrapper (post-iPad-tap
+        investigation, ticket 86c9gp99a). The slot is decorative — Melody
+        herself, the ready ring, and the wake-tap finger-tap nudge are all
+        eye-candy, not interactive surfaces. Without this, iPad Safari's
+        hit-testing can land taps on the inner <m.img> (Melody) before they
+        reach the absolutely-positioned full-viewport <button> below. With
+        it, every pixel inside the slot's box transparently passes through
+        to whatever is actually tappable underneath — namely the wake-tap
+        target during Wake state, or the screen background during intro.
+       */}
       <div
         data-testid="greet-melody-slot"
-        className="relative flex h-[60vh] w-full flex-1 items-center justify-center"
+        className="pointer-events-none relative flex h-[60vh] w-full flex-1 items-center justify-center"
       >
         {/* Ready ring — Wake state only (or the silent retry relock state).
             Pure SVG, no asset file. Spec line 198 documents this is inline. */}
@@ -985,6 +1082,7 @@ export default function Greet({
           firing in quick succession don't double-fire speak() or chime. */}
       {tapTargetActive && (
         <button
+          ref={wakeTapTargetRef}
           type="button"
           data-testid="greet-wake-tap-target"
           aria-label="Tap to start"
@@ -994,6 +1092,14 @@ export default function Greet({
           // is free in normal sessions but priceless when Thomas needs to
           // confirm that touchend / click / pointerdown are actually
           // firing on his iPad.
+          //
+          // Native shadow listeners (touchstart / touchend / pointerdown /
+          // click) are also bound via `addEventListener` in a useEffect
+          // above — those record into a separate "raw events" debug-bus
+          // line so we can tell apart "iPad delivers events but React
+          // doesn't catch them" from "iPad never delivers events to this
+          // element". The native touchstart attachment also doubles as
+          // the iPad-Safari touch-handler "wake-up" workaround.
           onClick={() => {
             recordTap('click', 'greet-wake-tap-target')
             handleWakeTap()
@@ -1020,6 +1126,27 @@ export default function Greet({
             right: 'env(safe-area-inset-right)',
             // No outline — invisible affordance. The ring + Melody carry the read.
             outline: 'none',
+            // Belt-and-braces — `cursor-pointer` Tailwind class covers
+            // the desktop case but iPad Safari has a documented quirk
+            // where `<div>`/`<button>` taps without `cursor: pointer` in
+            // the inline style fail to fire `onClick` on touch. The
+            // Tailwind class compiles to CSS that should win, but the
+            // inline form is the strictest possible signal to Webkit's
+            // hit-testing layer that this element is interactive.
+            cursor: 'pointer',
+            // `touch-action: manipulation` disables the OS-level
+            // double-tap-to-zoom and 300ms click delay. The Tailwind
+            // class above ships the same value; the inline declaration
+            // is defensive against any future class-purge / specificity
+            // surprise. Critical on iPad: the 300ms delay can interact
+            // with the wake-tap-target unmounting (`tapTargetActive`
+            // flips to false on transition to intro) and eat the click.
+            touchAction: 'manipulation',
+            // Webkit-only: explicitly opt out of the tap-highlight
+            // grey flash. Pure cosmetic; no behavioural impact, but
+            // since we're touching the inline style block anyway it
+            // keeps everything in one place.
+            WebkitTapHighlightColor: 'transparent',
           }}
         />
       )}
