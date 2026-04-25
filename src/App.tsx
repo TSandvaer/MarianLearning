@@ -7,6 +7,7 @@ import {
 } from 'motion/react'
 import Splash from './screens/Splash'
 import Greet from './screens/Greet'
+import Math from './screens/Math'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
 
@@ -28,13 +29,15 @@ export default function App() {
   const [route, setRoute] = useState<Route>(FIRST_ROUTE)
 
   const goGreet = useCallback(() => setRoute('greet'), [])
+  const goMath = useCallback(() => setRoute('math'), [])
 
   return (
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
         <AnimatePresence mode="wait">
           {route === 'splash' && <Splash key="splash" onAdvance={goGreet} />}
-          {route === 'greet' && <Greet key="greet" />}
+          {route === 'greet' && <Greet key="greet" onAdvance={goMath} />}
+          {route === 'math' && <Math key="math" />}
         </AnimatePresence>
       </MotionConfig>
     </LazyMotion>
