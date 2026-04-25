@@ -65,6 +65,11 @@ export interface SpeakLikeOptions {
   volume?: number
   onBoundary?: (event: BoundaryEvent) => void
   boundaryWPM?: number
+  /**
+   * Fires when the speech engine actually starts. Used by Greet to clear
+   * the audio-unlock-gate watchdog. Forwarded to `lib/tts.speak()`.
+   */
+  onStart?: () => void
 }
 
 /**
@@ -84,6 +89,12 @@ export interface GreetSequenceHooks {
   onHeartReady?: () => void
   /** Called once when the entire 4-line greeting completes naturally. */
   onComplete?: () => void
+  /**
+   * Called when the FIRST line's TTS engine actually starts speaking. Used
+   * by Greet to clear the iPad-Safari gesture-gate watchdog. Only fires for
+   * line 0; subsequent lines are unlocked by definition.
+   */
+  onLine0Start?: () => void
 }
 
 export interface GreetSequenceOptions extends GreetSequenceHooks {
@@ -164,6 +175,13 @@ export function runGreetSequence(
         if (cancelled) return
         opts.onWordBoundary?.(index, event)
       },
+      onStart:
+        index === 0
+          ? () => {
+              if (cancelled) return
+              opts.onLine0Start?.()
+            }
+          : undefined,
     })
 
     speakPromise
