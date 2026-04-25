@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  melody-happy.svg
+  Melody, happy / ear-wiggle pose. Same character as melody-idle.svg with:
+  - Ears tilted (left ear -10°, right ear +12° about pivot near hood top)
+  - Closed-arch happy eyes (^_^ style)
+  - Wider open smile, slightly raised cheeks
+  - Same palette / proportions / heart accent — visual continuity for cross-fade swap
+  - viewBox 0 0 800 800
+  - Authored as SVG (recommendation (a) in the ticket).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Melody, happy">
+  <title>Melody — happy / ear-wiggle</title>
+  <defs>
+    <radialGradient id="cheekHappy" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F48FB1" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#F48FB1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bodyHappy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFF0F4"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(400 410)">
+    <!-- Body -->
+    <path d="
+      M -150 220
+      C -160 140, -130 100, -90 90
+      L 90 90
+      C 130 100, 160 140, 150 220
+      C 140 260, 80 270, 0 270
+      C -80 270, -140 260, -150 220 Z"
+      fill="url(#bodyHappy)" stroke="#F48FB1" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M 0 170
+      C -10 156, -34 156, -34 178
+      C -34 196, -16 208, 0 222
+      C 16 208, 34 196, 34 178
+      C 34 156, 10 156, 0 170 Z"
+      fill="#F48FB1"/>
+
+    <!-- Hood crown (without ears — ears drawn separately so they can be wiggled in code) -->
+    <path d="
+      M -210  60
+      C -218 -20, -190 -120, -150 -180
+      C -110 -220,  -50 -240,    0 -240
+      C   50 -240,  110 -220,  150 -180
+      C  190 -120,  218 -20,   210  60
+      C  205 110,  150 145,    80 158
+      C   30 168,  -30 168,   -80 158
+      C -150 145, -205 110,  -210  60 Z"
+      fill="#FFC0CB" stroke="#F48FB1" stroke-width="6" stroke-linejoin="round"/>
+
+    <!-- Left ear (rotated -10°) -->
+    <g transform="rotate(-10 -90 -180)">
+      <path d="
+        M -130 -210
+        C -150 -260, -130 -316,  -80 -322
+        C  -54 -322,  -36 -296,  -42 -240
+        C  -52 -200,  -80 -180, -100 -176
+        C -118 -174, -128 -190, -130 -210 Z"
+        fill="#FFC0CB" stroke="#F48FB1" stroke-width="6" stroke-linejoin="round"/>
+      <path d="
+        M -110 -210
+        C -120 -250, -106 -296,  -80 -300
+        C  -64 -300,  -54 -276,  -60 -240
+        C  -68 -210,  -86 -198, -100 -198
+        C -110 -198, -110 -200, -110 -210 Z"
+        fill="#FFD3DC"/>
+    </g>
+
+    <!-- Right ear (rotated +12°) -->
+    <g transform="rotate(12 90 -180)">
+      <path d="
+        M  130 -210
+        C  150 -260,  130 -316,   80 -322
+        C   54 -322,   36 -296,   42 -240
+        C   52 -200,   80 -180,  100 -176
+        C  118 -174,  128 -190,  130 -210 Z"
+        fill="#FFC0CB" stroke="#F48FB1" stroke-width="6" stroke-linejoin="round"/>
+      <path d="
+        M  110 -210
+        C  120 -250,  106 -296,   80 -300
+        C   64 -300,   54 -276,   60 -240
+        C   68 -210,   86 -198,  100 -198
+        C  110 -198,  110 -200,  110 -210 Z"
+        fill="#FFD3DC"/>
+    </g>
+
+    <!-- Hood heart accent -->
+    <path d="M 0 -90
+      C -10 -110, -38 -110, -38 -84
+      C -38 -64, -20 -50, 0 -32
+      C 20 -50, 38 -64, 38 -84
+      C 38 -110, 10 -110, 0 -90 Z"
+      fill="#F48FB1"/>
+
+    <!-- Inner face -->
+    <ellipse cx="0" cy="40" rx="128" ry="116" fill="#FFF5F0"/>
+
+    <!-- Happy eyes: closed arches ^_^ -->
+    <path d="M -60 28 Q -44 12, -28 28" fill="none" stroke="#3D2B3D" stroke-width="6" stroke-linecap="round"/>
+    <path d="M  28 28 Q  44 12,  60 28" fill="none" stroke="#3D2B3D" stroke-width="6" stroke-linecap="round"/>
+
+    <!-- Cheek blush (deeper for happy) -->
+    <ellipse cx="-66" cy="66" rx="26" ry="14" fill="url(#cheekHappy)"/>
+    <ellipse cx=" 66" cy="66" rx="26" ry="14" fill="url(#cheekHappy)"/>
+
+    <!-- Nose -->
+    <path d="M -7 56 Q 0 64, 7 56" fill="none" stroke="#3D2B3D" stroke-width="4" stroke-linecap="round"/>
+    <!-- Open happy smile -->
+    <path d="M -26 78 Q 0 104, 26 78 Q 0 92, -26 78 Z"
+      fill="#3D2B3D" stroke="#3D2B3D" stroke-width="2" stroke-linejoin="round"/>
+    <!-- Tongue hint (warm coral) -->
+    <path d="M -12 88 Q 0 96, 12 88 Q 0 92, -12 88 Z" fill="#F48FB1"/>
+
+    <!-- Side flower -->
+    <g transform="translate(150 -110)">
+      <circle r="14" fill="#FFD966"/>
+      <circle cx="-16" cy="-4" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle cx=" 16" cy="-4" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle cx="-10" cy="14" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle cx=" 10" cy="14" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle r="6" fill="#F48FB1"/>
+    </g>
+
+    <!-- Sparkle puffs around head to signal happy state -->
+    <g fill="#FFD966">
+      <path d="M -240 -100 l 4 12 l 12 4 l -12 4 l -4 12 l -4 -12 l -12 -4 l 12 -4 z"/>
+      <path d="M  240 -120 l 3  9 l  9 3 l  -9 3 l -3  9 l -3 -9 l  -9 -3 l  9 -3 z"/>
+      <path d="M -200  -40 l 2  6 l  6 2 l  -6 2 l -2  6 l -2 -6 l  -6 -2 l  6 -2 z"/>
+    </g>
+  </g>
+</svg>

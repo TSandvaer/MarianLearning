@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  melody-idle.svg
+  Melody, idle / soft-smile pose. Stylised pink-bunny inspired by My Melody but original.
+  - viewBox 0 0 800 800 (matches the "@2x 800×800" target from spec)
+  - Square canvas, character bottom-aligned for clean float against ribbon
+  - Reuses palette from melody-logo.svg
+  - NO copyrighted character traceries — proportions, ear shape, hood shape, face features
+    are an original stylisation in the same family (rounded hood + long lobed ears + soft cheeks)
+  - Authored as SVG (recommendation (a) in the ticket): scales perfectly on iPad Retina, no PNG export needed.
+  - Spec update: melody-idle.png -> melody-idle.svg in design/session-1.md (separate commit)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Melody, smiling">
+  <title>Melody — idle</title>
+  <defs>
+    <radialGradient id="cheekIdle" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F48FB1" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#F48FB1" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bodyIdle" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFF0F4"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(400 410)">
+    <!-- Body / dress (small pinafore peeking from under hood) -->
+    <path d="
+      M -150 220
+      C -160 140, -130 100, -90 90
+      L 90 90
+      C 130 100, 160 140, 150 220
+      C 140 260, 80 270, 0 270
+      C -80 270, -140 260, -150 220 Z"
+      fill="url(#bodyIdle)" stroke="#F48FB1" stroke-width="6" stroke-linejoin="round"/>
+    <!-- Body heart pocket -->
+    <path d="M 0 170
+      C -10 156, -34 156, -34 178
+      C -34 196, -16 208, 0 222
+      C 16 208, 34 196, 34 178
+      C 34 156, 10 156, 0 170 Z"
+      fill="#F48FB1"/>
+
+    <!-- Hood: rounded triangle silhouette with long ear lobes (Melody-family stylisation, original geometry) -->
+    <path d="
+      M -210  60
+      C -220 -40, -180 -150, -130 -210
+      C -120 -260,  -90 -310,  -50 -316
+      C  -20 -322,   20 -322,   50 -316
+      C   90 -310,  120 -260,  130 -210
+      C  180 -150,  220  -40,  210  60
+      C  205 110,  150 145,   80 158
+      C   30 168,  -30 168,  -80 158
+      C -150 145, -205 110, -210  60 Z"
+      fill="#FFC0CB" stroke="#F48FB1" stroke-width="6" stroke-linejoin="round"/>
+
+    <!-- Ear inner panels (soft pink) -->
+    <path d="M -90 -210 C -78 -270, -52 -300, -36 -300 C -28 -270, -42 -220, -64 -180 Z"
+      fill="#FFD3DC"/>
+    <path d="M  90 -210 C  78 -270,  52 -300,  36 -300 C  28 -270,  42 -220,  64 -180 Z"
+      fill="#FFD3DC"/>
+
+    <!-- Hood heart accent -->
+    <path d="M 0 -90
+      C -10 -110, -38 -110, -38 -84
+      C -38 -64, -20 -50, 0 -32
+      C 20 -50, 38 -64, 38 -84
+      C 38 -110, 10 -110, 0 -90 Z"
+      fill="#F48FB1"/>
+
+    <!-- Inner face: cream oval -->
+    <ellipse cx="0" cy="40" rx="128" ry="116" fill="#FFF5F0"/>
+
+    <!-- Eyes: gentle dot eyes (idle) -->
+    <circle cx="-44" cy="30" r="9" fill="#3D2B3D"/>
+    <circle cx=" 44" cy="30" r="9" fill="#3D2B3D"/>
+    <!-- tiny eye highlights -->
+    <circle cx="-41" cy="26" r="2.6" fill="#FFFFFF"/>
+    <circle cx=" 47" cy="26" r="2.6" fill="#FFFFFF"/>
+
+    <!-- Cheek blush -->
+    <ellipse cx="-66" cy="66" rx="22" ry="12" fill="url(#cheekIdle)"/>
+    <ellipse cx=" 66" cy="66" rx="22" ry="12" fill="url(#cheekIdle)"/>
+
+    <!-- Nose -->
+    <path d="M -7 56 Q 0 64, 7 56" fill="none" stroke="#3D2B3D" stroke-width="4" stroke-linecap="round"/>
+    <!-- Soft smile -->
+    <path d="M -18 78 Q 0 92, 18 78" fill="none" stroke="#3D2B3D" stroke-width="4.4" stroke-linecap="round"/>
+
+    <!-- Tiny flower at the side of the hood -->
+    <g transform="translate(150 -120)">
+      <circle r="14" fill="#FFD966"/>
+      <circle cx="-16" cy="-4" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle cx=" 16" cy="-4" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle cx="-10" cy="14" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle cx=" 10" cy="14" r="10" fill="#FFFFFF" stroke="#F48FB1" stroke-width="2"/>
+      <circle r="6" fill="#F48FB1"/>
+    </g>
+  </g>
+</svg>
