@@ -692,9 +692,10 @@ describe('Greet', () => {
       render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
 
       fireWakeTap()
-      // 2s elapses with no onStart and no boundary — gate flips to relock.
+      // 5s elapses with no onStart and no boundary — gate flips to relock.
+      // (Round 5 bumped FIRST_UTTERANCE_RETRY_MS from 2_000 → 5_000.)
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_000)
+        await vi.advanceTimersByTimeAsync(5_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -707,7 +708,7 @@ describe('Greet', () => {
   })
 
   describe("First-utterance retry contract (Dave's)", () => {
-    it('if onStart never fires within 2s of the wake tap, the gate transitions to relock and shows the ring + tap target again', async () => {
+    it('if onStart never fires within 5s of the wake tap, the gate transitions to relock and shows the ring + tap target again', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makeSpeakHarness()
       render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
@@ -717,9 +718,11 @@ describe('Greet', () => {
       // silently rejecting the call.
       expect(h.calls).toHaveLength(1)
 
-      // 2s elapses. Watchdog flips to relock.
+      // Round 5 (ticket 86c9gp99a): watchdog window bumped from 2 → 5s
+      // after Thomas iPad QA showed legitimate first-speech routinely
+      // takes 3-5s on cold-cache PWA loads.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_000)
+        await vi.advanceTimersByTimeAsync(5_000)
       })
 
       expect(screen.getByTestId('greet')).toHaveAttribute(
@@ -732,6 +735,39 @@ describe('Greet', () => {
       expect(screen.getByTestId('greet-wake-tap-target')).toBeInTheDocument()
     })
 
+    it('does NOT prematurely relock at 2s — speech that takes 3-4s to start should still be honoured', async () => {
+      // Regression guard for the round-5 watchdog bump. The previous 2s
+      // value would mark the gate `relock` even though the engine was
+      // about to start speaking 1-3s later — Marian then tapped again and
+      // queued a competing speak(). This test pins the new behaviour: at
+      // 2s elapsed we MUST still be `pending`, not `relock`.
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      fireWakeTap()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'pending',
+      )
+
+      // Speech genuinely starts at the 4s mark — well past old 2s, well
+      // before new 5s. Gate transitions to unlocked, no relock surfaced.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      act(() => {
+        h.fireOnStart()
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'unlocked',
+      )
+    })
+
     it('the next user gesture after a silent fail synchronously re-fires speak(line0) with a fresh utterance', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makeSpeakHarness()
@@ -741,9 +777,9 @@ describe('Greet', () => {
       fireWakeTap()
       expect(h.calls).toHaveLength(1)
 
-      // Watchdog expires.
+      // Watchdog expires (5s post-round-5).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_000)
+        await vi.advanceTimersByTimeAsync(5_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -767,7 +803,7 @@ describe('Greet', () => {
       )
     })
 
-    it('a successful onStart inside the 2s window keeps the gate in unlocked state — no ring re-show', async () => {
+    it('a successful onStart inside the 5s window keeps the gate in unlocked state — no ring re-show', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makeSpeakHarness()
       render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
@@ -782,17 +818,52 @@ describe('Greet', () => {
         'unlocked',
       )
 
-      // Past the 2s mark: gate stays unlocked, no relock surfaces. The
+      // Past the 5s mark: gate stays unlocked, no relock surfaces. The
       // ring may still be in the DOM mid-exit-animation (rAF driver
       // doesn't tick under jsdom fake timers) but it's invisible — we
       // assert on the gate state rather than ring presence.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3_000)
+        await vi.advanceTimersByTimeAsync(6_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
         'unlocked',
       )
+    })
+
+    it('multi-event from one physical tap during relock fires the retry only ONCE (round-5 guard)', async () => {
+      // Round-5 fix (ticket 86c9gp99a). A single iPad tap during relock
+      // delivers touchend + pointerdown + click — without the same-tick
+      // guard on the relock branch of handleWakeTap, all three would call
+      // gate.dispatchGesture() and fire the registered retry, queuing
+      // three competing speak() calls. Thomas reported this as the
+      // "ring re-pulses, voice eventually fires" pattern.
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      fireWakeTap()
+      const speaksAfterFirstTap = h.calls.length
+
+      // Watchdog expires; gate enters relock.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000)
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+
+      // One physical tap → three synthetic events on the wake-tap target.
+      const target = screen.getByTestId('greet-wake-tap-target')
+      fireEvent.touchEnd(target)
+      fireEvent.pointerDown(target)
+      fireEvent.click(target)
+
+      // Exactly ONE additional speak() — the guard collapsed the other
+      // two synthetic events.
+      expect(h.calls.length).toBe(speaksAfterFirstTap + 1)
+      expect(h.calls[h.calls.length - 1].text).toBe('Hi!')
     })
   })
 

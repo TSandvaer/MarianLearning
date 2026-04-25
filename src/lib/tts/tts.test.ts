@@ -1,6 +1,34 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cancel, isAvailable, loadVoices, primeVoices, speak } from './tts'
+import {
+  _resetMelodyVoiceCacheForTests,
+  cancel,
+  isAvailable,
+  loadVoices,
+  pickMelodyVoice,
+  primeVoices,
+  speak,
+} from './tts'
 import { _resetForTests } from '../debug/debugBus'
+
+/**
+ * Build a SpeechSynthesisVoice-shaped object for tests. The Web Speech
+ * API's voice type is a host-defined interface; we only assert on the
+ * fields our voice-picker reads (name, lang, voiceURI), so a partial
+ * object cast to the type is sound for unit tests.
+ */
+function fakeVoice(
+  name: string,
+  lang: string,
+  voiceURI: string = name.toLowerCase(),
+): SpeechSynthesisVoice {
+  return {
+    voiceURI,
+    name,
+    lang,
+    default: false,
+    localService: true,
+  } as SpeechSynthesisVoice
+}
 
 type UtteranceLike = {
   text: string
@@ -95,6 +123,10 @@ describe('tts', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     _resetForTests()
+    // Voice cache is module-level (intentionally — production runs one
+    // pick per session). Reset between tests so cases that install
+    // different voice lists don't see stale cached state.
+    _resetMelodyVoiceCacheForTests()
   })
 
   afterEach(() => {
@@ -102,6 +134,7 @@ describe('tts', () => {
     vi.unstubAllGlobals()
     cancel()
     _resetForTests()
+    _resetMelodyVoiceCacheForTests()
   })
 
   describe('isAvailable', () => {
@@ -124,20 +157,23 @@ describe('tts', () => {
   })
 
   describe('speak', () => {
-    it('resolves when the utterance ends with iPad-safe defaults (rate 1.0, pitch 1.0)', async () => {
-      // Defaults pulled from spec line 29 (rate 0.9, pitch 1.1) to neutral
-      // 1.0/1.0 in the post-PR-#21 iPad fix. iPad WebKit silently rejects
-      // utterances with non-default pitch on some builds; defaulting to
-      // 1.0 maximises the chance the engine honours the call. Callers can
-      // still pass explicit rate/pitch via SpeakOptions.
+    it('resolves when the utterance ends with spec defaults (rate 0.9, pitch 1.1)', async () => {
+      // Spec design/session-1.md line 29: Melody is voiced at rate 0.9,
+      // pitch 1.1 — slightly higher, slightly slower than neutral, to
+      // match the Sanrio bunny character. PR #22 temporarily flattened
+      // these to 1.0/1.0 as a defensive guess (we suspected iPad WebKit
+      // was rejecting non-default pitch utterances). PR #23 then proved
+      // the hypothesis wrong, and round 5 (ticket 86c9gp99a) reverted
+      // to spec values after Thomas iPad QA confirmed audio fires
+      // reliably with full TTS.
       const synth = installFakeSynth()
       const promise = speak('Hi! I am Melody.')
 
       expect(synth.speak).toHaveBeenCalledTimes(1)
       const u = synth._utterances[0]
       expect(u.text).toBe('Hi! I am Melody.')
-      expect(u.rate).toBe(1.0)
-      expect(u.pitch).toBe(1.0)
+      expect(u.rate).toBe(0.9)
+      expect(u.pitch).toBe(1.1)
       expect(u.volume).toBe(1.0)
 
       u.onend?.call(u as unknown as SpeechSynthesisUtterance)
@@ -555,6 +591,205 @@ describe('tts', () => {
       const u = synth._utterances[1]
       u.onend?.call(u as unknown as SpeechSynthesisUtterance)
       await second
+    })
+  })
+
+  describe('pickMelodyVoice', () => {
+    it('returns null when speechSynthesis is missing', () => {
+      vi.stubGlobal('speechSynthesis', undefined)
+      expect(pickMelodyVoice()).toBeNull()
+    })
+
+    it('returns null when the voice list is empty (engine not ready yet)', () => {
+      const synth = installFakeSynth()
+      synth._voices = []
+      expect(pickMelodyVoice()).toBeNull()
+      // Importantly, the negative result is NOT cached when the list was
+      // empty — a follow-up call after voiceschanged populates voices
+      // must be able to pick afresh.
+      synth._voices = [fakeVoice('Samantha', 'en-US')]
+      expect(pickMelodyVoice()?.name).toBe('Samantha')
+    })
+
+    it('returns null when there are voices but none are English', () => {
+      const synth = installFakeSynth()
+      synth._voices = [
+        fakeVoice('Paulina', 'es-MX'),
+        fakeVoice('Yuna', 'ko-KR'),
+      ]
+      expect(pickMelodyVoice()).toBeNull()
+    })
+
+    it('prefers Samantha (tier 1, top of preference list) when present', () => {
+      // Samantha is the iPad / iOS Safari default US-English voice and the
+      // first entry in MELODY_VOICE_NAMES — it should win even when other
+      // matching female voices are also present.
+      const synth = installFakeSynth()
+      const samantha = fakeVoice('Samantha', 'en-US')
+      synth._voices = [
+        fakeVoice('Karen', 'en-AU'),
+        fakeVoice('Allison', 'en-US'),
+        samantha,
+        fakeVoice('Daniel', 'en-GB'),
+      ]
+      expect(pickMelodyVoice()).toBe(samantha)
+    })
+
+    it('honours preference order when Samantha is absent (Karen wins over Allison)', () => {
+      const synth = installFakeSynth()
+      const karen = fakeVoice('Karen', 'en-AU')
+      const allison = fakeVoice('Allison', 'en-US')
+      synth._voices = [allison, karen]
+      // Even though Allison comes first in getVoices(), Karen is earlier in
+      // the preference list and wins.
+      expect(pickMelodyVoice()).toBe(karen)
+    })
+
+    it('matches name prefixes (e.g. "Samantha (Enhanced)") via the ^Samantha pattern', () => {
+      // iPadOS sometimes labels voice variants like "Samantha (Enhanced)".
+      // The ^-anchored regex in pickMelodyVoice should still match.
+      const synth = installFakeSynth()
+      const enhanced = fakeVoice('Samantha (Enhanced)', 'en-US')
+      synth._voices = [enhanced]
+      expect(pickMelodyVoice()).toBe(enhanced)
+    })
+
+    it('filters non-English voices out of consideration', () => {
+      const synth = installFakeSynth()
+      // A Spanish voice happens to be named "Samantha" — must be skipped
+      // because it's not en-*. We don't want a Spanish voice rendering
+      // English text on Marian's iPad.
+      synth._voices = [
+        fakeVoice('Samantha', 'es-ES'),
+        fakeVoice('Karen', 'en-AU'),
+      ]
+      expect(pickMelodyVoice()?.name).toBe('Karen')
+    })
+
+    it('falls back to "(female)"-labeled voices on Android-style engines', () => {
+      // Older Chrome / Android engines label voices "English United States
+      // (female)". No tier-1 name match → tier-2 picks it up.
+      const synth = installFakeSynth()
+      const female = fakeVoice('English United States (female)', 'en-US')
+      synth._voices = [
+        fakeVoice('Daniel', 'en-GB'),
+        female,
+        fakeVoice('Mark', 'en-US'),
+      ]
+      expect(pickMelodyVoice()).toBe(female)
+    })
+
+    it('falls back to literal name === "Samantha" if regex-anchored match somehow misses (defensive tier 3)', () => {
+      // Tier 3 is a redundancy: the tier-1 ^Samantha regex already catches
+      // a voice named exactly "Samantha". This test is mostly insurance:
+      // if a future regex edit accidentally drops the Samantha entry from
+      // tier 1, tier 3 still fires the right pick.
+      const synth = installFakeSynth()
+      const samantha = fakeVoice('Samantha', 'en-US')
+      synth._voices = [samantha]
+      expect(pickMelodyVoice()).toBe(samantha)
+    })
+
+    it('returns null when no English voice matches any tier', () => {
+      const synth = installFakeSynth()
+      synth._voices = [
+        fakeVoice('Daniel', 'en-GB'),
+        fakeVoice('Mark', 'en-US'),
+        fakeVoice('Bruce', 'en-AU'),
+      ]
+      expect(pickMelodyVoice()).toBeNull()
+    })
+
+    it('caches the picked voice across calls (no re-iteration on every speak)', () => {
+      // Module-level cache is the whole point — speak() runs on every
+      // utterance so we don't want a getVoices() iteration each time.
+      const synth = installFakeSynth()
+      const samantha = fakeVoice('Samantha', 'en-US')
+      synth._voices = [samantha]
+
+      expect(pickMelodyVoice()).toBe(samantha)
+      const callsAfterFirst = synth.getVoices.mock.calls.length
+
+      // Second call — should hit the cache. We allow ONE getVoices() call
+      // (the re-validation scan) but not the full iteration.
+      expect(pickMelodyVoice()).toBe(samantha)
+      const callsAfterSecond = synth.getVoices.mock.calls.length
+      // At most one extra call (the cache-validation scan).
+      expect(callsAfterSecond - callsAfterFirst).toBeLessThanOrEqual(1)
+    })
+
+    it('caches the negative "no match" result so retries are cheap', () => {
+      // After a confirmed-empty match, subsequent calls should not iterate
+      // the voice list again. A re-pick only happens after _resetMelodyVoice
+      // CacheForTests() (or a fresh page load).
+      const synth = installFakeSynth()
+      synth._voices = [fakeVoice('Daniel', 'en-GB'), fakeVoice('Mark', 'en-US')]
+      expect(pickMelodyVoice()).toBeNull()
+      const callsAfterFirst = synth.getVoices.mock.calls.length
+
+      expect(pickMelodyVoice()).toBeNull()
+      const callsAfterSecond = synth.getVoices.mock.calls.length
+      // The "cached null" path skips getVoices entirely.
+      expect(callsAfterSecond).toBe(callsAfterFirst)
+    })
+
+    it('invalidates the cache if the picked voice disappears from the engine list', () => {
+      // Bluetooth disconnect / external display unplug can drop voices
+      // mid-session. Stale-cache scenario: cached Samantha is no longer
+      // in getVoices() — pickMelodyVoice must re-pick.
+      const synth = installFakeSynth()
+      const samantha = fakeVoice('Samantha', 'en-US')
+      const karen = fakeVoice('Karen', 'en-AU')
+      synth._voices = [samantha, karen]
+      expect(pickMelodyVoice()).toBe(samantha)
+
+      // Samantha disappears.
+      synth._voices = [karen]
+      expect(pickMelodyVoice()).toBe(karen)
+    })
+  })
+
+  describe('speak — auto voice selection (round 5: light girl voice)', () => {
+    it('assigns pickMelodyVoice() to utterance.voice when no voiceURI is provided', async () => {
+      // Round-5 fix: without this, iPad falls back to the system default
+      // voice (often male / deep on Thomas's iPad). Auto-pick gives
+      // Melody a consistent light female voice across devices.
+      const synth = installFakeSynth()
+      const samantha = fakeVoice('Samantha', 'en-US')
+      synth._voices = [samantha]
+      const promise = speak('Hi.')
+      const u = synth._utterances[0]
+      expect(u.voice).toBe(samantha)
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await promise
+    })
+
+    it('explicit voiceURI still wins over the auto-pick (override path intact)', async () => {
+      // Callers that already know which voice they want must not be
+      // overridden by the auto-picker.
+      const synth = installFakeSynth()
+      const samantha = fakeVoice('Samantha', 'en-US', 'com.apple.samantha')
+      const karen = fakeVoice('Karen', 'en-AU', 'com.apple.karen')
+      synth._voices = [samantha, karen]
+
+      const promise = speak('Hi.', { voiceURI: 'com.apple.karen' })
+      const u = synth._utterances[0]
+      expect(u.voice).toBe(karen)
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await promise
+    })
+
+    it('leaves utterance.voice unset (engine default) when no English voice matches', async () => {
+      // Graceful degradation: if pickMelodyVoice() returns null, we don't
+      // pretend we know better than the OS. The engine picks its system
+      // default, and pitch 1.1 lifts it out of "deep" territory anyway.
+      const synth = installFakeSynth()
+      synth._voices = [fakeVoice('Daniel', 'en-GB')] // not in preference list
+      const promise = speak('Hi.')
+      const u = synth._utterances[0]
+      expect(u.voice).toBeNull()
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await promise
     })
   })
 })

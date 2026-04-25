@@ -56,10 +56,13 @@ import {
  * First-utterance retry (Dave's contract)
  * ---------------------------------------
  * Even with the gesture in the right place, iPadOS occasionally rejects the
- * very first call. `useAudioUnlockGate` arms a 2s watchdog around the
+ * very first call. `useAudioUnlockGate` arms a 5s watchdog around the
  * speak; if onstart never fires we surface the Wake ring again silently and
  * the next gesture re-fires speak(line0) inside its own synchronous tick.
  * No copy is shown — Marian sees a slightly delayed Melody, not an error.
+ * (Window was 2s pre-round-5; bumped to 5s after Thomas's iPad QA showed
+ * legitimate first-speech routinely takes 3-5s on cold-cache PWA loads.
+ * See FIRST_UTTERANCE_RETRY_MS below.)
  *
  * Reduced motion: the global `MotionConfig reducedMotion="user"` collapses
  * spring entrances and stops infinite loops. We additionally branch on
@@ -89,8 +92,15 @@ const ICON_PULSE_MS = 600
 const ICON_HOLD_AFTER_PULSE_MS = 2_500
 /** Finger-tap icon fade-out duration. */
 const ICON_FADE_OUT_MS = 400
-/** Watchdog window for "did the engine actually start speaking" — Dave's contract. */
-const FIRST_UTTERANCE_RETRY_MS = 2_000
+/**
+ * Watchdog window for "did the engine actually start speaking" — Dave's
+ * contract. Bumped from 2_000 → 5_000 in round 5 (ticket 86c9gp99a) to
+ * match real-iPad first-speech latency observed in Thomas's QA: cold-cache
+ * PWA loads take 3-5 s before `onstart` fires. The previous 2 s value was
+ * triggering spurious relocks before the engine had a chance to start. See
+ * the matching DEFAULT_WATCHDOG_MS comment in useAudioUnlockGate.ts.
+ */
+const FIRST_UTTERANCE_RETRY_MS = 5_000
 /** Melody's breathing loop period (spec line 166). */
 const BREATHING_PERIOD_S = 2.4
 /** Ring pulse loop period (spec line 167). */
@@ -239,8 +249,18 @@ export default function Greet({
    * maximum iPad Safari compatibility, a single user tap can fire the
    * handler up to three times before React commits the state transition
    * out of `wake`. This ref short-circuits all but the first call until
-   * the state machine actually advances. Cleared in the relock retry
-   * path so a second tap after a silent fail still fires speak() again.
+   * the state machine actually advances. Cleared via the screenState-
+   * change effect so a second tap after a silent fail still fires
+   * speak() again, and via a microtask in the relock retry branch so
+   * the same physical tap can't queue multiple retry-speak() calls.
+   *
+   * Round 5 (ticket 86c9gp99a) extension: this guard now also gates the
+   * relock-retry branch (`screenState !== 'wake'` → `gate.dispatchGesture`).
+   * Without that, a single physical tap during the relock state could
+   * fire `dispatchGesture` three times (once per synthetic event), all
+   * three reading `gate.state === 'relock'` from the same render closure
+   * and each invoking the registered retry callback — that's the
+   * "queues behind the in-flight one" pattern Thomas reported.
    */
   const wakeTapInFlightRef = useRef(false)
 
@@ -513,7 +533,28 @@ export default function Greet({
     if (screenState !== 'wake') {
       // Soft re-gate retry path: if the gate is showing (relock state), this
       // tap is the gesture that retries speak(line0). Let the gate route it.
-      if (gate.dispatchGesture()) return
+      //
+      // Same-tick guard applies HERE too (round 5, ticket 86c9gp99a). A
+      // single physical tap during relock fires three synthetic events
+      // (touchend + pointerdown + click); without the guard, all three
+      // see `gate.state === 'relock'` from the same render closure and
+      // each runs the registered retry callback, queuing three speak()
+      // calls that compete on the engine. Microtask reset clears the
+      // guard once the React render cycle has commited the new state.
+      if (wakeTapInFlightRef.current) return
+      wakeTapInFlightRef.current = true
+      const dispatched = gate.dispatchGesture()
+      // Reset on a microtask so the next physical tap is not blocked.
+      // Microtask (queueMicrotask) drains after the current synchronous
+      // batch but before the next event-loop tick — exactly when React's
+      // state has been re-committed and a new physical tap is the next
+      // expected input.
+      queueMicrotask(() => {
+        wakeTapInFlightRef.current = false
+      })
+      // Whether or not dispatch consumed the gesture, return — we've
+      // routed everything we can in the non-wake branch.
+      void dispatched
       return
     }
 
