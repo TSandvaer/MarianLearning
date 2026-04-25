@@ -381,20 +381,20 @@ She just got a math problem right. Melody cheered. Transition cross-faded from g
 - Letters: `d`, `o`, `g` in 96pt, spaced ~48pt apart. Each letter is tappable — tapping it plays that letter's sound alone.
 - Speaker button: circular, 72pt, teal accent (`#8EDCE6`). Tapping plays "d... o... g... dog!" (sound-by-sound, then blended).
 - Primary actions at bottom:
-  - **Again** (paw-print icon, 72pt) — replays the full sound sequence.
-  - **Got it** (checkmark icon in soft pink circle, 88pt) — advances. Larger than "Again" because it's the primary path.
+  - **Again** (paw-print icon, 72pt) — replays the full sound sequence. **Disabled (non-interactive, visually de-emphasized) until the intro sound sequence completes** (i.e., until line 5 "You try!" finishes at ~6.0s). See States and Motion for the disabled→enabled transition. We keep it visually present but greyed rather than hiding it entirely — the layout stays stable and Marian sees the affordance ahead of time, but it can't steal a tap during the intro. Per Dave's audit (2026-04-25): reduces simultaneous interactive zones during the model-building moment from 7 to 6.
+  - **Got it** (checkmark icon in soft pink circle, 88pt) — advances. Larger than "Again" because it's the primary path. Also disabled during the intro sound sequence (same window as "Again") — Marian shouldn't be able to skip past Melody before Melody has finished speaking.
 
 **Input model:** passive. She doesn't have to select an answer — this is a **listen + repeat exercise**. Speech recognition is v3. For v1, she just listens, optionally taps letters, and taps "Got it" when she feels ready. We trust her.
 
 ## Copy / TTS script
 
-1. **(0.0s on entry)** "Look!" *(picture bounces in)*
-2. **(1.0s)** "A dog."
-3. **(2.0s)** "D... O... G."  *(each letter highlighted in turn, 600ms between)*
-4. **(4.2s)** "Dog!" *(all three letters glow together, picture bounces once)*
-5. **(5.5s)** "You try!" *(speaker button gets a hint-pulse)*
+1. **(0.0s on entry)** "Look!" *(picture bounces in)* — TTS
+2. **(1.0s)** "A dog." — TTS
+3. **(2.0s–4.0s)** **TTS is silent for the sound-out.** Pre-recorded phonemes play in sequence: `phoneme-d.mp3` → `phoneme-o-short.mp3` → `phoneme-g.mp3`, each with its letter's visual highlight, ~600ms between onsets (~200ms gap between files). **Do not queue a TTS utterance for this segment.** Per Dave's audit (2026-04-25): TTS narrating "D... O... G." over the phoneme files would put two near-simultaneous audio streams on the same perceptual channel — Mayer's redundancy principle. The phoneme files own this moment.
+4. **(4.2s)** "Dog!" *(all three letters glow together, picture bounces once)* — TTS resumes
+5. **(5.5s)** "You try!" *(speaker button gets a hint-pulse)* — TTS
 
-**Word-count check:** `look, a, dog, d, o, g, you, try` — 8 unique words. All within cap. Target phonics word `dog` is session-locked.
+**Word-count check:** `look, a, dog, you, try` — 5 unique TTS words (down from 8; `d`, `o`, `g` are no longer spoken via TTS, only via phoneme files). All within cap. Target phonics word `dog` is session-locked.
 
 **On letter tap:** plays just that letter's pre-recorded phoneme — "/d/", "/ŏ/", "/g/". (Phonemes, not letter names. Web Speech API can't cleanly produce isolated phonemes; per Thomas (2026-04-25), we ship pre-recorded phoneme audio files. See Assets and Implementation notes.)
 
@@ -407,16 +407,20 @@ She just got a math problem right. Melody cheered. Transition cross-faded from g
 ## Motion
 
 - **Entrance:** bg cross-fades, Melody layoutId transitions to upper-left. Picture `initial={{ scale: 0, opacity: 0 }}`, spring `{ stiffness: 260, damping: 16 }` — slight bounce on land. Letters stagger in after picture, 150ms offset each.
-- **Letter highlight during line 3:** each letter pulses `scale: [1, 1.2, 1]` over 400ms as its **pre-recorded phoneme** plays. Color shifts from `--ink` to `--my-rose` during the pulse, then back. Sequence the three phoneme audio files back-to-back with ~200ms gaps.
+- **Letter highlight during line 3 (sound-out, phoneme-only audio):** each letter pulses `scale: [1, 1.2, 1]` over 400ms as its **pre-recorded phoneme** plays. Color shifts from `--ink` to `--my-rose` during the pulse, then back. Sequence the three phoneme audio files back-to-back with ~200ms gaps. **No TTS plays during this segment** — the phoneme files are the only audio. The visual highlight is triggered off the phoneme file's `play` event, not a TTS boundary, so the visual and audio are tightly coupled.
 - **Blend moment (line 4):** all three letters simultaneously scale 1→1.15→1 and picture does a happy bob. Feels like the word "clicks."
 - **Speaker hint-pulse:** gentle 2-beat pulse loop (`scale: [1, 1.08, 1]`) when line 5 finishes, stops after first user tap anywhere.
+- **"Again" + "Got it" enable transition:** at intro completion (~6.0s, after "You try!" TTS finishes), both buttons fade from disabled state (opacity 0.35, `pointer-events: none`, `aria-disabled="true"`) to enabled state (opacity 1, interactive) over 300ms. No bounce, no scale — just an opacity ramp so the change reads as "now ready" rather than "new thing." Disabled state styling: same icons and shapes as enabled, just at 0.35 opacity with no `whileTap` response. **Do not grey out via filter or desaturation** — opacity preserves the icon's color identity so Marian can still recognize what each button is.
 - **Letter tap feedback:** single letter pulses + its sound plays. Other letters stay calm.
 - **"Got it" tap:** checkmark scales 1→1.2→0.9→1 with a happy chime, then transition to Screen 5.
 
 ## States
 
-### Idle
-Picture + letters + speaker + buttons all present. Speaker pulses after intro completes.
+### Intro (0.0s – ~6.0s)
+Picture + letters + speaker + buttons all rendered, but **"Again" and "Got it" are visibly disabled** (opacity 0.35, non-interactive). Speaker is visible and tappable throughout — tapping it during the intro interrupts the current sequence and replays from line 2. Letters are tappable throughout (their phonemes play on demand without disrupting the intro).
+
+### Idle (post-intro, ~6.0s onward)
+Picture + letters + speaker + buttons all present and fully interactive. "Again" and "Got it" have ramped to opacity 1. Speaker pulses after intro completes.
 
 ### Happy path (she taps "Got it")
 - Checkmark animates, chime plays, Melody says "Nice!" (1 word, within cap), screen transitions to Screen 5.
@@ -457,13 +461,16 @@ Picture + letters + speaker + buttons all present. Speaker pulses after intro co
 - [ ] Letters `d`, `o`, `g` render in 96pt with ~48pt spacing
 - [ ] Each letter is tappable and plays that letter's **pre-recorded phoneme** (`phoneme-d.mp3`, `phoneme-o-short.mp3`, `phoneme-g.mp3`) when tapped — not Web Speech API output
 - [ ] Speaker button plays full sound-out sequence when tapped (three pre-recorded phonemes in order, ~200ms gaps, then live-TTS "Dog!")
-- [ ] "Again" button replays full TTS sequence including Melody's intro
+- [ ] "Again" button replays full sequence including Melody's intro
 - [ ] "Got it" button (at 88pt, larger than "Again") advances to Screen 5
 - [ ] During intro playback, letters highlight in sequence (`d` then `o` then `g`, then all three at blend)
+- [ ] **No TTS utterance is queued or playing during the sound-out segment (line 3, ~2.0s–4.0s).** The only audio in this window is the three pre-recorded phoneme files. Verify by inspecting the TTS queue and confirming silence on the speech-synthesis side during phoneme playback.
+- [ ] **"Again" and "Got it" buttons are disabled (opacity 0.35, `pointer-events: none`, `aria-disabled="true"`) from screen mount until the intro sound sequence completes (~6.0s, after "You try!" TTS finishes). They fade to opacity 1 and become interactive over a 300ms transition. Tapping them during the disabled window has no effect.**
+- [ ] Speaker button and individual letters remain tappable throughout (including during intro)
 - [ ] No "wrong answer" state exists on this screen
 - [ ] All touch targets ≥60pt
 - [ ] Speaker hint-pulse stops after any user interaction
-- [ ] With Reduce Motion on, letter highlights are color-only (no scale pulse), picture fades in without bounce
+- [ ] With Reduce Motion on, letter highlights are color-only (no scale pulse), picture fades in without bounce, "Again"/"Got it" enable as an instant opacity swap (no fade)
 
 ---
 
