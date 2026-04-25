@@ -87,6 +87,75 @@ describe('runGreetSequence', () => {
     expect(h.calls).toHaveLength(1)
   })
 
+  it('start(fromIndex) seeds the sequence at the given line — used by the relock retry path', () => {
+    // Ticket 86c9gr43t: when line 2 errors, Greet builds a fresh sequence
+    // and calls start(2) so Marian retries the failed line rather than
+    // re-hearing "Hi!" + "I'm Melody." again.
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start(2)
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0].text).toBe(GREET_LINES[2])
+  })
+
+  it('start(fromIndex) clamps a negative seed to 0', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start(-3)
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+  })
+
+  it('start(fromIndex) clamps an out-of-range seed to the last line', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start(99)
+    expect(h.calls[0].text).toBe(GREET_LINES[GREET_LINES.length - 1])
+  })
+
+  // Ticket 86c9gr43t round-2 (Kevin's review of PR #29):
+  // Math.max(0, Math.min(NaN, n)) returns NaN, which slips past the
+  // `index >= GREET_LINES.length` guard (NaN >= 4 is false) and reaches
+  // speak(GREET_LINES[NaN]) === speak(undefined). The production
+  // playLineAdapter throws on undefined text. Contract per JSDoc is
+  // graceful clamping to a valid index — anything not finite goes to 0.
+  it('start(NaN) clamps to line 0 instead of speak(undefined)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start(Number.NaN)
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+    expect(h.calls[0].text).toBe('Hi!')
+  })
+
+  it('start(undefined) clamps to line 0 (parameter default path)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    // Cast to satisfy the typed signature; runtime behaviour is what we
+    // care about — bad callers must not crash the gesture handler.
+    handle.start(undefined as unknown as number)
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+  })
+
+  it('start(non-numeric) clamps to line 0 instead of producing speak(undefined)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start('foo' as unknown as number)
+    expect(h.calls).toHaveLength(1)
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+  })
+
+  it('start(Infinity) clamps to the last line (Number.isFinite excludes Infinity)', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start(Number.POSITIVE_INFINITY)
+    expect(h.calls).toHaveLength(1)
+    // Infinity is not finite, so the guard sends us to 0 (the safe default).
+    // Documented behaviour: anything not finite -> 0. That's the contract
+    // future callers can rely on; no surprise jumps to the end of the list.
+    expect(h.calls[0].text).toBe(GREET_LINES[0])
+  })
+
   it('start() after cancel() is a no-op', () => {
     const h = makeSpeakHarness()
     const handle = runGreetSequence({ speak: h.speak })
@@ -251,6 +320,137 @@ describe('runGreetSequence', () => {
 
     expect(h.calls).toHaveLength(1)
     expect(onComplete).not.toHaveBeenCalled()
+  })
+
+  describe('onLineError (ticket 86c9gr43t — GBUG-7 silent-halt fix)', () => {
+    it('fires onLineError with index + error when a speak() rejects', async () => {
+      // The load-bearing test for the silent-halt regression. Pre-86c9gr43t
+      // the rejection was caught and discarded; the orchestrator just
+      // stopped advancing and the heart never appeared. Now the caller
+      // gets the signal so it can route to the gate's relock pathway.
+      const h = makeSpeakHarness()
+      const onLineError = vi.fn()
+
+      const handle = runGreetSequence({ speak: h.speak, onLineError })
+      handle.start()
+
+      h.rejectLast(
+        '[preRecorded] loaderror for "/assets/audio/greet/greet-01-hi.mp3"',
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(onLineError).toHaveBeenCalledTimes(1)
+      const [index, err] = onLineError.mock.calls[0]
+      expect(index).toBe(0)
+      expect(err).toBeInstanceOf(Error)
+      expect((err as Error).message).toMatch(/loaderror/)
+    })
+
+    it('fires onLineError for a mid-sequence failure (not just line 0)', async () => {
+      // The actual GBUG-7 repro: line 0 plays fine, line 2's MP3 404s.
+      // Without this, only the line-0 failure path got testing.
+      const h = makeSpeakHarness()
+      const onLineError = vi.fn()
+      const onLineEnd = vi.fn()
+
+      const handle = runGreetSequence({
+        speak: h.speak,
+        onLineError,
+        onLineEnd,
+      })
+      handle.start()
+
+      // Line 0 + 1 succeed.
+      h.resolveLast()
+      await Promise.resolve()
+      await Promise.resolve()
+      vi.advanceTimersByTime(LINE_GAP_MS)
+      h.resolveLast()
+      await Promise.resolve()
+      await Promise.resolve()
+      vi.advanceTimersByTime(LINE_GAP_MS)
+      expect(onLineEnd).toHaveBeenCalledTimes(2)
+
+      // Line 2 errors (the heart-reveal line — extra-painful failure mode
+      // because the heart depends on this line completing).
+      expect(h.calls).toHaveLength(3)
+      h.rejectLast(
+        '[preRecorded] loaderror for ".../greet-03-nice-to-meet-you.mp3"',
+      )
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(onLineError).toHaveBeenCalledTimes(1)
+      expect(onLineError.mock.calls[0][0]).toBe(2)
+    })
+
+    it('does NOT fire onLineError when cancel() runs before the speak rejects', async () => {
+      // Cancellations are intentional (unmount, heart-tap mid-line). We
+      // don't want to surface them as errors and trigger the relock path.
+      const h = makeSpeakHarness()
+      const onLineError = vi.fn()
+
+      const handle = runGreetSequence({ speak: h.speak, onLineError })
+      handle.start()
+
+      handle.cancel()
+      h.rejectLast('cancelled')
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(onLineError).not.toHaveBeenCalled()
+    })
+
+    it('does NOT advance to the next line after onLineError fires', async () => {
+      // Symmetry with the existing "rejected speak halts" test, but
+      // explicitly asserts behaviour AFTER the onLineError call. The
+      // recovery (relock + retry) is the caller's responsibility; the
+      // orchestrator stays halted.
+      const h = makeSpeakHarness()
+      const onLineError = vi.fn()
+      const onLineEnd = vi.fn()
+      const onComplete = vi.fn()
+
+      const handle = runGreetSequence({
+        speak: h.speak,
+        onLineError,
+        onLineEnd,
+        onComplete,
+      })
+      handle.start()
+
+      h.rejectLast('boom')
+      await Promise.resolve()
+      await Promise.resolve()
+      vi.advanceTimersByTime(LINE_GAP_MS * 5)
+
+      expect(onLineError).toHaveBeenCalledTimes(1)
+      expect(onLineEnd).not.toHaveBeenCalled()
+      expect(onComplete).not.toHaveBeenCalled()
+      // No further speak() calls were queued.
+      expect(h.calls).toHaveLength(1)
+    })
+
+    it('wraps a non-Error rejection value into an Error before forwarding', async () => {
+      // Defensive: anything reaching the catch should be normalised to an
+      // Error so callers' `err.message` access is always safe. Some Howler
+      // builds reject with a numeric error code or a string.
+      const h = makeSpeakHarness()
+      const onLineError = vi.fn()
+
+      const handle = runGreetSequence({ speak: h.speak, onLineError })
+      handle.start()
+
+      // Reject with a non-Error string. Bypass rejectLast() (which builds an
+      // Error) and reach into the harness directly.
+      h.calls[h.calls.length - 1].reject('raw string' as unknown as Error)
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(onLineError).toHaveBeenCalledTimes(1)
+      expect(onLineError.mock.calls[0][1]).toBeInstanceOf(Error)
+    })
   })
 
   it('forwards the configured boundaryWPM to speak()', () => {

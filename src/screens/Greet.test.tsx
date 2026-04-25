@@ -57,7 +57,10 @@ vi.mock('../lib/audio', async () => {
 })
 
 import Greet from './Greet'
-import { _resetForTests as resetDebugBus } from '../lib/debug'
+import {
+  _resetForTests as resetDebugBus,
+  snapshot as debugSnapshot,
+} from '../lib/debug'
 import {
   GREET_LINES,
   HEART_REVEAL_AFTER_LINE_INDEX,
@@ -136,6 +139,18 @@ function makePlayHarness() {
       const call = calls[calls.length - 1]
       if (!call) throw new Error('no pending playGreetLine() to start')
       call.opts?.onPlay?.()
+    },
+    /**
+     * Reject the most-recent in-flight playback — the production analogue
+     * is a Howler `loaderror` (404 / decode failure) or `playerror`. Used
+     * by the GBUG-7 silent-halt regression tests (ticket 86c9gr43t).
+     */
+    rejectLast(
+      message = '[preRecorded] loaderror for "/assets/audio/greet/greet-XX.mp3"',
+    ) {
+      const call = calls[calls.length - 1]
+      if (!call) throw new Error('no pending playGreetLine() to reject')
+      call.reject(new Error(message))
     },
   }
 }
@@ -1272,6 +1287,246 @@ describe('Greet', () => {
       // without leaking implementation details, so we settle for "the icon
       // is rendered and not crashing".
       expect(icon).toBeInTheDocument()
+    })
+  })
+
+  describe('Greet MP3 failure recovery (ticket 86c9gr43t — GBUG-7)', () => {
+    // The load-bearing regression suite for the silent-halt bug. Pre-fix,
+    // a single MP3 `loaderror` froze the entire Greet sequence — empty
+    // caption ribbon, no heart CTA, Marian stuck. The fix wires the
+    // playGreetLine rejection through onLineError → gate.reportSpeechError
+    // so the relock ring re-appears and the next gesture retries the
+    // failed line. Marian gets agency instead of silence.
+
+    it('a line-0 playGreetLine rejection flips the gate to relock immediately (pre-watchdog)', async () => {
+      // Fast-fail path: line 0's MP3 fails to load. The fix should NOT
+      // wait for the 1.5s watchdog — the rejection itself is a stronger
+      // signal than "no onPlay arrived yet". Marian sees the ring
+      // re-appear within a frame of the failure.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+
+      fireWakeTap()
+      expect(h.calls).toHaveLength(1)
+
+      // Reject before the watchdog could fire.
+      await act(async () => {
+        h.rejectLast()
+        // Two microtask flushes: orchestrator's .catch → onLineError →
+        // gate.reportSpeechError → setState('relock').
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+      expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
+      expect(screen.getByTestId('greet-wake-tap-target')).toBeInTheDocument()
+    })
+
+    it('AC repro: line 0 plays, line 1 fails to load → relock ring appears (no silent halt)', async () => {
+      // Direct from the ticket's Acceptance:
+      //   "tap Wake → line 1 plays → on line 2 load failure, relock ring
+      //    appears → Marian can retry"
+      // (Spec uses 1-indexed line numbers; we index line 0 = "Hi!", line 1
+      // = "I'm Melody.") The killer: pre-fix, this test would have hung
+      // forever — onLineEnd never fires, no relock surface, no heart.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+
+      fireWakeTap()
+      expect(h.calls).toHaveLength(1)
+      expect(h.calls[0].key).toBe('hi')
+
+      // Line 0 plays normally to the end.
+      await act(async () => {
+        h.fireOnPlay()
+      })
+      await completeLine(h)
+      await crossGap()
+
+      // Line 1's MP3 errors.
+      expect(h.calls).toHaveLength(2)
+      expect(h.calls[1].key).toBe('imMelody')
+      await act(async () => {
+        h.rejectLast(
+          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"',
+        )
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // Gate is in relock; ring is back.
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+      expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
+      // The heart MUST NOT have appeared — line 2 (the heart-reveal line)
+      // never completed. Silent-halt regression would have NO heart AND
+      // no relock; the fix gives us the relock as the surface.
+      expect(screen.queryByTestId('greet-heart')).toBeNull()
+    })
+
+    it('reaches the heart CTA when no MP3 fails — drift guard for the happy path', async () => {
+      // Companion to the AC test above. If a future "fix" routes every
+      // resolved playGreetLine through the error path by accident, this
+      // catches it: no rejection, full sequence completes, heart appears.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+
+      fireWakeTap()
+      // All four lines resolve cleanly.
+      for (let i = 0; i < GREET_LINES.length; i++) {
+        if (i === 0) {
+          await act(async () => {
+            h.fireOnPlay()
+          })
+        }
+        await completeLine(h)
+        if (i < GREET_LINES.length - 1) await crossGap()
+      }
+
+      // Heart CTA is on screen — the silent-halt did NOT trigger.
+      expect(screen.getByTestId('greet-heart')).toBeInTheDocument()
+    })
+
+    it('next gesture after a mid-sequence failure retries the FAILED line, not line 0', async () => {
+      // Marian shouldn't have to listen to "Hi!" again every time a later
+      // MP3 fails. Ticket explicitly notes she'll "hit the same load
+      // failure and relock again" — so the retry must target the same
+      // line, not restart from the top.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+
+      fireWakeTap()
+      // Play line 0 to end.
+      await act(async () => {
+        h.fireOnPlay()
+      })
+      await completeLine(h)
+      await crossGap()
+
+      // Line 1 fails.
+      await act(async () => {
+        h.rejectLast()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+
+      const callsBeforeRetry = h.calls.length
+      // User taps the relock ring.
+      fireWakeTap()
+      // A new playGreetLine landed — for the FAILED line, not for line 0.
+      expect(h.calls.length).toBe(callsBeforeRetry + 1)
+      expect(h.calls[h.calls.length - 1].key).toBe('imMelody')
+    })
+
+    it('retry that hits the same failure re-shows the relock ring (agency over silence)', async () => {
+      // The "she has agency, vs. stuck silently" AC clause. Two failures
+      // in a row should each surface relock — not a degraded state where
+      // the second failure is ignored.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+
+      fireWakeTap()
+      // First failure on line 0.
+      await act(async () => {
+        h.rejectLast()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+
+      // Tap relock ring → retry → also fails.
+      fireWakeTap()
+      await act(async () => {
+        h.rejectLast()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      // Still in relock. Marian can keep tapping.
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+      expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
+    })
+
+    it('emits the failed MP3 source URL to the debug bus so iPad QA can identify the file without console access', async () => {
+      // ?debug=1 overlay surface — iPad standalone PWA has no console.
+      // The lastSpeak debug entry is how Jessica / Thomas tell apart
+      // "greet-02 missing" from "greet-04 missing" without a Mac tether.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+
+      // Reset bus mid-test so we know the debug record is from the failure,
+      // not from a prior speak attempt.
+      resetDebugBus()
+
+      fireWakeTap()
+      await act(async () => {
+        h.fireOnPlay()
+      })
+      await completeLine(h)
+      await crossGap()
+
+      await act(async () => {
+        h.rejectLast(
+          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"',
+        )
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      const snap = debugSnapshot()
+      expect(snap.lastSpeak).not.toBeNull()
+      expect(snap.lastSpeak?.status).toBe('errored')
+      // Error message includes the failing source URL (load-bearing for
+      // iPad QA — without it, "an MP3 failed" tells you nothing).
+      expect(snap.lastSpeak?.error).toMatch(/greet-02-im-melody\.mp3/)
+      // The text field carries the failed line so the panel reads
+      // naturally: `errored: "I'm Melody."`.
+      expect(snap.lastSpeak?.text).toBe(GREET_LINES[1])
     })
   })
 

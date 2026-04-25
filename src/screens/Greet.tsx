@@ -8,7 +8,7 @@ import {
   type GreetLineKey,
   type PlayGreetLineOptions,
 } from '../lib/audio'
-import { recordRawTapEvent, recordTap } from '../lib/debug'
+import { recordRawTapEvent, recordSpeakAttempt, recordTap } from '../lib/debug'
 import {
   GREET_LINES,
   REPROMPT_AFTER_MS,
@@ -278,6 +278,18 @@ export default function Greet({
   const wakeIconRepromptUsedRef = useRef(false)
   const sequenceRef = useRef<GreetSequenceHandle | null>(null)
   /**
+   * Index of the most recent line whose `playGreetLine` rejected. The relock
+   * retry path reads this so the next gesture re-fires the failed line, not
+   * line 0 — Marian shouldn't have to listen to "Hi!" again every time a
+   * mid-sequence MP3 fails (ticket 86c9gr43t).
+   *
+   * Reset to `null` after a successful retry registration consumes it. We
+   * use a ref (not state) because the gate's retry callback closes over the
+   * value and a stale render would re-fire the wrong line. A ref is read
+   * fresh on every dispatch.
+   */
+  const lastFailedLineRef = useRef<number | null>(null)
+  /**
    * DOM ref for the wake-tap target. We attach native `addEventListener`
    * handlers directly (in addition to React's onClick / onTouchEnd /
    * onPointerDown) for two distinct reasons:
@@ -482,6 +494,23 @@ export default function Greet({
         // Start the 20s no-tap re-prompt timer once the heart is interactive.
         scheduleReprompt()
       },
+      onLineError: (i, err) => {
+        // Ticket 86c9gr43t (GBUG-7): a Howler `loaderror` / `playerror`
+        // rejected the line. Surface to the debug overlay so iPad QA can
+        // see WHICH MP3 failed without console access; flip the gate to
+        // `relock` so the ring re-appears; mark the failed line so the
+        // next gesture retries it (rather than restarting at line 0).
+        // The retry callback itself is registered in handleWakeTap and
+        // closes over buildSequence + reads `lastFailedLineRef.current`
+        // to decide where to start.
+        recordSpeakAttempt(
+          GREET_LINES[i] ?? `(line ${i})`,
+          'errored',
+          err.message,
+        )
+        lastFailedLineRef.current = i
+        gate.reportSpeechError()
+      },
     })
   }, [gate, scheduleReprompt, playLineAdapter, triggerEarWiggle])
 
@@ -665,6 +694,11 @@ export default function Greet({
     // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
     cancelWakeReprompt()
 
+    // Fresh wake-tap → no failed line yet. Clearing the ref ensures any
+    // stale value from a prior mount/recovery doesn't leak into the
+    // initial play.
+    lastFailedLineRef.current = null
+
     // Build a fresh sequence (the one from mount may already be running if
     // we're recovering from a relock state) and kick it off synchronously.
     sequenceRef.current?.cancel()
@@ -690,16 +724,23 @@ export default function Greet({
       }
     })
 
-    // Register a synchronous retry: if the gate watchdog expires, the next
-    // user gesture will run this callback inside its own tap handler. We
-    // cancel the in-flight (silent) sequence and start a fresh one.
+    // Register a synchronous retry: if the gate watchdog expires (silent
+    // first-utterance miss) OR a playGreetLine rejects (Howler load/play
+    // failure — ticket 86c9gr43t), the next user gesture will run this
+    // callback inside its own tap handler. `lastFailedLineRef.current`
+    // decides whether to restart from line 0 (ref is null — silent miss)
+    // or to retry the failed line (ref carries the index — MP3 failure).
     gate.registerRetry(() => {
       sequenceRef.current?.cancel()
       cancelPreRecorded()
       const retryHandle = buildSequence()
       sequenceRef.current = retryHandle
+      const fromIndex = lastFailedLineRef.current ?? 0
+      // Consume the failed-line marker — if THIS retry also fails, the
+      // orchestrator's onLineError will re-set it.
+      lastFailedLineRef.current = null
       gate.wrapSpeak(() => {
-        retryHandle.start()
+        retryHandle.start(fromIndex)
       })
     })
 

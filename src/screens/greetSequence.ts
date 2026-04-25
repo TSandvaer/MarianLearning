@@ -19,8 +19,13 @@
  *    between them, calling the supplied hooks at each state-machine boundary.
  *  - It is cancellation-safe: callers receive a `cancel()` that stops any
  *    in-flight speech and prevents pending lines from being queued.
- *  - If a `speak()` call rejects (e.g. user navigated away → cancel(); engine
- *    error), we stop the sequence; we do NOT auto-retry.
+ *  - If a `speak()` call rejects, we stop the sequence and call `onLineError`
+ *    (when provided) with the failed line index and the underlying error.
+ *    We do NOT auto-retry — the caller decides what to do (relock the gate,
+ *    skip and advance, surface UI, etc.). Pre-86c9gr43t we silently swallowed
+ *    the rejection, which produced the GBUG-7 silent-halt: an orchestrator-
+ *    layer change ago, the catch ate the error and the heart never appeared.
+ *    Now the caller gets the signal and can drive the recovery story.
  */
 
 import type { BoundaryEvent } from '../lib/tts'
@@ -95,6 +100,23 @@ export interface GreetSequenceHooks {
    * line 0; subsequent lines are unlocked by definition.
    */
   onLine0Start?: () => void
+  /**
+   * Called when a `speak()` rejects (Howler `loaderror`, `playerror`, or any
+   * other terminal failure). The sequence is halted — no further lines are
+   * queued. The caller decides recovery (relock the gate, skip + advance,
+   * etc.); the orchestrator deliberately stays opinion-free.
+   *
+   * Provenance: ticket 86c9gr43t (GBUG-7). Before this hook existed, the
+   * `.catch` swallowed the rejection silently and the heart never appeared
+   * on a Howler load failure. Now the caller (Greet) maps the signal onto
+   * the gate's `reportSpeechError` + `registerRetry` pair so Marian sees
+   * the relock ring instead of a frozen Melody.
+   *
+   * `onComplete` will NOT fire when a line errors. Cancellations are still
+   * silent (no rejection forwarded) — distinguished from genuine errors by
+   * the orchestrator's internal `cancelled` flag.
+   */
+  onLineError?: (index: number, err: Error) => void
 }
 
 export interface GreetSequenceOptions extends GreetSequenceHooks {
@@ -113,10 +135,11 @@ export interface GreetSequenceOptions extends GreetSequenceHooks {
 
 export interface GreetSequenceHandle {
   /**
-   * Kick off line 0 ("Hi!"). MUST be called synchronously inside a user
-   * gesture handler on iPad Safari — see the audio-unlock note in
-   * design/session-1.md → Implementation notes. Calling `start()` more than
-   * once is a no-op (the orchestrator already running its sequence).
+   * Kick off the sequence at `fromIndex` (defaults to 0). MUST be called
+   * synchronously inside a user gesture handler on iPad Safari — see the
+   * audio-unlock note in design/session-1.md → Implementation notes.
+   * Calling `start()` more than once is a no-op (the orchestrator already
+   * running its sequence).
    *
    * Refactored 2026-04-25 (ticket 86c9gp99a): previously the sequence
    * auto-started inside `runGreetSequence`. The auto-start was incompatible
@@ -125,8 +148,17 @@ export interface GreetSequenceHandle {
    * mount's effect tick rather than inside the tap handler. The Greet
    * component now constructs the handle on mount and invokes `start()`
    * inside its synchronous Wake-tap handler.
+   *
+   * `fromIndex` (added in ticket 86c9gr43t): supports the relock-and-retry
+   * path. When a mid-sequence MP3 fails, Greet builds a fresh sequence and
+   * calls `start(failedIndex)` so Marian retries the failed line rather
+   * than re-hearing every earlier line. Out-of-range indices (`< 0` or
+   * `>= GREET_LINES.length`) are treated as 0 and length-1 respectively;
+   * the orchestrator never throws on a bad seed. Anything non-finite
+   * (NaN, ±Infinity, or non-numeric junk passed via a typed-any cast)
+   * collapses to 0 — same "never crash the gesture handler" rule.
    */
-  start: () => void
+  start: (fromIndex?: number) => void
   /**
    * Cancel the sequence: any in-flight `speak()` is left to its own cancel
    * (callers should also call tts.cancel() to silence the engine), and no
@@ -200,16 +232,44 @@ export function runGreetSequence(
           speakLine(index + 1)
         }, LINE_GAP_MS)
       })
-      .catch(() => {
-        // Cancellation or engine error — bail. We do NOT advance.
+      .catch((err: unknown) => {
+        // Cancellations stay silent — the caller invoked cancel() on
+        // purpose (unmount, heart-tap mid-line, etc.) and we don't want
+        // to surface that as an error. Distinguishable from genuine
+        // engine failures via the orchestrator's `cancelled` flag.
+        if (cancelled) return
+        // We do NOT advance the sequence — but we DO surface the error
+        // so the caller can route it (typically: gate.reportSpeechError
+        // + registerRetry to give Marian a tappable ring instead of a
+        // silent halt). Pre-86c9gr43t this catch was an empty body and
+        // the screen got stuck.
+        const error =
+          err instanceof Error ? err : new Error(String(err ?? 'unknown'))
+        opts.onLineError?.(index, error)
       })
   }
 
   return {
-    start(): void {
+    start(fromIndex = 0): void {
       if (started || cancelled) return
       started = true
-      speakLine(0)
+      // Clamp to a valid line index. We deliberately don't throw on a bad
+      // seed — callers might pass `failedIndex` from an unrelated context
+      // and a hard error in the gesture handler would be worse than a
+      // graceful no-op restart at line 0 (or the final line).
+      //
+      // Number.isFinite gate (added in PR #29 round-2 review): without it,
+      // Math.min(NaN, n) returns NaN, which then slips past speakLine's
+      // `index >= GREET_LINES.length` guard (NaN >= n is always false) and
+      // calls opts.speak(GREET_LINES[NaN]) — i.e. speak(undefined). The
+      // production playLineAdapter throws on undefined text, which would
+      // re-introduce the silent-halt this whole ticket was meant to kill.
+      // Anything not finite (NaN, ±Infinity, non-numeric junk via a typed
+      // any-cast) collapses to 0 — the safe default the JSDoc promises.
+      const seed = Number.isFinite(fromIndex)
+        ? Math.max(0, Math.min(fromIndex, GREET_LINES.length - 1))
+        : 0
+      speakLine(seed)
     },
     cancel(): void {
       if (cancelled) return
