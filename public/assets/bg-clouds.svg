@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  bg-clouds.svg
+  Greet-screen background. Cream-to-pink wash with 3 stylised clouds.
+  - viewBox 0 0 768 1024 (iPad portrait-ish ratio, scales via preserveAspectRatio="xMidYMid slice")
+  - 3 clouds positioned for upper-third visual weight, leaving lower 60% clear for Melody + ribbon + CTA
+  - Soft, no hard edges, no kindergarten-bright primaries
+  - Drift animation handled in component via Framer Motion (per session-1.md), so no SMIL here
+  - Target <15 KB
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 1024" preserveAspectRatio="xMidYMid slice"
+     role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#FFF5F0"/>
+      <stop offset="60%" stop-color="#FFE7EE"/>
+      <stop offset="100%" stop-color="#FFC0CB" stop-opacity="0.55"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="22%" r="55%">
+      <stop offset="0%"  stop-color="#FFFFFF" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Reusable cloud shape: blob made of overlapping ellipses, single-color flat -->
+    <symbol id="cloud" viewBox="0 0 240 100" overflow="visible">
+      <g fill="#FFFFFF">
+        <ellipse cx="60"  cy="60" rx="56" ry="34"/>
+        <ellipse cx="115" cy="46" rx="62" ry="40"/>
+        <ellipse cx="170" cy="58" rx="54" ry="32"/>
+        <ellipse cx="200" cy="68" rx="36" ry="22"/>
+      </g>
+      <!-- subtle pink underline shadow -->
+      <ellipse cx="120" cy="84" rx="100" ry="6" fill="#F48FB1" opacity="0.08"/>
+    </symbol>
+  </defs>
+
+  <!-- Sky wash -->
+  <rect width="768" height="1024" fill="url(#sky)"/>
+  <!-- Soft top glow -->
+  <rect width="768" height="1024" fill="url(#glow)"/>
+
+  <!-- Cloud 1: upper-left, large -->
+  <use href="#cloud" x="-40"  y="120" width="320" height="134"/>
+  <!-- Cloud 2: upper-right, medium-small -->
+  <use href="#cloud" x="460"  y="80"  width="260" height="108"/>
+  <!-- Cloud 3: mid-left, small (background depth) -->
+  <use href="#cloud" x="220"  y="260" width="200" height="84" opacity="0.85"/>
+</svg>
