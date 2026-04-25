@@ -17,9 +17,12 @@
 // Runtime: Web-standard fetch handler. The TTS pipeline imported from
 // `_tts.ts` uses the `ws` package + `node:crypto`, so this function MUST
 // run on Vercel's Node runtime, not Edge. Vercel's default for files
-// under `api/` IS the Node runtime — no `export const config` needed —
-// but if anyone ever flips this file to Edge, the WS-based TTS will fail
-// at import time. Leaving this comment as a tripwire.
+// under `api/` IS the Node runtime today, but defaults can drift and a
+// project-wide `vercel.json` could force Edge. The `config` export below
+// is the actual tripwire — it locks the runtime regardless of project
+// defaults. If a future maintainer flips it to `edge`, the
+// `import { WebSocket } from 'ws'` in `_tts.ts` blows up at cold-start
+// instead of silently producing a cryptic runtime error.
 
 import {
   isClaudeRequest,
@@ -28,6 +31,10 @@ import {
   type SessionStartResponse,
 } from './_types'
 import { renderSessionAudio } from './_session'
+
+/** Vercel runtime config. Locks this function to the Node runtime; do not
+ *  change to `edge` — see the WSS / `ws` dependency note above. */
+export const config = { runtime: 'nodejs' } as const
 
 // Origins allowed to hit this function. Local dev port + the Vercel
 // deployment's own origin (provided as VERCEL_URL at runtime, without

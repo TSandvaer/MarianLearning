@@ -26,7 +26,7 @@ vi.mock('./_session', () => {
   }
 })
 
-import handler from './claude'
+import handler, { config } from './claude'
 import { renderSessionAudio } from './_session'
 
 const mockedRender = vi.mocked(renderSessionAudio)
@@ -47,6 +47,16 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.ANTHROPIC_API_KEY
+})
+
+describe('runtime config (Vercel tripwire)', () => {
+  it('locks the function to the Node runtime so the `ws` dep cannot break under an Edge flip', () => {
+    // The TTS pipeline imports `ws` + `node:crypto`; an Edge runtime would
+    // blow up at cold-start. The `config` export is the actual lock —
+    // without it, a project-wide vercel.json or a Vercel default flip
+    // could silently move this function to Edge.
+    expect(config).toEqual({ runtime: 'nodejs' })
+  })
 })
 
 describe('OPTIONS preflight', () => {
