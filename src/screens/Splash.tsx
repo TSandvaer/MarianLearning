@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { m } from 'motion/react'
-import { cancel as cancelTts } from '../lib/tts'
+import { cancel as cancelTts, loadVoices, primeVoices } from '../lib/tts'
 import {
   detectColdStart,
   markWarm,
@@ -71,6 +71,17 @@ export default function Splash({
     } catch {
       // tts.cancel is itself defensive; swallow if speechSynthesis is unset.
     }
+
+    // iPad Safari TTS warmup (post-PR-#21 deeper fix). Some iPad WebKit
+    // builds only start loading the voice list the first time `getVoices()`
+    // is called, and a `speak()` issued before voices are available is
+    // silently rejected. Splash is the perfect place to do this — Marian
+    // sees the same silent splash, and by the time Wake-tap fires the
+    // voice list is ready. primeVoices() is a synchronous nudge; the async
+    // loadVoices() below is fire-and-forget so the splash auto-advance
+    // timer is unaffected.
+    primeVoices()
+    void loadVoices()
 
     markWarm()
 

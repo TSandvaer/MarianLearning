@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   AnimatePresence,
   LazyMotion,
@@ -8,6 +8,7 @@ import {
 import Splash from './screens/Splash'
 import Greet from './screens/Greet'
 import Math from './screens/Math'
+import { DebugOverlay, isDebugEnabled } from './lib/debug'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
 
@@ -31,6 +32,11 @@ export default function App() {
   const goGreet = useCallback(() => setRoute('greet'), [])
   const goMath = useCallback(() => setRoute('math'), [])
 
+  // Capture once on mount — flipping debug mid-session would tear the
+  // overlay in/out and isn't worth the complexity. To enable, append
+  // `?debug=1` to the URL (works in Safari tab and PWA install both).
+  const debugOn = useMemo(() => isDebugEnabled(), [])
+
   return (
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
@@ -39,6 +45,11 @@ export default function App() {
           {route === 'greet' && <Greet key="greet" onAdvance={goMath} />}
           {route === 'math' && <Math key="math" />}
         </AnimatePresence>
+        {/* Debug overlay sits outside AnimatePresence so it persists across
+            screen transitions. Gated on `?debug=1` so it never ships visibly
+            in normal sessions. See lib/debug/DebugOverlay.tsx for the iPad
+            QA usage notes. */}
+        {debugOn && <DebugOverlay />}
       </MotionConfig>
     </LazyMotion>
   )

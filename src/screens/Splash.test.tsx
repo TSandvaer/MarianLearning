@@ -14,12 +14,17 @@ import type { ReactNode } from 'react'
 // Mock TTS module so Splash can call cancel() without touching the real
 // speechSynthesis stub (which jsdom doesn't ship). We assert on the spy
 // directly to verify "no audio fires" — both that nothing was queued and
-// that cancel() was called defensively.
+// that cancel() was called defensively. loadVoices/primeVoices are also
+// mocked since Splash now triggers an iPad TTS warmup (post-PR-#21).
 const ttsSpeakSpy = vi.fn()
 const ttsCancelSpy = vi.fn()
+const ttsLoadVoicesSpy = vi.fn(() => Promise.resolve([]))
+const ttsPrimeVoicesSpy = vi.fn()
 vi.mock('../lib/tts', () => ({
   speak: (...args: unknown[]) => ttsSpeakSpy(...args),
   cancel: () => ttsCancelSpy(),
+  loadVoices: () => ttsLoadVoicesSpy(),
+  primeVoices: () => ttsPrimeVoicesSpy(),
 }))
 
 import Splash from './Splash'
@@ -42,6 +47,8 @@ describe('Splash', () => {
     window.sessionStorage.clear()
     ttsSpeakSpy.mockClear()
     ttsCancelSpy.mockClear()
+    ttsLoadVoicesSpy.mockClear()
+    ttsPrimeVoicesSpy.mockClear()
   })
 
   afterEach(() => {
@@ -147,6 +154,18 @@ describe('Splash', () => {
       vi.advanceTimersByTime(1500)
     })
     expect(ttsSpeakSpy).not.toHaveBeenCalled()
+  })
+
+  it('primes the iPad voice list on mount (TTS warmup, post-PR-#21)', () => {
+    // Splash kicks both the synchronous primeVoices() nudge and the async
+    // loadVoices() so by the time Wake-tap fires the voice list is ready.
+    // Without this warmup, the very first speak() on cold launch can be
+    // silently rejected by iPad WebKit.
+    stubReducedMotion(false)
+    render(withMotion(<Splash onAdvance={vi.fn()} detector={() => false} />))
+
+    expect(ttsPrimeVoicesSpy).toHaveBeenCalledTimes(1)
+    expect(ttsLoadVoicesSpy).toHaveBeenCalledTimes(1)
   })
 
   it('clears its timer on unmount and does not call onAdvance', () => {
