@@ -4,25 +4,32 @@
 // -------
 //  - 86c9gkm0c (initial) scaffolded the endpoint as a stub: validate the
 //    body, presence-check the API key, return a placeholder.
-//  - 86c9gr385 (this change, Path A — server-side TTS pipeline) extends
+//  - 86c9gr385 (Path A — server-side TTS pipeline) extends
 //    `kind: 'session-start'` to optionally carry a session plan and have
 //    every utterance rendered to MP3 server-side via Edge AnaNeural. The
 //    stub success path is preserved for callers that don't pass a plan
 //    (stumble-explanation, session-end, and any session-start that
 //    pre-dates the real Claude prompt wiring).
+//  - 86c9grnj4 (this change — P1 hot-fix) removes a broken
+//    `export const config = { runtime: 'nodejs' }` that caused
+//    FUNCTION_INVOCATION_FAILED on every request. The Vercel /api/*.ts
+//    file format does NOT recognise `runtime: 'nodejs'` as a valid value
+//    in the `config` export (that shape is the Next.js middleware
+//    convention; for plain /api functions the Node runtime IS the
+//    default and no config export is needed). The intended tripwire —
+//    "fail loud at cold-start if a future maintainer pushes us onto
+//    Edge" — is reimplemented below as a real runtime assertion that
+//    cannot be bypassed by a config-shape misunderstanding.
 //
 // ABSOLUTE RULE: ANTHROPIC_API_KEY is read here only. It must never reach
 // the browser bundle. Do not echo, log, or include it in any response.
 //
 // Runtime: Web-standard fetch handler. The TTS pipeline imported from
-// `_tts.ts` uses the `ws` package + `node:crypto`, so this function MUST
-// run on Vercel's Node runtime, not Edge. Vercel's default for files
-// under `api/` IS the Node runtime today, but defaults can drift and a
-// project-wide `vercel.json` could force Edge. The `config` export below
-// is the actual tripwire — it locks the runtime regardless of project
-// defaults. If a future maintainer flips it to `edge`, the
-// `import { WebSocket } from 'ws'` in `_tts.ts` blows up at cold-start
-// instead of silently producing a cryptic runtime error.
+// `_tts.ts` uses the `ws` package + `node:crypto`, both of which require
+// Vercel's Node runtime (Edge is V8 isolates with no Node built-ins).
+// /api/*.ts defaults to Node on Vercel; the assertion below is the
+// belt-and-braces guard against a future project-wide vercel.json or
+// platform default flip silently moving us to Edge.
 
 import {
   isClaudeRequest,
@@ -32,9 +39,33 @@ import {
 } from './_types'
 import { renderSessionAudio } from './_session'
 
-/** Vercel runtime config. Locks this function to the Node runtime; do not
- *  change to `edge` — see the WSS / `ws` dependency note above. */
-export const config = { runtime: 'nodejs' } as const
+/**
+ * Cold-start runtime assertion. Throws at module load if the function is
+ * not running on Node — `_tts.ts` would crash on `import { WebSocket } from 'ws'`
+ * and `node:crypto` anyway, but this throw produces a clear message at the
+ * top of the stack instead of a cryptic "ws is not defined".
+ *
+ * Edge runtime: `globalThis.process` is undefined.
+ * Node runtime: `process.versions.node` is always a string (e.g. "22.11.0").
+ *
+ * Exported for unit-test coverage; the side effect is the runtime check
+ * itself — calling `assertNodeRuntime()` from another file must produce the
+ * same throw shape so the regression test is meaningful.
+ */
+export function assertNodeRuntime(): void {
+  const nodeVersion = (
+    globalThis as { process?: { versions?: { node?: string } } }
+  ).process?.versions?.node
+  if (typeof nodeVersion !== 'string') {
+    throw new Error(
+      '/api/claude must run on the Vercel Node runtime — `ws` and `node:crypto` ' +
+        'imports require Node. Check vercel.json and the Vercel project runtime ' +
+        'setting; do not move this function to Edge.',
+    )
+  }
+}
+
+assertNodeRuntime()
 
 // Origins allowed to hit this function. Local dev port + the Vercel
 // deployment's own origin (provided as VERCEL_URL at runtime, without
