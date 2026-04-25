@@ -17,6 +17,14 @@ export default {
           800: '#8a1f48',
           900: '#5c1530',
         },
+        // Spec tokens (design/session-1.md → "Color tokens (Melody palette)").
+        // Kept separate from the placeholder ramp so Kyle's final palette can
+        // replace `melody` without churning screens that ref these tokens.
+        'my-pink': '#FFC0CB',
+        'my-cream': '#FFF5F0',
+        'my-rose': '#F48FB1',
+        ink: '#3D2B3D',
+        sparkle: '#FFD966',
       },
       fontFamily: {
         // System stack for now; Kyle picks web fonts later
