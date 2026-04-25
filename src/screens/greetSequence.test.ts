@@ -69,16 +69,36 @@ describe('runGreetSequence', () => {
     expect(LINE_GAP_MS).toBe(400)
   })
 
-  it('speaks line 0 immediately on start', () => {
+  it('does NOT speak line 0 on construction — only after start() is called (iPad Safari gesture-gate)', () => {
     const h = makeSpeakHarness()
-    runGreetSequence({ speak: h.speak })
+    const handle = runGreetSequence({ speak: h.speak })
+    // Construction is the screen-mount tick; we must remain silent here.
+    expect(h.calls).toHaveLength(0)
+    handle.start()
     expect(h.calls).toHaveLength(1)
     expect(h.calls[0].text).toBe('Hi!')
   })
 
+  it('start() is idempotent — calling it twice does not re-speak line 0', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start()
+    handle.start()
+    expect(h.calls).toHaveLength(1)
+  })
+
+  it('start() after cancel() is a no-op', () => {
+    const h = makeSpeakHarness()
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.cancel()
+    handle.start()
+    expect(h.calls).toHaveLength(0)
+  })
+
   it('schedules line 1 exactly LINE_GAP_MS after line 0 ends', async () => {
     const h = makeSpeakHarness()
-    runGreetSequence({ speak: h.speak })
+    const handle = runGreetSequence({ speak: h.speak })
+    handle.start()
 
     // Resolve line 0 — line 1 should be scheduled, not yet fired.
     await vi.runAllTimersAsync()
@@ -106,7 +126,7 @@ describe('runGreetSequence', () => {
     const lineEnds: number[] = []
     let completed = false
 
-    runGreetSequence({
+    const handle = runGreetSequence({
       speak: h.speak,
       onLineStart: (i) => lineStarts.push(i),
       onLineEnd: (i) => lineEnds.push(i),
@@ -114,6 +134,7 @@ describe('runGreetSequence', () => {
         completed = true
       },
     })
+    handle.start()
 
     for (let i = 0; i < GREET_LINES.length; i++) {
       // Each iteration: line i is in flight. Resolve it, advance the gap,
@@ -138,10 +159,11 @@ describe('runGreetSequence', () => {
     const h = makeSpeakHarness()
     const heartFired = vi.fn()
 
-    runGreetSequence({
+    const handle = runGreetSequence({
       speak: h.speak,
       onHeartReady: heartFired,
     })
+    handle.start()
 
     // Lines 0 + 1: no heart yet.
     h.resolveLast()
@@ -174,10 +196,11 @@ describe('runGreetSequence', () => {
     const h = makeSpeakHarness()
     const events: Array<{ line: number; word: string }> = []
 
-    runGreetSequence({
+    const handle = runGreetSequence({
       speak: h.speak,
       onWordBoundary: (line, ev) => events.push({ line, word: ev.word }),
     })
+    handle.start()
 
     h.calls[0].opts?.onBoundary?.({ wordIndex: 0, word: 'Hi!', charIndex: 0 })
     expect(events).toEqual([{ line: 0, word: 'Hi!' }])
@@ -186,6 +209,7 @@ describe('runGreetSequence', () => {
   it('cancel() prevents pending lines from being queued', async () => {
     const h = makeSpeakHarness()
     const handle = runGreetSequence({ speak: h.speak })
+    handle.start()
 
     h.resolveLast()
     await Promise.resolve()
@@ -203,6 +227,7 @@ describe('runGreetSequence', () => {
       speak: h.speak,
       onLineEnd,
     })
+    handle.start()
 
     handle.cancel()
     h.resolveLast() // late resolve
@@ -216,7 +241,8 @@ describe('runGreetSequence', () => {
     const h = makeSpeakHarness()
     const onComplete = vi.fn()
 
-    runGreetSequence({ speak: h.speak, onComplete })
+    const handle = runGreetSequence({ speak: h.speak, onComplete })
+    handle.start()
 
     h.rejectLast('canceled')
     await Promise.resolve()
@@ -229,7 +255,8 @@ describe('runGreetSequence', () => {
 
   it('forwards the configured boundaryWPM to speak()', () => {
     const h = makeSpeakHarness()
-    runGreetSequence({ speak: h.speak, boundaryWPM: 200 })
+    const handle = runGreetSequence({ speak: h.speak, boundaryWPM: 200 })
+    handle.start()
     expect(h.calls[0].opts?.boundaryWPM).toBe(200)
   })
 
@@ -241,7 +268,8 @@ describe('runGreetSequence', () => {
       return 1
     })
 
-    runGreetSequence({ speak: h.speak, schedule })
+    const handle = runGreetSequence({ speak: h.speak, schedule })
+    handle.start()
 
     h.resolveLast()
     await Promise.resolve()
