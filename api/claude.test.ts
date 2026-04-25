@@ -26,7 +26,7 @@ vi.mock('./_session', () => {
   }
 })
 
-import handler, { config } from './claude'
+import handler, { assertNodeRuntime } from './claude'
 import { renderSessionAudio } from './_session'
 
 const mockedRender = vi.mocked(renderSessionAudio)
@@ -49,13 +49,44 @@ afterEach(() => {
   delete process.env.ANTHROPIC_API_KEY
 })
 
-describe('runtime config (Vercel tripwire)', () => {
-  it('locks the function to the Node runtime so the `ws` dep cannot break under an Edge flip', () => {
-    // The TTS pipeline imports `ws` + `node:crypto`; an Edge runtime would
-    // blow up at cold-start. The `config` export is the actual lock —
-    // without it, a project-wide vercel.json or a Vercel default flip
-    // could silently move this function to Edge.
-    expect(config).toEqual({ runtime: 'nodejs' })
+describe('runtime assertion (Vercel cold-start tripwire)', () => {
+  // Background: PR #28 first attempted this tripwire as
+  //   export const config = { runtime: 'nodejs' } as const
+  // which Vercel does NOT recognise for /api/*.ts files (that shape is the
+  // Next.js middleware convention). The result was FUNCTION_INVOCATION_FAILED
+  // on every request — module load failed before reaching the handler. This
+  // hot-fix replaces the magic-string config with a real runtime check that
+  // throws if `process.versions.node` is missing (i.e. running on Edge).
+  //
+  // The presence of THIS test plus the `assertNodeRuntime()` call at module
+  // top-level means a regression that flips the function to Edge will fail
+  // CI (this test runs in Node so the assertion passes here) AND will fail
+  // loud at cold-start in production (with a clear message, not a cryptic
+  // "ws is not defined").
+
+  it('does not throw when running on Node (sanity)', () => {
+    expect(() => assertNodeRuntime()).not.toThrow()
+  })
+
+  it('throws a clear message when process.versions.node is missing (Edge-runtime simulation)', () => {
+    const originalProcess = globalThis.process
+    try {
+      // Simulate Edge runtime: no Node `process` global.
+      ;(globalThis as { process?: unknown }).process = undefined
+      expect(() => assertNodeRuntime()).toThrow(/Vercel Node runtime/)
+    } finally {
+      ;(globalThis as { process?: unknown }).process = originalProcess
+    }
+  })
+
+  it('throws when process exists but process.versions.node is not a string', () => {
+    const originalProcess = globalThis.process
+    try {
+      ;(globalThis as { process?: unknown }).process = { versions: {} }
+      expect(() => assertNodeRuntime()).toThrow(/Vercel Node runtime/)
+    } finally {
+      ;(globalThis as { process?: unknown }).process = originalProcess
+    }
   })
 })
 

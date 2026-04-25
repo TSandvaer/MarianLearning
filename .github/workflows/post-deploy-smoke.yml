@@ -1,0 +1,61 @@
+# Post-deploy smoke check for /api/claude on production.
+#
+# Runs after every push to `main` (i.e. after Vercel auto-deploys main to
+# production at https://marian-learning.vercel.app). Polls the production
+# /api/claude endpoint until it stops returning the previous deploy's
+# response (up to 5 min — Vercel cold-starts can take 30-60s after a push)
+# then runs the smoke assertions in scripts/post-deploy-smoke.sh.
+#
+# Why a smoke check exists
+# ------------------------
+# PR #28 caused FUNCTION_INVOCATION_FAILED at cold-start due to a bad
+# Vercel runtime config export. Unit tests passed because the bad export
+# was inert when imported in Vitest — only Vercel rejected it. The only
+# place this regression class is observable is against the actually
+# deployed function. See PR (this one) and scripts/post-deploy-smoke.sh
+# for the assertions.
+
+name: post-deploy-smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to smoke-test (defaults to production)'
+        required: false
+        default: 'https://marian-learning.vercel.app'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for Vercel deploy to publish
+        # Vercel's GitHub integration deploys on push asynchronously. Give
+        # it up to 5 min to publish before we hit the function. Polling
+        # the endpoint and ignoring failures here means the actual smoke
+        # step (next) gets a fresh deploy to test.
+        run: |
+          set +e
+          base="${{ github.event.inputs.base_url || 'https://marian-learning.vercel.app' }}"
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              -X OPTIONS "$base/api/claude" \
+              -H 'Origin: http://localhost:5173')
+            echo "poll #$i: HTTP $code"
+            if [ "$code" = "204" ] || [ "$code" = "200" ]; then
+              echo "deploy is responding healthily; proceeding to smoke"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "deploy still not healthy after 5min — running smoke anyway to capture failure"
+
+      - name: Run smoke assertions
+        run: |
+          chmod +x ./scripts/post-deploy-smoke.sh
+          ./scripts/post-deploy-smoke.sh "${{ github.event.inputs.base_url || 'https://marian-learning.vercel.app' }}"
