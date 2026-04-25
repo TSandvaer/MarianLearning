@@ -10,7 +10,7 @@ import { m } from 'motion/react'
  * Same pattern Devon used for the Greet stub during Splash development:
  * minimal markup, identical safe-area handling, and crucially the
  * `layoutId="melody"` wrapper so the shared-element transition from Greet
- * (per spec line 696) has somewhere to land.
+ * (per spec line 795) has somewhere to land.
  *
  * Anything beyond "Melody is here, screen exists" is out of scope.
  */

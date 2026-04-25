@@ -9,7 +9,7 @@ import Math from './Math'
  * the contract Greet relies on:
  *   1. The screen mounts cleanly under the same Motion providers App uses.
  *   2. It exposes Melody at layoutId="melody" so the shared-element
- *      transition from Greet → Math has a destination (spec line 696).
+ *      transition from Greet → Math has a destination (spec line 795).
  */
 function withMotion(node: ReactNode) {
   return (
