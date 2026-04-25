@@ -25,7 +25,7 @@
   - No reds. No browns. No grey that reads as "disabled."
 - **Motion library:** Framer Motion via `LazyMotion` + `m` component (4.6 KB budget). Global `MotionConfig reducedMotion="user"` at app root — if Marian's iPad has Reduce Motion on, springs collapse to short fades.
 - **Audio stack:** Web Speech API for Melody's TTS (`en-US`, female voice preference, rate 0.9, pitch 1.1). Howler.js for SFX. Preload all SFX at app boot; TTS is generated on demand.
-- **TTS captions:** every Melody line is mirrored as on-screen text in a speech-ribbon below/beside her, **revealed word-by-word synced to TTS `boundary` events** (passive reading exposure). If `boundary` events don't fire (Safari quirk), fall back to full-line reveal on `start` event.
+- **TTS captions:** every Melody line is mirrored as on-screen text in a speech-ribbon below/beside her, **revealed word-by-word synced to TTS `boundary` events** (passive reading exposure). If `boundary` events don't fire (Safari quirk — common on iPad, our primary device), fall back to a **synthetic word-paced reveal at configurable WPM** (default 165, derived from Melody's `rate: 0.9`). See implementation notes for full fallback contract.
 - **No red X, ever.** Wrong answers trigger puzzled-tilt + "poof" SFX + retry — see Error Path in each exercise screen.
 - **No streak/XP counter is visible in Session 1.** First-run is about meeting Melody, not earning points.
 
@@ -193,7 +193,7 @@ On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon
 - [ ] Melody slides in from bottom-left with spring, landing position center
 - [ ] Melody's 4 TTS lines play in order with ~400ms gaps, total ~5–6s
 - [ ] Ear-wiggle triggers on the word "Hi!"
-- [ ] Caption text appears word-by-word in sync with TTS boundary events (or full-line on start if boundaries unavailable)
+- [ ] Caption text appears word-by-word in sync with TTS boundary events; if boundary events do not fire, falls back to synthetic word-paced reveal at the configured WPM (default 165), still word-by-word
 - [ ] Heart button does NOT appear until line 3 completes
 - [ ] Heart button pulses gently after appearing
 - [ ] Tapping heart plays chime SFX, animates squish, transitions to Screen 3 within 400ms
@@ -720,7 +720,7 @@ The 5 non-blocking items from the original spec. Two I'm answering myself; three
 - **Framer Motion setup:** wrap `<App>` in `<LazyMotion features={domAnimation}>` + `<MotionConfig reducedMotion="user">`. Use `<m.div>` everywhere, NOT `<motion.div>`, to stay in the 4.6 KB budget.
 - **Shared Melody element across screens:** use `layoutId="melody"` on Melody's wrapper in Screens 2–5 so her position transitions animate for free. Keep her in a single component that re-parents via React state, not unmount/remount.
 - **AnimatePresence gotcha:** AnimatePresence must wrap the conditional, not be wrapped by it. Applies to particles, transitions between screens, and the teaser card.
-- **Caption word reveal:** use the `SpeechSynthesisUtterance.onboundary` event. If it doesn't fire (Safari sometimes skips it), fall back to `onstart` + full text reveal. Don't block on boundaries.
+- **Caption word reveal:** primary path uses `SpeechSynthesisUtterance.onboundary` to advance the highlighted word in lockstep with TTS. iPad Safari frequently omits `onboundary`, and Safari is Marian's primary device — treat the fallback as the *main* path, not an edge case. Fallback: on `onstart`, begin a synthetic word-paced reveal at a configurable WPM (default **165 wpm**, derived from Melody's `rate: 0.9` × ~183 baseline wpm). Reveal one word at a time on a `setInterval(60_000 / wpm)` tick; clear on `onend`/`onerror`. Rationale: per-word visual reinforcement is the passive-reading-exposure value the audio-first / text-mirror principle is optimizing for, and Marian is CVC-emerging — losing word-by-word pacing on the primary device would be a real regression. Acceptable desync: ±1 word from audio is fine; if drift exceeds 2 words the captioner should snap to `onend` and reveal the remainder. Do not block playback on boundaries either way.
 - **Preload SFX on boot:** `Howl` instances for all 5 SFX created at app init, not on-demand (first-tap latency kills the feel).
 - **Preload phoneme audio on boot:** same Howler pattern as SFX. Session 1 needs the 3 short-o phonemes (`phoneme-d.mp3`, `phoneme-o-short.mp3`, `phoneme-g.mp3`) loaded before Screen 4. They're tiny (~12 KB total) and tap-latency-sensitive — letter-tap → phoneme playback should feel instant.
 - **Twilight filter (Screen 5):** apply CSS `filter` to the background element on screen entry; animate via CSS transition (`transition: filter 600ms ease-out`), not Framer Motion. Filter animations on a single DOM property are GPU-accelerated and don't need motion-library overhead.
