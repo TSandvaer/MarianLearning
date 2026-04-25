@@ -17,7 +17,7 @@ body,
  * Body sits behind every screen during AnimatePresence route transitions.
  * Without this, a screen using `bg-my-cream` that animates `opacity → 0` on
  * exit reveals the default white UA background mid-fade — producing a
- * cream → white → cream flash that violates design/session-1.md line 79
+ * cream → white → cream flash that violates design/session-1.md line 86
  * ("shared layout — no hard cut" between Splash and Greet).
  *
  * Value MUST stay in lockstep with `tailwind.config.js` → `colors['my-cream']`.

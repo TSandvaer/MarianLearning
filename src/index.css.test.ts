@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
  * The body's background-color must match Tailwind's `my-cream` token. Without
  * a body bg, AnimatePresence route transitions fade through the default white
  * UA backdrop and produce a cream → white → cream flash between Splash and
- * Greet — see Kevin's review on PR #13 and design/session-1.md line 79
+ * Greet — see Kevin's review on PR #13 and design/session-1.md line 86
  * ("shared layout — no hard cut").
  *
  * Vitest runs with `css: false`, so we can't assert via getComputedStyle in
