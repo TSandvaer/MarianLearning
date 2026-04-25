@@ -525,6 +525,13 @@ describe('Greet', () => {
       const h = makeSpeakHarness()
       render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
       fireWakeTap()
+      // The ribbon mounts as soon as the engine reports it actually started
+      // speaking (post-#86c9gp99a-real iPad fix: empty ribbon never shows
+      // before evidence of audio). Fire onStart so the ribbon mounts, then
+      // assert no words are revealed yet — we haven't sent a boundary.
+      act(() => {
+        h.fireOnStart()
+      })
 
       const revealed = screen
         .getAllByTestId('greet-caption-word')
@@ -537,9 +544,160 @@ describe('Greet', () => {
       const h = makeSpeakHarness()
       render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
       fireWakeTap()
+      // Force the ribbon to mount via onStart (see preceding test for why).
+      act(() => {
+        h.fireOnStart()
+      })
 
       const caption = screen.getByTestId('greet-caption')
       expect(caption.className).toMatch(/text-\[2\.4rem\]/)
+    })
+  })
+
+  describe('Wake-tap event-binding coverage (post-#86c9gp99a-real iPad fix)', () => {
+    it('responds to a click event (the iPad-Safari-honored gesture for speech unlock)', () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      const target = screen.getByTestId('greet-wake-tap-target')
+      fireEvent.click(target)
+
+      expect(h.calls).toHaveLength(1)
+      expect(h.calls[0].text).toBe('Hi!')
+    })
+
+    it('responds to a touchend event (iPad gesture-gate fallback)', () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      const target = screen.getByTestId('greet-wake-tap-target')
+      fireEvent.touchEnd(target)
+
+      expect(h.calls).toHaveLength(1)
+      expect(h.calls[0].text).toBe('Hi!')
+    })
+
+    it('responds to a pointerdown event (Chromium / desktop snappy path)', () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      const target = screen.getByTestId('greet-wake-tap-target')
+      fireEvent.pointerDown(target)
+
+      expect(h.calls).toHaveLength(1)
+    })
+
+    it('triple-fires from one tap (touchend + pointerdown + click) only fire speak ONCE', () => {
+      // Single physical tap on iPad Safari delivers touchend → pointerdown → click
+      // in quick succession; React batches the state updates so all three handlers
+      // see screenState === 'wake'. The same-tick guard must collapse them.
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      const target = screen.getByTestId('greet-wake-tap-target')
+      // Mirror the real iPad event sequence for one tap.
+      fireEvent.touchEnd(target)
+      fireEvent.pointerDown(target)
+      fireEvent.click(target)
+
+      expect(h.calls).toHaveLength(1)
+      // And only one chime play() (silent unlock).
+      expect(sfxState.last?.play).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('Wake-icon inline SVG (post-#86c9gp99a-real iPad fix)', () => {
+    it('renders the wake-icon as inline SVG markup, NOT as an <img>', () => {
+      // iPad Safari standalone PWA mode mis-rendered <img src="…svg"> as a
+      // broken-image placeholder for this asset. Inlining sidesteps the bug.
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      act(() => {
+        vi.advanceTimersByTime(8_000)
+      })
+      const icon = screen.getByTestId('greet-wake-icon')
+      expect(icon.tagName.toLowerCase()).toBe('svg')
+      // Belt: no src attribute, no <img> involved at all.
+      expect(icon.hasAttribute('src')).toBe(false)
+      // Has the expected role + accessible name for SVG.
+      expect(icon.getAttribute('role')).toBe('img')
+      expect(icon.getAttribute('aria-label')).toBe('Tap here')
+      // Contains the finger silhouette path — confirms the markup body
+      // landed, not just the wrapper element.
+      expect(icon.querySelector('path')).not.toBeNull()
+    })
+  })
+
+  describe('Empty-ribbon prevention (post-#86c9gp99a-real iPad fix)', () => {
+    it('does NOT mount the ribbon synchronously on wake-tap before any speech evidence', () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      fireWakeTap()
+      // Screen state advanced — but no onStart, no boundary, no evidence the
+      // engine actually picked up the call. iPad Safari can silently reject;
+      // the ribbon must not appear as an empty rounded rectangle.
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-screen-state',
+        'intro',
+      )
+      expect(screen.queryByTestId('greet-ribbon')).toBeNull()
+    })
+
+    it('mounts the ribbon as soon as onStart fires (engine confirmed speaking)', () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      fireWakeTap()
+      expect(screen.queryByTestId('greet-ribbon')).toBeNull()
+
+      act(() => {
+        h.fireOnStart()
+      })
+      expect(screen.getByTestId('greet-ribbon')).toBeInTheDocument()
+    })
+
+    it('mounts the ribbon when a boundary fires even if onStart was skipped (engine quirk fallback)', async () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      fireWakeTap()
+      expect(screen.queryByTestId('greet-ribbon')).toBeNull()
+
+      // Some engines skip onstart but emit onboundary — the gate also flips
+      // to unlocked on the first boundary (greetSequence wires this).
+      await act(async () => {
+        h.boundary(0, 'Hi!')
+      })
+      expect(screen.getByTestId('greet-ribbon')).toBeInTheDocument()
+    })
+
+    it('does NOT mount the ribbon in the silent-fail relock path', async () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makeSpeakHarness()
+      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+
+      fireWakeTap()
+      // 2s elapses with no onStart and no boundary — gate flips to relock.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+      // No ribbon visible during the relock — Marian sees the ring re-emerge,
+      // not an empty rounded rectangle hanging under Melody.
+      expect(screen.queryByTestId('greet-ribbon')).toBeNull()
     })
   })
 

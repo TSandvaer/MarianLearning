@@ -213,6 +213,16 @@ export default function Greet({
   )
   const wakeIconRepromptUsedRef = useRef(false)
   const sequenceRef = useRef<GreetSequenceHandle | null>(null)
+  /**
+   * Same-tick wake-tap guard. Because we bind THREE event handlers
+   * (onClick + onTouchEnd + onPointerDown) on the wake-tap target for
+   * maximum iPad Safari compatibility, a single user tap can fire the
+   * handler up to three times before React commits the state transition
+   * out of `wake`. This ref short-circuits all but the first call until
+   * the state machine actually advances. Cleared in the relock retry
+   * path so a second tap after a silent fail still fires speak() again.
+   */
+  const wakeTapInFlightRef = useRef(false)
 
   /** Tear down any timers — used by both unmount cleanup and heart-tap. */
   const clearAllTimers = useCallback(() => {
@@ -420,6 +430,10 @@ export default function Greet({
       return
     }
 
+    // Same-tick guard — see wakeTapInFlightRef declaration for why.
+    if (wakeTapInFlightRef.current) return
+    wakeTapInFlightRef.current = true
+
     // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
     cancelWakeReprompt()
 
@@ -520,6 +534,19 @@ export default function Greet({
   // is asking for a retry. Once we're in `intro` and the gate is happy, the
   // overlay disappears so heart taps and other intra-screen UI work normally.
   const tapTargetActive = screenState === 'wake' || gate.showGate
+
+  // Ribbon visibility guard (post-#86c9gp99a-real iPad fix). The ribbon
+  // mounts the moment we have *evidence* that speech actually started:
+  //  - Either the gate observed an `onstart` (state === 'unlocked'), or
+  //  - At least one word boundary has fired for the active line (covers
+  //    engines that skip onstart but emit boundaries — see lib/tts/tts.ts
+  //    comment on the onboundary-as-fallback start signal).
+  // While the gate is still `pending`, we suppress the ribbon so an empty
+  // rounded-rectangle never appears under Melody on a silent-fail iPad path.
+  // Once any speech has been heard we keep it mounted across gate re-arms
+  // so a successful intro doesn't briefly un-mount the ribbon mid-line.
+  const hasRevealedAnyWord = revealedByLine.some((count) => count > 0)
+  const shouldShowRibbon = gate.state === 'unlocked' || hasRevealedAnyWord
 
   return (
     <m.main
@@ -695,16 +722,32 @@ export default function Greet({
 
         {/* Wake re-prompt: finger-tap icon centered on the ring. Fades in,
             pulses once, fades out. Triggered exactly once at 8s of no tap.
-            Spec lines 195 + 209. */}
+            Spec lines 195 + 209.
+
+            Inlined-SVG (post-#86c9gp99a-real iPad fix)
+            -------------------------------------------
+            We render the icon as inline SVG markup rather than as an
+            `<img src="/assets/icon-finger-tap.svg">`. Thomas's real-device
+            iPad install showed a broken-image glyph here even though the
+            asset itself serves cleanly (HTTP 200, correct content-type,
+            valid XML). iPad Safari standalone PWA mode has documented
+            quirks fetching/decoding SVGs via `<img>` — likely a service
+            worker / cache interaction or the leading XML declaration
+            tripping the image sniffer. Inlining sidesteps the entire
+            class of bug and saves an HTTP request. The markup mirrors
+            `public/assets/icon-finger-tap.svg` byte-for-byte (sans the
+            authoring comment block); keep the two in sync if either
+            changes — they're both shipped because the standalone-asset
+            file is also referenced by the PWA precache manifest. */}
         <AnimatePresence>
           {showWakeIcon && (
-            <m.img
+            <m.svg
               key="wake-icon"
               data-testid="greet-wake-icon"
-              src="/assets/icon-finger-tap.svg"
-              alt=""
-              aria-hidden
-              draggable={false}
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 64 64"
+              role="img"
+              aria-label="Tap here"
               className="pointer-events-none absolute select-none"
               style={{
                 // 48pt at 1.333px/pt ≈ 64px. Matches the icon's native viewBox.
@@ -773,15 +816,54 @@ export default function Greet({
                       ease: 'easeInOut',
                     }
               }
-            />
+            >
+              <title>Tap here</title>
+              {/* Soft target dot beneath fingertip */}
+              <circle cx="32" cy="50" r="6" fill="#F48FB1" opacity="0.35" />
+              <circle cx="32" cy="50" r="3" fill="#F48FB1" opacity="0.55" />
+              {/* Hand + extended index finger, single closed path. Mirrors
+                  public/assets/icon-finger-tap.svg verbatim — keep in sync. */}
+              <path
+                d="M 32 44 C 28.5 44, 27 41, 27 37 L 27 24 C 27 20.5, 29 18, 32 18 C 35 18, 37 20.5, 37 24 L 37 33 C 39 32, 42 33, 43 36 L 44.5 41 C 46 45, 46 49, 44 52 C 42 55, 38 56, 34 56 L 28 56 C 23 56, 20 53, 20 48 L 20 41 C 20 37, 22 35, 25 35 C 26.5 35, 27 36, 27 37 Z"
+                fill="#F48FB1"
+                stroke="#3D2B3D"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              {/* Soft highlight on the finger pad for volume */}
+              <ellipse
+                cx="30"
+                cy="24"
+                rx="2.2"
+                ry="3.2"
+                fill="#FFC0CB"
+                opacity="0.6"
+              />
+              {/* Wrist hint: subtle rounded base under the fist */}
+              <path
+                d="M 24 55 C 24 58, 27 59, 32 59 C 37 59, 40 58, 40 55 Z"
+                fill="#F48FB1"
+              />
+            </m.svg>
           )}
         </AnimatePresence>
       </div>
 
       {/* Speech ribbon. White rounded rect, 88% viewport width, pink border.
           Hidden during Wake state (spec line 137). Scales in from 0.9 → 1
-          on first mount per spec line 170. */}
-      {screenState === 'intro' && (
+          on first mount per spec line 170.
+
+          Additionally hidden while the audio-unlock gate is still `pending`
+          OR `relock` AND no words have been revealed yet — i.e. when iPad
+          Safari silently rejected the speak() call and we have nothing to
+          show. Without this guard, the ribbon mounts as an empty rounded
+          rectangle the moment we transition to `intro`, which Thomas saw
+          on the real-device PWA after the first iPad QA run. The condition
+          is permissive once any speech has been heard (revealedByLine > 0),
+          so an in-flight retry that landed at least one word still keeps
+          the ribbon mounted across re-arms of the gate. */}
+      {screenState === 'intro' && shouldShowRibbon && (
         <m.div
           data-testid="greet-ribbon"
           role="status"
@@ -876,19 +958,38 @@ export default function Greet({
 
       {/* Full-viewport tap target. Sits ABOVE everything else when active
           (Wake state or relock retry) so any pixel inside safe-area is the
-          gesture trigger. We use onPointerDown for snappy iPad response —
-          onClick has a synthetic-event delay that shows up as 100-300ms of
-          dead time on Marian's first tap. Spec line 140 + 210. */}
+          gesture trigger. Spec line 140 + 210.
+
+          Event binding (post-#86c9gp99a-real iPad fix)
+          ---------------------------------------------
+          We bind THREE handlers, all wired to the same idempotent
+          `handleWakeTap`:
+
+            - `onClick` — load-bearing for iPad Safari standalone PWA. This
+              is the gesture event Webkit reliably honours as a user
+              activation for `speechSynthesis.speak()`. The previous
+              implementation was `onPointerDown`-only, which Thomas saw
+              fail silently on a real iPad install.
+            - `onTouchEnd` — backup for any iPad-Safari quirk where the
+              synthesized click after pointerdown→pointerup gets eaten
+              by the button unmounting itself in the same tick (we flip
+              `tapTargetActive` to false the moment we transition to
+              `intro`). Touchend fires earlier in the gesture flow and
+              is also a known-good user-activation event.
+            - `onPointerDown` — kept for snappy desktop / Chromium response
+              and for any gesture path where pointerdown does count.
+
+          The handler is idempotent (it early-returns when `screenState !==
+          'wake'` and the gate isn't in retry mode) so multiple events
+          firing in quick succession don't double-fire speak() or chime. */}
       {tapTargetActive && (
         <button
           type="button"
           data-testid="greet-wake-tap-target"
           aria-label="Tap to start"
-          onPointerDown={handleWakeTap}
-          // onClick is the keyboard-equivalent fallback; iPad won't reach
-          // here because pointerdown already consumed the gesture, but
-          // assistive switch-control or a connected keyboard might.
           onClick={handleWakeTap}
+          onTouchEnd={handleWakeTap}
+          onPointerDown={handleWakeTap}
           className="
             absolute inset-0 z-50
             cursor-pointer
