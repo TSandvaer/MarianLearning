@@ -177,6 +177,42 @@ describe('tts', () => {
       await expect(second).resolves.toBeUndefined()
     })
 
+    it('cancels the audio-layer queue between back-to-back speak() calls', async () => {
+      const synth = installFakeSynth()
+      // Model the real Web Speech API: cancel() drains the pending queue.
+      // Without this, the second utterance sits behind the first on iPad and
+      // the user hears "First. Second." instead of just "Second."
+      synth.cancel.mockImplementation(() => {
+        synth._utterances.length = 0
+      })
+
+      const first = speak('First.')
+      // Capture state right after the first speak() — queue should hold one.
+      expect(synth.speak).toHaveBeenCalledTimes(1)
+      expect(synth.cancel).not.toHaveBeenCalled()
+      expect(synth._utterances).toHaveLength(1)
+
+      const second = speak('Second.')
+
+      // Cancel must have fired exactly once, between the two speak() calls.
+      expect(synth.cancel).toHaveBeenCalledTimes(1)
+      expect(synth.speak).toHaveBeenCalledTimes(2)
+      const speakOrders = synth.speak.mock.invocationCallOrder
+      const cancelOrder = synth.cancel.mock.invocationCallOrder[0]
+      expect(cancelOrder).toBeGreaterThan(speakOrders[0])
+      expect(cancelOrder).toBeLessThan(speakOrders[1])
+
+      // Queue depth stays at 1: the first utterance was drained by cancel(),
+      // only the second is enqueued.
+      expect(synth._utterances).toHaveLength(1)
+      expect(synth._utterances[0].text).toBe('Second.')
+
+      await expect(first).rejects.toThrow('canceled')
+      const u = synth._utterances[0]
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await expect(second).resolves.toBeUndefined()
+    })
+
     it('rejects when the Web Speech API is not available', async () => {
       vi.stubGlobal('speechSynthesis', undefined)
       vi.stubGlobal('SpeechSynthesisUtterance', undefined)

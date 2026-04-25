@@ -107,9 +107,13 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     }
 
     // Replace any in-flight utterance so callers don't accidentally stack speech.
+    // Web Speech API queues utterances by default, so we must call synth.cancel()
+    // to stop the previous one at the audio layer — rejecting the JS promise alone
+    // doesn't silence the speaker on iPad/Safari.
     if (activeReject) {
       const prevReject = activeReject
       activeReject = null
+      synth.cancel()
       prevReject(new Error('canceled'))
     }
     activeUtterance = utterance
