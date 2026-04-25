@@ -16,7 +16,7 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'number-recog': 'mastered',
   'add-to-10': 'practicing', // sums to 10, drive automaticity
   'add-to-20': 'locked',
-  'sub-to-10': 'practicing', // within 15 confident => sub-to-10 in active practice
+  'sub-to-10': 'mastered', // within 15 confident => sub-to-10 is solid
   'sub-to-20': 'locked', // diagnostic says extend to 20 no-borrow next
   'two-digit-addsub': 'locked',
   'skip-counting': 'locked',
@@ -26,7 +26,7 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
 
   // Word Song — literacy
   'letter-names': 'mastered', // alphabet mastered (minor b/d confusion)
-  'letter-sounds': 'mastered', // consonant sounds mastered; vowels in flight
+  'letter-sounds': 'practicing', // consonants mastered, vowels mid-flight (only short a)
   'blending-cv': 'practicing', // CV confident
   'cvc-words': 'intro', // emerging
   digraphs: 'locked',
