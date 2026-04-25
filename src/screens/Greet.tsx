@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
-import { cancel as cancelTts, speak } from '../lib/tts'
 import { createSfx, type Sfx } from '../lib/sfx'
-import { useAudioUnlockGate } from '../lib/audio'
+import {
+  cancelPreRecorded,
+  playGreetLine as defaultPlayGreetLine,
+  useAudioUnlockGate,
+  type GreetLineKey,
+  type PlayGreetLineOptions,
+} from '../lib/audio'
 import { recordRawTapEvent, recordTap } from '../lib/debug'
 import {
   GREET_LINES,
@@ -11,7 +16,31 @@ import {
   speakReprompt,
   type GreetSequenceHandle,
   type SpeakFn,
+  type SpeakLikeOptions,
 } from './greetSequence'
+
+/**
+ * Map line text → pre-recorded key. The text strings are owned by
+ * `greetSequence.GREET_LINES`; this map is the bridge between the
+ * orchestrator (text-based) and the new pre-recorded engine (key-based).
+ * Built off GREET_LINES at module load so any future drift is a compile-
+ * time-detectable mismatch.
+ */
+const LINE_TEXT_TO_KEY: Record<string, GreetLineKey> = {
+  [GREET_LINES[0]]: 'hi',
+  [GREET_LINES[1]]: 'imMelody',
+  [GREET_LINES[2]]: 'niceToMeet',
+  [GREET_LINES[3]]: 'tapHeart',
+}
+
+/**
+ * Type for the pre-recorded playback function — exposed as a Greet prop
+ * test seam (mirrors the now-removed `speakFn` seam).
+ */
+export type PlayGreetLineFn = (
+  key: GreetLineKey,
+  opts?: PlayGreetLineOptions,
+) => Promise<void>
 
 /**
  * Screen 2 — First Greeting (Meet Melody).
@@ -40,7 +69,7 @@ import {
  * iPad Safari audio unlock (the bug this ticket fixes)
  * ----------------------------------------------------
  * Splash auto-advances into Greet without a tap. Without this Wake state,
- * Greet's first `speak()` ran inside a useEffect on the screen-mount tick,
+ * Greet's first audio call ran inside a useEffect on the screen-mount tick,
  * which iPad Safari treats as a fresh execution context with no user
  * gesture — so the call was silently rejected and the entire greeting died.
  * We fix that by:
@@ -53,16 +82,25 @@ import {
  *      context (Howler bridges to Web Audio for sub-frame latency on
  *      subsequent SFX plays).
  *
+ * Pre-recorded MP3s (post-86c9gqprh)
+ * ----------------------------------
+ * The 4 fixed Greet lines play through Howler.js (`lib/audio/preRecorded`),
+ * not Web Speech. This was the architectural pivot after 5 rounds of band-
+ * aiding the iPad Safari `speechSynthesis.speak()` "first-speak unreliable"
+ * pattern (PRs #18, #21, #22, #23, #24). Web Speech stays the engine for
+ * dynamic Math/Word Song lines via `lib/tts/*` — the two paths are siblings.
+ *
  * First-utterance retry (Dave's contract)
  * ---------------------------------------
- * Even with the gesture in the right place, iPadOS occasionally rejects the
- * very first call. `useAudioUnlockGate` arms a 5s watchdog around the
- * speak; if onstart never fires we surface the Wake ring again silently and
- * the next gesture re-fires speak(line0) inside its own synchronous tick.
- * No copy is shown — Marian sees a slightly delayed Melody, not an error.
- * (Window was 2s pre-round-5; bumped to 5s after Thomas's iPad QA showed
- * legitimate first-speech routinely takes 3-5s on cold-cache PWA loads.
- * See FIRST_UTTERANCE_RETRY_MS below.)
+ * Even with the gesture in the right place, iPadOS can occasionally reject
+ * the very first audio call (e.g. WebAudio context warm-up). `useAudioUnlockGate`
+ * arms a 1.5s watchdog around the play; if `onPlay` never fires we surface
+ * the Wake ring again silently and the next gesture re-fires line 0 inside
+ * its own synchronous tick. No copy is shown — Marian sees a slightly
+ * delayed Melody, not an error. (Window was 5s during the Web-Speech era
+ * because synthesis genuinely had 3-5s first-utterance latency; pre-recorded
+ * MP3s `play` event fires ~50ms after `play()`, so 1.5s is plenty. See
+ * FIRST_UTTERANCE_RETRY_MS below.)
  *
  * Reduced motion: the global `MotionConfig reducedMotion="user"` collapses
  * spring entrances and stops infinite loops. We additionally branch on
@@ -93,14 +131,22 @@ const ICON_HOLD_AFTER_PULSE_MS = 2_500
 /** Finger-tap icon fade-out duration. */
 const ICON_FADE_OUT_MS = 400
 /**
- * Watchdog window for "did the engine actually start speaking" — Dave's
- * contract. Bumped from 2_000 → 5_000 in round 5 (ticket 86c9gp99a) to
- * match real-iPad first-speech latency observed in Thomas's QA: cold-cache
- * PWA loads take 3-5 s before `onstart` fires. The previous 2 s value was
- * triggering spurious relocks before the engine had a chance to start. See
- * the matching DEFAULT_WATCHDOG_MS comment in useAudioUnlockGate.ts.
+ * Watchdog window for "did the audio engine actually start playing" — Dave's
+ * contract.
+ *
+ * Pre-recorded MP3 era (ticket 86c9gqprh): shrunk from 5_000 → 1_500 ms.
+ * Howler's `onplay` event fires within ~50 ms of `play()` once the audio
+ * context is gesture-unlocked; the bulk of the remaining budget is for
+ * first-load decode of the 9-18 KB MP3s. 1.5s is generous for any
+ * realistic iPad PWA cold-cache scenario yet tight enough that a true
+ * silent-fail surfaces the relock ring before Marian gives up.
+ *
+ * History: this was 2_000 (PRs #18-#22), bumped to 5_000 in round 5
+ * (PR #24) when we still depended on Web Speech, which had genuine 3-5s
+ * first-utterance latency on iPad. Pre-recorded audio doesn't share that
+ * cost so we get to spend the saved time on a snappier retry surface.
  */
-const FIRST_UTTERANCE_RETRY_MS = 5_000
+const FIRST_UTTERANCE_RETRY_MS = 1_500
 /** Melody's breathing loop period (spec line 166). */
 const BREATHING_PERIOD_S = 2.4
 /** Ring pulse loop period (spec line 167). */
@@ -131,10 +177,17 @@ export interface GreetProps {
   /** Called when the heart-tap → Math hand-off should happen. */
   onAdvance: () => void
   /**
-   * Test seam: replace the live `speak` with a fake. Defaults to the real
-   * lib/tts speak() so the screen mounts in production without ceremony.
+   * Test seam: replace the live pre-recorded playback with a fake.
+   * Defaults to the real `lib/audio.playGreetLine()` so the screen mounts
+   * in production without ceremony.
+   *
+   * Why this is shaped (key, opts) and not (text, opts): post-86c9gqprh
+   * the Greet lines are pre-recorded MP3s identified by stable keys, not
+   * Web Speech utterances identified by their text. The orchestrator
+   * (`greetSequence.ts`) still works in text-space; this component bridges
+   * via `LINE_TEXT_TO_KEY` inside `playLineAdapter`.
    */
-  speakFn?: SpeakFn
+  playGreetLineFn?: PlayGreetLineFn
   /**
    * Test seam: replace the chime SFX. Defaults to a Howler-backed chime
    * tolerant of the asset being absent (see assets-todo.md).
@@ -170,14 +223,14 @@ function usePrefersReducedMotion(): boolean {
 
 export default function Greet({
   onAdvance,
-  speakFn = speak,
+  playGreetLineFn = defaultPlayGreetLine,
   chime,
 }: GreetProps) {
   const reducedMotion = usePrefersReducedMotion()
 
-  // Audio unlock gate — wraps line 0's speak with a 2s watchdog. If the
-  // engine doesn't actually start speaking within the window, we surface
-  // the Wake ring again so the next tap can retry synchronously.
+  // Audio unlock gate — wraps line 0's play with a 1.5s watchdog. If the
+  // Howl `onplay` event doesn't fire within the window, we surface the
+  // Wake ring again so the next tap can retry synchronously.
   const gate = useAudioUnlockGate({ watchdogMs: FIRST_UTTERANCE_RETRY_MS })
 
   // Lazy-init: createSfx kicks off an XHR; we only want one per mount.
@@ -299,6 +352,50 @@ export default function Greet({
     }, EAR_WIGGLE_MS)
   }, [])
 
+  // --- SpeakFn adapter ------------------------------------------------------
+  //
+  // The orchestrator (`runGreetSequence`) and the re-prompt helper still work
+  // in text-space — same shape as the Web Speech-era contract. We bridge to
+  // the key-based pre-recorded engine here. Two responsibilities:
+  //
+  //   1. Map line text → GreetLineKey via LINE_TEXT_TO_KEY (module-scope).
+  //   2. Translate the orchestrator's onStart/onBoundary callbacks onto the
+  //      pre-recorded engine's onPlay/onWordTick events. The shape match is
+  //      1:1 by design — both sides describe "audio started" and "advance
+  //      to word index N", just with different transport.
+  //
+  // This adapter is the ONLY production caller into `playGreetLineFn`; tests
+  // mock the prop and so they never see the adapter directly.
+
+  const playLineAdapter: SpeakFn = useCallback(
+    (text: string, opts?: SpeakLikeOptions) => {
+      const key = LINE_TEXT_TO_KEY[text]
+      if (!key) {
+        // Unknown line — should be impossible given GREET_LINES is the
+        // single source of truth on both sides, but reject loudly so a
+        // future drift surfaces in the failing-promise path the
+        // orchestrator already handles (silent halt, no auto-retry).
+        return Promise.reject(
+          new Error(`[Greet] no pre-recorded key for line "${text}"`),
+        )
+      }
+      return playGreetLineFn(key, {
+        onPlay: opts?.onStart,
+        onWordTick: opts?.onBoundary
+          ? (wordIndex) => {
+              const words = text.split(/\s+/).filter(Boolean)
+              opts.onBoundary?.({
+                wordIndex,
+                word: words[wordIndex] ?? '',
+                charIndex: 0,
+              })
+            }
+          : undefined,
+      })
+    },
+    [playGreetLineFn],
+  )
+
   // --- Re-prompt timer (post-line-4, 20s no-heart-tap) ----------------------
 
   const scheduleReprompt = useCallback(() => {
@@ -319,7 +416,7 @@ export default function Greet({
         return next
       })
       void speakReprompt({
-        speak: speakFn,
+        speak: playLineAdapter,
         onBoundary: (ev) => {
           setRevealedByLine((prev) => {
             const next = prev.slice()
@@ -329,7 +426,7 @@ export default function Greet({
         },
       })
     }, REPROMPT_AFTER_MS)
-  }, [speakFn])
+  }, [playLineAdapter])
 
   // --- Sequence factory -----------------------------------------------------
   //
@@ -338,7 +435,7 @@ export default function Greet({
 
   const buildSequence = useCallback((): GreetSequenceHandle => {
     return runGreetSequence({
-      speak: speakFn,
+      speak: playLineAdapter,
       onLineStart: (i) => {
         setActiveLine(i)
       },
@@ -386,7 +483,7 @@ export default function Greet({
         scheduleReprompt()
       },
     })
-  }, [gate, scheduleReprompt, speakFn, triggerEarWiggle])
+  }, [gate, scheduleReprompt, playLineAdapter, triggerEarWiggle])
 
   // Build the sequence handle on mount; do NOT start() it. Mounting a sequence
   // costs nothing — speak() is only called when start() runs.
@@ -395,12 +492,15 @@ export default function Greet({
     return () => {
       sequenceRef.current?.cancel()
       sequenceRef.current = null
-      cancelTts()
+      // Cancel any in-flight pre-recorded playback. Math/Word Song still
+      // use Web Speech via lib/tts; that's untouched here.
+      cancelPreRecorded()
       clearAllTimers()
       chimeInstance.unload()
     }
-    // We deliberately rebuild only on speakFn / chime changes — the rest of
-    // the deps are stable identities from this component's own state setters.
+    // We deliberately rebuild only when the playback-fn / chime change —
+    // the rest of the deps are stable identities from this component's own
+    // state setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -568,7 +668,7 @@ export default function Greet({
     // Build a fresh sequence (the one from mount may already be running if
     // we're recovering from a relock state) and kick it off synchronously.
     sequenceRef.current?.cancel()
-    cancelTts()
+    cancelPreRecorded()
     const handle = buildSequence()
     sequenceRef.current = handle
 
@@ -595,7 +695,7 @@ export default function Greet({
     // cancel the in-flight (silent) sequence and start a fresh one.
     gate.registerRetry(() => {
       sequenceRef.current?.cancel()
-      cancelTts()
+      cancelPreRecorded()
       const retryHandle = buildSequence()
       sequenceRef.current = retryHandle
       gate.wrapSpeak(() => {
@@ -625,7 +725,7 @@ export default function Greet({
     tapHandledRef.current = true
 
     // Cancel any in-flight TTS so Melody isn't talking over the chime.
-    cancelTts()
+    cancelPreRecorded()
     // Cancel the re-prompt — she tapped, no nag needed.
     if (repromptTimerRef.current !== null) {
       clearTimeout(repromptTimerRef.current)

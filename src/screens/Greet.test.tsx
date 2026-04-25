@@ -11,15 +11,6 @@ import {
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import type { ReactNode } from 'react'
 
-// IMPORTANT: stub `lib/tts` BEFORE importing the screen — the real module
-// reaches into window.speechSynthesis which jsdom does not implement.
-const ttsCancelSpy = vi.fn()
-const ttsSpeakSpy = vi.fn()
-vi.mock('../lib/tts', () => ({
-  speak: (...args: unknown[]) => ttsSpeakSpy(...args),
-  cancel: () => ttsCancelSpy(),
-}))
-
 // Stub the SFX factory so jsdom never tries to construct a real Howl. We
 // also expose the spy via a mock-state object so individual tests can
 // override the `play()` return value (true/false → asset present/missing).
@@ -47,6 +38,24 @@ vi.mock('../lib/sfx', () => ({
   }),
 }))
 
+// Stub the pre-recorded module so jsdom never tries to construct a real
+// Howl for the Greet MP3s. We also stub `cancelPreRecorded` so the test
+// can spy on cancellations.
+//
+// `useAudioUnlockGate` is the real implementation — we WANT to drive the
+// watchdog/relock state machine end-to-end in these tests; only the audio
+// I/O layer needs faking.
+const cancelPreRecordedSpy = vi.fn()
+vi.mock('../lib/audio', async () => {
+  const actual =
+    await vi.importActual<typeof import('../lib/audio')>('../lib/audio')
+  return {
+    ...actual,
+    playGreetLine: vi.fn(),
+    cancelPreRecorded: () => cancelPreRecordedSpy(),
+  }
+})
+
 import Greet from './Greet'
 import { _resetForTests as resetDebugBus } from '../lib/debug'
 import {
@@ -54,8 +63,8 @@ import {
   HEART_REVEAL_AFTER_LINE_INDEX,
   LINE_GAP_MS,
   REPROMPT_AFTER_MS,
-  type SpeakLikeOptions,
 } from './greetSequence'
+import type { GreetLineKey, PlayGreetLineOptions } from '../lib/audio'
 
 function withMotion(node: ReactNode) {
   // Mirror App.tsx providers so <m.*> elements + AnimatePresence resolve.
@@ -67,64 +76,77 @@ function withMotion(node: ReactNode) {
 }
 
 /**
- * Build a controllable speak() fake. We hand it to <Greet speakFn={...} />
- * so the component drives the same orchestrator the production wiring uses,
- * but each line is a deferred promise the test resolves explicitly.
+ * Build a controllable playGreetLineFn() fake. Production-shape: each
+ * call takes a stable line key (`'hi' | 'imMelody' | ...`) plus playback
+ * opts, and returns a deferred promise the test resolves explicitly.
+ *
+ * Replaces the Web Speech-era `speakFn` harness — the orchestrator still
+ * works in text-space but the Greet adapter (`playLineAdapter`) translates
+ * text → key, so what arrives here is the key.
  */
-function makeSpeakHarness() {
+function makePlayHarness() {
   const calls: Array<{
+    key: GreetLineKey
+    opts: PlayGreetLineOptions | undefined
+    /** The line text the orchestrator was working with — derived from key. */
     text: string
-    opts: SpeakLikeOptions | undefined
     resolve: () => void
     reject: (err: Error) => void
   }> = []
 
-  const speakFn = vi.fn(
-    (text: string, opts?: SpeakLikeOptions) =>
+  const KEY_TO_TEXT: Record<GreetLineKey, string> = {
+    hi: GREET_LINES[0],
+    imMelody: GREET_LINES[1],
+    niceToMeet: GREET_LINES[2],
+    tapHeart: GREET_LINES[3],
+  }
+
+  const playGreetLineFn = vi.fn(
+    (key: GreetLineKey, opts?: PlayGreetLineOptions) =>
       new Promise<void>((resolve, reject) => {
-        calls.push({ text, opts, resolve, reject })
+        calls.push({ key, opts, text: KEY_TO_TEXT[key], resolve, reject })
       }),
   )
 
   return {
-    speakFn,
+    playGreetLineFn,
     calls,
-    /** Resolve the most-recent in-flight speak(). */
+    /** Resolve the most-recent in-flight playback (mirrors `Howl.end`). */
     resolveLast() {
       const call = calls[calls.length - 1]
-      if (!call) throw new Error('no pending speak() to resolve')
+      if (!call) throw new Error('no pending playGreetLine() to resolve')
       call.resolve()
     },
-    /** Fire a synthetic word boundary on the most-recent in-flight line. */
-    boundary(wordIndex: number, word: string) {
+    /**
+     * Fire a synthetic word tick on the most-recent in-flight line. The
+     * Greet adapter translates this into an `onBoundary` event the
+     * orchestrator's `onWordBoundary` hook reads.
+     */
+    tickWord(wordIndex: number) {
       const call = calls[calls.length - 1]
-      if (!call) throw new Error('no pending speak() to boundary')
-      call.opts?.onBoundary?.({
-        wordIndex,
-        word,
-        charIndex: 0,
-      })
+      if (!call) throw new Error('no pending playGreetLine() to tick')
+      call.opts?.onWordTick?.(wordIndex)
     },
     /**
-     * Fire the most-recent line's onStart callback, simulating the engine
-     * actually beginning to speak (used by useAudioUnlockGate to clear the
-     * 2s watchdog).
+     * Fire the most-recent line's onPlay callback, simulating the engine
+     * actually beginning to play (used by useAudioUnlockGate to clear the
+     * 1.5s watchdog).
      */
-    fireOnStart() {
+    fireOnPlay() {
       const call = calls[calls.length - 1]
-      if (!call) throw new Error('no pending speak() to start')
-      call.opts?.onStart?.()
+      if (!call) throw new Error('no pending playGreetLine() to start')
+      call.opts?.onPlay?.()
     },
   }
 }
 
 /**
- * Drive the speak harness to completion of line `index` while flushing
+ * Drive the play harness to completion of the active line while flushing
  * micro/macro tasks the way `runGreetSequence` expects. After this, the
- * caption for line `index` is fully revealed and the next line is queued
- * after LINE_GAP_MS.
+ * caption is forcibly revealed and the next line is queued after
+ * LINE_GAP_MS.
  */
-async function completeLine(harness: ReturnType<typeof makeSpeakHarness>) {
+async function completeLine(harness: ReturnType<typeof makePlayHarness>) {
   await act(async () => {
     harness.resolveLast()
     await Promise.resolve()
@@ -172,11 +194,10 @@ describe('Greet', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
-    ttsCancelSpy.mockClear()
-    ttsSpeakSpy.mockClear()
+    cancelPreRecordedSpy.mockClear()
     sfxState.last = null
     sfxState.createCount = 0
-    // Bus is a module-level singleton — reset between tests so tap/gate/speak
+    // Bus is a module-level singleton — reset between tests so tap/gate/play
     // state from a previous case can't leak into the next.
     resetDebugBus()
   })
@@ -191,8 +212,12 @@ describe('Greet', () => {
   describe('Wake state (initial mount, audio locked)', () => {
     it('mounts in Wake state and renders Melody, the cloud bg, the ready ring, and the tap target', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-screen-state',
@@ -209,21 +234,29 @@ describe('Greet', () => {
 
     it('does NOT show the speech ribbon, heart, or wake-icon in initial Wake state', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       expect(screen.queryByTestId('greet-ribbon')).toBeNull()
       expect(screen.queryByTestId('greet-heart')).toBeNull()
       expect(screen.queryByTestId('greet-wake-icon')).toBeNull()
     })
 
-    it('does NOT call speak() before the user tap (the iPad Safari fix)', () => {
-      // This is the load-bearing invariant for ticket 86c9gp99a. The screen
+    it('does NOT call playGreetLine() before the user tap (the iPad Safari fix)', () => {
+      // Load-bearing invariant for ticket 86c9gp99a / 86c9gqprh. The screen
       // must remain audio-silent until a synchronous user gesture lands —
-      // calling speak() from useEffect on mount is what the bug used to do.
+      // calling play() from useEffect on mount is what the bug used to do.
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       expect(h.calls).toHaveLength(0)
 
@@ -235,15 +268,20 @@ describe('Greet', () => {
       expect(h.calls).toHaveLength(0)
     })
 
-    it('full-viewport tap target tap synchronously fires speak(line0) and transitions to intro', () => {
+    it('full-viewport tap target tap synchronously fires playGreetLine("hi") and transitions to intro', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
 
-      // Synchronously, with no awaits between tap and speak.
+      // Synchronously, with no awaits between tap and play.
       expect(h.calls).toHaveLength(1)
+      expect(h.calls[0].key).toBe('hi')
       expect(h.calls[0].text).toBe('Hi!')
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-screen-state',
@@ -268,32 +306,44 @@ describe('Greet', () => {
 
     it('also kicks the chime SFX synchronously inside the tap handler (WebAudio unlock)', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
 
       // The chime instance was constructed at mount; play() is called inside
-      // the same handler as speak() to silently unlock Howler's WebAudio
-      // context for later SFX.
+      // the same handler as playGreetLine() to silently unlock Howler's
+      // WebAudio context for later SFX.
       expect(sfxState.last?.play).toHaveBeenCalledTimes(1)
     })
 
-    it('forwards an onStart callback on the line-0 speak (gate watchdog signal)', () => {
+    it('forwards an onPlay callback on the line-0 play (gate watchdog signal)', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
-      expect(h.calls[0].opts?.onStart).toBeTypeOf('function')
+      expect(h.calls[0].opts?.onPlay).toBeTypeOf('function')
     })
   })
 
   describe('Wake re-prompt (8s no-tap nudge)', () => {
     it('does NOT show the wake-icon before 8s elapsed', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       expect(screen.queryByTestId('greet-wake-icon')).toBeNull()
       act(() => {
@@ -304,8 +354,12 @@ describe('Greet', () => {
 
     it('shows the wake-icon and triggers ear-wiggle at exactly 8s', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       act(() => {
         vi.advanceTimersByTime(8_000)
@@ -318,10 +372,14 @@ describe('Greet', () => {
       expect(poses).toContain('happy')
     })
 
-    it('does NOT call speak() during the wake re-prompt (audio still locked)', () => {
+    it('does NOT call playGreetLine() during the wake re-prompt (audio still locked)', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       act(() => {
         vi.advanceTimersByTime(8_000)
@@ -337,8 +395,12 @@ describe('Greet', () => {
       // the production behaviour is unaffected and the alternative
       // (advancing rAF manually in tests) leaks Motion internals.
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       act(() => {
         vi.advanceTimersByTime(8_000)
@@ -365,8 +427,12 @@ describe('Greet', () => {
 
     it('triggers exactly once — does NOT re-fire after hide', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       act(() => {
         vi.advanceTimersByTime(8_000)
@@ -390,8 +456,12 @@ describe('Greet', () => {
 
     it('a tap before 8s cancels the wake re-prompt — icon never fires', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       act(() => {
         vi.advanceTimersByTime(2_000)
@@ -406,10 +476,14 @@ describe('Greet', () => {
   })
 
   describe('Intro state (post-tap)', () => {
-    it('captions reveal word-by-word as boundary events fire', async () => {
+    it('captions reveal word-by-word as word ticks fire', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
       fireWakeTap()
 
       // Resolve "Hi!" so we move to "I'm Melody."
@@ -418,7 +492,7 @@ describe('Greet', () => {
 
       // Now the second line is in flight with two words.
       await act(async () => {
-        h.boundary(0, "I'm")
+        h.tickWord(0)
       })
       let revealed = screen
         .getAllByTestId('greet-caption-word')
@@ -427,7 +501,7 @@ describe('Greet', () => {
       expect(revealed).toEqual(["I'm"])
 
       await act(async () => {
-        h.boundary(1, 'Melody.')
+        h.tickWord(1)
       })
       revealed = screen
         .getAllByTestId('greet-caption-word')
@@ -436,10 +510,14 @@ describe('Greet', () => {
       expect(revealed).toEqual(["I'm", 'Melody.'])
     })
 
-    it('forces line fully revealed at line-end (covers the punctuation/no-boundary fallback)', async () => {
+    it('forces line fully revealed at line-end (covers the punctuation/no-tick fallback)', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
       fireWakeTap()
 
       await completeLine(h)
@@ -451,10 +529,14 @@ describe('Greet', () => {
       expect(revealed).toHaveLength(1)
     })
 
-    it('triggers the ear-wiggle when the "Hi!" boundary arrives', async () => {
+    it('triggers the ear-wiggle when the "Hi!" word tick arrives', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
       fireWakeTap()
 
       // Pre-condition: idle.
@@ -464,10 +546,10 @@ describe('Greet', () => {
       )
 
       expect(h.calls).toHaveLength(1)
-      expect(h.calls[0].opts?.onBoundary).toBeTypeOf('function')
+      expect(h.calls[0].opts?.onWordTick).toBeTypeOf('function')
 
       await act(async () => {
-        h.boundary(0, 'Hi!')
+        h.tickWord(0)
       })
 
       let poses = screen
@@ -484,18 +566,22 @@ describe('Greet', () => {
       expect(poses).toContain('idle')
     })
 
-    it('does not trigger the ear-wiggle on non-"Hi!" boundaries', async () => {
+    it('does not trigger the ear-wiggle on non-line-0 word ticks', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
       fireWakeTap()
 
       await completeLine(h)
       await crossGap()
 
       await act(async () => {
-        h.boundary(0, "I'm")
-        h.boundary(1, 'Melody.')
+        h.tickWord(0)
+        h.tickWord(1)
       })
       const poses = screen
         .getAllByTestId('greet-melody')
@@ -505,8 +591,12 @@ describe('Greet', () => {
 
     it('reveals the heart only after line 3 ("It\'s so nice to meet you.") completes', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
       fireWakeTap()
 
       for (let i = 0; i <= HEART_REVEAL_AFTER_LINE_INDEX; i++) {
@@ -527,15 +617,19 @@ describe('Greet', () => {
 
     it("captions never show text Melody hasn't said (initially zero revealed)", () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
       fireWakeTap()
       // The ribbon mounts as soon as the engine reports it actually started
-      // speaking (post-#86c9gp99a-real iPad fix: empty ribbon never shows
-      // before evidence of audio). Fire onStart so the ribbon mounts, then
-      // assert no words are revealed yet — we haven't sent a boundary.
+      // playing (post-#86c9gp99a-real iPad fix: empty ribbon never shows
+      // before evidence of audio). Fire onPlay so the ribbon mounts, then
+      // assert no words are revealed yet — we haven't sent a tick.
       act(() => {
-        h.fireOnStart()
+        h.fireOnPlay()
       })
 
       const revealed = screen
@@ -546,12 +640,16 @@ describe('Greet', () => {
 
     it('caption text font-size is comfortably above the 28pt floor', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
       fireWakeTap()
-      // Force the ribbon to mount via onStart (see preceding test for why).
+      // Force the ribbon to mount via onPlay (see preceding test for why).
       act(() => {
-        h.fireOnStart()
+        h.fireOnPlay()
       })
 
       const caption = screen.getByTestId('greet-caption')
@@ -560,34 +658,46 @@ describe('Greet', () => {
   })
 
   describe('Wake-tap event-binding coverage (post-#86c9gp99a-real iPad fix)', () => {
-    it('responds to a click event (the iPad-Safari-honored gesture for speech unlock)', () => {
+    it('responds to a click event (the iPad-Safari-honored gesture for audio unlock)', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       const target = screen.getByTestId('greet-wake-tap-target')
       fireEvent.click(target)
 
       expect(h.calls).toHaveLength(1)
-      expect(h.calls[0].text).toBe('Hi!')
+      expect(h.calls[0].key).toBe('hi')
     })
 
     it('responds to a touchend event (iPad gesture-gate fallback)', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       const target = screen.getByTestId('greet-wake-tap-target')
       fireEvent.touchEnd(target)
 
       expect(h.calls).toHaveLength(1)
-      expect(h.calls[0].text).toBe('Hi!')
+      expect(h.calls[0].key).toBe('hi')
     })
 
     it('responds to a pointerdown event (Chromium / desktop snappy path)', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       const target = screen.getByTestId('greet-wake-tap-target')
       fireEvent.pointerDown(target)
@@ -595,13 +705,17 @@ describe('Greet', () => {
       expect(h.calls).toHaveLength(1)
     })
 
-    it('triple-fires from one tap (touchend + pointerdown + click) only fire speak ONCE', () => {
+    it('triple-fires from one tap (touchend + pointerdown + click) only fire play ONCE', () => {
       // Single physical tap on iPad Safari delivers touchend → pointerdown → click
       // in quick succession; React batches the state updates so all three handlers
       // see screenState === 'wake'. The same-tick guard must collapse them.
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       const target = screen.getByTestId('greet-wake-tap-target')
       // Mirror the real iPad event sequence for one tap.
@@ -620,8 +734,12 @@ describe('Greet', () => {
       // iPad Safari standalone PWA mode mis-rendered <img src="…svg"> as a
       // broken-image placeholder for this asset. Inlining sidesteps the bug.
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       act(() => {
         vi.advanceTimersByTime(8_000)
@@ -640,13 +758,17 @@ describe('Greet', () => {
   })
 
   describe('Empty-ribbon prevention (post-#86c9gp99a-real iPad fix)', () => {
-    it('does NOT mount the ribbon synchronously on wake-tap before any speech evidence', () => {
+    it('does NOT mount the ribbon synchronously on wake-tap before any play evidence', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
-      // Screen state advanced — but no onStart, no boundary, no evidence the
+      // Screen state advanced — but no onPlay, no tick, no evidence the
       // engine actually picked up the call. iPad Safari can silently reject;
       // the ribbon must not appear as an empty rounded rectangle.
       expect(screen.getByTestId('greet')).toHaveAttribute(
@@ -656,46 +778,60 @@ describe('Greet', () => {
       expect(screen.queryByTestId('greet-ribbon')).toBeNull()
     })
 
-    it('mounts the ribbon as soon as onStart fires (engine confirmed speaking)', () => {
+    it('mounts the ribbon as soon as onPlay fires (engine confirmed playing)', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
       expect(screen.queryByTestId('greet-ribbon')).toBeNull()
 
       act(() => {
-        h.fireOnStart()
+        h.fireOnPlay()
       })
       expect(screen.getByTestId('greet-ribbon')).toBeInTheDocument()
     })
 
-    it('mounts the ribbon when a boundary fires even if onStart was skipped (engine quirk fallback)', async () => {
+    it('mounts the ribbon when a word tick fires even if onPlay was skipped (engine quirk fallback)', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
       expect(screen.queryByTestId('greet-ribbon')).toBeNull()
 
-      // Some engines skip onstart but emit onboundary — the gate also flips
-      // to unlocked on the first boundary (greetSequence wires this).
+      // Greet's adapter wires the first onWordTick to also flip the
+      // gate to unlocked — covers any future engine that emits ticks
+      // without an onPlay event.
       await act(async () => {
-        h.boundary(0, 'Hi!')
+        h.tickWord(0)
       })
       expect(screen.getByTestId('greet-ribbon')).toBeInTheDocument()
     })
 
     it('does NOT mount the ribbon in the silent-fail relock path', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
-      // 5s elapses with no onStart and no boundary — gate flips to relock.
-      // (Round 5 bumped FIRST_UTTERANCE_RETRY_MS from 2_000 → 5_000.)
+      // 1.5s elapses with no onPlay and no tick — gate flips to relock.
+      // (Pre-recorded MP3 era shrunk FIRST_UTTERANCE_RETRY_MS from
+      // 5_000 → 1_500.)
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5_000)
+        await vi.advanceTimersByTimeAsync(1_500)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -708,21 +844,25 @@ describe('Greet', () => {
   })
 
   describe("First-utterance retry contract (Dave's)", () => {
-    it('if onStart never fires within 5s of the wake tap, the gate transitions to relock and shows the ring + tap target again', async () => {
+    it('if onPlay never fires within 1.5s of the wake tap, the gate transitions to relock and shows the ring + tap target again', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
-      // Speak fired but onStart is never called — simulating iPad Safari
+      // Play fired but onPlay is never called — simulating iPad Safari
       // silently rejecting the call.
       expect(h.calls).toHaveLength(1)
 
-      // Round 5 (ticket 86c9gp99a): watchdog window bumped from 2 → 5s
-      // after Thomas iPad QA showed legitimate first-speech routinely
-      // takes 3-5s on cold-cache PWA loads.
+      // Pre-recorded MP3 era (ticket 86c9gqprh): watchdog window shrunk
+      // from 5 → 1.5s. Howler `onplay` fires within ~50ms once the audio
+      // context is unlocked; 1.5s is generous for cold-cache decode.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5_000)
+        await vi.advanceTimersByTimeAsync(1_500)
       })
 
       expect(screen.getByTestId('greet')).toHaveAttribute(
@@ -735,32 +875,35 @@ describe('Greet', () => {
       expect(screen.getByTestId('greet-wake-tap-target')).toBeInTheDocument()
     })
 
-    it('does NOT prematurely relock at 2s — speech that takes 3-4s to start should still be honoured', async () => {
-      // Regression guard for the round-5 watchdog bump. The previous 2s
-      // value would mark the gate `relock` even though the engine was
-      // about to start speaking 1-3s later — Marian then tapped again and
-      // queued a competing speak(). This test pins the new behaviour: at
-      // 2s elapsed we MUST still be `pending`, not `relock`.
+    it('does NOT prematurely relock at 1s — sub-second decode latency should still be honoured', async () => {
+      // Regression guard for the watchdog window. Before pre-recorded
+      // audio, this test pinned the 5s window against premature relock at
+      // 2s. Post-pre-recorded the window is 1.5s, so we assert the gate
+      // is still `pending` at the 1s mark — well inside the window.
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_000)
+        await vi.advanceTimersByTimeAsync(1_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
         'pending',
       )
 
-      // Speech genuinely starts at the 4s mark — well past old 2s, well
-      // before new 5s. Gate transitions to unlocked, no relock surfaced.
+      // Audio genuinely starts playing at the 1.4s mark — past 1s, before 1.5s.
+      // Gate transitions to unlocked, no relock surfaced.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_000)
+        await vi.advanceTimersByTimeAsync(400)
       })
       act(() => {
-        h.fireOnStart()
+        h.fireOnPlay()
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -768,34 +911,38 @@ describe('Greet', () => {
       )
     })
 
-    it('the next user gesture after a silent fail synchronously re-fires speak(line0) with a fresh utterance', async () => {
+    it('the next user gesture after a silent fail synchronously re-fires play(line0) with a fresh playback', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
-      // First tap — speak fired but engine ignored it.
+      // First tap — play fired but engine ignored it.
       fireWakeTap()
       expect(h.calls).toHaveLength(1)
 
-      // Watchdog expires (5s post-round-5).
+      // Watchdog expires (1.5s post-pre-recorded).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5_000)
+        await vi.advanceTimersByTimeAsync(1_500)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
         'relock',
       )
 
-      // Second tap — synchronously retries speak(line0).
+      // Second tap — synchronously retries play(line0).
       fireWakeTap()
-      // A new speak() call has fired.
+      // A new playGreetLine() call has fired.
       expect(h.calls.length).toBeGreaterThanOrEqual(2)
       const lastCall = h.calls[h.calls.length - 1]
-      expect(lastCall.text).toBe('Hi!')
+      expect(lastCall.key).toBe('hi')
 
       // This time the engine actually starts.
       act(() => {
-        h.fireOnStart()
+        h.fireOnPlay()
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -803,27 +950,31 @@ describe('Greet', () => {
       )
     })
 
-    it('a successful onStart inside the 5s window keeps the gate in unlocked state — no ring re-show', async () => {
+    it('a successful onPlay inside the 1.5s window keeps the gate in unlocked state — no ring re-show', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
-      // Engine starts speaking promptly.
+      // Engine starts playing promptly.
       act(() => {
-        h.fireOnStart()
+        h.fireOnPlay()
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
         'unlocked',
       )
 
-      // Past the 5s mark: gate stays unlocked, no relock surfaces. The
+      // Past the 1.5s mark: gate stays unlocked, no relock surfaces. The
       // ring may still be in the DOM mid-exit-animation (rAF driver
       // doesn't tick under jsdom fake timers) but it's invisible — we
       // assert on the gate state rather than ring presence.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(6_000)
+        await vi.advanceTimersByTimeAsync(2_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -836,18 +987,22 @@ describe('Greet', () => {
       // delivers touchend + pointerdown + click — without the same-tick
       // guard on the relock branch of handleWakeTap, all three would call
       // gate.dispatchGesture() and fire the registered retry, queuing
-      // three competing speak() calls. Thomas reported this as the
+      // three competing play() calls. Thomas reported this as the
       // "ring re-pulses, voice eventually fires" pattern.
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       fireWakeTap()
-      const speaksAfterFirstTap = h.calls.length
+      const callsAfterFirstTap = h.calls.length
 
       // Watchdog expires; gate enters relock.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5_000)
+        await vi.advanceTimersByTimeAsync(1_500)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -860,15 +1015,15 @@ describe('Greet', () => {
       fireEvent.pointerDown(target)
       fireEvent.click(target)
 
-      // Exactly ONE additional speak() — the guard collapsed the other
+      // Exactly ONE additional play() — the guard collapsed the other
       // two synthetic events.
-      expect(h.calls.length).toBe(speaksAfterFirstTap + 1)
-      expect(h.calls[h.calls.length - 1].text).toBe('Hi!')
+      expect(h.calls.length).toBe(callsAfterFirstTap + 1)
+      expect(h.calls[h.calls.length - 1].key).toBe('hi')
     })
   })
 
   describe('heart tap (happy path)', () => {
-    async function advanceToHeart(h: ReturnType<typeof makeSpeakHarness>) {
+    async function advanceToHeart(h: ReturnType<typeof makePlayHarness>) {
       fireWakeTap()
       for (let i = 0; i <= HEART_REVEAL_AFTER_LINE_INDEX; i++) {
         await completeLine(h)
@@ -879,8 +1034,12 @@ describe('Greet', () => {
     it('plays the chime, squishes, and calls onAdvance within 400ms', async () => {
       mediaSpy = stubReducedMotion(false)
       const onAdvance = vi.fn()
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={onAdvance} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={onAdvance} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       await advanceToHeart(h)
 
@@ -907,7 +1066,7 @@ describe('Greet', () => {
     it('does not throw and still calls onAdvance when the chime asset is missing', async () => {
       mediaSpy = stubReducedMotion(false)
       const onAdvance = vi.fn()
-      const h = makeSpeakHarness()
+      const h = makePlayHarness()
 
       // Custom chime that simulates a 404 — play() returns false, no throw.
       const missingChime = {
@@ -921,7 +1080,7 @@ describe('Greet', () => {
         withMotion(
           <Greet
             onAdvance={onAdvance}
-            speakFn={h.speakFn}
+            playGreetLineFn={h.playGreetLineFn}
             chime={missingChime}
           />,
         ),
@@ -938,22 +1097,32 @@ describe('Greet', () => {
       expect(onAdvance).toHaveBeenCalledTimes(1)
     })
 
-    it('cancels in-flight TTS on heart tap so Melody is silent during the chime', async () => {
+    it('cancels in-flight pre-recorded playback on heart tap so Melody is silent during the chime', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       await advanceToHeart(h)
-      const cancelsBefore = ttsCancelSpy.mock.calls.length
+      const cancelsBefore = cancelPreRecordedSpy.mock.calls.length
       fireEvent.click(screen.getByTestId('greet-heart'))
-      expect(ttsCancelSpy.mock.calls.length).toBeGreaterThan(cancelsBefore)
+      expect(cancelPreRecordedSpy.mock.calls.length).toBeGreaterThan(
+        cancelsBefore,
+      )
     })
 
     it('debounces double-tap: only one onAdvance regardless of how many taps land', async () => {
       mediaSpy = stubReducedMotion(false)
       const onAdvance = vi.fn()
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={onAdvance} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={onAdvance} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       await advanceToHeart(h)
 
@@ -974,8 +1143,12 @@ describe('Greet', () => {
 
     it('triggers ear-wiggle (wave) on tap per spec line 189', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       await advanceToHeart(h)
       const preTap = screen
@@ -992,7 +1165,7 @@ describe('Greet', () => {
   })
 
   describe('20s no-tap re-prompt (post-line-4)', () => {
-    async function advanceToHeart(h: ReturnType<typeof makeSpeakHarness>) {
+    async function advanceToHeart(h: ReturnType<typeof makePlayHarness>) {
       fireWakeTap()
       for (let i = 0; i <= HEART_REVEAL_AFTER_LINE_INDEX; i++) {
         await completeLine(h)
@@ -1000,10 +1173,14 @@ describe('Greet', () => {
       }
     }
 
-    it('re-speaks line 3 once after 20s without a tap, then never again', async () => {
+    it('re-plays line 3 once after 20s without a tap, then never again', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       await advanceToHeart(h)
       let elapsedSinceArm = 0
@@ -1011,20 +1188,21 @@ describe('Greet', () => {
       elapsedSinceArm += LINE_GAP_MS
       await completeLine(h)
 
-      const speaksBefore = h.calls.length
-      expect(speaksBefore).toBe(GREET_LINES.length) // all 4 lines spoken once
+      const callsBefore = h.calls.length
+      expect(callsBefore).toBe(GREET_LINES.length) // all 4 lines played once
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(
           REPROMPT_AFTER_MS - elapsedSinceArm - 1,
         )
       })
-      expect(h.calls.length).toBe(speaksBefore)
+      expect(h.calls.length).toBe(callsBefore)
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1)
       })
-      expect(h.calls.length).toBe(speaksBefore + 1)
+      expect(h.calls.length).toBe(callsBefore + 1)
+      expect(h.calls[h.calls.length - 1].key).toBe('tapHeart')
       expect(h.calls[h.calls.length - 1].text).toBe(
         "Tap the heart when you're ready.",
       )
@@ -1032,46 +1210,58 @@ describe('Greet', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(REPROMPT_AFTER_MS * 2)
       })
-      expect(h.calls.length).toBe(speaksBefore + 1)
+      expect(h.calls.length).toBe(callsBefore + 1)
     })
 
     it('cancels the re-prompt when the heart is tapped first', async () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       await advanceToHeart(h)
       await crossGap()
       await completeLine(h)
 
-      const speaksBefore = h.calls.length
+      const callsBefore = h.calls.length
 
       fireEvent.click(screen.getByTestId('greet-heart'))
       await act(async () => {
         await vi.advanceTimersByTimeAsync(REPROMPT_AFTER_MS * 2)
       })
-      expect(h.calls.length).toBe(speaksBefore)
+      expect(h.calls.length).toBe(callsBefore)
     })
   })
 
   describe('reduced motion', () => {
-    it('renders core surfaces, no speak() before tap, ring static at 0.5 opacity', () => {
+    it('renders core surfaces, no playGreetLine() before tap, ring static at 0.5 opacity', () => {
       mediaSpy = stubReducedMotion(true)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       expect(screen.getByTestId('greet')).toBeInTheDocument()
       expect(screen.getByTestId('greet-clouds')).toBeInTheDocument()
       expect(screen.getByTestId('greet-melody')).toBeInTheDocument()
       expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
-      // No speak before tap, regardless of motion preference.
+      // No play before tap, regardless of motion preference.
       expect(h.calls).toHaveLength(0)
     })
 
     it('does not pulse the wake-icon under reduced motion (single fade only)', () => {
       mediaSpy = stubReducedMotion(true)
-      const h = makeSpeakHarness()
-      render(withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />))
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
 
       act(() => {
         vi.advanceTimersByTime(8_000)
@@ -1086,17 +1276,21 @@ describe('Greet', () => {
   })
 
   describe('cleanup', () => {
-    it('cancels TTS and unloads the chime on unmount', () => {
+    it('cancels in-flight playback and unloads the chime on unmount', () => {
       mediaSpy = stubReducedMotion(false)
-      const h = makeSpeakHarness()
+      const h = makePlayHarness()
       const { unmount } = render(
-        withMotion(<Greet onAdvance={vi.fn()} speakFn={h.speakFn} />),
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
       )
 
-      const cancelsBefore = ttsCancelSpy.mock.calls.length
+      const cancelsBefore = cancelPreRecordedSpy.mock.calls.length
       unmount()
 
-      expect(ttsCancelSpy.mock.calls.length).toBeGreaterThan(cancelsBefore)
+      expect(cancelPreRecordedSpy.mock.calls.length).toBeGreaterThan(
+        cancelsBefore,
+      )
       expect(sfxState.last?.unload).toHaveBeenCalledTimes(1)
     })
   })

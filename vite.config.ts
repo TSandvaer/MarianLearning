@@ -57,8 +57,14 @@ export default defineConfig({
         ],
       },
       injectManifest: {
-        // Precache HTML, JS, CSS, PNG, SVG, webmanifest — not much else in v1
-        globPatterns: ['**/*.{js,css,html,png,svg,webmanifest,woff,woff2,ico}'],
+        // Precache HTML, JS, CSS, PNG, SVG, webmanifest, plus MP3s for the
+        // pre-recorded Greet voice lines (ticket 86c9gqprh). The Greet
+        // audio is gateway-critical — the screen can't progress until line
+        // 1 plays, so we want it ready offline-first rather than paying
+        // network latency on a freshly-installed PWA.
+        globPatterns: [
+          '**/*.{js,css,html,png,svg,webmanifest,woff,woff2,ico,mp3}',
+        ],
       },
       devOptions: {
         enabled: false,
