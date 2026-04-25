@@ -1,11 +1,29 @@
 // iOS Safari requires the first speak() call to originate from a user gesture;
 // callers must ensure that, this module makes no attempt to fake one.
 
+import { subscribeToBoundary } from './boundary'
+import type { BoundaryEvent } from './boundary'
+
 export interface SpeakOptions {
   voiceURI?: string
   rate?: number
   pitch?: number
   volume?: number
+  /**
+   * Receive a callback per word boundary, synced to TTS playback. Uses the
+   * Web Speech API's `onboundary` event when available, with a paced fallback
+   * for engines (looking at you, iPad WebKit) where it's unreliable.
+   *
+   * See `./boundary.ts` for the full subscription API if you need to attach
+   * to an utterance you already own.
+   */
+  onBoundary?: (event: BoundaryEvent) => void
+  /**
+   * Words-per-minute used by the Safari fallback path. Defaults to 165 to
+   * roughly match Melody's `rate: 0.9`. Has no effect if the engine fires
+   * `onboundary` natively.
+   */
+  boundaryWPM?: number
 }
 
 const DEFAULT_RATE = 0.9
@@ -104,6 +122,14 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
       cleanup()
       // `canceled` and `interrupted` come through onerror in some engines.
       reject(new Error(event.error || 'speech synthesis error'))
+    }
+
+    // Subscribe to boundary events AFTER onend/onerror are wired so the
+    // boundary helper can chain through them rather than be clobbered.
+    if (opts.onBoundary) {
+      subscribeToBoundary(utterance, opts.onBoundary, {
+        wpm: opts.boundaryWPM,
+      })
     }
 
     // Replace any in-flight utterance so callers don't accidentally stack speech.

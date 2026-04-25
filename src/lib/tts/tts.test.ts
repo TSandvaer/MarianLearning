@@ -7,9 +7,17 @@ type UtteranceLike = {
   pitch: number
   volume: number
   voice: SpeechSynthesisVoice | null
-  onend: ((this: SpeechSynthesisUtterance) => void) | null
+  onstart:
+    | ((this: SpeechSynthesisUtterance, ev?: SpeechSynthesisEvent) => void)
+    | null
+  onend:
+    | ((this: SpeechSynthesisUtterance, ev?: SpeechSynthesisEvent) => void)
+    | null
   onerror:
     | ((this: SpeechSynthesisUtterance, ev: SpeechSynthesisErrorEvent) => void)
+    | null
+  onboundary:
+    | ((this: SpeechSynthesisUtterance, ev?: SpeechSynthesisEvent) => void)
     | null
 }
 
@@ -19,9 +27,17 @@ class FakeUtterance implements UtteranceLike {
   pitch = 1
   volume = 1
   voice: SpeechSynthesisVoice | null = null
-  onend: ((this: SpeechSynthesisUtterance) => void) | null = null
+  onstart:
+    | ((this: SpeechSynthesisUtterance, ev?: SpeechSynthesisEvent) => void)
+    | null = null
+  onend:
+    | ((this: SpeechSynthesisUtterance, ev?: SpeechSynthesisEvent) => void)
+    | null = null
   onerror:
     | ((this: SpeechSynthesisUtterance, ev: SpeechSynthesisErrorEvent) => void)
+    | null = null
+  onboundary:
+    | ((this: SpeechSynthesisUtterance, ev?: SpeechSynthesisEvent) => void)
     | null = null
 
   constructor(text: string) {
@@ -217,6 +233,80 @@ describe('tts', () => {
       vi.stubGlobal('speechSynthesis', undefined)
       vi.stubGlobal('SpeechSynthesisUtterance', undefined)
       await expect(speak('Hi.')).rejects.toThrow('not available')
+    })
+
+    it('forwards SpeakOptions.onBoundary to the boundary helper', async () => {
+      // Integration check: the SpeakOptions seam must wire through to the
+      // boundary module without losing chained onend semantics. This is the
+      // path Kyle's caption ribbon will use on Screen 2.
+      const synth = installFakeSynth()
+      const events: Array<{ word: string; wordIndex: number }> = []
+      const promise = speak("Hi! I'm Melody.", {
+        onBoundary: (e) =>
+          events.push({ word: e.word, wordIndex: e.wordIndex }),
+      })
+
+      const u = synth._utterances[0] as unknown as FakeUtterance
+      // Drive the lifecycle the way a real engine would.
+      u.onstart?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {} as SpeechSynthesisEvent,
+      )
+      u.onboundary?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {
+          charIndex: 0,
+          charLength: 3,
+          name: 'word',
+        } as unknown as SpeechSynthesisEvent,
+      )
+      u.onboundary?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {
+          charIndex: 4,
+          charLength: 3,
+          name: 'word',
+        } as unknown as SpeechSynthesisEvent,
+      )
+      u.onboundary?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {
+          charIndex: 8,
+          charLength: 7,
+          name: 'word',
+        } as unknown as SpeechSynthesisEvent,
+      )
+
+      expect(events).toEqual([
+        { word: 'Hi!', wordIndex: 0 },
+        { word: "I'm", wordIndex: 1 },
+        { word: 'Melody.', wordIndex: 2 },
+      ])
+
+      // Speak() must still resolve on natural end after boundary chaining.
+      u.onend?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {} as SpeechSynthesisEvent,
+      )
+      await expect(promise).resolves.toBeUndefined()
+    })
+
+    it('does not call onBoundary if the option is omitted', async () => {
+      // Backward-compat: existing speak() callers that never pass onBoundary
+      // must not pay any cost, attach any listeners, or change behaviour.
+      const synth = installFakeSynth()
+      const promise = speak('Hi.')
+      const u = synth._utterances[0] as unknown as FakeUtterance
+
+      // No onstart/onboundary handlers were attached by the boundary helper.
+      expect(u.onstart).toBeNull()
+      expect(u.onboundary).toBeNull()
+
+      u.onend?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {} as SpeechSynthesisEvent,
+      )
+      await expect(promise).resolves.toBeUndefined()
     })
   })
 
