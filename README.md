@@ -20,11 +20,17 @@ via a Vercel function, progress in localStorage.
 ## Layout
 
 ```
+api/
+  claude.ts            Vercel function — Anthropic proxy (stub in 86c9gkm0c)
+  _types.ts            shared request/response types (private — leading _)
 src/
   App.tsx              app root
   Hello.tsx            scaffold hello page (replaced in W2)
   main.tsx             React + SW registration entry
   index.css            Tailwind entry
+  lib/
+    claude/
+      client.ts        callClaude() — browser-side wrapper around /api/claude
   pwa/
     registerServiceWorker.ts   manual SW registration (prod only)
     sw.ts                      Workbox SW (injectManifest source)
@@ -38,9 +44,36 @@ public/
 
 ## Environment
 
-Copy `.env.example` to `.env.local`. `VITE_CLAUDE_API_ENDPOINT` points at the
-Vercel function that proxies Anthropic — the API key lives there, never in
-the bundle.
+Copy `.env.example` to `.env.local`. Two halves:
+
+- `VITE_CLAUDE_API_ENDPOINT` — browser-side. Default `/api/claude`. Only
+  override for unusual local setups.
+- `ANTHROPIC_API_KEY` — **server-side only**. Read by the `/api/claude`
+  Vercel function from `process.env`. **Never** prefix with `VITE_` and
+  **never** read it from `src/`. The browser bundle must not contain it.
+
+In production, set `ANTHROPIC_API_KEY` in the Vercel dashboard
+(Project Settings -> Environment Variables) for Production / Preview /
+Development as appropriate. Do not commit a populated `.env.local`.
+
+## Local development with the API function
+
+`yarn dev` runs only the Vite dev server — it cannot serve the `/api/*`
+function. To exercise the Claude endpoint locally, use the Vercel CLI:
+
+```sh
+# one-time
+npm i -g vercel
+vercel link        # links the directory to the Vercel project
+
+# every run
+vercel dev         # serves Vite on :3000 and the /api/* functions together
+```
+
+`vercel dev` reads `.env.local` automatically, so a populated
+`ANTHROPIC_API_KEY` line is enough — no Vercel-side config needed for local
+work. The function returns a stub payload until follow-up tickets wire the
+real prompt.
 
 ## PWA install (iPad)
 
