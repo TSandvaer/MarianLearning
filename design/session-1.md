@@ -229,6 +229,12 @@ On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon
 
 # Screen 3 — Math Exercise (Number Garden: sums to 10)
 
+> **Note:** Session 1 contains _one_ math problem (`3 + 2 = ?`) as part of the first-run
+> walkthrough. The full Math screen — 8 problems, stardust HUD, streak indicator, distractor
+> rule, Path A audio integration — is specified standalone in
+> [`design/screen-3-math.md`](./screen-3-math.md). From Session 2 onward, that file is canonical;
+> this section covers only the first-run subset. Implementation ticket: `86c9grn33`.
+
 ## Goal
 
 Give Marian one gentle, winnable math problem that matches her diagnosed level (sums to 10). Visual groups carry the concept.
