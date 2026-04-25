@@ -1,0 +1,9 @@
+node_modules
+dist
+dev-dist
+coverage
+yarn.lock
+package-lock.json
+pnpm-lock.yaml
+public/icons
+public/splash
