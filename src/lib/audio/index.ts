@@ -20,3 +20,21 @@ export type {
   CreatePreRecordedOptions,
   HowlLike as PreRecordedHowlLike,
 } from './preRecorded'
+export {
+  createSessionAudio,
+  loadSessionAudio,
+  playSessionUtterance,
+  cancelSessionAudio,
+  unloadSessionAudio,
+  clearSessionAudio,
+  createIndexedDbCache,
+  base64ToBytes,
+  countWords,
+} from './sessionAudio'
+export type {
+  SessionAudio,
+  SessionAudioCache,
+  PlaySessionUtteranceOptions,
+  CreateSessionAudioOptions,
+  HowlLike as SessionAudioHowlLike,
+} from './sessionAudio'

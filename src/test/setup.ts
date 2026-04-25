@@ -35,17 +35,23 @@ class MemoryStorage implements Storage {
   }
 }
 
-if (
-  typeof window.localStorage?.setItem !== 'function' ||
-  typeof window.localStorage?.clear !== 'function'
-) {
-  Object.defineProperty(window, 'localStorage', {
-    configurable: true,
-    value: new MemoryStorage(),
+// Per-file `@vitest-environment node` skips the jsdom setup entirely, so
+// `window` will be undefined for those tests. Guard the storage shim and
+// the React unmount hook so node-environment specs (api/_tts.test.ts and
+// friends) don't blow up at setup-time.
+if (typeof window !== 'undefined') {
+  if (
+    typeof window.localStorage?.setItem !== 'function' ||
+    typeof window.localStorage?.clear !== 'function'
+  ) {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: new MemoryStorage(),
+    })
+  }
+
+  // Ensure every test teardown unmounts React trees.
+  afterEach(() => {
+    cleanup()
   })
 }
-
-// Ensure every test teardown unmounts React trees.
-afterEach(() => {
-  cleanup()
-})
