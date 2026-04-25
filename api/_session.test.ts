@@ -160,4 +160,65 @@ describe('renderSessionAudio', () => {
       /upstream blew up/,
     )
   })
+
+  it('aborts in-flight workers on first failure and does NOT leak unhandled rejections', async () => {
+    // Mid-batch failure scenario: 6 utterances, concurrency 3. Worker that
+    // picks up index 1 fails fast. The other two workers are mid-`await`
+    // on slow synths. The fix: on first failure, sibling workers see the
+    // shared `aborted` flag and short-circuit before pulling their next
+    // utterance, so their pending awaits resolve cleanly. Promise.allSettled
+    // observes every worker promise so no rejection escapes as unhandled.
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => unhandled.push(reason)
+    process.on('unhandledRejection', onUnhandled)
+
+    try {
+      let callIndex = 0
+      const synth = vi.fn(async (req: TtsRequest) => {
+        const myIndex = callIndex++
+        if (myIndex === 1) {
+          // Fail fast before the slow workers finish.
+          await new Promise((r) => setTimeout(r, 5))
+          throw new Error('mid-batch boom')
+        }
+        // Slow workers — finish AFTER the failure has propagated.
+        await new Promise((r) => setTimeout(r, 30))
+        return { audio: new TextEncoder().encode(req.text) }
+      })
+
+      const plan = {
+        utterances: Array.from({ length: 6 }, (_, i) => ({
+          id: `u${i}`,
+          text: `t${i}`,
+        })),
+      }
+      await expect(
+        renderSessionAudio(plan, { synth, concurrency: 3 }),
+      ).rejects.toThrow(/mid-batch boom/)
+
+      // Give any orphan rejections a tick to surface.
+      await new Promise((r) => setTimeout(r, 50))
+      expect(unhandled).toEqual([])
+
+      // Work was aborted: the in-flight slow workers each completed at most
+      // their current iteration, and the queue did NOT continue draining.
+      // (Concurrency 3 with 6 items: at most 3 calls are in-flight when the
+      // boom hits; survivors complete their CURRENT item, not the queue.)
+      expect(synth.mock.calls.length).toBeLessThan(6)
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+  })
+
+  it('surfaces a non-Error rejection by wrapping it in an Error', async () => {
+    // Defensive: a synth implementation that rejects with a non-Error
+    // value (e.g. a string) shouldn't crash our Error-instanceof checks.
+    const synth = vi.fn(async () => {
+      throw 'string-rejection'
+    })
+    const plan = { utterances: [{ id: 'a', text: 't' }] }
+    await expect(renderSessionAudio(plan, { synth })).rejects.toThrow(
+      /string-rejection/,
+    )
+  })
 })

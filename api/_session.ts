@@ -96,19 +96,38 @@ export async function renderSessionAudio(
   // Concurrency-limited fan-out. Promise.all without limit would open one
   // socket per utterance simultaneously; the Edge endpoint tolerates a
   // handful but not 30+. We use a tiny pool here rather than pulling in
-  // p-limit — the dependency cost outweighs the 8 lines of pool code.
+  // p-limit — the dependency cost outweighs the small pool implementation.
+  //
+  // Failure semantics: the first worker to reject wins — the function
+  // rejects with that error, the caller (api/claude.ts) maps it to a 502
+  // tts-failed, and the user sees one degraded session. The other workers
+  // notice the shared `aborted` flag and short-circuit before starting their
+  // next utterance, so their pending awaits cannot turn into orphan
+  // unhandled rejections. We still `Promise.allSettled` on the worker
+  // promises so any in-flight rejection that arrives after the first one
+  // is observed (no UnhandledPromiseRejectionWarning on Vercel logs).
   const utterances: Utterance[] = new Array(sources.length)
   let nextIndex = 0
+  let aborted = false
 
   async function worker(): Promise<void> {
-    while (true) {
+    while (!aborted) {
       const i = nextIndex++
       if (i >= sources.length) return
       const src = sources[i]!
-      const result = await synth(
-        { text: src.text, ...MELODY_VOICE_CONFIG },
-        opts.synthOptions,
-      )
+      let result: { audio: Uint8Array }
+      try {
+        result = await synth(
+          { text: src.text, ...MELODY_VOICE_CONFIG },
+          opts.synthOptions,
+        )
+      } catch (err) {
+        // Tell sibling workers to stop pulling new work, then re-throw so
+        // Promise.allSettled records this worker as rejected and we surface
+        // the first failure below.
+        aborted = true
+        throw err
+      }
       utterances[i] = {
         id: src.id,
         text: src.text,
@@ -125,7 +144,15 @@ export async function renderSessionAudio(
   for (let i = 0; i < Math.min(concurrency, sources.length); i++) {
     workers.push(worker())
   }
-  await Promise.all(workers)
+
+  const results = await Promise.allSettled(workers)
+  const firstRejection = results.find(
+    (r): r is PromiseRejectedResult => r.status === 'rejected',
+  )
+  if (firstRejection) {
+    const reason = firstRejection.reason
+    throw reason instanceof Error ? reason : new Error(String(reason))
+  }
 
   return {
     ok: true,
