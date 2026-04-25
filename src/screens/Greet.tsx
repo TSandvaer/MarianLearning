@@ -345,13 +345,18 @@ export default function Greet({
 
       {/* Melody. Sized to fill ~60% of viewport height per spec line 117.
           AnimatePresence cross-fades idle ↔ happy on the ear-wiggle cue.
+          We use the default (non-wait) mode so both poses briefly co-exist
+          during the swap — that's the soft cross-fade Kyle's spec calls for
+          (line 161, "sprite swap idle → happy for 600ms then back"), and it
+          also keeps tests deterministic because the new element mounts
+          immediately rather than waiting on the previous one's exit anim.
           layoutId="melody" is set so Screen 3+ can shared-element-transition
           her position (spec line 696). */}
       <div
         data-testid="greet-melody-slot"
         className="relative flex h-[60vh] w-full flex-1 items-center justify-center"
       >
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence initial={false}>
           <m.img
             layoutId="melody"
             key={pose}
@@ -360,7 +365,7 @@ export default function Greet({
             src={`/assets/melody-${pose}.svg`}
             alt="Melody"
             draggable={false}
-            className="h-full w-auto select-none"
+            className="absolute h-full w-auto select-none"
             initial={
               reducedMotion ? { opacity: 0 } : { x: -120, y: 60, opacity: 0 }
             }
