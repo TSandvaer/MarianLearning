@@ -6,6 +6,8 @@
 **Scope:** First-ever session — splash → greet → 1 math problem → 1 literacy problem → reward/teaser
 **Session length target:** 4–6 minutes (first-run only; later sessions run the full 10–15 min)
 
+> **Updated 2026-04-25** with Thomas decisions on Q1 / Q2 / Q4 (phoneme audio budget, CSS-filter twilight, gentle-ramp distractors). Original Q3 / Q5 / Q6 / Q7 / Q8 remain as non-blocking TODOs at the bottom.
+
 ---
 
 ## Global conventions (apply to every screen)
@@ -230,7 +232,7 @@ She just tapped the heart. Melody is with her in a new background — garden sce
 |    (flower)(flower)              |  <- 2 visual-group flowers
 |       = ?                        |
 |                                  |
-|   [ 4 ]  [ 5 ]  [ 6 ]           |  <- 3 answer chips, thumb zone
+|   [ 3 ]  [ 5 ]  [ 10 ]          |  <- 3 answer chips, thumb zone
 |                                  |
 |        [safe area bottom]        |
 +----------------------------------+
@@ -242,9 +244,11 @@ She just tapped the heart. Melody is with her in a new background — garden sce
   - Symbolic line: `3 + 2` in 96pt numerals
   - Visual line: 3 flower glyphs, plus sign, 2 flower glyphs. Each flower ~64pt.
   - A large `?` under `=` in 96pt
-- Answer chips: 3 circular buttons at bottom, 88×88pt each, 32pt between them. **One correct (5), two distractors (4 and 6 — adjacent numbers, the kind of off-by-one errors she made in diagnostic).** Chip order: correct answer in a randomized position.
+- Answer chips: 3 circular buttons at bottom, 88×88pt each, 32pt between them. **One correct (5), two distractors (3 and 10 — clearly wrong, no off-by-one bait).** Chip order: correct answer in a randomized position.
 
 **Why `3 + 2`:** It was the first problem on her diagnostic and she got it right (fingers, but right). Starting with a win she's already had = psychological safety. Future sessions pull from a weighted pool.
+
+**Why distractors `3` and `10` on the very first problem (gentle ramp):** Her April 2026 diagnostic flagged off-by-one finger-counting miscounts (4/6-style), so adjacent-number distractors are pedagogically useful — but using them on her *debut* problem risks a sour first impression. Per Thomas (2026-04-25): problem #1 uses the gentle ramp (`3`, `10` — clearly wrong, low confusion), and the off-by-one trap distractors (`4`/`6`-style) **start at problem #3** once she's banked two wins. Out of scope for this spec since Session 1 only contains one math problem; flagged here so the session-generator code follows the same rule from Session 2 onward.
 
 ## Copy / TTS script
 
@@ -279,7 +283,7 @@ Problem displayed, Melody idle, chips waiting.
 - **Caption:** `5` highlights in gold on the problem line, replacing the `?`.
 - **Auto-advance:** 1.2s after correct answer, transition to Screen 4.
 
-### Error path (wrong — she taps `4` or `6`)
+### Error path (wrong — she taps `3` or `10`)
 - **NEVER a red X. NEVER a "wrong" text callout.**
 - **Chip animation:** tapped chip does a soft shake (`x: [0, -6, 6, -4, 4, 0]` over 400ms). No color change. Chip remains available.
 - **Melody:** sprite swap to puzzled-tilt pose (head tilted ~15°, ears slightly down). Held for 1.5s.
@@ -318,10 +322,10 @@ This IS the first visit. No empty state.
 ## Acceptance criteria
 
 - [ ] Problem `3 + 2 = ?` renders with numerals at 96pt and 5 flower glyphs (3 + 2) as visual groups
-- [ ] Three answer chips render at 88×88pt with 32pt gaps, correct answer `5` randomly placed
+- [ ] Three answer chips render at 88×88pt with 32pt gaps; chip values are `3`, `5`, `10`; correct answer `5` randomly placed
 - [ ] Melody TTS "Let's count! Three plus two, how many?" plays on screen entry
 - [ ] Tapping `5` triggers: chip sparkle, Melody ear-wiggle, chime + sparkle SFX, TTS "Yes! Five.", 1.2s auto-advance
-- [ ] Tapping `4` or `6` triggers: chip shake (no color change), Melody puzzled-tilt, poof SFX, TTS "Hmm, try again?" — chips remain tappable
+- [ ] Tapping `3` or `10` triggers: chip shake (no color change), Melody puzzled-tilt, poof SFX, TTS "Hmm, try again?" — chips remain tappable
 - [ ] After 2 wrong attempts, hint state plays: flower groups pulse in sequence with TTS narration
 - [ ] After 3 wrong attempts, correct chip shimmers and Melody says "This one is five."
 - [ ] No red color appears anywhere on wrong answer
@@ -392,7 +396,7 @@ She just got a math problem right. Melody cheered. Transition cross-faded from g
 
 **Word-count check:** `look, a, dog, d, o, g, you, try` — 8 unique words. All within cap. Target phonics word `dog` is session-locked.
 
-**On letter tap:** TTS says just that letter's sound — "/d/", "/ŏ/", "/g/". (Phonemes, not letter names. Web Speech API doesn't do phonemes well — **see Open Questions.**)
+**On letter tap:** plays just that letter's pre-recorded phoneme — "/d/", "/ŏ/", "/g/". (Phonemes, not letter names. Web Speech API can't cleanly produce isolated phonemes; per Thomas (2026-04-25), we ship pre-recorded phoneme audio files. See Assets and Implementation notes.)
 
 **On speaker tap:** replays lines 3–4 ("D... O... G... Dog!").
 
@@ -403,7 +407,7 @@ She just got a math problem right. Melody cheered. Transition cross-faded from g
 ## Motion
 
 - **Entrance:** bg cross-fades, Melody layoutId transitions to upper-left. Picture `initial={{ scale: 0, opacity: 0 }}`, spring `{ stiffness: 260, damping: 16 }` — slight bounce on land. Letters stagger in after picture, 150ms offset each.
-- **Letter highlight during line 3:** each letter pulses `scale: [1, 1.2, 1]` over 400ms as its sound plays. Color shifts from `--ink` to `--my-rose` during the pulse, then back.
+- **Letter highlight during line 3:** each letter pulses `scale: [1, 1.2, 1]` over 400ms as its **pre-recorded phoneme** plays. Color shifts from `--ink` to `--my-rose` during the pulse, then back. Sequence the three phoneme audio files back-to-back with ~200ms gaps.
 - **Blend moment (line 4):** all three letters simultaneously scale 1→1.15→1 and picture does a happy bob. Feels like the word "clicks."
 - **Speaker hint-pulse:** gentle 2-beat pulse loop (`scale: [1, 1.08, 1]`) when line 5 finishes, stops after first user tap anywhere.
 - **Letter tap feedback:** single letter pulses + its sound plays. Other letters stay calm.
@@ -444,14 +448,15 @@ Picture + letters + speaker + buttons all present. Speaker pulses after intro co
 - `icon-paw.svg` — pawprint for "Again" button. <3 KB.
 - `icon-check.svg` — checkmark. <2 KB.
 - `sfx-chime-soft.mp3`, `sfx-sparkle.mp3` — reused.
-- TTS generated live. Per-letter sounds are the risky bit — see Open Questions.
+- **Phoneme audio files (pre-recorded).** Session 1 needs 3: `phoneme-d.mp3`, `phoneme-o-short.mp3`, `phoneme-g.mp3`. Each ~4 KB, ~250–400ms. Used on letter tap and during the sound-out sequence (lines 3–4). The full literacy track will need ~26 phoneme files over time; budget approved at ~100 KB total of the 200 KB asset budget (Thomas 2026-04-25). Voice should match Melody's TTS register as closely as possible (warm, female, mid-pitch). Sourcing TBD by Matt — flag if a voice actor session is needed vs. an existing phonics audio library.
+- Sentence-level TTS (Melody's narration around the phonemes) generated live via Web Speech API as before.
 
 ## Acceptance criteria
 
 - [ ] Picture of dog renders at ~320pt square, centered horizontally
 - [ ] Letters `d`, `o`, `g` render in 96pt with ~48pt spacing
-- [ ] Each letter is tappable and plays that letter's sound when tapped
-- [ ] Speaker button plays full sound-out sequence when tapped
+- [ ] Each letter is tappable and plays that letter's **pre-recorded phoneme** (`phoneme-d.mp3`, `phoneme-o-short.mp3`, `phoneme-g.mp3`) when tapped — not Web Speech API output
+- [ ] Speaker button plays full sound-out sequence when tapped (three pre-recorded phonemes in order, ~200ms gaps, then live-TTS "Dog!")
 - [ ] "Again" button replays full TTS sequence including Melody's intro
 - [ ] "Got it" button (at 88pt, larger than "Again") advances to Screen 5
 - [ ] During intro playback, letters highlight in sequence (`d` then `o` then `g`, then all three at blend)
@@ -497,7 +502,7 @@ She completed one math problem and one literacy moment. ~3–4 minutes in.
 +----------------------------------+
 ```
 
-- Background: transitions from garden → soft twilight (cream + pink + pale lavender). Subtle stars fade in.
+- Background: transitions from song-scene → soft twilight. **Twilight is not a separate asset** — it's `bg-song.svg` (the previous screen's background) with a runtime CSS filter applied (per Thomas 2026-04-25). Starting recipe: `filter: hue-rotate(220deg) brightness(0.75) saturate(1.1);` applied to the background layer. Tune to taste during implementation; the values approximate the cream → twilight wash the original spec called for. Subtle stars fade in over the filtered base. Net result: 4 visual moods, 3 background assets, zero extra bytes.
 - Melody: centered, cheering pose (ears up, arms if rigged / hands up). Larger than on problem screens.
 - **Stardust jar:** visual glass jar with 3 star icons dropping in one at a time. Each star represents a completed moment (greeting, math, literacy = 3). **No score, no point total, no percentage.**
 - **Teaser:** a small "Tomorrow: [silhouette of a short-o friend]" teaser card — e.g., a fox silhouette for short-o word `fox`. Gentle, not a cliffhanger. Fades in after the main celebration.
@@ -518,7 +523,7 @@ She completed one math problem and one literacy moment. ~3–4 minutes in.
 
 ## Motion
 
-- **Entrance:** background cross-fades from song scene to twilight over 600ms. Melody grows in size via spring `{ stiffness: 180, damping: 20 }`. (Uses `layoutId="melody"`.)
+- **Entrance:** background filter animates from `none` → `hue-rotate(220deg) brightness(0.75) saturate(1.1)` over 600ms (CSS transition on `filter`). Same `bg-song.svg` element stays mounted — only the filter changes, so this is effectively free. Melody grows in size via spring `{ stiffness: 180, damping: 20 }`. (Uses `layoutId="melody"`.)
 - **Stardust particle burst:** 20–30 small `sparkle-particle.svg` elements emit from Melody's position, spring outward to random positions, then slowly drift up and fade over 3s. Use `AnimatePresence` with keyed particles. Stagger emission over 400ms for organic feel.
 - **Stars into jar:** each star `initial={{ y: -80, opacity: 0, scale: 0.5 }}`, animates to its jar slot position with spring `{ stiffness: 200, damping: 18 }`. 600ms apart. Each landing triggers a soft "plink" SFX.
 - **All-three-stars glow:** when star 3 lands, all three get a shared glow pulse (`boxShadow` or `filter: drop-shadow` animation) for 800ms.
@@ -541,14 +546,15 @@ Not applicable — no inputs to get wrong.
 This IS first visit. Only Session 1 shows 3 stars from 3 moments; future sessions will show more and the jar visual scales accordingly — out of scope for this spec.
 
 ### Transition in / out
-- **In:** song-scene → twilight cross-fade. Melody grows + re-centers.
-- **Out:** on home tap, fade to splash cream bg over 300ms.
+- **In:** `bg-song.svg` filter animates to twilight recipe (no asset swap). Melody grows + re-centers.
+- **Out:** on home tap, filter clears + fade to splash cream bg over 300ms.
 
 ## Assets required
 
 - `melody-cheering.png` — ears way up, happy. **NEW.** 800×800 @2x, ~80 KB.
 - `melody-sleepy.png` — eyes closed, slight smile. **NEW** but **deferred** — not used in Session 1 happy path. Build in parallel for the "Come back soon!" post-home state. Out of scope for this spec's AC.
-- `bg-twilight.svg` — cream/pink/lavender wash with subtle stars. **NEW.** <25 KB.
+- ~~`bg-twilight.svg`~~ — **not shipped.** Twilight is `bg-song.svg` + CSS filter `hue-rotate(220deg) brightness(0.75) saturate(1.1)` per Thomas 2026-04-25. The starry overlay (small star elements fading in) is rendered in the foreground as DOM/SVG stars, not baked into a background asset.
+- `star-overlay.svg` (or rendered as React component using `sparkle-particle.svg` instances) — small stars that fade in over the filtered twilight base. <2 KB if a separate asset.
 - `sparkle-particle.svg` — reused from Screen 3.
 - `star-filled.svg` — filled gold star for jar. <2 KB.
 - `jar.svg` — glass jar outline. <4 KB.
@@ -559,7 +565,7 @@ This IS first visit. Only Session 1 shows 3 stars from 3 moments; future session
 
 ## Acceptance criteria
 
-- [ ] Background cross-fades from song-scene to twilight over 600ms
+- [ ] Background transitions from song-scene to twilight over 600ms via CSS `filter` animation (`hue-rotate(220deg) brightness(0.75) saturate(1.1)`) on `bg-song.svg` — no separate twilight asset is loaded
 - [ ] Melody appears in cheering pose, scaled larger than on problem screens
 - [ ] 3 stardust particles burst from Melody's position
 - [ ] 3 stars drop into the jar, one per TTS line ("One... Two... Three stars!")
@@ -603,15 +609,14 @@ Per the non-negotiables, confirmed absent from this spec:
 
 **Note:** sprites only needed if animating between states with CSS/sprite sheet. If each expression is a separate image swapped via React state + `AnimatePresence` cross-fade, no sprite system required. **Recommend: separate images, cross-fade in AnimatePresence — simpler to ship.**
 
-### Backgrounds (3 total in Session 1, per constraint)
+### Backgrounds (3 distinct assets, 4 visual moods)
 | Asset | Use | Size target | Format |
 |---|---|---|---|
 | `bg-clouds.svg` | Screen 2 — greeting | <15 KB | SVG |
 | `bg-garden.svg` | Screen 3 — math (Number Garden) | <20 KB | SVG |
-| `bg-song.svg` | Screen 4 — literacy (Word Song) | <20 KB | SVG |
-| `bg-twilight.svg` | Screen 5 — reward | <25 KB | SVG |
+| `bg-song.svg` | Screen 4 — literacy (Word Song) — **also Screen 5 base** | <20 KB | SVG |
 
-**Background count: 4.** This exceeds the "3 backgrounds v1" budget from CLAUDE.md by one. **Flag for Thomas:** either we fold twilight into clouds (share assets, just change tint via CSS filter), or accept 4. Recommendation: share `bg-clouds.svg` base and apply CSS `filter: hue-rotate()` + `opacity` layer for twilight. Saves a background and keeps us at 3 distinct assets. See Open Questions.
+**Background count: 3 distinct assets, 4 visual moods.** Per Thomas 2026-04-25: Screen 5's twilight is derived at runtime from `bg-song.svg` via `filter: hue-rotate(220deg) brightness(0.75) saturate(1.1)`. Net result: visual variety of 4, asset payload of 3, zero extra bytes. CSS-filter recipe is a starting point — Kevin/Devon may tune values during implementation; if the tuned values diverge significantly from the starting recipe, note it in PR review so Kyle can confirm the mood still reads as "twilight" rather than "muddy."
 
 ### Icons / UI glyphs
 | Asset | Use | Size | Format |
@@ -640,8 +645,21 @@ Per the non-negotiables, confirmed absent from this spec:
 
 **Total SFX payload: ~39 KB.** Preload at boot via Howler.
 
-### TTS
-- Generated live via Web Speech API. No audio asset files required for v1.
+### Pre-recorded phoneme audio (per Thomas 2026-04-25)
+Web Speech API can't reliably produce isolated phonemes (it pronounces letter names or mangles short vowels), and the literacy track depends on Marian hearing pure phonemes. Approved budget: **up to ~100 KB of the 200 KB asset budget** for the full phoneme library (~26 files across the literacy roadmap). Session 1 ships 3:
+
+| Asset | Phoneme | Duration target | Size target |
+|---|---|---|---|
+| `phoneme-d.mp3` | /d/ | ~250ms | ~4 KB |
+| `phoneme-o-short.mp3` | /ŏ/ (short o) | ~350ms | ~4 KB |
+| `phoneme-g.mp3` | /g/ | ~250ms | ~4 KB |
+
+**Session 1 phoneme payload: ~12 KB** of the ~100 KB phoneme allocation.
+
+Voice direction: warm, female-leaning, mid-pitch — should feel like the same person Melody's TTS sounds like. Pure phoneme (no schwa appended): /d/ not /duh/, /g/ not /guh/. Sourcing decision (voice actor session vs. licensed phonics audio library) is Matt's call — flag if it needs Thomas. Preload alongside SFX via Howler.
+
+### TTS (sentence-level Melody narration)
+- Generated live via Web Speech API for all of Melody's spoken sentences. **Phonemes are NOT generated by TTS** — they're pre-recorded files (see above).
 - Voice preference: `en-US` female-leaning (queried from `speechSynthesis.getVoices()`, preferred list: "Samantha", "Allison", "Ava"). Fallback: first `en-US` voice with `gender === 'female'` or default if not available.
 - Rate: 0.9. Pitch: 1.1. Volume: 1.0.
 
@@ -658,35 +676,35 @@ Unique count: **~40 words**, well within the 200-word cap.
 **Potentially out-of-cap / flagged words** (asking for Thomas via Matt):
 - **None** — all words used are standard common-English kid vocabulary.
 
-**Phonemes (letter sounds)** — `/d/`, `/ŏ/`, `/g/` — not words but flagged separately: Web Speech API can't cleanly produce phonemes. See Open Questions.
+**Phonemes (letter sounds)** — `/d/`, `/ŏ/`, `/g/` — not words. Shipped as **pre-recorded audio files** per Thomas 2026-04-25 (Web Speech API can't cleanly produce isolated phonemes). See Pre-recorded phoneme audio table above.
 
 ---
 
-## Open questions (need Thomas via Matt)
+## Resolved decisions (Thomas, 2026-04-25)
 
-1. **Phonemes vs letter names.** Web Speech API cannot reliably produce isolated phonemes like `/ŏ/` or `/d/` — it says letter names or struggles. Options:
-   - **(a)** Pre-record phoneme audio files (one-time voice cost, highest quality)
-   - **(b)** Use letter names for v1 and accept a pedagogical compromise on Screen 4
-   - **(c)** Use ElevenLabs phoneme tags early (was scoped for v2)
-   - **Recommendation:** (a) — 26 phoneme audio files, maybe 4 KB each = ~100 KB total. Worth it; phonics is the whole point of Word Song. Needs Thomas sign-off on the time/budget.
+These were originally open questions on this spec; they are now baked into the body above. Listed here as a paper trail.
 
-2. **Background count: 3 or 4?** CLAUDE.md says 3 backgrounds v1. I've specified 4 (clouds, garden, song, twilight). Proposal: merge clouds+twilight via CSS filter on the same base SVG → effective count 3 distinct assets. Confirm this is acceptable, or drop twilight and reuse clouds with a warmer tint for Screen 5.
+1. **~~Phonemes vs letter names~~ — RESOLVED.** Pre-record phoneme audio files. Up to ~100 KB of the 200 KB asset budget approved for the full phoneme library. Session 1 ships 3 files (`phoneme-d.mp3`, `phoneme-o-short.mp3`, `phoneme-g.mp3`). Web Speech API handles only sentence-level Melody narration. See Screen 4 Assets and the Pre-recorded phoneme audio table.
 
-3. **"Home" tap behavior on iPad PWA.** iOS doesn't let a PWA close itself. Options:
-   - Return to splash/neutral state (recommended, clean)
-   - Show a "Come back soon!" static screen with `melody-sleepy` (requires the deferred asset)
-   - Do nothing (just a "quiet" state — she can close via iPad gesture)
-   - **Recommendation:** return to splash. Simple, predictable.
+2. **~~Background count: 3 or 4?~~ — RESOLVED.** Ship 3 PNG/SVG backgrounds. Twilight is derived at runtime from `bg-song.svg` via `filter: hue-rotate(220deg) brightness(0.75) saturate(1.1)`. 4 visual moods, 3 assets, zero extra bytes. Recipe values are a starting point; Kevin/Devon may tune.
 
-4. **Math distractor choice.** I chose `4` and `6` as off-by-one distractors because her diagnostic showed finger-counting off-by-one errors. Is targeting her specific error pattern on the *first ever* problem feeling like a trap, or the right teaching move? Could alternatively use `3` and `10` — more obviously wrong, lower chance of real confusion. Preference?
+3. **~~Math distractor choice~~ — RESOLVED.** Gentle ramp on problem #1: distractors `3` and `10` (clearly wrong, no off-by-one bait). Off-by-one trap distractors (`4`/`6`-style targeting Marian's documented diagnostic miscount pattern) start at problem #3 once she's banked two wins. Out of scope here since Session 1 has only one math problem; flagged so the future session generator follows the rule.
 
-5. **TTS voice stability.** iPad's Web Speech voices can differ between updates. For Session 1 we accept whatever's available, but longer-term Melody's voice identity matters a lot for bonding. When do we move to pre-recorded / ElevenLabs? (Non-blocking for Session 1; flagging so it's on the roadmap.)
+---
 
-6. **Return-user flow on Screen 2.** From Session 2 onward, Melody *will* know Marian. The greeting copy/flow changes. That's a separate spec. Confirming this ticket is Session 1 only, and Matt will open a follow-up for returning-user greeting.
+## Open TODOs (non-blocking)
 
-7. **PWA install moment.** This spec covers what happens *after* install. The install prompt / "Add to Home Screen" instruction flow is a separate ticket per the AC ("first-run flow only"). Flagging so we don't drop it. Recommendation: a 1-screen pre-install instructional card (iPad-specific: "Tap share → Add to Home Screen") delivered once from the Vercel URL before home-screen launch ever happens.
+The 5 non-blocking items from the original spec. Two I'm answering myself; three remain queued.
 
-8. **Reduced data mode / slow network.** Splash has a 3000ms cold-cache cap. If assets genuinely can't load (e.g., first launch ever, no network), what's the fallback? Recommendation: ship Melody idle + one background as inline SVGs in the initial HTML so we always have *something* to show. Confirm this is acceptable bundle cost.
+1. **"Home" tap behavior on iPad PWA — RESOLVED (Kyle, no Thomas needed).** Return to splash/neutral state. Simple, predictable, and the `melody-sleepy` "Come back soon!" path is already deferred to post-Session-1 along with that asset. Spec body already reflects the recommendation; this just confirms it's the chosen path. If Thomas later wants the sleepy variant, it's a small follow-up.
+
+2. **Return-user flow on Screen 2 — RESOLVED (Kyle, no Thomas needed).** Confirmed: this spec is Session 1 only. From Session 2 onward, Melody knows Marian and the greeting changes. Matt to open a follow-up ticket for the returning-user greeting spec; reuse of `melody-idle` / `melody-happy` / the cloud bg / heart CTA pattern should make it cheap.
+
+3. **TTS voice stability — TODO (recommend revisiting at Session 4–5 milestone).** iPad Web Speech voices can shift between iOS updates and Melody's voice identity matters for bonding. With phoneme files now pre-recorded for the literacy track, the natural next move is pre-recording or ElevenLabs-generating Melody's most-repeated sentences (greeting, "Yes!", "Hmm, try again?", "You did it!"). Estimated ~30 sentences across all sessions. Suggest scoping after a few sessions ship and we know which lines Marian actually hears most. Non-blocking; Matt to pick the right moment.
+
+4. **PWA install moment — TODO (separate ticket).** This spec covers what happens *after* the home-screen install. The install prompt / "Add to Home Screen" instruction flow is a separate ticket per the AC ("first-run flow only"). Recommendation, unchanged: a 1-screen pre-install instructional card (iPad-specific: "Tap share → Add to Home Screen") delivered once from the Vercel URL before home-screen launch. Matt to open the ticket when ready; could touch the `pwa-manifest-generator` skill for manifest specifics.
+
+5. **Reduced data mode / slow network — TODO (recommend answering during Kevin/Devon's first integration spike).** Splash has a 3000ms cold-cache cap. If assets genuinely can't load on first launch, fallback is still TBD. Recommendation, unchanged: ship Melody idle + one background as inline SVGs in the initial HTML so we always have *something* to show. Hard to answer without measuring real bundle cost — best to revisit once the build pipeline exists. Non-blocking for design; flagging so Matt has it on the engineering side.
 
 ---
 
@@ -697,6 +715,8 @@ Unique count: **~40 words**, well within the 200-word cap.
 - **AnimatePresence gotcha:** AnimatePresence must wrap the conditional, not be wrapped by it. Applies to particles, transitions between screens, and the teaser card.
 - **Caption word reveal:** use the `SpeechSynthesisUtterance.onboundary` event. If it doesn't fire (Safari sometimes skips it), fall back to `onstart` + full text reveal. Don't block on boundaries.
 - **Preload SFX on boot:** `Howl` instances for all 5 SFX created at app init, not on-demand (first-tap latency kills the feel).
+- **Preload phoneme audio on boot:** same Howler pattern as SFX. Session 1 needs the 3 short-o phonemes (`phoneme-d.mp3`, `phoneme-o-short.mp3`, `phoneme-g.mp3`) loaded before Screen 4. They're tiny (~12 KB total) and tap-latency-sensitive — letter-tap → phoneme playback should feel instant.
+- **Twilight filter (Screen 5):** apply CSS `filter` to the background element on screen entry; animate via CSS transition (`transition: filter 600ms ease-out`), not Framer Motion. Filter animations on a single DOM property are GPU-accelerated and don't need motion-library overhead.
 - **No animations on Melody's mouth/eyes in v1.** Just pose swaps. Real facial animation is out of scope.
 - **Touch target debug overlay:** add a dev-only overlay toggle that draws 60×60pt bounding boxes around every tappable element, so Jessica can verify sizing visually.
 
