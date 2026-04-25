@@ -1,22 +1,33 @@
 // /api/claude — Vercel Function. Server-side proxy for the Anthropic API.
 //
-// STUB: this ticket (86c9gkm0c) only scaffolds the endpoint. It validates
-// the body, checks the API key is present in env, and returns a placeholder.
-// The real prompt wiring (Haiku for session-start/session-end, Sonnet for
-// stumble-explanation) comes in follow-up tickets.
+// HISTORY
+// -------
+//  - 86c9gkm0c (initial) scaffolded the endpoint as a stub: validate the
+//    body, presence-check the API key, return a placeholder.
+//  - 86c9gr385 (this change, Path A — server-side TTS pipeline) extends
+//    `kind: 'session-start'` to optionally carry a session plan and have
+//    every utterance rendered to MP3 server-side via Edge AnaNeural. The
+//    stub success path is preserved for callers that don't pass a plan
+//    (stumble-explanation, session-end, and any session-start that
+//    pre-dates the real Claude prompt wiring).
 //
 // ABSOLUTE RULE: ANTHROPIC_API_KEY is read here only. It must never reach
 // the browser bundle. Do not echo, log, or include it in any response.
 //
-// Runtime: Web-standard fetch handler (works on Vercel's Edge runtime and
-// the Node runtime via the Fetch API adapter). No @vercel/node dependency
-// required for this stub.
+// Runtime: Web-standard fetch handler. The TTS pipeline imported from
+// `_tts.ts` uses the `ws` package + `node:crypto`, so this function MUST
+// run on Vercel's Node runtime, not Edge. Vercel's default for files
+// under `api/` IS the Node runtime — no `export const config` needed —
+// but if anyone ever flips this file to Edge, the WS-based TTS will fail
+// at import time. Leaving this comment as a tripwire.
 
 import {
   isClaudeRequest,
   type ClaudeErrorResponse,
   type ClaudeStubResponse,
+  type SessionStartResponse,
 } from './_types'
+import { renderSessionAudio } from './_session'
 
 // Origins allowed to hit this function. Local dev port + the Vercel
 // deployment's own origin (provided as VERCEL_URL at runtime, without
@@ -53,7 +64,7 @@ function corsHeaders(requestOrigin: string | null): Headers {
 }
 
 function jsonResponse(
-  body: ClaudeStubResponse | ClaudeErrorResponse,
+  body: ClaudeStubResponse | SessionStartResponse | ClaudeErrorResponse,
   status: number,
   baseHeaders: Headers,
 ): Response {
@@ -63,6 +74,16 @@ function jsonResponse(
   // by an intermediary or the browser.
   headers.set('Cache-Control', 'no-store')
   return new Response(JSON.stringify(body), { status, headers })
+}
+
+/** Pull a session plan out of the payload, if one was provided. The plan
+ *  is opaque here — `_session.extractUtteranceTexts` is the single point
+ *  that knows how to find utterance text inside a plan. */
+function extractPlan(payload: unknown): unknown | null {
+  if (typeof payload !== 'object' || payload === null) return null
+  const p = payload as Record<string, unknown>
+  if (!('plan' in p)) return null
+  return p.plan
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -106,7 +127,38 @@ export default async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'config-missing' }, 500, headers)
   }
 
-  // Stub success. Real Claude call is wired in a follow-up ticket.
+  // session-start with a plan attached → render audio and return the
+  // SessionStartResponse. Real Claude prompt wiring (which produces the
+  // plan in the first place) is a follow-up ticket; until then the
+  // browser can pass its own plan to exercise the audio pipeline.
+  if (body.kind === 'session-start') {
+    const plan = extractPlan(body.payload)
+    if (plan !== null) {
+      try {
+        const rendered = await renderSessionAudio(plan)
+        return jsonResponse(rendered, 200, headers)
+      } catch (err) {
+        // Don't leak provider internals — `tts-failed` is the stable
+        // code; the browser falls back to a degraded session per
+        // "Claude is the brain, not the mouth" / graceful-degradation
+        // policy in CLAUDE.md.
+        return jsonResponse(
+          {
+            error: 'tts-failed',
+            message:
+              err instanceof Error && err.message
+                ? `tts pipeline failed: ${err.message}`
+                : 'tts pipeline failed',
+          },
+          502,
+          headers,
+        )
+      }
+    }
+  }
+
+  // Stub success path (unchanged from the prior contract). Real Claude
+  // call is wired in a follow-up ticket.
   return jsonResponse(
     {
       ok: true,
