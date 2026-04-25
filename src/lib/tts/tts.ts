@@ -35,18 +35,157 @@ export interface SpeakOptions {
   onStart?: () => void
 }
 
-// Spec design/session-1.md line 29 calls for `rate 0.9, pitch 1.1` to give
-// Melody her slightly higher, slightly slower character voice. iPad Safari
-// QA on Thomas's real device showed TTS dead even with the gesture in the
-// right place, and one of the documented iOS WebKit quirks is silent
-// rejection of utterances with non-default pitch/rate (especially pitch).
-// We pulled the defaults to 1.0 for both to maximise the chance the engine
-// honours the call. PR body documents the deviation; if iPad sounds too
-// "flat" once TTS is unblocked, Kyle has the call on whether to bring
-// pitch back up incrementally and re-test, or live with neutral defaults.
-const DEFAULT_RATE = 1.0
-const DEFAULT_PITCH = 1.0
+// Spec design/session-1.md line 29: `rate 0.9, pitch 1.1` gives Melody her
+// slightly higher, slightly slower character voice (light girl bunny). PR #22
+// temporarily flattened these to 1.0/1.0 as a defensive guess — we suspected
+// iPad WebKit was silently rejecting non-default pitch utterances. PR #23
+// then proved that hypothesis wrong: TTS works end-to-end with the right
+// gesture-gate + pointer-events fix. Reverted to spec values in round 5
+// (ticket 86c9gp99a) after Thomas iPad QA confirmed audio fires reliably;
+// the deep voice he reported on iPad was the engine picking a system default
+// voice WITH pitch 1.0, not pitch 1.1 being rejected. See pickMelodyVoice()
+// below for the voice-selection half of the fix.
+const DEFAULT_RATE = 0.9
+const DEFAULT_PITCH = 1.1
 const DEFAULT_VOLUME = 1.0
+
+/**
+ * Names of light-to-medium female English voices commonly available on
+ * iPad / macOS / iOS Safari. Order in `MELODY_VOICE_NAMES` is preference:
+ * earliest-listed name wins. Drawn from observed `getVoices()` output on
+ * real iPads (Samantha is the default US English voice on virtually every
+ * iPadOS install) and macOS Big Sur+ shipping voices.
+ *
+ * We anchor each entry with `^` when matching so partial-name collisions
+ * ("Samantha (Enhanced)") still match the intended voice family without
+ * accidentally picking up "Mark" or other male voices that happen to
+ * contain a substring.
+ */
+const MELODY_VOICE_NAMES = [
+  'Samantha',
+  'Karen',
+  'Allison',
+  'Ava',
+  'Susan',
+  'Victoria',
+  'Serena',
+  'Catherine',
+  'Tessa',
+  'Moira',
+  'Fiona',
+] as const
+
+/**
+ * Cached voice pick. Recomputed on first call after page load (and whenever
+ * the cached voice goes stale — see invalidation in pickMelodyVoice itself).
+ * Module-level so we don't iterate getVoices() on every utterance, which is
+ * cheap individually but adds up once Melody is talking through a session.
+ */
+let cachedMelodyVoice: SpeechSynthesisVoice | null = null
+let cachedMelodyVoiceComputed = false
+
+/**
+ * Test-only seam — clears the module-level voice cache so each test starts
+ * with a clean slate. Exported so `pickMelodyVoice` tests can run in any
+ * order without leaking cached state across cases.
+ */
+export function _resetMelodyVoiceCacheForTests(): void {
+  cachedMelodyVoice = null
+  cachedMelodyVoiceComputed = false
+}
+
+/**
+ * Pick the best-fit voice for Melody from whatever the engine offers.
+ *
+ *  1. Filter to English voices (`lang.startsWith('en')`). Spec is en-US,
+ *     but Marian's iPad may ship en-GB / en-AU as the only options — any
+ *     English voice is better than the system-default non-English fallback
+ *     some configurations surface.
+ *  2. Prefer named voices in MELODY_VOICE_NAMES (in order). These are the
+ *     light/medium female voices that match Melody's character (Sanrio
+ *     bunny, child-coded).
+ *  3. Fall back to any voice whose name contains "(female)" — older Android
+ *     / Chrome installs label voices this way.
+ *  4. Fall back to a literal `name === 'Samantha'` heuristic for engines
+ *     that don't surface gender metadata at all.
+ *  5. If nothing matches, return `null` and let the caller leave
+ *     `utterance.voice` unset — the engine then picks its system default.
+ *     We don't pretend we know better than the OS in that case.
+ *
+ * Returns the chosen voice or null. Cached at module level for reuse.
+ */
+export function pickMelodyVoice(): SpeechSynthesisVoice | null {
+  // Cache hit (positive): re-validate the voice is still in the engine's
+  // voice list, because some engines drop voices when an external display
+  // / Bluetooth audio device disconnects mid-session. Cheap O(n) scan.
+  if (cachedMelodyVoiceComputed && cachedMelodyVoice !== null) {
+    const synth = getSynth()
+    if (synth) {
+      const voices = synth.getVoices()
+      if (voices.includes(cachedMelodyVoice)) return cachedMelodyVoice
+    }
+    // Cached voice is gone — re-pick.
+    cachedMelodyVoice = null
+    cachedMelodyVoiceComputed = false
+  } else if (cachedMelodyVoiceComputed) {
+    // Cached "no match" — cheap to return without re-iterating.
+    return null
+  }
+
+  const synth = getSynth()
+  if (!synth) return null
+
+  const all = synth.getVoices()
+  if (all.length === 0) {
+    // Voice list isn't ready yet; don't cache the negative result so the
+    // next call (after voiceschanged fires) can pick up real voices.
+    return null
+  }
+
+  const englishVoices = all.filter((v) =>
+    v.lang?.toLowerCase().startsWith('en'),
+  )
+  if (englishVoices.length === 0) {
+    cachedMelodyVoiceComputed = true
+    cachedMelodyVoice = null
+    return null
+  }
+
+  // Tier 1: named-pattern match, preserving preference order. We walk
+  // MELODY_VOICE_NAMES (not getVoices()'s ordering, which is engine-dependent
+  // and not stable across iPadOS versions) so Samantha wins over Karen wins
+  // over Allison.
+  for (const preferredName of MELODY_VOICE_NAMES) {
+    const re = new RegExp(`^${preferredName}`, 'i')
+    const match = englishVoices.find((v) => re.test(v.name))
+    if (match) {
+      cachedMelodyVoice = match
+      cachedMelodyVoiceComputed = true
+      return match
+    }
+  }
+
+  // Tier 2: any voice with "(female)" in the name (Android / older Chrome).
+  const femaleLabeled = englishVoices.find((v) => /\(female\)/i.test(v.name))
+  if (femaleLabeled) {
+    cachedMelodyVoice = femaleLabeled
+    cachedMelodyVoiceComputed = true
+    return femaleLabeled
+  }
+
+  // Tier 3: literal Samantha heuristic. Already covered by tier 1, but kept
+  // explicitly per the brief — defensive against future regex edits.
+  const samantha = englishVoices.find((v) => v.name === 'Samantha')
+  if (samantha) {
+    cachedMelodyVoice = samantha
+    cachedMelodyVoiceComputed = true
+    return samantha
+  }
+
+  cachedMelodyVoiceComputed = true
+  cachedMelodyVoice = null
+  return null
+}
 
 function getSynth(): SpeechSynthesis | null {
   if (typeof window === 'undefined') return null
@@ -138,6 +277,17 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     if (opts.voiceURI) {
       const voice = synth.getVoices().find((v) => v.voiceURI === opts.voiceURI)
       if (voice) utterance.voice = voice
+    } else {
+      // No explicit voice override — pick Melody's character voice from the
+      // engine's voice list. Without this assignment iPad Safari falls back
+      // to whatever the system default voice is, which on Thomas's real
+      // device read as a deep / masculine voice (not the light girl bunny
+      // the spec calls for). pickMelodyVoice() returns null if no English
+      // voice matches our preference list, in which case we leave
+      // utterance.voice unset and the engine default kicks in — at least
+      // pitch 1.1 will lift it out of "deep" territory.
+      const melodyVoice = pickMelodyVoice()
+      if (melodyVoice) utterance.voice = melodyVoice
     }
 
     const cleanup = () => {

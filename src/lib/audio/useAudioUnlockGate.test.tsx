@@ -95,14 +95,19 @@ describe('useAudioUnlockGate', () => {
     expect(result.current.showGate).toBe(true)
   })
 
-  it("default watchdog is 2000ms (Dave's first-utterance retry contract)", () => {
+  it('default watchdog is 5000ms (round-5 first-utterance retry contract)', () => {
+    // Bumped from 2000ms in round 5 (ticket 86c9gp99a) after Thomas iPad QA
+    // showed first-speech routinely takes 3-5s on cold-cache PWA loads. The
+    // previous 2s value was firing relock BEFORE the engine actually started
+    // speaking; Marian saw the ring re-pulse, tapped again, and queued
+    // competing speak() calls — the "eventually one wins" pattern.
     const { result } = renderHook(() => useAudioUnlockGate())
 
     act(() => {
       result.current.wrapSpeak(() => {})
     })
     act(() => {
-      vi.advanceTimersByTime(1999)
+      vi.advanceTimersByTime(4999)
     })
     expect(result.current.state).toBe('pending')
     act(() => {

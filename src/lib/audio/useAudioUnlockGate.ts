@@ -14,9 +14,17 @@
  * -------------------------------
  * 1. **First-utterance miss (Dave's contract).** Even with the gesture in
  *    the right place, iPadOS occasionally rejects the very first call. We
- *    give it 2s; if `onstart` never fires we mark the unlock as pending so
+ *    give it 5s; if `onstart` never fires we mark the unlock as pending so
  *    the next user gesture can synchronously retry with a fresh utterance.
  *    The user sees a short silent beat, never an error.
+ *
+ *    The 5s value (bumped from 2s in round 5, ticket 86c9gp99a) is sized
+ *    against Thomas's real-iPad QA: first-speech routinely takes 3-5s on
+ *    cold-cache PWA loads (voice list lazy-init, audio session warm-up,
+ *    Howler WebAudio context bridge). 2s was triggering spurious relocks
+ *    BEFORE the engine actually started speaking — Marian saw the ring
+ *    re-pulse, tapped again, queued a second speak() that competed with
+ *    the first; the "eventually one wins" pattern she reported.
  *
  * 2. **Soft re-gate after long background.** When iPadOS aggressively
  *    suspends a backgrounded PWA's audio context (>~5 min), the next
@@ -29,7 +37,7 @@
  * -------------------
  * - The `gateState` machine: `idle` → `pending` → `unlocked` (or `idle` →
  *   `pending` → `relock` if onstart never fires within the watchdog window).
- * - The watchdog timeout. Configurable per call: 2000 ms for the
+ * - The watchdog timeout. Configurable per call: 5000 ms for the
  *   first-utterance retry contract, 250 ms for the cross-screen soft re-gate.
  * - A `reportSpeechStart()` callback that callers wire into their TTS
  *   utility's `onstart` (or, since lib/tts doesn't expose onstart, the
@@ -75,8 +83,9 @@ export type GateState =
 export interface UseAudioUnlockGateOptions {
   /**
    * How long to wait for `reportSpeechStart()` before transitioning to
-   * `relock`. Defaults to 2000 ms — Dave's first-utterance retry contract.
-   * Pass 250 ms for the cross-screen soft-regate path.
+   * `relock`. Defaults to 5000 ms — Dave's first-utterance retry contract,
+   * sized against real-iPad first-speech latency observed in round-5 QA
+   * (Thomas iPad). Pass 250 ms for the cross-screen soft-regate path.
    */
   watchdogMs?: number
   /**
@@ -133,7 +142,16 @@ export interface AudioUnlockGate {
   reset: () => void
 }
 
-const DEFAULT_WATCHDOG_MS = 2000
+/**
+ * Default first-utterance watchdog window. Bumped from 2000 → 5000 ms in
+ * round 5 (ticket 86c9gp99a) after Thomas iPad QA showed first-speech
+ * routinely takes 3-5 s on cold-cache PWA loads. The previous 2 s value
+ * was triggering spurious relocks BEFORE the engine actually started
+ * speaking — Marian then tapped again, queued a competing speak(), and
+ * saw the "ring re-pulses several times then voice eventually fires"
+ * pattern. 5 s is the safe upper bound on observed first-speech latency.
+ */
+const DEFAULT_WATCHDOG_MS = 5000
 
 export function useAudioUnlockGate(
   opts: UseAudioUnlockGateOptions = {},
