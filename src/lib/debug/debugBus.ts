@@ -43,19 +43,53 @@ export interface TapEventRecord {
   target: string
 }
 
+/**
+ * Native-DOM raw event types we shadow-record on the wake-tap target.
+ *
+ * "Raw" means the event was observed via `addEventListener` directly on the
+ * DOM node, BEFORE React's synthetic-event system gets a crack at it. Used
+ * to distinguish "iPad isn't delivering events to this element" from
+ * "events arrive but React's onClick/onTouchEnd binding doesn't catch them"
+ * — see DebugOverlay raw-events line.
+ */
+export type RawTapEventType =
+  | 'touchstart'
+  | 'touchend'
+  | 'pointerdown'
+  | 'click'
+
+export interface RawTapEventRecord {
+  type: RawTapEventType
+  /** ms since epoch. */
+  timestamp: number
+  /** Which testid (or other label) the event landed on. */
+  target: string
+}
+
 export type GateStateName = 'idle' | 'pending' | 'unlocked' | 'relock'
 
 export interface DebugSnapshot {
   lastSpeak: SpeakAttemptRecord | null
   recentTaps: TapEventRecord[]
+  /**
+   * Raw DOM events on the wake-tap target, captured via addEventListener
+   * BEFORE React's onClick/onTouchEnd handlers run. If `recentTaps` stays
+   * empty but `recentRawEvents` populates, the bug is in the React event
+   * binding layer (or our handler logic) — not in iPad's hit-testing.
+   * If both stay empty, iPad isn't delivering events to the element at all
+   * (CSS hit-testing / overlapping element capturing the tap).
+   */
+  recentRawEvents: RawTapEventRecord[]
   gateState: GateStateName | null
 }
 
 const MAX_TAPS = 5
+const MAX_RAW_EVENTS = 8
 
 const state: DebugSnapshot = {
   lastSpeak: null,
   recentTaps: [],
+  recentRawEvents: [],
   gateState: null,
 }
 
@@ -70,6 +104,7 @@ function notify(): void {
   const snapshot: DebugSnapshot = {
     lastSpeak: state.lastSpeak,
     recentTaps: state.recentTaps.slice(),
+    recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
   }
   for (const listener of listeners) {
@@ -136,6 +171,22 @@ export function recordTap(type: TapEventType, target: string): void {
 }
 
 /**
+ * Record a raw DOM event observed via `addEventListener` BEFORE React's
+ * synthetic-event system runs. Diagnostic-only — used by Greet's wake-tap
+ * target to expose whether iPad Safari is delivering pointer/touch events
+ * to the element at all. Filtered separately from `recentTaps` (which only
+ * fire from React handlers) so we can tell apart "events arrive, React
+ * handler doesn't fire" from "events never reach the element".
+ */
+export function recordRawTapEvent(type: RawTapEventType, target: string): void {
+  state.recentRawEvents = [
+    ...state.recentRawEvents.slice(-MAX_RAW_EVENTS + 1),
+    { type, timestamp: nowMs(), target },
+  ]
+  notify()
+}
+
+/**
  * Record the audio-unlock-gate state machine's current value. Wired from
  * `useAudioUnlockGate` via a useEffect.
  */
@@ -151,6 +202,7 @@ export function subscribe(listener: Listener): () => void {
   listener({
     lastSpeak: state.lastSpeak,
     recentTaps: state.recentTaps.slice(),
+    recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
   })
   return () => {
@@ -165,6 +217,7 @@ export function subscribe(listener: Listener): () => void {
 export function _resetForTests(): void {
   state.lastSpeak = null
   state.recentTaps = []
+  state.recentRawEvents = []
   state.gateState = null
   listeners.clear()
 }
@@ -177,6 +230,7 @@ export function snapshot(): DebugSnapshot {
   return {
     lastSpeak: state.lastSpeak,
     recentTaps: state.recentTaps.slice(),
+    recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
   }
 }

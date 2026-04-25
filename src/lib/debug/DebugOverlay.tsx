@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   subscribe,
   type DebugSnapshot,
+  type RawTapEventRecord,
   type SpeakAttemptRecord,
   type TapEventRecord,
 } from './debugBus'
@@ -24,7 +25,14 @@ import {
  *    timestamp, and current status (queued → started → ended, or errored).
  *  - The last error message, if any.
  *  - The last 5 tap events: timestamp + event type. Confirms the multi-event
- *    binding (click/touchend/pointerdown) is actually firing on the iPad.
+ *    binding (click/touchend/pointerdown) is actually firing on the iPad
+ *    via React's synthetic-event system.
+ *  - The last 8 raw DOM events on the wake-tap target, captured via
+ *    `addEventListener` BEFORE React sees them. Diagnostic line for the
+ *    iPad-tap-not-firing investigation: if `taps (0)` but
+ *    `raw events (>0)`, React's synthetic binding is broken; if both are
+ *    zero, iPad isn't delivering events to the element at all (CSS
+ *    hit-testing issue).
  *  - The audio-unlock-gate state: idle / pending / unlocked / relock.
  *
  * iPad QA usage
@@ -123,6 +131,10 @@ function renderTap(t: TapEventRecord): string {
   return `[${formatTimestamp(t.timestamp)}] ${t.type} → ${t.target}`
 }
 
+function renderRawTap(t: RawTapEventRecord): string {
+  return `[${formatTimestamp(t.timestamp)}] ${t.type} → ${t.target}`
+}
+
 export interface DebugOverlayProps {
   /**
    * Test seam — overrides the polling read of `speechSynthesis`. Defaults to
@@ -137,6 +149,7 @@ export default function DebugOverlay({
   const [bus, setBus] = useState<DebugSnapshot>({
     lastSpeak: null,
     recentTaps: [],
+    recentRawEvents: [],
     gateState: null,
   })
   const [synth, setSynth] = useState<SynthSnapshot>(() => readSynthFn())
@@ -204,6 +217,24 @@ export default function DebugOverlay({
             .map((t, i) => (
               <div key={`${t.timestamp}-${i}`} data-testid="debug-overlay-tap">
                 {renderTap(t)}
+              </div>
+            ))
+        )}
+      </div>
+      <div data-testid="debug-overlay-raw-events">
+        <strong>raw events ({bus.recentRawEvents.length})</strong>
+        {bus.recentRawEvents.length === 0 ? (
+          <div>(none)</div>
+        ) : (
+          bus.recentRawEvents
+            .slice()
+            .reverse()
+            .map((t, i) => (
+              <div
+                key={`${t.timestamp}-${i}`}
+                data-testid="debug-overlay-raw-event"
+              >
+                {renderRawTap(t)}
               </div>
             ))
         )}

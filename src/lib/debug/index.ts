@@ -4,6 +4,7 @@ export {
   recordSpeakAttempt,
   recordSpeakStatus,
   recordTap,
+  recordRawTapEvent,
   recordGateState,
   subscribe,
   snapshot,
@@ -15,5 +16,7 @@ export type {
   SpeakStatus,
   TapEventRecord,
   TapEventType,
+  RawTapEventRecord,
+  RawTapEventType,
   GateStateName,
 } from './debugBus'
