@@ -48,6 +48,7 @@ vi.mock('../lib/sfx', () => ({
 }))
 
 import Greet from './Greet'
+import { _resetForTests as resetDebugBus } from '../lib/debug'
 import {
   GREET_LINES,
   HEART_REVEAL_AFTER_LINE_INDEX,
@@ -175,12 +176,16 @@ describe('Greet', () => {
     ttsSpeakSpy.mockClear()
     sfxState.last = null
     sfxState.createCount = 0
+    // Bus is a module-level singleton — reset between tests so tap/gate/speak
+    // state from a previous case can't leak into the next.
+    resetDebugBus()
   })
 
   afterEach(() => {
     vi.useRealTimers()
     mediaSpy?.mockRestore()
     mediaSpy = undefined
+    resetDebugBus()
   })
 
   describe('Wake state (initial mount, audio locked)', () => {

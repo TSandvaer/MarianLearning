@@ -1,6 +1,7 @@
 // iOS Safari requires the first speak() call to originate from a user gesture;
 // callers must ensure that, this module makes no attempt to fake one.
 
+import { recordSpeakAttempt, recordSpeakStatus } from '../debug/debugBus'
 import { subscribeToBoundary } from './boundary'
 import type { BoundaryEvent } from './boundary'
 
@@ -34,8 +35,17 @@ export interface SpeakOptions {
   onStart?: () => void
 }
 
-const DEFAULT_RATE = 0.9
-const DEFAULT_PITCH = 1.1
+// Spec design/session-1.md line 29 calls for `rate 0.9, pitch 1.1` to give
+// Melody her slightly higher, slightly slower character voice. iPad Safari
+// QA on Thomas's real device showed TTS dead even with the gesture in the
+// right place, and one of the documented iOS WebKit quirks is silent
+// rejection of utterances with non-default pitch/rate (especially pitch).
+// We pulled the defaults to 1.0 for both to maximise the chance the engine
+// honours the call. PR body documents the deviation; if iPad sounds too
+// "flat" once TTS is unblocked, Kyle has the call on whether to bring
+// pitch back up incrementally and re-test, or live with neutral defaults.
+const DEFAULT_RATE = 1.0
+const DEFAULT_PITCH = 1.0
 const DEFAULT_VOLUME = 1.0
 
 function getSynth(): SpeechSynthesis | null {
@@ -88,6 +98,23 @@ export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   })
 }
 
+/**
+ * Synchronously poke the voice list. Some iPad WebKit builds only start
+ * loading voices the first time `getVoices()` is called — a cheap, safe nudge
+ * during Splash means the voice list is ready by the time the Wake-tap fires
+ * speak(). The return value is intentionally unused; the side effect is the
+ * point. Safe to call repeatedly; safe to call before any user gesture.
+ */
+export function primeVoices(): void {
+  const synth = getSynth()
+  if (!synth) return
+  try {
+    synth.getVoices()
+  } catch {
+    // Defensive: some engines throw if speech isn't initialised. Swallow.
+  }
+}
+
 let activeUtterance: SpeechSynthesisUtterance | null = null
 let activeReject: ((reason: Error) => void) | null = null
 
@@ -98,6 +125,7 @@ let activeReject: ((reason: Error) => void) | null = null
 export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
   const synth = getSynth()
   if (!synth || typeof window.SpeechSynthesisUtterance !== 'function') {
+    recordSpeakAttempt(text, 'errored', 'Web Speech API not available')
     return Promise.reject(new Error('Web Speech API not available'))
   }
 
@@ -123,19 +151,27 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
 
     utterance.onend = () => {
       cleanup()
+      recordSpeakStatus('ended')
       resolve()
     }
 
     utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
       cleanup()
+      const errMsg = event.error || 'speech synthesis error'
+      recordSpeakStatus('errored', errMsg)
       // `canceled` and `interrupted` come through onerror in some engines.
-      reject(new Error(event.error || 'speech synthesis error'))
+      reject(new Error(errMsg))
     }
 
     if (opts.onStart) {
       const userOnStart = opts.onStart
       utterance.onstart = () => {
+        recordSpeakStatus('started')
         userOnStart()
+      }
+    } else {
+      utterance.onstart = () => {
+        recordSpeakStatus('started')
       }
     }
 
@@ -151,6 +187,13 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     // Web Speech API queues utterances by default, so we must call synth.cancel()
     // to stop the previous one at the audio layer — rejecting the JS promise alone
     // doesn't silence the speaker on iPad/Safari.
+    //
+    // CRITICAL iPad note (post-PR-#21 Thomas iPad QA): cancel-then-speak in the
+    // same JS task is a documented iOS WebKit bug — the new speak is silently
+    // dropped. We sidestep that by ONLY calling cancel() when there's actually
+    // an in-flight utterance to cancel. On a cold-load first speak (the path
+    // Wake's tap takes), `activeReject` is null so this branch is skipped and
+    // the engine sees a clean speak() with no cancel preceding it.
     if (activeReject) {
       const prevReject = activeReject
       activeReject = null
@@ -160,6 +203,20 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     activeUtterance = utterance
     activeReject = reject
 
+    // iPad Safari sometimes initialises `speechSynthesis` in a paused state,
+    // especially after the PWA returns from a background tab or after the
+    // service worker cycles. resume() is a no-op when not paused, so it's
+    // safe to call unconditionally on every speak. Inside the user-gesture
+    // tick, resume() also re-arms the engine so the speak() that follows is
+    // recognised as user-activated.
+    try {
+      synth.resume()
+    } catch {
+      // Some engines throw if not initialised. The speak() call below will
+      // tell us anything resume()'s exception couldn't.
+    }
+
+    recordSpeakAttempt(text, 'queued')
     synth.speak(utterance)
   })
 }

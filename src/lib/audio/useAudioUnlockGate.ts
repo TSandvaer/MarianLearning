@@ -57,6 +57,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { recordGateState } from '../debug/debugBus'
 
 export type GateState =
   /** No speak() in flight; gate hidden. Default state on mount. */
@@ -165,6 +166,14 @@ export function useAudioUnlockGate(
 
   const watchdogHandleRef = useRef<unknown>(null)
   const retryRef = useRef<(() => void) | null>(null)
+
+  // Push the current state to the debug bus on every change so the
+  // `?debug=1` overlay can show what the iPad sees in real time. The
+  // bus is a no-op when there are no listeners, so this is free in
+  // normal sessions.
+  useEffect(() => {
+    recordGateState(state)
+  }, [state])
 
   const clearWatchdog = useCallback(() => {
     if (watchdogHandleRef.current !== null) {

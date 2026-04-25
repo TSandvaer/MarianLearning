@@ -3,6 +3,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { cancel as cancelTts, speak } from '../lib/tts'
 import { createSfx, type Sfx } from '../lib/sfx'
 import { useAudioUnlockGate } from '../lib/audio'
+import { recordTap } from '../lib/debug'
 import {
   GREET_LINES,
   REPROMPT_AFTER_MS,
@@ -987,9 +988,24 @@ export default function Greet({
           type="button"
           data-testid="greet-wake-tap-target"
           aria-label="Tap to start"
-          onClick={handleWakeTap}
-          onTouchEnd={handleWakeTap}
-          onPointerDown={handleWakeTap}
+          // Each handler records its event type to the debug bus BEFORE
+          // delegating to the shared (idempotent) wake-tap logic. The bus
+          // is a no-op without the `?debug=1` overlay subscribed, so this
+          // is free in normal sessions but priceless when Thomas needs to
+          // confirm that touchend / click / pointerdown are actually
+          // firing on his iPad.
+          onClick={() => {
+            recordTap('click', 'greet-wake-tap-target')
+            handleWakeTap()
+          }}
+          onTouchEnd={() => {
+            recordTap('touchend', 'greet-wake-tap-target')
+            handleWakeTap()
+          }}
+          onPointerDown={() => {
+            recordTap('pointerdown', 'greet-wake-tap-target')
+            handleWakeTap()
+          }}
           className="
             absolute inset-0 z-50
             cursor-pointer

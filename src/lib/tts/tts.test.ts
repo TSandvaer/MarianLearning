@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cancel, isAvailable, loadVoices, speak } from './tts'
+import { cancel, isAvailable, loadVoices, primeVoices, speak } from './tts'
+import { _resetForTests } from '../debug/debugBus'
 
 type UtteranceLike = {
   text: string
@@ -48,6 +49,7 @@ class FakeUtterance implements UtteranceLike {
 interface FakeSynth {
   speak: ReturnType<typeof vi.fn>
   cancel: ReturnType<typeof vi.fn>
+  resume: ReturnType<typeof vi.fn>
   getVoices: ReturnType<typeof vi.fn>
   addEventListener: ReturnType<typeof vi.fn>
   removeEventListener: ReturnType<typeof vi.fn>
@@ -67,6 +69,7 @@ function makeFakeSynth(): FakeSynth {
       utterances.push(u)
     }),
     cancel: vi.fn(),
+    resume: vi.fn(),
     getVoices: vi.fn(() => synth._voices),
     addEventListener: vi.fn((event: string, handler: () => void) => {
       if (event === 'voiceschanged') handlers.push(handler)
@@ -91,12 +94,14 @@ function installFakeSynth(): FakeSynth {
 describe('tts', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    _resetForTests()
   })
 
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
     cancel()
+    _resetForTests()
   })
 
   describe('isAvailable', () => {
@@ -119,17 +124,76 @@ describe('tts', () => {
   })
 
   describe('speak', () => {
-    it('resolves when the utterance ends', async () => {
+    it('resolves when the utterance ends with iPad-safe defaults (rate 1.0, pitch 1.0)', async () => {
+      // Defaults pulled from spec line 29 (rate 0.9, pitch 1.1) to neutral
+      // 1.0/1.0 in the post-PR-#21 iPad fix. iPad WebKit silently rejects
+      // utterances with non-default pitch on some builds; defaulting to
+      // 1.0 maximises the chance the engine honours the call. Callers can
+      // still pass explicit rate/pitch via SpeakOptions.
       const synth = installFakeSynth()
       const promise = speak('Hi! I am Melody.')
 
       expect(synth.speak).toHaveBeenCalledTimes(1)
       const u = synth._utterances[0]
       expect(u.text).toBe('Hi! I am Melody.')
-      expect(u.rate).toBeCloseTo(0.9)
-      expect(u.pitch).toBeCloseTo(1.1)
+      expect(u.rate).toBe(1.0)
+      expect(u.pitch).toBe(1.0)
       expect(u.volume).toBe(1.0)
 
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await expect(promise).resolves.toBeUndefined()
+    })
+
+    it('does NOT call synth.cancel() on cold-load first speak (iPad WebKit cancel-then-speak race)', async () => {
+      // Documented iOS WebKit bug: cancel() followed immediately by speak()
+      // in the same JS task often causes the new speak to be silently
+      // dropped. Conditional cancel-only-if-active sidesteps this. On a
+      // cold-load first speak, there's nothing to cancel — the engine sees
+      // a clean speak() call.
+      const synth = installFakeSynth()
+      const promise = speak('Hi.')
+      expect(synth.cancel).not.toHaveBeenCalled()
+      expect(synth.speak).toHaveBeenCalledTimes(1)
+
+      const u = synth._utterances[0]
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await promise
+    })
+
+    it('calls synth.resume() inside speak() to wake a paused engine (iPad PWA quirk)', async () => {
+      // iPad Safari sometimes initialises speechSynthesis in a paused state,
+      // especially in PWA / standalone mode. resume() is a no-op when not
+      // paused, so we call it unconditionally on every speak() inside the
+      // user-gesture tick. Without this, every speak() silently fails until
+      // something else happens to resume the engine.
+      const synth = installFakeSynth()
+      const promise = speak('Hi.')
+
+      expect(synth.resume).toHaveBeenCalledTimes(1)
+
+      // Order matters: resume must be called BEFORE speak so the new
+      // utterance lands on a non-paused engine.
+      const resumeOrder = synth.resume.mock.invocationCallOrder[0]
+      const speakOrder = synth.speak.mock.invocationCallOrder[0]
+      expect(resumeOrder).toBeLessThan(speakOrder)
+
+      const u = synth._utterances[0]
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await promise
+    })
+
+    it('swallows a thrown synth.resume() — does not break the speak path', async () => {
+      // Some engines throw if speechSynthesis isn't fully initialised.
+      // resume()'s exception must not poison the speak() that follows.
+      const synth = installFakeSynth()
+      synth.resume.mockImplementation(() => {
+        throw new Error('engine not ready')
+      })
+      const promise = speak('Hi.')
+
+      // Speak must still have been queued despite resume's throw.
+      expect(synth.speak).toHaveBeenCalledTimes(1)
+      const u = synth._utterances[0]
       u.onend?.call(u as unknown as SpeechSynthesisUtterance)
       await expect(promise).resolves.toBeUndefined()
     })
@@ -293,13 +357,17 @@ describe('tts', () => {
 
     it('does not call onBoundary if the option is omitted', async () => {
       // Backward-compat: existing speak() callers that never pass onBoundary
-      // must not pay any cost, attach any listeners, or change behaviour.
+      // must not pay any cost from the boundary helper.
+      //
+      // Note: utterance.onstart IS attached unconditionally (to push status
+      // to the debug bus) — that's a different concern from the boundary
+      // helper. We only assert the boundary helper isn't sneaking work in.
       const synth = installFakeSynth()
       const promise = speak('Hi.')
       const u = synth._utterances[0] as unknown as FakeUtterance
 
-      // No onstart/onboundary handlers were attached by the boundary helper.
-      expect(u.onstart).toBeNull()
+      // The boundary helper is the thing under test here — its onboundary
+      // wiring must not happen when onBoundary is omitted.
       expect(u.onboundary).toBeNull()
 
       u.onend?.call(
@@ -439,6 +507,54 @@ describe('tts', () => {
     it('returns empty list when speechSynthesis is missing', async () => {
       vi.stubGlobal('speechSynthesis', undefined)
       await expect(loadVoices()).resolves.toEqual([])
+    })
+  })
+
+  describe('primeVoices', () => {
+    it('synchronously calls getVoices() on the engine', () => {
+      // The point of primeVoices is to nudge engines (iPad WebKit) that only
+      // start populating the voice list the first time getVoices() is called.
+      // We don't care about the return value — just that the engine is poked.
+      const synth = installFakeSynth()
+      primeVoices()
+      expect(synth.getVoices).toHaveBeenCalledTimes(1)
+    })
+
+    it('is a no-op when speechSynthesis is missing', () => {
+      vi.stubGlobal('speechSynthesis', undefined)
+      expect(() => primeVoices()).not.toThrow()
+    })
+
+    it('swallows a thrown getVoices()', () => {
+      // Defensive: some engines throw if not initialised. Must not bubble.
+      const synth = installFakeSynth()
+      synth.getVoices.mockImplementation(() => {
+        throw new Error('not initialised')
+      })
+      expect(() => primeVoices()).not.toThrow()
+    })
+  })
+
+  describe('iPad-Safari second-utterance race', () => {
+    it('only calls cancel() between back-to-back speaks (the conditional branch)', async () => {
+      // The conditional cancel-only-if-active gates the cancel-then-speak
+      // race. On a second utterance there IS an active reject, so cancel
+      // fires once. This test is the companion to the cold-load assertion
+      // above — together they prove the conditional is doing its job.
+      const synth = installFakeSynth()
+      // Attach the rejection handler before issuing the second speak so
+      // Vitest doesn't see a transient unhandled-rejection between calls.
+      const first = speak('First.')
+      const firstAssertion = expect(first).rejects.toThrow('canceled')
+      expect(synth.cancel).not.toHaveBeenCalled()
+
+      const second = speak('Second.')
+      expect(synth.cancel).toHaveBeenCalledTimes(1)
+
+      await firstAssertion
+      const u = synth._utterances[1]
+      u.onend?.call(u as unknown as SpeechSynthesisUtterance)
+      await second
     })
   })
 })
