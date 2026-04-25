@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { cancel as cancelTts, speak } from '../lib/tts'
 import { createSfx, type Sfx } from '../lib/sfx'
+import { useAudioUnlockGate } from '../lib/audio'
 import {
   GREET_LINES,
   REPROMPT_AFTER_MS,
   runGreetSequence,
   speakReprompt,
+  type GreetSequenceHandle,
   type SpeakFn,
 } from './greetSequence'
 
@@ -14,34 +16,84 @@ import {
  * Screen 2 — First Greeting (Meet Melody).
  *
  * Spec: design/session-1.md §"Screen 2 — First Greeting (Meet Melody)" — the
- * 12 AC bullets at lines 192–203 are the contract this component implements.
+ * AC bullets at lines 202–223 are the contract this component implements.
  *
- * Architectural shape
- * -------------------
- *  - Sequence orchestration (which line to speak, when the heart appears) is
- *    the pure state machine in `./greetSequence.ts`. This component is a thin
- *    wrapper that wires that machine to:
- *      * Framer Motion (clouds drift, Melody slide, heart pulse, ear-wiggle)
- *      * the TTS utility (live Web Speech)
- *      * the SFX helper (heart-tap chime — defensive against missing asset)
- *      * a 20s no-tap re-prompt timer
- *  - Captions live in a single `revealedByLine[i]` count per line. The TTS
- *    boundary hook (PR #11) advances this in lockstep with the speech engine
- *    on Chrome and via the synthetic word-paced fallback on iPad Safari.
- *  - Melody's pose swap (idle ↔ happy) drives the ear-wiggle. We watch for
- *    `BoundaryEvent.word === 'Hi!'` on line 0 and flip to happy for ~600ms.
- *  - Reduced motion: the global `MotionConfig reducedMotion="user"` collapses
- *    spring entrances to fades and stops `repeat: Infinity` loops. We
- *    additionally branch on `prefers-reduced-motion` here to skip arming the
- *    cloud-drift `animate.x` array, the Melody slide, and the heart bob —
- *    spec line 202 calls for an explicit absence, not just a softer ease.
+ * State machine (post-86c9gp99a)
+ * ------------------------------
+ * The screen has two visible phases:
+ *
+ *   `wake`  — initial state on mount. Audio context is locked. Melody is
+ *             on-screen, idle and breathing; a soft pink ready ring pulses
+ *             around her; the entire viewport is a transparent tap target.
+ *             No TTS. No SFX. No speech ribbon. No heart. After 8s of no
+ *             tap, a finger-tap icon and ear-wiggle play once as a
+ *             low-arousal nudge — but the screen sits patiently after that;
+ *             no nag loop.
+ *
+ *   `intro` — post-tap. The same tap that flipped this state synchronously
+ *             dispatched `speak(line0)`, unlocking iPad Safari's audio
+ *             context (the whole point of Wake). The 4-line greeting plays
+ *             with ~400ms gaps; captions reveal word-by-word; the heart
+ *             appears after line 3 completes.
+ *
+ * iPad Safari audio unlock (the bug this ticket fixes)
+ * ----------------------------------------------------
+ * Splash auto-advances into Greet without a tap. Without this Wake state,
+ * Greet's first `speak()` ran inside a useEffect on the screen-mount tick,
+ * which iPad Safari treats as a fresh execution context with no user
+ * gesture — so the call was silently rejected and the entire greeting died.
+ * We fix that by:
+ *
+ *   1. Constructing the sequence handle on mount but NOT calling start()
+ *      until the Wake-tap fires.
+ *   2. Calling `handle.start()` synchronously inside the Wake-tap handler
+ *      — same JS tick as the gesture, no awaited promises.
+ *   3. Also kicking the chime SFX synchronously to unlock the WebAudio
+ *      context (Howler bridges to Web Audio for sub-frame latency on
+ *      subsequent SFX plays).
+ *
+ * First-utterance retry (Dave's contract)
+ * ---------------------------------------
+ * Even with the gesture in the right place, iPadOS occasionally rejects the
+ * very first call. `useAudioUnlockGate` arms a 2s watchdog around the
+ * speak; if onstart never fires we surface the Wake ring again silently and
+ * the next gesture re-fires speak(line0) inside its own synchronous tick.
+ * No copy is shown — Marian sees a slightly delayed Melody, not an error.
+ *
+ * Reduced motion: the global `MotionConfig reducedMotion="user"` collapses
+ * spring entrances and stops infinite loops. We additionally branch on
+ * `prefers-reduced-motion` here to skip cloud-drift, Melody slide, ring
+ * pulse, and heart bob — spec lines 167 and 220 want an explicit absence,
+ * not just softer easing.
  */
 
-const HEART_TAP_TRANSITION_MS = 400 // spec line 199: ≤400ms heart-tap → screen 3
-const HEART_SQUISH_MS = 250 // spec line 175
-const EAR_WIGGLE_MS = 600 // spec line 161
-const CLOUD_FADE_MS = 600 // spec line 153
-const CLOUD_DRIFT_S = 20 // spec line 153 + ticket: ~20s repeating mirror drift
+const HEART_TAP_TRANSITION_MS = 400 // spec line 217: ≤400ms heart-tap → screen 3
+const HEART_SQUISH_MS = 250 // spec line 185
+const EAR_WIGGLE_MS = 600 // spec line 169
+const CLOUD_FADE_MS = 600 // spec line 159
+const CLOUD_DRIFT_S = 20 // spec line 159
+
+// Wake state timings (spec lines 166–169, 183, 209)
+/** How long after mount the ring fades in. */
+const RING_REVEAL_DELAY_MS = 900 // spec line 167
+/** Ring fade-in duration. */
+const RING_REVEAL_MS = 200
+/** How long after the last tap before the wake re-prompt fires. Spec line 183. */
+const WAKE_REPROMPT_AFTER_MS = 8_000
+/** Finger-tap icon fade-in duration on the wake re-prompt. */
+const ICON_FADE_IN_MS = 300
+/** Finger-tap icon pulse (`scale: 1 → 1.1 → 1`) duration. */
+const ICON_PULSE_MS = 600
+/** How long the icon stays at full opacity before fading out. */
+const ICON_HOLD_AFTER_PULSE_MS = 2_500
+/** Finger-tap icon fade-out duration. */
+const ICON_FADE_OUT_MS = 400
+/** Watchdog window for "did the engine actually start speaking" — Dave's contract. */
+const FIRST_UTTERANCE_RETRY_MS = 2_000
+/** Melody's breathing loop period (spec line 166). */
+const BREATHING_PERIOD_S = 2.4
+/** Ring pulse loop period (spec line 167). */
+const RING_PULSE_PERIOD_S = 1.4
 
 const MELODY_ENTRANCE_SPRING = {
   type: 'spring' as const,
@@ -61,6 +113,8 @@ const RIBBON_SPRING = {
   stiffness: 260,
   damping: 20,
 }
+
+export type ScreenState = 'wake' | 'intro'
 
 export interface GreetProps {
   /** Called when the heart-tap → Math hand-off should happen. */
@@ -110,6 +164,11 @@ export default function Greet({
 }: GreetProps) {
   const reducedMotion = usePrefersReducedMotion()
 
+  // Audio unlock gate — wraps line 0's speak with a 2s watchdog. If the
+  // engine doesn't actually start speaking within the window, we surface
+  // the Wake ring again so the next tap can retry synchronously.
+  const gate = useAudioUnlockGate({ watchdogMs: FIRST_UTTERANCE_RETRY_MS })
+
   // Lazy-init: createSfx kicks off an XHR; we only want one per mount.
   // TODO(86c9gnhez/sfx-chime-soft): asset is pending Thomas — see
   // public/assets/assets-todo.md. createSfx will warn once and play() will
@@ -123,9 +182,15 @@ export default function Greet({
       }),
   )
 
+  // Top-level screen phase.
+  const [screenState, setScreenState] = useState<ScreenState>('wake')
+
+  // Wake re-prompt: shows the finger-tap icon + ear-wiggle once at 8s.
+  const [showWakeIcon, setShowWakeIcon] = useState(false)
+
   // Caption state: one revealed-word count per line. We render the spoken
   // text in a stable speech ribbon underneath Melody; revealing word-by-word
-  // mirrors the spec's "passive reading exposure" goal (line 28 + 196).
+  // mirrors the spec's "passive reading exposure" goal (line 30 + 214).
   const [activeLine, setActiveLine] = useState(0)
   const [revealedByLine, setRevealedByLine] = useState<number[]>(() =>
     GREET_LINES.map(() => 0),
@@ -140,6 +205,14 @@ export default function Greet({
   const repromptUsedRef = useRef(false)
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tapHandledRef = useRef(false)
+  const wakeRepromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
+  const wakeIconHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
+  const wakeIconRepromptUsedRef = useRef(false)
+  const sequenceRef = useRef<GreetSequenceHandle | null>(null)
 
   /** Tear down any timers — used by both unmount cleanup and heart-tap. */
   const clearAllTimers = useCallback(() => {
@@ -155,6 +228,14 @@ export default function Greet({
       clearTimeout(advanceTimerRef.current)
       advanceTimerRef.current = null
     }
+    if (wakeRepromptTimerRef.current !== null) {
+      clearTimeout(wakeRepromptTimerRef.current)
+      wakeRepromptTimerRef.current = null
+    }
+    if (wakeIconHideTimerRef.current !== null) {
+      clearTimeout(wakeIconHideTimerRef.current)
+      wakeIconHideTimerRef.current = null
+    }
   }, [])
 
   const triggerEarWiggle = useCallback(() => {
@@ -168,7 +249,7 @@ export default function Greet({
     }, EAR_WIGGLE_MS)
   }, [])
 
-  // --- Re-prompt timer -------------------------------------------------------
+  // --- Re-prompt timer (post-line-4, 20s no-heart-tap) ----------------------
 
   const scheduleReprompt = useCallback(() => {
     if (repromptUsedRef.current) return
@@ -179,7 +260,7 @@ export default function Greet({
       repromptTimerRef.current = null
       repromptUsedRef.current = true
       // Re-show line 3's caption. Reset its revealed count so the word-by-word
-      // animation re-fires. Spec line 176 reuses the same line.
+      // animation re-fires. Spec line 186 reuses the same line.
       const lastIdx = GREET_LINES.length - 1
       setActiveLine(lastIdx)
       setRevealedByLine((prev) => {
@@ -200,19 +281,23 @@ export default function Greet({
     }, REPROMPT_AFTER_MS)
   }, [speakFn])
 
-  // --- Sequence playback -----------------------------------------------------
+  // --- Sequence factory -----------------------------------------------------
+  //
+  // Building the handle is cheap (no speak() until start() is called), so we
+  // can rebuild on retry without any teardown ceremony beyond a cancel().
 
-  useEffect(() => {
-    let mounted = true
-
-    const handle = runGreetSequence({
+  const buildSequence = useCallback((): GreetSequenceHandle => {
+    return runGreetSequence({
       speak: speakFn,
       onLineStart: (i) => {
-        if (!mounted) return
         setActiveLine(i)
       },
+      onLine0Start: () => {
+        // The engine actually started speaking — clear the watchdog so we
+        // don't surface the relock ring spuriously.
+        gate.reportSpeechStart()
+      },
       onWordBoundary: (lineIndex, ev) => {
-        if (!mounted) return
         // Reveal up to and including this word index. Using max() guards
         // against a late native boundary arriving after the synthetic
         // fallback already painted past it (hybrid-recovery path in
@@ -222,16 +307,21 @@ export default function Greet({
           next[lineIndex] = Math.max(next[lineIndex], ev.wordIndex + 1)
           return next
         })
-        // Ear-wiggle on the very first "Hi!" word (line 0). Spec line 142.
+        // Some engines skip onstart entirely but do fire onboundary for the
+        // first word — treat the first word boundary as a backup
+        // speech-start signal.
+        if (lineIndex === 0 && ev.wordIndex === 0) {
+          gate.reportSpeechStart()
+        }
+        // Ear-wiggle on the very first "Hi!" word (line 0). Spec line 169.
         if (lineIndex === 0 && ev.word === 'Hi!') {
           triggerEarWiggle()
         }
       },
       onLineEnd: (i) => {
-        if (!mounted) return
         // Defensive: if the engine never gave us a boundary for a word
         // (e.g. punctuation-only token), force the line fully revealed at
-        // its end. Acceptable per spec line 723's ±2-word tolerance.
+        // its end. Acceptable per spec line 759's ±2-word tolerance.
         setRevealedByLine((prev) => {
           const total = GREET_LINES[i].split(/\s+/).filter(Boolean).length
           if (prev[i] >= total) return prev
@@ -241,32 +331,155 @@ export default function Greet({
         })
       },
       onHeartReady: () => {
-        if (!mounted) return
         setHeartReady(true)
         // Start the 20s no-tap re-prompt timer once the heart is interactive.
         scheduleReprompt()
       },
     })
+  }, [gate, scheduleReprompt, speakFn, triggerEarWiggle])
 
+  // Build the sequence handle on mount; do NOT start() it. Mounting a sequence
+  // costs nothing — speak() is only called when start() runs.
+  useEffect(() => {
+    sequenceRef.current = buildSequence()
     return () => {
-      mounted = false
-      handle.cancel()
+      sequenceRef.current?.cancel()
+      sequenceRef.current = null
       cancelTts()
       clearAllTimers()
       chimeInstance.unload()
     }
-  }, [
-    speakFn,
-    chimeInstance,
-    clearAllTimers,
-    scheduleReprompt,
-    triggerEarWiggle,
-  ])
+    // We deliberately rebuild only on speakFn / chime changes — the rest of
+    // the deps are stable identities from this component's own state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // --- Wake re-prompt (8s no-tap) ------------------------------------------
+
+  const scheduleWakeReprompt = useCallback(() => {
+    if (wakeIconRepromptUsedRef.current) return
+    if (wakeRepromptTimerRef.current !== null) {
+      clearTimeout(wakeRepromptTimerRef.current)
+    }
+    wakeRepromptTimerRef.current = setTimeout(() => {
+      wakeRepromptTimerRef.current = null
+      wakeIconRepromptUsedRef.current = true
+      // Surface the icon + ear-wiggle wave. No TTS — context is still locked.
+      setShowWakeIcon(true)
+      triggerEarWiggle()
+      // Hide the icon after pulse completes (600ms) + 2.5s hold + 400ms fade.
+      wakeIconHideTimerRef.current = setTimeout(() => {
+        wakeIconHideTimerRef.current = null
+        setShowWakeIcon(false)
+      }, ICON_PULSE_MS + ICON_HOLD_AFTER_PULSE_MS)
+    }, WAKE_REPROMPT_AFTER_MS)
+  }, [triggerEarWiggle])
+
+  const cancelWakeReprompt = useCallback(() => {
+    if (wakeRepromptTimerRef.current !== null) {
+      clearTimeout(wakeRepromptTimerRef.current)
+      wakeRepromptTimerRef.current = null
+    }
+    if (wakeIconHideTimerRef.current !== null) {
+      clearTimeout(wakeIconHideTimerRef.current)
+      wakeIconHideTimerRef.current = null
+    }
+    setShowWakeIcon(false)
+  }, [])
+
+  // Arm the 8s wake-reprompt timer on Wake-state mount only. Once Marian taps
+  // (screenState moves to 'intro') OR the timer fires, we don't re-arm.
+  useEffect(() => {
+    if (screenState !== 'wake') return
+    scheduleWakeReprompt()
+    return cancelWakeReprompt
+  }, [cancelWakeReprompt, scheduleWakeReprompt, screenState])
+
+  // --- Wake-tap handler -----------------------------------------------------
+  //
+  // This is the load-bearing function for the whole iPad Safari fix. The
+  // critical contract:
+  //
+  //   1. It is a synchronous handler (onPointerDown / onClick — no
+  //      setTimeout, no Promise, no useEffect dispatch).
+  //   2. Inside its body, before any awaited work, it calls
+  //      `handle.start()` which synchronously calls `speak(line0)`.
+  //   3. It also kicks the chime SFX (silent unlock for the WebAudio context).
+  //
+  // The reason for the awkward shape (`gate.wrapSpeak(() => start())` with the
+  // closure) is that the gate watchdog needs to be armed in the same tick as
+  // the speak — otherwise a fast onstart (in tests, mostly) could land before
+  // the watchdog even existed.
+
+  const handleWakeTap = useCallback(() => {
+    // Idempotent — double-taps are common and we don't want to double-fire.
+    if (screenState !== 'wake') {
+      // Soft re-gate retry path: if the gate is showing (relock state), this
+      // tap is the gesture that retries speak(line0). Let the gate route it.
+      if (gate.dispatchGesture()) return
+      return
+    }
+
+    // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
+    cancelWakeReprompt()
+
+    // Build a fresh sequence (the one from mount may already be running if
+    // we're recovering from a relock state) and kick it off synchronously.
+    sequenceRef.current?.cancel()
+    cancelTts()
+    const handle = buildSequence()
+    sequenceRef.current = handle
+
+    // Wrap the synchronous speak with the gate's watchdog. The arrow body
+    // runs *before* wrapSpeak returns, so handle.start() — and therefore
+    // speak(line0) — sits in the same JS tick as this tap. That's the whole
+    // shape iPad Safari requires.
+    gate.wrapSpeak(() => {
+      handle.start()
+      // Silent unlock for the WebAudio (Howler) context — covers the chime
+      // we'll need on the heart tap. .play() is defensive: if the asset
+      // 404'd, this is a silent no-op; if the engine throws (unlikely),
+      // we eat it and move on.
+      try {
+        chimeInstance.play()
+      } catch {
+        // Howler can throw synchronously if no audio backend is available.
+        // The chime missing isn't a blocker for the unlock pathway.
+      }
+    })
+
+    // Register a synchronous retry: if the gate watchdog expires, the next
+    // user gesture will run this callback inside its own tap handler. We
+    // cancel the in-flight (silent) sequence and start a fresh one.
+    gate.registerRetry(() => {
+      sequenceRef.current?.cancel()
+      cancelTts()
+      const retryHandle = buildSequence()
+      sequenceRef.current = retryHandle
+      gate.wrapSpeak(() => {
+        retryHandle.start()
+      })
+    })
+
+    setScreenState('intro')
+  }, [buildSequence, cancelWakeReprompt, chimeInstance, gate, screenState])
 
   // --- Heart tap -------------------------------------------------------------
 
   const handleHeartTap = useCallback(() => {
     if (!heartReady || tapHandledRef.current) return
+
+    // Heart tap is itself a user-gesture handler. If the audio gate is in a
+    // relock state (extremely rare path: the wake speak silently failed AND
+    // somehow the heart still appeared — we keep the path symmetrical for
+    // future re-use even though Greet's onHeartReady wouldn't fire without
+    // line 2 actually being spoken), route through the gate first.
+    if (gate.dispatchGesture()) {
+      // Don't consume the heart tap on a retry — let the user tap again
+      // when Melody has caught up. The retry doesn't advance the screen.
+      return
+    }
+
     tapHandledRef.current = true
 
     // Cancel any in-flight TTS so Melody isn't talking over the chime.
@@ -277,7 +490,7 @@ export default function Greet({
       repromptTimerRef.current = null
     }
 
-    // Wave! Ear-wiggle on transition out per spec line 179.
+    // Wave! Ear-wiggle on transition out per spec line 189.
     triggerEarWiggle()
 
     // Defensive chime: silent no-op if asset is missing (assets-todo.md).
@@ -290,7 +503,7 @@ export default function Greet({
       advanceTimerRef.current = null
       onAdvance()
     }, HEART_TAP_TRANSITION_MS)
-  }, [heartReady, chimeInstance, onAdvance, triggerEarWiggle])
+  }, [chimeInstance, gate, heartReady, onAdvance, triggerEarWiggle])
 
   // --- Render ----------------------------------------------------------------
 
@@ -299,11 +512,22 @@ export default function Greet({
     [],
   )
 
+  // The ring is shown during Wake state AND during the 'relock' gate state
+  // (silent first-utterance retry). Spec lines 167 + 754.
+  const showRing = screenState === 'wake' || gate.showGate
+
+  // The full-viewport tap target is hot during Wake state OR when the gate
+  // is asking for a retry. Once we're in `intro` and the gate is happy, the
+  // overlay disappears so heart taps and other intra-screen UI work normally.
+  const tapTargetActive = screenState === 'wake' || gate.showGate
+
   return (
     <m.main
       data-testid="greet"
+      data-screen-state={screenState}
       data-active-line={activeLine}
       data-heart-ready={heartReady ? 'true' : 'false'}
+      data-gate-state={gate.state}
       className="
         relative flex h-full w-full flex-col items-center
         bg-my-cream text-ink
@@ -343,19 +567,91 @@ export default function Greet({
         }
       />
 
-      {/* Melody. Sized to fill ~60% of viewport height per spec line 117.
+      {/* Melody. Sized to fill ~60% of viewport height per spec line 136.
           AnimatePresence cross-fades idle ↔ happy on the ear-wiggle cue.
           We use the default (non-wait) mode so both poses briefly co-exist
           during the swap — that's the soft cross-fade Kyle's spec calls for
-          (line 161, "sprite swap idle → happy for 600ms then back"), and it
+          (line 169, "sprite swap idle → happy for 600ms then back"), and it
           also keeps tests deterministic because the new element mounts
           immediately rather than waiting on the previous one's exit anim.
           layoutId="melody" is set so Screen 3+ can shared-element-transition
-          her position (spec line 696). */}
+          her position (spec line 757).
+
+          Wake state: she breathes (`scale: [1, 1.05, 1]` over 2.4s, infinite
+          loop). Spec line 166 — the value 1.05 was specifically chosen
+          (Dave's consult: 1.015 was rejected as imperceptibly subtle on
+          iPad scale and read as frozen). */}
       <div
         data-testid="greet-melody-slot"
         className="relative flex h-[60vh] w-full flex-1 items-center justify-center"
       >
+        {/* Ready ring — Wake state only (or the silent retry relock state).
+            Pure SVG, no asset file. Spec line 198 documents this is inline. */}
+        <AnimatePresence>
+          {showRing && (
+            <m.div
+              key="ring"
+              data-testid="greet-ready-ring"
+              aria-hidden
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={
+                reducedMotion
+                  ? { scale: 1, opacity: 0.5 }
+                  : {
+                      scale: 1,
+                      opacity: [0.4, 0.9, 0.4],
+                    }
+              }
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={
+                reducedMotion
+                  ? {
+                      delay: RING_REVEAL_DELAY_MS / 1000,
+                      duration: RING_REVEAL_MS / 1000,
+                    }
+                  : {
+                      scale: {
+                        delay: RING_REVEAL_DELAY_MS / 1000,
+                        duration: RING_REVEAL_MS / 1000,
+                        ease: 'easeOut',
+                      },
+                      opacity: {
+                        delay: RING_REVEAL_DELAY_MS / 1000,
+                        duration: RING_PULSE_PERIOD_S,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                      },
+                    }
+              }
+            >
+              {/* The ring itself: a circle ~24pt outside Melody's bounding
+                  silhouette. We render relative to her viewport slot; the
+                  `60vh` Melody bounding box puts her circumscribed circle
+                  at roughly 30vh radius, so the ring sits at ~32vh radius
+                  (24pt extra). Drawn with a viewBox so it scales cleanly
+                  on iPad portrait. */}
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="xMidYMid meet"
+                className="h-[64vh] w-[64vh]"
+                role="presentation"
+                aria-hidden
+              >
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="46"
+                  fill="none"
+                  stroke="#FFC0CB"
+                  strokeWidth="3"
+                  strokeOpacity="1"
+                />
+              </svg>
+            </m.div>
+          )}
+        </AnimatePresence>
+
         <AnimatePresence initial={false}>
           <m.img
             layoutId="melody"
@@ -370,42 +666,147 @@ export default function Greet({
               reducedMotion ? { opacity: 0 } : { x: -120, y: 60, opacity: 0 }
             }
             animate={
-              reducedMotion ? { opacity: 1 } : { x: 0, y: 0, opacity: 1 }
+              reducedMotion
+                ? { opacity: 1, scale: 1 }
+                : {
+                    x: 0,
+                    y: 0,
+                    opacity: 1,
+                    scale: [1, 1.05, 1],
+                  }
             }
             exit={{ opacity: 0, transition: { duration: 0.15 } }}
             transition={
-              reducedMotion ? { duration: 0.3 } : MELODY_ENTRANCE_SPRING
+              reducedMotion
+                ? { duration: 0.3 }
+                : {
+                    ...MELODY_ENTRANCE_SPRING,
+                    scale: {
+                      duration: BREATHING_PERIOD_S,
+                      repeat: Infinity,
+                      ease: 'easeInOut',
+                      // Delay so breathing only starts after the slide-in lands.
+                      delay: 0.3 + 0.7,
+                    },
+                  }
             }
           />
+        </AnimatePresence>
+
+        {/* Wake re-prompt: finger-tap icon centered on the ring. Fades in,
+            pulses once, fades out. Triggered exactly once at 8s of no tap.
+            Spec lines 195 + 209. */}
+        <AnimatePresence>
+          {showWakeIcon && (
+            <m.img
+              key="wake-icon"
+              data-testid="greet-wake-icon"
+              src="/assets/icon-finger-tap.svg"
+              alt=""
+              aria-hidden
+              draggable={false}
+              className="pointer-events-none absolute select-none"
+              style={{
+                // 48pt at 1.333px/pt ≈ 64px. Matches the icon's native viewBox.
+                width: '64px',
+                height: '64px',
+              }}
+              initial={{ opacity: 0, scale: 1 }}
+              animate={
+                reducedMotion
+                  ? { opacity: [0, 1, 1, 0], scale: 1 }
+                  : { opacity: [0, 1, 1, 0], scale: [1, 1.1, 1, 1] }
+              }
+              exit={{ opacity: 0 }}
+              transition={
+                reducedMotion
+                  ? {
+                      opacity: {
+                        duration:
+                          (ICON_FADE_IN_MS +
+                            ICON_PULSE_MS +
+                            ICON_HOLD_AFTER_PULSE_MS +
+                            ICON_FADE_OUT_MS) /
+                          1000,
+                        times: [
+                          0,
+                          ICON_FADE_IN_MS /
+                            (ICON_FADE_IN_MS +
+                              ICON_PULSE_MS +
+                              ICON_HOLD_AFTER_PULSE_MS +
+                              ICON_FADE_OUT_MS),
+                          (ICON_FADE_IN_MS +
+                            ICON_PULSE_MS +
+                            ICON_HOLD_AFTER_PULSE_MS) /
+                            (ICON_FADE_IN_MS +
+                              ICON_PULSE_MS +
+                              ICON_HOLD_AFTER_PULSE_MS +
+                              ICON_FADE_OUT_MS),
+                          1,
+                        ],
+                      },
+                    }
+                  : {
+                      // Spec line 209: 300ms fade-in, 600ms pulse, 2500ms hold,
+                      // 400ms fade-out. Use keyframe times so we don't need
+                      // multiple chained transitions.
+                      duration:
+                        (ICON_FADE_IN_MS +
+                          ICON_PULSE_MS +
+                          ICON_HOLD_AFTER_PULSE_MS +
+                          ICON_FADE_OUT_MS) /
+                        1000,
+                      times: [
+                        0,
+                        ICON_FADE_IN_MS /
+                          (ICON_FADE_IN_MS +
+                            ICON_PULSE_MS +
+                            ICON_HOLD_AFTER_PULSE_MS +
+                            ICON_FADE_OUT_MS),
+                        (ICON_FADE_IN_MS + ICON_PULSE_MS) /
+                          (ICON_FADE_IN_MS +
+                            ICON_PULSE_MS +
+                            ICON_HOLD_AFTER_PULSE_MS +
+                            ICON_FADE_OUT_MS),
+                        1,
+                      ],
+                      ease: 'easeInOut',
+                    }
+              }
+            />
+          )}
         </AnimatePresence>
       </div>
 
       {/* Speech ribbon. White rounded rect, 88% viewport width, pink border.
-          Scales in from 0.9 → 1 on first mount per spec line 162. */}
-      <m.div
-        data-testid="greet-ribbon"
-        role="status"
-        aria-live="polite"
-        className="
-          mx-auto mt-2 mb-6 w-[88%] max-w-2xl
-          rounded-3xl border-[3px] border-my-pink bg-white
-          px-6 py-4
-          shadow-[0_8px_24px_rgba(244,143,177,0.18)]
-          text-center
-        "
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={reducedMotion ? { duration: 0.3 } : RIBBON_SPRING}
-      >
-        <p
-          data-testid="greet-caption"
-          // ≥28pt body text per spec AC line 203 (1pt ≈ 1.333px → ≥37px).
-          // Tailwind's text-[2.4rem] = 38.4px, comfortably above the floor.
-          className="font-display text-[2.4rem] leading-snug text-ink"
+          Hidden during Wake state (spec line 137). Scales in from 0.9 → 1
+          on first mount per spec line 170. */}
+      {screenState === 'intro' && (
+        <m.div
+          data-testid="greet-ribbon"
+          role="status"
+          aria-live="polite"
+          className="
+            mx-auto mt-2 mb-6 w-[88%] max-w-2xl
+            rounded-3xl border-[3px] border-my-pink bg-white
+            px-6 py-4
+            shadow-[0_8px_24px_rgba(244,143,177,0.18)]
+            text-center
+          "
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={reducedMotion ? { duration: 0.3 } : RIBBON_SPRING}
         >
-          {renderCaption(activeLine, revealedByLine[activeLine] ?? 0)}
-        </p>
-      </m.div>
+          <p
+            data-testid="greet-caption"
+            // ≥28pt body text per spec AC line 221 (1pt ≈ 1.333px → ≥37px).
+            // Tailwind's text-[2.4rem] = 38.4px, comfortably above the floor.
+            className="font-display text-[2.4rem] leading-snug text-ink"
+          >
+            {renderCaption(activeLine, revealedByLine[activeLine] ?? 0)}
+          </p>
+        </m.div>
+      )}
 
       {/* Heart CTA. Hidden until line 3 (HEART_REVEAL_AFTER_LINE_INDEX)
           completes, then springs in. Idle bob (y: [0, -6, 0]) on a 2s loop
@@ -427,9 +828,9 @@ export default function Greet({
                 touch-manipulation
               "
               style={{
-                // Spec line 136: 88pt tall × 120pt wide. 1pt ≈ 1.333px →
+                // Spec line 138: 88pt tall × 120pt wide. 1pt ≈ 1.333px →
                 // 117px tall × 160px wide. Above the 60pt minimum touch
-                // target (spec line 17) by a wide margin.
+                // target (spec line 19) by a wide margin.
                 width: '160px',
                 height: '117px',
                 minWidth: '60px',
@@ -472,6 +873,39 @@ export default function Greet({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Full-viewport tap target. Sits ABOVE everything else when active
+          (Wake state or relock retry) so any pixel inside safe-area is the
+          gesture trigger. We use onPointerDown for snappy iPad response —
+          onClick has a synthetic-event delay that shows up as 100-300ms of
+          dead time on Marian's first tap. Spec line 140 + 210. */}
+      {tapTargetActive && (
+        <button
+          type="button"
+          data-testid="greet-wake-tap-target"
+          aria-label="Tap to start"
+          onPointerDown={handleWakeTap}
+          // onClick is the keyboard-equivalent fallback; iPad won't reach
+          // here because pointerdown already consumed the gesture, but
+          // assistive switch-control or a connected keyboard might.
+          onClick={handleWakeTap}
+          className="
+            absolute inset-0 z-50
+            cursor-pointer
+            border-0 bg-transparent p-0
+            touch-manipulation
+          "
+          style={{
+            // Cover the safe-area rect, not the whole viewport — spec line 140.
+            top: 'env(safe-area-inset-top)',
+            bottom: 'env(safe-area-inset-bottom)',
+            left: 'env(safe-area-inset-left)',
+            right: 'env(safe-area-inset-right)',
+            // No outline — invisible affordance. The ring + Melody carry the read.
+            outline: 'none',
+          }}
+        />
+      )}
     </m.main>
   )
 }

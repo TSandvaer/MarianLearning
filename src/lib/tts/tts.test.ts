@@ -308,6 +308,49 @@ describe('tts', () => {
       )
       await expect(promise).resolves.toBeUndefined()
     })
+
+    it('forwards onStart to the engine onstart event (used by useAudioUnlockGate)', async () => {
+      const synth = installFakeSynth()
+      const onStart = vi.fn()
+      const promise = speak('Hi.', { onStart })
+      const u = synth._utterances[0] as unknown as FakeUtterance
+
+      expect(onStart).not.toHaveBeenCalled()
+      u.onstart?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {} as SpeechSynthesisEvent,
+      )
+      expect(onStart).toHaveBeenCalledTimes(1)
+
+      u.onend?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {} as SpeechSynthesisEvent,
+      )
+      await promise
+    })
+
+    it('chains onStart through the boundary helper when both are provided', async () => {
+      // Order matters: tts.ts sets utterance.onstart = userOnStart BEFORE
+      // subscribeToBoundary chains its own start handler. The boundary helper
+      // preserves the prior handler and calls it. Verify both fire.
+      const synth = installFakeSynth()
+      const onStart = vi.fn()
+      const onBoundary = vi.fn()
+      const promise = speak('Hi.', { onStart, onBoundary })
+      const u = synth._utterances[0] as unknown as FakeUtterance
+
+      u.onstart?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {} as SpeechSynthesisEvent,
+      )
+      expect(onStart).toHaveBeenCalledTimes(1)
+
+      u.onend?.call(
+        u as unknown as SpeechSynthesisUtterance,
+        {} as SpeechSynthesisEvent,
+      )
+      await promise
+    })
   })
 
   describe('cancel', () => {

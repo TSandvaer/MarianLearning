@@ -24,6 +24,14 @@ export interface SpeakOptions {
    * `onboundary` natively.
    */
   boundaryWPM?: number
+  /**
+   * Fires when the engine actually begins speaking — i.e. the
+   * `SpeechSynthesisUtterance.onstart` event. Used by `useAudioUnlockGate`
+   * to confirm the iPad Safari gesture-gate let the call through. If the
+   * engine doesn't emit onstart (rare; some custom voices), the gate falls
+   * back to interpreting the first onboundary as a start signal.
+   */
+  onStart?: () => void
 }
 
 const DEFAULT_RATE = 0.9
@@ -122,6 +130,13 @@ export function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
       cleanup()
       // `canceled` and `interrupted` come through onerror in some engines.
       reject(new Error(event.error || 'speech synthesis error'))
+    }
+
+    if (opts.onStart) {
+      const userOnStart = opts.onStart
+      utterance.onstart = () => {
+        userOnStart()
+      }
     }
 
     // Subscribe to boundary events AFTER onend/onerror are wired so the

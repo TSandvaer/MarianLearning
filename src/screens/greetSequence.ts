@@ -65,6 +65,11 @@ export interface SpeakLikeOptions {
   volume?: number
   onBoundary?: (event: BoundaryEvent) => void
   boundaryWPM?: number
+  /**
+   * Fires when the speech engine actually starts. Used by Greet to clear
+   * the audio-unlock-gate watchdog. Forwarded to `lib/tts.speak()`.
+   */
+  onStart?: () => void
 }
 
 /**
@@ -84,6 +89,12 @@ export interface GreetSequenceHooks {
   onHeartReady?: () => void
   /** Called once when the entire 4-line greeting completes naturally. */
   onComplete?: () => void
+  /**
+   * Called when the FIRST line's TTS engine actually starts speaking. Used
+   * by Greet to clear the iPad-Safari gesture-gate watchdog. Only fires for
+   * line 0; subsequent lines are unlocked by definition.
+   */
+  onLine0Start?: () => void
 }
 
 export interface GreetSequenceOptions extends GreetSequenceHooks {
@@ -102,6 +113,21 @@ export interface GreetSequenceOptions extends GreetSequenceHooks {
 
 export interface GreetSequenceHandle {
   /**
+   * Kick off line 0 ("Hi!"). MUST be called synchronously inside a user
+   * gesture handler on iPad Safari — see the audio-unlock note in
+   * design/session-1.md → Implementation notes. Calling `start()` more than
+   * once is a no-op (the orchestrator already running its sequence).
+   *
+   * Refactored 2026-04-25 (ticket 86c9gp99a): previously the sequence
+   * auto-started inside `runGreetSequence`. The auto-start was incompatible
+   * with iPad Safari's per-execution-context gesture gate — the very first
+   * `speak()` was being silently rejected because it ran in the screen
+   * mount's effect tick rather than inside the tap handler. The Greet
+   * component now constructs the handle on mount and invokes `start()`
+   * inside its synchronous Wake-tap handler.
+   */
+  start: () => void
+  /**
    * Cancel the sequence: any in-flight `speak()` is left to its own cancel
    * (callers should also call tts.cancel() to silence the engine), and no
    * further lines will be queued.
@@ -110,8 +136,9 @@ export interface GreetSequenceHandle {
 }
 
 /**
- * Run the four-line greet sequence. Returns synchronously with a handle the
- * caller can use to cancel.
+ * Build the four-line greet orchestrator. **Returns immediately without
+ * speaking** — call `start()` on the handle (synchronously, inside a user
+ * gesture) to actually kick off line 0.
  */
 export function runGreetSequence(
   opts: GreetSequenceOptions,
@@ -120,6 +147,7 @@ export function runGreetSequence(
   const cancelSchedule =
     opts.cancelSchedule ?? ((h) => window.clearTimeout(h as number))
 
+  let started = false
   let cancelled = false
   let pendingHandle: unknown = null
 
@@ -130,43 +158,59 @@ export function runGreetSequence(
     }
   }
 
-  const speakLine = async (index: number): Promise<void> => {
+  const speakLine = (index: number): void => {
     if (cancelled) return
     if (index >= GREET_LINES.length) {
       opts.onComplete?.()
       return
     }
     opts.onLineStart?.(index)
-    try {
-      await opts.speak(GREET_LINES[index], {
-        boundaryWPM: opts.boundaryWPM,
-        onBoundary: (event) => {
-          if (cancelled) return
-          opts.onWordBoundary?.(index, event)
-        },
+    // We *synchronously* invoke speak() so the very first call (index === 0)
+    // sits inside the same JS tick as the user-gesture handler that called
+    // start(). Awaiting the returned promise still works for line ordering;
+    // the synchronous dispatch is what iPad Safari's audio unlock cares about.
+    const speakPromise = opts.speak(GREET_LINES[index], {
+      boundaryWPM: opts.boundaryWPM,
+      onBoundary: (event) => {
+        if (cancelled) return
+        opts.onWordBoundary?.(index, event)
+      },
+      onStart:
+        index === 0
+          ? () => {
+              if (cancelled) return
+              opts.onLine0Start?.()
+            }
+          : undefined,
+    })
+
+    speakPromise
+      .then(() => {
+        if (cancelled) return
+        opts.onLineEnd?.(index)
+        if (index === HEART_REVEAL_AFTER_LINE_INDEX) {
+          opts.onHeartReady?.()
+        }
+        if (index === GREET_LINES.length - 1) {
+          opts.onComplete?.()
+          return
+        }
+        pendingHandle = schedule(() => {
+          pendingHandle = null
+          speakLine(index + 1)
+        }, LINE_GAP_MS)
       })
-    } catch {
-      // Cancellation or engine error — bail. We do NOT advance.
-      return
-    }
-    if (cancelled) return
-    opts.onLineEnd?.(index)
-    if (index === HEART_REVEAL_AFTER_LINE_INDEX) {
-      opts.onHeartReady?.()
-    }
-    if (index === GREET_LINES.length - 1) {
-      opts.onComplete?.()
-      return
-    }
-    pendingHandle = schedule(() => {
-      pendingHandle = null
-      void speakLine(index + 1)
-    }, LINE_GAP_MS)
+      .catch(() => {
+        // Cancellation or engine error — bail. We do NOT advance.
+      })
   }
 
-  void speakLine(0)
-
   return {
+    start(): void {
+      if (started || cancelled) return
+      started = true
+      speakLine(0)
+    },
     cancel(): void {
       if (cancelled) return
       cancelled = true
