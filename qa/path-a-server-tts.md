@@ -1,0 +1,148 @@
+# Path A — Server-side TTS pipeline — Regression Checklist
+
+ClickUp tickets:
+- `86c9gr385` — **Path A: server-side TTS pipeline for app-wide voice consistency, PR #28 (merged as `16aeea7` on 2026-04-25).** Adds `api/_tts.ts`, `api/_session.ts`, extends `api/claude.ts`, ships `src/lib/audio/sessionAudio.ts` + IndexedDB cache. Math, Word Song, and any future per-session line will inherit the cute child voice via pre-rendered MP3s.
+
+**Status note:** PR #28 merged mid-checklist-authoring. This checklist was prepared pre-merge and still applies as-is — Vercel preview against `origin/main` is now the deploy target for the desktop / iPad rows.
+
+Lineage:
+- `86c9gqprh` (PR #25) — Plan B for Greet (pre-recorded bundled MP3s). Path A adopts the same voice (`en-US-AnaNeural`, rate `-10%`) for app-wide consistency. **The voice baseline this checklist asserts against is whatever Greet's bundled MP3s sound like.**
+- `86c9gp99a` (PRs #15–#24) — the five rounds of Web Speech band-aiding that justify retiring it for dynamic content.
+
+Spec / source-of-truth: PR #28's "Acceptance criteria (Jessica)" section in the PR body. There is no `design/` spec for Path A yet — Math/Word Song screens don't exist, so the wire shape + voice config are the contract. **Spec ambiguity: when Math/Word Song land, Kyle will need a spec doc that bakes in `Utterance` / `SessionStartResponse` shape and the voice config so future PRs have something to validate against. Flagged to Matt as item D below.**
+
+Prior siblings (templates / regression-adjacent):
+- `qa/greet-regression.md` — Plan B Greet checklist; Path A's voice is supposed to match it.
+- (no `qa/splash-regression.md` exists at time of writing — prior round's reference was Greet only.)
+
+This checklist is reusable: rerun every merge that touches `api/_tts.ts`, `api/_session.ts`, `api/claude.ts`, `api/_types.ts`, `src/lib/audio/sessionAudio.ts`, `src/lib/audio/index.ts` (when re-exports change), or `vite.config.ts` (PWA precache rules). Aim for ~15 minutes desktop end-to-end, plus the iPad pass.
+
+`src/lib/audio/preRecorded.ts` and `src/screens/Greet.*` are **OUT OF SCOPE** for Path A — those are Greet's bundled-asset path, untouched by this PR. If a Path A PR ever reaches into them, run `qa/greet-regression.md` as well.
+
+`src/lib/tts/**` (Web Speech) is **OUT OF SCOPE for new code** — Path A explicitly does not consume it, and the PR description confirms it stays alive only as Greet's residual fallback (which Plan B already retired). Row 12 below asserts the module still imports cleanly so we don't break the residual.
+
+## How to run
+
+1. `yarn install` (once per branch).
+2. `yarn typecheck && yarn lint && yarn test --run` — all green before any manual step. PR #28 advertises 303 tests passing; if local count diverges, investigate before continuing.
+3. Manual desktop steps assume Vercel preview is up for the PR head SHA (the orchestrator/Matt will confirm the URL after merge — or you can hit the most-recent successful preview directly from the PR's checks tab on GitHub).
+4. iPad rows: install the PWA from the Vercel preview URL onto Marian's actual iPad (or QA loaner if available), launch from home screen.
+5. Walk through the matrix below. Mark each row PASS / NOTES / FAIL / DEFERRED.
+
+Touch-target / pixel-perfect / iPad-Safari-quirk rows are **DEFERRED-TO-DEVICE** — Thomas owns the binding verdict on a real iPad.
+
+---
+
+## Spec drift / ambiguities flagged for Kyle, Matt, and Thomas
+
+| # | Status | Note |
+|---|---|---|
+| A | **Resolved in PR #28** | Voice locked to `en-US-AnaNeural` rate `-10%` via `MELODY_VOICE_CONFIG` exported from `api/_session.ts`. Matches PR #25's Greet voice baseline. Tests at `api/_session.test.ts:42-51` and `api/_tts.test.ts:106-130` lock the SSML wire-level config. |
+| B | **Resolved in PR #28** | `kind: 'session-start'` with a `plan` payload returns `SessionStartResponse`; without a plan, legacy stub path preserved. Discriminated by presence of `payload.plan` in `api/claude.ts`. Stumble-explanation and session-end stub paths unchanged. |
+| C | **Resolved in PR #28** | `tts-failed` (502) is the stable error code when upstream Edge endpoint is unreachable, rate-limited, times out, or any synth call rejects. Test at `api/claude.test.ts:190` covers the mapping. |
+| **D** | **Open — flag for Matt** | No `design/` spec exists yet for the session-start audio pipeline. AC is anchored only on the PR body. **When Math (Screen 3) or Word Song (Screen 4) lands, Kyle should write a section in the matching spec doc that pins (a) the voice config, (b) the wire shape (`Utterance` / `SessionStartResponse`), (c) the cache lifecycle (sessionId-keyed, cleared on session-end), and (d) the `tts-failed` graceful-degradation contract.** Without it, the next reviewer has nothing but the PR description as a reference. **Not a release blocker** — Path A doesn't reach a consumer screen this round (acknowledged in PR #28's "Risk / rollback"). |
+| **E** | **Open — flag for Kevin/Matt** | The `concurrency` cap in `api/_session.ts:93` defaults to `6`. PR #28 review item #3 calls out "empirical guess at the Edge endpoint's per-IP tolerance — I don't have a documented limit." If we ever observe `tts-failed` 502 spikes from Vercel logs, this is the first knob to turn (env var was floated as a follow-up). **Not testable today** — flag it as something to monitor once the function is hit by real session-plans, not unit tests. |
+| **F** | **Open — flag for Devon** | PR #28 review item #5 mentions Windows CRLF noise on the contributor's worktree, fixed locally. Recommends a `.gitattributes` (`* text=auto eol=lf`) at some point. **Not in scope for this checklist** — file-encoding hygiene is a repo-housekeeping ticket, not a Path A AC. Mention to Matt so it doesn't get lost. |
+
+A/B/C are unblocked in the matrix. D, E, F are notes for Matt's queue, not gating items.
+
+---
+
+## Distribution
+
+`X automated / Y manual desktop / Z iPad-only`
+
+- **AC matrix:** 8 AC rows (rows 1–8), plus 4 regression/survival rows (rows 9–12), plus 4 voice + size + cache-invariant rows (rows 13–16) = **16 rows total**.
+- **Automated:** 9 (rows 1, 2, 5, 7, 8, 11, 13, 14, 15 — covered by Vitest in `api/*.test.ts`, `src/lib/audio/sessionAudio.test.ts`, `src/lib/audio/sessionAudioCache.test.ts`).
+- **Manual desktop:** 5 (rows 3, 4, 6, 10, 16 — DevTools console smoke tests against the deployed Vercel function, `Application` panel inspection, Workbox precache check).
+- **iPad-only:** 2 (rows 9, 12 — first session utterance ≤500ms after wake-tap on installed PWA, voice consistency listen-test against Greet).
+
+Plus 5 survival checks (lens 4) and 4 console/network sanity items below the matrix.
+
+---
+
+## AC matrix
+
+One row per acceptance-criteria bullet from PR #28's "Acceptance criteria (Jessica)" section, in PR-body order. Plus regression rows derived from "Risk / rollback" + "Out of scope" sections of the PR body and from cross-cutting concerns (Greet untouched, IndexedDB resilience, Web Speech non-regression).
+
+| # | Acceptance criterion (source) | Owner | How verified |
+|---|---|---|---|
+| 1 | Session-generation request with a `plan` returns `Utterance[]` with paired audio in the response payload (PR #28 AC bullet 1). | **Auto** (Vitest) | `api/claude.test.ts:152` `it('renders TTS and returns the SessionStartResponse')` — POSTs `{ kind: 'session-start', payload: { plan: ... } }`, asserts response `ok: true`, `kind: 'session-start'`, and that `utterances` is a non-empty array of `{ id, text, audio: { kind: 'inline', base64, mime: 'audio/mpeg' } }`. `api/_session.test.ts:54` `it('passes every utterance through synth ...')` covers the orchestration. **Type-guard coverage:** `api/_types.ts:117-128` `isSessionStartResponse` is exported; the test suite uses it implicitly via `isUtterance` per-element checks. |
+| 2 | Generated audio uses `en-US-AnaNeural` voice with rate `-10%` (PR #28 AC bullet 2 — wire-level + smoke-test). | **Auto + Desktop** | **Auto:** `api/_session.test.ts:42-51` `it('matches PR #25 Plan B Greet voice — AnaNeural at -10%')` asserts `MELODY_VOICE_CONFIG === { voice: 'en-US-AnaNeural', rate: '-10%' }`. `api/_tts.test.ts:106-130` `it('embeds voice, prosody attrs, and escaped text inside the SSML envelope')` parses the on-the-wire SSML message and asserts `voice name='en-US-AnaNeural'` and `rate='-10%'`. **Desktop smoke:** in DevTools console against the Vercel preview, `await fetch('/api/claude', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'session-start', payload: { plan: { utterances: [{ id: 't1', text: 'Hello Marian.' }] } } }) }).then(r => r.json())` — inspect response, decode `utterances[0].audio.base64`, save as `.mp3`, play. Voice should match Greet's bundled MP3 voice. |
+| 3 | Frontend `playSessionUtterance` plays through Howler — no Web Speech regression (PR #28 AC bullet 3). | **Auto + Desktop** | **Auto:** `src/lib/audio/sessionAudio.test.ts:273` `it('plays, fires onPlay + onWordTick, resolves on Howler end')` asserts the playback path uses Howler events, not `speechSynthesis`. **Desktop:** in DevTools console pre-instrument `window.speechSynthesis.speak = function(...args){ console.error('UNEXPECTED Web Speech call', args); throw new Error('Web Speech regression'); }`. Then call into the `loadSessionAudio` + `playSessionUtterance` path (no consumer screen exists yet — see test-needed note below). **Test needed:** there is no end-to-end browser path that exercises `sessionAudio.ts` outside Vitest, because Math/Word Song don't exist. Until they do, this row is auto-only. **Flag for Matt: when Math lands, add a manual desktop walk-through here.** |
+| 4 | On a freshly-installed PWA on iPad, after the first wake-tap, the first session utterance starts within ~500ms (PR #28 AC bullet 4). | **iPad** | **DEVICE:** Install PWA from Vercel preview, hard-launch from home screen. **Catch:** there is no consumer screen for session audio yet, so this AC is unverifiable end-to-end this round. **Workaround:** in iPad Safari console (via remote-debug from Mac), call `loadSessionAudio('test', [{ id: 't1', text: 'Hello.', audio: { kind: 'inline', base64: '<base64>', mime: 'audio/mpeg' } }])` then `playSessionUtterance('t1')` immediately on a tap handler. Stopwatch from tap → audible playback. **Easier path:** wait until Math/Word Song ship and re-run this row in their checklists. **For PR #28 alone, mark this row DEFERRED-TO-INTEGRATION.** |
+| 5 | Session response payload < 1 MB for 8 problems × ~5 utterances (~600 KB expected) (PR #28 AC bullet 5). | **Auto** (test needed) | **Test needed:** no Vitest assertion currently bounds the response size. **Recommend** a test in `api/_session.test.ts` that runs `renderSessionAudio` with a 40-utterance fixture against a stub-synth that emits ~12 KB per utterance (the actual edge-tts size for ~10 words at our voice config), then asserts `JSON.stringify(response).length < 1_000_000`. ~30 minutes to write. **Manual desktop fallback:** in DevTools console against the deployed function, POST a 40-utterance plan, log `JSON.stringify(json).length`. Should be sub-1 MB. **Flag to Kevin.** |
+| 6 | `tts-failed` (502) is returned when the upstream Edge endpoint is unreachable (PR #28 AC bullet 6). | **Auto + Desktop** | **Auto:** `api/claude.test.ts:190` `it('returns 502 tts-failed when the TTS render throws')` covers the synth-throws → 502 mapping. `api/_session.test.ts:154` `it('rejects (propagates) when synth throws — the function-level handler maps this to tts-failed')` confirms the propagation contract. `api/_session.test.ts:164` `it('aborts in-flight workers on first failure and does NOT leak unhandled rejections')` covers the cleanup. **Desktop:** can't easily simulate "Edge unreachable" against the live Vercel function without modifying the function. Inspect response shape on a real failure mode if one occurs (e.g. malformed plan that surfaces a synth error). Otherwise rely on the auto coverage. |
+| 7 | Greet's bundled MP3 path still works identically to PR #25 (PR #28 AC bullet 7 — non-regression). | **Auto** | **Auto:** all of `qa/greet-regression.md`'s AC matrix (rows 1–24) re-runs as part of the standard test suite under `Greet.test.tsx`, `greetSequence.test.ts`, `preRecorded.test.ts`, `useAudioUnlockGate.test.tsx`. PR #28 doesn't touch any of those files (verified: `gh pr diff 28 --name-only` shows zero overlap with Greet sources). **Manual desktop confirmation:** run the deployed Vercel preview, walk through Greet's wake-tap → 4 lines → heart flow exactly as `qa/greet-regression.md` describes. Should be visually + audibly identical to the post-PR-#25 baseline. |
+| 8 | Web Speech (`lib/tts/*`) still imports cleanly but is no longer reachable from new code (PR #28 AC bullet 8 — survival of the residual fallback). | **Auto + Desktop** | **Auto:** the existing `lib/tts/tts.test.ts` suite (22 tests, untouched by PR #28) must remain green. `gh pr diff 28 --name-only` confirms no `lib/tts/*` files are modified. **Desktop check:** `grep -r "from.*lib/tts" src/` (excluding `src/lib/tts/` itself and `src/screens/Greet.tsx`'s legacy import if still present) — new code under `src/lib/audio/sessionAudio.ts` should NOT pull from `lib/tts`. Any new import would be a regression. |
+| **9** | **NEW survival — Voice consistency on iPad** (subjective listen-test against Greet's bundled MP3s). | **iPad** | **DEVICE:** Install PWA, play Greet's first wake-tap → "Hi!" — recall the voice character (Cute child female, AnaNeural at -10%, Thomas-approved on PR #25). Then trigger a Path A render (workaround: copy a sample-plan POST into Safari console, decode + play the returned base64 on the iPad). The two should sound like **the same voice** — same pitch, same warmth, same "Cartoon/Cute" character. **Subjective check, but binding** — if Path A drifts off Greet's voice on the device, app-wide consistency is broken and the whole point of locking `MELODY_VOICE_CONFIG` is undermined. Thomas may want to do this side-by-side. |
+| **10** | **NEW survival — IndexedDB cache survives PWA reload** (PR #28 architecture: "session audio is keyed by sessionId in IndexedDB ... full-app reload mid-session doesn't re-fetch"). | **Desktop** | **Desktop:** in DevTools against Vercel preview, manually call `loadSessionAudio('test-session', [<2-3 utterances>])`. Inspect `Application → IndexedDB → marian-tutor-session-audio → session-audio` — should contain a row keyed `'test-session'` with a Map of utterance-id → base64. Hard-reload the page. Re-call `loadSessionAudio('test-session', [<same fixtures>])` — confirm via console-instrumentation that the cache adapter's `get` returns non-null and the inline base64 is **not** re-decoded from the supplied utterance (cached path is taken). `src/lib/audio/sessionAudio.test.ts:222` `it('reuses cached base64 when available — does not just take the inline payload')` covers the unit-level contract; this row covers the real IndexedDB. |
+| **11** | **NEW survival — `tts-failed` 502 returns a clean error envelope** (no leaked stack traces, no provider internals; PR #28 AC bullet 6 + `api/claude.ts:148` "Don't leak provider internals"). | **Auto** | **Auto:** `api/claude.test.ts:190-204` covers the response shape (`{ error: 'tts-failed', message?: string }`) and confirms the message field, when present, is human-readable not a raw stack. Also confirm `cache-control: no-store` header is present (`api/claude.test.ts:204`). |
+| **12** | **NEW regression — Web Speech fallback path stays usable for any caller still on it** (Greet residual + Math/Word Song until they migrate). | **Desktop** | **Desktop:** in DevTools console against Vercel preview, `import('/src/lib/tts/tts.ts')` (or whatever the dev-server resolves to) — module loads, `speak` exports cleanly. Confirm no runtime errors at import time. **Auto coverage** (`lib/tts/tts.test.ts` 22 tests) is the primary gate; this manual row is a smoke-filter only. |
+| **13** | **NEW invariant — `MELODY_VOICE_CONFIG` is the single source of truth** (`api/_session.ts:30`). | **Auto** | **Auto:** grep test in `tests/qa/` would assert no other file in the repo declares `voice: 'en-US-AnaNeural'` or `rate: '-10%'` literally — they should all import the constant. **Test needed.** Recommend adding to `tests/qa/voiceConfigInvariant.test.ts`. ~20 minutes to write. **Workaround until then:** manually `grep -rn "en-US-AnaNeural\|rate.*-10%" src/ api/ --exclude-dir=node_modules` and confirm only `api/_session.ts`, `api/_session.test.ts`, and `api/_tts.test.ts` (assertion sites) reference the literals. Greet's bundled MP3s have the voice baked in — no source literal needed. **Flag to Kevin.** |
+| **14** | **NEW invariant — IndexedDB schema name + store name are stable** (`marian-tutor-session-audio` / `session-audio`). | **Auto** | **Auto:** `src/lib/audio/sessionAudio.test.ts:393` `it('removes the session from the IndexedDB cache')` exercises the round-trip via `fake-indexeddb`. `src/lib/audio/sessionAudioCache.test.ts:23-67` covers the production adapter. Schema change would require a migration story; flag to Matt if any future PR renames either constant. |
+| **15** | **NEW invariant — Concurrency cap is enforced at 6 (or whatever default `api/_session.ts:93` declares)**. | **Auto** | **Auto:** `api/_session.test.ts:132` `it('respects the concurrency cap (no more than N parallel synth calls)')` covers the contract. Flag to Matt if the default ever changes (it's an empirical guess per PR #28 review item #3). |
+| **16** | **NEW survival — Quota-exceeded / no-IndexedDB / transaction failures fall through to in-memory only without crashing** (PR #28 architecture: "Quota-exceeded ... swallow silently and fall through to in-memory only"). | **Auto + Desktop** | **Auto:** `src/lib/audio/sessionAudio.test.ts:417` `it('survives a cache.put that rejects (in-memory copy still works)')` and `:426` `it('survives a cache.get that returns null')`. **Desktop:** in DevTools, `Application → IndexedDB → Delete database` mid-session, then trigger another `loadSessionAudio` call. Should not throw; in-memory Howls should keep working until next page reload. |
+
+---
+
+## Survival checks (lens 4)
+
+| Check | How | Expected |
+|---|---|---|
+| Mid-session API failure (rate-limited or `tts-failed` mid-render) | Pre-instrument `fetch` to return `{ ok: false, error: 'tts-failed' }` with status 502 on the second `/api/claude` call. Trigger a session-start. | Frontend handles the error path gracefully — no white-screen, no unhandled-promise-rejection in console. **Spec is silent on the consumer-screen UX of `tts-failed`** because no consumer screen exists. Flag for Kyle when Math/Word Song land: what does the user see if Path A renders fail mid-session? Today: only `playSessionUtterance` would reject if called against a missing utterance id; the load failure surfaces via the awaited `loadSessionAudio` promise's rejection. |
+| Quota-exhausted IndexedDB (large session payload, browser limits) | DevTools console pre-instrument the cache `put` to throw `QuotaExceededError`. Call `loadSessionAudio` with a large fixture. | In-memory Howls still work, no crash, IDB row simply not persisted. Subsequent page reload would re-fetch from the API (or from inline base64 if still in the request lifecycle). Covered by AC row 16 auto. |
+| Browser without IndexedDB (private mode in some legacy browsers, certain mobile webviews) | DevTools console pre-load: `Object.defineProperty(window, 'indexedDB', { get: () => undefined })`. Reload, trigger a `loadSessionAudio`. | Module's no-op cache adapter (`sessionAudio.ts:129`) kicks in. Audio plays from inline base64. No crash. **Test seam confirms this:** `loadSessionAudio` accepts an injected cache adapter. |
+| Background / resume mid-session (iPad PWA backgrounded for 5+ min) | iPad PWA into a session, swipe to home, wait 5+ min, return. | The audio context will be suspended (iPadOS behavior). Next `playSessionUtterance` should reject via Howler error — and the soft re-gate path (covered by `qa/greet-regression.md` row 9 + GBUG-5) should re-engage. **Cross-screen integration is DEFERRED-TO-DEVICE** until Math/Word Song land and we can actually navigate into them. |
+| Concurrent `loadSessionAudio` calls (race between two session-starts) | DevTools console: fire `loadSessionAudio('a', ...)` and `loadSessionAudio('b', ...)` without awaiting the first. | The second call should tear down the first session's Howls (`sessionAudio.test.ts:244` `it('tears down a previous session when a new sessionId loads')`). No leaked Howls, no leaked blob URLs. Covered by auto. |
+
+---
+
+## Console / network sanity
+
+- DevTools Console must show **zero** errors and zero warnings on any page that loads `src/lib/audio/sessionAudio.ts` directly. (No consumer screen yet — load via dev-shortcut or unit-test bench.)
+- Network tab during a `/api/claude` POST with `kind: 'session-start'` and a `plan` payload should show:
+  - **One** outbound request to the function URL.
+  - Response `Content-Type: application/json`.
+  - Response `Cache-Control: no-store` (asserted by `api/claude.test.ts:204`).
+  - Response body parses cleanly to `SessionStartResponse` (`isSessionStartResponse` returns true).
+- `Application → IndexedDB → marian-tutor-session-audio → session-audio` populates after a successful `loadSessionAudio`. One row per sessionId. Map values are base64 strings, not blob URLs (blobs are revoked on session teardown — `sessionAudio.test.ts:379`).
+- Service worker precache: PR #28 does NOT add session audio to the SW precache (session audio is per-session, dynamic, not bundle-shipped). Verify the precache count is unchanged from main's baseline of 37 entries (post-PR #25). If it changed, investigate.
+
+---
+
+## Path A regression list (when adding to it as Math / Word Song land)
+
+This section will grow as consumer screens come online. Today, only the infrastructure is being shipped, so the regression surface is:
+
+| Risk surface | What to re-run on PRs that touch it |
+|---|---|
+| `api/_tts.ts` (Edge protocol re-impl) | All `api/_tts.test.ts` (38 tests). Plus row 2 desktop smoke (SSML wire-level voice config). |
+| `api/_session.ts` (concurrency, voice config, orchestration) | `api/_session.test.ts` (10 tests). Plus row 5 (payload size, when test added) and row 15 (concurrency cap). |
+| `api/claude.ts` (function entry, dispatch, error mapping) | `api/claude.test.ts` (15 tests). Plus row 11 (clean error envelope) and row 6 (`tts-failed` mapping). |
+| `src/lib/audio/sessionAudio.ts` (Howler + IndexedDB + linear caption tick) | `src/lib/audio/sessionAudio.test.ts` (~25 tests). Plus rows 3, 10, 16. |
+| `src/lib/audio/sessionAudioCache.ts` (production IDB adapter) | `src/lib/audio/sessionAudioCache.test.ts` (~5 tests). Plus row 14 (schema invariants). |
+| `api/_types.ts` (wire shape) | All of the above — type changes ripple. Also re-run row 1 (response shape). |
+
+---
+
+## Test-needed gaps to log for Kevin / Devon (follow-up tickets)
+
+Captured during checklist authoring; do NOT block PR #28 merge but should be in Matt's queue:
+
+1. **`tests/qa/responseSizeBudget.test.ts`** — assert `JSON.stringify(SessionStartResponse).length < 1_000_000` for a 40-utterance fixture (covers AC row 5). ~30 minutes.
+2. **`tests/qa/voiceConfigInvariant.test.ts`** — grep guard that no source file outside `api/_session.ts` literally declares `voice: 'en-US-AnaNeural'` or `rate: '-10%'` (covers AC row 13). ~20 minutes.
+3. **End-to-end browser test for `sessionAudio.ts`** — once Math (Screen 3) lands, replace AC row 4's "DEFERRED-TO-INTEGRATION" with a real iPad walk-through. Tracking note for Matt.
+4. **Web-Speech-import-leak ESLint rule** — flag any new import of `lib/tts/*` from new code (covers AC row 8 enforcement at write time, complementing the smoke check). ~1 hour.
+
+---
+
+## Out of scope for this checklist
+
+- Math screen integration (doesn't exist yet — PR #28 is pure infrastructure).
+- Word Song screen integration (doesn't exist yet).
+- Real Claude prompt wiring (PR #28 keeps the legacy stub for the no-plan path; real prompts land in a follow-up).
+- Removing `lib/tts/*` Web Speech module entirely (out-of-scope per PR #28; tracked for future cleanup).
+- Greet's bundled-asset path (covered by `qa/greet-regression.md`; PR #28 explicitly leaves it untouched).
+- iPad real-device installability + PWA-precache integrity beyond the SW count check — Thomas's pass.
+- Final voice approval — `en-US-AnaNeural -10%` was Thomas-approved on PR #25; Path A inherits that approval. Any future change to `MELODY_VOICE_CONFIG` needs Thomas re-approval.
