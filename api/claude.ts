@@ -10,26 +10,45 @@
 //    stub success path is preserved for callers that don't pass a plan
 //    (stumble-explanation, session-end, and any session-start that
 //    pre-dates the real Claude prompt wiring).
-//  - 86c9grnj4 (this change — P1 hot-fix) removes a broken
-//    `export const config = { runtime: 'nodejs' }` that caused
-//    FUNCTION_INVOCATION_FAILED on every request. The Vercel /api/*.ts
-//    file format does NOT recognise `runtime: 'nodejs'` as a valid value
-//    in the `config` export (that shape is the Next.js middleware
-//    convention; for plain /api functions the Node runtime IS the
-//    default and no config export is needed). The intended tripwire —
-//    "fail loud at cold-start if a future maintainer pushes us onto
-//    Edge" — is reimplemented below as a real runtime assertion that
-//    cannot be bypassed by a config-shape misunderstanding.
+//  - 86c9grnj4 (P1 hot-fix, round 1) removed a broken
+//    `export const config = { runtime: 'nodejs' }` export. PR #32 merged
+//    but production still 500'd FUNCTION_INVOCATION_FAILED on every
+//    request — the round-1 hypothesis (runtime config shape) was wrong.
+//  - 86c9grnj4 (P1 hot-fix, round 2 — THIS CHANGE) fixes the actual root
+//    cause: the function's default export was a bare async function with
+//    a Web `Request` parameter, but `@vercel/node` only routes the Web
+//    `Request`/`Response` codepath when the entrypoint exports a
+//    per-method handler (GET/POST/...) OR an object with a `fetch`
+//    method. Without those, Vercel takes the legacy fallback and invokes
+//    the default function as `(req: IncomingMessage, res: ServerResponse)`.
+//    The first line of our handler — `request.headers.get('origin')` —
+//    then throws TypeError because Node's `IncomingMessage.headers` is a
+//    plain object, not a `Headers` instance. The throw propagates out as
+//    FUNCTION_INVOCATION_FAILED on every method, including OPTIONS.
+//
+//    Source of truth for the dispatch logic:
+//    https://github.com/vercel/vercel/blob/main/packages/node/src/serverless-functions/serverless-handler.mts
+//    (look for `shouldUseWebHandlers` — it's the OR of `isMiddleware`,
+//    any HTTP_METHODS export, or `typeof listener.fetch === 'function'`).
+//
+//    Fix: change the default export from a bare function to
+//    `{ fetch: handler }`. The `handler` symbol is still named-exported
+//    so tests (and future callers) can import it directly without going
+//    through `default.fetch`.
 //
 // ABSOLUTE RULE: ANTHROPIC_API_KEY is read here only. It must never reach
 // the browser bundle. Do not echo, log, or include it in any response.
 //
-// Runtime: Web-standard fetch handler. The TTS pipeline imported from
-// `_tts.ts` uses the `ws` package + `node:crypto`, both of which require
-// Vercel's Node runtime (Edge is V8 isolates with no Node built-ins).
-// /api/*.ts defaults to Node on Vercel; the assertion below is the
-// belt-and-braces guard against a future project-wide vercel.json or
-// platform default flip silently moving us to Edge.
+// Runtime: Web-standard fetch handler (the `fetch` export above is what
+// triggers Vercel's Web `Request`/`Response` codepath, which in turn runs
+// on the Node runtime by default for /api/*.ts entrypoints). The TTS
+// pipeline imported from `_tts.ts` uses the `ws` package + `node:crypto`,
+// both of which require Node — so the Edge runtime would break us at
+// import time. The runtime-assertion below catches the in-between case
+// where Vercel's defaults flip to Edge in a future platform change but
+// still resolve our imports (e.g. via Node-compat shims). It does NOT
+// add coverage when the imports themselves fail under Edge — that's
+// caught loudly at module-load anyway.
 
 import {
   isClaudeRequest,
@@ -43,23 +62,22 @@ import { renderSessionAudio } from './_session'
  * Cold-start runtime assertion. Throws at module load if the function is
  * not running on Node.
  *
- * Caveat: this fires AFTER the static `import { WebSocket } from 'ws'` and
- * `node:crypto` imports above are resolved. On a pure Edge runtime those
- * imports would themselves fail first with "Cannot find module 'ws'" — so
- * this assertion does NOT add coverage there. What it DOES add coverage
- * for is the in-between cases that exist in the Vercel ecosystem: hybrid
- * runtimes (Edge with Node compat shims), partial polyfills, or a future
- * Vercel build target that resolves the imports but still lacks
- * `process.versions.node`. In those cases the imports succeed but the
- * function would later mis-behave; this throw makes the failure loud and
- * named at the top of the stack.
- *
  * Edge runtime: `globalThis.process` is undefined.
  * Node runtime: `process.versions.node` is always a string (e.g. "22.11.0").
  *
+ * Caveat: this fires AFTER the static `import { WebSocket } from 'ws'`
+ * and `node:crypto` imports above are resolved. On a pure Edge runtime
+ * those imports would themselves fail first with "Cannot find module
+ * 'ws'" — so this assertion does NOT add coverage there. What it DOES
+ * add coverage for is hybrid runtimes (Edge with Node compat shims) or
+ * a future Vercel build target that resolves the imports but still
+ * lacks `process.versions.node`. In those cases the imports succeed but
+ * the function would later mis-behave; this throw makes the failure
+ * loud and named at the top of the stack.
+ *
  * Exported for unit-test coverage; the side effect is the runtime check
- * itself — calling `assertNodeRuntime()` from another file must produce the
- * same throw shape so the regression test is meaningful.
+ * itself — calling `assertNodeRuntime()` from another file must produce
+ * the same throw shape so the regression test is meaningful.
  */
 export function assertNodeRuntime(): void {
   const nodeVersion = (
@@ -133,7 +151,13 @@ function extractPlan(payload: unknown): unknown | null {
   return p.plan
 }
 
-export default async function handler(request: Request): Promise<Response> {
+/**
+ * The actual request handler. Exported as a named symbol so tests can
+ * import it directly; the Vercel entrypoint is the `default` export
+ * below, which wraps this in a `{ fetch }` object so Vercel routes the
+ * Web `Request`/`Response` codepath (see top-of-file HISTORY).
+ */
+export async function handler(request: Request): Promise<Response> {
   const origin = request.headers.get('origin')
   const headers = corsHeaders(origin)
 
@@ -217,3 +241,12 @@ export default async function handler(request: Request): Promise<Response> {
     headers,
   )
 }
+
+/**
+ * Vercel entrypoint. The `fetch` property — NOT a bare default function —
+ * is what makes `@vercel/node` invoke `handler` with Web standard
+ * `Request`/`Response` instead of the legacy `(IncomingMessage,
+ * ServerResponse)` signature. See top-of-file HISTORY (round 2 fix) for
+ * the full reasoning and the upstream source link.
+ */
+export default { fetch: handler }

@@ -26,7 +26,7 @@ vi.mock('./_session', () => {
   }
 })
 
-import handler, { assertNodeRuntime } from './claude'
+import claudeEntrypoint, { handler, assertNodeRuntime } from './claude'
 import { renderSessionAudio } from './_session'
 
 const mockedRender = vi.mocked(renderSessionAudio)
@@ -87,6 +87,38 @@ describe('runtime assertion (Vercel cold-start tripwire)', () => {
     } finally {
       ;(globalThis as { process?: unknown }).process = originalProcess
     }
+  })
+})
+
+describe('Vercel entrypoint shape (regression — round-2 hot-fix 86c9grnj4)', () => {
+  // Background: the round-1 fix kept the default export as a bare async
+  // function `export default async function handler(request: Request)`.
+  // `@vercel/node`'s dispatcher only routes the Web `Request`/`Response`
+  // codepath when the entrypoint exports per-method handlers (GET/POST/...)
+  // OR an object with a `fetch` method. Without those it falls back to
+  // invoking the default function with `(IncomingMessage, ServerResponse)`,
+  // and our handler — which calls `request.headers.get('origin')` —
+  // throws TypeError on the first line. Result: FUNCTION_INVOCATION_FAILED
+  // on every method, including OPTIONS, in production.
+  //
+  // Source of truth:
+  //   github.com/vercel/vercel — packages/node/src/serverless-functions/
+  //     serverless-handler.mts  (`shouldUseWebHandlers`)
+  //
+  // This test pins the export shape so a future refactor that drops the
+  // `fetch` wrapper (or reverts to a bare default function) fails in CI
+  // before it reaches Vercel.
+
+  it('default export is an object with a `fetch` method (NOT a bare function)', () => {
+    expect(typeof claudeEntrypoint).toBe('object')
+    expect(claudeEntrypoint).not.toBeNull()
+    expect(typeof (claudeEntrypoint as { fetch?: unknown }).fetch).toBe(
+      'function',
+    )
+  })
+
+  it('default.fetch is the same handler exported by name', () => {
+    expect((claudeEntrypoint as { fetch: unknown }).fetch).toBe(handler)
   })
 })
 
