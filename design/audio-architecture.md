@@ -30,12 +30,12 @@ this section is the condensed version so future contributors don't repeat the ex
 
 ### What we tried (rounds 1–5)
 
-| Round | PR | Hypothesis | Outcome |
-|---|---|---|---|
-| 1–2 | #18, #21 | Add gesture-unlock + multi-event handlers to satisfy iOS user-gesture requirement | Events still didn't reach the engine on iPad |
-| 3 | #22 | Add Web Speech workarounds (cancel-before-speak, voice priming, `?debug=1` overlay) | iPad showed `taps: 0`, `speak: none` — events not even reaching the React handlers |
-| 4 | #23 | `pointer-events: none` on the decorative melody-slot so taps reach the button beneath; raw-event shadow recording for diagnosis | Event-layer fixed. Taps now reach React. Speech still flaky. |
-| 5 | #24 | Light-girl voice profile + watchdog tuning (2s → 5s) + multi-synthetic-event regression guard | Tap registers → `speak() queued` → `synth speaking=false` 12+ seconds later → gate relocks. iPad silently rejects the utterance. After 4–5 retries one finally fires. |
+| Round | PR       | Hypothesis                                                                                                                      | Outcome                                                                                                                                                               |
+| ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1–2   | #18, #21 | Add gesture-unlock + multi-event handlers to satisfy iOS user-gesture requirement                                               | Events still didn't reach the engine on iPad                                                                                                                          |
+| 3     | #22      | Add Web Speech workarounds (cancel-before-speak, voice priming, `?debug=1` overlay)                                             | iPad showed `taps: 0`, `speak: none` — events not even reaching the React handlers                                                                                    |
+| 4     | #23      | `pointer-events: none` on the decorative melody-slot so taps reach the button beneath; raw-event shadow recording for diagnosis | Event-layer fixed. Taps now reach React. Speech still flaky.                                                                                                          |
+| 5     | #24      | Light-girl voice profile + watchdog tuning (2s → 5s) + multi-synthetic-event regression guard                                   | Tap registers → `speak() queued` → `synth speaking=false` 12+ seconds later → gate relocks. iPad silently rejects the utterance. After 4–5 retries one finally fires. |
 
 The smoking gun was on round 5. With `?debug=1` overlay live, a single tap produced this:
 
@@ -126,26 +126,25 @@ That's Path A (ticket `86c9gr385`).
 
 ### Module boundaries
 
-| Module | Purpose | Used by |
-|---|---|---|
-| `src/lib/audio/preRecorded.ts` | Howler wrapper for bundled-asset MP3s | Greet only |
-| `src/lib/audio/sessionAudio.ts` | Howler wrapper for session-supplied base64 audio + IndexedDB cache | Math, Word Song, all future dynamic content |
-| `src/lib/audio/useAudioUnlockGate.ts` | Wake-tap pattern; gesture unlock state machine | Any screen that plays audio after a non-interactive transition |
-| `src/lib/tts/*` | Web Speech engine (Greet's old path) | **Dead.** Kept in tree post-Path-A for safety; deletion follow-up planned once Math + Word Song are on the new pipeline. |
-| `api/_tts.ts` | Node Azure TTS wrapper (Vercel-side) | `api/claude.ts` only |
-| `api/_session.ts` | Session generation + TTS merge orchestrator | `api/claude.ts` only |
+| Module                                | Purpose                                                            | Used by                                                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `src/lib/audio/preRecorded.ts`        | Howler wrapper for bundled-asset MP3s                              | Greet only                                                                                                               |
+| `src/lib/audio/sessionAudio.ts`       | Howler wrapper for session-supplied base64 audio + IndexedDB cache | Math, Word Song, all future dynamic content                                                                              |
+| `src/lib/audio/useAudioUnlockGate.ts` | Wake-tap pattern; gesture unlock state machine                     | Any screen that plays audio after a non-interactive transition                                                           |
+| `src/lib/tts/*`                       | Web Speech engine (Greet's old path)                               | **Dead.** Kept in tree post-Path-A for safety; deletion follow-up planned once Math + Word Song are on the new pipeline. |
+| `api/_tts.ts`                         | Node Azure TTS wrapper (Vercel-side)                               | `api/claude.ts` only                                                                                                     |
+| `api/_session.ts`                     | Session generation + TTS merge orchestrator                        | `api/claude.ts` only                                                                                                     |
 
 ### Session JSON shape (post-Path-A)
 
 ```typescript
 type Utterance = {
-  text: string             // for caption rendering + accessibility
+  text: string // for caption rendering + accessibility
   audio: AudioRef
 }
 
-type AudioRef =
-  | { kind: 'inline'; base64: string; mime: 'audio/mpeg' }
-  // Future: { kind: 'url'; href: string } if we ever need CDN-hosted audio
+type AudioRef = { kind: 'inline'; base64: string; mime: 'audio/mpeg' }
+// Future: { kind: 'url'; href: string } if we ever need CDN-hosted audio
 ```
 
 Every dynamic spoken string in a session response is an `Utterance`. Frontend pairs the
@@ -209,6 +208,7 @@ words generated by Claude), do this:
 
 If your screen has **fixed onboarding content** (4–10 short lines, never change like Greet),
 you have a choice:
+
 - Easiest: add to the session-generation pipeline (above) — slight session-start cost,
   but consistent with everything else.
 - More work, faster runtime: pre-record at build time (use `edge-tts` CLI with the same
@@ -222,15 +222,15 @@ wider app, and we have evidence it's unreliable on the target device.
 
 ## Failure modes and what to do
 
-| Symptom | Likely cause | Where to look |
-|---|---|---|
-| Audio plays but caption is out of sync | Linear timer drift or word-count mismatch | `preRecorded.ts` / `sessionAudio.ts` `onWordTick` logic; check `LINE_TEXT_TO_KEY` map |
-| First-tap audio doesn't fire on iPad | Gesture-unlock failed; audio context locked | `useAudioUnlockGate` state in `?debug=1` overlay; should transition `idle → pending → unlocked` |
-| Audio fires but no caption | `Utterance.text` not piped through to UI | Screen-level wiring; check the screen passes `text` to its caption component |
-| Greet's voice differs from Math's voice | Either Vercel TTS config drifted from edge-tts CLI config, OR re-recording happened with different settings | Check `api/_tts.ts` voice/rate constants vs `preRecorded.ts` regen comment |
-| Single MP3 fails to load → silent halt | `loaderror` rejection swallowed; orchestrator doesn't fall back | Tracked in ticket `86c9gr43t` (GBUG-7). Fix wires rejection through to `useAudioUnlockGate`'s relock pathway |
-| Session JSON payload too large | Too many utterances × ~15 KB each | Inspect the session response size; CDN variant of `AudioRef` is the future-proof escape hatch (not implemented) |
-| iPad PWA quota exceeded | IndexedDB cache bloat across many sessions | `sessionAudio` clears on session-end; check the cleanup hook fires |
+| Symptom                                 | Likely cause                                                                                                | Where to look                                                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Audio plays but caption is out of sync  | Linear timer drift or word-count mismatch                                                                   | `preRecorded.ts` / `sessionAudio.ts` `onWordTick` logic; check `LINE_TEXT_TO_KEY` map                           |
+| First-tap audio doesn't fire on iPad    | Gesture-unlock failed; audio context locked                                                                 | `useAudioUnlockGate` state in `?debug=1` overlay; should transition `idle → pending → unlocked`                 |
+| Audio fires but no caption              | `Utterance.text` not piped through to UI                                                                    | Screen-level wiring; check the screen passes `text` to its caption component                                    |
+| Greet's voice differs from Math's voice | Either Vercel TTS config drifted from edge-tts CLI config, OR re-recording happened with different settings | Check `api/_tts.ts` voice/rate constants vs `preRecorded.ts` regen comment                                      |
+| Single MP3 fails to load → silent halt  | `loaderror` rejection swallowed; orchestrator doesn't fall back                                             | Tracked in ticket `86c9gr43t` (GBUG-7). Fix wires rejection through to `useAudioUnlockGate`'s relock pathway    |
+| Session JSON payload too large          | Too many utterances × ~15 KB each                                                                           | Inspect the session response size; CDN variant of `AudioRef` is the future-proof escape hatch (not implemented) |
+| iPad PWA quota exceeded                 | IndexedDB cache bloat across many sessions                                                                  | `sessionAudio` clears on session-end; check the cleanup hook fires                                              |
 
 ---
 

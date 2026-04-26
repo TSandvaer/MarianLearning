@@ -55,14 +55,14 @@ scenario gets the same recovery contract — that's the point — but they diffe
 in whether any in-flight audio needs cleanup. Devon should design the resume orchestrator
 against this matrix, not against any single scenario.
 
-| # | Scenario | Detection mechanism | Expected behaviour | Recovery contract |
-|---|----------|--------------------|--------------------|-------------------|
-| 1 | Marian closes the PWA tab / swipes the app away | `visibilitychange` → `document.visibilityState === 'hidden'`, then `pagehide` | Persist progress on `pagehide` (best-effort; iOS may not run async work past visibility change). On next cold-launch: read state, branch per stale policy. | Persisted via `pagehide` → on relaunch enter resume flow if state present and fresh. |
-| 2 | PWA backgrounded > N minutes (iOS suspends) | `visibilitychange` to `hidden` while session active; iOS may freeze the JS context with no further events fired before suspend. | Persist progress on the same `visibilitychange` → `hidden` transition (don't wait for `pagehide`, which iOS skips on suspend). On wake: if `visibilityState` flips back to `visible` within the same JS context, just re-arm audio gate (see scenario 4). If the context was killed and the app re-mounts, treat as cold-launch resume. | Same persisted state powers both wake-in-place and cold-launch-rehydrate. |
-| 3 | Network drops mid-utterance (audio stops mid-word) | Howler `playerror` / `loaderror` on the in-flight Howl; `navigator.onLine === false` on next play attempt. | This is **not** an interrupt for resume purposes — the session is still "live" in memory. Math screen handles it locally: stop caption ticker, leave Melody at the last frame, surface `useAudioUnlockGate` ring on the next user gesture so she can re-tap to retry. Persisted state is unchanged. **Note:** post-Path-A, audio is local-cached in IndexedDB so true "network drop mid-utterance" should be rare — the failure mode looks more like "blob URL revoked under us" or "Howler context died." | No state change. Math screen retries via gesture. Out of this spec's scope; flagged here so we don't accidentally treat audio failure as "session abandoned." |
-| 4 | Device sleep / lock (Marian closes the iPad cover) | `visibilitychange` → `hidden`. Often followed by no `pagehide` if she wakes the device within a few minutes. | Persist on `hidden`. On `visibilitychange` → `visible` within same JS context: do NOT replay the in-flight problem yet; wait for a tap. The iOS audio context may have soft-locked during sleep — re-arm `useAudioUnlockGate` with the soft-regate watchdog (250ms per `useAudioUnlockGate.ts` lines 30–35). First tap re-runs the current problem's `math.p{N}.read` utterance from the start. | If JS context survived: in-place wake. If it didn't (longer sleep, iOS killed the context): cold-launch resume per stale-session policy. |
-| 5 | Browser/PWA crash | No detection from inside the dead context. Detected on next launch as "state present, but no clean `pagehide` ran." | Treat as cold-launch resume. The persisted state is the last `requestIdleCallback`-flushed snapshot (see §State persistence: write cadence). Worst-case data loss is one problem's wrong-attempt count; everything else is journaled per-problem. | Same as scenario 1's recovery, just without the `pagehide` write. The journal cadence is what saves us. |
-| 6 | Marian taps home screen / accidentally swipes up | Same as scenario 1 (visibility → hidden, app dismissed). On iPad PWAs swiping up exits to home screen. | Same as scenario 1. | Same as scenario 1. |
+| #   | Scenario                                           | Detection mechanism                                                                                                             | Expected behaviour                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Recovery contract                                                                                                                                             |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Marian closes the PWA tab / swipes the app away    | `visibilitychange` → `document.visibilityState === 'hidden'`, then `pagehide`                                                   | Persist progress on `pagehide` (best-effort; iOS may not run async work past visibility change). On next cold-launch: read state, branch per stale policy.                                                                                                                                                                                                                                                                                                                                                 | Persisted via `pagehide` → on relaunch enter resume flow if state present and fresh.                                                                          |
+| 2   | PWA backgrounded > N minutes (iOS suspends)        | `visibilitychange` to `hidden` while session active; iOS may freeze the JS context with no further events fired before suspend. | Persist progress on the same `visibilitychange` → `hidden` transition (don't wait for `pagehide`, which iOS skips on suspend). On wake: if `visibilityState` flips back to `visible` within the same JS context, just re-arm audio gate (see scenario 4). If the context was killed and the app re-mounts, treat as cold-launch resume.                                                                                                                                                                    | Same persisted state powers both wake-in-place and cold-launch-rehydrate.                                                                                     |
+| 3   | Network drops mid-utterance (audio stops mid-word) | Howler `playerror` / `loaderror` on the in-flight Howl; `navigator.onLine === false` on next play attempt.                      | This is **not** an interrupt for resume purposes — the session is still "live" in memory. Math screen handles it locally: stop caption ticker, leave Melody at the last frame, surface `useAudioUnlockGate` ring on the next user gesture so she can re-tap to retry. Persisted state is unchanged. **Note:** post-Path-A, audio is local-cached in IndexedDB so true "network drop mid-utterance" should be rare — the failure mode looks more like "blob URL revoked under us" or "Howler context died." | No state change. Math screen retries via gesture. Out of this spec's scope; flagged here so we don't accidentally treat audio failure as "session abandoned." |
+| 4   | Device sleep / lock (Marian closes the iPad cover) | `visibilitychange` → `hidden`. Often followed by no `pagehide` if she wakes the device within a few minutes.                    | Persist on `hidden`. On `visibilitychange` → `visible` within same JS context: do NOT replay the in-flight problem yet; wait for a tap. The iOS audio context may have soft-locked during sleep — re-arm `useAudioUnlockGate` with the soft-regate watchdog (250ms per `useAudioUnlockGate.ts` lines 30–35). First tap re-runs the current problem's `math.p{N}.read` utterance from the start.                                                                                                            | If JS context survived: in-place wake. If it didn't (longer sleep, iOS killed the context): cold-launch resume per stale-session policy.                      |
+| 5   | Browser/PWA crash                                  | No detection from inside the dead context. Detected on next launch as "state present, but no clean `pagehide` ran."             | Treat as cold-launch resume. The persisted state is the last `requestIdleCallback`-flushed snapshot (see §State persistence: write cadence). Worst-case data loss is one problem's wrong-attempt count; everything else is journaled per-problem.                                                                                                                                                                                                                                                          | Same as scenario 1's recovery, just without the `pagehide` write. The journal cadence is what saves us.                                                       |
+| 6   | Marian taps home screen / accidentally swipes up   | Same as scenario 1 (visibility → hidden, app dismissed). On iPad PWAs swiping up exits to home screen.                          | Same as scenario 1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Same as scenario 1.                                                                                                                                           |
 
 **Cross-scenario invariants:**
 
@@ -82,11 +82,11 @@ The full schema lives in localStorage under the key **`marian-tutor.session-prog
 **locked here** as the canonical key — coordinate with Math screen's `marian-tutor.stardust.v1` and
 sibling Session-end's `marian-tutor.session-history.v1`. Three keys, three concerns, no overlap:
 
-| Key | Owner spec | Lifecycle | Concern |
-|---|---|---|---|
-| `marian-tutor.stardust.v1` | `screen-3-math.md` | Lifetime — never cleared | Cumulative stardust counter across all sessions |
-| `marian-tutor.session-progress.v1` | This spec | Per-session — cleared on session-end | In-flight session state for resume |
-| `marian-tutor.session-history.v1` | `session-end.md` (sibling ticket `86c9grnjd`) | Append-only history | Completed-session log (for parent review later) |
+| Key                                | Owner spec                                    | Lifecycle                            | Concern                                         |
+| ---------------------------------- | --------------------------------------------- | ------------------------------------ | ----------------------------------------------- |
+| `marian-tutor.stardust.v1`         | `screen-3-math.md`                            | Lifetime — never cleared             | Cumulative stardust counter across all sessions |
+| `marian-tutor.session-progress.v1` | This spec                                     | Per-session — cleared on session-end | In-flight session state for resume              |
+| `marian-tutor.session-history.v1`  | `session-end.md` (sibling ticket `86c9grnjd`) | Append-only history                  | Completed-session log (for parent review later) |
 
 **Schema for `marian-tutor.session-progress.v1`:**
 
@@ -260,15 +260,15 @@ hears:
 
 **Per-problem state on resume:**
 
-| Field | Behaviour on resume |
-|---|---|
-| `wrongAttempts` | **Reset to 0** for the current problem. She shouldn't be penalised for the interrupt — the interruption itself is not a "wrong tap." |
-| `hintShown` | **Preserved.** If she saw the hint before the interrupt, do not auto-replay it. The hint state machine still arms after 2 wrongs as normal; the persisted `hintShown` only affects whether the hint plays again unprompted. (It doesn't, in this design — hints only fire on the 2-wrong threshold mid-session.) |
-| `guidedCompletionShown` | **Preserved.** Same logic. |
-| `stardustAwarded` | **Preserved** for prior problems. The current problem's value is still false until she answers correctly. |
-| `correct` | **Preserved** for prior problems. Current problem's value is false until she answers. |
-| `sessionStardust` | **Preserved.** The HUD shows cumulative stardust per Open Question §4, but internal session-stardust accumulator is needed to re-evaluate the streak-bonus thresholds (3, 5, 8) without double-awarding. |
-| `streak` | **Preserved.** The interrupt does not break the streak. (Dave-consult flag — Open Question §3. If Dave says interrupts SHOULD break streak, change this default.) |
+| Field                   | Behaviour on resume                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `wrongAttempts`         | **Reset to 0** for the current problem. She shouldn't be penalised for the interrupt — the interruption itself is not a "wrong tap."                                                                                                                                                                             |
+| `hintShown`             | **Preserved.** If she saw the hint before the interrupt, do not auto-replay it. The hint state machine still arms after 2 wrongs as normal; the persisted `hintShown` only affects whether the hint plays again unprompted. (It doesn't, in this design — hints only fire on the 2-wrong threshold mid-session.) |
+| `guidedCompletionShown` | **Preserved.** Same logic.                                                                                                                                                                                                                                                                                       |
+| `stardustAwarded`       | **Preserved** for prior problems. The current problem's value is still false until she answers correctly.                                                                                                                                                                                                        |
+| `correct`               | **Preserved** for prior problems. Current problem's value is false until she answers.                                                                                                                                                                                                                            |
+| `sessionStardust`       | **Preserved.** The HUD shows cumulative stardust per Open Question §4, but internal session-stardust accumulator is needed to re-evaluate the streak-bonus thresholds (3, 5, 8) without double-awarding.                                                                                                         |
+| `streak`                | **Preserved.** The interrupt does not break the streak. (Dave-consult flag — Open Question §3. If Dave says interrupts SHOULD break streak, change this default.)                                                                                                                                                |
 
 **Why preserve streak across interrupt (default):**
 
@@ -336,10 +336,10 @@ type SessionPlanV1 = {
   schemaVersion: 1
   sessionId: string
   surface: 'math'
-  problems: MathProblemSpec[]   // 8 entries; same shape api/_session.ts emits
+  problems: MathProblemSpec[] // 8 entries; same shape api/_session.ts emits
   utteranceMetadata: Array<{
-    id: string                  // e.g. 'math.p3.read'
-    text: string                // for caption rendering
+    id: string // e.g. 'math.p3.read'
+    text: string // for caption rendering
     mime: 'audio/mpeg'
     // base64 deliberately omitted — IDB owns it
   }>
@@ -348,12 +348,12 @@ type SessionPlanV1 = {
 
 This is a third locked localStorage key. Updated `coordinate with` table:
 
-| Key | Owner spec | Lifecycle | Concern |
-|---|---|---|---|
-| `marian-tutor.stardust.v1` | `screen-3-math.md` | Lifetime — never cleared | Cumulative stardust counter |
-| `marian-tutor.session-progress.v1` | This spec | Per-session — cleared on session-end | In-flight session state for resume |
-| `marian-tutor.session-plan.v1` | This spec | Per-session — cleared on session-end | Lightweight session plan (no audio base64) for cache-miss recovery |
-| `marian-tutor.session-history.v1` | `session-end.md` (`86c9grnjd`) | Append-only history | Completed-session log |
+| Key                                | Owner spec                     | Lifecycle                            | Concern                                                            |
+| ---------------------------------- | ------------------------------ | ------------------------------------ | ------------------------------------------------------------------ |
+| `marian-tutor.stardust.v1`         | `screen-3-math.md`             | Lifetime — never cleared             | Cumulative stardust counter                                        |
+| `marian-tutor.session-progress.v1` | This spec                      | Per-session — cleared on session-end | In-flight session state for resume                                 |
+| `marian-tutor.session-plan.v1`     | This spec                      | Per-session — cleared on session-end | Lightweight session plan (no audio base64) for cache-miss recovery |
+| `marian-tutor.session-history.v1`  | `session-end.md` (`86c9grnjd`) | Append-only history                  | Completed-session log                                              |
 
 **Cache-miss recovery flow (IDB cleared but progress + plan present):**
 
@@ -422,10 +422,10 @@ standard staggered reveal in parallel with the `math.p{N}.read` utterance.
 
 ### Cold-launch decision branches Marian sees
 
-| Decision | First audible line | Visual cue |
-|---|---|---|
-| Fresh session (no record, or stale, or completed) | Greet's "Hi!" → standard Greet → Math | Standard Session-1 flow per `session-1.md` |
-| Resume (record present, fresh) | "Welcome back!" → "Let's keep going." (after heart tap: `math.p{N}.read`) | HUD shows progress dots filled for completed problems; problem N is the current dot with the ring |
+| Decision                                          | First audible line                                                        | Visual cue                                                                                        |
+| ------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Fresh session (no record, or stale, or completed) | Greet's "Hi!" → standard Greet → Math                                     | Standard Session-1 flow per `session-1.md`                                                        |
+| Resume (record present, fresh)                    | "Welcome back!" → "Let's keep going." (after heart tap: `math.p{N}.read`) | HUD shows progress dots filled for completed problems; problem N is the current dot with the ring |
 
 **No "would you like to resume?" dialog.** Per the cross-scenario invariants, we never make
 Marian decide.
@@ -448,10 +448,10 @@ Two new utterances to add to the Path A bundle on session-start. These are sessi
 (content doesn't depend on which problem she's on) but should be rendered server-side at
 session-start so they're available in the cache from day one.
 
-| `id` | Sample text | When played | SSML rate | SSML pitch | Notes |
-|---|---|---|---|---|---|
-| `meta.welcomeBack` | "Welcome back!" | Resume entry, before heart tap | `-10%` | default | Plays unprompted on resume mount. Marian doesn't need to tap to hear this — but audio context may not be unlocked yet, so this utterance must be wrapped in `useAudioUnlockGate.wrapSpeak()`. If the engine rejects (cold context), the gate ring surfaces and her tap on the heart triggers the retry that includes this line. |
-| `meta.keepGoing` | "Let's keep going." | 600ms after `meta.welcomeBack` ends | `-10%` | default | Same gate-handling. Caption appears after Welcome Back's caption finishes. |
+| `id`               | Sample text         | When played                         | SSML rate | SSML pitch | Notes                                                                                                                                                                                                                                                                                                                           |
+| ------------------ | ------------------- | ----------------------------------- | --------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `meta.welcomeBack` | "Welcome back!"     | Resume entry, before heart tap      | `-10%`    | default    | Plays unprompted on resume mount. Marian doesn't need to tap to hear this — but audio context may not be unlocked yet, so this utterance must be wrapped in `useAudioUnlockGate.wrapSpeak()`. If the engine rejects (cold context), the gate ring surfaces and her tap on the heart triggers the retry that includes this line. |
+| `meta.keepGoing`   | "Let's keep going." | 600ms after `meta.welcomeBack` ends | `-10%`    | default    | Same gate-handling. Caption appears after Welcome Back's caption finishes.                                                                                                                                                                                                                                                      |
 
 **Word-count check** against the 200-word vocabulary cap:
 `welcome, back, let's, keep, going` — 5 unique words. `welcome` and `keep` and `going` are
@@ -534,24 +534,24 @@ time `math.p{N}.read` starts.
 
 Reused from existing specs (no new authoring):
 
-| Asset | Source | Purpose on resume |
-|---|---|---|
-| `melody-idle.svg` | Already in repo | Default pose throughout resume entry |
-| `bg-garden.svg` | `screen-3-math.md` (assets-todo) | Math background |
-| `heart-button.svg` | Session-1 Screen 2 | Resume continue affordance |
-| `sfx-chime-soft.mp3` | Greet (already on assets-todo) | Heart tap SFX |
-| `star-filled.svg` | `screen-3-math.md` | HUD stardust glyph (persisted total) |
-| `icon-flame.svg` (or sparkle alternative per Math §Open Question §4) | `screen-3-math.md` | HUD streak indicator (persisted streak) |
-| `flower-glyph.svg`, `sparkle-particle.svg` | `screen-3-math.md` | Standard Math problem assets, used post-heart-tap |
+| Asset                                                                | Source                           | Purpose on resume                                 |
+| -------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------- |
+| `melody-idle.svg`                                                    | Already in repo                  | Default pose throughout resume entry              |
+| `bg-garden.svg`                                                      | `screen-3-math.md` (assets-todo) | Math background                                   |
+| `heart-button.svg`                                                   | Session-1 Screen 2               | Resume continue affordance                        |
+| `sfx-chime-soft.mp3`                                                 | Greet (already on assets-todo)   | Heart tap SFX                                     |
+| `star-filled.svg`                                                    | `screen-3-math.md`               | HUD stardust glyph (persisted total)              |
+| `icon-flame.svg` (or sparkle alternative per Math §Open Question §4) | `screen-3-math.md`               | HUD streak indicator (persisted streak)           |
+| `flower-glyph.svg`, `sparkle-particle.svg`                           | `screen-3-math.md`               | Standard Math problem assets, used post-heart-tap |
 
 **No new visual assets required for this spec.** Resume reuses Math + Greet's existing kit.
 
 **New audio (TTS, generated server-side):**
 
-| Asset | Generated by | Cost |
-|---|---|---|
+| Asset                        | Generated by                          | Cost                                |
+| ---------------------------- | ------------------------------------- | ----------------------------------- |
 | `meta.welcomeBack` utterance | Vercel `api/_tts.ts` at session-start | +15 KB inline base64 / session JSON |
-| `meta.keepGoing` utterance | Vercel `api/_tts.ts` at session-start | +15 KB inline base64 / session JSON |
+| `meta.keepGoing` utterance   | Vercel `api/_tts.ts` at session-start | +15 KB inline base64 / session JSON |
 
 Total: **+30 KB / session JSON.** Within Vercel 4.5 MB response cap.
 
@@ -685,11 +685,14 @@ src/screens/Math/
 ```typescript
 // sessionProgress.ts
 export const STORAGE_KEY = 'marian-tutor.session-progress.v1'
-export const STALE_SESSION_MS = 30 * 60 * 1000  // 30 min — Dave-consult Open Q §1
+export const STALE_SESSION_MS = 30 * 60 * 1000 // 30 min — Dave-consult Open Q §1
 export function readSessionProgress(): SessionProgressV1 | null
 export function writeSessionProgress(state: SessionProgressV1): void
 export function clearSessionProgress(): void
-export function isStale(record: SessionProgressV1, now: number = Date.now()): boolean
+export function isStale(
+  record: SessionProgressV1,
+  now: number = Date.now(),
+): boolean
 
 // resumeOrchestrator.ts
 export type ColdLaunchDecision =
