@@ -76,6 +76,25 @@ describe('App routing skeleton', () => {
     expect(screen.getByTestId('greet')).toBeInTheDocument()
   })
 
+  describe('Math Path A wiring', () => {
+    // Sanity-check: the /api/claude POST is gated on `route === 'math'`.
+    // While App is on Splash or Greet, no fetch should be issued.
+    // (Pre-fetching session audio before the user reaches Math would burn
+    // a TTS render every cold start — wasteful and pollutes QA logs.)
+    it('does NOT POST to /api/claude on initial mount (route=splash)', () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('{}'))
+      render(<App />)
+      // Splash mount only — no Math route visited.
+      expect(fetchSpy).not.toHaveBeenCalledWith(
+        '/api/claude',
+        expect.anything(),
+      )
+      fetchSpy.mockRestore()
+    })
+  })
+
   describe('debug overlay', () => {
     // The overlay is gated on `?debug=1`. Without it, normal sessions never
     // see (or pay for) the panel — critical because we ship debug to prod and
