@@ -620,8 +620,9 @@ describe('Math (Number Garden) screen', () => {
     //
     //   We DO NOT assert data-total='1' here — it would fail under jsdom
     //   today and ticket 86c9gumhp's hard constraint forbids touching
-    //   Math.tsx in this PR. Filed as a separate bug for Devon/Kevin to
-    //   pick up; this test currently asserts the parts that DO hold:
+    //   Math.tsx in this PR. Filed as a separate bug for the test-author
+    //   to pick up after the fix lands; this test currently asserts the
+    //   parts that DO hold:
     //   onSessionComplete fires zero times during rapid taps and exactly
     //   one auto-advance lands (problem-index goes 0 → 1, not 1 → 2+).
     //   Once Math.tsx switches to a ref-guarded resolved flag, flip the
