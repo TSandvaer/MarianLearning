@@ -90,3 +90,29 @@ replaces them in ticket 86c9gkm42.
 
 Husky runs `yarn typecheck` and `lint-staged` on commit. Never use
 `--no-verify`; fix the cause.
+
+## ESM resolution in `api/`
+
+`package.json` declares `"type": "module"`, so the deployed `claude.js`
+(compiled from `api/claude.ts`) is ESM. **Every relative import inside
+`api/*.ts` MUST end in an explicit `.js` extension** — e.g.
+`from './_types.js'`, not `from './_types'`. Same rule applies to
+`vi.mock('./_session.js', ...)` calls in `api/*.test.ts`.
+
+Why: Node ESM strict-resolution at the Vercel runtime does not resolve
+bare specifiers; it throws `ERR_MODULE_NOT_FOUND` at module-load and
+Vercel surfaces that as `FUNCTION_INVOCATION_FAILED` (HTTP 500) on every
+request. TypeScript bundler-resolution and Vitest both forgive bare
+specifiers, so unit tests pass green, type-check passes, lint passes —
+and prod is dead. We learned this the hard way (PR #36 closed the loop
+after three hot-fix rounds; see `memory/project_vercel_runtime_config.md`).
+
+`yarn lint` enforces this via the custom rule
+`marian-api/require-js-extension` (defined in
+`eslint-rules/require-js-extension.js`, scoped to `api/**/*.ts` only).
+The `.js` suffix resolves back to the matching `.ts` source under
+`moduleResolution: "bundler"` for type-check + Vitest, so one canonical
+spelling works in dev, test, and prod.
+
+The rule does NOT apply to `src/**` — Vite bundles those files for the
+browser and the strict-resolution constraint does not apply.
