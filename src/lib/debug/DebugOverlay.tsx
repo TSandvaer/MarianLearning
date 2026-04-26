@@ -264,8 +264,12 @@ function renderAudioCtxEvent(e: AudioCtxEventRecord): string {
       ? ''
       : ` soundId=${e.speakResult === null ? 'null' : String(e.speakResult)}`
   const reason = e.skipReason ? ` reason=${e.skipReason}` : ''
+  // Phase-4 (ticket 86c9gvd0y): speak-call / speak-onplay rows carry
+  // `lineKey` instead of `skipReason`. Render it as `line=<key>` for the
+  // panel readout.
+  const lineKey = e.lineKey ? ` line=${e.lineKey}` : ''
   const error = e.errorMessage ? ` error="${e.errorMessage}"` : ''
-  return `[${formatTimestamp(e.timestamp)}] ${e.cause}: ${e.ctxState}${gate}${synth}${speakResult}${reason}${error}`
+  return `[${formatTimestamp(e.timestamp)}] ${e.cause}: ${e.ctxState}${gate}${synth}${speakResult}${reason}${lineKey}${error}`
 }
 
 export interface DebugOverlayProps {

@@ -48,6 +48,10 @@ import {
   recordSpeakCallEvent,
   recordSpeakOnPlayEvent,
 } from '../debug/audioContextProbe'
+import {
+  awaitHowlerContextResume,
+  type AwaitResumeOptions,
+} from './howlerContext'
 
 /**
  * Stable identifiers for the 4 fixed Greet lines. The orchestrator
@@ -157,6 +161,17 @@ export interface CreatePreRecordedOptions {
    * tests inject a fake.
    */
   HowlCtor?: typeof Howl
+  /**
+   * Test seam — Phase-4 (ticket 86c9gvd0y) audio-context-resume helper.
+   * Awaited once per `playGreetLine` immediately before `Howl.play()` so
+   * the buffer source binds against a `running` context, not a still-
+   * suspended one. Production omits this and we use the real
+   * `awaitHowlerContextResume` from `./howlerContext`.
+   *
+   * Tests inject a stub to (a) skip the real Howler/AudioContext (jsdom
+   * has neither), and (b) assert call ordering against `Howl.play()`.
+   */
+  awaitContextResume?: (opts?: AwaitResumeOptions) => Promise<unknown> | unknown
 }
 
 /**
@@ -174,6 +189,7 @@ export function createPreRecorded(
   opts: CreatePreRecordedOptions = {},
 ): PreRecordedAudio {
   const HowlCtor = opts.HowlCtor ?? Howl
+  const awaitContextResume = opts.awaitContextResume ?? awaitHowlerContextResume
 
   let howls: Record<GreetLineKey, HowlLike> | null = null
   let loadPromise: Promise<Record<GreetLineKey, HowlLike>> | null = null
@@ -370,32 +386,87 @@ export function createPreRecorded(
             )
           })
 
-          // Synchronous play — the whole point. Caller MUST invoke
-          // playGreetLine inside a user-gesture handler on iOS for the
-          // first call.
+          // Phase-4 fix (ticket 86c9gvd0y): await the AudioContext resume
+          // BEFORE calling Howl.play(). The Phase-3 iPad data showed that
+          // when the context is `'suspended'` at play() time, Howler
+          // binds its buffer source against the suspended state and the
+          // play silently drops — `onplay` never fires, the gate
+          // watchdog catches it 250 ms later as a relock, and Marian
+          // sees no Melody. Awaiting the resume promise (bounded by a
+          // 500 ms timeout) ensures the context is `'running'` by the
+          // time we call play(), so the buffer source binds against a
+          // live state. ~140 ms latency on tap-after-idle.
+          //
+          // Caller MUST still invoke playGreetLine inside a user-gesture
+          // handler on iOS for the first call — the gesture authorizes
+          // the resume; this helper just waits for it to settle.
+          //
+          // The Phase-2 helper (`resumeHowlerContextOnGesture`) STAYS
+          // upstream in the gesture-tick callers; it kicks resume()
+          // synchronously inside the gesture window, which is the most
+          // robust gesture-context association on iOS. This await is
+          // the second half: don't proceed until resume actually
+          // settled.
+          //
+          // Sync-fast-path: when the helper returns a non-Promise (e.g.
+          // a test stub, or the production helper hitting the
+          // already-running short-circuit) we run play() in the same
+          // tick. Production iPad-suspended path hits the async branch
+          // and pays the bounded resume await before play.
           //
           // Phase-3 (ticket 86c9gvd0y) instrumentation: record the
           // synchronous return of `howl.play()` to the audio-ctx log
           // under `cause: 'speak-call'`. The `speakResult` field carries
           // the Howler sound id (number) on success, or `null` when
-          // play() threw. This is the load-bearing diagnostic for "did
-          // we even try to play?" — together with the corresponding
-          // `'speak-onplay'` rows further down (or absence thereof) we
-          // can localize whether the failure is at play-call time or at
-          // play-emit time.
+          // play() threw. Together with the corresponding
+          // `'speak-onplay'` rows (or absence thereof) we can localize
+          // whether the failure is at play-call time or at play-emit
+          // time.
+          const callPlay = () => {
+            // If cancel() ran during the await window, the activeStop
+            // handler already settled the rejection. Don't double-play.
+            if (resolved || stopped) return
+            try {
+              const soundId = howl.play()
+              recordSpeakCallEvent(
+                typeof soundId === 'number' ? soundId : null,
+                key,
+              )
+            } catch (err) {
+              recordSpeakCallEvent(null, key)
+              settleReject(
+                err instanceof Error
+                  ? err
+                  : new Error(`[preRecorded] play() threw: ${String(err)}`),
+              )
+            }
+          }
+
+          let resumeReturn: Promise<unknown> | unknown
           try {
-            const soundId = howl.play()
-            recordSpeakCallEvent(
-              typeof soundId === 'number' ? soundId : null,
-              key,
-            )
-          } catch (err) {
-            recordSpeakCallEvent(null, key)
-            settleReject(
-              err instanceof Error
-                ? err
-                : new Error(`[preRecorded] play() threw: ${String(err)}`),
-            )
+            resumeReturn = awaitContextResume()
+          } catch {
+            // Defensive: if a custom seam throws synchronously, fall
+            // through to play() — production helper never throws.
+            resumeReturn = undefined
+          }
+
+          if (
+            resumeReturn &&
+            typeof (resumeReturn as Promise<unknown>).then === 'function'
+          ) {
+            ;(resumeReturn as Promise<unknown>)
+              .catch(() => {
+                // The await helper swallows resume failures internally
+                // and resolves; this catch is purely defensive against
+                // custom seams that reject. Either way, proceed to
+                // play() — we're never worse than pre-fix.
+              })
+              .then(callPlay)
+          } else {
+            // Synchronous return (production short-circuit or test
+            // stub) — play in the same tick.
+            callPlay()
           }
         })
         .catch((err) => {

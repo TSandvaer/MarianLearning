@@ -4,11 +4,16 @@ export type {
   AudioUnlockGate,
   UseAudioUnlockGateOptions,
 } from './useAudioUnlockGate'
-export { resumeHowlerContextOnGesture } from './howlerContext'
+export {
+  resumeHowlerContextOnGesture,
+  awaitHowlerContextResume,
+} from './howlerContext'
 export type {
   HowlerContextState,
   ResumeAudioContextOptions,
   ResumeResult,
+  AwaitResumeOptions,
+  AwaitResumeResult,
 } from './howlerContext'
 export {
   createPreRecorded,
