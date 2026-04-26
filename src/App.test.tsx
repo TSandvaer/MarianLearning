@@ -1,6 +1,7 @@
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { _resetAudioContextProbeForTests } from './lib/debug'
 
 // Splash imports tts.cancel — give it a no-op so jsdom doesn't trip over
 // the absent speechSynthesis global. Also stub speak() to a never-resolving
@@ -50,6 +51,10 @@ describe('App routing skeleton', () => {
   afterEach(() => {
     vi.useRealTimers()
     restoreSearch()
+    // The audio-context probe is a module-level singleton (`?debug=1`
+    // path). Reset it between tests so the timer/listener it owns
+    // doesn't leak into the next case.
+    _resetAudioContextProbeForTests()
   })
 
   it('starts on Splash and auto-advances to the Greet screen', async () => {

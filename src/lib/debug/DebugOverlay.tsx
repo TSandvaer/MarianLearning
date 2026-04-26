@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   subscribe,
+  type AudioCtxEventRecord,
   type DebugSnapshot,
   type RawTapEventRecord,
   type SpeakAttemptRecord,
@@ -34,6 +35,13 @@ import {
  *    zero, iPad isn't delivering events to the element at all (CSS
  *    hit-testing issue).
  *  - The audio-unlock-gate state: idle / pending / unlocked / relock.
+ *  - The most-recent AudioContext.state (running / suspended / interrupted /
+ *    closed / unavailable). Driven by the audio-context probe — see
+ *    `audioContextProbe.ts` for the polling cadence and statechange capture.
+ *  - The last 6 audio-context samples (poll, statechange, tap), each with
+ *    a wall-clock timestamp and the optional `speechSynthesis.paused`
+ *    co-reading. The full timeline is mirrored to localStorage under
+ *    `debug:audioCtxLog:v1` for paste-back from iPad.
  *
  * iPad QA usage
  * -------------
@@ -65,6 +73,11 @@ import {
  *    rejected the utterance config (try simplifying pitch/rate further).
  *  - gateState stuck on `pending` → speak() returned but no onstart fired
  *    within the watchdog window; will flip to `relock` on next poll.
+ *  - audioCtx flips from `running` → `suspended` / `interrupted` mid-idle,
+ *    AND the next tap shows `cause: tap, ctxState: suspended` — that's the
+ *    iOS audio-session decay fingerprint for ticket 86c9gvd0y. If the tap
+ *    sample shows `running` instead, the bug is somewhere else (Howler
+ *    bookkeeping, our retry path, or a different layer).
  */
 
 const POLL_MS = 200
@@ -135,6 +148,12 @@ function renderRawTap(t: RawTapEventRecord): string {
   return `[${formatTimestamp(t.timestamp)}] ${t.type} → ${t.target}`
 }
 
+function renderAudioCtxEvent(e: AudioCtxEventRecord): string {
+  const synth =
+    e.synthPaused === undefined ? '' : ` synthPaused=${String(e.synthPaused)}`
+  return `[${formatTimestamp(e.timestamp)}] ${e.cause}: ${e.ctxState}${synth}`
+}
+
 export interface DebugOverlayProps {
   /**
    * Test seam — overrides the polling read of `speechSynthesis`. Defaults to
@@ -151,6 +170,8 @@ export default function DebugOverlay({
     recentTaps: [],
     recentRawEvents: [],
     gateState: null,
+    audioCtxState: null,
+    audioCtxEvents: [],
   })
   const [synth, setSynth] = useState<SynthSnapshot>(() => readSynthFn())
 
@@ -202,6 +223,32 @@ export default function DebugOverlay({
       </div>
       <div data-testid="debug-overlay-gate">
         <strong>gate</strong> {bus.gateState ?? '(unmounted)'}
+      </div>
+      <div data-testid="debug-overlay-audio-ctx">
+        <strong>audioCtx</strong> {bus.audioCtxState ?? '(no probe)'}
+      </div>
+      <div data-testid="debug-overlay-audio-ctx-events">
+        <strong>audioCtx events ({bus.audioCtxEvents.length})</strong>
+        {bus.audioCtxEvents.length === 0 ? (
+          <div>(none)</div>
+        ) : (
+          // Render only the most-recent few in the on-screen panel so the
+          // overlay stays compact. The full timeline is mirrored to
+          // localStorage by the probe (see audioContextProbe.ts) — Thomas
+          // pastes that back via Safari Web Inspector or the
+          // localStorage.getItem('debug:audioCtxLog:v1') console call.
+          bus.audioCtxEvents
+            .slice(-6)
+            .reverse()
+            .map((e, i) => (
+              <div
+                key={`${e.timestamp}-${i}`}
+                data-testid="debug-overlay-audio-ctx-event"
+              >
+                {renderAudioCtxEvent(e)}
+              </div>
+            ))
+        )}
       </div>
       <div data-testid="debug-overlay-speak">
         <strong>speak</strong> {renderSpeak(bus.lastSpeak)}

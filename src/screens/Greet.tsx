@@ -8,7 +8,12 @@ import {
   type GreetLineKey,
   type PlayGreetLineOptions,
 } from '../lib/audio'
-import { recordRawTapEvent, recordSpeakAttempt, recordTap } from '../lib/debug'
+import {
+  recordRawTapEvent,
+  recordSpeakAttempt,
+  recordTap,
+  sampleAudioCtxOnTap,
+} from '../lib/debug'
 import {
   GREET_LINES,
   REPROMPT_AFTER_MS,
@@ -1283,14 +1288,23 @@ export default function Greet({
           // element". The native touchstart attachment also doubles as
           // the iPad-Safari touch-handler "wake-up" workaround.
           onClick={() => {
+            // sampleAudioCtxOnTap MUST run synchronously inside the
+            // gesture-handler tick — the whole point of the Phase-1
+            // diagnostic for ticket 86c9gvd0y is to record what the
+            // AudioContext.state IS at the moment the tap arrives,
+            // before any async work or audio play call. No-op when
+            // the probe is inactive (production / no `?debug=1`).
+            sampleAudioCtxOnTap()
             recordTap('click', 'greet-wake-tap-target')
             handleWakeTap()
           }}
           onTouchEnd={() => {
+            sampleAudioCtxOnTap()
             recordTap('touchend', 'greet-wake-tap-target')
             handleWakeTap()
           }}
           onPointerDown={() => {
+            sampleAudioCtxOnTap()
             recordTap('pointerdown', 'greet-wake-tap-target')
             handleWakeTap()
           }}

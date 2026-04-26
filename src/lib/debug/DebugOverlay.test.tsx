@@ -4,6 +4,7 @@ import DebugOverlay from './DebugOverlay'
 import { isDebugEnabled } from './isDebugEnabled'
 import {
   _resetForTests,
+  recordAudioCtxEvent,
   recordGateState,
   recordSpeakAttempt,
   recordSpeakStatus,
@@ -70,14 +71,60 @@ describe('DebugOverlay', () => {
     _resetForTests()
   })
 
-  it('mounts with synth + gate + speak + tap rows', () => {
+  it('mounts with synth + gate + audio-ctx + speak + tap rows', () => {
     render(<DebugOverlay readSynthFn={() => FAKE_SYNTH_DEFAULT} />)
     expect(screen.getByTestId('debug-overlay')).toBeInTheDocument()
     expect(screen.getByTestId('debug-overlay-synth')).toBeInTheDocument()
     expect(screen.getByTestId('debug-overlay-voices')).toBeInTheDocument()
     expect(screen.getByTestId('debug-overlay-gate')).toBeInTheDocument()
+    expect(screen.getByTestId('debug-overlay-audio-ctx')).toBeInTheDocument()
+    expect(
+      screen.getByTestId('debug-overlay-audio-ctx-events'),
+    ).toBeInTheDocument()
     expect(screen.getByTestId('debug-overlay-speak')).toBeInTheDocument()
     expect(screen.getByTestId('debug-overlay-taps')).toBeInTheDocument()
+  })
+
+  it('reflects audio-context state pushes and shows recent events newest-first', () => {
+    render(<DebugOverlay readSynthFn={() => FAKE_SYNTH_DEFAULT} />)
+    expect(screen.getByTestId('debug-overlay-audio-ctx')).toHaveTextContent(
+      '(no probe)',
+    )
+
+    act(() => {
+      recordAudioCtxEvent({
+        timestamp: 1,
+        ctxState: 'running',
+        cause: 'init',
+      })
+    })
+    expect(screen.getByTestId('debug-overlay-audio-ctx')).toHaveTextContent(
+      'running',
+    )
+
+    act(() => {
+      recordAudioCtxEvent({
+        timestamp: 2,
+        ctxState: 'suspended',
+        cause: 'statechange',
+        synthPaused: true,
+      })
+      recordAudioCtxEvent({
+        timestamp: 3,
+        ctxState: 'suspended',
+        cause: 'tap',
+      })
+    })
+
+    expect(screen.getByTestId('debug-overlay-audio-ctx')).toHaveTextContent(
+      'suspended',
+    )
+    const events = screen.getAllByTestId('debug-overlay-audio-ctx-event')
+    // Newest-first: tap (3), statechange (2), init (1).
+    expect(events[0]).toHaveTextContent('tap: suspended')
+    expect(events[1]).toHaveTextContent('statechange: suspended')
+    expect(events[1]).toHaveTextContent('synthPaused=true')
+    expect(events[2]).toHaveTextContent('init: running')
   })
 
   it('shows the polled synth state', () => {
