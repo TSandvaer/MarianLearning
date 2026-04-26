@@ -73,15 +73,15 @@ mounted but TTS hasn't fired yet (gated on unlock).
 
 **Vertical rhythm (top → bottom, portrait iPad ~1024pt tall):**
 
-| Band                | Height       | Contents                                              |
-| ------------------- | ------------ | ----------------------------------------------------- |
-| Safe-area top       | env inset    | —                                                     |
-| HUD strip           | 56pt         | Stardust counter (left), problem dots (center), streak indicator (right) |
-| Melody + ribbon     | ~30vh        | Melody upper-left at ~30vh tall; ribbon to her right  |
-| Problem display     | ~22vh        | Numerals row (96pt) + visual-groups row (~64pt)       |
-| Spacer              | ~8vh         | Breathing room — non-negotiable; do not collapse      |
-| Answer chips row    | ~14vh        | 3 chips, 88×88pt, 32pt gaps                           |
-| Safe-area bottom    | env inset    | —                                                     |
+| Band             | Height    | Contents                                                                 |
+| ---------------- | --------- | ------------------------------------------------------------------------ |
+| Safe-area top    | env inset | —                                                                        |
+| HUD strip        | 56pt      | Stardust counter (left), problem dots (center), streak indicator (right) |
+| Melody + ribbon  | ~30vh     | Melody upper-left at ~30vh tall; ribbon to her right                     |
+| Problem display  | ~22vh     | Numerals row (96pt) + visual-groups row (~64pt)                          |
+| Spacer           | ~8vh      | Breathing room — non-negotiable; do not collapse                         |
+| Answer chips row | ~14vh     | 3 chips, 88×88pt, 32pt gaps                                              |
+| Safe-area bottom | env inset | —                                                                        |
 
 **Thumb zone:** the answer chip row sits in the bottom ~25% of the viewport (above safe-area
 inset). Marian holds the iPad in her lap or props it on a table; either way her thumbs reach the
@@ -141,12 +141,12 @@ probability of session-opening discouragement during Marian's first 5–10 sessi
 
 **Candidate rules considered and rejected:**
 
-| Rule                    | Why rejected                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------- |
-| Always off-by-one       | Punishing on problem 1; no gentle ramp.                                               |
-| Always swap-of-digits   | Distractors like `32` for `3 + 2 = ?` look like "what is that even" — confusing, not pedagogical. |
-| Random-in-range (1–10)  | Pedagogically random — doesn't target Marian's actual error pattern; sometimes too easy, sometimes too hard. |
-| Always gentle ramp      | Never confronts the actual miscount pattern — wastes the Math surface on softballs.   |
+| Rule                   | Why rejected                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Always off-by-one      | Punishing on problem 1; no gentle ramp.                                                                      |
+| Always swap-of-digits  | Distractors like `32` for `3 + 2 = ?` look like "what is that even" — confusing, not pedagogical.            |
+| Random-in-range (1–10) | Pedagogically random — doesn't target Marian's actual error pattern; sometimes too easy, sometimes too hard. |
+| Always gentle ramp     | Never confronts the actual miscount pattern — wastes the Math surface on softballs.                          |
 
 **Constraint set the rule must satisfy** (lock these regardless of which rule wins):
 
@@ -189,7 +189,7 @@ ambiguities" item 4).
    peels off the burst at 200ms and animates on a curved Bezier path to the HUD stardust counter.
    Total flight ~700ms. On arrival:
 3. **Counter pop:** the stardust counter number scales `1 → 1.25 → 1` over 250ms (`spring,
-   stiffness 300, damping 16`) and the count increments. Tiny gold flash behind the number for
+stiffness 300, damping 16`) and the count increments. Tiny gold flash behind the number for
    200ms.
 
 For the streak-bonus stardust (problem 3, 5, 8 of a clean run), a _second_ grain peels off ~200ms
@@ -323,18 +323,18 @@ pitch, MP3 mono 24kHz ~48kbps. Do not deviate per-utterance.
 
 **Per-problem utterances (8 problems × 4 lines = 32 audio assets per session):**
 
-| `id` template          | Sample text (problem `3 + 2 = 5`) | When played                              | SSML rate | SSML pitch | Notes                                                                                 |
-| ---------------------- | --------------------------------- | ---------------------------------------- | --------- | ---------- | ------------------------------------------------------------------------------------- |
-| `math.p{N}.read`       | "Three plus two. How many?"       | Screen entry / problem reveal complete   | `-10%`    | default    | The problem read-aloud. `{N}` is 1–8.                                                 |
-| `math.p{N}.correct`    | "Yes! Five!"                      | Correct chip tapped                      | `-10%`    | default    | Number is the actual answer. Generated per-problem; do not template at runtime.       |
-| `math.p{N}.reprompt`   | "Hmm... try again?"               | Wrong chip tapped (1st or 2nd attempt)   | `-10%`    | default    | Same text every problem — but render per-problem so each problem's bundle is self-contained. Reuse via `LINE_TEXT_TO_KEY`-style map if Devon prefers, but the bundle ships all 8 for cache-locality and to dodge any "missing utterance" dropouts. |
-| `math.p{N}.hint`       | "Look. Three. And two more. How many now?" | After 2 wrong attempts on this problem | `-12%`  | default    | Slightly slower for the hint. Generated with the actual numerals for this problem.    |
+| `id` template        | Sample text (problem `3 + 2 = 5`)          | When played                            | SSML rate | SSML pitch | Notes                                                                                                                                                                                                                                              |
+| -------------------- | ------------------------------------------ | -------------------------------------- | --------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `math.p{N}.read`     | "Three plus two. How many?"                | Screen entry / problem reveal complete | `-10%`    | default    | The problem read-aloud. `{N}` is 1–8.                                                                                                                                                                                                              |
+| `math.p{N}.correct`  | "Yes! Five!"                               | Correct chip tapped                    | `-10%`    | default    | Number is the actual answer. Generated per-problem; do not template at runtime.                                                                                                                                                                    |
+| `math.p{N}.reprompt` | "Hmm... try again?"                        | Wrong chip tapped (1st or 2nd attempt) | `-10%`    | default    | Same text every problem — but render per-problem so each problem's bundle is self-contained. Reuse via `LINE_TEXT_TO_KEY`-style map if Devon prefers, but the bundle ships all 8 for cache-locality and to dodge any "missing utterance" dropouts. |
+| `math.p{N}.hint`     | "Look. Three. And two more. How many now?" | After 2 wrong attempts on this problem | `-12%`    | default    | Slightly slower for the hint. Generated with the actual numerals for this problem.                                                                                                                                                                 |
 
 **Optional — only if 3rd-strike guided completion fires:**
 
-| `id` template          | Sample text                  | When played                       | SSML rate | SSML pitch |
-| ---------------------- | ---------------------------- | --------------------------------- | --------- | ---------- |
-| `math.p{N}.giveAnswer` | "This one is five."          | After 3 wrong attempts            | `-10%`    | default    |
+| `id` template          | Sample text         | When played            | SSML rate | SSML pitch |
+| ---------------------- | ------------------- | ---------------------- | --------- | ---------- |
+| `math.p{N}.giveAnswer` | "This one is five." | After 3 wrong attempts | `-10%`    | default    |
 
 **Total per-problem audio:** 4 lines × 8 problems = **32 utterances** baseline, +8 if we always
 pre-render the giveAnswer fallback (recommend yes — predictable bundle size, ~120 KB extra at
@@ -343,13 +343,13 @@ the 4.5 MB Vercel response cap budget noted in audio-architecture.md.
 
 **SFX (NOT pre-rendered via TTS — these are static MP3s on disk, played via Howler):**
 
-| `id`                  | File                     | When played                          | Status                                 |
-| --------------------- | ------------------------ | ------------------------------------ | -------------------------------------- |
-| `sfx.chime`           | `sfx-chime-soft.mp3`     | Reused — already in Greet            | Blocked on Thomas (assets-todo.md)     |
-| `sfx.sparkle`         | `sfx-sparkle.mp3`        | Correct answer celebration           | Not yet authored — flagged             |
-| `sfx.poof`            | `sfx-poof.mp3`           | Wrong answer puzzled-tilt response   | Not yet authored — flagged             |
-| `sfx.stardust-grain`  | `sfx-plink.mp3`          | Stardust grain arrives at HUD counter| Reuse the Session-5 plink (gentle, short) |
-| `sfx.streak-bonus`    | `sfx-sparkle.mp3` (reuse)| Streak threshold bonus stardust pop  | Reuse — distinct chord not worth a new asset for v1 |
+| `id`                 | File                      | When played                           | Status                                              |
+| -------------------- | ------------------------- | ------------------------------------- | --------------------------------------------------- |
+| `sfx.chime`          | `sfx-chime-soft.mp3`      | Reused — already in Greet             | Blocked on Thomas (assets-todo.md)                  |
+| `sfx.sparkle`        | `sfx-sparkle.mp3`         | Correct answer celebration            | Not yet authored — flagged                          |
+| `sfx.poof`           | `sfx-poof.mp3`            | Wrong answer puzzled-tilt response    | Not yet authored — flagged                          |
+| `sfx.stardust-grain` | `sfx-plink.mp3`           | Stardust grain arrives at HUD counter | Reuse the Session-5 plink (gentle, short)           |
+| `sfx.streak-bonus`   | `sfx-sparkle.mp3` (reuse) | Streak threshold bonus stardust pop   | Reuse — distinct chord not worth a new asset for v1 |
 
 **Audio dispatch sequence on chip tap (correct):**
 
@@ -396,6 +396,7 @@ showing the just-spoken read-aloud line (full reveal, no animation), HUD strip s
 ### Happy path (correct first attempt)
 
 Per the chip-tap-correct sequence in §Audio integration contract. After auto-advance:
+
 - HUD: stardust +1 (animated), streak +1 (HUD streak indicator pops in if it was 0→1, or pops
   if it was already visible)
 - Problem dot: current dot animates `filled-with-ring` → `filled-no-ring`; next dot animates
@@ -461,25 +462,25 @@ callback. Whoever owns Session-end builds the next surface.
 
 Already in repo (no new authoring required for this spec):
 
-| Asset                       | Used for                                             | Size       |
-| --------------------------- | ---------------------------------------------------- | ---------- |
-| `melody-idle.svg`           | Melody idle/breathing in upper-left                  | 6 KB ✅    |
-| `melody-happy.svg`          | Correct-answer ear-wiggle pose                       | 6 KB ✅    |
-| `melody-puzzled.svg`        | Wrong-answer puzzled-tilt pose                       | 6 KB ✅    |
-| `melody-cheering.svg`       | NOT used in this screen — reserved for Session-end   | 7 KB ✅    |
+| Asset                 | Used for                                           | Size    |
+| --------------------- | -------------------------------------------------- | ------- |
+| `melody-idle.svg`     | Melody idle/breathing in upper-left                | 6 KB ✅ |
+| `melody-happy.svg`    | Correct-answer ear-wiggle pose                     | 6 KB ✅ |
+| `melody-puzzled.svg`  | Wrong-answer puzzled-tilt pose                     | 6 KB ✅ |
+| `melody-cheering.svg` | NOT used in this screen — reserved for Session-end | 7 KB ✅ |
 
 Required, not yet authored (already on `assets-todo.md` follow-up list — flag to Thomas via Matt):
 
-| Asset                       | Used for                                             | Target size | Notes                                    |
-| --------------------------- | ---------------------------------------------------- | ----------- | ---------------------------------------- |
-| `bg-garden.svg`             | Math screen background                               | <20 KB      | Pastel meadow, no hard edges             |
-| `flower-glyph.svg`          | Visual-group flowers in problem display              | <3 KB       | Render via React component, not 5 copies |
-| `sparkle-particle.svg`      | Celebration burst + stardust grain + HUD streak indicator (32pt) | <1 KB | Single shape, reused across all three uses (per locked decision in §Stardust treatment) |
-| `star-filled.svg`           | HUD stardust counter glyph                           | <2 KB       | Same as Session-end jar star             |
-| `sfx-sparkle.mp3`           | Correct-answer chime                                 | ~6 KB       | Soft shimmer, 400ms                      |
-| `sfx-poof.mp3`              | Wrong-answer gentle response                         | ~8 KB       | Soft breathy poof, 500ms — NOT a buzzer  |
-| `sfx-plink.mp3`             | Stardust grain arrival                               | ~5 KB       | Reused from Session-5 jar                |
-| `sfx-chime-soft.mp3`        | (Reused from Greet)                                  | ~8 KB       | Already on assets-todo                   |
+| Asset                  | Used for                                                         | Target size | Notes                                                                                   |
+| ---------------------- | ---------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------- |
+| `bg-garden.svg`        | Math screen background                                           | <20 KB      | Pastel meadow, no hard edges                                                            |
+| `flower-glyph.svg`     | Visual-group flowers in problem display                          | <3 KB       | Render via React component, not 5 copies                                                |
+| `sparkle-particle.svg` | Celebration burst + stardust grain + HUD streak indicator (32pt) | <1 KB       | Single shape, reused across all three uses (per locked decision in §Stardust treatment) |
+| `star-filled.svg`      | HUD stardust counter glyph                                       | <2 KB       | Same as Session-end jar star                                                            |
+| `sfx-sparkle.mp3`      | Correct-answer chime                                             | ~6 KB       | Soft shimmer, 400ms                                                                     |
+| `sfx-poof.mp3`         | Wrong-answer gentle response                                     | ~8 KB       | Soft breathy poof, 500ms — NOT a buzzer                                                 |
+| `sfx-plink.mp3`        | Stardust grain arrival                                           | ~5 KB       | Reused from Session-5 jar                                                               |
+| `sfx-chime-soft.mp3`   | (Reused from Greet)                                              | ~8 KB       | Already on assets-todo                                                                  |
 
 **TTS audio:** generated server-side at session-start. ~40 inline base64 MP3s per session, ~600 KB.
 No static authored assets needed.
@@ -618,8 +619,8 @@ export function pickTier(problemIndex: number): DistractorTier {
 }
 
 export function pickDistractors(
-  correct: number,        // the right answer, 0-10
-  problemIndex: number,   // 1-8
+  correct: number, // the right answer, 0-10
+  problemIndex: number, // 1-8
 ): [number, number] {
   const tier = pickTier(problemIndex)
   // ... rules per §Distractor policy constraint set
@@ -730,9 +731,9 @@ iPad PWA:
 
 3. **Stardust per session math:** clean 8-for-8 = 11 stardust (8 + 3 bonuses). One wrong on problem 1 (no streak bonuses possible until streak rebuild) = ~7 stardust. Is that ratio right, or do we want bonuses to feel rarer / more rewarded? **Default:** ship as specified.
 
-6. **Session JSON failure recovery:** if the orchestrator delivers a malformed session (missing utterances, bad distractor data), Math currently shows Melody's puzzled-tilt and stalls. Should there be a graceful "let's try again later" surface, or is this entirely the orchestrator's responsibility to detect upstream? **Default:** orchestrator owns it. Math fails closed (puzzled + stall) — better than crashing.
+4. **Session JSON failure recovery:** if the orchestrator delivers a malformed session (missing utterances, bad distractor data), Math currently shows Melody's puzzled-tilt and stalls. Should there be a graceful "let's try again later" surface, or is this entirely the orchestrator's responsibility to detect upstream? **Default:** orchestrator owns it. Math fails closed (puzzled + stall) — better than crashing.
 
-7. **Melody interactivity:** v1 keeps Melody non-interactive on this screen. The finger-counting affordance (tap Melody → she shows the addends as fingers) is a v2 idea. Confirming v1 = non-interactive is the right call. **Default:** non-interactive in v1.
+5. **Melody interactivity:** v1 keeps Melody non-interactive on this screen. The finger-counting affordance (tap Melody → she shows the addends as fingers) is a v2 idea. Confirming v1 = non-interactive is the right call. **Default:** non-interactive in v1.
 
 ---
 

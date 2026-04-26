@@ -75,12 +75,13 @@ The spec is well-constructed and mostly evidence-aligned for an 8-year-old L2 En
 ❌ **Risk: Lines 2–4 overlap animation and audio in ways that will saturate an 8-year-old's working memory.**
 
 Specifically, at the ~2-second mark, Marian must simultaneously process:
+
 - TTS narration ("D... O... G.") — auditory phonological channel
 - Sequential pre-recorded phoneme playback (`phoneme-d.mp3`, `phoneme-o-short.mp3`, `phoneme-g.mp3`) — **same auditory channel** as TTS, but different audio source, 200ms apart
 - Letter highlight pulses: scale 1→1.2→1, colour `--ink` → `--my-rose` — visual channel
 - Picture persisting in frame — additional visual object
 
-The TTS "D... O... G." and the phoneme audio files are playing from **two different audio sources in rapid sequence on the same perceptual channel** (hearing). Mayer's redundancy principle (Mayer & Moreno, 2003) predicts this will interfere rather than reinforce: two simultaneous or near-simultaneous auditory streams for the same letter-sound target competes for the phonological loop. The spec states "Sequence the three phoneme audio files back-to-back with ~200ms gaps" during line 3 — but it is unclear whether the TTS "D... O... G." utterance is *replaced by* the phoneme files or plays *alongside* them.
+The TTS "D... O... G." and the phoneme audio files are playing from **two different audio sources in rapid sequence on the same perceptual channel** (hearing). Mayer's redundancy principle (Mayer & Moreno, 2003) predicts this will interfere rather than reinforce: two simultaneous or near-simultaneous auditory streams for the same letter-sound target competes for the phonological loop. The spec states "Sequence the three phoneme audio files back-to-back with ~200ms gaps" during line 3 — but it is unclear whether the TTS "D... O... G." utterance is _replaced by_ the phoneme files or plays _alongside_ them.
 
 **This needs explicit resolution.** If TTS says "D" and `phoneme-d.mp3` plays 200ms later, that is near-simultaneous redundant auditory input — which Mayer's research categorises as a design flaw that decreases learning outcomes compared to a single coherent audio stream.
 
@@ -186,24 +187,24 @@ The purpose of distractors is to capture the common misconception — but only f
 
 Evidence strength is noted inline. Real, findable references only — no fabricated citations.
 
-- Cowan, N. (2001). "The magical number 4 in short-term memory: A reconsideration of mental storage capacity." *Behavioral and Brain Sciences*, 24(1), 87–114. [PMC4270959 — Knowledge Cannot Explain the Developmental Growth of Working Memory Capacity](https://pmc.ncbi.nlm.nih.gov/articles/PMC4270959/). **Strong** (systematic review of WM development).
+- Cowan, N. (2001). "The magical number 4 in short-term memory: A reconsideration of mental storage capacity." _Behavioral and Brain Sciences_, 24(1), 87–114. [PMC4270959 — Knowledge Cannot Explain the Developmental Growth of Working Memory Capacity](https://pmc.ncbi.nlm.nih.gov/articles/PMC4270959/). **Strong** (systematic review of WM development).
 
-- Gilchrist, A. L., et al. (2009). "Investigating the Childhood Development of Working Memory Using Sentences: New Evidence for the Growth of Chunk Capacity." *PMC2752294*. [PMC link](https://pmc.ncbi.nlm.nih.gov/articles/PMC2752294/). **Moderate** (single study, sentence-based chunks; generalisation to mixed visual-auditory tasks is an extrapolation).
+- Gilchrist, A. L., et al. (2009). "Investigating the Childhood Development of Working Memory Using Sentences: New Evidence for the Growth of Chunk Capacity." _PMC2752294_. [PMC link](https://pmc.ncbi.nlm.nih.gov/articles/PMC2752294/). **Moderate** (single study, sentence-based chunks; generalisation to mixed visual-auditory tasks is an extrapolation).
 
-- Mayer, R. E., & Moreno, R. (2003). "Nine Ways to Reduce Cognitive Load in Multimedia Learning." *Educational Psychologist*, 38(1), 43–52. [Faculty Washington PDF](https://faculty.washington.edu/farkas/WDFR/MayerMoreno9WaysToReduceCognitiveLoad.pdf). **Strong** (replicated across many studies; the redundancy principle and split-attention effect are among the most robust findings in instructional design).
+- Mayer, R. E., & Moreno, R. (2003). "Nine Ways to Reduce Cognitive Load in Multimedia Learning." _Educational Psychologist_, 38(1), 43–52. [Faculty Washington PDF](https://faculty.washington.edu/farkas/WDFR/MayerMoreno9WaysToReduceCognitiveLoad.pdf). **Strong** (replicated across many studies; the redundancy principle and split-attention effect are among the most robust findings in instructional design).
 
 - International Dyslexia Association. "Building Phoneme Awareness: Know What Matters." [IDA link](https://dyslexiaida.org/building-phoneme-awareness-know-what-matters/). **Practitioner consensus** (strong alignment with structured literacy research; not a primary RCT).
 
 - Reading Rockets. "Phonological Awareness: Instructional and Assessment Guidelines." [Reading Rockets](https://www.readingrockets.org/topics/phonological-and-phonemic-awareness/articles/phonological-awareness-instructional-and). **Practitioner consensus** (synthesis of NRP and subsequent replication).
 
-- Kapur, M. (2014). "Productive failure in learning math." *Psychological Science*, 25(10), 1994–2002. [PubMed](https://pubmed.ncbi.nlm.nih.gov/24628487/). **Strong** (replicated RCT series; note: productive failure is most robustly studied at middle-school age, not age 8 specifically — applying to primary is an age-extrapolation).
+- Kapur, M. (2014). "Productive failure in learning math." _Psychological Science_, 25(10), 1994–2002. [PubMed](https://pubmed.ncbi.nlm.nih.gov/24628487/). **Strong** (replicated RCT series; note: productive failure is most robustly studied at middle-school age, not age 8 specifically — applying to primary is an age-extrapolation).
 
-- Gierl, M. J., Bulut, O., Guo, Q., & Zhang, X. (2017). "Developing, Analyzing, and Using Distractors for Multiple-Choice Tests in Education: A Comprehensive Review." *Review of Educational Research*. [Sage Journals](https://journals.sagepub.com/doi/10.3102/0034654317726529). **Strong** (systematic review; primary finding is assessment context, which differs from practice context — noted).
+- Gierl, M. J., Bulut, O., Guo, Q., & Zhang, X. (2017). "Developing, Analyzing, and Using Distractors for Multiple-Choice Tests in Education: A Comprehensive Review." _Review of Educational Research_. [Sage Journals](https://journals.sagepub.com/doi/10.3102/0034654317726529). **Strong** (systematic review; primary finding is assessment context, which differs from practice context — noted).
 
-- Pmc11803059. "Learning from errors and failure in educational contexts: New findings." *British Journal of Educational Psychology* (2025). [Wiley](https://bpspsychub.onlinelibrary.wiley.com/doi/10.1111/bjep.12716). **Moderate** (recent meta-analysis; age-specific effects for 8-year-olds are not isolated).
+- Pmc11803059. "Learning from errors and failure in educational contexts: New findings." _British Journal of Educational Psychology_ (2025). [Wiley](https://bpspsychub.onlinelibrary.wiley.com/doi/10.1111/bjep.12716). **Moderate** (recent meta-analysis; age-specific effects for 8-year-olds are not isolated).
 
-- ScienceDirect (2023). "Engineered highs: Reward variability and frequency as potential prerequisites of behavioural addiction." *Drug and Alcohol Dependence*. [ScienceDirect](https://www.sciencedirect.com/science/article/pii/S0306460323000217). **Moderate** (adult-focused; paediatric extrapolation supported by overjustification effect literature).
+- ScienceDirect (2023). "Engineered highs: Reward variability and frequency as potential prerequisites of behavioural addiction." _Drug and Alcohol Dependence_. [ScienceDirect](https://www.sciencedirect.com/science/article/pii/S0306460323000217). **Moderate** (adult-focused; paediatric extrapolation supported by overjustification effect literature).
 
-- Cambridge Core. "Working Memory Capacity and L2 Reading." *Studies in Second Language Acquisition*. [Cambridge Core](https://www.cambridge.org/core/journals/studies-in-second-language-acquisition/article/working-memory-capacity-and-l2-reading/B5B68CCC0DFE04EEE5E929F5499008B2). **Moderate** (adult L2 readers; application to an 8-year-old L2 learner is a plausible extrapolation, not a direct finding).
+- Cambridge Core. "Working Memory Capacity and L2 Reading." _Studies in Second Language Acquisition_. [Cambridge Core](https://www.cambridge.org/core/journals/studies-in-second-language-acquisition/article/working-memory-capacity-and-l2-reading/B5B68CCC0DFE04EEE5E929F5499008B2). **Moderate** (adult L2 readers; application to an 8-year-old L2 learner is a plausible extrapolation, not a direct finding).
 
-- Springer Nature (2016). "Visual working memory capacity increases between ages 3 and 8 years." *Attention, Perception, & Psychophysics*. [Springer](https://link.springer.com/article/10.3758/s13414-016-1140-5). **Moderate** (visual WM specifically; supports the ~3–4 item figure at age 8).
+- Springer Nature (2016). "Visual working memory capacity increases between ages 3 and 8 years." _Attention, Perception, & Psychophysics_. [Springer](https://link.springer.com/article/10.3758/s13414-016-1140-5). **Moderate** (visual WM specifically; supports the ~3–4 item figure at age 8).

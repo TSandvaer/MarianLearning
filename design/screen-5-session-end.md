@@ -37,13 +37,14 @@ The Path A `sessionAudio` cache is hot.
 
 Two state sources arrive with her:
 
-| Field           | Type   | Range          | Source                                          |
-| --------------- | ------ | -------------- | ----------------------------------------------- |
-| `totalCorrect`  | number | 0–8            | Math screen's per-session correct count         |
-| `totalStardust` | number | 0–11           | Math screen's per-session stardust earned       |
-| `finalStreak`   | number | 0–8            | Longest streak she hit during this session      |
+| Field           | Type   | Range | Source                                     |
+| --------------- | ------ | ----- | ------------------------------------------ |
+| `totalCorrect`  | number | 0–8   | Math screen's per-session correct count    |
+| `totalStardust` | number | 0–11  | Math screen's per-session stardust earned  |
+| `finalStreak`   | number | 0–8   | Longest streak she hit during this session |
 
 Notes on bounds:
+
 - `totalStardust` max of 11 = 8 (one per correct) + 3 (streak bonuses at 3/5/8). Per
   screen-3-math.md §"Stardust treatment".
 - `finalStreak` is the longest streak she reached at any point, not necessarily her final-three
@@ -92,16 +93,16 @@ Notes on bounds:
 
 **Vertical rhythm (top → bottom, portrait iPad ~1024pt tall):**
 
-| Band                   | Height       | Contents                                                       |
-| ---------------------- | ------------ | -------------------------------------------------------------- |
-| Safe-area top          | env inset    | —                                                              |
-| Background wash        | full         | `bg-twilight.svg` (or filtered `bg-clouds.svg` per Open Q #2)  |
-| Melody + ribbon        | ~38vh        | Melody centered horizontally, ribbon below her                 |
-| Session stardust       | ~14vh        | `★` glyph at 32pt + numeral at 64pt, centered                  |
-| Streak summary         | ~10vh        | Conditional band — fixed-height even if hidden, no reflow      |
-| Spacer                 | ~8vh         | Breathing room — non-negotiable                                |
-| CTA "All done!"        | ~12vh        | Single 88pt-tall × ~220pt-wide pill, centered                  |
-| Safe-area bottom       | env inset    | —                                                              |
+| Band             | Height    | Contents                                                      |
+| ---------------- | --------- | ------------------------------------------------------------- |
+| Safe-area top    | env inset | —                                                             |
+| Background wash  | full      | `bg-twilight.svg` (or filtered `bg-clouds.svg` per Open Q #2) |
+| Melody + ribbon  | ~38vh     | Melody centered horizontally, ribbon below her                |
+| Session stardust | ~14vh     | `★` glyph at 32pt + numeral at 64pt, centered                 |
+| Streak summary   | ~10vh     | Conditional band — fixed-height even if hidden, no reflow     |
+| Spacer           | ~8vh      | Breathing room — non-negotiable                               |
+| CTA "All done!"  | ~12vh     | Single 88pt-tall × ~220pt-wide pill, centered                 |
+| Safe-area bottom | env inset | —                                                             |
 
 **Thumb zone:** the "All done!" CTA sits in the bottom ~22% of the viewport, well within the
 global bottom-60% rule from CLAUDE.md. Single primary action; no secondary actions on this screen
@@ -128,12 +129,12 @@ TTS still does the work.**
 Lines play in order with ~400ms natural pauses, mirroring Greet's cadence. Caption ribbon
 mirrors word-by-word via Path A `onWordTick`.
 
-| t (s) | Line                       | Visible event                                            |
-| ----- | -------------------------- | -------------------------------------------------------- |
-| 0.0   | "You did it!"              | Melody arms-up celebrate; first stardust particles burst |
-| 1.4   | "You earned eleven stars!" | Stardust counter ticks up from 0 → `totalStardust`       |
-| 3.4   | _(if `finalStreak ≥ 3`)_ "Five in a row! Wow!" | Streak summary band fades in    |
-| 5.0   | "See you soon."            | CTA "All done!" appears                                  |
+| t (s) | Line                                           | Visible event                                            |
+| ----- | ---------------------------------------------- | -------------------------------------------------------- |
+| 0.0   | "You did it!"                                  | Melody arms-up celebrate; first stardust particles burst |
+| 1.4   | "You earned eleven stars!"                     | Stardust counter ticks up from 0 → `totalStardust`       |
+| 3.4   | _(if `finalStreak ≥ 3`)_ "Five in a row! Wow!" | Streak summary band fades in                             |
+| 5.0   | "See you soon."                                | CTA "All done!" appears                                  |
 
 **Word-count check (against 200-word cap):** `you, did, it, earned, eleven, stars, in, a, row, wow,
 see, soon, all, done` — 14 unique. All within cap. Numbers 0–11 are on the locked numeric allow-list
@@ -177,38 +178,38 @@ pitch, MP3 mono 24kHz ~48kbps.
 
 **Fixed lines (always pre-rendered, always shipped):**
 
-| `id`                    | Sample text                | When played                          | SSML rate | SSML pitch | Notes                                                                                                                  |
-| ----------------------- | -------------------------- | ------------------------------------ | --------- | ---------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `session.end.opener`    | "You did it!"              | Screen entry                         | `-10%`    | default    | Same text every session — but render per-session for cache locality (matches Math reprompt pattern, screen-3-math:285) |
-| `session.end.goodbye`   | "See you soon."            | After streak band (or after recap if no streak band) | `-10%` | default | Same text every session.                                                                                       |
+| `id`                  | Sample text     | When played                                          | SSML rate | SSML pitch | Notes                                                                                                                  |
+| --------------------- | --------------- | ---------------------------------------------------- | --------- | ---------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `session.end.opener`  | "You did it!"   | Screen entry                                         | `-10%`    | default    | Same text every session — but render per-session for cache locality (matches Math reprompt pattern, screen-3-math:285) |
+| `session.end.goodbye` | "See you soon." | After streak band (or after recap if no streak band) | `-10%`    | default    | Same text every session.                                                                                               |
 
 **Recap line — pre-rendered variants (12 total, one always dispatched):**
 
-| `id`                       | Sample text                | When played                  | SSML rate | SSML pitch | Notes                                          |
-| -------------------------- | -------------------------- | ---------------------------- | --------- | ---------- | ---------------------------------------------- |
-| `session.end.recap.0`      | _(not dispatched — silent)_ | n/a                          | `-10%`    | default    | Pre-rendered for bundle uniformity; never played |
-| `session.end.recap.1`      | "You earned one star!"     | After opener if stardust = 1 | `-10%`    | default    | Singular form                                  |
-| `session.end.recap.2`      | "You earned two stars!"    | After opener if stardust = 2 | `-10%`    | default    | Plural, etc.                                   |
-| `session.end.recap.3`      | "You earned three stars!"  | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.4`      | "You earned four stars!"   | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.5`      | "You earned five stars!"   | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.6`      | "You earned six stars!"    | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.7`      | "You earned seven stars!"  | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.8`      | "You earned eight stars!"  | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.9`      | "You earned nine stars!"   | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.10`     | "You earned ten stars!"    | …                            | `-10%`    | default    |                                                |
-| `session.end.recap.11`     | "You earned eleven stars!" | …                            | `-10%`    | default    |                                                |
+| `id`                   | Sample text                 | When played                  | SSML rate | SSML pitch | Notes                                            |
+| ---------------------- | --------------------------- | ---------------------------- | --------- | ---------- | ------------------------------------------------ |
+| `session.end.recap.0`  | _(not dispatched — silent)_ | n/a                          | `-10%`    | default    | Pre-rendered for bundle uniformity; never played |
+| `session.end.recap.1`  | "You earned one star!"      | After opener if stardust = 1 | `-10%`    | default    | Singular form                                    |
+| `session.end.recap.2`  | "You earned two stars!"     | After opener if stardust = 2 | `-10%`    | default    | Plural, etc.                                     |
+| `session.end.recap.3`  | "You earned three stars!"   | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.4`  | "You earned four stars!"    | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.5`  | "You earned five stars!"    | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.6`  | "You earned six stars!"     | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.7`  | "You earned seven stars!"   | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.8`  | "You earned eight stars!"   | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.9`  | "You earned nine stars!"    | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.10` | "You earned ten stars!"     | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.11` | "You earned eleven stars!"  | …                            | `-10%`    | default    |                                                  |
 
 **Streak line — pre-rendered variants (6 total, conditionally dispatched):**
 
-| `id`                       | Sample text             | When played                          | SSML rate | SSML pitch |
-| -------------------------- | ----------------------- | ------------------------------------ | --------- | ---------- |
-| `session.end.streak.3`     | "Three in a row! Wow!"  | If `finalStreak === 3`               | `-10%`    | default    |
-| `session.end.streak.4`     | "Four in a row! Wow!"   | If `finalStreak === 4`               | `-10%`    | default    |
-| `session.end.streak.5`     | "Five in a row! Wow!"   | If `finalStreak === 5`               | `-10%`    | default    |
-| `session.end.streak.6`     | "Six in a row! Wow!"    | If `finalStreak === 6`               | `-10%`    | default    |
-| `session.end.streak.7`     | "Seven in a row! Wow!"  | If `finalStreak === 7`               | `-10%`    | default    |
-| `session.end.streak.8`     | "Eight in a row! Wow!"  | If `finalStreak === 8`               | `-10%`    | default    |
+| `id`                   | Sample text            | When played            | SSML rate | SSML pitch |
+| ---------------------- | ---------------------- | ---------------------- | --------- | ---------- |
+| `session.end.streak.3` | "Three in a row! Wow!" | If `finalStreak === 3` | `-10%`    | default    |
+| `session.end.streak.4` | "Four in a row! Wow!"  | If `finalStreak === 4` | `-10%`    | default    |
+| `session.end.streak.5` | "Five in a row! Wow!"  | If `finalStreak === 5` | `-10%`    | default    |
+| `session.end.streak.6` | "Six in a row! Wow!"   | If `finalStreak === 6` | `-10%`    | default    |
+| `session.end.streak.7` | "Seven in a row! Wow!" | If `finalStreak === 7` | `-10%`    | default    |
+| `session.end.streak.8` | "Eight in a row! Wow!" | If `finalStreak === 8` | `-10%`    | default    |
 
 **Total Session-End audio per session:** 2 fixed + 12 recap variants + 6 streak variants = **20
 utterances**. At ~15 KB/utterance, that's ~300 KB inline base64. Combined with Math's ~600 KB
@@ -223,12 +224,12 @@ and zero new code paths. (Alternative strategies are the subject of Open Q #4.)
 
 **SFX (NOT pre-rendered via TTS — static MP3s on disk via Howler):**
 
-| `id`                 | File                 | When played                                  | Status                              |
-| -------------------- | -------------------- | -------------------------------------------- | ----------------------------------- |
-| `sfx.chime`          | `sfx-chime-soft.mp3` | "All done!" tap                              | Reused — already in Greet           |
-| `sfx.sparkle`        | `sfx-sparkle.mp3`    | Stardust burst on screen entry               | Reused from Math (screen-3-math:303)|
-| `sfx.stardust-grain` | `sfx-plink.mp3`      | Per-tick during stardust counter tick-up     | Reused from Math (screen-3-math:306)|
-| `sfx.cheer`          | `sfx-cheer.mp3`      | Soft "ta-da" chord under "You did it!"       | Not yet authored — flagged          |
+| `id`                 | File                 | When played                              | Status                               |
+| -------------------- | -------------------- | ---------------------------------------- | ------------------------------------ |
+| `sfx.chime`          | `sfx-chime-soft.mp3` | "All done!" tap                          | Reused — already in Greet            |
+| `sfx.sparkle`        | `sfx-sparkle.mp3`    | Stardust burst on screen entry           | Reused from Math (screen-3-math:303) |
+| `sfx.stardust-grain` | `sfx-plink.mp3`      | Per-tick during stardust counter tick-up | Reused from Math (screen-3-math:306) |
+| `sfx.cheer`          | `sfx-cheer.mp3`      | Soft "ta-da" chord under "You did it!"   | Not yet authored — flagged           |
 
 **Audio dispatch sequence on screen mount:**
 
@@ -277,11 +278,11 @@ empty, and the "All done!" CTA still appears at t=6200 via a fallback timer (see
 
 **Open question for Thomas (#1):** three options. Recommendation is **Option C**.
 
-| Option | Behaviour                                                       | Pro                                              | Con                                                   |
-| ------ | --------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
-| A      | Hard exit — programmatically close the PWA                      | Cleanest "session is over" semantic              | iOS PWAs cannot programmatically close themselves; would require Marian to swipe-up to home — same as doing nothing. **Not actually possible on the target device.** |
-| B      | Return to a hub/menu screen                                     | Future-proof for multi-tree (Math + Word Song)   | Hub screen does not exist yet — would balloon scope into a separate spec + impl ticket. v1 has no hub. |
-| C      | Show a static "Come back soon!" splash with sleeping Melody, no further actions. PWA stays open; Marian closes it via iPad gesture. | Minimal scope; reuses existing assets (`melody-sleepy` is already on the assets-todo list for Session-1 deferred work, see session-1.md:550); no new screens; quiet, predictable end | "Come back soon!" copy could read as soft FOMO if not careful — must phrase as warm closure, not as a hook. See sub-spec below. |
+| Option | Behaviour                                                                                                                           | Pro                                                                                                                                                                                  | Con                                                                                                                                                                  |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A      | Hard exit — programmatically close the PWA                                                                                          | Cleanest "session is over" semantic                                                                                                                                                  | iOS PWAs cannot programmatically close themselves; would require Marian to swipe-up to home — same as doing nothing. **Not actually possible on the target device.** |
+| B      | Return to a hub/menu screen                                                                                                         | Future-proof for multi-tree (Math + Word Song)                                                                                                                                       | Hub screen does not exist yet — would balloon scope into a separate spec + impl ticket. v1 has no hub.                                                               |
+| C      | Show a static "Come back soon!" splash with sleeping Melody, no further actions. PWA stays open; Marian closes it via iPad gesture. | Minimal scope; reuses existing assets (`melody-sleepy` is already on the assets-todo list for Session-1 deferred work, see session-1.md:550); no new screens; quiet, predictable end | "Come back soon!" copy could read as soft FOMO if not careful — must phrase as warm closure, not as a hook. See sub-spec below.                                      |
 
 **Recommended for v1: Option C — "Come back soon!" splash.**
 
@@ -547,20 +548,20 @@ anti-FOMO copy. Out of scope here.
 
 ## Motion
 
-| Element                  | Trigger                            | Spring / duration                                       | Reduce-Motion fallback                          |
-| ------------------------ | ---------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
-| Background cross-fade    | Math `onSessionComplete`           | 600ms `ease: "easeOut"`                                 | Same — fades are fine for Reduce Motion         |
-| Melody re-size + center  | Math `onSessionComplete`           | spring `{ stiffness: 180, damping: 20 }`, ~700ms         | Direct teleport (no spring); opacity fade only  |
-| Stardust burst (on entry) | Mount, t=0                         | 20 `sparkle-particle.svg`, spring `{ stiffness: 120, damping: 18 }`, fade over 1.2s | No drift — particles render static for 800ms then fade |
-| Speech ribbon scale-in   | First TTS `onPlay`                  | spring `{ stiffness: 260, damping: 20 }`, ~300ms        | Direct opacity fade-in over 200ms               |
-| Caption word reveal      | Path A `onWordTick`                | per-word opacity 0→1 over 100ms                          | Same — opacity reveals are fine                 |
-| Stardust counter tick-up | After opener, t=1400               | Numeric tween 0 → N over the recap utterance duration (~1.8s); per-tick `sfx.stardust-grain.play()` | Counter jumps to N instantly with one chime; no per-tick plinks (otherwise it sounds frantic) |
-| Counter pop on each tick | Per-tick                            | scale `1 → 1.05 → 1` over 150ms                          | No pop                                          |
-| Streak band fade-in      | After streak utterance starts      | opacity 0→1 + `y: 12 → 0` over 400ms                     | Opacity only, no y-shift                        |
-| Melody ear-wiggle (idle loop) | Settled state                  | sprite swap to `melody-happy` for 600ms every 4s         | No swap; static `melody-celebrating` pose       |
-| "All done!" CTA scale-in | After goodbye utterance            | spring `{ stiffness: 300, damping: 16 }`, ~400ms         | Opacity fade-in over 200ms                      |
-| "All done!" CTA tap      | Tap                                 | scale `1 → 0.95 → 1` over 200ms; chime SFX               | Same                                            |
-| Screen fade-out          | Post-tap                            | Opacity 1 → 0 over 300ms                                | Same                                            |
+| Element                       | Trigger                       | Spring / duration                                                                                   | Reduce-Motion fallback                                                                        |
+| ----------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Background cross-fade         | Math `onSessionComplete`      | 600ms `ease: "easeOut"`                                                                             | Same — fades are fine for Reduce Motion                                                       |
+| Melody re-size + center       | Math `onSessionComplete`      | spring `{ stiffness: 180, damping: 20 }`, ~700ms                                                    | Direct teleport (no spring); opacity fade only                                                |
+| Stardust burst (on entry)     | Mount, t=0                    | 20 `sparkle-particle.svg`, spring `{ stiffness: 120, damping: 18 }`, fade over 1.2s                 | No drift — particles render static for 800ms then fade                                        |
+| Speech ribbon scale-in        | First TTS `onPlay`            | spring `{ stiffness: 260, damping: 20 }`, ~300ms                                                    | Direct opacity fade-in over 200ms                                                             |
+| Caption word reveal           | Path A `onWordTick`           | per-word opacity 0→1 over 100ms                                                                     | Same — opacity reveals are fine                                                               |
+| Stardust counter tick-up      | After opener, t=1400          | Numeric tween 0 → N over the recap utterance duration (~1.8s); per-tick `sfx.stardust-grain.play()` | Counter jumps to N instantly with one chime; no per-tick plinks (otherwise it sounds frantic) |
+| Counter pop on each tick      | Per-tick                      | scale `1 → 1.05 → 1` over 150ms                                                                     | No pop                                                                                        |
+| Streak band fade-in           | After streak utterance starts | opacity 0→1 + `y: 12 → 0` over 400ms                                                                | Opacity only, no y-shift                                                                      |
+| Melody ear-wiggle (idle loop) | Settled state                 | sprite swap to `melody-happy` for 600ms every 4s                                                    | No swap; static `melody-celebrating` pose                                                     |
+| "All done!" CTA scale-in      | After goodbye utterance       | spring `{ stiffness: 300, damping: 16 }`, ~400ms                                                    | Opacity fade-in over 200ms                                                                    |
+| "All done!" CTA tap           | Tap                           | scale `1 → 0.95 → 1` over 200ms; chime SFX                                                          | Same                                                                                          |
+| Screen fade-out               | Post-tap                      | Opacity 1 → 0 over 300ms                                                                            | Same                                                                                          |
 
 **Reduce-Motion handling:** copy `usePrefersReducedMotion` from `Greet.tsx` (or use the shared
 hook if Devon factors it out per screen-3-math.md:561). Same global `MotionConfig
@@ -568,11 +569,13 @@ reducedMotion="user"` covers infinite loops; the per-element fallbacks above are
 absences spec'd here.
 
 **No infinite loops EXCEPT:**
+
 - Melody ear-wiggle every 4s — this is a calm idle loop, not a hype loop. Disabled with Reduce
   Motion.
 - No background drift (twilight bg is static — different from Session-1's cloud drift).
 
 **Performance sanity:**
+
 - 20 sparkle particles in AnimatePresence simultaneously animating on entry. Single moment, then
   they unmount. Fine.
 - Counter tick-up: a single numeric state with per-tick re-render. 11 ticks over 1.8s = ~6
@@ -586,28 +589,28 @@ absences spec'd here.
 
 Already in repo (no new authoring required for this spec):
 
-| Asset                       | Used for                                             | Size       |
-| --------------------------- | ---------------------------------------------------- | ---------- |
-| `sparkle-particle.svg`      | Stardust burst on entry                              | <1 KB ✅   |
-| `star-filled.svg`           | Session-stardust counter glyph                       | <2 KB ✅   |
-| `sfx-chime-soft.mp3`        | "All done!" tap                                      | ~8 KB ✅   |
+| Asset                  | Used for                       | Size     |
+| ---------------------- | ------------------------------ | -------- |
+| `sparkle-particle.svg` | Stardust burst on entry        | <1 KB ✅ |
+| `star-filled.svg`      | Session-stardust counter glyph | <2 KB ✅ |
+| `sfx-chime-soft.mp3`   | "All done!" tap                | ~8 KB ✅ |
 
 Already on `assets-todo.md` follow-up list (shared with Math screen — no new request from this
 spec):
 
-| Asset                       | Used for                                             | Status                              |
-| --------------------------- | ---------------------------------------------------- | ----------------------------------- |
-| `bg-twilight.svg`           | Session-End background wash                          | On assets-todo (Session-1 deferred); see Open Q #2 about merging with `bg-clouds.svg` |
-| `sfx-sparkle.mp3`           | Stardust burst SFX (reused from Math)                | On assets-todo (Math)               |
-| `sfx-plink.mp3`             | Stardust counter per-tick (reused from Math)         | On assets-todo (Math)               |
-| `melody-sleepy.svg`         | Sleep splash (post-"All done!" state)                | On assets-todo (Session-1 deferred); **load-bearing for Option C** |
+| Asset               | Used for                                     | Status                                                                                |
+| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `bg-twilight.svg`   | Session-End background wash                  | On assets-todo (Session-1 deferred); see Open Q #2 about merging with `bg-clouds.svg` |
+| `sfx-sparkle.mp3`   | Stardust burst SFX (reused from Math)        | On assets-todo (Math)                                                                 |
+| `sfx-plink.mp3`     | Stardust counter per-tick (reused from Math) | On assets-todo (Math)                                                                 |
+| `melody-sleepy.svg` | Sleep splash (post-"All done!" state)        | On assets-todo (Session-1 deferred); **load-bearing for Option C**                    |
 
 **NEW asset gaps surfaced by this spec (flag to Thomas via Matt for art queue):**
 
-| Asset                       | Used for                                             | Target size | Notes                                    |
-| --------------------------- | ---------------------------------------------------- | ----------- | ---------------------------------------- |
-| `melody-celebrating.svg`    | Melody centered pose for Session-End opener          | 6–8 KB      | Arms up, ears wiggling, big smile. Distinct from `melody-happy.svg` (which is the ear-wiggle/correct-answer pose) — celebrating is the bigger, more "I'm proud of you" pose. **NEW — flag to Thomas.** |
-| `sfx-cheer.mp3`             | Soft "ta-da" chord under "You did it!" opener        | ~12 KB      | Gentle, not a game-show fanfare. Same constraint as Session-1 spec line 558. **NEW — flag to Thomas (Session-1 already requested it under the same name, but it's not yet on `assets-todo.md` per my read; confirm).** |
+| Asset                    | Used for                                      | Target size | Notes                                                                                                                                                                                                                  |
+| ------------------------ | --------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `melody-celebrating.svg` | Melody centered pose for Session-End opener   | 6–8 KB      | Arms up, ears wiggling, big smile. Distinct from `melody-happy.svg` (which is the ear-wiggle/correct-answer pose) — celebrating is the bigger, more "I'm proud of you" pose. **NEW — flag to Thomas.**                 |
+| `sfx-cheer.mp3`          | Soft "ta-da" chord under "You did it!" opener | ~12 KB      | Gentle, not a game-show fanfare. Same constraint as Session-1 spec line 558. **NEW — flag to Thomas (Session-1 already requested it under the same name, but it's not yet on `assets-todo.md` per my read; confirm).** |
 
 **Why not reuse `melody-happy.svg` for the celebrate pose:** `melody-happy` is the per-correct-
 answer ear-wiggle pose (small, in-place reaction). Session-End's pose is a sustained celebration
@@ -731,9 +734,9 @@ src/screens/SessionEnd/
 ```typescript
 // In src/screens/Math/Math.tsx (already specified at screen-3-math.md:411):
 type SessionCompletePayload = {
-  totalCorrect: number   // 0-8
-  totalStardust: number  // 0-11
-  finalStreak: number    // 0-8 (longest streak reached this session, not necessarily current)
+  totalCorrect: number // 0-8
+  totalStardust: number // 0-11
+  finalStreak: number // 0-8 (longest streak reached this session, not necessarily current)
 }
 
 type MathProps = {
@@ -752,17 +755,23 @@ unmount + SessionEnd's mount (with shared bg cross-fade time).
 export type SessionHistoryV1 = {
   schemaVersion: 1
   sessionCount: number
-  lastSessionCompletedAt: string  // ISO string; '' sentinel when sessionCount === 0
+  lastSessionCompletedAt: string // ISO string; '' sentinel when sessionCount === 0
   longestStreakEver: number
   cumulativeStardust: number
 }
 
-export function readSessionHistory(): SessionHistoryV1 { /* with try/catch + default */ }
-export function writeSessionHistory(next: SessionHistoryV1): void { /* with try/catch */ }
+export function readSessionHistory(): SessionHistoryV1 {
+  /* with try/catch + default */
+}
+export function writeSessionHistory(next: SessionHistoryV1): void {
+  /* with try/catch */
+}
 export function recordSessionEnd(
   finalStreak: number,
   cumulativeStardust: number,
-): SessionHistoryV1 { /* read → compute next → write → return next */ }
+): SessionHistoryV1 {
+  /* read → compute next → write → return next */
+}
 ```
 
 Pure functions, fully unit-testable. Test cases for: first-ever session (default → record),
