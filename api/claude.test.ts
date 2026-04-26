@@ -12,8 +12,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock _session BEFORE importing the handler so the handler picks up the
-// stubbed renderSessionAudio.
-vi.mock('./_session', () => {
+// stubbed renderSessionAudio. NB: the mock specifier MUST match the source
+// import specifier exactly — handler imports `./_session.js`, so the mock
+// is keyed on `./_session.js` too. See HISTORY in api/claude.ts (round 3).
+vi.mock('./_session.js', () => {
   return {
     renderSessionAudio: vi.fn(),
     MELODY_VOICE_CONFIG: {
@@ -26,8 +28,8 @@ vi.mock('./_session', () => {
   }
 })
 
-import claudeEntrypoint, { handler, assertNodeRuntime } from './claude'
-import { renderSessionAudio } from './_session'
+import claudeEntrypoint, { handler, assertNodeRuntime } from './claude.js'
+import { renderSessionAudio } from './_session.js'
 
 const mockedRender = vi.mocked(renderSessionAudio)
 

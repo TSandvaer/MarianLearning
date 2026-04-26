@@ -14,27 +14,40 @@
 //    `export const config = { runtime: 'nodejs' }` export. PR #32 merged
 //    but production still 500'd FUNCTION_INVOCATION_FAILED on every
 //    request — the round-1 hypothesis (runtime config shape) was wrong.
-//  - 86c9grnj4 (P1 hot-fix, round 2 — THIS CHANGE) fixes the actual root
-//    cause: the function's default export was a bare async function with
-//    a Web `Request` parameter, but `@vercel/node` only routes the Web
-//    `Request`/`Response` codepath when the entrypoint exports a
-//    per-method handler (GET/POST/...) OR an object with a `fetch`
-//    method. Without those, Vercel takes the legacy fallback and invokes
-//    the default function as `(req: IncomingMessage, res: ServerResponse)`.
-//    The first line of our handler — `request.headers.get('origin')` —
-//    then throws TypeError because Node's `IncomingMessage.headers` is a
-//    plain object, not a `Headers` instance. The throw propagates out as
-//    FUNCTION_INVOCATION_FAILED on every method, including OPTIONS.
+//  - 86c9grnj4 (P1 hot-fix, round 2) switched the default export from a
+//    bare async function to `{ fetch: handler }` so `@vercel/node` would
+//    route the Web `Request`/`Response` codepath instead of the legacy
+//    `(IncomingMessage, ServerResponse)` fallback. Reading of the upstream
+//    `shouldUseWebHandlers` dispatch logic
+//    (https://github.com/vercel/vercel/blob/main/packages/node/src/serverless-functions/serverless-handler.mts)
+//    confirmed the dispatch shape was correct. PR #34 merged but production
+//    still 500'd — the dispatch shape was a real future-proofing fix but
+//    not the actual root cause of the cold-start failure.
+//  - 86c9grnj4 (P1 hot-fix, round 3 — THIS CHANGE) fixes the ACTUAL root
+//    cause, identified empirically by reading Vercel function logs
+//    (`vercel logs --status-code 500 --json --no-follow`) instead of by
+//    further source-spelunking. The cold-start error reported by Node is
+//    unambiguous:
+//        Error [ERR_MODULE_NOT_FOUND]: Cannot find module
+//        '/var/task/api/_types' imported from /var/task/api/claude.js
+//    The function never reached the handler — it failed at module-load
+//    when Node's ESM resolver tried to resolve the bare specifier
+//    `'./_types'` from the compiled `claude.js`. With `"type": "module"`
+//    in package.json, Vercel's `@vercel/node` builder emits ESM, and
+//    Node ESM strict-resolution requires explicit file extensions on
+//    relative imports — extension-less specifiers do NOT resolve. Source
+//    code under `tsconfig.api.json`'s `moduleResolution: "bundler"` was
+//    happy to write `'./_types'`, but the deployed runtime is not.
 //
-//    Source of truth for the dispatch logic:
-//    https://github.com/vercel/vercel/blob/main/packages/node/src/serverless-functions/serverless-handler.mts
-//    (look for `shouldUseWebHandlers` — it's the OR of `isMiddleware`,
-//    any HTTP_METHODS export, or `typeof listener.fetch === 'function'`).
-//
-//    Fix: change the default export from a bare function to
-//    `{ fetch: handler }`. The `handler` symbol is still named-exported
-//    so tests (and future callers) can import it directly without going
-//    through `default.fetch`.
+//    Fix: add `.js` to every relative import inside api/. TypeScript with
+//    `moduleResolution: "bundler"` accepts the `.js` suffix and resolves
+//    it back to the matching `.ts` source for type-checking. Vitest
+//    (Vite-bundler resolution) accepts it too. So a single canonical
+//    spelling — `'./_types.js'` — works in dev, test, and production.
+//    Round 1 + round 2 changes are kept as defensive measures even
+//    though neither was the root cause: the no-config-export silence is
+//    the upstream-recommended shape, and `{ fetch: handler }` is the
+//    correct dispatch hint going forward.
 //
 // ABSOLUTE RULE: ANTHROPIC_API_KEY is read here only. It must never reach
 // the browser bundle. Do not echo, log, or include it in any response.
@@ -55,8 +68,8 @@ import {
   type ClaudeErrorResponse,
   type ClaudeStubResponse,
   type SessionStartResponse,
-} from './_types'
-import { renderSessionAudio } from './_session'
+} from './_types.js'
+import { renderSessionAudio } from './_session.js'
 
 /**
  * Cold-start runtime assertion. Throws at module load if the function is

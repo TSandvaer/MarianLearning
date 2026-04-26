@@ -18,13 +18,18 @@
 // the prompt lands, `extractUtteranceTexts` is the single point that
 // changes.
 
+// NOTE on `.js` extensions: this file is compiled to ESM and shipped to the
+// Vercel Node runtime, where ESM strict-resolution requires explicit file
+// extensions on relative imports. See HISTORY in api/claude.ts (round 3).
+// Vitest tolerates the bare specifier locally because it uses Vite's
+// bundler-resolution; the `.js` suffix breaks neither environment.
 import {
   synthesizeUtterance,
   uint8ToBase64,
   type SynthesizeOptions,
   type TtsRequest,
-} from './_tts'
-import type { SessionStartResponse, Utterance } from './_types'
+} from './_tts.js'
+import type { SessionStartResponse, Utterance } from './_types.js'
 
 /** Voice config used app-wide. Matches PR #25's Plan B Greet voice. */
 export const MELODY_VOICE_CONFIG: Pick<

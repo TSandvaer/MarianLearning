@@ -6,8 +6,8 @@ import {
   extractUtteranceTexts,
   MELODY_VOICE_CONFIG,
   renderSessionAudio,
-} from './_session'
-import type { TtsRequest } from './_tts'
+} from './_session.js'
+import type { TtsRequest } from './_tts.js'
 
 describe('extractUtteranceTexts', () => {
   it('returns [] for non-object plans', () => {
