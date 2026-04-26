@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AnimatePresence,
   LazyMotion,
@@ -7,12 +7,14 @@ import {
 } from 'motion/react'
 import Splash from './screens/Splash'
 import Greet from './screens/Greet'
-import Math from './screens/Math'
+import Math, { pickStaticSessionPlan } from './screens/Math'
+import type { MathSessionPlan, PlayMathUtteranceFn } from './screens/Math'
 import {
   DebugOverlay,
   activateAudioContextProbe,
   isDebugEnabled,
 } from './lib/debug'
+import { prepareMathPathA } from './lib/audio/mathPathA'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
 
@@ -56,13 +58,79 @@ export default function App() {
     // Deliberate: no cleanup. See above for rationale.
   }, [debugOn])
 
+  // ── Math screen — Path A live audio wiring (ticket 86c9gumgk item F) ──
+  //
+  // Pick the math plan ONCE per app session — shared between the fetch
+  // below and the <Math> prop, so the screen's `useMemo([])` plan capture
+  // matches the plan we asked the server to render. Picked even when the
+  // user never reaches Math; the cost is a single deterministic function
+  // call against `Date.now()`.
+  const mathPlan = useMemo<MathSessionPlan>(() => pickStaticSessionPlan(), [])
+
+  // The live `playUtterance` becomes non-null once the /api/claude fetch
+  // resolves and the audio is loaded. Until then (or on any failure),
+  // <Math> renders without the prop and falls back to its silent-but-
+  // captioned default (165 wpm). No error chime, no nag copy — Marian
+  // sees text. See `lib/audio/mathPathA.ts` for the full failure-mode
+  // surface and the wire-shape adapter rationale.
+  const [mathPlay, setMathPlay] = useState<PlayMathUtteranceFn | null>(null)
+  const mathUnloadRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    if (route !== 'math') return
+
+    const controller = new AbortController()
+    let cancelled = false
+
+    void prepareMathPathA(mathPlan, mathPlan.id, { signal: controller.signal })
+      .then((prepared) => {
+        if (cancelled) {
+          prepared.unload()
+          return
+        }
+        mathUnloadRef.current = prepared.unload
+        // Wrap in a thunk so React doesn't call the function before storing
+        // it (useState treats function arg as a lazy initializer).
+        setMathPlay(() => prepared.playUtterance)
+      })
+      .catch((err: unknown) => {
+        // Soft-fail: keep playUtterance null, Math falls back to silent
+        // default. Log so the QA pass can attribute the fallback if it
+        // bites a captured iPad session.
+        if (!cancelled) {
+          console.warn(
+            '[App] Math Path A unavailable; using silent fallback:',
+            err,
+          )
+        }
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+      // Tear down any howls registered while we were on Math, so a future
+      // re-entry rebuilds cleanly. Idempotent if no fetch ever resolved.
+      if (mathUnloadRef.current) {
+        mathUnloadRef.current()
+        mathUnloadRef.current = null
+      }
+      setMathPlay(null)
+    }
+  }, [route, mathPlan])
+
   return (
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
         <AnimatePresence mode="wait">
           {route === 'splash' && <Splash key="splash" onAdvance={goGreet} />}
           {route === 'greet' && <Greet key="greet" onAdvance={goMath} />}
-          {route === 'math' && <Math key="math" />}
+          {route === 'math' && (
+            <Math
+              key="math"
+              plan={mathPlan}
+              playUtterance={mathPlay ?? undefined}
+            />
+          )}
         </AnimatePresence>
         {/* Debug overlay sits outside AnimatePresence so it persists across
             screen transitions. Gated on `?debug=1` so it never ships visibly

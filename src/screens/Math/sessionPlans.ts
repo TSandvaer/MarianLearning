@@ -6,15 +6,43 @@
  * Per CLAUDE.md, the production architecture is "Claude is the brain, not
  * the mouth": the session-start Claude call returns a JSON plan + the
  * inline TTS bundle for it. That pipeline is real (`api/claude.ts` +
- * `api/_tts.ts` post-86c9gr385) BUT requires `ANTHROPIC_API_KEY` in Vercel
- * env, which is still owed (see project memory `reference_deploy.md`).
+ * `api/_tts.ts` post-86c9gr385) and `ANTHROPIC_API_KEY` is now in Vercel
+ * env (production + preview + development).
  *
- * Until the key lands, we ship 2-3 deterministic plans here so the Math
- * screen can be developed and QA-tested end-to-end without any network
- * dependency. When the key is configured and Path A is wired into Math's
- * mount, the orchestrator will replace `pickStaticSessionPlan()` with a
- * fetch — the {@link MathSessionPlan} shape is the contract that survives
- * the swap, so consumers don't change.
+ * We still ship 2-3 deterministic plans here so the Math screen can be
+ * developed and QA-tested end-to-end without any network dependency, and
+ * so the Path A wiring layer (App.tsx) has a stable input plan to feed
+ * the server's TTS pipeline. When real Claude prompt wiring lands, the
+ * orchestrator will replace `pickStaticSessionPlan()` with a fetch — the
+ * {@link MathSessionPlan} shape is the contract that survives the swap,
+ * so consumers (the `Math` screen) don't change.
+ *
+ * Wire shape & adapter
+ * --------------------
+ * The on-the-wire shape that `/api/claude` (kind=`session-start`) consumes
+ * and returns is FLAT — the `plan` blob is opaque to the server except for
+ * a top-level `utterances: { id, text }[]` field, walked by
+ * `api/_session.ts:extractUtteranceTexts`. The browser receives back
+ * `Utterance[]` (id, text, audio.base64) — see `api/_types.ts`.
+ *
+ * `MathSessionPlan` (this file) keeps the per-problem nested shape
+ * (`problems[].utterances.{read,correct,reprompt,hint,giveAnswer}`)
+ * because every consumer in `Math.tsx` reads utterance lines by slot name
+ * inside the gesture-driven state machine. Translating between the two
+ * shapes is the job of {@link mathSessionPlanToUtteranceSources} (flatten
+ * to wire) and {@link mathSessionPlanFromWire} (rehydrate from wire). The
+ * id template is {@link mathUtteranceId}.
+ *
+ * Why an adapter and not a shape change
+ * - Math.tsx pervasively reads `problem.utterances.read` etc. Flattening
+ *   the shape means re-keying every callsite by `math.p{N}.read`-style
+ *   ids; high churn for a screen that's already QA'd.
+ * - Server-side `extractUtteranceTexts` is unchanged: we POST the wire
+ *   shape, server walks the flat array, browser merges the returned
+ *   audio back into the nested shape via App.tsx's wiring layer.
+ * - Single source of truth lives in `api/_types.ts` (`Utterance`, the
+ *   inline-base64 contract) and `design/screen-3-math.md`
+ *   (`math.p{N}.{slot}` id template).
  *
  * Plan choice
  * -----------
@@ -38,16 +66,65 @@
  *
  * Audio
  * -----
- * Each plan ships a list of pre-canned utterance lines. The shape mirrors
- * `Utterance` from `api/_types.ts` so when Path A lands, the swap is
- * mechanical. While hardcoded, `audio.base64` is empty — the production
- * `sessionAudio.playSessionUtterance` path would fail to play these as
- * MP3s, so for v1 the Math component receives a `playUtterance` test seam
- * (defaulting to a function that just resolves immediately and reveals
- * the caption text). When the Anthropic key is configured, the plan
- * factory swaps to a real fetch and the screen receives genuine MP3s
- * without any other change.
+ * Each plan defines the lines per problem. The audio bytes live OUT of the
+ * plan — App.tsx fetches them from `/api/claude` at session-start by
+ * flattening the plan via {@link mathSessionPlanToUtteranceSources}, and
+ * binds the returned `Utterance[]` to Math via the `playUtterance` prop.
+ * When that prop is omitted (no key, fetch failure, tests) Math falls back
+ * to its silent-but-captioned `defaultPlayUtterance` at 165 wpm.
  */
+
+import type { Utterance } from '../../../api/_types'
+
+/**
+ * Wire-shape source row — `{ id, text }` per utterance, no audio. Used as
+ * the request payload's `plan.utterances` array (server reads this via
+ * `api/_session.ts:extractUtteranceTexts`) and as the input to
+ * {@link mathSessionPlanFromWire}. Mirrors `UtteranceSource` in
+ * `api/_session.ts`; declared locally to keep the frontend's type
+ * dependency surface narrow (frontend already imports `Utterance` from
+ * `api/_types.ts`; pulling another type from `api/_session.ts` would
+ * widen the api/ public surface for no benefit).
+ */
+export interface MathUtteranceSource {
+  id: string
+  text: string
+}
+
+/** Slot names matching the per-problem utterance set. */
+export type MathUtteranceSlot =
+  | 'read'
+  | 'correct'
+  | 'reprompt'
+  | 'hint'
+  | 'giveAnswer'
+
+/**
+ * Build the canonical utterance id for a problem + slot.
+ *
+ * Spec source of truth: `design/screen-3-math.md` §"Audio integration
+ * contract (Path A)". The pattern `math.p{N}.{slot}` is what the design
+ * spec mandates and what the server's pipeline expects to see in the
+ * wire-shape `plan.utterances` array.
+ *
+ * @param problemIndex 1-based problem index (matches `MathProblem.index`).
+ * @param slot the per-problem utterance slot.
+ */
+export function mathUtteranceId(
+  problemIndex: number,
+  slot: MathUtteranceSlot,
+): string {
+  return `math.p${problemIndex}.${slot}`
+}
+
+/** Slots emitted in canonical render order — matches the spec's bundle layout. */
+const ALL_SLOTS: readonly MathUtteranceSlot[] = [
+  'read',
+  'correct',
+  'reprompt',
+  'hint',
+  'giveAnswer',
+]
 
 /** Per-problem audio set. Lines map 1:1 to Kyle's spec §Audio integration. */
 export interface MathProblemUtterances {
@@ -196,8 +273,9 @@ export const STATIC_SESSION_PLANS: readonly MathSessionPlan[] = [
  * started in the same minute see the same plan; consecutive minutes
  * advance one slot. Tests pass `now` to pin the choice.
  *
- * When the Anthropic key lands, this function gets replaced (or wrapped)
- * with a fetch to `/api/claude` kind=`session-start`.
+ * When real Claude prompt wiring lands, this function gets replaced (or
+ * wrapped) with a fetch to `/api/claude` kind=`session-start`. The
+ * adapter functions below survive that swap unchanged.
  */
 export function pickStaticSessionPlan(
   now: () => Date = () => new Date(),
@@ -207,4 +285,98 @@ export function pickStaticSessionPlan(
     ((minute % STATIC_SESSION_PLANS.length) + STATIC_SESSION_PLANS.length) %
     STATIC_SESSION_PLANS.length
   return STATIC_SESSION_PLANS[idx]
+}
+
+// ── Wire-shape adapters ──────────────────────────────────────────────────
+//
+// These translate between `MathSessionPlan` (this file's nested shape) and
+// the on-the-wire shape that `/api/claude` consumes (request) and returns
+// (response). See the file header `Wire shape & adapter` block for the
+// rationale on why this is an adapter rather than a shape change.
+
+/**
+ * Flatten a MathSessionPlan into the wire-shape utterance list — one entry
+ * per problem × slot, in canonical (problem-major, slot-order) order.
+ *
+ * The output is shaped to drop directly into the `plan.utterances` field
+ * the server walks via `api/_session.ts:extractUtteranceTexts`. App.tsx's
+ * Path A wiring layer POSTs `{ kind: 'session-start', payload: { plan: {
+ * utterances: mathSessionPlanToUtteranceSources(plan) } } }` to render the
+ * audio bundle.
+ *
+ * Order is stable: problem 1 read/correct/reprompt/hint/giveAnswer, then
+ * problem 2's, etc. Server preserves order in its response (per
+ * `_session.test.ts:'preserves utterance order even with parallel
+ * rendering'`), which makes round-tripping through
+ * {@link mathSessionPlanFromWire} deterministic.
+ */
+export function mathSessionPlanToUtteranceSources(
+  plan: MathSessionPlan,
+): MathUtteranceSource[] {
+  const out: MathUtteranceSource[] = []
+  for (const problem of plan.problems) {
+    for (const slot of ALL_SLOTS) {
+      out.push({
+        id: mathUtteranceId(problem.index, slot),
+        text: problem.utterances[slot],
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * Rehydrate a MathSessionPlan from its plan skeleton + the server's
+ * returned `Utterance[]` (which carries the rendered audio). The plan
+ * skeleton supplies the math (addends, ordering); the utterances supply
+ * the text + audio bytes for each slot.
+ *
+ * Used by App.tsx's Path A wiring after a successful `/api/claude` call
+ * to confirm that the server returned every expected utterance id. The
+ * actual `playUtterance` binding doesn't need this — Math reads text from
+ * the plan and the wiring layer maps text → Howl directly — but we keep
+ * this adapter for round-trip tests and for any future consumer that
+ * needs ID-keyed access to the rehydrated plan.
+ *
+ * Rules
+ * - Every problem × slot combination MUST be present in `utterances`,
+ *   matched by id. A missing id throws — better to crash loudly than to
+ *   silently substitute the wrong text.
+ * - Text from the wire wins over the plan skeleton's original text. The
+ *   server is the source of truth for what was actually synthesized; if
+ *   it diverges from our skeleton (e.g. SSML normalization tweak), the
+ *   captions need to mirror the audio, not the skeleton.
+ *
+ * @throws {Error} if any expected utterance id is missing from `utterances`.
+ */
+export function mathSessionPlanFromWire(
+  skeleton: MathSessionPlan,
+  utterances: readonly Utterance[],
+): MathSessionPlan {
+  const byId = new Map<string, Utterance>()
+  for (const u of utterances) byId.set(u.id, u)
+
+  const rebuiltProblems: MathProblem[] = skeleton.problems.map((problem) => {
+    const slotTexts: Partial<MathProblemUtterances> = {}
+    for (const slot of ALL_SLOTS) {
+      const id = mathUtteranceId(problem.index, slot)
+      const u = byId.get(id)
+      if (!u) {
+        throw new Error(
+          `[sessionPlans] mathSessionPlanFromWire: missing utterance "${id}" — ` +
+            'wire response is incomplete; cannot rehydrate plan.',
+        )
+      }
+      slotTexts[slot] = u.text
+    }
+    return {
+      ...problem,
+      utterances: slotTexts as MathProblemUtterances,
+    }
+  })
+
+  return {
+    ...skeleton,
+    problems: rebuiltProblems,
+  }
 }

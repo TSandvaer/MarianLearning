@@ -10,5 +10,17 @@ export type {
   PlayMathUtteranceOptions,
 } from './Math'
 export { STREAK_BONUS_THRESHOLDS } from './constants'
-export type { MathProblem, MathSessionPlan } from './sessionPlans'
-export { STATIC_SESSION_PLANS, pickStaticSessionPlan } from './sessionPlans'
+export type {
+  MathProblem,
+  MathProblemUtterances,
+  MathSessionPlan,
+  MathUtteranceSlot,
+  MathUtteranceSource,
+} from './sessionPlans'
+export {
+  STATIC_SESSION_PLANS,
+  mathSessionPlanFromWire,
+  mathSessionPlanToUtteranceSources,
+  mathUtteranceId,
+  pickStaticSessionPlan,
+} from './sessionPlans'
