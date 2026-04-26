@@ -9,14 +9,47 @@ import Splash from './screens/Splash'
 import Greet from './screens/Greet'
 import Math, { pickStaticSessionPlan } from './screens/Math'
 import type { MathSessionPlan, PlayMathUtteranceFn } from './screens/Math'
+import WordSong, { pickStaticWordSongPlan } from './screens/WordSong'
+import type {
+  PlayWordSongUtteranceFn,
+  WordSongSessionPlan,
+} from './screens/WordSong'
 import {
   DebugOverlay,
   activateAudioContextProbe,
   isDebugEnabled,
 } from './lib/debug'
 import { prepareMathPathA } from './lib/audio/mathPathA'
+import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
+
+/**
+ * Optional initial-route override via `?route=literacy` etc. Used for
+ * QA-direct-launch into the Word Song surface (or any future screen)
+ * before the orchestrator's session-sequencer wires the auto-handoff
+ * from Math → Word Song. Falls back to FIRST_ROUTE on missing /
+ * unrecognised values.
+ */
+function getInitialRoute(): Route {
+  if (typeof window === 'undefined') return FIRST_ROUTE
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const v = params.get('route')
+    if (
+      v === 'splash' ||
+      v === 'greet' ||
+      v === 'math' ||
+      v === 'literacy' ||
+      v === 'reward'
+    ) {
+      return v
+    }
+  } catch {
+    // URLSearchParams should not throw on a string, but be defensive.
+  }
+  return FIRST_ROUTE
+}
 
 /**
  * App shell.
@@ -33,10 +66,16 @@ import { FIRST_ROUTE } from './router/route'
  * markup — no per-screen branching for the a11y path.
  */
 export default function App() {
-  const [route, setRoute] = useState<Route>(FIRST_ROUTE)
+  const [route, setRoute] = useState<Route>(() => getInitialRoute())
 
   const goGreet = useCallback(() => setRoute('greet'), [])
   const goMath = useCallback(() => setRoute('math'), [])
+  // No `goLiteracy` callback wired today — the Math→Word Song handoff
+  // contract belongs to the Session-end ticket 86c9grnjd which
+  // generalises the post-problem-8 transition. The literacy route is
+  // reachable directly via `?route=literacy` (see `getInitialRoute`)
+  // for QA, and the orchestrator's session-sequencer ticket will wire
+  // the auto-handoff when it lands.
 
   // Capture once on mount — flipping debug mid-session would tear the
   // overlay in/out and isn't worth the complexity. To enable, append
@@ -118,6 +157,57 @@ export default function App() {
     }
   }, [route, mathPlan])
 
+  // ── Word Song screen — Path A live audio wiring ──
+  //
+  // Mirrors Math's wiring above. Picked once per app session; the fetch
+  // fires lazily when the user actually navigates to the literacy
+  // surface. On any failure, <WordSong> renders without the prop and
+  // falls back to its silent-but-captioned default. No nag copy.
+  const wordSongPlan = useMemo<WordSongSessionPlan>(
+    () => pickStaticWordSongPlan(),
+    [],
+  )
+  const [wordSongPlay, setWordSongPlay] =
+    useState<PlayWordSongUtteranceFn | null>(null)
+  const wordSongUnloadRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    if (route !== 'literacy') return
+
+    const controller = new AbortController()
+    let cancelled = false
+
+    void prepareWordSongPathA(wordSongPlan, wordSongPlan.id, {
+      signal: controller.signal,
+    })
+      .then((prepared) => {
+        if (cancelled) {
+          prepared.unload()
+          return
+        }
+        wordSongUnloadRef.current = prepared.unload
+        setWordSongPlay(() => prepared.playUtterance)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          console.warn(
+            '[App] Word Song Path A unavailable; using silent fallback:',
+            err,
+          )
+        }
+      })
+
+    return () => {
+      cancelled = true
+      controller.abort()
+      if (wordSongUnloadRef.current) {
+        wordSongUnloadRef.current()
+        wordSongUnloadRef.current = null
+      }
+      setWordSongPlay(null)
+    }
+  }, [route, wordSongPlan])
+
   return (
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
@@ -129,6 +219,13 @@ export default function App() {
               key="math"
               plan={mathPlan}
               playUtterance={mathPlay ?? undefined}
+            />
+          )}
+          {route === 'literacy' && (
+            <WordSong
+              key="literacy"
+              plan={wordSongPlan}
+              playUtterance={wordSongPlay ?? undefined}
             />
           )}
         </AnimatePresence>
