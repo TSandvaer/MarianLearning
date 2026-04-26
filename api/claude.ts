@@ -228,6 +228,19 @@ export async function handler(request: Request): Promise<Response> {
         const rendered = await renderSessionAudio(plan)
         return jsonResponse(rendered, 200, headers)
       } catch (err) {
+        // Surface the failure in `vercel logs` so future tts-failed shapes
+        // can be root-caused from stack traces instead of from the
+        // response message alone (see ticket 86c9gwxah; the 86c9gwvn0 P0
+        // investigation had to reason from message shape because this
+        // catch path was silent). Log message + stack ONLY — never the
+        // request body, payload, or any provider headers; the underlying
+        // _tts module is responsible for never embedding the Azure key
+        // in the error it throws, and we deliberately don't widen the
+        // log surface here in case that contract ever slips.
+        const message = err instanceof Error ? err.message : String(err)
+        const stack = err instanceof Error ? err.stack : undefined
+        console.error('[api/claude] tts-failed', { message, stack })
+
         // Don't leak provider internals — `tts-failed` is the stable
         // code; the browser falls back to a degraded session per
         // "Claude is the brain, not the mouth" / graceful-degradation

@@ -253,17 +253,66 @@ describe('TTS-merge path (session-start with plan)', () => {
   })
 
   it('returns 502 tts-failed when the TTS render throws', async () => {
-    mockedRender.mockRejectedValueOnce(new Error('socket reset'))
-    const res = await handler(
-      makeRequest({
-        kind: 'session-start',
-        payload: { plan: { utterances: [{ id: 'a', text: 't' }] } },
-      }),
-    )
-    expect(res.status).toBe(502)
-    const body = (await res.json()) as { error: string; message?: string }
-    expect(body.error).toBe('tts-failed')
-    expect(body.message).toContain('socket reset')
+    // Suppress the new console.error log (asserted by its own test below)
+    // so this existing assertion isn't noisy in test output.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      mockedRender.mockRejectedValueOnce(new Error('socket reset'))
+      const res = await handler(
+        makeRequest({
+          kind: 'session-start',
+          payload: { plan: { utterances: [{ id: 'a', text: 't' }] } },
+        }),
+      )
+      expect(res.status).toBe(502)
+      const body = (await res.json()) as { error: string; message?: string }
+      expect(body.error).toBe('tts-failed')
+      expect(body.message).toContain('socket reset')
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it('logs the underlying error to console.error on the tts-failed path (ticket 86c9gwxah — so vercel logs is non-empty)', async () => {
+    // Background: the 86c9gwvn0 P0 investigation had to reason from the
+    // 502 response-message shape because this catch path was silent. The
+    // structural fix is to log message + stack so future failures of
+    // this shape are diagnosable from `vercel logs` directly.
+    //
+    // PII / secrets discipline: the log line must NOT carry the request
+    // body, the payload, or the Azure key. Asserting on the call shape
+    // (exactly { message, stack }) keeps that contract enforced — if
+    // someone widens the log surface, this test fails and the PR review
+    // surfaces it.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const thrown = new Error('socket reset')
+      mockedRender.mockRejectedValueOnce(thrown)
+
+      const res = await handler(
+        makeRequest({
+          kind: 'session-start',
+          payload: { plan: { utterances: [{ id: 'a', text: 't' }] } },
+        }),
+      )
+      expect(res.status).toBe(502)
+
+      // Logged exactly once, with a stable label and a structured payload
+      // carrying message + stack. No third positional arg — no payload /
+      // body / headers / key surface.
+      expect(errorSpy).toHaveBeenCalledTimes(1)
+      const [label, detail, ...rest] = errorSpy.mock.calls[0]!
+      expect(label).toBe('[api/claude] tts-failed')
+      expect(rest).toEqual([])
+      expect(detail).toMatchObject({
+        message: 'socket reset',
+        stack: expect.stringContaining('Error: socket reset'),
+      })
+      // Belt-and-braces: nothing else snuck in.
+      expect(Object.keys(detail as object).sort()).toEqual(['message', 'stack'])
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   it('cache-control header is no-store on every response', async () => {
