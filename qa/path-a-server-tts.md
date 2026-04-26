@@ -62,6 +62,8 @@ A/B/C are unblocked in the matrix. D, E, F are notes for Matt's queue, not gatin
 
 Plus 5 survival checks (lens 4) and 4 console/network sanity items below the matrix.
 
+**Latest verdict tally (after Run #2, 2026-04-26):** 11 PASS / 1 PASS-with-blocked-portion (row 16) / **1 FAIL (row 5)** / 1 NEEDS-WIRING (row 10) / 3 BLOCKED-iPad (rows 4, 9, Survival #4) / 1 FAIL-portion (row 2 desktop smoke). Auto suite remains green; the FAIL is upstream-reachability against `wss://speech.platform.bing.com/...` from Vercel egress, not a code regression. **Path A is NOT ready for ticket → COMPLETE — see Run #2's "What this means for Path A → COMPLETE" section.**
+
 ---
 
 ## Run results — 2026-04-25 (Jessica) — branch `qa/run-86c9gr385-86c9gr43t` @ origin/main `199411b`
@@ -176,6 +178,132 @@ Result: ✅ PASS — Path A's `sessionAudio.ts` does not pull from `lib/tts`. Sp
 - ⚠️ BLOCKED-iPad: rows 4, 9, plus Survival #4 = 3 items. **Owed to Thomas for real-device pass.**
 
 **FAIL count: 0.** No suspected regressions. The known limitation (missing `ANTHROPIC_API_KEY`) is the only thing blocking the live-curl SSML render smokes — that is a deploy/config follow-up tracked in `reference_deploy.md`, NOT a code regression.
+
+---
+
+## Run results — 2026-04-26 (Jessica) — branch `qa/86c9gr385-finish-env-var-rows` @ origin/main `b892dac`
+
+**Context:** `ANTHROPIC_API_KEY` was set in Vercel env between Run #1 and now. Orchestrator pre-confirmed the env-var presence-check is satisfied (`POST /api/claude` with `{"kind":"session-start","payload":null}` now returns HTTP 200 stub instead of HTTP 500 `config-missing`). This run re-executes the three rows that Run #1 marked `BLOCKED-other` because they required the key to be present (rows 5, 10, Survival #1). Already-PASS rows are NOT re-run.
+
+**Backend re-confirmation (orchestrator already saw, re-verified for the audit trail):**
+
+```
+$ curl -s -X POST https://marian-learning.vercel.app/api/claude \
+    -H 'Content-Type: application/json' \
+    -d '{"kind":"session-start","payload":null}' \
+    --max-time 15 -i
+HTTP/1.1 200 OK
+Cache-Control: no-store
+Content-Type: application/json; charset=utf-8
+X-Vercel-Id: arn1::iad1::hh5lf-1777202963851-6ae784a2f1ba
+{"ok":true,"kind":"session-start","stub":true,"note":"Claude API call not yet wired — see follow-up tickets"}
+```
+
+✅ Env-var gate passes. Function reaches the post-`config-missing` branch and returns the legacy stub for the no-plan path.
+
+### Live SSML render smoke — 3-utterance plan
+
+POST against prod with a hand-built 3-utterance plan in the wire shape `extractUtteranceTexts` accepts (`{ utterances: [{id, text}, ...] }` — note: NOT the `MathSessionPlan` shape from `src/screens/Math/sessionPlans.ts`; that shape is only consumed in-app and would also flatten to 0 utterances against `extractUtteranceTexts` today, see "Spec drift addendum" below).
+
+```
+$ cat /tmp/path-a-smoke-plan.json
+{
+  "kind": "session-start",
+  "payload": {
+    "plan": {
+      "utterances": [
+        { "id": "smoke-1", "text": "Hi Marian." },
+        { "id": "smoke-2", "text": "Three plus two. How many?" },
+        { "id": "smoke-3", "text": "Yes! Five!" }
+      ]
+    }
+  }
+}
+
+$ curl -s -X POST https://marian-learning.vercel.app/api/claude \
+    -H 'Content-Type: application/json' --data @/tmp/path-a-smoke-plan.json \
+    --max-time 60 -D /tmp/h.txt -o /tmp/b.json \
+    -w 'HTTP %{http_code} | size %{size_download} | time %{time_total}s\n'
+HTTP 502 | size 80 bytes | time 8.232043s
+
+X-Vercel-Id: arn1::iad1::wzmq7-1777202977778-a88a26aa5762
+Body: {"error":"tts-failed","message":"tts pipeline failed: tts timeout after 8000ms"}
+```
+
+**The good news:** the function reaches `renderSessionAudio()` (we got past the env-var gate, past the stub branch, and into the synth pool — `extractPlan` correctly pulls `payload.plan` and the `body.kind === 'session-start' && plan !== null` branch fires). The response shape exactly matches the documented `tts-failed` 502 contract — clean envelope, stable error code, human-readable message, no provider internals leaked, `Cache-Control: no-store` present.
+
+**The bad news:** the upstream WSS handshake to `wss://speech.platform.bing.com/...` (Microsoft's free Edge read-aloud endpoint, the only synth path Path A supports today) does not complete within `_tts.ts`'s 8000 ms hard timeout from Vercel's serverless egress. This is reproducible and consistent across cold and warm invocations and across plan sizes.
+
+Retries to nail down the failure mode:
+
+| Attempt                       | Body                                   | Result                                                    | X-Vercel-Id                                    |
+| ----------------------------- | -------------------------------------- | --------------------------------------------------------- | ---------------------------------------------- |
+| 1 (cold) 3-utterance plan     | (above)                                | HTTP 502 `tts-failed: tts timeout after 8000ms` in 8.23s  | `arn1::iad1::wzmq7-1777202977778-a88a26aa5762` |
+| 2 (warm) same body            | (above)                                | HTTP 502 `tts-failed: tts timeout after 8000ms` in 8.37s  | `arn1::iad1::d5q4l-1777202999182-775fce4fc54d` |
+| 3 (warm) 1-utterance plan     | `{"id":"x1","text":"Hi."}`             | HTTP 502 `tts-failed: tts timeout after 8000ms` in 8.21s  | `arn1::iad1::d7s49-1777203007732-d61a561a276e` |
+| 4 (warm) 1-utterance retry    | `{"id":"x1","text":"Hi."}`             | HTTP 502 `tts-failed: tts timeout after 8000ms` in 8.22s  | `arn1::iad1::768jx-1777203036855-4048b82057f4` |
+| Malformed plan A (empty `{}`) | `{"plan":{}}`                          | HTTP 200 `{ok, kind, plan:{}, utterances:[]}` in 0.21s    | `arn1::iad1::8bpqg-1777203071848-cca246f856d5` |
+| Malformed plan B (no `text`)  | `{"plan":{"utterances":[{"id":"a"}]}}` | HTTP 200 `{ok, kind, plan:{...}, utterances:[]}` in 0.22s | `arn1::iad1::hj25c-1777203072225-7bdd4ebf85e6` |
+
+Malformed plans flatten to 0-utterance success responses (per `extractUtteranceTexts`'s permissive contract) — they don't attempt synth, so they pass cleanly. This confirms the failure mode is specific to the `synthesizeUtterance` call against the upstream WSS endpoint, NOT in dispatch / extraction / response assembly.
+
+**Per-row verdicts for this run:**
+
+| #           | Run #1 verdict   | Run #2 verdict                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------- | ---------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5           | 🚧 BLOCKED-other | ❌ **FAIL**                       | Cannot exercise the response-size budget (target < 1 MB) because no plan ever produces a successful response in production — every well-formed plan times out at 8 s in the upstream synth. Auto coverage suggested by the row text (still owed) would still pass under unit conditions; the prod-only failure is the upstream WSS reachability issue. **Row stays open as FAIL pending upstream-reachability fix.** Ticket needed for Kevin/Devon: investigate why `wss://speech.platform.bing.com/...` is unreachable from Vercel `arn1`/`iad1` egress (geo-block? rate-limit? outbound-port WSS not allowed on Hobby plan?).                                                                                                                                                                                                   |
+| 10          | 🚧 BLOCKED-other | 🚧 **NEEDS-WIRING**               | Row asks for IndexedDB cache-survives-PWA-reload validation. Requires a successful `loadSessionAudio` round-trip, which requires a successful `/api/claude` SessionStartResponse, which requires the synth to succeed. Auto coverage at `sessionAudio.test.ts:222` is still the only live signal. **Cannot mark PASS or FAIL until row 5 unblocks** (synth path is reachable from prod). Re-running today moves the status from "blocked on env-var" to "blocked on upstream-reachability" — the row needs an upstream-fix or a successful synth route before it can be exercised.                                                                                                                                                                                                                                                |
+| Survival #1 | 🚧 BLOCKED-other | ✅ **PASS** (partial) — see notes | Row asks: "mid-session API failure (rate-limited or `tts-failed` mid-render) — frontend handles the error path gracefully — no white-screen, no unhandled-promise-rejection in console." **The server-side half of this contract is now empirically validated against prod**: every well-formed plan triggers a real (not simulated) `tts-failed` 502 with the documented stable shape `{error: 'tts-failed', message: 'tts pipeline failed: ...'}`, `Cache-Control: no-store`, no leaked stack trace, no provider internals (the WSS URL `wss://speech.platform.bing.com/...` is NOT in the message). The 502 maps cleanly. The frontend half (no white-screen / no unhandled rejection) remains DEFERRED-TO-INTEGRATION because no consumer screen exists yet — flagged for next round when Math is wired to the live function. |
+
+### Voice config inspection (re-confirm — was already PASS)
+
+Re-grep against current source:
+
+```
+$ grep -rn "en-US-AnaNeural\|rate.*-10%\|pitch.*\\+0Hz\|volume.*\\+0%" api/ src/ \
+    --include="*.ts" --include="*.tsx"
+api/_session.ts:39-42    ← canonical declaration (MELODY_VOICE_CONFIG)
+api/_session.test.ts     ← assertion sites (expected)
+api/_tts.test.ts         ← assertion sites (expected)
+api/claude.test.ts       ← assertion sites (expected)
+src/lib/audio/preRecorded.ts  ← Greet's bundled MP3 generator command (documented in JSDoc, not a runtime literal)
+```
+
+Confirmed `MELODY_VOICE_CONFIG` in `api/_session.ts:35-43` matches Greet's bundled MP3 voice spec exactly:
+
+| Field  | Greet baseline (PR #25) | Path A (`api/_session.ts`) | Match |
+| ------ | ----------------------- | -------------------------- | ----- |
+| voice  | `en-US-AnaNeural`       | `en-US-AnaNeural`          | ✅    |
+| rate   | `-10%`                  | `-10%`                     | ✅    |
+| pitch  | `+0Hz` (default)        | `+0Hz`                     | ✅    |
+| volume | `+0%` (default)         | `+0%`                      | ✅    |
+
+✅ Single-source-of-truth invariant holds. Voice config row stays PASS.
+
+### Spec drift addendum (flag for Matt → Kyle/Devon)
+
+While building the smoke plan, noticed: `src/screens/Math/sessionPlans.ts`'s `MathSessionPlan` shape carries utterance text under `problems[].utterances.{read,correct,reprompt,hint,giveAnswer}` — five named slots per problem. `api/_session.ts`'s `extractUtteranceTexts` only knows how to find a top-level flat `utterances: [{id, text}]` list. **If the Math screen ever POSTs its own `MathSessionPlan` to `/api/claude` to get audio rendered, it will silently flatten to 0 utterances rendered.** Today this is moot because Math uses a no-op `playUtterance` test seam (per `sessionPlans.ts:43-49`) so the integration is intentionally not wired. **But the wire-shape mismatch is a foot-gun for whoever wires the swap** described in `sessionPlans.ts:202-209`. This belongs in the Path A spec gap already flagged as item D, plus needs an explicit `flattenMathPlan(plan): UtteranceSource[]` adapter in `_session.ts` (or a contract change so the consumer pre-flattens before POSTing). Flagged to Matt — not a Path A regression, not a Run #2 blocker, but worth a ticket.
+
+### Updated tally for Path A (Run #1 + Run #2 combined)
+
+- ✅ PASS: 11 rows (1, 3, 6, 7, 8, 11, 12, 13, 14, 15, plus Survival #1's server-side half newly confirmed in Run #2). Row 2's auto portion is still PASS; the desktop-smoke portion of row 2 is now **FAIL** for the same upstream-reachability reason as row 5 — the SSML render against prod cannot complete.
+- ⚠️ PASS-with-blocked-portion: row 16 (auto green; desktop IDB-delete-mid-session still requires a successful synth, so blocked).
+- ❌ **FAIL: row 5** — response-size budget cannot be exercised against prod because every plan times out in the synth.
+- 🚧 NEEDS-WIRING: row 10 — IDB cache-survives-PWA-reload requires a successful synth. Status: needs upstream-reachability fix or a working synth route.
+- ⚠️ BLOCKED-iPad: rows 4, 9, plus Survival #4 = 3 items. Owed to Thomas for real-device pass (orchestrator confirmed out-of-scope for this run).
+- ⚠️ Row 2 desktop smoke: previously `BLOCKED-DESKTOP`, now **FAIL** (same upstream reason).
+
+**FAIL count: 1 row + 1 partial (row 2 desktop portion).** Auto suite is still green — the failure is in the runtime path against the upstream WSS endpoint, not in any code under test.
+
+### What this means for Path A → COMPLETE
+
+**Path A is NOT ready to move to COMPLETE.** The infrastructure is correct (env-var gate, dispatch, error mapping, response shape — all live-validated against prod). But the actual primary use case — render a session plan's utterances to inline base64 MP3s — does not work in production. Until row 5 unblocks, the value Path A is supposed to deliver (replacing Web Speech with consistent server-side TTS) is unreachable.
+
+**Recommended next steps (for Matt's queue, not for this PR):**
+
+1. Open a P1 follow-up ticket: "Path A: synthesize WSS upstream times out in production from Vercel egress." Owner Devon (or whoever knows the Vercel networking story). Repro: any well-formed plan POST to `/api/claude` returns `tts-failed: tts timeout after 8000ms` consistently. Hypotheses to investigate: (a) Vercel Hobby plan blocks outbound WSS, (b) `arn1`/`iad1` regions are geo-fenced from `speech.platform.bing.com`, (c) the `Sec-MS-GEC` token is being rejected (would expect a non-timeout failure, but worth verifying the WSS handshake error code), (d) `ws` package needs a different proxy/connect option in Vercel's serverless runtime.
+2. Once unblocked, re-run rows 5, 10, and re-examine row 2's desktop smoke portion. Survival #1's server-side half stays PASS (already validated).
+3. Consumer-screen integration (Math wires to live function) cannot ship until (1) is resolved — `sessionPlans.ts:43-49` test seam is doing the right thing keeping it stubbed.
 
 ---
 
