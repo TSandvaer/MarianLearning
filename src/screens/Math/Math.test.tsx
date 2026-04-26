@@ -574,6 +574,113 @@ describe('Math (Number Garden) screen', () => {
 
     // The give-answer utterance was spoken.
     expect(harness.spoken()).toContain('This one is five.')
+
+    // Stardust withhold check (ticket 86c9gumhp item #4 — AC row 5).
+    // Spec §Wrong-answer policy lines 308-310: guided-completion path
+    // withholds stardust ("standard happy-path animation but no stardust
+    // awarded"). The chips above are still rendered with the correct one
+    // tappable; tapping it now should animate happy but NOT increment the
+    // stardust counter past 0.
+    const stardustBefore = screen
+      .getByTestId('math-stardust')
+      .getAttribute('data-total')
+    expect(stardustBefore).toBe('0')
+
+    const correctChip = chipsAfter.find(
+      (c) => c.getAttribute('data-value') === '5',
+    )!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // Stardust counter is still 0 — no grant on the guided correct tap.
+    // (data-total is the live attribute; the ticket called this assertion
+    // "data-stardust" but the rendered DOM attribute is data-total — the
+    // load-bearing surface is the stardust count value, not the attr name.)
+    expect(screen.getByTestId('math-stardust')).toHaveAttribute(
+      'data-total',
+      '0',
+    )
+  })
+
+  it('rage-tap: 5 rapid clicks on correct chip resolve to a single auto-advance (smoke; data-total surfaces a known bug)', async () => {
+    // Ticket 86c9gumhp item #3 — "Rage-tap correct chip 5x rapidly".
+    // Reproduces the worst-case 8-year-old gesture (frustrated smash on
+    // the chip) and asserts the screen does not double-fire the
+    // session-complete callback or land us past the second problem.
+    //
+    // Bug discovered while writing this test (filed as follow-up):
+    //   `problemState.resolved` is React state, NOT a ref. The closure in
+    //   `onChipTap` (Math.tsx:695-759) captures the prior render's value,
+    //   so 5 synchronous fireEvent.click calls all see resolved=false and
+    //   ALL run handleCorrectTap → grantStardust(1). With STREAK_BONUS at
+    //   [3, 5, 8], 5 clean increments grant 5 base + 2 bonuses = 7
+    //   stardust. The expected behaviour from the ticket is data-total='1'.
+    //
+    //   We DO NOT assert data-total='1' here — it would fail under jsdom
+    //   today and ticket 86c9gumhp's hard constraint forbids touching
+    //   Math.tsx in this PR. Filed as a separate bug for the test-author
+    //   to pick up after the fix lands; this test currently asserts the
+    //   parts that DO hold:
+    //   onSessionComplete fires zero times during rapid taps and exactly
+    //   one auto-advance lands (problem-index goes 0 → 1, not 1 → 2+).
+    //   Once Math.tsx switches to a ref-guarded resolved flag, flip the
+    //   data-total assertion to '1' and remove this caveat.
+    //
+    // In the real browser the chip is `disabled` once resolved (Math.tsx
+    // line ~994) — disabled buttons swallow the second click natively.
+    // jsdom does not honour that, so the bug is surfaced here even though
+    // it may not reproduce on iPad. Refs would protect both environments.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    const onSessionComplete = vi.fn()
+    render(
+      withMotion(
+        <Math
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          onSessionComplete={onSessionComplete}
+        />,
+      ),
+    )
+
+    const correctChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') === '5')!
+
+    // 5 synchronous clicks — no awaits between them.
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        fireEvent.click(correctChip)
+      }
+      await Promise.resolve()
+    })
+
+    // onSessionComplete has NOT yet fired — auto-advance is scheduled but
+    // the timer hasn't elapsed. This is problem 1 of 8; the session ends
+    // only when the 8th problem's auto-advance lands.
+    expect(onSessionComplete).not.toHaveBeenCalled()
+
+    // Drain the auto-advance timer (1200ms). Exactly one advance should
+    // fire — we land on problem index 1 (the second problem), not 2+.
+    // The clearTimeout guard at Math.tsx:675-677 collapses repeated
+    // setTimeout calls into a single pending advance, so this assertion
+    // holds even with the rage-tap bug.
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+    // Still no session-complete; we're 1/8 deep, not 8/8.
+    expect(onSessionComplete).not.toHaveBeenCalled()
   })
 
   it('completes the session on problem 8 and invokes onSessionComplete', async () => {

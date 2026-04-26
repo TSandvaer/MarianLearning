@@ -202,3 +202,98 @@ describe('pickStaticSessionPlan rotation (regression)', () => {
     }
   })
 })
+
+describe('STATIC_SESSION_PLANS shape contract (regression — ticket 86c9gumhp)', () => {
+  // Ticket 86c9gumhp item #2 closes the regression surface around the
+  // hardcoded plans before Path A replaces them. The existing rotation tests
+  // above only assert the picked plan; these assertions hold for every plan
+  // in the rotation so a future "let me add a fourth plan" PR can't drift
+  // off the sums-to-10 ceiling without tripping CI.
+
+  it('ships at least one plan in the rotation', () => {
+    expect(STATIC_SESSION_PLANS.length).toBeGreaterThan(0)
+  })
+
+  it('every plan has a unique id (rotation collision guard)', () => {
+    const ids = STATIC_SESSION_PLANS.map((p) => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('every plan has exactly 8 problems', () => {
+    for (const plan of STATIC_SESSION_PLANS) {
+      expect(
+        plan.problems.length,
+        `plan "${plan.id}" should have exactly 8 problems`,
+      ).toBe(8)
+    }
+  })
+
+  it("every problem's correct === addendA + addendB", () => {
+    for (const plan of STATIC_SESSION_PLANS) {
+      for (const problem of plan.problems) {
+        expect(
+          problem.correct,
+          `plan "${plan.id}" problem ${problem.index}: ` +
+            `correct (${problem.correct}) must equal addendA (${problem.addendA}) + addendB (${problem.addendB})`,
+        ).toBe(problem.addendA + problem.addendB)
+      }
+    }
+  })
+
+  it('every problem stays within the sums-to-10 ceiling (correct ≤ 10)', () => {
+    // Marian's documented ceiling per project_diagnostic_results.md is sums
+    // to 10. The numberWord() table also tops out at 10 — drifting past 10
+    // would either crash plan construction or (worse) silently produce an
+    // unreadable utterance line.
+    for (const plan of STATIC_SESSION_PLANS) {
+      for (const problem of plan.problems) {
+        expect(
+          problem.correct,
+          `plan "${plan.id}" problem ${problem.index}: ` +
+            `correct (${problem.correct}) must be ≤ 10`,
+        ).toBeLessThanOrEqual(10)
+      }
+    }
+  })
+
+  it('every problem has both addends in the range [1, 10]', () => {
+    // Belt-and-braces: numberWord() throws on anything outside [1, 10], so a
+    // plan that drifted to addendA=0 would crash at construction. Asserting
+    // the range explicitly here makes the contract visible at the test level
+    // rather than relying on an internal throw.
+    for (const plan of STATIC_SESSION_PLANS) {
+      for (const problem of plan.problems) {
+        expect(
+          problem.addendA,
+          `plan "${plan.id}" problem ${problem.index}: addendA out of range`,
+        ).toBeGreaterThanOrEqual(1)
+        expect(
+          problem.addendA,
+          `plan "${plan.id}" problem ${problem.index}: addendA out of range`,
+        ).toBeLessThanOrEqual(10)
+        expect(
+          problem.addendB,
+          `plan "${plan.id}" problem ${problem.index}: addendB out of range`,
+        ).toBeGreaterThanOrEqual(1)
+        expect(
+          problem.addendB,
+          `plan "${plan.id}" problem ${problem.index}: addendB out of range`,
+        ).toBeLessThanOrEqual(10)
+      }
+    }
+  })
+
+  it('every problem has 1-based index matching its position', () => {
+    // Math.tsx and the wire adapter both rely on `problem.index` being the
+    // 1-based position; if a future plan author skips an index or re-uses
+    // one, `mathUtteranceId` would emit colliding ids.
+    for (const plan of STATIC_SESSION_PLANS) {
+      for (let i = 0; i < plan.problems.length; i++) {
+        expect(
+          plan.problems[i]!.index,
+          `plan "${plan.id}" position ${i}: index should be ${i + 1}`,
+        ).toBe(i + 1)
+      }
+    }
+  })
+})
