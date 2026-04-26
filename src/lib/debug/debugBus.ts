@@ -68,6 +68,45 @@ export interface RawTapEventRecord {
 
 export type GateStateName = 'idle' | 'pending' | 'unlocked' | 'relock'
 
+/**
+ * Possible AudioContext states. Mirrors the W3C Web Audio spec values plus
+ * `'interrupted'` — a non-standard but documented WebKit/iOS-only value
+ * that surfaces when the audio session is preempted (phone call, Siri, or
+ * the iOS audio-session idle decay we're hunting in ticket 86c9gvd0y).
+ *
+ * `'unavailable'` is our own marker for "no AudioContext exists yet" —
+ * before any Howler.play() unlocks the engine, `Howler.ctx` may not have
+ * been instantiated.
+ */
+export type AudioCtxState =
+  | 'suspended'
+  | 'running'
+  | 'closed'
+  | 'interrupted'
+  | 'unavailable'
+
+/**
+ * One sample of `Howler.ctx.state` (or fallback observation). Recorded
+ * either by the 1Hz polling tick during the warm-up window, by a
+ * `statechange` event firing on the AudioContext, or synchronously inside
+ * a tap handler. The `cause` field tells us which.
+ */
+export interface AudioCtxEventRecord {
+  /** ms since epoch. */
+  timestamp: number
+  /** AudioContext.state at the moment this sample was taken. */
+  ctxState: AudioCtxState
+  /** Why this sample was taken — disambiguates poll noise from real events. */
+  cause: 'poll' | 'statechange' | 'tap' | 'init'
+  /**
+   * Optional companion: speechSynthesis.paused at the same instant.
+   * Useful because Web Speech and Web Audio share an audio session on
+   * iOS — if both flip together, that's the audio-session interruption
+   * fingerprint.
+   */
+  synthPaused?: boolean
+}
+
 export interface DebugSnapshot {
   lastSpeak: SpeakAttemptRecord | null
   recentTaps: TapEventRecord[]
@@ -81,16 +120,39 @@ export interface DebugSnapshot {
    */
   recentRawEvents: RawTapEventRecord[]
   gateState: GateStateName | null
+  /**
+   * Most-recently-observed AudioContext.state. Updated on every poll tick,
+   * statechange event, or tap. `null` when no probe is running (debug
+   * disabled, or before the first tick).
+   */
+  audioCtxState: AudioCtxState | null
+  /**
+   * Rolling log of AudioContext samples — one per poll, statechange, or
+   * tap. Used by Phase-1 instrumentation (ticket 86c9gvd0y) to confirm or
+   * deny the iOS audio-session decay hypothesis: does iOS fire a
+   * statechange to `interrupted` / `suspended` at the ~30s idle mark?
+   */
+  audioCtxEvents: AudioCtxEventRecord[]
 }
 
 const MAX_TAPS = 5
 const MAX_RAW_EVENTS = 8
+/**
+ * Audio-context event buffer size. Sized to fit the Phase-1 capture
+ * window: 90s of 1Hz polling = 90 samples, plus a handful of statechange
+ * and tap samples. 128 gives headroom; the overlay only renders the last
+ * few entries but the full buffer is mirrored to localStorage by the
+ * probe so Thomas can paste the timeline back.
+ */
+const MAX_AUDIO_CTX_EVENTS = 128
 
 const state: DebugSnapshot = {
   lastSpeak: null,
   recentTaps: [],
   recentRawEvents: [],
   gateState: null,
+  audioCtxState: null,
+  audioCtxEvents: [],
 }
 
 type Listener = (snapshot: DebugSnapshot) => void
@@ -106,6 +168,8 @@ function notify(): void {
     recentTaps: state.recentTaps.slice(),
     recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
+    audioCtxState: state.audioCtxState,
+    audioCtxEvents: state.audioCtxEvents.slice(),
   }
   for (const listener of listeners) {
     try {
@@ -195,6 +259,24 @@ export function recordGateState(gateState: GateStateName): void {
   notify()
 }
 
+/**
+ * Record one observation of the AudioContext's state. Called by the
+ * Phase-1 audio-context probe (`audioContextProbe.ts`) on its 1Hz poll
+ * tick, on `statechange` events, and synchronously inside tap handlers.
+ *
+ * The buffer is bounded — older samples are dropped when full. The
+ * probe additionally mirrors all samples to localStorage so Thomas can
+ * paste back a full timeline even after a reload.
+ */
+export function recordAudioCtxEvent(record: AudioCtxEventRecord): void {
+  state.audioCtxState = record.ctxState
+  state.audioCtxEvents = [
+    ...state.audioCtxEvents.slice(-MAX_AUDIO_CTX_EVENTS + 1),
+    record,
+  ]
+  notify()
+}
+
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener)
   // Push the current snapshot once so the listener has something to render
@@ -204,6 +286,8 @@ export function subscribe(listener: Listener): () => void {
     recentTaps: state.recentTaps.slice(),
     recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
+    audioCtxState: state.audioCtxState,
+    audioCtxEvents: state.audioCtxEvents.slice(),
   })
   return () => {
     listeners.delete(listener)
@@ -219,6 +303,8 @@ export function _resetForTests(): void {
   state.recentTaps = []
   state.recentRawEvents = []
   state.gateState = null
+  state.audioCtxState = null
+  state.audioCtxEvents = []
   listeners.clear()
 }
 
@@ -232,5 +318,7 @@ export function snapshot(): DebugSnapshot {
     recentTaps: state.recentTaps.slice(),
     recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
+    audioCtxState: state.audioCtxState,
+    audioCtxEvents: state.audioCtxEvents.slice(),
   }
 }

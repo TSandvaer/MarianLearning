@@ -6,6 +6,7 @@ export {
   recordTap,
   recordRawTapEvent,
   recordGateState,
+  recordAudioCtxEvent,
   subscribe,
   snapshot,
   _resetForTests,
@@ -19,4 +20,17 @@ export type {
   RawTapEventRecord,
   RawTapEventType,
   GateStateName,
+  AudioCtxState,
+  AudioCtxEventRecord,
 } from './debugBus'
+export {
+  startAudioContextProbe,
+  activateAudioContextProbe,
+  sampleAudioCtxOnTap,
+  AUDIO_CTX_LOG_STORAGE_KEY,
+  _resetAudioContextProbeForTests,
+} from './audioContextProbe'
+export type {
+  AudioContextProbeHandle,
+  AudioContextProbeOptions,
+} from './audioContextProbe'

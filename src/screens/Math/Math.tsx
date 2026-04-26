@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
+import { resumeHowlerContextOnGesture } from '../../lib/audio/howlerContext'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { pickDistractors } from './distractors'
 import {
@@ -138,6 +139,15 @@ export interface MathProps {
   /** Test seam: clock injection — used by both `pickStaticSessionPlan()` and
    *  `writeStardust()` so two callers can share a deterministic timeline. */
   now?: () => Date
+  /**
+   * Test seam: spy on the per-gesture `Howler.ctx.resume()` kick added in
+   * Phase 2 of ticket 86c9gvd0y. Defaults to the real
+   * `resumeHowlerContextOnGesture` from `lib/audio/howlerContext`. Production
+   * callers should never override this. Mirrors the same seam on `Greet`
+   * (kept identical so future audio-active screens — Word Song, Session End —
+   * follow the same shape).
+   */
+  resumeAudioContext?: () => void
 }
 
 // ── Default no-op playback (spec note: silent-but-captioned fallback) ------
@@ -247,8 +257,14 @@ function MathScreen({
   plink,
   storage,
   now = () => new Date(),
+  resumeAudioContext,
 }: MathProps) {
   const reducedMotion = usePrefersReducedMotion()
+
+  // Bind the per-gesture audio-context resume kick. Defaults to the real
+  // helper from `lib/audio/howlerContext`. See Greet.tsx for the shape
+  // rationale (Phase-2 fix for ticket 86c9gvd0y).
+  const resumeAudioCtx = resumeAudioContext ?? resumeHowlerContextOnGesture
 
   // Plan is captured ONCE per mount — we never re-roll mid-session even if
   // the parent re-renders with a fresh `now`. Tests pin via the prop.
@@ -681,6 +697,19 @@ function MathScreen({
       const problem = plan.problems[problemIndex]
       if (problemState.resolved) return
 
+      // Phase-2 fix for ticket 86c9gvd0y. Kick `Howler.ctx.resume()`
+      // synchronously inside this user-gesture handler. Splash → Greet →
+      // Math navigation can leave the Howler context in `'suspended'`
+      // state when the user lingered on Greet for >30s before tapping —
+      // and even after Greet's wake-tap resumed the context, iOS can
+      // re-suspend it on screen transition / page-visibility events.
+      // Resuming here unconditionally guarantees the chip-tap's result
+      // audio (correct/wrong SFX + spoken read-aloud) plays without
+      // racing the suspended → running transition. No-op when ctx is
+      // already running. See `lib/audio/howlerContext.ts` for the full
+      // rationale.
+      resumeAudioCtx()
+
       // First-tap audio unlock: route the very first user gesture through
       // the gate and trigger the read-aloud after this tap (the chip-tap
       // result audio fires in the same handler, so the gate's watchdog
@@ -725,6 +754,7 @@ function MathScreen({
       plan,
       problemIndex,
       problemState.resolved,
+      resumeAudioCtx,
     ],
   )
 

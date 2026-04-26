@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AnimatePresence,
   LazyMotion,
@@ -8,7 +8,11 @@ import {
 import Splash from './screens/Splash'
 import Greet from './screens/Greet'
 import Math from './screens/Math'
-import { DebugOverlay, isDebugEnabled } from './lib/debug'
+import {
+  DebugOverlay,
+  activateAudioContextProbe,
+  isDebugEnabled,
+} from './lib/debug'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
 
@@ -36,6 +40,21 @@ export default function App() {
   // overlay in/out and isn't worth the complexity. To enable, append
   // `?debug=1` to the URL (works in Safari tab and PWA install both).
   const debugOn = useMemo(() => isDebugEnabled(), [])
+
+  // Phase-1 instrumentation for ticket 86c9gvd0y (iOS audio-context
+  // decay). The probe is started exactly once when debug is enabled and
+  // intentionally NOT torn down — the React tree may unmount on
+  // hot-reload, but the probe outlives that and keeps the localStorage
+  // log contiguous across screen navigations.
+  //
+  // No production cost: when `debugOn` is false the effect is a no-op
+  // and the probe module never instantiates a poller, listener, or
+  // localStorage handle.
+  useEffect(() => {
+    if (!debugOn) return
+    activateAudioContextProbe()
+    // Deliberate: no cleanup. See above for rationale.
+  }, [debugOn])
 
   return (
     <LazyMotion features={domAnimation} strict>

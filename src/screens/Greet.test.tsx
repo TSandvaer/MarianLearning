@@ -1549,4 +1549,198 @@ describe('Greet', () => {
       expect(sfxState.last?.unload).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('Audio-context resume on gesture (ticket 86c9gvd0y — Phase 2)', () => {
+    // The Phase-1 iPad export-log proved Howler creates `Howler.ctx` in a
+    // `'suspended'` state at Greet mount time and the context never
+    // unlocks itself — even after a tap, when the implicit gesture-unlock
+    // inside Howler `play()` succeeds, the buffer source stalls and
+    // `onplay` never fires. Phase-2 fix: kick `Howler.ctx.resume()`
+    // SYNCHRONOUSLY inside every gesture handler, BEFORE we call into
+    // Howler's play() path. The call sites:
+    //
+    //   1. Wake-tap (the load-bearing one — Marian's first tap on the
+    //      whole app).
+    //   2. Relock-retry tap (the gesture that follows a watchdog or
+    //      onLineError relock).
+    //   3. Heart tap (covers a future where iOS preempts the audio
+    //      session between line 2 ending and the heart tap).
+    //
+    // These tests exercise each call site via the `resumeAudioContext`
+    // prop seam — a stable spy seam that doesn't require fake-Howler
+    // gymnastics.
+
+    it('wake tap synchronously calls resumeAudioContext BEFORE playGreetLine', () => {
+      // The order is critical for iPad Safari: resume() inside the
+      // gesture window, then play() in a microtask. We assert via call
+      // ordering against the playGreetLine spy.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const resumeSpy = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={vi.fn()}
+            playGreetLineFn={h.playGreetLineFn}
+            resumeAudioContext={resumeSpy}
+          />,
+        ),
+      )
+
+      // Pre-tap: no resume kick yet — the screen is still locked.
+      expect(resumeSpy).not.toHaveBeenCalled()
+
+      fireWakeTap()
+
+      // Resume kicked exactly once on the gesture.
+      expect(resumeSpy).toHaveBeenCalledTimes(1)
+      // And resumeAudioContext was called BEFORE playGreetLine landed —
+      // Vitest spy `mock.invocationCallOrder` gives us the global
+      // call ordinal across all spies.
+      const resumeOrder = resumeSpy.mock.invocationCallOrder[0]
+      const playOrder = h.playGreetLineFn.mock.invocationCallOrder[0]
+      expect(resumeOrder).toBeLessThan(playOrder)
+    })
+
+    it('does NOT call resumeAudioContext before any tap (no spurious mount-time resume)', () => {
+      // Belt-and-braces: the resume kick is a per-gesture action, not a
+      // mount-time effect. Calling it from a useEffect would land outside
+      // the gesture window and waste an iOS resume() that won't actually
+      // transition the context.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const resumeSpy = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={vi.fn()}
+            playGreetLineFn={h.playGreetLineFn}
+            resumeAudioContext={resumeSpy}
+          />,
+        ),
+      )
+
+      // Even after time has elapsed (wake-reprompt at 8s), no resume.
+      act(() => {
+        vi.advanceTimersByTime(10_000)
+      })
+      expect(resumeSpy).not.toHaveBeenCalled()
+    })
+
+    it('relock-retry tap synchronously kicks resumeAudioContext before re-playing', async () => {
+      // The actual repro from the iPad. After a silent first-utterance
+      // miss the gate goes to relock; the next tap retries. Every retry
+      // tap must also kick the resume — otherwise we'd be back to the
+      // original race (suspended ctx, play() before resume settles).
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const resumeSpy = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={vi.fn()}
+            playGreetLineFn={h.playGreetLineFn}
+            resumeAudioContext={resumeSpy}
+          />,
+        ),
+      )
+
+      // Initial wake tap.
+      fireWakeTap()
+      expect(resumeSpy).toHaveBeenCalledTimes(1)
+
+      // Force the gate into relock via a line-0 rejection.
+      await act(async () => {
+        h.rejectLast()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+
+      const callsBeforeRetry = h.calls.length
+      const resumeCallsBeforeRetry = resumeSpy.mock.calls.length
+      // The retry gesture.
+      fireWakeTap()
+      // The retry gesture kicks resumeAudioContext at LEAST once.
+      // Implementation detail: the dispatch branch in Greet's wake-tap
+      // handler kicks resume, and the registered retry callback also
+      // kicks resume as belt-and-braces (idempotent — the helper is a
+      // no-op when ctx is already running). We assert the gesture
+      // produced AT LEAST one new resume call rather than pinning the
+      // exact count, since pinning would couple the test to internal
+      // belt-and-braces structure that's deliberately conservative.
+      expect(resumeSpy.mock.calls.length).toBeGreaterThanOrEqual(
+        resumeCallsBeforeRetry + 1,
+      )
+      // And the retry play landed AFTER the first new resume kick.
+      expect(h.calls.length).toBe(callsBeforeRetry + 1)
+      const retryResumeOrder =
+        resumeSpy.mock.invocationCallOrder[resumeCallsBeforeRetry]
+      const retryPlayOrder =
+        h.playGreetLineFn.mock.invocationCallOrder[h.calls.length - 1]
+      expect(retryResumeOrder).toBeLessThan(retryPlayOrder)
+    })
+
+    it('heart tap synchronously kicks resumeAudioContext (covers cross-screen audio-session preemption)', async () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const resumeSpy = vi.fn()
+      const onAdvance = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={onAdvance}
+            playGreetLineFn={h.playGreetLineFn}
+            resumeAudioContext={resumeSpy}
+          />,
+        ),
+      )
+
+      // Drive the sequence to the heart-ready state.
+      fireWakeTap()
+      // Wake-tap kick.
+      expect(resumeSpy).toHaveBeenCalledTimes(1)
+
+      for (let i = 0; i < HEART_REVEAL_AFTER_LINE_INDEX + 1; i++) {
+        if (i === 0) {
+          await act(async () => {
+            h.fireOnPlay()
+          })
+        }
+        await completeLine(h)
+        if (i < HEART_REVEAL_AFTER_LINE_INDEX) await crossGap()
+      }
+
+      const heart = screen.getByTestId('greet-heart')
+      expect(heart).toBeInTheDocument()
+      const beforeHeartTap = resumeSpy.mock.calls.length
+      fireEvent.click(heart)
+
+      // Heart tap kicked the resume.
+      expect(resumeSpy.mock.calls.length).toBe(beforeHeartTap + 1)
+    })
+
+    it('falls back to the real resumeHowlerContextOnGesture when no prop is provided (production path)', () => {
+      // Sanity: omitting the test-seam prop wires the real helper. The
+      // real helper is a no-op in jsdom (no Howler.ctx), so this just
+      // asserts no exception is thrown — i.e. the default-binding line
+      // (`resumeAudioContext ?? resumeHowlerContextOnGesture`) is alive.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+      // No throw on tap; the wake transition still happens.
+      expect(() => fireWakeTap()).not.toThrow()
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-screen-state',
+        'intro',
+      )
+    })
+  })
 })
