@@ -5,6 +5,7 @@ import {
   cancelPreRecorded,
   playGreetLine as defaultPlayGreetLine,
   resumeHowlerContextOnGesture,
+  unlockIosAudioSession,
   useAudioUnlockGate,
   type GreetLineKey,
   type PlayGreetLineOptions,
@@ -15,6 +16,7 @@ import {
   recordSpeakAttempt,
   recordSpeakSkippedEvent,
   recordTap,
+  recordUnlockStateEvent,
   sampleAudioCtxOnTap,
 } from '../lib/debug'
 import {
@@ -213,6 +215,17 @@ export interface GreetProps {
    * one is correct for every shipping path.
    */
   resumeAudioContext?: () => void
+  /**
+   * Test seam: spy on the per-gesture iOS audio-session unlock added in
+   * Phase 5 of ticket 86c9gvd0y. Defaults to the real
+   * `unlockIosAudioSession` from `lib/audio`. Tests use this to assert
+   * the silent-buffer kick lands synchronously inside the gesture
+   * handler tick, alongside `resumeAudioContext`.
+   *
+   * Production callers should never override this — like the resume
+   * kick, the helper is a safe no-op when no audio context exists.
+   */
+  unlockAudioSession?: () => void
 }
 
 /**
@@ -246,6 +259,7 @@ export default function Greet({
   playGreetLineFn = defaultPlayGreetLine,
   chime,
   resumeAudioContext,
+  unlockAudioSession,
 }: GreetProps) {
   // Bind the per-gesture audio-context resume kick. Defaults to the real
   // helper from `lib/audio`; tests can inject a spy to observe call
@@ -253,6 +267,9 @@ export default function Greet({
   // identity is stable across renders so the same default reference flows
   // through every gesture handler closure without re-creating the kick.
   const resumeAudioCtx = resumeAudioContext ?? resumeHowlerContextOnGesture
+  // Phase-5 (ticket 86c9gvd0y): per-gesture iOS audio-session unlock kick.
+  // Same identity-stable shape as `resumeAudioCtx`. Tests inject a spy.
+  const unlockAudioSessionFn = unlockAudioSession ?? unlockIosAudioSession
   const reducedMotion = usePrefersReducedMotion()
 
   // Audio unlock gate — wraps line 0's play with a 1.5s watchdog. If the
@@ -735,6 +752,19 @@ export default function Greet({
         // state during the gesture window, so the microtask `play()` runs
         // against a context that's already moving toward `running`.
         resumeAudioCtx()
+        // Phase-5 fix for ticket 86c9gvd0y: re-engage the OS-level iOS
+        // audio session by playing a 1-sample silent buffer in the
+        // gesture window. Howler's `_audioUnlocked` flag latches `true`
+        // on the first gesture and never re-runs Howler's own scratch-
+        // buffer unlock; iOS releases the audio session every long-idle
+        // window regardless. Calling this every gesture re-engages the
+        // session so subsequent `Howl.play()` lands in a live output
+        // graph. Idempotent + safe no-op when no ctx exists.
+        unlockAudioSessionFn()
+        // Phase-5 instrumentation: snapshot Howler's internal unlock
+        // flags at the gesture instant. Only meaningful in `?debug=1`
+        // sessions; production sessions pay one null check.
+        recordUnlockStateEvent()
         const dispatched = gate.dispatchGesture()
         // Reset on a microtask so the next physical tap is not blocked.
         // Microtask (queueMicrotask) drains after the current synchronous
@@ -793,6 +823,14 @@ export default function Greet({
       // Howler hasn't lazy-initted, or when the context is closed — safe
       // to call unconditionally on every tap.
       resumeAudioCtx()
+      // Phase-5 fix for ticket 86c9gvd0y: see relock-branch comment above
+      // for the full rationale. Same call, same gesture-window contract;
+      // we kick this even on the cold first wake-tap because Howler's
+      // own internal scratch-buffer plays once-only on its first gesture
+      // listener but we want the silent buffer ALSO inside our handler
+      // tick — belt-and-braces is cheap on a 1-sample buffer.
+      unlockAudioSessionFn()
+      recordUnlockStateEvent()
 
       // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
       cancelWakeReprompt()
@@ -844,6 +882,10 @@ export default function Greet({
       // dispatch path. Idempotent, so safe to repeat.
       gate.registerRetry(() => {
         resumeAudioCtx()
+        // Phase-5 (ticket 86c9gvd0y). Retry callbacks run inside the
+        // user's retry-tap handler — same gesture-window contract.
+        unlockAudioSessionFn()
+        recordUnlockStateEvent()
         sequenceRef.current?.cancel()
         cancelPreRecorded()
         const retryHandle = buildSequence()
@@ -876,6 +918,7 @@ export default function Greet({
     gate,
     resumeAudioCtx,
     screenState,
+    unlockAudioSessionFn,
   ])
 
   // --- Heart tap -------------------------------------------------------------
@@ -890,6 +933,12 @@ export default function Greet({
     // line 2 ending and the heart tap — calling resume() here covers
     // that path even though we're not actively reproducing it.
     resumeAudioCtx()
+    // Phase-5 (ticket 86c9gvd0y): re-engage the OS audio session in the
+    // gesture window so the chime that fires below lands in a live
+    // output graph after >60s of idle. Same belt-and-braces shape as
+    // wake-tap; cost is one 1-sample silent buffer per heart tap.
+    unlockAudioSessionFn()
+    recordUnlockStateEvent()
 
     // Heart tap is itself a user-gesture handler. If the audio gate is in a
     // relock state (extremely rare path: the wake speak silently failed AND
@@ -932,6 +981,7 @@ export default function Greet({
     onAdvance,
     resumeAudioCtx,
     triggerEarWiggle,
+    unlockAudioSessionFn,
   ])
 
   // --- Render ----------------------------------------------------------------

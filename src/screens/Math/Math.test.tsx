@@ -723,4 +723,43 @@ describe('Math (Number Garden) screen', () => {
     ).mock.invocationCallOrder[0]
     expect(resumeOrder).toBeLessThan(playOrder)
   })
+
+  it('chip-tap kicks unlockAudioSession synchronously before audio (ticket 86c9gvd0y Phase 5)', async () => {
+    // Same gesture-window contract as resumeAudioContext, but for the
+    // OS-level iOS audio session (silent 1-sample buffer trick). Has to
+    // land before play() so the OS re-engages the audio output graph
+    // for this gesture's audio.
+    const harness = makePlayHarness()
+    const unlockSpy = vi.fn()
+    render(
+      withMotion(
+        <Math
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          unlockAudioSession={unlockSpy}
+        />,
+      ),
+    )
+
+    expect(unlockSpy).not.toHaveBeenCalled()
+
+    const correctChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') === '5')!
+
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    expect(unlockSpy).toHaveBeenCalledTimes(1)
+    const unlockOrder = unlockSpy.mock.invocationCallOrder[0]
+    const playOrder = (
+      harness.playUtterance as unknown as {
+        mock: { invocationCallOrder: number[] }
+      }
+    ).mock.invocationCallOrder[0]
+    expect(unlockOrder).toBeLessThan(playOrder)
+  })
 })

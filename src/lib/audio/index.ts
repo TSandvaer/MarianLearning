@@ -7,6 +7,7 @@ export type {
 export {
   resumeHowlerContextOnGesture,
   awaitHowlerContextResume,
+  unlockIosAudioSession,
 } from './howlerContext'
 export type {
   HowlerContextState,
@@ -14,6 +15,7 @@ export type {
   ResumeResult,
   AwaitResumeOptions,
   AwaitResumeResult,
+  UnlockIosAudioSessionResult,
 } from './howlerContext'
 export {
   createPreRecorded,

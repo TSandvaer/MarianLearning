@@ -375,3 +375,119 @@ export async function awaitHowlerContextResume(
     resumeThrew: false,
   }
 }
+
+/**
+ * Phase-5 fix surface (ticket 86c9gvd0y).
+ *
+ * Why this exists alongside the Phase-2 / Phase-4 helpers
+ * -------------------------------------------------------
+ * The Phase-4 iPad data showed `ctx.resume()` settling correctly (state
+ * `'running'` 188 ms after the tap, well within the awaited window) and
+ * `Howl.play()` returning a valid sound id. But `'speak-onplay'` never
+ * fired — across three back-to-back taps. That localizes the failure
+ * BELOW the WebAudio `AudioContext` layer, at the iOS audio-session /
+ * hardware-output layer.
+ *
+ * iOS draws a distinction the Web Audio spec does not:
+ *
+ *   - **WebAudio AudioContext** is a browser-level construct. `state` and
+ *     `resume()` operate here. After ~60 s of total silence, iOS does not
+ *     change this state — the context remains `running` (or transitions
+ *     `suspended → running` on the next gesture, as Phase-1/4 confirmed).
+ *
+ *   - **iOS audio session** is an OS-level construct, independent of any
+ *     browser. After ~60 s with no actual audio output, iOS releases the
+ *     audio session to save power. `AudioContext.state` does not reflect
+ *     this. `AudioBufferSourceNode.start()` will queue the source against
+ *     a context that is `running` from JS's perspective but whose output
+ *     graph is no longer wired through to the speaker — the source plays
+ *     into the void, no `'play'` event ever fires from the underlying
+ *     buffer source's `onended` chain.
+ *
+ * The canonical fix on iOS is to play a 1-sample silent buffer SYNCHRONOUSLY
+ * inside the user-gesture event handler, every gesture. The OS audio session
+ * re-engages because something is requesting output; subsequent real plays
+ * (microseconds later) bind against a live output graph and fire `'play'`
+ * normally.
+ *
+ * Why Howler doesn't do this for us
+ * ---------------------------------
+ * Howler's internal `_unlockAudio` (see `node_modules/howler/dist/howler.js`
+ * around line 301) plays a scratch buffer on the FIRST gesture, then sets
+ * `Howler._audioUnlocked = true` and removes its own gesture listeners.
+ * After that flag flips, Howler never re-runs the unlock — even though iOS
+ * re-releases the session every long-idle window. We need to kick the
+ * silent buffer ourselves on every gesture that's about to play audio.
+ *
+ * What this helper does NOT do
+ * ----------------------------
+ * - It does not touch `AudioContext.state`. The Phase-2 (`resumeHowlerContextOnGesture`)
+ *   and Phase-4 (`awaitHowlerContextResume`) helpers stay — they remain the
+ *   right tools for the WebAudio layer. This helper addresses a different
+ *   layer.
+ * - It does not own a buffer cache. Creating a 1-sample buffer is so cheap
+ *   (microseconds, no allocation pressure on the audio thread) that caching
+ *   it would add complexity for no measurable benefit.
+ * - It is NOT debug-gated. This is a production fix that runs on every
+ *   gesture-window play call.
+ *
+ * MUST be called synchronously inside the user-gesture handler tick on iOS.
+ * Calling it after `await` defeats the purpose — iOS associates the
+ * audio-session re-engagement with the gesture, and the gesture's
+ * authorization expires the moment the JS task yields.
+ */
+export interface UnlockIosAudioSessionResult {
+  /**
+   * Whether we successfully created and started a silent buffer source.
+   * False on environments without WebAudio, when the ctx is closed, or
+   * when the silent-buffer construction threw.
+   */
+  bufferStarted: boolean
+  /**
+   * Whether one of the underlying calls (createBuffer / createBufferSource
+   * / start / connect) threw synchronously. Diagnostic only — caller has
+   * no recovery action; we just record and move on.
+   */
+  threw: boolean
+}
+
+export function unlockIosAudioSession(
+  opts: ResumeAudioContextOptions = {},
+): UnlockIosAudioSessionResult {
+  const ctx = readHowlerCtx(opts.howlerLike)
+  if (!ctx) {
+    return { bufferStarted: false, threw: false }
+  }
+  const state = readState(ctx)
+  // Don't try on a closed context — createBufferSource throws.
+  if (state === 'closed' || state === 'unavailable') {
+    return { bufferStarted: false, threw: false }
+  }
+
+  try {
+    // 1-sample buffer at 22050 Hz: matches Howler's own scratch-buffer
+    // shape exactly (see node_modules/howler/dist/howler.js, _unlockAudio).
+    // Smallest-possible buffer that still re-engages the iOS audio session.
+    const buffer = ctx.createBuffer(1, 1, 22050)
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+    source.start(0)
+    // Disconnect immediately. The 1-sample buffer's playback completes in
+    // ~45 microseconds anyway, but explicit disconnect avoids leaving any
+    // node references alive longer than needed.
+    try {
+      source.disconnect()
+    } catch {
+      // Some impls reject disconnect on a not-yet-played source. Harmless
+      // either way — the source will be garbage-collected once its end
+      // event fires.
+    }
+    return { bufferStarted: true, threw: false }
+  } catch {
+    // Best-effort. iOS may reject this in obscure edge cases (page is
+    // backgrounded, audio session preempted by phone call). The next
+    // gesture will try again; we don't propagate.
+    return { bufferStarted: false, threw: true }
+  }
+}
