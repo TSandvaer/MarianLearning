@@ -44,6 +44,10 @@
  */
 
 import { Howl } from 'howler'
+import {
+  recordSpeakCallEvent,
+  recordSpeakOnPlayEvent,
+} from '../debug/audioContextProbe'
 
 /**
  * Stable identifiers for the 4 fixed Greet lines. The orchestrator
@@ -299,6 +303,19 @@ export function createPreRecorded(
           }
 
           howl.on('play', () => {
+            // Phase-3 (ticket 86c9gvd0y) instrumentation. Record that
+            // Howler emitted the `'play'` event — this is the missing
+            // signal from the Phase-2 data round, where we saw `tap →
+            // statechange → running` but never knew whether `onplay`
+            // actually fired (pre-recorded audio doesn't push to the
+            // existing `lastSpeak` bus channel). If we see speak-call
+            // rows but no matching speak-onplay rows, the bug is the
+            // Howler-on-iOS play-to-onplay stall.
+            //
+            // Logged BEFORE the resolved/stopped guard because we want
+            // to know whenever Howler fired the event, even if a
+            // concurrent stop() suppressed the user-visible effect.
+            recordSpeakOnPlayEvent(key)
             if (resolved || stopped) return
             playOpts.onPlay?.()
 
@@ -356,9 +373,24 @@ export function createPreRecorded(
           // Synchronous play — the whole point. Caller MUST invoke
           // playGreetLine inside a user-gesture handler on iOS for the
           // first call.
+          //
+          // Phase-3 (ticket 86c9gvd0y) instrumentation: record the
+          // synchronous return of `howl.play()` to the audio-ctx log
+          // under `cause: 'speak-call'`. The `speakResult` field carries
+          // the Howler sound id (number) on success, or `null` when
+          // play() threw. This is the load-bearing diagnostic for "did
+          // we even try to play?" — together with the corresponding
+          // `'speak-onplay'` rows further down (or absence thereof) we
+          // can localize whether the failure is at play-call time or at
+          // play-emit time.
           try {
-            howl.play()
+            const soundId = howl.play()
+            recordSpeakCallEvent(
+              typeof soundId === 'number' ? soundId : null,
+              key,
+            )
           } catch (err) {
+            recordSpeakCallEvent(null, key)
             settleReject(
               err instanceof Error
                 ? err

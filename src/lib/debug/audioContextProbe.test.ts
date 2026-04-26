@@ -3,10 +3,14 @@ import {
   AUDIO_CTX_LOG_STORAGE_KEY,
   _resetAudioContextProbeForTests,
   activateAudioContextProbe,
+  recordHandlerErrorEvent,
+  recordSpeakCallEvent,
+  recordSpeakOnPlayEvent,
+  recordSpeakSkippedEvent,
   sampleAudioCtxOnTap,
   startAudioContextProbe,
 } from './audioContextProbe'
-import { _resetForTests, snapshot } from './debugBus'
+import { _resetForTests, recordGateState, snapshot } from './debugBus'
 
 /**
  * Minimal AudioContext stub that lets tests flip `state` and dispatch a
@@ -414,6 +418,193 @@ describe('audioContextProbe', () => {
       const beforeFirstFire = snapshot().audioCtxEvents.length
       ctx1.setState('suspended')
       expect(snapshot().audioCtxEvents.length).toBe(beforeFirstFire)
+    })
+  })
+
+  describe('Phase-3 (ticket 86c9gvd0y) — gateState mirror + speak instrumentation', () => {
+    it('attaches the latest gateState to every emitted record once the gate has reported', () => {
+      const ctx = new FakeAudioContext()
+      const probe = startAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      // Before the gate has reported, records carry no gateState — we
+      // omit the field rather than fabricate a value.
+      expect(snapshot().audioCtxEvents[0].gateState).toBeUndefined()
+
+      // Gate transitions and pushes its state into the bus (mirrors what
+      // `useAudioUnlockGate` does on every state change).
+      recordGateState('pending')
+      vi.advanceTimersByTime(1000)
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'poll',
+        gateState: 'pending',
+      })
+
+      recordGateState('relock')
+      ctx.setState('suspended')
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'statechange',
+        gateState: 'relock',
+      })
+      probe.stop()
+    })
+
+    it('records a speak-call row carrying the soundId and tag', () => {
+      const ctx = new FakeAudioContext()
+      activateAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordSpeakCallEvent(42, 'hi')
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'speak-call',
+        ctxState: 'running',
+        speakResult: 42,
+        skipReason: 'hi',
+      })
+    })
+
+    it('records a speak-call row with speakResult=null when play threw', () => {
+      activateAudioContextProbe({
+        howlerLike: {
+          ctx: new FakeAudioContext() as unknown as AudioContext,
+        },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordSpeakCallEvent(null, 'imMelody')
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'speak-call',
+        speakResult: null,
+        skipReason: 'imMelody',
+      })
+    })
+
+    it('records a speak-onplay row for the Howler `play` event arrival', () => {
+      activateAudioContextProbe({
+        howlerLike: {
+          ctx: new FakeAudioContext() as unknown as AudioContext,
+        },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordSpeakOnPlayEvent('niceToMeet')
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'speak-onplay',
+        skipReason: 'niceToMeet',
+      })
+    })
+
+    it('records a speak-skipped row carrying the early-return reason', () => {
+      activateAudioContextProbe({
+        howlerLike: {
+          ctx: new FakeAudioContext() as unknown as AudioContext,
+        },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordSpeakSkippedEvent('non-wake-dispatch-not-consumed')
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'speak-skipped',
+        skipReason: 'non-wake-dispatch-not-consumed',
+      })
+    })
+
+    it('records a handler-error row carrying the Error message', () => {
+      activateAudioContextProbe({
+        howlerLike: {
+          ctx: new FakeAudioContext() as unknown as AudioContext,
+        },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordHandlerErrorEvent(new Error('kaboom'))
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'handler-error',
+        errorMessage: 'kaboom',
+      })
+    })
+
+    it('records a handler-error row with a fallback message for non-Error throws', () => {
+      activateAudioContextProbe({
+        howlerLike: {
+          ctx: new FakeAudioContext() as unknown as AudioContext,
+        },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordHandlerErrorEvent('string-throw')
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'handler-error',
+        errorMessage: 'string-throw',
+      })
+
+      recordHandlerErrorEvent({ weird: true })
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'handler-error',
+        errorMessage: '(non-Error thrown)',
+      })
+    })
+
+    it('all four singleton Phase-3 wrappers are no-ops when no probe is active', () => {
+      // No activate call. Each wrapper should silently no-op.
+      const before = snapshot().audioCtxEvents.length
+      recordSpeakCallEvent(7, 'hi')
+      recordSpeakOnPlayEvent('hi')
+      recordSpeakSkippedEvent('whatever')
+      recordHandlerErrorEvent(new Error('nope'))
+      expect(snapshot().audioCtxEvents.length).toBe(before)
+    })
+
+    it('Phase-3 records are persisted to localStorage alongside poll/tap rows', () => {
+      const storage = makeStorage()
+      activateAudioContextProbe({
+        howlerLike: {
+          ctx: new FakeAudioContext() as unknown as AudioContext,
+        },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage,
+      })
+
+      recordSpeakSkippedEvent('wake-in-flight-guard')
+      recordSpeakCallEvent(99, 'tapHeart')
+      recordHandlerErrorEvent(new Error('boom'))
+      recordSpeakOnPlayEvent('tapHeart')
+
+      const parsed = JSON.parse(
+        storage.getItem(AUDIO_CTX_LOG_STORAGE_KEY)!,
+      ) as Array<{ cause: string }>
+      const causes = parsed.map((r) => r.cause)
+      expect(causes).toContain('speak-skipped')
+      expect(causes).toContain('speak-call')
+      expect(causes).toContain('handler-error')
+      expect(causes).toContain('speak-onplay')
     })
   })
 })

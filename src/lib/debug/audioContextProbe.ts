@@ -76,6 +76,7 @@
 
 import { Howler } from 'howler'
 import {
+  readGateState,
   recordAudioCtxEvent,
   type AudioCtxEventRecord,
   type AudioCtxState,
@@ -120,6 +121,34 @@ export interface AudioContextProbeHandle {
    * behavioral action on the value.
    */
   sampleNow: (cause?: 'tap' | 'init') => AudioCtxState
+  /**
+   * Record a `cause: 'speak-call'` row — the synchronous return from
+   * `Howl.play()`. `soundId` is the Howler-returned sound id (number),
+   * or `null` when play() threw / no Howl was available. The optional
+   * `tag` is folded into `skipReason` for cross-referencing (e.g. the
+   * Greet line key).
+   */
+  recordSpeakCall: (soundId: number | null, tag?: string) => void
+  /**
+   * Record a `cause: 'speak-onplay'` row — Howler emitted the `'play'`
+   * event. The optional `tag` carries the Greet line key (or similar).
+   *
+   * The diagnostic value: if `'speak-call'` rows show up but
+   * `'speak-onplay'` rows don't, the bug is the Howler-on-iOS
+   * play-to-onplay stall.
+   */
+  recordSpeakOnPlay: (tag?: string) => void
+  /**
+   * Record a `cause: 'speak-skipped'` row — the wake-tap handler
+   * entered but didn't reach `speak()`. `reason` is a short tag.
+   */
+  recordSpeakSkipped: (reason: string) => void
+  /**
+   * Record a `cause: 'handler-error'` row — the wake-tap handler body
+   * threw. The error's message is recorded; the caller is expected to
+   * re-throw afterwards so production behaviour is unchanged.
+   */
+  recordHandlerError: (error: unknown) => void
 }
 
 export interface AudioContextProbeOptions {
@@ -330,14 +359,35 @@ export function startAudioContextProbe(
   function emit(
     cause: AudioCtxEventRecord['cause'],
     ctx: AudioContext | null,
+    extra: Pick<
+      AudioCtxEventRecord,
+      'speakResult' | 'skipReason' | 'errorMessage'
+    > = {},
   ): AudioCtxState {
     const ctxState = readCtxState(ctx)
     const synthPaused = readSynthPaused(opts.speechSynthLike)
+    // Phase-3 (ticket 86c9gvd0y): mirror the most-recent gate state into
+    // every emit so a single localStorage paste-back tells us both the
+    // audio-context timeline AND the gate timeline aligned by timestamp.
+    // The gate pushes its state to the bus on every transition; we read
+    // the latest value here. `null` when the gate hasn't reported yet —
+    // we omit the field rather than write `null` to keep the JSON tight.
+    const gateState = readGateState()
     const record: AudioCtxEventRecord = {
       timestamp: now(),
       ctxState,
       cause,
       ...(synthPaused !== undefined ? { synthPaused } : {}),
+      ...(gateState !== null ? { gateState } : {}),
+      ...(extra.speakResult !== undefined
+        ? { speakResult: extra.speakResult }
+        : {}),
+      ...(extra.skipReason !== undefined
+        ? { skipReason: extra.skipReason }
+        : {}),
+      ...(extra.errorMessage !== undefined
+        ? { errorMessage: extra.errorMessage }
+        : {}),
     }
     recordAudioCtxEvent(record)
     if (storage) appendToStorage(storage, record, maxLogEntries)
@@ -430,7 +480,59 @@ export function startAudioContextProbe(
     return emit(cause, ctx)
   }
 
-  return { stop, sampleNow }
+  /**
+   * Phase-3 diagnostic emit (ticket 86c9gvd0y). The probe shares its
+   * emit path with the new Phase-3 causes so every record — speak-call,
+   * speak-onplay, speak-skipped, handler-error — lands in the same
+   * localStorage timeline as the original poll/statechange/tap rows,
+   * with the gateState mirror attached uniformly.
+   *
+   * After `stop()` these are no-ops to avoid surprising tests / cleanup
+   * paths that still hold a stale handle.
+   */
+  function recordSpeakCall(soundId: number | null, tag?: string): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('speak-call', ctx, {
+      speakResult: soundId,
+      ...(tag !== undefined ? { skipReason: tag } : {}),
+    })
+  }
+
+  function recordSpeakOnPlay(tag?: string): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('speak-onplay', ctx, {
+      ...(tag !== undefined ? { skipReason: tag } : {}),
+    })
+  }
+
+  function recordSpeakSkipped(reason: string): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('speak-skipped', ctx, { skipReason: reason })
+  }
+
+  function recordHandlerError(error: unknown): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : '(non-Error thrown)'
+    emit('handler-error', ctx, { errorMessage: message })
+  }
+
+  return {
+    stop,
+    sampleNow,
+    recordSpeakCall,
+    recordSpeakOnPlay,
+    recordSpeakSkipped,
+    recordHandlerError,
+  }
 }
 
 /**
@@ -477,6 +579,57 @@ export function activateAudioContextProbe(
 export function sampleAudioCtxOnTap(): AudioCtxState {
   if (!activeProbe) return 'unavailable'
   return activeProbe.sampleNow('tap')
+}
+
+/**
+ * Phase-3 diagnostic surface (ticket 86c9gvd0y). All four singleton
+ * wrappers below are no-ops when no probe is active, so production
+ * sessions (no `?debug=1`) pay only a null check per call. iPad QA
+ * sessions add roughly one localStorage row per call.
+ *
+ * Diagnostic intent
+ * -----------------
+ * - `recordSpeakCall(soundId, tag?)`: every `Howl.play()` synchronous
+ *   return emits a row. `soundId` is the Howler return value (number)
+ *   or `null` when play threw / no Howl available. `tag` is folded
+ *   into `skipReason` for cross-referencing (typical: a Greet line key).
+ *
+ * - `recordSpeakOnPlayEvent(tag?)`: Howler's `'play'` event handler
+ *   emits a row. The diagnostic question we are answering: do we see
+ *   `'speak-call'` rows but no matching `'speak-onplay'` rows? That
+ *   would localize the failure to Howler-on-iOS play-to-onplay stall,
+ *   downstream of the audio-context layer.
+ *
+ * - `recordSpeakSkipped(reason)`: tap-handler early-returns. If we see
+ *   tap rows followed by `'speak-skipped'` with `reason` and no
+ *   `'speak-call'`, the gate is bouncing the gesture (e.g. dispatch
+ *   wasn't consumed because gate isn't `'relock'` yet).
+ *
+ * - `recordHandlerError(error)`: tap-handler body threw. The error
+ *   message is recorded. Caller MUST re-throw afterwards so production
+ *   behaviour (the throw) is preserved.
+ */
+export function recordSpeakCallEvent(
+  soundId: number | null,
+  tag?: string,
+): void {
+  if (!activeProbe) return
+  activeProbe.recordSpeakCall(soundId, tag)
+}
+
+export function recordSpeakOnPlayEvent(tag?: string): void {
+  if (!activeProbe) return
+  activeProbe.recordSpeakOnPlay(tag)
+}
+
+export function recordSpeakSkippedEvent(reason: string): void {
+  if (!activeProbe) return
+  activeProbe.recordSpeakSkipped(reason)
+}
+
+export function recordHandlerErrorEvent(error: unknown): void {
+  if (!activeProbe) return
+  activeProbe.recordHandlerError(error)
 }
 
 /**

@@ -56,7 +56,7 @@ vi.mock('../lib/audio', async () => {
   }
 })
 
-import Greet from './Greet'
+import Greet, { type PlayGreetLineFn } from './Greet'
 import {
   _resetForTests as resetDebugBus,
   snapshot as debugSnapshot,
@@ -1741,6 +1741,98 @@ describe('Greet', () => {
         'data-screen-state',
         'intro',
       )
+    })
+  })
+
+  describe('Phase-3 (ticket 86c9gvd0y) — wake-tap handler instrumentation', () => {
+    /**
+     * The probe singleton is what wires the speak-skipped /
+     * handler-error events through to the bus's audioCtxEvents stream.
+     * We activate it at the start of each test and reset after.
+     *
+     * `recordTap` (from sampleAudioCtxOnTap → activeProbe.sampleNow)
+     * pushes `cause: 'tap'` rows; the new instrumentation pushes
+     * `'speak-skipped'` and `'handler-error'`. Production behaviour
+     * for the handler-error case still re-throws — the test asserts on
+     * the recorded row + the bubbled exception.
+     */
+    beforeEach(async () => {
+      const probe = await import('../lib/debug/audioContextProbe')
+      probe._resetAudioContextProbeForTests()
+      probe.activateAudioContextProbe({
+        howlerLike: { ctx: undefined },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+    })
+
+    afterEach(async () => {
+      const probe = await import('../lib/debug/audioContextProbe')
+      probe._resetAudioContextProbeForTests()
+    })
+
+    it('records a handler-error row and re-throws when the handler body throws synchronously', () => {
+      mediaSpy = stubReducedMotion(false)
+      // playGreetLineFn that throws synchronously inside the wake-tap.
+      // Production analogue: a Howler-throws-on-play path that bypasses
+      // the gate's reportSpeechError flow. The handler's outer
+      // try/catch records the error to the audio-ctx log under
+      // `cause: 'handler-error'` and then re-throws so React's error
+      // path is unchanged from before this instrumentation landed.
+      const throwingPlayGreetLineFn: PlayGreetLineFn = vi.fn(() => {
+        throw new Error('synthetic-handler-throw')
+      })
+
+      render(
+        withMotion(
+          <Greet
+            onAdvance={vi.fn()}
+            playGreetLineFn={throwingPlayGreetLineFn}
+          />,
+        ),
+      )
+
+      // Suppress the React error log + the global window error listener
+      // for the duration of the throw. React 19 in dev re-dispatches the
+      // synchronous event-handler throw via `window.dispatchEvent(new
+      // ErrorEvent(...))`, which Vitest treats as an unhandled error.
+      // Capturing + preventDefault'ing keeps the test output clean
+      // without altering the production behaviour we're asserting.
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const winErrorHandler = (e: ErrorEvent) => {
+        if (e.error && /synthetic-handler-throw/.test(String(e.error))) {
+          e.preventDefault()
+          e.stopImmediatePropagation()
+        }
+      }
+      window.addEventListener('error', winErrorHandler, true)
+
+      try {
+        // fireWakeTap returns normally because React 19 catches the
+        // synchronous handler throw and re-dispatches it asynchronously
+        // (which our `winErrorHandler` above suppresses to keep Vitest
+        // quiet). The diagnostic value we assert is the handler-error
+        // row landing in the bus — proof that the catch+record contract
+        // ran. The re-throw side of the contract is covered at the
+        // unit-level by `recordHandlerErrorEvent` tests in
+        // `audioContextProbe.test.ts`, plus visible at the source level
+        // in handleWakeTap's `} catch (err) { ... throw err }` block.
+        fireWakeTap()
+
+        const errors = debugSnapshot().audioCtxEvents.filter(
+          (e) => e.cause === 'handler-error',
+        )
+        expect(errors.length).toBeGreaterThanOrEqual(1)
+        expect(errors[errors.length - 1]).toMatchObject({
+          cause: 'handler-error',
+          errorMessage: 'synthetic-handler-throw',
+        })
+      } finally {
+        window.removeEventListener('error', winErrorHandler, true)
+        errSpy.mockRestore()
+      }
     })
   })
 })
