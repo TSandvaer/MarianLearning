@@ -1,4 +1,4 @@
-// Server-side TTS using Microsoft's free Edge Read-Aloud endpoint.
+// Server-side TTS using Azure Speech REST.
 //
 // Why this exists
 // ---------------
@@ -6,39 +6,47 @@
 // Greet lines using `en-US-AnaNeural` at rate -10% via the Python `edge-tts`
 // CLI. Math, Word Song, and any future per-session utterance is dynamic
 // (Claude-generated per session) and cannot be pre-recorded. This module
-// reimplements the same protocol in Node so the Vercel session-generation
-// function can mint AnaNeural audio for every utterance in a session plan
-// at session-start time.
+// renders those dynamic lines at session-start time using the same voice.
 //
-// Protocol references — derived from the Python `edge-tts` package
-// (https://github.com/rany2/edge-tts), specifically `communicate.py`,
-// `constants.py`, and `drm.py`. No API key is required: the
-// TrustedClientToken below is the public token Edge ships with for the
-// free read-aloud endpoint, and Sec-MS-GEC is computed locally.
+// HISTORY
+// -------
+//  - 86c9gr385 (Path A — server-side TTS pipeline): first impl reused the
+//    free Edge Read-Aloud WSS endpoint
+//    (wss://speech.platform.bing.com/...) — the same protocol the Python
+//    `edge-tts` package speaks. The choice was empirically wrong: from
+//    Vercel's serverless egress (arn1/iad1) the WSS handshake times out at
+//    8000ms across cold and warm invocations, plan sizes, and retries. Root
+//    cause is most likely a Vercel plan-level outbound WSS restriction or a
+//    Microsoft block-list on Vercel egress IPs. Either way the failure
+//    class is structural — no amount of timeout tuning fixes it.
+//    See ticket 86c9gv8um for the diagnostic write-up.
+//  - 86c9gvgjk (THIS CHANGE — Plan B lock-in): swap the entire transport
+//    layer to Azure Speech REST. Same voice (en-US-AnaNeural in Azure's
+//    official catalog), same output format (audio-24khz-48kbitrate-mono-mp3),
+//    same wire shape exposed to the caller (Uint8Array MP3 bytes). Plain
+//    HTTPS — no WSS, no Sec-MS-GEC token, no reverse-engineered protocol.
+//    Cost: $0/month within Azure F0 free tier.
 //
-// IMPORTANT: this is a server-side module ONLY. It uses the `ws` package
-// and Node's `crypto.subtle`. Never import from the browser bundle —
-// `tsconfig.api.json` keeps it scoped to `api/`.
+// IMPORTANT: this is a server-side module ONLY. It reads
+// `process.env.AZURE_SPEECH_KEY` and `process.env.AZURE_SPEECH_REGION`.
+// Never import from the browser bundle — `tsconfig.api.json` keeps it
+// scoped to `api/`.
 
-import { WebSocket } from 'ws'
-import { createHash, randomUUID } from 'node:crypto'
+const AZURE_TTS_PATH = '/cognitiveservices/v1'
 
-const TRUSTED_CLIENT_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4'
-const WSS_URL_BASE =
-  'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1'
+/** Output format header value. Matches what the Greet pre-recorded MP3s use
+ *  and what the client decoder expects. Do not change without coordinating
+ *  with the iPad audio path. */
+const AZURE_OUTPUT_FORMAT = 'audio-24khz-48kbitrate-mono-mp3'
 
-// Windows file-time epoch offset (1601-01-01) vs Unix epoch (1970-01-01),
-// in seconds. See drm.py — Sec-MS-GEC is a SHA-256 of "<ticks>"+token where
-// ticks is in 100-ns units of Windows file time, rounded down to the nearest
-// 5-minute boundary.
-const WIN_EPOCH_SECONDS = 11_644_473_600
-const SEC_MS_GEC_VERSION = '1-143.0.3650.75'
+/** User-Agent — Azure logs reject empty/clearly-bot UAs on some regions.
+ *  The value itself doesn't matter for billing; this just identifies us in
+ *  the Azure portal's diagnostic logs. */
+const USER_AGENT = 'marian-tutor/1.0 (+marian-learning.vercel.app)'
 
-// Edge's User-Agent string — the service does some basic UA sniffing so we
-// match what the Python lib sends.
-const USER_AGENT =
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-  '(KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.3650.75'
+/** Default per-utterance hard timeout. 8s matches the prior WSS contract;
+ *  Azure REST typically responds in <1s so this is comfortable headroom. */
+const DEFAULT_TIMEOUT_MS = 8_000
 
 /** Voice config for a single utterance. */
 export interface TtsRequest {
@@ -55,25 +63,45 @@ export interface TtsRequest {
 }
 
 export interface TtsResult {
-  /** Concatenated MP3 audio bytes (audio/mpeg). */
+  /** MP3 audio bytes (audio/mpeg). */
   audio: Uint8Array
 }
 
-/** Generates the Sec-MS-GEC token used to authenticate against the free
- *  Edge read-aloud endpoint. Pure function — easy to test. */
-export function generateSecMsGec(nowMs: number = Date.now()): string {
-  const unixSeconds = Math.floor(nowMs / 1000)
-  const winSeconds = unixSeconds + WIN_EPOCH_SECONDS
-  // Round DOWN to nearest 5-minute (300s) boundary.
-  const rounded = winSeconds - (winSeconds % 300)
-  // Convert to 100-ns ticks. We must avoid floating-point precision loss for
-  // the multiply — use BigInt.
-  const ticks = BigInt(rounded) * 10_000_000n
-  const toHash = `${ticks.toString()}${TRUSTED_CLIENT_TOKEN}`
-  return createHash('sha256').update(toHash).digest('hex').toUpperCase()
+/** Server-side env-var snapshot. Pulled at synthesize-time so a deploy that
+ *  forgot to set the vars fails loud per request rather than at module-load
+ *  (where it would mask the cold-start error in `/api/claude` behind a
+ *  generic FUNCTION_INVOCATION_FAILED). */
+export interface AzureCredentials {
+  key: string
+  region: string
 }
 
-/** XML-escape a string for safe embedding in SSML.  */
+/** Read Azure credentials from process.env. Exported for unit tests; the
+ *  production path calls this implicitly inside synthesizeUtterance. */
+export function readAzureCredentials(
+  env: NodeJS.ProcessEnv = process.env,
+): AzureCredentials {
+  const key = env.AZURE_SPEECH_KEY
+  const region = env.AZURE_SPEECH_REGION
+  if (!key || typeof key !== 'string') {
+    throw new Error(
+      'tts misconfigured: AZURE_SPEECH_KEY is not set in the function environment',
+    )
+  }
+  if (!region || typeof region !== 'string') {
+    throw new Error(
+      'tts misconfigured: AZURE_SPEECH_REGION is not set in the function environment',
+    )
+  }
+  return { key, region }
+}
+
+/** Build the Azure TTS endpoint URL for a given region. */
+export function buildAzureEndpoint(region: string): string {
+  return `https://${region}.tts.speech.microsoft.com${AZURE_TTS_PATH}`
+}
+
+/** XML-escape a string for safe embedding in SSML. */
 export function escapeSsml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -83,264 +111,143 @@ export function escapeSsml(text: string): string {
     .replace(/'/g, '&apos;')
 }
 
-/** Build the WSS URL with required query params. */
-export function buildWssUrl(
-  connectionId: string,
-  nowMs: number = Date.now(),
-): string {
-  const params = new URLSearchParams({
-    TrustedClientToken: TRUSTED_CLIENT_TOKEN,
-    ConnectionId: connectionId.replace(/-/g, ''),
-    'Sec-MS-GEC': generateSecMsGec(nowMs),
-    'Sec-MS-GEC-Version': SEC_MS_GEC_VERSION,
-  })
-  return `${WSS_URL_BASE}?${params.toString()}`
-}
-
-/** Build the speech.config message sent right after WS connect. */
-export function buildSpeechConfigMessage(): string {
-  const config = {
-    context: {
-      synthesis: {
-        audio: {
-          metadataoptions: {
-            sentenceBoundaryEnabled: 'false',
-            wordBoundaryEnabled: 'false',
-          },
-          outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
-        },
-      },
-    },
-  }
-  return (
-    `X-Timestamp:${new Date().toISOString()}\r\n` +
-    `Content-Type:application/json; charset=utf-8\r\n` +
-    `Path:speech.config\r\n\r\n` +
-    JSON.stringify(config)
-  )
-}
-
-/** Build the SSML message for a single utterance. All four attribute fields
+/** Build the SSML body sent to Azure. All four prosody attribute fields
  *  (voice/rate/pitch/volume) are XML-escaped in addition to `text`. Today
- *  these all come from the hardcoded `MELODY_VOICE_CONFIG`, but
- *  `buildSsmlMessage` is exported and `TtsRequest` accepts arbitrary strings
- *  — escaping is cheap defense-in-depth against a future caller passing
- *  user-derived prosody values into a single-quoted attribute slot. */
-export function buildSsmlMessage(req: TtsRequest, requestId: string): string {
-  const ssml =
-    `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>` +
-    `<voice name='${escapeSsml(req.voice)}'>` +
-    `<prosody pitch='${escapeSsml(req.pitch)}' rate='${escapeSsml(req.rate)}' volume='${escapeSsml(req.volume)}'>` +
+ *  these all come from the hardcoded `MELODY_VOICE_CONFIG`, but the
+ *  function is exported and `TtsRequest` accepts arbitrary strings —
+ *  escaping is cheap defense-in-depth against a future caller passing
+ *  user-derived prosody values into a single-quoted attribute slot.
+ *
+ *  `xml:lang="en-US"` is set on the speak element per Azure docs; the
+ *  service is more strict about this than the old Edge endpoint was. */
+export function buildSsmlBody(req: TtsRequest): string {
+  return (
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">` +
+    `<voice name="${escapeSsml(req.voice)}">` +
+    `<prosody pitch="${escapeSsml(req.pitch)}" rate="${escapeSsml(req.rate)}" volume="${escapeSsml(req.volume)}">` +
     `${escapeSsml(req.text)}` +
     `</prosody></voice></speak>`
-  // X-Timestamp must be a single ISO-8601 + Z, not double-Z. `toISOString()`
-  // already terminates with Z; an earlier draft of this file appended a second
-  // Z and the Edge endpoint silently tolerated it. Match the speech.config
-  // message format above (and edge-tts/communicate.py upstream).
-  return (
-    `X-RequestId:${requestId.replace(/-/g, '')}\r\n` +
-    `Content-Type:application/ssml+xml\r\n` +
-    `X-Timestamp:${new Date().toISOString()}\r\n` +
-    `Path:ssml\r\n\r\n` +
-    ssml
   )
 }
 
-/** Parse `\r\n`-separated `key:value` header lines into a record. Shared
- *  between the binary-frame parser (where headers live in a length-prefixed
- *  block) and the text-frame parser (where headers live before `\r\n\r\n`). */
-function parseHeaderBlock(headerText: string): Record<string, string> {
-  const headers: Record<string, string> = {}
-  for (const line of headerText.split('\r\n')) {
-    const idx = line.indexOf(':')
-    if (idx > 0) {
-      headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
-    }
+/** Map an upstream non-2xx into a stable, named Error. The outer
+ *  `_session.ts` and `claude.ts` both wrap this in the public `tts-failed`
+ *  response shape; the message text is preserved for log diagnosis but is
+ *  not user-facing and does not echo any secret value. */
+export function describeAzureFailure(status: number, bodyHint: string): Error {
+  const trimmed = bodyHint.trim().slice(0, 200)
+  // 401 is almost always a stale or wrong AZURE_SPEECH_KEY. 403 likewise
+  // (region/key mismatch counts as auth-shaped). 429 is rate-limit (F0
+  // tier ceiling or burst control). 5xx is upstream — retry-class.
+  if (status === 401 || status === 403) {
+    return new Error(`tts auth failed (${status}): check AZURE_SPEECH_KEY`)
   }
-  return headers
-}
-
-/** Parse a binary frame returned by the service. The first 2 bytes are a
- *  big-endian uint16 giving the header length; headers are then `\r\n`-
- *  separated `key:value` pairs; payload starts at offset 2 + headerLength. */
-export function parseBinaryFrame(buf: Uint8Array): {
-  headers: Record<string, string>
-  payload: Uint8Array
-} {
-  if (buf.length < 2) {
-    return { headers: {}, payload: new Uint8Array(0) }
+  if (status === 429) {
+    return new Error(`tts rate limited (429): Azure throttled the request`)
   }
-  const headerLength = (buf[0]! << 8) | buf[1]!
-  const headerBytes = buf.subarray(2, 2 + headerLength)
-  const headerText = Buffer.from(headerBytes).toString('utf8')
-  const headers = parseHeaderBlock(headerText)
-  const payload = buf.subarray(2 + headerLength)
-  return { headers, payload }
-}
-
-/** Parse a text frame: headers separated from body by `\r\n\r\n`. If the
- *  separator is missing, the whole string is treated as headers (the body is
- *  optional for our purposes — we only ever read `Path`). */
-export function parseTextFrame(text: string): {
-  headers: Record<string, string>
-  body: string
-} {
-  const sep = text.indexOf('\r\n\r\n')
-  if (sep < 0) {
-    return { headers: parseHeaderBlock(text), body: '' }
+  if (status >= 500 && status < 600) {
+    return new Error(
+      `tts upstream error (${status}): Azure returned 5xx${trimmed ? ` — ${trimmed}` : ''}`,
+    )
   }
-  return {
-    headers: parseHeaderBlock(text.slice(0, sep)),
-    body: text.slice(sep + 4),
-  }
+  return new Error(`tts http error (${status})${trimmed ? `: ${trimmed}` : ''}`)
 }
 
-/** Minimal duck-type for the WebSocket we depend on. Lets tests inject a
- *  fake without spinning up a real WS server. */
-export interface WebSocketLike {
-  send: (data: string | Uint8Array) => void
-  close: () => void
-  readonly readyState: number
-  on(event: 'open', listener: () => void): unknown
-  on(event: 'message', listener: (data: Buffer | ArrayBuffer) => void): unknown
-  on(event: 'error', listener: (err: Error) => void): unknown
-  on(event: 'close', listener: () => void): unknown
-}
-
-export type WebSocketFactory = (url: string) => WebSocketLike
-
-/** Default factory using the `ws` package. Tests inject their own. */
-export const defaultWebSocketFactory: WebSocketFactory = (url) => {
-  return new WebSocket(url, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-      'Cache-Control': 'no-cache',
-      Pragma: 'no-cache',
-    },
-  }) as unknown as WebSocketLike
-}
+/** Test seam — a fetch-shaped function. Defaults to `globalThis.fetch`. */
+export type FetchFn = typeof fetch
 
 export interface SynthesizeOptions {
-  /** Test seam: WebSocket factory. Defaults to `defaultWebSocketFactory`. */
-  webSocketFactory?: WebSocketFactory
-  /** Test seam: clock used for Sec-MS-GEC. Defaults to `Date.now`. */
-  now?: () => number
-  /** Test seam: connection ID. Defaults to `crypto.randomUUID()`. */
-  connectionId?: string
-  /** Test seam: per-utterance request ID. Defaults to `crypto.randomUUID()`. */
-  requestId?: string
+  /** Test seam: fetch implementation. Defaults to `globalThis.fetch`. */
+  fetchFn?: FetchFn
   /** Hard timeout for a single utterance in ms. Defaults to 8s. */
   timeoutMs?: number
   /** Test seam: schedule a timeout. Defaults to setTimeout. */
   setTimeoutFn?: (cb: () => void, ms: number) => unknown
   /** Test seam: cancel a timeout. Defaults to clearTimeout. */
   clearTimeoutFn?: (handle: unknown) => void
+  /** Test seam: env snapshot. Defaults to `process.env`. */
+  env?: NodeJS.ProcessEnv
 }
 
 /**
- * Synthesize one utterance. Opens a WSS to the Edge endpoint, sends the
- * speech.config + SSML messages, accumulates `audio` binary frames, and
- * resolves with the concatenated MP3 bytes once `Path:turn.end` is seen.
+ * Synthesize one utterance via Azure Speech REST. POSTs an SSML body to
+ * `https://{region}.tts.speech.microsoft.com/cognitiveservices/v1` with
+ * `Ocp-Apim-Subscription-Key` auth and the standard 24kHz/48kbps mono MP3
+ * output format header. Resolves with the response body bytes; rejects on
+ * non-2xx with a named error (`describeAzureFailure`) or on timeout.
  *
- * One WSS per utterance is the simple, correct shape: the protocol allows
- * multiplexing requests over a single socket, but our parallelism is bound
- * by the Vercel function's CPU and the endpoint's per-IP concurrency, not
- * by socket count, and a fresh socket per utterance keeps error handling
- * tractable. Connection setup is ~50ms — negligible inside our 10s budget.
+ * One HTTPS call per utterance — same dispatch shape as the prior WSS
+ * implementation. The fan-out / concurrency cap lives in `_session.ts`.
  */
-export function synthesizeUtterance(
+export async function synthesizeUtterance(
   req: TtsRequest,
   opts: SynthesizeOptions = {},
 ): Promise<TtsResult> {
-  const factory = opts.webSocketFactory ?? defaultWebSocketFactory
-  const now = opts.now ?? (() => Date.now())
-  const connectionId = opts.connectionId ?? randomUUID()
-  const requestId = opts.requestId ?? randomUUID()
-  const timeoutMs = opts.timeoutMs ?? 8_000
+  const fetchFn = opts.fetchFn ?? globalThis.fetch
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const scheduleTimeout = opts.setTimeoutFn ?? ((cb, ms) => setTimeout(cb, ms))
   const cancelTimeout =
     opts.clearTimeoutFn ??
     ((h) => clearTimeout(h as ReturnType<typeof setTimeout>))
 
-  return new Promise<TtsResult>((resolve, reject) => {
-    const url = buildWssUrl(connectionId, now())
-    const ws = factory(url)
-    const audioChunks: Uint8Array[] = []
-    let settled = false
-    let timeoutHandle: unknown = null
+  if (typeof fetchFn !== 'function') {
+    throw new Error(
+      'tts misconfigured: globalThis.fetch is not available — is this running on the Vercel Node runtime?',
+    )
+  }
 
-    const settle = (fn: () => void) => {
-      if (settled) return
-      settled = true
-      if (timeoutHandle !== null) {
-        cancelTimeout(timeoutHandle)
-        timeoutHandle = null
-      }
-      try {
-        ws.close()
-      } catch {
-        // best effort
-      }
-      fn()
+  const { key, region } = readAzureCredentials(opts.env)
+  const endpoint = buildAzureEndpoint(region)
+  const body = buildSsmlBody(req)
+
+  // AbortController gives us a cancellation handle the fetch implementation
+  // honours natively. We wrap it in the existing setTimeout/clearTimeout
+  // seam so the timeout test can run synchronously without real timers.
+  const controller = new AbortController()
+  let timedOut = false
+  const timeoutHandle = scheduleTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+
+  let response: Response
+  try {
+    response = await fetchFn(endpoint, {
+      method: 'POST',
+      headers: {
+        'Ocp-Apim-Subscription-Key': key,
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': AZURE_OUTPUT_FORMAT,
+        'User-Agent': USER_AGENT,
+      },
+      body,
+      signal: controller.signal,
+    })
+  } catch (err) {
+    cancelTimeout(timeoutHandle)
+    if (timedOut) {
+      throw new Error(`tts timeout after ${timeoutMs}ms`, { cause: err })
     }
+    throw err instanceof Error ? err : new Error(String(err), { cause: err })
+  }
 
-    timeoutHandle = scheduleTimeout(() => {
-      settle(() => reject(new Error(`tts timeout after ${timeoutMs}ms`)))
-    }, timeoutMs)
+  cancelTimeout(timeoutHandle)
 
-    ws.on('open', () => {
-      try {
-        ws.send(buildSpeechConfigMessage())
-        ws.send(buildSsmlMessage(req, requestId))
-      } catch (err) {
-        settle(() =>
-          reject(err instanceof Error ? err : new Error(String(err))),
-        )
-      }
-    })
+  if (!response.ok) {
+    // Drain the body so the underlying socket can be reused; capture the
+    // first 200 chars for the named-error message but never log the auth
+    // header value.
+    let bodyHint = ''
+    try {
+      bodyHint = await response.text()
+    } catch {
+      // best-effort
+    }
+    throw describeAzureFailure(response.status, bodyHint)
+  }
 
-    ws.on('message', (data) => {
-      // Binary frames are audio + audio-control; text frames are turn.start /
-      // turn.end / response. We only act on binary `Path:audio` frames and
-      // text frames whose Path is `turn.end`.
-      if (data instanceof ArrayBuffer || Buffer.isBuffer(data)) {
-        const buf =
-          data instanceof ArrayBuffer
-            ? new Uint8Array(data)
-            : new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-        const { headers, payload } = parseBinaryFrame(buf)
-        if (headers['Path'] === 'audio' && payload.length > 0) {
-          audioChunks.push(payload)
-        }
-        return
-      }
-
-      // Text frame. Parse the header block properly rather than substring-
-      // matching on `Path:turn.end` — a malformed body that happened to
-      // contain that literal would otherwise false-trigger the resolve.
-      const text = String(data)
-      const { headers: textHeaders } = parseTextFrame(text)
-      if (textHeaders['Path'] === 'turn.end') {
-        const total = audioChunks.reduce((n, c) => n + c.length, 0)
-        const merged = new Uint8Array(total)
-        let offset = 0
-        for (const chunk of audioChunks) {
-          merged.set(chunk, offset)
-          offset += chunk.length
-        }
-        settle(() => resolve({ audio: merged }))
-      }
-    })
-
-    ws.on('error', (err) => {
-      settle(() => reject(err))
-    })
-
-    ws.on('close', () => {
-      settle(() => reject(new Error('tts socket closed before turn.end')))
-    })
-  })
+  const buf = await response.arrayBuffer()
+  return { audio: new Uint8Array(buf) }
 }
 
 /** Encode a Uint8Array as base64. Server-side only — uses Node's Buffer. */
