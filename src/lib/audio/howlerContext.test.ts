@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resumeHowlerContextOnGesture } from './howlerContext'
+import {
+  awaitHowlerContextResume,
+  resumeHowlerContextOnGesture,
+} from './howlerContext'
 
 /**
  * Minimal AudioContext stub for unit tests. Mirrors the FakeAudioContext
@@ -205,5 +208,199 @@ describe('resumeHowlerContextOnGesture', () => {
     // into something that already failed once.
     expect(result.resumeCalled).toBe(false)
     expect(ctx.resume).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Phase-4 fix tests (ticket 86c9gvd0y).
+ *
+ * `awaitHowlerContextResume` is the awaited counterpart to
+ * `resumeHowlerContextOnGesture` — same gesture-context contract but
+ * waits for the resume promise to settle (bounded by a timeout) so
+ * `Howl.play()` doesn't fire against a still-suspended context.
+ */
+describe('awaitHowlerContextResume', () => {
+  it('resolves immediately when ctx is unavailable', async () => {
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: undefined },
+    })
+    expect(result.stateBefore).toBe('unavailable')
+    expect(result.resumeAwaited).toBe(false)
+    expect(result.timedOut).toBe(false)
+  })
+
+  it('resolves immediately when ctx is already running (no await)', async () => {
+    const ctx = new FakeAudioContext()
+    ctx.state = 'running'
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+    })
+    expect(result.stateBefore).toBe('running')
+    expect(result.resumeAwaited).toBe(false)
+    expect(ctx.resumeCalls).toBe(0)
+  })
+
+  it('resolves immediately when ctx is closed (resume on closed is illegal)', async () => {
+    const ctx = new FakeAudioContext()
+    ctx.state = 'closed'
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+    })
+    expect(result.stateBefore).toBe('closed')
+    expect(result.resumeAwaited).toBe(false)
+    expect(ctx.resumeCalls).toBe(0)
+  })
+
+  it('awaits the resume() promise when ctx is suspended', async () => {
+    const ctx = new FakeAudioContext()
+    ctx.state = 'suspended'
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+    })
+    expect(result.stateBefore).toBe('suspended')
+    expect(result.resumeAwaited).toBe(true)
+    expect(result.timedOut).toBe(false)
+    expect(ctx.resumeCalls).toBe(1)
+  })
+
+  it('awaits the resume() promise when ctx is interrupted (WebKit-only state)', async () => {
+    const ctx = new FakeAudioContext()
+    ctx.state = 'interrupted'
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+    })
+    expect(result.stateBefore).toBe('interrupted')
+    expect(result.resumeAwaited).toBe(true)
+    expect(ctx.resumeCalls).toBe(1)
+  })
+
+  it('does not resolve until the resume promise actually settles', async () => {
+    // Drive the timeline manually with a controllable resume promise.
+    let resolveResume!: () => void
+    const resumePromise = new Promise<void>((resolve) => {
+      resolveResume = resolve
+    })
+    const ctx = {
+      state: 'suspended' as const,
+      resume: vi.fn(() => resumePromise),
+    }
+
+    let settled = false
+    const promise = awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+      // Plenty of headroom — we want to prove the resume is the gating
+      // step, not the timeout.
+      timeoutMs: 10_000,
+    }).then((r) => {
+      settled = true
+      return r
+    })
+
+    // Microtask flush — resume() has been called but the promise is
+    // pending, so awaitHowlerContextResume must NOT have resolved yet.
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(ctx.resume).toHaveBeenCalledTimes(1)
+    expect(settled).toBe(false)
+
+    resolveResume()
+    const result = await promise
+    expect(settled).toBe(true)
+    expect(result.resumeAwaited).toBe(true)
+    expect(result.timedOut).toBe(false)
+  })
+
+  it('returns timedOut=true when resume() never settles within the timeout', async () => {
+    // A resume promise that never resolves — simulating a worst-case
+    // iOS edge where the resume promise hangs. The bounded timeout is
+    // the safety valve.
+    const neverPromise = new Promise<void>(() => {})
+    const ctx = {
+      state: 'suspended' as const,
+      resume: vi.fn(() => neverPromise),
+    }
+
+    // Drive the timeout deterministically with an injected scheduler.
+    // We fire the timeout immediately so the test doesn't actually wait.
+    const scheduleOnce = vi.fn((cb: () => void) => {
+      cb()
+      return 1
+    })
+    const cancelScheduleOnce = vi.fn()
+
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+      timeoutMs: 500,
+      scheduleOnce,
+      cancelScheduleOnce,
+    })
+    expect(result.resumeAwaited).toBe(true)
+    expect(result.timedOut).toBe(true)
+    expect(scheduleOnce).toHaveBeenCalledWith(expect.any(Function), 500)
+  })
+
+  it('treats a rejecting resume() promise as settled (not timeout)', async () => {
+    const ctx = {
+      state: 'suspended' as const,
+      resume: vi.fn(() =>
+        Promise.reject(new Error('synthetic resume rejection')),
+      ),
+    }
+    // Bind unhandled-rejection probe to verify we swallow the rejection.
+    const unhandled: unknown[] = []
+    const handler = (ev: PromiseRejectionEvent) => {
+      unhandled.push(ev.reason)
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('unhandledrejection', handler)
+    }
+
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+      timeoutMs: 10_000,
+    })
+    expect(result.resumeAwaited).toBe(true)
+    expect(result.timedOut).toBe(false)
+
+    // Drain microtasks so any leaked rejection has a chance to fire.
+    await Promise.resolve()
+    await Promise.resolve()
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('unhandledrejection', handler)
+    }
+    expect(unhandled).toHaveLength(0)
+  })
+
+  it('reports resumeThrew=true when resume() throws synchronously', async () => {
+    const ctx = {
+      state: 'suspended' as const,
+      resume: vi.fn(() => {
+        throw new Error('synthetic synchronous throw')
+      }),
+    }
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+    })
+    expect(result.stateBefore).toBe('suspended')
+    expect(result.resumeAwaited).toBe(false)
+    expect(result.resumeThrew).toBe(true)
+    expect(result.timedOut).toBe(false)
+  })
+
+  it('handles a legacy resume() that returns void (no promise to await)', async () => {
+    const ctx = {
+      state: 'suspended' as const,
+      resume: vi.fn(() => undefined as unknown as Promise<void>),
+    }
+    const result = await awaitHowlerContextResume({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+    })
+    // We tried to resume — but there was no promise to wait for. Caller
+    // proceeds to play() immediately, which is fine for browsers where
+    // resume() takes effect synchronously.
+    expect(result.stateBefore).toBe('suspended')
+    expect(result.resumeAwaited).toBe(false)
+    expect(result.timedOut).toBe(false)
+    expect(ctx.resume).toHaveBeenCalledTimes(1)
   })
 })

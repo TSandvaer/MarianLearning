@@ -202,3 +202,176 @@ export function resumeHowlerContextOnGesture(
 
   return { stateBefore, resumeCalled: true, resumeThrew }
 }
+
+/**
+ * Phase-4 fix surface (ticket 86c9gvd0y).
+ *
+ * Why this exists alongside `resumeHowlerContextOnGesture`
+ * --------------------------------------------------------
+ * The Phase-2 helper (above) kicks `ctx.resume()` synchronously inside the
+ * gesture handler — correct iOS hygiene, but the resume PROMISE still
+ * settles asynchronously. Phase-3's iPad data showed the race that follows:
+ *
+ *   t=0      tap arrives, gesture window open
+ *   t=0+ms   resumeHowlerContextOnGesture() fires, ctx.resume() called
+ *   t=0+ms   playGreetLine() resolves its `ensureLoaded.then` microtask
+ *            and calls `Howl.play()` while ctx is still `'suspended'` —
+ *            Howler binds a buffer source against the suspended context
+ *   t=139ms  ctx statechange → `'running'` (resume promise finally settles)
+ *   …        but the buffer source is in limbo and `onplay` never fires
+ *
+ * This helper fixes that by AWAITING the resume promise before the caller
+ * proceeds to `Howl.play()`. By the time play() is called, the context is
+ * actually `running` and Howler binds against a live state.
+ *
+ * Cost: ~140ms added latency on tap-after-idle (matches the observed iPad
+ * resume-promise settle time). Imperceptible relative to Greet's own
+ * line-to-line cadence; well worth shipping clean audio.
+ *
+ * The Phase-2 helper STAYS — it's still the right thing to do
+ * synchronously inside the gesture handler (gesture-context association
+ * for iOS is most robust when resume is kicked in the same tick as the
+ * tap). This Phase-4 helper is the AWAITED version, intended for the
+ * play-call site (one microtask later).
+ *
+ * Bounded wait: a never-settling resume promise would hang Greet forever.
+ * We race the resume against a 500 ms timeout — well above the observed
+ * 139 ms iPad settle time but well below any user-visible silence floor.
+ * If the timeout wins, we return anyway and let `play()` try; iOS may
+ * still play, and even if it doesn't, the watchdog → relock recovery
+ * kicks in. We're never worse than the pre-fix behaviour.
+ */
+
+/** Bounded-wait timeout for the resume promise. */
+const RESUME_AWAIT_TIMEOUT_MS = 500
+
+export interface AwaitResumeResult {
+  /** State observed BEFORE we awaited. */
+  stateBefore: HowlerContextState
+  /**
+   * Whether we awaited the resume promise. False if the context was
+   * already running, closed, or unavailable (no resume to wait for).
+   */
+  resumeAwaited: boolean
+  /**
+   * Whether the bounded-wait timeout fired before the resume promise
+   * settled. Diagnostic only — caller proceeds to `play()` either way.
+   */
+  timedOut: boolean
+  /**
+   * Whether `ctx.resume()` threw synchronously. Mirrors
+   * `ResumeResult.resumeThrew`.
+   */
+  resumeThrew: boolean
+}
+
+export interface AwaitResumeOptions extends ResumeAudioContextOptions {
+  /**
+   * Override the bounded-wait timeout. Tests use a small value to keep
+   * the suite snappy; production uses the module default.
+   */
+  timeoutMs?: number
+  /** Test seam — defaults to `window.setTimeout`. */
+  scheduleOnce?: (cb: () => void, ms: number) => unknown
+  /** Test seam — defaults to `window.clearTimeout`. */
+  cancelScheduleOnce?: (handle: unknown) => void
+}
+
+/**
+ * Resume `Howler.ctx` and await the resume promise's settlement (bounded
+ * by a timeout) before resolving. Intended for the play-call site:
+ * `await awaitHowlerContextResume()` immediately before `Howl.play()`.
+ *
+ *   - If `ctx` is unavailable, already running, or closed: resolves
+ *     immediately with `resumeAwaited: false`.
+ *   - If `ctx` is suspended/interrupted: calls `ctx.resume()` and awaits
+ *     the returned promise, racing against `RESUME_AWAIT_TIMEOUT_MS`.
+ *     Resolves when the resume settles (success or failure) or the
+ *     timeout fires, whichever comes first.
+ *
+ * Caller MUST be inside (or microtask-adjacent to) a user-gesture for the
+ * resume to actually transition the context on iOS. This helper does
+ * not synthesize a gesture; it just waits for the resume the gesture
+ * authorized.
+ */
+export async function awaitHowlerContextResume(
+  opts: AwaitResumeOptions = {},
+): Promise<AwaitResumeResult> {
+  const ctx = readHowlerCtx(opts.howlerLike)
+  const stateBefore = readState(ctx)
+
+  if (!ctx) {
+    return {
+      stateBefore,
+      resumeAwaited: false,
+      timedOut: false,
+      resumeThrew: false,
+    }
+  }
+
+  if (stateBefore !== 'suspended' && stateBefore !== 'interrupted') {
+    return {
+      stateBefore,
+      resumeAwaited: false,
+      timedOut: false,
+      resumeThrew: false,
+    }
+  }
+
+  const timeoutMs = opts.timeoutMs ?? RESUME_AWAIT_TIMEOUT_MS
+  const scheduleOnce =
+    opts.scheduleOnce ?? ((cb, ms) => window.setTimeout(cb, ms))
+  const cancelScheduleOnce =
+    opts.cancelScheduleOnce ?? ((h) => window.clearTimeout(h as number))
+
+  let resumePromise: Promise<unknown> | null = null
+  try {
+    const result = ctx.resume()
+    if (result && typeof (result as Promise<void>).then === 'function') {
+      resumePromise = result as Promise<unknown>
+    }
+  } catch {
+    // Synchronous throw — mirror Phase-2 behaviour. Skip the await; the
+    // caller proceeds to play() and the watchdog handles failure.
+    return {
+      stateBefore,
+      resumeAwaited: false,
+      timedOut: false,
+      resumeThrew: true,
+    }
+  }
+
+  // Legacy resume() that returns void: nothing to await; resolve.
+  if (!resumePromise) {
+    return {
+      stateBefore,
+      resumeAwaited: false,
+      timedOut: false,
+      resumeThrew: false,
+    }
+  }
+
+  // Race the resume promise against a bounded timeout. Either way the
+  // caller can proceed; the diagnostic flag tells the probe which won.
+  let timeoutHandle: unknown = null
+  const timeoutPromise = new Promise<'timeout'>((resolve) => {
+    timeoutHandle = scheduleOnce(() => resolve('timeout'), timeoutMs)
+  })
+  const settledPromise = resumePromise
+    .then(() => 'settled' as const)
+    .catch(() => 'settled' as const)
+
+  const winner = await Promise.race([settledPromise, timeoutPromise])
+  if (timeoutHandle !== null) cancelScheduleOnce(timeoutHandle)
+
+  return {
+    stateBefore,
+    resumeAwaited: true,
+    timedOut: winner === 'timeout',
+    // resume() did not throw synchronously — we already returned in the
+    // catch branch above if it had. The reject path of the resume
+    // promise itself is folded into 'settled' (we don't surface it as
+    // resumeThrew, which is reserved for synchronous throws).
+    resumeThrew: false,
+  }
+}

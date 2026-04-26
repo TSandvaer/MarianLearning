@@ -113,7 +113,12 @@ interface Harness {
   fake: (key: GreetLineKey) => FakeHowl | undefined
 }
 
-function makeHarness(opts: { duration?: number } = {}): Harness {
+function makeHarness(
+  opts: {
+    duration?: number
+    awaitContextResume?: () => Promise<unknown> | unknown
+  } = {},
+): Harness {
   const fakes = new Map<string, FakeHowl>()
   // The production code calls `new HowlCtor({ src: [...] })` — we mimic
   // Howler's signature loosely. We only need the constructor to register a
@@ -124,7 +129,14 @@ function makeHarness(opts: { duration?: number } = {}): Harness {
     return fake
   }) as unknown as typeof import('howler').Howl
 
-  const audio = createPreRecorded({ HowlCtor })
+  // Default: synchronous-resolving await stub. Production injects the
+  // real async helper that resolves the AudioContext resume promise
+  // before play(); tests that aren't asserting resume-await ordering
+  // bypass that microtask chain to keep their existing flush patterns
+  // (`await Promise.resolve()` once before firing events) working.
+  const awaitContextResume = opts.awaitContextResume ?? (() => undefined)
+
+  const audio = createPreRecorded({ HowlCtor, awaitContextResume })
 
   return {
     audio,
@@ -514,8 +526,11 @@ describe('preRecorded', () => {
       expect(speakCall).toMatchObject({
         cause: 'speak-call',
         speakResult: 1,
-        skipReason: 'hi',
+        lineKey: 'hi',
       })
+      // Phase-4 cleanup (ticket 86c9gvd0y): speak-call MUST NOT use the
+      // `skipReason` field — it's reserved for speak-skipped rows.
+      expect(speakCall).not.toHaveProperty('skipReason')
 
       h.fake('hi')!.__fire('play')
       h.fake('hi')!.__fire('end')
@@ -534,8 +549,9 @@ describe('preRecorded', () => {
       expect(onPlay).toBeDefined()
       expect(onPlay).toMatchObject({
         cause: 'speak-onplay',
-        skipReason: 'imMelody',
+        lineKey: 'imMelody',
       })
+      expect(onPlay).not.toHaveProperty('skipReason')
 
       h.fake('imMelody')!.__fire('end')
       await promise
@@ -565,8 +581,124 @@ describe('preRecorded', () => {
       expect(speakCall).toMatchObject({
         cause: 'speak-call',
         speakResult: null,
-        skipReason: 'niceToMeet',
+        lineKey: 'niceToMeet',
       })
+      expect(speakCall).not.toHaveProperty('skipReason')
+    })
+  })
+
+  /**
+   * Phase-4 fix verification (ticket 86c9gvd0y).
+   *
+   * The iPad-suspended bug looked like: tap → ctx is suspended → Howl.play()
+   * fires while ctx is still suspended → Howler binds buffer source against
+   * limbo state → onplay never fires → 250 ms watchdog catches the missing
+   * onplay → gate relocks. Marian sees no Melody.
+   *
+   * The fix: in playGreetLine, await `awaitContextResume()` before calling
+   * `howl.play()`. This block proves the order — using a stub that
+   * exposes the moment the resume "settles" so we can assert play() did
+   * not fire before that moment.
+   *
+   * jsdom has no real Howler/WebAudio, so we cannot reproduce the
+   * iPad failure mode end-to-end. What we CAN do is assert the call
+   * order between the injected resume stub and the Howl `play()` mock,
+   * which is the load-bearing invariant: if play() ever fires before
+   * the resume promise settles, the iPad bug is back.
+   */
+  describe('Phase-4 (ticket 86c9gvd0y) — awaits AudioContext resume before play()', () => {
+    it('does NOT call howl.play() until awaitContextResume() resolves', async () => {
+      // Build a controllable resume stub: we capture the resolver so the
+      // test drives the timeline manually.
+      let resolveResume!: () => void
+      const resumePromise = new Promise<void>((resolve) => {
+        resolveResume = resolve
+      })
+      const awaitContextResume = vi.fn(() => resumePromise)
+
+      const h = makeHarness({ awaitContextResume })
+
+      const promise = h.audio.playGreetLine('hi')
+
+      // Flush microtasks for the load chain. After this, the play()
+      // call site has been reached but is parked on the resume promise.
+      await Promise.resolve()
+      await Promise.resolve()
+
+      // The resume helper was called — but play() must NOT have fired
+      // yet. This is the load-bearing assertion: pre-fix, play() ran
+      // synchronously after load and the resume came too late.
+      expect(awaitContextResume).toHaveBeenCalledTimes(1)
+      expect(h.fake('hi')!.__playCalls).toBe(0)
+
+      // Settle the resume promise. Now play() must fire on the next
+      // microtask — proving the resume was the gating step.
+      resolveResume()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(h.fake('hi')!.__playCalls).toBe(1)
+
+      // Wrap up cleanly so the test doesn't leak a pending promise.
+      h.fake('hi')!.__fire('play')
+      h.fake('hi')!.__fire('end')
+      await promise
+    })
+
+    it('still calls play() if awaitContextResume() rejects (degrades to pre-fix behaviour)', async () => {
+      // A resume rejection should NOT prevent play(). The production
+      // helper swallows rejections internally; this guard is for custom
+      // seams (or a future regression) that surface them. Worst case
+      // we're back to the pre-fix race, which is what we already shipped
+      // — never worse.
+      const awaitContextResume = vi.fn(() =>
+        Promise.reject(new Error('synthetic resume failure')),
+      )
+
+      const h = makeHarness({ awaitContextResume })
+
+      const promise = h.audio.playGreetLine('hi')
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(awaitContextResume).toHaveBeenCalledTimes(1)
+      expect(h.fake('hi')!.__playCalls).toBe(1)
+
+      h.fake('hi')!.__fire('play')
+      h.fake('hi')!.__fire('end')
+      await promise
+    })
+
+    it('does not call play() if the line was cancelled while awaiting resume', async () => {
+      // If Greet's orchestrator cancels (e.g. screen-leave) between the
+      // tap and the resume settle, we MUST NOT play — the resume could
+      // settle 140 ms later by which point Marian is already on the next
+      // screen.
+      let resolveResume!: () => void
+      const resumePromise = new Promise<void>((resolve) => {
+        resolveResume = resolve
+      })
+      const awaitContextResume = vi.fn(() => resumePromise)
+
+      const h = makeHarness({ awaitContextResume })
+
+      const promise = h.audio.playGreetLine('hi')
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(h.fake('hi')!.__playCalls).toBe(0)
+
+      // Cancel BEFORE resume settles. The pending promise will reject
+      // with 'cancelled', and the post-resume callPlay() must short-
+      // circuit on the resolved/stopped guards.
+      h.audio.cancel()
+      await expect(promise).rejects.toThrow(/cancelled/)
+
+      // Now the resume settles — but play() MUST NOT fire because the
+      // line was already cancelled.
+      resolveResume()
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(h.fake('hi')!.__playCalls).toBe(0)
     })
   })
 })

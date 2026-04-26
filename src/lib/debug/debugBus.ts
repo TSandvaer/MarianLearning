@@ -103,14 +103,17 @@ export type AudioCtxState =
  *
  *   - `'speak-call'` — `Howl.play()` returned synchronously. Carries
  *     `speakResult` (the Howler sound id, or null/undefined when play
- *     threw or the howl wasn't there).
- *   - `'speak-onplay'` — Howler emitted the `'play'` event. If
+ *     threw or the howl wasn't there) and optionally `lineKey` (the
+ *     Greet line key) for cross-referencing.
+ *   - `'speak-onplay'` — Howler emitted the `'play'` event. Carries
+ *     `lineKey` to pair with the matching `speak-call` row. If
  *     `'speak-call'` rows appear but `'speak-onplay'` rows don't, the
  *     bug is the Howler-on-iOS play-to-onplay stall.
  *   - `'speak-skipped'` — the wake-tap handler entered but didn't reach
  *     `speak()`. Carries `skipReason` from the handler's early-return
  *     (e.g. `'in-flight-guard'`, `'gate-not-relock'`,
- *     `'screen-not-wake-no-retry'`).
+ *     `'screen-not-wake-no-retry'`). `skipReason` is RESERVED for
+ *     speak-skipped rows — speak-call/speak-onplay rows use `lineKey`.
  *   - `'handler-error'` — the wake-tap handler body threw. Carries
  *     `errorMessage` from the caught error. The error is re-thrown by
  *     the caller after recording — production behaviour is unchanged.
@@ -153,11 +156,27 @@ export interface AudioCtxEventRecord {
    */
   speakResult?: number | null
   /**
-   * For `cause === 'speak-skipped'` rows: a short tag describing why
-   * the handler short-circuited. For `cause === 'speak-call'` rows:
-   * may carry a Howler asset key for cross-referencing.
+   * For `cause === 'speak-skipped'` rows ONLY: a short tag describing
+   * why the handler short-circuited (e.g. `'in-flight-guard'`,
+   * `'gate-not-relock'`). RESERVED for speak-skipped — speak-call and
+   * speak-onplay rows use `lineKey` instead, so a paste-back search for
+   * `skipReason: …` only matches genuine handler skips.
+   *
+   * Phase-4 cleanup (ticket 86c9gvd0y): pre-Phase-4 emit code reused
+   * this field on speak-call/speak-onplay rows to carry the line text
+   * — confusing in iPad exports because it looked like the handler
+   * had skipped.
    */
   skipReason?: string
+  /**
+   * For `cause === 'speak-call'` and `cause === 'speak-onplay'` rows:
+   * the Greet line key (`'hi'`, `'imMelody'`, `'niceToMeet'`,
+   * `'tapHeart'`) — or any other short identifier the producer wants
+   * to pair speak-call ↔ speak-onplay rows by. Phase-4 (ticket
+   * 86c9gvd0y) split this out from `skipReason` so the two diagnostics
+   * don't share a field.
+   */
+  lineKey?: string
   /** For `cause === 'handler-error'` rows: the caught error's message. */
   errorMessage?: string
 }

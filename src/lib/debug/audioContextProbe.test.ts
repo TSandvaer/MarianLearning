@@ -454,7 +454,7 @@ describe('audioContextProbe', () => {
       probe.stop()
     })
 
-    it('records a speak-call row carrying the soundId and tag', () => {
+    it('records a speak-call row carrying the soundId and lineKey', () => {
       const ctx = new FakeAudioContext()
       activateAudioContextProbe({
         howlerLike: { ctx: ctx as unknown as AudioContext },
@@ -465,12 +465,17 @@ describe('audioContextProbe', () => {
       })
 
       recordSpeakCallEvent(42, 'hi')
-      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+      const row = snapshot().audioCtxEvents.at(-1)
+      expect(row).toMatchObject({
         cause: 'speak-call',
         ctxState: 'running',
         speakResult: 42,
-        skipReason: 'hi',
+        lineKey: 'hi',
       })
+      // Phase-4 cleanup (ticket 86c9gvd0y): speak-call rows MUST NOT
+      // emit `skipReason` — that field is reserved for speak-skipped
+      // rows. A regression here would be the bug we just fixed.
+      expect(row).not.toHaveProperty('skipReason')
     })
 
     it('records a speak-call row with speakResult=null when play threw', () => {
@@ -488,7 +493,7 @@ describe('audioContextProbe', () => {
       expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
         cause: 'speak-call',
         speakResult: null,
-        skipReason: 'imMelody',
+        lineKey: 'imMelody',
       })
     })
 
@@ -504,10 +509,14 @@ describe('audioContextProbe', () => {
       })
 
       recordSpeakOnPlayEvent('niceToMeet')
-      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+      const row = snapshot().audioCtxEvents.at(-1)
+      expect(row).toMatchObject({
         cause: 'speak-onplay',
-        skipReason: 'niceToMeet',
+        lineKey: 'niceToMeet',
       })
+      // Phase-4 cleanup: same reservation — speak-onplay carries lineKey,
+      // not skipReason.
+      expect(row).not.toHaveProperty('skipReason')
     })
 
     it('records a speak-skipped row carrying the early-return reason', () => {
