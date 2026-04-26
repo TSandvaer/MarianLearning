@@ -253,9 +253,9 @@ machine for a wrong tap.
 
 1. Tapped chip does a soft horizontal shake: `x: [0, -6, 6, -4, 4, 0]` over 400ms. **No colour
    change.** The chip stays at its normal fill.
-2. Melody sprite swaps from `melody-idle.svg` → `melody-puzzled.svg` (asset confirmed present at
-   `public/assets/melody-puzzled.svg`, 6 KB). Cross-fade through `AnimatePresence` (no `wait`
-   mode — same pattern as Greet's idle↔happy swap), 200ms.
+2. Melody's expression swaps from `melody-idle.svg` → `melody-puzzled.svg` (asset confirmed
+   present at `public/assets/melody-puzzled.svg`, 6 KB). Cross-fade through `AnimatePresence`
+   (no `wait` mode — same pattern as Greet's idle↔happy expression swap), 200ms.
 3. SFX: `sfx-poof.mp3` plays. Soft, breathy, ~500ms. **NOT a buzzer.** (Asset blocked on Thomas
    per `assets-todo.md`; until it lands, `createSfx` will warn-once and `play()` is a silent no-op
    — that's the right failure mode, silence is better than a stand-in tone.)
