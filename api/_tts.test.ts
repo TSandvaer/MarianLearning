@@ -22,6 +22,7 @@ import {
   describeAzureFailure,
   escapeSsml,
   readAzureCredentials,
+  renderSsmlInnerText,
   synthesizeUtterance,
   uint8ToBase64,
 } from './_tts.js'
@@ -106,12 +107,15 @@ describe('buildSsmlBody', () => {
   })
 
   it('XML-escapes the text payload (defense against SSML injection)', () => {
+    // Use a declarative payload so this test pins escape behavior
+    // independently of the trailing-interrogative emphasis wrap (covered
+    // separately under renderSsmlInnerText / buildSsmlBody-prosody tests).
     const body = buildSsmlBody({
       ...baseReq,
-      text: `What's <2+2>?`,
+      text: `What's <2+2>.`,
     })
-    expect(body).toContain('What&apos;s &lt;2+2&gt;?')
-    expect(body).not.toContain("What's <2+2>?")
+    expect(body).toContain('What&apos;s &lt;2+2&gt;.')
+    expect(body).not.toContain("What's <2+2>.")
   })
 
   it('XML-escapes voice/rate/pitch/volume attribute values (defense-in-depth)', () => {
@@ -132,6 +136,96 @@ describe('buildSsmlBody', () => {
     // Raw double-quote inside the voice attribute would close it early —
     // verify it's gone after escaping.
     expect(body).not.toContain(`voice name="evil" onerror=""`)
+  })
+})
+
+describe('renderSsmlInnerText (interrogative emphasis hint, ticket 86c9gxup4)', () => {
+  // Background: en-US-AnaNeural's prosody predictor sometimes fails to flip
+  // into question intonation on short trailing interrogatives ("How many
+  // now?" after a numeric clause). Wrapping the trailing clause in
+  // <emphasis level="moderate"> nudges Azure into the right shape.
+
+  it('passes declarative text through unchanged (no emphasis tag)', () => {
+    expect(renderSsmlInnerText('Hello Marian!')).toBe('Hello Marian!')
+    expect(renderSsmlInnerText('This one is five.')).toBe('This one is five.')
+    expect(renderSsmlInnerText('Yes! Five!')).toBe('Yes! Five!')
+  })
+
+  it('still XML-escapes declarative text', () => {
+    expect(renderSsmlInnerText(`A & B < C.`)).toBe('A &amp; B &lt; C.')
+  })
+
+  it('wraps the trailing clause of the Math hint in <emphasis>', () => {
+    // The exact utterance from sessionPlans.ts that the ticket targets.
+    expect(
+      renderSsmlInnerText('Look. Three. And two more. How many now?'),
+    ).toBe(
+      'Look. Three. And two more. <emphasis level="moderate">How many now?</emphasis>',
+    )
+  })
+
+  it('wraps the whole text when it is one short interrogative with no internal boundary', () => {
+    expect(renderSsmlInnerText('How many?')).toBe(
+      '<emphasis level="moderate">How many?</emphasis>',
+    )
+  })
+
+  it('XML-escapes both the leading portion and the wrapped clause', () => {
+    expect(renderSsmlInnerText(`A & B. What's left?`)).toBe(
+      `A &amp; B. <emphasis level="moderate">What&apos;s left?</emphasis>`,
+    )
+  })
+
+  it('does not match a final-punctuation+whitespace inside the trailing clause itself', () => {
+    // Defensive case: only one sentence boundary exists, and it sits
+    // immediately before the trailing clause. No false-positive split.
+    expect(renderSsmlInnerText('Ready. Go now?')).toBe(
+      'Ready. <emphasis level="moderate">Go now?</emphasis>',
+    )
+  })
+
+  it('treats `!` and `.` endings as declarative even after question-shaped phrasing', () => {
+    expect(renderSsmlInnerText('How many now.')).toBe('How many now.')
+    expect(renderSsmlInnerText('How many now!')).toBe('How many now!')
+  })
+
+  it('handles the read utterance ("X plus Y. How many?") correctly', () => {
+    expect(renderSsmlInnerText('Three plus two. How many?')).toBe(
+      'Three plus two. <emphasis level="moderate">How many?</emphasis>',
+    )
+  })
+})
+
+describe('buildSsmlBody (prosody-hint integration)', () => {
+  const baseReq = {
+    voice: 'en-US-AnaNeural',
+    rate: '-10%',
+    pitch: '+0Hz',
+    volume: '+0%',
+  }
+
+  it('emits the <emphasis> hint inside <prosody> for the Math hint utterance', () => {
+    const body = buildSsmlBody({
+      ...baseReq,
+      text: 'Look. Three. And two more. How many now?',
+    })
+    expect(body).toContain(
+      '<prosody pitch="+0Hz" rate="-10%" volume="+0%">' +
+        'Look. Three. And two more. ' +
+        '<emphasis level="moderate">How many now?</emphasis>' +
+        '</prosody>',
+    )
+  })
+
+  it('does NOT emit <emphasis> for declarative utterances (regression guard for non-hint lines)', () => {
+    const body = buildSsmlBody({
+      ...baseReq,
+      text: 'Yes! Five!',
+    })
+    expect(body).not.toContain('<emphasis')
+    expect(body).toContain(
+      '<prosody pitch="+0Hz" rate="-10%" volume="+0%">Yes! Five!</prosody>',
+    )
   })
 })
 
