@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AUDIO_CTX_LOG_STORAGE_KEY } from './audioContextProbe'
 import {
   subscribe,
   type AudioCtxEventRecord,
@@ -42,6 +43,14 @@ import {
  *    a wall-clock timestamp and the optional `speechSynthesis.paused`
  *    co-reading. The full timeline is mirrored to localStorage under
  *    `debug:audioCtxLog:v1` for paste-back from iPad.
+ *  - An "Export log" button + entry counter that lets Thomas capture the
+ *    full localStorage timeline directly from the iPad (no Mac / Web
+ *    Inspector required). Primary path uses `navigator.clipboard.writeText`
+ *    on a user gesture (HTTPS + tap satisfies iOS Safari requirements).
+ *    Fallback path renders a monospace, scrollable `<textarea>` so Thomas
+ *    can long-press → Select All → Copy. The exported payload is a
+ *    self-describing JSON object containing `userAgent`, `exportedAt`,
+ *    `pageUrl`, the storage key, and the parsed log array.
  *
  * iPad QA usage
  * -------------
@@ -82,6 +91,100 @@ import {
 
 const POLL_MS = 200
 const TEXT_TRUNCATE_AT = 40
+
+/**
+ * How long the transient "Copied" confirmation stays visible after a
+ * successful clipboard write. Two seconds is enough for Thomas to register
+ * the success on the iPad without making the panel feel sticky.
+ */
+const COPIED_CONFIRMATION_MS = 2000
+
+/**
+ * Rows on the fallback `<textarea>`. Big enough that the JSON is scrollable
+ * and readable in one piece, small enough that the overlay still fits on an
+ * iPad in landscape without dominating the screen.
+ */
+const FALLBACK_TEXTAREA_ROWS = 12
+
+interface ExportPayload {
+  /** ISO timestamp of the export call. */
+  exportedAt: string
+  /** `Date.now()` of the export call (matches probe sample timestamps). */
+  exportedAtMs: number
+  /** `navigator.userAgent` so we can confirm iPad model / iOS version. */
+  userAgent: string
+  /** `window.location.href` so we can tell PR-preview from production. */
+  pageUrl: string
+  /** Storage key the log was read from — explicit so paste is self-describing. */
+  storageKey: string
+  /** The parsed log array, or `null` if the buffer was empty / malformed. */
+  log: unknown
+  /** Count of rows in `log`, or 0 if the buffer was empty / malformed. */
+  logEntryCount: number
+}
+
+/**
+ * Read the audio-context log from localStorage and parse it as JSON.
+ * Returns `null` if the key is missing, the value is empty, or parsing
+ * fails. Test seam — pass via props so the component is exercisable
+ * without poking at jsdom's localStorage shim.
+ */
+function readAudioCtxLog(): unknown {
+  if (typeof window === 'undefined' || !window.localStorage) return null
+  let raw: string | null
+  try {
+    raw = window.localStorage.getItem(AUDIO_CTX_LOG_STORAGE_KEY)
+  } catch {
+    return null
+  }
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // Surface the raw string so Thomas can still paste something useful
+    // even if the buffer got corrupted. Better than swallowing it.
+    return raw
+  }
+}
+
+/**
+ * Build the self-describing export payload that Thomas pastes back to the
+ * ticket. Wrapped in a function so tests can assert the shape without
+ * reaching into the component.
+ */
+function buildExportPayload(
+  log: unknown,
+  now: number = Date.now(),
+): ExportPayload {
+  // Defensive reads: jsdom and certain test harnesses may leave
+  // `window.location.href` or `navigator.userAgent` as `undefined`. We
+  // never want an export call to throw — the whole point is paste-back.
+  let pageUrl = '(unknown)'
+  try {
+    if (typeof window !== 'undefined' && window.location?.href) {
+      pageUrl = window.location.href
+    }
+  } catch {
+    // some sandboxes throw on cross-origin reads — keep the default.
+  }
+  let userAgent = '(unknown)'
+  try {
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+      userAgent = navigator.userAgent
+    }
+  } catch {
+    // ignore
+  }
+  return {
+    exportedAt: new Date(now).toISOString(),
+    exportedAtMs: now,
+    userAgent,
+    pageUrl,
+    storageKey: AUDIO_CTX_LOG_STORAGE_KEY,
+    log: log ?? null,
+    logEntryCount: Array.isArray(log) ? log.length : 0,
+  }
+}
 
 interface SynthSnapshot {
   speaking: boolean
@@ -160,10 +263,31 @@ export interface DebugOverlayProps {
    * the live engine. Tests pass a stub so they don't depend on jsdom.
    */
   readSynthFn?: () => SynthSnapshot
+  /**
+   * Test seam — overrides the localStorage read for the audio-context log.
+   * Defaults to reading `debug:audioCtxLog:v1`. Tests pass a stub so they
+   * don't have to populate jsdom's localStorage to exercise the export UI.
+   */
+  readAudioCtxLogFn?: () => unknown
+  /**
+   * Test seam — overrides the clipboard write. Defaults to
+   * `navigator.clipboard.writeText`. Tests pass a stub that resolves or
+   * rejects to exercise both the primary path and the textarea fallback.
+   * If clipboard is unavailable in the host (e.g. older iPad WebKit), pass
+   * a function that always rejects to force the fallback path.
+   */
+  writeClipboardFn?: (text: string) => Promise<void>
+  /**
+   * Test seam — overrides `Date.now()` used in the export payload.
+   */
+  nowFn?: () => number
 }
 
 export default function DebugOverlay({
   readSynthFn = readSynth,
+  readAudioCtxLogFn = readAudioCtxLog,
+  writeClipboardFn,
+  nowFn,
 }: DebugOverlayProps) {
   const [bus, setBus] = useState<DebugSnapshot>({
     lastSpeak: null,
@@ -174,11 +298,81 @@ export default function DebugOverlay({
     audioCtxEvents: [],
   })
   const [synth, setSynth] = useState<SynthSnapshot>(() => readSynthFn())
+  const [exportText, setExportText] = useState<string | null>(null)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'fallback'>(
+    'idle',
+  )
+  const [logEntryCount, setLogEntryCount] = useState<number>(() => {
+    const log = readAudioCtxLogFn()
+    return Array.isArray(log) ? log.length : 0
+  })
+  const copyTimerRef = useRef<number | null>(null)
 
   // Subscribe to the bus on mount.
   useEffect(() => {
     return subscribe(setBus)
   }, [])
+
+  // Clear any pending "Copied" timer on unmount so we never call setState
+  // after the component has been torn down (?debug=1 toggled off mid-flight,
+  // hot reload, etc.).
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current !== null) {
+        window.clearTimeout(copyTimerRef.current)
+        copyTimerRef.current = null
+      }
+    }
+  }, [])
+
+  // Re-read the log entry count alongside the synth poll so the counter
+  // stays roughly fresh as the probe pushes new samples. Cheap: one
+  // localStorage read + JSON.parse every 200ms, only under ?debug=1.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const log = readAudioCtxLogFn()
+      setLogEntryCount(Array.isArray(log) ? log.length : 0)
+    }, POLL_MS)
+    return () => window.clearInterval(id)
+  }, [readAudioCtxLogFn])
+
+  const handleExport = useCallback(async () => {
+    const log = readAudioCtxLogFn()
+    const payload = buildExportPayload(log, nowFn ? nowFn() : Date.now())
+    const json = JSON.stringify(payload, null, 2)
+
+    // Resolve the clipboard writer. Prefer the prop (test seam) but fall
+    // back to the platform API. Wrap in a function rather than reading
+    // navigator.clipboard inline so a missing API takes the fallback path
+    // immediately rather than throwing TypeError on `.writeText`.
+    const writer =
+      writeClipboardFn ??
+      (typeof navigator !== 'undefined' && navigator.clipboard
+        ? (text: string) => navigator.clipboard.writeText(text)
+        : null)
+
+    if (writer) {
+      try {
+        await writer(json)
+        setCopyState('copied')
+        setExportText(null)
+        if (copyTimerRef.current !== null) {
+          window.clearTimeout(copyTimerRef.current)
+        }
+        copyTimerRef.current = window.setTimeout(() => {
+          setCopyState('idle')
+          copyTimerRef.current = null
+        }, COPIED_CONFIRMATION_MS)
+        return
+      } catch {
+        // Fall through to textarea fallback. Older iPad WebKit + permission
+        // rejection both land here.
+      }
+    }
+
+    setCopyState('fallback')
+    setExportText(json)
+  }, [readAudioCtxLogFn, writeClipboardFn, nowFn])
 
   // Poll `speechSynthesis` every POLL_MS so the engine's live state stays
   // visible without callers needing to push it to the bus. The engine doesn't
@@ -284,6 +478,65 @@ export default function DebugOverlay({
                 {renderRawTap(t)}
               </div>
             ))
+        )}
+      </div>
+      {/*
+        Export block. The overlay container is `pointer-events-none` so it
+        never intercepts taps meant for the screen — but the export button
+        and the fallback textarea must accept input, so the wrapper switches
+        `pointer-events-auto` back on for this region only. `aria-hidden`
+        stays true on the parent (debug noise must not reach a screen
+        reader); the button is reachable by touch regardless.
+      */}
+      <div
+        data-testid="debug-overlay-export"
+        className="pointer-events-auto mt-1"
+      >
+        <strong>log entries: {logEntryCount}</strong>
+        <button
+          type="button"
+          data-testid="debug-overlay-export-button"
+          onClick={() => {
+            void handleExport()
+          }}
+          className="
+            ml-2 px-2 py-0.5
+            rounded border border-white/40
+            bg-white/10 hover:bg-white/20
+            text-white text-[12px]
+            font-mono
+          "
+        >
+          Export log
+        </button>
+        {copyState === 'copied' && (
+          <span
+            data-testid="debug-overlay-export-confirm"
+            className="ml-2 text-green-300"
+          >
+            Copied
+          </span>
+        )}
+        {copyState === 'fallback' && exportText !== null && (
+          <textarea
+            data-testid="debug-overlay-export-textarea"
+            readOnly
+            rows={FALLBACK_TEXTAREA_ROWS}
+            value={exportText}
+            // Keep the fallback inside the same panel so Thomas doesn't
+            // have to hunt for it. Monospace + full width of the overlay
+            // so JSON wraps predictably; long-press → Select All → Copy
+            // is the iOS-native interaction we're targeting.
+            className="
+              mt-1 block w-full
+              bg-black/60 text-white
+              font-mono text-[11px] leading-tight
+              border border-white/30 rounded
+              p-1
+              resize-y
+            "
+            onFocus={(e) => e.currentTarget.select()}
+          />
         )}
       </div>
     </div>
