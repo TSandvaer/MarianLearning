@@ -111,6 +111,75 @@ export function escapeSsml(text: string): string {
     .replace(/'/g, '&apos;')
 }
 
+/** Render the inner-text region of the SSML body — the bit between
+ *  `<prosody>` and `</prosody>`. Plain text is XML-escaped; if the
+ *  utterance is a trailing interrogative (ends with `?`), the trailing
+ *  clause is wrapped in `<emphasis level="moderate">` to nudge Azure
+ *  Neural TTS into question prosody.
+ *
+ *  Why this exists (ticket 86c9gxup4)
+ *  ----------------------------------
+ *  Thomas reported that Math's hint utterance —
+ *      "Look. {n}. And {m} more. How many now?"
+ *  sounds robotic on "How many now?" when synthesized by
+ *  `en-US-AnaNeural`. The trailing `?` reaches Azure intact, but Azure's
+ *  prosody predictor doesn't reliably flip into question intonation on a
+ *  short interrogative that follows a numeric clause. Wrapping the
+ *  trailing clause in `<emphasis level="moderate">` is the canonical
+ *  Azure recipe for this — voice-and-region-stable, no namespace
+ *  declarations required (standard W3C SSML 1.0).
+ *
+ *  Detection rule
+ *  --------------
+ *  - Text trimmed to end in `?`              → wrap trailing clause.
+ *  - Anything else (declarative, exclamation) → escape unchanged.
+ *
+ *  "Trailing clause" = the substring after the last sentence-ending
+ *  punctuation (`.`, `!`, `?`) followed by whitespace, or the entire
+ *  string if there is no such boundary. The leading portion (everything
+ *  before the trailing clause) and the clause itself are escaped
+ *  independently and joined with the raw SSML tags around the clause.
+ *
+ *  Backward-compat
+ *  ---------------
+ *  Declaratives (which is every non-hint utterance Math/WordSong emits
+ *  today: greetings, problem reads, correct/reprompt/giveAnswer lines)
+ *  are unchanged on the wire. The only utterances affected are those
+ *  ending with `?` — that is the bug class. */
+export function renderSsmlInnerText(text: string): string {
+  // Use the original text for boundary detection (we want to operate on
+  // un-escaped characters). Trailing whitespace doesn't matter for the
+  // ends-in-? check.
+  const trimmed = text.replace(/\s+$/, '')
+  if (!trimmed.endsWith('?')) {
+    return escapeSsml(text)
+  }
+  // Find the last sentence-ending boundary BEFORE the trailing clause.
+  // Pattern matches `. ` / `! ` / `? ` — punctuation followed by
+  // whitespace. We only consider boundaries inside the trimmed region;
+  // if none exist, the whole utterance is the trailing clause.
+  const boundary = /[.!?]\s+/g
+  let lastEnd = -1
+  let m: RegExpExecArray | null
+  while ((m = boundary.exec(trimmed)) !== null) {
+    // Skip a match whose punctuation is the very last char of trimmed —
+    // that is the trailing `?` itself with no clause after it.
+    if (m.index + m[0].length >= trimmed.length) break
+    lastEnd = m.index + m[0].length
+  }
+  // Preserve any trailing whitespace from the original input by appending
+  // it after the closing tag (it doesn't affect prosody but keeps round-
+  // trippability for callers that compare strings).
+  const trailingWs = text.slice(trimmed.length)
+  if (lastEnd === -1) {
+    // Whole utterance is one short interrogative — wrap it.
+    return `<emphasis level="moderate">${escapeSsml(trimmed)}</emphasis>${trailingWs}`
+  }
+  const lead = trimmed.slice(0, lastEnd)
+  const clause = trimmed.slice(lastEnd)
+  return `${escapeSsml(lead)}<emphasis level="moderate">${escapeSsml(clause)}</emphasis>${trailingWs}`
+}
+
 /** Build the SSML body sent to Azure. All four prosody attribute fields
  *  (voice/rate/pitch/volume) are XML-escaped in addition to `text`. Today
  *  these all come from the hardcoded `MELODY_VOICE_CONFIG`, but the
@@ -119,13 +188,18 @@ export function escapeSsml(text: string): string {
  *  user-derived prosody values into a single-quoted attribute slot.
  *
  *  `xml:lang="en-US"` is set on the speak element per Azure docs; the
- *  service is more strict about this than the old Edge endpoint was. */
+ *  service is more strict about this than the old Edge endpoint was.
+ *
+ *  Inner-text rendering goes through `renderSsmlInnerText` so that
+ *  trailing-interrogative utterances pick up an `<emphasis>` prosody
+ *  hint (see that function's doc for the full rationale, ticket
+ *  86c9gxup4). */
 export function buildSsmlBody(req: TtsRequest): string {
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">` +
     `<voice name="${escapeSsml(req.voice)}">` +
     `<prosody pitch="${escapeSsml(req.pitch)}" rate="${escapeSsml(req.rate)}" volume="${escapeSsml(req.volume)}">` +
-    `${escapeSsml(req.text)}` +
+    `${renderSsmlInnerText(req.text)}` +
     `</prosody></voice></speak>`
   )
 }
