@@ -163,6 +163,98 @@ if [[ "$LAST_CODE" != "400" ]]; then
   record_failure
 fi
 
+# --- 4. POST kind=session-start with a tiny plan → Azure TTS round-trip ----
+#
+# Catches the entire failure class that motivated ticket 86c9gvgjk: any
+# auth/region misconfig (AZURE_SPEECH_KEY missing or wrong, AZURE_SPEECH_REGION
+# pointing at the wrong region for the F0 resource, etc.) surfaces here as
+# a 502 tts-failed instead of green. The previous WSS pipeline used to time
+# out at 8000ms here; the Azure path should answer in <2s wall.
+#
+# Set TTS_SMOKE_SKIP=1 to skip just this check (e.g. against a preview that
+# is intentionally configured without the Azure vars).
+if [[ "${TTS_SMOKE_SKIP:-}" == "1" ]]; then
+  echo "smoke: POST session-start (Azure TTS) — SKIPPED (TTS_SMOKE_SKIP=1)"
+else
+  echo "smoke: POST session-start (Azure TTS round-trip)"
+  fetch_with_id "post-tts-session-start" POST \
+    '{"kind":"session-start","payload":{"plan":{"utterances":[{"id":"smoke.0","text":"Hello Marian."}]}}}'
+  if [[ "$LAST_BODY" == *"FUNCTION_INVOCATION_FAILED"* ]]; then
+    echo "  FAIL: response contains FUNCTION_INVOCATION_FAILED" >&2
+    echo "  body: $LAST_BODY" >&2
+    record_failure
+  fi
+  if [[ "$LAST_CODE" != "200" ]]; then
+    echo "  FAIL: expected 200 (Azure TTS happy path), got $LAST_CODE" >&2
+    echo "  body: $LAST_BODY" >&2
+    record_failure
+  else
+    # Body shape: { ok: true, kind: "session-start", utterances: [{ id, text,
+    # audio: { kind: "inline", base64, mime: "audio/mpeg" } }] }. Use jq if
+    # available — falls back to grep so the script is portable without a
+    # hard dependency.
+    if command -v jq >/dev/null 2>&1; then
+      kind=$(printf '%s' "$LAST_BODY" | jq -r '.kind // empty')
+      utt_count=$(printf '%s' "$LAST_BODY" | jq -r '.utterances | length // 0')
+      first_b64=$(printf '%s' "$LAST_BODY" | jq -r '.utterances[0].audio.base64 // empty')
+      first_mime=$(printf '%s' "$LAST_BODY" | jq -r '.utterances[0].audio.mime // empty')
+
+      if [[ "$kind" != "session-start" ]]; then
+        echo "  FAIL: response.kind = '$kind' (want 'session-start')" >&2
+        record_failure
+      fi
+      if [[ "$utt_count" -lt 1 ]]; then
+        echo "  FAIL: utterances[] is empty (want >=1)" >&2
+        record_failure
+      fi
+      if [[ "$first_mime" != "audio/mpeg" ]]; then
+        echo "  FAIL: utterances[0].audio.mime = '$first_mime' (want 'audio/mpeg')" >&2
+        record_failure
+      fi
+      # Validate base64: non-empty, base64 charset, decodes to non-empty
+      # bytes whose first 2 bytes look like an MP3 frame header (0xFF 0xFB
+      # for MPEG-1 Layer III, mono, 24kHz/48kbps — what the Azure output
+      # format header asks for).
+      if [[ -z "$first_b64" ]]; then
+        echo "  FAIL: utterances[0].audio.base64 is empty" >&2
+        record_failure
+      else
+        if ! printf '%s' "$first_b64" | grep -qE '^[A-Za-z0-9+/]+=*$'; then
+          echo "  FAIL: utterances[0].audio.base64 is not valid base64" >&2
+          record_failure
+        else
+          # Decode the first ~6 bytes and check the MP3 sync word. Accept
+          # both 0xFFFB (MPEG-1 L3) and 0xFFF3 (MPEG-2 L3) — Azure may
+          # emit either depending on bitrate negotiation.
+          first_two_hex=$(printf '%s' "$first_b64" | head -c 16 \
+            | base64 -d 2>/dev/null | od -An -N2 -tx1 | tr -d ' \n' || true)
+          if [[ -z "$first_two_hex" ]]; then
+            echo "  FAIL: base64 decoded to empty bytes" >&2
+            record_failure
+          elif [[ "$first_two_hex" != fffb* && "$first_two_hex" != fff3* && "$first_two_hex" != fffa* && "$first_two_hex" != fff2* ]]; then
+            echo "  FAIL: decoded bytes do not start with an MP3 frame sync (got 0x$first_two_hex)" >&2
+            record_failure
+          fi
+        fi
+      fi
+    else
+      # Minimal non-jq fallback: just check the wire-shape strings appear.
+      if [[ "$LAST_BODY" != *'"kind":"session-start"'* ]]; then
+        echo "  FAIL: body missing kind:session-start" >&2
+        record_failure
+      fi
+      if [[ "$LAST_BODY" != *'"audio":{"kind":"inline"'* ]]; then
+        echo "  FAIL: body missing audio:{kind:inline} marker" >&2
+        record_failure
+      fi
+      if [[ "$LAST_BODY" != *'"mime":"audio/mpeg"'* ]]; then
+        echo "  FAIL: body missing mime:audio/mpeg marker" >&2
+        record_failure
+      fi
+    fi
+  fi
+fi
+
 if [[ "$fail" -ne 0 ]]; then
   echo "" >&2
   echo "==============================================================" >&2

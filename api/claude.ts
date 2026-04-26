@@ -55,13 +55,19 @@
 // Runtime: Web-standard fetch handler (the `fetch` export above is what
 // triggers Vercel's Web `Request`/`Response` codepath, which in turn runs
 // on the Node runtime by default for /api/*.ts entrypoints). The TTS
-// pipeline imported from `_tts.ts` uses the `ws` package + `node:crypto`,
-// both of which require Node — so the Edge runtime would break us at
-// import time. The runtime-assertion below catches the in-between case
-// where Vercel's defaults flip to Edge in a future platform change but
-// still resolve our imports (e.g. via Node-compat shims). It does NOT
-// add coverage when the imports themselves fail under Edge — that's
+// pipeline imported from `_tts.ts` uses `globalThis.fetch` (Node 20+
+// global), `Buffer` (Node global), and `process.env` (Node API) — all of
+// which require Node. The runtime-assertion below catches the in-between
+// case where Vercel's defaults flip to Edge in a future platform change
+// but still resolve our imports (e.g. via Node-compat shims). It does
+// NOT add coverage when the imports themselves fail under Edge — that's
 // caught loudly at module-load anyway.
+//
+// Historical note: prior to ticket 86c9gvgjk the TTS pipeline imported
+// the `ws` package to speak the Edge Read-Aloud WSS protocol. The Azure
+// REST swap dropped that dependency from this codepath; the assertion's
+// error message and the assertNodeRuntime() doc-comment were updated in
+// the same PR to reflect the new dependency surface.
 
 import {
   isClaudeRequest,
@@ -78,15 +84,14 @@ import { renderSessionAudio } from './_session.js'
  * Edge runtime: `globalThis.process` is undefined.
  * Node runtime: `process.versions.node` is always a string (e.g. "22.11.0").
  *
- * Caveat: this fires AFTER the static `import { WebSocket } from 'ws'`
- * and `node:crypto` imports above are resolved. On a pure Edge runtime
- * those imports would themselves fail first with "Cannot find module
- * 'ws'" — so this assertion does NOT add coverage there. What it DOES
- * add coverage for is hybrid runtimes (Edge with Node compat shims) or
- * a future Vercel build target that resolves the imports but still
- * lacks `process.versions.node`. In those cases the imports succeed but
- * the function would later mis-behave; this throw makes the failure
- * loud and named at the top of the stack.
+ * Caveat: this fires AFTER the static module imports above are resolved.
+ * On a pure Edge runtime, `Buffer` and `process.env` accesses inside
+ * `_tts.ts` would themselves fail first — so this assertion does NOT add
+ * coverage there. What it DOES add coverage for is hybrid runtimes (Edge
+ * with Node compat shims) or a future Vercel build target that resolves
+ * the imports but still lacks `process.versions.node`. In those cases
+ * the imports succeed but the function would later mis-behave; this
+ * throw makes the failure loud and named at the top of the stack.
  *
  * Exported for unit-test coverage; the side effect is the runtime check
  * itself — calling `assertNodeRuntime()` from another file must produce
@@ -98,8 +103,9 @@ export function assertNodeRuntime(): void {
   ).process?.versions?.node
   if (typeof nodeVersion !== 'string') {
     throw new Error(
-      '/api/claude must run on the Vercel Node runtime — `ws` and `node:crypto` ' +
-        'imports require Node. Check vercel.json and the Vercel project runtime ' +
+      '/api/claude must run on the Vercel Node runtime — `Buffer`, ' +
+        '`process.env`, and `globalThis.fetch` (used by the TTS pipeline) ' +
+        'all require Node. Check vercel.json and the Vercel project runtime ' +
         'setting; do not move this function to Edge.',
     )
   }
