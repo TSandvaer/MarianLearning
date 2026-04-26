@@ -279,6 +279,22 @@ function WordSongScreen({
   const [problemIndex, setProblemIndex] = useState(0)
   const [problemState, setProblemState] =
     useState<PerProblemState>(FRESH_PROBLEM_STATE)
+
+  /**
+   * Always-fresh mirror of `problemState.resolved`. The chip-tap gate must
+   * read this synchronously: 5 rapid `fireEvent.click` calls (or 5
+   * real-iPad finger-mashes within the same React batch window) all
+   * capture the same closure and read the pre-batch `resolved=false`,
+   * so without a ref each click runs the full reward path — granting
+   * N stardust + crossing streak-bonus thresholds — for a single
+   * problem. The ref is flipped synchronously inside `handleCorrectTap`
+   * so the very next click in the same gesture tick sees `true` and
+   * bails. Visual `data-resolved` continues to derive from React state
+   * (used by `disabled` + cursor styling) — only the gate uses the ref.
+   * Mirrors Math's PR #66 fix to ticket 86c9gy4mf.
+   */
+  const resolvedRef = useRef(false)
+
   const [streak, setStreak] = useState(0)
   const streakRef = useRef(0)
   const totalCorrectRef = useRef(0)
@@ -393,6 +409,11 @@ function WordSongScreen({
     if (problemIndex < plan.problems.length - 1) {
       setProblemIndex((i) => i + 1)
       setProblemState(FRESH_PROBLEM_STATE)
+      // Reset the synchronous resolved gate alongside the React state
+      // reset — otherwise the new problem's first chip-tap would see
+      // `resolvedRef.current === true` from the previous problem and
+      // short-circuit the reward path.
+      resolvedRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
@@ -514,6 +535,15 @@ function WordSongScreen({
    */
   const handleCorrectTap = useCallback(
     (problem: WordSongProblem) => {
+      // Flip the synchronous ref FIRST — before any grant, streak update,
+      // or auto-advance schedule — so any same-tick re-entry from a rapid
+      // second tap on the correct chip bails at the `onChipTap` gate.
+      // React state batching means `setProblemState` below won't be
+      // visible until the next render; the ref is the only thing that
+      // protects the reward path from compounding. Mirrors Math's PR #66
+      // fix to ticket 86c9gy4mf.
+      resolvedRef.current = true
+
       sparkleInstance.play()
       plinkInstance.play()
 
@@ -571,7 +601,10 @@ function WordSongScreen({
   const onChipTap = useCallback(
     (chipWord: string) => {
       const problem = plan.problems[problemIndex]
-      if (problemState.resolved) return
+      // Read the synchronous ref, NOT React state. See `resolvedRef`
+      // declaration for the rage-tap rationale (mirrors Math's PR #66
+      // fix to ticket 86c9gy4mf).
+      if (resolvedRef.current) return
 
       // Phase-2 fix (ticket 86c9gvd0y) — same as Math.
       resumeAudioCtx()
@@ -611,7 +644,9 @@ function WordSongScreen({
       handleWrongTap,
       plan,
       problemIndex,
-      problemState.resolved,
+      // problemState.resolved intentionally omitted — gate reads
+      // resolvedRef.current synchronously instead. Mirrors Math's PR #66
+      // fix to ticket 86c9gy4mf.
       resumeAudioCtx,
       unlockAudioSessionFn,
     ],

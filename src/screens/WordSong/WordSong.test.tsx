@@ -480,6 +480,97 @@ describe('Word Song screen', () => {
     expect(harness.spoken()).toContain('This one is cat.')
   })
 
+  it('rage-tap: 5 rapid clicks on correct picture chip grant exactly 1 stardust and a single auto-advance', async () => {
+    // Strict single-grant on rapid tap, mirrors Math's PR #66 fix to
+    // ticket 86c9gy4mf.
+    //
+    // Reproduces the worst-case 8-year-old gesture (frustrated smash on
+    // the correct picture chip) and asserts the strict single-grant
+    // behaviour:
+    //   - exactly 1 stardust granted (data-total='1')
+    //   - streak advances by exactly 1 (data-streak='1')
+    //   - exactly one auto-advance scheduled (problem-index goes 0 → 1)
+    //   - onSessionComplete is NOT called (we're 1/8 deep, not 8/8)
+    //
+    // Background: prior to the ref-guard, `problemState.resolved` was
+    // held in React useState. Five synchronous fireEvent.click calls all
+    // captured the same closure with resolved=false and each ran the full
+    // reward path → 5 base stardust + streak bonuses at thresholds 3 and
+    // 5 (= 2 extra) = 7 total. The fix moves the gate to a useRef
+    // (`resolvedRef.current`) so the very next click in the same tick
+    // sees the flipped value and bails. The visual `disabled` chip
+    // styling still derives from React state; only the synchronous gate
+    // uses the ref.
+    //
+    // In the real browser the chip is `disabled` once resolved — disabled
+    // buttons swallow the second click natively. jsdom does not honour
+    // that, so the bug surfaced here even though it might not reproduce
+    // on iPad. The ref-guard protects both environments.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    const onSessionComplete = vi.fn()
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          onSessionComplete={onSessionComplete}
+        />,
+      ),
+    )
+
+    const correctChip = screen
+      .getAllByTestId('word-song-chip')
+      .find((c) => c.getAttribute('data-word') === 'cat')!
+
+    // 5 synchronous clicks — no awaits between them.
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        fireEvent.click(correctChip)
+      }
+      await Promise.resolve()
+    })
+
+    // Strict single-grant: 5 rapid taps → exactly 1 stardust, no streak
+    // compounding. Pre-fix this would have been '7' (5 base + bonuses at
+    // streak thresholds 3 and 5).
+    expect(screen.getByTestId('word-song-stardust')).toHaveAttribute(
+      'data-total',
+      '1',
+    )
+    expect(screen.getByTestId('word-song')).toHaveAttribute('data-streak', '1')
+
+    // onSessionComplete has NOT yet fired — auto-advance is scheduled but
+    // the timer hasn't elapsed. This is problem 1 of 8; the session ends
+    // only when the 8th problem's auto-advance lands.
+    expect(onSessionComplete).not.toHaveBeenCalled()
+
+    // Drain the auto-advance timer (1200ms). Exactly one advance should
+    // fire — we land on problem index 1 (the second problem), not 2+.
+    // The clearTimeout guard collapses repeated setTimeout calls into a
+    // single pending advance, and the ref-guard ensures only the first
+    // click ever schedules one.
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+    // Still no session-complete; we're 1/8 deep, not 8/8.
+    expect(onSessionComplete).not.toHaveBeenCalled()
+    // Stardust didn't grow during the auto-advance either.
+    expect(screen.getByTestId('word-song-stardust')).toHaveAttribute(
+      'data-total',
+      '1',
+    )
+  })
+
   it('completes the session on problem 8 and invokes onSessionComplete with surface=word-song', async () => {
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
