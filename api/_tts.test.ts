@@ -15,7 +15,7 @@ import {
   synthesizeUtterance,
   uint8ToBase64,
   type WebSocketLike,
-} from './_tts'
+} from './_tts.js'
 
 // Strict ISO-8601 + single-Z timestamp shape. The earlier double-Z bug
 // (`...sssZZ`) shipped under tests that only asserted substring presence
