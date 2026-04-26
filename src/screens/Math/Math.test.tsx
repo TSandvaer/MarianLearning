@@ -604,34 +604,30 @@ describe('Math (Number Garden) screen', () => {
     )
   })
 
-  it('rage-tap: 5 rapid clicks on correct chip resolve to a single auto-advance (smoke; data-total surfaces a known bug)', async () => {
+  it('rage-tap: 5 rapid clicks on correct chip grant exactly 1 stardust and a single auto-advance', async () => {
     // Ticket 86c9gumhp item #3 — "Rage-tap correct chip 5x rapidly".
     // Reproduces the worst-case 8-year-old gesture (frustrated smash on
-    // the chip) and asserts the screen does not double-fire the
-    // session-complete callback or land us past the second problem.
+    // the chip) and asserts the strict single-grant behaviour spec'd in
+    // ticket 86c9gy4mf:
+    //   - exactly 1 stardust granted (data-total='1')
+    //   - streak advances by exactly 1 (data-streak='1')
+    //   - exactly one auto-advance scheduled (problem-index goes 0 → 1)
+    //   - onSessionComplete is NOT called (we're 1/8 deep, not 8/8)
     //
-    // Bug discovered while writing this test (filed as follow-up):
-    //   `problemState.resolved` is React state, NOT a ref. The closure in
-    //   `onChipTap` (Math.tsx:695-759) captures the prior render's value,
-    //   so 5 synchronous fireEvent.click calls all see resolved=false and
-    //   ALL run handleCorrectTap → grantStardust(1). With STREAK_BONUS at
-    //   [3, 5, 8], 5 clean increments grant 5 base + 2 bonuses = 7
-    //   stardust. The expected behaviour from the ticket is data-total='1'.
+    // Background: prior to ticket 86c9gy4mf, `problemState.resolved` was
+    // held in React useState. Five synchronous fireEvent.click calls all
+    // captured the same closure with resolved=false and each ran the full
+    // reward path → 5 base stardust + streak bonuses at thresholds 3 and 5
+    // (= 2 extra) = 7 total. The fix moves the gate to a useRef
+    // (`resolvedRef.current`) so the very next click in the same tick sees
+    // the flipped value and bails. The visual `data-resolved` attribute is
+    // still derived from React state for `disabled` + cursor styling; only
+    // the synchronous gate uses the ref.
     //
-    //   We DO NOT assert data-total='1' here — it would fail under jsdom
-    //   today and ticket 86c9gumhp's hard constraint forbids touching
-    //   Math.tsx in this PR. Filed as a separate bug for the test-author
-    //   to pick up after the fix lands; this test currently asserts the
-    //   parts that DO hold:
-    //   onSessionComplete fires zero times during rapid taps and exactly
-    //   one auto-advance lands (problem-index goes 0 → 1, not 1 → 2+).
-    //   Once Math.tsx switches to a ref-guarded resolved flag, flip the
-    //   data-total assertion to '1' and remove this caveat.
-    //
-    // In the real browser the chip is `disabled` once resolved (Math.tsx
-    // line ~994) — disabled buttons swallow the second click natively.
-    // jsdom does not honour that, so the bug is surfaced here even though
-    // it may not reproduce on iPad. Refs would protect both environments.
+    // In the real browser the chip is `disabled` once resolved — disabled
+    // buttons swallow the second click natively. jsdom does not honour
+    // that, so the bug surfaced here even though it might not reproduce on
+    // iPad. The ref-guard protects both environments.
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
     })
@@ -660,6 +656,15 @@ describe('Math (Number Garden) screen', () => {
       await Promise.resolve()
     })
 
+    // Strict single-grant: 5 rapid taps → exactly 1 stardust, no streak
+    // compounding. Pre-fix this would have been '7' (5 base + bonuses at
+    // streak thresholds 3 and 5).
+    expect(screen.getByTestId('math-stardust')).toHaveAttribute(
+      'data-total',
+      '1',
+    )
+    expect(screen.getByTestId('math')).toHaveAttribute('data-streak', '1')
+
     // onSessionComplete has NOT yet fired — auto-advance is scheduled but
     // the timer hasn't elapsed. This is problem 1 of 8; the session ends
     // only when the 8th problem's auto-advance lands.
@@ -667,9 +672,9 @@ describe('Math (Number Garden) screen', () => {
 
     // Drain the auto-advance timer (1200ms). Exactly one advance should
     // fire — we land on problem index 1 (the second problem), not 2+.
-    // The clearTimeout guard at Math.tsx:675-677 collapses repeated
-    // setTimeout calls into a single pending advance, so this assertion
-    // holds even with the rage-tap bug.
+    // The clearTimeout guard collapses repeated setTimeout calls into a
+    // single pending advance, and the ref-guard ensures only the first
+    // click ever schedules one.
     await act(async () => {
       vi.advanceTimersByTime(1200)
       await Promise.resolve()
@@ -681,6 +686,11 @@ describe('Math (Number Garden) screen', () => {
     )
     // Still no session-complete; we're 1/8 deep, not 8/8.
     expect(onSessionComplete).not.toHaveBeenCalled()
+    // Stardust didn't grow during the auto-advance either.
+    expect(screen.getByTestId('math-stardust')).toHaveAttribute(
+      'data-total',
+      '1',
+    )
   })
 
   it('completes the session on problem 8 and invokes onSessionComplete', async () => {

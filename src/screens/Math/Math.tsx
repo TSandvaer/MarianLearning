@@ -340,6 +340,21 @@ function MathScreen({
   const [problemState, setProblemState] =
     useState<PerProblemState>(FRESH_PROBLEM_STATE)
 
+  /**
+   * Always-fresh mirror of `problemState.resolved`. The chip-tap gate must
+   * read this synchronously: 5 rapid `fireEvent.click` calls (or 5
+   * real-iPad finger-mashes within the same React batch window) all
+   * capture the same closure and read the pre-batch `resolved=false`,
+   * so without a ref each click runs the full reward path — granting
+   * N stardust + crossing streak-bonus thresholds — for a single
+   * problem. The ref is flipped synchronously inside `handleCorrectTap`
+   * so the very next click in the same gesture tick sees `true` and
+   * bails. Visual `data-resolved` continues to derive from React state
+   * (used by `disabled` + cursor styling) — only the gate uses the ref.
+   * See ticket 86c9gy4mf.
+   */
+  const resolvedRef = useRef(false)
+
   /** Streak of consecutive clean wins (correct-on-first-tap). */
   const [streak, setStreak] = useState(0)
   /** Always-fresh mirror of `streak` — same reasoning as `stardustTotalRef`.
@@ -506,6 +521,11 @@ function MathScreen({
     if (problemIndex < plan.problems.length - 1) {
       setProblemIndex((i) => i + 1)
       setProblemState(FRESH_PROBLEM_STATE)
+      // Reset the synchronous resolved gate alongside the React state
+      // reset — otherwise the new problem's first chip-tap would see
+      // `resolvedRef.current === true` from the previous problem and
+      // short-circuit the reward path.
+      resolvedRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
@@ -649,6 +669,13 @@ function MathScreen({
 
       setPose('happy')
       setCelebrating(true)
+      // Flip the synchronous ref FIRST — before any grant or streak
+      // update — so any same-tick re-entry from a rapid second tap on
+      // the correct chip bails at the `onChipTap` gate. React state
+      // batching means `setProblemState` below won't be visible until
+      // the next render; the ref is the only thing that protects the
+      // reward path from compounding.
+      resolvedRef.current = true
       setProblemState((prev) => ({ ...prev, resolved: true }))
 
       // Stardust + streak. Spec line 162-164: stardust is awarded even after
@@ -710,7 +737,9 @@ function MathScreen({
   const onChipTap = useCallback(
     (chipValue: number) => {
       const problem = plan.problems[problemIndex]
-      if (problemState.resolved) return
+      // Read the synchronous ref, NOT React state. See `resolvedRef`
+      // declaration for the rage-tap rationale (ticket 86c9gy4mf).
+      if (resolvedRef.current) return
 
       // Phase-2 fix for ticket 86c9gvd0y. Kick `Howler.ctx.resume()`
       // synchronously inside this user-gesture handler. Splash → Greet →
@@ -780,7 +809,8 @@ function MathScreen({
       handleWrongTap,
       plan,
       problemIndex,
-      problemState.resolved,
+      // problemState.resolved intentionally omitted — gate reads
+      // resolvedRef.current synchronously instead. See ticket 86c9gy4mf.
       resumeAudioCtx,
       unlockAudioSessionFn,
     ],
