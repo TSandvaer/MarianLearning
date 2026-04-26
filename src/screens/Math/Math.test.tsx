@@ -676,4 +676,51 @@ describe('Math (Number Garden) screen', () => {
     // Note: "X" alone would match "ax" / "fix" etc. — checking the canonical
     // failure-mode strings is sufficient for this regression.
   })
+
+  it('chip-tap kicks resumeAudioContext synchronously before audio (ticket 86c9gvd0y Phase 2)', async () => {
+    // Same shape as the Greet wake-tap test: every audio-active screen
+    // needs to resume `Howler.ctx` inside the gesture window before any
+    // play() call lands. Math's chip-tap is the load-bearing gesture for
+    // this screen — first-tap unlocks the read-aloud, subsequent taps
+    // play the result audio. The resume kick fires on every tap, not
+    // just the first, because iOS can re-suspend the context on screen
+    // transitions or page-visibility events between problems.
+    const harness = makePlayHarness()
+    const resumeSpy = vi.fn()
+    render(
+      withMotion(
+        <Math
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          resumeAudioContext={resumeSpy}
+        />,
+      ),
+    )
+
+    // Pre-tap: no resume kick.
+    expect(resumeSpy).not.toHaveBeenCalled()
+
+    const correctChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') === '5')!
+
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // Resume was kicked exactly once on the chip-tap gesture.
+    expect(resumeSpy).toHaveBeenCalledTimes(1)
+    // And the resume kick lands BEFORE playUtterance — the shape iPad
+    // Safari needs (resume() inside gesture, play() can land in a later
+    // microtask).
+    const resumeOrder = resumeSpy.mock.invocationCallOrder[0]
+    const playOrder = (
+      harness.playUtterance as unknown as {
+        mock: { invocationCallOrder: number[] }
+      }
+    ).mock.invocationCallOrder[0]
+    expect(resumeOrder).toBeLessThan(playOrder)
+  })
 })

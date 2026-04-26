@@ -4,6 +4,7 @@ import { createSfx, type Sfx } from '../lib/sfx'
 import {
   cancelPreRecorded,
   playGreetLine as defaultPlayGreetLine,
+  resumeHowlerContextOnGesture,
   useAudioUnlockGate,
   type GreetLineKey,
   type PlayGreetLineOptions,
@@ -198,6 +199,18 @@ export interface GreetProps {
    * tolerant of the asset being absent (see assets-todo.md).
    */
   chime?: Sfx
+  /**
+   * Test seam: spy on the per-gesture `Howler.ctx.resume()` kick added in
+   * Phase 2 of ticket 86c9gvd0y. Defaults to the real
+   * `resumeHowlerContextOnGesture` from `lib/audio`. Tests use this to
+   * assert the call lands synchronously on every gesture path (wake-tap,
+   * relock-retry-tap, heart-tap) without standing up a fake `Howler.ctx`.
+   *
+   * Production callers should never override this — the helper is a safe,
+   * idempotent no-op when no audio context exists, so plumbing the real
+   * one is correct for every shipping path.
+   */
+  resumeAudioContext?: () => void
 }
 
 /**
@@ -230,7 +243,14 @@ export default function Greet({
   onAdvance,
   playGreetLineFn = defaultPlayGreetLine,
   chime,
+  resumeAudioContext,
 }: GreetProps) {
+  // Bind the per-gesture audio-context resume kick. Defaults to the real
+  // helper from `lib/audio`; tests can inject a spy to observe call
+  // ordering. We deliberately do NOT call this lazily on each tap — the
+  // identity is stable across renders so the same default reference flows
+  // through every gesture handler closure without re-creating the kick.
+  const resumeAudioCtx = resumeAudioContext ?? resumeHowlerContextOnGesture
   const reducedMotion = usePrefersReducedMotion()
 
   // Audio unlock gate — wraps line 0's play with a 1.5s watchdog. If the
@@ -677,6 +697,16 @@ export default function Greet({
       // guard once the React render cycle has commited the new state.
       if (wakeTapInFlightRef.current) return
       wakeTapInFlightRef.current = true
+      // Phase-2 fix for ticket 86c9gvd0y: kick `Howler.ctx.resume()`
+      // synchronously inside the gesture, BEFORE the registered retry
+      // (which goes through `gate.wrapSpeak` → `playGreetLine` → Howler
+      // `play()` in a microtask). The retry path is the very case where
+      // a previous tap landed on a suspended context and Howler's
+      // implicit gesture-unlock left the buffer source stalled. By
+      // resuming explicitly here we put the context into a transitioning
+      // state during the gesture window, so the microtask `play()` runs
+      // against a context that's already moving toward `running`.
+      resumeAudioCtx()
       const dispatched = gate.dispatchGesture()
       // Reset on a microtask so the next physical tap is not blocked.
       // Microtask (queueMicrotask) drains after the current synchronous
@@ -695,6 +725,35 @@ export default function Greet({
     // Same-tick guard — see wakeTapInFlightRef declaration for why.
     if (wakeTapInFlightRef.current) return
     wakeTapInFlightRef.current = true
+
+    // Phase-2 fix for ticket 86c9gvd0y. Resume `Howler.ctx` SYNCHRONOUSLY
+    // inside the gesture handler, BEFORE we call into Howler's `play()`
+    // path via wrapSpeak → handle.start() → playGreetLine. The Phase-1
+    // iPad export-log proved that:
+    //
+    //   1. Howler creates `Howler.ctx` in `'suspended'` state at Greet
+    //      mount time (chime SFX construction triggers lazy init, but
+    //      Splash → Greet auto-advances without a user gesture so the
+    //      context is born suspended).
+    //   2. The context stays suspended until a tap. iOS does not decay
+    //      it; it has just never been unlocked.
+    //   3. The tap successfully resumes the context (statechange to
+    //      `running` ~185 ms post-tap, observed in the iPad export).
+    //   4. But Howler's `onplay` event never fires — the gate watchdog
+    //      times out to `relock` and Marian sees no Melody, no heart.
+    //
+    // Empirical hypothesis: Howler's implicit gesture-unlock (called
+    // inside `Howl.play()` when ctx is suspended) races with the buffer
+    // source binding for a Howl that was preloaded against a suspended
+    // context. The fix is to resume the context EXPLICITLY here, in the
+    // gesture tick, so by the time `play()` runs (in a microtask via
+    // `ensureLoaded.then` inside `playGreetLine`) the context is already
+    // moving toward running and the source binding doesn't stall.
+    //
+    // The helper is a no-op when the context is already running, when
+    // Howler hasn't lazy-initted, or when the context is closed — safe
+    // to call unconditionally on every tap.
+    resumeAudioCtx()
 
     // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
     cancelWakeReprompt()
@@ -735,7 +794,15 @@ export default function Greet({
     // callback inside its own tap handler. `lastFailedLineRef.current`
     // decides whether to restart from line 0 (ref is null — silent miss)
     // or to retry the failed line (ref carries the index — MP3 failure).
+    //
+    // The retry callback ALSO kicks `resumeHowlerContextOnGesture` — the
+    // outer dispatchGesture branch above calls it synchronously when the
+    // gesture arrives, so by the time this callback runs the context
+    // resume is already in flight; this second kick is belt-and-braces
+    // against any future caller that triggers a retry through a different
+    // dispatch path. Idempotent, so safe to repeat.
     gate.registerRetry(() => {
+      resumeAudioCtx()
       sequenceRef.current?.cancel()
       cancelPreRecorded()
       const retryHandle = buildSequence()
@@ -750,12 +817,27 @@ export default function Greet({
     })
 
     setScreenState('intro')
-  }, [buildSequence, cancelWakeReprompt, chimeInstance, gate, screenState])
+  }, [
+    buildSequence,
+    cancelWakeReprompt,
+    chimeInstance,
+    gate,
+    resumeAudioCtx,
+    screenState,
+  ])
 
   // --- Heart tap -------------------------------------------------------------
 
   const handleHeartTap = useCallback(() => {
     if (!heartReady || tapHandledRef.current) return
+
+    // Phase-2 fix for ticket 86c9gvd0y. Heart tap is a user gesture, so
+    // it's the right place to make sure the audio context is running
+    // before the chime plays. iOS can suspend the context if the user
+    // received a phone call / Siri / system audio interruption between
+    // line 2 ending and the heart tap — calling resume() here covers
+    // that path even though we're not actively reproducing it.
+    resumeAudioCtx()
 
     // Heart tap is itself a user-gesture handler. If the audio gate is in a
     // relock state (extremely rare path: the wake speak silently failed AND
@@ -791,7 +873,14 @@ export default function Greet({
       advanceTimerRef.current = null
       onAdvance()
     }, HEART_TAP_TRANSITION_MS)
-  }, [chimeInstance, gate, heartReady, onAdvance, triggerEarWiggle])
+  }, [
+    chimeInstance,
+    gate,
+    heartReady,
+    onAdvance,
+    resumeAudioCtx,
+    triggerEarWiggle,
+  ])
 
   // --- Render ----------------------------------------------------------------
 
