@@ -88,8 +88,32 @@ export type AudioCtxState =
 /**
  * One sample of `Howler.ctx.state` (or fallback observation). Recorded
  * either by the 1Hz polling tick during the warm-up window, by a
- * `statechange` event firing on the AudioContext, or synchronously inside
- * a tap handler. The `cause` field tells us which.
+ * `statechange` event firing on the AudioContext, synchronously inside
+ * a tap handler, or by a tap-handler instrumentation call (speak-call /
+ * speak-skipped / handler-error). The `cause` field tells us which.
+ *
+ * Phase-3 (ticket 86c9gvd0y) extended causes
+ * ------------------------------------------
+ * The Phase-2 fix (`resumeHowlerContextOnGesture`) verified the audio
+ * context resumes correctly on tap, but Thomas's iPad still reproduced
+ * the bug — which means the failure is downstream of the audio-context
+ * layer (gate, handler, or Howler `play()`-to-`onplay` chain). These
+ * causes mirror those layers into the same log so the next iPad export
+ * shows where the chain breaks:
+ *
+ *   - `'speak-call'` — `Howl.play()` returned synchronously. Carries
+ *     `speakResult` (the Howler sound id, or null/undefined when play
+ *     threw or the howl wasn't there).
+ *   - `'speak-onplay'` — Howler emitted the `'play'` event. If
+ *     `'speak-call'` rows appear but `'speak-onplay'` rows don't, the
+ *     bug is the Howler-on-iOS play-to-onplay stall.
+ *   - `'speak-skipped'` — the wake-tap handler entered but didn't reach
+ *     `speak()`. Carries `skipReason` from the handler's early-return
+ *     (e.g. `'in-flight-guard'`, `'gate-not-relock'`,
+ *     `'screen-not-wake-no-retry'`).
+ *   - `'handler-error'` — the wake-tap handler body threw. Carries
+ *     `errorMessage` from the caught error. The error is re-thrown by
+ *     the caller after recording — production behaviour is unchanged.
  */
 export interface AudioCtxEventRecord {
   /** ms since epoch. */
@@ -97,7 +121,15 @@ export interface AudioCtxEventRecord {
   /** AudioContext.state at the moment this sample was taken. */
   ctxState: AudioCtxState
   /** Why this sample was taken — disambiguates poll noise from real events. */
-  cause: 'poll' | 'statechange' | 'tap' | 'init'
+  cause:
+    | 'poll'
+    | 'statechange'
+    | 'tap'
+    | 'init'
+    | 'speak-call'
+    | 'speak-onplay'
+    | 'speak-skipped'
+    | 'handler-error'
   /**
    * Optional companion: speechSynthesis.paused at the same instant.
    * Useful because Web Speech and Web Audio share an audio session on
@@ -105,6 +137,29 @@ export interface AudioCtxEventRecord {
    * fingerprint.
    */
   synthPaused?: boolean
+  /**
+   * Optional companion: the audio-unlock-gate state at the same instant.
+   * The gate already pushes its state to the bus on every transition;
+   * this field mirrors the most-recent value into each ctx-event record
+   * so a single localStorage paste-back tells us both the audio-context
+   * timeline AND the gate timeline aligned by timestamp.
+   */
+  gateState?: GateStateName
+  /**
+   * For `cause === 'speak-call'` rows: the synchronous return value of
+   * `Howl.play()`. Howler returns a numeric sound id on success; we
+   * record `null` when play() threw or there was no Howl to play.
+   * Undefined for non-speak-call rows.
+   */
+  speakResult?: number | null
+  /**
+   * For `cause === 'speak-skipped'` rows: a short tag describing why
+   * the handler short-circuited. For `cause === 'speak-call'` rows:
+   * may carry a Howler asset key for cross-referencing.
+   */
+  skipReason?: string
+  /** For `cause === 'handler-error'` rows: the caught error's message. */
+  errorMessage?: string
 }
 
 export interface DebugSnapshot {
@@ -306,6 +361,20 @@ export function _resetForTests(): void {
   state.audioCtxState = null
   state.audioCtxEvents = []
   listeners.clear()
+}
+
+/**
+ * Accessor for the latest gate-state value. Used by the audio-context
+ * probe (`audioContextProbe.ts`) to attach the current gate state to
+ * every emitted `AudioCtxEventRecord` — keeps the gate timeline aligned
+ * to the audio-context timeline in a single localStorage paste-back.
+ *
+ * Returns `null` when no gate has reported yet (component unmounted, or
+ * before first state push). The value is read fresh on every call; no
+ * snapshot copy required because this is a single primitive.
+ */
+export function readGateState(): GateStateName | null {
+  return state.gateState
 }
 
 /**

@@ -10,8 +10,10 @@ import {
   type PlayGreetLineOptions,
 } from '../lib/audio'
 import {
+  recordHandlerErrorEvent,
   recordRawTapEvent,
   recordSpeakAttempt,
+  recordSpeakSkippedEvent,
   recordTap,
   sampleAudioCtxOnTap,
 } from '../lib/debug'
@@ -683,140 +685,190 @@ export default function Greet({
   // the watchdog even existed.
 
   const handleWakeTap = useCallback(() => {
-    // Idempotent — double-taps are common and we don't want to double-fire.
-    if (screenState !== 'wake') {
-      // Soft re-gate retry path: if the gate is showing (relock state), this
-      // tap is the gesture that retries speak(line0). Let the gate route it.
-      //
-      // Same-tick guard applies HERE too (round 5, ticket 86c9gp99a). A
-      // single physical tap during relock fires three synthetic events
-      // (touchend + pointerdown + click); without the guard, all three
-      // see `gate.state === 'relock'` from the same render closure and
-      // each runs the registered retry callback, queuing three speak()
-      // calls that compete on the engine. Microtask reset clears the
-      // guard once the React render cycle has commited the new state.
-      if (wakeTapInFlightRef.current) return
-      wakeTapInFlightRef.current = true
-      // Phase-2 fix for ticket 86c9gvd0y: kick `Howler.ctx.resume()`
-      // synchronously inside the gesture, BEFORE the registered retry
-      // (which goes through `gate.wrapSpeak` → `playGreetLine` → Howler
-      // `play()` in a microtask). The retry path is the very case where
-      // a previous tap landed on a suspended context and Howler's
-      // implicit gesture-unlock left the buffer source stalled. By
-      // resuming explicitly here we put the context into a transitioning
-      // state during the gesture window, so the microtask `play()` runs
-      // against a context that's already moving toward `running`.
-      resumeAudioCtx()
-      const dispatched = gate.dispatchGesture()
-      // Reset on a microtask so the next physical tap is not blocked.
-      // Microtask (queueMicrotask) drains after the current synchronous
-      // batch but before the next event-loop tick — exactly when React's
-      // state has been re-committed and a new physical tap is the next
-      // expected input.
-      queueMicrotask(() => {
-        wakeTapInFlightRef.current = false
-      })
-      // Whether or not dispatch consumed the gesture, return — we've
-      // routed everything we can in the non-wake branch.
-      void dispatched
-      return
-    }
-
-    // Same-tick guard — see wakeTapInFlightRef declaration for why.
-    if (wakeTapInFlightRef.current) return
-    wakeTapInFlightRef.current = true
-
-    // Phase-2 fix for ticket 86c9gvd0y. Resume `Howler.ctx` SYNCHRONOUSLY
-    // inside the gesture handler, BEFORE we call into Howler's `play()`
-    // path via wrapSpeak → handle.start() → playGreetLine. The Phase-1
-    // iPad export-log proved that:
+    // Phase-3 (ticket 86c9gvd0y) instrumentation. The whole body is
+    // wrapped in a try/catch so any throw — from gate calls, from
+    // resumeAudioCtx, from buildSequence, from chimeInstance.play —
+    // gets a row in the audio-ctx log before it propagates. We
+    // re-throw at the end of the catch block to preserve production
+    // behaviour (React's error boundary still gets the error).
     //
-    //   1. Howler creates `Howler.ctx` in `'suspended'` state at Greet
-    //      mount time (chime SFX construction triggers lazy init, but
-    //      Splash → Greet auto-advances without a user gesture so the
-    //      context is born suspended).
-    //   2. The context stays suspended until a tap. iOS does not decay
-    //      it; it has just never been unlocked.
-    //   3. The tap successfully resumes the context (statechange to
-    //      `running` ~185 ms post-tap, observed in the iPad export).
-    //   4. But Howler's `onplay` event never fires — the gate watchdog
-    //      times out to `relock` and Marian sees no Melody, no heart.
+    // The `recordSpeakSkippedEvent` calls below land at every early-
+    // return. Together with `recordSpeakCall` from preRecorded.ts and
+    // the pre-existing `sampleAudioCtxOnTap` call from the onClick /
+    // onTouchEnd / onPointerDown bindings, the iPad export-log will
+    // now show, per tap:
     //
-    // Empirical hypothesis: Howler's implicit gesture-unlock (called
-    // inside `Howl.play()` when ctx is suspended) races with the buffer
-    // source binding for a Howl that was preloaded against a suspended
-    // context. The fix is to resume the context EXPLICITLY here, in the
-    // gesture tick, so by the time `play()` runs (in a microtask via
-    // `ensureLoaded.then` inside `playGreetLine`) the context is already
-    // moving toward running and the source binding doesn't stall.
+    //   - whether the handler entered (sampleAudioCtxOnTap rows)
+    //   - whether the handler short-circuited and why
+    //     (speak-skipped rows)
+    //   - whether speak() was actually called (speak-call rows)
+    //   - whether the handler threw (handler-error rows)
     //
-    // The helper is a no-op when the context is already running, when
-    // Howler hasn't lazy-initted, or when the context is closed — safe
-    // to call unconditionally on every tap.
-    resumeAudioCtx()
-
-    // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
-    cancelWakeReprompt()
-
-    // Fresh wake-tap → no failed line yet. Clearing the ref ensures any
-    // stale value from a prior mount/recovery doesn't leak into the
-    // initial play.
-    lastFailedLineRef.current = null
-
-    // Build a fresh sequence (the one from mount may already be running if
-    // we're recovering from a relock state) and kick it off synchronously.
-    sequenceRef.current?.cancel()
-    cancelPreRecorded()
-    const handle = buildSequence()
-    sequenceRef.current = handle
-
-    // Wrap the synchronous speak with the gate's watchdog. The arrow body
-    // runs *before* wrapSpeak returns, so handle.start() — and therefore
-    // speak(line0) — sits in the same JS tick as this tap. That's the whole
-    // shape iPad Safari requires.
-    gate.wrapSpeak(() => {
-      handle.start()
-      // Silent unlock for the WebAudio (Howler) context — covers the chime
-      // we'll need on the heart tap. .play() is defensive: if the asset
-      // 404'd, this is a silent no-op; if the engine throws (unlikely),
-      // we eat it and move on.
-      try {
-        chimeInstance.play()
-      } catch {
-        // Howler can throw synchronously if no audio backend is available.
-        // The chime missing isn't a blocker for the unlock pathway.
+    // The probe is `?debug=1`-gated — production sessions pay one
+    // null check per record call.
+    try {
+      // Idempotent — double-taps are common and we don't want to double-fire.
+      if (screenState !== 'wake') {
+        // Soft re-gate retry path: if the gate is showing (relock state),
+        // this tap is the gesture that retries speak(line0). Let the gate
+        // route it.
+        //
+        // Same-tick guard applies HERE too (round 5, ticket 86c9gp99a). A
+        // single physical tap during relock fires three synthetic events
+        // (touchend + pointerdown + click); without the guard, all three
+        // see `gate.state === 'relock'` from the same render closure and
+        // each runs the registered retry callback, queuing three speak()
+        // calls that compete on the engine. Microtask reset clears the
+        // guard once the React render cycle has commited the new state.
+        if (wakeTapInFlightRef.current) {
+          recordSpeakSkippedEvent('non-wake-in-flight-guard')
+          return
+        }
+        wakeTapInFlightRef.current = true
+        // Phase-2 fix for ticket 86c9gvd0y: kick `Howler.ctx.resume()`
+        // synchronously inside the gesture, BEFORE the registered retry
+        // (which goes through `gate.wrapSpeak` → `playGreetLine` → Howler
+        // `play()` in a microtask). The retry path is the very case where
+        // a previous tap landed on a suspended context and Howler's
+        // implicit gesture-unlock left the buffer source stalled. By
+        // resuming explicitly here we put the context into a transitioning
+        // state during the gesture window, so the microtask `play()` runs
+        // against a context that's already moving toward `running`.
+        resumeAudioCtx()
+        const dispatched = gate.dispatchGesture()
+        // Reset on a microtask so the next physical tap is not blocked.
+        // Microtask (queueMicrotask) drains after the current synchronous
+        // batch but before the next event-loop tick — exactly when React's
+        // state has been re-committed and a new physical tap is the next
+        // expected input.
+        queueMicrotask(() => {
+          wakeTapInFlightRef.current = false
+        })
+        // Phase-3 instrumentation: tell the export-log whether the
+        // gate consumed the gesture or bounced it. `dispatched=false`
+        // is the "gate not in relock state" outcome — exactly the
+        // shape we expect to see when the user taps during `pending`
+        // (watchdog hasn't fired yet) or `unlocked` (sequence already
+        // running). If we see this row immediately followed by no
+        // speak-call rows, the bug is "gate sat in pending while
+        // user tapped, taps bounced silently".
+        if (!dispatched) {
+          recordSpeakSkippedEvent('non-wake-dispatch-not-consumed')
+        }
+        return
       }
-    })
 
-    // Register a synchronous retry: if the gate watchdog expires (silent
-    // first-utterance miss) OR a playGreetLine rejects (Howler load/play
-    // failure — ticket 86c9gr43t), the next user gesture will run this
-    // callback inside its own tap handler. `lastFailedLineRef.current`
-    // decides whether to restart from line 0 (ref is null — silent miss)
-    // or to retry the failed line (ref carries the index — MP3 failure).
-    //
-    // The retry callback ALSO kicks `resumeHowlerContextOnGesture` — the
-    // outer dispatchGesture branch above calls it synchronously when the
-    // gesture arrives, so by the time this callback runs the context
-    // resume is already in flight; this second kick is belt-and-braces
-    // against any future caller that triggers a retry through a different
-    // dispatch path. Idempotent, so safe to repeat.
-    gate.registerRetry(() => {
+      // Same-tick guard — see wakeTapInFlightRef declaration for why.
+      if (wakeTapInFlightRef.current) {
+        recordSpeakSkippedEvent('wake-in-flight-guard')
+        return
+      }
+      wakeTapInFlightRef.current = true
+
+      // Phase-2 fix for ticket 86c9gvd0y. Resume `Howler.ctx` SYNCHRONOUSLY
+      // inside the gesture handler, BEFORE we call into Howler's `play()`
+      // path via wrapSpeak → handle.start() → playGreetLine. The Phase-1
+      // iPad export-log proved that:
+      //
+      //   1. Howler creates `Howler.ctx` in `'suspended'` state at Greet
+      //      mount time (chime SFX construction triggers lazy init, but
+      //      Splash → Greet auto-advances without a user gesture so the
+      //      context is born suspended).
+      //   2. The context stays suspended until a tap. iOS does not decay
+      //      it; it has just never been unlocked.
+      //   3. The tap successfully resumes the context (statechange to
+      //      `running` ~185 ms post-tap, observed in the iPad export).
+      //   4. But Howler's `onplay` event never fires — the gate watchdog
+      //      times out to `relock` and Marian sees no Melody, no heart.
+      //
+      // Empirical hypothesis: Howler's implicit gesture-unlock (called
+      // inside `Howl.play()` when ctx is suspended) races with the buffer
+      // source binding for a Howl that was preloaded against a suspended
+      // context. The fix is to resume the context EXPLICITLY here, in the
+      // gesture tick, so by the time `play()` runs (in a microtask via
+      // `ensureLoaded.then` inside `playGreetLine`) the context is already
+      // moving toward running and the source binding doesn't stall.
+      //
+      // The helper is a no-op when the context is already running, when
+      // Howler hasn't lazy-initted, or when the context is closed — safe
+      // to call unconditionally on every tap.
       resumeAudioCtx()
+
+      // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
+      cancelWakeReprompt()
+
+      // Fresh wake-tap → no failed line yet. Clearing the ref ensures any
+      // stale value from a prior mount/recovery doesn't leak into the
+      // initial play.
+      lastFailedLineRef.current = null
+
+      // Build a fresh sequence (the one from mount may already be running
+      // if we're recovering from a relock state) and kick it off
+      // synchronously.
       sequenceRef.current?.cancel()
       cancelPreRecorded()
-      const retryHandle = buildSequence()
-      sequenceRef.current = retryHandle
-      const fromIndex = lastFailedLineRef.current ?? 0
-      // Consume the failed-line marker — if THIS retry also fails, the
-      // orchestrator's onLineError will re-set it.
-      lastFailedLineRef.current = null
-      gate.wrapSpeak(() => {
-        retryHandle.start(fromIndex)
-      })
-    })
+      const handle = buildSequence()
+      sequenceRef.current = handle
 
-    setScreenState('intro')
+      // Wrap the synchronous speak with the gate's watchdog. The arrow body
+      // runs *before* wrapSpeak returns, so handle.start() — and therefore
+      // speak(line0) — sits in the same JS tick as this tap. That's the
+      // whole shape iPad Safari requires.
+      gate.wrapSpeak(() => {
+        handle.start()
+        // Silent unlock for the WebAudio (Howler) context — covers the
+        // chime we'll need on the heart tap. .play() is defensive: if the
+        // asset 404'd, this is a silent no-op; if the engine throws
+        // (unlikely), we eat it and move on.
+        try {
+          chimeInstance.play()
+        } catch {
+          // Howler can throw synchronously if no audio backend is
+          // available. The chime missing isn't a blocker for the unlock
+          // pathway.
+        }
+      })
+
+      // Register a synchronous retry: if the gate watchdog expires (silent
+      // first-utterance miss) OR a playGreetLine rejects (Howler load/play
+      // failure — ticket 86c9gr43t), the next user gesture will run this
+      // callback inside its own tap handler. `lastFailedLineRef.current`
+      // decides whether to restart from line 0 (ref is null — silent miss)
+      // or to retry the failed line (ref carries the index — MP3 failure).
+      //
+      // The retry callback ALSO kicks `resumeHowlerContextOnGesture` — the
+      // outer dispatchGesture branch above calls it synchronously when the
+      // gesture arrives, so by the time this callback runs the context
+      // resume is already in flight; this second kick is belt-and-braces
+      // against any future caller that triggers a retry through a different
+      // dispatch path. Idempotent, so safe to repeat.
+      gate.registerRetry(() => {
+        resumeAudioCtx()
+        sequenceRef.current?.cancel()
+        cancelPreRecorded()
+        const retryHandle = buildSequence()
+        sequenceRef.current = retryHandle
+        const fromIndex = lastFailedLineRef.current ?? 0
+        // Consume the failed-line marker — if THIS retry also fails, the
+        // orchestrator's onLineError will re-set it.
+        lastFailedLineRef.current = null
+        gate.wrapSpeak(() => {
+          retryHandle.start(fromIndex)
+        })
+      })
+
+      setScreenState('intro')
+    } catch (err) {
+      // Phase-3 (ticket 86c9gvd0y) instrumentation. Record the throw to
+      // the audio-ctx log under `cause: 'handler-error'` so the iPad
+      // export-log surfaces any in-handler exception that would
+      // otherwise just blow past the React error boundary without a
+      // diagnostic trace. Then re-throw so production behaviour is
+      // unchanged — the error still bubbles, the boundary still sees
+      // it, no swallowing.
+      recordHandlerErrorEvent(err)
+      throw err
+    }
   }, [
     buildSequence,
     cancelWakeReprompt,

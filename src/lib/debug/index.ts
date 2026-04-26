@@ -7,6 +7,7 @@ export {
   recordRawTapEvent,
   recordGateState,
   recordAudioCtxEvent,
+  readGateState,
   subscribe,
   snapshot,
   _resetForTests,
@@ -27,6 +28,10 @@ export {
   startAudioContextProbe,
   activateAudioContextProbe,
   sampleAudioCtxOnTap,
+  recordSpeakCallEvent,
+  recordSpeakOnPlayEvent,
+  recordSpeakSkippedEvent,
+  recordHandlerErrorEvent,
   AUDIO_CTX_LOG_STORAGE_KEY,
   _resetAudioContextProbeForTests,
 } from './audioContextProbe'

@@ -254,7 +254,18 @@ function renderRawTap(t: RawTapEventRecord): string {
 function renderAudioCtxEvent(e: AudioCtxEventRecord): string {
   const synth =
     e.synthPaused === undefined ? '' : ` synthPaused=${String(e.synthPaused)}`
-  return `[${formatTimestamp(e.timestamp)}] ${e.cause}: ${e.ctxState}${synth}`
+  // Phase-3 (ticket 86c9gvd0y) extension. Surface the gate state mirror
+  // and the speak-call / speak-skipped / handler-error companion fields
+  // on the on-screen panel so iPad QA can read them at a glance. The
+  // localStorage export already carries them via the JSON record shape.
+  const gate = e.gateState ? ` gate=${e.gateState}` : ''
+  const speakResult =
+    e.speakResult === undefined
+      ? ''
+      : ` soundId=${e.speakResult === null ? 'null' : String(e.speakResult)}`
+  const reason = e.skipReason ? ` reason=${e.skipReason}` : ''
+  const error = e.errorMessage ? ` error="${e.errorMessage}"` : ''
+  return `[${formatTimestamp(e.timestamp)}] ${e.cause}: ${e.ctxState}${gate}${synth}${speakResult}${reason}${error}`
 }
 
 export interface DebugOverlayProps {

@@ -8,6 +8,11 @@ import {
   type PreRecordedAudio,
 } from './preRecorded'
 import { GREET_LINES } from '../../screens/greetSequence'
+import {
+  _resetAudioContextProbeForTests,
+  activateAudioContextProbe,
+} from '../debug/audioContextProbe'
+import { _resetForTests, snapshot } from '../debug/debugBus'
 
 /**
  * Build a controllable Howl-like fake. Each instance records every event
@@ -472,6 +477,96 @@ describe('preRecorded', () => {
 
       h.fake('niceToMeet')!.__fire('end')
       await promise
+    })
+  })
+
+  describe('Phase-3 (ticket 86c9gvd0y) — audio-ctx probe instrumentation', () => {
+    /** Set up an active probe so the singleton wrappers in preRecorded.ts
+     * actually emit. Each test resets afterwards so probe state doesn't
+     * bleed across cases. */
+    beforeEach(() => {
+      _resetForTests()
+      _resetAudioContextProbeForTests()
+      activateAudioContextProbe({
+        howlerLike: { ctx: undefined },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+    })
+
+    afterEach(() => {
+      _resetAudioContextProbeForTests()
+      _resetForTests()
+    })
+
+    it('records a speak-call row with the synchronous Howl.play() return value as soundId', async () => {
+      const h = makeHarness()
+      const promise = h.audio.playGreetLine('hi')
+      await Promise.resolve()
+
+      // The fake's play() returns 1 (see makeFakeHowl). Find the
+      // speak-call row in the bus events.
+      const events = snapshot().audioCtxEvents
+      const speakCall = events.find((e) => e.cause === 'speak-call')
+      expect(speakCall).toBeDefined()
+      expect(speakCall).toMatchObject({
+        cause: 'speak-call',
+        speakResult: 1,
+        skipReason: 'hi',
+      })
+
+      h.fake('hi')!.__fire('play')
+      h.fake('hi')!.__fire('end')
+      await promise
+    })
+
+    it('records a speak-onplay row when Howler emits its `play` event', async () => {
+      const h = makeHarness()
+      const promise = h.audio.playGreetLine('imMelody')
+      await Promise.resolve()
+
+      h.fake('imMelody')!.__fire('play')
+
+      const events = snapshot().audioCtxEvents
+      const onPlay = events.find((e) => e.cause === 'speak-onplay')
+      expect(onPlay).toBeDefined()
+      expect(onPlay).toMatchObject({
+        cause: 'speak-onplay',
+        skipReason: 'imMelody',
+      })
+
+      h.fake('imMelody')!.__fire('end')
+      await promise
+    })
+
+    it('records a speak-call row with speakResult=null when Howl.play() throws', async () => {
+      const h = makeHarness()
+      // Override play() on the named line's Howl to throw synchronously.
+      // We have to wait for loadGreetAudio to actually instantiate the
+      // fakes first — kick a one-line load via playGreetLine so the
+      // fakes register, then we'll override and run a fresh playGreetLine.
+      await h.audio.loadGreetAudio()
+
+      const fake = h.fake('niceToMeet')!
+      fake.play = () => {
+        throw new Error('iOS rejected play()')
+      }
+
+      const promise = h.audio.playGreetLine('niceToMeet')
+      // Catch the rejection — our assertion is on the recorded event,
+      // not on whether the promise rejects (it should).
+      await expect(promise).rejects.toThrow('iOS rejected play()')
+
+      const events = snapshot().audioCtxEvents
+      const speakCall = events.find((e) => e.cause === 'speak-call')
+      expect(speakCall).toBeDefined()
+      expect(speakCall).toMatchObject({
+        cause: 'speak-call',
+        speakResult: null,
+        skipReason: 'niceToMeet',
+      })
     })
   })
 })
