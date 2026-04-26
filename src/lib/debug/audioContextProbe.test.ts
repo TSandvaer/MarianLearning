@@ -7,6 +7,7 @@ import {
   recordSpeakCallEvent,
   recordSpeakOnPlayEvent,
   recordSpeakSkippedEvent,
+  recordUnlockStateEvent,
   sampleAudioCtxOnTap,
   startAudioContextProbe,
 } from './audioContextProbe'
@@ -586,6 +587,8 @@ describe('audioContextProbe', () => {
       recordSpeakOnPlayEvent('hi')
       recordSpeakSkippedEvent('whatever')
       recordHandlerErrorEvent(new Error('nope'))
+      // Phase-5 wrapper too — same no-op contract.
+      recordUnlockStateEvent()
       expect(snapshot().audioCtxEvents.length).toBe(before)
     })
 
@@ -614,6 +617,121 @@ describe('audioContextProbe', () => {
       expect(causes).toContain('speak-call')
       expect(causes).toContain('handler-error')
       expect(causes).toContain('speak-onplay')
+    })
+  })
+
+  describe('Phase-5 (ticket 86c9gvd0y) — Howler unlock-state diagnostic', () => {
+    it('records an unlock-state row carrying Howler audio-unlock flags', () => {
+      // Compose a fake Howler-shaped object that exposes the same
+      // private flags Howler uses. The probe defensively reads them via
+      // the howlerLike override (we test the override path here; the
+      // production path reads the same fields off the real `Howler`).
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        _audioUnlocked: true,
+        _html5AudioPool: ['a', 'b', 'c'],
+        _scratchBuffer: { fakeScratch: true },
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'unlock-state',
+        howlerAudioUnlocked: true,
+        howlerHtml5PoolSize: 3,
+        howlerHasScratchBuffer: true,
+      })
+    })
+
+    it('records the false / empty / null shapes correctly', () => {
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        _audioUnlocked: false,
+        _html5AudioPool: [],
+        _scratchBuffer: null,
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'unlock-state',
+        howlerAudioUnlocked: false,
+        howlerHtml5PoolSize: 0,
+        howlerHasScratchBuffer: false,
+      })
+    })
+
+    it('omits flag fields when Howler hasnt populated them', () => {
+      // Mid-init Howler exposes ctx but not yet the unlock fields. The
+      // probe should record an unlock-state row anyway with no flag
+      // fields, so the export-log timeline isn't broken.
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      const last = snapshot().audioCtxEvents.at(-1)!
+      expect(last.cause).toBe('unlock-state')
+      expect(last).not.toHaveProperty('howlerAudioUnlocked')
+      expect(last).not.toHaveProperty('howlerHtml5PoolSize')
+      // hasScratchBuffer is set unconditionally in the helper because
+      // `null` (the field absent) maps to `false` cleanly. Acceptable
+      // to surface that as an explicit `false`.
+      expect(last.howlerHasScratchBuffer).toBe(false)
+    })
+
+    it('persists unlock-state rows to localStorage with their flag fields', () => {
+      const storage = makeStorage()
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        _audioUnlocked: true,
+        _html5AudioPool: ['x', 'y'],
+        _scratchBuffer: { fake: true },
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage,
+      })
+
+      recordUnlockStateEvent()
+      const parsed = JSON.parse(
+        storage.getItem(AUDIO_CTX_LOG_STORAGE_KEY)!,
+      ) as Array<{
+        cause: string
+        howlerAudioUnlocked?: boolean
+        howlerHtml5PoolSize?: number
+        howlerHasScratchBuffer?: boolean
+      }>
+      const unlockRows = parsed.filter((r) => r.cause === 'unlock-state')
+      expect(unlockRows).toHaveLength(1)
+      expect(unlockRows[0]).toMatchObject({
+        cause: 'unlock-state',
+        howlerAudioUnlocked: true,
+        howlerHtml5PoolSize: 2,
+        howlerHasScratchBuffer: true,
+      })
     })
   })
 })

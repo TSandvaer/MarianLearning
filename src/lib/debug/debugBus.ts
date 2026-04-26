@@ -133,6 +133,7 @@ export interface AudioCtxEventRecord {
     | 'speak-onplay'
     | 'speak-skipped'
     | 'handler-error'
+    | 'unlock-state'
   /**
    * Optional companion: speechSynthesis.paused at the same instant.
    * Useful because Web Speech and Web Audio share an audio session on
@@ -179,6 +180,33 @@ export interface AudioCtxEventRecord {
   lineKey?: string
   /** For `cause === 'handler-error'` rows: the caught error's message. */
   errorMessage?: string
+  /**
+   * For `cause === 'unlock-state'` rows (Phase-5, ticket 86c9gvd0y): the
+   * `Howler._audioUnlocked` flag. Howler flips this to `true` exactly
+   * once on the first user gesture, then short-circuits its own internal
+   * unlock pathway forever after — even though iOS releases the OS-level
+   * audio session every long-idle window. If we see `true` here while
+   * `'speak-onplay'` rows fail to fire, the canonical iOS audio-session
+   * decay is the culprit (independent of WebAudio's `AudioContext.state`).
+   */
+  howlerAudioUnlocked?: boolean
+  /**
+   * For `cause === 'unlock-state'` rows (Phase-5, ticket 86c9gvd0y):
+   * `Howler._html5AudioPool.length`. Captured because Howler's HTML5
+   * pool flag (`_unlocked` on each Audio node) is independent of
+   * `_audioUnlocked` (the Web Audio flag); a divergence between the two
+   * is part of the diagnostic surface. We record the pool length as a
+   * cheap proxy for "did Howler ever populate its HTML5 pool" — empty
+   * pool means the gesture-unlock never ran past line 348 in howler.js.
+   */
+  howlerHtml5PoolSize?: number
+  /**
+   * For `cause === 'unlock-state'` rows (Phase-5, ticket 86c9gvd0y):
+   * `Howler._scratchBuffer != null`. True after the first call to
+   * `_unlockAudio` constructed the scratch buffer (line 322 in howler.js)
+   * — diagnostic for "did Howler enter its unlock pathway at all".
+   */
+  howlerHasScratchBuffer?: boolean
 }
 
 export interface DebugSnapshot {

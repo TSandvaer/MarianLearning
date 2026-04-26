@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   awaitHowlerContextResume,
   resumeHowlerContextOnGesture,
+  unlockIosAudioSession,
 } from './howlerContext'
 
 /**
@@ -402,5 +403,198 @@ describe('awaitHowlerContextResume', () => {
     expect(result.resumeAwaited).toBe(false)
     expect(result.timedOut).toBe(false)
     expect(ctx.resume).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * Phase-5 fix tests (ticket 86c9gvd0y).
+ *
+ * `unlockIosAudioSession` plays a 1-sample silent buffer through the
+ * AudioContext destination, synchronously inside a user-gesture handler,
+ * to re-engage iOS's OS-level audio session. We can't reproduce iOS
+ * audio-session behaviour in jsdom — these tests assert the API CALL
+ * SHAPE only (createBuffer + createBufferSource + connect + start +
+ * disconnect ordering). Real-device verification is Thomas's iPad pass.
+ */
+describe('unlockIosAudioSession', () => {
+  /**
+   * Minimal fake source + ctx mirroring the parts the helper touches.
+   * Records call ordering so we can assert connect/start/disconnect
+   * sequence without standing up the full Web Audio API.
+   */
+  function makeFakeCtx(state: AudioContext['state'] = 'running') {
+    const calls: string[] = []
+    const fakeBuffer = { fakeBuffer: true }
+    const fakeDestination = { fakeDestination: true }
+    const fakeSource = {
+      buffer: null as unknown,
+      connect: vi.fn((dest: unknown) => {
+        calls.push(
+          `connect:${(dest as { fakeDestination?: boolean }).fakeDestination ? 'destination' : 'other'}`,
+        )
+      }),
+      disconnect: vi.fn(() => {
+        calls.push('disconnect')
+      }),
+      start: vi.fn((when: number) => {
+        calls.push(`start:${when}`)
+      }),
+    }
+    const ctx = {
+      state,
+      destination: fakeDestination as unknown as AudioDestinationNode,
+      createBuffer: vi.fn(
+        (channels: number, length: number, sampleRate: number) => {
+          calls.push(`createBuffer:${channels}:${length}:${sampleRate}`)
+          return fakeBuffer as unknown as AudioBuffer
+        },
+      ),
+      createBufferSource: vi.fn(() => {
+        calls.push('createBufferSource')
+        return fakeSource as unknown as AudioBufferSourceNode
+      }),
+    } as unknown as AudioContext
+    return { ctx, calls, fakeSource, fakeBuffer }
+  }
+
+  it('is a no-op when Howler.ctx is missing', () => {
+    const result = unlockIosAudioSession({
+      howlerLike: { ctx: undefined },
+    })
+    expect(result.bufferStarted).toBe(false)
+    expect(result.threw).toBe(false)
+  })
+
+  it('is a no-op when ctx is closed (createBufferSource is illegal there)', () => {
+    const { ctx, calls } = makeFakeCtx('closed')
+    const result = unlockIosAudioSession({
+      howlerLike: { ctx },
+    })
+    expect(result.bufferStarted).toBe(false)
+    expect(result.threw).toBe(false)
+    expect(calls).toEqual([])
+  })
+
+  it('plays a 1-sample silent buffer when ctx is running', () => {
+    const { ctx, calls, fakeSource, fakeBuffer } = makeFakeCtx('running')
+    const result = unlockIosAudioSession({
+      howlerLike: { ctx },
+    })
+    expect(result.bufferStarted).toBe(true)
+    expect(result.threw).toBe(false)
+    // The 1-sample/22050Hz buffer matches Howler's own scratch-buffer
+    // shape exactly. Assert the exact arguments — drift here means
+    // we're constructing a different shape than Howler's verified-
+    // working unlock and may not actually re-engage the iOS session.
+    expect(ctx.createBuffer).toHaveBeenCalledWith(1, 1, 22050)
+    expect(ctx.createBufferSource).toHaveBeenCalledTimes(1)
+    expect(fakeSource.buffer).toBe(fakeBuffer)
+    expect(fakeSource.connect).toHaveBeenCalledWith(ctx.destination)
+    expect(fakeSource.start).toHaveBeenCalledWith(0)
+    // Ordering: createBuffer → createBufferSource → connect → start →
+    // disconnect. The helper relies on this sequence — connect must
+    // happen before start; start(0) is what re-engages the OS audio
+    // session.
+    expect(calls).toEqual([
+      'createBuffer:1:1:22050',
+      'createBufferSource',
+      'connect:destination',
+      'start:0',
+      'disconnect',
+    ])
+  })
+
+  it('plays a silent buffer when ctx is suspended too', () => {
+    // Suspended is the realistic state right at the gesture moment —
+    // the Phase-2/4 helpers will resume it, but our silent buffer needs
+    // to fire in the same gesture window regardless.
+    const { ctx, fakeSource } = makeFakeCtx('suspended')
+    const result = unlockIosAudioSession({
+      howlerLike: { ctx },
+    })
+    expect(result.bufferStarted).toBe(true)
+    expect(fakeSource.start).toHaveBeenCalledWith(0)
+  })
+
+  it('reports threw=true when createBuffer throws synchronously', () => {
+    const failing = {
+      state: 'running' as const,
+      destination: {} as unknown as AudioDestinationNode,
+      createBuffer: vi.fn(() => {
+        throw new Error('synthetic createBuffer failure')
+      }),
+      createBufferSource: vi.fn(),
+    }
+    const result = unlockIosAudioSession({
+      howlerLike: { ctx: failing as unknown as AudioContext },
+    })
+    expect(result.bufferStarted).toBe(false)
+    expect(result.threw).toBe(true)
+    // We never reached createBufferSource — bail out early on the
+    // upstream throw, no half-finished node graph.
+    expect(failing.createBufferSource).not.toHaveBeenCalled()
+  })
+
+  it('reports threw=true when start() throws synchronously', () => {
+    const fakeSource = {
+      buffer: null as unknown,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      start: vi.fn(() => {
+        throw new Error('synthetic start() failure')
+      }),
+    }
+    const failing = {
+      state: 'running' as const,
+      destination: {} as unknown as AudioDestinationNode,
+      createBuffer: vi.fn(() => ({}) as unknown as AudioBuffer),
+      createBufferSource: vi.fn(
+        () => fakeSource as unknown as AudioBufferSourceNode,
+      ),
+    }
+    const result = unlockIosAudioSession({
+      howlerLike: { ctx: failing as unknown as AudioContext },
+    })
+    expect(result.bufferStarted).toBe(false)
+    expect(result.threw).toBe(true)
+  })
+
+  it('swallows a disconnect() throw (best-effort cleanup)', () => {
+    // Some impls reject disconnect on a not-yet-played source. The
+    // helper should still report bufferStarted=true because start() ran.
+    const fakeSource = {
+      buffer: null as unknown,
+      connect: vi.fn(),
+      disconnect: vi.fn(() => {
+        throw new Error('synthetic disconnect failure')
+      }),
+      start: vi.fn(),
+    }
+    const ctx = {
+      state: 'running' as const,
+      destination: {} as unknown as AudioDestinationNode,
+      createBuffer: vi.fn(() => ({}) as unknown as AudioBuffer),
+      createBufferSource: vi.fn(
+        () => fakeSource as unknown as AudioBufferSourceNode,
+      ),
+    }
+    const result = unlockIosAudioSession({
+      howlerLike: { ctx: ctx as unknown as AudioContext },
+    })
+    expect(result.bufferStarted).toBe(true)
+    expect(result.threw).toBe(false)
+  })
+
+  it('treats a ctx getter that throws as unavailable (no-op)', () => {
+    const throwingTarget = {
+      get ctx(): AudioContext {
+        throw new Error('locked-down environment')
+      },
+    }
+    const result = unlockIosAudioSession({
+      howlerLike: throwingTarget as unknown as { ctx?: AudioContext | null },
+    })
+    expect(result.bufferStarted).toBe(false)
+    expect(result.threw).toBe(false)
   })
 })

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
-import { resumeHowlerContextOnGesture } from '../../lib/audio/howlerContext'
+import {
+  resumeHowlerContextOnGesture,
+  unlockIosAudioSession,
+} from '../../lib/audio/howlerContext'
+import { recordUnlockStateEvent } from '../../lib/debug/audioContextProbe'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { pickDistractors } from './distractors'
 import {
@@ -148,6 +152,13 @@ export interface MathProps {
    * follow the same shape).
    */
   resumeAudioContext?: () => void
+  /**
+   * Test seam: spy on the per-gesture iOS audio-session unlock added in
+   * Phase 5 of ticket 86c9gvd0y. Defaults to the real
+   * `unlockIosAudioSession` from `lib/audio/howlerContext`. Mirrors the
+   * same seam on `Greet`. Production callers should never override this.
+   */
+  unlockAudioSession?: () => void
 }
 
 // ── Default no-op playback (spec note: silent-but-captioned fallback) ------
@@ -258,6 +269,7 @@ function MathScreen({
   storage,
   now = () => new Date(),
   resumeAudioContext,
+  unlockAudioSession,
 }: MathProps) {
   const reducedMotion = usePrefersReducedMotion()
 
@@ -265,6 +277,9 @@ function MathScreen({
   // helper from `lib/audio/howlerContext`. See Greet.tsx for the shape
   // rationale (Phase-2 fix for ticket 86c9gvd0y).
   const resumeAudioCtx = resumeAudioContext ?? resumeHowlerContextOnGesture
+  // Phase-5 (ticket 86c9gvd0y): per-gesture iOS audio-session unlock.
+  // See Greet.tsx + howlerContext.ts for the rationale.
+  const unlockAudioSessionFn = unlockAudioSession ?? unlockIosAudioSession
 
   // Plan is captured ONCE per mount — we never re-roll mid-session even if
   // the parent re-renders with a fresh `now`. Tests pin via the prop.
@@ -709,6 +724,18 @@ function MathScreen({
       // already running. See `lib/audio/howlerContext.ts` for the full
       // rationale.
       resumeAudioCtx()
+      // Phase-5 fix for ticket 86c9gvd0y. Re-engage the OS-level iOS
+      // audio session by playing a 1-sample silent buffer in the
+      // gesture window. AudioContext.state being `running` is necessary
+      // but not sufficient on iOS — after >60s of audio idle iOS
+      // releases the OS audio session even while WebAudio's context
+      // stays running, and Howler caches its own `_audioUnlocked` flag
+      // so won't re-run its scratch-buffer trick. We play a 1-sample
+      // silent buffer in this gesture handler to re-engage the OS
+      // audio session every chip-tap. See `lib/audio/howlerContext.ts`
+      // → `unlockIosAudioSession` for the full rationale.
+      unlockAudioSessionFn()
+      recordUnlockStateEvent()
 
       // First-tap audio unlock: route the very first user gesture through
       // the gate and trigger the read-aloud after this tap (the chip-tap
@@ -755,6 +782,7 @@ function MathScreen({
       problemIndex,
       problemState.resolved,
       resumeAudioCtx,
+      unlockAudioSessionFn,
     ],
   )
 

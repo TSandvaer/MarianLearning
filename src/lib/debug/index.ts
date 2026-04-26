@@ -32,6 +32,7 @@ export {
   recordSpeakOnPlayEvent,
   recordSpeakSkippedEvent,
   recordHandlerErrorEvent,
+  recordUnlockStateEvent,
   AUDIO_CTX_LOG_STORAGE_KEY,
   _resetAudioContextProbeForTests,
 } from './audioContextProbe'

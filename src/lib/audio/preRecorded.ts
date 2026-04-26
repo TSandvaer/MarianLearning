@@ -47,6 +47,7 @@ import { Howl } from 'howler'
 import {
   recordSpeakCallEvent,
   recordSpeakOnPlayEvent,
+  recordUnlockStateEvent,
 } from '../debug/audioContextProbe'
 import {
   awaitHowlerContextResume,
@@ -426,6 +427,16 @@ export function createPreRecorded(
             // If cancel() ran during the await window, the activeStop
             // handler already settled the rejection. Don't double-play.
             if (resolved || stopped) return
+            // Phase-5 (ticket 86c9gvd0y) instrumentation. Snapshot
+            // Howler's internal unlock flags at the exact play-call
+            // moment, even if the gesture-tick handler already emitted
+            // an unlock-state row ~hundreds of ms earlier. This pairs
+            // unlock-state with the matching speak-call by timestamp
+            // so the iPad export shows: were Howler's flags `true`
+            // (Howler thinks unlocked) at the moment we hit the
+            // missing-onplay path? That's the key data point for the
+            // OS-audio-session-decay theory.
+            recordUnlockStateEvent()
             try {
               const soundId = howl.play()
               recordSpeakCallEvent(

@@ -151,6 +151,16 @@ export interface AudioContextProbeHandle {
    * re-throw afterwards so production behaviour is unchanged.
    */
   recordHandlerError: (error: unknown) => void
+  /**
+   * Record a `cause: 'unlock-state'` row (Phase-5, ticket 86c9gvd0y).
+   * Snapshots `Howler._audioUnlocked`, the HTML5 audio pool size, and
+   * scratch-buffer presence at the call site. Producers (gesture
+   * handlers, play-call site) emit one row per gesture-window so the
+   * iPad export aligns Howler's internal unlock state with `'speak-call'`
+   * / `'speak-onplay'` rows by timestamp. Diagnoses the iOS audio-session
+   * decay below the WebAudio layer.
+   */
+  recordUnlockState: () => void
 }
 
 export interface AudioContextProbeOptions {
@@ -232,6 +242,65 @@ function readHowlerCtx(override?: { ctx?: AudioContext }): AudioContext | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Phase-5 (ticket 86c9gvd0y) — read Howler's internal unlock flags
+ * defensively. These are non-public properties of the Howler module
+ * singleton; their names come from inspecting `node_modules/howler/dist/
+ * howler.js` (`_audioUnlocked`, `_html5AudioPool`, `_scratchBuffer`).
+ *
+ * If Howler ever renames these we'll see `undefined` here and the
+ * probe will simply omit the fields — no crash, no false signal.
+ *
+ * Returns three independently-undefined flags so the probe can record
+ * partial information when Howler is mid-init or our property reads
+ * trip something unexpected.
+ */
+interface HowlerUnlockFlags {
+  audioUnlocked?: boolean
+  html5PoolSize?: number
+  hasScratchBuffer?: boolean
+}
+
+function readHowlerUnlockFlags(override?: {
+  ctx?: AudioContext | null
+}): HowlerUnlockFlags {
+  // The override path is mostly used by tests that pass a fake
+  // `Howler`-shaped object via `howlerLike`. In production we read the
+  // real Howler module singleton.
+  const target =
+    override ??
+    (Howler as unknown as {
+      _audioUnlocked?: unknown
+      _html5AudioPool?: unknown
+      _scratchBuffer?: unknown
+    })
+  const flags: HowlerUnlockFlags = {}
+  try {
+    const audioUnlocked = (target as { _audioUnlocked?: unknown })
+      ._audioUnlocked
+    if (typeof audioUnlocked === 'boolean') {
+      flags.audioUnlocked = audioUnlocked
+    }
+  } catch {
+    // best-effort
+  }
+  try {
+    const pool = (target as { _html5AudioPool?: unknown })._html5AudioPool
+    if (Array.isArray(pool)) {
+      flags.html5PoolSize = pool.length
+    }
+  } catch {
+    // best-effort
+  }
+  try {
+    const scratch = (target as { _scratchBuffer?: unknown })._scratchBuffer
+    flags.hasScratchBuffer = scratch != null
+  } catch {
+    // best-effort
+  }
+  return flags
 }
 
 /**
@@ -363,7 +432,13 @@ export function startAudioContextProbe(
     ctx: AudioContext | null,
     extra: Pick<
       AudioCtxEventRecord,
-      'speakResult' | 'skipReason' | 'lineKey' | 'errorMessage'
+      | 'speakResult'
+      | 'skipReason'
+      | 'lineKey'
+      | 'errorMessage'
+      | 'howlerAudioUnlocked'
+      | 'howlerHtml5PoolSize'
+      | 'howlerHasScratchBuffer'
     > = {},
   ): AudioCtxState {
     const ctxState = readCtxState(ctx)
@@ -390,6 +465,15 @@ export function startAudioContextProbe(
       ...(extra.lineKey !== undefined ? { lineKey: extra.lineKey } : {}),
       ...(extra.errorMessage !== undefined
         ? { errorMessage: extra.errorMessage }
+        : {}),
+      ...(extra.howlerAudioUnlocked !== undefined
+        ? { howlerAudioUnlocked: extra.howlerAudioUnlocked }
+        : {}),
+      ...(extra.howlerHtml5PoolSize !== undefined
+        ? { howlerHtml5PoolSize: extra.howlerHtml5PoolSize }
+        : {}),
+      ...(extra.howlerHasScratchBuffer !== undefined
+        ? { howlerHasScratchBuffer: extra.howlerHasScratchBuffer }
         : {}),
     }
     recordAudioCtxEvent(record)
@@ -528,6 +612,23 @@ export function startAudioContextProbe(
     emit('handler-error', ctx, { errorMessage: message })
   }
 
+  function recordUnlockState(): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    const flags = readHowlerUnlockFlags(opts.howlerLike)
+    emit('unlock-state', ctx, {
+      ...(flags.audioUnlocked !== undefined
+        ? { howlerAudioUnlocked: flags.audioUnlocked }
+        : {}),
+      ...(flags.html5PoolSize !== undefined
+        ? { howlerHtml5PoolSize: flags.html5PoolSize }
+        : {}),
+      ...(flags.hasScratchBuffer !== undefined
+        ? { howlerHasScratchBuffer: flags.hasScratchBuffer }
+        : {}),
+    })
+  }
+
   return {
     stop,
     sampleNow,
@@ -535,6 +636,7 @@ export function startAudioContextProbe(
     recordSpeakOnPlay,
     recordSpeakSkipped,
     recordHandlerError,
+    recordUnlockState,
   }
 }
 
@@ -637,6 +739,26 @@ export function recordSpeakSkippedEvent(reason: string): void {
 export function recordHandlerErrorEvent(error: unknown): void {
   if (!activeProbe) return
   activeProbe.recordHandlerError(error)
+}
+
+/**
+ * Phase-5 diagnostic singleton wrapper (ticket 86c9gvd0y). Snapshots
+ * Howler's internal unlock flags (`_audioUnlocked`, `_html5AudioPool`
+ * length, `_scratchBuffer` presence) into the audio-ctx export-log
+ * under `cause: 'unlock-state'`. Producers (gesture handlers, the
+ * play-call site in `preRecorded.ts`) emit per gesture window so the
+ * iPad export aligns Howler's internal state with `'speak-call'` /
+ * `'speak-onplay'` rows by timestamp.
+ *
+ * Diagnostic intent: localize the iOS audio-session decay below the
+ * WebAudio AudioContext layer. If `howlerAudioUnlocked: true` rows
+ * coexist with missing `'speak-onplay'` rows, the OS-level audio
+ * session is the issue (not Web Audio's `AudioContext.state`) — and
+ * the silent-buffer Phase-5 fix addresses exactly that.
+ */
+export function recordUnlockStateEvent(): void {
+  if (!activeProbe) return
+  activeProbe.recordUnlockState()
 }
 
 /**

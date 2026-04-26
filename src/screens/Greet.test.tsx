@@ -1744,6 +1744,160 @@ describe('Greet', () => {
     })
   })
 
+  describe('iOS audio-session unlock on gesture (ticket 86c9gvd0y — Phase 5)', () => {
+    // Phase-5 hypothesis: WebAudio AudioContext.state being `running` is
+    // necessary but not sufficient on iOS. The OS audio session is
+    // released after ~60s of audio idle, and Howler caches its own
+    // `_audioUnlocked` flag so won't re-engage. We play a 1-sample
+    // silent buffer in the gesture window to re-engage the OS audio
+    // session every gesture. Tests assert the call lands synchronously
+    // alongside the resume kick on every gesture path.
+
+    it('wake tap synchronously kicks unlockAudioSession alongside resumeAudioContext', () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const resumeSpy = vi.fn()
+      const unlockSpy = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={vi.fn()}
+            playGreetLineFn={h.playGreetLineFn}
+            resumeAudioContext={resumeSpy}
+            unlockAudioSession={unlockSpy}
+          />,
+        ),
+      )
+
+      expect(unlockSpy).not.toHaveBeenCalled()
+
+      fireWakeTap()
+
+      // Both kicks fire on the same gesture, both before play().
+      expect(resumeSpy).toHaveBeenCalledTimes(1)
+      expect(unlockSpy).toHaveBeenCalledTimes(1)
+      const unlockOrder = unlockSpy.mock.invocationCallOrder[0]
+      const playOrder = h.playGreetLineFn.mock.invocationCallOrder[0]
+      expect(unlockOrder).toBeLessThan(playOrder)
+    })
+
+    it('does NOT call unlockAudioSession before any tap (no spurious mount-time unlock)', () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const unlockSpy = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={vi.fn()}
+            playGreetLineFn={h.playGreetLineFn}
+            unlockAudioSession={unlockSpy}
+          />,
+        ),
+      )
+
+      act(() => {
+        vi.advanceTimersByTime(10_000)
+      })
+      expect(unlockSpy).not.toHaveBeenCalled()
+    })
+
+    it('relock-retry tap synchronously kicks unlockAudioSession before re-playing', async () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const unlockSpy = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={vi.fn()}
+            playGreetLineFn={h.playGreetLineFn}
+            unlockAudioSession={unlockSpy}
+          />,
+        ),
+      )
+
+      fireWakeTap()
+      expect(unlockSpy).toHaveBeenCalledTimes(1)
+
+      await act(async () => {
+        h.rejectLast()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-gate-state',
+        'relock',
+      )
+
+      const callsBeforeRetry = h.calls.length
+      const unlockCallsBeforeRetry = unlockSpy.mock.calls.length
+      fireWakeTap()
+      // Belt-and-braces: dispatch branch + retry callback both kick
+      // unlock. We assert AT LEAST one new unlock from the gesture.
+      expect(unlockSpy.mock.calls.length).toBeGreaterThanOrEqual(
+        unlockCallsBeforeRetry + 1,
+      )
+      expect(h.calls.length).toBe(callsBeforeRetry + 1)
+      const retryUnlockOrder =
+        unlockSpy.mock.invocationCallOrder[unlockCallsBeforeRetry]
+      const retryPlayOrder =
+        h.playGreetLineFn.mock.invocationCallOrder[h.calls.length - 1]
+      expect(retryUnlockOrder).toBeLessThan(retryPlayOrder)
+    })
+
+    it('heart tap synchronously kicks unlockAudioSession (covers cross-screen audio-session preemption)', async () => {
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      const unlockSpy = vi.fn()
+      const onAdvance = vi.fn()
+      render(
+        withMotion(
+          <Greet
+            onAdvance={onAdvance}
+            playGreetLineFn={h.playGreetLineFn}
+            unlockAudioSession={unlockSpy}
+          />,
+        ),
+      )
+
+      fireWakeTap()
+      expect(unlockSpy).toHaveBeenCalledTimes(1)
+
+      for (let i = 0; i < HEART_REVEAL_AFTER_LINE_INDEX + 1; i++) {
+        if (i === 0) {
+          await act(async () => {
+            h.fireOnPlay()
+          })
+        }
+        await completeLine(h)
+        if (i < HEART_REVEAL_AFTER_LINE_INDEX) await crossGap()
+      }
+
+      const heart = screen.getByTestId('greet-heart')
+      expect(heart).toBeInTheDocument()
+      const beforeHeartTap = unlockSpy.mock.calls.length
+      fireEvent.click(heart)
+
+      expect(unlockSpy.mock.calls.length).toBe(beforeHeartTap + 1)
+    })
+
+    it('falls back to the real unlockIosAudioSession when no prop is provided (production path)', () => {
+      // Sanity: omitting the test-seam wires the real helper. Real
+      // helper is a no-op in jsdom (no Howler.ctx with destination).
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+      expect(() => fireWakeTap()).not.toThrow()
+      expect(screen.getByTestId('greet')).toHaveAttribute(
+        'data-screen-state',
+        'intro',
+      )
+    })
+  })
+
   describe('Phase-3 (ticket 86c9gvd0y) — wake-tap handler instrumentation', () => {
     /**
      * The probe singleton is what wires the speak-skipped /
