@@ -108,7 +108,7 @@ streak appearing/disappearing. Marian's eye should land on the problem, not the 
 **Locked rule (Dave-signed, PR #35):**
 
 > **Adaptive 2-tier off-by-one.** Problems 1–3: gentle ramp distractors (clearly wrong, e.g.
-> for `3 + 2 = 5`, show `3` and `10`). Problems 4–8: off-by-one trap distractors (e.g. `4` and
+> for `3 + 2 = 5`, show `1` and `10`). Problems 4–8: off-by-one trap distractors (e.g. `4` and
 > `6`). Always 3 chips total: 1 correct + 2 distractors. Correct chip position randomised per
 > problem.
 
