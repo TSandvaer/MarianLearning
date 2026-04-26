@@ -670,7 +670,7 @@ Per the non-negotiables, confirmed absent from this spec:
 | `melody-cheering.svg`                                | End-of-session celebration  | ~7 KB on disk    | SVG (vector)                       | S5                   |
 | `melody-sleepy.png` (**deferred to post-Session-1**) | Post-exit / return screen   | TBD when shipped | TBD (likely SVG to match the rest) | —                    |
 
-**Note:** sprites only needed if animating between states with CSS/sprite sheet. If each expression is a separate image swapped via React state + `AnimatePresence` cross-fade, no sprite system required. **Recommend: separate images, cross-fade in AnimatePresence — simpler to ship.**
+**Note:** Each expression ships as a separate SVG asset, swapped via React state and cross-faded with Framer Motion's `AnimatePresence` (`initial`/`animate`/`exit` opacity). Sprite sheets are out of scope — the project is vector-only and no sprite pipeline exists or is planned.
 
 ### Backgrounds (3 distinct assets, 4 visual moods)
 
