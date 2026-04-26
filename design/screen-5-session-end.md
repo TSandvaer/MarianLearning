@@ -558,7 +558,7 @@ anti-FOMO copy. Out of scope here.
 | Stardust counter tick-up      | After opener, t=1400          | Numeric tween 0 → N over the recap utterance duration (~1.8s); per-tick `sfx.stardust-grain.play()` | Counter jumps to N instantly with one chime; no per-tick plinks (otherwise it sounds frantic) |
 | Counter pop on each tick      | Per-tick                      | scale `1 → 1.05 → 1` over 150ms                                                                     | No pop                                                                                        |
 | Streak band fade-in           | After streak utterance starts | opacity 0→1 + `y: 12 → 0` over 400ms                                                                | Opacity only, no y-shift                                                                      |
-| Melody ear-wiggle (idle loop) | Settled state                 | sprite swap to `melody-happy` for 600ms every 4s                                                    | No swap; static `melody-celebrating` pose                                                     |
+| Melody ear-wiggle (idle loop) | Settled state                 | expression swap to `melody-happy` (via `AnimatePresence` cross-fade) for 600ms every 4s             | No expression change; static `melody-celebrating` pose                                        |
 | "All done!" CTA scale-in      | After goodbye utterance       | spring `{ stiffness: 300, damping: 16 }`, ~400ms                                                    | Opacity fade-in over 200ms                                                                    |
 | "All done!" CTA tap           | Tap                           | scale `1 → 0.95 → 1` over 200ms; chime SFX                                                          | Same                                                                                          |
 | Screen fade-out               | Post-tap                      | Opacity 1 → 0 over 300ms                                                                            | Same                                                                                          |
@@ -887,7 +887,7 @@ iPad PWA:
 
 4. **Audio recap interpolation strategy.** Three choices for the "You earned `<N>` stars!" line:
    - **(a)** Pre-render all 12 variants per session (current spec recommendation; ~180 KB).
-   - **(b)** Concatenate pre-rendered "You earned" + per-N number + "stars" client-side via Howler sprite splicing or sequential plays (~30 KB total but gluing audio cleanly is hard; risk of awkward gaps; new code path).
+   - **(b)** Concatenate pre-rendered "You earned" + per-N number + "stars" client-side via Howler audio-sprite splicing (Howler.js's audio-segment API — unrelated to character sprite-sheets, which are out of scope per session-1.md §Assets footnote) or sequential plays (~30 KB total but gluing audio cleanly is hard; risk of awkward gaps; new code path).
    - **(c)** Live-synthesise via Web Speech at session-end (would re-introduce the dependency we explicitly rejected in audio-architecture.md; not viable).
    - **Recommendation:** (a). Bundle cost is fine, no new code paths, matches Math's per-problem-N pattern (screen-3-math.md:285). **Default:** (a).
 

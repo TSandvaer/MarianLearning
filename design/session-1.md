@@ -81,7 +81,7 @@ On-screen text: **"Melody"** (wordmark only).
 ## States
 
 - **Idle / first visit:** as described. Lasts 1500ms then transitions.
-- **First visit (cold cache):** if critical assets (Melody idle sprite, intro TTS audio if pre-generated) aren't ready at 1500ms, extend splash up to **3000ms max**, then force-advance even if assets are mid-load (show Melody's idle frame even if her animation sprite hasn't loaded).
+- **First visit (cold cache):** if critical assets (Melody's idle expression SVG, intro TTS audio if pre-generated) aren't ready at 1500ms, extend splash up to **3000ms max**, then force-advance even if assets are mid-load (show Melody's idle frame even if her happy/puzzled expression assets haven't loaded yet).
 - **Return user (not applicable in Session 1 by definition — but reuse this screen):** same splash, no change.
 - **Transition out:** logo + dots fade out over 250ms (`opacity: 0`, `ease: "easeOut"`), cream background stays as background for Screen 2 (shared layout — no hard cut).
 
@@ -170,7 +170,7 @@ On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon
   Total entrance ~700ms. Spring settles without bounce-past (damping 22 keeps it calm, not cartoonish). She lands in idle pose and **breathes**: `scale: [1, 1.05, 1]` over 2.4s, `repeat: Infinity`, `ease: "easeInOut"`. Reads as clearly alive at iPad viewport scale — earlier draft used `1.015` which Dave's consult flagged as too subtle to perceive (would read as frozen by 4–5s on a child's first look).
 - **Ready ring (Wake state):** scales in 0.9 → 1 + opacity 0 → 0.4 with 200ms ease-out, **starting at +900ms** (after Melody settles). Then opacity-pulses 0.4 → 0.9 → 0.4 over 1.4s, `repeat: Infinity`. Disabled if `prefers-reduced-motion` (held at static 0.5 opacity).
 - **Wake → Intro transition (on first tap):** ring scales out + fades over 250ms; same tap synchronously dispatches `speak(line1)` (see Implementation Notes for the exact handler shape). Melody's breathing loop continues uninterrupted.
-- **Ear-wiggle** on "Hi!" word boundary: sprite swap idle → happy for 600ms, then back. If no sprite system, CSS rotation of ear layer `rotate: [0, -8, 6, 0]` over 500ms.
+- **Ear-wiggle** on "Hi!" word boundary: expression swap `melody-idle.svg` → `melody-happy.svg` for 600ms, then back. Cross-faded via Framer Motion `AnimatePresence` (200ms opacity overlap), matching the locked pattern from session-1.md §Assets footnote and screen-3-math.md:257.
 - **Speech ribbon:** scales in from 0.9 → 1 on first TTS `start` event, spring `{ stiffness: 260, damping: 20 }`.
 - **Caption word reveal:** each word fades in with `opacity: 0 → 1` over 150ms, synced to TTS `boundary` events. Previous words stay visible.
 - **Heart button:** does NOT appear until Melody's line 3 finishes. Then:
@@ -184,13 +184,13 @@ On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon
 ## States
 
 - **Wake (pre-tap, audio locked):** Melody is on-screen in idle pose, breathing. Ready ring pulses around her. Speech ribbon hidden. Heart button hidden. No TTS, no SFX. Full viewport is a transparent tap target.
-- **Wake re-prompt (no tap for 8s):** A small finger-tap icon (48pt, `--my-rose` fill, `--ink` outline) fades in centered on the ready ring (`opacity: 0 → 1` over 300ms) and pulses once (`scale: 1 → 1.1 → 1` over 600ms). Simultaneously, Melody plays a single ear-wiggle wave (sprite swap for 600ms, then back to idle). Icon fades out 2.5s after pulse completes (`opacity: 1 → 0` over 400ms). Ring continues pulsing. **No TTS** (still locked). This is the _only_ re-prompt; the screen sits indefinitely without further prompts. Rationale (Dave's 2026-04-25 consult, citations in PR #15 history): research-backed sustained-attention ranges put 8s at the upper bound for an 8-year-old's "screen is alive" tolerance on a low-arousal screen. The ear-wiggle communicates "I'm alive"; the finger-tap icon communicates "tap here" — both are needed because, alone, neither does the affordance work for a low-literacy child. One nudge, then patience — no nag loop.
+- **Wake re-prompt (no tap for 8s):** A small finger-tap icon (48pt, `--my-rose` fill, `--ink` outline) fades in centered on the ready ring (`opacity: 0 → 1` over 300ms) and pulses once (`scale: 1 → 1.1 → 1` over 600ms). Simultaneously, Melody plays a single ear-wiggle wave (expression swap to `melody-happy.svg` for 600ms via `AnimatePresence` cross-fade, then back to idle). Icon fades out 2.5s after pulse completes (`opacity: 1 → 0` over 400ms). Ring continues pulsing. **No TTS** (still locked). This is the _only_ re-prompt; the screen sits indefinitely without further prompts. Rationale (Dave's 2026-04-25 consult, citations in PR #15 history): research-backed sustained-attention ranges put 8s at the upper bound for an 8-year-old's "screen is alive" tolerance on a low-arousal screen. The ear-wiggle communicates "I'm alive"; the finger-tap icon communicates "tap here" — both are needed because, alone, neither does the affordance work for a low-literacy child. One nudge, then patience — no nag loop.
 - **Intro (post-tap, audio unlocked):** full greeting sequence plays. Heart button appears at ~4s mark (after line 3 completes) and pulses gently.
 - **Heart tapped (happy path):** heart does a single quick squish (`scale: [1, 1.15, 0.95, 1]` over 250ms), soft chime SFX, then transition out to Screen 3.
 - **No heart tap for 20 seconds (post-intro, after line 4 finishes):** Melody re-prompts once — "Tap the heart when you're ready." (reuses existing line, no new TTS generation needed). **Does not re-prompt again** — if she walks away, that's fine. No nag loop. **This timer is independent of the Wake re-prompt timer; it starts only after line 4 completes.**
 - **Error path:** not applicable (nothing to get wrong).
 - **Return user:** Not applicable in Session 1. (Note for later: from Session 2 on, this screen is skipped and she lands directly on the home/session-start screen. Flag for Matt. **The audio-unlock gesture still has to happen somewhere on the new entry screen** — Session 2+ greeting design needs to inherit this constraint.)
-- **Transition out:** Melody waves (ear-wiggle sprite) while background cross-fades to Number Garden scene. Melody's position persists across screens — she's the constant.
+- **Transition out:** Melody waves (ear-wiggle expression — `melody-happy.svg`) while background cross-fades to Number Garden scene. Melody's position persists across screens — she's the constant.
 
 ## Assets required
 
@@ -210,7 +210,7 @@ On-screen text: exact TTS transcript, revealed word-by-word in the speech ribbon
 - [ ] **Wake state:** ready ring appears around Melody at +900ms after mount and pulses 0.4 → 0.9 → 0.4 over 1.4s on infinite loop
 - [ ] **Wake state:** no TTS is queued or attempted; `speechSynthesis.speak()` is NOT called before the user tap. Verify by inspecting the speech-synthesis queue — it must be empty until first tap
 - [ ] **Wake state:** the entire viewport (within safe-area insets) is a single tap target; tapping any pixel transitions to Intro state
-- [ ] **Wake re-prompt:** at 8s of no tap, a finger-tap icon (48pt, `--my-rose` fill, `--ink` outline) fades in centered on the ready ring (`opacity: 0 → 1` over 300ms), pulses once (`scale: 1 → 1.1 → 1` over 600ms), then fades out 2.5s later (`opacity: 1 → 0` over 400ms). Simultaneously Melody plays a single ear-wiggle wave (sprite swap for 600ms). Triggers exactly once. No TTS during this re-prompt
+- [ ] **Wake re-prompt:** at 8s of no tap, a finger-tap icon (48pt, `--my-rose` fill, `--ink` outline) fades in centered on the ready ring (`opacity: 0 → 1` over 300ms), pulses once (`scale: 1 → 1.1 → 1` over 600ms), then fades out 2.5s later (`opacity: 1 → 0` over 400ms). Simultaneously Melody plays a single ear-wiggle wave (expression swap to `melody-happy.svg` via `AnimatePresence` cross-fade for 600ms). Triggers exactly once. No TTS during this re-prompt
 - [ ] **Wake state tap target is full viewport:** taps register on any pixel inside the safe-area rect — Melody, ring, icon, blank cream space all behave identically as the gesture-unlock trigger
 - [ ] **Wake → Intro transition:** the same synchronous tap handler that unlocks audio also calls `speechSynthesis.speak(line1Utterance)`. Confirm via `onstart` firing within 250ms of the tap event on iPad Safari
 - [ ] **Intro state:** ring fades out over 250ms, speech ribbon scales in, Melody's 4 TTS lines play in order with ~400ms gaps, total ~5–6s from tap
@@ -310,7 +310,7 @@ Problem displayed, Melody idle, chips waiting.
 
 - **Chip animation:** tapped chip scales to 1.15, fills with sparkle yellow (`--sparkle`), then scales back to 1. 400ms total.
 - **Sparkles:** 8 small star particles burst from the chip, spring outward with `{ stiffness: 120, damping: 18 }`, fade out over 800ms. (Use `AnimatePresence` with `initial/animate/exit`, keyed particles.)
-- **Melody:** sprite swap to ear-wiggle + cheering pose. 600ms, then back to idle.
+- **Melody:** expression swap to ear-wiggle + cheering pose (`melody-happy.svg`) via `AnimatePresence` cross-fade. 600ms, then back to idle.
 - **SFX:** soft chime (`sfx-chime-soft.mp3` reused from Screen 2) + gentle sparkle shimmer (`sfx-sparkle.mp3`, ~400ms).
 - **TTS:** "Yes! Five." — 2 words, within cap.
 - **Caption:** `5` highlights in gold on the problem line, replacing the `?`.
@@ -320,7 +320,7 @@ Problem displayed, Melody idle, chips waiting.
 
 - **NEVER a red X. NEVER a "wrong" text callout.**
 - **Chip animation:** tapped chip does a soft shake (`x: [0, -6, 6, -4, 4, 0]` over 400ms). No color change. Chip remains available.
-- **Melody:** sprite swap to puzzled-tilt pose (head tilted ~15°, ears slightly down). Held for 1.5s.
+- **Melody:** expression swap to puzzled-tilt pose (`melody-puzzled.svg` — head tilted ~15°, ears slightly down) via `AnimatePresence` cross-fade. Held for 1.5s.
 - **SFX:** gentle "poof" (`sfx-poof.mp3` — soft breathy sound, ~500ms, NOT a buzzer).
 - **TTS:** "Hmm... try again?" — 3 words, within cap.
 - **Caption:** mirrors TTS. After TTS completes, Melody returns to idle. All three chips remain tappable. No counter, no "strike" tracker.
@@ -585,7 +585,7 @@ She completed one math problem and one literacy moment. ~3–4 minutes in.
 - **Stars into jar:** each star `initial={{ y: -80, opacity: 0, scale: 0.5 }}`, animates to its jar slot position with spring `{ stiffness: 200, damping: 18 }`. 600ms apart. Each landing triggers a soft "plink" SFX.
 - **All-three-stars glow:** when star 3 lands, all three get a shared glow pulse (`boxShadow` or `filter: drop-shadow` animation) for 800ms.
 - **Teaser card:** fades in from below (`y: 20 → 0`, opacity 0→1) with spring, 400ms, at line 5.
-- **Melody wave:** sprite swap to ear-wiggle on "Bye for now!" — same asset as happy.
+- **Melody wave:** expression swap to ear-wiggle on "Bye for now!" — reuses `melody-happy.svg`. `AnimatePresence` cross-fade as elsewhere.
 - **Home button:** appears last, 500ms after final line, gentle scale-in.
 
 ## States
