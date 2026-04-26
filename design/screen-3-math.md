@@ -47,7 +47,7 @@ mounted but TTS hasn't fired yet (gated on unlock).
 +------------------------------------------+
 |        [safe area top]                   |
 |                                          |
-|  ★ 5     ●●●○○○○○        🔥 3            |  <- HUD strip, 56pt tall
+|  ★ 5     ●●●○○○○○         ✦ 3            |  <- HUD strip, 56pt tall
 |  stardust   problem dots   streak        |
 |                                          |
 |  ~ pastel garden background ~            |
@@ -94,8 +94,9 @@ the bottom 60%; chips are well within.
   Font: display, 32pt. Animates +1 on correct (see §Stardust treatment).
 - **Problem dots (center):** 8 small dots, 12pt each, 8pt gaps. Filled (current/completed) vs.
   outlined (upcoming). Current problem dot has a soft ring around it. Read-only — not tappable.
-- **Streak indicator (right, 16pt from edge):** flame glyph + count. Only visible when
-  `streak ≥ 2` — a streak of 1 is just "she got one right", not a streak yet.
+- **Streak indicator (right, 16pt from edge):** sparkle glyph + count (per locked decision in
+  §Stardust treatment → "Streak indicator visual"). Only visible when `streak ≥ 2` — a streak of
+  1 is just "she got one right", not a streak yet.
 
 The HUD strip is intentionally _quiet_. No animations except the per-event +1 stardust pop and the
 streak appearing/disappearing. Marian's eye should land on the problem, not the HUD.
@@ -104,19 +105,39 @@ streak appearing/disappearing. Marian's eye should land on the problem, not the 
 
 ## Distractor policy (sums to 10)
 
-**Recommended rule (Kyle's default — needs Dave sign-off before locking):**
+**Locked rule (Dave-signed, PR #35):**
 
-> **Adaptive 2-tier off-by-one.** Problems 1–2: gentle ramp distractors (clearly wrong, e.g.
-> for `3 + 2 = 5`, show `3` and `10`). Problems 3–8: off-by-one trap distractors (e.g. `4` and
+> **Adaptive 2-tier off-by-one.** Problems 1–3: gentle ramp distractors (clearly wrong, e.g.
+> for `3 + 2 = 5`, show `3` and `10`). Problems 4–8: off-by-one trap distractors (e.g. `4` and
 > `6`). Always 3 chips total: 1 correct + 2 distractors. Correct chip position randomised per
 > problem.
 
 **Why:** Marian's April 2026 diagnostic flagged off-by-one finger-counting errors as her primary
 miscount pattern. Adjacent-number distractors are pedagogically the right surface to drill against
-— but using them on her _first_ problem of a session risks a sour opening. The 2-tier ramp gives
-her two banked wins before the trap distractors arrive, so by problem 3 she's calibrated to the
-exercise and the off-by-one cost is "oops, retry with Melody's hint" rather than "the app
-ambushed me."
+— but using them on her _first_ problems of a session risks a sour opening. The 3-problem warm-up
+ramp gives her three banked wins before the trap distractors arrive, so by problem 4 she's
+calibrated to the exercise and the off-by-one cost is "oops, retry with Melody's hint" rather than
+"the app ambushed me."
+
+**Rationale (locked per Dave's research memo `design/research/math-distractor-and-streak-decisions.md`,
+PR #35):** Three warm-up items is the evidence-supported minimum before introducing tight
+discriminations for an 8-year-old who is still procedurally dependent and entering a novel digital
+context. Convergent support from:
+
+- **Siegler's overlapping-waves model** (Erikson Institute draft, 2016) — children this age fluidly
+  shift between retrieval and counting strategies across sessions; the first problems of a session
+  carry higher procedural-error risk because the child has not yet settled into the session's
+  cognitive rhythm.
+- **Mammarella et al. (2023, Annals NYAS)** — wrong answers early in a problem set produce
+  measurably elevated state anxiety that persists across subsequent items; effect is stronger for
+  grades 1–3 and for low-automaticity learners. Three successful completions provide a meaningful
+  buffer past the session-onset anxiety window.
+- **McNeil et al. (2025, Psychological Science in the Public Interest)** — practice sessions should
+  begin with easy, clear-cut items as warm-up calibration before diagnostic-quality items arrive.
+
+The cost of the change is one fewer off-by-one diagnostic problem per session (5 instead of 6),
+which is still sufficient signal for spaced repetition. The benefit is a measurably lower
+probability of session-opening discouragement during Marian's first 5–10 sessions in the app.
 
 **Candidate rules considered and rejected:**
 
@@ -138,13 +159,9 @@ ambushed me."
    direction, biased toward the extremes of the range. For `3 + 2 = 5`, that's `1` and `10` (or
    `2` and `9`, etc.). The implementation can pick deterministically per problem ID.
 
-**Open question for Dave (file as ClickUp comment on `86c9grn9c` — see Open Questions §1):**
-is the 2-tier ramp at problems 1–2 → 3–8 the right cutoff for an 8-year-old, or should the gentle
-ramp last longer (e.g. problems 1–3)? Developmental call — if Dave says push the cutoff, change
-this section accordingly before Devon implements.
-
-**Default until Dave weighs in:** ship the 2-tier ramp as specified. Do not block impl on the
-consult; cutoff is a one-line change in `distractors.ts` if Dave wants it later.
+**Implementation note:** in `distractors.ts`, `pickTier(problemIndex)` must use
+`problemIndex <= 3 ? 'gentle' : 'offByOne'` (i.e. `pickTier <= 3`, not `pickTier <= 2`). The cutoff
+is locked at 3; do not parameterise. See §"Implementation pointers" for the full code shape.
 
 ---
 
@@ -205,6 +222,26 @@ ticks twice. The streak indicator also pops at the same moment.
 - Min display value: `0`. Hide the count entirely if it's the very first session and total is
   still 0 _at screen mount_? No — show "★ 0". Sets the expectation that something accumulates.
 
+**Streak indicator visual — locked: sparkle, not flame (per Dave's research memo, PR #35):**
+
+The HUD streak indicator (top-right) renders the existing `sparkle-particle.svg` at **32pt** (one
+size larger than the stardust counter glyph at 24pt to read as a separate, slightly more
+celebratory mark) with a **gold pulse** animation behind it on streak-threshold ticks (`box-shadow`
+pulse at `--sparkle` `#FFD966`, 600ms, single fire — not a loop). Format: `[sparkle] 3`. Number
+in the same display font / 32pt / `--ink` as the stardust counter so the right-side mark visually
+parallels the left-side stardust counter without competing for emphasis.
+
+**No new flame asset is authored.** The previously-flagged `icon-flame.svg` is dropped from the
+required-assets list (see §Assets required note).
+
+**Rationale (Dave, PR #35):** flame glyphs carry urgency / danger connotations in most cultural
+contexts, and the cognitive-emotional priming effects of iconography are documented at
+early-elementary ages (Nummenmaa et al., 2014, on embodied emotion and symbol processing). A soft
+sparkle is on-brand for Melody and avoids the "don't lose your streak!" pressure framing that
+CLAUDE.md explicitly bans. The sparkle reads as "you're on a roll" rather than "watch out, this
+could burn out" — which is the exact emotional tone the anti-dark-pattern audit requires of this
+mark. **Do not substitute a flame asset without a fresh Dave consult.**
+
 ---
 
 ## Wrong-answer policy
@@ -233,7 +270,7 @@ machine for a wrong tap.
 When a wrong answer breaks an active streak (`streak ≥ 2`), the streak indicator on the HUD does
 NOT shake, flash, glow red, or otherwise punish. Instead:
 
-- Streak indicator gently fades to opacity 0 over 400ms (the count was last shown as `🔥 3` —
+- Streak indicator gently fades to opacity 0 over 400ms (the count was last shown as `✦ 3` —
   it just quietly leaves).
 - Internal `streak` state resets to 0.
 - No SFX dedicated to the streak break. The puzzle-poof is the only audio.
@@ -248,6 +285,14 @@ this week", it can read the streak count from session state — but it should ne
 the live problem screen.
 
 **After 2 wrong attempts on the same problem — hint state:**
+
+**Locked at 2 wrongs (not 1) per Dave's research memo (PR #35).** Mastery-learning rationale:
+triggering a hint after only 1 wrong attempt removes the self-correction opportunity, which is
+where real learning happens for a child building automaticity. Hattie & Timperley (2007) on
+feedback timing shows the effect size for "error + self-correction" exceeds "error + immediate
+correction." For Marian — at 100% finger reliance and still consolidating addition facts — the
+chance to notice her own miscount and re-tap is the high-value moment. Hint after 2 protects that
+moment; hint after 1 short-circuits it. **Do not lower this threshold without a fresh Dave consult.**
 
 Same as Session-1 Screen 3 (lines 323–330). Flower groups pulse one at a time with TTS narration:
 
@@ -429,9 +474,8 @@ Required, not yet authored (already on `assets-todo.md` follow-up list — flag 
 | --------------------------- | ---------------------------------------------------- | ----------- | ---------------------------------------- |
 | `bg-garden.svg`             | Math screen background                               | <20 KB      | Pastel meadow, no hard edges             |
 | `flower-glyph.svg`          | Visual-group flowers in problem display              | <3 KB       | Render via React component, not 5 copies |
-| `sparkle-particle.svg`      | Celebration burst + stardust grain                   | <1 KB       | Single shape, reused                     |
+| `sparkle-particle.svg`      | Celebration burst + stardust grain + HUD streak indicator (32pt) | <1 KB | Single shape, reused across all three uses (per locked decision in §Stardust treatment) |
 | `star-filled.svg`           | HUD stardust counter glyph                           | <2 KB       | Same as Session-end jar star             |
-| `icon-flame.svg`            | HUD streak indicator                                 | <2 KB       | **NEW** — flag to Thomas. Soft pink/orange flame, _not_ aggressive red. |
 | `sfx-sparkle.mp3`           | Correct-answer chime                                 | ~6 KB       | Soft shimmer, 400ms                      |
 | `sfx-poof.mp3`              | Wrong-answer gentle response                         | ~8 KB       | Soft breathy poof, 500ms — NOT a buzzer  |
 | `sfx-plink.mp3`             | Stardust grain arrival                               | ~5 KB       | Reused from Session-5 jar                |
@@ -567,9 +611,10 @@ src/screens/Math/
 export type DistractorTier = 'gentle' | 'offByOne'
 
 export function pickTier(problemIndex: number): DistractorTier {
-  // Problems 1-2: gentle ramp. Problems 3-8: off-by-one trap.
-  // Cutoff is configurable here in case Dave consult moves it.
-  return problemIndex <= 2 ? 'gentle' : 'offByOne'
+  // Problems 1-3: gentle ramp. Problems 4-8: off-by-one trap.
+  // Cutoff locked at 3 per Dave's research memo (PR #35) — Siegler overlapping-waves
+  // + Mammarella 2023 + McNeil 2025. Do not parameterise.
+  return problemIndex <= 3 ? 'gentle' : 'offByOne'
 }
 
 export function pickDistractors(
@@ -630,7 +675,7 @@ Functional:
 - [ ] Session 1 entry: Math screen renders 1 problem (`3 + 2 = ?`) per Session-1 spec
 - [ ] Session 2+ entry: Math screen renders 8 problems sequentially, all from the session JSON
 - [ ] Each problem displays: symbolic line at 96pt, visual-groups row at 64pt flowers, 3 answer chips at 88pt
-- [ ] Distractor rule: problems 1–2 use gentle-ramp distractors; problems 3–8 use off-by-one distractors (per `distractors.ts`)
+- [ ] Distractor rule: problems 1–3 use gentle-ramp distractors; problems 4–8 use off-by-one distractors (per `distractors.ts`)
 - [ ] Correct chip position randomised per problem
 - [ ] Distractors satisfy the constraint set (in range [1,10], distinct, clamp-on-overflow)
 - [ ] HUD: stardust counter visible, problem dots visible, streak indicator hidden until streak ≥ 2
@@ -676,15 +721,14 @@ iPad PWA:
 
 ## Open questions (need Thomas / Dave)
 
-1. **Distractor cutoff (Dave consult):** is the 2-tier ramp at problems 1–2 → 3–8 the right cutoff for an 8-year-old? Could push the gentle-ramp window to problems 1–3 if Dave thinks the trap distractors arrive too early. **Action:** file ticket comment on `86c9grn9c` requesting Dave's input; default cutoff stays as specified until he weighs in. One-line change in `distractors.ts`. Non-blocking on impl.
+> **Note on numbering:** items 1, 4, and 5 from the original list have been resolved by Dave's
+> research memo (PR #35) and locked into the spec body — distractor cutoff into §Distractor policy,
+> sparkle-vs-flame into §Stardust treatment → "Streak indicator visual", hint threshold into
+> §Wrong-answer policy. The remaining items below retain their original numbering for traceability.
 
-2. **Streak threshold values (3, 5, 8):** I picked these as feel-right milestones for an 8-problem session. Alternative: 4 and 8 (cleaner halves). Or 3, 6, 8. Want Thomas's taste call. **Default until decided:** ship `[3, 5, 8]`.
+2. **Streak threshold values (3, 5, 8):** I picked these as feel-right milestones for an 8-problem session. Alternative: 4 and 8 (cleaner halves). Or 3, 6, 8. Want Thomas's taste call. **Default until decided:** ship `[3, 5, 8]`. (Dave's memo, PR #35, supports keeping `[3, 5, 8]` from a reinforcement-schedule standpoint but flags this as a Thomas taste call rather than a developmental requirement.)
 
 3. **Stardust per session math:** clean 8-for-8 = 11 stardust (8 + 3 bonuses). One wrong on problem 1 (no streak bonuses possible until streak rebuild) = ~7 stardust. Is that ratio right, or do we want bonuses to feel rarer / more rewarded? **Default:** ship as specified.
-
-4. **`icon-flame.svg` for streak indicator:** new asset, not on assets-todo.md yet. Need a soft, friendly flame — pastel peach/pink, not aggressive red. **Action:** add to `assets-todo.md` in a follow-up commit if this spec is approved. Could also use a sparkle / star burst instead of a flame — flame is the conventional metaphor but flames are "danger" coded; might be off-brand for Melody. **Recommendation:** use the existing `sparkle-particle.svg` at a slightly larger size with a gold-tinted background pulse instead of authoring a new flame. Would also dodge any "streak shame" connotation a flame icon might carry. Sign-off needed.
-
-5. **Hint timing:** the hint state interrupts after 2 wrongs. Is 2 the right threshold, or should it be 1 (Marian gets help on the very first wrong)? **Default:** 2. Rationale: 1-wrong-then-hint robs her of the chance to self-correct; 2 lets her actually try.
 
 6. **Session JSON failure recovery:** if the orchestrator delivers a malformed session (missing utterances, bad distractor data), Math currently shows Melody's puzzled-tilt and stalls. Should there be a graceful "let's try again later" surface, or is this entirely the orchestrator's responsibility to detect upstream? **Default:** orchestrator owns it. Math fails closed (puzzled + stall) — better than crashing.
 
@@ -710,7 +754,9 @@ Per CLAUDE.md non-negotiables, confirmed absent from this spec:
 ## Provenance
 
 - Brief: ClickUp ticket `86c9grn9c` (high priority, week-3, blocks Math impl `86c9grn33`).
+- Dave-locked decisions follow-up: ClickUp ticket `86c9gt449` (week-3, follow-up).
 - Audio architecture canonical reference: `design/audio-architecture.md` (PR #27).
 - Greet implementation pattern reference: `src/screens/Greet.tsx`, `src/lib/audio/useAudioUnlockGate.ts`, `src/lib/audio/preRecorded.ts`.
 - Session-1 walkthrough (single-problem version): `design/session-1.md` § "Screen 3 — Math Exercise".
 - Diagnostic data informing distractor rule: `build a tutor AI app with investigation and analysis.md`, project memory `project_diagnostic_results.md`.
+- Dave's research memo on distractor cutoff, hint threshold, and streak-indicator iconography: `design/research/math-distractor-and-streak-decisions.md` (PR #35).
