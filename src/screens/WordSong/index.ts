@@ -1,0 +1,42 @@
+/**
+ * Barrel for the Word Song screen. App.tsx imports `./screens/WordSong`
+ * which resolves here.
+ */
+export { default } from './WordSong'
+export type {
+  WordSongProps,
+  WordSongSessionResult,
+  PlayWordSongUtteranceFn,
+  PlayWordSongUtteranceOptions,
+} from './WordSong'
+export { STREAK_BONUS_THRESHOLDS } from './constants'
+export type {
+  WordSongProblem,
+  WordSongProblemUtterances,
+  WordSongSessionPlan,
+  WordSongUtteranceSlot,
+  WordSongUtteranceSource,
+} from './wordSessionPlans'
+export {
+  STATIC_WORD_SONG_PLANS,
+  TARGET_WORDS,
+  pickStaticWordSongPlan,
+  wordSongSessionPlanFromWire,
+  wordSongSessionPlanToUtteranceSources,
+  wordSongUtteranceId,
+} from './wordSessionPlans'
+export {
+  GENTLE_RAMP_THROUGH,
+  pickDistractors,
+  pickTier,
+} from './wordDistractors'
+export type { DistractorTier } from './wordDistractors'
+export {
+  ALL_WORDS,
+  DISTRACTOR_ONLY_WORDS,
+  FORBIDDEN_PAIRS,
+  TARGET_PAIRINGS,
+  getWordEntry,
+  isForbiddenPair,
+} from './wordPack'
+export type { TargetPairings, WordCategory, WordEntry } from './wordPack'
