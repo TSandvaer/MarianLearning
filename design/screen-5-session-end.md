@@ -1,18 +1,33 @@
-# Screen 5 — Session End (Math)
+# Screen 5 — Session End
 
 **Audience:** Devon + Kevin (impl), Jessica (QA), Thomas (taste).
-**Author:** Kyle (UX) — ticket `86c9grnjd`.
+**Author:** Kyle (UX) — ticket `86c9grnjd`; Word Song handoff amendment per follow-up to PR #61.
 **Status:** Spec — implementation blocked on this PR merging.
 **Surface:** iPad portrait PWA, home-screen installed.
-**Scope:** What happens after problem 8 of an 8-problem Math session. The "completed clean run" path
-only — mid-session abandonment lives in sibling ticket `86c9grnjf`.
+**Scope:** What happens after the eighth problem of an 8-problem session, regardless of whether
+the last surface was **Math** (`design/screen-3-math.md`) or **Word Song**
+(`design/screen-4-word-song.md`). The "completed clean run" path only — mid-session abandonment
+lives in sibling ticket `86c9grnjf`.
 
-This file is the canonical spec for the Session-End screen following a Math session. Session-1's
-Screen 5 (`design/session-1.md` lines 466–576) is the first-run miniature version (3 stars from 3
-moments); from Session 2 onward this file owns the surface. The Math screen
-(`design/screen-3-math.md`) hands off to this screen via the
-`onSessionComplete({ totalCorrect, totalStardust, finalStreak })` callback contract noted at
-screen-3-math.md:411.
+This file is the canonical spec for the Session-End screen following any completed v1 session.
+Session-1's Screen 5 (`design/session-1.md` lines 466–576) is the first-run miniature version
+(3 stars from 3 moments); from Session 2 onward this file owns the surface. Both content screens
+hand off to Session-End via the same contract:
+
+- Math fires `onSessionComplete({ totalCorrect, totalStardust, finalStreak })` per
+  screen-3-math.md:411.
+- Word Song fires `onSessionComplete({ totalCorrect, totalStardust, finalStreak, surface: 'word-song' })`
+  per screen-4-word-song.md:540. (Math's payload is treated as `surface: 'math'` by default — see
+  §"User state entering this screen" below for the unified shape.)
+
+**Cross-tree session note (v1 sequencer):** the `CLAUDE.md` architecture says "sessions mix both
+trees in one ~15-min flow", which means in steady-state v1 a session is 8 Math + 8 Word Song
+problems interleaved. The session ends after problem 8 of whichever tree comes last in the
+sequencer's plan; that tree's screen fires `onSessionComplete`, and Session-End handles the
+recap. Session-End does not care which tree you came from for the celebration shape — the spoken
+recap, the stardust counter, the streak band, and the goodbye are all session-scoped, not
+tree-scoped. The few branches that _do_ differentiate are flagged inline (entry-state notes,
+optional Word Song recap variant per Open Q #8, Provenance).
 
 ---
 
@@ -30,28 +45,67 @@ end of a visit with a friend who is glad she came.
 
 ## User state entering this screen
 
-She just tapped the correct chip on problem 8 of the Math session. The Math screen fired
-`onSessionComplete({ totalCorrect, totalStardust, finalStreak })` — that callback wires straight
-into this screen's mount. The audio context is already gesture-unlocked (last tap was within 1.2s).
-The Path A `sessionAudio` cache is hot.
+She just tapped the correct chip on problem 8 of **either** the Math screen **or** the Word Song
+screen — whichever was the final surface in this session's plan. The originating screen fired
+`onSessionComplete(payload)` and unmounted. That callback wires straight into Session-End's mount.
+The audio context is already gesture-unlocked (last tap was within 1.2s). The Path A
+`sessionAudio` cache is hot — and importantly, it is the _same_ `sessionAudio` instance whether
+she came from Math or Word Song, because both screens consume from the unified session-start audio
+bundle (per `design/audio-architecture.md`). No re-initialisation is required at the boundary.
 
-Two state sources arrive with her:
+**Unified payload shape:**
 
-| Field           | Type   | Range | Source                                     |
-| --------------- | ------ | ----- | ------------------------------------------ |
-| `totalCorrect`  | number | 0–8   | Math screen's per-session correct count    |
-| `totalStardust` | number | 0–11  | Math screen's per-session stardust earned  |
-| `finalStreak`   | number | 0–8   | Longest streak she hit during this session |
+| Field           | Type                    | Range                         | Source                                                               |
+| --------------- | ----------------------- | ----------------------------- | -------------------------------------------------------------------- |
+| `totalCorrect`  | number                  | 0–N (N = problems in session) | Originating screen's per-session correct count                       |
+| `totalStardust` | number                  | 0–(N + 3)                     | Originating screen's per-session stardust earned                     |
+| `finalStreak`   | number                  | 0–N                           | Longest streak she hit during this session (unified across trees)    |
+| `surface`       | `'math' \| 'word-song'` | enum                          | The originating screen identifier. Math omits → defaults to `'math'` |
 
 Notes on bounds:
 
-- `totalStardust` max of 11 = 8 (one per correct) + 3 (streak bonuses at 3/5/8). Per
-  screen-3-math.md §"Stardust treatment".
-- `finalStreak` is the longest streak she reached at any point, not necessarily her final-three
-  state. So if she went 5-in-a-row then missed problem 6 then got 7+8 right, `finalStreak === 5`,
-  not 2.
+- `totalStardust` max of 11 = 8 (one per correct) + 3 (streak bonuses at 3/5/8) for a single-tree
+  session of 8 problems. **For a mixed session of 8 Math + 8 Word Song = 16 problems, the ceiling
+  is 19** (16 corrects + 3 streak bonuses if the unified streak fires at 3/5/8). The Word Song
+  spec calls this out at screen-4-word-song.md:220. Devon: do NOT hard-code 11 anywhere; use the
+  arriving `totalStardust` value as the source of truth and pre-render the recap variants up to
+  the maximum N the v1 sequencer can produce. See §"Audio integration contract" amendment below
+  for the bundle-size implication.
+- `finalStreak` is the longest streak she reached at any point during the session, unified across
+  Math and Word Song problems (per screen-4-word-song.md:240 — "Locked: streak counts unbroken
+  -correct-on-first-tap across Math + Word Song within a single session"). So if she went
+  5-in-a-row across two Math + three Word Song problems, then missed a Word Song chip, then
+  recovered, `finalStreak === 5`.
 - `totalCorrect` is informational here; this screen never displays it numerically (see §Wrong-answer
   recap policy).
+- `surface` exists so the screen can branch on entry-state copy and Open Q #8's optional
+  Word-Song-flavored recap variant. Math omits the field; Session-End treats the absence as
+  `'math'` to preserve backwards compatibility with PR #54's already-shipped Math impl.
+
+### Backwards-compatibility shim (Devon)
+
+Math's existing `onSessionComplete` payload (per PR #54 / screen-3-math.md:411) does NOT include
+`surface`. Word Song's payload DOES (per screen-4-word-song.md:540). Session-End's mount handler
+should normalise:
+
+```typescript
+type SessionCompletePayloadV1 = {
+  totalCorrect: number
+  totalStardust: number
+  finalStreak: number
+  surface?: 'math' | 'word-song' // undefined → 'math'
+}
+
+function normalizePayload(
+  raw: SessionCompletePayloadV1,
+): Required<SessionCompletePayloadV1> {
+  return { ...raw, surface: raw.surface ?? 'math' }
+}
+```
+
+This keeps the Math impl untouched while letting Word Song's wiring drop in cleanly. **Do not
+amend Math to start sending `surface: 'math'` explicitly until a separate ticket calls for it —
+the Word Song spec is locked and Math's spec did not anticipate the field.**
 
 ---
 
@@ -142,10 +196,14 @@ per Session-1 vocabulary policy.
 
 **Numeric ranges in TTS:**
 
-- "You earned `<N>` stars!" — N can be 0 to 11. Pre-render all 12 variants per the audio contract
-  below. (See Open Q #4 on whether to use concatenation or per-N pre-rendered.)
-- "`<N>` in a row! Wow!" — N can be 3 to 8. Pre-render 6 variants. (Streak summary only fires for
-  N ≥ 3, so 3, 4, 5, 6, 7, 8.)
+- "You earned `<N>` stars!" — N can be 0 to 19 in v1 steady-state (mixed Math + Word Song
+  ceiling — see §"User state entering this screen" bound notes). Pre-render all 20 variants per
+  the audio contract below. (See Open Q #4 on whether to use concatenation or per-N pre-rendered.
+  This was originally a 12-variant range when only Math sessions existed; the Word Song handoff
+  amendment extends it to 20.)
+- "`<N>` in a row! Wow!" — N can be 3 to 16 in v1 steady-state. Pre-render 14 variants. (Streak
+  summary only fires for N ≥ 3, so 3 through 16. Single-tree-only sessions cap at N = 8; mixed
+  sessions cap at N = 16. Pre-rendering is cheap — see Audio Integration Contract below.)
 
 **Edge case — zero stardust:** if Marian somehow reaches session-end with `totalStardust === 0`
 (only possible via 8 guided-completion fall-throughs — every single problem hit the 3-strike floor),
@@ -183,38 +241,67 @@ pitch, MP3 mono 24kHz ~48kbps.
 | `session.end.opener`  | "You did it!"   | Screen entry                                         | `-10%`    | default    | Same text every session — but render per-session for cache locality (matches Math reprompt pattern, screen-3-math:285) |
 | `session.end.goodbye` | "See you soon." | After streak band (or after recap if no streak band) | `-10%`    | default    | Same text every session.                                                                                               |
 
-**Recap line — pre-rendered variants (12 total, one always dispatched):**
+**Recap line — pre-rendered variants (20 total, one always dispatched):**
 
-| `id`                   | Sample text                 | When played                  | SSML rate | SSML pitch | Notes                                            |
-| ---------------------- | --------------------------- | ---------------------------- | --------- | ---------- | ------------------------------------------------ |
-| `session.end.recap.0`  | _(not dispatched — silent)_ | n/a                          | `-10%`    | default    | Pre-rendered for bundle uniformity; never played |
-| `session.end.recap.1`  | "You earned one star!"      | After opener if stardust = 1 | `-10%`    | default    | Singular form                                    |
-| `session.end.recap.2`  | "You earned two stars!"     | After opener if stardust = 2 | `-10%`    | default    | Plural, etc.                                     |
-| `session.end.recap.3`  | "You earned three stars!"   | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.4`  | "You earned four stars!"    | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.5`  | "You earned five stars!"    | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.6`  | "You earned six stars!"     | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.7`  | "You earned seven stars!"   | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.8`  | "You earned eight stars!"   | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.9`  | "You earned nine stars!"    | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.10` | "You earned ten stars!"     | …                            | `-10%`    | default    |                                                  |
-| `session.end.recap.11` | "You earned eleven stars!"  | …                            | `-10%`    | default    |                                                  |
+| `id`                   | Sample text                   | When played                  | SSML rate | SSML pitch | Notes                                            |
+| ---------------------- | ----------------------------- | ---------------------------- | --------- | ---------- | ------------------------------------------------ |
+| `session.end.recap.0`  | _(not dispatched — silent)_   | n/a                          | `-10%`    | default    | Pre-rendered for bundle uniformity; never played |
+| `session.end.recap.1`  | "You earned one star!"        | After opener if stardust = 1 | `-10%`    | default    | Singular form                                    |
+| `session.end.recap.2`  | "You earned two stars!"       | After opener if stardust = 2 | `-10%`    | default    | Plural, etc.                                     |
+| `session.end.recap.3`  | "You earned three stars!"     | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.4`  | "You earned four stars!"      | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.5`  | "You earned five stars!"      | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.6`  | "You earned six stars!"       | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.7`  | "You earned seven stars!"     | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.8`  | "You earned eight stars!"     | …                            | `-10%`    | default    | Single-tree session ceiling                      |
+| `session.end.recap.9`  | "You earned nine stars!"      | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.10` | "You earned ten stars!"       | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.11` | "You earned eleven stars!"    | …                            | `-10%`    | default    | Single-tree streak-bonus ceiling                 |
+| `session.end.recap.12` | "You earned twelve stars!"    | …                            | `-10%`    | default    | **Mixed-session range begins**                   |
+| `session.end.recap.13` | "You earned thirteen stars!"  | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.14` | "You earned fourteen stars!"  | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.15` | "You earned fifteen stars!"   | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.16` | "You earned sixteen stars!"   | …                            | `-10%`    | default    | All-correct mixed (no streak bonuses)            |
+| `session.end.recap.17` | "You earned seventeen stars!" | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.18` | "You earned eighteen stars!"  | …                            | `-10%`    | default    |                                                  |
+| `session.end.recap.19` | "You earned nineteen stars!"  | …                            | `-10%`    | default    | Mixed-session ceiling (16 + 3 streak bonuses)    |
 
-**Streak line — pre-rendered variants (6 total, conditionally dispatched):**
+**Number-word vocabulary check:** the mixed-session range introduces `twelve, thirteen, fourteen,
+fifteen, sixteen, seventeen, eighteen, nineteen` to Melody's spoken numerals. These are on the
+locked numeric allow-list per the Session-1 vocabulary policy (numbers are an allow-list category,
+not part of the 200-word cap). No vocab-cap impact.
 
-| `id`                   | Sample text            | When played            | SSML rate | SSML pitch |
-| ---------------------- | ---------------------- | ---------------------- | --------- | ---------- |
-| `session.end.streak.3` | "Three in a row! Wow!" | If `finalStreak === 3` | `-10%`    | default    |
-| `session.end.streak.4` | "Four in a row! Wow!"  | If `finalStreak === 4` | `-10%`    | default    |
-| `session.end.streak.5` | "Five in a row! Wow!"  | If `finalStreak === 5` | `-10%`    | default    |
-| `session.end.streak.6` | "Six in a row! Wow!"   | If `finalStreak === 6` | `-10%`    | default    |
-| `session.end.streak.7` | "Seven in a row! Wow!" | If `finalStreak === 7` | `-10%`    | default    |
-| `session.end.streak.8` | "Eight in a row! Wow!" | If `finalStreak === 8` | `-10%`    | default    |
+**Streak line — pre-rendered variants (14 total, conditionally dispatched):**
 
-**Total Session-End audio per session:** 2 fixed + 12 recap variants + 6 streak variants = **20
-utterances**. At ~15 KB/utterance, that's ~300 KB inline base64. Combined with Math's ~600 KB
-(screen-3-math.md:296), session payload is ~900 KB — comfortably within the 4.5 MB Vercel response
-cap.
+| `id`                    | Sample text               | When played             | SSML rate | SSML pitch |
+| ----------------------- | ------------------------- | ----------------------- | --------- | ---------- | ---------------------- |
+| `session.end.streak.3`  | "Three in a row! Wow!"    | If `finalStreak === 3`  | `-10%`    | default    |
+| `session.end.streak.4`  | "Four in a row! Wow!"     | If `finalStreak === 4`  | `-10%`    | default    |
+| `session.end.streak.5`  | "Five in a row! Wow!"     | If `finalStreak === 5`  | `-10%`    | default    |
+| `session.end.streak.6`  | "Six in a row! Wow!"      | If `finalStreak === 6`  | `-10%`    | default    |
+| `session.end.streak.7`  | "Seven in a row! Wow!"    | If `finalStreak === 7`  | `-10%`    | default    |
+| `session.end.streak.8`  | "Eight in a row! Wow!"    | If `finalStreak === 8`  | `-10%`    | default    | Single-tree ceiling    |
+| `session.end.streak.9`  | "Nine in a row! Wow!"     | If `finalStreak === 9`  | `-10%`    | default    | **Mixed range begins** |
+| `session.end.streak.10` | "Ten in a row! Wow!"      | If `finalStreak === 10` | `-10%`    | default    |                        |
+| `session.end.streak.11` | "Eleven in a row! Wow!"   | If `finalStreak === 11` | `-10%`    | default    |                        |
+| `session.end.streak.12` | "Twelve in a row! Wow!"   | If `finalStreak === 12` | `-10%`    | default    |                        |
+| `session.end.streak.13` | "Thirteen in a row! Wow!" | If `finalStreak === 13` | `-10%`    | default    |                        |
+| `session.end.streak.14` | "Fourteen in a row! Wow!" | If `finalStreak === 14` | `-10%`    | default    |                        |
+| `session.end.streak.15` | "Fifteen in a row! Wow!"  | If `finalStreak === 15` | `-10%`    | default    |                        |
+| `session.end.streak.16` | "Sixteen in a row! Wow!"  | If `finalStreak === 16` | `-10%`    | default    | Mixed-session ceiling  |
+
+**Total Session-End audio per session:** 2 fixed + 20 recap variants + 14 streak variants = **36
+utterances**. At ~15 KB/utterance, that's ~540 KB inline base64. Combined with the originating
+screen's audio (~600 KB Math or ~600 KB Word Song; in mixed sessions the two screens together are
+~1.2 MB), session payload tops out at ~1.74 MB for a mixed session — comfortably within the
+4.5 MB Vercel response cap.
+
+**Bundle-shipping note (Devon):** the originating-screen identity at session-start is _known_ to
+the sequencer (the session plan determines whether the last surface is Math or Word Song before
+the bundle is rendered). In principle the Vercel function could ship only the recap variants
+needed for that session's plausible stardust range. **Do not optimise this in v1.** The bundle
+overhead is small (~540 KB), the logic is simple ("ship all variants always"), and trimming
+based on plan-aware bounds invites session-cache miss bugs when the plan changes mid-flight.
 
 **Why pre-render all variants instead of templating at runtime:** Path A's whole architectural point
 is that audio is rendered server-side at session-start so the client never depends on Web Speech or
@@ -458,6 +545,163 @@ Melody's celebration voice — that reads as a joke at her expense.
 
 ---
 
+## Word Song handoff — design decisions and tensions
+
+This section is the heart of the Word Song handoff amendment. It documents the choices made,
+the tensions resolved, and the deferrals flagged. Read this before §States below if you want
+the _why_; if you only need the _what_, it's already woven into the sections above.
+
+### Tension #1 — Stardust completion-contingency for literacy (Dave's research vs. locked Word Song spec)
+
+**The conflict.**
+
+Dave's phonics research memo (`design/research/phonics-sequence-marian.md` §"On the
+overjustification effect and stardust", lines 299–301; §Recommendations item 3, line 341)
+recommends literacy stardust be **completion-contingent** rather than correct-only:
+
+> _Stardust for phonics should be completion-contingent, not correct-only. Unlike math
+> automaticity (where there is a right/wrong binary that carries motivational information),
+> phonics decoding is a developing skill and wrong attempts are learning events. Award stardust
+> for completing the item (attempting the decode and hearing the answer), not only for correct
+> decodes. Melody's character reaction distinguishes correct vs. incorrect; the currency should
+> not._
+
+The Word Song spec (`design/screen-4-word-song.md` §Stardust treatment → "Award rules", lines
+214–220) **locked the opposite rule**: stardust is correct-only-on-first-tap, identical to Math's
+rule, in service of a unified counter and a single mental model for Marian.
+
+> _+1 stardust per correct answer, awarded on the first tap (no stardust for retry-and-eventually
+> -correct — that's a hint outcome, not a clean win)._
+
+Both rationales have merit:
+
+- **Dave's argument** is grounded in the Deci/Koestner/Ryan (1999) overjustification meta-
+  analysis (d = −0.34 for performance-contingent rewards on intrinsic motivation) and the
+  developmental observation that phonics is an _emerging_ skill where wrong attempts are
+  learning events, not failures.
+- **Word Song spec's argument** is that two stardust regimes (correct-only for Math,
+  completion-contingent for Word Song) compound mental load for an 8-year-old, dilute the
+  "stardust = clean win" signal, and complicate the unified counter shape (the same counter
+  literally cannot mean two things).
+
+**The resolution for v1: keep Word Song's locked correct-only rule, defer Dave's recommendation.**
+
+Reasons:
+
+1. **Word Song spec is locked** (per the brief for this amendment) and shipped via PR #61.
+   Re-opening it for an award-rule change is out of this ticket's scope.
+2. **Session-End is a recap surface, not a reward-rule arbiter.** Whatever rule the originating
+   screen used, Session-End just consumes the resulting `totalStardust` count. The amendment's
+   job is to handle the count gracefully, not to prescribe how it was computed.
+3. **The unified-counter argument is itself anti-dark-pattern.** Two simultaneous reward
+   regimes risk Marian noticing the asymmetry ("I earned a star for trying that one but not
+   this one — why?") and either gaming it (deliberately tapping Word Song problems she's
+   uncertain about for free stars) or feeling the asymmetry as inconsistency. Both outcomes
+   undermine the warmth.
+4. **Dave's recommendation can be revisited as a Word Song spec amendment (separate ticket)
+   without re-amending Session-End.** The spoken recap is "You earned `<N>` stars!" regardless
+   of how N was computed; the audio bundle and the counter UI are unchanged by an upstream
+   Word Song stardust-rule change. So this deferral does not bake in technical debt at the
+   Session-End layer.
+
+**Action items resulting from this deferral:**
+
+- This amendment **does not change the Word Song stardust rule.**
+- Open Q #9 below documents Dave's recommendation as a deferred item Thomas should weigh in
+  on. If Thomas wants to align with Dave's research, that triggers a follow-up Word Song spec
+  amendment ticket (NOT a Session-End amendment).
+- The acceptance criteria (§Acceptance criteria) remain aligned with the Word Song spec's
+  current (correct-only) rule.
+- The wrong-answer recap policy in this spec already disclaims ever surfacing wrong-answer
+  counts, which Dave's research supports independently — that part is not in tension.
+
+### Tension #2 — Domain framing in the recap line (Math vs. Word Song)
+
+**The conflict.**
+
+The current Math-flavoured spec phrases the entry-state ("She just tapped the correct chip on
+problem 8 of the Math session"). The recap line is "You earned `<N>` stars!" — domain-agnostic
+on its face. But the brief asks: should the recap differentiate ("Math problems!" vs. "Word
+Song!") to reinforce which tree she just played?
+
+**The resolution for v1: keep the recap line domain-agnostic.**
+
+Reasons:
+
+1. **Mixed sessions break the framing.** When the v1 sequencer interleaves Math + Word Song,
+   the closing surface is whichever tree the sequencer placed last. Saying "Math problems!"
+   when she just played 8 Math + 8 Word Song misrepresents the session; saying "Word Song!"
+   focuses on only the last 8. Either is a partial truth.
+2. **The "session is over" frame is what matters.** Marian doesn't need a recap of _what_ she
+   did — she just did it. She needs a warm closing. "You earned `<N>` stars!" says _you did
+   the thing_, which is the message.
+3. **Vocab cap economy.** Adding a Word-Song-flavored recap variant means either branching the
+   recap copy ("`<N>` Math stars!" / "`<N>` Word Song stars!") which doubles the recap bundle
+   from 20 to 40 variants per session for ~40 KB more inline base64, or templating
+   ("`<N>` stars from `<tree>`!") which fights the audio architecture's per-variant pre-render
+   discipline. Neither is worth it for a marginal framing benefit.
+4. **Open Q #8 lets Thomas overrule** if he wants tree-flavored recap variants ("Eight Word
+   Song stars!"). Default until decided: domain-agnostic, single recap line.
+
+### Tension #3 — Streak-break visual contract for Word Song
+
+**The conflict.**
+
+The brief asks: does Math's row-9 streak-break behaviour (400ms quiet fade) apply identically
+to Word Song?
+
+**The resolution: yes — identical.** Per `design/screen-4-word-song.md` §Wrong-answer policy →
+"Streak break" (lines 266–273):
+
+> _Identical to Math (`screen-3-math.md` §Wrong-answer policy → "Streak break"):_
+>
+> - _Streak indicator gently fades to opacity 0 over 400ms._
+> - _Internal `streak` state resets to 0._
+> - _No dedicated SFX, no TTS, no copy._
+> - _Streak indicator never reappears retroactively._
+
+The unified streak (across Math + Word Song) means a wrong tap on either tree breaks the same
+streak. Session-End never sees a "live" streak state — it receives `finalStreak` (the longest
+streak hit at any point during the session). So the streak-break behaviour is entirely
+upstream of Session-End. No amendment needed here; this resolution is documented for
+completeness.
+
+### Reward-animation semantic check — sparkles for literacy
+
+**The question.** The Math celebration uses `sparkle-particle.svg` + `sfx-sparkle.mp3` for the
+stardust burst. Is that vocabulary semantically appropriate when the closing celebration
+follows a literacy session?
+
+**Answer: yes.** Sparkles are a generic positive-reaction visual; they don't read as
+math-specific. The Word Song spec already locks `sparkle-particle.svg` as Word Song's
+correct-answer celebration (screen-4-word-song.md:452: "Sparkle particle burst from chip
+centre, 6 particles, spring `{ stiffness: 120, damping: 18 }`, fade over 600ms — identical to
+Math's StardustBurst pattern."). Whatever Marian saw in the Word Song happy-path, she sees a
+larger version of in Session-End. No semantic mismatch.
+
+The only reward token that _could_ read as math-specific is the star glyph itself
+(`star-filled.svg`), used as the stardust-counter glyph. Stars are also pretty universal — they
+don't read as numerical, just as "rewards". Word Song's HUD already uses the same glyph per
+screen-4-word-song.md:556. No re-skin needed.
+
+### What this amendment intentionally does NOT do
+
+- **Does not amend the Word Song spec.** That spec is locked; any Word-Song-internal change
+  belongs in a separate ticket.
+- **Does not introduce a tree-flavored recap variant.** Open Q #8 documents the option for
+  Thomas to overrule.
+- **Does not resolve the open question on "All done!" CTA destination** (Open Q #1, also
+  tracked at ClickUp ticket `86c9gugm7`). Default until Thomas decides remains Option C
+  (Sleep splash). The Word Song handoff does not change the option set.
+- **Does not introduce bilingual copy on the Sleep splash.** The strict English-only
+  non-negotiable holds for Word Song's closing surface as much as Math's. Open Q #5 in the
+  original spec already covers this.
+- **Does not change Word Song's stardust completion-contingency rule.** Dave's recommendation
+  is documented as Open Q #9 (deferred); resolving it requires a Word Song spec amendment, not
+  a Session-End amendment.
+
+---
+
 ## States
 
 ### Idle (post-mount, all dispatch complete)
@@ -529,13 +773,33 @@ anti-FOMO copy. Out of scope here.
 
 ### Transition in
 
-- From Math (post-problem-8 happy path): Math's last problem's chips fade out (200ms), Math
+The transition shape is identical regardless of originating surface; only the originating
+background asset differs.
+
+- **From Math (post-problem-8 happy path):** Math's last problem's chips fade out (200ms), Math
   background cross-fades from `bg-garden.svg` to `bg-twilight.svg` over 600ms. Melody
   `layoutId="melody"` re-sizes from upper-left small to centered larger via spring
   `{ stiffness: 180, damping: 20 }` over ~700ms. Math's HUD strip fades out over 300ms (delayed
   to start at the same moment as the bg cross-fade).
-- This screen mounts on Math's `onSessionComplete` callback. Math owns the cross-fade; Session-End
-  mounts with all elements at opacity 0 and animates them in per the dispatch sequence.
+- **From Word Song (post-problem-8 happy path):** Word Song's last word card + chips fade out
+  (200ms; the word card includes the picture, the letters, and the optional speaker icon —
+  per screen-4-word-song.md:436). Word Song's background cross-fades from `bg-song.svg` (the
+  canonical filename per screen-4-word-song.md:582 §Asset reuse summary; note Word Song's
+  narrative occasionally calls this "song-scene" but the asset is `bg-song.svg`) to
+  `bg-twilight.svg` over 600ms. Melody `layoutId="melody"` re-sizes the same way (Word Song's
+  Melody position is upper-left at ~26vh per screen-4-word-song.md:435 — _same_ origin as Math,
+  so the spring lands the same). The unified HUD strip fades out over 300ms in lock-step with
+  the bg cross-fade.
+- **In both cases:** Session-End mounts on the originating screen's `onSessionComplete` callback.
+  The originating screen owns the cross-fade; Session-End mounts with all elements at opacity 0
+  and animates them in per the dispatch sequence. The shared `layoutId="melody"` carries Melody
+  smoothly across the boundary regardless of which screen unmounts.
+
+**Why no separate background per surface:** the closing wash is `bg-twilight.svg` either way.
+Twilight reads as "session is winding down"; the originating tree is irrelevant to the closing
+mood. If a future spec wants tree-specific closing visuals (e.g. a garden-twilight for Math
+and a music-twilight for Word Song), open a separate ticket — the asset budget bumps from 1
+twilight bg to 2.
 
 ### Transition out
 
@@ -548,20 +812,20 @@ anti-FOMO copy. Out of scope here.
 
 ## Motion
 
-| Element                       | Trigger                       | Spring / duration                                                                                   | Reduce-Motion fallback                                                                        |
-| ----------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Background cross-fade         | Math `onSessionComplete`      | 600ms `ease: "easeOut"`                                                                             | Same — fades are fine for Reduce Motion                                                       |
-| Melody re-size + center       | Math `onSessionComplete`      | spring `{ stiffness: 180, damping: 20 }`, ~700ms                                                    | Direct teleport (no spring); opacity fade only                                                |
-| Stardust burst (on entry)     | Mount, t=0                    | 20 `sparkle-particle.svg`, spring `{ stiffness: 120, damping: 18 }`, fade over 1.2s                 | No drift — particles render static for 800ms then fade                                        |
-| Speech ribbon scale-in        | First TTS `onPlay`            | spring `{ stiffness: 260, damping: 20 }`, ~300ms                                                    | Direct opacity fade-in over 200ms                                                             |
-| Caption word reveal           | Path A `onWordTick`           | per-word opacity 0→1 over 100ms                                                                     | Same — opacity reveals are fine                                                               |
-| Stardust counter tick-up      | After opener, t=1400          | Numeric tween 0 → N over the recap utterance duration (~1.8s); per-tick `sfx.stardust-grain.play()` | Counter jumps to N instantly with one chime; no per-tick plinks (otherwise it sounds frantic) |
-| Counter pop on each tick      | Per-tick                      | scale `1 → 1.05 → 1` over 150ms                                                                     | No pop                                                                                        |
-| Streak band fade-in           | After streak utterance starts | opacity 0→1 + `y: 12 → 0` over 400ms                                                                | Opacity only, no y-shift                                                                      |
-| Melody ear-wiggle (idle loop) | Settled state                 | expression swap to `melody-happy` (via `AnimatePresence` cross-fade) for 600ms every 4s             | No expression change; static `melody-celebrating` pose                                        |
-| "All done!" CTA scale-in      | After goodbye utterance       | spring `{ stiffness: 300, damping: 16 }`, ~400ms                                                    | Opacity fade-in over 200ms                                                                    |
-| "All done!" CTA tap           | Tap                           | scale `1 → 0.95 → 1` over 200ms; chime SFX                                                          | Same                                                                                          |
-| Screen fade-out               | Post-tap                      | Opacity 1 → 0 over 300ms                                                                            | Same                                                                                          |
+| Element                       | Trigger                         | Spring / duration                                                                                   | Reduce-Motion fallback                                                                        |
+| ----------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Background cross-fade         | Originating `onSessionComplete` | 600ms `ease: "easeOut"`                                                                             | Same — fades are fine for Reduce Motion                                                       |
+| Melody re-size + center       | Originating `onSessionComplete` | spring `{ stiffness: 180, damping: 20 }`, ~700ms                                                    | Direct teleport (no spring); opacity fade only                                                |
+| Stardust burst (on entry)     | Mount, t=0                      | 20 `sparkle-particle.svg`, spring `{ stiffness: 120, damping: 18 }`, fade over 1.2s                 | No drift — particles render static for 800ms then fade                                        |
+| Speech ribbon scale-in        | First TTS `onPlay`              | spring `{ stiffness: 260, damping: 20 }`, ~300ms                                                    | Direct opacity fade-in over 200ms                                                             |
+| Caption word reveal           | Path A `onWordTick`             | per-word opacity 0→1 over 100ms                                                                     | Same — opacity reveals are fine                                                               |
+| Stardust counter tick-up      | After opener, t=1400            | Numeric tween 0 → N over the recap utterance duration (~1.8s); per-tick `sfx.stardust-grain.play()` | Counter jumps to N instantly with one chime; no per-tick plinks (otherwise it sounds frantic) |
+| Counter pop on each tick      | Per-tick                        | scale `1 → 1.05 → 1` over 150ms                                                                     | No pop                                                                                        |
+| Streak band fade-in           | After streak utterance starts   | opacity 0→1 + `y: 12 → 0` over 400ms                                                                | Opacity only, no y-shift                                                                      |
+| Melody ear-wiggle (idle loop) | Settled state                   | expression swap to `melody-happy` (via `AnimatePresence` cross-fade) for 600ms every 4s             | No expression change; static `melody-celebrating` pose                                        |
+| "All done!" CTA scale-in      | After goodbye utterance         | spring `{ stiffness: 300, damping: 16 }`, ~400ms                                                    | Opacity fade-in over 200ms                                                                    |
+| "All done!" CTA tap           | Tap                             | scale `1 → 0.95 → 1` over 200ms; chime SFX                                                          | Same                                                                                          |
+| Screen fade-out               | Post-tap                        | Opacity 1 → 0 over 300ms                                                                            | Same                                                                                          |
 
 **Reduce-Motion handling:** copy `usePrefersReducedMotion` from `Greet.tsx` (or use the shared
 hook if Devon factors it out per screen-3-math.md:561). Same global `MotionConfig
@@ -607,10 +871,10 @@ spec):
 
 **NEW asset gaps surfaced by this spec (flag to Thomas via Matt for art queue):**
 
-| Asset                    | Used for                                      | Target size | Notes                                                                                                                                                                                                                  |
-| ------------------------ | --------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `melody-celebrating.svg` | Melody centered pose for Session-End opener   | 6–8 KB      | Arms up, ears wiggling, big smile. Distinct from `melody-happy.svg` (which is the ear-wiggle/correct-answer pose) — celebrating is the bigger, more "I'm proud of you" pose. **NEW — flag to Thomas.**                 |
-| `sfx-cheer.mp3`          | Soft "ta-da" chord under "You did it!" opener | ~12 KB      | Gentle, not a game-show fanfare. Same constraint as Session-1 spec line 558. **NEW — flag to Thomas (Session-1 already requested it under the same name, but it's not yet on `assets-todo.md` per my read; confirm).** |
+| Asset                    | Used for                                      | Target size | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------ | --------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `melody-celebrating.svg` | Melody centered pose for Session-End opener   | 6–8 KB      | Arms up, ears wiggling, big smile. Distinct from `melody-happy.svg` (which is the ear-wiggle/correct-answer pose) — celebrating is the bigger, more "I'm proud of you" pose. **NEW — flag to Thomas.** **Naming note (Word Song handoff amendment):** `screen-4-word-song.md:579` refers to the same asset as `melody-cheering.svg`. The two names refer to the same pose; this spec's `melody-celebrating.svg` is the canonical filename. When the asset lands, ensure both specs reference the same file path. Devon: if you discover one spec already imports `melody-cheering.svg` post-impl, file a follow-up rename ticket. |
+| `sfx-cheer.mp3`          | Soft "ta-da" chord under "You did it!" opener | ~12 KB      | Gentle, not a game-show fanfare. Same constraint as Session-1 spec line 558. **NEW — flag to Thomas (Session-1 already requested it under the same name, but it's not yet on `assets-todo.md` per my read; confirm).**                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 **Why not reuse `melody-happy.svg` for the celebrate pose:** `melody-happy` is the per-correct-
 answer ear-wiggle pose (small, in-place reaction). Session-End's pose is a sustained celebration
@@ -676,12 +940,18 @@ Explicitly NOT covered by this spec, with the ticket that owns each:
 - **Mid-session resume / abandonment recovery** — ticket `86c9grnjf`. See §Inline answers item #5.
 - **Hub / menu screen** — does not exist in v1. If Thomas chooses Option B for the "All done!"
   CTA, the Hub becomes a new spec ticket and blocks this spec's impl. See Open Q #1.
-- **Word Song Session-End** — this spec is the Math Session-End. Word Song will need its own
-  Session-End spec (likely a near-copy of this with vocabulary swaps), or this spec gets
-  generalised when the Word Song screen lands. No ticket for Word Song Session-End yet — flag for
-  Matt's backlog.
-- **Mixed Math + Word Song session-end (when sessions interleave both trees per CLAUDE.md)** —
-  out of scope here; v1 ships Math-only sessions first per Marian's diagnostic priority.
+- **~~Word Song Session-End~~ — RESOLVED.** As of the Word Song handoff amendment (this PR),
+  this spec covers both Math and Word Song session-ends with the unified payload shape
+  documented in §"User state entering this screen". No separate Word-Song Session-End spec
+  needed.
+- **~~Mixed Math + Word Song session-end~~ — RESOLVED.** Per CLAUDE.md the v1 sequencer
+  interleaves both trees in a single session. This spec handles the resulting Session-End
+  regardless of which tree's screen called `onSessionComplete`; the unified streak and unified
+  stardust counter make the recap shape tree-agnostic. Stardust ceiling extended from 11 to 19
+  in the audio bundle to cover mixed-session totals.
+- **Word Song stardust completion-contingency rule (per Dave's research)** — deferred to a
+  potential future Word Song spec amendment; out of scope here. See §"Word Song handoff —
+  design decisions and tensions" Tension #1, and Open Q #9.
 - **Stardust unlock loop / cosmetic gallery** — flagged for v2 in screen-3-math.md:483. This spec
   does not surface unlock progress (see Open Q #3).
 - **Streak persistence display** — `longestStreakEver` is persisted but never displayed on this
@@ -814,28 +1084,34 @@ Session-1 implementation note line 701 / screen-3-math.md:613).
 
 Functional:
 
-- [ ] Screen mounts when Math fires `onSessionComplete({ totalCorrect, totalStardust, finalStreak })`
-- [ ] Background cross-fades from `bg-garden.svg` (Math) to `bg-twilight.svg` over 600ms
-- [ ] Melody re-sizes from upper-left small to centered larger via spring; uses `melody-celebrating.svg`
+- [ ] Screen mounts when Math fires `onSessionComplete({ totalCorrect, totalStardust, finalStreak })` (no `surface` field; treated as `surface: 'math'`)
+- [ ] Screen mounts when Word Song fires `onSessionComplete({ totalCorrect, totalStardust, finalStreak, surface: 'word-song' })`
+- [ ] Backwards-compat shim: missing `surface` field defaults to `'math'`; no crash, no warning shown to Marian
+- [ ] Background cross-fades from `bg-garden.svg` (Math) OR `bg-song.svg` (Word Song) to `bg-twilight.svg` over 600ms
+- [ ] Melody re-sizes from upper-left small to centered larger via spring; uses `melody-celebrating.svg` regardless of originating surface
 - [ ] Stardust burst plays on entry (~20 particles, fade over 1.2s)
 - [ ] Speech ribbon shows opener line "You did it!" word-by-word via Path A `onWordTick`
 - [ ] Stardust counter ticks up from 0 to `totalStardust` over the recap utterance duration; each tick plinks
+- [ ] Counter handles all values 0–19 (single-tree max 11, mixed-session max 19) without overflow or layout reflow
 - [ ] If `totalStardust === 0`, recap utterance is skipped entirely; counter stays at 0
-- [ ] Singular form ("one star") used iff `totalStardust === 1`; plural ("stars") used otherwise
-- [ ] Streak band visible iff `finalStreak >= 3`; correct numeric variant fires (e.g. "Five in a row! Wow!")
+- [ ] Singular form ("one star") used iff `totalStardust === 1`; plural ("stars") used otherwise (including for 12–19)
+- [ ] Streak band visible iff `finalStreak >= 3`; correct numeric variant fires for all values 3–16 (e.g. "Five in a row! Wow!", "Sixteen in a row! Wow!")
 - [ ] Goodbye utterance "See you soon." plays after streak band (or after recap if no streak)
 - [ ] "All done!" CTA appears only after goodbye utterance settles (~6.2s on happy-audio path)
 - [ ] Tapping "All done!" plays chime SFX, fades to Sleep splash over 300ms
 - [ ] Sleep splash shows `melody-sleepy.svg` + "Come back soon." text; NO TTS plays on Sleep splash
 - [ ] Sleep splash has zero interactive elements (no taps do anything)
 - [ ] Screen sits idle indefinitely if "All done!" not tapped — no auto-advance, no nag
+- [ ] Recap copy is identical regardless of `surface` value (no tree-flavored variants in v1; default per Open Q #8)
 
 Audio:
 
 - [ ] All TTS routed through `sessionAudio.playUtterance`, never `lib/tts.speak()` or `preRecorded.playGreetLine()`
-- [ ] Pre-rendered utterance bundle includes: 1 opener + 12 recap variants (0–11) + 6 streak variants (3–8) + 1 goodbye = 20 utterances per session
+- [ ] Pre-rendered utterance bundle includes: 1 opener + 20 recap variants (0–19) + 14 streak variants (3–16) + 1 goodbye = 36 utterances per session
+- [ ] All 36 variants ship inline in the session JSON regardless of which tree(s) the session contains (per "ship all variants always" guidance in §Audio integration contract)
 - [ ] If audio bundle fails (`loaderror` on opener), fallback timer still surfaces "All done!" CTA at t=4000ms
 - [ ] Cancellable mid-playback: tapping "All done!" before the goodbye utterance finishes cancels playback cleanly (no audio bleed into Sleep splash)
+- [ ] Audio context unlock check is uniform regardless of originating surface (last gesture was the correct chip on either Math or Word Song's problem 8; both routes leave the context unlocked at handoff)
 
 State persistence:
 
@@ -870,10 +1146,11 @@ Touch + accessibility:
 
 iPad PWA:
 
-- [ ] Audio context already unlocked on screen entry (Math's last tap was the gesture); no `useAudioUnlockGate` ring should appear
+- [ ] Audio context already unlocked on screen entry (last tap on either Math or Word Song was the gesture); no `useAudioUnlockGate` ring should appear
 - [ ] No audio dropouts mid-playback (opener → recap → streak → goodbye plays cleanly through)
 - [ ] Sleep splash persists indefinitely; iPad backgrounds the tab eventually without crash
 - [ ] If Marian closes the PWA on the Sleep splash, next launch starts fresh from Splash (no resume from Sleep splash)
+- [ ] Mixed-session bundle (Math + Word Song + Session-End) fits within Vercel's 4.5 MB response cap (target ~1.74 MB; alarm at 3 MB)
 
 ---
 
@@ -886,16 +1163,62 @@ iPad PWA:
 3. **Stardust unlock loop on this surface.** CLAUDE.md mentions "unlocks" as part of gamification. Math screen-3-math.md §"Inline answers item #4" explicitly defers the unlock loop to v2 (no surface, no spec, no impl). Confirming Session-End ALSO has no unlock surface in v1 — the cumulative stardust is persisted but never displayed as "X more to unlock Y!". If Thomas wants any unlock progress indicator on this screen, that becomes its own scope item AND requires a v2 unlock-loop spec to land first. **Default:** no unlock surface in v1; cumulative stardust silently accumulates in localStorage.
 
 4. **Audio recap interpolation strategy.** Three choices for the "You earned `<N>` stars!" line:
-   - **(a)** Pre-render all 12 variants per session (current spec recommendation; ~180 KB).
-   - **(b)** Concatenate pre-rendered "You earned" + per-N number + "stars" client-side via Howler audio-sprite splicing (Howler.js's audio-segment API — unrelated to character sprite-sheets, which are out of scope per session-1.md §Assets footnote) or sequential plays (~30 KB total but gluing audio cleanly is hard; risk of awkward gaps; new code path).
+   - **(a)** Pre-render all variants per session (current spec recommendation; 20 recap + 14 streak = 34 numeric variants, ~510 KB after the Word Song handoff amendment extended the upper bound to 19/16).
+   - **(b)** Concatenate pre-rendered "You earned" + per-N number + "stars" client-side via Howler audio-sprite splicing (Howler.js's audio-segment API — unrelated to character sprite-sheets, which are out of scope per session-1.md §Assets footnote) or sequential plays (~50 KB total but gluing audio cleanly is hard; risk of awkward gaps; new code path).
    - **(c)** Live-synthesise via Web Speech at session-end (would re-introduce the dependency we explicitly rejected in audio-architecture.md; not viable).
-   - **Recommendation:** (a). Bundle cost is fine, no new code paths, matches Math's per-problem-N pattern (screen-3-math.md:285). **Default:** (a).
+   - **Recommendation:** (a). Bundle cost is fine even with the extended numeric range, no new code paths, matches Math's per-problem-N pattern (screen-3-math.md:285). **Default:** (a).
 
 5. **Sleep splash text — bilingual question.** "Come back soon." is English-only per CLAUDE.md "strict English-only" non-negotiable. Confirming this is not the spot to add Tagalog ("babalik ka soon!") even though the sleep splash is the most read-without-Melody moment in the session. **Default:** English only, locked. (Flagging because the strict policy is easy to accidentally cross on a "warm closure" surface; want explicit confirmation no exception is being made here.)
 
 6. **Should `melody-celebrating` differ from `melody-happy` at all, or is reusing `melody-happy` (the per-correct ear-wiggle pose) acceptable for v1?** I argued in §Assets that they should be visually distinct (small-reaction vs sustained-celebration). If Thomas thinks the asset budget is tighter than I'm modeling, we can ship v1 reusing `melody-happy` here and author `melody-celebrating` only when art queue has bandwidth — that's a one-line `src` swap when the new asset lands. **Default until decided:** request `melody-celebrating` as a new asset; reuse `melody-happy` as the temporary stand-in if the art queue can't deliver before Devon's impl PR.
 
 7. **Goodbye-line cadence.** Current spec runs goodbye at t=5000ms after streak band finishes (or skipping the streak gap). Total settled time is ~6.2s. Is that too fast (feels rushed)? Too slow (Marian's attention drifts)? **Default until decided:** ship at the spec'd timing; iterate based on Marian's first-week observation. (Flagging because a 6-second close-out is fundamentally a vibes call and Thomas owns vibes.)
+
+8. **Tree-flavored recap variant for Word Song sessions.** _(Added in Word Song handoff
+   amendment.)_ Currently the spoken recap is "You earned `<N>` stars!" regardless of which tree
+   the session ended on. Alternative: ship a Word-Song-flavored recap variant
+   ("`<N>` Word Song stars!" or "Eight new words!" or similar) that fires when
+   `surface === 'word-song'`. **Pro:** reinforces the literacy session's identity and gives
+   Marian a clearer "I just read words" reflection. **Con:** doubles the recap audio bundle
+   (20 → 40 variants, +~300 KB inline base64), introduces tree-asymmetric copy that complicates
+   mixed-session framing (which tree's recap fires after a 16-problem mixed session?), and
+   pushes against the unified-counter / unified-streak pattern that Word Song's stardust
+   treatment intentionally established. **Recommendation:** keep the recap domain-agnostic for
+   v1; revisit once we have evidence that Marian wants tree-specific feedback. **Default:**
+   single domain-agnostic recap line. (Reasoning trail in §"Word Song handoff" Tension #2.)
+
+9. **Word Song stardust completion-contingency (per Dave's research) — defer or escalate.**
+   _(Added in Word Song handoff amendment.)_ Dave's phonics research memo
+   (`design/research/phonics-sequence-marian.md` lines 299–301, 341) recommends literacy
+   stardust be **completion-contingent** (every completed item earns a star, regardless of
+   correct/wrong) rather than the **correct-only** rule the locked Word Song spec uses
+   (screen-4-word-song.md:214–220). **This amendment defers Dave's recommendation** because
+   the Word Song spec is locked and Session-End is a recap surface — we don't change reward
+   rules from this layer. **Decision needed from Thomas:**
+   - **(a)** Keep correct-only as currently spec'd in Word Song. _(Default; this amendment
+     ships under this assumption.)_
+   - **(b)** Schedule a separate Word Song spec amendment to switch literacy to
+     completion-contingent. Triggers a new ticket; does NOT amend Session-End directly
+     (because Session-End just consumes whatever count arrives).
+   - **(c)** Hybrid — completion-contingent for the _first_ wrong attempt only (so retry-and-
+     succeed earns a star but not retry-and-still-wrong; mid-ground between Dave's recommendation
+     and Word Song's locked rule). Triggers a Word Song spec amendment with more design work.
+     **Recommendation:** ship v1 with (a), watch Marian's first 2 weeks, then revisit. The
+     overjustification risk Dave cites is real but probabilistic; for an 8-year-old with strong
+     pre-existing motivation (per the diagnostic), the unified-counter benefit may outweigh it.
+     **This question is the highest-stakes deferral in the Word Song handoff amendment. Flag to
+     Thomas explicitly.**
+
+10. **Sleep splash CTA destination follow-up (cross-reference ClickUp `86c9gugm7`).** _(Added
+    in Word Song handoff amendment.)_ The Word Song handoff brief flagged ticket `86c9gugm7`
+    as a Thomas-decision-pending item that defaults to home in v1 — same scope as Open Q #1
+    above. **No conflict.** Open Q #1's Option C (Sleep splash + `melody-sleepy` + "Come
+    back soon.") satisfies the "defaults to home in v1" framing because the Sleep splash _is_
+    the home-state for the PWA — there's no further nav, the user closes the PWA from there.
+    If Thomas's resolution of `86c9gugm7` introduces a hub/menu screen as the post-Session-End
+    destination, that's Option B in Open Q #1, which itself blocks this spec's impl until a
+    Hub spec lands. **No new question to add here; consider this a courtesy reference for
+    Thomas as he closes both tickets together.**
 
 ---
 
@@ -918,9 +1241,26 @@ Per CLAUDE.md non-negotiables, confirmed absent from this spec:
 ## Provenance
 
 - Brief: ClickUp ticket `86c9grnjd` (normal priority, week-3).
+- Word Song handoff amendment brief: follow-up to PR #61 (Word Song spec merged 2026-04-26).
 - Math handoff contract: `design/screen-3-math.md` (locked at PR #38, commit `8a2e477`).
+- Word Song handoff contract: `design/screen-4-word-song.md` (locked at PR #61).
+- Picture-pack reference for Word Song: `design/word-song-picture-pack.md` (PR #64).
+- Phonics research informing Word Song handoff (stardust completion-contingency tension):
+  `design/research/phonics-sequence-marian.md` (PR #62).
 - Audio architecture canonical reference: `design/audio-architecture.md` (PR #27).
 - Session-1 walkthrough (mini Session-End — 3 stars from 3 moments): `design/session-1.md` § "Screen 5 — Reward + End-of-Session Teaser".
 - Greet implementation pattern reference: `src/screens/Greet.tsx`, `src/lib/audio/useAudioUnlockGate.ts`, `src/lib/audio/preRecorded.ts`.
 - Wrong-answer-recap policy evidence: `design/research/math-distractor-and-streak-decisions.md` (Mammarella et al. 2023, Garon-Carrier et al. 2016).
+- Stardust completion-contingency evidence (deferred per Open Q #9): Deci, Koestner & Ryan
+  (1999) overjustification meta-analysis (cited at `design/research/phonics-sequence-marian.md`
+  source #16) and the follow-up rebuttal of Cameron & Pierce (1994) per Deci et al. (2001).
 - Sibling spec (mid-session abandonment, NOT covered here): ticket `86c9grnjf`.
+- Sibling ticket cross-referenced in Open Q #10: `86c9gugm7` (Thomas decision pending on
+  post-Session-End destination; defaults to home in v1).
+- Amendment edit log: this PR adds the Word Song handoff to a previously Math-only spec.
+  Material additions: payload `surface` discriminant + backwards-compat shim; recap audio
+  variants extended 0–11 → 0–19; streak variants extended 3–8 → 3–16; new "Word Song handoff
+  — design decisions and tensions" section; Open Qs #8, #9, #10. Material edits: title from
+  "(Math)" to surface-agnostic; Transition-in branches per originating surface; Out-of-scope
+  items #Word-Song-Session-End and #Mixed-session both flipped to RESOLVED. Acceptance
+  criteria extended for both surfaces. No reductions to existing Math-side acceptance criteria.
