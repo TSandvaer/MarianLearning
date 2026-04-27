@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pic-dog.svg
+  Friendly Sanrio-style dog illustration for the CVC word "dog" in Word Song.
+  Matches My Melody's visual world: rounded shapes, soft lines, cute proportions.
+  - viewBox 0 0 200 200 (square, scales cleanly at 96pt chip and 180pt card sizes)
+  - Color palette: warm tones complementing Melody's pink theme
+  - Lineart: #3D2B3D at 3.5pt, stroke-linejoin round (consistent with Melody assets)
+  - Clear silhouette at small sizes (recognizable as a dog at 96pt)
+  - Target: <15 KB on disk
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Dog">
+  <title>Dog</title>
+
+  <!-- Tail (behind body) -->
+  <path d="
+    M 148 120
+    C 164 100, 178 88, 180 72
+    C 182 60, 174 54, 166 62
+    C 158 72, 154 90, 148 108"
+    fill="none" stroke="#3D2B3D" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="
+    M 148 120
+    C 164 100, 176 90, 178 74
+    C 180 64, 174 58, 168 64
+    C 160 74, 156 92, 150 108"
+    fill="#F5D6A8" stroke="none"/>
+
+  <!-- Back legs -->
+  <ellipse cx="132" cy="162" rx="18" ry="14" fill="#F5D6A8" stroke="#3D2B3D" stroke-width="3.5"/>
+  <ellipse cx="132" cy="174" rx="14" ry="10" fill="#FFF5F0" stroke="#3D2B3D" stroke-width="3"/>
+
+  <!-- Front legs -->
+  <ellipse cx="76" cy="162" rx="16" ry="14" fill="#F5D6A8" stroke="#3D2B3D" stroke-width="3.5"/>
+  <ellipse cx="76" cy="174" rx="13" ry="10" fill="#FFF5F0" stroke="#3D2B3D" stroke-width="3"/>
+
+  <!-- Body: rounded bean shape, warm golden-cream -->
+  <path d="
+    M 58 120
+    C 48 100, 52 80, 70 76
+    C 90 72, 140 72, 156 80
+    C 168 86, 170 106, 164 124
+    C 158 142, 140 156, 110 158
+    C 80 160, 54 148, 58 120 Z"
+    fill="#F5D6A8" stroke="#3D2B3D" stroke-width="3.5" stroke-linejoin="round"/>
+
+  <!-- Belly patch (lighter cream) -->
+  <ellipse cx="104" cy="128" rx="36" ry="22" fill="#FFF5F0" opacity="0.7"/>
+
+  <!-- LEFT ear (floppy, hanging down-left) -->
+  <path d="
+    M 62 62
+    C 40 50, 24 56, 22 72
+    C 20 88, 28 104, 42 108
+    C 52 110, 58 100, 60 86
+    C 62 74, 62 66, 62 62 Z"
+    fill="#E8B878" stroke="#3D2B3D" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- LEFT ear inner -->
+  <path d="
+    M 58 70
+    C 44 62, 32 66, 30 78
+    C 28 90, 34 100, 44 102
+    C 50 104, 54 96, 56 86
+    C 58 78, 58 72, 58 70 Z"
+    fill="#F5D6A8" opacity="0.6"/>
+
+  <!-- RIGHT ear (floppy, hanging down-right) -->
+  <path d="
+    M 136 58
+    C 154 42, 172 46, 176 62
+    C 180 78, 174 96, 160 102
+    C 150 106, 142 96, 140 82
+    C 138 70, 136 62, 136 58 Z"
+    fill="#E8B878" stroke="#3D2B3D" stroke-width="3.5" stroke-linejoin="round"/>
+  <!-- RIGHT ear inner -->
+  <path d="
+    M 140 66
+    C 152 54, 166 56, 168 68
+    C 170 80, 166 92, 156 96
+    C 150 98, 146 90, 144 80
+    C 142 72, 140 68, 140 66 Z"
+    fill="#F5D6A8" opacity="0.6"/>
+
+  <!-- Head: rounded circle, warm golden-cream -->
+  <circle cx="100" cy="68" r="46" fill="#F5D6A8" stroke="#3D2B3D" stroke-width="3.5"/>
+
+  <!-- Face patch (lighter cream around muzzle area) -->
+  <ellipse cx="100" cy="78" rx="28" ry="20" fill="#FFF5F0"/>
+
+  <!-- Eyes: round dots with tiny white highlights, friendly -->
+  <circle cx="84" cy="62" r="6" fill="#3D2B3D"/>
+  <circle cx="82" cy="60" r="2" fill="#FFFFFF"/>
+  <circle cx="116" cy="62" r="6" fill="#3D2B3D"/>
+  <circle cx="114" cy="60" r="2" fill="#FFFFFF"/>
+
+  <!-- Cheek blush (matching Melody's blush style) -->
+  <ellipse cx="72" cy="78" rx="10" ry="5" fill="#F8C8DC"/>
+  <ellipse cx="128" cy="78" rx="10" ry="5" fill="#F8C8DC"/>
+
+  <!-- Nose: round, soft brown-pink -->
+  <ellipse cx="100" cy="76" rx="8" ry="6" fill="#E8A0A0" stroke="#3D2B3D" stroke-width="2.5"/>
+
+  <!-- Mouth: soft smile -->
+  <path d="M 92 84 Q 100 92, 108 84" fill="none" stroke="#3D2B3D" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Tongue (tiny, peeking out) -->
+  <ellipse cx="100" cy="88" rx="5" ry="4" fill="#F48FB1"/>
+
+  <!-- Collar (pink, matching Melody's palette) -->
+  <path d="
+    M 68 104
+    C 78 112, 122 112, 132 104"
+    fill="none" stroke="#FFC0CB" stroke-width="6" stroke-linecap="round"/>
+  <!-- Collar tag (heart-shaped, gold) -->
+  <path d="
+    M 100 114
+    C 96 110, 90 112, 90 116
+    C 90 120, 96 124, 100 128
+    C 104 124, 110 120, 110 116
+    C 110 112, 104 110, 100 114 Z"
+    fill="#FFD966" stroke="#3D2B3D" stroke-width="2"/>
+</svg>

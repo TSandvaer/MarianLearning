@@ -417,7 +417,7 @@ She just got a math problem right. Melody cheered. Transition cross-faded from g
 ```
 
 - Background: `bg-song.svg` — soft wash with 3–4 stylized music notes floating. Pastel, not kindergarten-bright.
-- Picture: `pic-dog.svg` or `pic-dog.png` — friendly illustrated dog (not photo; style-consistent with Melody).
+- Picture: `pic-dog.svg` — friendly Sanrio-style illustrated dog (vector, style-consistent with Melody). Lives at `public/assets/pictures/pic-dog.svg`.
 - Letters: `d`, `o`, `g` in 96pt, spaced ~48pt apart. Each letter is tappable — tapping it plays that letter's sound alone.
 - Speaker button: circular, 72pt, teal accent (`#8EDCE6`). Tapping plays "d... o... g... dog!" (sound-by-sound, then blended).
 - Primary actions at bottom:
@@ -494,8 +494,7 @@ Picture + letters + speaker + buttons all present and fully interactive. "Again"
 
 - `melody-idle.svg`, `melody-happy.svg` — reused.
 - `bg-song.svg` — music-notes wash. **NEW.** <20 KB.
-- `pic-dog.svg` or `pic-dog.png` — illustrated dog. **NEW.** 640×640 @2x target, <30 KB.
-  - **Note to Thomas via Matt:** if going PNG for style warmth, budget for a future CVC word library — we'll need ~30 CVC-word pictures over time (dog, pot, top, log, fox, etc. through short-o/u/e/i ladder). Flag for v2 asset pipeline.
+- `pic-dog.svg` — Sanrio-style illustrated dog. **SHIPPED.** SVG vector at `public/assets/pictures/pic-dog.svg`, ~4.4 KB on disk. Scales cleanly at 96pt (chip) and 180pt+ (word card). All future CVC word pictures will also be SVG per Thomas (2026-04-27).
 - `icon-speaker.svg` — simple speaker. <3 KB.
 - `icon-paw.svg` — pawprint for "Again" button. <3 KB.
 - `icon-check.svg` — checkmark. <2 KB.
@@ -690,7 +689,7 @@ Per the non-negotiables, confirmed absent from this spec:
 | `heart-button.svg`      | Primary CTA on greeting      | <4 KB  | SVG        |
 | `flower-glyph.svg`      | Math visual groups           | <3 KB  | SVG        |
 | `sparkle-particle.svg`  | Celebration bursts           | <1 KB  | SVG        |
-| `pic-dog.svg` or `.png` | Literacy picture             | <30 KB | SVG or PNG |
+| `pic-dog.svg`           | Literacy picture             | ~4.4 KB | SVG       |
 | `icon-speaker.svg`      | Speaker button               | <3 KB  | SVG        |
 | `icon-paw.svg`          | "Again" button               | <3 KB  | SVG        |
 | `icon-check.svg`        | "Got it" button              | <2 KB  | SVG        |
