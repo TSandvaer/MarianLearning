@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import { createSfx, type Sfx } from '../lib/sfx'
 import {
   cancelPreRecorded,
@@ -246,32 +247,6 @@ export interface GreetProps {
   unlockAudioSession?: () => {
     howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
   } | void
-}
-
-/**
- * Detect prefers-reduced-motion at mount. We rely on the global MotionConfig
- * for the actual easing collapse — this hook just lets us turn OFF
- * infinite-loop animations entirely, which Framer Motion's reduced-motion
- * mode on its own doesn't always do for `animate.x: [0, 10, 0]` arrays.
- */
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  })
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const handler = (ev: MediaQueryListEvent) => setReduced(ev.matches)
-    if (mq.addEventListener) {
-      mq.addEventListener('change', handler)
-      return () => mq.removeEventListener('change', handler)
-    }
-    return undefined
-  }, [])
-
-  return reduced
 }
 
 export default function Greet({

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
 import {
   resumeHowlerContextOnGesture,
@@ -248,27 +249,6 @@ const FRESH_PROBLEM_STATE: PerProblemState = {
   wrongCount: 0,
   hintPlayed: false,
   guidedPlayed: false,
-}
-
-/** Detect prefers-reduced-motion at mount. Same hook shape as Math. */
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  })
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const handler = (ev: MediaQueryListEvent) => setReduced(ev.matches)
-    if (mq.addEventListener) {
-      mq.addEventListener('change', handler)
-      return () => mq.removeEventListener('change', handler)
-    }
-    return undefined
-  }, [])
-
-  return reduced
 }
 
 function WordSongScreen({
