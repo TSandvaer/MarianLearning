@@ -23,11 +23,24 @@
  * Caching
  * -------
  * Each session's audio is keyed by a sessionId the caller supplies. We
- * persist the inline base64 to IndexedDB (under store name `session-audio`,
- * one row per sessionId carrying a Map<utteranceId, base64>) so that a
- * full-app reload mid-session doesn't re-fetch from the network. Cleared
- * on `clearSessionAudio(sessionId)` — the session-end orchestrator calls
- * that. Quota errors fall back gracefully to in-memory only.
+ * persist the inline base64 to IndexedDB (under store name
+ * `session-audio-v${CACHE_VERSION}`, one row per sessionId carrying a
+ * Map<utteranceId, base64>) so that a full-app reload mid-session doesn't
+ * re-fetch from the network. Cleared on `clearSessionAudio(sessionId)` —
+ * the session-end orchestrator calls that. Quota errors fall back
+ * gracefully to in-memory only.
+ *
+ * Cache invalidation
+ * ------------------
+ * The cache key is `sessionId` only — it does NOT fingerprint the SSML,
+ * voice, or prosody settings used to render the audio. When the
+ * server-side TTS rendering shape changes (e.g. PR #82 introduced
+ * digit-by-digit SSML for two-digit numbers), pre-existing cached audio
+ * keyed by the same `sessionId` becomes stale. To invalidate the bucket,
+ * bump `CACHE_VERSION` below; that changes both `STORE_NAME` and the
+ * IndexedDB `DB_VERSION` integer, which fires `onupgradeneeded` and drops
+ * every prior store. One cold session-start refetch is the cost; it is
+ * cheap on F0 Azure (20 tx/s) for a single-user app.
  *
  * Voice consistency
  * -----------------
@@ -116,9 +129,23 @@ export interface CreateSessionAudioOptions {
   revokeBlobUrl?: (url: string) => void
 }
 
-const STORE_NAME = 'session-audio'
-const DB_NAME = 'marian-tutor-session-audio'
-const DB_VERSION = 1
+/**
+ * Bump this whenever the server-side TTS rendering shape changes — SSML
+ * strategy, voice, prosody attrs, etc. — so the IndexedDB-cached MP3s from
+ * the previous shape are dropped on next load. The store name and the
+ * IndexedDB schema version both derive from this constant; bumping it
+ * fires `onupgradeneeded`, which deletes the old store. v1 = pre-PR-#82
+ * (plain text → AnaNeural). v2 = post-PR-#82 (digit-by-digit SSML for
+ * two-digit numbers).
+ */
+export const CACHE_VERSION = 2
+export const STORE_NAME = `session-audio-v${CACHE_VERSION}`
+export const DB_NAME = 'marian-tutor-session-audio'
+/** Tied to CACHE_VERSION so `onupgradeneeded` fires on any bump. The IDB
+ *  spec only triggers upgrades when the integer goes UP relative to the
+ *  on-disk version; bumping in lockstep with CACHE_VERSION keeps that
+ *  contract automatic. */
+export const DB_VERSION = CACHE_VERSION
 
 /** Production IndexedDB cache. Returns a no-op adapter when IndexedDB is
  *  unavailable or any operation throws — failing soft is correct because
@@ -137,6 +164,14 @@ export function createIndexedDbCache(): SessionAudioCache {
       const req = indexedDB.open(DB_NAME, DB_VERSION)
       req.onupgradeneeded = () => {
         const db = req.result
+        // Drop any store from a prior CACHE_VERSION. Keeps the DB tidy
+        // and — critically — guarantees stale audio rendered with the
+        // previous SSML/voice/prosody shape can never be served.
+        for (const name of Array.from(db.objectStoreNames)) {
+          if (name !== STORE_NAME) {
+            db.deleteObjectStore(name)
+          }
+        }
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME)
         }
