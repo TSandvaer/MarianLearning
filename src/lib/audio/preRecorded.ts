@@ -1,34 +1,26 @@
 /**
  * Pre-recorded audio playback for fixed Greet lines.
  *
- * Background — why this module exists alongside `lib/tts`
- * -------------------------------------------------------
+ * Background
+ * ----------
  * After 5 rounds of band-aiding iPad Safari's Web Speech API (ticket
  * 86c9gp99a, PRs #18, #21, #22, #23, #24), real-device QA on 2026-04-25
- * confirmed the documented "first-speak unreliable" pattern is not solvable
- * within Web Speech itself: a single tap → `speechSynthesis.speak()` is
- * silently rejected by the engine 4-5 times over ~25s before one finally
- * fires. Once one fires, the rest of the session works.
+ * confirmed the browser TTS path was not viable on iPad. The architecture
+ * shifted to server-side TTS (Azure Speech, Path A) for dynamic lines and
+ * pre-recorded MP3s via Howler.js for the fixed Greet lines. The old
+ * `lib/tts/` Web Speech module has been removed (ticket 86c9grn3n).
  *
  * The 4 Greet lines are FIXED text (never change session-to-session), so
- * pre-recorded MP3s through Howler.js sidesteps the whole synthesis-engine
- * flakiness. Howler still requires a user gesture for the first play on
- * iOS, but once that lands the `onplay` event fires within ~50ms — a 100×
- * improvement on first-utterance latency vs Web Speech.
+ * pre-recorded MP3s through Howler.js sidestep synthesis-engine flakiness.
+ * Howler still requires a user gesture for the first play on iOS, but once
+ * that lands the `onplay` event fires within ~50ms.
  *
- * Web Speech (`lib/tts/*`) stays untouched: Math + Word Song lines are
- * dynamic (Claude-generated per session) and pre-recording isn't viable
- * there. This module is a SIBLING, not a replacement.
- *
- * Caption sync without `onboundary`
- * ---------------------------------
- * Pre-recorded audio doesn't fire word-boundary events the way Web Speech
- * does (when it works). We compensate with a linear timer: when playback
- * starts, divide `howl.duration()` by the word count and fire
- * `onWordTick(i)` at each interval. Spec design/session-1.md already
- * accepts a word-paced fallback at 165 wpm (boundary.ts FALLBACK_ARM_MS
- * lineage); we now have exact audio duration upfront so timing is more
- * accurate than the WPM heuristic.
+ * Caption sync
+ * ------------
+ * Pre-recorded audio doesn't fire word-boundary events. We compensate with
+ * a linear timer: when playback starts, divide `howl.duration()` by the
+ * word count and fire `onWordTick(i)` at each interval. We have exact
+ * audio duration upfront so timing is more accurate than a WPM heuristic.
  *
  * Voice provenance
  * ----------------
@@ -346,8 +338,7 @@ export function createPreRecorded(
             if (wordCount > 1) {
               const duration = howl.duration() // seconds
               // Defensive: if Howler reports 0 (asset not yet probed),
-              // fall back to 165 wpm — same fallback the Web Speech
-              // boundary path uses (see lib/tts/boundary.ts DEFAULT_WPM).
+              // fall back to 165 wpm — the standard fallback cadence.
               const totalMs =
                 duration > 0 ? duration * 1000 : (wordCount / 165) * 60_000
               const intervalMs = totalMs / wordCount
@@ -521,9 +512,8 @@ export function createPreRecorded(
 }
 
 /**
- * Module-level singleton, mirroring the `lib/tts/tts.ts` pattern. Most
- * callers use these functions directly; tests construct their own via
- * `createPreRecorded({ HowlCtor })`.
+ * Module-level singleton. Most callers use these functions directly;
+ * tests construct their own via `createPreRecorded({ HowlCtor })`.
  */
 const defaultInstance = createPreRecorded()
 

@@ -135,13 +135,6 @@ export interface AudioCtxEventRecord {
     | 'handler-error'
     | 'unlock-state'
   /**
-   * Optional companion: speechSynthesis.paused at the same instant.
-   * Useful because Web Speech and Web Audio share an audio session on
-   * iOS — if both flip together, that's the audio-session interruption
-   * fingerprint.
-   */
-  synthPaused?: boolean
-  /**
    * Optional companion: the audio-unlock-gate state at the same instant.
    * The gate already pushes its state to the bus on every transition;
    * this field mirrors the most-recent value into each ctx-event record
@@ -320,7 +313,7 @@ function nowMs(): number {
 
 /**
  * Record the start of a speak() attempt OR a terminal status (errored).
- * Called from `lib/tts/tts.ts`. The bus replaces lastSpeak entirely so the
+ * Called from audio playback call sites. The bus replaces lastSpeak entirely so the
  * overlay always shows the most recent call.
  */
 export function recordSpeakAttempt(

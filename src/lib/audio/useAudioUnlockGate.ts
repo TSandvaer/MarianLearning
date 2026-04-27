@@ -1,13 +1,12 @@
 /**
- * useAudioUnlockGate — reusable hook for the iPad Safari TTS gesture gate.
+ * useAudioUnlockGate — reusable hook for the iPad Safari audio gesture gate.
  *
  * Background
  * ----------
- * iPad Safari rejects `speechSynthesis.speak()` and any new `Audio` / `Howl`
- * playback unless the call sits in the synchronous body of a user-gesture
- * handler. The unlock is per-app-session: once any gesture-aligned audio
- * call lands, the rest of the session stays unlocked. See
- * design/session-1.md → "iPad Safari audio constraint" for the spec author's
+ * iPad Safari rejects any new `Audio` / `Howl` playback unless the call sits
+ * in the synchronous body of a user-gesture handler. The unlock is
+ * per-app-session: once any gesture-aligned audio call lands, the rest of
+ * the session stays unlocked. See design/session-1.md for the spec author's
  * full rationale.
  *
  * Two failure modes need handling
@@ -40,7 +39,7 @@
  * - The watchdog timeout. Configurable per call: 5000 ms for the
  *   first-utterance retry contract, 250 ms for the cross-screen soft re-gate.
  * - A `reportSpeechStart()` callback that callers wire into their TTS
- *   utility's `onstart` (or, since lib/tts doesn't expose onstart, the
+ *   utility's `onstart` (or the
  *   `onBoundary` first-fire) to clear the watchdog.
  * - A `retryOnGesture` mechanism: components register a synchronous retry
  *   callback. When the user taps the ring/screen while we're in `relock`,
@@ -52,9 +51,9 @@
  * - The Wake-state visuals (ring, breathing Melody, finger-tap icon). Those
  *   live in components. The hook just exposes a `showGate: boolean` for the
  *   component to render against.
- * - The actual `speechSynthesis.speak()` call. The hook gives you a
- *   `wrapSpeak()` that arms/disarms the watchdog around YOUR speak call —
- *   it never owns the utterance.
+ * - The actual audio playback call. The hook gives you a `wrapSpeak()`
+ *   that arms/disarms the watchdog around YOUR speak call — it never
+ *   owns the utterance.
  *
  * Why a hook (not a singleton)
  * ----------------------------
