@@ -1326,13 +1326,18 @@ describe('Word Song screen', () => {
       'false',
     )
 
+    // Drain the full microtask queue rather than counting ticks; see
+    // Math.test.tsx cold-mount real-flow test for the rationale
+    // (ticket 86c9hf4ef).
     await act(async () => {
-      await Promise.resolve()
-      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
-    // First problem in fixedPlan() targets the word "cat".
-    expect(harness.spoken()).toContain('Tap the cat.')
+    // First problem in fixedPlan() targets the word "cat". Exact-match
+    // equality (single-element array) so a double-speak regression fails
+    // the test loudly. See Math.test.tsx for the full rationale and
+    // ticket 86c9hf4ef.
+    expect(harness.spoken()).toEqual(['Tap the cat.'])
     expect(screen.getByTestId('word-song')).toHaveAttribute(
       'data-read-aloud-played',
       'true',

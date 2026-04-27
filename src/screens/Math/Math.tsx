@@ -415,6 +415,29 @@ function MathScreen({
   )
   const readAloudPlayedRef = useRef(__testInitiallyAudioUnlocked)
 
+  /**
+   * Synchronous "we already kicked off speak() for this problem" latch.
+   * Flipped to `true` inside the read-aloud microtask BEFORE the `speak()`
+   * call. Reset to `false` on every problem advance.
+   *
+   * Why this exists (ticket 86c9hf4ef, Kevin's review of PR #88):
+   * The cold-mount effect's deps are `[problemIndex, audioUnlocked]`.
+   * On cold mount Run 1 sees `audioUnlocked=false` + `howlerRunning=true`,
+   * schedules a microtask, and inside that microtask flips
+   * `setAudioUnlocked(true)` and calls `speak()`. The state change triggers
+   * a re-render → effect Run 2 sees `audioUnlocked=true`, evaluates
+   * `!audioUnlocked && !howlerRunning` as `false && (whatever) = false`,
+   * does NOT early-return, schedules a SECOND microtask, calls `speak()`
+   * AGAIN. `readAloudPlayedRef` doesn't catch it because it only flips
+   * after the first `speak().then(...)` resolves — the second microtask
+   * fires before that promise settles.
+   *
+   * The latch fixes this by being purely synchronous: the moment Run 1's
+   * microtask starts, it flips the ref. Run 2's microtask checks the ref
+   * first and bails. No double-speak.
+   */
+  const spokeReadAloudRef = useRef(__testInitiallyAudioUnlocked)
+
   /** Melody's current pose. Driven by tap outcomes + the auto-return timer. */
   const [pose, setPose] = useState<MelodyPose>('idle')
 
@@ -614,6 +637,14 @@ function MathScreen({
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
+      // Synchronous double-speak latch (ticket 86c9hf4ef). Must flip
+      // BEFORE `speak()` is called and BEFORE any setState — when the
+      // cold-mount fast path triggers `setAudioUnlocked(true)`, the
+      // resulting re-render re-runs this effect; the second microtask
+      // sees the ref and bails here. `readAloudPlayedRef` cannot serve
+      // this role because it only flips after `speak()` resolves.
+      if (spokeReadAloudRef.current) return
+      spokeReadAloudRef.current = true
       // Mirror `audioUnlocked` for downstream consistency BEFORE the
       // first speak() resolves. The chip-tap path's `if (!audioUnlocked)`
       // early-return reads this; flipping it now means a chip tap that
@@ -656,6 +687,9 @@ function MathScreen({
       // problem's read-aloud completes. See ticket 86c9guh4y.
       readAloudPlayedRef.current = false
       setReadAloudPlayed(false)
+      // Reset the synchronous double-speak latch so the next problem's
+      // read-aloud effect can fire. See ticket 86c9hf4ef.
+      spokeReadAloudRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)

@@ -1232,19 +1232,27 @@ describe('Math (Number Garden) screen', () => {
       'false',
     )
 
-    // Drain the queueMicrotask + the playUtterance promise + the post-resolve
-    // setReadAloudPlayed commit. One act() pass is enough because the
-    // makePlayHarness fake resolves on the microtask queue (see
-    // `Promise.resolve().then(() => resolve())` in makePlayHarness).
+    // Drain the queueMicrotask → speak() → playUtterance harness
+    // promise → outer .then(setReadAloudPlayed) → React commit chain.
+    // Use a setTimeout(0)-style yield to drain the entire microtask
+    // queue rather than counting ticks — pre-86c9hf4ef-fix the chain
+    // was shorter (the doubled-up effect run flushed a commit early);
+    // post-fix it's strictly serialised. Counting ticks made the test
+    // brittle, so just yield to a macrotask. See ticket 86c9hf4ef.
     await act(async () => {
-      await Promise.resolve()
-      await Promise.resolve()
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
-    // The read-aloud was spoken. Pre-fix: spoken().length === 0 here
-    // because the effect short-circuited on `!audioUnlocked`. Post-fix:
-    // the Howler-running fast path authorises the speak.
-    expect(harness.spoken()).toContain('Three plus two. How many?')
+    // The read-aloud was spoken EXACTLY ONCE. Pre-fix-of-PR-#83: 0 calls
+    // because the effect short-circuited on `!audioUnlocked`. Post-PR-#83
+    // first cut (pre-86c9hf4ef-fix-2): 2 calls because the cold-mount
+    // fast path's `setAudioUnlocked(true)` re-rendered the effect, which
+    // re-passed the gate and fired a second microtask that called speak()
+    // again — the `.toContain()` assertion silently passed both. Post-fix:
+    // a synchronous `spokeReadAloudRef` latch ensures a single call.
+    // Use exact-match equality so a future double-speak regression fails
+    // the test loudly.
+    expect(harness.spoken()).toEqual(['Three plus two. How many?'])
 
     // The screen flipped readAloudPlayed=true once the speak() resolved.
     expect(screen.getByTestId('math')).toHaveAttribute(

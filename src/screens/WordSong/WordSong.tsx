@@ -384,6 +384,14 @@ function WordSongScreen({
   )
   const readAloudPlayedRef = useRef(__testInitiallyAudioUnlocked)
 
+  /**
+   * Synchronous double-speak latch. See Math.tsx for the long-form
+   * rationale (ticket 86c9hf4ef). Flipped synchronously inside the
+   * read-aloud microtask before `speak()` is called; reset on every
+   * problem advance.
+   */
+  const spokeReadAloudRef = useRef(__testInitiallyAudioUnlocked)
+
   const [pose, setPose] = useState<MelodyPose>('idle')
   const [shakingChip, setShakingChip] = useState<string | null>(null)
   const [captionText, setCaptionText] = useState('')
@@ -514,6 +522,13 @@ function WordSongScreen({
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
+      // Synchronous double-speak latch (ticket 86c9hf4ef). Flips before
+      // any setState/speak so that the re-render triggered by the
+      // cold-mount fast path's `setAudioUnlocked(true)` cannot schedule
+      // a second microtask that re-speaks the same line. See Math.tsx
+      // for the long-form rationale.
+      if (spokeReadAloudRef.current) return
+      spokeReadAloudRef.current = true
       // Mirror `audioUnlocked` inside the microtask so the setState lands
       // outside the effect body (react-hooks/set-state-in-effect).
       if (howlerRunning) setAudioUnlocked(true)
@@ -552,6 +567,9 @@ function WordSongScreen({
       // problem's read-aloud completes. See ticket 86c9guh4y.
       readAloudPlayedRef.current = false
       setReadAloudPlayed(false)
+      // Reset the synchronous double-speak latch so the next problem's
+      // read-aloud effect can fire. See ticket 86c9hf4ef.
+      spokeReadAloudRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
