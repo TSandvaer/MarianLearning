@@ -1290,4 +1290,98 @@ describe('Word Song screen', () => {
       expect(innerPicture).toHaveAttribute('data-picture-key', word)
     }
   })
+
+  /*
+   * ╔══════════════════════════════════════════════════════════════════════╗
+   * ║ COLD-MOUNT REAL-FLOW REGRESSION TEST — ticket 86c9hf4ef              ║
+   * ║                                                                      ║
+   * ║ Mirrors the Math.test.tsx cold-mount real-flow test. Same root       ║
+   * ║ cause (Splash → Greet → screen handoff leaves Howler ctx running     ║
+   * ║ but local audioUnlocked false → chips stay disabled forever),        ║
+   * ║ same fix shape (read-aloud effect accepts Howler-running as a        ║
+   * ║ second authorisation alongside audioUnlocked).                       ║
+   * ║                                                                      ║
+   * ║ See Math.test.tsx for the longer-form rationale and Thomas's iPad    ║
+   * ║ empirical evidence.                                                  ║
+   * ╚══════════════════════════════════════════════════════════════════════╝
+   */
+  it('cold-mount real-flow: when Howler ctx is already running, read-aloud fires and chips become enabled (ticket 86c9hf4ef)', async () => {
+    const harness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => true)
+
+    render(
+      withMotion(
+        <WordSong
+          // NOTE: __testInitiallyAudioUnlocked deliberately NOT passed.
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+
+    // Drain the full microtask queue rather than counting ticks; see
+    // Math.test.tsx cold-mount real-flow test for the rationale
+    // (ticket 86c9hf4ef).
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // First problem in fixedPlan() targets the word "cat". Exact-match
+    // equality (single-element array) so a double-speak regression fails
+    // the test loudly. See Math.test.tsx for the full rationale and
+    // ticket 86c9hf4ef.
+    expect(harness.spoken()).toEqual(['Tap the cat.'])
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+
+    const chips = screen.getAllByTestId('word-song-chip')
+    expect(chips).toHaveLength(3)
+    for (const chip of chips) {
+      expect(chip).not.toBeDisabled()
+    }
+
+    expect(getHowlerRunning).toHaveBeenCalled()
+  })
+
+  it('cold-mount: when Howler ctx is NOT running, read-aloud does NOT fire on mount (ticket 86c9hf4ef)', async () => {
+    // Negative-path mirror of the Math test — see Math.test.tsx for the
+    // belt-and-suspenders rationale.
+    const harness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => false)
+
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(harness.spoken()).toHaveLength(0)
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+    const chips = screen.getAllByTestId('word-song-chip')
+    for (const chip of chips) {
+      expect(chip).toBeDisabled()
+    }
+  })
 })

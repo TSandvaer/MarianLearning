@@ -9,6 +9,7 @@ export {
   awaitHowlerContextResume,
   unlockIosAudioSession,
   disableHowlerAutoSuspend,
+  readHowlerContextRunning,
 } from './howlerContext'
 export type {
   HowlerContextState,

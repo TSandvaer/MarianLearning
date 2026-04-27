@@ -3,6 +3,7 @@ import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
 import {
+  readHowlerContextRunning,
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
 } from '../../lib/audio/howlerContext'
@@ -146,6 +147,22 @@ export interface MathProps {
     howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
   } | void
   /**
+   * Test seam: returns whether `Howler.ctx` is currently `'running'`.
+   * Defaults to the real `readHowlerContextRunning` from
+   * `lib/audio/howlerContext`. Production callers should never override
+   * this. Tests inject a stub (returning `true`) to simulate the
+   * Splash → Greet → Math cold-mount handoff where Greet's wake-tap +
+   * heart-tap have already unlocked Howler before Math mounts.
+   *
+   * Provenance: ticket 86c9hf4ef. Kevin's PR #87 review flagged this
+   * cold-mount path as a future concern; Thomas's iPad audioCtxLog from
+   * 2026-04-27 confirmed it bites in the real Splash → Greet → Math flow.
+   * Math's local `audioUnlocked` defaults to `false`, the read-aloud
+   * effect short-circuits, `readAloudPlayed` never flips, chips stay
+   * `disabled`, the screen is unreachable.
+   */
+  getHowlerRunning?: () => boolean
+  /**
    * Test seam ONLY — pre-arms `audioUnlocked` and `readAloudPlayed` so the
    * chips render enabled on first paint and tests can `fireEvent.click`
    * without first having to bypass the `disabled` DOM attribute.
@@ -244,6 +261,7 @@ function MathScreen({
   now = () => new Date(),
   resumeAudioContext,
   unlockAudioSession,
+  getHowlerRunning,
   __testInitiallyAudioUnlocked = false,
 }: MathProps) {
   const reducedMotion = usePrefersReducedMotion()
@@ -255,6 +273,11 @@ function MathScreen({
   // Phase-5 (ticket 86c9gvd0y): per-gesture iOS audio-session unlock.
   // See Greet.tsx + howlerContext.ts for the rationale.
   const unlockAudioSessionFn = unlockAudioSession ?? unlockIosAudioSession
+  // Ticket 86c9hf4ef: detect "Howler already unlocked by a previous screen's
+  // gesture" so the read-aloud effect can fire on cold mount even when
+  // Math's local `audioUnlocked` defaults to false. Production reads the
+  // real `Howler.ctx`; tests inject a stub.
+  const getHowlerRunningFn = getHowlerRunning ?? readHowlerContextRunning
 
   // Plan is captured ONCE per mount — we never re-roll mid-session even if
   // the parent re-renders with a fresh `now`. Tests pin via the prop.
@@ -392,6 +415,29 @@ function MathScreen({
   )
   const readAloudPlayedRef = useRef(__testInitiallyAudioUnlocked)
 
+  /**
+   * Synchronous "we already kicked off speak() for this problem" latch.
+   * Flipped to `true` inside the read-aloud microtask BEFORE the `speak()`
+   * call. Reset to `false` on every problem advance.
+   *
+   * Why this exists (ticket 86c9hf4ef, Kevin's review of PR #88):
+   * The cold-mount effect's deps are `[problemIndex, audioUnlocked]`.
+   * On cold mount Run 1 sees `audioUnlocked=false` + `howlerRunning=true`,
+   * schedules a microtask, and inside that microtask flips
+   * `setAudioUnlocked(true)` and calls `speak()`. The state change triggers
+   * a re-render → effect Run 2 sees `audioUnlocked=true`, evaluates
+   * `!audioUnlocked && !howlerRunning` as `false && (whatever) = false`,
+   * does NOT early-return, schedules a SECOND microtask, calls `speak()`
+   * AGAIN. `readAloudPlayedRef` doesn't catch it because it only flips
+   * after the first `speak().then(...)` resolves — the second microtask
+   * fires before that promise settles.
+   *
+   * The latch fixes this by being purely synchronous: the moment Run 1's
+   * microtask starts, it flips the ref. Run 2's microtask checks the ref
+   * first and bails. No double-speak.
+   */
+  const spokeReadAloudRef = useRef(__testInitiallyAudioUnlocked)
+
   /** Melody's current pose. Driven by tap outcomes + the auto-return timer. */
   const [pose, setPose] = useState<MelodyPose>('idle')
 
@@ -508,29 +554,104 @@ function MathScreen({
     [gate, playUtterance],
   )
 
+  // ── Audio-unlock gate-state mirror (ticket 86c9hf4ef) ------------------
+
+  /**
+   * Drive `audioUnlocked` from gate-state transitions. When the gate
+   * reaches `'unlocked'` (the gate's `runSpeak` callback's `onPlay`
+   * observed a successful audio start), flip `audioUnlocked` to `true`
+   * so the rest of the screen (chip tappability, subsequent renders)
+   * stays consistent with the gate.
+   *
+   * On cold-mount Math after Greet has already unlocked Howler, this
+   * effect is a no-op (the gate stays `idle` because Math's own
+   * `runSpeak` hasn't fired yet — that's what the read-aloud effect
+   * below kicks off via the Howler-running fast path). But once the
+   * read-aloud effect calls `speak()`, the gate transitions to `pending`
+   * and then `unlocked` on `onPlay`, and this effect catches the second
+   * transition to keep state consistent.
+   *
+   * Provenance: ticket 86c9hf4ef Option-3 fix from Kevin's PR #87 review.
+   *
+   * The setState is deferred to a microtask to satisfy
+   * react-hooks/set-state-in-effect — same pattern as the read-aloud
+   * effect below (and Greet's first-line effect).
+   */
+  useEffect(() => {
+    if (gate.state !== 'unlocked' || audioUnlocked) return
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setAudioUnlocked(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [gate.state, audioUnlocked])
+
   // ── Problem reveal: speak the read-aloud line on each problem entry ---
 
   /**
-   * Fire the per-problem read-aloud. We do this on every problem-index
-   * transition AS LONG AS audio has been unlocked — for the very first
-   * problem, the unlock happens via the first chip tap (or via the gate's
-   * dispatchGesture path), so the read-aloud is delayed until then.
+   * Fire the per-problem read-aloud. Two preconditions can authorise this:
+   *
+   *   1. `audioUnlocked` (local React state) is true. Set by a chip tap
+   *      on Math itself (Session-2+ entry path) or by the gate-state
+   *      mirror effect above when `gate.state === 'unlocked'`.
+   *
+   *   2. `getHowlerRunningFn()` returns `true` — meaning a previous
+   *      screen's gesture (Greet's wake-tap or heart-tap) already
+   *      unlocked Howler's `AudioContext` before Math mounted. This is
+   *      the cold-mount real-flow path (Splash → Greet → Math). On
+   *      this path Math's `audioUnlocked` starts `false` and the gate
+   *      starts `idle`; without this branch the read-aloud effect
+   *      would never fire and chips would stay `disabled` forever.
+   *      See ticket 86c9hf4ef.
+   *
+   * When the Howler-running branch fires, we synchronously flip
+   * `audioUnlocked` to `true` inside the effect so subsequent gestures
+   * on this screen behave the same as if Math's own first-tap had been
+   * the unlocker — chip-tap path skips the `if (!audioUnlocked)` early
+   * return, the gate-state mirror sees a consistent picture, etc.
    *
    * After the read-aloud completes, flip `readAloudPlayed` so chips
    * become tappable. This closes the Session-2+ race where a chip tap
    * could fire before the question was read. See ticket 86c9guh4y.
    */
   useEffect(() => {
-    if (!audioUnlocked) return
     if (guidedActive) return // mid-guided playback owns the audio
+
+    // Cold-mount fast path: Howler already unlocked by a previous screen's
+    // gesture. Drive the read-aloud now; mirror `audioUnlocked` for
+    // downstream consistency. We check this BEFORE the audioUnlocked
+    // short-circuit because on cold mount audioUnlocked is false but
+    // Howler is running — that's the exact case the bug was hiding.
+    const howlerRunning = !audioUnlocked && getHowlerRunningFn()
+    if (!audioUnlocked && !howlerRunning) return
+
     const problem = plan.problems[problemIndex]
-    // Defer to a microtask so the setState calls inside `speak` (caption
-    // text/visible) don't fire synchronously inside the effect body —
-    // satisfies react-hooks/set-state-in-effect and matches the React
-    // recommendation for "kick off async work from an effect".
+    // Defer to a microtask so the setState calls (audioUnlocked mirror,
+    // and the caption setStates inside `speak`) don't fire synchronously
+    // inside the effect body — satisfies react-hooks/set-state-in-effect
+    // and matches the React recommendation for "kick off async work from
+    // an effect".
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
+      // Synchronous double-speak latch (ticket 86c9hf4ef). Must flip
+      // BEFORE `speak()` is called and BEFORE any setState — when the
+      // cold-mount fast path triggers `setAudioUnlocked(true)`, the
+      // resulting re-render re-runs this effect; the second microtask
+      // sees the ref and bails here. `readAloudPlayedRef` cannot serve
+      // this role because it only flips after `speak()` resolves.
+      if (spokeReadAloudRef.current) return
+      spokeReadAloudRef.current = true
+      // Mirror `audioUnlocked` for downstream consistency BEFORE the
+      // first speak() resolves. The chip-tap path's `if (!audioUnlocked)`
+      // early-return reads this; flipping it now means a chip tap that
+      // arrives mid-read-aloud falls through to the
+      // `!readAloudPlayedRef.current` gate (correct behaviour) rather
+      // than re-firing the unlock branch.
+      if (howlerRunning) setAudioUnlocked(true)
       void speak(problem.utterances.read).then(() => {
         if (cancelled) return
         readAloudPlayedRef.current = true
@@ -542,7 +663,8 @@ function MathScreen({
     }
     // We don't include `speak` because it's stable enough — and including
     // it would re-trigger on every render that touches `gate`, which would
-    // re-speak the line repeatedly.
+    // re-speak the line repeatedly. `getHowlerRunningFn` is also omitted —
+    // it's the test seam binding, stable per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemIndex, audioUnlocked])
 
@@ -565,6 +687,9 @@ function MathScreen({
       // problem's read-aloud completes. See ticket 86c9guh4y.
       readAloudPlayedRef.current = false
       setReadAloudPlayed(false)
+      // Reset the synchronous double-speak latch so the next problem's
+      // read-aloud effect can fire. See ticket 86c9hf4ef.
+      spokeReadAloudRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
