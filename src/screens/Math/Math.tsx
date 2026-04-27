@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
 import {
   resumeHowlerContextOnGesture,
@@ -13,13 +14,23 @@ import {
   writeStardust,
   type StardustState,
   type StorageAdapter,
-} from './stardust'
+} from '../_shared/stardust'
 import {
   pickStaticSessionPlan,
   type MathSessionPlan,
   type MathProblem,
 } from './sessionPlans'
-import { STREAK_BONUS_THRESHOLDS } from './constants'
+import {
+  ADVANCE_AFTER_CORRECT_MS,
+  CHIP_TAP_SPRING,
+  FIRST_UTTERANCE_RETRY_MS,
+  GUIDED_AFTER_WRONG_COUNT,
+  HINT_AFTER_WRONG_COUNT,
+  HINT_DELAY_AFTER_WRONG_MS,
+  STREAK_BONUS_THRESHOLDS,
+  STREAK_FADE_OUT_MS,
+  WRONG_SHAKE_MS,
+} from '../_shared/gameplayConstants'
 
 /**
  * Screen 3 — Math (Number Garden, sums to 10).
@@ -52,44 +63,8 @@ import { STREAK_BONUS_THRESHOLDS } from './constants'
  *   swaps without cross-fade — same reasons as Greet.
  */
 
-// ── Constants — single source of truth, mirror the spec --------------------
-// Externally-observable constants live in `./constants.ts` so this file can
-// re-export only the React component (react-refresh requires that).
-
-/** Wrong-attempt count after which the hint utterance fires. */
-const HINT_AFTER_WRONG_COUNT = 2
-
-/** Wrong-attempt count after which the guided-completion path fires. */
-const GUIDED_AFTER_WRONG_COUNT = 3
-
-/** Auto-advance delay after a correct answer (spec §Audio dispatch). */
-const ADVANCE_AFTER_CORRECT_MS = 1200
-
-/** Wrong-tap chip shake duration (spec §Wrong-answer policy item 1). */
-const WRONG_SHAKE_MS = 400
-
-/** Hint reveal delay after the wrong sequence completes. */
-const HINT_DELAY_AFTER_WRONG_MS = 600
-
-/** Streak fade-out duration when a wrong tap breaks the streak. */
-const STREAK_FADE_OUT_MS = 400
-
-/**
- * Audio-unlock watchdog window — sized to outlast the event-driven
- * AudioContext resume await (5 000 ms) plus the Howler play → onplay
- * settle (~50 ms) plus slack. Phase-7 (ticket 86c9gvd0y) bumped this
- * from 1 500 ms → 6 000 ms; see Greet.tsx FIRST_UTTERANCE_RETRY_MS for
- * the full history.
- */
-const FIRST_UTTERANCE_RETRY_MS = 6_000
-
-/**
- * Spring preset — mirrors the spec's §Implementation pointers list.
- * NOTE: HUD pop animations use a tween (HUD_POP_TWEEN below) instead of
- * a spring, because Framer Motion springs only support 2-keyframe
- * arrays and the pop pattern is `[1, 1.25, 1]` (3 keyframes).
- */
-const CHIP_TAP_SPRING = { type: 'spring' as const, stiffness: 300, damping: 18 }
+// ── Constants ── Shared gameplay constants imported from _shared/gameplayConstants.
+// Screen-specific constants remain inline below.
 
 /**
  * Pop tween — used for the 3-keyframe `[1, 1.25, 1]` HUD pop. Framer
@@ -235,32 +210,6 @@ const FRESH_PROBLEM_STATE: PerProblemState = {
   wrongCount: 0,
   hintPlayed: false,
   guidedPlayed: false,
-}
-
-/**
- * Detect prefers-reduced-motion at mount. Same hook shape as Greet — we
- * could factor it out to `lib/usePrefersReducedMotion.ts` but Kyle flagged
- * that as a Devon-judgement-call refactor; deferring to keep this PR
- * focused on the Math screen. Filed mentally as a follow-up.
- */
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  })
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const handler = (ev: MediaQueryListEvent) => setReduced(ev.matches)
-    if (mq.addEventListener) {
-      mq.addEventListener('change', handler)
-      return () => mq.removeEventListener('change', handler)
-    }
-    return undefined
-  }, [])
-
-  return reduced
 }
 
 /**
