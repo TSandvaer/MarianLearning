@@ -4,18 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { _resetAudioContextProbeForTests } from './lib/debug'
 
-// Splash imports tts.cancel — give it a no-op so jsdom doesn't trip over
-// the absent speechSynthesis global. Also stub speak() to a never-resolving
-// promise so Greet can mount without firing real TTS in jsdom.
-// loadVoices / primeVoices are no-ops in tests; Splash calls them on mount
-// as part of the iPad TTS warmup.
-vi.mock('./lib/tts', () => ({
-  speak: vi.fn(() => new Promise<void>(() => {})),
-  cancel: vi.fn(),
-  loadVoices: vi.fn(() => Promise.resolve([])),
-  primeVoices: vi.fn(),
-}))
-
 // Greet creates a chime SFX on mount; jsdom has no audio backend. Stub the
 // factory so we don't pay an XHR + console.warn on every test render.
 vi.mock('./lib/sfx', () => ({

@@ -28,7 +28,33 @@
  *    Now the caller gets the signal and can drive the recovery story.
  */
 
-import type { BoundaryEvent } from '../lib/tts'
+/**
+ * Word-boundary event the orchestrator surfaces to the screen. Drives
+ * Greet's caption-reveal animation and the "Hi!" ear-wiggle.
+ *
+ * Provenance: the shape was originally defined in `lib/tts/boundary.ts`
+ * for the Web Speech API path, where it carried real `SpeechSynthesisUtterance`
+ * boundary metadata (charIndex was meaningful, word came from native
+ * onboundary). When the audio pipeline pivoted to Path A — pre-rendered
+ * MP3s through Howler (`lib/audio/preRecorded`) — the engine started
+ * emitting only `onWordTick(wordIndex)`, and Greet's playLineAdapter
+ * synthesises the full event from `text.split(/\s+/)`. The `charIndex`
+ * field is now always 0 under Path A; it stays in the shape so any
+ * future caller wanting native byte offsets has a stable contract to
+ * extend.
+ *
+ * Relocated from `lib/tts` (ticket 86c9h3c57) so this module no longer
+ * depends on the dead Web Speech tree — that's a precursor to deleting
+ * `src/lib/tts/` outright (86c9grn3n).
+ */
+export interface BoundaryEvent {
+  /** Zero-based word index within the current line. */
+  wordIndex: number
+  /** The actual word string (with attached punctuation). */
+  word: string
+  /** Character offset of the word's first character. Always 0 under Path A. */
+  charIndex: number
+}
 
 /**
  * The four lines Melody says on Screen 2. Single source of truth — both the

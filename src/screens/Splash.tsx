@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { m } from 'motion/react'
-import { cancel as cancelTts, loadVoices, primeVoices } from '../lib/tts'
 import {
   detectColdStart,
   markWarm,
@@ -14,9 +13,7 @@ import {
  * Spec: design/session-1.md §"Screen 1 — Splash / Launch".
  *
  * Behaviour summary:
- *  - Silent. No TTS, no SFX. (We defensively cancel any queued TTS in case
- *    something re-entered the splash mid-session — guards the same class
- *    of regression as PR #3.)
+ *  - Silent. No TTS, no SFX.
  *  - Auto-advances after 1500ms (warm) or up to 3000ms (cold). No skip.
  *  - Logo: spring scale-in (stiffness 180, damping 18, opacity 0→1, scale
  *    0.9→1) per spec line 70. Reduced-motion fallback is handled globally
@@ -28,6 +25,12 @@ import {
  * Reduced-motion: the global MotionConfig collapses springs to fades and
  * removes pulsing on `repeat: Infinity` style loops. The unit test verifies
  * the static-fallback shape by mocking the media query.
+ *
+ * Path A note (post-86c9h3c57): the cold-start `speechSynthesis` voice
+ * warmup (cancelTts/loadVoices/primeVoices via `lib/tts`) was removed once
+ * the audio pipeline switched to pre-rendered MP3s through Howler. Web
+ * Speech is no longer invoked in production, so the warmup was dead code
+ * and the defensive `cancel()` was guarding a path that can't be reached.
  */
 
 export interface SplashProps {
@@ -64,25 +67,6 @@ export default function Splash({
   const advancedRef = useRef(false)
 
   useEffect(() => {
-    // Defensive: if anything queued speech before splash mounted, silence it.
-    // Splash is silent by spec (line 64) and AC (line 95).
-    try {
-      cancelTts()
-    } catch {
-      // tts.cancel is itself defensive; swallow if speechSynthesis is unset.
-    }
-
-    // iPad Safari TTS warmup (post-PR-#21 deeper fix). Some iPad WebKit
-    // builds only start loading the voice list the first time `getVoices()`
-    // is called, and a `speak()` issued before voices are available is
-    // silently rejected. Splash is the perfect place to do this — Marian
-    // sees the same silent splash, and by the time Wake-tap fires the
-    // voice list is ready. primeVoices() is a synchronous nudge; the async
-    // loadVoices() below is fire-and-forget so the splash auto-advance
-    // timer is unaffected.
-    primeVoices()
-    void loadVoices()
-
     markWarm()
 
     const advance = () => {
