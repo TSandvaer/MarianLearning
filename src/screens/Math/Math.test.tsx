@@ -30,7 +30,7 @@ vi.mock('../../lib/sfx', () => ({
   }),
 }))
 
-import Math from './Math'
+import MathScreen from './Math'
 import type { PlayMathUtteranceFn } from './Math'
 import type { MathSessionPlan } from './sessionPlans'
 import { STARDUST_STORAGE_KEY, type StorageAdapter } from '../_shared/stardust'
@@ -260,7 +260,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -300,7 +300,7 @@ describe('Math (Number Garden) screen', () => {
     const storage = makeMemoryStorage()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -356,7 +356,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -401,7 +401,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -443,7 +443,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -493,7 +493,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -564,7 +564,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -669,7 +669,7 @@ describe('Math (Number Garden) screen', () => {
     const onSessionComplete = vi.fn()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -760,7 +760,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -834,7 +834,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -897,7 +897,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -988,7 +988,7 @@ describe('Math (Number Garden) screen', () => {
     const onSessionComplete = vi.fn()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -1035,7 +1035,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -1058,7 +1058,7 @@ describe('Math (Number Garden) screen', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -1096,7 +1096,7 @@ describe('Math (Number Garden) screen', () => {
     const resumeSpy = vi.fn()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
@@ -1141,7 +1141,7 @@ describe('Math (Number Garden) screen', () => {
     const unlockSpy = vi.fn()
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}

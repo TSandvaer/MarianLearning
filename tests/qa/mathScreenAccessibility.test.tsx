@@ -71,7 +71,7 @@ vi.mock('../../src/lib/sfx', () => ({
   })),
 }))
 
-import Math from '../../src/screens/Math/Math'
+import MathScreen from '../../src/screens/Math/Math'
 import type { PlayMathUtteranceFn } from '../../src/screens/Math/Math'
 import type { MathSessionPlan } from '../../src/screens/Math/sessionPlans'
 import type { StorageAdapter } from '../../src/screens/_shared/stardust'
@@ -151,7 +151,7 @@ describe('Math screen accessibility contract (build-time guard, ticket 86c9gumhp
   it('every chip has an aria-label="Answer N" matching its data-value', () => {
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={makeSilentPlay()}
@@ -172,7 +172,7 @@ describe('Math screen accessibility contract (build-time guard, ticket 86c9gumhp
   it('caption ribbon has role="status" + aria-live="polite"', async () => {
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={makeSilentPlay()}
@@ -206,7 +206,7 @@ describe('Math screen accessibility contract (build-time guard, ticket 86c9gumhp
   it('stardust counter exposes the value via aria-label="Stardust: N"', () => {
     render(
       withMotion(
-        <Math
+        <MathScreen
           __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={makeSilentPlay()}
