@@ -140,6 +140,15 @@ export function escapeSsml(text: string): string {
  *  before the trailing clause) and the clause itself are escaped
  *  independently and joined with the raw SSML tags around the clause.
  *
+ *  SSML strategy (updated after `<emphasis>` alone proved insufficient):
+ *  1. `<break time="250ms"/>` before the clause — resets the prosody
+ *     predictor so it doesn't carry flat numeric intonation forward.
+ *  2. `<prosody pitch="+8%" rate="-5%">` — raises pitch and slows
+ *     slightly, forcing rising question intonation.
+ *  The combination reliably produces natural question prosody on
+ *  AnaNeural for patterns like "Three plus two. How many?" where
+ *  `<emphasis>` alone left the trailing clause flat/robotic.
+ *
  *  Backward-compat
  *  ---------------
  *  Declaratives (which is every non-hint utterance Math/WordSong emits
@@ -171,13 +180,15 @@ export function renderSsmlInnerText(text: string): string {
   // it after the closing tag (it doesn't affect prosody but keeps round-
   // trippability for callers that compare strings).
   const trailingWs = text.slice(trimmed.length)
+  const QUESTION_WRAP_OPEN =
+    '<break time="250ms"/><prosody pitch="+8%" rate="-5%">'
+  const QUESTION_WRAP_CLOSE = '</prosody>'
   if (lastEnd === -1) {
-    // Whole utterance is one short interrogative — wrap it.
-    return `<emphasis level="moderate">${escapeSsml(trimmed)}</emphasis>${trailingWs}`
+    return `${QUESTION_WRAP_OPEN}${escapeSsml(trimmed)}${QUESTION_WRAP_CLOSE}${trailingWs}`
   }
   const lead = trimmed.slice(0, lastEnd)
   const clause = trimmed.slice(lastEnd)
-  return `${escapeSsml(lead)}<emphasis level="moderate">${escapeSsml(clause)}</emphasis>${trailingWs}`
+  return `${escapeSsml(lead)}${QUESTION_WRAP_OPEN}${escapeSsml(clause)}${QUESTION_WRAP_CLOSE}${trailingWs}`
 }
 
 /** Build the SSML body sent to Azure. All four prosody attribute fields
