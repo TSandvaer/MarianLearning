@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { Howler } from 'howler'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { _resetAudioContextProbeForTests } from './lib/debug'
@@ -269,6 +270,19 @@ describe('App routing skeleton', () => {
       setSearch('?debug=true')
       render(<App />)
       expect(screen.queryByTestId('debug-overlay')).toBeNull()
+    })
+  })
+
+  describe('Phase-8 (ticket 86c9gvd0y) — Howler autoSuspend disable on app boot', () => {
+    // App.tsx calls `disableHowlerAutoSuspend()` at module top level, so
+    // by the time any test imports App the side effect has already run.
+    // Asserting the resulting state both (a) confirms the boot effect
+    // landed and (b) catches any future regression that re-enables
+    // autoSuspend (the 30-second iPad audio-decay bug shape).
+    it('Howler.autoSuspend is false after App is imported', () => {
+      // No render needed — the side effect ran when the test file
+      // imported App at the top. We just observe the resulting state.
+      expect(Howler.autoSuspend).toBe(false)
     })
   })
 })

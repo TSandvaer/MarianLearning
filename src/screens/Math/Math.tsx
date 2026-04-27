@@ -163,8 +163,13 @@ export interface MathProps {
    * Phase 5 of ticket 86c9gvd0y. Defaults to the real
    * `unlockIosAudioSession` from `lib/audio/howlerContext`. Mirrors the
    * same seam on `Greet`. Production callers should never override this.
+   *
+   * Optional Phase-8 (ticket 86c9gvd0y) return shape carrying
+   * `howlerUnlockMethodCalled` for the unlock-state probe row.
    */
-  unlockAudioSession?: () => void
+  unlockAudioSession?: () => {
+    howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
+  } | void
 }
 
 // ── Default no-op playback (spec note: silent-but-captioned fallback) ------
@@ -775,8 +780,12 @@ function MathScreen({
       // → `unlockIosAudioSession` for the full rationale. Phase-6
       // extension: this also refills `Howler._html5AudioPool`
       // synchronously inside the gesture (see howlerContext.ts).
-      unlockAudioSessionFn()
-      recordUnlockStateEvent()
+      const unlockResult = unlockAudioSessionFn()
+      // Phase-8 (ticket 86c9gvd0y): thread the helper's
+      // `howlerUnlockMethodCalled` outcome through.
+      recordUnlockStateEvent({
+        howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+      })
 
       // First-tap audio unlock: route the very first user gesture through
       // the gate and trigger the read-aloud after this tap (the chip-tap

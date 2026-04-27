@@ -734,4 +734,202 @@ describe('audioContextProbe', () => {
       })
     })
   })
+
+  /**
+   * Phase-8 fix tests (ticket 86c9gvd0y).
+   *
+   * The unlock-state row now also captures `Howler.state` (the Howler-
+   * internal state machine, NOT `AudioContext.state`), `Howler.autoSuspend`
+   * (should be `false` post-Phase-8 boot), and a producer-supplied
+   * `howlerUnlockMethodCalled` outcome from `unlockIosAudioSession`.
+   */
+  describe('Phase-8 (ticket 86c9gvd0y) — Howler state + autoSuspend in unlock-state row', () => {
+    it('records Howler.state and Howler.autoSuspend when present', () => {
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        _audioUnlocked: true,
+        _html5AudioPool: ['a'],
+        _scratchBuffer: { fake: true },
+        state: 'running' as const,
+        autoSuspend: false,
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'unlock-state',
+        howlerState: 'running',
+        howlerAutoSuspend: false,
+      })
+    })
+
+    it("records Howler.state === 'suspended' when the autoSuspend timer fired (failing-session repro)", () => {
+      // The pre-Phase-8 failing case: autoSuspend ran the timer, flipped
+      // Howler.state to 'suspended' even though ctx.state is 'running'
+      // because we resumed it upstream via Phase-7. The unlock-state
+      // row pairs this with the iPad export so the diagnostic delta is
+      // unambiguous.
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        _audioUnlocked: true,
+        _html5AudioPool: [],
+        _scratchBuffer: null,
+        state: 'suspended' as const,
+        autoSuspend: true, // not yet disabled — this is the bug shape
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'unlock-state',
+        howlerState: 'suspended',
+        howlerAutoSuspend: true,
+      })
+    })
+
+    it("buckets unknown Howler.state values into 'unavailable'", () => {
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        state: 'definitely-not-a-real-state',
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      expect(snapshot().audioCtxEvents.at(-1)?.howlerState).toBe('unavailable')
+    })
+
+    it('omits howlerState / howlerAutoSuspend when Howler does not expose them', () => {
+      // Pre-Howler-init or stripped-down stub. Probe records the row
+      // anyway with no Howler.state / autoSuspend fields, so missing
+      // data is unambiguous in the export.
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      const last = snapshot().audioCtxEvents.at(-1)!
+      expect(last).not.toHaveProperty('howlerState')
+      expect(last).not.toHaveProperty('howlerAutoSuspend')
+    })
+
+    it('threads producer-supplied howlerUnlockMethodCalled into the row', () => {
+      // Producers (Greet/Math/WordSong gesture handlers) call
+      // unlockIosAudioSession() and pass the resulting
+      // `howlerUnlockMethodCalled` field to recordUnlockStateEvent so
+      // the iPad export shows whether Howler._unlockAudio() was reachable
+      // / called / threw on this gesture.
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        state: 'running' as const,
+        autoSuspend: false,
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent({ howlerUnlockMethodCalled: 'called' })
+      expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
+        cause: 'unlock-state',
+        howlerUnlockMethodCalled: 'called',
+      })
+
+      recordUnlockStateEvent({ howlerUnlockMethodCalled: 'missing' })
+      expect(snapshot().audioCtxEvents.at(-1)?.howlerUnlockMethodCalled).toBe(
+        'missing',
+      )
+
+      recordUnlockStateEvent({ howlerUnlockMethodCalled: 'threw' })
+      expect(snapshot().audioCtxEvents.at(-1)?.howlerUnlockMethodCalled).toBe(
+        'threw',
+      )
+    })
+
+    it('omits howlerUnlockMethodCalled when no producer extra is passed', () => {
+      // Pre-call snapshots (the "before unlockIosAudioSession" rows) call
+      // recordUnlockStateEvent() with no args — no method-called outcome
+      // exists yet at that point. The row must not lie by emitting a
+      // stale value.
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+
+      recordUnlockStateEvent()
+      expect(snapshot().audioCtxEvents.at(-1)).not.toHaveProperty(
+        'howlerUnlockMethodCalled',
+      )
+    })
+
+    it('persists Phase-8 fields to localStorage alongside the rest of the row', () => {
+      const storage = makeStorage()
+      const fakeHowler = {
+        ctx: new FakeAudioContext() as unknown as AudioContext,
+        _audioUnlocked: true,
+        _html5AudioPool: ['x', 'y'],
+        _scratchBuffer: { fake: true },
+        state: 'running' as const,
+        autoSuspend: false,
+      }
+      activateAudioContextProbe({
+        howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
+        speechSynthLike: null,
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage,
+      })
+
+      recordUnlockStateEvent({ howlerUnlockMethodCalled: 'called' })
+      const parsed = JSON.parse(
+        storage.getItem(AUDIO_CTX_LOG_STORAGE_KEY)!,
+      ) as Array<{
+        cause: string
+        howlerState?: string
+        howlerAutoSuspend?: boolean
+        howlerUnlockMethodCalled?: string
+      }>
+      const unlockRows = parsed.filter((r) => r.cause === 'unlock-state')
+      expect(unlockRows).toHaveLength(1)
+      expect(unlockRows[0]).toMatchObject({
+        cause: 'unlock-state',
+        howlerState: 'running',
+        howlerAutoSuspend: false,
+        howlerUnlockMethodCalled: 'called',
+      })
+    })
+  })
 })

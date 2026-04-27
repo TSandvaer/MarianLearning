@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   awaitHowlerContextResume,
+  disableHowlerAutoSuspend,
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
 } from './howlerContext'
@@ -1027,5 +1028,266 @@ describe('unlockIosAudioSession', () => {
         'source.start',
       ])
     })
+  })
+
+  /**
+   * Phase-8 fix tests (ticket 86c9gvd0y).
+   *
+   * `unlockIosAudioSession` now ALSO invokes `Howler._unlockAudio()`
+   * synchronously inside the gesture window, between the Phase-6 pool
+   * refill and the Phase-5 silent-buffer kick. The invocation is wrapped
+   * defensively because `_unlockAudio` is a leading-underscore private
+   * method on the Howler module — if Howler renames or removes it the
+   * helper degrades to the Phase-5/6 fallbacks without throwing.
+   */
+  describe('Phase-8 Howler._unlockAudio invocation', () => {
+    function makeHowlerLikeWithUnlock(
+      ctxState: AudioContext['state'] = 'running',
+      _unlockAudio?: unknown,
+    ) {
+      const fakeBuffer = { fakeBuffer: true }
+      const fakeDestination = { fakeDestination: true }
+      const fakeSource = {
+        buffer: null as unknown,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(),
+      }
+      const ctx = {
+        state: ctxState,
+        destination: fakeDestination as unknown as AudioDestinationNode,
+        createBuffer: vi.fn(() => fakeBuffer as unknown as AudioBuffer),
+        createBufferSource: vi.fn(
+          () => fakeSource as unknown as AudioBufferSourceNode,
+        ),
+      } as unknown as AudioContext
+      return {
+        howlerUnlockHost: { _unlockAudio } as { _unlockAudio?: unknown },
+        howlerLike: {
+          ctx,
+          _html5AudioPool: [],
+          html5PoolSize: 0,
+        } as unknown as { ctx?: AudioContext | null } | undefined,
+      }
+    }
+
+    it("calls Howler._unlockAudio() once per gesture and reports 'called'", () => {
+      const unlockSpy = vi.fn()
+      const { howlerUnlockHost, howlerLike } = makeHowlerLikeWithUnlock(
+        'running',
+        unlockSpy,
+      )
+      const result = unlockIosAudioSession({
+        howlerLike,
+        howlerUnlockHost,
+      })
+      expect(unlockSpy).toHaveBeenCalledTimes(1)
+      // Howler's real method is invoked with `this === Howler`; we mirror
+      // that contract via .call(host) so the method's internal
+      // `this || Howler` defaulting still resolves correctly.
+      expect(unlockSpy.mock.instances[0]).toBe(howlerUnlockHost)
+      expect(result.howlerUnlockMethodCalled).toBe('called')
+      // Phase-5 / Phase-6 still ran — Phase-8 is additive, not a swap.
+      expect(result.bufferStarted).toBe(true)
+    })
+
+    it("reports 'missing' when Howler._unlockAudio is not a function (renamed / older Howler)", () => {
+      const { howlerUnlockHost, howlerLike } = makeHowlerLikeWithUnlock(
+        'running',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        undefined as any,
+      )
+      const result = unlockIosAudioSession({
+        howlerLike,
+        howlerUnlockHost,
+      })
+      expect(result.howlerUnlockMethodCalled).toBe('missing')
+      // Fallbacks still ran — silent buffer kicked.
+      expect(result.bufferStarted).toBe(true)
+    })
+
+    it("reports 'threw' when Howler._unlockAudio throws synchronously", () => {
+      const unlockSpy = vi.fn(() => {
+        throw new Error('synthetic _unlockAudio throw')
+      })
+      const { howlerUnlockHost, howlerLike } = makeHowlerLikeWithUnlock(
+        'running',
+        unlockSpy,
+      )
+      const result = unlockIosAudioSession({
+        howlerLike,
+        howlerUnlockHost,
+      })
+      expect(unlockSpy).toHaveBeenCalledTimes(1)
+      expect(result.howlerUnlockMethodCalled).toBe('threw')
+      // Critically: silent-buffer fallback still executed despite the
+      // _unlockAudio throw — we never want a private-method failure to
+      // break audio for Marian.
+      expect(result.bufferStarted).toBe(true)
+    })
+
+    it('reports howlerUnlockMethodCalled even when ctx is closed (helper short-circuits before fallbacks)', () => {
+      // Closed-ctx path returns early before the silent buffer; Phase-8
+      // invocation also short-circuits because the iOS contract requires
+      // a live ctx. The result still includes howlerUnlockMethodCalled
+      // as 'missing' (default) so the iPad export shows the gap.
+      const unlockSpy = vi.fn()
+      const { howlerUnlockHost, howlerLike } = makeHowlerLikeWithUnlock(
+        'closed',
+        unlockSpy,
+      )
+      const result = unlockIosAudioSession({
+        howlerLike,
+        howlerUnlockHost,
+      })
+      // Helper bailed at the closed-ctx check — _unlockAudio is not
+      // called on a closed context (no point; nothing can play either way).
+      expect(unlockSpy).not.toHaveBeenCalled()
+      expect(result.bufferStarted).toBe(false)
+      // Phase-8 result field is undefined on the early-return path —
+      // we don't lie about something we didn't do.
+      expect(result.howlerUnlockMethodCalled).toBeUndefined()
+    })
+
+    it('does not throw when reading howlerUnlockHost itself throws', () => {
+      // Lockdown environment edge case: even property access on the
+      // Howler module can throw. The helper must swallow + report 'threw'.
+      const throwingHost = {
+        get _unlockAudio(): unknown {
+          throw new Error('locked-down environment')
+        },
+      }
+      const { howlerLike } = makeHowlerLikeWithUnlock('running')
+      const result = unlockIosAudioSession({
+        howlerLike,
+        howlerUnlockHost: throwingHost as { _unlockAudio?: unknown },
+      })
+      expect(result.howlerUnlockMethodCalled).toBe('threw')
+      // Silent buffer still kicked.
+      expect(result.bufferStarted).toBe(true)
+    })
+
+    it('preserves Phase-6 → Phase-8 → Phase-5 ordering inside the helper', () => {
+      // Pool refill must run BEFORE _unlockAudio (so we have the pool in
+      // the shape Howler expects when its listener body fires later);
+      // _unlockAudio must run BEFORE the silent buffer (so Howler's own
+      // session-engagement runs first; ours is the safety net).
+      const callOrder: string[] = []
+      const fakeBuffer = { fakeBuffer: true }
+      const fakeSource = {
+        buffer: null as unknown,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(() => {
+          callOrder.push('source.start')
+        }),
+      }
+      const ctx = {
+        state: 'running' as const,
+        destination: {} as unknown as AudioDestinationNode,
+        createBuffer: vi.fn(() => fakeBuffer as unknown as AudioBuffer),
+        createBufferSource: vi.fn(
+          () => fakeSource as unknown as AudioBufferSourceNode,
+        ),
+      } as unknown as AudioContext
+      const pool: unknown[] = []
+      const FakeAudio = class {
+        _unlocked?: boolean
+        constructor() {
+          callOrder.push('new Audio')
+        }
+      } as unknown as new () => unknown
+      const unlockSpy = vi.fn(() => {
+        callOrder.push('_unlockAudio')
+      })
+      unlockIosAudioSession({
+        howlerLike: {
+          ctx,
+          _html5AudioPool: pool,
+          html5PoolSize: 2,
+        } as unknown as { ctx?: AudioContext | null },
+        AudioCtor: FakeAudio,
+        howlerUnlockHost: { _unlockAudio: unlockSpy },
+      })
+      expect(callOrder).toEqual([
+        'new Audio',
+        'new Audio',
+        '_unlockAudio',
+        'source.start',
+      ])
+    })
+  })
+})
+
+/**
+ * Phase-8 fix tests (ticket 86c9gvd0y) — `disableHowlerAutoSuspend`.
+ *
+ * The 30-second iPad audio-decay threshold matches Howler's own
+ * `_autoSuspend` timer EXACTLY (howler.js line 461-505: 30 000 ms after
+ * each sound's `_ended` callback). Setting `Howler.autoSuspend = false`
+ * (the public, documented option) suppresses the entire timer.
+ */
+describe('disableHowlerAutoSuspend', () => {
+  it('writes false to Howler.autoSuspend and reports applied=true', () => {
+    const fake = { autoSuspend: true }
+    const result = disableHowlerAutoSuspend({ howlerLike: fake })
+    expect(fake.autoSuspend).toBe(false)
+    expect(result.applied).toBe(true)
+    expect(result.previousValue).toBe(true)
+  })
+
+  it('reports the previous value when autoSuspend was already false', () => {
+    const fake = { autoSuspend: false }
+    const result = disableHowlerAutoSuspend({ howlerLike: fake })
+    expect(fake.autoSuspend).toBe(false)
+    expect(result.applied).toBe(true)
+    expect(result.previousValue).toBe(false)
+  })
+
+  it('omits previousValue when autoSuspend is not a boolean (Howler renamed?)', () => {
+    // Hostile shape — the property exists but isn't a boolean. We still
+    // attempt the disable; previousValue is omitted because we can't
+    // truthfully report it.
+    const fake: { autoSuspend?: unknown } = { autoSuspend: 'not-a-bool' }
+    const result = disableHowlerAutoSuspend({
+      howlerLike: fake as { autoSuspend?: boolean },
+    })
+    expect(result.applied).toBe(true)
+    expect(result.previousValue).toBeUndefined()
+  })
+
+  it('reports applied=false when the property write throws (frozen Howler)', () => {
+    const fake = Object.freeze({ autoSuspend: true })
+    // Object.freeze makes the property non-writable; assignment in
+    // strict mode throws. The helper must swallow and return applied=false.
+    const result = disableHowlerAutoSuspend({
+      howlerLike: fake as { autoSuspend?: boolean },
+    })
+    expect(result.applied).toBe(false)
+    expect(result.previousValue).toBe(true)
+  })
+
+  it('reports applied=false when the property read throws', () => {
+    const throwingFake = {
+      get autoSuspend(): boolean {
+        throw new Error('synthetic read failure')
+      },
+    }
+    const result = disableHowlerAutoSuspend({
+      howlerLike: throwingFake as unknown as { autoSuspend?: boolean },
+    })
+    expect(result.applied).toBe(false)
+    expect(result.previousValue).toBeUndefined()
+  })
+
+  it('is idempotent: calling twice flips false → false without surprises', () => {
+    const fake = { autoSuspend: true }
+    const a = disableHowlerAutoSuspend({ howlerLike: fake })
+    const b = disableHowlerAutoSuspend({ howlerLike: fake })
+    expect(a.applied).toBe(true)
+    expect(a.previousValue).toBe(true)
+    expect(b.applied).toBe(true)
+    expect(b.previousValue).toBe(false)
+    expect(fake.autoSuspend).toBe(false)
   })
 })

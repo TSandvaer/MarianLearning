@@ -237,8 +237,15 @@ export interface GreetProps {
    *
    * Production callers should never override this — like the resume
    * kick, the helper is a safe no-op when no audio context exists.
+   *
+   * Returns optional Phase-8 (ticket 86c9gvd0y) result fields used to
+   * thread `howlerUnlockMethodCalled` into the unlock-state probe row;
+   * test spies that return undefined are tolerated via optional
+   * chaining at the call site.
    */
-  unlockAudioSession?: () => void
+  unlockAudioSession?: () => {
+    howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
+  } | void
 }
 
 /**
@@ -787,11 +794,17 @@ export default function Greet({
         // listener never fired — pushing fresh `new Audio()` objects
         // here re-engages the iOS audio session even when Howler's
         // internal unlock didn't.
-        unlockAudioSessionFn()
+        const unlockResult = unlockAudioSessionFn()
         // Phase-5 / Phase-6 instrumentation: snapshot Howler's internal
         // unlock flags AFTER the helper. Only meaningful in `?debug=1`
         // sessions; production sessions pay one null check.
-        recordUnlockStateEvent()
+        // Phase-8 (ticket 86c9gvd0y): thread the helper's
+        // `howlerUnlockMethodCalled` outcome into the row so the iPad
+        // export pairs the snapshot with whether the Howler-internal
+        // unlock method actually ran in this gesture window.
+        recordUnlockStateEvent({
+          howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+        })
         const dispatched = gate.dispatchGesture()
         // Reset on a microtask so the next physical tap is not blocked.
         // Microtask (queueMicrotask) drains after the current synchronous
@@ -862,8 +875,14 @@ export default function Greet({
       // tick — belt-and-braces is cheap on a 1-sample buffer. Phase-6
       // extension: this also fills the HTML5 pool inside the gesture
       // window (see lib/audio/howlerContext.ts for full rationale).
-      unlockAudioSessionFn()
-      recordUnlockStateEvent()
+      const unlockResult = unlockAudioSessionFn()
+      // Phase-8 (ticket 86c9gvd0y): thread `howlerUnlockMethodCalled`
+      // through so the iPad export records whether
+      // `Howler._unlockAudio()` was reachable / called / threw on this
+      // wake-tap.
+      recordUnlockStateEvent({
+        howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+      })
 
       // Cancel the 8s wake re-prompt — she tapped, no nudge needed.
       cancelWakeReprompt()
@@ -921,8 +940,12 @@ export default function Greet({
         // Phase-5 (ticket 86c9gvd0y). Retry callbacks run inside the
         // user's retry-tap handler — same gesture-window contract.
         // Phase-6 extension: pool refill happens here too.
-        unlockAudioSessionFn()
-        recordUnlockStateEvent()
+        const unlockResult = unlockAudioSessionFn()
+        // Phase-8 (ticket 86c9gvd0y): thread the helper's
+        // `howlerUnlockMethodCalled` outcome through.
+        recordUnlockStateEvent({
+          howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+        })
         sequenceRef.current?.cancel()
         cancelPreRecorded()
         const retryHandle = buildSequence()
@@ -978,8 +1001,12 @@ export default function Greet({
     // output graph after >60s of idle. Same belt-and-braces shape as
     // wake-tap; cost is one 1-sample silent buffer per heart tap.
     // Phase-6 extension: also refills the HTML5 pool synchronously.
-    unlockAudioSessionFn()
-    recordUnlockStateEvent()
+    const unlockResult = unlockAudioSessionFn()
+    // Phase-8 (ticket 86c9gvd0y): thread the helper's
+    // `howlerUnlockMethodCalled` outcome through.
+    recordUnlockStateEvent({
+      howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+    })
 
     // Heart tap is itself a user-gesture handler. If the audio gate is in a
     // relock state (extremely rare path: the wake speak silently failed AND

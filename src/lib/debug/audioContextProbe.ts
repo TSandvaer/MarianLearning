@@ -159,8 +159,28 @@ export interface AudioContextProbeHandle {
    * iPad export aligns Howler's internal unlock state with `'speak-call'`
    * / `'speak-onplay'` rows by timestamp. Diagnoses the iOS audio-session
    * decay below the WebAudio layer.
+   *
+   * Phase-8 extension (ticket 86c9gvd0y): the optional `extra` arg lets
+   * producers thread observed values from `unlockIosAudioSession` (e.g.
+   * `howlerUnlockMethodCalled`) into the row, so the iPad export pairs
+   * the snapshot with the side-effect outcome from the same gesture
+   * window.
    */
-  recordUnlockState: () => void
+  recordUnlockState: (extra?: UnlockStateExtra) => void
+}
+
+/**
+ * Extra fields a producer can pass to `recordUnlockState` (Phase-8,
+ * ticket 86c9gvd0y). All fields are optional — the helper falls back to
+ * synchronous reads of the Howler module for everything not provided.
+ */
+export interface UnlockStateExtra {
+  /**
+   * Outcome of `Howler._unlockAudio()` invocation from
+   * `unlockIosAudioSession`. Producers thread this through so the
+   * recorded row reflects the actual call result, not just the snapshot.
+   */
+  howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
 }
 
 export interface AudioContextProbeOptions {
@@ -261,6 +281,20 @@ interface HowlerUnlockFlags {
   audioUnlocked?: boolean
   html5PoolSize?: number
   hasScratchBuffer?: boolean
+  /**
+   * Phase-8 (ticket 86c9gvd0y): `Howler.state`. The Howler-internal state
+   * machine that gates `Howl.play()`'s synchronous-vs-deferred path
+   * (howler.js line 886). Independent of `AudioContext.state`; flips to
+   * `'suspended'` 30 s after the last sound ended unless `autoSuspend`
+   * is disabled.
+   */
+  howlerState?: 'running' | 'suspending' | 'suspended' | 'unavailable'
+  /**
+   * Phase-8: `Howler.autoSuspend`. Should be `false` post-Phase-8 boot.
+   * Capturing it lets the iPad export confirm the boot-time disable
+   * landed (and didn't get reset by some other code path).
+   */
+  autoSuspend?: boolean
 }
 
 function readHowlerUnlockFlags(override?: {
@@ -275,6 +309,8 @@ function readHowlerUnlockFlags(override?: {
       _audioUnlocked?: unknown
       _html5AudioPool?: unknown
       _scratchBuffer?: unknown
+      state?: unknown
+      autoSuspend?: unknown
     })
   const flags: HowlerUnlockFlags = {}
   try {
@@ -297,6 +333,28 @@ function readHowlerUnlockFlags(override?: {
   try {
     const scratch = (target as { _scratchBuffer?: unknown })._scratchBuffer
     flags.hasScratchBuffer = scratch != null
+  } catch {
+    // best-effort
+  }
+  try {
+    const rawState = (target as { state?: unknown }).state
+    if (
+      rawState === 'running' ||
+      rawState === 'suspending' ||
+      rawState === 'suspended'
+    ) {
+      flags.howlerState = rawState
+    } else if (rawState !== undefined) {
+      flags.howlerState = 'unavailable'
+    }
+  } catch {
+    // best-effort
+  }
+  try {
+    const auto = (target as { autoSuspend?: unknown }).autoSuspend
+    if (typeof auto === 'boolean') {
+      flags.autoSuspend = auto
+    }
   } catch {
     // best-effort
   }
@@ -439,6 +497,9 @@ export function startAudioContextProbe(
       | 'howlerAudioUnlocked'
       | 'howlerHtml5PoolSize'
       | 'howlerHasScratchBuffer'
+      | 'howlerState'
+      | 'howlerAutoSuspend'
+      | 'howlerUnlockMethodCalled'
     > = {},
   ): AudioCtxState {
     const ctxState = readCtxState(ctx)
@@ -474,6 +535,15 @@ export function startAudioContextProbe(
         : {}),
       ...(extra.howlerHasScratchBuffer !== undefined
         ? { howlerHasScratchBuffer: extra.howlerHasScratchBuffer }
+        : {}),
+      ...(extra.howlerState !== undefined
+        ? { howlerState: extra.howlerState }
+        : {}),
+      ...(extra.howlerAutoSuspend !== undefined
+        ? { howlerAutoSuspend: extra.howlerAutoSuspend }
+        : {}),
+      ...(extra.howlerUnlockMethodCalled !== undefined
+        ? { howlerUnlockMethodCalled: extra.howlerUnlockMethodCalled }
         : {}),
     }
     recordAudioCtxEvent(record)
@@ -612,7 +682,7 @@ export function startAudioContextProbe(
     emit('handler-error', ctx, { errorMessage: message })
   }
 
-  function recordUnlockState(): void {
+  function recordUnlockState(extra?: UnlockStateExtra): void {
     if (internal.stopped) return
     const ctx = readHowlerCtx(opts.howlerLike)
     const flags = readHowlerUnlockFlags(opts.howlerLike)
@@ -625,6 +695,15 @@ export function startAudioContextProbe(
         : {}),
       ...(flags.hasScratchBuffer !== undefined
         ? { howlerHasScratchBuffer: flags.hasScratchBuffer }
+        : {}),
+      ...(flags.howlerState !== undefined
+        ? { howlerState: flags.howlerState }
+        : {}),
+      ...(flags.autoSuspend !== undefined
+        ? { howlerAutoSuspend: flags.autoSuspend }
+        : {}),
+      ...(extra?.howlerUnlockMethodCalled !== undefined
+        ? { howlerUnlockMethodCalled: extra.howlerUnlockMethodCalled }
         : {}),
     })
   }
@@ -756,9 +835,9 @@ export function recordHandlerErrorEvent(error: unknown): void {
  * session is the issue (not Web Audio's `AudioContext.state`) — and
  * the silent-buffer Phase-5 fix addresses exactly that.
  */
-export function recordUnlockStateEvent(): void {
+export function recordUnlockStateEvent(extra?: UnlockStateExtra): void {
   if (!activeProbe) return
-  activeProbe.recordUnlockState()
+  activeProbe.recordUnlockState(extra)
 }
 
 /**
