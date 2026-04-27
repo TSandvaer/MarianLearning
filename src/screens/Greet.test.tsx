@@ -1917,7 +1917,6 @@ describe('Greet', () => {
       probe._resetAudioContextProbeForTests()
       probe.activateAudioContextProbe({
         howlerLike: { ctx: undefined },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
