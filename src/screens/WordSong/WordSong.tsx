@@ -152,6 +152,20 @@ export interface WordSongProps {
   /** Optional: replace the audio playback function. Default is the
    *  silent-but-captioned 165 wpm fallback. */
   playUtterance?: PlayWordSongUtteranceFn
+  /**
+   * Optional: parent-driven gate for the cold-mount first read-aloud.
+   * When `false`, the cold-mount fast path waits; when flipped to `true`
+   * the effect re-runs and the read-aloud fires. `undefined` (no value
+   * passed) preserves backwards-compatible "fire immediately" behaviour.
+   *
+   * See `Math.tsx` for the full rationale — mirrored shape. Ticket
+   * 86c9hjnn8: on cold mount the read-aloud fires before
+   * `prepareWordSongPathA` resolves, so the first problem walks the
+   * caption against the silent `defaultPlayUtterance` and never plays
+   * audibly. This prop lets the parent hold the read-aloud until the
+   * Path A fetch settles.
+   */
+  audioReady?: boolean
   /** Optional: sparkle SFX on correct. Default a Howler-backed silent-fallback. */
   sparkle?: Sfx
   /** Optional: poof SFX on wrong. Default a Howler-backed silent-fallback. */
@@ -251,6 +265,7 @@ function WordSongScreen({
   onSessionComplete,
   plan: planProp,
   playUtterance = defaultPlayUtterance,
+  audioReady,
   sparkle,
   poof,
   plink,
@@ -538,6 +553,14 @@ function WordSongScreen({
     const howlerRunning = !audioUnlocked && getHowlerRunningFn()
     if (!audioUnlocked && !howlerRunning) return
 
+    // Audio-ready gate (ticket 86c9hjnn8). When the parent passes
+    // `audioReady={false}` (Path A fetch still in flight), wait — firing
+    // now would walk the caption against `defaultPlayUtterance` and the
+    // first problem would never play audibly. `undefined` preserves the
+    // legacy "fire immediately" behaviour for callers that don't track
+    // audio readiness. See Math.tsx for the long-form rationale.
+    if (audioReady === false) return
+
     const problem = plan.problems[problemIndex]
     const myProblemIndex = problemIndex
     queueMicrotask(() => {
@@ -564,8 +587,12 @@ function WordSongScreen({
         setReadAloudPlayed(true)
       })
     })
+    // `audioReady` IS in the deps so the effect re-runs when the parent
+    // flips it from `false` → `true` (Path A fetch settled). The
+    // `spokeReadAloudRef` latch ensures a re-run after read-aloud fired
+    // is a no-op. Ticket 86c9hjnn8 — see Math.tsx for the rationale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problemIndex, audioUnlocked])
+  }, [problemIndex, audioUnlocked, audioReady])
 
   // ── Chip tap handler ---------------------------------------------------
 

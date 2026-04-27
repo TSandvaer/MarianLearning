@@ -113,6 +113,39 @@ export interface MathProps {
    *  but still fires `onPlay` + word ticks at ~165 wpm so the caption ribbon
    *  reveals normally even without real TTS. */
   playUtterance?: PlayMathUtteranceFn
+  /**
+   * Optional: parent-driven gate for the cold-mount first read-aloud. When
+   * present and `false`, the cold-mount fast path WAITS — it does not call
+   * `speak()` on mount. When the prop flips to `true`, the effect re-runs
+   * and the read-aloud fires.
+   *
+   * Why this exists (ticket 86c9hjnn8)
+   * ----------------------------------
+   * On cold mount Math fires the first read-aloud the moment Howler's ctx
+   * is observed `'running'` — but at that moment the parent's
+   * `prepareMathPathA` POST to `/api/claude` has not yet resolved, so
+   * `playUtterance` is still the silent `defaultPlayUtterance`. The first
+   * problem's "speak" walks the caption at 165 wpm in silence; once Path A
+   * resolves several seconds later, the prop flips to the real player but
+   * the synchronous `spokeReadAloudRef` latch has already fired, so the
+   * line never plays audibly. Subsequent problems work because by then the
+   * real prop is wired.
+   *
+   * Empirical: Thomas's 2026-04-27 iPad QA on production deploy `b6df65b`.
+   * Caption renders correctly (proves speak() ran), no audio for problem 1,
+   * chips become tappable after the silent fallback's 165-wpm walk
+   * completes (~3 s), problem 2 onward reads aloud normally.
+   *
+   * The fix: parent (App.tsx) tracks `mathAudioReady` and only flips it to
+   * `true` once `prepareMathPathA` settles (resolve OR reject — both
+   * unblock; on reject we use the silent fallback intentionally). Math
+   * waits for the flip before firing the first read-aloud.
+   *
+   * Backwards-compatible: when this prop is `undefined` (no value passed),
+   * the cold-mount fast path fires immediately as it did pre-fix —
+   * preserves every existing test that doesn't know about audio readiness.
+   */
+  audioReady?: boolean
   /** Optional: sparkle SFX on correct. Default a Howler-backed silent-fallback. */
   sparkle?: Sfx
   /** Optional: poof SFX on wrong. Default a Howler-backed silent-fallback. */
@@ -254,6 +287,7 @@ function MathScreen({
   onSessionComplete,
   plan: planProp,
   playUtterance = defaultPlayUtterance,
+  audioReady,
   sparkle,
   poof,
   plink,
@@ -672,6 +706,20 @@ function MathScreen({
     const howlerRunning = !audioUnlocked && getHowlerRunningFn()
     if (!audioUnlocked && !howlerRunning) return
 
+    // Audio-ready gate (ticket 86c9hjnn8). When the parent passes
+    // `audioReady={false}` (Path A fetch still in flight), wait — firing
+    // the read-aloud now would walk the caption against the silent
+    // `defaultPlayUtterance` and the first problem would never play
+    // audibly. Once App.tsx flips the prop to `true` (fetch settled,
+    // resolve OR reject), this effect re-runs and the read-aloud fires
+    // against whatever `playUtterance` is bound at that moment.
+    //
+    // `undefined` (no prop passed by the caller) is treated as "not
+    // applicable, fire immediately" — preserves backwards compatibility
+    // with every existing test/caller that pre-dates this gate. Production
+    // App.tsx always passes a boolean.
+    if (audioReady === false) return
+
     const problem = plan.problems[problemIndex]
     // Capture the problem index this effect run owns. The deferred
     // `.then()` below compares against `problemIndexRef.current` to bail
@@ -724,6 +772,11 @@ function MathScreen({
     // re-speak the line repeatedly. `getHowlerRunningFn` is also omitted —
     // it's the test seam binding, stable per mount.
     //
+    // `audioReady` IS in the deps so the effect re-runs when the parent
+    // flips it from `false` → `true` (Path A fetch settled). The
+    // `spokeReadAloudRef` latch ensures that a re-run after the read-aloud
+    // already fired is a no-op.
+    //
     // No cleanup function: the previous version's `let cancelled = false`
     // / cleanup `cancelled = true` pair was load-bearing for two cases:
     //   (a) component unmount — now handled by `unmountedRef`.
@@ -736,7 +789,7 @@ function MathScreen({
     //       problem it owns. The `myProblemIndex` capture handles the
     //       advance-past-it case.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problemIndex, audioUnlocked])
+  }, [problemIndex, audioUnlocked, audioReady])
 
   // ── Chip tap handler ---------------------------------------------------
 

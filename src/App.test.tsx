@@ -66,20 +66,60 @@ describe('App routing skeleton', () => {
   })
 
   describe('Math Path A wiring', () => {
-    // Sanity-check: the /api/claude POST is gated on `route === 'math'`.
-    // While App is on Splash or Greet, no fetch should be issued.
-    // (Pre-fetching session audio before the user reaches Math would burn
-    // a TTS render every cold start — wasteful and pollutes QA logs.)
+    // Sanity-check: the /api/claude POST is gated on the user actually
+    // beginning a session. While App is on Splash, no fetch should be
+    // issued — the splash screen is a brief auto-advance hold and the user
+    // hasn't committed to the session yet. Once route flips to Greet
+    // (`route === 'greet'`), the fetch starts so the audio is ready by
+    // the time Math mounts (ticket 86c9hjnn8).
     it('does NOT POST to /api/claude on initial mount (route=splash)', () => {
       const fetchSpy = vi
         .spyOn(globalThis, 'fetch')
         .mockResolvedValue(new Response('{}'))
       render(<App />)
-      // Splash mount only — no Math route visited.
+      // Splash mount only — no Greet/Math route visited yet.
       expect(fetchSpy).not.toHaveBeenCalledWith(
         '/api/claude',
         expect.anything(),
       )
+      fetchSpy.mockRestore()
+    })
+
+    // Pre-warm fix for ticket 86c9hjnn8: on direct ?route=greet launch
+    // (and equivalently the Splash → Greet auto-advance), App fires the
+    // /api/claude POST immediately so the audio is loaded by the time
+    // Math mounts. Without this, the cold-mount first read-aloud races
+    // the network fetch and the first problem plays silent — the bug
+    // Thomas captured on production deploy b6df65b.
+    it('POSTs to /api/claude on entering Greet (pre-warm for Math) — ticket 86c9hjnn8', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        // Hand back a response shape that prepareMathPathA will reject
+        // as `invalid-response` (no utterances field). The test only
+        // cares that the POST was issued, not that it succeeded — the
+        // failure path is exercised by lib/audio/mathPathA.test.ts.
+        new Response('{}', { status: 200 }),
+      )
+      setSearch('?route=greet')
+      render(<App />)
+
+      // Expect at least one fetch to /api/claude with a session-start body.
+      const calls = fetchSpy.mock.calls.filter((c) => c[0] === '/api/claude')
+      expect(calls.length).toBeGreaterThanOrEqual(1)
+      // Verify it's the session-start kind (not some other future use).
+      const body = calls[0][1]?.body
+      expect(typeof body).toBe('string')
+      expect(JSON.parse(body as string)).toMatchObject({
+        kind: 'session-start',
+      })
+
+      // Drain the fetch's .then/.catch so the resulting setState (the
+      // audio-ready flip in the catch path) commits inside act() rather
+      // than escaping the test boundary.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
       fetchSpy.mockRestore()
     })
   })
