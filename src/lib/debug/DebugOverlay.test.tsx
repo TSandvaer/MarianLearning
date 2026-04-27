@@ -7,6 +7,7 @@ import {
   _resetForTests,
   recordAudioCtxEvent,
   recordGateState,
+  recordRawTapEvent,
   recordSpeakAttempt,
   recordSpeakStatus,
   recordTap,
@@ -184,6 +185,56 @@ describe('DebugOverlay', () => {
     // Newest-first ordering: 'f' first, 'b' last.
     expect(taps[0]).toHaveTextContent('click → f')
     expect(taps[4]).toHaveTextContent('touchend → b')
+  })
+
+  it('shows the raw-events row with (none) when no raw events have been recorded', () => {
+    render(<DebugOverlay />)
+    const row = screen.getByTestId('debug-overlay-raw-events')
+    expect(row).toBeInTheDocument()
+    expect(row).toHaveTextContent('raw events (0)')
+    expect(row).toHaveTextContent('(none)')
+    expect(screen.queryAllByTestId('debug-overlay-raw-event')).toHaveLength(0)
+  })
+
+  it('renders a single raw event with its type and target', () => {
+    render(<DebugOverlay />)
+    act(() => {
+      recordRawTapEvent('pointerdown', 'wake')
+    })
+    const events = screen.getAllByTestId('debug-overlay-raw-event')
+    expect(events).toHaveLength(1)
+    expect(events[0]).toHaveTextContent('pointerdown → wake')
+    expect(screen.getByTestId('debug-overlay-raw-events')).toHaveTextContent(
+      'raw events (1)',
+    )
+  })
+
+  it('shows raw events newest-first and caps the displayed list at 8', () => {
+    render(<DebugOverlay />)
+
+    // Push 9 raw events; bus caps at MAX_RAW_EVENTS=8 so only the most
+    // recent 8 should be visible. Render reverses for newest-first.
+    act(() => {
+      recordRawTapEvent('touchstart', 'a')
+      recordRawTapEvent('touchend', 'b')
+      recordRawTapEvent('pointerdown', 'c')
+      recordRawTapEvent('click', 'd')
+      recordRawTapEvent('touchstart', 'e')
+      recordRawTapEvent('touchend', 'f')
+      recordRawTapEvent('pointerdown', 'g')
+      recordRawTapEvent('click', 'h')
+      recordRawTapEvent('touchstart', 'i')
+    })
+
+    const events = screen.getAllByTestId('debug-overlay-raw-event')
+    expect(events).toHaveLength(8)
+    // Oldest ('a') was dropped by the bus. Newest ('i') renders first;
+    // oldest surviving ('b') renders last.
+    expect(events[0]).toHaveTextContent('touchstart → i')
+    expect(events[7]).toHaveTextContent('touchend → b')
+    expect(screen.getByTestId('debug-overlay-raw-events')).toHaveTextContent(
+      'raw events (8)',
+    )
   })
 
   it('truncates long speak text', () => {
