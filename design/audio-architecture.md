@@ -247,6 +247,90 @@ wider app, and we have evidence it's unreliable on the target device.
 
 ---
 
+## Mid-session resume: cache-miss contract
+
+**Decision (ticket `86c9gugmm`, resolves Open Question #5 from `design/mid-session-resume.md`):**
+**Fresh-session-on-cache-miss.** No rehydrate-by-sessionId endpoint. No `/api/claude` changes.
+
+### What this means for Devon's resume path
+
+When the cold-launch decision tree picks the resume branch and `sessionAudio.loadSessionAudio`
+discovers the IDB audio cache is empty (evicted, quota-cleared, PWA data wipe), the resume
+orchestrator must **discard the persisted session state and start a fresh session**. Concretely:
+
+1. Clear `marian-tutor.session-progress.v1` from localStorage.
+2. Clear `marian-tutor.session-plan.v1` from localStorage.
+3. Call `sessionAudio.clearSessionAudio(sessionId)` (no-op if IDB was already empty, but
+   keeps the contract clean).
+4. Run the standard fresh-session flow (Greet -> Math) as if no persisted state existed.
+
+There is no `/api/claude` rehydrate mode. The server is stateless; it does not store session
+plans by ID and cannot re-emit a prior session on request.
+
+### Why not rehydrate-by-sessionId (Option 2)
+
+The alternative was to add server-side session storage with a TTL so the client could request
+the original session plan by ID on cache-miss. Rejected for five reasons:
+
+1. **Server state is a category violation.** The entire app is built on client-local storage
+   (localStorage + IndexedDB). A server-side session cache would be the only stateful server
+   resource in the architecture. For a family-local PWA with one user, that's unjustifiable
+   operational overhead.
+
+2. **TTL creates a second staleness window.** The client already has a 30-minute stale-session
+   policy. A server-side TTL must be at least that long to be useful, which means running a
+   cache for 30+ minutes per session for a child who plays once a day. And if the server TTL
+   expires before the client requests rehydration, the server falls back to... a fresh session.
+   So the rehydrate path is only useful when the IDB cache evicts AND the server TTL hasn't
+   expired, a vanishingly narrow window.
+
+3. **The audio is the only thing lost.** The problem set (operands, correct answers,
+   distractors) is persisted in `marian-tutor.session-plan.v1` in localStorage. IDB only
+   stores the rendered MP3 audio. A rehydrate call would still need to re-render TTS for every
+   utterance (same cost as a fresh session), and the problem set continuity it preserves is
+   already available client-side. The savings are zero.
+
+4. **The cache-miss path is already rare.** IDB eviction on iPad PWA requires quota exhaustion
+   or a manual "Clear Website Data" action. Combined with the 30-minute stale window, the
+   probability of hitting the "progress present + plan present + IDB evicted + still fresh"
+   state is negligible in practice.
+
+5. **Simplicity.** The `/api/claude` contract stays unchanged. Devon's resume path has one
+   code path for cache-miss (discard + fresh). No new error states, no retry logic against a
+   server cache, no TTL configuration.
+
+### The contract
+
+```
+Cache-miss recovery (IDB empty, progress + plan present in localStorage):
+  -> Discard session-progress.v1
+  -> Discard session-plan.v1
+  -> Clear IDB for the sessionId
+  -> Run fresh-session flow (Greet -> Math)
+  -> Marian loses at most ~5 minutes of session progress
+     (the 30-minute stale window makes longer losses impossible)
+```
+
+This simplifies the `mid-session-resume.md` cache-miss recovery flow. The spec's Option B
+fallback path (POST `/api/claude { sessionId, mode: 'rehydrate' }`) is **not implemented** and
+should not be built. The "thinking" indicator for rehydrate latency (spec lines 383-385) is
+also not needed; the fresh-session path has its own standard loading sequence.
+
+### If we ever reconsider
+
+The seam is clean: `session-plan.v1` already stores the problem set with a `sessionId`. If a
+future requirement demands continuity through IDB eviction, the path is:
+
+1. Add a `mode: 'rehydrate'` variant to `ClaudeRequest.kind` or `payload`.
+2. Server reads the problem set from the request body (client sends it from `session-plan.v1`),
+   skips Claude, re-runs only the TTS pipeline.
+3. No server-side storage needed even then -- the client is the source of truth for the plan.
+
+That path is cheaper than server-side session caching and avoids TTL policy entirely. But it's
+not worth building until there's evidence the cache-miss path is a real problem.
+
+---
+
 ## What we deferred / what's unfinished
 
 - **Web Speech module deletion** (`src/lib/tts/*`) — kept in tree post-Path-A for safety
@@ -269,6 +353,8 @@ wider app, and we have evidence it's unreliable on the target device.
 - Path A (server-side session TTS): ticket `86c9gr385`, PR pending.
 - Web Speech investigation (5 rounds): ticket `86c9gp99a`, PRs #18 / #21 / #22 / #23 / #24.
 - Jessica's QA validation of Plan B: PR #26 (`647be7b`), `qa/greet-regression.md`.
+- Cache-miss contract (fresh-session-on-miss): ticket `86c9gugmm`, resolves Open Question #5
+  from `design/mid-session-resume.md`.
 
 When the Path A PR merges, update this document's Architecture section with the actual
 exported API surface and any deviations from the plan above.
