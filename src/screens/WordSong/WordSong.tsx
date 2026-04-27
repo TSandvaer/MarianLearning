@@ -79,8 +79,14 @@ const HINT_DELAY_AFTER_WRONG_MS = 600
 /** Streak fade-out duration when a wrong tap breaks the streak. */
 const STREAK_FADE_OUT_MS = 400
 
-/** Audio-unlock watchdog window — same as Greet/Math. */
-const FIRST_UTTERANCE_RETRY_MS = 1_500
+/**
+ * Audio-unlock watchdog window — sized to outlast the event-driven
+ * AudioContext resume await (5 000 ms) plus the Howler play → onplay
+ * settle (~50 ms) plus slack. Phase-7 (ticket 86c9gvd0y) bumped this
+ * from 1 500 ms → 6 000 ms; see Greet.tsx FIRST_UTTERANCE_RETRY_MS for
+ * the full history.
+ */
+const FIRST_UTTERANCE_RETRY_MS = 6_000
 
 /** Spring preset — chip tap (matches Math). */
 const CHIP_TAP_SPRING = { type: 'spring' as const, stiffness: 300, damping: 18 }

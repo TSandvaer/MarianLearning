@@ -204,7 +204,7 @@ export function resumeHowlerContextOnGesture(
 }
 
 /**
- * Phase-4 fix surface (ticket 86c9gvd0y).
+ * Phase-4 / Phase-7 fix surface (ticket 86c9gvd0y).
  *
  * Why this exists alongside `resumeHowlerContextOnGesture`
  * --------------------------------------------------------
@@ -220,30 +220,63 @@ export function resumeHowlerContextOnGesture(
  *   t=139ms  ctx statechange → `'running'` (resume promise finally settles)
  *   …        but the buffer source is in limbo and `onplay` never fires
  *
- * This helper fixes that by AWAITING the resume promise before the caller
- * proceeds to `Howl.play()`. By the time play() is called, the context is
- * actually `running` and Howler binds against a live state.
+ * This helper fixes that by AWAITING the resume before the caller proceeds
+ * to `Howl.play()`. By the time play() is called, the context is actually
+ * `running` and Howler binds against a live state.
  *
- * Cost: ~140ms added latency on tap-after-idle (matches the observed iPad
- * resume-promise settle time). Imperceptible relative to Greet's own
- * line-to-line cadence; well worth shipping clean audio.
+ * Phase-7 update (ticket 86c9gvd0y, 2026-04-26): event-driven resume wait
+ * -----------------------------------------------------------------------
+ * The Phase-4 implementation used a fixed 500 ms timeout, sized against
+ * the ~139 ms observed iPad resume-promise settle time on a 3 s idle.
+ * Thomas's 2026-04-26 iPad capture revealed a worst-case scenario the
+ * Phase-4 sizing missed: after a 78 s idle (page sat suspended in the
+ * background), iOS Safari's audio session takes ~3.6 s to actually transition
+ * the context from `'suspended'` to `'running'` after `ctx.resume()` is
+ * called. The 500 ms timeout fired long before that, `play()` ran against
+ * a still-suspended context, `onplay` never fired, and the gate relocked.
+ *
+ * The fix: drop the fixed-time race and instead WAIT FOR THE STATE TO
+ * ACTUALLY BECOME `'running'`. We subscribe to the `statechange` event on
+ * the AudioContext and resolve the helper the moment the state observably
+ * transitions. A much longer fallback timeout (5 000 ms) is the safety
+ * valve for genuinely stuck contexts — but the common case is event-driven
+ * and resolves in whatever time the OS actually needs (139 ms on warm
+ * idle, 3.6 s on cold idle).
+ *
+ * Why event-driven (not just a longer timeout)
+ * --------------------------------------------
+ *   - The resume PROMISE on iOS sometimes settles before the state has
+ *     fully transitioned (or settles after — neither is reliable).
+ *     Subscribing to `statechange` is the canonical signal for "the
+ *     context is now `running`".
+ *   - The iPad data shows variable resume latency (139 ms / 3.6 s) — a
+ *     longer fixed timeout would either still race the cold case or
+ *     waste time on the warm case. Event-driven adapts.
+ *   - Cleanup is straightforward: a single `removeEventListener` +
+ *     `clearTimeout` on resolve, regardless of which path won.
+ *
+ * Cost: zero extra latency on the warm path (event fires the moment the
+ * OS transitions the context). Up to 5 000 ms on a worst-case stuck
+ * context — long, but bounded, and the gate's watchdog at the call-site
+ * is sized accordingly (Greet/Math/WordSong's `FIRST_UTTERANCE_RETRY_MS`
+ * was bumped from 1 500 ms → 6 000 ms in the same Phase-7 patch).
  *
  * The Phase-2 helper STAYS — it's still the right thing to do
  * synchronously inside the gesture handler (gesture-context association
  * for iOS is most robust when resume is kicked in the same tick as the
- * tap). This Phase-4 helper is the AWAITED version, intended for the
+ * tap). This Phase-4/7 helper is the AWAITED version, intended for the
  * play-call site (one microtask later).
- *
- * Bounded wait: a never-settling resume promise would hang Greet forever.
- * We race the resume against a 500 ms timeout — well above the observed
- * 139 ms iPad settle time but well below any user-visible silence floor.
- * If the timeout wins, we return anyway and let `play()` try; iOS may
- * still play, and even if it doesn't, the watchdog → relock recovery
- * kicks in. We're never worse than the pre-fix behaviour.
  */
 
-/** Bounded-wait timeout for the resume promise. */
-const RESUME_AWAIT_TIMEOUT_MS = 500
+/**
+ * Phase-7 fallback timeout for the event-driven resume wait. Sized against
+ * Thomas's 2026-04-26 iPad capture: worst observed `'suspended'` →
+ * `'running'` transition after long idle was 3.6 s. 5 s is the safety
+ * valve — well above the worst observed real-iOS latency, well below the
+ * Greet/Math/WordSong gate watchdog (6 s) so a genuinely-stuck context
+ * surfaces a relock UI rather than hanging forever.
+ */
+const RESUME_AWAIT_TIMEOUT_MS = 5_000
 
 export interface AwaitResumeResult {
   /** State observed BEFORE we awaited. */
@@ -278,16 +311,31 @@ export interface AwaitResumeOptions extends ResumeAudioContextOptions {
 }
 
 /**
- * Resume `Howler.ctx` and await the resume promise's settlement (bounded
- * by a timeout) before resolving. Intended for the play-call site:
- * `await awaitHowlerContextResume()` immediately before `Howl.play()`.
+ * Resume `Howler.ctx` and wait for the context state to actually transition
+ * to `'running'` (bounded by a fallback timeout) before resolving. Intended
+ * for the play-call site: `await awaitHowlerContextResume()` immediately
+ * before `Howl.play()`.
  *
  *   - If `ctx` is unavailable, already running, or closed: resolves
  *     immediately with `resumeAwaited: false`.
- *   - If `ctx` is suspended/interrupted: calls `ctx.resume()` and awaits
- *     the returned promise, racing against `RESUME_AWAIT_TIMEOUT_MS`.
- *     Resolves when the resume settles (success or failure) or the
- *     timeout fires, whichever comes first.
+ *   - If `ctx` is suspended/interrupted: calls `ctx.resume()` and waits
+ *     for the next of these signals, whichever fires first:
+ *       (a) a `statechange` event firing with `ctx.state === 'running'`
+ *           (the canonical signal — the OS has actually transitioned
+ *           the audio output graph), or
+ *       (b) the resume promise settling AND `ctx.state === 'running'` at
+ *           that moment (belt-and-suspenders for browsers that resolve
+ *           the resume promise without firing `statechange`), or
+ *       (c) the fallback timeout (`RESUME_AWAIT_TIMEOUT_MS`, default
+ *           5 000 ms) — `timedOut: true`. The caller proceeds to play()
+ *           anyway; the gate watchdog at the call site catches a stuck
+ *           context as a relock.
+ *
+ * Phase-7 (ticket 86c9gvd0y): the previous implementation raced the resume
+ * promise against a 500 ms timeout. Real-iPad data after long-idle showed
+ * iOS taking ~3.6 s to transition the context, so the timeout fired and
+ * `play()` ran against a still-suspended context. Event-driven wait
+ * adapts to the actual OS latency (139 ms on warm idle, 3.6 s on cold).
  *
  * Caller MUST be inside (or microtask-adjacent to) a user-gesture for the
  * resume to actually transition the context on iOS. This helper does
@@ -341,39 +389,128 @@ export async function awaitHowlerContextResume(
     }
   }
 
-  // Legacy resume() that returns void: nothing to await; resolve.
-  if (!resumePromise) {
+  // Read state defensively — if the post-resume state read throws, treat
+  // it as still-not-running and fall through to the event-driven wait.
+  const isRunningNow = (): boolean => {
+    try {
+      return (ctx.state as unknown as string) === 'running'
+    } catch {
+      return false
+    }
+  }
+
+  // Fast path: some impls flip state synchronously inside resume(). If
+  // we're already running, no need to attach listeners or schedule a
+  // timeout — done.
+  if (isRunningNow()) {
     return {
       stateBefore,
-      resumeAwaited: false,
+      resumeAwaited: true,
       timedOut: false,
       resumeThrew: false,
     }
   }
 
-  // Race the resume promise against a bounded timeout. Either way the
-  // caller can proceed; the diagnostic flag tells the probe which won.
-  let timeoutHandle: unknown = null
-  const timeoutPromise = new Promise<'timeout'>((resolve) => {
-    timeoutHandle = scheduleOnce(() => resolve('timeout'), timeoutMs)
+  // Event-driven wait. Resolve when state observably transitions to
+  // `'running'`, OR when the resume promise settles and state happens to
+  // be `'running'` at that moment, OR when the fallback timeout fires.
+  // Whichever wins, we clean up the others before resolving.
+  return new Promise<AwaitResumeResult>((resolveOuter) => {
+    let settled = false
+    let timeoutHandle: unknown = null
+
+    const finish = (timedOut: boolean) => {
+      if (settled) return
+      settled = true
+      // Best-effort listener removal. If `removeEventListener` doesn't
+      // exist (legacy / stub ctx), the listener was never attached so
+      // there's nothing to remove.
+      try {
+        if (typeof ctx.removeEventListener === 'function') {
+          ctx.removeEventListener('statechange', onStateChange)
+        }
+      } catch {
+        // Defensive — never let cleanup throw out of the helper.
+      }
+      if (timeoutHandle !== null) {
+        try {
+          cancelScheduleOnce(timeoutHandle)
+        } catch {
+          // Defensive — same rationale.
+        }
+        timeoutHandle = null
+      }
+      resolveOuter({
+        stateBefore,
+        resumeAwaited: true,
+        timedOut,
+        // resume() did not throw synchronously — we already returned in
+        // the catch branch above if it had. Resume-promise rejection is
+        // folded into the wait (we just keep waiting for state===running
+        // or the timeout).
+        resumeThrew: false,
+      })
+    }
+
+    const onStateChange = () => {
+      if (isRunningNow()) finish(false)
+    }
+
+    // Subscribe to statechange BEFORE checking state again — narrow the
+    // race window where state transitions between our last read and the
+    // listener attaching.
+    let listenerAttached = false
+    try {
+      if (typeof ctx.addEventListener === 'function') {
+        ctx.addEventListener('statechange', onStateChange)
+        listenerAttached = true
+      }
+    } catch {
+      // Defensive — fall through to the timeout-only path.
+    }
+
+    // Re-check state after attaching the listener: if it transitioned
+    // synchronously between our earlier check and the listener attach,
+    // we'd otherwise wait for a `statechange` event that already fired.
+    if (isRunningNow()) {
+      finish(false)
+      return
+    }
+
+    // Schedule the fallback timeout. The caller proceeds to play() with
+    // `timedOut: true` if this fires; the gate watchdog at the call site
+    // catches the relock case.
+    timeoutHandle = scheduleOnce(() => {
+      timeoutHandle = null
+      finish(true)
+    }, timeoutMs)
+
+    // If the resume promise settles and state is running by then, we can
+    // resolve early without waiting for the (already-fired) statechange
+    // event. If state is NOT running on resume settle, we keep waiting
+    // — the resume promise on some browsers settles before the state
+    // actually transitions, and the statechange event is the truth.
+    //
+    // Resume-promise rejection is benign: state may still transition
+    // (some iOS edge cases reject the promise but the OS audio session
+    // still wakes up), so we treat reject the same as resolve and just
+    // re-check state.
+    if (resumePromise) {
+      const recheck = () => {
+        if (isRunningNow()) finish(false)
+      }
+      resumePromise.then(recheck, recheck)
+    }
+
+    // If we couldn't attach a listener (ancient ctx without
+    // addEventListener), fall back to the resume-promise + timeout path.
+    // Nothing more to do — the timeout will fire, or the resume promise
+    // recheck above will resolve if state happens to be running by then.
+    if (!listenerAttached && !resumePromise) {
+      // No way to observe a transition AND no resume promise to recheck
+      // state on. The timeout is the only possible resolver — leave it.
+    }
   })
-  const settledPromise = resumePromise
-    .then(() => 'settled' as const)
-    .catch(() => 'settled' as const)
-
-  const winner = await Promise.race([settledPromise, timeoutPromise])
-  if (timeoutHandle !== null) cancelScheduleOnce(timeoutHandle)
-
-  return {
-    stateBefore,
-    resumeAwaited: true,
-    timedOut: winner === 'timeout',
-    // resume() did not throw synchronously — we already returned in the
-    // catch branch above if it had. The reject path of the resume
-    // promise itself is folded into 'settled' (we don't surface it as
-    // resumeThrew, which is reserved for synchronous throws).
-    resumeThrew: false,
-  }
 }
 
 /**

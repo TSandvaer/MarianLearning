@@ -104,12 +104,13 @@ export type PlayGreetLineFn = (
  * ---------------------------------------
  * Even with the gesture in the right place, iPadOS can occasionally reject
  * the very first audio call (e.g. WebAudio context warm-up). `useAudioUnlockGate`
- * arms a 1.5s watchdog around the play; if `onPlay` never fires we surface
+ * arms a 6s watchdog around the play; if `onPlay` never fires we surface
  * the Wake ring again silently and the next gesture re-fires line 0 inside
  * its own synchronous tick. No copy is shown — Marian sees a slightly
- * delayed Melody, not an error. (Window was 5s during the Web-Speech era
- * because synthesis genuinely had 3-5s first-utterance latency; pre-recorded
- * MP3s `play` event fires ~50ms after `play()`, so 1.5s is plenty. See
+ * delayed Melody, not an error. (Window was 1.5s during the early
+ * pre-recorded MP3 era because Howler `onplay` fires ~50ms after `play()`;
+ * Phase-7 of ticket 86c9gvd0y bumped it to 6s to outlast the event-driven
+ * AudioContext resume await for cold-iPad audio-session resumption. See
  * FIRST_UTTERANCE_RETRY_MS below.)
  *
  * Reduced motion: the global `MotionConfig reducedMotion="user"` collapses
@@ -144,19 +145,31 @@ const ICON_FADE_OUT_MS = 400
  * Watchdog window for "did the audio engine actually start playing" — Dave's
  * contract.
  *
- * Pre-recorded MP3 era (ticket 86c9gqprh): shrunk from 5_000 → 1_500 ms.
- * Howler's `onplay` event fires within ~50 ms of `play()` once the audio
- * context is gesture-unlocked; the bulk of the remaining budget is for
- * first-load decode of the 9-18 KB MP3s. 1.5s is generous for any
- * realistic iPad PWA cold-cache scenario yet tight enough that a true
- * silent-fail surfaces the relock ring before Marian gives up.
+ * Phase-7 (ticket 86c9gvd0y, 2026-04-26): bumped 1_500 → 6_000 ms.
+ * `awaitHowlerContextResume` now waits up to 5_000 ms for the AudioContext
+ * to actually transition from `'suspended'` → `'running'` (event-driven on
+ * `statechange`, sized against the worst-observed 3.6 s cold-iPad latency
+ * after long idle). The watchdog must outlast that resume wait plus the
+ * ~50 ms Howler play → `onplay` settle time, otherwise the gate relocks
+ * before play() ever runs. 6 s is the resume-await ceiling + 1 s slack.
  *
- * History: this was 2_000 (PRs #18-#22), bumped to 5_000 in round 5
- * (PR #24) when we still depended on Web Speech, which had genuine 3-5s
- * first-utterance latency on iPad. Pre-recorded audio doesn't share that
- * cost so we get to spend the saved time on a snappier retry surface.
+ * The cost: Marian could see up to 6 s of silence between her tap and
+ * audio on a worst-case cold-resume. The follow-up (ticket TBD) is to
+ * surface a "loading" indicator during the wait — out of scope for this
+ * patch; the relock ring remains the safety net.
+ *
+ * History
+ * -------
+ *   - 2_000 ms (PRs #18-#22): original Web Speech sizing.
+ *   - 5_000 ms (PR #24, round 5): bumped because Web Speech had 3-5 s
+ *     first-utterance latency on iPad.
+ *   - 1_500 ms (ticket 86c9gqprh): shrunk after the pre-recorded MP3
+ *     pivot. Howler `onplay` fires ~50 ms after `play()` once unlocked;
+ *     1.5 s was generous for cold-cache decode.
+ *   - 6_000 ms (Phase-7, ticket 86c9gvd0y): bumped to accommodate the
+ *     event-driven resume await for cold-iPad audio-session resumption.
  */
-const FIRST_UTTERANCE_RETRY_MS = 1_500
+const FIRST_UTTERANCE_RETRY_MS = 6_000
 /** Melody's breathing loop period (spec line 166). */
 const BREATHING_PERIOD_S = 2.4
 /** Ring pulse loop period (spec line 167). */
