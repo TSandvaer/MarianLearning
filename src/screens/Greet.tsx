@@ -95,10 +95,10 @@ export type PlayGreetLineFn = (
  * Pre-recorded MP3s (post-86c9gqprh)
  * ----------------------------------
  * The 4 fixed Greet lines play through Howler.js (`lib/audio/preRecorded`),
- * not Web Speech. This was the architectural pivot after 5 rounds of band-
- * aiding the iPad Safari `speechSynthesis.speak()` "first-speak unreliable"
- * pattern (PRs #18, #21, #22, #23, #24). Web Speech stays the engine for
- * dynamic Math/Word Song lines via `lib/tts/*` — the two paths are siblings.
+ * not the old Web Speech path. This was the architectural pivot after 5
+ * rounds of band-aiding iPad Safari's "first-speak unreliable" pattern
+ * (PRs #18, #21, #22, #23, #24). All TTS now uses server-side Azure
+ * Speech (Path A) via `lib/audio/`; the old `lib/tts/` module is removed.
  *
  * First-utterance retry (Dave's contract)
  * ---------------------------------------
@@ -585,8 +585,7 @@ export default function Greet({
     return () => {
       sequenceRef.current?.cancel()
       sequenceRef.current = null
-      // Cancel any in-flight pre-recorded playback. Math/Word Song still
-      // use Web Speech via lib/tts; that's untouched here.
+      // Cancel any in-flight pre-recorded playback.
       cancelPreRecorded()
       clearAllTimers()
       chimeInstance.unload()
@@ -1072,8 +1071,7 @@ export default function Greet({
   // mounts the moment we have *evidence* that speech actually started:
   //  - Either the gate observed an `onstart` (state === 'unlocked'), or
   //  - At least one word boundary has fired for the active line (covers
-  //    engines that skip onstart but emit boundaries — see lib/tts/tts.ts
-  //    comment on the onboundary-as-fallback start signal).
+  //    engines that skip onstart but emit boundaries).
   // While the gate is still `pending`, we suppress the ribbon so an empty
   // rounded-rectangle never appears under Melody on a silent-fail iPad path.
   // Once any speech has been heard we keep it mounted across gate re-arms
@@ -1511,9 +1509,9 @@ export default function Greet({
 
             - `onClick` — load-bearing for iPad Safari standalone PWA. This
               is the gesture event Webkit reliably honours as a user
-              activation for `speechSynthesis.speak()`. The previous
-              implementation was `onPointerDown`-only, which Thomas saw
-              fail silently on a real iPad install.
+              activation for audio playback. The previous implementation
+              was `onPointerDown`-only, which Thomas saw fail silently on
+              a real iPad install.
             - `onTouchEnd` — backup for any iPad-Safari quirk where the
               synthesized click after pointerdown→pointerup gets eaten
               by the button unmounting itself in the same tick (we flip

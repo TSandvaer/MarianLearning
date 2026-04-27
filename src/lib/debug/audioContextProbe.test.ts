@@ -84,7 +84,6 @@ describe('audioContextProbe', () => {
   it('emits an init sample with `unavailable` when Howler.ctx is missing at start', () => {
     const probe = startAudioContextProbe({
       howlerLike: { ctx: undefined },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage: null,
@@ -101,7 +100,6 @@ describe('audioContextProbe', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage: null,
@@ -118,7 +116,6 @@ describe('audioContextProbe', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 5000,
       storage: null,
@@ -140,7 +137,6 @@ describe('audioContextProbe', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage: null,
@@ -162,7 +158,6 @@ describe('audioContextProbe', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage: null,
@@ -176,7 +171,6 @@ describe('audioContextProbe', () => {
     const howlerLike: { ctx?: AudioContext } = { ctx: undefined }
     const probe = startAudioContextProbe({
       howlerLike,
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage: null,
@@ -206,7 +200,6 @@ describe('audioContextProbe', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 3000,
       storage: null,
@@ -230,7 +223,6 @@ describe('audioContextProbe', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage,
@@ -263,7 +255,6 @@ describe('audioContextProbe', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 100,
       pollWindowMs: 10_000,
       storage,
@@ -291,7 +282,6 @@ describe('audioContextProbe', () => {
 
     const probe = startAudioContextProbe({
       howlerLike: { ctx: new FakeAudioContext() as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage,
@@ -306,48 +296,10 @@ describe('audioContextProbe', () => {
     probe.stop()
   })
 
-  it('records synthPaused alongside ctx state when speechSynthLike is provided', () => {
-    const ctx = new FakeAudioContext()
-    const synth = { paused: false }
-    const probe = startAudioContextProbe({
-      howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: synth,
-      pollIntervalMs: 1000,
-      pollWindowMs: 90_000,
-      storage: null,
-    })
-
-    expect(snapshot().audioCtxEvents[0]).toMatchObject({
-      cause: 'init',
-      synthPaused: false,
-    })
-
-    synth.paused = true
-    vi.advanceTimersByTime(1000)
-    expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
-      cause: 'poll',
-      synthPaused: true,
-    })
-    probe.stop()
-  })
-
-  it('omits synthPaused when speechSynthLike is null', () => {
-    const probe = startAudioContextProbe({
-      howlerLike: { ctx: new FakeAudioContext() as unknown as AudioContext },
-      speechSynthLike: null,
-      pollIntervalMs: 1000,
-      pollWindowMs: 90_000,
-      storage: null,
-    })
-    expect(snapshot().audioCtxEvents[0].synthPaused).toBeUndefined()
-    probe.stop()
-  })
-
   it('stops idempotently and ignores further timer ticks', () => {
     const ctx = new FakeAudioContext()
     const probe = startAudioContextProbe({
       howlerLike: { ctx: ctx as unknown as AudioContext },
-      speechSynthLike: null,
       pollIntervalMs: 1000,
       pollWindowMs: 90_000,
       storage: null,
@@ -373,7 +325,6 @@ describe('audioContextProbe', () => {
       const ctx = new FakeAudioContext()
       activateAudioContextProbe({
         howlerLike: { ctx: ctx as unknown as AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -394,7 +345,6 @@ describe('audioContextProbe', () => {
       const ctx1 = new FakeAudioContext()
       activateAudioContextProbe({
         howlerLike: { ctx: ctx1 as unknown as AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -406,7 +356,6 @@ describe('audioContextProbe', () => {
       ctx2.state = 'interrupted'
       activateAudioContextProbe({
         howlerLike: { ctx: ctx2 as unknown as AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -427,7 +376,6 @@ describe('audioContextProbe', () => {
       const ctx = new FakeAudioContext()
       const probe = startAudioContextProbe({
         howlerLike: { ctx: ctx as unknown as AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -459,7 +407,6 @@ describe('audioContextProbe', () => {
       const ctx = new FakeAudioContext()
       activateAudioContextProbe({
         howlerLike: { ctx: ctx as unknown as AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -484,7 +431,7 @@ describe('audioContextProbe', () => {
         howlerLike: {
           ctx: new FakeAudioContext() as unknown as AudioContext,
         },
-        speechSynthLike: null,
+
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -503,7 +450,7 @@ describe('audioContextProbe', () => {
         howlerLike: {
           ctx: new FakeAudioContext() as unknown as AudioContext,
         },
-        speechSynthLike: null,
+
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -525,7 +472,7 @@ describe('audioContextProbe', () => {
         howlerLike: {
           ctx: new FakeAudioContext() as unknown as AudioContext,
         },
-        speechSynthLike: null,
+
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -543,7 +490,7 @@ describe('audioContextProbe', () => {
         howlerLike: {
           ctx: new FakeAudioContext() as unknown as AudioContext,
         },
-        speechSynthLike: null,
+
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -561,7 +508,7 @@ describe('audioContextProbe', () => {
         howlerLike: {
           ctx: new FakeAudioContext() as unknown as AudioContext,
         },
-        speechSynthLike: null,
+
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -598,7 +545,7 @@ describe('audioContextProbe', () => {
         howlerLike: {
           ctx: new FakeAudioContext() as unknown as AudioContext,
         },
-        speechSynthLike: null,
+
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage,
@@ -634,7 +581,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -658,7 +604,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -682,7 +627,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -709,7 +653,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage,
@@ -755,7 +698,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -785,7 +727,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -806,7 +747,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -825,7 +765,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -850,7 +789,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -883,7 +821,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage: null,
@@ -907,7 +844,6 @@ describe('audioContextProbe', () => {
       }
       activateAudioContextProbe({
         howlerLike: fakeHowler as unknown as { ctx?: AudioContext },
-        speechSynthLike: null,
         pollIntervalMs: 1000,
         pollWindowMs: 90_000,
         storage,

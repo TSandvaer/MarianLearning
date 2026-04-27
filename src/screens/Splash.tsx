@@ -26,11 +26,10 @@ import {
  * removes pulsing on `repeat: Infinity` style loops. The unit test verifies
  * the static-fallback shape by mocking the media query.
  *
- * Path A note (post-86c9h3c57): the cold-start `speechSynthesis` voice
- * warmup (cancelTts/loadVoices/primeVoices via `lib/tts`) was removed once
- * the audio pipeline switched to pre-rendered MP3s through Howler. Web
- * Speech is no longer invoked in production, so the warmup was dead code
- * and the defensive `cancel()` was guarding a path that can't be reached.
+ * Path A note (post-86c9h3c57): the cold-start Web Speech voice warmup
+ * was removed once the audio pipeline switched to pre-rendered MP3s
+ * through Howler + server-side Azure Speech TTS. The old `lib/tts/`
+ * module has been deleted entirely (ticket 86c9grn3n).
  */
 
 export interface SplashProps {

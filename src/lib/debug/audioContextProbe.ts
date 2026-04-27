@@ -188,13 +188,6 @@ export interface AudioContextProbeOptions {
    * Override Howler. Tests inject a stub; production omits this.
    */
   howlerLike?: { ctx?: AudioContext }
-  /**
-   * Override `window.speechSynthesis`. Tests inject a stub. The probe
-   * reads `synth.paused` to co-record the speech-engine state alongside
-   * the audio-context state — useful because both share an audio session
-   * on iOS, so a co-flip is a strong audio-session-interruption signal.
-   */
-  speechSynthLike?: { paused: boolean } | null
   /** Test seam — defaults to `window.setInterval`. */
   schedule?: (cb: () => void, ms: number) => unknown
   /** Test seam — defaults to `window.clearInterval`. */
@@ -225,26 +218,6 @@ interface InternalState {
   attachedCtx: AudioContext | null
   detachStatechange: (() => void) | null
   stopped: boolean
-}
-
-function readSynthPaused(
-  synth: { paused: boolean } | null | undefined,
-): boolean | undefined {
-  if (synth === null) return undefined
-  if (synth === undefined) {
-    if (typeof window === 'undefined') return undefined
-    if (!window.speechSynthesis) return undefined
-    try {
-      return window.speechSynthesis.paused
-    } catch {
-      return undefined
-    }
-  }
-  try {
-    return synth.paused
-  } catch {
-    return undefined
-  }
 }
 
 /**
@@ -503,7 +476,6 @@ export function startAudioContextProbe(
     > = {},
   ): AudioCtxState {
     const ctxState = readCtxState(ctx)
-    const synthPaused = readSynthPaused(opts.speechSynthLike)
     // Phase-3 (ticket 86c9gvd0y): mirror the most-recent gate state into
     // every emit so a single localStorage paste-back tells us both the
     // audio-context timeline AND the gate timeline aligned by timestamp.
@@ -515,7 +487,6 @@ export function startAudioContextProbe(
       timestamp: now(),
       ctxState,
       cause,
-      ...(synthPaused !== undefined ? { synthPaused } : {}),
       ...(gateState !== null ? { gateState } : {}),
       ...(extra.speakResult !== undefined
         ? { speakResult: extra.speakResult }

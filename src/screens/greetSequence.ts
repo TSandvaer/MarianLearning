@@ -97,15 +97,15 @@ export interface SpeakLikeOptions {
   onBoundary?: (event: BoundaryEvent) => void
   boundaryWPM?: number
   /**
-   * Fires when the speech engine actually starts. Used by Greet to clear
-   * the audio-unlock-gate watchdog. Forwarded to `lib/tts.speak()`.
+   * Fires when the audio engine actually starts. Used by Greet to clear
+   * the audio-unlock-gate watchdog.
    */
   onStart?: () => void
 }
 
 /**
- * Subset of `lib/tts`'s `speak` we depend on. Declared locally so tests can
- * inject a fake without dragging in jsdom's missing speechSynthesis.
+ * Subset of the audio `speak` contract we depend on. Declared locally so
+ * tests can inject a fake without depending on browser audio APIs.
  */
 export type SpeakFn = (text: string, opts?: SpeakLikeOptions) => Promise<void>
 

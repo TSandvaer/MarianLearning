@@ -17,14 +17,8 @@ import {
  *
  * What it shows
  * -------------
- *  - Live `speechSynthesis` state (`speaking`, `pending`, `paused`) polled
- *    every 200ms. These three booleans are the iPad-Safari-specific signal
- *    we care about: a "paused" engine is the most common silent-fail mode.
- *  - Voice list length + first voice's `lang`. If voices.length === 0 by
- *    the time the user taps Wake, the speak() that follows will be silently
- *    rejected on most iPad WebKit builds.
  *  - The last `speak()` call: text (truncated to 40 chars), wall-clock
- *    timestamp, and current status (queued → started → ended, or errored).
+ *    timestamp, and current status (queued / started / ended / errored).
  *  - The last error message, if any.
  *  - The last 5 tap events: timestamp + event type. Confirms the multi-event
  *    binding (click/touchend/pointerdown) is actually firing on the iPad
@@ -37,53 +31,46 @@ import {
  *    hit-testing issue).
  *  - The audio-unlock-gate state: idle / pending / unlocked / relock.
  *  - The most-recent AudioContext.state (running / suspended / interrupted /
- *    closed / unavailable). Driven by the audio-context probe — see
+ *    closed / unavailable). Driven by the audio-context probe -- see
  *    `audioContextProbe.ts` for the polling cadence and statechange capture.
  *  - The last 6 audio-context samples (poll, statechange, tap), each with
- *    a wall-clock timestamp and the optional `speechSynthesis.paused`
- *    co-reading. The full timeline is mirrored to localStorage under
- *    `debug:audioCtxLog:v1` for paste-back from iPad.
+ *    a wall-clock timestamp. The full timeline is mirrored to localStorage
+ *    under `debug:audioCtxLog:v1` for paste-back from iPad.
  *  - An "Export log" button + entry counter that lets Thomas capture the
  *    full localStorage timeline directly from the iPad (no Mac / Web
  *    Inspector required). Primary path uses `navigator.clipboard.writeText`
  *    on a user gesture (HTTPS + tap satisfies iOS Safari requirements).
  *    Fallback path renders a monospace, scrollable `<textarea>` so Thomas
- *    can long-press → Select All → Copy. The exported payload is a
+ *    can long-press -> Select All -> Copy. The exported payload is a
  *    self-describing JSON object containing `userAgent`, `exportedAt`,
  *    `pageUrl`, the storage key, and the parsed log array.
  *
  * iPad QA usage
  * -------------
- * Test in Safari tab mode only — DO NOT install to home screen for debug
+ * Test in Safari tab mode only -- DO NOT install to home screen for debug
  * runs. The PWA manifest's `start_url` is `/` (no query string), so an
  * installed-from-home-screen tile will strip `?debug=1` and launch the
- * production build with no overlay. (`scope` only constrains service-worker
- * interception; it does not preserve query strings on the launcher.) Since
- * the iPad TTS bug repros in BOTH Safari tab and installed PWA modes
- * (Thomas confirmed this 2026-04-25), Safari-tab-only testing loses no
- * diagnostic signal.
+ * production build with no overlay.
  *
  *  1. Open https://marian-learning.vercel.app/?debug=1 (or the PR-preview
  *     URL with `?debug=1` appended) in a Safari TAB on iPad. Do not Add to
  *     Home Screen.
- *  2. Walk through Splash → Greet → tap the wake target.
- *  3. Watch the bottom-left overlay panel. Screenshot it if TTS doesn't fire.
+ *  2. Walk through Splash -> Greet -> tap the wake target.
+ *  3. Watch the bottom-left overlay panel. Screenshot it if audio doesn't fire.
  *
  * Reading the panel after a silent fail
  * -------------------------------------
- *  - Recent tap shows `click` / `touchend` / `pointerdown` → the binding is
+ *  - Recent tap shows `click` / `touchend` / `pointerdown` -> the binding is
  *    firing. If only `pointerdown` shows, the multi-event fix isn't taking
  *    effect (regression).
- *  - lastSpeak.status stuck on `queued` → engine accepted the call but never
- *    started. Check `paused` (likely true) and voice count (likely zero).
- *  - lastSpeak.status === `errored` with error `not-allowed` → gesture-gate
+ *  - lastSpeak.status stuck on `queued` -> handler accepted the call but
+ *    audio never started.
+ *  - lastSpeak.status === `errored` with error `not-allowed` -> gesture-gate
  *    rejection; the tap didn't land in the same JS task as speak().
- *  - lastSpeak.status === `errored` with error `synthesis-failed` → engine
- *    rejected the utterance config (try simplifying pitch/rate further).
- *  - gateState stuck on `pending` → speak() returned but no onstart fired
+ *  - gateState stuck on `pending` -> audio call returned but no onplay fired
  *    within the watchdog window; will flip to `relock` on next poll.
- *  - audioCtx flips from `running` → `suspended` / `interrupted` mid-idle,
- *    AND the next tap shows `cause: tap, ctxState: suspended` — that's the
+ *  - audioCtx flips from `running` -> `suspended` / `interrupted` mid-idle,
+ *    AND the next tap shows `cause: tap, ctxState: suspended` -- that's the
  *    iOS audio-session decay fingerprint for ticket 86c9gvd0y. If the tap
  *    sample shows `running` instead, the bug is somewhere else (Howler
  *    bookkeeping, our retry path, or a different layer).
@@ -186,40 +173,6 @@ function buildExportPayload(
   }
 }
 
-interface SynthSnapshot {
-  speaking: boolean
-  pending: boolean
-  paused: boolean
-  voiceCount: number
-  firstVoiceLang: string | null
-}
-
-function readSynth(): SynthSnapshot {
-  if (typeof window === 'undefined' || !window.speechSynthesis) {
-    return {
-      speaking: false,
-      pending: false,
-      paused: false,
-      voiceCount: 0,
-      firstVoiceLang: null,
-    }
-  }
-  const synth = window.speechSynthesis
-  let voices: SpeechSynthesisVoice[]
-  try {
-    voices = synth.getVoices()
-  } catch {
-    voices = []
-  }
-  return {
-    speaking: synth.speaking,
-    pending: synth.pending,
-    paused: synth.paused,
-    voiceCount: voices.length,
-    firstVoiceLang: voices[0]?.lang ?? null,
-  }
-}
-
 function truncate(text: string, at: number): string {
   if (text.length <= at) return text
   return `${text.slice(0, at - 1)}…`
@@ -252,8 +205,6 @@ function renderRawTap(t: RawTapEventRecord): string {
 }
 
 function renderAudioCtxEvent(e: AudioCtxEventRecord): string {
-  const synth =
-    e.synthPaused === undefined ? '' : ` synthPaused=${String(e.synthPaused)}`
   // Phase-3 (ticket 86c9gvd0y) extension. Surface the gate state mirror
   // and the speak-call / speak-skipped / handler-error companion fields
   // on the on-screen panel so iPad QA can read them at a glance. The
@@ -269,15 +220,10 @@ function renderAudioCtxEvent(e: AudioCtxEventRecord): string {
   // panel readout.
   const lineKey = e.lineKey ? ` line=${e.lineKey}` : ''
   const error = e.errorMessage ? ` error="${e.errorMessage}"` : ''
-  return `[${formatTimestamp(e.timestamp)}] ${e.cause}: ${e.ctxState}${gate}${synth}${speakResult}${reason}${lineKey}${error}`
+  return `[${formatTimestamp(e.timestamp)}] ${e.cause}: ${e.ctxState}${gate}${speakResult}${reason}${lineKey}${error}`
 }
 
 export interface DebugOverlayProps {
-  /**
-   * Test seam — overrides the polling read of `speechSynthesis`. Defaults to
-   * the live engine. Tests pass a stub so they don't depend on jsdom.
-   */
-  readSynthFn?: () => SynthSnapshot
   /**
    * Test seam — overrides the localStorage read for the audio-context log.
    * Defaults to reading `debug:audioCtxLog:v1`. Tests pass a stub so they
@@ -299,7 +245,6 @@ export interface DebugOverlayProps {
 }
 
 export default function DebugOverlay({
-  readSynthFn = readSynth,
   readAudioCtxLogFn = readAudioCtxLog,
   writeClipboardFn,
   nowFn,
@@ -312,7 +257,6 @@ export default function DebugOverlay({
     audioCtxState: null,
     audioCtxEvents: [],
   })
-  const [synth, setSynth] = useState<SynthSnapshot>(() => readSynthFn())
   const [exportText, setExportText] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'fallback'>(
     'idle',
@@ -389,18 +333,6 @@ export default function DebugOverlay({
     setExportText(json)
   }, [readAudioCtxLogFn, writeClipboardFn, nowFn])
 
-  // Poll `speechSynthesis` every POLL_MS so the engine's live state stays
-  // visible without callers needing to push it to the bus. The engine doesn't
-  // expose change events for `paused` / `speaking` / `pending`, so polling is
-  // the only honest option. 200ms is a reasonable refresh on a debug panel
-  // and the cost (one property read + a setState) is negligible.
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setSynth(readSynthFn())
-    }, POLL_MS)
-    return () => window.clearInterval(id)
-  }, [readSynthFn])
-
   return (
     <div
       data-testid="debug-overlay"
@@ -422,14 +354,6 @@ export default function DebugOverlay({
       role="status"
       aria-hidden="true"
     >
-      <div data-testid="debug-overlay-synth">
-        <strong>synth</strong> speaking={String(synth.speaking)} pending=
-        {String(synth.pending)} paused={String(synth.paused)}
-      </div>
-      <div data-testid="debug-overlay-voices">
-        <strong>voices</strong> count={synth.voiceCount} lang=
-        {synth.firstVoiceLang ?? '(none)'}
-      </div>
       <div data-testid="debug-overlay-gate">
         <strong>gate</strong> {bus.gateState ?? '(unmounted)'}
       </div>
