@@ -741,6 +741,10 @@ function MathScreen({
       // declaration for the rage-tap rationale (ticket 86c9gy4mf).
       if (resolvedRef.current) return
 
+      // Phase-6 instrumentation: pre-call snapshot of Howler's flags
+      // inside the chip-tap gesture window. Pairs with the post-call row
+      // below; the iPad export shows pool=N → pool=10 across the helper.
+      recordUnlockStateEvent()
       // Phase-2 fix for ticket 86c9gvd0y. Kick `Howler.ctx.resume()`
       // synchronously inside this user-gesture handler. Splash → Greet →
       // Math navigation can leave the Howler context in `'suspended'`
@@ -762,7 +766,9 @@ function MathScreen({
       // so won't re-run its scratch-buffer trick. We play a 1-sample
       // silent buffer in this gesture handler to re-engage the OS
       // audio session every chip-tap. See `lib/audio/howlerContext.ts`
-      // → `unlockIosAudioSession` for the full rationale.
+      // → `unlockIosAudioSession` for the full rationale. Phase-6
+      // extension: this also refills `Howler._html5AudioPool`
+      // synchronously inside the gesture (see howlerContext.ts).
       unlockAudioSessionFn()
       recordUnlockStateEvent()
 

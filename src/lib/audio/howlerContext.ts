@@ -419,6 +419,33 @@ export async function awaitHowlerContextResume(
  * re-releases the session every long-idle window. We need to kick the
  * silent buffer ourselves on every gesture that's about to play audio.
  *
+ * Phase-6 extension (ticket 86c9gvd0y): HTML5 audio pool refill
+ * -------------------------------------------------------------
+ * Phase-5 shipped, but iPad still failed after long-idle. Two back-to-back
+ * sessions captured 2026-04-26 isolated the empirical delta: at the
+ * gesture moment of a WORKING session, `Howler._html5AudioPool.length`
+ * was 10. At the gesture moment of a FAILING session (after ~52 s idle),
+ * it was 0. Pool=0 BEFORE first user tap.
+ *
+ * Pool=10 → 0 is not "draining"; the pool starts empty and is populated
+ * exclusively by Howler's own `unlock` handler (howler.js line 334-348),
+ * which runs on the first capture-phase `touchstart`/`touchend`/`click`
+ * delivered to `document`. On long-idle iPad PWA, that handler does not
+ * fire reliably — the user gesture reaches React via a different path
+ * (we suspect iOS's hit-testing or focus-restoration delivers the touch
+ * directly to the React root after a focus-loss window) so Howler's
+ * capture-phase listener never sees it. `_audioUnlocked` stays false,
+ * the pool stays empty, the OS audio session stays released.
+ *
+ * Pool size doesn't directly affect Web Audio playback (we use Web Audio
+ * mode; the pool is only consumed when sounds are constructed in HTML5
+ * mode). But pool=0 is a reliable signal that Howler's unlock code path
+ * never ran in this gesture window, and we want all of its iOS-relevant
+ * side effects to run, in OUR gesture handler tick. Phase-5 already
+ * replicates the scratch-buffer + ctx.resume() side effects. This Phase-6
+ * extension replicates the OTHER load-bearing side effect: filling the
+ * HTML5 pool with `new Audio()` objects synchronously inside the gesture.
+ *
  * What this helper does NOT do
  * ----------------------------
  * - It does not touch `AudioContext.state`. The Phase-2 (`resumeHowlerContextOnGesture`)
@@ -428,6 +455,11 @@ export async function awaitHowlerContextResume(
  * - It does not own a buffer cache. Creating a 1-sample buffer is so cheap
  *   (microseconds, no allocation pressure on the audio thread) that caching
  *   it would add complexity for no measurable benefit.
+ * - It does not flip `Howler._audioUnlocked`. Howler owns that flag; we
+ *   only mutate `Howler._html5AudioPool` (which Howler itself treats as
+ *   replenishable — see howler.js line 334's `while (length < poolSize)`
+ *   loop). Pushing to the pool in the same shape Howler does is the
+ *   intended-by-Howler safe extension point.
  * - It is NOT debug-gated. This is a production fix that runs on every
  *   gesture-window play call.
  *
@@ -449,20 +481,175 @@ export interface UnlockIosAudioSessionResult {
    * no recovery action; we just record and move on.
    */
   threw: boolean
+  /**
+   * Phase-6 (ticket 86c9gvd0y): `Howler._html5AudioPool.length` BEFORE
+   * the helper ran. `undefined` when Howler isn't reachable / pool field
+   * is missing (e.g. Howler renamed it). 0 in failing-session iPad
+   * captures; 10 in working-session captures. This pair (with `poolAfter`)
+   * is the diagnostic delta the Phase-6 fix targets — and the
+   * regression-tracing surface for any future drift.
+   */
+  poolBefore?: number
+  /**
+   * Phase-6: `Howler._html5AudioPool.length` AFTER the helper pushed
+   * fresh `new Audio()` objects. Should match `Howler.html5PoolSize`
+   * (default 10). If less, `new Audio()` threw on this device.
+   */
+  poolAfter?: number
+  /**
+   * Phase-6: how many `new Audio()` objects we successfully pushed into
+   * `Howler._html5AudioPool` this call. 0 when the pool was already
+   * full, when Howler was unreachable, or when every Audio construction
+   * threw.
+   */
+  poolFilled?: number
+}
+
+/**
+ * Howler's HTML5 pool-size constant. Mirrored locally to avoid plumbing
+ * `Howler.html5PoolSize` access through the `howlerLike` override seam
+ * for tests; matches howler.js line 38 (`self.html5PoolSize = 10`). If
+ * Howler ever raises its own default we'll see a one-time pool
+ * under-fill on iPad — easily caught in the next probe pass.
+ */
+const HTML5_AUDIO_POOL_SIZE = 10
+
+/**
+ * Read Howler's `_html5AudioPool` array defensively. Howler types this
+ * field as private; we treat any non-array value as "pool unavailable"
+ * and return `undefined`. The same shape both production and tests
+ * use — tests pass a `howlerLike` whose ctx field carries the pool ref
+ * via a side property (see `unlockIosAudioSession` test seam).
+ */
+interface HowlerHtml5PoolHost {
+  _html5AudioPool?: unknown
+  html5PoolSize?: unknown
+}
+
+function readHowlerHtml5Pool(
+  override?: { ctx?: AudioContext | null } & HowlerHtml5PoolHost,
+): {
+  pool: { push: (audio: unknown) => unknown; length: number } | null
+  poolSize: number
+} {
+  // Production: read the real Howler module singleton. Tests can pass an
+  // override that includes the pool fields directly on the howlerLike
+  // shape (alongside `ctx`), which lets unit tests stand up a fake pool
+  // without monkeypatching the real Howler import.
+  const target =
+    override ?? (Howler as unknown as HowlerHtml5PoolHost & { ctx?: unknown })
+  let pool: { push: (audio: unknown) => unknown; length: number } | null = null
+  let poolSize = HTML5_AUDIO_POOL_SIZE
+  try {
+    const rawPool = (target as HowlerHtml5PoolHost)._html5AudioPool
+    if (Array.isArray(rawPool)) {
+      pool = rawPool as unknown as {
+        push: (audio: unknown) => unknown
+        length: number
+      }
+    }
+  } catch {
+    // pool unreachable — leave null
+  }
+  try {
+    const rawSize = (target as HowlerHtml5PoolHost).html5PoolSize
+    if (typeof rawSize === 'number' && rawSize >= 0 && rawSize < 1000) {
+      poolSize = rawSize
+    }
+  } catch {
+    // size unreachable — fall back to the local constant
+  }
+  return { pool, poolSize }
+}
+
+export interface UnlockIosAudioSessionOptions extends ResumeAudioContextOptions {
+  /**
+   * Test seam — Audio constructor for the HTML5 pool refill. Production
+   * uses `window.Audio`. Tests inject a fake counter so we can assert
+   * how many constructions ran without standing up the real DOM Audio.
+   */
+  AudioCtor?: new () => unknown
 }
 
 export function unlockIosAudioSession(
-  opts: ResumeAudioContextOptions = {},
+  opts: UnlockIosAudioSessionOptions = {},
 ): UnlockIosAudioSessionResult {
   const ctx = readHowlerCtx(opts.howlerLike)
+  // Snapshot the pool BEFORE we do anything — diagnostic captures the
+  // state Howler arrived in at the moment of this gesture, regardless of
+  // whether ctx is reachable.
+  const { pool, poolSize } = readHowlerHtml5Pool(
+    opts.howlerLike as
+      | ({ ctx?: AudioContext | null } & HowlerHtml5PoolHost)
+      | undefined,
+  )
+  const poolBefore = pool ? pool.length : undefined
+
   if (!ctx) {
-    return { bufferStarted: false, threw: false }
+    return {
+      bufferStarted: false,
+      threw: false,
+      ...(poolBefore !== undefined ? { poolBefore } : {}),
+      ...(poolBefore !== undefined ? { poolAfter: poolBefore } : {}),
+      poolFilled: 0,
+    }
   }
   const state = readState(ctx)
   // Don't try on a closed context — createBufferSource throws.
   if (state === 'closed' || state === 'unavailable') {
-    return { bufferStarted: false, threw: false }
+    return {
+      bufferStarted: false,
+      threw: false,
+      ...(poolBefore !== undefined ? { poolBefore } : {}),
+      ...(poolBefore !== undefined ? { poolAfter: poolBefore } : {}),
+      poolFilled: 0,
+    }
   }
+
+  // Phase-6 (ticket 86c9gvd0y). Refill `Howler._html5AudioPool` up to
+  // `Howler.html5PoolSize` BEFORE the silent buffer plays. Pushing fresh
+  // `new Audio()` instances synchronously inside the user gesture
+  // mirrors Howler's own unlock loop (howler.js line 334-348) — the
+  // documented iOS-friendly way to populate the pool. Each construction
+  // is in its own try block because `new Audio()` can throw on hostile
+  // platforms (no audio backend at all) and we want a partial fill
+  // rather than aborting the whole helper. iPad QA exports show the
+  // result via `recordUnlockStateEvent` rows captured before/after this
+  // helper; a 0 → 10 transition confirms the fix.
+  let poolFilled = 0
+  if (pool) {
+    const AudioCtor =
+      opts.AudioCtor ??
+      (typeof window !== 'undefined' && typeof window.Audio === 'function'
+        ? (window.Audio as unknown as new () => unknown)
+        : null)
+    if (AudioCtor) {
+      // Bound the loop by both the target size AND a hard iteration cap
+      // so a poison Howler that ignores our pushes can't infinite-loop.
+      let safety = poolSize + 4
+      while (pool.length < poolSize && safety > 0) {
+        safety -= 1
+        try {
+          const audio = new AudioCtor()
+          // Mark the fresh element as unlocked, mirroring howler.js line
+          // 340. Without this flag, Howler's `_releaseHtml5Audio` would
+          // refuse to recycle the element back to the pool when a
+          // played-through Sound finishes (howler.js line 449's
+          // `audio._unlocked` guard).
+          ;(audio as { _unlocked?: boolean })._unlocked = true
+          pool.push(audio)
+          poolFilled += 1
+        } catch {
+          // `new Audio()` threw — typical on platforms without audio
+          // support. Stop pushing; partial fill is still better than
+          // none, and the next gesture will retry.
+          break
+        }
+      }
+    }
+  }
+
+  const poolAfter = pool ? pool.length : poolBefore
 
   try {
     // 1-sample buffer at 22050 Hz: matches Howler's own scratch-buffer
@@ -483,11 +670,23 @@ export function unlockIosAudioSession(
       // either way — the source will be garbage-collected once its end
       // event fires.
     }
-    return { bufferStarted: true, threw: false }
+    return {
+      bufferStarted: true,
+      threw: false,
+      ...(poolBefore !== undefined ? { poolBefore } : {}),
+      ...(poolAfter !== undefined ? { poolAfter } : {}),
+      poolFilled,
+    }
   } catch {
     // Best-effort. iOS may reject this in obscure edge cases (page is
     // backgrounded, audio session preempted by phone call). The next
     // gesture will try again; we don't propagate.
-    return { bufferStarted: false, threw: true }
+    return {
+      bufferStarted: false,
+      threw: true,
+      ...(poolBefore !== undefined ? { poolBefore } : {}),
+      ...(poolAfter !== undefined ? { poolAfter } : {}),
+      poolFilled,
+    }
   }
 }

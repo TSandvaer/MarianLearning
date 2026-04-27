@@ -742,6 +742,11 @@ export default function Greet({
           return
         }
         wakeTapInFlightRef.current = true
+        // Phase-6 instrumentation: snapshot Howler's internal unlock
+        // flags BEFORE the unlock helper runs. Pairs with the post-call
+        // row below; the iPad export shows pool=0 → pool=10 across the
+        // helper, confirming the pool-refill fix landed in this gesture.
+        recordUnlockStateEvent()
         // Phase-2 fix for ticket 86c9gvd0y: kick `Howler.ctx.resume()`
         // synchronously inside the gesture, BEFORE the registered retry
         // (which goes through `gate.wrapSpeak` → `playGreetLine` → Howler
@@ -760,9 +765,18 @@ export default function Greet({
         // window regardless. Calling this every gesture re-engages the
         // session so subsequent `Howl.play()` lands in a live output
         // graph. Idempotent + safe no-op when no ctx exists.
+        //
+        // Phase-6 (ticket 86c9gvd0y) extension: this same helper now
+        // also refills `Howler._html5AudioPool` synchronously inside
+        // the gesture, mirroring the pool-fill loop Howler runs in its
+        // own first-gesture unlock handler. Long-idle iPad reproduces
+        // showed pool=0 at gesture time when Howler's capture-phase
+        // listener never fired — pushing fresh `new Audio()` objects
+        // here re-engages the iOS audio session even when Howler's
+        // internal unlock didn't.
         unlockAudioSessionFn()
-        // Phase-5 instrumentation: snapshot Howler's internal unlock
-        // flags at the gesture instant. Only meaningful in `?debug=1`
+        // Phase-5 / Phase-6 instrumentation: snapshot Howler's internal
+        // unlock flags AFTER the helper. Only meaningful in `?debug=1`
         // sessions; production sessions pay one null check.
         recordUnlockStateEvent()
         const dispatched = gate.dispatchGesture()
@@ -822,13 +836,19 @@ export default function Greet({
       // The helper is a no-op when the context is already running, when
       // Howler hasn't lazy-initted, or when the context is closed — safe
       // to call unconditionally on every tap.
+      // Phase-6 instrumentation: pre-call snapshot of Howler's internal
+      // unlock flags. The export pairs this with the post-call snapshot
+      // below to confirm the Phase-6 pool-fill ran (pool=0 → pool=10).
+      recordUnlockStateEvent()
       resumeAudioCtx()
       // Phase-5 fix for ticket 86c9gvd0y: see relock-branch comment above
       // for the full rationale. Same call, same gesture-window contract;
       // we kick this even on the cold first wake-tap because Howler's
       // own internal scratch-buffer plays once-only on its first gesture
       // listener but we want the silent buffer ALSO inside our handler
-      // tick — belt-and-braces is cheap on a 1-sample buffer.
+      // tick — belt-and-braces is cheap on a 1-sample buffer. Phase-6
+      // extension: this also fills the HTML5 pool inside the gesture
+      // window (see lib/audio/howlerContext.ts for full rationale).
       unlockAudioSessionFn()
       recordUnlockStateEvent()
 
@@ -881,9 +901,13 @@ export default function Greet({
       // against any future caller that triggers a retry through a different
       // dispatch path. Idempotent, so safe to repeat.
       gate.registerRetry(() => {
+        // Phase-6 instrumentation: pre-call snapshot of Howler's flags
+        // inside the retry-tap gesture window.
+        recordUnlockStateEvent()
         resumeAudioCtx()
         // Phase-5 (ticket 86c9gvd0y). Retry callbacks run inside the
         // user's retry-tap handler — same gesture-window contract.
+        // Phase-6 extension: pool refill happens here too.
         unlockAudioSessionFn()
         recordUnlockStateEvent()
         sequenceRef.current?.cancel()
@@ -926,6 +950,9 @@ export default function Greet({
   const handleHeartTap = useCallback(() => {
     if (!heartReady || tapHandledRef.current) return
 
+    // Phase-6 instrumentation: pre-call snapshot of Howler's flags
+    // (heart-tap gesture window). Pairs with the post-call row below.
+    recordUnlockStateEvent()
     // Phase-2 fix for ticket 86c9gvd0y. Heart tap is a user gesture, so
     // it's the right place to make sure the audio context is running
     // before the chime plays. iOS can suspend the context if the user
@@ -937,6 +964,7 @@ export default function Greet({
     // gesture window so the chime that fires below lands in a live
     // output graph after >60s of idle. Same belt-and-braces shape as
     // wake-tap; cost is one 1-sample silent buffer per heart tap.
+    // Phase-6 extension: also refills the HTML5 pool synchronously.
     unlockAudioSessionFn()
     recordUnlockStateEvent()
 

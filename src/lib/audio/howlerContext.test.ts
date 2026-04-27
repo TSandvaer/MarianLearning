@@ -597,4 +597,262 @@ describe('unlockIosAudioSession', () => {
     expect(result.bufferStarted).toBe(false)
     expect(result.threw).toBe(false)
   })
+
+  /**
+   * Phase-6 fix tests (ticket 86c9gvd0y). The helper now also fills
+   * `Howler._html5AudioPool` synchronously inside the gesture window.
+   * The two empirical cases from Thomas's 2026-04-26 capture:
+   *   - working session: pool=10 at gesture moment
+   *   - failing session: pool=0 at gesture moment
+   * After Phase-6 the pool MUST be at `html5PoolSize` after the call,
+   * regardless of starting state.
+   */
+  describe('Phase-6 HTML5 pool refill', () => {
+    /**
+     * Test seam shape — `howlerLike` carries both the AudioContext and
+     * the pool fields the helper reads from `Howler` directly. We don't
+     * monkeypatch the real `Howler` module; we just hand the helper a
+     * fake-shaped target that mirrors Howler's real layout.
+     */
+    function makeHowlerLikeWithPool(
+      ctxState: AudioContext['state'] = 'running',
+      initialPool: unknown[] = [],
+      poolSize = 10,
+    ) {
+      const fakeBuffer = { fakeBuffer: true }
+      const fakeDestination = { fakeDestination: true }
+      const fakeSource = {
+        buffer: null as unknown,
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        start: vi.fn(),
+      }
+      const ctx = {
+        state: ctxState,
+        destination: fakeDestination as unknown as AudioDestinationNode,
+        createBuffer: vi.fn(() => fakeBuffer as unknown as AudioBuffer),
+        createBufferSource: vi.fn(
+          () => fakeSource as unknown as AudioBufferSourceNode,
+        ),
+      } as unknown as AudioContext
+      const pool = initialPool.slice()
+      return {
+        howlerLike: {
+          ctx,
+          _html5AudioPool: pool,
+          html5PoolSize: poolSize,
+        } as unknown as { ctx?: AudioContext | null },
+        pool,
+      }
+    }
+
+    /**
+     * Counter-stub Audio constructor — doesn't actually allocate any
+     * media element. Tests assert it was constructed N times by reading
+     * a class-level counter.
+     */
+    function makeFakeAudioCtor() {
+      let constructed = 0
+      const FakeAudio = class {
+        _unlocked?: boolean
+        constructor() {
+          constructed += 1
+        }
+      } as unknown as new () => unknown
+      return {
+        FakeAudio,
+        get constructed() {
+          return constructed
+        },
+      }
+    }
+
+    it('refills an empty pool to html5PoolSize (failing-session repro)', () => {
+      const { howlerLike, pool } = makeHowlerLikeWithPool('running', [], 10)
+      const audio = makeFakeAudioCtor()
+      const result = unlockIosAudioSession({
+        howlerLike,
+        AudioCtor: audio.FakeAudio,
+      })
+      expect(result.bufferStarted).toBe(true)
+      expect(result.poolBefore).toBe(0)
+      expect(result.poolAfter).toBe(10)
+      expect(result.poolFilled).toBe(10)
+      expect(audio.constructed).toBe(10)
+      expect(pool.length).toBe(10)
+      // Each fresh element is marked unlocked so Howler's
+      // _releaseHtml5Audio recycles them on Sound teardown
+      // (howler.js line 449's `audio._unlocked` guard).
+      for (const el of pool) {
+        expect((el as { _unlocked?: boolean })._unlocked).toBe(true)
+      }
+    })
+
+    it('does not over-fill a partially-populated pool', () => {
+      const { howlerLike, pool } = makeHowlerLikeWithPool(
+        'running',
+        ['existing-1', 'existing-2', 'existing-3'],
+        10,
+      )
+      const audio = makeFakeAudioCtor()
+      const result = unlockIosAudioSession({
+        howlerLike,
+        AudioCtor: audio.FakeAudio,
+      })
+      expect(result.poolBefore).toBe(3)
+      expect(result.poolAfter).toBe(10)
+      expect(result.poolFilled).toBe(7)
+      expect(audio.constructed).toBe(7)
+      expect(pool.length).toBe(10)
+    })
+
+    it('is a no-op on the pool when already at html5PoolSize (working-session repro)', () => {
+      const initial = Array.from({ length: 10 }, (_, i) => `existing-${i}`)
+      const { howlerLike, pool } = makeHowlerLikeWithPool(
+        'running',
+        initial,
+        10,
+      )
+      const audio = makeFakeAudioCtor()
+      const result = unlockIosAudioSession({
+        howlerLike,
+        AudioCtor: audio.FakeAudio,
+      })
+      expect(result.poolBefore).toBe(10)
+      expect(result.poolAfter).toBe(10)
+      expect(result.poolFilled).toBe(0)
+      expect(audio.constructed).toBe(0)
+      expect(pool.length).toBe(10)
+      // The original elements remain — we did not replace them.
+      expect(pool).toEqual(initial)
+    })
+
+    it('does not push to the pool when ctx is closed (skip-without-side-effects)', () => {
+      const { howlerLike, pool } = makeHowlerLikeWithPool('closed', [], 10)
+      const audio = makeFakeAudioCtor()
+      const result = unlockIosAudioSession({
+        howlerLike,
+        AudioCtor: audio.FakeAudio,
+      })
+      expect(result.bufferStarted).toBe(false)
+      expect(result.poolBefore).toBe(0)
+      expect(result.poolAfter).toBe(0)
+      expect(result.poolFilled).toBe(0)
+      expect(audio.constructed).toBe(0)
+      expect(pool.length).toBe(0)
+    })
+
+    it('does not push to the pool when ctx is missing', () => {
+      const audio = makeFakeAudioCtor()
+      const result = unlockIosAudioSession({
+        howlerLike: { ctx: undefined },
+        AudioCtor: audio.FakeAudio,
+      })
+      expect(result.bufferStarted).toBe(false)
+      // No pool field on the howlerLike → poolBefore/After are
+      // undefined; production captures these via the bus probe rather
+      // than through this result.
+      expect(result.poolBefore).toBeUndefined()
+      expect(result.poolAfter).toBeUndefined()
+      expect(result.poolFilled).toBe(0)
+      expect(audio.constructed).toBe(0)
+    })
+
+    it('respects a non-default html5PoolSize override', () => {
+      const { howlerLike, pool } = makeHowlerLikeWithPool('running', [], 4)
+      const audio = makeFakeAudioCtor()
+      const result = unlockIosAudioSession({
+        howlerLike,
+        AudioCtor: audio.FakeAudio,
+      })
+      expect(result.poolBefore).toBe(0)
+      expect(result.poolAfter).toBe(4)
+      expect(result.poolFilled).toBe(4)
+      expect(audio.constructed).toBe(4)
+      expect(pool.length).toBe(4)
+    })
+
+    it('stops pushing when the Audio ctor throws (partial-fill, no infinite-loop)', () => {
+      const { howlerLike, pool } = makeHowlerLikeWithPool('running', [], 10)
+      let ctorCalls = 0
+      const ThrowingAudio = class {
+        _unlocked?: boolean
+        constructor() {
+          ctorCalls += 1
+          if (ctorCalls > 3) {
+            throw new Error('synthetic Audio ctor failure')
+          }
+        }
+      } as unknown as new () => unknown
+      const result = unlockIosAudioSession({
+        howlerLike,
+        AudioCtor: ThrowingAudio,
+      })
+      // First 3 succeed, 4th throws and we bail.
+      expect(result.poolFilled).toBe(3)
+      expect(result.poolAfter).toBe(3)
+      expect(pool.length).toBe(3)
+      // bufferStarted still true — pool refill failure doesn't prevent
+      // the silent-buffer kick.
+      expect(result.bufferStarted).toBe(true)
+    })
+
+    it('refills the pool BEFORE playing the silent buffer (ordering invariant)', () => {
+      // Howler's own unlock loop fills the pool first (line 334-348),
+      // then plays the scratch buffer (line 372-381). We mirror that
+      // ordering so any iOS-state assumptions Howler bakes in still hold.
+      const callOrder: string[] = []
+      const fakeBuffer = { fakeBuffer: true }
+      const fakeSource = {
+        buffer: null as unknown,
+        connect: vi.fn(() => {
+          callOrder.push('source.connect')
+        }),
+        disconnect: vi.fn(),
+        start: vi.fn(() => {
+          callOrder.push('source.start')
+        }),
+      }
+      const ctx = {
+        state: 'running' as const,
+        destination: {} as unknown as AudioDestinationNode,
+        createBuffer: vi.fn(() => {
+          callOrder.push('createBuffer')
+          return fakeBuffer as unknown as AudioBuffer
+        }),
+        createBufferSource: vi.fn(() => {
+          callOrder.push('createBufferSource')
+          return fakeSource as unknown as AudioBufferSourceNode
+        }),
+      } as unknown as AudioContext
+      const pool: unknown[] = []
+      const FakeAudio = class {
+        _unlocked?: boolean
+        constructor() {
+          callOrder.push('new Audio')
+        }
+      } as unknown as new () => unknown
+      const result = unlockIosAudioSession({
+        howlerLike: {
+          ctx,
+          _html5AudioPool: pool,
+          html5PoolSize: 3,
+        } as unknown as { ctx?: AudioContext | null },
+        AudioCtor: FakeAudio,
+      })
+      expect(result.bufferStarted).toBe(true)
+      expect(result.poolFilled).toBe(3)
+      // All 3 Audio() constructions happen before any AudioContext call
+      // — the silent-buffer kick comes AFTER the pool is replenished.
+      expect(callOrder).toEqual([
+        'new Audio',
+        'new Audio',
+        'new Audio',
+        'createBuffer',
+        'createBufferSource',
+        'source.connect',
+        'source.start',
+      ])
+    })
+  })
 })
