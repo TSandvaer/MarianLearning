@@ -242,7 +242,8 @@ export default function App() {
    * server TTS render and delaying resolution by however long the first
    * fetch had already been running. The ref pins the fetch to the FIRST
    * route entering [greet, math] and the rest of the lifecycle is driven
-   * by the cleanup effect below.
+   * by the leave-effect below (which also resets the latch on session
+   * end so a future session re-fetches).
    */
   const mathFetchStartedRef = useRef(false)
 
@@ -258,8 +259,25 @@ export default function App() {
    * Direct `?route=math` QA launches also trigger the fetch (the latch
    * fires the first time route is greet OR math, whichever comes first).
    *
-   * The cleanup-on-route-leave path lives in the separate effect below so
-   * the cleanup deps don't force a re-run mid-fetch.
+   * Why no cleanup-on-deps-change here (Kevin's PR #92 review)
+   * ----------------------------------------------------------
+   * Earlier shape returned a cleanup that ran `controller.abort()` and set
+   * a local `cancelled = true`. With `route` in the deps, that cleanup
+   * fires on every greet → math transition — exactly the slow-network case
+   * the pre-warm was meant to cover. The fetch then rejected with
+   * `AbortError`; the `.catch` saw `cancelled === true` and skipped the
+   * unblocking `setMathAudioReady(true)`; the latch prevented re-issue;
+   * Math's cold-mount gate held forever. Empirical reproduction: hold the
+   * fetch open, fire greet → math; observe `started=1, aborted=1,
+   * audioReady=false`.
+   *
+   * Fix: route-change cleanup must NOT touch the in-flight pre-warm. The
+   * leave-effect below owns the abort surface (greet/math → non-audio
+   * route via `mathAbortRef`); the unmount-effect further down owns the
+   * full-App-unmount abort. The settle handlers below check
+   * `controller.signal.aborted` to short-circuit when the leave-effect or
+   * the unmount-effect has decided we're tearing down — that's the
+   * authoritative "should I publish state?" signal under the new shape.
    */
   useEffect(() => {
     if (route !== 'greet' && route !== 'math') return
@@ -267,11 +285,13 @@ export default function App() {
     mathFetchStartedRef.current = true
 
     const controller = new AbortController()
-    let cancelled = false
 
     void prepareMathPathA(mathPlan, mathPlan.id, { signal: controller.signal })
       .then((prepared) => {
-        if (cancelled) {
+        if (controller.signal.aborted) {
+          // Leave-effect (or unmount-effect) aborted us mid-flight. Drop
+          // the loaded howls so we don't leak — the next greet/math entry
+          // will fetch fresh per the latch reset in the leave-effect.
           prepared.unload()
           return
         }
@@ -285,29 +305,41 @@ export default function App() {
         // Soft-fail: keep playUtterance null, Math falls back to silent
         // default. Log so the QA pass can attribute the fallback if it
         // bites a captured iPad session.
-        if (!cancelled) {
-          console.warn(
-            '[App] Math Path A unavailable; using silent fallback:',
-            err,
-          )
-          // Even on failure, unblock Math's cold-mount read-aloud — the
-          // silent fallback at least walks the caption + unlocks chips,
-          // which is better than leaving the screen permanently waiting.
-          setMathAudioReady(true)
+        if (controller.signal.aborted) {
+          // Aborted by leave/unmount — settling state would either be
+          // ignored (post-unmount setState no-op) or stomp the leave
+          // effect's reset to false. Silent.
+          return
         }
+        console.warn(
+          '[App] Math Path A unavailable; using silent fallback:',
+          err,
+        )
+        // Even on failure, unblock Math's cold-mount read-aloud — the
+        // silent fallback at least walks the caption + unlocks chips,
+        // which is better than leaving the screen permanently waiting.
+        setMathAudioReady(true)
       })
 
     // Capture the controller so the leave-effect below can abort if Marian
-    // bails the session before the fetch resolves. The latch ref keeps
-    // this effect from re-firing, so we don't need a per-run cleanup.
+    // bails the session (greet/math → non-audio surface) before the fetch
+    // resolves. The latch ref keeps THIS effect from re-firing, so a
+    // per-run cleanup would hurt (see header comment) — we deliberately
+    // omit it.
+    //
+    // Why no full-App-unmount cleanup either
+    // --------------------------------------
+    // A separate `[]`-deps cleanup would seem to handle the "tab closed
+    // mid-fetch" case, but its cleanup also fires on StrictMode's
+    // simulated unmount (dev only). Combined with the latch persisting
+    // in the ref, the simulated remount short-circuits the body and the
+    // fetch never resumes — re-creating the same brick-shape we're
+    // fixing here. In practice the browser cancels in-flight fetches
+    // on real tab close, and tests that unmount during fetch let the
+    // promise settle into the post-unmount setState no-op (React 18+
+    // is silent about that). Net: leaving the abort path solely with
+    // the leave-effect is safe and avoids the StrictMode foot-gun.
     mathAbortRef.current = controller
-    return () => {
-      // Only fires on full unmount of the App (not on intra-session route
-      // changes — those are driven by the leave-effect below). Aborts the
-      // in-flight fetch and lets it settle into the cancelled branch.
-      cancelled = true
-      controller.abort()
-    }
     // mathPlan is captured ONCE per app session by useMemo, so it's
     // effectively stable — listing it satisfies eslint without changing
     // semantics. Route is in deps so the effect is allowed to fire on the
@@ -374,19 +406,26 @@ export default function App() {
    */
   const [wordSongAudioReady, setWordSongAudioReady] = useState(false)
 
+  /**
+   * Same shape as the Math fetch-effect above (no cleanup; settle
+   * handlers gate on `controller.signal.aborted`). The Word Song
+   * deps `[route, wordSongPlan]` would have caused literacy →
+   * non-literacy transitions to abort an in-flight fetch and brick
+   * `wordSongAudioReady`. See the Math fetch-effect's header for the
+   * full rationale.
+   */
   useEffect(() => {
     if (route !== 'literacy') return
     if (wordSongFetchStartedRef.current) return
     wordSongFetchStartedRef.current = true
 
     const controller = new AbortController()
-    let cancelled = false
 
     void prepareWordSongPathA(wordSongPlan, wordSongPlan.id, {
       signal: controller.signal,
     })
       .then((prepared) => {
-        if (cancelled) {
+        if (controller.signal.aborted) {
           prepared.unload()
           return
         }
@@ -395,23 +434,21 @@ export default function App() {
         setWordSongAudioReady(true)
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          console.warn(
-            '[App] Word Song Path A unavailable; using silent fallback:',
-            err,
-          )
-          // Even on failure, unblock the cold-mount read-aloud so the
-          // silent fallback walks the caption + unlocks chips. See the
-          // Math gate's docstring above for the same-shape rationale.
-          setWordSongAudioReady(true)
-        }
+        if (controller.signal.aborted) return
+        console.warn(
+          '[App] Word Song Path A unavailable; using silent fallback:',
+          err,
+        )
+        // Even on failure, unblock the cold-mount read-aloud so the
+        // silent fallback walks the caption + unlocks chips. See the
+        // Math gate's docstring above for the same-shape rationale.
+        setWordSongAudioReady(true)
       })
 
     wordSongAbortRef.current = controller
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
+    // No cleanup — see the Math fetch-effect for the why (route changes
+    // must NOT abort, and adding a `[]`-deps unmount cleanup re-creates
+    // the StrictMode-double-mount bug shape).
   }, [route, wordSongPlan])
 
   /**

@@ -122,6 +122,123 @@ describe('App routing skeleton', () => {
 
       fetchSpy.mockRestore()
     })
+
+    // Regression test for Kevin's PR #92 review (ticket 86c9hjnn8):
+    //
+    // The fetch effect's deps `[route, mathPlan]` previously caused React
+    // to run the cleanup of the prior effect run on greet → math route
+    // flip. Cleanup called `controller.abort()` and set a local
+    // `cancelled = true`. The fetch then rejected with `AbortError`; the
+    // `.catch` saw `cancelled === true` and skipped the unblocking
+    // `setMathAudioReady(true)`. The latch prevented re-issue. Net
+    // result: `audioReady` stuck false, Math fully bricked — strictly
+    // worse than the original silent-first-problem bug the pre-warm was
+    // meant to fix.
+    //
+    // Asserts:
+    //   (i)  exactly ONE /api/claude POST is issued (no abort + re-issue)
+    //   (ii) `audioReady` ends `true` after the fetch resolves, even
+    //        though the route flipped greet → math while the fetch was
+    //        in flight (the slow-network case the pre-warm covers)
+    it("greet → math during in-flight fetch lands audioReady=true (Kevin's PR #92 regression)", async () => {
+      // Hold the fetch open so the route flip happens mid-flight.
+      let resolveFetch!: (r: Response) => void
+      const fetchPromise = new Promise<Response>((resolve) => {
+        resolveFetch = resolve
+      })
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockReturnValue(fetchPromise as Promise<Response>)
+
+      // Mock Math to surface `audioReady` via a data attribute. We don't
+      // need the real screen for this test — the App-side gate is what
+      // we're validating.
+      vi.doMock('./screens/Math', async () => {
+        const actual: Record<string, unknown> =
+          await vi.importActual('./screens/Math')
+        return {
+          ...actual,
+          default: ({ audioReady }: { audioReady?: boolean }) => (
+            <div
+              data-testid="math-mock"
+              data-audio-ready={audioReady === true ? 'true' : 'false'}
+            />
+          ),
+        }
+      })
+      // Mock Greet to a one-button shim so we can drive greet → math
+      // synchronously without walking the real 4-line intro timeline.
+      vi.doMock('./screens/Greet', () => ({
+        default: ({ onAdvance }: { onAdvance: () => void }) => (
+          <button
+            type="button"
+            data-testid="greet-mock-advance"
+            onClick={onAdvance}
+          />
+        ),
+      }))
+
+      vi.resetModules()
+      const { default: AppFresh } = await import('./App')
+
+      setSearch('?route=greet')
+      render(<AppFresh />)
+
+      // The pre-warm fetch fires on greet mount.
+      let claudeCalls = fetchSpy.mock.calls.filter(
+        (c) => c[0] === '/api/claude',
+      )
+      expect(claudeCalls.length).toBe(1)
+
+      // Drive greet → math while the fetch is still pending. This is the
+      // slow-network case: the fetch hasn't resolved yet when route
+      // flips. Pre-fix, this triggered the abort+brick chain. Post-fix,
+      // the fetch keeps running and settles cleanly against Math.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('greet-mock-advance'))
+        await Promise.resolve()
+      })
+
+      // Math is now mounted, audioReady still false (fetch hasn't
+      // settled).
+      const math = screen.getByTestId('math-mock')
+      expect(math).toHaveAttribute('data-audio-ready', 'false')
+
+      // Verify NO duplicate fetch was issued by the route flip — exactly
+      // one /api/claude call total.
+      claudeCalls = fetchSpy.mock.calls.filter((c) => c[0] === '/api/claude')
+      expect(claudeCalls.length).toBe(1)
+
+      // Resolve the fetch with an invalid-shape response (the soft-fail
+      // path, identical to the existing pre-warm test). What matters is
+      // that EITHER settle path flips audioReady to true. Pre-fix, the
+      // catch's `if (!cancelled)` guard skipped the flip and
+      // audioReady stayed false forever.
+      await act(async () => {
+        resolveFetch(new Response('{}', { status: 200 }))
+        // Drain microtasks: fetch.then → response.json → catch in
+        // prepareMathPathA → catch in App → setMathAudioReady(true).
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // The fix: audioReady ends true after the in-flight fetch settles
+      // post route flip.
+      expect(screen.getByTestId('math-mock')).toHaveAttribute(
+        'data-audio-ready',
+        'true',
+      )
+
+      // Still exactly one fetch — no abort + re-issue path.
+      claudeCalls = fetchSpy.mock.calls.filter((c) => c[0] === '/api/claude')
+      expect(claudeCalls.length).toBe(1)
+
+      vi.doUnmock('./screens/Math')
+      vi.doUnmock('./screens/Greet')
+      fetchSpy.mockRestore()
+    })
   })
 
   describe('Session-End handoff wiring (App ↔ screens)', () => {
