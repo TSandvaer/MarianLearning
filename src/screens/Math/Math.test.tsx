@@ -693,6 +693,255 @@ describe('Math (Number Garden) screen', () => {
     )
   })
 
+  it('rage-tap wrong chip: 5 rapid taps fire exactly 1 hint and 1 guided-completion', async () => {
+    // Ticket 86c9gy7ju — peer-review follow-up to PR #66. Same closure-stale
+    // class of bug as `problemState.resolved`, but on the wrong-tap path:
+    // `problemState.{wrongCount,hintPlayed,guidedPlayed}` were all read from
+    // a captured closure inside `handleWrongTap`. 5 rapid wrong-taps in the
+    // same React batch window all read pre-batch values:
+    //   - each computed `nextWrongCount = 0 + 1 = 1` (stale wrongCount=0)
+    //   - or all simultaneously crossed the hint/guided thresholds on a
+    //     later batch when the closure refreshed
+    //   - `!problemState.hintPlayed` / `!problemState.guidedPlayed` guards
+    //     absorbed most damage but could still queue duplicate hint timers
+    //     and duplicate guided dispatches.
+    //
+    // The fix mirrors PR #66: hold `wrongCount`/`hintPlayed`/`guidedPlayed`
+    // in refs alongside the React state. The state setter still fires for
+    // visual consistency; the synchronous gates inside `handleWrongTap`
+    // read the refs.
+    //
+    // This test asserts the strict single-dispatch behaviour:
+    //   - reprompt utterance fires once per tap (5x) — that's expected,
+    //     each wrong tap triggers a reprompt;
+    //   - hint utterance fires EXACTLY once across the whole rapid sequence
+    //     (the 600ms beat after the 2nd wrong tap);
+    //   - giveAnswer utterance fires EXACTLY once across the whole rapid
+    //     sequence (the guided-completion dispatch after the 3rd wrong tap);
+    //   - guided-active state latches to true (data-guided='true').
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <Math
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // Pick one specific wrong chip — Marian is rage-tapping the SAME chip
+    // (worst-case 8-year-old gesture). Choose the first non-correct chip.
+    const wrongChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') !== '5')!
+    expect(wrongChip).toBeDefined()
+
+    // 5 synchronous clicks on the same wrong chip — no awaits between them.
+    // This is the closure-stale-window: every click runs in the same React
+    // batch, so without the ref fix every click reads the pre-batch state.
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        fireEvent.click(wrongChip)
+      }
+      await Promise.resolve()
+    })
+
+    // Drain the hint timer (600ms beat) AND the reprompt-then guided
+    // dispatch microtasks. We advance plenty of time to let any duplicate
+    // timers that the bug WOULD have queued elapse — if the gate is
+    // working, only one of each fires regardless.
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+
+    const spoken = harness.spoken()
+
+    // Reprompt fires once per tap — that's correct behaviour, not a bug.
+    // Each wrong tap reprompts, even rapid ones; the deduplication is at
+    // the hint/guided level, not at the reprompt level.
+    const repromptCount = spoken.filter((t) => t === 'Hmm... try again?').length
+    expect(repromptCount).toBe(5)
+
+    // The load-bearing assertions: hint and giveAnswer each fire EXACTLY
+    // once. Pre-fix: with batched closures crossing the threshold together,
+    // multiple hint timers / guided dispatches could queue, producing
+    // counts >1.
+    const hintCount = spoken.filter(
+      (t) => t === 'Look. Three. And two more. How many now?',
+    ).length
+    expect(hintCount).toBe(1)
+
+    const giveAnswerCount = spoken.filter(
+      (t) => t === 'This one is five.',
+    ).length
+    expect(giveAnswerCount).toBe(1)
+
+    // Guided state is active exactly once (the latching also drives the
+    // visual chip-dim). data-guided is the live attribute.
+    expect(screen.getByTestId('math')).toHaveAttribute('data-guided', 'true')
+  })
+
+  it('single wrong-tap: no hint, no guided dispatch (regression guard)', async () => {
+    // Ticket 86c9gy7ju AC: "No regression in single-tap wrong-handling".
+    // After exactly ONE wrong tap, only the reprompt should have spoken;
+    // the hint threshold is 2 and the guided threshold is 3, so neither
+    // should fire. This guards against a refactor that accidentally moves
+    // the gate from "==2" to ">=2" or similar.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <Math
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const wrongChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') !== '5')!
+
+    await act(async () => {
+      fireEvent.click(wrongChip)
+      await Promise.resolve()
+    })
+
+    // Generous timer drain — even the longest hint-beat path (600ms +
+    // hint utterance + post-hint pose timer) would have elapsed by now.
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+
+    const spoken = harness.spoken()
+
+    // Reprompt fired exactly once.
+    expect(spoken.filter((t) => t === 'Hmm... try again?').length).toBe(1)
+
+    // Hint did NOT fire.
+    expect(
+      spoken.filter((t) => t === 'Look. Three. And two more. How many now?')
+        .length,
+    ).toBe(0)
+
+    // Guided dispatch did NOT fire.
+    expect(spoken.filter((t) => t === 'This one is five.').length).toBe(0)
+
+    // Guided state is NOT active.
+    expect(screen.getByTestId('math')).toHaveAttribute('data-guided', 'false')
+  })
+
+  it('per-problem reset: rage-tap on problem 1 does not leak gates into problem 2', async () => {
+    // Ticket 86c9gy7ju AC: "starting a fresh problem zeroes the ref AND
+    // the state". The wrongCount/hintPlayed/guidedPlayed refs must reset
+    // alongside `setProblemState(FRESH_PROBLEM_STATE)` in `advanceToNext`,
+    // or else problem 2 would inherit a latched `hintPlayedRef.current=true`
+    // and never fire a hint of its own (and worse, problem 2's chip-tap
+    // gate would still see `wrongCountRef.current=5` — meaning even the
+    // FIRST wrong tap of problem 2 would already be past the guided
+    // threshold).
+    //
+    // This test rage-taps problem 1 to drive the gates fully latched
+    // (hint + guided fired), advances past it, then verifies problem 2
+    // behaves like a fresh problem: a single wrong tap fires no hint and
+    // no guided dispatch.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <Math
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // Problem 1: rage-tap wrong chip 5x to fully latch all three gates.
+    const p1WrongChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') !== '5')!
+    await act(async () => {
+      for (let i = 0; i < 5; i++) {
+        fireEvent.click(p1WrongChip)
+      }
+      await Promise.resolve()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+
+    // Tap the correct chip on problem 1 (guided-completion path makes it
+    // the only enabled one). This advances to problem 2 after the 1200ms
+    // auto-advance timer.
+    const p1CorrectChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') === '5')!
+    await act(async () => {
+      fireEvent.click(p1CorrectChip)
+      await Promise.resolve()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+
+    // We're now on problem 2.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+    expect(screen.getByTestId('math')).toHaveAttribute('data-guided', 'false')
+
+    // Snapshot the spoken-list count BEFORE the problem-2 wrong tap so we
+    // can isolate problem 2's emissions from the problem-1 noise.
+    const spokenBeforeP2Tap = [...harness.spoken()]
+
+    // Problem 2: single wrong tap. This is the regression-guard payload —
+    // if the refs leaked from problem 1, this single tap would already
+    // see `wrongCountRef.current = 5` and dispatch hint + guided
+    // immediately. Post-fix: refs are reset, so this is a fresh tap on a
+    // fresh problem.
+    const p2WrongChip = screen
+      .getAllByTestId('math-chip')
+      .find(
+        (c) =>
+          c.getAttribute('data-value') !==
+          String(fixedPlan().problems[1].correct),
+      )!
+    await act(async () => {
+      fireEvent.click(p2WrongChip)
+      await Promise.resolve()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+
+    const newlySpoken = harness.spoken().slice(spokenBeforeP2Tap.length)
+
+    // Exactly one new utterance — the reprompt for problem 2's single
+    // wrong tap. Problem 2's hint copy ('Look. One. And four more...')
+    // and giveAnswer copy ('This one is five.' — same string as problem 1
+    // but on a fresh problem) MUST NOT have fired.
+    expect(newlySpoken).toContain('Hmm... try again?')
+    expect(newlySpoken).not.toContain('Look. One. And four more. How many now?')
+    // Guided remains inactive on problem 2.
+    expect(screen.getByTestId('math')).toHaveAttribute('data-guided', 'false')
+  })
+
   it('completes the session on problem 8 and invokes onSessionComplete', async () => {
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
