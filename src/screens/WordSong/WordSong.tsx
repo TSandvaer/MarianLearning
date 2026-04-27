@@ -617,16 +617,27 @@ function WordSongScreen({
         guidedPlayedRef.current = true
       }
 
-      // In-flight reprompt lock — set BEFORE the await, cleared in
-      // .finally(). The synchronous gate at the top of the handler reads
-      // this; a rapid second tap landing while the first reprompt
-      // promise is still pending observes the lock and skips the
-      // duplicate hint/guided side-effect path. See ticket 86c9gyb2v
-      // (the one shape difference vs Math 86c9gy7ju / PR #74).
+      // In-flight reprompt lock — set BEFORE the speak() call, cleared in
+      // .finally(). The .then() body reads it: if the lock has been
+      // cleared between speak() and resolve() (only `advanceToNext`
+      // clears it externally, on a problem-advance), the reprompt has
+      // gone stale — the user advanced past this problem while the
+      // reprompt was mid-air — and the hint/guided dispatch must NOT run
+      // on the now-current (different) problem. The synchronous
+      // ref-mirror gates above already deduplicate within a single
+      // problem; the lock closes the cross-problem race that those gates
+      // can't see. See ticket 86c9gyb2v (the shape difference vs Math
+      // 86c9gy7ju / PR #74).
       repromptInFlightRef.current = true
 
       void speak(problem.utterances.reprompt)
         .then(() => {
+          // Stale-resolve guard: if the lock was cleared while we were
+          // awaiting (advanceToNext fired between speak() and resolve()),
+          // bail. Without this, a hint/guided utterance for problem N
+          // could fire while problem N+1 is on screen.
+          if (!repromptInFlightRef.current) return
+
           // Return to idle pose unless this tap scheduled a hint/guided
           // line — in which case the next utterance owns the pose.
           if (!didScheduleHint && !didScheduleGuided) {

@@ -585,21 +585,27 @@ describe('Word Song screen', () => {
     //     absorbed most damage but could still queue duplicate hint timers
     //     and duplicate guided dispatches.
     //
-    // Direct mirror of Math 86c9gy7ju / PR #74. The only Word Song-specific
+    // Direct mirror of Math 86c9gy7ju / PR #74. The Word Song-specific
     // wrinkle is an in-flight reprompt lock — Word Song's reprompt-then-
     // hint/guided chain has an async window between `await speak(reprompt)`
     // resolving and the hint/guided dispatch decision; the lock prevents
     // a rapid re-entrant tap from scheduling a second hint/guided pass
-    // while the first reprompt is still in-flight.
+    // while the first reprompt is still in-flight. The lock is observable:
+    // 5 rapid taps fire ONE reprompt (the rest are dropped at the
+    // synchronous re-entry guard), unlike Math where each rapid tap
+    // re-fires the reprompt.
     //
     // This test asserts the strict single-dispatch behaviour:
-    //   - reprompt utterance fires once per tap (5x) — that's expected,
-    //     each wrong tap triggers a reprompt;
-    //   - hint utterance fires EXACTLY once across the whole rapid sequence
-    //     (the 600ms beat after the 2nd wrong tap);
-    //   - giveAnswer utterance fires EXACTLY once across the whole rapid
-    //     sequence (the guided-completion dispatch after the 3rd wrong tap);
-    //   - guided-active state latches to true (data-guided='true').
+    //   - reprompt utterance fires EXACTLY once across the rapid sequence
+    //     — the in-flight lock drops re-entrant taps;
+    //   - hint utterance fires EXACTLY once (or zero — only the first
+    //     reprompt resolves into a single wrongCount=1 bump, not 2 or 3,
+    //     so neither hint nor guided thresholds get crossed by the rapid
+    //     burst alone). After follow-up real wrong taps spaced far enough
+    //     apart, hint then guided will land — that's the next two
+    //     assertions below;
+    //   - guided-active state will eventually latch to true via further
+    //     real (non-re-entrant) taps.
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
     })
