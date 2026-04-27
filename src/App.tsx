@@ -19,8 +19,8 @@ import type {
   WordSongSessionPlan,
   WordSongSessionResult,
 } from './screens/WordSong'
-import SessionEndPlaceholder from './screens/SessionEndPlaceholder'
-import type { SessionEndPayload } from './screens/SessionEndPlaceholder'
+import SessionEnd from './screens/SessionEnd'
+import type { SessionEndPayload } from './screens/SessionEnd'
 import {
   DebugOverlay,
   activateAudioContextProbe,
@@ -125,14 +125,12 @@ export default function App() {
    * Session-End handoff state. Captured from the originating screen's
    * `onSessionComplete({ ... surface })` callback and surfaced to the
    * Session-End screen on mount. Persisted in component state (not a
-   * ref) because the placeholder screen reads it during render and we
-   * want React-driven re-render parity with the route flip.
+   * ref) because the screen reads it during render and we want
+   * React-driven re-render parity with the route flip.
    *
-   * Until the full Session-End screen lands (blocked on Thomas's CTA
-   * decision in 86c9gugm7), the route resolves to a minimal
-   * `SessionEndPlaceholder` so Marian sees SOMETHING after problem 8
-   * instead of the resolved-but-frozen problem view Thomas reported.
-   * The full screen will replace the placeholder under its own ticket.
+   * The full Session-End screen (ticket 86c9hb2r6) replaces the
+   * earlier placeholder. Thomas decided Option C for the CTA
+   * destination: "Come back soon" sleep splash.
    */
   const [sessionEndPayload, setSessionEndPayload] =
     useState<SessionEndPayload | null>(null)
@@ -321,10 +319,7 @@ export default function App() {
             />
           )}
           {route === 'session-end' && (
-            <SessionEndPlaceholder
-              key="session-end"
-              payload={sessionEndPayload}
-            />
+            <SessionEnd key="session-end" payload={sessionEndPayload} />
           )}
         </AnimatePresence>
         {/* Debug overlay sits outside AnimatePresence so it persists across
