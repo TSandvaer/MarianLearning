@@ -133,7 +133,8 @@ function makePlayHarness() {
     /**
      * Fire the most-recent line's onPlay callback, simulating the engine
      * actually beginning to play (used by useAudioUnlockGate to clear the
-     * 1.5s watchdog).
+     * 6s watchdog — bumped from 1.5s in Phase-7 of ticket 86c9gvd0y to
+     * outlast the event-driven AudioContext resume await).
      */
     fireOnPlay() {
       const call = calls[calls.length - 1]
@@ -842,11 +843,11 @@ describe('Greet', () => {
       )
 
       fireWakeTap()
-      // 1.5s elapses with no onPlay and no tick — gate flips to relock.
-      // (Pre-recorded MP3 era shrunk FIRST_UTTERANCE_RETRY_MS from
-      // 5_000 → 1_500.)
+      // 6s elapses with no onPlay and no tick — gate flips to relock.
+      // (Phase-7 of ticket 86c9gvd0y bumped FIRST_UTTERANCE_RETRY_MS
+      // from 1.5s → 6s to outlast the event-driven resume await.)
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1_500)
+        await vi.advanceTimersByTimeAsync(6_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -859,7 +860,7 @@ describe('Greet', () => {
   })
 
   describe("First-utterance retry contract (Dave's)", () => {
-    it('if onPlay never fires within 1.5s of the wake tap, the gate transitions to relock and shows the ring + tap target again', async () => {
+    it('if onPlay never fires within the watchdog window of the wake tap, the gate transitions to relock and shows the ring + tap target again', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -873,11 +874,11 @@ describe('Greet', () => {
       // silently rejecting the call.
       expect(h.calls).toHaveLength(1)
 
-      // Pre-recorded MP3 era (ticket 86c9gqprh): watchdog window shrunk
-      // from 5 → 1.5s. Howler `onplay` fires within ~50ms once the audio
-      // context is unlocked; 1.5s is generous for cold-cache decode.
+      // Phase-7 (ticket 86c9gvd0y): watchdog bumped 1.5 → 6s to outlast
+      // the event-driven AudioContext resume await (5s ceiling on
+      // cold-iPad audio-session resumption).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1_500)
+        await vi.advanceTimersByTimeAsync(6_000)
       })
 
       expect(screen.getByTestId('greet')).toHaveAttribute(
@@ -890,11 +891,12 @@ describe('Greet', () => {
       expect(screen.getByTestId('greet-wake-tap-target')).toBeInTheDocument()
     })
 
-    it('does NOT prematurely relock at 1s — sub-second decode latency should still be honoured', async () => {
-      // Regression guard for the watchdog window. Before pre-recorded
-      // audio, this test pinned the 5s window against premature relock at
-      // 2s. Post-pre-recorded the window is 1.5s, so we assert the gate
-      // is still `pending` at the 1s mark — well inside the window.
+    it('does NOT prematurely relock at 5s — cold-iPad resume latency should still be honoured', async () => {
+      // Regression guard for the watchdog window. The watchdog is sized
+      // to outlast the event-driven AudioContext resume await (5s
+      // ceiling). At 5s the gate must still be `pending` — Phase-7
+      // explicitly sized the window for the worst-observed 3.6s
+      // cold-iPad resume latency plus headroom.
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -905,17 +907,17 @@ describe('Greet', () => {
 
       fireWakeTap()
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1_000)
+        await vi.advanceTimersByTimeAsync(5_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
         'pending',
       )
 
-      // Audio genuinely starts playing at the 1.4s mark — past 1s, before 1.5s.
+      // Audio genuinely starts playing at the 5.5s mark — past 5s, before 6s.
       // Gate transitions to unlocked, no relock surfaced.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(400)
+        await vi.advanceTimersByTimeAsync(500)
       })
       act(() => {
         h.fireOnPlay()
@@ -939,9 +941,9 @@ describe('Greet', () => {
       fireWakeTap()
       expect(h.calls).toHaveLength(1)
 
-      // Watchdog expires (1.5s post-pre-recorded).
+      // Watchdog expires (6s after Phase-7 of ticket 86c9gvd0y).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1_500)
+        await vi.advanceTimersByTimeAsync(6_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -965,7 +967,7 @@ describe('Greet', () => {
       )
     })
 
-    it('a successful onPlay inside the 1.5s window keeps the gate in unlocked state — no ring re-show', async () => {
+    it('a successful onPlay inside the watchdog window keeps the gate in unlocked state — no ring re-show', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -984,12 +986,12 @@ describe('Greet', () => {
         'unlocked',
       )
 
-      // Past the 1.5s mark: gate stays unlocked, no relock surfaces. The
+      // Past the 6s mark: gate stays unlocked, no relock surfaces. The
       // ring may still be in the DOM mid-exit-animation (rAF driver
       // doesn't tick under jsdom fake timers) but it's invisible — we
       // assert on the gate state rather than ring presence.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_000)
+        await vi.advanceTimersByTimeAsync(7_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -1015,9 +1017,9 @@ describe('Greet', () => {
       fireWakeTap()
       const callsAfterFirstTap = h.calls.length
 
-      // Watchdog expires; gate enters relock.
+      // Watchdog expires; gate enters relock (6s post-Phase-7).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(1_500)
+        await vi.advanceTimersByTimeAsync(6_000)
       })
       expect(screen.getByTestId('greet')).toHaveAttribute(
         'data-gate-state',
@@ -1300,7 +1302,7 @@ describe('Greet', () => {
 
     it('a line-0 playGreetLine rejection flips the gate to relock immediately (pre-watchdog)', async () => {
       // Fast-fail path: line 0's MP3 fails to load. The fix should NOT
-      // wait for the 1.5s watchdog — the rejection itself is a stronger
+      // wait for the 6s watchdog — the rejection itself is a stronger
       // signal than "no onPlay arrived yet". Marian sees the ring
       // re-appear within a frame of the failure.
       mediaSpy = stubReducedMotion(false)
