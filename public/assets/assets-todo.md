@@ -57,8 +57,9 @@ critical path. Track separately so they don't slip:
 - `bg-song.svg` — Screen 4 background.
 - `bg-twilight.svg` — Screen 5 background. (Open Q from spec: share base with `bg-clouds.svg` via
   CSS hue-rotate? Pending Thomas decision.)
-- `flower-glyph.svg`, `sparkle-particle.svg`, `pic-dog.svg`, `icon-speaker.svg`, `icon-paw.svg`,
+- `flower-glyph.svg`, `sparkle-particle.svg`, `icon-speaker.svg`, `icon-paw.svg`,
   `icon-check.svg`, `star-filled.svg`, `jar.svg`, `silhouette-fox.svg`, `icon-home.svg`.
+- ~~`pic-dog.svg`~~ — **SHIPPED** (2026-04-27, ticket `86c9grn2q`). Lives at `public/assets/pictures/pic-dog.svg`, ~4.4 KB. SVG format locked for all CVC word pictures per Thomas.
 - SFX: `sfx-sparkle.mp3`, `sfx-poof.mp3`, `sfx-plink.mp3`, `sfx-cheer.mp3` — all blocked on the
   same audio-authoring constraint as `sfx-chime-soft.mp3`. Same sourcing recommendation.
 
