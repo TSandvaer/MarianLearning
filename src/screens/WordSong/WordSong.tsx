@@ -606,7 +606,11 @@ function WordSongScreen({
       // fix to ticket 86c9gy4mf).
       if (resolvedRef.current) return
 
-      // Phase-2 fix (ticket 86c9gvd0y) — same as Math.
+      // Phase-2/5/6 gesture-window fixes (ticket 86c9gvd0y) — same as
+      // Math. Pre-call snapshot, then resume + unlock + post-call
+      // snapshot. The pre/post pair surfaces the Phase-6 pool refill
+      // (pool=N → pool=10) in the iPad export.
+      recordUnlockStateEvent()
       resumeAudioCtx()
       unlockAudioSessionFn()
       recordUnlockStateEvent()
