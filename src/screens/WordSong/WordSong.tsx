@@ -344,6 +344,39 @@ function WordSongScreen({
    */
   const resolvedRef = useRef(false)
 
+  /**
+   * Always-fresh mirrors of `problemState.{wrongCount,hintPlayed,guidedPlayed}`.
+   * Same closure-stale risk as `resolvedRef` (above) but on the wrong-tap
+   * path: 5 rapid taps on the SAME wrong picture chip all capture the
+   * pre-batch `wrongCount=0` / `hintPlayed=false` / `guidedPlayed=false`
+   * and each compute `nextWrongCount=1`, then on subsequent renders cross
+   * the hint/guided thresholds together — queueing duplicate hint
+   * utterances and duplicate guided-completion entries even though the
+   * existing `!hintPlayed` / `!guidedPlayed` guards absorb most damage.
+   *
+   * Refs are flipped synchronously inside `handleWrongTap` BEFORE any
+   * `speak()` schedule or `setTimeout` callback, so the very next tap in
+   * the same gesture tick sees the updated counter and the latched
+   * hint/guided flags and bails out of the duplicate-side-effect path.
+   *
+   * Visual rendering (the chip `disabled` state, the guided-completion
+   * dimming, the data-* attributes) continues to derive from React
+   * `problemState`. Only the synchronous gates inside the handlers read
+   * the refs. See ticket 86c9gyb2v (mirrors Math 86c9gy7ju / PR #74).
+   */
+  const wrongCountRef = useRef(0)
+  const hintPlayedRef = useRef(false)
+  const guidedPlayedRef = useRef(false)
+
+  /**
+   * Cross-problem staleness guard. Set true before `speak(reprompt)`,
+   * read inside the `.then()` to skip hint/guided dispatch if the
+   * problem advanced while the reprompt was in-flight. Cleared in the
+   * finally path. Does NOT block concurrent taps from firing their own
+   * reprompts — dedup is at the hint/guided ref-gate level.
+   */
+  const repromptInFlightRef = useRef(false)
+
   const [streak, setStreak] = useState(0)
   const streakRef = useRef(0)
   const totalCorrectRef = useRef(0)
@@ -458,11 +491,19 @@ function WordSongScreen({
     if (problemIndex < plan.problems.length - 1) {
       setProblemIndex((i) => i + 1)
       setProblemState(FRESH_PROBLEM_STATE)
-      // Reset the synchronous resolved gate alongside the React state
-      // reset — otherwise the new problem's first chip-tap would see
-      // `resolvedRef.current === true` from the previous problem and
-      // short-circuit the reward path.
+      // Reset the synchronous gates alongside the React state reset —
+      // otherwise the new problem's first taps would see the previous
+      // problem's latched ref values (resolved=true / hintPlayed=true /
+      // etc.) and short-circuit the reward + hint/guided dispatch paths.
+      // Mirrors `FRESH_PROBLEM_STATE` field-for-field. The reprompt
+      // in-flight lock also resets — it should only ever be true while a
+      // reprompt is mid-await, but resetting defensively guards against
+      // a worst-case advance that fires while a prior speak() hung.
       resolvedRef.current = false
+      wrongCountRef.current = 0
+      hintPlayedRef.current = false
+      guidedPlayedRef.current = false
+      repromptInFlightRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
@@ -529,52 +570,104 @@ function WordSongScreen({
         setStreak(0)
       }
 
-      const nextWrongCount = problemState.wrongCount + 1
+      // Read + bump the wrong-count via the synchronous ref. The state
+      // setter still fires for visual consistency, but the threshold
+      // arithmetic must use the ref or 5 rapid taps on the same wrong
+      // chip all see `wrongCount=0` from the captured closure and each
+      // compute `nextWrongCount=1` — never crossing the hint/guided
+      // thresholds, or all crossing them simultaneously on a later batch.
+      // See `wrongCountRef` declaration (ticket 86c9gyb2v).
+      const nextWrongCount = wrongCountRef.current + 1
+      wrongCountRef.current = nextWrongCount
       setProblemState((prev) => ({ ...prev, wrongCount: nextWrongCount }))
 
-      const willTriggerGuided = nextWrongCount >= GUIDED_AFTER_WRONG_COUNT
-      const willTriggerHint =
-        nextWrongCount === HINT_AFTER_WRONG_COUNT && !problemState.hintPlayed
+      // Latch the hint/guided "scheduled" flags synchronously NOW —
+      // before the reprompt promise resolves and before the 600ms hint
+      // timer elapses — so the next rapid tap in the same gesture tick
+      // (or any tap that lands during the pending hint timer window)
+      // observes the latched flag and skips the duplicate-schedule path.
+      //
+      // The local `didScheduleHint` / `didScheduleGuided` snapshots
+      // capture whether THIS specific tap is the one that crossed the
+      // threshold (and therefore owns the dispatch). Subsequent rapid
+      // taps recompute the threshold predicate too — but the ref read
+      // (`!hintPlayedRef.current`) returns false on the second tap, so
+      // they do not schedule the dispatch.
+      //
+      // The React state setters for `hintPlayed=true` / `guidedPlayed=true`
+      // are still kicked downstream (visual consistency), but the gate
+      // that prevents queuing reads the ref.
+      const didScheduleHint =
+        nextWrongCount === HINT_AFTER_WRONG_COUNT && !hintPlayedRef.current
+      if (didScheduleHint) {
+        hintPlayedRef.current = true
+      }
+      const didScheduleGuided =
+        nextWrongCount >= GUIDED_AFTER_WRONG_COUNT && !guidedPlayedRef.current
+      if (didScheduleGuided) {
+        guidedPlayedRef.current = true
+      }
 
-      void speak(problem.utterances.reprompt).then(() => {
-        if (!willTriggerHint && !willTriggerGuided) {
-          poseTimerRef.current = setTimeout(() => {
-            setPose('idle')
-            poseTimerRef.current = null
-          }, 0)
-        }
+      // In-flight reprompt lock — set BEFORE the speak() call, cleared in
+      // .finally(). The .then() body reads it: if the lock has been
+      // cleared between speak() and resolve() (only `advanceToNext`
+      // clears it externally, on a problem-advance), the reprompt has
+      // gone stale — the user advanced past this problem while the
+      // reprompt was mid-air — and the hint/guided dispatch must NOT run
+      // on the now-current (different) problem. The synchronous
+      // ref-mirror gates above already deduplicate within a single
+      // problem; the lock closes the cross-problem race that those gates
+      // can't see. See ticket 86c9gyb2v (the shape difference vs Math
+      // 86c9gy7ju / PR #74).
+      repromptInFlightRef.current = true
 
-        if (willTriggerGuided && !problemState.guidedPlayed) {
-          setGuidedActive(true)
-          setProblemState((prev) => ({ ...prev, guidedPlayed: true }))
-          void speak(problem.utterances.giveAnswer).then(() => {
+      void speak(problem.utterances.reprompt)
+        .then(() => {
+          // Stale-resolve guard: if the lock was cleared while we were
+          // awaiting (advanceToNext fired between speak() and resolve()),
+          // bail. Without this, a hint/guided utterance for problem N
+          // could fire while problem N+1 is on screen.
+          if (!repromptInFlightRef.current) return
+
+          // Return to idle pose unless this tap scheduled a hint/guided
+          // line — in which case the next utterance owns the pose.
+          if (!didScheduleHint && !didScheduleGuided) {
             poseTimerRef.current = setTimeout(() => {
               setPose('idle')
               poseTimerRef.current = null
             }, 0)
-          })
-        } else if (willTriggerHint) {
-          hintTimerRef.current = setTimeout(() => {
-            hintTimerRef.current = null
-            setProblemState((prev) => ({ ...prev, hintPlayed: true }))
-            void speak(problem.utterances.hint).then(() => {
+          }
+
+          if (didScheduleGuided) {
+            setGuidedActive(true)
+            setProblemState((prev) => ({ ...prev, guidedPlayed: true }))
+            void speak(problem.utterances.giveAnswer).then(() => {
               poseTimerRef.current = setTimeout(() => {
                 setPose('idle')
                 poseTimerRef.current = null
               }, 0)
             })
-          }, HINT_DELAY_AFTER_WRONG_MS)
-        }
-      })
+          } else if (didScheduleHint) {
+            hintTimerRef.current = setTimeout(() => {
+              hintTimerRef.current = null
+              setProblemState((prev) => ({ ...prev, hintPlayed: true }))
+              void speak(problem.utterances.hint).then(() => {
+                poseTimerRef.current = setTimeout(() => {
+                  setPose('idle')
+                  poseTimerRef.current = null
+                }, 0)
+              })
+            }, HINT_DELAY_AFTER_WRONG_MS)
+          }
+        })
+        .finally(() => {
+          repromptInFlightRef.current = false
+        })
     },
-    [
-      poofInstance,
-      problemState.wrongCount,
-      problemState.hintPlayed,
-      problemState.guidedPlayed,
-      speak,
-      streak,
-    ],
+    // problemState.{wrongCount,hintPlayed,guidedPlayed} intentionally
+    // omitted from deps — the gates read the synchronous refs instead.
+    // See ref declarations for the rage-tap rationale (ticket 86c9gyb2v).
+    [poofInstance, speak, streak],
   )
 
   /**
@@ -602,9 +695,15 @@ function WordSongScreen({
 
       // Stardust + streak. Same rule as Math: stardust granted even after
       // 1-or-2 wrongs; ONLY the guided-completion path withholds it.
-      const isCleanWin =
-        problemState.wrongCount === 0 && !problemState.guidedPlayed
-      if (!problemState.guidedPlayed) {
+      //
+      // Read from the synchronous refs (not React state). In normal play
+      // the gates between wrong-then-correct span gestures and React has
+      // committed prior state batches, so state would also work — but
+      // the refs are the single source of truth for "what does the gate
+      // see right now", and using them here keeps `handleCorrectTap`
+      // symmetric with the wrong-tap latches above. See ticket 86c9gyb2v.
+      const isCleanWin = wrongCountRef.current === 0 && !guidedPlayedRef.current
+      if (!guidedPlayedRef.current) {
         grantStardust(1)
         totalCorrectRef.current += 1
         if (isCleanWin) {
@@ -636,15 +735,10 @@ function WordSongScreen({
         advanceToNext()
       }, ADVANCE_AFTER_CORRECT_MS)
     },
-    [
-      advanceToNext,
-      grantStardust,
-      plinkInstance,
-      problemState.guidedPlayed,
-      problemState.wrongCount,
-      sparkleInstance,
-      speak,
-    ],
+    // problemState.{wrongCount,guidedPlayed} intentionally omitted from
+    // deps — the cleanWin computation reads the synchronous refs instead
+    // (see `wrongCountRef` declaration; ticket 86c9gyb2v).
+    [advanceToNext, grantStardust, plinkInstance, sparkleInstance, speak],
   )
 
   const onChipTap = useCallback(
