@@ -1481,4 +1481,130 @@ describe('Math (Number Garden) screen', () => {
       expect(chip).not.toBeDisabled()
     }
   })
+
+  /*
+   * ╔══════════════════════════════════════════════════════════════════════╗
+   * ║ FIRST-PROBLEM AUDIO-RACE REGRESSION TEST — ticket 86c9hjnn8          ║
+   * ║                                                                      ║
+   * ║ Reproduces the EMPIRICAL production bug Thomas captured on real iPad ║
+   * ║ Safari (deploy b6df65b, post-#88/#89): cold-mount Math reaches the   ║
+   * ║ first problem, the caption renders, but no audio plays for problem 1.║
+   * ║ Subsequent problems read aloud correctly.                            ║
+   * ║                                                                      ║
+   * ║ Root cause: on cold mount, the read-aloud effect fires the moment    ║
+   * ║ Howler's ctx is observed `'running'` — but at that moment the        ║
+   * ║ parent's `prepareMathPathA` POST has NOT resolved yet, so the        ║
+   * ║ `playUtterance` prop is still the silent `defaultPlayUtterance`.     ║
+   * ║ The first speak() walks the caption against the silent fallback;     ║
+   * ║ when the real prop arrives seconds later, `spokeReadAloudRef` has    ║
+   * ║ already latched and the line never plays audibly.                    ║
+   * ║                                                                      ║
+   * ║ Fix: parent passes `audioReady={false}` until the fetch settles, then║
+   * ║ flips to `true`. Math holds the cold-mount fast path until the flip. ║
+   * ║                                                                      ║
+   * ║ This test asserts the SHAPE of the fix: when `audioReady={false}`,   ║
+   * ║ no read-aloud fires; when it flips to `true`, the read-aloud fires   ║
+   * ║ AGAINST WHATEVER `playUtterance` IS BOUND AT THAT MOMENT — i.e. the  ║
+   * ║ real one the parent has just wired in. Chips unlock as expected.     ║
+   * ╚══════════════════════════════════════════════════════════════════════╝
+   */
+  it('audioReady gate: when false on mount, read-aloud waits; when flipped to true the bound playUtterance is used (ticket 86c9hjnn8)', async () => {
+    // Two harnesses: a "silent" default that the parent uses pre-fetch, and
+    // the "real" Path A player that arrives after the fetch resolves.
+    const silentHarness = makePlayHarness()
+    const realHarness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => true)
+
+    const { rerender } = render(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={silentHarness.playUtterance}
+          audioReady={false}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    // Drain the microtask queue. With `audioReady=false`, the cold-mount
+    // fast path must NOT speak — the silent default would otherwise
+    // capture the read-aloud silently.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(silentHarness.spoken()).toEqual([])
+    expect(realHarness.spoken()).toEqual([])
+    // readAloudPlayed stayed false → chips stayed locked while we wait
+    // for the real audio to arrive.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+
+    // Parent's prepareMathPathA fetch resolves: it swaps `playUtterance` to
+    // the real player AND flips `audioReady` to `true`.
+    rerender(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={realHarness.playUtterance}
+          audioReady={true}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // The read-aloud fired against the REAL playUtterance — not the silent
+    // fallback. This is the load-bearing assertion: pre-fix the silent
+    // harness would have been called and the real one would have stayed
+    // empty. Post-fix the gate held until the real one was wired.
+    expect(silentHarness.spoken()).toEqual([])
+    expect(realHarness.spoken()).toEqual(['Three plus two. How many?'])
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+    const chips = screen.getAllByTestId('math-chip')
+    for (const chip of chips) {
+      expect(chip).not.toBeDisabled()
+    }
+  })
+
+  it('audioReady gate: backwards-compatible — undefined behaves as legacy "fire immediately" (ticket 86c9hjnn8)', async () => {
+    // Existing tests/callers omit the `audioReady` prop entirely. Behaviour
+    // must be identical to pre-fix: cold-mount fast path fires immediately.
+    // This test exists so a future refactor that flips the default can't
+    // silently break the dozens of unit tests that pre-date this gate.
+    const harness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => true)
+
+    render(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          // NOTE: audioReady deliberately NOT passed.
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(harness.spoken()).toEqual(['Three plus two. How many?'])
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+  })
 })

@@ -1444,4 +1444,70 @@ describe('Word Song screen', () => {
     // Sanity: only spoke once (spokeReadAloudRef latch held).
     expect(harness.spoken()).toEqual(['Tap the cat.'])
   })
+
+  /*
+   * First-problem audio-race regression — ticket 86c9hjnn8.
+   *
+   * Mirrors the Math.test.tsx test of the same name. The cold-mount fast
+   * path must NOT speak while the parent's Path A fetch is still in
+   * flight (`audioReady={false}`). When the prop flips to `true` the read-
+   * aloud fires against the REAL playUtterance — not the silent default
+   * the parent passed pre-fetch. See Math.test.tsx for the long-form
+   * rationale.
+   */
+  it('audioReady gate: when false on mount, read-aloud waits; when flipped to true the bound playUtterance is used (ticket 86c9hjnn8)', async () => {
+    const silentHarness = makePlayHarness()
+    const realHarness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => true)
+
+    const { rerender } = render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={silentHarness.playUtterance}
+          audioReady={false}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(silentHarness.spoken()).toEqual([])
+    expect(realHarness.spoken()).toEqual([])
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+
+    rerender(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={realHarness.playUtterance}
+          audioReady={true}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(silentHarness.spoken()).toEqual([])
+    expect(realHarness.spoken()).toEqual(['Tap the cat.'])
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+    const chips = screen.getAllByTestId('word-song-chip')
+    for (const chip of chips) {
+      expect(chip).not.toBeDisabled()
+    }
+  })
 })

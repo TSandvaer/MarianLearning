@@ -202,16 +202,96 @@ export default function App() {
   // surface and the wire-shape adapter rationale.
   const [mathPlay, setMathPlay] = useState<PlayMathUtteranceFn | null>(null)
   const mathUnloadRef = useRef<(() => void) | null>(null)
+  /**
+   * Aborts the in-flight `prepareMathPathA` fetch on session end / route
+   * leave. Held in a ref because the leave-effect needs to access it
+   * without depending on `controller` being recreated (the fetch effect
+   * is one-shot, gated by `mathFetchStartedRef`).
+   */
+  const mathAbortRef = useRef<AbortController | null>(null)
+  /**
+   * Audio-ready gate for Math (ticket 86c9hjnn8). Flipped to `true` once
+   * `prepareMathPathA` settles — resolve OR reject. Math reads this prop
+   * to hold the cold-mount first read-aloud until the real `playUtterance`
+   * is bound (or until we know we're going to use the silent fallback,
+   * which is the same result either way: don't fire the read-aloud while
+   * `playUtterance` is still in transition).
+   *
+   * Why both branches flip it to `true`
+   * -----------------------------------
+   * On resolve, `mathPlay` becomes the real Path A player; firing the
+   * read-aloud now will play audibly. On reject, `mathPlay` stays null
+   * and Math falls back to its silent-but-captioned `defaultPlayUtterance`;
+   * we still want chips to unlock via that fallback's word-tick walk
+   * (otherwise a Path A failure would brick the screen). The bug we're
+   * fixing is specifically the WINDOW between mount and fetch settle —
+   * once we're past that window in either direction, the existing
+   * behaviour is correct.
+   *
+   * Reset to `false` whenever the route leaves Math so a re-entry
+   * (Math → SessionEnd → Math via QA flow) restarts the gate cleanly.
+   */
+  const [mathAudioReady, setMathAudioReady] = useState(false)
 
+  /**
+   * Once-per-app-session latch for the Math Path A fetch (ticket 86c9hjnn8).
+   *
+   * Without this latch, including `route` and `mathPlay` in the fetch
+   * effect's deps caused the greet → math transition to abort the
+   * still-in-flight fetch and re-start a fresh one — burning a duplicate
+   * server TTS render and delaying resolution by however long the first
+   * fetch had already been running. The ref pins the fetch to the FIRST
+   * route entering [greet, math] and the rest of the lifecycle is driven
+   * by the leave-effect below (which also resets the latch on session
+   * end so a future session re-fetches).
+   */
+  const mathFetchStartedRef = useRef(false)
+
+  /**
+   * Kick the Math Path A fetch as soon as Greet mounts (ticket 86c9hjnn8).
+   * Greet's wake + 4-line intro + heart-tap window is ~8-15s on real
+   * Marian-paced flows; that's plenty of time for the /api/claude POST to
+   * settle before Math mounts. Starting on `route === 'math'` (the prior
+   * behaviour) made the cold-mount race tight: fetch began at mount and
+   * resolved seconds later, well after the read-aloud had already fired
+   * silently against `defaultPlayUtterance`.
+   *
+   * Direct `?route=math` QA launches also trigger the fetch (the latch
+   * fires the first time route is greet OR math, whichever comes first).
+   *
+   * Why no cleanup-on-deps-change here (Kevin's PR #92 review)
+   * ----------------------------------------------------------
+   * Earlier shape returned a cleanup that ran `controller.abort()` and set
+   * a local `cancelled = true`. With `route` in the deps, that cleanup
+   * fires on every greet → math transition — exactly the slow-network case
+   * the pre-warm was meant to cover. The fetch then rejected with
+   * `AbortError`; the `.catch` saw `cancelled === true` and skipped the
+   * unblocking `setMathAudioReady(true)`; the latch prevented re-issue;
+   * Math's cold-mount gate held forever. Empirical reproduction: hold the
+   * fetch open, fire greet → math; observe `started=1, aborted=1,
+   * audioReady=false`.
+   *
+   * Fix: route-change cleanup must NOT touch the in-flight pre-warm. The
+   * leave-effect below owns the abort surface (greet/math → non-audio
+   * route via `mathAbortRef`); the unmount-effect further down owns the
+   * full-App-unmount abort. The settle handlers below check
+   * `controller.signal.aborted` to short-circuit when the leave-effect or
+   * the unmount-effect has decided we're tearing down — that's the
+   * authoritative "should I publish state?" signal under the new shape.
+   */
   useEffect(() => {
-    if (route !== 'math') return
+    if (route !== 'greet' && route !== 'math') return
+    if (mathFetchStartedRef.current) return
+    mathFetchStartedRef.current = true
 
     const controller = new AbortController()
-    let cancelled = false
 
     void prepareMathPathA(mathPlan, mathPlan.id, { signal: controller.signal })
       .then((prepared) => {
-        if (cancelled) {
+        if (controller.signal.aborted) {
+          // Leave-effect (or unmount-effect) aborted us mid-flight. Drop
+          // the loaded howls so we don't leak — the next greet/math entry
+          // will fetch fresh per the latch reset in the leave-effect.
           prepared.unload()
           return
         }
@@ -219,31 +299,88 @@ export default function App() {
         // Wrap in a thunk so React doesn't call the function before storing
         // it (useState treats function arg as a lazy initializer).
         setMathPlay(() => prepared.playUtterance)
+        setMathAudioReady(true)
       })
       .catch((err: unknown) => {
         // Soft-fail: keep playUtterance null, Math falls back to silent
         // default. Log so the QA pass can attribute the fallback if it
         // bites a captured iPad session.
-        if (!cancelled) {
-          console.warn(
-            '[App] Math Path A unavailable; using silent fallback:',
-            err,
-          )
+        if (controller.signal.aborted) {
+          // Aborted by leave/unmount — settling state would either be
+          // ignored (post-unmount setState no-op) or stomp the leave
+          // effect's reset to false. Silent.
+          return
         }
+        console.warn(
+          '[App] Math Path A unavailable; using silent fallback:',
+          err,
+        )
+        // Even on failure, unblock Math's cold-mount read-aloud — the
+        // silent fallback at least walks the caption + unlocks chips,
+        // which is better than leaving the screen permanently waiting.
+        setMathAudioReady(true)
       })
 
+    // Capture the controller so the leave-effect below can abort if Marian
+    // bails the session (greet/math → non-audio surface) before the fetch
+    // resolves. The latch ref keeps THIS effect from re-firing, so a
+    // per-run cleanup would hurt (see header comment) — we deliberately
+    // omit it.
+    //
+    // Why no full-App-unmount cleanup either
+    // --------------------------------------
+    // A separate `[]`-deps cleanup would seem to handle the "tab closed
+    // mid-fetch" case, but its cleanup also fires on StrictMode's
+    // simulated unmount (dev only). Combined with the latch persisting
+    // in the ref, the simulated remount short-circuits the body and the
+    // fetch never resumes — re-creating the same brick-shape we're
+    // fixing here. In practice the browser cancels in-flight fetches
+    // on real tab close, and tests that unmount during fetch let the
+    // promise settle into the post-unmount setState no-op (React 18+
+    // is silent about that). Net: leaving the abort path solely with
+    // the leave-effect is safe and avoids the StrictMode foot-gun.
+    mathAbortRef.current = controller
+    // mathPlan is captured ONCE per app session by useMemo, so it's
+    // effectively stable — listing it satisfies eslint without changing
+    // semantics. Route is in deps so the effect is allowed to fire on the
+    // first transition into greet/math even if App mounted on splash.
+  }, [route, mathPlan])
+
+  /**
+   * Tear-down on session-end / cold-restart. Runs only when route leaves
+   * Math AND Greet — i.e. the user has either completed the session or
+   * navigated to a non-audio surface. Releases the howls, resets the
+   * latch so a future session re-fetches, and clears the audio-ready
+   * gate so the next Math mount holds again until its real player binds.
+   *
+   * setState calls deferred to a microtask to satisfy
+   * `react-hooks/set-state-in-effect` — same pattern as the screen-level
+   * audio-unlock effects (see Math.tsx / WordSong.tsx).
+   */
+  useEffect(() => {
+    if (route === 'math' || route === 'greet') return
+    const hadAudio =
+      mathUnloadRef.current !== null || mathPlay !== null || mathAudioReady
+    if (!hadAudio) return
+    if (mathUnloadRef.current) {
+      mathUnloadRef.current()
+      mathUnloadRef.current = null
+    }
+    if (mathAbortRef.current) {
+      mathAbortRef.current.abort()
+      mathAbortRef.current = null
+    }
+    mathFetchStartedRef.current = false
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setMathPlay(null)
+      setMathAudioReady(false)
+    })
     return () => {
       cancelled = true
-      controller.abort()
-      // Tear down any howls registered while we were on Math, so a future
-      // re-entry rebuilds cleanly. Idempotent if no fetch ever resolved.
-      if (mathUnloadRef.current) {
-        mathUnloadRef.current()
-        mathUnloadRef.current = null
-      }
-      setMathPlay(null)
     }
-  }, [route, mathPlan])
+  }, [route, mathPlay, mathAudioReady])
 
   // ── Word Song screen — Path A live audio wiring ──
   //
@@ -258,43 +395,93 @@ export default function App() {
   const [wordSongPlay, setWordSongPlay] =
     useState<PlayWordSongUtteranceFn | null>(null)
   const wordSongUnloadRef = useRef<(() => void) | null>(null)
+  const wordSongAbortRef = useRef<AbortController | null>(null)
+  const wordSongFetchStartedRef = useRef(false)
+  /**
+   * Audio-ready gate for Word Song (ticket 86c9hjnn8). Same shape as
+   * `mathAudioReady` above — flipped to `true` once
+   * `prepareWordSongPathA` settles so the cold-mount read-aloud waits
+   * for a real `playUtterance` before firing. See the Math gate's
+   * documentation for the long-form rationale.
+   */
+  const [wordSongAudioReady, setWordSongAudioReady] = useState(false)
 
+  /**
+   * Same shape as the Math fetch-effect above (no cleanup; settle
+   * handlers gate on `controller.signal.aborted`). The Word Song
+   * deps `[route, wordSongPlan]` would have caused literacy →
+   * non-literacy transitions to abort an in-flight fetch and brick
+   * `wordSongAudioReady`. See the Math fetch-effect's header for the
+   * full rationale.
+   */
   useEffect(() => {
     if (route !== 'literacy') return
+    if (wordSongFetchStartedRef.current) return
+    wordSongFetchStartedRef.current = true
 
     const controller = new AbortController()
-    let cancelled = false
 
     void prepareWordSongPathA(wordSongPlan, wordSongPlan.id, {
       signal: controller.signal,
     })
       .then((prepared) => {
-        if (cancelled) {
+        if (controller.signal.aborted) {
           prepared.unload()
           return
         }
         wordSongUnloadRef.current = prepared.unload
         setWordSongPlay(() => prepared.playUtterance)
+        setWordSongAudioReady(true)
       })
       .catch((err: unknown) => {
-        if (!cancelled) {
-          console.warn(
-            '[App] Word Song Path A unavailable; using silent fallback:',
-            err,
-          )
-        }
+        if (controller.signal.aborted) return
+        console.warn(
+          '[App] Word Song Path A unavailable; using silent fallback:',
+          err,
+        )
+        // Even on failure, unblock the cold-mount read-aloud so the
+        // silent fallback walks the caption + unlocks chips. See the
+        // Math gate's docstring above for the same-shape rationale.
+        setWordSongAudioReady(true)
       })
 
+    wordSongAbortRef.current = controller
+    // No cleanup — see the Math fetch-effect for the why (route changes
+    // must NOT abort, and adding a `[]`-deps unmount cleanup re-creates
+    // the StrictMode-double-mount bug shape).
+  }, [route, wordSongPlan])
+
+  /**
+   * Tear-down effect for Word Song. Same shape as Math's tear-down above.
+   * setState calls deferred to a microtask to satisfy the
+   * `react-hooks/set-state-in-effect` rule.
+   */
+  useEffect(() => {
+    if (route === 'literacy') return
+    const hadAudio =
+      wordSongUnloadRef.current !== null ||
+      wordSongPlay !== null ||
+      wordSongAudioReady
+    if (!hadAudio) return
+    if (wordSongUnloadRef.current) {
+      wordSongUnloadRef.current()
+      wordSongUnloadRef.current = null
+    }
+    if (wordSongAbortRef.current) {
+      wordSongAbortRef.current.abort()
+      wordSongAbortRef.current = null
+    }
+    wordSongFetchStartedRef.current = false
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setWordSongPlay(null)
+      setWordSongAudioReady(false)
+    })
     return () => {
       cancelled = true
-      controller.abort()
-      if (wordSongUnloadRef.current) {
-        wordSongUnloadRef.current()
-        wordSongUnloadRef.current = null
-      }
-      setWordSongPlay(null)
     }
-  }, [route, wordSongPlan])
+  }, [route, wordSongPlay, wordSongAudioReady])
 
   return (
     <LazyMotion features={domAnimation} strict>
@@ -307,6 +494,7 @@ export default function App() {
               key="math"
               plan={mathPlan}
               playUtterance={mathPlay ?? undefined}
+              audioReady={mathAudioReady}
               onSessionComplete={handleMathComplete}
             />
           )}
@@ -315,6 +503,7 @@ export default function App() {
               key="literacy"
               plan={wordSongPlan}
               playUtterance={wordSongPlay ?? undefined}
+              audioReady={wordSongAudioReady}
               onSessionComplete={handleWordSongComplete}
             />
           )}
