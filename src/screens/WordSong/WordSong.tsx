@@ -173,6 +173,15 @@ export interface WordSongProps {
   unlockAudioSession?: () => {
     howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
   } | void
+  /**
+   * Test seam ONLY — pre-arms `audioUnlocked` and `readAloudPlayed` so the
+   * chips render enabled on first paint and tests can `fireEvent.click`
+   * without first having to bypass the `disabled` DOM attribute.
+   *
+   * Production must NEVER pass this. See `Math.tsx` for the full rationale
+   * (mirrored seam). Ticket 86c9guh4y test fix-forward.
+   */
+  __testInitiallyAudioUnlocked?: boolean
 }
 
 // ── Default no-op playback (silent-but-captioned fallback) -----------------
@@ -240,6 +249,7 @@ function WordSongScreen({
   now = () => new Date(),
   resumeAudioContext,
   unlockAudioSession,
+  __testInitiallyAudioUnlocked = false,
 }: WordSongProps) {
   const reducedMotion = usePrefersReducedMotion()
 
@@ -338,7 +348,11 @@ function WordSongScreen({
   const [streak, setStreak] = useState(0)
   const streakRef = useRef(0)
   const totalCorrectRef = useRef(0)
-  const [audioUnlocked, setAudioUnlocked] = useState(false)
+  /** Test seam: when `__testInitiallyAudioUnlocked` is set, this starts
+   *  true so chips render tappable from first paint. See `WordSongProps`. */
+  const [audioUnlocked, setAudioUnlocked] = useState(
+    __testInitiallyAudioUnlocked,
+  )
 
   /**
    * True once the per-problem read-aloud has completed. Chips are disabled
@@ -353,8 +367,10 @@ function WordSongScreen({
    *
    * See ticket 86c9guh4y.
    */
-  const [readAloudPlayed, setReadAloudPlayed] = useState(false)
-  const readAloudPlayedRef = useRef(false)
+  const [readAloudPlayed, setReadAloudPlayed] = useState(
+    __testInitiallyAudioUnlocked,
+  )
+  const readAloudPlayedRef = useRef(__testInitiallyAudioUnlocked)
 
   const [pose, setPose] = useState<MelodyPose>('idle')
   const [shakingChip, setShakingChip] = useState<string | null>(null)

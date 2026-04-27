@@ -49,6 +49,16 @@ import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
+/*
+ * NOTE on `__testInitiallyAudioUnlocked` threaded through every render below:
+ *
+ * PR #83 (ticket 86c9guh4y) gates chips behind a `disabled={!readAloudPlayed}`
+ * attribute. jsdom + React 19 silently swallows `fireEvent.click` on
+ * `<button disabled>`, so the seam pre-arms the gate so chips render
+ * tappable on first paint. Production callers never pass this. See
+ * `src/screens/Math/Math.test.tsx` for the full rationale.
+ */
+
 // Stub the SFX factory so jsdom never tries to construct a real Howl.
 // Same pattern as Math.test.tsx — tests don't need real audio output, just
 // a no-op handle that won't blow up Howler at module load.
@@ -142,6 +152,7 @@ describe('Math screen accessibility contract (build-time guard, ticket 86c9gumhp
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={makeSilentPlay()}
           storage={makeMemoryStorage()}
@@ -162,6 +173,7 @@ describe('Math screen accessibility contract (build-time guard, ticket 86c9gumhp
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={makeSilentPlay()}
           storage={makeMemoryStorage()}
@@ -195,6 +207,7 @@ describe('Math screen accessibility contract (build-time guard, ticket 86c9gumhp
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={makeSilentPlay()}
           storage={makeMemoryStorage()}

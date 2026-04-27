@@ -35,6 +35,33 @@ import type { PlayMathUtteranceFn } from './Math'
 import type { MathSessionPlan } from './sessionPlans'
 import { STARDUST_STORAGE_KEY, type StorageAdapter } from '../_shared/stardust'
 
+/*
+ * NOTE on `__testInitiallyAudioUnlocked` threaded through every render below:
+ *
+ * PR #83 (ticket 86c9guh4y) added a `disabled={!readAloudPlayed}` gate on
+ * the chip buttons so Marian can't tap before hearing the question. The
+ * intended unlock sequence is: first chip tap flips `audioUnlocked` →
+ * read-aloud effect fires → `readAloudPlayed` flips → chips become
+ * tappable.
+ *
+ * jsdom + React 19 silently swallows `fireEvent.click` on a `<button
+ * disabled>` (verified empirically — the click event is dispatched but
+ * React's synthetic-event pipeline checks `disabled` on the target and
+ * never invokes the onClick handler). That makes the first-tap-unlock
+ * path unreachable from these tests, so chips stay disabled forever and
+ * every chip-tap assertion no-ops.
+ *
+ * The seam pre-arms both `audioUnlocked` AND `readAloudPlayed` so chips
+ * render tappable on first paint. Tests then exercise the post-unlock
+ * contract — exactly what PR #83 was asserting. The two
+ * `chip-tap kicks resumeAudioContext / unlockAudioSession synchronously`
+ * tests now assert the post-unlock shape (the hooks still fire on every
+ * tap, regardless of whether the tap was the first or a subsequent one).
+ *
+ * Production callers never pass this prop. The Session-1 unlock contract
+ * is unaffected at runtime. See ticket 86c9guh4y test fix-forward.
+ */
+
 function withMotion(node: ReactNode) {
   return (
     <LazyMotion features={domAnimation} strict>
@@ -234,6 +261,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -273,6 +301,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={storage}
@@ -328,6 +357,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -372,6 +402,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -413,6 +444,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -462,6 +494,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -532,6 +565,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -636,6 +670,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -726,6 +761,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -799,6 +835,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -861,6 +898,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -951,6 +989,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -997,6 +1036,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1019,6 +1059,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1056,6 +1097,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1100,6 +1142,7 @@ describe('Math (Number Garden) screen', () => {
     render(
       withMotion(
         <Math
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}

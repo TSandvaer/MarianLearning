@@ -35,6 +35,18 @@ import type { WordSongSessionPlan } from './wordSessionPlans'
 import { STARDUST_STORAGE_KEY, type StorageAdapter } from '../_shared/stardust'
 import { getWordEntry } from './wordPack'
 
+/*
+ * NOTE on `__testInitiallyAudioUnlocked` threaded through every render below:
+ *
+ * PR #83 (ticket 86c9guh4y) added a `disabled={!readAloudPlayed}` gate on
+ * the chip buttons so Marian can't tap before hearing the question.
+ * jsdom + React 19 silently swallows `fireEvent.click` on `<button
+ * disabled>`, so without this seam every chip-tap test no-ops. The seam
+ * pre-arms `audioUnlocked` AND `readAloudPlayed` so chips render
+ * tappable on first paint. Production callers never pass this. See
+ * Math.test.tsx for the longer-form rationale and ticket 86c9guh4y.
+ */
+
 function withMotion(node: ReactNode) {
   return (
     <LazyMotion features={domAnimation} strict>
@@ -138,6 +150,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -180,6 +193,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -201,6 +215,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={storage}
@@ -249,6 +264,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -289,6 +305,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -331,6 +348,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={plan}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -378,6 +396,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={plan}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -439,6 +458,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -514,6 +534,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -605,6 +626,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -679,6 +701,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -742,6 +765,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={plan}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -838,6 +862,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={plan}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -884,6 +909,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -906,6 +932,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -935,6 +962,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -976,6 +1004,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1011,6 +1040,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1060,6 +1090,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={storage}
@@ -1089,6 +1120,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1128,6 +1160,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={makePlayHarness().playUtterance}
           storage={makeMemoryStorage()}
@@ -1161,6 +1194,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1196,6 +1230,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
@@ -1233,6 +1268,7 @@ describe('Word Song screen', () => {
     render(
       withMotion(
         <WordSong
+          __testInitiallyAudioUnlocked
           plan={fixedPlan()}
           playUtterance={harness.playUtterance}
           storage={makeMemoryStorage()}
