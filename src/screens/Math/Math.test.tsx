@@ -1171,4 +1171,144 @@ describe('Math (Number Garden) screen', () => {
     ).mock.invocationCallOrder[0]
     expect(unlockOrder).toBeLessThan(playOrder)
   })
+
+  /*
+   * ╔══════════════════════════════════════════════════════════════════════╗
+   * ║ COLD-MOUNT REAL-FLOW REGRESSION TEST — ticket 86c9hf4ef              ║
+   * ║                                                                      ║
+   * ║ This test asserts that Math correctly fires its read-aloud and       ║
+   * ║ enables its chips on COLD MOUNT — i.e. when `audioUnlocked` defaults ║
+   * ║ to `false` AND the chip-tap path that would normally flip it is      ║
+   * ║ blocked by `disabled={!readAloudPlayed}` (Safari swallows clicks on  ║
+   * ║ disabled buttons; chicken-and-egg).                                  ║
+   * ║                                                                      ║
+   * ║ The precondition: Howler's `AudioContext` is already `'running'`     ║
+   * ║ because a previous screen (Greet) unlocked it via wake-tap +         ║
+   * ║ heart-tap. In real flow, by the time Math mounts, this has already   ║
+   * ║ happened. Pre-fix, Math ignored that signal — it only watched its    ║
+   * ║ own local `audioUnlocked` flag. Post-fix, Math reads the Howler      ║
+   * ║ state via `getHowlerRunning()` and uses it as a second authorisation ║
+   * ║ for the read-aloud effect.                                           ║
+   * ║                                                                      ║
+   * ║ THIS IS THE TEST THAT SHOULD HAVE CAUGHT THE PR #83 REGRESSION       ║
+   * ║ BEFORE IT MERGED. Empirical evidence: Thomas's iPad audioCtxLog from ║
+   * ║ 2026-04-27 16:26 UTC showed Splash → Greet → Math reaching Math with ║
+   * ║ `howlerAudioUnlocked: true` (i.e. Howler ctx running) but the gate   ║
+   * ║ stuck at `idle` and the read-aloud effect never firing — chips       ║
+   * ║ stayed `disabled` forever, screen unreachable.                       ║
+   * ║                                                                      ║
+   * ║ Do NOT pass `__testInitiallyAudioUnlocked` here — that seam exists   ║
+   * ║ to bypass the chip-disabled gate in OTHER tests that exercise        ║
+   * ║ post-unlock behaviour. This test is precisely about the path the     ║
+   * ║ seam was created to skip.                                            ║
+   * ╚══════════════════════════════════════════════════════════════════════╝
+   */
+  it('cold-mount real-flow: when Howler ctx is already running, read-aloud fires and chips become enabled (ticket 86c9hf4ef)', async () => {
+    const harness = makePlayHarness()
+    // Simulate Greet's wake-tap + heart-tap having already unlocked Howler
+    // before Math mounted. In real flow Howler.ctx.state === 'running' at
+    // this point; the test seam returns true so the screen sees the same
+    // signal without standing up a fake AudioContext.
+    const getHowlerRunning = vi.fn(() => true)
+
+    render(
+      withMotion(
+        <MathScreen
+          // NOTE: __testInitiallyAudioUnlocked deliberately NOT passed.
+          // audioUnlocked starts false — the bug-reproducing precondition.
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    // Pre-tick: chips render in their disabled (read-aloud-not-played)
+    // state. This is the same chip-disabled gate PR #83 added; we expect
+    // it to flip post-tick once the read-aloud effect fires.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+
+    // Drain the queueMicrotask + the playUtterance promise + the post-resolve
+    // setReadAloudPlayed commit. One act() pass is enough because the
+    // makePlayHarness fake resolves on the microtask queue (see
+    // `Promise.resolve().then(() => resolve())` in makePlayHarness).
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // The read-aloud was spoken. Pre-fix: spoken().length === 0 here
+    // because the effect short-circuited on `!audioUnlocked`. Post-fix:
+    // the Howler-running fast path authorises the speak.
+    expect(harness.spoken()).toContain('Three plus two. How many?')
+
+    // The screen flipped readAloudPlayed=true once the speak() resolved.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+
+    // The chips are no longer disabled — Marian can now answer the question.
+    // Pre-fix: chips stayed disabled forever; the screen was unreachable.
+    const chips = screen.getAllByTestId('math-chip')
+    expect(chips).toHaveLength(3)
+    for (const chip of chips) {
+      expect(chip).not.toBeDisabled()
+    }
+
+    // The Howler-running probe was consulted at least once. We don't pin
+    // an exact count because the effect can re-run benignly across
+    // commits — what matters is that the screen observed the signal.
+    expect(getHowlerRunning).toHaveBeenCalled()
+  })
+
+  it('cold-mount: when Howler ctx is NOT running, read-aloud does NOT fire on mount (ticket 86c9hf4ef)', async () => {
+    // The negative path of the cold-mount fix: if the Howler ctx is NOT
+    // running on mount (e.g. user navigated directly to Math without going
+    // through Greet — not a real Session-1 path, but a defensive guard),
+    // the read-aloud effect must NOT fire on mount. It waits for the
+    // first chip-tap to flip `audioUnlocked` (the Session-1 unlock
+    // contract from PR #83 — ticket 86c9guh4y).
+    //
+    // Without this guard the cold-mount fast path could leak into
+    // sessions where the fast path's gesture-context association
+    // assumptions don't hold, and the speak() would race iOS's audio
+    // unlock without ever having been authorised by a gesture on this
+    // screen. Belt-and-suspenders next to the production reality that
+    // Math ALWAYS follows Greet today.
+    const harness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => false)
+
+    render(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // No utterance spoken on mount.
+    expect(harness.spoken()).toHaveLength(0)
+    // readAloudPlayed stayed false; chips stayed disabled.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+    const chips = screen.getAllByTestId('math-chip')
+    for (const chip of chips) {
+      expect(chip).toBeDisabled()
+    }
+  })
 })

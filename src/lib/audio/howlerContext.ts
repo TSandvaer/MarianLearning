@@ -143,6 +143,32 @@ function readState(ctx: AudioContext | null): HowlerContextState {
 }
 
 /**
+ * Read whether `Howler.ctx` is currently in the `'running'` state. Returns
+ * `false` when Howler has not lazy-initted, when the context is missing, or
+ * when the context is in any state other than `'running'`.
+ *
+ * Why this helper exists (ticket 86c9hf4ef)
+ * -----------------------------------------
+ * After Greet's wake-tap + heart-tap sequence, Howler's audio context has
+ * been unlocked and is in `'running'` state. When Math (or Word Song) mounts
+ * next, its local `audioUnlocked` React state defaults to `false`, but the
+ * underlying Howler context is already live — a previous gesture on a
+ * different screen authorised it. Math/Word Song's read-aloud effect uses
+ * this helper to detect the Greet-already-unlocked precondition and fire
+ * the read-aloud immediately on cold mount, rather than waiting for a chip
+ * tap that the disabled-chip gate won't allow.
+ *
+ * Production callers read the real `Howler.ctx`. Tests pass a stub through
+ * the screen prop seam (`getHowlerRunning`) — we don't expose a `howlerLike`
+ * override here because the production helper is a pure read with no
+ * side-effects.
+ */
+export function readHowlerContextRunning(): boolean {
+  const ctx = readHowlerCtx()
+  return readState(ctx) === 'running'
+}
+
+/**
  * Synchronously kick `Howler.ctx.resume()` if the context exists and is
  * not already running. Safe to call from any user-gesture handler:
  *
