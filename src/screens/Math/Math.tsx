@@ -145,6 +145,20 @@ export interface MathProps {
   unlockAudioSession?: () => {
     howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
   } | void
+  /**
+   * Test seam ONLY — pre-arms `audioUnlocked` and `readAloudPlayed` so the
+   * chips render enabled on first paint and tests can `fireEvent.click`
+   * without first having to bypass the `disabled` DOM attribute.
+   *
+   * Production must NEVER pass this. The Session-1 audio-unlock contract
+   * (first chip tap unlocks audio + queues read-aloud; chips stay disabled
+   * until read-aloud completes) is what ticket 86c9guh4y added in PR #83
+   * to close the audio race; this seam exists purely so the unit-test
+   * suite can assert behaviour AT and AFTER that point without trying to
+   * dispatch click events on `<button disabled>` (which jsdom + React 19
+   * silently swallow). See ticket 86c9guh4y test fix-forward.
+   */
+  __testInitiallyAudioUnlocked?: boolean
 }
 
 // ── Default no-op playback (spec note: silent-but-captioned fallback) ------
@@ -230,6 +244,7 @@ function MathScreen({
   now = () => new Date(),
   resumeAudioContext,
   unlockAudioSession,
+  __testInitiallyAudioUnlocked = false,
 }: MathProps) {
   const reducedMotion = usePrefersReducedMotion()
 
@@ -351,8 +366,13 @@ function MathScreen({
   const totalCorrectRef = useRef(0)
 
   /** True while the screen is in the "first tap unlocks audio" window —
-   *  we keep this one-shot so we don't kick the unlock gate on every chip tap. */
-  const [audioUnlocked, setAudioUnlocked] = useState(false)
+   *  we keep this one-shot so we don't kick the unlock gate on every chip tap.
+   *
+   *  Test seam: when `__testInitiallyAudioUnlocked` is set, this starts true
+   *  so chips render tappable from first paint. See `MathProps` doc. */
+  const [audioUnlocked, setAudioUnlocked] = useState(
+    __testInitiallyAudioUnlocked,
+  )
 
   /**
    * True once the per-problem read-aloud has completed. Chips are disabled
@@ -367,8 +387,10 @@ function MathScreen({
    *
    * See ticket 86c9guh4y.
    */
-  const [readAloudPlayed, setReadAloudPlayed] = useState(false)
-  const readAloudPlayedRef = useRef(false)
+  const [readAloudPlayed, setReadAloudPlayed] = useState(
+    __testInitiallyAudioUnlocked,
+  )
+  const readAloudPlayedRef = useRef(__testInitiallyAudioUnlocked)
 
   /** Melody's current pose. Driven by tap outcomes + the auto-return timer. */
   const [pose, setPose] = useState<MelodyPose>('idle')
