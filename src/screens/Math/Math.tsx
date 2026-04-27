@@ -475,6 +475,41 @@ function MathScreen({
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  /**
+   * Unmount latch for the read-aloud `.then()` resolution path. Set to
+   * `true` inside the lifetime cleanup effect; the read-aloud effect's
+   * deferred `.then()` reads this to bail before calling
+   * `setReadAloudPlayed(true)` on an unmounted component.
+   *
+   * Replaces the per-effect-run `let cancelled = false` closure-flag the
+   * read-aloud effect previously used. That flag was the actual production
+   * bug surfaced by Thomas's 2026-04-27 iPad capture (ticket 86c9hf4ef
+   * round 2): on cold mount the read-aloud microtask flips
+   * `setAudioUnlocked(true)`, the resulting React commit re-runs the
+   * effect, the previous run's cleanup sets `cancelled = true`, and when
+   * `speak()` finally resolves seconds later the `.then()` sees the
+   * stale `cancelled=true` and skips the `setReadAloudPlayed(true)` call
+   * that unlocks chips. Tests passed because the test `playUtterance`
+   * harness resolves the speak() promise on a single microtask — too fast
+   * for React to commit the audioUnlocked flip and run the cleanup
+   * before the .then() fires. Production audio takes seconds to resolve,
+   * so the cancel-vs-then race always lost.
+   */
+  const unmountedRef = useRef(false)
+
+  /**
+   * Always-fresh mirror of `problemIndex` for the read-aloud `.then()`'s
+   * "are we still on the same problem?" check. The read-aloud effect's
+   * `.then()` callback runs after `speak()` resolves (potentially seconds
+   * later in production). If the user has advanced to the next problem in
+   * the meantime, the new problem's read-aloud effect owns its own
+   * `setReadAloudPlayed(true)` call; the old `.then()` must NOT stomp it.
+   * Capturing `myProblemIndex` at effect-run time and comparing against
+   * this ref at .then-time keeps stale resolutions from leaking forward.
+   * Updated synchronously inside the effect body each run.
+   */
+  const problemIndexRef = useRef(problemIndex)
+
   const clearAllTimers = useCallback(() => {
     for (const ref of [
       advanceTimerRef,
@@ -492,6 +527,7 @@ function MathScreen({
 
   useEffect(() => {
     return () => {
+      unmountedRef.current = true
       clearAllTimers()
       sparkleInstance.unload()
       poofInstance.unload()
@@ -617,6 +653,14 @@ function MathScreen({
    * become tappable. This closes the Session-2+ race where a chip tap
    * could fire before the question was read. See ticket 86c9guh4y.
    */
+  // Keep `problemIndexRef` in sync on every render so the read-aloud
+  // effect's deferred `.then()` reads the latest value. Refs are written
+  // here (post-render) rather than during render to satisfy the standard
+  // "no ref mutation during render" lint guidance.
+  useEffect(() => {
+    problemIndexRef.current = problemIndex
+  }, [problemIndex])
+
   useEffect(() => {
     if (guidedActive) return // mid-guided playback owns the audio
 
@@ -629,14 +673,25 @@ function MathScreen({
     if (!audioUnlocked && !howlerRunning) return
 
     const problem = plan.problems[problemIndex]
+    // Capture the problem index this effect run owns. The deferred
+    // `.then()` below compares against `problemIndexRef.current` to bail
+    // if Marian has advanced to a new problem before the speak() resolved
+    // — the new problem's effect run owns its own setReadAloudPlayed.
+    const myProblemIndex = problemIndex
+
     // Defer to a microtask so the setState calls (audioUnlocked mirror,
     // and the caption setStates inside `speak`) don't fire synchronously
     // inside the effect body — satisfies react-hooks/set-state-in-effect
     // and matches the React recommendation for "kick off async work from
     // an effect".
-    let cancelled = false
     queueMicrotask(() => {
-      if (cancelled) return
+      if (unmountedRef.current) return
+      // If Marian has already advanced past the problem this run was
+      // scheduled for, skip — the new problem's effect owns its own
+      // read-aloud. Same-problem re-runs (e.g. from the cold-mount
+      // audioUnlocked flip below) fall through to the
+      // `spokeReadAloudRef` latch, which absorbs them.
+      if (problemIndexRef.current !== myProblemIndex) return
       // Synchronous double-speak latch (ticket 86c9hf4ef). Must flip
       // BEFORE `speak()` is called and BEFORE any setState — when the
       // cold-mount fast path triggers `setAudioUnlocked(true)`, the
@@ -653,18 +708,33 @@ function MathScreen({
       // than re-firing the unlock branch.
       if (howlerRunning) setAudioUnlocked(true)
       void speak(problem.utterances.read).then(() => {
-        if (cancelled) return
+        // Bail ONLY if the component unmounted, or we've moved on to a
+        // new problem (the new problem's read-aloud owns
+        // `setReadAloudPlayed`). Do NOT bail just because the effect
+        // re-ran for the same problem — that's exactly the cancelled-flag
+        // race the production bug fix removed (ticket 86c9hf4ef round 2).
+        if (unmountedRef.current) return
+        if (problemIndexRef.current !== myProblemIndex) return
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
       })
     })
-    return () => {
-      cancelled = true
-    }
     // We don't include `speak` because it's stable enough — and including
     // it would re-trigger on every render that touches `gate`, which would
     // re-speak the line repeatedly. `getHowlerRunningFn` is also omitted —
     // it's the test seam binding, stable per mount.
+    //
+    // No cleanup function: the previous version's `let cancelled = false`
+    // / cleanup `cancelled = true` pair was load-bearing for two cases:
+    //   (a) component unmount — now handled by `unmountedRef`.
+    //   (b) effect re-run on the same problem (e.g. audioUnlocked flip) —
+    //       previously bailed the .then(); but the .then() RESOLVING is
+    //       what unlocks chips, and bailing it on a same-problem re-run
+    //       is what bricked Math on cold mount in production. The
+    //       `spokeReadAloudRef` latch already prevents double-speak; we
+    //       want the speak() promise's .then() to ALWAYS run for the
+    //       problem it owns. The `myProblemIndex` capture handles the
+    //       advance-past-it case.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemIndex, audioUnlocked])
 

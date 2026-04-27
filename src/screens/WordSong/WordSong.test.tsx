@@ -1384,4 +1384,64 @@ describe('Word Song screen', () => {
       expect(chip).toBeDisabled()
     }
   })
+
+  /*
+   * Production silent-fail regression — ticket 86c9hf4ef round 2.
+   *
+   * Mirrors the Math.test.tsx test of the same name. When `playUtterance`
+   * resolves AFTER React has committed the cold-mount audioUnlocked flip
+   * (production-real timing — Howler's 'end' event fires seconds after
+   * play()), chips MUST still unlock. The previous closure-cancelled
+   * flag bailed the .then() in this case and bricked the screen on real
+   * iPad (Thomas's 2026-04-27 PR #88 deploy capture). See
+   * Math.test.tsx for the full rationale.
+   */
+  it('cold-mount real-flow: chips unlock even when speak() resolves AFTER the audioUnlocked flip causes the effect to re-run (ticket 86c9hf4ef round 2)', async () => {
+    const harness = makePlayHarness({ autoResolve: false })
+    const getHowlerRunning = vi.fn(() => true)
+
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // Read-aloud was kicked off (proves we entered the fast path).
+    expect(harness.spoken()).toEqual(['Tap the cat.'])
+    // But chips stay disabled until speak() resolves.
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+
+    // Resolve speak() — corresponds to Howler 'end' firing in production.
+    // Pre-fix: cleanup-set cancelled=true bails the .then(), chips never
+    // unlock. Post-fix: .then() bails only on unmount or problem-advance,
+    // so setReadAloudPlayed(true) fires.
+    await act(async () => {
+      harness.resolveAll()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+    const chips = screen.getAllByTestId('word-song-chip')
+    expect(chips).toHaveLength(3)
+    for (const chip of chips) {
+      expect(chip).not.toBeDisabled()
+    }
+    // Sanity: only spoke once (spokeReadAloudRef latch held).
+    expect(harness.spoken()).toEqual(['Tap the cat.'])
+  })
 })

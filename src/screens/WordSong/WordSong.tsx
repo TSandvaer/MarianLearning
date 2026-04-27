@@ -417,6 +417,14 @@ function WordSongScreen({
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  /**
+   * Unmount latch and problem-index mirror for the read-aloud `.then()`
+   * resolution path. See Math.tsx for the long-form rationale — mirrored
+   * shape. Ticket 86c9hf4ef round 2 (production cancelled-flag race fix).
+   */
+  const unmountedRef = useRef(false)
+  const problemIndexRef = useRef(problemIndex)
+
   const clearAllTimers = useCallback(() => {
     for (const ref of [
       advanceTimerRef,
@@ -434,6 +442,7 @@ function WordSongScreen({
 
   useEffect(() => {
     return () => {
+      unmountedRef.current = true
       clearAllTimers()
       sparkleInstance.unload()
       poofInstance.unload()
@@ -500,6 +509,14 @@ function WordSongScreen({
 
   // ── Problem reveal -----------------------------------------------------
 
+  // Keep `problemIndexRef` in sync on every render so the read-aloud
+  // effect's deferred `.then()` reads the latest value. Refs are written
+  // here (post-render) rather than during render to satisfy the
+  // "no ref mutation during render" lint guidance.
+  useEffect(() => {
+    problemIndexRef.current = problemIndex
+  }, [problemIndex])
+
   /**
    * Fire the per-problem read-aloud. Two preconditions can authorise this:
    *
@@ -507,7 +524,10 @@ function WordSongScreen({
    *   2. `getHowlerRunningFn()` returns `true` — Greet's wake-tap +
    *      heart-tap already unlocked Howler before WordSong mounted.
    *
-   * See Math.tsx for the full rationale — mirrored shape. Ticket 86c9hf4ef.
+   * See Math.tsx for the full rationale — mirrored shape. Tickets
+   * 86c9hf4ef (round 1: cold-mount fast path) and 86c9hf4ef (round 2:
+   * production cancelled-flag race fix; the .then() now bails on
+   * unmount or problem-advance only, never on same-problem re-runs).
    *
    * After the read-aloud completes, flip `readAloudPlayed` so chips
    * become tappable. Closes the Session-2+ race (ticket 86c9guh4y).
@@ -519,9 +539,10 @@ function WordSongScreen({
     if (!audioUnlocked && !howlerRunning) return
 
     const problem = plan.problems[problemIndex]
-    let cancelled = false
+    const myProblemIndex = problemIndex
     queueMicrotask(() => {
-      if (cancelled) return
+      if (unmountedRef.current) return
+      if (problemIndexRef.current !== myProblemIndex) return
       // Synchronous double-speak latch (ticket 86c9hf4ef). Flips before
       // any setState/speak so that the re-render triggered by the
       // cold-mount fast path's `setAudioUnlocked(true)` cannot schedule
@@ -533,14 +554,16 @@ function WordSongScreen({
       // outside the effect body (react-hooks/set-state-in-effect).
       if (howlerRunning) setAudioUnlocked(true)
       void speak(problem.utterances.read).then(() => {
-        if (cancelled) return
+        // See Math.tsx for the bail-criteria rationale: unmount and
+        // problem-advance only. Same-problem re-runs MUST resolve the
+        // .then() so chips unlock. The previous closure-cancelled flag
+        // bricked this in production (ticket 86c9hf4ef round 2).
+        if (unmountedRef.current) return
+        if (problemIndexRef.current !== myProblemIndex) return
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
       })
     })
-    return () => {
-      cancelled = true
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemIndex, audioUnlocked])
 
