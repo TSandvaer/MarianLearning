@@ -437,6 +437,7 @@ export default function SessionEnd({
       data-surface={p.surface}
       data-phase={phase}
       data-total-stardust={p.totalStardust}
+      data-earned={p.earnedThisSession}
       data-final-streak={p.finalStreak}
       className="
         relative flex h-full w-full flex-col items-center
