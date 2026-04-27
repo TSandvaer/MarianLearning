@@ -69,6 +69,39 @@ const GUIDED_AFTER_WRONG_COUNT = 3
  *  sequence on chip tap (correct)" line 388. */
 const ADVANCE_AFTER_CORRECT_MS = 1200
 
+/** Ear-wiggle rotation duration on a correct tap. Bumped from the implicit
+ *  pose-swap (~200ms cross-fade) to a visible keyframed rotation per the
+ *  Word Song UX bug ticket — Thomas reports the celebration is "practically
+ *  not visible" on iPad with the silent-but-captioned default audio path
+ *  (no real TTS to fill the 1200ms auto-advance window).
+ *
+ *  Constraints:
+ *  - Must be ≥600ms (ticket acceptance criterion)
+ *  - Must complete strictly before ADVANCE_AFTER_CORRECT_MS (1200ms)
+ *  - Skipped on prefers-reduced-motion — the static pose swap remains
+ *
+ *  600ms gives a clear two-tilt wiggle that lands well inside the budget. */
+const EAR_WIGGLE_MS = 600
+
+/** Sparkle-burst total reveal duration on a correct tap. Bumped from the
+ *  default 0.6s spring tail to 0.85s so the stardust grant + sparkle reads
+ *  as a clear ≥800ms beat per the UX bug ticket. Particles still travel
+ *  the same distance; the spring is just stiffer-tail-damped to extend
+ *  visible time. Stays under the 1200ms advance window. */
+const SPARKLE_BURST_MS = 850
+
+/** HUD pop duration (stardust counter + streak indicator) on a correct
+ *  tap. Bumped from 250ms to 400ms per the UX bug acceptance criterion
+ *  ("streak pulse ≥400ms"). Same value drives the stardust counter pop
+ *  and the streak-bonus pulse — both are part of the unified "reward
+ *  visible window" Thomas observed as too fast.
+ *
+ *  Note: Math intentionally still uses 250ms — the brief was scoped to
+ *  Word Song only and Matt explicitly forbade touching Math.tsx beyond
+ *  reading values. If Math users report the same complaint, file a
+ *  separate Math ticket. */
+const HUD_POP_MS = 400
+
 /** Wrong-tap chip shake duration. Spec §"Wrong-answer policy" item 1. */
 const WRONG_SHAKE_MS = 400
 
@@ -85,10 +118,13 @@ const FIRST_UTTERANCE_RETRY_MS = 1_500
 /** Spring preset — chip tap (matches Math). */
 const CHIP_TAP_SPRING = { type: 'spring' as const, stiffness: 300, damping: 18 }
 
-/** Pop tween — used for the 3-keyframe `[1, 1.25, 1]` HUD pop. Same as Math. */
+/** Pop tween — drives the 3-keyframe `[1, 1.3, 1]` HUD pop. Duration is
+ *  HUD_POP_MS (400ms) — bumped from the prior 250ms per the UX bug
+ *  ticket. The peak scale is also slightly larger (1.3 vs 1.25) so the
+ *  pop is unmistakable on iPad at viewing distance. */
 const HUD_POP_TWEEN = {
   type: 'tween' as const,
-  duration: 0.25,
+  duration: HUD_POP_MS / 1000,
   ease: 'easeOut' as const,
 }
 
@@ -708,7 +744,7 @@ function WordSongScreen({
           <m.span
             key={stardust.total}
             initial={{ scale: 1 }}
-            animate={celebrating ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+            animate={celebrating ? { scale: [1, 1.3, 1] } : { scale: 1 }}
             transition={celebrating ? HUD_POP_TWEEN : { duration: 0 }}
             className="inline-flex items-center"
             aria-hidden
@@ -765,7 +801,7 @@ function WordSongScreen({
                     (STREAK_BONUS_THRESHOLDS as readonly number[]).includes(
                       streak,
                     )
-                      ? [1, 1.25, 1]
+                      ? [1, 1.3, 1]
                       : 1,
                 }}
                 exit={{
@@ -789,21 +825,44 @@ function WordSongScreen({
       {/* Melody + ribbon row */}
       <div className="relative flex w-full items-start gap-4 px-4">
         {/* Melody — upper-left, ~26vh per spec (slightly smaller than
-            Math's 30vh — see spec line 141). */}
+            Math's 30vh — see spec line 141).
+            Ear-wiggle: on a correct tap (`pose === 'happy'`) Melody plays
+            a 600ms rotation keyframe wiggle so the celebration is visibly
+            punchy on iPad even when the Path A audio path is the silent-
+            but-captioned fallback. Skipped under prefers-reduced-motion;
+            the static-pose cross-fade still reads. */}
         <AnimatePresence initial={false}>
           <m.img
             layoutId="melody"
             key={pose}
             data-testid="word-song-melody"
             data-pose={pose}
+            data-wiggling={
+              pose === 'happy' && !reducedMotion ? 'true' : 'false'
+            }
             src={`/assets/melody-${pose}.svg`}
             alt="Melody"
             draggable={false}
-            className="h-[26vh] w-auto select-none"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            className="h-[26vh] w-auto select-none origin-bottom"
+            initial={{ opacity: 0, rotate: 0 }}
+            animate={
+              pose === 'happy' && !reducedMotion
+                ? { opacity: 1, rotate: [0, -8, 8, -5, 5, 0] }
+                : { opacity: 1, rotate: 0 }
+            }
             exit={{ opacity: 0, transition: { duration: 0.15 } }}
-            transition={{ duration: 0.2 }}
+            transition={
+              pose === 'happy' && !reducedMotion
+                ? {
+                    opacity: { duration: 0.2 },
+                    rotate: {
+                      duration: EAR_WIGGLE_MS / 1000,
+                      ease: 'easeInOut',
+                      times: [0, 0.2, 0.45, 0.65, 0.85, 1],
+                    },
+                  }
+                : { duration: 0.2 }
+            }
           />
         </AnimatePresence>
 
@@ -1085,7 +1144,12 @@ function SparkleGlyph() {
   )
 }
 
-/** Sparkle burst — 6 particles. Same component pattern as Math. */
+/** Sparkle burst — 6 particles. Diverged from Math's identical-shape
+ *  helper per the UX bug ticket: particles travel 25% farther (75pt vs
+ *  60pt) and the spring is tuned for a softer landing so the burst
+ *  reads for ~850ms (≥800ms acceptance criterion) instead of Math's
+ *  ~600ms. The total visible window still lands inside the 1200ms
+ *  auto-advance budget. */
 function SparkleBurst() {
   return (
     <span
@@ -1095,21 +1159,20 @@ function SparkleBurst() {
     >
       {Array.from({ length: 6 }).map((_, i) => {
         const angle = (i / 6) * Math.PI * 2
-        const dx = Math.cos(angle) * 60
-        const dy = Math.sin(angle) * 60
+        const dx = Math.cos(angle) * 75
+        const dy = Math.sin(angle) * 75
         return (
           <m.span
             key={i}
             data-testid="word-song-sparkle-particle"
             className="absolute"
             initial={{ x: 0, y: 0, opacity: 1, scale: 0.5 }}
-            animate={{ x: dx, y: dy, opacity: 0, scale: 1 }}
+            animate={{ x: dx, y: dy, opacity: 0, scale: 1.1 }}
             exit={{ opacity: 0 }}
             transition={{
-              type: 'spring',
-              stiffness: 120,
-              damping: 18,
-              duration: 0.6,
+              type: 'tween',
+              ease: 'easeOut',
+              duration: SPARKLE_BURST_MS / 1000,
             }}
           >
             <SparkleGlyph />
