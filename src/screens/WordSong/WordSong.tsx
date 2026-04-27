@@ -339,6 +339,23 @@ function WordSongScreen({
   const streakRef = useRef(0)
   const totalCorrectRef = useRef(0)
   const [audioUnlocked, setAudioUnlocked] = useState(false)
+
+  /**
+   * True once the per-problem read-aloud has completed. Chips are disabled
+   * until this flips to `true` so Marian cannot tap a chip before hearing
+   * the question — fixing the Session-2+ race where the deferred
+   * `audioUnlocked` effect queued the read-aloud AFTER the user had
+   * already tapped a chip and heard the result utterance.
+   *
+   * Reset to `false` on every problem advance. The ref mirror
+   * (`readAloudPlayedRef`) is the synchronous gate read in `onChipTap`;
+   * the React state drives the visual `disabled` prop on chips.
+   *
+   * See ticket 86c9guh4y.
+   */
+  const [readAloudPlayed, setReadAloudPlayed] = useState(false)
+  const readAloudPlayedRef = useRef(false)
+
   const [pose, setPose] = useState<MelodyPose>('idle')
   const [shakingChip, setShakingChip] = useState<string | null>(null)
   const [captionText, setCaptionText] = useState('')
@@ -428,6 +445,12 @@ function WordSongScreen({
 
   // ── Problem reveal -----------------------------------------------------
 
+  /**
+   * Fire the per-problem read-aloud. After the read-aloud completes,
+   * flip `readAloudPlayed` so chips become tappable. This closes the
+   * Session-2+ race where a chip tap could fire before the question
+   * was read. See ticket 86c9guh4y.
+   */
   useEffect(() => {
     if (!audioUnlocked) return
     if (guidedActive) return
@@ -435,7 +458,11 @@ function WordSongScreen({
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
-      void speak(problem.utterances.read)
+      void speak(problem.utterances.read).then(() => {
+        if (cancelled) return
+        readAloudPlayedRef.current = true
+        setReadAloudPlayed(true)
+      })
     })
     return () => {
       cancelled = true
@@ -462,6 +489,10 @@ function WordSongScreen({
       hintPlayedRef.current = false
       guidedPlayedRef.current = false
       repromptInFlightRef.current = false
+      // Reset the read-aloud gate so chips are disabled until the next
+      // problem's read-aloud completes. See ticket 86c9guh4y.
+      readAloudPlayedRef.current = false
+      setReadAloudPlayed(false)
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
@@ -720,34 +751,35 @@ function WordSongScreen({
         howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
       })
 
+      // First-tap audio unlock: the very first user gesture sets
+      // `audioUnlocked` which triggers the read-aloud effect. We
+      // return immediately WITHOUT dispatching the correct/wrong
+      // handler — chips stay disabled until the read-aloud completes
+      // and flips `readAloudPlayed`. This closes the Session-2+ race
+      // where a chip tap could fire before the question was read aloud,
+      // producing overlapping audio. See ticket 86c9guh4y.
       if (!audioUnlocked) {
         setAudioUnlocked(true)
+        return
       }
 
+      // Read-aloud gate: block taps until the per-problem read-aloud
+      // has completed. The read-aloud effect flips this ref after
+      // speak() resolves. See ticket 86c9guh4y.
+      if (!readAloudPlayedRef.current) return
+
+      // Block guided-completion path on non-correct chips.
       if (guidedActive && chipWord !== problem.target.word) return
 
       const isCorrect = chipWord === problem.target.word
       if (isCorrect) {
-        if (!audioUnlocked) {
-          gate.wrapSpeak(() => {
-            handleCorrectTap(problem)
-          })
-        } else {
-          handleCorrectTap(problem)
-        }
+        handleCorrectTap(problem)
       } else {
-        if (!audioUnlocked) {
-          gate.wrapSpeak(() => {
-            handleWrongTap(chipWord, problem)
-          })
-        } else {
-          handleWrongTap(chipWord, problem)
-        }
+        handleWrongTap(chipWord, problem)
       }
     },
     [
       audioUnlocked,
-      gate,
       guidedActive,
       handleCorrectTap,
       handleWrongTap,
@@ -775,6 +807,7 @@ function WordSongScreen({
       data-pose={pose}
       data-gate-state={gate.state}
       data-guided={guidedActive ? 'true' : 'false'}
+      data-read-aloud-played={readAloudPlayed ? 'true' : 'false'}
       data-target-word={currentProblem.target.word}
       className="
         relative flex h-full w-full flex-col
@@ -1046,14 +1079,16 @@ function WordSongScreen({
               data-shaking={isShaking ? 'true' : 'false'}
               aria-label={`Picture of ${entry.word}`}
               onClick={() => onChipTap(entry.word)}
-              disabled={problemState.resolved || dimForGuided}
+              disabled={
+                problemState.resolved || dimForGuided || !readAloudPlayed
+              }
               className={`
                 relative flex select-none items-center justify-center
                 rounded-2xl border-[3px] border-my-pink bg-white
                 transition-opacity
                 disabled:cursor-default
                 touch-manipulation
-                ${dimForGuided ? 'opacity-60' : 'opacity-100'}
+                ${dimForGuided || !readAloudPlayed ? 'opacity-60' : 'opacity-100'}
                 ${guidedShimmer ? 'shadow-[0_0_24px_rgba(244,143,177,0.85)]' : 'shadow-[0_4px_12px_rgba(244,143,177,0.18)]'}
               `}
               style={{
@@ -1062,7 +1097,9 @@ function WordSongScreen({
                 minWidth: '60px',
                 minHeight: '60px',
                 cursor:
-                  problemState.resolved || dimForGuided ? 'default' : 'pointer',
+                  problemState.resolved || dimForGuided || !readAloudPlayed
+                    ? 'default'
+                    : 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
                 padding: '8px',
@@ -1073,10 +1110,15 @@ function WordSongScreen({
                   ? reducedMotion
                     ? { scale: 1, opacity: [1, 0.7, 1], y: 0 }
                     : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1, y: 0 }
-                  : { scale: 1, opacity: dimForGuided ? 0.6 : 1, x: 0, y: 0 }
+                  : {
+                      scale: 1,
+                      opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
+                      x: 0,
+                      y: 0,
+                    }
               }
               whileTap={
-                problemState.resolved || dimForGuided
+                problemState.resolved || dimForGuided || !readAloudPlayed
                   ? undefined
                   : { scale: 0.92 }
               }
