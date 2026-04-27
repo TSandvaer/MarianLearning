@@ -167,6 +167,61 @@ export interface AudioContextProbeHandle {
    * window.
    */
   recordUnlockState: (extra?: UnlockStateExtra) => void
+  /**
+   * Diagnostic instrumentation pass (ticket 86c9hjnn8 follow-up). Each
+   * helper below emits a row in the same audioCtxLog timeline so a
+   * single localStorage paste-back covers bundle sanity, prop changes,
+   * Path A settle, dispatch decisions, and Howl-level events.
+   */
+  recordBundleInit: (info: BundleInitInfo) => void
+  recordAudioReadyState: (
+    screen: 'math' | 'wordSong',
+    audioReady: boolean | undefined,
+  ) => void
+  recordPathASettle: (
+    screen: 'math' | 'wordSong',
+    outcome: 'resolve' | 'reject',
+    errorMessage?: string,
+  ) => void
+  recordPlayUtteranceDispatch: (
+    screen: 'math' | 'wordSong',
+    playerKind: 'real' | 'silent-fallback',
+  ) => void
+  recordHowlPlayCall: (info: HowlPlayCallInfo) => void
+  recordHowlPlayEvent: (utteranceId: string, dtFromCallMs: number) => void
+  recordHowlEndEvent: (utteranceId: string, dtFromCallMs: number) => void
+  recordHowlLoaderrorEvent: (
+    utteranceId: string,
+    dtFromCallMs: number,
+    errorMessage: string,
+  ) => void
+}
+
+/**
+ * Information passed to `recordBundleInit`. All fields are optional —
+ * the producer (App.tsx) reads what it can and the helper records
+ * whatever was supplied. Optional rather than required because each
+ * source (commit SHA, SW registration, IDB version) can fail in
+ * production without aborting the bundle-init log.
+ */
+export interface BundleInitInfo {
+  cacheVersion: number
+  storeName: string
+  idbSchemaVersion?: number | null
+  commitSha?: string
+  serviceWorkerScriptUrl?: string | null
+}
+
+/**
+ * Information passed to `recordHowlPlayCall`. Fields mirror the
+ * shape recorded into the AudioCtxEventRecord — see the field docs
+ * on AudioCtxEventRecord for the diagnostic intent.
+ */
+export interface HowlPlayCallInfo {
+  utteranceId: string
+  howlSrc: string
+  howlState: 'unloaded' | 'loading' | 'loaded' | 'unknown'
+  howlDuration: number
 }
 
 /**
@@ -473,6 +528,20 @@ export function startAudioContextProbe(
       | 'howlerState'
       | 'howlerAutoSuspend'
       | 'howlerUnlockMethodCalled'
+      // Ticket 86c9hjnn8 follow-up — diagnostic instrumentation pass
+      | 'cacheVersion'
+      | 'storeName'
+      | 'idbSchemaVersion'
+      | 'commitSha'
+      | 'serviceWorkerScriptUrl'
+      | 'audioReadyValue'
+      | 'pathAScreen'
+      | 'playerKind'
+      | 'howlSrc'
+      | 'howlState'
+      | 'howlDuration'
+      | 'dtFromCallMs'
+      | 'utteranceId'
     > = {},
   ): AudioCtxState {
     const ctxState = readCtxState(ctx)
@@ -515,6 +584,41 @@ export function startAudioContextProbe(
         : {}),
       ...(extra.howlerUnlockMethodCalled !== undefined
         ? { howlerUnlockMethodCalled: extra.howlerUnlockMethodCalled }
+        : {}),
+      // Ticket 86c9hjnn8 follow-up — diagnostic instrumentation pass.
+      // We pass each new field through only when defined so the JSON
+      // stays tight and existing rows (which don't carry these) are
+      // untouched.
+      ...(extra.cacheVersion !== undefined
+        ? { cacheVersion: extra.cacheVersion }
+        : {}),
+      ...(extra.storeName !== undefined ? { storeName: extra.storeName } : {}),
+      ...(extra.idbSchemaVersion !== undefined
+        ? { idbSchemaVersion: extra.idbSchemaVersion }
+        : {}),
+      ...(extra.commitSha !== undefined ? { commitSha: extra.commitSha } : {}),
+      ...(extra.serviceWorkerScriptUrl !== undefined
+        ? { serviceWorkerScriptUrl: extra.serviceWorkerScriptUrl }
+        : {}),
+      ...(extra.audioReadyValue !== undefined
+        ? { audioReadyValue: extra.audioReadyValue }
+        : {}),
+      ...(extra.pathAScreen !== undefined
+        ? { pathAScreen: extra.pathAScreen }
+        : {}),
+      ...(extra.playerKind !== undefined
+        ? { playerKind: extra.playerKind }
+        : {}),
+      ...(extra.howlSrc !== undefined ? { howlSrc: extra.howlSrc } : {}),
+      ...(extra.howlState !== undefined ? { howlState: extra.howlState } : {}),
+      ...(extra.howlDuration !== undefined
+        ? { howlDuration: extra.howlDuration }
+        : {}),
+      ...(extra.dtFromCallMs !== undefined
+        ? { dtFromCallMs: extra.dtFromCallMs }
+        : {}),
+      ...(extra.utteranceId !== undefined
+        ? { utteranceId: extra.utteranceId }
         : {}),
     }
     recordAudioCtxEvent(record)
@@ -679,6 +783,100 @@ export function startAudioContextProbe(
     })
   }
 
+  function recordBundleInit(info: BundleInitInfo): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('bundle-init', ctx, {
+      cacheVersion: info.cacheVersion,
+      storeName: info.storeName,
+      ...(info.idbSchemaVersion !== undefined
+        ? { idbSchemaVersion: info.idbSchemaVersion }
+        : {}),
+      ...(info.commitSha !== undefined ? { commitSha: info.commitSha } : {}),
+      ...(info.serviceWorkerScriptUrl !== undefined
+        ? { serviceWorkerScriptUrl: info.serviceWorkerScriptUrl }
+        : {}),
+    })
+  }
+
+  function recordAudioReadyState(
+    screen: 'math' | 'wordSong',
+    audioReady: boolean | undefined,
+  ): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('audio-ready-state', ctx, {
+      pathAScreen: screen,
+      audioReadyValue:
+        audioReady === undefined ? 'undefined' : audioReady ? 'true' : 'false',
+    })
+  }
+
+  function recordPathASettle(
+    screen: 'math' | 'wordSong',
+    outcome: 'resolve' | 'reject',
+    errorMessage?: string,
+  ): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit(outcome === 'resolve' ? 'pathA-resolve' : 'pathA-reject', ctx, {
+      pathAScreen: screen,
+      ...(errorMessage !== undefined ? { errorMessage } : {}),
+    })
+  }
+
+  function recordPlayUtteranceDispatch(
+    screen: 'math' | 'wordSong',
+    playerKind: 'real' | 'silent-fallback',
+  ): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('play-utterance-dispatch', ctx, {
+      pathAScreen: screen,
+      playerKind,
+    })
+  }
+
+  function recordHowlPlayCall(info: HowlPlayCallInfo): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('howl-play-call', ctx, {
+      utteranceId: info.utteranceId,
+      howlSrc: info.howlSrc,
+      howlState: info.howlState,
+      howlDuration: info.howlDuration,
+    })
+  }
+
+  function recordHowlPlayEvent(
+    utteranceId: string,
+    dtFromCallMs: number,
+  ): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('howl-play-event', ctx, { utteranceId, dtFromCallMs })
+  }
+
+  function recordHowlEndEvent(utteranceId: string, dtFromCallMs: number): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('howl-end-event', ctx, { utteranceId, dtFromCallMs })
+  }
+
+  function recordHowlLoaderrorEvent(
+    utteranceId: string,
+    dtFromCallMs: number,
+    errorMessage: string,
+  ): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('howl-loaderror-event', ctx, {
+      utteranceId,
+      dtFromCallMs,
+      errorMessage,
+    })
+  }
+
   return {
     stop,
     sampleNow,
@@ -687,6 +885,14 @@ export function startAudioContextProbe(
     recordSpeakSkipped,
     recordHandlerError,
     recordUnlockState,
+    recordBundleInit,
+    recordAudioReadyState,
+    recordPathASettle,
+    recordPlayUtteranceDispatch,
+    recordHowlPlayCall,
+    recordHowlPlayEvent,
+    recordHowlEndEvent,
+    recordHowlLoaderrorEvent,
   }
 }
 
@@ -809,6 +1015,76 @@ export function recordHandlerErrorEvent(error: unknown): void {
 export function recordUnlockStateEvent(extra?: UnlockStateExtra): void {
   if (!activeProbe) return
   activeProbe.recordUnlockState(extra)
+}
+
+/**
+ * Diagnostic instrumentation pass (ticket 86c9hjnn8 follow-up). All
+ * singleton wrappers below are no-ops when no probe is active, so
+ * production sessions (no `?debug=1`) pay only a null check per call.
+ *
+ * The producers are scattered across the audio chain — App.tsx for
+ * `bundle-init` + `pathA-*`, Math/WordSong for `audio-ready-state` +
+ * `play-utterance-dispatch`, sessionAudio.ts for `howl-*-event`. Each
+ * uses the appropriate wrapper below.
+ */
+export function recordBundleInitEvent(info: BundleInitInfo): void {
+  if (!activeProbe) return
+  activeProbe.recordBundleInit(info)
+}
+
+export function recordAudioReadyStateEvent(
+  screen: 'math' | 'wordSong',
+  audioReady: boolean | undefined,
+): void {
+  if (!activeProbe) return
+  activeProbe.recordAudioReadyState(screen, audioReady)
+}
+
+export function recordPathASettleEvent(
+  screen: 'math' | 'wordSong',
+  outcome: 'resolve' | 'reject',
+  errorMessage?: string,
+): void {
+  if (!activeProbe) return
+  activeProbe.recordPathASettle(screen, outcome, errorMessage)
+}
+
+export function recordPlayUtteranceDispatchEvent(
+  screen: 'math' | 'wordSong',
+  playerKind: 'real' | 'silent-fallback',
+): void {
+  if (!activeProbe) return
+  activeProbe.recordPlayUtteranceDispatch(screen, playerKind)
+}
+
+export function recordHowlPlayCallEvent(info: HowlPlayCallInfo): void {
+  if (!activeProbe) return
+  activeProbe.recordHowlPlayCall(info)
+}
+
+export function recordHowlPlayEventEvent(
+  utteranceId: string,
+  dtFromCallMs: number,
+): void {
+  if (!activeProbe) return
+  activeProbe.recordHowlPlayEvent(utteranceId, dtFromCallMs)
+}
+
+export function recordHowlEndEventEvent(
+  utteranceId: string,
+  dtFromCallMs: number,
+): void {
+  if (!activeProbe) return
+  activeProbe.recordHowlEndEvent(utteranceId, dtFromCallMs)
+}
+
+export function recordHowlLoaderrorEventEvent(
+  utteranceId: string,
+  dtFromCallMs: number,
+  errorMessage: string,
+): void {
+  if (!activeProbe) return
+  activeProbe.recordHowlLoaderrorEvent(utteranceId, dtFromCallMs, errorMessage)
 }
 
 /**

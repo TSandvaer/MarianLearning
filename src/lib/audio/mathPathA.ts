@@ -248,6 +248,14 @@ export async function prepareMathPathA(
       onWordTick: playOpts?.onWordTick,
     })
   }
+  // Diagnostic tag (ticket 86c9hjnn8 follow-up). Lets Math.tsx tell apart
+  // "real Path A player wired" from "silent fallback" without === ref
+  // comparison against the default — the `===` approach is brittle when
+  // React re-creates closures for memoization. The tag is read by
+  // `getPlayerKind()` in `lib/debug/playerKind.ts`.
+  ;(
+    playUtterance as PlayMathUtteranceFn & { __playerKind?: 'real' }
+  ).__playerKind = 'real'
 
   return {
     playUtterance,

@@ -32,6 +32,8 @@
 // Never import from the browser bundle — `tsconfig.api.json` keeps it
 // scoped to `api/`.
 
+import { createHash } from 'node:crypto'
+
 const AZURE_TTS_PATH = '/cognitiveservices/v1'
 
 /** Output format header value. Matches what the Greet pre-recorded MP3s use
@@ -284,6 +286,44 @@ export async function synthesizeUtterance(
   const { key, region } = readAzureCredentials(opts.env)
   const endpoint = buildAzureEndpoint(region)
   const body = buildSsmlBody(req)
+
+  // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). Logs the
+  // SSML body fingerprint to Vercel function logs so we can correlate
+  // a "client played silently" iPad capture with whatever SSML the
+  // server actually rendered. No client-side gate — this is on Vercel
+  // logs which are private and only carry text we constructed (no PII;
+  // every input here is non-user content from the static session
+  // plan). Fields:
+  //   - ssmlPreview: first 200 chars of the SSML body
+  //   - ssmlSha256: full SHA256 hash of the body — lets us check if
+  //     two utterances rendered the same SSML, and lets us match a
+  //     server log to a client cache hit.
+  //   - ssmlLength: total length so a "got 800B back, expected ~3KB"
+  //     mismatch is one-shot diagnosable.
+  //   - voice / rate / pitch: the per-utterance prosody combo.
+  // The log line is structured (single console.log of an object) so
+  // Vercel's log explorer keeps it queryable.
+  //
+  // Suppressed under `NODE_ENV === 'test'` so the existing _tts test
+  // suite doesn't gain ~37 noisy log lines per run. Vercel's
+  // serverless runtime sets NODE_ENV='production', so the log fires
+  // exactly where we want it (real /api/_tts invocations). We read
+  // process.env directly here (not opts.env) — opts.env is the Azure
+  // credential override, but the test-suppression flag is a runtime
+  // property of the host node process, which is what NODE_ENV
+  // actually reflects.
+  const suppressLog = process.env.NODE_ENV === 'test'
+  if (!suppressLog) {
+    console.log({
+      event: 'tts-render',
+      voice: req.voice,
+      rate: req.rate,
+      pitch: req.pitch,
+      ssmlLength: body.length,
+      ssmlPreview: body.slice(0, 200),
+      ssmlSha256: createHash('sha256').update(body).digest('hex'),
+    })
+  }
 
   // AbortController gives us a cancellation handle the fetch implementation
   // honours natively. We wrap it in the existing setTimeout/clearTimeout

@@ -1,5 +1,8 @@
 export { default as DebugOverlay } from './DebugOverlay'
 export { isDebugEnabled } from './isDebugEnabled'
+export { emitBundleInit } from './bundleInit'
+export { getPlayerKind } from './playerKind'
+export type { PlayerKindTagged } from './playerKind'
 export {
   recordSpeakAttempt,
   recordSpeakStatus,
@@ -33,6 +36,14 @@ export {
   recordSpeakSkippedEvent,
   recordHandlerErrorEvent,
   recordUnlockStateEvent,
+  recordBundleInitEvent,
+  recordAudioReadyStateEvent,
+  recordPathASettleEvent,
+  recordPlayUtteranceDispatchEvent,
+  recordHowlPlayCallEvent,
+  recordHowlPlayEventEvent,
+  recordHowlEndEventEvent,
+  recordHowlLoaderrorEventEvent,
   AUDIO_CTX_LOG_STORAGE_KEY,
   _resetAudioContextProbeForTests,
 } from './audioContextProbe'
@@ -40,4 +51,6 @@ export type {
   AudioContextProbeHandle,
   AudioContextProbeOptions,
   UnlockStateExtra,
+  BundleInitInfo,
+  HowlPlayCallInfo,
 } from './audioContextProbe'

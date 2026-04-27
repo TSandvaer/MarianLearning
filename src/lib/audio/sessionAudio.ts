@@ -51,6 +51,12 @@
 
 import { Howl } from 'howler'
 import type { Utterance } from '../../../api/_types'
+import {
+  recordHowlEndEventEvent,
+  recordHowlLoaderrorEventEvent,
+  recordHowlPlayCallEvent,
+  recordHowlPlayEventEvent,
+} from '../debug/audioContextProbe'
 
 /** Minimal Howl-shape we depend on. Identical to preRecorded.HowlLike;
  *  duplicated rather than imported to keep the modules independent. */
@@ -260,6 +266,60 @@ export function createIndexedDbCache(): SessionAudioCache {
   }
 }
 
+/**
+ * Diagnostic helper (ticket 86c9hjnn8 follow-up). Reads Howler's
+ * non-public `_src` and `_state` properties defensively. Howler's
+ * public API doesn't expose `_src` (the internal source list it picks
+ * from to feed `<audio>` / WebAudio) — but it's stable across versions
+ * and is exactly the field we want for the audioCtxLog row. Truncated
+ * to the first 80 chars to avoid 4 KB blob URLs blowing the storage
+ * budget.
+ *
+ * Returns a normalised shape so the caller never has to inspect the
+ * Howl internals. All reads are wrapped in try/catch — if Howler
+ * renames a field we degrade to `'unknown'` rather than crash.
+ */
+export function readHowlInternals(howl: HowlLike): {
+  howlSrc: string
+  howlState: 'unloaded' | 'loading' | 'loaded' | 'unknown'
+  howlDuration: number
+} {
+  let howlSrc = ''
+  try {
+    const raw = (howl as unknown as { _src?: unknown })._src
+    if (typeof raw === 'string') {
+      howlSrc = raw
+    } else if (Array.isArray(raw) && typeof raw[0] === 'string') {
+      howlSrc = raw[0]
+    }
+  } catch {
+    // best-effort
+  }
+  // Truncate to the first 80 chars. Blob URLs run ~70 chars; remote
+  // MP3 paths fit comfortably. Keeps the JSON tight.
+  if (howlSrc.length > 80) howlSrc = howlSrc.slice(0, 80)
+
+  let howlState: 'unloaded' | 'loading' | 'loaded' | 'unknown' = 'unknown'
+  try {
+    if (typeof howl.state === 'function') {
+      const s = howl.state()
+      if (s === 'unloaded' || s === 'loading' || s === 'loaded') howlState = s
+    }
+  } catch {
+    // best-effort
+  }
+
+  let howlDuration = 0
+  try {
+    const d = howl.duration()
+    if (typeof d === 'number' && Number.isFinite(d)) howlDuration = d
+  } catch {
+    // best-effort
+  }
+
+  return { howlSrc, howlState, howlDuration }
+}
+
 /** Decode a base64 string into a Uint8Array. Browser-side only — uses
  *  `atob`. Pulled out as a helper so tests can sanity-check. */
 export function base64ToBytes(b64: string): Uint8Array {
@@ -451,8 +511,15 @@ export function createSessionAudio(
         settleReject(new Error('cancelled'))
       }
 
+      // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). Capture
+      // the play-call timestamp so each Howl event row carries a delta —
+      // the iPad export shows whether play() → onPlay landed within ms,
+      // seconds, or never.
+      let playCallTimestamp = 0
+
       howl.on('play', () => {
         if (resolved || stopped) return
+        recordHowlPlayEventEvent(utteranceId, Date.now() - playCallTimestamp)
         playOpts.onPlay?.()
         playOpts.onWordTick?.(0)
         if (wordCount > 1) {
@@ -477,22 +544,49 @@ export function createSessionAudio(
       })
 
       howl.on('end', () => {
+        recordHowlEndEventEvent(utteranceId, Date.now() - playCallTimestamp)
         settleResolve()
       })
 
       howl.on('loaderror', () => {
+        recordHowlLoaderrorEventEvent(
+          utteranceId,
+          Date.now() - playCallTimestamp,
+          `loaderror for utterance "${utteranceId}"`,
+        )
         settleReject(
           new Error(`[sessionAudio] loaderror for utterance "${utteranceId}"`),
         )
       })
 
       howl.on('playerror', () => {
+        // playerror also lands as a loaderror-class diagnostic — the
+        // distinction (couldn't decode vs. couldn't play a decoded
+        // sample) is iPad-significant and the Howler-side error
+        // message is the only signal we have. Reuse the loaderror row
+        // to keep the export schema small.
+        recordHowlLoaderrorEventEvent(
+          utteranceId,
+          Date.now() - playCallTimestamp,
+          `playerror for utterance "${utteranceId}"`,
+        )
         settleReject(
           new Error(`[sessionAudio] playerror for utterance "${utteranceId}"`),
         )
       })
 
       try {
+        // Diagnostic snapshot taken immediately before the play call so
+        // the row in the audioCtxLog reflects the engine state Howler
+        // saw at dispatch time.
+        const internals = readHowlInternals(howl)
+        playCallTimestamp = Date.now()
+        recordHowlPlayCallEvent({
+          utteranceId,
+          howlSrc: internals.howlSrc,
+          howlState: internals.howlState,
+          howlDuration: internals.howlDuration,
+        })
         howl.play()
       } catch (err) {
         settleReject(

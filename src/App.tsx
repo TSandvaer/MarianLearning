@@ -24,7 +24,9 @@ import type { SessionEndPayload } from './screens/SessionEnd'
 import {
   DebugOverlay,
   activateAudioContextProbe,
+  emitBundleInit,
   isDebugEnabled,
+  recordPathASettleEvent,
 } from './lib/debug'
 import { disableHowlerAutoSuspend } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
@@ -183,6 +185,13 @@ export default function App() {
     if (!debugOn) return
     activateAudioContextProbe()
     // Deliberate: no cleanup. See above for rationale.
+
+    // Bundle / cache sanity probe (ticket 86c9hjnn8 follow-up). Emitted
+    // once per App mount, AFTER the probe is active so the bundle-init
+    // row lands at the top of Thomas's audioCtxLog export. The async
+    // reads (IDB schema version, SW script URL) are best-effort; the
+    // probe handles any partial result gracefully.
+    void emitBundleInit()
   }, [debugOn])
 
   // ── Math screen — Path A live audio wiring (ticket 86c9gumgk item F) ──
@@ -296,6 +305,11 @@ export default function App() {
           return
         }
         mathUnloadRef.current = prepared.unload
+        // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up).
+        // Records the resolve in the audioCtxLog timeline so the iPad
+        // export shows when the pre-warm finished. Fires BEFORE the
+        // setStates so the timestamp pairs with the prop flip cleanly.
+        recordPathASettleEvent('math', 'resolve')
         // Wrap in a thunk so React doesn't call the function before storing
         // it (useState treats function arg as a lazy initializer).
         setMathPlay(() => prepared.playUtterance)
@@ -311,6 +325,14 @@ export default function App() {
           // effect's reset to false. Silent.
           return
         }
+        // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up).
+        // Records the rejection with its message so the iPad export
+        // attributes the silent-fallback path to a concrete cause.
+        recordPathASettleEvent(
+          'math',
+          'reject',
+          err instanceof Error ? err.message : String(err),
+        )
         console.warn(
           '[App] Math Path A unavailable; using silent fallback:',
           err,
@@ -430,11 +452,19 @@ export default function App() {
           return
         }
         wordSongUnloadRef.current = prepared.unload
+        // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). See
+        // the Math fetch-effect for the rationale.
+        recordPathASettleEvent('wordSong', 'resolve')
         setWordSongPlay(() => prepared.playUtterance)
         setWordSongAudioReady(true)
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
+        recordPathASettleEvent(
+          'wordSong',
+          'reject',
+          err instanceof Error ? err.message : String(err),
+        )
         console.warn(
           '[App] Word Song Path A unavailable; using silent fallback:',
           err,
