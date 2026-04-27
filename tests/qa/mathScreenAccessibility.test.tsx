@@ -64,7 +64,7 @@ vi.mock('../../src/lib/sfx', () => ({
 import Math from '../../src/screens/Math/Math'
 import type { PlayMathUtteranceFn } from '../../src/screens/Math/Math'
 import type { MathSessionPlan } from '../../src/screens/Math/sessionPlans'
-import type { StorageAdapter } from '../../src/screens/Math/stardust'
+import type { StorageAdapter } from '../../src/screens/_shared/stardust'
 
 function withMotion(node: ReactNode) {
   return (

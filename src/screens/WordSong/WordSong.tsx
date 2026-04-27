@@ -14,7 +14,7 @@ import {
   writeStardust,
   type StardustState,
   type StorageAdapter,
-} from '../Math/stardust'
+} from '../_shared/stardust'
 import {
   pickStaticWordSongPlan,
   type WordSongSessionPlan,

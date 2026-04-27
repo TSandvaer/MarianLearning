@@ -32,7 +32,7 @@ vi.mock('../../lib/sfx', () => ({
 import WordSong from './WordSong'
 import type { PlayWordSongUtteranceFn } from './WordSong'
 import type { WordSongSessionPlan } from './wordSessionPlans'
-import { STARDUST_STORAGE_KEY, type StorageAdapter } from '../Math/stardust'
+import { STARDUST_STORAGE_KEY, type StorageAdapter } from '../_shared/stardust'
 import { getWordEntry } from './wordPack'
 
 function withMotion(node: ReactNode) {
