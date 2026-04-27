@@ -185,8 +185,15 @@ export interface WordSongProps {
   now?: () => Date
   /** Test seam: spy on the per-gesture `Howler.ctx.resume()` kick. */
   resumeAudioContext?: () => void
-  /** Test seam: spy on the per-gesture iOS audio-session unlock. */
-  unlockAudioSession?: () => void
+  /**
+   * Test seam: spy on the per-gesture iOS audio-session unlock.
+   *
+   * Optional Phase-8 (ticket 86c9gvd0y) return shape carrying
+   * `howlerUnlockMethodCalled` for the unlock-state probe row.
+   */
+  unlockAudioSession?: () => {
+    howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
+  } | void
 }
 
 // ── Default no-op playback (silent-but-captioned fallback) -----------------
@@ -654,8 +661,12 @@ function WordSongScreen({
       // (pool=N → pool=10) in the iPad export.
       recordUnlockStateEvent()
       resumeAudioCtx()
-      unlockAudioSessionFn()
-      recordUnlockStateEvent()
+      const unlockResult = unlockAudioSessionFn()
+      // Phase-8 (ticket 86c9gvd0y): thread the helper's
+      // `howlerUnlockMethodCalled` outcome through.
+      recordUnlockStateEvent({
+        howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+      })
 
       if (!audioUnlocked) {
         setAudioUnlocked(true)

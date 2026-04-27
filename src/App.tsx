@@ -26,10 +26,46 @@ import {
   activateAudioContextProbe,
   isDebugEnabled,
 } from './lib/debug'
+import { disableHowlerAutoSuspend } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
 import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
+
+/**
+ * Phase-8 fix (ticket 86c9gvd0y) — disable Howler's internal `_autoSuspend`
+ * timer ONCE at module load.
+ *
+ * The 30-second iPad audio-decay bug Thomas reproduced is caused by
+ * Howler's own `_autoSuspend` mechanism (howler.js line 461-505): after
+ * 30 s with no sound playing, Howler flips `Howler.state` to `'suspending'`
+ * → `'suspended'` and calls `Howler.ctx.suspend()`. On the next gesture,
+ * `Howl.play()` checks `Howler.state === 'running'` (line 886) — finds
+ * it `'suspended'` — and defers playback to a `'resume'` event that, on
+ * iPad PWA after long idle, sometimes never fires.
+ *
+ * `Howler.autoSuspend = false` (the public, documented option from the
+ * library) suppresses the entire timer. `Howler.state` never leaves
+ * `'running'` after the first play, `play()` always takes the synchronous
+ * fast path, and `_emit('play', id)` always fires — fixing exactly the
+ * "speak-call lands but speak-onplay never fires" symptom Phase-7's iPad
+ * capture localized.
+ *
+ * Done at module top level (not inside React) for two reasons:
+ *
+ *   1. Howler's `_autoSuspend` runs as soon as a sound finishes. The
+ *      Greet chime at line 0 plays on splash auto-advance — we want
+ *      `autoSuspend` already disabled by then. A `useEffect` after first
+ *      render is a microtask too late.
+ *   2. The setting is global to the Howler singleton; running it once at
+ *      module load is sufficient for the lifetime of the page.
+ *
+ * No production cost: one boolean property write at startup. Power impact
+ * of leaving the WebAudio graph alive is negligible (Safari parks the
+ * audio thread when no nodes are connected; our session has nothing
+ * connected when idle).
+ */
+disableHowlerAutoSuspend()
 
 /**
  * Optional initial-route override via `?route=literacy` etc. Used for

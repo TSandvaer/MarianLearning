@@ -207,6 +207,35 @@ export interface AudioCtxEventRecord {
    * — diagnostic for "did Howler enter its unlock pathway at all".
    */
   howlerHasScratchBuffer?: boolean
+  /**
+   * For `cause === 'unlock-state'` rows (Phase-8, ticket 86c9gvd0y):
+   * `Howler.state` — the Howler-internal state machine value (NOT the
+   * WebAudio `AudioContext.state`). Howler's `_autoSuspend` flips this
+   * between `'running'`, `'suspending'`, and `'suspended'` independently
+   * of `ctx.state`. Exact symptom of the Phase-8 root cause: this is
+   * `'suspended'` at the moment of a failing tap, while `ctxState` reads
+   * `'running'`. After the Phase-8 fix (`autoSuspend = false`) this should
+   * stay `'running'` for the entire session.
+   */
+  howlerState?: 'running' | 'suspending' | 'suspended' | 'unavailable'
+  /**
+   * For `cause === 'unlock-state'` rows (Phase-8, ticket 86c9gvd0y):
+   * `Howler.autoSuspend`. Should be `false` after the Phase-8 boot-time
+   * `disableHowlerAutoSuspend()` call. If we ever see `true` in an iPad
+   * export, the boot-time disable did not land — most likely cause is a
+   * test-mode or hot-reload race where the boot effect didn't run.
+   */
+  howlerAutoSuspend?: boolean
+  /**
+   * For `cause === 'unlock-state'` rows (Phase-8, ticket 86c9gvd0y):
+   * outcome of invoking `Howler._unlockAudio()` from inside the gesture
+   * window. Mirrors the same-named field on
+   * `UnlockIosAudioSessionResult`. Captures whether the Howler-internal
+   * unlock method was reachable / called / threw at the moment of the
+   * gesture — diagnostic-only; Phase-5/6 fallbacks remain authoritative
+   * for the iOS contract.
+   */
+  howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
 }
 
 export interface DebugSnapshot {

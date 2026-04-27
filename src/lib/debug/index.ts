@@ -39,4 +39,5 @@ export {
 export type {
   AudioContextProbeHandle,
   AudioContextProbeOptions,
+  UnlockStateExtra,
 } from './audioContextProbe'

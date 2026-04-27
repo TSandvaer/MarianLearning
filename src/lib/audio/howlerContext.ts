@@ -640,6 +640,23 @@ export interface UnlockIosAudioSessionResult {
    * threw.
    */
   poolFilled?: number
+  /**
+   * Phase-8 (ticket 86c9gvd0y): outcome of invoking Howler's internal
+   * `_unlockAudio()` inside the gesture window.
+   *
+   *   - `'called'` — `Howler._unlockAudio` exists and we invoked it.
+   *     Howler's own implementation guards on `_audioUnlocked`, so this
+   *     does not double-unlock; it just gives Howler a chance to install
+   *     its document-capture listeners again on the rare iOS edge case
+   *     where its first install was missed.
+   *   - `'missing'` — `Howler._unlockAudio` was not a function (Howler
+   *     renamed the method, or we are running against a Howler stub /
+   *     test fake that doesn't expose it). The Phase-5/6 fallbacks below
+   *     still run and are sufficient for the documented iOS contract.
+   *   - `'threw'` — calling `Howler._unlockAudio()` threw synchronously.
+   *     Diagnostic only — we swallow and continue.
+   */
+  howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
 }
 
 /**
@@ -706,6 +723,14 @@ export interface UnlockIosAudioSessionOptions extends ResumeAudioContextOptions 
    * how many constructions ran without standing up the real DOM Audio.
    */
   AudioCtor?: new () => unknown
+  /**
+   * Phase-8 test seam (ticket 86c9gvd0y) — the Howler-shaped object whose
+   * `_unlockAudio` method we should invoke inside the gesture window.
+   * Defaults to the imported `Howler` singleton in production. Tests pass
+   * a fake `{ _unlockAudio: vi.fn() }` (or omit the method to simulate
+   * Howler renaming it).
+   */
+  howlerUnlockHost?: { _unlockAudio?: unknown }
 }
 
 export function unlockIosAudioSession(
@@ -788,6 +813,74 @@ export function unlockIosAudioSession(
 
   const poolAfter = pool ? pool.length : poolBefore
 
+  // Phase-8 (ticket 86c9gvd0y). Invoke Howler's internal `_unlockAudio()`
+  // synchronously inside the gesture window, between the pool refill
+  // (Phase-6) and the silent-buffer kick (Phase-5).
+  //
+  // Why this is here
+  // ----------------
+  // Phase-7's iPad capture proved `ctx.state` reaches `'running'` and our
+  // synchronous `Howl.play()` call gets a valid sound id — yet the
+  // `'play'` event still never fires after a long-idle window. Inspection
+  // of `node_modules/howler/dist/howler.js` reveals the smoking gun: the
+  // OUTER `_unlockAudio` (line 301) is idempotent-guarded by
+  // `_audioUnlocked`. On the first gesture it installs a document-level
+  // `touchstart`/`touchend`/`click`/`keydown` capture listener (lines
+  // 408-412) whose body (lines 327-405) is what actually:
+  //   - fills the HTML5 pool with `new Audio()` objects (line 334-348)
+  //   - plays Howler's own scratch buffer (line 372-381)
+  //   - calls `ctx.resume()` from inside the gesture (line 384-386)
+  //   - sets `_audioUnlocked = true` and removes its own listeners (line
+  //     393-399, inside the buffer source's `onended` handler)
+  //
+  // On the long-idle iPad path, our React handler runs BEFORE Howler's
+  // document-capture listener fires (or fires it without driving the full
+  // unlock — iOS gesture-event-dispatch on an app that's been backgrounded
+  // is documented to be non-deterministic). `_audioUnlocked` stays false,
+  // and on the NEXT gesture Howler's `_unlockAudio` short-circuits at
+  // line 305 because — reading the Howler source carefully —
+  // `_audioUnlocked` was never flipped to true (it gets RESET to false at
+  // line 309 each call, but only flips to true inside the `onended`
+  // handler which the document listener body schedules).
+  //
+  // Calling `Howler._unlockAudio()` here re-installs the document-capture
+  // listeners. iOS's hit-testing for the same gesture is stale by this
+  // point, but the listeners stay armed for the NEXT gesture, which is
+  // the realistic recovery path the user will take after the first failed
+  // tap. Belt-and-suspenders alongside our own pool refill (Phase-6) and
+  // silent buffer (Phase-5) — both of which already replicate the
+  // load-bearing side effects of Howler's `unlock(e)` body.
+  //
+  // Wrapped in try/catch because `_unlockAudio` is a leading-underscore
+  // private method on the Howler module; if Howler ever renames it
+  // we want to degrade silently rather than break audio. The Phase-5/6
+  // fallbacks below are sufficient for the documented iOS contract on
+  // their own.
+  let howlerUnlockMethodCalled: 'called' | 'missing' | 'threw' = 'missing'
+  try {
+    const unlockHost =
+      opts.howlerUnlockHost ?? (Howler as unknown as { _unlockAudio?: unknown })
+    const unlockFn = unlockHost?._unlockAudio
+    if (typeof unlockFn === 'function') {
+      try {
+        ;(unlockFn as (this: unknown) => unknown).call(unlockHost)
+        howlerUnlockMethodCalled = 'called'
+      } catch {
+        // Synchronous throw inside `_unlockAudio`. Rare — the documented
+        // implementation is straight-line code that does not throw — but
+        // we never want a private-method invocation to surface as a JS
+        // error to Marian. Swallow and proceed to Phase-5/6 fallbacks.
+        howlerUnlockMethodCalled = 'threw'
+      }
+    }
+  } catch {
+    // Reading `Howler._unlockAudio` itself threw. Lockdown environments
+    // can make property access on the Howler module throw. Swallow and
+    // fall through to the silent-buffer kick — the rest of the helper
+    // is unaffected.
+    howlerUnlockMethodCalled = 'threw'
+  }
+
   try {
     // 1-sample buffer at 22050 Hz: matches Howler's own scratch-buffer
     // shape exactly (see node_modules/howler/dist/howler.js, _unlockAudio).
@@ -813,6 +906,7 @@ export function unlockIosAudioSession(
       ...(poolBefore !== undefined ? { poolBefore } : {}),
       ...(poolAfter !== undefined ? { poolAfter } : {}),
       poolFilled,
+      howlerUnlockMethodCalled,
     }
   } catch {
     // Best-effort. iOS may reject this in obscure edge cases (page is
@@ -824,6 +918,134 @@ export function unlockIosAudioSession(
       ...(poolBefore !== undefined ? { poolBefore } : {}),
       ...(poolAfter !== undefined ? { poolAfter } : {}),
       poolFilled,
+      howlerUnlockMethodCalled,
     }
+  }
+}
+
+/**
+ * Phase-8 fix surface (ticket 86c9gvd0y) — disable Howler's internal
+ * `_autoSuspend` state machine.
+ *
+ * Why this exists
+ * ---------------
+ * Re-reading `node_modules/howler/dist/howler.js` after the Phase-7 iPad
+ * capture surfaced a SECOND mechanism with a 30-second idle threshold —
+ * matching Thomas's stopwatch repro EXACTLY:
+ *
+ *   - `Howler._autoSuspend()` (howler.js line 461) schedules a 30 000 ms
+ *     timer after every sound's `_ended` callback (line 1997).
+ *   - When the timer fires, it sets `Howler.state = 'suspending'` then
+ *     calls `Howler.ctx.suspend()`. On resolve, `Howler.state = 'suspended'`.
+ *   - On the next `Howl.play()`, the play body checks
+ *     `Howler.state === 'running'` (line 886). When the state is
+ *     `'suspended'`, play takes the else branch at line 888-896:
+ *     `_playLock = true; self.once('resume', playWebAudio);` — i.e. it
+ *     defers playback until Howler emits its OWN internal `'resume'`
+ *     event.
+ *   - That `'resume'` event is supposed to be emitted by `_autoResume()`
+ *     (line 528-532) after `ctx.resume().then(...)` resolves. But our
+ *     Phase-7 helper has ALREADY resumed `ctx` synchronously upstream —
+ *     so by the time Howler's `_autoResume()` runs, `ctx.state` is
+ *     already `'running'`. Howler's logic at line 521-523 sees this and
+ *     takes the `else if (self.state === 'suspended' || ...)` branch
+ *     (line 524), calling `ctx.resume()` AGAIN.
+ *
+ * The double-resume is fine on most browsers — `ctx.resume()` on a
+ * running context is a fast no-op. But on long-idle iPad PWA the
+ * second `.then` callback never settles in some captures, so
+ * `Howler.state` stays at `'suspended'` and the deferred `playWebAudio`
+ * is never invoked. The `Howl.play()` call has already returned a sound
+ * id (the one Phase-7 logged: `soundId=1006`), but `_emit('play', id)`
+ * inside `playWebAudio` never fires — exactly the symptom Phase-7
+ * captured.
+ *
+ * The fix
+ * -------
+ * `Howler.autoSuspend = false`. Public, documented option (see
+ * https://github.com/goldfire/howler.js#autosuspend-boolean). Suppresses
+ * the 30 s timer entirely, so `Howler.state` never leaves `'running'`
+ * after the first play, so `play()` always takes the line 887 fast path
+ * (`playWebAudio()` runs synchronously), so `_emit('play', id)` always
+ * fires.
+ *
+ * Why we can't just rely on `awaitHowlerContextResume` (Phase 7)
+ * -------------------------------------------------------------
+ * `awaitHowlerContextResume` operates on `Howler.ctx.state` (the WebAudio
+ * layer). `Howler.state` (the Howler-internal state machine) is
+ * independent — it does NOT mirror `Howler.ctx.state` directly; it is
+ * driven by Howler's own suspend/resume machinery. Our resume helper
+ * lands `ctx.state === 'running'` but Howler-internal state stays at
+ * `'suspended'`, and Howler's `play()` body reads the latter, not the
+ * former.
+ *
+ * Why we don't use this for `playLine`-time recovery
+ * --------------------------------------------------
+ * Setting `autoSuspend = false` once at app boot is the cleanest fix.
+ * Calling it per gesture would also work but adds a property write to
+ * every gesture handler. Boot-time once is sufficient because Howler
+ * reads `self.autoSuspend` at line 485 (inside the timer callback) — a
+ * single boot-time write disables the entire mechanism for the lifetime
+ * of the page.
+ *
+ * Cost
+ * ----
+ * The PWA stays idle indefinitely on Greet (Marian stares at Melody for
+ * minutes). With `autoSuspend = true`, Howler's `_autoSuspend` calls
+ * `ctx.suspend()` which DOES save power (no audio thread running). With
+ * `autoSuspend = false`, the audio thread keeps idling. On iOS the OS
+ * itself manages audio session lifecycle independently — and our Phase-5
+ * silent-buffer kick re-engages the OS audio session per gesture
+ * regardless. The extra power draw of an idle running AudioContext is
+ * negligible on modern hardware (Safari's Web Audio thread parks itself
+ * when nothing is connected), well under the cost of letting the bug
+ * persist.
+ */
+export interface DisableHowlerAutoSuspendResult {
+  /**
+   * Whether the property write succeeded. False when Howler is unreachable
+   * or the property write threw (lockdown environments).
+   */
+  applied: boolean
+  /** The value of `Howler.autoSuspend` BEFORE we wrote to it. */
+  previousValue?: boolean
+}
+
+export interface DisableHowlerAutoSuspendOptions {
+  /**
+   * Test seam — the Howler-shaped target. Production omits this and we
+   * write to the real `Howler` module singleton.
+   */
+  howlerLike?: { autoSuspend?: boolean }
+}
+
+export function disableHowlerAutoSuspend(
+  opts: DisableHowlerAutoSuspendOptions = {},
+): DisableHowlerAutoSuspendResult {
+  const target =
+    opts.howlerLike ?? (Howler as unknown as { autoSuspend?: boolean })
+  let previousValue: boolean | undefined
+  try {
+    const raw = target.autoSuspend
+    if (typeof raw === 'boolean') previousValue = raw
+  } catch {
+    // Property read threw (very unusual). Treat as unreachable — return
+    // applied:false so callers know the disable did not land.
+    return { applied: false }
+  }
+  try {
+    target.autoSuspend = false
+  } catch {
+    // Property write threw — Howler frozen (Object.freeze) or otherwise
+    // restricted. We can't disable autoSuspend; the bug will remain. Log
+    // applied:false so the caller / probe can record the gap.
+    return {
+      applied: false,
+      ...(previousValue !== undefined ? { previousValue } : {}),
+    }
+  }
+  return {
+    applied: true,
+    ...(previousValue !== undefined ? { previousValue } : {}),
   }
 }
