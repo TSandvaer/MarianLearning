@@ -1,12 +1,9 @@
 /**
- * Word Song screen constants — extracted from WordSong.tsx so they can be
- * exported without tripping `react-refresh/only-export-components`.
+ * Word Song screen constants — re-exports from the shared module.
  *
- * Same pattern as Math's `constants.ts`. The streak threshold value is
- * shared with Math (per spec §"Streak treatment" → "Same threshold values
- * as Math: bonuses at 3, 5, 8") — we re-export from Math's constants
- * file so there's a single source of truth and a Thomas decision lands
- * in one place if he ever wants to revisit.
+ * The canonical definition now lives in `_shared/gameplayConstants.ts`.
+ * This file re-exports for backward compatibility with any code that
+ * imports from `./constants` (barrel files, tests).
  */
 
-export { STREAK_BONUS_THRESHOLDS } from '../Math/constants'
+export { STREAK_BONUS_THRESHOLDS } from '../_shared/gameplayConstants'

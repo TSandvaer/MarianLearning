@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
+import { FIRST_UTTERANCE_RETRY_MS } from './_shared/gameplayConstants'
 import { createSfx, type Sfx } from '../lib/sfx'
 import {
   cancelPreRecorded,
@@ -142,35 +143,6 @@ const ICON_PULSE_MS = 600
 const ICON_HOLD_AFTER_PULSE_MS = 2_500
 /** Finger-tap icon fade-out duration. */
 const ICON_FADE_OUT_MS = 400
-/**
- * Watchdog window for "did the audio engine actually start playing" — Dave's
- * contract.
- *
- * Phase-7 (ticket 86c9gvd0y, 2026-04-26): bumped 1_500 → 6_000 ms.
- * `awaitHowlerContextResume` now waits up to 5_000 ms for the AudioContext
- * to actually transition from `'suspended'` → `'running'` (event-driven on
- * `statechange`, sized against the worst-observed 3.6 s cold-iPad latency
- * after long idle). The watchdog must outlast that resume wait plus the
- * ~50 ms Howler play → `onplay` settle time, otherwise the gate relocks
- * before play() ever runs. 6 s is the resume-await ceiling + 1 s slack.
- *
- * The cost: Marian could see up to 6 s of silence between her tap and
- * audio on a worst-case cold-resume. The follow-up (ticket TBD) is to
- * surface a "loading" indicator during the wait — out of scope for this
- * patch; the relock ring remains the safety net.
- *
- * History
- * -------
- *   - 2_000 ms (PRs #18-#22): original Web Speech sizing.
- *   - 5_000 ms (PR #24, round 5): bumped because Web Speech had 3-5 s
- *     first-utterance latency on iPad.
- *   - 1_500 ms (ticket 86c9gqprh): shrunk after the pre-recorded MP3
- *     pivot. Howler `onplay` fires ~50 ms after `play()` once unlocked;
- *     1.5 s was generous for cold-cache decode.
- *   - 6_000 ms (Phase-7, ticket 86c9gvd0y): bumped to accommodate the
- *     event-driven resume await for cold-iPad audio-session resumption.
- */
-const FIRST_UTTERANCE_RETRY_MS = 6_000
 /** Melody's breathing loop period (spec line 166). */
 const BREATHING_PERIOD_S = 2.4
 /** Ring pulse loop period (spec line 167). */

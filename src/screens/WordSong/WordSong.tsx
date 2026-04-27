@@ -20,7 +20,17 @@ import {
   type WordSongSessionPlan,
   type WordSongProblem,
 } from './wordSessionPlans'
-import { STREAK_BONUS_THRESHOLDS } from './constants'
+import {
+  ADVANCE_AFTER_CORRECT_MS,
+  CHIP_TAP_SPRING,
+  FIRST_UTTERANCE_RETRY_MS,
+  GUIDED_AFTER_WRONG_COUNT,
+  HINT_AFTER_WRONG_COUNT,
+  HINT_DELAY_AFTER_WRONG_MS,
+  STREAK_BONUS_THRESHOLDS,
+  STREAK_FADE_OUT_MS,
+  WRONG_SHAKE_MS,
+} from '../_shared/gameplayConstants'
 import { WordPicture } from './wordPictures'
 import type { WordEntry } from './wordPack'
 
@@ -57,18 +67,8 @@ import type { WordEntry } from './wordPack'
  *   snap pose swaps, no stagger.
  */
 
-// ── Constants — single source of truth, mirror the spec --------------------
-
-/** Wrong-attempt count after which the hint utterance fires. Spec §"Wrong-
- *  answer policy" → "After 2 wrong attempts on the same problem". */
-const HINT_AFTER_WRONG_COUNT = 2
-
-/** Wrong-attempt count after which the guided-completion path fires. */
-const GUIDED_AFTER_WRONG_COUNT = 3
-
-/** Auto-advance delay after a correct answer. Spec §"Audio dispatch
- *  sequence on chip tap (correct)" line 388. */
-const ADVANCE_AFTER_CORRECT_MS = 1200
+// ── Constants ── Shared gameplay constants imported from _shared/gameplayConstants.
+// Screen-specific constants remain inline below.
 
 /** Ear-wiggle rotation duration on a correct tap. Bumped from the implicit
  *  pose-swap (~200ms cross-fade) to a visible keyframed rotation per the
@@ -102,28 +102,6 @@ const SPARKLE_BURST_MS = 850
  *  reading values. If Math users report the same complaint, file a
  *  separate Math ticket. */
 const HUD_POP_MS = 400
-
-/** Wrong-tap chip shake duration. Spec §"Wrong-answer policy" item 1. */
-const WRONG_SHAKE_MS = 400
-
-/** Hint reveal delay after the wrong sequence completes. Spec §"Wrong-answer
- *  policy" hint choreography note. */
-const HINT_DELAY_AFTER_WRONG_MS = 600
-
-/** Streak fade-out duration when a wrong tap breaks the streak. */
-const STREAK_FADE_OUT_MS = 400
-
-/**
- * Audio-unlock watchdog window — sized to outlast the event-driven
- * AudioContext resume await (5 000 ms) plus the Howler play → onplay
- * settle (~50 ms) plus slack. Phase-7 (ticket 86c9gvd0y) bumped this
- * from 1 500 ms → 6 000 ms; see Greet.tsx FIRST_UTTERANCE_RETRY_MS for
- * the full history.
- */
-const FIRST_UTTERANCE_RETRY_MS = 6_000
-
-/** Spring preset — chip tap (matches Math). */
-const CHIP_TAP_SPRING = { type: 'spring' as const, stiffness: 300, damping: 18 }
 
 /** Pop tween — drives the 3-keyframe `[1, 1.3, 1]` HUD pop. Duration is
  *  HUD_POP_MS (400ms) — bumped from the prior 250ms per the UX bug
