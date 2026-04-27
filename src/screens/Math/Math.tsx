@@ -405,6 +405,22 @@ function MathScreen({
    *  we keep this one-shot so we don't kick the unlock gate on every chip tap. */
   const [audioUnlocked, setAudioUnlocked] = useState(false)
 
+  /**
+   * True once the per-problem read-aloud has completed. Chips are disabled
+   * until this flips to `true` so Marian cannot tap a chip before hearing
+   * the question — fixing the Session-2+ race where the deferred
+   * `audioUnlocked` effect queued the read-aloud AFTER the user had
+   * already tapped a chip and heard the result utterance.
+   *
+   * Reset to `false` on every problem advance. The ref mirror
+   * (`readAloudPlayedRef`) is the synchronous gate read in `onChipTap`;
+   * the React state drives the visual `disabled` prop on chips.
+   *
+   * See ticket 86c9guh4y.
+   */
+  const [readAloudPlayed, setReadAloudPlayed] = useState(false)
+  const readAloudPlayedRef = useRef(false)
+
   /** Melody's current pose. Driven by tap outcomes + the auto-return timer. */
   const [pose, setPose] = useState<MelodyPose>('idle')
 
@@ -528,6 +544,10 @@ function MathScreen({
    * transition AS LONG AS audio has been unlocked — for the very first
    * problem, the unlock happens via the first chip tap (or via the gate's
    * dispatchGesture path), so the read-aloud is delayed until then.
+   *
+   * After the read-aloud completes, flip `readAloudPlayed` so chips
+   * become tappable. This closes the Session-2+ race where a chip tap
+   * could fire before the question was read. See ticket 86c9guh4y.
    */
   useEffect(() => {
     if (!audioUnlocked) return
@@ -540,7 +560,11 @@ function MathScreen({
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
-      void speak(problem.utterances.read)
+      void speak(problem.utterances.read).then(() => {
+        if (cancelled) return
+        readAloudPlayedRef.current = true
+        setReadAloudPlayed(true)
+      })
     })
     return () => {
       cancelled = true
@@ -566,6 +590,10 @@ function MathScreen({
       wrongCountRef.current = 0
       hintPlayedRef.current = false
       guidedPlayedRef.current = false
+      // Reset the read-aloud gate so chips are disabled until the next
+      // problem's read-aloud completes. See ticket 86c9guh4y.
+      readAloudPlayedRef.current = false
+      setReadAloudPlayed(false)
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
@@ -844,44 +872,35 @@ function MathScreen({
         howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
       })
 
-      // First-tap audio unlock: route the very first user gesture through
-      // the gate and trigger the read-aloud after this tap (the chip-tap
-      // result audio fires in the same handler, so the gate's watchdog
-      // sees an utterance start either way).
+      // First-tap audio unlock: the very first user gesture sets
+      // `audioUnlocked` which triggers the read-aloud effect. We
+      // return immediately WITHOUT dispatching the correct/wrong
+      // handler — chips stay disabled until the read-aloud completes
+      // and flips `readAloudPlayed`. This closes the Session-2+ race
+      // where a chip tap could fire before the question was read aloud,
+      // producing overlapping audio. See ticket 86c9guh4y.
       if (!audioUnlocked) {
         setAudioUnlocked(true)
-        // The read-aloud will fire from the audioUnlocked effect; the
-        // chip-result audio (correct / wrong) is what the gate's watchdog
-        // observes, and that's also kicked synchronously below via speak().
+        return
       }
+
+      // Read-aloud gate: block taps until the per-problem read-aloud
+      // has completed. The read-aloud effect flips this ref after
+      // speak() resolves. See ticket 86c9guh4y.
+      if (!readAloudPlayedRef.current) return
 
       // Block guided-completion path on non-correct chips.
       if (guidedActive && chipValue !== problem.correct) return
 
       const isCorrect = chipValue === problem.correct
       if (isCorrect) {
-        // Wrap the speak call with the gate so the very first chip-tap
-        // utterance is watchdog-tracked. Subsequent calls just speak.
-        if (!audioUnlocked) {
-          gate.wrapSpeak(() => {
-            handleCorrectTap(problem)
-          })
-        } else {
-          handleCorrectTap(problem)
-        }
+        handleCorrectTap(problem)
       } else {
-        if (!audioUnlocked) {
-          gate.wrapSpeak(() => {
-            handleWrongTap(chipValue, problem)
-          })
-        } else {
-          handleWrongTap(chipValue, problem)
-        }
+        handleWrongTap(chipValue, problem)
       }
     },
     [
       audioUnlocked,
-      gate,
       guidedActive,
       handleCorrectTap,
       handleWrongTap,
@@ -908,6 +927,7 @@ function MathScreen({
       data-pose={pose}
       data-gate-state={gate.state}
       data-guided={guidedActive ? 'true' : 'false'}
+      data-read-aloud-played={readAloudPlayed ? 'true' : 'false'}
       className="
         relative flex h-full w-full flex-col
         bg-my-cream text-ink
@@ -1127,7 +1147,9 @@ function MathScreen({
               data-shaking={isShaking ? 'true' : 'false'}
               aria-label={`Answer ${value}`}
               onClick={() => onChipTap(value)}
-              disabled={problemState.resolved || dimForGuided}
+              disabled={
+                problemState.resolved || dimForGuided || !readAloudPlayed
+              }
               className={`
                 relative flex select-none items-center justify-center
                 rounded-3xl border-[3px] border-my-pink bg-white
@@ -1135,7 +1157,7 @@ function MathScreen({
                 transition-opacity
                 disabled:cursor-default
                 touch-manipulation
-                ${dimForGuided ? 'opacity-60' : 'opacity-100'}
+                ${dimForGuided || !readAloudPlayed ? 'opacity-60' : 'opacity-100'}
                 ${guidedShimmer ? 'shadow-[0_0_24px_rgba(244,143,177,0.85)]' : 'shadow-[0_4px_12px_rgba(244,143,177,0.18)]'}
               `}
               style={{
@@ -1144,7 +1166,9 @@ function MathScreen({
                 minWidth: '60px',
                 minHeight: '60px',
                 cursor:
-                  problemState.resolved || dimForGuided ? 'default' : 'pointer',
+                  problemState.resolved || dimForGuided || !readAloudPlayed
+                    ? 'default'
+                    : 'pointer',
                 touchAction: 'manipulation',
                 WebkitTapHighlightColor: 'transparent',
               }}
@@ -1154,10 +1178,14 @@ function MathScreen({
                   ? reducedMotion
                     ? { scale: 1, opacity: [1, 0.7, 1] }
                     : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1 }
-                  : { scale: 1, opacity: dimForGuided ? 0.6 : 1, x: 0 }
+                  : {
+                      scale: 1,
+                      opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
+                      x: 0,
+                    }
               }
               whileTap={
-                problemState.resolved || dimForGuided
+                problemState.resolved || dimForGuided || !readAloudPlayed
                   ? undefined
                   : { scale: 0.92 }
               }
