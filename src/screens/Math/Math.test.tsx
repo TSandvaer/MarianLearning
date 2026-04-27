@@ -1319,4 +1319,166 @@ describe('Math (Number Garden) screen', () => {
       expect(chip).toBeDisabled()
     }
   })
+
+  /*
+   * ╔══════════════════════════════════════════════════════════════════════╗
+   * ║ PRODUCTION SILENT-FAIL REGRESSION TEST — ticket 86c9hf4ef round 2    ║
+   * ║                                                                      ║
+   * ║ Reproduces the EXACT timing of the production bug Thomas captured    ║
+   * ║ on real iPad Safari (PR #88 deploy 95e36f8, screenshot 2026-04-27    ║
+   * ║ 17:54 UTC): caption rendered with the real Path A line, but chips    ║
+   * ║ stayed locked because `setReadAloudPlayed(true)` never fired.        ║
+   * ║                                                                      ║
+   * ║ Root cause: the read-aloud effect used a per-effect-run              ║
+   * ║   `let cancelled = false`                                            ║
+   * ║   ...                                                                ║
+   * ║   return () => { cancelled = true }                                  ║
+   * ║ pair, and bailed the `.then()` on `cancelled === true`. On cold      ║
+   * ║ mount the microtask flips `setAudioUnlocked(true)`, React commits,   ║
+   * ║ the effect re-runs, the previous run's cleanup sets `cancelled=true` ║
+   * ║ — and seconds later when production audio resolves, the .then()     ║
+   * ║ bails and chips never unlock.                                        ║
+   * ║                                                                      ║
+   * ║ Why the existing cold-mount test (above) didn't catch it: it uses    ║
+   * ║ `makePlayHarness()` which resolves `playUtterance` on a single       ║
+   * ║ microtask. That's faster than React's commit, so the .then() fires  ║
+   * ║ BEFORE the cleanup runs, and `cancelled` is still false when the    ║
+   * ║ bail check executes.                                                 ║
+   * ║                                                                      ║
+   * ║ This test forces production timing: `autoResolve: false` keeps the   ║
+   * ║ play promise pending, we explicitly drain enough scheduler ticks for ║
+   * ║ React to commit the audioUnlocked flip + run cleanup, THEN we fire  ║
+   * ║ resolveAll() to mimic Howler's `'end'` event arriving after the      ║
+   * ║ audio actually finished playing.                                     ║
+   * ║                                                                      ║
+   * ║ Pre-fix expectation: chips stay disabled forever (the production    ║
+   * ║ bug). Post-fix expectation: chips become tappable once speak()       ║
+   * ║ resolves, regardless of how late that resolution arrives.            ║
+   * ╚══════════════════════════════════════════════════════════════════════╝
+   */
+  it('cold-mount real-flow: chips unlock even when speak() resolves AFTER the audioUnlocked flip causes the effect to re-run (ticket 86c9hf4ef round 2)', async () => {
+    // autoResolve:false — playUtterance returns a promise we resolve manually.
+    // Mirrors production where Howler's 'end' event fires seconds after play.
+    const harness = makePlayHarness({ autoResolve: false })
+    const getHowlerRunning = vi.fn(() => true)
+
+    render(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    // Drain enough microtasks for the cold-mount fast path to fire:
+    //   1. Read-aloud effect runs (Run 1).
+    //   2. Microtask schedules; flips spokeReadAloudRef + audioUnlocked.
+    //   3. setAudioUnlocked(true) triggers a re-render.
+    //   4. React commits; cleanup of Run 1 fires (pre-fix this set
+    //      cancelled=true on a closure variable the .then() reads).
+    //   5. Effect Run 2 fires; spokeReadAloudRef latch absorbs it.
+    //
+    // After this drain, the speak() promise from Run 1 is still pending —
+    // exactly the production state at the moment the audio is mid-playback.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // The read-aloud was kicked off (proves we entered the fast path).
+    expect(harness.spoken()).toEqual(['Three plus two. How many?'])
+
+    // But the chips MUST still be disabled — the speak() promise hasn't
+    // resolved yet, so readAloudPlayed should still be false.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'false',
+    )
+
+    // Now resolve the speak() promise. In production this corresponds to
+    // Howler firing the `'end'` event after the actual MP3 finished.
+    // Pre-fix: the cleanup-set `cancelled=true` from step 4 above bails the
+    // .then(), and setReadAloudPlayed(true) is NEVER called. Chips stay
+    // disabled forever, screen unreachable — the bug Thomas captured.
+    // Post-fix: the .then() bails only on unmount or problem-advance, so
+    // setReadAloudPlayed(true) fires, chips unlock, Marian can answer.
+    await act(async () => {
+      harness.resolveAll()
+      // Yield enough for the .then() and the React commit it triggers.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+    const chips = screen.getAllByTestId('math-chip')
+    expect(chips).toHaveLength(3)
+    for (const chip of chips) {
+      expect(chip).not.toBeDisabled()
+    }
+
+    // Sanity: only spoke once (the spokeReadAloudRef latch held — no
+    // double-speak across the audioUnlocked re-run).
+    expect(harness.spoken()).toEqual(['Three plus two. How many?'])
+  })
+
+  /*
+   * Companion test: even when `playUtterance` REJECTS (Path A pipeline
+   * failure mid-flow — server tts-failed, blob loaderror, Howler
+   * playerror, etc.), the read-aloud .then() chain MUST still complete so
+   * chips unlock. The screen's `speak()` catches errors and resolves; the
+   * .then() runs regardless of speak's success or failure. This protects
+   * against "audio failed but UI must still unlock" — the reverse of the
+   * original race fix. Brief from ticket 86c9hf4ef round 2.
+   */
+  it('cold-mount real-flow: chips unlock even when playUtterance rejects (Path A pipeline failure — ticket 86c9hf4ef round 2)', async () => {
+    // Build a harness whose playUtterance rejects on the microtask queue.
+    // Mirrors prepareMathPathA's pass-through of a sessionAudio rejection
+    // (loaderror, playerror, "no utterance with id", etc.).
+    const playUtterance: PlayMathUtteranceFn = vi.fn(async (_text, opts) => {
+      return await new Promise<void>((_resolve, reject) => {
+        // Fire onPlay (caption renders) so this matches the screenshot
+        // shape Thomas captured: caption visible, no audio, chips locked.
+        opts?.onPlay?.()
+        // Reject on a later macrotask so the same React-commit timing
+        // window the cancelled-flag race depended on is exercised.
+        setTimeout(
+          () => reject(new Error('[test] simulated Path A failure')),
+          0,
+        )
+      })
+    })
+
+    const getHowlerRunning = vi.fn(() => true)
+
+    render(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={playUtterance}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    })
+
+    // Even on rejection, chips MUST unlock — the gate exists to delay
+    // chip-tap until the read-aloud finishes; if there's no audio at all,
+    // we still don't want a permanently-disabled screen.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-read-aloud-played',
+      'true',
+    )
+    const chips = screen.getAllByTestId('math-chip')
+    for (const chip of chips) {
+      expect(chip).not.toBeDisabled()
+    }
+  })
 })
