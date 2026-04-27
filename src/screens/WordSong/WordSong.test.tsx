@@ -586,26 +586,18 @@ describe('Word Song screen', () => {
     //     and duplicate guided dispatches.
     //
     // Direct mirror of Math 86c9gy7ju / PR #74. The Word Song-specific
-    // wrinkle is an in-flight reprompt lock — Word Song's reprompt-then-
-    // hint/guided chain has an async window between `await speak(reprompt)`
-    // resolving and the hint/guided dispatch decision; the lock prevents
-    // a rapid re-entrant tap from scheduling a second hint/guided pass
-    // while the first reprompt is still in-flight. The lock is observable:
-    // 5 rapid taps fire ONE reprompt (the rest are dropped at the
-    // synchronous re-entry guard), unlike Math where each rapid tap
-    // re-fires the reprompt.
+    // wrinkle is a repromptInFlightRef lock that guards the .then() after
+    // speak(reprompt) — if the problem advances while the reprompt is
+    // in-flight, the stale .then() is a no-op instead of dispatching
+    // hint/guided into the next problem.
     //
-    // This test asserts the strict single-dispatch behaviour:
-    //   - reprompt utterance fires EXACTLY once across the rapid sequence
-    //     — the in-flight lock drops re-entrant taps;
-    //   - hint utterance fires EXACTLY once (or zero — only the first
-    //     reprompt resolves into a single wrongCount=1 bump, not 2 or 3,
-    //     so neither hint nor guided thresholds get crossed by the rapid
-    //     burst alone). After follow-up real wrong taps spaced far enough
-    //     apart, hint then guided will land — that's the next two
-    //     assertions below;
-    //   - guided-active state will eventually latch to true via further
-    //     real (non-re-entrant) taps.
+    // Each rapid tap DOES fire its own reprompt (5 taps → 5 reprompts).
+    // Deduplication is at the hint/guided level via the ref-mirror gates,
+    // not at the reprompt level. This test asserts:
+    //   - reprompt fires once per tap (5 total);
+    //   - hint fires EXACTLY once (ref gate deduplicates);
+    //   - guided fires EXACTLY once (ref gate deduplicates);
+    //   - guided-active state latches to true.
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
     })

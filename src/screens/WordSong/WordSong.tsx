@@ -369,20 +369,11 @@ function WordSongScreen({
   const guidedPlayedRef = useRef(false)
 
   /**
-   * In-flight reprompt lock. Set true at the start of `handleWrongTap`
-   * BEFORE the `await speak(reprompt)` call, cleared in the finally path
-   * after the reprompt-then chain has decided whether to schedule a hint
-   * or enter guided-completion. Word Song's reprompt-then-hint/guided
-   * chain has an async window between `speak(reprompt)` resolving and the
-   * hint/guided dispatch decision; the lock prevents a rapid re-entrant
-   * tap from running a second wrong-tap pass while the first reprompt is
-   * still in-flight.
-   *
-   * Defence-in-depth on top of the synchronous ref-mirror gates above —
-   * the gates already deduplicate hint/guided dispatch, but the lock
-   * also prevents redundant pose-flip + reprompt-utterance churn during
-   * the in-flight window. Specifically called out in ticket 86c9gyb2v as
-   * the difference vs Math 86c9gy7ju / PR #74.
+   * Cross-problem staleness guard. Set true before `speak(reprompt)`,
+   * read inside the `.then()` to skip hint/guided dispatch if the
+   * problem advanced while the reprompt was in-flight. Cleared in the
+   * finally path. Does NOT block concurrent taps from firing their own
+   * reprompts — dedup is at the hint/guided ref-gate level.
    */
   const repromptInFlightRef = useRef(false)
 
