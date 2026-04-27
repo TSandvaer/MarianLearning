@@ -7,7 +7,7 @@ import {
 } from 'motion/react'
 import Splash from './screens/Splash'
 import Greet from './screens/Greet'
-import Math, { pickStaticSessionPlan } from './screens/Math'
+import MathScreen, { pickStaticSessionPlan } from './screens/Math'
 import type {
   MathSessionPlan,
   MathSessionResult,
@@ -303,7 +303,7 @@ export default function App() {
           {route === 'splash' && <Splash key="splash" onAdvance={goGreet} />}
           {route === 'greet' && <Greet key="greet" onAdvance={goMath} />}
           {route === 'math' && (
-            <Math
+            <MathScreen
               key="math"
               plan={mathPlan}
               playUtterance={mathPlay ?? undefined}
