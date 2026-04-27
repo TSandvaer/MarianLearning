@@ -8,12 +8,19 @@ import {
 import Splash from './screens/Splash'
 import Greet from './screens/Greet'
 import Math, { pickStaticSessionPlan } from './screens/Math'
-import type { MathSessionPlan, PlayMathUtteranceFn } from './screens/Math'
+import type {
+  MathSessionPlan,
+  MathSessionResult,
+  PlayMathUtteranceFn,
+} from './screens/Math'
 import WordSong, { pickStaticWordSongPlan } from './screens/WordSong'
 import type {
   PlayWordSongUtteranceFn,
   WordSongSessionPlan,
+  WordSongSessionResult,
 } from './screens/WordSong'
+import SessionEndPlaceholder from './screens/SessionEndPlaceholder'
+import type { SessionEndPayload } from './screens/SessionEndPlaceholder'
 import {
   DebugOverlay,
   activateAudioContextProbe,
@@ -41,6 +48,7 @@ function getInitialRoute(): Route {
       v === 'greet' ||
       v === 'math' ||
       v === 'literacy' ||
+      v === 'session-end' ||
       v === 'reward'
     ) {
       return v
@@ -76,6 +84,52 @@ export default function App() {
   // reachable directly via `?route=literacy` (see `getInitialRoute`)
   // for QA, and the orchestrator's session-sequencer ticket will wire
   // the auto-handoff when it lands.
+
+  /**
+   * Session-End handoff state. Captured from the originating screen's
+   * `onSessionComplete({ ... surface })` callback and surfaced to the
+   * Session-End screen on mount. Persisted in component state (not a
+   * ref) because the placeholder screen reads it during render and we
+   * want React-driven re-render parity with the route flip.
+   *
+   * Until the full Session-End screen lands (blocked on Thomas's CTA
+   * decision in 86c9gugm7), the route resolves to a minimal
+   * `SessionEndPlaceholder` so Marian sees SOMETHING after problem 8
+   * instead of the resolved-but-frozen problem view Thomas reported.
+   * The full screen will replace the placeholder under its own ticket.
+   */
+  const [sessionEndPayload, setSessionEndPayload] =
+    useState<SessionEndPayload | null>(null)
+
+  const handleMathComplete = useCallback((result: MathSessionResult) => {
+    // Math's existing payload omits the `surface` discriminant per
+    // PR #54 / screen-3-math.md:411 — the Session-End spec's
+    // backwards-compat shim defaults missing `surface` to `'math'`
+    // (screen-5-session-end.md:96-102). We materialise the default
+    // here so downstream consumers always see a complete payload.
+    setSessionEndPayload({
+      totalCorrect: result.totalCorrect,
+      totalStardust: result.totalStardust,
+      finalStreak: result.finalStreak,
+      earnedThisSession: result.earnedThisSession,
+      surface: 'math',
+    })
+    setRoute('session-end')
+  }, [])
+
+  const handleWordSongComplete = useCallback(
+    (result: WordSongSessionResult) => {
+      setSessionEndPayload({
+        totalCorrect: result.totalCorrect,
+        totalStardust: result.totalStardust,
+        finalStreak: result.finalStreak,
+        earnedThisSession: result.earnedThisSession,
+        surface: result.surface,
+      })
+      setRoute('session-end')
+    },
+    [],
+  )
 
   // Capture once on mount — flipping debug mid-session would tear the
   // overlay in/out and isn't worth the complexity. To enable, append
@@ -219,6 +273,7 @@ export default function App() {
               key="math"
               plan={mathPlan}
               playUtterance={mathPlay ?? undefined}
+              onSessionComplete={handleMathComplete}
             />
           )}
           {route === 'literacy' && (
@@ -226,6 +281,13 @@ export default function App() {
               key="literacy"
               plan={wordSongPlan}
               playUtterance={wordSongPlay ?? undefined}
+              onSessionComplete={handleWordSongComplete}
+            />
+          )}
+          {route === 'session-end' && (
+            <SessionEndPlaceholder
+              key="session-end"
+              payload={sessionEndPayload}
             />
           )}
         </AnimatePresence>

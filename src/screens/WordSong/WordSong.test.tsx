@@ -817,6 +817,160 @@ describe('Word Song screen', () => {
     )
   })
 
+  // ── Celebration UX bug fix: SFX call site + visible animation markers ──
+  //
+  // Background: Thomas's iPad test pass reported the correct-tap celebration
+  // was "practically not visible" and there was no reward sound. Causes:
+  //  - HUD pop was 250ms — too brief next to the 1200ms auto-advance
+  //  - Sparkle burst was a spring with ~600ms tail — undershot the 800ms target
+  //  - Melody pose-swap was a 200ms cross-fade — no perceptible "wiggle"
+  // Tests below verify the fix without coupling to the exact frame-by-frame
+  // timing values (those live as named constants and can be tweaked).
+
+  it('reward SFX (sparkle + plink) fire on correct tap', async () => {
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // Three SFX instances are created at mount: sparkle, poof, plink.
+    // Order matches the createSfx call order in WordSong.tsx.
+    expect(sfxState.createCount).toBe(3)
+    const [sparkle, poof, plink] = sfxState.instances
+    expect(sparkle.play).not.toHaveBeenCalled()
+    expect(plink.play).not.toHaveBeenCalled()
+
+    const correctChip = screen
+      .getAllByTestId('word-song-chip')
+      .find((c) => c.getAttribute('data-word') === 'cat')!
+
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // Reward SFX both fired exactly once. Poof (wrong-tap SFX) did NOT fire.
+    expect(sparkle.play).toHaveBeenCalledTimes(1)
+    expect(plink.play).toHaveBeenCalledTimes(1)
+    expect(poof.play).not.toHaveBeenCalled()
+  })
+
+  it('reward SFX is wired to the sfx-sparkle.mp3 asset path', async () => {
+    // Documents the asset contract: the sparkle SFX MUST be sourced from
+    // /assets/sfx-sparkle.mp3 (per Math symmetry + assets-todo.md). If the
+    // file path drifts, the test catches it before iPad QA does.
+    const { createSfx } = (await import('../../lib/sfx')) as unknown as {
+      createSfx: ReturnType<typeof vi.fn>
+    }
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={makePlayHarness().playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // Three calls — sparkle, poof, plink — and the sparkle one points at
+    // /assets/sfx-sparkle.mp3.
+    const calls = createSfx.mock.calls.map((c) => c[0])
+    const sparkleCall = calls.find((c) => c.src === '/assets/sfx-sparkle.mp3')
+    expect(sparkleCall).toBeDefined()
+    expect(sparkleCall.volume).toBeGreaterThan(0)
+  })
+
+  it('Melody ear-wiggle is suppressed under prefers-reduced-motion', async () => {
+    const matchMediaSpy = vi
+      .spyOn(window, 'matchMedia')
+      .mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(() => false),
+      }))
+
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const correctChip = screen
+      .getAllByTestId('word-song-chip')
+      .find((c) => c.getAttribute('data-word') === 'cat')!
+
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // AnimatePresence keeps the exiting (idle) and entering (happy)
+    // <m.img> in the DOM concurrently during the cross-fade. Pick the
+    // happy one explicitly — under reduced-motion its wiggle marker is
+    // false even though the pose still flipped.
+    const melodies = screen.getAllByTestId('word-song-melody')
+    const melodyHappy = melodies.find(
+      (el) => el.getAttribute('data-pose') === 'happy',
+    )
+    expect(melodyHappy).toBeDefined()
+    expect(melodyHappy).toHaveAttribute('data-wiggling', 'false')
+
+    matchMediaSpy.mockRestore()
+  })
+
+  it('Melody plays an ear-wiggle on correct tap (data-wiggling=true)', async () => {
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // Idle state: only one Melody node, with no wiggle.
+    const melodyIdle = screen.getByTestId('word-song-melody')
+    expect(melodyIdle).toHaveAttribute('data-pose', 'idle')
+    expect(melodyIdle).toHaveAttribute('data-wiggling', 'false')
+
+    const correctChip = screen
+      .getAllByTestId('word-song-chip')
+      .find((c) => c.getAttribute('data-word') === 'cat')!
+
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // After correct tap, AnimatePresence keeps both the exiting (idle)
+    // and the entering (happy) <m.img> in the tree during the
+    // cross-fade. Find the happy one — it carries the wiggle marker.
+    const melodies = screen.getAllByTestId('word-song-melody')
+    const melodyHappy = melodies.find(
+      (el) => el.getAttribute('data-pose') === 'happy',
+    )
+    expect(melodyHappy).toBeDefined()
+    expect(melodyHappy).toHaveAttribute('data-wiggling', 'true')
+  })
+
   it('renders the picture chip SVG with the correct picture-key data attribute', () => {
     const harness = makePlayHarness()
     render(

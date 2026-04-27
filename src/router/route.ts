@@ -11,6 +11,12 @@
  * (parental dashboard, return-user flow), swap this for react-router and
  * keep the route names — they map 1:1 to path segments.
  */
-export type Route = 'splash' | 'greet' | 'math' | 'literacy' | 'reward'
+export type Route =
+  | 'splash'
+  | 'greet'
+  | 'math'
+  | 'literacy'
+  | 'session-end'
+  | 'reward'
 
 export const FIRST_ROUTE: Route = 'splash'
