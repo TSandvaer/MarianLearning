@@ -7,7 +7,12 @@ import {
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
 } from '../../lib/audio/howlerContext'
-import { recordUnlockStateEvent } from '../../lib/debug/audioContextProbe'
+import {
+  recordAudioReadyStateEvent,
+  recordPlayUtteranceDispatchEvent,
+  recordUnlockStateEvent,
+} from '../../lib/debug/audioContextProbe'
+import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { pickDistractors } from './wordDistractors'
 import {
@@ -468,6 +473,16 @@ function WordSongScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Diagnostic instrumentation (ticket 86c9hjnn8 follow-up) ------------
+
+  /**
+   * Mirror every change of the `audioReady` prop to the audioCtxLog.
+   * See Math.tsx for the rationale.
+   */
+  useEffect(() => {
+    recordAudioReadyStateEvent('wordSong', audioReady)
+  }, [audioReady])
+
   // ── Audio playback wrapper --------------------------------------------
 
   const speak = useCallback(
@@ -487,6 +502,10 @@ function WordSongScreen({
           setCaptionRevealed((prev) => Math.max(prev, wordIndex + 1))
         },
       }
+
+      // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). See
+      // Math.tsx for the rationale.
+      recordPlayUtteranceDispatchEvent('wordSong', getPlayerKind(playUtterance))
 
       try {
         await playUtterance(text, playOpts)

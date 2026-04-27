@@ -3,8 +3,29 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/**
+ * Commit SHA injection for the diagnostic instrumentation pass
+ * (ticket 86c9hjnn8 follow-up). The build resolves the SHA from
+ * Vercel's `VERCEL_GIT_COMMIT_SHA` env var (set automatically on every
+ * Vercel deployment) or from the explicit `VITE_COMMIT_SHA` override
+ * if a caller wants to pin a value. When neither is set we emit
+ * `'unknown'` — the iPad debug overlay reads this to detect "Thomas
+ * loaded a stale service-worker bundle" without requiring any pretty
+ * formatting or git introspection.
+ *
+ * Defined here (not via `loadEnv`) because we want this to flow into
+ * `import.meta.env.VITE_COMMIT_SHA` at build time even when the
+ * variable is named `VERCEL_GIT_COMMIT_SHA` upstream — the rename
+ * happens in this config, not in the Vercel project settings.
+ */
+const commitSha =
+  process.env.VITE_COMMIT_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? 'unknown'
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    'import.meta.env.VITE_COMMIT_SHA': JSON.stringify(commitSha),
+  },
   plugins: [
     react(),
     VitePWA({

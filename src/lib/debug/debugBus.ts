@@ -134,6 +134,71 @@ export interface AudioCtxEventRecord {
     | 'speak-skipped'
     | 'handler-error'
     | 'unlock-state'
+    /**
+     * Diagnostic instrumentation pass (ticket 86c9hjnn8 follow-up). All
+     * fields below land in the same audioCtxLog timeline so a single
+     * paste-back tells us whether the bundle Thomas loaded matches the
+     * deployed commit AND where the audio-readiness chain breaks.
+     */
+    /**
+     * `bundle-init` — emitted exactly once on App mount. Carries
+     * `cacheVersion`, `storeName`, `idbSchemaVersion`, `commitSha`,
+     * `serviceWorkerScriptUrl`. The load-bearing line for tomorrow's
+     * iPad QA: if Thomas's export shows a stale `commitSha` he's
+     * looking at a cached service-worker bundle, not the new code.
+     */
+    | 'bundle-init'
+    /**
+     * `audio-ready-state` — emitted from Math/WordSong when the
+     * `audioReady` prop changes. Carries `audioReadyValue` (boolean
+     * or 'undefined'). Lets us see if the parent's gate ever flipped
+     * to `true` for the screen the user actually sat on.
+     */
+    | 'audio-ready-state'
+    /**
+     * `pathA-resolve` / `pathA-reject` — emitted from App.tsx's
+     * `prepareMathPathA` / `prepareWordSongPathA` settle handlers.
+     * Distinguishes "fetch finished, real player wired" from "fetch
+     * failed, silent fallback path". `pathA-reject` carries
+     * `errorMessage`; both carry `pathAScreen` ('math' | 'wordSong').
+     */
+    | 'pathA-resolve'
+    | 'pathA-reject'
+    /**
+     * `play-utterance-dispatch` — emitted from Math/WordSong's `speak`
+     * helper when it's about to call `playUtterance`. Carries
+     * `playerKind: 'real' | 'silent-fallback'` so the timeline shows
+     * whether the screen reached into the wired Path A player or the
+     * default 165-wpm captioner. Pair with `howl-play-call` for the
+     * full chain.
+     */
+    | 'play-utterance-dispatch'
+    /**
+     * `howl-play-call` — emitted from `sessionAudio.ts` when
+     * `Howl.play()` is invoked. Carries truncated `howlSrc` (first 80
+     * chars of `_src`), `howlState` (Howler's `_state` string), and
+     * `howlDuration` (seconds, from `duration()`).
+     */
+    | 'howl-play-call'
+    /**
+     * `howl-play-event` — Howler's `play` event fired for the howl we
+     * just dispatched. Carries `dtFromCallMs` (delta from the
+     * preceding `howl-play-call` for the same utterance). The
+     * definitive "audio actually started" signal.
+     */
+    | 'howl-play-event'
+    /**
+     * `howl-end-event` — Howler's `end` event fired. Carries
+     * `dtFromCallMs`. If `howl-play-event` lands but `howl-end-event`
+     * never lands, the audio started but stopped early.
+     */
+    | 'howl-end-event'
+    /**
+     * `howl-loaderror-event` — Howler's `loaderror` event fired. The
+     * load-bearing failure mode for "Howl exists but never plays
+     * because it could not decode the blob". Carries `errorMessage`.
+     */
+    | 'howl-loaderror-event'
   /**
    * Optional companion: the audio-unlock-gate state at the same instant.
    * The gate already pushes its state to the bus on every transition;
@@ -229,6 +294,90 @@ export interface AudioCtxEventRecord {
    * for the iOS contract.
    */
   howlerUnlockMethodCalled?: 'called' | 'missing' | 'threw'
+  /**
+   * For `cause === 'bundle-init'` rows (ticket 86c9hjnn8 follow-up):
+   * sessionAudio CACHE_VERSION constant. Mirrored into the log so a
+   * stale-bundle screenshot is one-shot diagnosable.
+   */
+  cacheVersion?: number
+  /**
+   * For `cause === 'bundle-init'` rows: sessionAudio STORE_NAME string
+   * (e.g. `'session-audio-v2'`).
+   */
+  storeName?: string
+  /**
+   * For `cause === 'bundle-init'` rows: the IndexedDB schema version
+   * actually opened (read post-onsuccess). `null` when IndexedDB is
+   * unavailable / the open failed; `undefined` when the probe didn't
+   * try to read the DB version (e.g. running outside a browser).
+   */
+  idbSchemaVersion?: number | null
+  /**
+   * For `cause === 'bundle-init'` rows: the bundle's commit SHA injected
+   * at build time via `vite.config.ts`. `'unknown'` when the env var
+   * wasn't set during the build (local dev, Vercel preview without
+   * `VITE_COMMIT_SHA`). The point is mismatch detection, not pretty
+   * formatting.
+   */
+  commitSha?: string
+  /**
+   * For `cause === 'bundle-init'` rows: the service worker's
+   * `registration.active.scriptURL` — proves we're running from the
+   * registered SW (and tells us which version path it served). `null`
+   * when no SW is active (dev mode, unsupported browser).
+   */
+  serviceWorkerScriptUrl?: string | null
+  /**
+   * For `cause === 'audio-ready-state'` rows: the new value of the
+   * `audioReady` prop on Math or WordSong. We capture `'undefined'`
+   * explicitly (instead of dropping the field) so we can tell apart
+   * "not yet observed" from "observed as false".
+   */
+  audioReadyValue?: 'true' | 'false' | 'undefined'
+  /**
+   * For `cause === 'audio-ready-state'` and `cause === 'pathA-resolve'`
+   * / `'pathA-reject'`: which screen the event is for.
+   */
+  pathAScreen?: 'math' | 'wordSong'
+  /**
+   * For `cause === 'play-utterance-dispatch'` rows: whether the
+   * function reference Math/WordSong invoked is the real Path A
+   * player (tagged with `playerKind = 'real'` by `mathPathA.ts` /
+   * `wordSongPathA.ts`) or the in-screen `defaultPlayUtterance`
+   * silent fallback.
+   */
+  playerKind?: 'real' | 'silent-fallback'
+  /**
+   * For `cause === 'howl-play-call'` rows: the Howl's `_src` truncated
+   * to the first 80 chars. Truncation avoids 4 KB blob-URL strings
+   * blowing the localStorage budget.
+   */
+  howlSrc?: string
+  /**
+   * For `cause === 'howl-play-call'` rows: the Howl's internal
+   * `_state` ('unloaded' | 'loading' | 'loaded'). If a `howl-play-call`
+   * row carries `'unloaded'` and never gets a paired `howl-play-event`,
+   * the howl never decoded.
+   */
+  howlState?: 'unloaded' | 'loading' | 'loaded' | 'unknown'
+  /**
+   * For `cause === 'howl-play-call'` rows: `howl.duration()` in
+   * seconds. `0` means Howler couldn't read a duration — the screen
+   * falls back to 165-wpm caption pacing in that case.
+   */
+  howlDuration?: number
+  /**
+   * For `cause === 'howl-play-event'`, `'howl-end-event'`,
+   * `'howl-loaderror-event'`: ms delta from the matching
+   * `howl-play-call` for the same utterance id.
+   */
+  dtFromCallMs?: number
+  /**
+   * For `cause === 'howl-play-call'` and the `howl-*-event` family:
+   * the utterance id this row pairs to. Lets the export pair calls
+   * with their event responses across interleaved rows.
+   */
+  utteranceId?: string
 }
 
 export interface DebugSnapshot {

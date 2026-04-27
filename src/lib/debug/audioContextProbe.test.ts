@@ -3,7 +3,15 @@ import {
   AUDIO_CTX_LOG_STORAGE_KEY,
   _resetAudioContextProbeForTests,
   activateAudioContextProbe,
+  recordAudioReadyStateEvent,
+  recordBundleInitEvent,
   recordHandlerErrorEvent,
+  recordHowlEndEventEvent,
+  recordHowlLoaderrorEventEvent,
+  recordHowlPlayCallEvent,
+  recordHowlPlayEventEvent,
+  recordPathASettleEvent,
+  recordPlayUtteranceDispatchEvent,
   recordSpeakCallEvent,
   recordSpeakOnPlayEvent,
   recordSpeakSkippedEvent,
@@ -866,6 +874,249 @@ describe('audioContextProbe', () => {
         howlerAutoSuspend: false,
         howlerUnlockMethodCalled: 'called',
       })
+    })
+  })
+
+  /**
+   * Smoke tests for the diagnostic instrumentation pass (ticket
+   * 86c9hjnn8 follow-up). One synthetic test per producer surface
+   * confirming each event lands in the audioCtxLog with the expected
+   * cause + at least one of the diagnostic-load-bearing fields.
+   *
+   * These tests exist primarily to catch a "wired but no-op" regression
+   * — if a future refactor accidentally drops one of the new emits,
+   * this suite catches it BEFORE the next iPad QA capture turns into a
+   * silent-fallback dead-end.
+   */
+  describe('diagnostic instrumentation pass (ticket 86c9hjnn8 follow-up)', () => {
+    it('records bundle-init with cacheVersion, storeName, idbSchemaVersion, commitSha, serviceWorkerScriptUrl', () => {
+      const ctx = new FakeAudioContext()
+      activateAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+      recordBundleInitEvent({
+        cacheVersion: 2,
+        storeName: 'session-audio-v2',
+        idbSchemaVersion: 2,
+        commitSha: 'abcdef0',
+        serviceWorkerScriptUrl: 'https://example.test/sw.js',
+      })
+      const rows = snapshot().audioCtxEvents.filter(
+        (e) => e.cause === 'bundle-init',
+      )
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({
+        cause: 'bundle-init',
+        cacheVersion: 2,
+        storeName: 'session-audio-v2',
+        idbSchemaVersion: 2,
+        commitSha: 'abcdef0',
+        serviceWorkerScriptUrl: 'https://example.test/sw.js',
+      })
+    })
+
+    it('records audio-ready-state with screen tag and stringified prop value', () => {
+      const ctx = new FakeAudioContext()
+      activateAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+      recordAudioReadyStateEvent('math', false)
+      recordAudioReadyStateEvent('math', true)
+      recordAudioReadyStateEvent('wordSong', undefined)
+      const rows = snapshot().audioCtxEvents.filter(
+        (e) => e.cause === 'audio-ready-state',
+      )
+      expect(rows).toHaveLength(3)
+      expect(rows[0]).toMatchObject({
+        cause: 'audio-ready-state',
+        pathAScreen: 'math',
+        audioReadyValue: 'false',
+      })
+      expect(rows[1]).toMatchObject({
+        pathAScreen: 'math',
+        audioReadyValue: 'true',
+      })
+      expect(rows[2]).toMatchObject({
+        pathAScreen: 'wordSong',
+        audioReadyValue: 'undefined',
+      })
+    })
+
+    it('records pathA-resolve and pathA-reject with optional errorMessage', () => {
+      const ctx = new FakeAudioContext()
+      activateAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+      recordPathASettleEvent('math', 'resolve')
+      recordPathASettleEvent('wordSong', 'reject', 'tts-failed')
+      const rows = snapshot().audioCtxEvents.filter(
+        (e) => e.cause === 'pathA-resolve' || e.cause === 'pathA-reject',
+      )
+      expect(rows).toHaveLength(2)
+      expect(rows[0]).toMatchObject({
+        cause: 'pathA-resolve',
+        pathAScreen: 'math',
+      })
+      expect(rows[1]).toMatchObject({
+        cause: 'pathA-reject',
+        pathAScreen: 'wordSong',
+        errorMessage: 'tts-failed',
+      })
+    })
+
+    it('records play-utterance-dispatch with playerKind', () => {
+      const ctx = new FakeAudioContext()
+      activateAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+      recordPlayUtteranceDispatchEvent('math', 'silent-fallback')
+      recordPlayUtteranceDispatchEvent('wordSong', 'real')
+      const rows = snapshot().audioCtxEvents.filter(
+        (e) => e.cause === 'play-utterance-dispatch',
+      )
+      expect(rows).toHaveLength(2)
+      expect(rows[0]).toMatchObject({
+        cause: 'play-utterance-dispatch',
+        pathAScreen: 'math',
+        playerKind: 'silent-fallback',
+      })
+      expect(rows[1]).toMatchObject({
+        pathAScreen: 'wordSong',
+        playerKind: 'real',
+      })
+    })
+
+    it('records howl-play-call, howl-play-event, howl-end-event, howl-loaderror-event with utterance pairing', () => {
+      const ctx = new FakeAudioContext()
+      activateAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage: null,
+      })
+      recordHowlPlayCallEvent({
+        utteranceId: 'u-1',
+        howlSrc: 'blob:abc',
+        howlState: 'loaded',
+        howlDuration: 1.23,
+      })
+      recordHowlPlayEventEvent('u-1', 12)
+      recordHowlEndEventEvent('u-1', 1242)
+      recordHowlLoaderrorEventEvent('u-2', 5, 'decode failed')
+
+      const rows = snapshot().audioCtxEvents
+      const callRow = rows.find((e) => e.cause === 'howl-play-call')
+      const playRow = rows.find((e) => e.cause === 'howl-play-event')
+      const endRow = rows.find((e) => e.cause === 'howl-end-event')
+      const errRow = rows.find((e) => e.cause === 'howl-loaderror-event')
+
+      expect(callRow).toMatchObject({
+        cause: 'howl-play-call',
+        utteranceId: 'u-1',
+        howlSrc: 'blob:abc',
+        howlState: 'loaded',
+        howlDuration: 1.23,
+      })
+      expect(playRow).toMatchObject({
+        cause: 'howl-play-event',
+        utteranceId: 'u-1',
+        dtFromCallMs: 12,
+      })
+      expect(endRow).toMatchObject({
+        cause: 'howl-end-event',
+        utteranceId: 'u-1',
+        dtFromCallMs: 1242,
+      })
+      expect(errRow).toMatchObject({
+        cause: 'howl-loaderror-event',
+        utteranceId: 'u-2',
+        dtFromCallMs: 5,
+        errorMessage: 'decode failed',
+      })
+    })
+
+    it('persists the new diagnostic rows to localStorage so iPad exports survive a reload', () => {
+      const ctx = new FakeAudioContext()
+      const storage = makeStorage()
+      activateAudioContextProbe({
+        howlerLike: { ctx: ctx as unknown as AudioContext },
+        pollIntervalMs: 1000,
+        pollWindowMs: 90_000,
+        storage,
+        maxLogEntries: 32,
+      })
+      recordBundleInitEvent({
+        cacheVersion: 2,
+        storeName: 'session-audio-v2',
+        commitSha: 'deadbee',
+      })
+      recordPlayUtteranceDispatchEvent('math', 'real')
+      recordHowlPlayCallEvent({
+        utteranceId: 'u-1',
+        howlSrc: 'blob:abc',
+        howlState: 'loaded',
+        howlDuration: 0.9,
+      })
+      recordHowlPlayEventEvent('u-1', 8)
+
+      const persisted = JSON.parse(
+        storage.getItem(AUDIO_CTX_LOG_STORAGE_KEY)!,
+      ) as Array<{ cause: string }>
+      const causes = persisted.map((r) => r.cause)
+      expect(causes).toContain('bundle-init')
+      expect(causes).toContain('play-utterance-dispatch')
+      expect(causes).toContain('howl-play-call')
+      expect(causes).toContain('howl-play-event')
+    })
+
+    it('all new singleton wrappers are no-ops when no probe is active', () => {
+      _resetAudioContextProbeForTests()
+      // None of these should throw.
+      recordBundleInitEvent({
+        cacheVersion: 2,
+        storeName: 'session-audio-v2',
+      })
+      recordAudioReadyStateEvent('math', true)
+      recordPathASettleEvent('math', 'resolve')
+      recordPlayUtteranceDispatchEvent('math', 'real')
+      recordHowlPlayCallEvent({
+        utteranceId: 'u-1',
+        howlSrc: 'blob:abc',
+        howlState: 'loaded',
+        howlDuration: 0,
+      })
+      recordHowlPlayEventEvent('u-1', 0)
+      recordHowlEndEventEvent('u-1', 0)
+      recordHowlLoaderrorEventEvent('u-1', 0, 'err')
+      // No probe active → no rows should land on the bus from these
+      // calls (the prior test suite's beforeEach reset everything).
+      const rows = snapshot().audioCtxEvents
+      expect(
+        rows.filter(
+          (e) =>
+            e.cause === 'bundle-init' ||
+            e.cause === 'audio-ready-state' ||
+            e.cause === 'pathA-resolve' ||
+            e.cause === 'pathA-reject' ||
+            e.cause === 'play-utterance-dispatch' ||
+            e.cause === 'howl-play-call' ||
+            e.cause === 'howl-play-event' ||
+            e.cause === 'howl-end-event' ||
+            e.cause === 'howl-loaderror-event',
+        ),
+      ).toHaveLength(0)
     })
   })
 })

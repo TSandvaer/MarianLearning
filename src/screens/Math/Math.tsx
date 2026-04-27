@@ -7,7 +7,12 @@ import {
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
 } from '../../lib/audio/howlerContext'
-import { recordUnlockStateEvent } from '../../lib/debug/audioContextProbe'
+import {
+  recordAudioReadyStateEvent,
+  recordPlayUtteranceDispatchEvent,
+  recordUnlockStateEvent,
+} from '../../lib/debug/audioContextProbe'
+import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { pickDistractors } from './distractors'
 import {
@@ -575,6 +580,22 @@ function MathScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Diagnostic instrumentation (ticket 86c9hjnn8 follow-up) ------------
+
+  /**
+   * Mirror every change of the `audioReady` prop to the audioCtxLog so
+   * the iPad export shows whether Math saw the parent flip the gate to
+   * `true` for the screen the user sat on. Includes the very first
+   * render's value (mount push) — that's the load-bearing case for
+   * cold-mount diagnosis.
+   *
+   * No production cost: `recordAudioReadyStateEvent` short-circuits
+   * with a single null-check when no debug probe is active.
+   */
+  useEffect(() => {
+    recordAudioReadyStateEvent('math', audioReady)
+  }, [audioReady])
+
   // ── Audio playback wrapper --------------------------------------------
 
   /**
@@ -601,6 +622,13 @@ function MathScreen({
           setCaptionRevealed((prev) => Math.max(prev, wordIndex + 1))
         },
       }
+
+      // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). Records
+      // whether the function we're about to invoke is the real Path A
+      // player or the silent fallback. The audioCtxLog row pairs by
+      // timestamp with the next `howl-play-call` (real path) or with
+      // a silent-walk caption tick (fallback path).
+      recordPlayUtteranceDispatchEvent('math', getPlayerKind(playUtterance))
 
       try {
         await playUtterance(text, playOpts)

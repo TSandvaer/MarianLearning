@@ -216,6 +216,12 @@ export async function prepareWordSongPathA(
       onWordTick: playOpts?.onWordTick,
     })
   }
+  // Diagnostic tag (ticket 86c9hjnn8 follow-up). See `mathPathA.ts` for
+  // the rationale — Math/WordSong read this via `getPlayerKind()` to
+  // attribute the dispatch row in the audioCtxLog.
+  ;(
+    playUtterance as PlayWordSongUtteranceFn & { __playerKind?: 'real' }
+  ).__playerKind = 'real'
 
   return {
     playUtterance,
