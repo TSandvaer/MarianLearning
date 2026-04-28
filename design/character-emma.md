@@ -42,7 +42,7 @@ The pattern: short, present-tense, declarative or gently interrogative, never em
 
 **CLAUDE.md principles inherited:** never punish initiative (Emma cuts off if Marian taps before she finishes); no nag loops (one re-prompt then quiet); audio-first text-mirror; never a red X (puzzled is curious, never disappointed).
 
-**Pending Dave's input.** Dave is being dispatched in parallel for developmental validation (warm-but-not-clingy, age-appropriate authority, no parasocial creepiness). Open Q #1.
+**Dave-validated 2026-04-28** (ticket `86c9hjnq1`, PR #97 merged). Developmental fit confirmed for warm-but-not-clingy, age-appropriate authority, no parasocial creepiness. Body-language constraints folded into §6.1.
 
 ---
 
@@ -113,7 +113,7 @@ Pivot for breathing/tilt animations: bottom-centre of head bbox (transform-origi
 
 - **Wand in LEFT hand at idle.** Load-bearing — when Emma is upper-left on Math/Word Song, wand points naturally into the problem area. Also makes the `attentive-pointing` pose work (raises wand to 45° toward problem).
 - **Bow on LEFT side, optional accessory.** Single, ~16pt, `--my-rose`. Reads as hair tie, not Sanrio ribbon. Use sparingly per Thomas's "overaccessorising drifts back to mascot territory."
-- **No glasses by default.** Glasses read older/more authoritative; over-corrects away from older-sister warmth. v2 alternate skin if Thomas wants.
+- **No glasses, ever.** Thomas-locked 2026-04-28 (Decision 1 = A): bow only. Glasses are not authored in v1 and are not a v2 alt skin — drop entirely. Rationale: glasses read older / more authoritative and over-correct away from older-sister warmth.
 - **Modesty + age-appropriate.** Cardigan closed enough that no skin shows below collarbone. Skirt knee-length minimum. No high-heels, no makeup detail, no figure-emphasising silhouette. Hair styled to read soft-natural, not "feminine performance".
 - **No bunny ears in any pose, ever.**
 
@@ -123,7 +123,8 @@ Manhwa carries 90% of emotion at the face. Locked attributes (Thomas):
 
 - **Eye shape:** rounded almond, top lid arcs ~30°, bottom ~10° (top-heavier reads warm, not surprised). Iris fills ~70% of opening, single cream catchlight upper-right (position invariant across expressions). 3 short upper-lash strokes per eye, no lower lashes.
 - **Eye spacing:** ~one-eye-width apart.
-- **Mouth (per state):** idle = small parabola arc; celebration = open soft "o" + 3 visible upper teeth max; puzzled = closed asymmetric (left corner ~3pt higher); listening = closed narrower than idle; sleepy = closed slight downward parabola (relaxed, not sad).
+- **Mouth (per state):** idle = small parabola arc; celebration = open soft "o" + 3 visible upper teeth max; puzzled = **open small "oh"** (per Dave §6 permitted-state, supersedes earlier "closed asymmetric" draft) — narrow oval ~6pt tall × 4pt wide, no teeth visible, soft rose fill; listening = closed narrower than idle; sleepy = closed slight downward parabola (relaxed, not sad).
+- **Eyebrows (per state):** idle = relaxed neutral; celebration = slight crinkle-up at outer corners; puzzled = **both** brows raised in curiosity (NOT one-up-asymmetric; NOT raised-with-downward-head-tilt — that composite is forbidden per Dave §6); listening = neutral with optional 1pt inner-end lift (attentive); sleepy = relaxed.
 - **Nose:** 2-stroke L-shape, no nostrils, no shading. Same across all expressions.
 
 ### 2.5 Expression beats — 6 mandatory + 2 optional
@@ -133,7 +134,7 @@ Manhwa carries 90% of emotion at the face. Locked attributes (Thomas):
 | 1 | `emma-idle.svg` | Default / breathing | Baseline. Eyes neutral. Closed-mouth parabola. Wand vertical at L hand. | `melody-idle.svg` |
 | 2 | `emma-listening.svg` | Mid-caption-reveal (Marian listening to TTS) | Top lid drops 1pt; mouth narrower; slight 2° head turn toward viewer. | NEW (no Melody equivalent) |
 | 3 | `emma-celebration.svg` | Correct-answer reaction | Eyes brighter (catchlight 1.2×). Mouth open soft "o" + 3 upper teeth. Cheek blush ~6pt. R hand raised palm-up at shoulder, small "yes!" gesture. Head tilted ~5°. | `melody-happy.svg` |
-| 4 | `emma-puzzled-tilt.svg` | Wrong-answer reaction | One eyebrow lifted ~3pt asymmetric. Mouth slightly off-centre. R hand to chin (loose fist, thumb against jaw). Head tilted ~10°, slight forward lean. | `melody-puzzled.svg` |
+| 4 | `emma-puzzled-tilt.svg` | Wrong-answer reaction | **Both** brows raised ~3pt in curiosity (not one-up-asymmetric). Mouth open small "oh" (~6×4pt oval, no teeth). R hand to chin (loose fist, thumb against jaw). Head tilted **sideways** ~10° (NOT down — downward tilt is forbidden per Dave §6). **Eyes track the problem area, NOT the viewer** (gaze direction set by where the problem renders relative to Emma; on Math/Word Song where Emma sits upper-left, gaze drops 8–12° down-right toward the problem chips). | `melody-puzzled.svg` |
 | 5 | `emma-attentive-pointing.svg` | Hint state (Math/Word Song after 2 wrong) | Idle face but L wand-pointer raised to ~45° toward right of frame. Eyes tracking wand tip. Slight forward lean. | NEW — Melody had no equivalent |
 | 6 | `emma-sleepy.svg` | End-of-session / Sleep splash | Eyes closed (single arc per eye). Closed-mouth gentle smile. Head tilted ~8° to side, ~10° forward. Wand lowered/held loosely. | `melody-sleepy.svg` (was deferred per `assets-todo.md`; never authored) |
 | 7 *(opt)* | `emma-cheering.svg` | Session-End big celebration only — NOT per-problem | BOTH hands raised palms-out at shoulder height, mouth fully open soft smile, head straight, catchlight 1.5×. | `melody-cheering.svg` |
@@ -187,13 +188,14 @@ Wake-state ready ring; breathing scale loop (1.0 → 1.02 → 1.0, 4s); `layoutI
 
 Auto-return-to-idle after 600ms (matches Melody's existing ear-wiggle window).
 
-### 3.3 Puzzled-tilt on wrong → head-tilt + hand-on-chin
+### 3.3 Puzzled-tilt on wrong → sideways head-tilt + hand-on-chin + open "oh"
 
-Same `AnimatePresence` shape as 3.2. Differences:
+Aligned with Dave's permitted wrong-answer state per §6: sideways head tilt + open "oh" mouth + brows raised in curiosity + **eyes on the problem, not the viewer**. Same `AnimatePresence` shape as 3.2. Differences from celebration:
 
-- **Direction opposite:** puzzled `rotateZ: +10` (tilts RIGHT); celebration `rotateZ: -6` (tilts LEFT). Visual contrast lets Marian read the two states at a glance from upper-left.
+- **Direction (sideways, not down):** puzzled `rotateZ: +10` (tilts RIGHT — purely sideways, no Y-axis nod); celebration `rotateZ: -6` (tilts LEFT). Visual contrast lets Marian read the two states at a glance from upper-left. **Critical: do NOT animate any downward head pitch** — `rotateX` stays at 0; downward-tilt-with-upward-gaze is on Dave's forbidden list (reads as judging).
 - **Spring softer:** stiffness 220 vs 260. Reads "considering" not "excited".
-- **Hand-on-chin is in the SVG, not animated.** Pose swap carries it.
+- **Hand-on-chin is in the SVG, not animated.** Pose swap carries it. Hand reads "thinking", not "tsk-tsk" — loose fist, thumb against jaw, never index-finger-wag.
+- **Gaze direction is in the SVG, not animated.** Eyes drawn looking toward problem area (down-right from Emma's upper-left perch). No tap-tracking or viewer-tracking.
 - **Hold:** 1500ms (matches Melody's existing puzzled hold per `screen-3-math.md`).
 
 ### 3.4 Attentive-pointing during hint state (NEW)
@@ -353,16 +355,45 @@ Same shape every screen — see §3.2 above. The only per-screen variation is th
 
 Per CLAUDE.md non-negotiables, confirmed honoured by Emma:
 
-- [x] **Emma never frowns.** `emma-puzzled-tilt.svg` is curious. Eyebrow lift is asymmetric (one brow up, not both down); mouth is off-centre asymmetric, not a frown arc. Hand-on-chin reads "thinking", not "tsk-tsk".
+- [x] **Emma never frowns.** `emma-puzzled-tilt.svg` is curious, not disappointed. Both brows raised in curiosity (not lowered, not asymmetric); mouth open small "oh" (not a frown arc, not pursed); head tilted purely sideways (never downward); eyes on the problem, never on the viewer. Hand-on-chin reads "thinking", not "tsk-tsk".
 - [x] **Celebration is warm, not over-the-top.** Eyes brighter (not huge), one hand palm-up (NOT both arms up — that's reserved for Session-End `cheering`). 6° head tilt, not a bouncing scale-up. Reads "yes, that's right" not "OMG AMAZING JOB".
 - [x] **Ear-wiggle replacement is not condescending.** Head-tilt-and-smile is age-mirroring (an attentive friend nodding) rather than performance-rewarding.
 - [x] **No teacher-authority body language.** No arms-crossed, no finger-wagging, no hand-on-hip, no eye-roll. `rotateZ` capped at 10° (any more reads as exasperated).
 - [x] **No "I missed you" / "I'm here for you" lines.** Banned in §1; design-of-character not just copy.
-- [x] **No teacher-authority body markers.** No glasses by default, no clipboard, no red pen, no chalkboard pose. Wand-pointer reads "this is how teachers in this world point at problems", not "this is the stick I tap your knuckles with."
+- [x] **No teacher-authority body markers.** No glasses (locked-out per §2.3), no clipboard, no red pen, no chalkboard pose. Wand-pointer reads "this is how teachers in this world point at problems", not "this is the stick I tap your knuckles with."
 - [x] **No fake-attention manipulation.** No eye-tracking that follows tap position. No animated mouth lip-sync (same rule as Melody — pose swap only, no per-frame mouth motion).
 - [x] **No gendered-performance manipulation.** Cardigan + skirt OR jeans (asset-author choice). No high-heels, no makeup detail, no figure-emphasising silhouette. Hair soft-natural, not "feminine performance". Bow optional, single, small (~16pt).
 
-Pending Dave's parallel review for any developmental angles I haven't caught (Open Q #1).
+### 6.1 Dave's body-language checklist (verbatim — load-bearing)
+
+Dave's developmental research at `design/research/character-emma-developmental-fit-86c9hjnq1.md` §Q5 identifies a forbidden list and a permitted wrong-answer state. Both are quoted verbatim below; asset author and QA treat them as binding.
+
+**Forbidden body-language states — Emma must NEVER appear in any of these in any pose, frame, or animation:**
+
+- Folded or crossed arms (dominance / closed-off signal)
+- Head tilted **downward with eyes looking up** (evaluative, "I'm judging you" signal)
+- Pursed or pressed lips (suppressed disappointment)
+- Slow, deliberate nodding without a smile (performative patience — reads as controlled disapproval)
+- Hands on hips (authority assertion)
+- A soft sigh even without a frown (defeat / disappointment signal)
+- Raised eyebrow combined with downward head tilt (the "I'm disappointed in you" composite signal)
+- Pointing at the viewer (Marian) — Emma points at the problem, never at the viewer
+
+**Permitted wrong-answer state — Emma's `puzzled-tilt` pose conforms to this exactly:**
+
+- **Sideways** head tilt (never downward)
+- Open small "oh" mouth (curious, not pursed, not frowning)
+- Brows raised in genuine **curiosity** (not furrowed in concern, not lowered, not the disappointed composite)
+- Eyes on **the problem, not the viewer** — the gaze direction is set in-SVG, not animated
+
+### 6.2 Audit checklist (Jessica QA gate)
+
+- [x] `emma-puzzled-tilt.svg` matches §6.1 permitted state on all four points (sideways tilt, open "oh", brows raised, gaze on problem)
+- [x] No pose in the asset set matches any §6.1 forbidden state — explicitly verified across all 6 mandatory + 2 optional poses
+- [x] `attentive-pointing` wand points at the problem area (down-right from Emma's upper-left perch on Math/Word Song); wand never points at the viewer's gaze line
+- [x] `celebration` and `cheering` raised-hand gestures are palm-out / palm-up — never index-finger pointing
+- [x] No animation introduces downward head pitch (`rotateX`) — all rotation is `rotateZ` only, capped at ±10°
+- [x] No animation introduces a sigh-shaped scale-down on the body (no Y-axis squash)
 
 ---
 
@@ -467,7 +498,9 @@ Keep the Phase 3b PR in a single commit (or easily-revertible chain) until Maria
 
 **Anti-dark-pattern:**
 
-- [ ] Emma never frowns (puzzled mouth asymmetric, not arched-down)
+- [ ] Emma never frowns (puzzled mouth = open small "oh", not arched-down, not pursed)
+- [ ] Puzzled-tilt pose conforms to §6.1 permitted state: sideways tilt, open "oh", brows raised in curiosity, gaze on problem not viewer
+- [ ] No pose matches any §6.1 forbidden state (folded arms, downward-tilt-with-upward-gaze, pursed lips, hands on hips, slow-nod-without-smile, sigh, raised-brow-with-downward-tilt composite, pointing at viewer)
 - [ ] No red colour on any wrong state (CLAUDE.md non-negotiable)
 - [ ] No teacher-authority gestures (arms crossed, finger wag, hand-on-hip) in any pose
 - [ ] No "I missed you" / "I'm here for you" copy anywhere
@@ -487,9 +520,9 @@ Keep the Phase 3b PR in a single commit (or easily-revertible chain) until Maria
 
 ## 9. Open questions
 
-1. **Pending Dave's input** — developmental validation in parallel. May add to §1 or §6. **Default:** ship as written; integrate via follow-up PR if material.
+1. ~~**Pending Dave's input.**~~ **Resolved 2026-04-28 (Dave, ticket `86c9hjnq1`, PR #97 merged):** developmental validation complete. Forbidden + permitted body-language lists incorporated verbatim into §6.1; puzzled-tilt pose realigned in §2.4, §2.5, §3.3 to match Dave's permitted wrong-answer state.
 
-2. **Bow + glasses combo — Thomas taste call.** Default: bow only, no glasses. If asset author's first sketch reads "too plain" without glasses, escalate via Matt. Bow is the v1 default; glasses are v2 alt skin.
+2. ~~**Bow + glasses combo — Thomas taste call.**~~ **Resolved 2026-04-28 (Thomas, Decision 1 = A):** bow only; glasses dropped entirely (not v1, not v2). No further action.
 
 3. **Hub SVG count — 12 or 19?** Brief says "19 SVGs queued under `86c9j53yx`". `screen-hub.md` §"Assets required" lists 12 (1 bg + 1 frame + 2 node visuals + 1 arrow + 7 stage icons; this spec's table shows 13 because checkmark + padlock are listed separately under stage icons). The "19" likely conflates 12 + 7 tree-themed alternatives (Hub spec Open Q #9 option B). **Default in this spec:** author the 12-13. Reconcile count via Matt → Thomas.
 
