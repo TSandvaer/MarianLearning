@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-04-28T17:57:47.655Z",
+  "region": "westeurope",
+  "outputFormat": "audio-24khz-48kbitrate-mono-mp3",
+  "sampleText": "Two plus two. How many?",
+  "samples": [
+    {
+      "id": "A-baseline-break-prosody",
+      "label": "A — Production baseline: <break time=\"250ms\"/><prosody pitch=\"+8%\" rate=\"-5%\">…</prosody>",
+      "voice": "en-US-AnaNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"en-US-AnaNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <break time=\"250ms\"/><prosody pitch=\"+8%\" rate=\"-5%\">How many?</prosody></prosody></voice></speak>",
+      "file": "A-baseline-break-prosody.mp3",
+      "bytes": 25920
+    },
+    {
+      "id": "B1-express-as-chat",
+      "label": "B1 — mstts:express-as style=\"chat\" on the trailing clause (Ana)",
+      "voice": "en-US-AnaNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"http://www.w3.org/2001/mstts\" xml:lang=\"en-US\"><voice name=\"en-US-AnaNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <mstts:express-as style=\"chat\"><break time=\"200ms\"/>How many?</mstts:express-as></prosody></voice></speak>",
+      "file": "B1-express-as-chat.mp3",
+      "bytes": 25056
+    },
+    {
+      "id": "B2-express-as-cheerful",
+      "label": "B2 — mstts:express-as style=\"cheerful\" on the trailing clause (Ana)",
+      "voice": "en-US-AnaNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"http://www.w3.org/2001/mstts\" xml:lang=\"en-US\"><voice name=\"en-US-AnaNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <mstts:express-as style=\"cheerful\"><break time=\"200ms\"/>How many?</mstts:express-as></prosody></voice></speak>",
+      "file": "B2-express-as-cheerful.mp3",
+      "bytes": 25056
+    },
+    {
+      "id": "B3-express-as-friendly",
+      "label": "B3 — mstts:express-as style=\"friendly\" on the trailing clause (Ana)",
+      "voice": "en-US-AnaNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"http://www.w3.org/2001/mstts\" xml:lang=\"en-US\"><voice name=\"en-US-AnaNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <mstts:express-as style=\"friendly\"><break time=\"200ms\"/>How many?</mstts:express-as></prosody></voice></speak>",
+      "file": "B3-express-as-friendly.mp3",
+      "bytes": 25056
+    },
+    {
+      "id": "B4-emma-express-as-chat",
+      "label": "B4 — en-US-EmmaMultilingualNeural + mstts:express-as style=\"chat\"",
+      "voice": "en-US-EmmaMultilingualNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xmlns:mstts=\"http://www.w3.org/2001/mstts\" xml:lang=\"en-US\"><voice name=\"en-US-EmmaMultilingualNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <mstts:express-as style=\"chat\"><break time=\"200ms\"/>How many?</mstts:express-as></prosody></voice></speak>",
+      "file": "B4-emma-express-as-chat.mp3",
+      "bytes": 16560
+    },
+    {
+      "id": "C1-emma-multilingual-baseline",
+      "label": "C1 — en-US-EmmaMultilingualNeural + production baseline SSML",
+      "voice": "en-US-EmmaMultilingualNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"en-US-EmmaMultilingualNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <break time=\"250ms\"/><prosody pitch=\"+8%\" rate=\"-5%\">How many?</prosody></prosody></voice></speak>",
+      "file": "C1-emma-multilingual-baseline.mp3",
+      "bytes": 16848
+    },
+    {
+      "id": "C2-ava-multilingual-baseline",
+      "label": "C2 — en-US-AvaMultilingualNeural + production baseline SSML",
+      "voice": "en-US-AvaMultilingualNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"en-US-AvaMultilingualNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <break time=\"250ms\"/><prosody pitch=\"+8%\" rate=\"-5%\">How many?</prosody></prosody></voice></speak>",
+      "file": "C2-ava-multilingual-baseline.mp3",
+      "bytes": 18288
+    },
+    {
+      "id": "A2-baseline-aggressive",
+      "label": "A2 — Baseline shape with aggressive pitch (+18%) and rate (-15%) on the clause",
+      "voice": "en-US-AnaNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"en-US-AnaNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <break time=\"250ms\"/><prosody pitch=\"+18%\" rate=\"-15%\">How many?</prosody></prosody></voice></speak>",
+      "file": "A2-baseline-aggressive.mp3",
+      "bytes": 27072
+    },
+    {
+      "id": "D-say-as-characters",
+      "label": "D — say-as interpret-as=\"characters\" on each trailing word (Ana)",
+      "voice": "en-US-AnaNeural",
+      "text": "Two plus two. How many?",
+      "ssml": "<speak version=\"1.0\" xmlns=\"http://www.w3.org/2001/10/synthesis\" xml:lang=\"en-US\"><voice name=\"en-US-AnaNeural\"><prosody pitch=\"+0Hz\" rate=\"-10%\" volume=\"+0%\">Two plus two. <say-as interpret-as=\"characters\">How</say-as> <say-as interpret-as=\"characters\">many</say-as>?</prosody></voice></speak>",
+      "file": "D-say-as-characters.mp3",
+      "bytes": 35280
+    }
+  ]
+}
