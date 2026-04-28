@@ -502,7 +502,7 @@ describe('Greet', () => {
       )
       fireWakeTap()
 
-      // Resolve "Hi!" so we move to "I'm Melody."
+      // Resolve "Hi!" so we move to "I'm Emma."
       await completeLine(h)
       await crossGap()
 
@@ -523,7 +523,7 @@ describe('Greet', () => {
         .getAllByTestId('greet-caption-word')
         .filter((el) => el.getAttribute('data-revealed') === 'true')
         .map((el) => el.getAttribute('data-word'))
-      expect(revealed).toEqual(["I'm", 'Melody.'])
+      expect(revealed).toEqual(["I'm", 'Emma.'])
     })
 
     it('forces line fully revealed at line-end (covers the punctuation/no-tick fallback)', async () => {
@@ -1338,7 +1338,7 @@ describe('Greet', () => {
       //   "tap Wake → line 1 plays → on line 2 load failure, relock ring
       //    appears → Marian can retry"
       // (Spec uses 1-indexed line numbers; we index line 0 = "Hi!", line 1
-      // = "I'm Melody.") The killer: pre-fix, this test would have hung
+      // = "I'm Emma.") The killer: pre-fix, this test would have hung
       // forever — onLineEnd never fires, no relock surface, no heart.
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
@@ -1527,7 +1527,7 @@ describe('Greet', () => {
       // iPad QA — without it, "an MP3 failed" tells you nothing).
       expect(snap.lastSpeak?.error).toMatch(/greet-02-im-melody\.mp3/)
       // The text field carries the failed line so the panel reads
-      // naturally: `errored: "I'm Melody."`.
+      // naturally: `errored: "I'm Emma."`.
       expect(snap.lastSpeak?.text).toBe(GREET_LINES[1])
     })
   })
