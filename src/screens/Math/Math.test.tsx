@@ -1577,6 +1577,162 @@ describe('Math (Number Garden) screen', () => {
     }
   })
 
+  /*
+   * ╔══════════════════════════════════════════════════════════════════════╗
+   * ║ Ticket 86c9j60qr — celebration audio cutoff after Emma voice swap.   ║
+   * ║                                                                      ║
+   * ║ Pre-fix: the auto-advance was a fixed `setTimeout(advance, 1200)`   ║
+   * ║ that ran in parallel with `speak(utterances.correct)`. Ana's renders ║
+   * ║ fit inside ~1.2s; Emma's renders are ~70% longer (~2.1s) so the      ║
+   * ║ advance kicked the next-problem audio while "Yes! [number]." was     ║
+   * ║ still mid-playback. Marian heard "Yes!" — never the number. Empirical║
+   * ║ from production iPad audioCtxLog 2026-04-28 19:01 UTC on commit      ║
+   * ║ ed1d838.                                                             ║
+   * ║                                                                      ║
+   * ║ Post-fix: the advance is gated on max(min-dwell, speak.onend) with   ║
+   * ║ a hard-ceiling (4 s) safety valve so a wedged audio engine still     ║
+   * ║ unblocks Marian. This test forces production timing via              ║
+   * ║ `autoResolve: false` — the speak() promise stays pending until we    ║
+   * ║ explicitly call `resolveAll()`, mimicking Howler's `'end'` event     ║
+   * ║ arriving after the actual MP3 finished. Pre-fix the next-problem     ║
+   * ║ read fires after 1200 ms regardless; post-fix it WAITS for resolve.  ║
+   * ╚══════════════════════════════════════════════════════════════════════╝
+   */
+  it('correct-tap auto-advance waits for the celebration audio to finish (ticket 86c9j60qr)', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    // autoResolve:false — the celebration speak() promise stays pending
+    // until we explicitly resolve it. Production timing — Howler's 'end'
+    // event arrives seconds after play() depending on the MP3 length.
+    const harness = makePlayHarness({ autoResolve: false })
+
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // Tap the correct chip (5). __testInitiallyAudioUnlocked makes chips
+    // tappable from first paint (read-aloud may or may not have flushed
+    // its microtask under fake timers — irrelevant for this test, the
+    // load-bearing path is the post-click advance).
+    const correctChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') === '5')!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // The celebration utterance was dispatched. (Whether or not the
+    // read-aloud also dispatched, "Yes! Five!" must be in the list.)
+    expect(harness.spoken()).toContain('Yes! Five!')
+    const spokenAfterTap = [...harness.spoken()]
+
+    // Advance the min-dwell timer. Pre-fix this would ALSO fire the next
+    // problem's read-aloud immediately. Post-fix the advance waits for the
+    // celebration speak() to resolve.
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+
+    // Still on problem 0 — the celebration speak() hasn't resolved yet.
+    // The spoken list MUST NOT have grown beyond what we captured right
+    // after the chip tap (no problem-2 read-aloud dispatched yet). This
+    // is the load-bearing assertion: pre-fix the next problem's read
+    // would already be in the list at this point.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      '0',
+    )
+    expect(harness.spoken()).toEqual(spokenAfterTap)
+    expect(harness.spoken()).not.toContain('Four plus one. How many?')
+
+    // Even pushing time well beyond 1200ms — but still keeping speak()
+    // pending — the screen must hold (cap below the 4s hard ceiling).
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      '0',
+    )
+
+    // Now resolve the celebration speak() — corresponds to Howler's 'end'
+    // event firing after the MP3 actually finished. The advance fires:
+    //   1. .then() runs, flips correctSpeakResolvedRef.
+    //   2. tryAdvance() advances → setProblemIndex(1) → re-render.
+    //   3. The new problem's read-aloud effect schedules a microtask.
+    //   4. We drain enough microtasks to let it dispatch.
+    await act(async () => {
+      harness.resolveAll()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+  })
+
+  /*
+   * Hard-ceiling fallback: if the celebration speak() promise never
+   * resolves (audio engine wedged, blob fetch hung, etc.), the advance
+   * MUST still fire so the screen never bricks. Mirrors the chip-lock
+   * defence pattern from PR #88/#89 (ticket 86c9hf4ef round 2).
+   */
+  it('correct-tap advance fires at hard ceiling even if speak() never resolves (ticket 86c9j60qr)', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness({ autoResolve: false })
+
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const correctChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') === '5')!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // We will NOT call resolveAll() — speak() stays pending forever
+    // (engine wedged). Push past the 4 s ceiling and assert the advance
+    // fired anyway.
+    await act(async () => {
+      vi.advanceTimersByTime(4000)
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+  })
+
   it('audioReady gate: backwards-compatible — undefined behaves as legacy "fire immediately" (ticket 86c9hjnn8)', async () => {
     // Existing tests/callers omit the `audioReady` prop entirely. Behaviour
     // must be identical to pre-fix: cold-mount fast path fires immediately.
