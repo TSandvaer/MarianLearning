@@ -110,6 +110,13 @@ export default defineConfig({
         // Future polish-backlog options to slim individual assets:
         // zopfli/oxipng re-encode, WebP-in-SVG, or vector re-trace.
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+        // The TTS prosody A/B harness in /audio-samples/ is a QA-only
+        // surface (audit ticket 86c9hjnq1). Its HTML is ~5KB and its
+        // MP3 set is ~450KB of audit artifacts — neither is needed
+        // offline by Marian's actual session, and we don't want to
+        // pay the precache budget on every install. Excluded from
+        // both the SW manifest and the offline runtime cache.
+        globIgnores: ['audio-samples/**'],
       },
       devOptions: {
         enabled: false,

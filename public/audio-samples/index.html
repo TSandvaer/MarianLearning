@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marian Tutor — TTS prosody A/B harness (audit 86c9hjnq1)</title>
+    <style>
+      :root {
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+        background: #fff5fa;
+        color: #333;
+      }
+      body {
+        max-width: 760px;
+        margin: 32px auto;
+        padding: 0 16px 64px;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+      }
+      h2 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #555;
+        margin-top: 32px;
+      }
+      .sample {
+        background: #fff;
+        border: 1px solid #f0d6e3;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin: 12px 0;
+      }
+      .sample.error {
+        background: #fff5f5;
+        border-color: #f0cccc;
+      }
+      .sample-id {
+        font-weight: 600;
+        color: #c2185b;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 13px;
+      }
+      .sample-label {
+        margin: 6px 0 8px;
+      }
+      .sample-meta {
+        font-size: 12px;
+        color: #888;
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      audio {
+        width: 100%;
+        margin-top: 8px;
+      }
+      details {
+        margin-top: 8px;
+      }
+      pre {
+        background: #f8f0f5;
+        padding: 8px;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .error-msg {
+        color: #b00020;
+        font-weight: 600;
+      }
+      .empty-state {
+        background: #fff;
+        border: 1px dashed #d0c0d0;
+        border-radius: 8px;
+        padding: 24px;
+        margin: 32px 0;
+        color: #666;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        font-size: 13px;
+        background: #fbeaf2;
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>TTS prosody A/B harness — ticket 86c9hjnq1</h1>
+    <p>
+      Tap each sample and decide which trailing-interrogative prosody sounds
+      most natural for an 8-year-old learner. The current production strategy is
+      <strong>A</strong>; everything else is a candidate replacement. After
+      picking a winner, comment on the audit PR with the strategy id (e.g.
+      <code>B1-express-as-chat</code>).
+    </p>
+    <p>
+      Same source utterance across all samples:
+      <strong id="sample-text">"Two plus two. How many?"</strong>
+    </p>
+
+    <div id="root">
+      <div class="empty-state">Loading <code>manifest.json</code>...</div>
+    </div>
+
+    <h2>How to (re-)generate these</h2>
+    <pre>
+# from repo root, with .env.local containing AZURE_SPEECH_KEY + AZURE_SPEECH_REGION
+node scripts/tts-prosody-samples.mjs</pre
+    >
+
+    <script>
+      // Resolve manifest.json relative to THIS file. Works for file://, for
+      // a Vercel preview at /audio-samples/, and for any static host that
+      // serves the directory verbatim.
+      async function main() {
+        const root = document.getElementById('root')
+        let manifest
+        try {
+          const r = await fetch('manifest.json', { cache: 'no-store' })
+          if (!r.ok) throw new Error('HTTP ' + r.status)
+          manifest = await r.json()
+        } catch (err) {
+          root.innerHTML =
+            '<div class="empty-state">' +
+            '<strong>No <code>manifest.json</code> found yet.</strong><br/>' +
+            'Run <code>node scripts/tts-prosody-samples.mjs</code> from the repo ' +
+            'root with Azure creds in <code>.env.local</code>, then refresh.<br/><br/>' +
+            'Error: <code>' +
+            String(err.message || err) +
+            '</code></div>'
+          return
+        }
+
+        document.getElementById('sample-text').textContent =
+          '"' + (manifest.sampleText || '?') + '"'
+
+        const html = manifest.samples
+          .map((s) => {
+            if (s.error) {
+              return (
+                '<div class="sample error">' +
+                '<div class="sample-id">' +
+                s.id +
+                '</div>' +
+                '<div class="sample-label">' +
+                s.label +
+                '</div>' +
+                '<div class="error-msg">Render failed: ' +
+                s.error +
+                '</div>' +
+                '<details><summary>SSML</summary><pre>' +
+                escapeHtml(s.ssml) +
+                '</pre></details>' +
+                '</div>'
+              )
+            }
+            return (
+              '<div class="sample">' +
+              '<div class="sample-id">' +
+              s.id +
+              '</div>' +
+              '<div class="sample-label">' +
+              s.label +
+              '</div>' +
+              '<div class="sample-meta">voice: ' +
+              s.voice +
+              ' &middot; ' +
+              s.bytes +
+              'B mp3</div>' +
+              '<audio controls preload="metadata" src="' +
+              s.file +
+              '"></audio>' +
+              '<details><summary>SSML</summary><pre>' +
+              escapeHtml(s.ssml) +
+              '</pre></details>' +
+              '</div>'
+            )
+          })
+          .join('')
+
+        root.innerHTML = html
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+      }
+
+      main()
+    </script>
+  </body>
+</html>
