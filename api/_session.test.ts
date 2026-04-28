@@ -40,9 +40,12 @@ describe('extractUtteranceTexts', () => {
 })
 
 describe('MELODY_VOICE_CONFIG', () => {
-  it('matches PR #25 Plan B Greet voice — AnaNeural at -10%', () => {
+  it('uses Emma multilingual at -10% (Phase 3a voice, ticket 86c9hjnq1)', () => {
+    // Voice swapped from en-US-AnaNeural to en-US-EmmaMultilingualNeural
+    // on 2026-04-28 — see the constant's docstring for full history. Rate /
+    // pitch / volume are unchanged across the swap.
     expect(MELODY_VOICE_CONFIG).toEqual({
-      voice: 'en-US-AnaNeural',
+      voice: 'en-US-EmmaMultilingualNeural',
       rate: '-10%',
       pitch: '+0Hz',
       volume: '+0%',
@@ -51,7 +54,7 @@ describe('MELODY_VOICE_CONFIG', () => {
 })
 
 describe('renderSessionAudio', () => {
-  it('passes every utterance through synth with the AnaNeural voice config', async () => {
+  it('passes every utterance through synth with the Emma multilingual voice config', async () => {
     const synth = vi.fn(async (req: TtsRequest) => ({
       audio: new TextEncoder().encode(`audio-for-${req.text}`),
     }))
@@ -72,7 +75,7 @@ describe('renderSessionAudio', () => {
 
     for (const call of synth.mock.calls) {
       const req = call[0] as TtsRequest
-      expect(req.voice).toBe('en-US-AnaNeural')
+      expect(req.voice).toBe('en-US-EmmaMultilingualNeural')
       expect(req.rate).toBe('-10%')
       expect(req.pitch).toBe('+0Hz')
       expect(req.volume).toBe('+0%')
