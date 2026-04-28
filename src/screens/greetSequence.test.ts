@@ -56,9 +56,12 @@ describe('runGreetSequence', () => {
   })
 
   it('exposes the four spec lines in order', () => {
+    // Phase 3a (ticket 86c9hjnq1, 2026-04-28): line 1 was renamed
+    // "I'm Melody." → "I'm Emma." — see GREET_LINES docstring for full
+    // context on the character pivot.
     expect(GREET_LINES).toEqual([
       'Hi!',
-      "I'm Melody.",
+      "I'm Emma.",
       "It's so nice to meet you.",
       "Tap the heart when you're ready.",
     ])
@@ -90,7 +93,7 @@ describe('runGreetSequence', () => {
   it('start(fromIndex) seeds the sequence at the given line — used by the relock retry path', () => {
     // Ticket 86c9gr43t: when line 2 errors, Greet builds a fresh sequence
     // and calls start(2) so Marian retries the failed line rather than
-    // re-hearing "Hi!" + "I'm Melody." again.
+    // re-hearing "Hi!" + "I'm Emma." again.
     const h = makeSpeakHarness()
     const handle = runGreetSequence({ speak: h.speak })
     handle.start(2)
@@ -186,7 +189,7 @@ describe('runGreetSequence', () => {
     // Cross the gap: line 1 starts.
     vi.advanceTimersByTime(1)
     expect(h.calls).toHaveLength(2)
-    expect(h.calls[1].text).toBe("I'm Melody.")
+    expect(h.calls[1].text).toBe("I'm Emma.")
   })
 
   it('plays all four lines in order with onLineStart/onLineEnd callbacks', async () => {

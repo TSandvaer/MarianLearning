@@ -19,7 +19,7 @@ vi.mock('./_session.js', () => {
   return {
     renderSessionAudio: vi.fn(),
     MELODY_VOICE_CONFIG: {
-      voice: 'en-US-AnaNeural',
+      voice: 'en-US-EmmaMultilingualNeural',
       rate: '-10%',
       pitch: '+0Hz',
       volume: '+0%',

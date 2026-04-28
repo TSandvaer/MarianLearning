@@ -31,12 +31,33 @@ import {
 } from './_tts.js'
 import type { SessionStartResponse, Utterance } from './_types.js'
 
-/** Voice config used app-wide. Matches PR #25's Plan B Greet voice. */
+/**
+ * Voice config used app-wide.
+ *
+ * History
+ * -------
+ * - PR #25 (ticket 86c9gqprh): Plan B locked `en-US-AnaNeural` rate `-10%`
+ *   for both Greet's bundled MP3s and Path A session audio.
+ * - Ticket 86c9hjnq1 (THIS CHANGE — Phase 3a, 2026-04-28): swap to
+ *   `en-US-EmmaMultilingualNeural`. Rationale: the audit-branch A/B
+ *   (`audit/86c9hjnq1-ssml-prosody-samples`, PR #96) confirmed Ana's
+ *   prosody engine produces metallic question intonation regardless of
+ *   SSML strategy; Emma multilingual produces natural prosody on the
+ *   exact same body. Thomas approved 2026-04-28.
+ *
+ * The character is also being renamed Melody → Emma in this phase to
+ * drop Sanrio IP. The visual pivot (manhwa-style art) is Phase 3b and
+ * lands separately — until then, audio + text say "Emma" while the
+ * SVG still shows the bunny. The constant name MELODY_VOICE_CONFIG is
+ * intentionally unchanged in Phase 3a; renaming the symbol cascades
+ * through `_session.test.ts`, `claude.test.ts`, and qa docs and is
+ * deferred to Phase 3b's broader rename pass.
+ */
 export const MELODY_VOICE_CONFIG: Pick<
   TtsRequest,
   'voice' | 'rate' | 'pitch' | 'volume'
 > = {
-  voice: 'en-US-AnaNeural',
+  voice: 'en-US-EmmaMultilingualNeural',
   rate: '-10%',
   pitch: '+0Hz',
   volume: '+0%',

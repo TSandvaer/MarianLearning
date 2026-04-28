@@ -61,10 +61,20 @@ export interface BoundaryEvent {
  * speech engine and the caption ribbon read from this array, so there is no
  * drift between what's spoken and what's shown (AC: "no text shown that
  * Melody doesn't also say").
+ *
+ * Phase 3a (ticket 86c9hjnq1, 2026-04-28): the second line was renamed from
+ * "I'm Melody." to "I'm Emma." as part of the character pivot away from
+ * Sanrio IP. Both the spoken audio (re-rendered with the Emma multilingual
+ * voice) and the caption ribbon now say "Emma". The corresponding
+ * `GreetLineKey` for this line is still `'imMelody'` and the MP3 filename
+ * is still `greet-02-im-melody.mp3` — those identifiers cascade through
+ * preRecorded.ts, audioContextProbe, debugBus, and several test suites,
+ * and Phase 3b's broader rename pass owns that refactor. The text/key
+ * mismatch is intentional and temporary.
  */
 export const GREET_LINES = [
   'Hi!',
-  "I'm Melody.",
+  "I'm Emma.",
   "It's so nice to meet you.",
   "Tap the heart when you're ready.",
 ] as const

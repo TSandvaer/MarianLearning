@@ -3,10 +3,11 @@
 // Why this exists
 // ---------------
 // PR #25 (ticket 86c9gqprh) shipped pre-recorded MP3s for the four fixed
-// Greet lines using `en-US-AnaNeural` at rate -10% via the Python `edge-tts`
-// CLI. Math, Word Song, and any future per-session utterance is dynamic
-// (Claude-generated per session) and cannot be pre-recorded. This module
-// renders those dynamic lines at session-start time using the same voice.
+// Greet lines via the Python `edge-tts` CLI. Math, Word Song, and any
+// future per-session utterance is dynamic (Claude-generated per session)
+// and cannot be pre-recorded. This module renders those dynamic lines at
+// session-start time using the same voice config as Greet (defined in
+// `api/_session.ts` → `MELODY_VOICE_CONFIG`).
 //
 // HISTORY
 // -------
@@ -20,12 +21,21 @@
 //    Microsoft block-list on Vercel egress IPs. Either way the failure
 //    class is structural — no amount of timeout tuning fixes it.
 //    See ticket 86c9gv8um for the diagnostic write-up.
-//  - 86c9gvgjk (THIS CHANGE — Plan B lock-in): swap the entire transport
-//    layer to Azure Speech REST. Same voice (en-US-AnaNeural in Azure's
-//    official catalog), same output format (audio-24khz-48kbitrate-mono-mp3),
+//  - 86c9gvgjk (Plan B lock-in): swap the entire transport layer to Azure
+//    Speech REST. Initial Azure voice was en-US-AnaNeural (Microsoft's
+//    "Cute" child female), output format audio-24khz-48kbitrate-mono-mp3,
 //    same wire shape exposed to the caller (Uint8Array MP3 bytes). Plain
 //    HTTPS — no WSS, no Sec-MS-GEC token, no reverse-engineered protocol.
 //    Cost: $0/month within Azure F0 free tier.
+//  - 86c9hjnq1 (Phase 3a, 2026-04-28): voice swap to
+//    en-US-EmmaMultilingualNeural. The audit branch
+//    (audit/86c9hjnq1-ssml-prosody-samples / PR #96) A/B confirmed Ana's
+//    prosody predictor produces metallic question intonation regardless
+//    of SSML strategy; Emma multilingual produces natural prosody on the
+//    same SSML body. Same wire shape, same output format. Voice config
+//    declared in api/_session.ts (MELODY_VOICE_CONFIG); see that file's
+//    header for full rationale. Phase 3b ships the visual pivot
+//    (manhwa-style art) and the broader rename of "Melody" symbols.
 //
 // IMPORTANT: this is a server-side module ONLY. It reads
 // `process.env.AZURE_SPEECH_KEY` and `process.env.AZURE_SPEECH_REGION`.
@@ -54,7 +64,7 @@ const DEFAULT_TIMEOUT_MS = 8_000
 export interface TtsRequest {
   /** Plain text to synthesize. Will be XML-escaped before embedding in SSML. */
   text: string
-  /** Voice short-name, e.g. `en-US-AnaNeural`. */
+  /** Voice short-name, e.g. `en-US-EmmaMultilingualNeural`. */
   voice: string
   /** Prosody rate, e.g. `'-10%'`, `'+0%'`, `'+5%'`. */
   rate: string

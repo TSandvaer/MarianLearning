@@ -44,9 +44,11 @@
  *
  * Voice consistency
  * -----------------
- * Server pipeline locks to `en-US-AnaNeural` rate `-10%`, identical to
- * Greet's Plan B voice. Frontend has no voice config to manage — the audio
- * is already rendered.
+ * Server pipeline locks to whatever `MELODY_VOICE_CONFIG` declares in
+ * `api/_session.ts`. Phase 3a (ticket 86c9hjnq1, 2026-04-28) moved that
+ * to `en-US-EmmaMultilingualNeural` rate `-10%`; same config applies to
+ * Greet's bundled MP3s. Frontend has no voice config to manage — the
+ * audio is already rendered.
  */
 
 import { Howl } from 'howler'
@@ -140,11 +142,15 @@ export interface CreateSessionAudioOptions {
  * strategy, voice, prosody attrs, etc. — so the IndexedDB-cached MP3s from
  * the previous shape are dropped on next load. The store name and the
  * IndexedDB schema version both derive from this constant; bumping it
- * fires `onupgradeneeded`, which deletes the old store. v1 = pre-PR-#82
- * (plain text → AnaNeural). v2 = post-PR-#82 (digit-by-digit SSML for
- * two-digit numbers).
+ * fires `onupgradeneeded`, which deletes the old store.
+ *  - v1 = pre-PR-#82 (plain text → AnaNeural).
+ *  - v2 = post-PR-#82 (digit-by-digit SSML for two-digit numbers, AnaNeural).
+ *  - v3 = post-PR for ticket 86c9hjnq1 (Phase 3a, 2026-04-28): voice swap
+ *    Ana → Emma multilingual. The SSML strategy is unchanged, but the
+ *    rendered audio bytes differ entirely (different voice timbre), so
+ *    every cached row from v2 must be invalidated.
  */
-export const CACHE_VERSION = 2
+export const CACHE_VERSION = 3
 export const STORE_NAME = `session-audio-v${CACHE_VERSION}`
 export const DB_NAME = 'marian-tutor-session-audio'
 /** Tied to CACHE_VERSION so `onupgradeneeded` fires on any bump. The IDB

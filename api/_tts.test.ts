@@ -88,7 +88,7 @@ describe('readAzureCredentials', () => {
 describe('buildSsmlBody', () => {
   const baseReq = {
     text: 'Hello Marian!',
-    voice: 'en-US-AnaNeural',
+    voice: 'en-US-EmmaMultilingualNeural',
     rate: '-10%',
     pitch: '+0Hz',
     volume: '+0%',
@@ -100,7 +100,7 @@ describe('buildSsmlBody', () => {
     expect(body).toContain(
       '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis"',
     )
-    expect(body).toContain('<voice name="en-US-AnaNeural">')
+    expect(body).toContain('<voice name="en-US-EmmaMultilingualNeural">')
     expect(body).toContain('<prosody pitch="+0Hz" rate="-10%" volume="+0%">')
     expect(body).toContain('Hello Marian!')
     expect(body).toMatch(/<\/prosody><\/voice><\/speak>$/)
@@ -198,7 +198,7 @@ describe('renderSsmlInnerText (interrogative prosody hint, ticket 86c9gxup4)', (
 
 describe('buildSsmlBody (prosody-hint integration)', () => {
   const baseReq = {
-    voice: 'en-US-AnaNeural',
+    voice: 'en-US-EmmaMultilingualNeural',
     rate: '-10%',
     pitch: '+0Hz',
     volume: '+0%',
@@ -272,7 +272,7 @@ describe('describeAzureFailure', () => {
 
 const HAPPY_REQ = {
   text: 'Hi!',
-  voice: 'en-US-AnaNeural',
+  voice: 'en-US-EmmaMultilingualNeural',
   rate: '-10%',
   pitch: '+0Hz',
   volume: '+0%',
@@ -335,7 +335,9 @@ describe('synthesizeUtterance', () => {
     expect(headers['User-Agent']).toBeTruthy()
 
     expect(typeof init!.body).toBe('string')
-    expect(init!.body as string).toContain('<voice name="en-US-AnaNeural">')
+    expect(init!.body as string).toContain(
+      '<voice name="en-US-EmmaMultilingualNeural">',
+    )
     expect(init!.body as string).toContain('xml:lang="en-US"')
     expect(init!.body as string).toContain('Hi!')
 
