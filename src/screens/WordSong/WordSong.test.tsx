@@ -1510,4 +1510,115 @@ describe('Word Song screen', () => {
       expect(chip).not.toBeDisabled()
     }
   })
+
+  /*
+   * Ticket 86c9j60qr — celebration audio cutoff. WordSong mirrors Math's
+   * advance-on-correct path; same fix shape; same regression risk. See
+   * Math.test.tsx for the long-form rationale.
+   */
+  it('correct-tap auto-advance waits for the celebration audio to finish (ticket 86c9j60qr)', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness({ autoResolve: false })
+
+    render(
+      withMotion(
+        <WordSong
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const correctChip = screen
+      .getAllByTestId('word-song-chip')
+      .find((c) => c.getAttribute('data-word') === 'cat')!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    expect(harness.spoken()).toContain('Yes! Cat.')
+    const spokenAfterTap = [...harness.spoken()]
+
+    // Min-dwell timer fires; pre-fix this would also fire the next read.
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+
+    // Still on problem 0 — celebration speak() still pending. The spoken
+    // list MUST NOT have grown (no problem-2 read-aloud dispatched).
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-problem-index',
+      '0',
+    )
+    expect(harness.spoken()).toEqual(spokenAfterTap)
+    expect(harness.spoken()).not.toContain('Tap the bag.')
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000)
+      await Promise.resolve()
+    })
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-problem-index',
+      '0',
+    )
+
+    // Resolve speak() — advance fires.
+    await act(async () => {
+      harness.resolveAll()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+  })
+
+  it('correct-tap advance fires at hard ceiling even if speak() never resolves (ticket 86c9j60qr)', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness({ autoResolve: false })
+
+    render(
+      withMotion(
+        <WordSong
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const correctChip = screen
+      .getAllByTestId('word-song-chip')
+      .find((c) => c.getAttribute('data-word') === 'cat')!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // No resolveAll() — advance must fire on the hard-ceiling timer.
+    await act(async () => {
+      vi.advanceTimersByTime(4000)
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('word-song')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+  })
 })

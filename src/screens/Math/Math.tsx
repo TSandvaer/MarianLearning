@@ -28,6 +28,7 @@ import {
 } from './sessionPlans'
 import {
   ADVANCE_AFTER_CORRECT_MS,
+  ADVANCE_HARD_CEILING_MS,
   CHIP_TAP_SPRING,
   FIRST_UTTERANCE_RETRY_MS,
   GUIDED_AFTER_WRONG_COUNT,
@@ -509,10 +510,33 @@ function MathScreen({
   // ── Refs for in-flight cleanup -----------------------------------------
 
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const advanceCeilingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
   const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /**
+   * Synchronous gates for the chained advance after a correct answer.
+   *
+   * The advance is gated on `max(ADVANCE_AFTER_CORRECT_MS, speak.onend)`
+   * so the celebration audio is always heard in full while the visual
+   * cadence stays predictable. A separate hard-ceiling timer at
+   * `ADVANCE_HARD_CEILING_MS` is the "audio engine wedged" escape valve;
+   * if either it OR (minDwell AND speakResolved) trips, the advance fires.
+   *
+   * Provenance: ticket 86c9j60qr. Pre-fix `setTimeout(..., 1200)` cut
+   * Emma's longer renders; the advance was never gated on speak's onend.
+   */
+  const minDwellElapsedRef = useRef(false)
+  const correctSpeakResolvedRef = useRef(false)
+  /** True once the auto-advance has actually been dispatched for this
+   *  correct answer. Prevents a double-fire when both gates flip in the
+   *  same tick (e.g. min-dwell timer firing exactly when speak resolves).
+   *  Reset alongside the gate refs in `advanceToNext`. */
+  const advanceFiredRef = useRef(false)
 
   /**
    * Unmount latch for the read-aloud `.then()` resolution path. Set to
@@ -552,6 +576,7 @@ function MathScreen({
   const clearAllTimers = useCallback(() => {
     for (const ref of [
       advanceTimerRef,
+      advanceCeilingTimerRef,
       shakeTimerRef,
       hintTimerRef,
       poseTimerRef,
@@ -1054,12 +1079,46 @@ function MathScreen({
         }
       }
 
-      // Speak the celebration utterance and schedule the auto-advance.
+      // Speak the celebration utterance, then chain the auto-advance on
+      // BOTH the minimum dwell timer AND the speak() resolution. Whichever
+      // is later wins — `max(animationDuration, audioDuration)`. A hard
+      // ceiling timer fires the advance unconditionally if speak() never
+      // resolves (audio engine wedged, blob fetch hung, etc.). See
+      // ticket 86c9j60qr for the empirical evidence.
+      //
+      // Reset the gate refs synchronously here so a re-entrant correct tap
+      // (rage-tap protection notwithstanding) sees a clean slate. The
+      // `advanceFiredRef` latch makes `tryAdvance` idempotent.
+      minDwellElapsedRef.current = false
+      correctSpeakResolvedRef.current = false
+      advanceFiredRef.current = false
+
+      const tryAdvance = () => {
+        if (advanceFiredRef.current) return
+        if (!minDwellElapsedRef.current || !correctSpeakResolvedRef.current) {
+          return
+        }
+        advanceFiredRef.current = true
+        // Clear the hard-ceiling timer — we're advancing on the normal path.
+        if (advanceCeilingTimerRef.current !== null) {
+          clearTimeout(advanceCeilingTimerRef.current)
+          advanceCeilingTimerRef.current = null
+        }
+        if (advanceTimerRef.current !== null) {
+          clearTimeout(advanceTimerRef.current)
+          advanceTimerRef.current = null
+        }
+        setCelebrating(false)
+        advanceToNext()
+      }
+
       void speak(problem.utterances.correct).then(() => {
+        correctSpeakResolvedRef.current = true
         poseTimerRef.current = setTimeout(() => {
           setPose('idle')
           poseTimerRef.current = null
         }, 0)
+        tryAdvance()
       })
 
       if (advanceTimerRef.current !== null) {
@@ -1067,9 +1126,30 @@ function MathScreen({
       }
       advanceTimerRef.current = setTimeout(() => {
         advanceTimerRef.current = null
+        minDwellElapsedRef.current = true
+        tryAdvance()
+      }, ADVANCE_AFTER_CORRECT_MS)
+
+      // Hard-ceiling fallback. If `speak()` never resolves (rare but
+      // observed in PR #88/#89's chip-lock saga — ticket 86c9hf4ef round
+      // 2), force the advance so the screen never bricks. The `advanceFiredRef`
+      // latch absorbs the case where this fires concurrently with a
+      // late-arriving onend.
+      if (advanceCeilingTimerRef.current !== null) {
+        clearTimeout(advanceCeilingTimerRef.current)
+      }
+      advanceCeilingTimerRef.current = setTimeout(() => {
+        advanceCeilingTimerRef.current = null
+        if (advanceFiredRef.current) return
+        advanceFiredRef.current = true
+        // Clear the (likely already-fired) min-dwell timer for tidiness.
+        if (advanceTimerRef.current !== null) {
+          clearTimeout(advanceTimerRef.current)
+          advanceTimerRef.current = null
+        }
         setCelebrating(false)
         advanceToNext()
-      }, ADVANCE_AFTER_CORRECT_MS)
+      }, ADVANCE_HARD_CEILING_MS)
     },
     // problemState.{wrongCount,guidedPlayed} intentionally omitted from
     // deps — the cleanWin computation reads the synchronous refs instead

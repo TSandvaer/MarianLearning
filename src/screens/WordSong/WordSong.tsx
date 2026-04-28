@@ -28,6 +28,7 @@ import {
 } from './wordSessionPlans'
 import {
   ADVANCE_AFTER_CORRECT_MS,
+  ADVANCE_HARD_CEILING_MS,
   CHIP_TAP_SPRING,
   FIRST_UTTERANCE_RETRY_MS,
   GUIDED_AFTER_WRONG_COUNT,
@@ -432,10 +433,22 @@ function WordSongScreen({
   // ── Refs for in-flight cleanup -----------------------------------------
 
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const advanceCeilingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
   const shakeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /**
+   * Synchronous gates for the chained advance after a correct answer.
+   * See Math.tsx for the long-form rationale — mirrored shape. Ticket
+   * 86c9j60qr (celebration-audio cutoff after Emma voice swap).
+   */
+  const minDwellElapsedRef = useRef(false)
+  const correctSpeakResolvedRef = useRef(false)
+  const advanceFiredRef = useRef(false)
 
   /**
    * Unmount latch and problem-index mirror for the read-aloud `.then()`
@@ -448,6 +461,7 @@ function WordSongScreen({
   const clearAllTimers = useCallback(() => {
     for (const ref of [
       advanceTimerRef,
+      advanceCeilingTimerRef,
       shakeTimerRef,
       hintTimerRef,
       poseTimerRef,
@@ -854,11 +868,37 @@ function WordSongScreen({
         }
       }
 
+      // Chain the auto-advance on max(min-dwell, speak.onend) with a hard
+      // ceiling fallback. Mirrors Math.tsx — see ticket 86c9j60qr.
+      minDwellElapsedRef.current = false
+      correctSpeakResolvedRef.current = false
+      advanceFiredRef.current = false
+
+      const tryAdvance = () => {
+        if (advanceFiredRef.current) return
+        if (!minDwellElapsedRef.current || !correctSpeakResolvedRef.current) {
+          return
+        }
+        advanceFiredRef.current = true
+        if (advanceCeilingTimerRef.current !== null) {
+          clearTimeout(advanceCeilingTimerRef.current)
+          advanceCeilingTimerRef.current = null
+        }
+        if (advanceTimerRef.current !== null) {
+          clearTimeout(advanceTimerRef.current)
+          advanceTimerRef.current = null
+        }
+        setCelebrating(false)
+        advanceToNext()
+      }
+
       void speak(problem.utterances.correct).then(() => {
+        correctSpeakResolvedRef.current = true
         poseTimerRef.current = setTimeout(() => {
           setPose('idle')
           poseTimerRef.current = null
         }, 0)
+        tryAdvance()
       })
 
       if (advanceTimerRef.current !== null) {
@@ -866,9 +906,25 @@ function WordSongScreen({
       }
       advanceTimerRef.current = setTimeout(() => {
         advanceTimerRef.current = null
+        minDwellElapsedRef.current = true
+        tryAdvance()
+      }, ADVANCE_AFTER_CORRECT_MS)
+
+      // Hard-ceiling fallback. See Math.tsx for the long rationale.
+      if (advanceCeilingTimerRef.current !== null) {
+        clearTimeout(advanceCeilingTimerRef.current)
+      }
+      advanceCeilingTimerRef.current = setTimeout(() => {
+        advanceCeilingTimerRef.current = null
+        if (advanceFiredRef.current) return
+        advanceFiredRef.current = true
+        if (advanceTimerRef.current !== null) {
+          clearTimeout(advanceTimerRef.current)
+          advanceTimerRef.current = null
+        }
         setCelebrating(false)
         advanceToNext()
-      }, ADVANCE_AFTER_CORRECT_MS)
+      }, ADVANCE_HARD_CEILING_MS)
     },
     // problemState.{wrongCount,guidedPlayed} intentionally omitted from
     // deps — the cleanWin computation reads the synchronous refs instead

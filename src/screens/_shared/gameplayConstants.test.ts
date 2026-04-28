@@ -10,6 +10,7 @@ import {
   HINT_AFTER_WRONG_COUNT,
   GUIDED_AFTER_WRONG_COUNT,
   ADVANCE_AFTER_CORRECT_MS,
+  ADVANCE_HARD_CEILING_MS,
   WRONG_SHAKE_MS,
   HINT_DELAY_AFTER_WRONG_MS,
   STREAK_FADE_OUT_MS,
@@ -26,6 +27,7 @@ describe('gameplay constants (spec-locked values)', () => {
 
   it('timing constants', () => {
     expect(ADVANCE_AFTER_CORRECT_MS).toBe(1200)
+    expect(ADVANCE_HARD_CEILING_MS).toBe(4000)
     expect(WRONG_SHAKE_MS).toBe(400)
     expect(HINT_DELAY_AFTER_WRONG_MS).toBe(600)
     expect(STREAK_FADE_OUT_MS).toBe(400)
