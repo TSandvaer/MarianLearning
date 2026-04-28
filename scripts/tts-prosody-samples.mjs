@@ -10,9 +10,10 @@
  * output STILL sounds metallic/robotic on questions like "How many?"
  * after a numeric clause.
  *
- * Phase 1 (scripts/_phase1-dump-ssml.mjs) confirmed the server emits the
- * SSML the tests assert. So the diagnosis is "AnaNeural's prosody engine
- * doesn't honour <break>+<prosody> well on this pattern."
+ * Phase 1 (a throwaway local SSML dump, not committed) confirmed the
+ * server emits exactly the SSML the test suite asserts. So the
+ * diagnosis is "AnaNeural's prosody engine doesn't honour
+ * <break>+<prosody> well on this pattern" — not a server bug.
  *
  * This script generates ALTERNATIVE renders so Thomas can A/B them on
  * iPad and pick the winner. The winner becomes the production SSML
@@ -47,8 +48,8 @@
  * COST DISCIPLINE
  * ---------------
  * Azure F0 free tier is 20 tx/s and 500K chars/month. This script makes
- * one call per strategy (currently 7), each ~50-100 chars of synth text
- * — well inside both ceilings. We sleep 100ms between calls so we never
+ * one call per strategy (currently 9), each ~50-100 chars of synth text
+ * — well inside both ceilings. We sleep 150ms between calls so we never
  * burst over 20/s even on a fast machine.
  */
 
@@ -119,8 +120,11 @@ function escapeSsml(text) {
 // `id` is the filename slug. `label` is what the HTML harness shows
 // under the play button.
 
+// Source utterance — same across every strategy so Thomas A/Bs prosody,
+// not text content. "Two plus two. How many?" matches Thomas's iPad
+// capture (sums-to-10 plan C, problem 1) and exercises the same
+// trailing-clause-after-numeric-clause pattern the hint utterance has.
 const SAMPLE_TEXT = 'Two plus two. How many?'
-const HINT_TEXT = 'Look. Two. And two more. How many now?'
 
 /** Outer prosody (the production wrapper around the whole utterance) is
  *  always the same: -10% rate, +0Hz pitch, +0% volume — what Greet uses. */
@@ -399,7 +403,6 @@ async function main() {
     region: AZURE_REGION,
     outputFormat: AZURE_OUTPUT_FORMAT,
     sampleText: SAMPLE_TEXT,
-    hintText: HINT_TEXT,
     samples: [],
   }
 
