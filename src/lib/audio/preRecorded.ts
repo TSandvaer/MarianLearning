@@ -24,15 +24,25 @@
  *
  * Voice provenance
  * ----------------
- * MP3s in `public/assets/audio/greet/` were generated 2026-04-25 with
- * `edge-tts` using voice `en-US-AnaNeural` (Microsoft's child-coded female
- * voice) at -10% rate. Tone approved by Thomas. To regenerate:
+ * MP3s in `public/assets/audio/greet/` are re-rendered whenever the voice
+ * config changes. Current voice (Phase 3a, ticket 86c9hjnq1, 2026-04-28):
+ * `en-US-EmmaMultilingualNeural` at -10% rate via Azure Speech REST.
+ * Re-render via `node scripts/render-greet-mp3s.mjs` (the script reads
+ * `.env.local` for AZURE_SPEECH_KEY / AZURE_SPEECH_REGION). Total asset
+ * budget: ~56 KB across the 4 lines, well under the ticket's 200 KB
+ * ceiling.
  *
- *   edge-tts --voice en-US-AnaNeural --rate=-10% \
- *     --text "Hi!" --write-media greet-01-hi.mp3
- *
- * Total asset budget: ~56 KB across the 4 lines, well under the ticket's
- * 200 KB ceiling.
+ * History:
+ *  - 2026-04-25 (PR #25, ticket 86c9gqprh): initial bake, `en-US-AnaNeural`
+ *    via the `edge-tts` Python CLI.
+ *  - 2026-04-28 (PR for ticket 86c9hjnq1, Phase 3a): re-rendered with
+ *    `en-US-EmmaMultilingualNeural` via Azure Speech REST. Audit branch
+ *    `audit/86c9hjnq1-ssml-prosody-samples` (PR #96) confirmed Emma
+ *    multilingual produces natural prosody where Ana sounded metallic
+ *    on questions. Greet's lines are declarative, not interrogative —
+ *    the voice swap is part of the broader character pivot away from
+ *    Sanrio IP rather than a prosody fix; the prosody win lands in
+ *    Path A (Math hint utterances) which uses the same voice config.
  */
 
 import { Howl } from 'howler'
@@ -51,6 +61,14 @@ import {
  * (`greetSequence.ts`) maps line text → key via `GREET_LINE_KEYS`; this
  * keeps the line strings as the single source of truth in one place
  * (greetSequence) while letting this module key on a small enum.
+ *
+ * Phase 3a note (ticket 86c9hjnq1, 2026-04-28): the line text for
+ * `imMelody` is now "I'm Emma." (character renamed away from Sanrio
+ * IP). The key name `'imMelody'` and the asset filename
+ * `greet-02-im-melody.mp3` are intentionally NOT renamed in this PR —
+ * Phase 3b owns the broader rename across debug rows, test fixtures,
+ * and the asset pipeline. Treat the key as a stable identifier that
+ * doesn't reflect the current text.
  */
 export type GreetLineKey = 'hi' | 'imMelody' | 'niceToMeet' | 'tapHeart'
 
@@ -72,7 +90,7 @@ const SOURCES: Record<GreetLineKey, string> = {
  */
 const WORD_COUNTS: Record<GreetLineKey, number> = {
   hi: 1, // "Hi!"
-  imMelody: 2, // "I'm Melody."
+  imMelody: 2, // "I'm Emma." (renamed from "I'm Melody." in ticket 86c9hjnq1)
   niceToMeet: 6, // "It's so nice to meet you."
   tapHeart: 6, // "Tap the heart when you're ready."
 }
