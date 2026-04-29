@@ -39,6 +39,10 @@ export function defaultProgress(childName = 'Marian'): Progress {
     schemaVersion: CURRENT_SCHEMA_VERSION,
     profile: {
       childName,
+      // Schema v1 stores this literal verbatim. The visible character is
+      // Emma post-Phase-3b — the on-disk identifier is unchanged on
+      // purpose; see `Character` type doc in ./types.ts and ticket
+      // 86c9jccp7 for the rationale (no schema bump for Phase 3b).
       character: 'melody',
       lastPlayedISO: null,
     },
