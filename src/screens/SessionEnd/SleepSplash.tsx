@@ -18,9 +18,7 @@
  *
  * Phase 3b note (ticket 86c9jccp7): the inline sleeping-bunny placeholder
  * has been replaced by the canonical Emma asset pipeline. The sleepy pose
- * itself is not yet shipped (see fallback comment on the <img> below);
- * once `emma-sleepy.svg` lands via ticket 86c9jcajq, only that path
- * string needs updating.
+ * shipped separately via ticket 86c9jcajq.
  */
 
 import { m } from 'motion/react'
@@ -46,16 +44,11 @@ export default function SleepSplash(): ReactElement {
           'linear-gradient(180deg, #F5EDF7 0%, #EDE0F0 40%, #E8D5EE 100%)',
       }}
     >
-      {/* Sleepy Emma -- centered, ~40vh.
-          FALLBACK: emma-sleepy.svg not yet shipped (ticket 86c9jcajq —
-          Midjourney source had artist-annotation labels covering the
-          figure, deferred for re-generation). Using emma-idle.svg as a
-          temporary substitute. Update to /assets/emma-sleepy.svg when
-          86c9jcajq lands; no other code changes are required. */}
+      {/* Sleepy Emma -- centered, ~40vh. */}
       <div className="flex h-[40vh] items-center justify-center">
         <m.img
           data-testid="sleep-splash-emma"
-          src="/assets/emma-idle.svg"
+          src="/assets/emma-sleepy.svg"
           alt="Emma resting"
           draggable={false}
           className="h-full w-auto select-none"
