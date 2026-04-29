@@ -87,6 +87,15 @@ export interface ClaudeErrorResponse {
     | 'invalid-json'
     | 'config-missing'
     | 'tts-failed'
+    /** Per-IP rate limit hit on session-start (added ticket 86c9jdh39 — guards
+     *  against runaway billing if the share-link leaks). Browser path A code
+     *  treats this like other failure codes and falls back to silent mode. */
+    | 'rate-limited'
+    /** Anthropic planner call failed: model returned malformed JSON, the
+     *  upstream SDK errored, or the request shape was rejected (e.g. unknown
+     *  track). Distinct from `tts-failed` so logs can attribute correctly.
+     *  Added ticket 86c9jdh39. */
+    | 'planner-failed'
   message?: string
 }
 
