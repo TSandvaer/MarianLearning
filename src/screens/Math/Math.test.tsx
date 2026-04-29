@@ -256,7 +256,7 @@ describe('Math (Number Garden) screen', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the first problem on mount with HUD, melody, and chips', () => {
+  it('renders the first problem on mount with HUD, emma, and chips', () => {
     const harness = makePlayHarness()
     render(
       withMotion(

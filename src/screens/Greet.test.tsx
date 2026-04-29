@@ -226,7 +226,7 @@ describe('Greet', () => {
   })
 
   describe('Wake state (initial mount, audio locked)', () => {
-    it('mounts in Wake state and renders Melody, the cloud bg, the ready ring, and the tap target', () => {
+    it('mounts in Wake state and renders Emma, the cloud bg, the ready ring, and the tap target', () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -243,9 +243,9 @@ describe('Greet', () => {
       expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
       expect(screen.getByTestId('greet-wake-tap-target')).toBeInTheDocument()
 
-      const melodyEls = screen.getAllByTestId('greet-melody')
-      expect(melodyEls).toHaveLength(1)
-      expect(melodyEls[0]).toHaveAttribute('data-pose', 'idle')
+      const emmaEls = screen.getAllByTestId('greet-emma')
+      expect(emmaEls).toHaveLength(1)
+      expect(emmaEls[0]).toHaveAttribute('data-pose', 'idle')
     })
 
     it('does NOT show the speech ribbon, heart, or wake-icon in initial Wake state', () => {
@@ -381,11 +381,11 @@ describe('Greet', () => {
         vi.advanceTimersByTime(8_000)
       })
       expect(screen.getByTestId('greet-wake-icon')).toBeInTheDocument()
-      // Ear-wiggle: the happy pose is now in the DOM.
+      // Ear-wiggle: the celebration pose is now in the DOM.
       const poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
-      expect(poses).toContain('happy')
+      expect(poses).toContain('celebration')
     })
 
     it('does NOT call playGreetLine() during the wake re-prompt (audio still locked)', () => {
@@ -556,7 +556,7 @@ describe('Greet', () => {
       fireWakeTap()
 
       // Pre-condition: idle.
-      expect(screen.getByTestId('greet-melody')).toHaveAttribute(
+      expect(screen.getByTestId('greet-emma')).toHaveAttribute(
         'data-pose',
         'idle',
       )
@@ -569,15 +569,15 @@ describe('Greet', () => {
       })
 
       let poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
-      expect(poses).toContain('happy')
+      expect(poses).toContain('celebration')
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(600)
       })
       poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
       expect(poses).toContain('idle')
     })
@@ -600,7 +600,7 @@ describe('Greet', () => {
         h.tickWord(1)
       })
       const poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
       expect(poses).toEqual(['idle'])
     })
@@ -631,7 +631,7 @@ describe('Greet', () => {
       )
     })
 
-    it("captions never show text Melody hasn't said (initially zero revealed)", () => {
+    it("captions never show text Emma hasn't said (initially zero revealed)", () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -854,7 +854,7 @@ describe('Greet', () => {
         'relock',
       )
       // No ribbon visible during the relock — Marian sees the ring re-emerge,
-      // not an empty rounded rectangle hanging under Melody.
+      // not an empty rounded rectangle hanging under Emma.
       expect(screen.queryByTestId('greet-ribbon')).toBeNull()
     })
   })
@@ -1114,7 +1114,7 @@ describe('Greet', () => {
       expect(onAdvance).toHaveBeenCalledTimes(1)
     })
 
-    it('cancels in-flight pre-recorded playback on heart tap so Melody is silent during the chime', async () => {
+    it('cancels in-flight pre-recorded playback on heart tap so Emma is silent during the chime', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -1169,15 +1169,15 @@ describe('Greet', () => {
 
       await advanceToHeart(h)
       const preTap = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
       expect(preTap).toEqual(['idle'])
 
       fireEvent.click(screen.getByTestId('greet-heart'))
       const postTap = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
-      expect(postTap).toContain('happy')
+      expect(postTap).toContain('celebration')
     })
   })
 
@@ -1265,7 +1265,7 @@ describe('Greet', () => {
 
       expect(screen.getByTestId('greet')).toBeInTheDocument()
       expect(screen.getByTestId('greet-clouds')).toBeInTheDocument()
-      expect(screen.getByTestId('greet-melody')).toBeInTheDocument()
+      expect(screen.getByTestId('greet-emma')).toBeInTheDocument()
       expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
       // No play before tap, regardless of motion preference.
       expect(h.calls).toHaveLength(0)

@@ -478,7 +478,7 @@ describe('SessionEnd', () => {
     expect(sparkle.play).toHaveBeenCalled()
   })
 
-  it('renders Melody celebrating image', () => {
+  it('renders Emma celebrating image', () => {
     const storage = createMemoryStorage()
     seedStardust(storage, 9)
 
@@ -495,7 +495,7 @@ describe('SessionEnd', () => {
       ),
     )
 
-    const melodyImg = screen.getByTestId('session-end-melody')
-    expect(melodyImg).toHaveAttribute('src', '/assets/melody-cheering.svg')
+    const emmaImg = screen.getByTestId('session-end-emma')
+    expect(emmaImg).toHaveAttribute('src', '/assets/emma-cheering.svg')
   })
 })

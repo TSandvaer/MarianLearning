@@ -145,7 +145,7 @@ describe('Word Song screen', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders the first problem on mount with HUD, melody, word card, and chips', () => {
+  it('renders the first problem on mount with HUD, emma, word card, and chips', () => {
     const harness = makePlayHarness()
     render(
       withMotion(
@@ -1111,7 +1111,7 @@ describe('Word Song screen', () => {
   // was "practically not visible" and there was no reward sound. Causes:
   //  - HUD pop was 250ms — too brief next to the 1200ms auto-advance
   //  - Sparkle burst was a spring with ~600ms tail — undershot the 800ms target
-  //  - Melody pose-swap was a 200ms cross-fade — no perceptible "wiggle"
+  //  - Emma pose-swap was a 200ms cross-fade — no perceptible "wiggle"
   // Tests below verify the fix without coupling to the exact frame-by-frame
   // timing values (those live as named constants and can be tweaked).
 
@@ -1176,7 +1176,7 @@ describe('Word Song screen', () => {
     expect(sparkleCall.volume).toBeGreaterThan(0)
   })
 
-  it('Melody ear-wiggle is suppressed under prefers-reduced-motion', async () => {
+  it('Emma celebration wiggle is suppressed under prefers-reduced-motion', async () => {
     const matchMediaSpy = vi
       .spyOn(window, 'matchMedia')
       .mockImplementation((query: string) => ({
@@ -1211,21 +1211,22 @@ describe('Word Song screen', () => {
       await Promise.resolve()
     })
 
-    // AnimatePresence keeps the exiting (idle) and entering (happy)
-    // <m.img> in the DOM concurrently during the cross-fade. Pick the
-    // happy one explicitly — under reduced-motion its wiggle marker is
-    // false even though the pose still flipped.
-    const melodies = screen.getAllByTestId('word-song-melody')
-    const melodyHappy = melodies.find(
-      (el) => el.getAttribute('data-pose') === 'happy',
+    // AnimatePresence keeps the exiting (idle) and entering
+    // (celebration) <m.img> in the DOM concurrently during the
+    // cross-fade. Pick the celebration one explicitly — under
+    // reduced-motion its wiggle marker is false even though the pose
+    // still flipped.
+    const emmas = screen.getAllByTestId('word-song-emma')
+    const emmaCelebration = emmas.find(
+      (el) => el.getAttribute('data-pose') === 'celebration',
     )
-    expect(melodyHappy).toBeDefined()
-    expect(melodyHappy).toHaveAttribute('data-wiggling', 'false')
+    expect(emmaCelebration).toBeDefined()
+    expect(emmaCelebration).toHaveAttribute('data-wiggling', 'false')
 
     matchMediaSpy.mockRestore()
   })
 
-  it('Melody plays an ear-wiggle on correct tap (data-wiggling=true)', async () => {
+  it('Emma plays a celebration wiggle on correct tap (data-wiggling=true)', async () => {
     const harness = makePlayHarness()
     render(
       withMotion(
@@ -1238,10 +1239,10 @@ describe('Word Song screen', () => {
       ),
     )
 
-    // Idle state: only one Melody node, with no wiggle.
-    const melodyIdle = screen.getByTestId('word-song-melody')
-    expect(melodyIdle).toHaveAttribute('data-pose', 'idle')
-    expect(melodyIdle).toHaveAttribute('data-wiggling', 'false')
+    // Idle state: only one Emma node, with no wiggle.
+    const emmaIdle = screen.getByTestId('word-song-emma')
+    expect(emmaIdle).toHaveAttribute('data-pose', 'idle')
+    expect(emmaIdle).toHaveAttribute('data-wiggling', 'false')
 
     const correctChip = screen
       .getAllByTestId('word-song-chip')
@@ -1253,14 +1254,14 @@ describe('Word Song screen', () => {
     })
 
     // After correct tap, AnimatePresence keeps both the exiting (idle)
-    // and the entering (happy) <m.img> in the tree during the
-    // cross-fade. Find the happy one — it carries the wiggle marker.
-    const melodies = screen.getAllByTestId('word-song-melody')
-    const melodyHappy = melodies.find(
-      (el) => el.getAttribute('data-pose') === 'happy',
+    // and the entering (celebration) <m.img> in the tree during the
+    // cross-fade. Find the celebration one — it carries the wiggle marker.
+    const emmas = screen.getAllByTestId('word-song-emma')
+    const emmaCelebration = emmas.find(
+      (el) => el.getAttribute('data-pose') === 'celebration',
     )
-    expect(melodyHappy).toBeDefined()
-    expect(melodyHappy).toHaveAttribute('data-wiggling', 'true')
+    expect(emmaCelebration).toBeDefined()
+    expect(emmaCelebration).toHaveAttribute('data-wiggling', 'true')
   })
 
   it('renders the picture chip SVG with the correct picture-key data attribute', () => {

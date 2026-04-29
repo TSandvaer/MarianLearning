@@ -48,7 +48,7 @@
  *
  * What this hook does NOT own
  * ---------------------------
- * - The Wake-state visuals (ring, breathing Melody, finger-tap icon). Those
+ * - The Wake-state visuals (ring, breathing Emma, finger-tap icon). Those
  *   live in components. The hook just exposes a `showGate: boolean` for the
  *   component to render against.
  * - The actual audio playback call. The hook gives you a `wrapSpeak()`

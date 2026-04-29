@@ -111,7 +111,7 @@ export default function SessionEndPlaceholder({
           className="font-display text-3xl text-ink"
         >
           {/* "You earned 5 stardust!" — number-led, low-vocab copy per
-              the 200-word Melody cap. */}
+              the 200-word Emma cap. */}
           You earned {earned} stardust!
         </p>
       </m.div>

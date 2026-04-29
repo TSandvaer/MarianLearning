@@ -59,18 +59,18 @@ describe('Splash', () => {
       })
   }
 
-  it('renders the Melody logo and three pulsing dots', () => {
+  it('renders the Emma logo and three pulsing dots', () => {
     stubReducedMotion(false)
     render(withMotion(<Splash onAdvance={vi.fn()} detector={() => false} />))
 
-    expect(screen.getByAltText('Melody')).toBeInTheDocument()
+    expect(screen.getByAltText('Emma')).toBeInTheDocument()
     expect(screen.getAllByTestId('splash-dot')).toHaveLength(3)
   })
 
-  it('renders only the "Melody" wordmark — no other text', () => {
+  it('renders only the "Emma" wordmark — no other text', () => {
     stubReducedMotion(false)
     render(withMotion(<Splash onAdvance={vi.fn()} detector={() => false} />))
-    // The logo SVG carries the "Melody" alt text. No other visible text node.
+    // The logo SVG carries the "Emma" alt text. No other visible text node.
     const splash = screen.getByTestId('splash')
     // Strip the alt text via the img and check the remaining textContent.
     splash.querySelectorAll('img').forEach((img) => img.remove())

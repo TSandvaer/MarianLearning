@@ -95,11 +95,11 @@ export default function Splash({
       }}
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: FADE_OUT_MS / 1000 } }}
-      aria-label="Melody is waking up"
+      aria-label="Emma is waking up"
     >
       <m.img
-        src="/assets/melody-logo.svg"
-        alt="Melody"
+        src="/assets/emma-logo.svg"
+        alt="Emma"
         className="w-60 max-w-[60vw] select-none"
         draggable={false}
         initial={{ scale: 0.9, opacity: 0 }}

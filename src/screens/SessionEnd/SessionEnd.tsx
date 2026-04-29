@@ -461,7 +461,7 @@ export default function SessionEnd({
         }}
       />
 
-      {/* Melody celebrating -- centered, ~38vh */}
+      {/* Emma celebrating -- centered, ~38vh */}
       <div className="pointer-events-none relative flex h-[38vh] w-full items-center justify-center">
         {/* Sparkle burst on entry */}
         <AnimatePresence>
@@ -493,17 +493,18 @@ export default function SessionEnd({
             ))}
         </AnimatePresence>
 
-        {/* Melody image -- uses melody-cheering.svg (the canonical
-            celebrating pose asset, named melody-cheering in the repo per
-            screen-4-word-song.md:579; spec note says this is the same as
-            melody-celebrating.svg) */}
+        {/* Emma image -- uses emma-cheering.svg (the canonical
+            big-celebration pose, BOTH hands raised; reserved for
+            Session-End and never used per-problem). Replaces the legacy
+            melody-cheering.svg in the Phase 3b character pivot
+            (ticket 86c9jccp7). */}
         <AnimatePresence initial={false}>
           <m.img
             layoutId="melody"
             key="celebrating"
-            data-testid="session-end-melody"
-            src="/assets/melody-cheering.svg"
-            alt="Melody celebrating"
+            data-testid="session-end-emma"
+            src="/assets/emma-cheering.svg"
+            alt="Emma celebrating"
             draggable={false}
             className="absolute h-full w-auto select-none"
             initial={

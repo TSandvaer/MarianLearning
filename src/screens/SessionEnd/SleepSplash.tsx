@@ -5,7 +5,7 @@
  * Option C sub-spec. Renders after the "All done!" CTA tap.
  *
  * Contract:
- * - No TTS on this screen. Melody rests. Audio playing here defeats the
+ * - No TTS on this screen. Emma rests. Audio playing here defeats the
  *   "we're done" message.
  * - No further interactions. Tapping anywhere does nothing.
  * - No "Tap to start a new session!" affordance (anti-dark-pattern).
@@ -16,10 +16,11 @@
  *   Going with spec: NO auto-dismiss, NO tap-to-dismiss. Sleep splash
  *   persists until Marian closes the PWA via iPad gesture.
  *
- * NOTE on the melody-sleepy SVG: the spec flags `melody-sleepy.svg` as
- * needed but not yet authored. We use an inline SVG placeholder (sleeping
- * bunny silhouette) per the task brief. Kyle will replace with canonical
- * art later.
+ * Phase 3b note (ticket 86c9jccp7): the inline sleeping-bunny placeholder
+ * has been replaced by the canonical Emma asset pipeline. The sleepy pose
+ * itself is not yet shipped (see fallback comment on the <img> below);
+ * once `emma-sleepy.svg` lands via ticket 86c9jcajq, only that path
+ * string needs updating.
  */
 
 import { m } from 'motion/react'
@@ -45,9 +46,20 @@ export default function SleepSplash(): ReactElement {
           'linear-gradient(180deg, #F5EDF7 0%, #EDE0F0 40%, #E8D5EE 100%)',
       }}
     >
-      {/* Sleepy Melody -- centered, ~40vh */}
+      {/* Sleepy Emma -- centered, ~40vh.
+          FALLBACK: emma-sleepy.svg not yet shipped (ticket 86c9jcajq —
+          Midjourney source had artist-annotation labels covering the
+          figure, deferred for re-generation). Using emma-idle.svg as a
+          temporary substitute. Update to /assets/emma-sleepy.svg when
+          86c9jcajq lands; no other code changes are required. */}
       <div className="flex h-[40vh] items-center justify-center">
-        <SleepyMelodyPlaceholder />
+        <m.img
+          data-testid="sleep-splash-emma"
+          src="/assets/emma-idle.svg"
+          alt="Emma resting"
+          draggable={false}
+          className="h-full w-auto select-none"
+        />
       </div>
 
       {/* "Come back soon." text -- 28pt, no TTS */}
@@ -70,107 +82,5 @@ export default function SleepSplash(): ReactElement {
         </p>
       </m.div>
     </m.div>
-  )
-}
-
-/**
- * Inline SVG placeholder for melody-sleepy.svg.
- *
- * Simple sleeping bunny silhouette in soft pink. This is a temporary
- * placeholder following the same pattern as Math's inline sparkle/flower
- * glyphs. Kyle will replace with the canonical asset.
- */
-function SleepyMelodyPlaceholder(): ReactElement {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 200 200"
-      className="h-full w-auto"
-      role="img"
-      aria-label="Melody sleeping"
-    >
-      <title>Melody sleeping</title>
-      {/* Body - soft pink oval */}
-      <ellipse cx="100" cy="130" rx="55" ry="50" fill="#FFB6C1" />
-      {/* Head */}
-      <circle cx="100" cy="80" r="40" fill="#FFB6C1" />
-      {/* Hood/cap */}
-      <ellipse cx="100" cy="68" rx="42" ry="30" fill="#FFFFFF" />
-      {/* Left ear */}
-      <ellipse
-        cx="75"
-        cy="35"
-        rx="12"
-        ry="25"
-        fill="#FFB6C1"
-        transform="rotate(-15 75 35)"
-      />
-      {/* Right ear - flopped down (sleeping) */}
-      <ellipse
-        cx="125"
-        cy="40"
-        rx="12"
-        ry="22"
-        fill="#FFB6C1"
-        transform="rotate(25 125 40)"
-      />
-      {/* Closed eyes - curved lines */}
-      <path
-        d="M 85 82 Q 88 78 92 82"
-        fill="none"
-        stroke="#3D2B3D"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 108 82 Q 111 78 115 82"
-        fill="none"
-        stroke="#3D2B3D"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      {/* Small smile */}
-      <path
-        d="M 95 92 Q 100 96 105 92"
-        fill="none"
-        stroke="#3D2B3D"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-      {/* Blush spots */}
-      <circle cx="82" cy="90" r="5" fill="#FF9BB3" opacity="0.4" />
-      <circle cx="118" cy="90" r="5" fill="#FF9BB3" opacity="0.4" />
-      {/* Zzz */}
-      <text
-        x="140"
-        y="55"
-        fontSize="16"
-        fontFamily="sans-serif"
-        fill="#C499CC"
-        opacity="0.7"
-      >
-        z
-      </text>
-      <text
-        x="150"
-        y="42"
-        fontSize="20"
-        fontFamily="sans-serif"
-        fill="#C499CC"
-        opacity="0.5"
-      >
-        z
-      </text>
-      <text
-        x="162"
-        y="28"
-        fontSize="24"
-        fontFamily="sans-serif"
-        fill="#C499CC"
-        opacity="0.3"
-      >
-        z
-      </text>
-    </svg>
   )
 }

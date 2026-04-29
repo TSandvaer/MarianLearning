@@ -457,7 +457,7 @@ export function createSessionAudio(
       }
 
       // Cancel any prior in-flight playback first (same single-line
-      // semantic as preRecorded — only one Melody utterance plays at a
+      // semantic as preRecorded — only one Emma utterance plays at a
       // time).
       if (activeStop) {
         activeStop()

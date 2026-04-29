@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* iPad PWA: disable text/tap callouts so Melody feels like an app, not a webpage */
+/* iPad PWA: disable text/tap callouts so Emma feels like an app, not a webpage */
 html,
 body,
 #root {

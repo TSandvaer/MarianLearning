@@ -12,13 +12,13 @@
  *     Splash → Greet auto-advances WITHOUT a user gesture. WebKit creates
  *     `AudioContext` suspended until the first gesture lands.
  *   - The context then sits `suspended` for as long as Marian looks at
- *     Melody (68 consecutive 1Hz polls confirmed `suspended` over 68s in
+ *     Emma (68 consecutive 1Hz polls confirmed `suspended` over 68s in
  *     Thomas's repro). It is not decaying. It has never been unlocked.
  *   - When the tap finally arrives, `ctx.resume()` (kicked implicitly by
  *     Howler's `play()` middleware) succeeds — `statechange → running`
  *     within ~185 ms. The audio context is fine.
  *   - But Howler's `onplay` event never fires. The gate's 1.5 s watchdog
- *     times out to `relock`. Marian sees no Melody, no heart, just the
+ *     times out to `relock`. Marian sees no Emma, no heart, just the
  *     ring re-pulsing.
  *
  * Empirical hypothesis for the play-stall: Howler's `Howl.play()` checks
@@ -1016,7 +1016,7 @@ export function unlockIosAudioSession(
  *
  * Cost
  * ----
- * The PWA stays idle indefinitely on Greet (Marian stares at Melody for
+ * The PWA stays idle indefinitely on Greet (Marian stares at Emma for
  * minutes). With `autoSuspend = true`, Howler's `_autoSuspend` calls
  * `ctx.suspend()` which DOES save power (no audio thread running). With
  * `autoSuspend = false`, the audio thread keeps idling. On iOS the OS
