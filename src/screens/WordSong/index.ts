@@ -26,6 +26,11 @@ export {
   wordSongUtteranceId,
 } from './wordSessionPlans'
 export {
+  PlanFromServerError as WordSongPlanFromServerError,
+  parseReadTarget,
+  wordSongSessionPlanFromServer,
+} from './planFromServer'
+export {
   GENTLE_RAMP_THROUGH,
   pickDistractors,
   pickTier,
