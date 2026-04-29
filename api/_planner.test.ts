@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   generateSessionPlan,
   PlannerError,
+  stripMarkdownFence,
   type GenerateSessionPlanArgs,
   type PlannerAnthropicClient,
 } from './_planner.js'
@@ -357,5 +358,107 @@ describe('generateSessionPlan — error paths', () => {
       name: 'PlannerError',
       code: 'invalid-request',
     })
+  })
+})
+
+/**
+ * Regression: ticket 86c9jrwb4
+ *
+ * `claude-haiku-4-5-20251001` empirically returns the JSON wrapped in a
+ * triple-backtick fence (```json\n...\n```) on every call, despite the
+ * system prompt asking it not to. The pure `stripMarkdownFence` helper
+ * unwraps the fence before `JSON.parse`. These tests pin the contract on
+ * both the helper and the integration through `generateSessionPlan`.
+ */
+describe('stripMarkdownFence — pure helper', () => {
+  const PAYLOAD = '{"id":"x","label":"y","utterances":[]}'
+
+  it('unwraps a fence with the json language tag', () => {
+    const wrapped = '```json\n' + PAYLOAD + '\n```'
+    expect(stripMarkdownFence(wrapped)).toBe(PAYLOAD)
+  })
+
+  it('unwraps a fence with no language tag', () => {
+    const wrapped = '```\n' + PAYLOAD + '\n```'
+    expect(stripMarkdownFence(wrapped)).toBe(PAYLOAD)
+  })
+
+  it('passes bare JSON through unchanged', () => {
+    expect(stripMarkdownFence(PAYLOAD)).toBe(PAYLOAD)
+  })
+
+  it('tolerates surrounding whitespace around the fence', () => {
+    const wrapped = '   \n```json\n' + PAYLOAD + '\n```   \n'
+    expect(stripMarkdownFence(wrapped)).toBe(PAYLOAD)
+  })
+
+  it('leaves a partial/torn fence alone (no opening fence)', () => {
+    // Only a trailing ``` — not a complete fence block. The helper must NOT
+    // mangle this; let JSON.parse surface the real error downstream.
+    const torn = PAYLOAD + '\n```'
+    expect(stripMarkdownFence(torn)).toBe(torn)
+  })
+})
+
+describe('generateSessionPlan — Haiku fence-stripping (regression for 86c9jrwb4)', () => {
+  const MATH_PLAN = {
+    id: 'haiku-math-001',
+    label: 'Sums to 10 — Haiku-generated',
+    utterances: [
+      { id: 'math.p1.read', text: 'Three plus two. How many?' },
+      { id: 'math.p1.correct', text: 'Yes! Five!' },
+      { id: 'math.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'math.p1.hint', text: 'Look. Three. And two more. How many now?' },
+      { id: 'math.p1.giveAnswer', text: 'This one is five.' },
+    ],
+  }
+
+  it('parses a fence-wrapped response with the json language tag', async () => {
+    // Exact wire shape Haiku 4.5 emits in production (per the Vercel
+    // function log on dpl_CLKpx1aQXiBaWHyJDfR3ijECdtLf).
+    const wrapped = '```json\n' + JSON.stringify(MATH_PLAN) + '\n```'
+    const client = makeMockClient(wrapped)
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    expect(plan.id).toBe('haiku-math-001')
+    expect(plan.utterances).toHaveLength(5)
+  })
+
+  it('parses a fence-wrapped response with no language tag', async () => {
+    const wrapped = '```\n' + JSON.stringify(MATH_PLAN) + '\n```'
+    const client = makeMockClient(wrapped)
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    expect(plan.id).toBe('haiku-math-001')
+    expect(plan.utterances).toHaveLength(5)
+  })
+
+  it('still parses a bare-JSON response (system prompt honored)', async () => {
+    // If/when Haiku starts honoring the "no fences" instruction, the bare
+    // path must continue to work. Regression guard against an over-eager
+    // fence-strip that requires fences.
+    const client = makeMockClient(JSON.stringify(MATH_PLAN))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    expect(plan.id).toBe('haiku-math-001')
+    expect(plan.utterances).toHaveLength(5)
   })
 })
