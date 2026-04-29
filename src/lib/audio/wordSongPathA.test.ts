@@ -12,7 +12,12 @@ import {
 } from '../../screens/WordSong'
 import type { SessionStartResponse, Utterance } from '../../../api/_types'
 
-/** Build a successful SessionStartResponse for the given plan. */
+/** Build a successful SessionStartResponse from one of the static plans —
+ *  same id/label, same utterances, same audio data. The track-based
+ *  switchover (ticket 86c9jteud) means the browser asks for {track, level,
+ *  childName} and the server returns whatever plan it generates; for
+ *  tests we feed the static plan back through the wire so the round-trip
+ *  rehydration via `wordSongSessionPlanFromServer` produces a known plan. */
 function buildServerResponse(plan: WordSongSessionPlan): SessionStartResponse {
   const sources = wordSongSessionPlanToUtteranceSources(plan)
   const utterances: Utterance[] = sources.map((s, i) => ({
@@ -52,14 +57,20 @@ function makeFetchMock(impl: () => Promise<Response>): FetchSpy {
   >(async () => impl())
 }
 
+const STD_ARGS = {
+  level: 1,
+  childName: 'Marian',
+  sessionId: 'test-session-ws-1',
+}
+
 describe('prepareWordSongPathA — happy path', () => {
-  it('POSTs the wire-shape plan to /api/claude with kind=session-start', async () => {
+  it('POSTs the track-based payload to /api/claude with kind=session-start', async () => {
     const plan = STATIC_WORD_SONG_PLANS[0]!
     const fetchMock = makeFetchMock(async () =>
       jsonResp(buildServerResponse(plan)),
     )
 
-    await prepareWordSongPathA(plan, plan.id, {
+    await prepareWordSongPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: vi.fn(async () => {}),
@@ -71,17 +82,31 @@ describe('prepareWordSongPathA — happy path', () => {
     expect(init?.method).toBe('POST')
     const body = JSON.parse(init?.body as string) as Record<string, unknown>
     expect(body.kind).toBe('session-start')
-    const payload = body.payload as Record<string, unknown>
-    const wirePlan = payload.plan as {
-      id: string
-      utterances: { id: string; text: string }[]
-    }
-    expect(wirePlan.id).toBe(plan.id)
-    expect(wirePlan.utterances).toHaveLength(40) // 8 × 5 slots
-    expect(wirePlan.utterances[0]).toEqual({
-      id: 'word.p1.read',
-      text: plan.problems[0]!.utterances.read,
+    expect(body.payload).toEqual({
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
     })
+  })
+
+  it('returns the rehydrated WordSongSessionPlan from the server response', async () => {
+    const sourcePlan = STATIC_WORD_SONG_PLANS[1]!
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(buildServerResponse(sourcePlan)),
+    )
+
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
+      fetch: fetchMock as unknown as typeof globalThis.fetch,
+      loadSessionAudio: vi.fn(async () => new Map()),
+      playSessionUtterance: vi.fn(async () => {}),
+    })
+
+    expect(prepared.plan.id).toBe(sourcePlan.id)
+    expect(prepared.plan.label).toBe(sourcePlan.label)
+    expect(prepared.plan.problems).toHaveLength(8)
+    expect(prepared.plan.problems[0]!.target.word).toBe(
+      sourcePlan.problems[0]!.target.word,
+    )
   })
 
   it('calls loadSessionAudio with the rehydrated utterances', async () => {
@@ -95,7 +120,7 @@ describe('prepareWordSongPathA — happy path', () => {
       ) => Promise<Map<string, HowlLike>>
     >(async () => new Map<string, HowlLike>())
 
-    await prepareWordSongPathA(plan, plan.id, {
+    await prepareWordSongPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: loadMock,
       playSessionUtterance: vi.fn(async () => {}),
@@ -103,7 +128,7 @@ describe('prepareWordSongPathA — happy path', () => {
 
     expect(loadMock).toHaveBeenCalledOnce()
     const [sessionId, utterances] = loadMock.mock.calls[0]!
-    expect(sessionId).toBe(plan.id)
+    expect(sessionId).toBe(STD_ARGS.sessionId)
     expect(utterances).toHaveLength(response.utterances.length)
   })
 
@@ -116,14 +141,14 @@ describe('prepareWordSongPathA — happy path', () => {
       (utteranceId: string, opts?: PlaySessionUtteranceOptions) => Promise<void>
     >(async () => {})
 
-    const prepared = await prepareWordSongPathA(plan, plan.id, {
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map<string, HowlLike>()),
       playSessionUtterance: playMock,
     })
 
     // Play problem 1's read text.
-    await prepared.playUtterance(plan.problems[0]!.utterances.read)
+    await prepared.playUtterance(prepared.plan.problems[0]!.utterances.read)
     expect(playMock).toHaveBeenCalledOnce()
     const [utteranceId] = playMock.mock.calls[0]!
     expect(utteranceId).toBe('word.p1.read')
@@ -135,7 +160,7 @@ describe('prepareWordSongPathA — happy path', () => {
       jsonResp(buildServerResponse(plan)),
     )
 
-    const prepared = await prepareWordSongPathA(plan, plan.id, {
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map<string, HowlLike>()),
       playSessionUtterance: vi.fn(async () => {}),
@@ -159,7 +184,7 @@ describe('prepareWordSongPathA — happy path', () => {
     const response = buildServerResponse(plan)
     const fetchMock = makeFetchMock(async () => jsonResp(response))
 
-    const prepared = await prepareWordSongPathA(plan, plan.id, {
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map<string, HowlLike>()),
       playSessionUtterance: vi.fn(async () => {}),
@@ -175,7 +200,7 @@ describe('prepareWordSongPathA — happy path', () => {
     )
     const unloadMock = vi.fn()
 
-    const prepared = await prepareWordSongPathA(plan, plan.id, {
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map<string, HowlLike>()),
       playSessionUtterance: vi.fn(async () => {}),
@@ -189,33 +214,63 @@ describe('prepareWordSongPathA — happy path', () => {
 
 describe('prepareWordSongPathA — error paths', () => {
   it('throws config-missing when server returns 503 with that error code', async () => {
-    const plan = STATIC_WORD_SONG_PLANS[0]!
     const fetchMock = makeFetchMock(async () =>
       jsonResp({ error: 'config-missing' }, { status: 503 }),
     )
 
     await expect(
-      prepareWordSongPathA(plan, plan.id, {
+      prepareWordSongPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
       }),
     ).rejects.toMatchObject({ code: 'config-missing' })
   })
 
   it('throws tts-failed when server returns 502 with that error code', async () => {
-    const plan = STATIC_WORD_SONG_PLANS[0]!
     const fetchMock = makeFetchMock(async () =>
       jsonResp({ error: 'tts-failed' }, { status: 502 }),
     )
 
     await expect(
-      prepareWordSongPathA(plan, plan.id, {
+      prepareWordSongPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
       }),
     ).rejects.toMatchObject({ code: 'tts-failed' })
   })
 
+  it('throws rate-limited when server returns 429 with that error code', async () => {
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(
+        { error: 'rate-limited', message: 'too many starts' },
+        { status: 429 },
+      ),
+    )
+
+    await expect(
+      prepareWordSongPathA(STD_ARGS, {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+      }),
+    ).rejects.toMatchObject({
+      name: 'PrepareWordSongPathAError',
+      code: 'rate-limited',
+    })
+  })
+
+  it('throws planner-failed when server returns 502 with that error code', async () => {
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp({ error: 'planner-failed' }, { status: 502 }),
+    )
+
+    await expect(
+      prepareWordSongPathA(STD_ARGS, {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+      }),
+    ).rejects.toMatchObject({
+      name: 'PrepareWordSongPathAError',
+      code: 'planner-failed',
+    })
+  })
+
   it('throws network-error when fetch itself rejects', async () => {
-    const plan = STATIC_WORD_SONG_PLANS[0]!
     const fetchMock = vi.fn<
       (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
     >(async () => {
@@ -223,14 +278,13 @@ describe('prepareWordSongPathA — error paths', () => {
     })
 
     await expect(
-      prepareWordSongPathA(plan, plan.id, {
+      prepareWordSongPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
       }),
     ).rejects.toMatchObject({ code: 'network-error' })
   })
 
   it('throws aborted when fetch raises AbortError', async () => {
-    const plan = STATIC_WORD_SONG_PLANS[0]!
     const fetchMock = vi.fn<
       (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
     >(async () => {
@@ -238,21 +292,44 @@ describe('prepareWordSongPathA — error paths', () => {
     })
 
     await expect(
-      prepareWordSongPathA(plan, plan.id, {
+      prepareWordSongPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
       }),
     ).rejects.toMatchObject({ code: 'aborted' })
   })
 
   it('throws invalid-response when server response is not the expected shape', async () => {
-    const plan = STATIC_WORD_SONG_PLANS[0]!
     const fetchMock = makeFetchMock(async () =>
       jsonResp({ ok: true, kind: 'session-start' }),
     )
 
     await expect(
-      prepareWordSongPathA(plan, plan.id, {
+      prepareWordSongPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-response' })
+  })
+
+  it('throws invalid-response when the server plan fails to parse (non-target word)', async () => {
+    const plan = STATIC_WORD_SONG_PLANS[0]!
+    const good = buildServerResponse(plan)
+    const broken: SessionStartResponse = {
+      ...good,
+      plan: {
+        id: plan.id,
+        label: plan.label,
+        utterances: wordSongSessionPlanToUtteranceSources(plan).map((u) =>
+          u.id === 'word.p1.read' ? { ...u, text: 'Tap the bus.' } : u,
+        ),
+      },
+    }
+    const fetchMock = makeFetchMock(async () => jsonResp(broken))
+
+    await expect(
+      prepareWordSongPathA(STD_ARGS, {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map<string, HowlLike>()),
+        playSessionUtterance: vi.fn(async () => {}),
       }),
     ).rejects.toMatchObject({ code: 'invalid-response' })
   })
@@ -265,5 +342,15 @@ describe('prepareWordSongPathA — error paths', () => {
     expect(err.code).toBe('network-error')
     expect(err.name).toBe('PrepareWordSongPathAError')
     expect(err.message).toContain('Path A fetch failed')
+  })
+
+  it('PrepareWordSongPathAError preserves rate-limited code', () => {
+    const err = new PrepareWordSongPathAError('rate-limited', 'slow down')
+    expect(err.code).toBe('rate-limited')
+  })
+
+  it('PrepareWordSongPathAError preserves planner-failed code', () => {
+    const err = new PrepareWordSongPathAError('planner-failed', 'haiku borked')
+    expect(err.code).toBe('planner-failed')
   })
 })
