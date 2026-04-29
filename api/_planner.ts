@@ -211,7 +211,7 @@ export async function generateSessionPlan(
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(text)
+    parsed = JSON.parse(stripMarkdownFence(text))
   } catch (err) {
     throw new PlannerError(
       'invalid-response',
@@ -228,6 +228,31 @@ export async function generateSessionPlan(
   }
 
   return parsed
+}
+
+/**
+ * Strip a single surrounding markdown code fence from a model response.
+ *
+ * Empirically (ticket 86c9jrwb4), `claude-haiku-4-5-20251001` returns the
+ * session-plan JSON wrapped in ```json\n...\n``` on every call, despite the
+ * system prompt explicitly forbidding code fences. This helper unwraps the
+ * fence so `JSON.parse` sees clean JSON. Three shapes covered:
+ *   1. ```json\n{...}\n```  (most common — language tag)
+ *   2. ```\n{...}\n```      (no language tag)
+ *   3. {...}                 (already clean — pass through unchanged)
+ *
+ * The regex anchors to the start and end of the (trimmed) string and only
+ * unwraps a *complete* fenced block — partial/torn fences in the middle of
+ * the text fall through to the original string and let JSON.parse surface
+ * the real error. Pure function; no side effects.
+ */
+export function stripMarkdownFence(text: string): string {
+  // Anchored: start of string, optional whitespace, ``` , optional language
+  // tag, optional newline, captured body, optional newline, optional
+  // whitespace, ``` , optional whitespace, end of string. `[\s\S]*?` is the
+  // dotall-equivalent for body content (newlines included).
+  const match = text.match(/^\s*```(?:json)?\s*\n?([\s\S]*?)\n?\s*```\s*$/)
+  return match ? match[1]! : text
 }
 
 /**
