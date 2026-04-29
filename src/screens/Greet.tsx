@@ -40,7 +40,7 @@ import {
  */
 const LINE_TEXT_TO_KEY: Record<string, GreetLineKey> = {
   [GREET_LINES[0]]: 'hi',
-  [GREET_LINES[1]]: 'imMelody',
+  [GREET_LINES[1]]: 'imEmma',
   [GREET_LINES[2]]: 'niceToMeet',
   [GREET_LINES[3]]: 'tapHeart',
 }

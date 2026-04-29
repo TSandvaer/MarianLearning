@@ -195,12 +195,12 @@ describe('debugBus', () => {
   describe('recordSpeakAttempt / recordSpeakStatus lifecycle', () => {
     it('records a fresh attempt with timestamp and status', () => {
       const before = Date.now()
-      recordSpeakAttempt('Hi! I am Melody.', 'queued')
+      recordSpeakAttempt('Hi! I am Emma.', 'queued')
       const after = Date.now()
 
       const last = snapshot().lastSpeak
       expect(last).not.toBeNull()
-      expect(last?.text).toBe('Hi! I am Melody.')
+      expect(last?.text).toBe('Hi! I am Emma.')
       expect(last?.status).toBe('queued')
       expect(last?.error).toBeUndefined()
       expect(last?.timestamp).toBeGreaterThanOrEqual(before)

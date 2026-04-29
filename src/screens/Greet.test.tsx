@@ -80,7 +80,7 @@ function withMotion(node: ReactNode) {
 
 /**
  * Build a controllable playGreetLineFn() fake. Production-shape: each
- * call takes a stable line key (`'hi' | 'imMelody' | ...`) plus playback
+ * call takes a stable line key (`'hi' | 'imEmma' | ...`) plus playback
  * opts, and returns a deferred promise the test resolves explicitly.
  *
  * Replaces the Web Speech-era `speakFn` harness — the orchestrator still
@@ -99,7 +99,7 @@ function makePlayHarness() {
 
   const KEY_TO_TEXT: Record<GreetLineKey, string> = {
     hi: GREET_LINES[0],
-    imMelody: GREET_LINES[1],
+    imEmma: GREET_LINES[1],
     niceToMeet: GREET_LINES[2],
     tapHeart: GREET_LINES[3],
   }
@@ -1361,10 +1361,10 @@ describe('Greet', () => {
 
       // Line 1's MP3 errors.
       expect(h.calls).toHaveLength(2)
-      expect(h.calls[1].key).toBe('imMelody')
+      expect(h.calls[1].key).toBe('imEmma')
       await act(async () => {
         h.rejectLast(
-          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"',
+          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-emma.mp3"',
         )
         await Promise.resolve()
         await Promise.resolve()
@@ -1447,7 +1447,7 @@ describe('Greet', () => {
       fireWakeTap()
       // A new playGreetLine landed — for the FAILED line, not for line 0.
       expect(h.calls.length).toBe(callsBeforeRetry + 1)
-      expect(h.calls[h.calls.length - 1].key).toBe('imMelody')
+      expect(h.calls[h.calls.length - 1].key).toBe('imEmma')
     })
 
     it('retry that hits the same failure re-shows the relock ring (agency over silence)', async () => {
@@ -1514,7 +1514,7 @@ describe('Greet', () => {
 
       await act(async () => {
         h.rejectLast(
-          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"',
+          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-emma.mp3"',
         )
         await Promise.resolve()
         await Promise.resolve()
@@ -1525,7 +1525,7 @@ describe('Greet', () => {
       expect(snap.lastSpeak?.status).toBe('errored')
       // Error message includes the failing source URL (load-bearing for
       // iPad QA — without it, "an MP3 failed" tells you nothing).
-      expect(snap.lastSpeak?.error).toMatch(/greet-02-im-melody\.mp3/)
+      expect(snap.lastSpeak?.error).toMatch(/greet-02-im-emma\.mp3/)
       // The text field carries the failed line so the panel reads
       // naturally: `errored: "I'm Emma."`.
       expect(snap.lastSpeak?.text).toBe(GREET_LINES[1])

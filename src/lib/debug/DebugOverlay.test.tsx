@@ -143,10 +143,10 @@ describe('DebugOverlay', () => {
     )
 
     act(() => {
-      recordSpeakAttempt('Hi! I am Melody.', 'queued')
+      recordSpeakAttempt('Hi! I am Emma.', 'queued')
     })
     expect(screen.getByTestId('debug-overlay-speak')).toHaveTextContent(
-      'queued: "Hi! I am Melody."',
+      'queued: "Hi! I am Emma."',
     )
 
     act(() => {

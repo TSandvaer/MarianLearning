@@ -158,7 +158,7 @@ describe('preRecorded', () => {
 
   describe('module-level constants', () => {
     it('has one source URL per GreetLineKey, all under public/assets/audio/greet/', () => {
-      const keys: GreetLineKey[] = ['hi', 'imMelody', 'niceToMeet', 'tapHeart']
+      const keys: GreetLineKey[] = ['hi', 'imEmma', 'niceToMeet', 'tapHeart']
       for (const k of keys) {
         expect(GREET_LINE_SOURCES[k]).toMatch(/^\/assets\/audio\/greet\/greet-/)
         expect(GREET_LINE_SOURCES[k]).toMatch(/\.mp3$/)
@@ -171,7 +171,7 @@ describe('preRecorded', () => {
       expect(GREET_LINE_WORD_COUNTS.hi).toBe(
         GREET_LINES[0].split(/\s+/).filter(Boolean).length,
       )
-      expect(GREET_LINE_WORD_COUNTS.imMelody).toBe(
+      expect(GREET_LINE_WORD_COUNTS.imEmma).toBe(
         GREET_LINES[1].split(/\s+/).filter(Boolean).length,
       )
       expect(GREET_LINE_WORD_COUNTS.niceToMeet).toBe(
@@ -191,7 +191,7 @@ describe('preRecorded', () => {
 
       expect(Object.keys(map1)).toEqual([
         'hi',
-        'imMelody',
+        'imEmma',
         'niceToMeet',
         'tapHeart',
       ])
@@ -421,7 +421,7 @@ describe('preRecorded', () => {
       h.fake('hi')!.__fire('play')
 
       // Start the second line — should cancel the first.
-      const second = h.audio.playGreetLine('imMelody')
+      const second = h.audio.playGreetLine('imEmma')
       await Promise.resolve()
 
       // The first Howl was stopped.
@@ -429,7 +429,7 @@ describe('preRecorded', () => {
       await expect(first).rejects.toThrow(/cancelled/)
 
       // Resolve the second normally.
-      h.fake('imMelody')!.__fire('end')
+      h.fake('imEmma')!.__fire('end')
       await expect(second).resolves.toBeUndefined()
     })
   })
@@ -538,21 +538,21 @@ describe('preRecorded', () => {
 
     it('records a speak-onplay row when Howler emits its `play` event', async () => {
       const h = makeHarness()
-      const promise = h.audio.playGreetLine('imMelody')
+      const promise = h.audio.playGreetLine('imEmma')
       await Promise.resolve()
 
-      h.fake('imMelody')!.__fire('play')
+      h.fake('imEmma')!.__fire('play')
 
       const events = snapshot().audioCtxEvents
       const onPlay = events.find((e) => e.cause === 'speak-onplay')
       expect(onPlay).toBeDefined()
       expect(onPlay).toMatchObject({
         cause: 'speak-onplay',
-        lineKey: 'imMelody',
+        lineKey: 'imEmma',
       })
       expect(onPlay).not.toHaveProperty('skipReason')
 
-      h.fake('imMelody')!.__fire('end')
+      h.fake('imEmma')!.__fire('end')
       await promise
     })
 
@@ -592,7 +592,7 @@ describe('preRecorded', () => {
    * The iPad-suspended bug looked like: tap → ctx is suspended → Howl.play()
    * fires while ctx is still suspended → Howler binds buffer source against
    * limbo state → onplay never fires → 250 ms watchdog catches the missing
-   * onplay → gate relocks. Marian sees no Melody.
+   * onplay → gate relocks. Marian sees no Emma.
    *
    * The fix: in playGreetLine, await `awaitContextResume()` before calling
    * `howl.play()`. This block proves the order — using a stub that

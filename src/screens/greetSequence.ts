@@ -69,12 +69,11 @@ export interface BoundaryEvent {
  * Phase 3a (ticket 86c9hjnq1, 2026-04-28): the second line was renamed from
  * "I'm Melody." to "I'm Emma." as part of the character pivot away from
  * Sanrio IP. Both the spoken audio (re-rendered with the Emma multilingual
- * voice) and the caption ribbon now say "Emma". The corresponding
- * `GreetLineKey` for this line is still `'imMelody'` and the MP3 filename
- * is still `greet-02-im-melody.mp3` — those identifiers cascade through
- * preRecorded.ts, audioContextProbe, debugBus, and several test suites,
- * and Phase 3b's broader rename pass owns that refactor. The text/key
- * mismatch is intentional and temporary.
+ * voice) and the caption ribbon now say "Emma".
+ *
+ * Phase 3b (ticket 86c9jccp7, 2026-04-29): the corresponding
+ * `GreetLineKey` is now `'imEmma'` and the MP3 filename is
+ * `greet-02-im-emma.mp3`. The Phase-3a text/key mismatch is resolved.
  */
 export const GREET_LINES = [
   'Hi!',

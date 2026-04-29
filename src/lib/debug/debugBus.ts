@@ -229,7 +229,7 @@ export interface AudioCtxEventRecord {
   skipReason?: string
   /**
    * For `cause === 'speak-call'` and `cause === 'speak-onplay'` rows:
-   * the Greet line key (`'hi'`, `'imMelody'`, `'niceToMeet'`,
+   * the Greet line key (`'hi'`, `'imEmma'`, `'niceToMeet'`,
    * `'tapHeart'`) — or any other short identifier the producer wants
    * to pair speak-call ↔ speak-onplay rows by. Phase-4 (ticket
    * 86c9gvd0y) split this out from `skipReason` so the two diagnostics
