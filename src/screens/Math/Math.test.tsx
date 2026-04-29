@@ -1763,4 +1763,64 @@ describe('Math (Number Garden) screen', () => {
       'true',
     )
   })
+
+  // ── Mid-skill back-arrow (#86c9j53ra) ──────────────────────────────────
+
+  describe('mid-skill back-arrow (Hub navigation contract)', () => {
+    it('does NOT render the back-arrow when no `onRequestExit` is provided (legacy direct-route)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+      expect(screen.queryByTestId('math-back-to-hub')).toBeNull()
+    })
+
+    it('renders the back-arrow with aria-label="Back" and a 56pt touch zone when `onRequestExit` is provided', () => {
+      const harness = makePlayHarness()
+      const onRequestExit = vi.fn()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onRequestExit={onRequestExit}
+          />,
+        ),
+      )
+      const back = screen.getByTestId('math-back-to-hub')
+      expect(back).toBeInTheDocument()
+      expect(back.getAttribute('aria-label')).toBe('Back')
+      // 56pt touch zone per spec line 798 ("56pt touch zone — same
+      // ergonomics as the parent gate").
+      expect(back.getAttribute('style')).toMatch(/56pt/)
+    })
+
+    it('fires `onRequestExit` exactly once on tap', () => {
+      const harness = makePlayHarness()
+      const onRequestExit = vi.fn()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onRequestExit={onRequestExit}
+          />,
+        ),
+      )
+      const back = screen.getByTestId('math-back-to-hub')
+      back.click()
+      expect(onRequestExit).toHaveBeenCalledTimes(1)
+    })
+  })
 })

@@ -7,6 +7,8 @@ import {
 } from 'motion/react'
 import Splash from './screens/Splash'
 import Greet from './screens/Greet'
+import Hub from './screens/Hub'
+import type { HubEntryPath } from './screens/Hub'
 import MathScreen, { pickStaticSessionPlan } from './screens/Math'
 import type {
   MathSessionPlan,
@@ -21,6 +23,10 @@ import type {
 } from './screens/WordSong'
 import SessionEnd from './screens/SessionEnd'
 import type { SessionEndPayload } from './screens/SessionEnd'
+import {
+  readSessionHistory,
+  type SkillTreeId,
+} from './screens/SessionEnd/sessionHistory'
 import {
   DebugOverlay,
   activateAudioContextProbe,
@@ -84,6 +90,7 @@ function getInitialRoute(): Route {
     if (
       v === 'splash' ||
       v === 'greet' ||
+      v === 'hub' ||
       v === 'math' ||
       v === 'literacy' ||
       v === 'session-end' ||
@@ -95,6 +102,28 @@ function getInitialRoute(): Route {
     // URLSearchParams should not throw on a string, but be defensive.
   }
   return FIRST_ROUTE
+}
+
+/**
+ * Compute the post-Splash route per `design/screen-hub.md` § "Navigation
+ * contract" Q1:
+ *   - `sessionCount === 0` (first-ever launch) → Greet (then Math →
+ *     SessionEnd → Hub via the standard flow).
+ *   - `sessionCount >= 1` → Hub directly. Greet is a once-ever moment
+ *     and never re-shows on subsequent launches.
+ *
+ * Reads `marian-tutor.session-history.v1` (now v2-aware via the lazy
+ * migration in `screens/SessionEnd/sessionHistory.ts`) — a missing /
+ * malformed key reads as `sessionCount === 0`, so the first-ever path
+ * is the safe default if storage is unavailable.
+ */
+function nextAfterSplash(): Route {
+  try {
+    const history = readSessionHistory()
+    return history.sessionCount === 0 ? 'greet' : 'hub'
+  } catch {
+    return 'greet'
+  }
 }
 
 /**
@@ -114,14 +143,85 @@ function getInitialRoute(): Route {
 export default function App() {
   const [route, setRoute] = useState<Route>(() => getInitialRoute())
 
-  const goGreet = useCallback(() => setRoute('greet'), [])
-  const goMath = useCallback(() => setRoute('math'), [])
-  // No `goLiteracy` callback wired today — the Math→Word Song handoff
-  // contract belongs to the Session-end ticket 86c9grnjd which
-  // generalises the post-problem-8 transition. The literacy route is
-  // reachable directly via `?route=literacy` (see `getInitialRoute`)
-  // for QA, and the orchestrator's session-sequencer ticket will wire
-  // the auto-handoff when it lands.
+  /**
+   * Hub-entry path tracked in state so Hub mounts know which welcome-back
+   * variant to play and whether the audio gate is needed. Updated by the
+   * route transitions below: Splash → Hub sets 'app-open' (or
+   * 'app-open-recent' if the last session was within 6h); Session-End →
+   * Hub sets 'session-end'; mid-skill back-arrow sets 'mid-skill-back';
+   * the once-ever first Hub mount post-Greet sets 'first-ever'.
+   */
+  const [hubEntryPath, setHubEntryPath] = useState<HubEntryPath>('app-open')
+
+  /**
+   * Splash advance — branches on session-history per the Hub navigation
+   * contract (`design/screen-hub.md` § Q1):
+   *   - `sessionCount === 0` → Greet (first-ever Session 1 path)
+   *   - `sessionCount >= 1` → Hub (returning launches)
+   */
+  const handleSplashAdvance = useCallback(() => {
+    const next = nextAfterSplash()
+    if (next === 'hub') {
+      // Determine whether to surface the 'app-open-recent' anchor
+      // ("Back so soon!" within ~6h) or the standard 'app-open'
+      // anchor.
+      try {
+        const history = readSessionHistory()
+        const last = new Date(history.lastSessionCompletedAt)
+        const recent =
+          !Number.isNaN(last.getTime()) &&
+          Date.now() - last.getTime() < 6 * 60 * 60 * 1000
+        setHubEntryPath(recent ? 'app-open-recent' : 'app-open')
+      } catch {
+        setHubEntryPath('app-open')
+      }
+    }
+    setRoute(next)
+  }, [])
+
+  /**
+   * Greet → Math handoff. The first-ever flow lands on Math directly
+   * (Session 1's fixed sequence per `design/session-1.md`). Greet is
+   * never re-shown — when Marian returns to Hub via Session-End the
+   * Splash router branches based on `sessionCount`.
+   */
+  const handleGreetAdvance = useCallback(() => {
+    setRoute('math')
+  }, [])
+
+  /**
+   * Hub → Math/WordSong handoff. The Hub component owns the
+   * suggestion-outcome write to localStorage; this orchestrator just
+   * routes.
+   */
+  const handleHubPickTree = useCallback((tree: SkillTreeId) => {
+    setRoute(tree === 'number-garden' ? 'math' : 'literacy')
+  }, [])
+
+  /** Hub parent-gate completion — v1 no-op (console.log inside the hook). */
+  const handleHubParentGate = useCallback(() => {
+    // v2 will navigate to a real parent area here. v1 ships invisible.
+  }, [])
+
+  /**
+   * Mid-skill back-arrow → Hub. Wired into Math/WordSong via their
+   * `onRequestExit` callback (added in slice 4).
+   */
+  const handleBackToHub = useCallback(() => {
+    setHubEntryPath('mid-skill-back')
+    setRoute('hub')
+  }, [])
+
+  /**
+   * Session-End "All done!" → Hub. Wired into SessionEnd via the new
+   * `onAllDone` prop (slice 6 ties the route flip; spec calls for a
+   * one-line change in SessionEnd.tsx, this orchestrator-side handler
+   * is the receiving side of that handoff).
+   */
+  const handleSessionEndAllDone = useCallback(() => {
+    setHubEntryPath('session-end')
+    setRoute('hub')
+  }, [])
 
   /**
    * Session-End handoff state. Captured from the originating screen's
@@ -517,8 +617,20 @@ export default function App() {
     <LazyMotion features={domAnimation} strict>
       <MotionConfig reducedMotion="user">
         <AnimatePresence mode="wait">
-          {route === 'splash' && <Splash key="splash" onAdvance={goGreet} />}
-          {route === 'greet' && <Greet key="greet" onAdvance={goMath} />}
+          {route === 'splash' && (
+            <Splash key="splash" onAdvance={handleSplashAdvance} />
+          )}
+          {route === 'greet' && (
+            <Greet key="greet" onAdvance={handleGreetAdvance} />
+          )}
+          {route === 'hub' && (
+            <Hub
+              key="hub"
+              path={hubEntryPath}
+              onPickTree={handleHubPickTree}
+              onParentGate={handleHubParentGate}
+            />
+          )}
           {route === 'math' && (
             <MathScreen
               key="math"
@@ -526,6 +638,7 @@ export default function App() {
               playUtterance={mathPlay ?? undefined}
               audioReady={mathAudioReady}
               onSessionComplete={handleMathComplete}
+              onRequestExit={handleBackToHub}
             />
           )}
           {route === 'literacy' && (
@@ -535,10 +648,15 @@ export default function App() {
               playUtterance={wordSongPlay ?? undefined}
               audioReady={wordSongAudioReady}
               onSessionComplete={handleWordSongComplete}
+              onRequestExit={handleBackToHub}
             />
           )}
           {route === 'session-end' && (
-            <SessionEnd key="session-end" payload={sessionEndPayload} />
+            <SessionEnd
+              key="session-end"
+              payload={sessionEndPayload}
+              onAllDone={handleSessionEndAllDone}
+            />
           )}
         </AnimatePresence>
         {/* Debug overlay sits outside AnimatePresence so it persists across
