@@ -24,7 +24,9 @@ import type {
 import SessionEnd from './screens/SessionEnd'
 import type { SessionEndPayload } from './screens/SessionEnd'
 import {
+  markTreeTouched,
   readSessionHistory,
+  writeSessionHistory,
   type SkillTreeId,
 } from './screens/SessionEnd/sessionHistory'
 import {
@@ -191,10 +193,24 @@ export default function App() {
 
   /**
    * Hub → Math/WordSong handoff. The Hub component owns the
-   * suggestion-outcome write to localStorage; this orchestrator just
+   * suggestion-outcome write; this orchestrator records the tree as
+   * "touched today" (drives tomorrow's suggestion alternation) and
    * routes.
+   *
+   * Per spec § "localStorage updates required → Write moments":
+   * `todayTreesTouched` is written when a content screen mounts via
+   * the orchestrator's session-start path. Wiring it here keeps the
+   * write atomic with the route change.
    */
   const handleHubPickTree = useCallback((tree: SkillTreeId) => {
+    try {
+      const prev = readSessionHistory()
+      const next = markTreeTouched(prev, tree, new Date())
+      if (next !== prev) writeSessionHistory(next)
+    } catch {
+      // Storage failures are non-fatal — the suggestion algorithm
+      // still works against stale state, just one nudge less varied.
+    }
     setRoute(tree === 'number-garden' ? 'math' : 'literacy')
   }, [])
 
