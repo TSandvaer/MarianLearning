@@ -1148,7 +1148,7 @@ function WordSongScreen({
             renamed semantics.) */}
         <AnimatePresence initial={false}>
           <m.img
-            layoutId="melody"
+            layoutId="emma"
             key={pose}
             data-testid="word-song-emma"
             data-pose={pose}

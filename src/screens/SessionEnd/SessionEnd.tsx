@@ -500,7 +500,7 @@ export default function SessionEnd({
             (ticket 86c9jccp7). */}
         <AnimatePresence initial={false}>
           <m.img
-            layoutId="melody"
+            layoutId="emma"
             key="celebrating"
             data-testid="session-end-emma"
             src="/assets/emma-cheering.svg"

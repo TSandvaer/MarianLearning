@@ -1382,7 +1382,7 @@ function MathScreen({
         {/* Emma — upper-left */}
         <AnimatePresence initial={false}>
           <m.img
-            layoutId="melody"
+            layoutId="emma"
             key={pose}
             data-testid="math-emma"
             data-pose={pose}

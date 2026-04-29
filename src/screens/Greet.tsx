@@ -1089,7 +1089,7 @@ export default function Greet({
           spec wording predates the Emma rename; semantics unchanged), and
           it also keeps tests deterministic because the new element mounts
           immediately rather than waiting on the previous one's exit anim.
-          layoutId="melody" is set so Screen 3+ can shared-element-transition
+          layoutId="emma" is set so Screen 3+ can shared-element-transition
           her position (spec line 757).
 
           Wake state: she breathes (`scale: [1, 1.05, 1]` over 2.4s, infinite
@@ -1098,7 +1098,7 @@ export default function Greet({
           iPad scale and read as frozen). */}
       {/*
         `pointer-events: none` on the emma-slot wrapper (post-iPad-tap
-        investigation, ticket 86c9gp99a; original "melody-slot" commit
+        investigation, ticket 86c9gp99a; original "emma-slot" commit
         pre-dates the Phase 3b character pivot). The slot is decorative —
         Emma herself, the ready ring, and the wake-tap finger-tap nudge
         are all eye-candy, not interactive surfaces. Without this, iPad
@@ -1182,7 +1182,7 @@ export default function Greet({
 
         <AnimatePresence initial={false}>
           <m.img
-            layoutId="melody"
+            layoutId="emma"
             key={pose}
             data-testid="greet-emma"
             data-pose={pose}
