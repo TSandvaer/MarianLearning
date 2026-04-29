@@ -47,13 +47,11 @@ import type { SessionStartResponse, Utterance } from './_types.js'
  *
  * The character is also being renamed Melody → Emma in this phase to
  * drop Sanrio IP. The visual pivot (manhwa-style art) is Phase 3b and
- * lands separately — until then, audio + text say "Emma" while the
- * SVG still shows the bunny. The constant name MELODY_VOICE_CONFIG is
- * intentionally unchanged in Phase 3a; renaming the symbol cascades
- * through `_session.test.ts`, `claude.test.ts`, and qa docs and is
- * deferred to Phase 3b's broader rename pass.
+ * lands separately. Phase 3b (ticket 86c9jccp7, 2026-04-29) renames
+ * this constant from `EMMA_VOICE_CONFIG` → `EMMA_VOICE_CONFIG` along
+ * with the rest of the cascading symbol pass.
  */
-export const MELODY_VOICE_CONFIG: Pick<
+export const EMMA_VOICE_CONFIG: Pick<
   TtsRequest,
   'voice' | 'rate' | 'pitch' | 'volume'
 > = {
@@ -144,7 +142,7 @@ export async function renderSessionAudio(
       let result: { audio: Uint8Array }
       try {
         result = await synth(
-          { text: src.text, ...MELODY_VOICE_CONFIG },
+          { text: src.text, ...EMMA_VOICE_CONFIG },
           opts.synthOptions,
         )
       } catch (err) {

@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('./_session.js', () => {
   return {
     renderSessionAudio: vi.fn(),
-    MELODY_VOICE_CONFIG: {
+    EMMA_VOICE_CONFIG: {
       voice: 'en-US-EmmaMultilingualNeural',
       rate: '-10%',
       pitch: '+0Hz',

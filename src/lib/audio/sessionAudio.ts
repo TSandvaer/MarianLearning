@@ -44,7 +44,7 @@
  *
  * Voice consistency
  * -----------------
- * Server pipeline locks to whatever `MELODY_VOICE_CONFIG` declares in
+ * Server pipeline locks to whatever `EMMA_VOICE_CONFIG` declares in
  * `api/_session.ts`. Phase 3a (ticket 86c9hjnq1, 2026-04-28) moved that
  * to `en-US-EmmaMultilingualNeural` rate `-10%`; same config applies to
  * Greet's bundled MP3s. Frontend has no voice config to manage — the

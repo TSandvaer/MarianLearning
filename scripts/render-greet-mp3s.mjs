@@ -12,7 +12,7 @@
  * synthesis flakiness.
  *
  * The MP3s have to be regenerated whenever the canonical voice config in
- * `api/_session.ts` (`MELODY_VOICE_CONFIG`) changes — otherwise Greet's
+ * `api/_session.ts` (`EMMA_VOICE_CONFIG`) changes — otherwise Greet's
  * voice drifts from Path A's voice and the child hears a tone change at
  * the screen boundary.
  *

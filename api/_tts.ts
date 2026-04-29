@@ -7,7 +7,7 @@
 // future per-session utterance is dynamic (Claude-generated per session)
 // and cannot be pre-recorded. This module renders those dynamic lines at
 // session-start time using the same voice config as Greet (defined in
-// `api/_session.ts` → `MELODY_VOICE_CONFIG`).
+// `api/_session.ts` → `EMMA_VOICE_CONFIG`).
 //
 // HISTORY
 // -------
@@ -33,7 +33,7 @@
 //    prosody predictor produces metallic question intonation regardless
 //    of SSML strategy; Emma multilingual produces natural prosody on the
 //    same SSML body. Same wire shape, same output format. Voice config
-//    declared in api/_session.ts (MELODY_VOICE_CONFIG); see that file's
+//    declared in api/_session.ts (EMMA_VOICE_CONFIG); see that file's
 //    header for full rationale. Phase 3b ships the visual pivot
 //    (manhwa-style art) and the broader rename of "Melody" symbols.
 //
@@ -205,7 +205,7 @@ export function renderSsmlInnerText(text: string): string {
 
 /** Build the SSML body sent to Azure. All four prosody attribute fields
  *  (voice/rate/pitch/volume) are XML-escaped in addition to `text`. Today
- *  these all come from the hardcoded `MELODY_VOICE_CONFIG`, but the
+ *  these all come from the hardcoded `EMMA_VOICE_CONFIG`, but the
  *  function is exported and `TtsRequest` accepts arbitrary strings —
  *  escaping is cheap defense-in-depth against a future caller passing
  *  user-derived prosody values into a single-quoted attribute slot.
