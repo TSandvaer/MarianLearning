@@ -445,11 +445,11 @@ describe('audioContextProbe', () => {
         storage: null,
       })
 
-      recordSpeakCallEvent(null, 'imMelody')
+      recordSpeakCallEvent(null, 'imEmma')
       expect(snapshot().audioCtxEvents.at(-1)).toMatchObject({
         cause: 'speak-call',
         speakResult: null,
-        lineKey: 'imMelody',
+        lineKey: 'imEmma',
       })
     })
 

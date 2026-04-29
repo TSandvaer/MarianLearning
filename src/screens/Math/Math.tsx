@@ -14,6 +14,7 @@ import {
 } from '../../lib/debug/audioContextProbe'
 import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
+import type { EmmaPose } from '../../lib/character/emmaPose'
 import { pickDistractors } from './distractors'
 import {
   loadStardust,
@@ -66,7 +67,7 @@ import {
  *   everywhere else.
  * - Reduced-motion: the global `MotionConfig reducedMotion="user"`
  *   collapses springs and stops infinite loops. We additionally branch
- *   here to skip the chip sparkle burst on reduce, and snap Melody pose
+ *   here to skip the chip sparkle burst on reduce, and snap Emma pose
  *   swaps without cross-fade — same reasons as Greet.
  */
 
@@ -261,7 +262,11 @@ const defaultPlayUtterance: PlayMathUtteranceFn = (text, opts) => {
 
 // ── Component -------------------------------------------------------------
 
-type MelodyPose = 'idle' | 'happy' | 'puzzled'
+// Phase 3b (ticket 86c9jccp7): the inlined `MelodyPose = 'idle' | 'happy'
+// | 'puzzled'` union has been replaced by the shared `EmmaPose` union in
+// `lib/character/emmaPose`. Math currently exercises a subset
+// (`idle | celebration | puzzled-tilt`); the broader pose space
+// (`listening`, `attentive-pointing`, etc.) is wired in follow-up tickets.
 
 /** Per-problem state machine. Resets on problem advance. */
 interface PerProblemState {
@@ -478,8 +483,8 @@ function MathScreen({
    */
   const spokeReadAloudRef = useRef(__testInitiallyAudioUnlocked)
 
-  /** Melody's current pose. Driven by tap outcomes + the auto-return timer. */
-  const [pose, setPose] = useState<MelodyPose>('idle')
+  /** Emma's current pose. Driven by tap outcomes + the auto-return timer. */
+  const [pose, setPose] = useState<EmmaPose>('idle')
 
   /** Chip currently shaking (after a wrong tap) — set to its value while
    *  the shake animation plays so we can target the keyframe. */
@@ -905,7 +910,7 @@ function MathScreen({
 
   /**
    * Handle a wrong tap. Sequenced per spec §Audio dispatch (wrong path):
-   * shake the chip, swap Melody to puzzled, fire SFX + reprompt utterance,
+   * shake the chip, swap Emma to puzzled-tilt, fire SFX + reprompt utterance,
    * then either schedule the hint (after 2 wrongs) or return to idle.
    */
   const handleWrongTap = useCallback(
@@ -919,7 +924,7 @@ function MathScreen({
         shakeTimerRef.current = null
       }, WRONG_SHAKE_MS)
 
-      setPose('puzzled')
+      setPose('puzzled-tilt')
       if (poseTimerRef.current !== null) clearTimeout(poseTimerRef.current)
 
       // Streak break — fade out the indicator, then reset.
@@ -1026,15 +1031,15 @@ function MathScreen({
 
   /**
    * Handle a correct tap. Sequenced per spec §Audio dispatch (correct path):
-   * happy pose, sparkle + plink SFX, grant stardust (unless this is the
-   * guided-completion flow), update streak, schedule auto-advance.
+   * celebration pose, sparkle + plink SFX, grant stardust (unless this is
+   * the guided-completion flow), update streak, schedule auto-advance.
    */
   const handleCorrectTap = useCallback(
     (problem: MathProblem) => {
       sparkleInstance.play()
       plinkInstance.play()
 
-      setPose('happy')
+      setPose('celebration')
       setCelebrating(true)
       // Flip the synchronous ref FIRST — before any grant or streak
       // update — so any same-tick re-entry from a rapid second tap on
@@ -1372,17 +1377,17 @@ function MathScreen({
         </div>
       </div>
 
-      {/* Melody + ribbon row */}
+      {/* Emma + ribbon row */}
       <div className="relative flex w-full items-start gap-4 px-4">
-        {/* Melody — upper-left */}
+        {/* Emma — upper-left */}
         <AnimatePresence initial={false}>
           <m.img
-            layoutId="melody"
+            layoutId="emma"
             key={pose}
-            data-testid="math-melody"
+            data-testid="math-emma"
             data-pose={pose}
-            src={`/assets/melody-${pose}.svg`}
-            alt="Melody"
+            src={`/assets/emma-${pose}.svg`}
+            alt="Emma"
             draggable={false}
             className="h-[26vh] w-auto select-none"
             initial={reducedMotion ? { opacity: 0 } : { opacity: 0 }}
@@ -1392,7 +1397,7 @@ function MathScreen({
           />
         </AnimatePresence>
 
-        {/* Caption ribbon — to Melody's right. Same word-by-word reveal
+        {/* Caption ribbon — to Emma's right. Same word-by-word reveal
             pattern as Greet (spec §Audio integration "Caption rendering"). */}
         {captionVisible && captionText && (
           <m.div

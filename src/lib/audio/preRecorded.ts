@@ -62,15 +62,15 @@ import {
  * keeps the line strings as the single source of truth in one place
  * (greetSequence) while letting this module key on a small enum.
  *
- * Phase 3a note (ticket 86c9hjnq1, 2026-04-28): the line text for
- * `imMelody` is now "I'm Emma." (character renamed away from Sanrio
- * IP). The key name `'imMelody'` and the asset filename
- * `greet-02-im-melody.mp3` are intentionally NOT renamed in this PR —
- * Phase 3b owns the broader rename across debug rows, test fixtures,
- * and the asset pipeline. Treat the key as a stable identifier that
- * doesn't reflect the current text.
+ * Phase 3a (ticket 86c9hjnq1, 2026-04-28): the line text for the second
+ * line was renamed from "I'm Melody." to "I'm Emma." as part of the
+ * character pivot away from Sanrio IP. Phase 3a deferred the key /
+ * filename rename to Phase 3b.
+ *
+ * Phase 3b (ticket 86c9jccp7): completes the rename. The key is now
+ * `'imEmma'` and the asset is `greet-02-im-emma.mp3`.
  */
-export type GreetLineKey = 'hi' | 'imMelody' | 'niceToMeet' | 'tapHeart'
+export type GreetLineKey = 'hi' | 'imEmma' | 'niceToMeet' | 'tapHeart'
 
 /**
  * Source URL for each line. Public-relative paths so Vite's static-asset
@@ -78,7 +78,7 @@ export type GreetLineKey = 'hi' | 'imMelody' | 'niceToMeet' | 'tapHeart'
  */
 const SOURCES: Record<GreetLineKey, string> = {
   hi: '/assets/audio/greet/greet-01-hi.mp3',
-  imMelody: '/assets/audio/greet/greet-02-im-melody.mp3',
+  imEmma: '/assets/audio/greet/greet-02-im-emma.mp3',
   niceToMeet: '/assets/audio/greet/greet-03-nice-to-meet-you.mp3',
   tapHeart: '/assets/audio/greet/greet-04-tap-the-heart.mp3',
 }
@@ -90,7 +90,7 @@ const SOURCES: Record<GreetLineKey, string> = {
  */
 const WORD_COUNTS: Record<GreetLineKey, number> = {
   hi: 1, // "Hi!"
-  imMelody: 2, // "I'm Emma." (renamed from "I'm Melody." in ticket 86c9hjnq1)
+  imEmma: 2, // "I'm Emma."
   niceToMeet: 6, // "It's so nice to meet you."
   tapHeart: 6, // "Tap the heart when you're ready."
 }
@@ -154,7 +154,7 @@ export interface PreRecordedAudio {
    * UI signal.
    *
    * The rejection's `Error.message` includes the offending source URL
-   * (e.g. `[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"`)
+   * (e.g. `[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-emma.mp3"`)
    * so iPad QA can trace which file failed without console access.
    */
   playGreetLine: (
@@ -402,7 +402,7 @@ export function createPreRecorded(
           // binds its buffer source against the suspended state and the
           // play silently drops — `onplay` never fires, the gate
           // watchdog catches it 250 ms later as a relock, and Marian
-          // sees no Melody. Awaiting the resume promise (bounded by a
+          // sees no Emma. Awaiting the resume promise (bounded by a
           // 500 ms timeout) ensures the context is `'running'` by the
           // time we call play(), so the buffer source binds against a
           // live state. ~140 ms latency on tap-after-idle.

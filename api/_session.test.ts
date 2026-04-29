@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   extractUtteranceTexts,
-  MELODY_VOICE_CONFIG,
+  EMMA_VOICE_CONFIG,
   renderSessionAudio,
 } from './_session.js'
 import type { TtsRequest } from './_tts.js'
@@ -39,12 +39,12 @@ describe('extractUtteranceTexts', () => {
   })
 })
 
-describe('MELODY_VOICE_CONFIG', () => {
+describe('EMMA_VOICE_CONFIG', () => {
   it('uses Emma multilingual at -10% (Phase 3a voice, ticket 86c9hjnq1)', () => {
     // Voice swapped from en-US-AnaNeural to en-US-EmmaMultilingualNeural
     // on 2026-04-28 — see the constant's docstring for full history. Rate /
     // pitch / volume are unchanged across the swap.
-    expect(MELODY_VOICE_CONFIG).toEqual({
+    expect(EMMA_VOICE_CONFIG).toEqual({
       voice: 'en-US-EmmaMultilingualNeural',
       rate: '-10%',
       pitch: '+0Hz',

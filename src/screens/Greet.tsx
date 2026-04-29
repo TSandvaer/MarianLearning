@@ -40,7 +40,7 @@ import {
  */
 const LINE_TEXT_TO_KEY: Record<string, GreetLineKey> = {
   [GREET_LINES[0]]: 'hi',
-  [GREET_LINES[1]]: 'imMelody',
+  [GREET_LINES[1]]: 'imEmma',
   [GREET_LINES[2]]: 'niceToMeet',
   [GREET_LINES[3]]: 'tapHeart',
 }
@@ -55,16 +55,20 @@ export type PlayGreetLineFn = (
 ) => Promise<void>
 
 /**
- * Screen 2 — First Greeting (Meet Melody).
+ * Screen 2 — First Greeting (Meet Emma).
  *
  * Spec: design/session-1.md §"Screen 2 — First Greeting (Meet Melody)" — the
  * AC bullets at lines 202–223 are the contract this component implements.
+ * (The session-1 spec heading still uses the legacy "Meet Melody" phrasing;
+ * the Phase 3a + 3b character pivot to Emma updates the in-app copy and
+ * audio; the session-1 spec heading itself is a pre-pivot historical
+ * reference and is not load-bearing.)
  *
  * State machine (post-86c9gp99a)
  * ------------------------------
  * The screen has two visible phases:
  *
- *   `wake`  — initial state on mount. Audio context is locked. Melody is
+ *   `wake`  — initial state on mount. Audio context is locked. Emma is
  *             on-screen, idle and breathing; a soft pink ready ring pulses
  *             around her; the entire viewport is a transparent tap target.
  *             No TTS. No SFX. No speech ribbon. No heart. After 8s of no
@@ -109,7 +113,7 @@ export type PlayGreetLineFn = (
  * arms a 6s watchdog around the play; if `onPlay` never fires we surface
  * the Wake ring again silently and the next gesture re-fires line 0 inside
  * its own synchronous tick. No copy is shown — Marian sees a slightly
- * delayed Melody, not an error. (Window was 1.5s during the early
+ * delayed Emma, not an error. (Window was 1.5s during the early
  * pre-recorded MP3 era because Howler `onplay` fires ~50ms after `play()`;
  * Phase-7 of ticket 86c9gvd0y bumped it to 6s to outlast the event-driven
  * AudioContext resume await for cold-iPad audio-session resumption. See
@@ -117,7 +121,7 @@ export type PlayGreetLineFn = (
  *
  * Reduced motion: the global `MotionConfig reducedMotion="user"` collapses
  * spring entrances and stops infinite loops. We additionally branch on
- * `prefers-reduced-motion` here to skip cloud-drift, Melody slide, ring
+ * `prefers-reduced-motion` here to skip cloud-drift, Emma slide, ring
  * pulse, and heart bob — spec lines 167 and 220 want an explicit absence,
  * not just softer easing.
  */
@@ -143,12 +147,12 @@ const ICON_PULSE_MS = 600
 const ICON_HOLD_AFTER_PULSE_MS = 2_500
 /** Finger-tap icon fade-out duration. */
 const ICON_FADE_OUT_MS = 400
-/** Melody's breathing loop period (spec line 166). */
+/** Emma's breathing loop period (spec line 166). */
 const BREATHING_PERIOD_S = 2.4
 /** Ring pulse loop period (spec line 167). */
 const RING_PULSE_PERIOD_S = 1.4
 
-const MELODY_ENTRANCE_SPRING = {
+const EMMA_ENTRANCE_SPRING = {
   type: 'spring' as const,
   stiffness: 220,
   damping: 22,
@@ -264,7 +268,7 @@ export default function Greet({
   const [showWakeIcon, setShowWakeIcon] = useState(false)
 
   // Caption state: one revealed-word count per line. We render the spoken
-  // text in a stable speech ribbon underneath Melody; revealing word-by-word
+  // text in a stable speech ribbon underneath Emma; revealing word-by-word
   // mirrors the spec's "passive reading exposure" goal (line 30 + 214).
   const [activeLine, setActiveLine] = useState(0)
   const [revealedByLine, setRevealedByLine] = useState<number[]>(() =>
@@ -272,7 +276,12 @@ export default function Greet({
   )
   const [heartReady, setHeartReady] = useState(false)
   const [heartSquishing, setHeartSquishing] = useState(false)
-  const [pose, setPose] = useState<'idle' | 'happy'>('idle')
+  // Phase 3b (ticket 86c9jccp7): the inlined `'idle' | 'happy'` union has
+  // been replaced by a `'idle' | 'celebration'` subset of the shared
+  // `EmmaPose` type. The legacy ear-wiggle on tap is now the celebration
+  // pose-swap; behaviour is identical, naming aligns with the broader
+  // character-pivot vocabulary.
+  const [pose, setPose] = useState<'idle' | 'celebration'>('idle')
   const [advancing, setAdvancing] = useState(false)
 
   const earWiggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -365,7 +374,7 @@ export default function Greet({
   }, [])
 
   const triggerEarWiggle = useCallback(() => {
-    setPose('happy')
+    setPose('celebration')
     if (earWiggleTimerRef.current !== null) {
       clearTimeout(earWiggleTimerRef.current)
     }
@@ -795,7 +804,7 @@ export default function Greet({
       //   3. The tap successfully resumes the context (statechange to
       //      `running` ~185 ms post-tap, observed in the iPad export).
       //   4. But Howler's `onplay` event never fires — the gate watchdog
-      //      times out to `relock` and Marian sees no Melody, no heart.
+      //      times out to `relock` and Marian sees no Emma, no heart.
       //
       // Empirical hypothesis: Howler's implicit gesture-unlock (called
       // inside `Howl.play()` when ctx is suspended) races with the buffer
@@ -961,13 +970,13 @@ export default function Greet({
     // line 2 actually being spoken), route through the gate first.
     if (gate.dispatchGesture()) {
       // Don't consume the heart tap on a retry — let the user tap again
-      // when Melody has caught up. The retry doesn't advance the screen.
+      // when Emma has caught up. The retry doesn't advance the screen.
       return
     }
 
     tapHandledRef.current = true
 
-    // Cancel any in-flight TTS so Melody isn't talking over the chime.
+    // Cancel any in-flight TTS so Emma isn't talking over the chime.
     cancelPreRecorded()
     // Cancel the re-prompt — she tapped, no nag needed.
     if (repromptTimerRef.current !== null) {
@@ -1020,7 +1029,7 @@ export default function Greet({
   //  - At least one word boundary has fired for the active line (covers
   //    engines that skip onstart but emit boundaries).
   // While the gate is still `pending`, we suppress the ribbon so an empty
-  // rounded-rectangle never appears under Melody on a silent-fail iPad path.
+  // rounded-rectangle never appears under Emma on a silent-fail iPad path.
   // Once any speech has been heard we keep it mounted across gate re-arms
   // so a successful intro doesn't briefly un-mount the ribbon mid-line.
   const hasRevealedAnyWord = revealedByLine.some((count) => count > 0)
@@ -1072,14 +1081,15 @@ export default function Greet({
         }
       />
 
-      {/* Melody. Sized to fill ~60% of viewport height per spec line 136.
-          AnimatePresence cross-fades idle ↔ happy on the ear-wiggle cue.
+      {/* Emma. Sized to fill ~60% of viewport height per spec line 136.
+          AnimatePresence cross-fades idle ↔ celebration on the ear-wiggle cue.
           We use the default (non-wait) mode so both poses briefly co-exist
           during the swap — that's the soft cross-fade Kyle's spec calls for
-          (line 169, "sprite swap idle → happy for 600ms then back"), and it
-          also keeps tests deterministic because the new element mounts
+          (line 169, "sprite swap idle → happy for 600ms then back" — the
+          spec wording predates the Emma rename; semantics unchanged), and
+          it also keeps tests deterministic because the new element mounts
           immediately rather than waiting on the previous one's exit anim.
-          layoutId="melody" is set so Screen 3+ can shared-element-transition
+          layoutId="emma" is set so Screen 3+ can shared-element-transition
           her position (spec line 757).
 
           Wake state: she breathes (`scale: [1, 1.05, 1]` over 2.4s, infinite
@@ -1087,18 +1097,20 @@ export default function Greet({
           (Dave's consult: 1.015 was rejected as imperceptibly subtle on
           iPad scale and read as frozen). */}
       {/*
-        `pointer-events: none` on the melody-slot wrapper (post-iPad-tap
-        investigation, ticket 86c9gp99a). The slot is decorative — Melody
-        herself, the ready ring, and the wake-tap finger-tap nudge are all
-        eye-candy, not interactive surfaces. Without this, iPad Safari's
-        hit-testing can land taps on the inner <m.img> (Melody) before they
+        `pointer-events: none` on the emma-slot wrapper (post-iPad-tap
+        investigation, ticket 86c9gp99a; original "emma-slot" commit
+        pre-dates the Phase 3b character pivot). The slot is decorative —
+        Emma herself, the ready ring, and the wake-tap finger-tap nudge
+        are all eye-candy, not interactive surfaces. Without this, iPad
+        Safari's hit-testing can land taps on the inner <m.img> (Emma)
+        before they
         reach the absolutely-positioned full-viewport <button> below. With
         it, every pixel inside the slot's box transparently passes through
         to whatever is actually tappable underneath — namely the wake-tap
         target during Wake state, or the screen background during intro.
        */}
       <div
-        data-testid="greet-melody-slot"
+        data-testid="greet-emma-slot"
         className="pointer-events-none relative flex h-[60vh] w-full flex-1 items-center justify-center"
       >
         {/* Ready ring — Wake state only (or the silent retry relock state).
@@ -1141,9 +1153,9 @@ export default function Greet({
                     }
               }
             >
-              {/* The ring itself: a circle ~24pt outside Melody's bounding
+              {/* The ring itself: a circle ~24pt outside Emma's bounding
                   silhouette. We render relative to her viewport slot; the
-                  `60vh` Melody bounding box puts her circumscribed circle
+                  `60vh` Emma bounding box puts her circumscribed circle
                   at roughly 30vh radius, so the ring sits at ~32vh radius
                   (24pt extra). Drawn with a viewBox so it scales cleanly
                   on iPad portrait. */}
@@ -1170,12 +1182,12 @@ export default function Greet({
 
         <AnimatePresence initial={false}>
           <m.img
-            layoutId="melody"
+            layoutId="emma"
             key={pose}
-            data-testid="greet-melody"
+            data-testid="greet-emma"
             data-pose={pose}
-            src={`/assets/melody-${pose}.svg`}
-            alt="Melody"
+            src={`/assets/emma-${pose}.svg`}
+            alt="Emma"
             draggable={false}
             className="absolute h-full w-auto select-none"
             initial={
@@ -1196,7 +1208,7 @@ export default function Greet({
               reducedMotion
                 ? { duration: 0.3 }
                 : {
-                    ...MELODY_ENTRANCE_SPRING,
+                    ...EMMA_ENTRANCE_SPRING,
                     scale: {
                       duration: BREATHING_PERIOD_S,
                       repeat: Infinity,
@@ -1524,7 +1536,7 @@ export default function Greet({
             bottom: 'env(safe-area-inset-bottom)',
             left: 'env(safe-area-inset-left)',
             right: 'env(safe-area-inset-right)',
-            // No outline — invisible affordance. The ring + Melody carry the read.
+            // No outline — invisible affordance. The ring + Emma carry the read.
             outline: 'none',
             // Belt-and-braces — `cursor-pointer` Tailwind class covers
             // the desktop case but iPad Safari has a documented quirk

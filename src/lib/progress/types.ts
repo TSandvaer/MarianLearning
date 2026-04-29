@@ -92,7 +92,22 @@ export type SessionHistory = SessionHistoryEntry[]
 // Profile + top-level Progress envelope.
 // --------------------------------------------------------------------------
 
-/** Character is fixed to Melody for v1; future skins bump the schema. */
+/**
+ * Character ID stored in the progress profile.
+ *
+ * v1 = `'melody'`. The Phase 3b character pivot (ticket 86c9jccp7,
+ * 2026-04-29) intentionally does NOT change this literal — renaming it
+ * to `'emma'` would require a v1 → v2 schema migration with a Leitner
+ * + history round-trip, and the field is invisible to Marian (no UI
+ * reads it; the character art and audio are governed by the screen-
+ * level constants, not by this profile field).
+ *
+ * The literal is kept here as a forward-compat seam: when v2 ships
+ * (skin selection, multiple characters, etc.), the union widens and
+ * a `migrateV1ToV2` step in `migrate.ts` rewrites stored documents
+ * to the new shape. Until then, the on-disk identifier remains
+ * `'melody'` and the visible character is Emma.
+ */
 export type Character = 'melody'
 
 export interface Profile {

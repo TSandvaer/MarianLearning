@@ -12,7 +12,7 @@
  * synthesis flakiness.
  *
  * The MP3s have to be regenerated whenever the canonical voice config in
- * `api/_session.ts` (`MELODY_VOICE_CONFIG`) changes — otherwise Greet's
+ * `api/_session.ts` (`EMMA_VOICE_CONFIG`) changes — otherwise Greet's
  * voice drifts from Path A's voice and the child hears a tone change at
  * the screen boundary.
  *
@@ -123,14 +123,14 @@ const VOLUME = '+0%'
  * Filename keys MUST stay in sync with `SOURCES` in
  * `src/lib/audio/preRecorded.ts`.
  *
- * Note: filename `greet-02-im-melody.mp3` retains the legacy "melody"
- * slug even though the spoken text now says "Emma". Renaming the file
- * cascades through several test fixtures and the SOURCES map; Phase 3b
- * owns that rename.
+ * Phase 3b (ticket 86c9jccp7, 2026-04-29): the second line was renamed
+ * `greet-02-im-melody.mp3` → `greet-02-im-emma.mp3` in lockstep with
+ * the corresponding `'imMelody'` → `'imEmma'` GreetLineKey rename in
+ * `src/lib/audio/preRecorded.ts`.
  */
 const LINES = [
   { file: 'greet-01-hi.mp3', text: 'Hi!' },
-  { file: 'greet-02-im-melody.mp3', text: "I'm Emma." },
+  { file: 'greet-02-im-emma.mp3', text: "I'm Emma." },
   { file: 'greet-03-nice-to-meet-you.mp3', text: "It's so nice to meet you." },
   {
     file: 'greet-04-tap-the-heart.mp3',

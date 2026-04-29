@@ -14,6 +14,7 @@ import {
 } from '../../lib/debug/audioContextProbe'
 import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
+import type { EmmaPose } from '../../lib/character/emmaPose'
 import { pickDistractors } from './wordDistractors'
 import {
   loadStardust,
@@ -250,7 +251,11 @@ const defaultPlayUtterance: PlayWordSongUtteranceFn = (text, opts) => {
 
 // ── Component -------------------------------------------------------------
 
-type MelodyPose = 'idle' | 'happy' | 'puzzled'
+// Phase 3b (ticket 86c9jccp7): the inlined `MelodyPose = 'idle' | 'happy'
+// | 'puzzled'` union has been replaced by the shared `EmmaPose` union
+// from `lib/character/emmaPose`. WordSong currently exercises a subset
+// (`idle | celebration | puzzled-tilt`); the broader pose space
+// (`listening`, `attentive-pointing`, etc.) is wired in follow-up tickets.
 
 /** Per-problem state machine. Resets on problem advance. */
 interface PerProblemState {
@@ -413,7 +418,7 @@ function WordSongScreen({
    */
   const spokeReadAloudRef = useRef(__testInitiallyAudioUnlocked)
 
-  const [pose, setPose] = useState<MelodyPose>('idle')
+  const [pose, setPose] = useState<EmmaPose>('idle')
   const [shakingChip, setShakingChip] = useState<string | null>(null)
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
@@ -686,7 +691,7 @@ function WordSongScreen({
 
   /**
    * Handle a wrong tap. Sequenced per spec §Audio dispatch (wrong path):
-   * shake the chip, swap Melody to puzzled, fire SFX + reprompt utterance,
+   * shake the chip, swap Emma to puzzled-tilt, fire SFX + reprompt utterance,
    * then either schedule the hint (after 2 wrongs) or return to idle.
    */
   const handleWrongTap = useCallback(
@@ -699,7 +704,7 @@ function WordSongScreen({
         shakeTimerRef.current = null
       }, WRONG_SHAKE_MS)
 
-      setPose('puzzled')
+      setPose('puzzled-tilt')
       if (poseTimerRef.current !== null) clearTimeout(poseTimerRef.current)
 
       // Streak break — fade-out + reset.
@@ -838,7 +843,7 @@ function WordSongScreen({
       sparkleInstance.play()
       plinkInstance.play()
 
-      setPose('happy')
+      setPose('celebration')
       setCelebrating(true)
       setProblemState((prev) => ({ ...prev, resolved: true }))
 
@@ -1130,37 +1135,39 @@ function WordSongScreen({
         </div>
       </div>
 
-      {/* Melody + ribbon row */}
+      {/* Emma + ribbon row */}
       <div className="relative flex w-full items-start gap-4 px-4">
-        {/* Melody — upper-left, ~26vh per spec (slightly smaller than
+        {/* Emma — upper-left, ~26vh per spec (slightly smaller than
             Math's 30vh — see spec line 141).
-            Ear-wiggle: on a correct tap (`pose === 'happy'`) Melody plays
-            a 600ms rotation keyframe wiggle so the celebration is visibly
-            punchy on iPad even when the Path A audio path is the silent-
-            but-captioned fallback. Skipped under prefers-reduced-motion;
-            the static-pose cross-fade still reads. */}
+            Celebration wiggle: on a correct tap (`pose === 'celebration'`)
+            Emma plays a 600ms rotation keyframe wiggle so the celebration
+            is visibly punchy on iPad even when the Path A audio path is
+            the silent-but-captioned fallback. Skipped under
+            prefers-reduced-motion; the static-pose cross-fade still reads.
+            (The legacy ear-wiggle moniker pre-dated Emma — same animation,
+            renamed semantics.) */}
         <AnimatePresence initial={false}>
           <m.img
-            layoutId="melody"
+            layoutId="emma"
             key={pose}
-            data-testid="word-song-melody"
+            data-testid="word-song-emma"
             data-pose={pose}
             data-wiggling={
-              pose === 'happy' && !reducedMotion ? 'true' : 'false'
+              pose === 'celebration' && !reducedMotion ? 'true' : 'false'
             }
-            src={`/assets/melody-${pose}.svg`}
-            alt="Melody"
+            src={`/assets/emma-${pose}.svg`}
+            alt="Emma"
             draggable={false}
             className="h-[26vh] w-auto select-none origin-bottom"
             initial={{ opacity: 0, rotate: 0 }}
             animate={
-              pose === 'happy' && !reducedMotion
+              pose === 'celebration' && !reducedMotion
                 ? { opacity: 1, rotate: [0, -8, 8, -5, 5, 0] }
                 : { opacity: 1, rotate: 0 }
             }
             exit={{ opacity: 0, transition: { duration: 0.15 } }}
             transition={
-              pose === 'happy' && !reducedMotion
+              pose === 'celebration' && !reducedMotion
                 ? {
                     opacity: { duration: 0.2 },
                     rotate: {
@@ -1174,7 +1181,7 @@ function WordSongScreen({
           />
         </AnimatePresence>
 
-        {/* Caption ribbon — to Melody's right. Same word-by-word reveal
+        {/* Caption ribbon — to Emma's right. Same word-by-word reveal
             as Greet/Math. */}
         {captionVisible && captionText && (
           <m.div

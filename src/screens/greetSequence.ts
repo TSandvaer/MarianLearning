@@ -2,6 +2,10 @@
  * Greet (Screen 2) TTS sequence orchestrator.
  *
  * Spec: design/session-1.md §"Screen 2 — First Greeting (Meet Melody)" — see
+ * (the session-1 spec heading still uses the legacy "Meet Melody" phrasing;
+ * the Phase 3a + 3b character pivot to Emma updates the in-app copy/audio,
+ * but the session-1 spec heading is retained for historical traceability.)
+ *
  * the four lines + ~400ms gaps in the Copy/TTS script (lines 142–145), plus
  * the AC bullets at line 192–203.
  *
@@ -57,20 +61,19 @@ export interface BoundaryEvent {
 }
 
 /**
- * The four lines Melody says on Screen 2. Single source of truth — both the
+ * The four lines Emma says on Screen 2. Single source of truth — both the
  * speech engine and the caption ribbon read from this array, so there is no
  * drift between what's spoken and what's shown (AC: "no text shown that
- * Melody doesn't also say").
+ * Emma doesn't also say").
  *
  * Phase 3a (ticket 86c9hjnq1, 2026-04-28): the second line was renamed from
  * "I'm Melody." to "I'm Emma." as part of the character pivot away from
  * Sanrio IP. Both the spoken audio (re-rendered with the Emma multilingual
- * voice) and the caption ribbon now say "Emma". The corresponding
- * `GreetLineKey` for this line is still `'imMelody'` and the MP3 filename
- * is still `greet-02-im-melody.mp3` — those identifiers cascade through
- * preRecorded.ts, audioContextProbe, debugBus, and several test suites,
- * and Phase 3b's broader rename pass owns that refactor. The text/key
- * mismatch is intentional and temporary.
+ * voice) and the caption ribbon now say "Emma".
+ *
+ * Phase 3b (ticket 86c9jccp7, 2026-04-29): the corresponding
+ * `GreetLineKey` is now `'imEmma'` and the MP3 filename is
+ * `greet-02-im-emma.mp3`. The Phase-3a text/key mismatch is resolved.
  */
 export const GREET_LINES = [
   'Hi!',
@@ -146,7 +149,7 @@ export interface GreetSequenceHooks {
    * `.catch` swallowed the rejection silently and the heart never appeared
    * on a Howler load failure. Now the caller (Greet) maps the signal onto
    * the gate's `reportSpeechError` + `registerRetry` pair so Marian sees
-   * the relock ring instead of a frozen Melody.
+   * the relock ring instead of a frozen Emma.
    *
    * `onComplete` will NOT fire when a line errors. Cancellations are still
    * silent (no rejection forwarded) — distinguished from genuine errors by

@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  melody-logo.svg
-  Original artwork in the visual family of Sanrio's My Melody. No traced geometry.
-  Personal-use art for Marian's tutor app.
+  emma-logo.svg
+  Phase 3b (ticket 86c9jccp7) wordmark for the Splash screen — text-only
+  edit of the legacy melody-logo.svg. The bunny mark is retained for now
+  per CLAUDE.md ("Until Phase 3b visual pivot lands the manhwa-style art,
+  the character visually remains the bunny while audio + text say 'Emma'.
+  This mismatch is temporary and known."). When Kyle ships an Emma-styled
+  logo mark, replace the <g transform="translate(128 132)"> body below.
 
-  - Splash logo: pink-bunny mark + "Melody" wordmark
-  - Renders at ~200x200 on Splash; bunny must read at that scale
+  Original artwork in the visual family of Sanrio's My Melody. No traced
+  geometry. Personal-use art for Marian's tutor app.
+
+  - Splash logo: pink-bunny mark + "Emma" wordmark
+  - Renders at ~200x200 on Splash; mark must read at that scale
   - viewBox 0 0 256 320 (mark in upper square, wordmark in lower band)
   - Palette: hood/ears outer #FFC0CB, deeper accents #F48FB1, face/body cream #FFF5F0,
     soft aubergine lineart #3D2B3D (never pure black), flower center #FFD966
@@ -13,8 +20,8 @@
   - Long lobed ears extending UP and OUT of hood top with lighter inner ear panels
   - 5-petal yellow-center flower large enough to read at 200px
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="Melody">
-  <title>Melody</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="Emma">
+  <title>Emma</title>
 
   <!-- Bunny mark, centered upper square (0..256 x 0..220) -->
   <g transform="translate(128 132)">
@@ -94,14 +101,14 @@
     <path d="M -7 30 Q 0 36, 7 30" fill="none" stroke="#3D2B3D" stroke-width="2.4" stroke-linecap="round"/>
   </g>
 
-  <!-- Wordmark "Melody" -->
+  <!-- Wordmark "Emma" -->
   <g transform="translate(128 252)" text-anchor="middle">
     <text x="0" y="0"
       font-family="-apple-system, 'SF Pro Rounded', 'SF Pro', 'Segoe UI', system-ui, sans-serif"
       font-weight="700"
       font-size="44"
       letter-spacing="1.5"
-      fill="#3D2B3D">Melody</text>
+      fill="#3D2B3D">Emma</text>
     <!-- Heart flourish below -->
     <path d="M 0 18
       C -3 13, -10 13, -10 19

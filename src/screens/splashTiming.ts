@@ -27,7 +27,7 @@ export type ColdStartDetector = () => boolean
  *     treat as warm — the SW cache is hot and the user is just refreshing.
  *  3. Otherwise (first nav, or detection unavailable), assume cold. The
  *     spec says "default to cold cap if uncertain" — safer to over-show
- *     the splash than to clip Melody's reveal.
+ *     the splash than to clip Emma's reveal.
  */
 export function detectColdStart(): boolean {
   if (typeof window === 'undefined') return true

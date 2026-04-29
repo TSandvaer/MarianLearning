@@ -12,9 +12,9 @@
  * Same posture as Math's inline `FlowerGroup` / `SparkleGlyph` fallbacks
  * (Math.tsx:1051-1129) — soft pastel SVGs that read at 96pt as
  * "stylised cartoon X" without pretending to be the real asset. Each
- * placeholder uses Melody's palette tokens (`--my-rose`, `--my-cream`,
+ * placeholder uses Emma's palette tokens (`--my-rose`, `--my-cream`,
  * `--ink`, `--sparkle` per spec §"Style requirements") so they don't
- * clash with Melody.
+ * clash with Emma.
  *
  * Distinctness — what matters for v1
  * ----------------------------------
@@ -362,7 +362,7 @@ function renderPictureBody(key: string): ReactNode {
 
     case 'man':
       // Stylised silhouette person (per Open Q #2 default — minimal facial
-      // detail, lower visual hierarchy than Melody).
+      // detail, lower visual hierarchy than Emma).
       return (
         <g>
           {/* Head */}

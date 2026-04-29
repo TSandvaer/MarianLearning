@@ -80,7 +80,7 @@ function withMotion(node: ReactNode) {
 
 /**
  * Build a controllable playGreetLineFn() fake. Production-shape: each
- * call takes a stable line key (`'hi' | 'imMelody' | ...`) plus playback
+ * call takes a stable line key (`'hi' | 'imEmma' | ...`) plus playback
  * opts, and returns a deferred promise the test resolves explicitly.
  *
  * Replaces the Web Speech-era `speakFn` harness — the orchestrator still
@@ -99,7 +99,7 @@ function makePlayHarness() {
 
   const KEY_TO_TEXT: Record<GreetLineKey, string> = {
     hi: GREET_LINES[0],
-    imMelody: GREET_LINES[1],
+    imEmma: GREET_LINES[1],
     niceToMeet: GREET_LINES[2],
     tapHeart: GREET_LINES[3],
   }
@@ -226,7 +226,7 @@ describe('Greet', () => {
   })
 
   describe('Wake state (initial mount, audio locked)', () => {
-    it('mounts in Wake state and renders Melody, the cloud bg, the ready ring, and the tap target', () => {
+    it('mounts in Wake state and renders Emma, the cloud bg, the ready ring, and the tap target', () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -243,9 +243,9 @@ describe('Greet', () => {
       expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
       expect(screen.getByTestId('greet-wake-tap-target')).toBeInTheDocument()
 
-      const melodyEls = screen.getAllByTestId('greet-melody')
-      expect(melodyEls).toHaveLength(1)
-      expect(melodyEls[0]).toHaveAttribute('data-pose', 'idle')
+      const emmaEls = screen.getAllByTestId('greet-emma')
+      expect(emmaEls).toHaveLength(1)
+      expect(emmaEls[0]).toHaveAttribute('data-pose', 'idle')
     })
 
     it('does NOT show the speech ribbon, heart, or wake-icon in initial Wake state', () => {
@@ -381,11 +381,11 @@ describe('Greet', () => {
         vi.advanceTimersByTime(8_000)
       })
       expect(screen.getByTestId('greet-wake-icon')).toBeInTheDocument()
-      // Ear-wiggle: the happy pose is now in the DOM.
+      // Ear-wiggle: the celebration pose is now in the DOM.
       const poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
-      expect(poses).toContain('happy')
+      expect(poses).toContain('celebration')
     })
 
     it('does NOT call playGreetLine() during the wake re-prompt (audio still locked)', () => {
@@ -556,7 +556,7 @@ describe('Greet', () => {
       fireWakeTap()
 
       // Pre-condition: idle.
-      expect(screen.getByTestId('greet-melody')).toHaveAttribute(
+      expect(screen.getByTestId('greet-emma')).toHaveAttribute(
         'data-pose',
         'idle',
       )
@@ -569,15 +569,15 @@ describe('Greet', () => {
       })
 
       let poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
-      expect(poses).toContain('happy')
+      expect(poses).toContain('celebration')
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(600)
       })
       poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
       expect(poses).toContain('idle')
     })
@@ -600,7 +600,7 @@ describe('Greet', () => {
         h.tickWord(1)
       })
       const poses = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
       expect(poses).toEqual(['idle'])
     })
@@ -631,7 +631,7 @@ describe('Greet', () => {
       )
     })
 
-    it("captions never show text Melody hasn't said (initially zero revealed)", () => {
+    it("captions never show text Emma hasn't said (initially zero revealed)", () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -854,7 +854,7 @@ describe('Greet', () => {
         'relock',
       )
       // No ribbon visible during the relock — Marian sees the ring re-emerge,
-      // not an empty rounded rectangle hanging under Melody.
+      // not an empty rounded rectangle hanging under Emma.
       expect(screen.queryByTestId('greet-ribbon')).toBeNull()
     })
   })
@@ -1114,7 +1114,7 @@ describe('Greet', () => {
       expect(onAdvance).toHaveBeenCalledTimes(1)
     })
 
-    it('cancels in-flight pre-recorded playback on heart tap so Melody is silent during the chime', async () => {
+    it('cancels in-flight pre-recorded playback on heart tap so Emma is silent during the chime', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -1169,15 +1169,15 @@ describe('Greet', () => {
 
       await advanceToHeart(h)
       const preTap = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
       expect(preTap).toEqual(['idle'])
 
       fireEvent.click(screen.getByTestId('greet-heart'))
       const postTap = screen
-        .getAllByTestId('greet-melody')
+        .getAllByTestId('greet-emma')
         .map((el) => el.getAttribute('data-pose'))
-      expect(postTap).toContain('happy')
+      expect(postTap).toContain('celebration')
     })
   })
 
@@ -1265,7 +1265,7 @@ describe('Greet', () => {
 
       expect(screen.getByTestId('greet')).toBeInTheDocument()
       expect(screen.getByTestId('greet-clouds')).toBeInTheDocument()
-      expect(screen.getByTestId('greet-melody')).toBeInTheDocument()
+      expect(screen.getByTestId('greet-emma')).toBeInTheDocument()
       expect(screen.getByTestId('greet-ready-ring')).toBeInTheDocument()
       // No play before tap, regardless of motion preference.
       expect(h.calls).toHaveLength(0)
@@ -1361,10 +1361,10 @@ describe('Greet', () => {
 
       // Line 1's MP3 errors.
       expect(h.calls).toHaveLength(2)
-      expect(h.calls[1].key).toBe('imMelody')
+      expect(h.calls[1].key).toBe('imEmma')
       await act(async () => {
         h.rejectLast(
-          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"',
+          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-emma.mp3"',
         )
         await Promise.resolve()
         await Promise.resolve()
@@ -1447,7 +1447,7 @@ describe('Greet', () => {
       fireWakeTap()
       // A new playGreetLine landed — for the FAILED line, not for line 0.
       expect(h.calls.length).toBe(callsBeforeRetry + 1)
-      expect(h.calls[h.calls.length - 1].key).toBe('imMelody')
+      expect(h.calls[h.calls.length - 1].key).toBe('imEmma')
     })
 
     it('retry that hits the same failure re-shows the relock ring (agency over silence)', async () => {
@@ -1514,7 +1514,7 @@ describe('Greet', () => {
 
       await act(async () => {
         h.rejectLast(
-          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-melody.mp3"',
+          '[preRecorded] loaderror for "/assets/audio/greet/greet-02-im-emma.mp3"',
         )
         await Promise.resolve()
         await Promise.resolve()
@@ -1525,7 +1525,7 @@ describe('Greet', () => {
       expect(snap.lastSpeak?.status).toBe('errored')
       // Error message includes the failing source URL (load-bearing for
       // iPad QA — without it, "an MP3 failed" tells you nothing).
-      expect(snap.lastSpeak?.error).toMatch(/greet-02-im-melody\.mp3/)
+      expect(snap.lastSpeak?.error).toMatch(/greet-02-im-emma\.mp3/)
       // The text field carries the failed line so the panel reads
       // naturally: `errored: "I'm Emma."`.
       expect(snap.lastSpeak?.text).toBe(GREET_LINES[1])

@@ -64,7 +64,7 @@ describe('STATIC_WORD_SONG_PLANS', () => {
   })
 
   it("captioned utterances stay within the spec's vocabulary cap", () => {
-    // Per CLAUDE.md "Melody's vocabulary capped to ~200 core English words".
+    // Per CLAUDE.md "Emma's vocabulary capped to ~200 core English words".
     // We can\'t enforce a 200-word global vocabulary here without a list,
     // but we can confirm Word Song doesn\'t introduce utterance shapes
     // outside the spec\'s sample text. Check that the utterance text uses

@@ -209,7 +209,7 @@ function numberWord(n: number): string {
   if (!w) {
     // Defensive — every plan in this file is hand-authored to stay within
     // [1, 10], but if someone adds a plan that drifts out, throw rather
-    // than silently producing "11" in Melody's mouth.
+    // than silently producing "11" in Emma's mouth.
     throw new Error(`[sessionPlans] no word for number ${n}`)
   }
   return w
