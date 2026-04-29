@@ -14,6 +14,15 @@
 export type Route =
   | 'splash'
   | 'greet'
+  /**
+   * Hub — landing / skill-tree picker. Reached on:
+   *   - app-open with `sessionCount >= 1` (Splash → Hub branch)
+   *   - Session-End "All done!" tap (post-route-flip per ticket 86c9j53ra)
+   *   - mid-skill back-arrow tap from Math/WordSong
+   *
+   * Source-of-truth: `design/screen-hub.md`.
+   */
+  | 'hub'
   | 'math'
   | 'literacy'
   | 'session-end'

@@ -339,6 +339,39 @@ describe('SessionEnd', () => {
     expect(screen.getByTestId('sleep-splash')).toBeInTheDocument()
   })
 
+  it('routes to Hub via `onAllDone` when provided (Hub-flip post-#86c9j53ra)', async () => {
+    const storage = createMemoryStorage()
+    const chime = createFakeSfx()
+    const onAllDone = vi.fn()
+    seedStardust(storage, 9)
+
+    render(
+      withMotion(
+        <SessionEnd
+          payload={MATH_PAYLOAD}
+          playUtteranceFn={createFakePlayUtterance()}
+          chime={chime}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+          onAllDone={onAllDone}
+        />,
+      ),
+    )
+
+    await advanceSequence(8000)
+    fireEvent.click(screen.getByTestId('session-end-cta'))
+    expect(chime.play).toHaveBeenCalled()
+
+    // Same 300ms tween-out as the legacy sleep-splash path; then
+    // onAllDone fires.
+    await advanceSequence(500)
+    expect(onAllDone).toHaveBeenCalledTimes(1)
+    // Sleep splash must NOT mount when onAllDone is wired —
+    // SessionEnd hands off to the orchestrator instead.
+    expect(screen.queryByTestId('sleep-splash')).toBeNull()
+  })
+
   it('sleep splash shows "Come back soon." text with no TTS', async () => {
     const storage = createMemoryStorage()
     const playUtterance = createFakePlayUtterance()

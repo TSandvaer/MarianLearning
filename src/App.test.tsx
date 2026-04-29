@@ -395,6 +395,33 @@ describe('App routing skeleton', () => {
     // covering anything new.
   })
 
+  describe('Hub navigation contract (#86c9j53ra)', () => {
+    // Source-of-truth: design/screen-hub.md § "Navigation contract".
+    // The dynamic Splash → Hub branching covered separately at the
+    // session-history layer (`nextAfterSplash` keys on
+    // `sessionCount`); these App-level tests cover the direct-route
+    // mount + first-visit fallback shape.
+
+    it('mounts Hub directly on ?route=hub', () => {
+      setSearch('?route=hub')
+      render(<App />)
+      expect(screen.getByTestId('hub')).toBeInTheDocument()
+      expect(
+        screen.getAllByTestId('hub-tree-node').length,
+      ).toBeGreaterThanOrEqual(2)
+    })
+
+    it('mounts Hub gracefully on a fresh state (Emma-idle, both nodes visible)', () => {
+      // Spec § "Empty / first-visit edge case": Hub renders correctly
+      // even if it somehow mounts on a fresh state — both nodes are
+      // tappable, Emma is in idle, the screen is functional.
+      setSearch('?route=hub')
+      render(<App />)
+      expect(screen.getByTestId('hub')).toBeInTheDocument()
+      expect(screen.getByTestId('hub-emma')).toBeInTheDocument()
+    })
+  })
+
   describe('debug overlay', () => {
     // The overlay is gated on `?debug=1`. Without it, normal sessions never
     // see (or pay for) the panel — critical because we ship debug to prod and

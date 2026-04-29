@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
+import { cancelSessionAudio } from '../../lib/audio'
 import {
   readHowlerContextRunning,
   resumeHowlerContextOnGesture,
@@ -153,6 +154,13 @@ export interface PlayWordSongUtteranceOptions {
 export interface WordSongProps {
   /** Optional: fires when problem 8 finishes (any path). */
   onSessionComplete?: (result: WordSongSessionResult) => void
+  /**
+   * Optional: fires when Marian taps the mid-skill back-arrow. The
+   * orchestrator routes back to Hub on this signal. Mirrored shape
+   * with `Math.tsx` `onRequestExit`; same per-spec contract from
+   * `design/screen-hub.md` § "Mid-skill exit contract".
+   */
+  onRequestExit?: () => void
   /** Optional: override the session plan. Defaults to
    *  `pickStaticWordSongPlan()` until Path A wires Claude into mount. */
   plan?: WordSongSessionPlan
@@ -274,6 +282,7 @@ const FRESH_PROBLEM_STATE: PerProblemState = {
 
 function WordSongScreen({
   onSessionComplete,
+  onRequestExit,
   plan: planProp,
   playUtterance = defaultPlayUtterance,
   audioReady,
@@ -1048,6 +1057,46 @@ function WordSongScreen({
           px-4
         "
       >
+        {/* Mid-skill back-arrow — top-left, leads the HUD. Mirrored
+            shape with Math.tsx; see `design/screen-hub.md`
+            § "Mid-skill exit contract". Hidden when no
+            `onRequestExit` handler is provided so existing direct-
+            route WordSong tests render the same shape they always did. */}
+        {onRequestExit && (
+          <button
+            type="button"
+            data-testid="word-song-back-to-hub"
+            aria-label="Back"
+            onClick={() => {
+              try {
+                cancelSessionAudio()
+              } catch {
+                // Best-effort.
+              }
+              onRequestExit()
+            }}
+            className="
+              flex items-center justify-center
+              text-my-rose
+              touch-manipulation select-none
+            "
+            style={{ width: '56pt', height: '56pt' }}
+          >
+            <svg
+              viewBox="0 0 28 28"
+              width="28"
+              height="28"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M18 6 L9 14 L18 22" />
+            </svg>
+          </button>
+        )}
         {/* Stardust counter — left */}
         <div
           data-testid="word-song-stardust"

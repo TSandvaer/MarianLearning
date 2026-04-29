@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
+import { cancelSessionAudio } from '../../lib/audio'
 import {
   readHowlerContextRunning,
   resumeHowlerContextOnGesture,
@@ -113,6 +114,21 @@ export interface PlayMathUtteranceOptions {
 export interface MathProps {
   /** Optional: fires when problem 8 finishes (any path). */
   onSessionComplete?: (result: MathSessionResult) => void
+  /**
+   * Optional: fires when Marian taps the mid-skill back-arrow. The
+   * orchestrator routes back to Hub on this signal. Per
+   * `design/screen-hub.md` § "Mid-skill exit contract", in-flight
+   * Math progress is silently invalidated if she picks the OTHER
+   * tree from Hub afterwards (recommendation (a) in the spec); the
+   * stardust she earned per-problem is already preserved by
+   * `stardust.v1` write moments.
+   *
+   * Bundled into the Hub-implementation PR per Q4=A
+   * (Thomas-locked, 2026-04-28). Without this, Hub is reachable
+   * only via Session-End — Marian would be trapped in a session if
+   * she just wants to switch trees.
+   */
+  onRequestExit?: () => void
   /** Optional: override the session plan. Defaults to a hardcoded rotation
    *  via `pickStaticSessionPlan()` until Path A wires Claude into Math mount. */
   plan?: MathSessionPlan
@@ -296,6 +312,7 @@ const FRESH_PROBLEM_STATE: PerProblemState = {
  */
 function MathScreen({
   onSessionComplete,
+  onRequestExit,
   plan: planProp,
   playUtterance = defaultPlayUtterance,
   audioReady,
@@ -1290,6 +1307,48 @@ function MathScreen({
           px-4
         "
       >
+        {/* Mid-skill back-arrow — top-left, leads the HUD. 28pt visible
+            glyph in a 56pt expanded touch zone (per design/screen-hub.md
+            § "Mid-skill exit contract"). Hidden when no `onRequestExit`
+            handler is provided so existing direct-route Math tests
+            (no Hub) render the same shape they always did. */}
+        {onRequestExit && (
+          <button
+            type="button"
+            data-testid="math-back-to-hub"
+            aria-label="Back"
+            onClick={() => {
+              // Cancel any in-flight TTS so the next screen doesn't
+              // hear bleed. Mirrors the Greet → Math handoff cleanup.
+              try {
+                cancelSessionAudio()
+              } catch {
+                // Best-effort.
+              }
+              onRequestExit()
+            }}
+            className="
+              flex items-center justify-center
+              text-my-rose
+              touch-manipulation select-none
+            "
+            style={{ width: '56pt', height: '56pt' }}
+          >
+            <svg
+              viewBox="0 0 28 28"
+              width="28"
+              height="28"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M18 6 L9 14 L18 22" />
+            </svg>
+          </button>
+        )}
         {/* Stardust counter — left */}
         <div
           data-testid="math-stardust"

@@ -59,6 +59,16 @@ export type PlayUtteranceFn = (
 export interface SessionEndProps {
   /** Payload from the originating screen's `onSessionComplete`. */
   payload: SessionEndPayload | null
+  /**
+   * Optional: fires when Marian taps "All done!". When provided, the
+   * screen routes to Hub via this handler instead of falling through
+   * to the legacy Sleep splash. Wired by App.tsx as part of the Hub
+   * navigation contract (`design/screen-hub.md` § "Q4: Session-End →
+   * Hub flip"). When `undefined` the legacy Sleep-splash path runs —
+   * preserved for unit tests + the dark-launch fallback Thomas
+   * approves.
+   */
+  onAllDone?: () => void
   /** Test seam: replace the live Path A playback function. */
   playUtteranceFn?: PlayUtteranceFn
   /** Test seam: replace chime SFX. */
@@ -132,6 +142,7 @@ function usePrefersReducedMotion(): boolean {
 
 export default function SessionEnd({
   payload,
+  onAllDone,
   playUtteranceFn,
   chime: chimeProp,
   sparkle: sparkleProp,
@@ -412,11 +423,24 @@ export default function SessionEnd({
     // Cancel any in-flight TTS
     cancelSessionAudio()
 
-    // Fade to sleep splash after 300ms
+    // Hub-route flip (`design/screen-hub.md` § Q4): when the orchestrator
+    // wires `onAllDone`, route to Hub instead of falling through to the
+    // legacy Sleep splash. The chime + scale tween still play; only the
+    // post-300ms destination changes. When `onAllDone` is undefined,
+    // legacy Sleep splash renders — preserves existing tests + supports
+    // a dark-launch fallback if Thomas opts for one.
+    if (onAllDone) {
+      addTimer(() => {
+        onAllDone()
+      }, 300)
+      return
+    }
+
+    // Fade to sleep splash after 300ms (legacy path).
     addTimer(() => {
       setPhase('sleep-splash')
     }, 300)
-  }, [phase, chimeInstance, addTimer])
+  }, [phase, chimeInstance, addTimer, onAllDone])
 
   // ── Sparkle particles (entry burst) -------------------------------------
   // Positions are generated once via useState lazy initializer. This avoids
