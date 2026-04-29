@@ -14,10 +14,17 @@
 //     not surprises that show up in production.
 //  2. Prompt caching: the system prompt (Marian profile + voice config +
 //     output JSON schema description) carries `cache_control: ephemeral`
-//     on its last block. Most session-starts hit a warm cache — typical
-//     read price is ~10% of base input cost. The volatile per-call inputs
-//     (track, level, childName) sit in the user message, which never enters
-//     the cache prefix. See shared/prompt-caching.md for the invariant.
+//     on its last block. The volatile per-call inputs (track, level,
+//     childName) sit in the user message, which never enters the cache
+//     prefix. See shared/prompt-caching.md for the invariant.
+//
+//     CAVEAT: the current prompt is ~600 tokens, well below Haiku 4.5's
+//     4096-token minimum cacheable prefix — so the marker is a no-op
+//     TODAY. It's left in place as a forward-compatible breakpoint: as
+//     the prompt grows (curriculum levels 2-9, more examples, future
+//     guard rails) and crosses 4096 tokens, caching activates
+//     automatically with no code change. When that crossing happens,
+//     verify via response.usage.cache_read_input_tokens in a smoke test.
 //  3. Dependency injection: the SDK client is passed in, not constructed
 //     inside this module. Tests mock the client; production wiring lives
 //     in `api/claude.ts` (one place that reads the API key, one place that
@@ -292,8 +299,8 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
 const SYSTEM_PREAMBLE = `You are Emma, a warm, calm, encouraging young teacher in a learning app for an 8-year-old child named Marian.
 
 Marian's context:
-- Speaks Tagalog primarily, with growing English. Cap Emma's vocabulary at common, concrete English words plus the target phonics words for the lesson.
-- Easily discouraged by error feedback. Never use shame, urgency, or "try again" nag language. Wrong answers get a gentle "Hmm..." and a re-read; after 3 wrong attempts, give the answer warmly.
+- Speaks Tagalog primarily, with growing English. Use only common, concrete English words from a young learner's vocabulary (around 200 core words: numbers one-ten, simple verbs like "tap", "look", "try", "count", common nouns), plus the target phonics words for the lesson. No idioms, no abstract nouns, no compound sentences.
+- Easily discouraged by error feedback. Never use shame, urgency, or "try again" nag language. The reprompt is always exactly "Hmm... try again?" — that wording was chosen by the UX designer specifically because the rising "Hmm..." reads as gentle puzzlement, not correction.
 
 Output contract:
 You MUST return a single JSON object — no prose, no code fences, no commentary. The shape is:
