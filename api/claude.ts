@@ -69,6 +69,8 @@
 // error message and the assertNodeRuntime() doc-comment were updated in
 // the same PR to reflect the new dependency surface.
 
+import Anthropic from '@anthropic-ai/sdk'
+
 import {
   isClaudeRequest,
   type ClaudeErrorResponse,
@@ -76,6 +78,13 @@ import {
   type SessionStartResponse,
 } from './_types.js'
 import { renderSessionAudio } from './_session.js'
+import {
+  generateSessionPlan,
+  PlannerError,
+  type PlannerAnthropicClient,
+  type PlannerTrack,
+} from './_planner.js'
+import { createRateLimiter, type RateLimiter } from './_rateLimit.js'
 
 /**
  * Cold-start runtime assertion. Throws at module load if the function is
@@ -170,15 +179,151 @@ function extractPlan(payload: unknown): unknown | null {
   return p.plan
 }
 
+/** Track-based session-start payload (added ticket 86c9jdh39). When the
+ *  caller doesn't ship a hand-built plan, they may instead ask the server
+ *  to generate one via Haiku by passing { track, level, childName }. */
+interface TrackPayload {
+  track: PlannerTrack
+  level: number
+  childName: string
+}
+
+const VALID_TRACKS: readonly PlannerTrack[] = ['math', 'word-song']
+
+/**
+ * Extract the track/level/childName triple if the payload carries one.
+ * Returns null if any field is missing or wrongly typed — the handler
+ * falls through to the legacy stub path in that case (no breaking change
+ * for callers that still pass `{ plan }`).
+ *
+ * Sanity: childName is also bounded — anything longer than 64 chars is
+ * suspicious enough to reject (real first names don't go that long; an
+ * over-long value is most likely a prompt-injection attempt or a bug).
+ * Level is restricted to 1-9 since today only level 1 is implemented and
+ * the prompt is forward-compatible up to 9.
+ */
+function extractTrackPayload(payload: unknown): TrackPayload | null {
+  if (typeof payload !== 'object' || payload === null) return null
+  const p = payload as Record<string, unknown>
+  const track = p.track
+  const level = p.level
+  const childName = p.childName
+  if (
+    typeof track !== 'string' ||
+    !VALID_TRACKS.includes(track as PlannerTrack)
+  )
+    return null
+  if (
+    typeof level !== 'number' ||
+    !Number.isInteger(level) ||
+    level < 1 ||
+    level > 9
+  )
+    return null
+  if (
+    typeof childName !== 'string' ||
+    childName.length === 0 ||
+    childName.length > 64
+  )
+    return null
+  return { track: track as PlannerTrack, level, childName }
+}
+
+/**
+ * Module-singleton rate limiter for session-start. Per-IP, in-memory.
+ * Lives at module scope (not per-request) so that warm Vercel containers
+ * accumulate state across invocations — see _rateLimit.ts header for the
+ * limitation discussion (cold starts reset the bucket, multi-instance
+ * deployments multiply the effective rate).
+ *
+ * Tunables: 6 requests / 60 seconds. Calibrated for the real "kid spams
+ * F5 / brother runs the iPad in a loop" cases without inconveniencing the
+ * legitimate "Marian started a session, was disrupted, restarted" case.
+ */
+const sessionStartLimiter: RateLimiter = createRateLimiter({
+  limit: 6,
+  windowMs: 60_000,
+})
+
+/** Best-effort source-IP extraction. Vercel sets `x-forwarded-for`. We
+ *  fall back to `x-real-ip` and finally to a fixed string — a fixed
+ *  fallback means all unidentifiable callers share one bucket, which is
+ *  conservative (over-throttles) but safe. */
+function extractSourceIp(request: Request): string {
+  const xff = request.headers.get('x-forwarded-for')
+  if (xff) {
+    // X-F-F can be a comma-separated chain; the leftmost is the original
+    // client per the standard. Vercel adds its own proxy address last.
+    const first = xff.split(',')[0]?.trim()
+    if (first) return first
+  }
+  const real = request.headers.get('x-real-ip')
+  if (real) return real
+  return 'unknown'
+}
+
+/** Build a real Anthropic SDK client wrapped in the planner's narrowed
+ *  interface. Kept as a factory so tests can inject a stub via the
+ *  exported handler-level seam below. */
+function buildAnthropicClient(): PlannerAnthropicClient {
+  // Anthropic SDK reads ANTHROPIC_API_KEY from env automatically; we
+  // already presence-checked it above the planner call.
+  const sdk = new Anthropic()
+  return {
+    messages: {
+      create: async (args) => {
+        const message = await sdk.messages.create({
+          model: args.model,
+          max_tokens: args.max_tokens,
+          system: args.system,
+          messages: args.messages,
+        })
+        // Narrow the SDK's typed content blocks down to what the planner's
+        // PlannerCreateResponse interface promises (just `type` + optional
+        // `text`). Unknown-type blocks pass through with no `text` field,
+        // and the planner's `extractText` skips them.
+        return {
+          content: message.content.map((block) =>
+            block.type === 'text'
+              ? { type: 'text', text: block.text }
+              : { type: block.type },
+          ),
+        }
+      },
+    },
+  }
+}
+
+/** Handler-level seams. Tests use these to inject a mock SDK client and a
+ *  pinned clock without monkey-patching internal state. Exported only for
+ *  the test file in the same module folder. */
+export interface HandlerOverrides {
+  /** Override the Anthropic SDK adapter. Defaults to a real
+   *  `@anthropic-ai/sdk` client. */
+  anthropicClient?: PlannerAnthropicClient
+  /** Override the rate limiter. Defaults to the module-singleton. */
+  rateLimiter?: RateLimiter
+  /** Override the clock for rate-limit windowing. Defaults to Date.now(). */
+  now?: () => number
+}
+
 /**
  * The actual request handler. Exported as a named symbol so tests can
  * import it directly; the Vercel entrypoint is the `default` export
  * below, which wraps this in a `{ fetch }` object so Vercel routes the
  * Web `Request`/`Response` codepath (see top-of-file HISTORY).
+ *
+ * @param overrides Test seams. In production, omit — the function uses
+ *   the module-singleton rate limiter and a real Anthropic SDK client.
  */
-export async function handler(request: Request): Promise<Response> {
+export async function handler(
+  request: Request,
+  overrides: HandlerOverrides = {},
+): Promise<Response> {
   const origin = request.headers.get('origin')
   const headers = corsHeaders(origin)
+  const limiter = overrides.rateLimiter ?? sessionStartLimiter
+  const now = overrides.now ?? Date.now
 
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers })
@@ -217,10 +362,18 @@ export async function handler(request: Request): Promise<Response> {
     return jsonResponse({ error: 'config-missing' }, 500, headers)
   }
 
-  // session-start with a plan attached → render audio and return the
-  // SessionStartResponse. Real Claude prompt wiring (which produces the
-  // plan in the first place) is a follow-up ticket; until then the
-  // browser can pass its own plan to exercise the audio pipeline.
+  // session-start branches:
+  //   1. payload.plan present  → render TTS for the supplied plan
+  //      (legacy v1 client path; preserved unchanged for backward compat).
+  //   2. payload.track present → call Haiku to generate a plan, then
+  //      render TTS (added ticket 86c9jdh39 — replaces the prior stub
+  //      that produced silence on Math + WordSong in production).
+  //   3. neither present       → legacy stub (200 with stub: true).
+  //
+  // Order matters: plan-attached requests bypass the rate limiter
+  // entirely (no Claude call, just TTS — same cost surface as v1). Only
+  // the new track-based path goes through the limiter, since that's the
+  // one that costs Anthropic credits.
   if (body.kind === 'session-start') {
     const plan = extractPlan(body.payload)
     if (plan !== null) {
@@ -258,10 +411,95 @@ export async function handler(request: Request): Promise<Response> {
         )
       }
     }
+
+    // Track-based branch: planner generates the plan via Haiku, then we
+    // render TTS through the same _session pipeline.
+    const trackPayload = extractTrackPayload(body.payload)
+    if (trackPayload !== null) {
+      // Per-IP rate limit. We honour the limiter BEFORE calling Anthropic
+      // so a leaked share-link in a tight loop can't run up a bill.
+      const ip = extractSourceIp(request)
+      const result = limiter.check(ip, now())
+      if (!result.allowed) {
+        if (result.retryAfterSec !== undefined) {
+          headers.set('Retry-After', String(result.retryAfterSec))
+        }
+        return jsonResponse(
+          {
+            error: 'rate-limited',
+            message: 'too many session-start requests; please slow down',
+          },
+          429,
+          headers,
+        )
+      }
+
+      const client = overrides.anthropicClient ?? buildAnthropicClient()
+
+      let plannedPlan
+      try {
+        plannedPlan = await generateSessionPlan({
+          client,
+          track: trackPayload.track,
+          level: trackPayload.level,
+          childName: trackPayload.childName,
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const stack = err instanceof Error ? err.stack : undefined
+        // Distinguish planner errors from generic upstream failures in
+        // logs so the QA sweep can attribute correctly. Same discipline
+        // as the tts-failed branch: log message + stack only, never
+        // request body / headers / key fragments.
+        console.error('[api/claude] planner-failed', { message, stack })
+        // For PlannerError("config-missing") we map to 500 — that's a
+        // server misconfiguration, not a client error. For everything
+        // else (invalid-response, upstream-error, invalid-request) we
+        // return 502, signalling "the request was fine but the upstream
+        // dependency couldn't satisfy it" — the browser's path A code
+        // treats this the same as tts-failed and falls back to silent
+        // mode.
+        if (err instanceof PlannerError && err.code === 'config-missing') {
+          return jsonResponse({ error: 'config-missing' }, 500, headers)
+        }
+        return jsonResponse(
+          {
+            error: 'planner-failed',
+            message: 'session plan generation failed',
+          },
+          502,
+          headers,
+        )
+      }
+
+      // Render audio for the planned plan. Same pipeline the v1 client
+      // path uses — no fork in the audio code.
+      try {
+        const rendered = await renderSessionAudio(plannedPlan)
+        return jsonResponse(rendered, 200, headers)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        const stack = err instanceof Error ? err.stack : undefined
+        console.error('[api/claude] tts-failed', { message, stack })
+        return jsonResponse(
+          {
+            error: 'tts-failed',
+            message:
+              err instanceof Error && err.message
+                ? `tts pipeline failed: ${err.message}`
+                : 'tts pipeline failed',
+          },
+          502,
+          headers,
+        )
+      }
+    }
   }
 
-  // Stub success path (unchanged from the prior contract). Real Claude
-  // call is wired in a follow-up ticket.
+  // Stub success path (unchanged from the prior contract). Stumble-
+  // explanation and session-end are out of scope for ticket 86c9jdh39
+  // and remain stubbed; session-start with neither plan nor track also
+  // returns the stub for backward compat.
   return jsonResponse(
     {
       ok: true,
