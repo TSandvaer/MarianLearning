@@ -15,6 +15,10 @@ export default defineConfig([
     'public/icons',
     'public/splash',
     'scripts',
+    // Persona-agent worktrees — created by the orchestration tooling
+    // for parallel work. They contain full repo copies that confuse
+    // eslint's tsconfig discovery (multiple candidate roots).
+    '.claude/**',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
