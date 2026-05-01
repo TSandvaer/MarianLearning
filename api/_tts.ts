@@ -123,6 +123,137 @@ export function escapeSsml(text: string): string {
     .replace(/'/g, '&apos;')
 }
 
+/**
+ * Per-word IPA pronunciation overrides for Azure Neural TTS.
+ *
+ * Why this exists (ticket 86c9kj2um)
+ * ----------------------------------
+ * Thomas reported that on production iPad, en-US-EmmaMultilingualNeural
+ * pronounces "four" as the homophone "for" (i.e. with the unstressed,
+ * shortened /fɚ/-ish realization rather than the long-vowel /fɔːr/).
+ * Marian, an English-as-a-second-language 8-year-old, hears the wrong
+ * sound and the math problem is unparseable.
+ *
+ * Pivot history: PR #114 tried Option B (carrier prefix — prepending
+ * "Okay." before each problem to defeat a hypothesised
+ * leading-position-triggered homophone selection). That hypothesis was
+ * empirically wrong: with the carrier in place, Thomas confirmed
+ * "four" still sounded like "for" AND the leading "Okay." was annoying
+ * background noise on every problem. PR #114 stays parked.
+ *
+ * Pivot to Option C: explicit IPA phoneme override via
+ * `<phoneme alphabet="ipa" ph="...">word</phoneme>`. Azure's neural
+ * voices honour the W3C SSML 1.0 phoneme element and use the supplied
+ * IPA string instead of running the word through the voice's lexicon.
+ * That is deterministic — no hidden context-sensitive realization.
+ *
+ * IPA values picked
+ * -----------------
+ *  - "four" → /fɔːr/ (American English long-vowel rhotacised
+ *    realization; THE_OPEN_O + LENGTH_MARK + R). This is the canonical
+ *    dictionary form and what every native speaker hears as "the
+ *    number four", clearly distinct from "for" /fɚ/ or /fɔr/.
+ *  - "two" → /tuː/ (long /u/ vowel, the canonical realization).
+ *    "two" hasn't been reported as a homophone problem yet, but every
+ *    Math session opens with "Two plus two. How many?" so the risk is
+ *    real. Defensive symmetry — same fix shape for both number-words
+ *    that share their phonetic skeleton with a high-frequency English
+ *    function word ("to"/"too").
+ *
+ * Why ONLY "four" and "two" and not e.g. "one" / "three"
+ * ------------------------------------------------------
+ *  - "one" /wʌn/ has no homophone the voice could plausibly select.
+ *  - "three" /θriː/ likewise — no high-frequency English word collides.
+ *  - The override has a real cost: it disables Azure's contextual
+ *    prosody for the wrapped word (the phoneme element is its own
+ *    prosody scope). So we only inject it where the homophone risk
+ *    has been observed or is structurally analogous.
+ *
+ * Word-boundary safety
+ * --------------------
+ * The regex uses `\b` so substring matches do not fire:
+ *   "fourteen", "fourth", "afternoon" — leave alone.
+ *   "twoscore", "Bartholomew"          — leave alone.
+ * Case is preserved in the output (matched substring is reused
+ * verbatim inside the tag), so "Four" stays "Four" while still being
+ * voiced from the IPA. The IPA itself is identical regardless of
+ * casing — Azure ignores the visible word once `ph=` is set, but
+ * keeping casing consistent helps debugging when reading the SSML.
+ */
+const PHONEME_OVERRIDES: Record<string, string> = {
+  four: 'fɔːr',
+  two: 'tuː',
+}
+
+/**
+ * Wrap whole-word matches of `PHONEME_OVERRIDES` keys in
+ * `<phoneme alphabet="ipa" ph="...">match</phoneme>`. Returns a string
+ * that is partially-SSML — i.e. the matched-word regions contain raw
+ * SSML markup, while the in-between plain regions are XML-escaped.
+ *
+ * Order of operations matters: we cannot escape the whole input first
+ * (that would corrupt the phoneme markup we then inject) and we cannot
+ * inject markup first then escape (that would escape our own tags
+ * back into entity references). The function therefore alternates:
+ * tokenise on word-boundary, escape plain segments, wrap target words.
+ *
+ * Word-boundary handling
+ * ----------------------
+ * `\b(four|two)\b` — JavaScript's `\b` is the standard ASCII word-
+ * boundary, which is exactly the right primitive here:
+ *   - "fourteen"      → "four" is followed by "t" (word char) → no \b
+ *                       at the right edge → no match. Correct.
+ *   - "fourth"        → same. Correct.
+ *   - "afternoon"     → "four" not at a left word-boundary. Correct.
+ *   - "twoscore"      → same as "fourteen". Correct.
+ *   - "Bartholomew"   → contains "two" as substring but not on
+ *                       boundaries. Correct.
+ *   - " four,"        → "four" is bordered by space and ",". Both are
+ *                       non-word chars → both \b's fire → match.
+ *   - "Four"          → at start of string (left \b is implicit) and
+ *                       followed by space → match. Case-insensitive.
+ *
+ * The case-insensitive flag means we look up the IPA via
+ * `match.toLowerCase()` so the lookup table only needs lowercase keys.
+ */
+export function applyPhonemeOverrides(text: string): string {
+  // Build the alternation pattern from the override keys so we don't
+  // duplicate the source-of-truth list. New entries in
+  // PHONEME_OVERRIDES become matchable automatically.
+  const keys = Object.keys(PHONEME_OVERRIDES)
+  if (keys.length === 0) return escapeSsml(text)
+  const pattern = new RegExp(`\\b(${keys.join('|')})\\b`, 'gi')
+
+  // Walk the string emitting alternating escaped-plain and
+  // phoneme-wrapped segments. We can't use replaceAll because plain
+  // segments still need XML-escaping, which the replacer-callback
+  // shape doesn't compose cleanly with (the surrounding non-match
+  // text is passed through raw).
+  const out: string[] = []
+  let lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = pattern.exec(text)) !== null) {
+    // Plain segment before this match: XML-escape.
+    if (m.index > lastIndex) {
+      out.push(escapeSsml(text.slice(lastIndex, m.index)))
+    }
+    // Matched word: keep original casing inside the tag for log
+    // readability. The IPA string is ASCII-clean (no XML
+    // metacharacters) so no escaping needed on `ph=`.
+    const original = m[0]
+    const ipa = PHONEME_OVERRIDES[original.toLowerCase()]
+    out.push(
+      `<phoneme alphabet="ipa" ph="${ipa}">${escapeSsml(original)}</phoneme>`,
+    )
+    lastIndex = m.index + original.length
+  }
+  // Tail.
+  if (lastIndex < text.length) {
+    out.push(escapeSsml(text.slice(lastIndex)))
+  }
+  return out.join('')
+}
+
 /** Render the inner-text region of the SSML body — the bit between
  *  `<prosody>` and `</prosody>`. Plain text is XML-escaped; if the
  *  utterance is a trailing interrogative (ends with `?`), the trailing
@@ -173,7 +304,12 @@ export function renderSsmlInnerText(text: string): string {
   // ends-in-? check.
   const trimmed = text.replace(/\s+$/, '')
   if (!trimmed.endsWith('?')) {
-    return escapeSsml(text)
+    // Plain text path: applyPhonemeOverrides handles escaping AND
+    // wraps target number-words ("four" / "two") in <phoneme> tags so
+    // Azure picks the long-vowel realization deterministically
+    // (ticket 86c9kj2um). For text that contains no override target,
+    // the helper degrades to a plain XML-escape.
+    return applyPhonemeOverrides(text)
   }
   // Find the last sentence-ending boundary BEFORE the trailing clause.
   // Pattern matches `. ` / `! ` / `? ` — punctuation followed by
@@ -195,12 +331,16 @@ export function renderSsmlInnerText(text: string): string {
   const QUESTION_WRAP_OPEN =
     '<break time="250ms"/><prosody pitch="+8%" rate="-5%">'
   const QUESTION_WRAP_CLOSE = '</prosody>'
+  // Both the lead clause and the trailing-question clause are run
+  // through applyPhonemeOverrides so a "four"/"two" landing in either
+  // half is voiced from IPA. The phoneme element nests cleanly inside
+  // the prosody element per the Azure SSML grammar.
   if (lastEnd === -1) {
-    return `${QUESTION_WRAP_OPEN}${escapeSsml(trimmed)}${QUESTION_WRAP_CLOSE}${trailingWs}`
+    return `${QUESTION_WRAP_OPEN}${applyPhonemeOverrides(trimmed)}${QUESTION_WRAP_CLOSE}${trailingWs}`
   }
   const lead = trimmed.slice(0, lastEnd)
   const clause = trimmed.slice(lastEnd)
-  return `${escapeSsml(lead)}${QUESTION_WRAP_OPEN}${escapeSsml(clause)}${QUESTION_WRAP_CLOSE}${trailingWs}`
+  return `${applyPhonemeOverrides(lead)}${QUESTION_WRAP_OPEN}${applyPhonemeOverrides(clause)}${QUESTION_WRAP_CLOSE}${trailingWs}`
 }
 
 /** Build the SSML body sent to Azure. All four prosody attribute fields
