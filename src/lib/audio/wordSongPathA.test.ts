@@ -82,10 +82,46 @@ describe('prepareWordSongPathA — happy path', () => {
     expect(init?.method).toBe('POST')
     const body = JSON.parse(init?.body as string) as Record<string, unknown>
     expect(body.kind).toBe('session-start')
+    // No progress fields on default STD_ARGS → no progress block on the
+    // wire (backwards-compat with the pre-M2 server contract).
     expect(body.payload).toEqual({
       track: 'word-song',
       level: 1,
       childName: 'Marian',
+    })
+  })
+
+  it('attaches a progress block when focusNode + recentSuccessRate are supplied (M2 — ticket 86c9kmwba)', async () => {
+    const plan = STATIC_WORD_SONG_PLANS[0]!
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(buildServerResponse(plan)),
+    )
+
+    await prepareWordSongPathA(
+      {
+        ...STD_ARGS,
+        focusNode: 'cvc-words',
+        recentSuccessRate: 0.5,
+      },
+      {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map()),
+        playSessionUtterance: vi.fn(async () => {}),
+      },
+    )
+
+    const [, init] = fetchMock.mock.calls[0]!
+    const body = JSON.parse(init?.body as string) as {
+      payload: Record<string, unknown>
+    }
+    expect(body.payload).toEqual({
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      progress: {
+        focusNode: 'cvc-words',
+        recentSuccessRate: 0.5,
+      },
     })
   })
 

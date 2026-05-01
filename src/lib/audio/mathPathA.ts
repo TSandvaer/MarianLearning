@@ -111,6 +111,20 @@ export interface PrepareMathPathAArgs {
   /** Stable id used to key the IndexedDB audio cache. App.tsx uses a
    *  per-app-mount id; tests can pin a string for determinism. */
   sessionId: string
+  /**
+   * M2 (ticket 86c9kmwba). Optional adaptive-engine hint computed from
+   * `loadProgress()` via `pickFocusNode(progress, 'math')`. When present,
+   * the server's planner generates problems for this skill node instead
+   * of the level-1 default. Omitted on legacy / no-progress paths — the
+   * server falls back to `add-to-10`.
+   */
+  focusNode?: string
+  /**
+   * M2 (ticket 86c9kmwba). Optional last-3 mean success rate, 0..1, or
+   * `null` for "no recent data". Computed via
+   * `pickRecentSuccessRate(progress, 'math')`.
+   */
+  recentSuccessRate?: number | null
 }
 
 export interface PreparedMathPathA {
@@ -178,12 +192,36 @@ export async function prepareMathPathA(
   // Track-based payload (ticket 86c9jteud). The server's _planner.ts
   // generates the plan via Haiku; api/claude.ts feeds the plan into the
   // same TTS pipeline the legacy plan-attached path uses.
+  //
+  // M2 (ticket 86c9kmwba): optionally include `progress.focusNode` and
+  // `progress.recentSuccessRate`. The server's planner uses focusNode
+  // to pick the curriculum slice (e.g. add-to-10 vs add-to-20) and
+  // includes recentSuccessRate as a soft hint to tune easier/harder
+  // mix. Both are computed by App.tsx from `loadProgress()` before
+  // calling this function — keeping the storage read out of this
+  // module preserves the unit-test seam (tests inject the values
+  // directly without needing to set up localStorage).
+  const progressBlock =
+    args.focusNode !== undefined || args.recentSuccessRate !== undefined
+      ? {
+          progress: {
+            ...(args.focusNode !== undefined
+              ? { focusNode: args.focusNode }
+              : {}),
+            ...(args.recentSuccessRate !== undefined
+              ? { recentSuccessRate: args.recentSuccessRate }
+              : {}),
+          },
+        }
+      : {}
+
   const body: ClaudeRequest = {
     kind: 'session-start',
     payload: {
       track: 'math',
       level: args.level,
       childName: args.childName,
+      ...progressBlock,
     },
   }
 

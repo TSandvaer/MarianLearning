@@ -40,6 +40,12 @@ import { disableHowlerAutoSuspend, playSessionUtterance } from './lib/audio'
 import type { PlaySessionUtteranceOptions } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
 import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
+import {
+  loadProgress,
+  pickFocusNode,
+  pickRecentSuccessRate,
+  type ProgressTrack,
+} from './lib/progress'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
 
@@ -126,6 +132,38 @@ function nextAfterSplash(): Route {
     return history.sessionCount === 0 ? 'greet' : 'hub'
   } catch {
     return 'greet'
+  }
+}
+
+/**
+ * M2 (ticket 86c9kmwba). Read the persisted `Progress` document and
+ * project the focus-node hints for `track` that the /api/claude payload
+ * carries.
+ *
+ * Returns `{ focusNode: undefined, recentSuccessRate: undefined }` when
+ * storage has no document yet (first run / private mode) — the server
+ * falls back to the level-1 default focus node for `track`. Don't
+ * synthesise a placeholder value here; that would mask the "first run"
+ * path in the planner.
+ *
+ * Pure module-scope function — no React, no closure deps. The App fetch
+ * effect calls this once per session-start (the ticket's contract is
+ * "browser reads `loadProgress()` before each session-start fetch"); the
+ * cost is one localStorage read per effect run, which is negligible. We
+ * deliberately don't memoize across fetches: a save in another tab
+ * would otherwise serve stale hints.
+ */
+function readProgressHintsForTrack(track: ProgressTrack): {
+  focusNode: string | undefined
+  recentSuccessRate: number | null | undefined
+} {
+  const progress = loadProgress()
+  if (progress === null) {
+    return { focusNode: undefined, recentSuccessRate: undefined }
+  }
+  return {
+    focusNode: pickFocusNode(progress, track),
+    recentSuccessRate: pickRecentSuccessRate(progress, track),
   }
 }
 
@@ -469,9 +507,22 @@ export default function App() {
     // compatible to level 9 and the per-child name comes from the
     // progress profile in a future ticket. The sessionId pins the
     // IndexedDB audio cache for this session run.
+    //
+    // M2 (ticket 86c9kmwba): also read `loadProgress()` and ship the
+    // focus-node hint + recent success rate for the math track. Server
+    // uses these to target the right curriculum slice; on a first-run
+    // / no-storage path, both stay undefined and the server uses its
+    // own default (add-to-10).
     const sessionId = `math-${mathFallbackPlan.id}-${Date.now()}`
+    const mathHints = readProgressHintsForTrack('math')
     void prepareMathPathA(
-      { level: 1, childName: 'Marian', sessionId },
+      {
+        level: 1,
+        childName: 'Marian',
+        sessionId,
+        focusNode: mathHints.focusNode,
+        recentSuccessRate: mathHints.recentSuccessRate,
+      },
       { signal: controller.signal },
     )
       .then((prepared) => {
@@ -654,9 +705,19 @@ export default function App() {
 
     const controller = new AbortController()
 
+    // M2 (ticket 86c9kmwba): focus-node hint for the word-song track.
+    // Same shape as the math fetch effect above — see that block for
+    // the rationale.
     const sessionId = `word-song-${wordSongFallbackPlan.id}-${Date.now()}`
+    const wordSongHints = readProgressHintsForTrack('word-song')
     void prepareWordSongPathA(
-      { level: 1, childName: 'Marian', sessionId },
+      {
+        level: 1,
+        childName: 'Marian',
+        sessionId,
+        focusNode: wordSongHints.focusNode,
+        recentSuccessRate: wordSongHints.recentSuccessRate,
+      },
       { signal: controller.signal },
     )
       .then((prepared) => {
