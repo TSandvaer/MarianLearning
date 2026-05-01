@@ -1,21 +1,22 @@
 /**
  * Word Song screen — Path A live audio wiring.
  *
- * Sibling of `mathPathA.ts`. Bridges `/api/claude` (kind=`session-start`)
- * → `sessionAudio.ts` → `WordSong.tsx`'s `playUtterance` prop. Keeps
- * App.tsx thin and gives this logic a unit-test seam.
+ * Sibling of `mathPathA.ts`. Bridges `/api/claude` (kind=`session-start`,
+ * track-based payload) → `sessionAudio.ts` → `WordSong.tsx`'s
+ * `playUtterance` prop. Keeps App.tsx thin and gives this logic a
+ * unit-test seam.
  *
  * Same shape, different content
  * -----------------------------
- * The flow is a near-clone of `prepareMathPathA`: flatten the plan to
- * the wire shape, POST to `/api/claude`, register Howls keyed by
- * utterance id, return a text-keyed `playUtterance`. The duplication
- * (~50 lines vs Math's mathPathA.ts) is intentional — the modules don't
- * share state, the contract is per-screen, and a shared abstraction
- * here would have to thread a generic plan/wire-shape through every
- * call site. The screens don't share an audio bundle session-side
- * either (Math + Word Song each fetch their own), so the duplication
- * matches the actual independence.
+ * The flow is a near-clone of `prepareMathPathA`: send track-based
+ * payload, parse the server's plan via `wordSongSessionPlanFromServer`,
+ * register Howls keyed by utterance id, return a text-keyed
+ * `playUtterance`. The duplication (~50 lines vs Math's mathPathA.ts) is
+ * intentional — the modules don't share state, the contract is
+ * per-screen, and a shared abstraction here would have to thread a
+ * generic plan/wire-shape through every call site. The screens don't
+ * share an audio bundle session-side either (Math + Word Song each
+ * fetch their own), so the duplication matches the actual independence.
  *
  * If a future screen (Session-end? Greet? a 4th literacy surface?) wants
  * the same shape, that's the moment to refactor to a generic
@@ -41,7 +42,8 @@ import type {
   PlayWordSongUtteranceOptions,
 } from '../../screens/WordSong'
 import {
-  wordSongSessionPlanToUtteranceSources,
+  WordSongPlanFromServerError,
+  wordSongSessionPlanFromServer,
   type WordSongSessionPlan,
 } from '../../screens/WordSong'
 import {
@@ -73,7 +75,20 @@ export interface PrepareWordSongPathAOptions {
   signal?: AbortSignal
 }
 
+export interface PrepareWordSongPathAArgs {
+  /** Curriculum level (1..9). Currently only level 1 is implemented. */
+  level: number
+  /** Child's display name — used by Haiku for the friendly opening line. */
+  childName: string
+  /** Stable id used to key the IndexedDB audio cache. */
+  sessionId: string
+}
+
 export interface PreparedWordSongPathA {
+  /** The session plan rehydrated from the server's response. App.tsx
+   *  passes this to `<WordSong plan={...} />` so the picture chips match
+   *  the spoken target. */
+  plan: WordSongSessionPlan
   /** Stable function ref — pass to `<WordSong playUtterance>`. */
   playUtterance: PlayWordSongUtteranceFn
   /** Map of utterance texts to their resolved howl ids. */
@@ -84,9 +99,18 @@ export interface PreparedWordSongPathA {
   unload: () => void
 }
 
+/**
+ * One-line distinct error code surface. The `rate-limited` and
+ * `planner-failed` codes were added with the track-based switchover
+ * (ticket 86c9jteud, subsumed 86c9jrwqd) — they were already on the wire
+ * from PR #105 but the browser previously couldn't trigger them because
+ * it was sending plan-attached payloads.
+ */
 export type PrepareWordSongPathAErrorCode =
   | 'config-missing'
   | 'tts-failed'
+  | 'rate-limited'
+  | 'planner-failed'
   | 'invalid-response'
   | 'network-error'
   | 'aborted'
@@ -101,16 +125,15 @@ export class PrepareWordSongPathAError extends Error {
 }
 
 /**
- * Fetch the session audio for a Word Song plan, register howls, and
- * return a text-keyed `playUtterance` ready to drop onto `<WordSong>`.
+ * Fetch the session audio for a Word Song session, register howls, and
+ * return a `{ plan, playUtterance, ... }` ready to drop onto `<WordSong>`.
  *
  * Throws `PrepareWordSongPathAError` on any failure path. App.tsx catches
- * and falls back to the silent default by omitting the `playUtterance`
- * prop — same fallback contract as Math.
+ * and falls back to a static plan + silent default by omitting the
+ * `playUtterance` prop — same fallback contract as Math.
  */
 export async function prepareWordSongPathA(
-  plan: WordSongSessionPlan,
-  sessionId: string,
+  args: PrepareWordSongPathAArgs,
   opts: PrepareWordSongPathAOptions = {},
 ): Promise<PreparedWordSongPathA> {
   const fetchImpl = opts.fetch ?? globalThis.fetch
@@ -118,16 +141,12 @@ export async function prepareWordSongPathA(
   const playSession = opts.playSessionUtterance ?? defaultPlaySessionUtterance
   const unloadAudio = opts.unloadSessionAudio ?? defaultUnloadSessionAudio
 
-  const wireUtterances = wordSongSessionPlanToUtteranceSources(plan)
-
   const body: ClaudeRequest = {
     kind: 'session-start',
     payload: {
-      plan: {
-        id: plan.id,
-        label: plan.label,
-        utterances: wireUtterances,
-      },
+      track: 'word-song',
+      level: args.level,
+      childName: args.childName,
     },
   }
 
@@ -177,6 +196,18 @@ export async function prepareWordSongPathA(
         'Server TTS pipeline failed',
       )
     }
+    if (errCode === 'rate-limited') {
+      throw new PrepareWordSongPathAError(
+        'rate-limited',
+        'Server rate-limited the session-start request',
+      )
+    }
+    if (errCode === 'planner-failed') {
+      throw new PrepareWordSongPathAError(
+        'planner-failed',
+        'Server-side Haiku planner failed to produce a valid plan',
+      )
+    }
     throw new PrepareWordSongPathAError(
       'invalid-response',
       `Path A returned ${response.status}`,
@@ -191,7 +222,24 @@ export async function prepareWordSongPathA(
   }
 
   const sessionResponse: SessionStartResponse = parsed
-  await loadAudio(sessionId, sessionResponse.utterances)
+
+  // Rehydrate the nested WordSongSessionPlan. See mathPathA.ts for the
+  // rationale on routing this failure to 'invalid-response' (not
+  // 'planner-failed').
+  let plan: WordSongSessionPlan
+  try {
+    plan = wordSongSessionPlanFromServer(sessionResponse.plan)
+  } catch (err) {
+    if (err instanceof WordSongPlanFromServerError) {
+      throw new PrepareWordSongPathAError(
+        'invalid-response',
+        `Path A plan rehydration failed: ${err.message}`,
+      )
+    }
+    throw err
+  }
+
+  await loadAudio(args.sessionId, sessionResponse.utterances)
 
   const textToId = new Map<string, string>()
   for (const u of sessionResponse.utterances) {
@@ -224,6 +272,7 @@ export async function prepareWordSongPathA(
   ).__playerKind = 'real'
 
   return {
+    plan,
     playUtterance,
     textToId,
     utteranceCount: sessionResponse.utterances.length,

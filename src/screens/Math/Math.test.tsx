@@ -1823,4 +1823,142 @@ describe('Math (Number Garden) screen', () => {
       expect(onRequestExit).toHaveBeenCalledTimes(1)
     })
   })
+
+  // ── Plan re-derivation on prop flip (ticket 86c9jteud) ─────────────────
+
+  describe('plan re-derivation on `plan` prop flip', () => {
+    /**
+     * Regression for ticket 86c9jteud. App.tsx mounts Math with the static
+     * fallback plan, kicks `prepareMathPathA()`, and once that resolves
+     * swaps the `plan` prop to the server-derived plan. The screen must
+     * pick up the new plan reference; otherwise `playUtterance(text)`
+     * lookups miss the server-rendered audio (textToId is keyed on Haiku
+     * text), giving silent (caption-only) sessions.
+     *
+     * The bug shape: `useMemo<MathSessionPlan>(() => planProp ?? ..., [])`
+     * captures the prop value at mount and ignores subsequent changes.
+     * Fix: include `planProp` in the deps array.
+     *
+     * This test FAILS on the buggy `[]` deps (problem 1 stays at 3 + 2
+     * after the prop flip) and PASSES on the `[planProp]` fix (problem 1
+     * becomes 7 + 2 after the flip).
+     */
+    function secondPlan(): MathSessionPlan {
+      return {
+        id: 'server-plan',
+        label: 'Server plan',
+        problems: [
+          {
+            index: 1,
+            addendA: 7,
+            addendB: 2,
+            correct: 9,
+            utterances: {
+              read: 'Seven plus two. How many?',
+              correct: 'Yes! Nine!',
+              reprompt: 'Hmm... try again?',
+              hint: 'Look. Seven. And two more. How many now?',
+              giveAnswer: 'This one is nine.',
+            },
+          },
+          // Reuse the rest of fixedPlan()'s problems verbatim so the
+          // assertion stays focused on problem-1's addends — the only
+          // observable diff that proves the screen adopted the new plan.
+          ...fixedPlan().problems.slice(1),
+        ],
+      }
+    }
+
+    it('re-derives the displayed plan when `plan` flips from fallback to server-derived without remount', () => {
+      const harness = makePlayHarness()
+      const { rerender } = render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Pre-flip — the static fallback's problem 1 is 3 + 2.
+      const symbolic = screen.getByTestId('math-symbolic')
+      expect(within(symbolic).getByTestId('math-addend-a')).toHaveTextContent(
+        '3',
+      )
+      expect(within(symbolic).getByTestId('math-addend-b')).toHaveTextContent(
+        '2',
+      )
+
+      // Flip the prop in place — same component instance, no key change,
+      // no remount. Mirrors what App.tsx does when `prepareMathPathA()`
+      // settles after Math has already mounted.
+      rerender(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={secondPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Post-flip — server plan's problem 1 is 7 + 2. If the screen
+      // ignored the prop change (the buggy `useMemo([], [])` shape), it
+      // would still show 3 + 2.
+      const symbolicAfter = screen.getByTestId('math-symbolic')
+      expect(
+        within(symbolicAfter).getByTestId('math-addend-a'),
+      ).toHaveTextContent('7')
+      expect(
+        within(symbolicAfter).getByTestId('math-addend-b'),
+      ).toHaveTextContent('2')
+    })
+
+    it('keeps `plan` referentially stable across re-renders with the same prop reference', () => {
+      // Sibling invariant: when `planProp` doesn't change, the memoized
+      // `plan` value MUST stay referentially stable. Several downstream
+      // `useMemo`/effect deps key on `plan`; thrashing the identity on
+      // every render would re-roll chip order + re-fire effects. We
+      // verify this indirectly: render twice with the SAME plan object
+      // and confirm the chip values are unchanged (chip order is derived
+      // via `useMemo([plan, problemIndex])` — a stable `plan` keeps the
+      // same chip values).
+      const planRef = fixedPlan()
+      const harness = makePlayHarness()
+      const { rerender } = render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={planRef}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const before = screen
+        .getAllByTestId('math-chip')
+        .map((c) => c.getAttribute('data-value'))
+
+      rerender(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={planRef}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const after = screen
+        .getAllByTestId('math-chip')
+        .map((c) => c.getAttribute('data-value'))
+
+      expect(after).toEqual(before)
+    })
+  })
 })

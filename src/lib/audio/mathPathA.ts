@@ -1,23 +1,39 @@
 /**
  * Math screen — Path A live audio wiring.
  *
- * Bridges `/api/claude` (kind=`session-start`) → `sessionAudio.ts` →
- * `Math.tsx`'s `playUtterance` prop. Keeps App.tsx thin and gives this
- * logic a unit-test seam.
+ * Bridges `/api/claude` (kind=`session-start`, track-based payload) →
+ * `sessionAudio.ts` → `Math.tsx`'s `playUtterance` prop. Keeps App.tsx
+ * thin and gives this logic a unit-test seam.
  *
- * Flow
- * ----
- * 1. App.tsx picks the static `MathSessionPlan` for the current session.
- * 2. {@link prepareMathPathA} flattens it via
- *    `mathSessionPlanToUtteranceSources`, POSTs the wire shape to
- *    `/api/claude`, and on success calls `loadSessionAudio` to register
- *    Howls keyed by utterance id.
- * 3. The returned `playUtterance` is TEXT-keyed (matches Math.tsx's
- *    existing contract — see `Math.tsx:PlayMathUtteranceFn`). It looks up
- *    the Howl by text and delegates to `playSessionUtterance(id, opts)`.
- * 4. On failure, App.tsx omits the `playUtterance` prop on Math, which
- *    falls back to its silent-but-captioned default (165 wpm caption tick,
- *    no audio). No error chime, no retry nag — Marian sees text.
+ * Flow (post-86c9jteud, track-based)
+ * ----------------------------------
+ * 1. App.tsx calls {@link prepareMathPathA} with the curriculum level,
+ *    Marian's name, and a stable session id.
+ * 2. We POST `{ kind: 'session-start', payload: { track: 'math', level,
+ *    childName } }` to `/api/claude`. The server (api/claude.ts) routes
+ *    the request to the Haiku planner (api/_planner.ts), generates an
+ *    8-problem plan, renders TTS for every utterance, and returns
+ *    `SessionStartResponse` carrying the rebuilt plan + inline base64
+ *    MP3s.
+ * 3. We rebuild a `MathSessionPlan` from the server's flat plan via
+ *    {@link mathSessionPlanFromServer} (parses addends out of the `read`
+ *    text), register Howls keyed by utterance id, and return the
+ *    rehydrated plan + a text-keyed `playUtterance` ready to drop onto
+ *    `<Math>`.
+ * 4. On any failure path (network, abort, malformed response, planner-
+ *    failed, rate-limited, tts-failed, config-missing), the wiring
+ *    throws `PrepareMathPathAError`. App.tsx catches and falls back to
+ *    a static plan + the silent-but-captioned default `playUtterance`
+ *    — Marian sees text. No error chime, no retry nag.
+ *
+ * Why we no longer pre-pick a local plan
+ * --------------------------------------
+ * Before 86c9jteud the browser sent its locally-built `MathSessionPlan`
+ * to the server, which only rendered TTS for its utterance texts. The
+ * server is now the source of truth for problem selection — Haiku
+ * picks the addends — so we ship `{track, level, childName}` and parse
+ * the returned plan back into our nested shape. This is the actual
+ * "Claude is the brain" contract from CLAUDE.md.
  *
  * Text-keyed lookup, duplicate-text howls
  * ---------------------------------------
@@ -51,7 +67,8 @@ import type {
   PlayMathUtteranceOptions,
 } from '../../screens/Math'
 import {
-  mathSessionPlanToUtteranceSources,
+  MathPlanFromServerError,
+  mathSessionPlanFromServer,
   type MathSessionPlan,
 } from '../../screens/Math'
 import {
@@ -85,7 +102,22 @@ export interface PrepareMathPathAOptions {
   signal?: AbortSignal
 }
 
+export interface PrepareMathPathAArgs {
+  /** Curriculum level (1..9). Currently only level 1 is implemented; the
+   *  field is forward-compatible per the planner contract. */
+  level: number
+  /** Child's display name — used by Haiku for the friendly opening line. */
+  childName: string
+  /** Stable id used to key the IndexedDB audio cache. App.tsx uses a
+   *  per-app-mount id; tests can pin a string for determinism. */
+  sessionId: string
+}
+
 export interface PreparedMathPathA {
+  /** The session plan rehydrated from the server's response. App.tsx
+   *  passes this to `<Math plan={...} />` so the addends/visuals match
+   *  the audio Marian hears. */
+  plan: MathSessionPlan
   /** Stable function ref — pass to `<Math playUtterance>`. */
   playUtterance: PlayMathUtteranceFn
   /** Map of all utterance texts to their resolved howl ids — useful for
@@ -101,10 +133,18 @@ export interface PreparedMathPathA {
  * One-line distinct error code surface so callers can branch (and so the
  * QA log can attribute fallbacks to a cause). All paths land us in the
  * silent-default fallback today; the codes are diagnostic, not control-flow.
+ *
+ * The `rate-limited` and `planner-failed` codes were added with the
+ * track-based switchover (ticket 86c9jteud, subsumed 86c9jrwqd). They
+ * were already on the wire from PR #105 but the browser previously
+ * couldn't trigger them because it was sending plan-attached payloads
+ * (which bypass both the rate limiter and the planner).
  */
 export type PrepareMathPathAErrorCode =
   | 'config-missing'
   | 'tts-failed'
+  | 'rate-limited'
+  | 'planner-failed'
   | 'invalid-response'
   | 'network-error'
   | 'aborted'
@@ -119,20 +159,15 @@ export class PrepareMathPathAError extends Error {
 }
 
 /**
- * Fetch the session audio for a Math plan, register howls, and return a
- * text-keyed `playUtterance` ready to drop onto `<Math>`.
+ * Fetch the session audio for a Math session, register howls, and return
+ * a `{ plan, playUtterance, ... }` ready to drop onto `<Math>`.
  *
  * Throws `PrepareMathPathAError` on any failure path. App.tsx catches and
- * falls back to the silent default by omitting the `playUtterance` prop.
- *
- * @param plan        The MathSessionPlan App.tsx is about to render with.
- * @param sessionId   A stable id used to key the IndexedDB cache. Reusing
- *                    the plan id is fine — every plan id is unique within
- *                    the rotation, and the cache is per-session anyway.
+ * falls back to a static plan + silent default by omitting the
+ * `playUtterance` prop.
  */
 export async function prepareMathPathA(
-  plan: MathSessionPlan,
-  sessionId: string,
+  args: PrepareMathPathAArgs,
   opts: PrepareMathPathAOptions = {},
 ): Promise<PreparedMathPathA> {
   const fetchImpl = opts.fetch ?? globalThis.fetch
@@ -140,19 +175,15 @@ export async function prepareMathPathA(
   const playSession = opts.playSessionUtterance ?? defaultPlaySessionUtterance
   const unloadAudio = opts.unloadSessionAudio ?? defaultUnloadSessionAudio
 
-  const wireUtterances = mathSessionPlanToUtteranceSources(plan)
-
-  // Build the wire-shape request body per `api/_types.ts:ClaudeRequest`
-  // and `api/_session.ts:extractUtteranceTexts` — the server walks
-  // `payload.plan.utterances` for the TTS fan-out.
+  // Track-based payload (ticket 86c9jteud). The server's _planner.ts
+  // generates the plan via Haiku; api/claude.ts feeds the plan into the
+  // same TTS pipeline the legacy plan-attached path uses.
   const body: ClaudeRequest = {
     kind: 'session-start',
     payload: {
-      plan: {
-        id: plan.id,
-        label: plan.label,
-        utterances: wireUtterances,
-      },
+      track: 'math',
+      level: args.level,
+      childName: args.childName,
     },
   }
 
@@ -204,6 +235,18 @@ export async function prepareMathPathA(
         'Server TTS pipeline failed',
       )
     }
+    if (errCode === 'rate-limited') {
+      throw new PrepareMathPathAError(
+        'rate-limited',
+        'Server rate-limited the session-start request',
+      )
+    }
+    if (errCode === 'planner-failed') {
+      throw new PrepareMathPathAError(
+        'planner-failed',
+        'Server-side Haiku planner failed to produce a valid plan',
+      )
+    }
     throw new PrepareMathPathAError(
       'invalid-response',
       `Path A returned ${response.status}`,
@@ -218,8 +261,29 @@ export async function prepareMathPathA(
   }
 
   const sessionResponse: SessionStartResponse = parsed
+
+  // Rehydrate the nested MathSessionPlan from the server's flat plan blob.
+  // If the model drifted off the prompt template (read line, slot ids, problem
+  // count), this throws — and we surface as 'invalid-response' so the
+  // caller's silent-fallback path fires cleanly. The structural failure is
+  // not "the planner errored on the server" (that would be 502
+  // planner-failed); it's "the server returned a plan that we can't
+  // make sense of locally", which is closer to malformed wire data.
+  let plan: MathSessionPlan
+  try {
+    plan = mathSessionPlanFromServer(sessionResponse.plan)
+  } catch (err) {
+    if (err instanceof MathPlanFromServerError) {
+      throw new PrepareMathPathAError(
+        'invalid-response',
+        `Path A plan rehydration failed: ${err.message}`,
+      )
+    }
+    throw err
+  }
+
   // Register howls keyed by utterance id.
-  await loadAudio(sessionId, sessionResponse.utterances)
+  await loadAudio(args.sessionId, sessionResponse.utterances)
 
   // Build a text → first-matching-id lookup. See file header for the
   // duplicate-text discussion.
@@ -258,6 +322,7 @@ export async function prepareMathPathA(
   ).__playerKind = 'real'
 
   return {
+    plan,
     playUtterance,
     textToId,
     utteranceCount: sessionResponse.utterances.length,

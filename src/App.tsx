@@ -312,12 +312,20 @@ export default function App() {
 
   // ── Math screen — Path A live audio wiring (ticket 86c9gumgk item F) ──
   //
-  // Pick the math plan ONCE per app session — shared between the fetch
-  // below and the <Math> prop, so the screen's `useMemo([])` plan capture
-  // matches the plan we asked the server to render. Picked even when the
-  // user never reaches Math; the cost is a single deterministic function
-  // call against `Date.now()`.
-  const mathPlan = useMemo<MathSessionPlan>(() => pickStaticSessionPlan(), [])
+  // Track-based switchover (ticket 86c9jteud): the server is now the
+  // source of truth for the plan. We send `{track, level, childName}` and
+  // the response carries Haiku-generated problems + pre-rendered audio.
+  // The rehydrated plan flows back via `prepareMathPathA(...).plan` and
+  // is stored in `mathPlan` state below. Until the fetch resolves (or if
+  // it fails), `<MathScreen plan>` falls back to a deterministic static
+  // plan — Marian sees a working Math screen with on-curriculum problems
+  // and the silent-but-captioned default `playUtterance`. Audio-only
+  // degradation, no UX brick.
+  const mathFallbackPlan = useMemo<MathSessionPlan>(
+    () => pickStaticSessionPlan(),
+    [],
+  )
+  const [mathPlan, setMathPlan] = useState<MathSessionPlan | null>(null)
 
   // The live `playUtterance` becomes non-null once the /api/claude fetch
   // resolves and the audio is loaded. Until then (or on any failure),
@@ -411,7 +419,16 @@ export default function App() {
 
     const controller = new AbortController()
 
-    void prepareMathPathA(mathPlan, mathPlan.id, { signal: controller.signal })
+    // Track-based payload (ticket 86c9jteud). Level 1 + name "Marian"
+    // is the only level we ship today; the planner contract is forward-
+    // compatible to level 9 and the per-child name comes from the
+    // progress profile in a future ticket. The sessionId pins the
+    // IndexedDB audio cache for this session run.
+    const sessionId = `math-${mathFallbackPlan.id}-${Date.now()}`
+    void prepareMathPathA(
+      { level: 1, childName: 'Marian', sessionId },
+      { signal: controller.signal },
+    )
       .then((prepared) => {
         if (controller.signal.aborted) {
           // Leave-effect (or unmount-effect) aborted us mid-flight. Drop
@@ -426,6 +443,11 @@ export default function App() {
         // export shows when the pre-warm finished. Fires BEFORE the
         // setStates so the timestamp pairs with the prop flip cleanly.
         recordPathASettleEvent('math', 'resolve')
+        // Server-derived plan now drives the screen visuals — addends,
+        // distractor seeds, and per-problem text all come from this
+        // plan. See `prepareMathPathA` for the rehydration via
+        // `mathSessionPlanFromServer`.
+        setMathPlan(prepared.plan)
         // Wrap in a thunk so React doesn't call the function before storing
         // it (useState treats function arg as a lazy initializer).
         setMathPlay(() => prepared.playUtterance)
@@ -478,11 +500,11 @@ export default function App() {
     // is silent about that). Net: leaving the abort path solely with
     // the leave-effect is safe and avoids the StrictMode foot-gun.
     mathAbortRef.current = controller
-    // mathPlan is captured ONCE per app session by useMemo, so it's
-    // effectively stable — listing it satisfies eslint without changing
-    // semantics. Route is in deps so the effect is allowed to fire on the
-    // first transition into greet/math even if App mounted on splash.
-  }, [route, mathPlan])
+    // `mathFallbackPlan` is `useMemo([])`-stable — listing it satisfies
+    // eslint without changing semantics. Route is in deps so the effect
+    // is allowed to fire on the first transition into greet/math even if
+    // App mounted on splash.
+  }, [route, mathFallbackPlan])
 
   /**
    * Tear-down on session-end / cold-restart. Runs only when route leaves
@@ -498,7 +520,10 @@ export default function App() {
   useEffect(() => {
     if (route === 'math' || route === 'greet') return
     const hadAudio =
-      mathUnloadRef.current !== null || mathPlay !== null || mathAudioReady
+      mathUnloadRef.current !== null ||
+      mathPlay !== null ||
+      mathAudioReady ||
+      mathPlan !== null
     if (!hadAudio) return
     if (mathUnloadRef.current) {
       mathUnloadRef.current()
@@ -514,21 +539,31 @@ export default function App() {
       if (cancelled) return
       setMathPlay(null)
       setMathAudioReady(false)
+      // Clear the server-derived plan so a re-entry into greet/math
+      // re-fetches and rebinds. The fallback plan persists (it's
+      // useMemo([])-stable) so the screen still renders during the
+      // re-fetch window.
+      setMathPlan(null)
     })
     return () => {
       cancelled = true
     }
-  }, [route, mathPlay, mathAudioReady])
+  }, [route, mathPlay, mathAudioReady, mathPlan])
 
   // ── Word Song screen — Path A live audio wiring ──
   //
-  // Mirrors Math's wiring above. Picked once per app session; the fetch
-  // fires lazily when the user actually navigates to the literacy
-  // surface. On any failure, <WordSong> renders without the prop and
-  // falls back to its silent-but-captioned default. No nag copy.
-  const wordSongPlan = useMemo<WordSongSessionPlan>(
+  // Mirrors Math's wiring above (track-based switchover, ticket
+  // 86c9jteud): the server picks the 8 target words via Haiku and
+  // returns inline-rendered TTS audio. The rehydrated plan flows back
+  // via `prepareWordSongPathA(...).plan` and is stored in `wordSongPlan`
+  // state. Falls back to a static plan during the fetch window (and on
+  // failure) so the screen always has something to render.
+  const wordSongFallbackPlan = useMemo<WordSongSessionPlan>(
     () => pickStaticWordSongPlan(),
     [],
+  )
+  const [wordSongPlan, setWordSongPlan] = useState<WordSongSessionPlan | null>(
+    null,
   )
   const [wordSongPlay, setWordSongPlay] =
     useState<PlayWordSongUtteranceFn | null>(null)
@@ -559,9 +594,11 @@ export default function App() {
 
     const controller = new AbortController()
 
-    void prepareWordSongPathA(wordSongPlan, wordSongPlan.id, {
-      signal: controller.signal,
-    })
+    const sessionId = `word-song-${wordSongFallbackPlan.id}-${Date.now()}`
+    void prepareWordSongPathA(
+      { level: 1, childName: 'Marian', sessionId },
+      { signal: controller.signal },
+    )
       .then((prepared) => {
         if (controller.signal.aborted) {
           prepared.unload()
@@ -571,6 +608,9 @@ export default function App() {
         // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). See
         // the Math fetch-effect for the rationale.
         recordPathASettleEvent('wordSong', 'resolve')
+        // Server-derived plan drives the picture chips and target words;
+        // see Math's parallel `setMathPlan` call for the rationale.
+        setWordSongPlan(prepared.plan)
         setWordSongPlay(() => prepared.playUtterance)
         setWordSongAudioReady(true)
       })
@@ -595,7 +635,7 @@ export default function App() {
     // No cleanup — see the Math fetch-effect for the why (route changes
     // must NOT abort, and adding a `[]`-deps unmount cleanup re-creates
     // the StrictMode-double-mount bug shape).
-  }, [route, wordSongPlan])
+  }, [route, wordSongFallbackPlan])
 
   /**
    * Tear-down effect for Word Song. Same shape as Math's tear-down above.
@@ -607,7 +647,8 @@ export default function App() {
     const hadAudio =
       wordSongUnloadRef.current !== null ||
       wordSongPlay !== null ||
-      wordSongAudioReady
+      wordSongAudioReady ||
+      wordSongPlan !== null
     if (!hadAudio) return
     if (wordSongUnloadRef.current) {
       wordSongUnloadRef.current()
@@ -623,11 +664,12 @@ export default function App() {
       if (cancelled) return
       setWordSongPlay(null)
       setWordSongAudioReady(false)
+      setWordSongPlan(null)
     })
     return () => {
       cancelled = true
     }
-  }, [route, wordSongPlay, wordSongAudioReady])
+  }, [route, wordSongPlay, wordSongAudioReady, wordSongPlan])
 
   return (
     <LazyMotion features={domAnimation} strict>
@@ -650,7 +692,7 @@ export default function App() {
           {route === 'math' && (
             <MathScreen
               key="math"
-              plan={mathPlan}
+              plan={mathPlan ?? mathFallbackPlan}
               playUtterance={mathPlay ?? undefined}
               audioReady={mathAudioReady}
               onSessionComplete={handleMathComplete}
@@ -660,7 +702,7 @@ export default function App() {
           {route === 'literacy' && (
             <WordSong
               key="literacy"
-              plan={wordSongPlan}
+              plan={wordSongPlan ?? wordSongFallbackPlan}
               playUtterance={wordSongPlay ?? undefined}
               audioReady={wordSongAudioReady}
               onSessionComplete={handleWordSongComplete}

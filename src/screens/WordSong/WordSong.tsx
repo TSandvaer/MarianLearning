@@ -303,11 +303,20 @@ function WordSongScreen({
   // Ticket 86c9hf4ef — see Math.tsx for the cold-mount fast-path rationale.
   const getHowlerRunningFn = getHowlerRunning ?? readHowlerContextRunning
 
-  // Plan captured ONCE per mount.
+  // Plan re-derives whenever `planProp` flips — see Math.tsx for the full
+  // rationale (ticket 86c9jteud). Short version: App.tsx swaps `planProp`
+  // from the static fallback to the server-derived plan once
+  // `prepareWordSongPathA()` resolves; if we captured `plan` once at mount
+  // the screen would stick on the fallback and `playUtterance(text)`
+  // lookups would miss the server-rendered audio. The parent's
+  // `key="literacy"` ensures a fresh mount on track-change so cross-screen
+  // plan leaks aren't possible. `now` is excluded from deps because the
+  // static fallback is deterministic per-minute and `now` is unused once
+  // `planProp` is non-null.
   const plan = useMemo<WordSongSessionPlan>(
     () => planProp ?? pickStaticWordSongPlan(now),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
+    [planProp],
   )
 
   // Lazy SFX. Same defensive 404 pattern as Math/Greet.

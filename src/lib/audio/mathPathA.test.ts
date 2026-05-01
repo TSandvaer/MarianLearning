@@ -12,7 +12,12 @@ import {
 } from '../../screens/Math'
 import type { SessionStartResponse, Utterance } from '../../../api/_types'
 
-/** Build a successful SessionStartResponse for the given plan. */
+/** Build a successful SessionStartResponse from one of the static plans —
+ *  same id/label, same utterances, same audio data. The track-based
+ *  switchover (ticket 86c9jteud) means the browser asks for {track, level,
+ *  childName} and the server returns whatever plan it generates; for
+ *  tests we feed the static plan back through the wire so the round-trip
+ *  rehydration via `mathSessionPlanFromServer` produces a known plan. */
 function buildServerResponse(plan: MathSessionPlan): SessionStartResponse {
   const sources = mathSessionPlanToUtteranceSources(plan)
   const utterances: Utterance[] = sources.map((s, i) => ({
@@ -60,14 +65,16 @@ function makeFetchMock(impl: () => Promise<Response>): FetchSpy {
   >(async () => impl())
 }
 
+const STD_ARGS = { level: 1, childName: 'Marian', sessionId: 'test-session-1' }
+
 describe('prepareMathPathA — happy path', () => {
-  it('POSTs the wire-shape plan to /api/claude with kind=session-start', async () => {
+  it('POSTs the track-based payload to /api/claude with kind=session-start', async () => {
     const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = makeFetchMock(async () =>
       jsonResp(buildServerResponse(plan)),
     )
 
-    await prepareMathPathA(plan, plan.id, {
+    await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: vi.fn(async () => {}),
@@ -79,18 +86,34 @@ describe('prepareMathPathA — happy path', () => {
     expect(init?.method).toBe('POST')
     const body = JSON.parse(init?.body as string) as Record<string, unknown>
     expect(body.kind).toBe('session-start')
-    const payload = body.payload as Record<string, unknown>
-    const wirePlan = payload.plan as {
-      id: string
-      utterances: { id: string; text: string }[]
-    }
-    expect(wirePlan.id).toBe(plan.id)
-    // 8 problems × 5 slots.
-    expect(wirePlan.utterances).toHaveLength(40)
-    expect(wirePlan.utterances[0]).toEqual({
-      id: 'math.p1.read',
-      text: plan.problems[0]!.utterances.read,
+    expect(body.payload).toEqual({
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
     })
+  })
+
+  it('returns the rehydrated MathSessionPlan from the server response', async () => {
+    const sourcePlan = STATIC_SESSION_PLANS[1]!
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(buildServerResponse(sourcePlan)),
+    )
+
+    const prepared = await prepareMathPathA(STD_ARGS, {
+      fetch: fetchMock as unknown as typeof globalThis.fetch,
+      loadSessionAudio: vi.fn(async () => new Map()),
+      playSessionUtterance: vi.fn(async () => {}),
+    })
+
+    expect(prepared.plan.id).toBe(sourcePlan.id)
+    expect(prepared.plan.label).toBe(sourcePlan.label)
+    expect(prepared.plan.problems).toHaveLength(8)
+    expect(prepared.plan.problems[0]!.addendA).toBe(
+      sourcePlan.problems[0]!.addendA,
+    )
+    expect(prepared.plan.problems[0]!.addendB).toBe(
+      sourcePlan.problems[0]!.addendB,
+    )
   })
 
   it('calls loadSessionAudio with the rehydrated utterances', async () => {
@@ -104,7 +127,7 @@ describe('prepareMathPathA — happy path', () => {
       ) => Promise<Map<string, HowlLike>>
     >(async () => new Map<string, HowlLike>())
 
-    await prepareMathPathA(plan, plan.id, {
+    await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: loadMock,
       playSessionUtterance: vi.fn(async () => {}),
@@ -112,7 +135,7 @@ describe('prepareMathPathA — happy path', () => {
 
     expect(loadMock).toHaveBeenCalledOnce()
     const [sessionId, utterances] = loadMock.mock.calls[0]!
-    expect(sessionId).toBe(plan.id)
+    expect(sessionId).toBe(STD_ARGS.sessionId)
     expect(utterances).toHaveLength(response.utterances.length)
   })
 
@@ -125,14 +148,14 @@ describe('prepareMathPathA — happy path', () => {
       (id: string, opts?: PlaySessionUtteranceOptions) => Promise<void>
     >(async () => {})
 
-    const prepared = await prepareMathPathA(plan, plan.id, {
+    const prepared = await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: playMock,
     })
 
     // Speak problem 1's read line.
-    const text = plan.problems[0]!.utterances.read
+    const text = prepared.plan.problems[0]!.utterances.read
     await prepared.playUtterance(text)
 
     expect(playMock).toHaveBeenCalledOnce()
@@ -150,7 +173,7 @@ describe('prepareMathPathA — happy path', () => {
         opts?.onWordTick?.(1)
       },
     )
-    const prepared = await prepareMathPathA(plan, plan.id, {
+    const prepared = await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: playMock,
@@ -158,10 +181,13 @@ describe('prepareMathPathA — happy path', () => {
 
     const onPlay = vi.fn()
     const onWordTick = vi.fn()
-    await prepared.playUtterance(plan.problems[0]!.utterances.correct, {
-      onPlay,
-      onWordTick,
-    })
+    await prepared.playUtterance(
+      prepared.plan.problems[0]!.utterances.correct,
+      {
+        onPlay,
+        onWordTick,
+      },
+    )
     expect(onPlay).toHaveBeenCalledOnce()
     expect(onWordTick).toHaveBeenCalledTimes(2)
     expect(onWordTick).toHaveBeenNthCalledWith(1, 0)
@@ -174,7 +200,7 @@ describe('prepareMathPathA — happy path', () => {
     const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () => jsonResp(buildServerResponse(plan)))
     const playMock = vi.fn(async () => {})
-    const prepared = await prepareMathPathA(plan, plan.id, {
+    const prepared = await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: playMock,
@@ -188,7 +214,7 @@ describe('prepareMathPathA — happy path', () => {
     const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () => jsonResp(buildServerResponse(plan)))
 
-    const prepared = await prepareMathPathA(plan, plan.id, {
+    const prepared = await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: vi.fn(async () => {}),
@@ -203,7 +229,7 @@ describe('prepareMathPathA — happy path', () => {
     const fetchMock = vi.fn(async () => jsonResp(buildServerResponse(plan)))
     const unloadMock = vi.fn()
 
-    const prepared = await prepareMathPathA(plan, plan.id, {
+    const prepared = await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: vi.fn(async () => {}),
@@ -217,13 +243,12 @@ describe('prepareMathPathA — happy path', () => {
 
 describe('prepareMathPathA — failure paths', () => {
   it('throws config-missing when /api/claude returns the config-missing error', async () => {
-    const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () =>
       jsonResp({ error: 'config-missing' }, { status: 500 }),
     )
 
     await expect(
-      prepareMathPathA(plan, plan.id, {
+      prepareMathPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
         loadSessionAudio: vi.fn(async () => new Map()),
         playSessionUtterance: vi.fn(async () => {}),
@@ -235,13 +260,12 @@ describe('prepareMathPathA — failure paths', () => {
   })
 
   it('throws tts-failed when the server emits tts-failed', async () => {
-    const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () =>
       jsonResp({ error: 'tts-failed' }, { status: 502 }),
     )
 
     await expect(
-      prepareMathPathA(plan, plan.id, {
+      prepareMathPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
         loadSessionAudio: vi.fn(async () => new Map()),
         playSessionUtterance: vi.fn(async () => {}),
@@ -251,8 +275,50 @@ describe('prepareMathPathA — failure paths', () => {
     })
   })
 
+  it('throws rate-limited when the server emits the 429 rate-limited code', async () => {
+    // Track-based payloads go through api/claude.ts:sessionStartLimiter;
+    // the 429 envelope is `{ error: "rate-limited", message: ... }`.
+    const fetchMock = vi.fn(async () =>
+      jsonResp(
+        { error: 'rate-limited', message: 'too many starts' },
+        { status: 429 },
+      ),
+    )
+
+    await expect(
+      prepareMathPathA(STD_ARGS, {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map()),
+        playSessionUtterance: vi.fn(async () => {}),
+      }),
+    ).rejects.toMatchObject({
+      name: 'PrepareMathPathAError',
+      code: 'rate-limited',
+    })
+  })
+
+  it('throws planner-failed when the server emits the 502 planner-failed code', async () => {
+    // Distinct from tts-failed: planner-failed means Haiku itself
+    // returned malformed JSON or the Anthropic call errored. The
+    // browser falls back to silent mode either way; the code matters
+    // for QA log attribution.
+    const fetchMock = vi.fn(async () =>
+      jsonResp({ error: 'planner-failed' }, { status: 502 }),
+    )
+
+    await expect(
+      prepareMathPathA(STD_ARGS, {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map()),
+        playSessionUtterance: vi.fn(async () => {}),
+      }),
+    ).rejects.toMatchObject({
+      name: 'PrepareMathPathAError',
+      code: 'planner-failed',
+    })
+  })
+
   it('throws invalid-response when the server returns malformed JSON', async () => {
-    const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(
       async () =>
         new Response('not-json-at-all', {
@@ -262,7 +328,7 @@ describe('prepareMathPathA — failure paths', () => {
     )
 
     await expect(
-      prepareMathPathA(plan, plan.id, {
+      prepareMathPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
         loadSessionAudio: vi.fn(async () => new Map()),
         playSessionUtterance: vi.fn(async () => {}),
@@ -273,13 +339,40 @@ describe('prepareMathPathA — failure paths', () => {
   })
 
   it('throws invalid-response when the response shape is wrong', async () => {
-    const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () =>
       jsonResp({ ok: true, kind: 'session-start', stub: true, note: 'hi' }),
     )
 
     await expect(
-      prepareMathPathA(plan, plan.id, {
+      prepareMathPathA(STD_ARGS, {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map()),
+        playSessionUtterance: vi.fn(async () => {}),
+      }),
+    ).rejects.toMatchObject({ code: 'invalid-response' })
+  })
+
+  it('throws invalid-response when the server plan fails to parse (drifted read line)', async () => {
+    const plan = STATIC_SESSION_PLANS[0]!
+    const good = buildServerResponse(plan)
+    // Drift problem-1's read line off template — planFromServer should
+    // throw, and the wiring should surface as 'invalid-response'.
+    const broken: SessionStartResponse = {
+      ...good,
+      plan: {
+        id: plan.id,
+        label: plan.label,
+        utterances: mathSessionPlanToUtteranceSources(plan).map((u) =>
+          u.id === 'math.p1.read'
+            ? { ...u, text: 'How many is three plus two?' }
+            : u,
+        ),
+      },
+    }
+    const fetchMock = vi.fn(async () => jsonResp(broken))
+
+    await expect(
+      prepareMathPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
         loadSessionAudio: vi.fn(async () => new Map()),
         playSessionUtterance: vi.fn(async () => {}),
@@ -288,13 +381,12 @@ describe('prepareMathPathA — failure paths', () => {
   })
 
   it('throws network-error when fetch itself rejects', async () => {
-    const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () => {
       throw new TypeError('network down')
     })
 
     await expect(
-      prepareMathPathA(plan, plan.id, {
+      prepareMathPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
         loadSessionAudio: vi.fn(async () => new Map()),
         playSessionUtterance: vi.fn(async () => {}),
@@ -303,7 +395,6 @@ describe('prepareMathPathA — failure paths', () => {
   })
 
   it('throws aborted when fetch is aborted via signal', async () => {
-    const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () => {
       const err = new DOMException('aborted', 'AbortError')
       throw err
@@ -313,7 +404,7 @@ describe('prepareMathPathA — failure paths', () => {
     controller.abort()
 
     await expect(
-      prepareMathPathA(plan, plan.id, {
+      prepareMathPathA(STD_ARGS, {
         fetch: fetchMock as unknown as typeof globalThis.fetch,
         signal: controller.signal,
         loadSessionAudio: vi.fn(async () => new Map()),
@@ -328,7 +419,7 @@ describe('prepareMathPathA — playUtterance edge cases', () => {
     const plan = STATIC_SESSION_PLANS[0]!
     const fetchMock = vi.fn(async () => jsonResp(buildServerResponse(plan)))
     const playMock = vi.fn(async () => {})
-    const prepared = await prepareMathPathA(plan, plan.id, {
+    const prepared = await prepareMathPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map()),
       playSessionUtterance: playMock,
@@ -356,5 +447,15 @@ describe('PrepareMathPathAError', () => {
     expect(err.message).toBe('kaboom')
     expect(err.name).toBe('PrepareMathPathAError')
     expect(err).toBeInstanceOf(Error)
+  })
+
+  it('preserves rate-limited code', () => {
+    const err = new PrepareMathPathAError('rate-limited', 'slow down')
+    expect(err.code).toBe('rate-limited')
+  })
+
+  it('preserves planner-failed code', () => {
+    const err = new PrepareMathPathAError('planner-failed', 'haiku borked')
+    expect(err.code).toBe('planner-failed')
   })
 })
