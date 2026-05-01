@@ -122,20 +122,46 @@ export async function renderSessionAudio(
   // handful but not 30+. We use a tiny pool here rather than pulling in
   // p-limit — the dependency cost outweighs the small pool implementation.
   //
-  // Failure semantics: the first worker to reject wins — the function
-  // rejects with that error, the caller (api/claude.ts) maps it to a 502
-  // tts-failed, and the user sees one degraded session. The other workers
-  // notice the shared `aborted` flag and short-circuit before starting their
-  // next utterance, so their pending awaits cannot turn into orphan
-  // unhandled rejections. We still `Promise.allSettled` on the worker
-  // promises so any in-flight rejection that arrives after the first one
-  // is observed (no UnhandledPromiseRejectionWarning on Vercel logs).
-  const utterances: Utterance[] = new Array(sources.length)
+  // Failure semantics (ticket 86c9kjdh2 — soft-fail per utterance):
+  // ---------------------------------------------------------------
+  // The synth dependency is responsible for retrying transient Azure
+  // failures (429 with backoff, 5xx single retry — see
+  // _tts.fetchWithBackoff). When it rejects here, retries are EXHAUSTED
+  // and this utterance is genuinely unrenderable.
+  //
+  // Prior behaviour (pre-86c9kjdh2): ANY worker rejection set the shared
+  // `aborted` flag, so siblings stopped pulling work, and the whole
+  // session-start failed with `tts-failed`. With 40-59 utterances per
+  // session, one transient failure tanked the entire batch.
+  //
+  // New behaviour: a per-utterance failure is recorded and the worker
+  // pool keeps draining. The corresponding slot in `utterances` is left
+  // empty and is filtered out before the response is assembled. The
+  // browser's Path A loader treats a missing utterance ID as "fall back
+  // to silent caption-only for that one phrase" — same blast-radius
+  // shape as before, but localised to the single failed phrase instead
+  // of the whole session.
+  //
+  // Failure threshold: even 0/N rendered utterances is returned as
+  // 200 OK with an empty array. The browser already handles missing
+  // audio gracefully; surfacing a 502 here would force the entire
+  // session into silent fallback when partial recovery is more useful.
+  // If Azure is fully down the user sees caption-only, which matches
+  // the prior tts-failed silent-fallback degradation but at least
+  // delivers the session plan.
+  //
+  // Promise.allSettled is no longer needed for failure-collation since
+  // workers no longer throw; it is preserved so that any unexpected
+  // worker-internal exception (e.g. a Buffer encoding bug) doesn't
+  // surface as an UnhandledPromiseRejection on Vercel logs.
+  const utterances: (Utterance | undefined)[] = new Array(sources.length)
+  const failures: { id: string; message: string }[] = []
   let nextIndex = 0
-  let aborted = false
 
   async function worker(): Promise<void> {
-    while (!aborted) {
+    // No early-abort. Each worker drains the queue independently; a
+    // per-utterance failure is logged and the worker moves to the next.
+    while (true) {
       const i = nextIndex++
       if (i >= sources.length) return
       const src = sources[i]!
@@ -146,11 +172,17 @@ export async function renderSessionAudio(
           opts.synthOptions,
         )
       } catch (err) {
-        // Tell sibling workers to stop pulling new work, then re-throw so
-        // Promise.allSettled records this worker as rejected and we surface
-        // the first failure below.
-        aborted = true
-        throw err
+        const message = err instanceof Error ? err.message : String(err)
+        failures.push({ id: src.id, message })
+        // Vercel log surface — structured single-line for query-ability.
+        // Suppressed under NODE_ENV === 'test' to keep test output clean.
+        if (process.env.NODE_ENV !== 'test') {
+          console.warn('[api/_session] tts-utterance-failed', {
+            id: src.id,
+            message,
+          })
+        }
+        continue
       }
       utterances[i] = {
         id: src.id,
@@ -169,19 +201,41 @@ export async function renderSessionAudio(
     workers.push(worker())
   }
 
+  // Drain the worker pool. Workers no longer throw on per-utterance
+  // failure (those are recorded in `failures` and skipped); a rejection
+  // here would indicate a bug in worker() itself (e.g. base64 encoder
+  // throws). Re-throw any such bug-class failure so it surfaces as
+  // tts-failed at the handler layer rather than as a silent partial.
   const results = await Promise.allSettled(workers)
-  const firstRejection = results.find(
+  const unexpectedRejection = results.find(
     (r): r is PromiseRejectedResult => r.status === 'rejected',
   )
-  if (firstRejection) {
-    const reason = firstRejection.reason
+  if (unexpectedRejection) {
+    const reason = unexpectedRejection.reason
     throw reason instanceof Error ? reason : new Error(String(reason))
   }
+
+  // Surface a single summary log when ANY utterance failed — easier to
+  // grep than the per-utterance lines and gives an at-a-glance failure
+  // rate for the Vercel log explorer.
+  if (failures.length > 0 && process.env.NODE_ENV !== 'test') {
+    console.warn('[api/_session] tts-partial', {
+      total: sources.length,
+      failed: failures.length,
+      rendered: sources.length - failures.length,
+    })
+  }
+
+  // Filter out failed slots — the browser-side loader handles missing
+  // utterance ids by falling back to silent caption-only for that
+  // phrase. Order is preserved (Array.filter on a sparse-by-undefined
+  // array keeps the relative order of the surviving entries).
+  const rendered = utterances.filter((u): u is Utterance => u !== undefined)
 
   return {
     ok: true,
     kind: 'session-start',
     plan,
-    utterances,
+    utterances: rendered,
   }
 }

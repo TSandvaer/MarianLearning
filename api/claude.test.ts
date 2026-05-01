@@ -31,6 +31,7 @@ vi.mock('./_session.js', () => {
 import claudeEntrypoint, { handler, assertNodeRuntime } from './claude.js'
 import { renderSessionAudio } from './_session.js'
 import { createRateLimiter } from './_rateLimit.js'
+import { createSessionCache } from './_sessionCache.js'
 import type { PlannerAnthropicClient } from './_planner.js'
 
 const mockedRender = vi.mocked(renderSessionAudio)
@@ -357,9 +358,15 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
   // seam; the TTS pipeline is replaced via the `vi.mock('./_session.js')`
   // at the top of this file.
 
+  // Fresh cache per test (ticket 86c9kjdh2). The handler defaults to a
+  // module-singleton cache; injecting a per-test instance ensures tests
+  // see a clean cache state regardless of execution order.
+  let sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
+
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
     mockedRender.mockReset()
+    sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
     // Default — render echoes a small response so the success path tests
     // don't have to set this up every time.
     mockedRender.mockResolvedValue({
@@ -388,7 +395,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
         kind: 'session-start',
         payload: { track: 'math', level: 1, childName: 'Marian' },
       }),
-      { anthropicClient },
+      { anthropicClient, sessionCache },
     )
 
     expect(res.status).toBe(200)
@@ -475,7 +482,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
           kind: 'session-start',
           payload: { track: 'math', level: 1, childName: 'Marian' },
         }),
-        { anthropicClient },
+        { anthropicClient, sessionCache },
       )
       expect(res.status).toBe(502)
       expect(await res.json()).toMatchObject({ error: 'planner-failed' })
@@ -500,7 +507,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
           kind: 'session-start',
           payload: { track: 'math', level: 1, childName: 'Marian' },
         }),
-        { anthropicClient },
+        { anthropicClient, sessionCache },
       )
       expect(res.status).toBe(502)
       const body = (await res.json()) as { error: string; message?: string }
@@ -527,7 +534,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
             childName: 'Marian',
           },
         }),
-        { anthropicClient },
+        { anthropicClient, sessionCache },
       )
       // The planner-failed log fires once with [label, detail] — no third
       // arg, no payload echo.
@@ -548,9 +555,14 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
 })
 
 describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => {
+  // Fresh cache per test (ticket 86c9kjdh2). See note in the track-based
+  // suite above for the rationale.
+  let sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
+
   beforeEach(() => {
     process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
     mockedRender.mockReset()
+    sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
     mockedRender.mockResolvedValue({
       ok: true,
       kind: 'session-start',
@@ -584,6 +596,7 @@ describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => 
     const res = await handler(req, {
       anthropicClient,
       rateLimiter,
+      sessionCache,
       now: () => 3000,
     })
 
@@ -630,10 +643,205 @@ describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => 
 
     const res = await handler(req, {
       rateLimiter,
+      sessionCache,
       now: () => 2000,
     })
 
     expect(res.status).toBe(200)
     expect(mockedRender).toHaveBeenCalled()
+  })
+})
+
+describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => {
+  // Per-test fresh cache + planner stub. The cache-aware handler should
+  // serve the second-and-subsequent identical requests from the cache,
+  // bypassing the Anthropic SDK and the TTS pipeline entirely.
+  //
+  // We also inject a fresh rate limiter per test (with a generous limit)
+  // so the module-singleton limiter accumulating state from earlier tests
+  // in this file doesn't reject our session-start calls.
+
+  let sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
+  let rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+  let nowMs = 1000
+  const nowFn = () => nowMs
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+    mockedRender.mockReset()
+    nowMs = 1000
+    sessionCache = createSessionCache({ ttlMs: 60_000, now: nowFn })
+    rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+    mockedRender.mockResolvedValue({
+      ok: true,
+      kind: 'session-start',
+      plan: { utterances: [] },
+      utterances: [
+        {
+          id: 'math.p1.read',
+          text: 'Three plus two. How many?',
+          audio: { kind: 'inline', base64: 'AAEC', mime: 'audio/mpeg' },
+        },
+      ],
+    })
+  })
+
+  it('serves the second identical session-start from cache (Azure synth not called twice)', async () => {
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+    const payload = {
+      kind: 'session-start' as const,
+      payload: { track: 'math', level: 1, childName: 'Marian' },
+    }
+
+    const res1 = await handler(makeRequest(payload), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+    expect(res1.status).toBe(200)
+    expect(mockedRender).toHaveBeenCalledTimes(1)
+    expect(anthropicClient.messages.create).toHaveBeenCalledTimes(1)
+
+    // Second call within TTL — should hit cache, NOT the planner or TTS.
+    nowMs = 2000 // 1s later, well within 60s TTL
+    const res2 = await handler(makeRequest(payload), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+    expect(res2.status).toBe(200)
+    expect(mockedRender).toHaveBeenCalledTimes(1) // STILL one call
+    expect(anthropicClient.messages.create).toHaveBeenCalledTimes(1)
+
+    // Bodies are equivalent (deep clone — cache returns a fresh object).
+    const body1 = await res1.json()
+    const body2 = await res2.json()
+    expect(body2).toEqual(body1)
+  })
+
+  it('different (track, level, childName) triples each hit the planner+Azure once', async () => {
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: { track: 'math', level: 1, childName: 'Marian' },
+      }),
+      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+    )
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: { track: 'word-song', level: 1, childName: 'Marian' },
+      }),
+      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+    )
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: { track: 'math', level: 1, childName: 'Other' },
+      }),
+      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+    )
+
+    // All three are distinct keys → all three render.
+    expect(mockedRender).toHaveBeenCalledTimes(3)
+    expect(anthropicClient.messages.create).toHaveBeenCalledTimes(3)
+  })
+
+  it('after TTL expiry, the next call hits the planner+Azure again', async () => {
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+    const payload = {
+      kind: 'session-start' as const,
+      payload: { track: 'math', level: 1, childName: 'Marian' },
+    }
+
+    nowMs = 1000
+    await handler(makeRequest(payload), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+    expect(mockedRender).toHaveBeenCalledTimes(1)
+
+    // Jump past the 60_000ms TTL.
+    nowMs = 100_000
+    await handler(makeRequest(payload), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+    expect(mockedRender).toHaveBeenCalledTimes(2)
+  })
+
+  it('parallel concurrent requests with the same key — race-safe (at most one planner+azure call after the first one settles)', async () => {
+    // We cannot prevent two cold-cache concurrent requests from BOTH
+    // rendering — that would require a mutex defeating the warm-cache
+    // goal. But we MUST guarantee no race breaks the cache map itself
+    // and that subsequent calls (after at least one has set()) hit the
+    // cache.
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+    const payload = {
+      kind: 'session-start' as const,
+      payload: { track: 'math', level: 1, childName: 'Marian' },
+    }
+
+    // Fire 5 concurrent requests. With the synchronous Map.get/set, after
+    // the first one resolves (and writes the cache), the rest may have
+    // already called the planner before the cache write — that's
+    // expected. The key invariant: no exception, all 5 return 200,
+    // mockedRender call count is bounded by 5 (not unbounded).
+    const calls = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        handler(makeRequest(payload), {
+          anthropicClient,
+          sessionCache,
+          rateLimiter,
+          now: nowFn,
+        }),
+      ),
+    )
+    for (const res of calls) {
+      expect(res.status).toBe(200)
+    }
+    expect(mockedRender.mock.calls.length).toBeLessThanOrEqual(5)
+    expect(mockedRender.mock.calls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('cached response is independent of the original (mutating the response does not corrupt the cache)', async () => {
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+    const payload = {
+      kind: 'session-start' as const,
+      payload: { track: 'math', level: 1, childName: 'Marian' },
+    }
+
+    const res1 = await handler(makeRequest(payload), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+    const body1 = (await res1.json()) as {
+      utterances: Array<{ text: string }>
+    }
+    // Caller shouldn't mutate, but if they did, it must NOT corrupt
+    // the next cache hit.
+    body1.utterances[0]!.text = 'caller-mutated'
+
+    nowMs = 2000
+    const res2 = await handler(makeRequest(payload), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+    const body2 = (await res2.json()) as {
+      utterances: Array<{ text: string }>
+    }
+    expect(body2.utterances[0]!.text).toBe('Three plus two. How many?')
   })
 })

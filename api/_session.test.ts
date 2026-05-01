@@ -154,74 +154,136 @@ describe('renderSessionAudio', () => {
     expect(synth).toHaveBeenCalledTimes(8)
   })
 
-  it('rejects (propagates) when synth throws — the function-level handler maps this to tts-failed', async () => {
-    const synth = vi.fn(async () => {
-      throw new Error('upstream blew up')
+  // --- Soft-fail semantics (ticket 86c9kjdh2) ---------------------------
+  //
+  // Prior to ticket 86c9kjdh2, ANY synth rejection aborted the whole batch
+  // and renderSessionAudio rejected → handler returned 502 tts-failed.
+  // After 86c9kjdh2 the synth dependency is responsible for retrying
+  // transient Azure failures (see _tts.fetchWithBackoff); when it still
+  // rejects here, the failure is genuinely terminal for THAT utterance,
+  // and the rest of the batch keeps rendering. The handler returns 200
+  // with the partial set; the browser falls back to caption-only for
+  // missing utterance ids.
+
+  it('soft-fails a single utterance and keeps rendering the rest (200 with partial set)', async () => {
+    // Two utterances: index 1 fails permanently. We expect index 0 to
+    // render normally and the response to omit the failed slot.
+    const synth = vi.fn(async (req: TtsRequest) => {
+      if (req.text === 'fail-me') throw new Error('terminal-tts-failure')
+      return { audio: new TextEncoder().encode(`audio-for-${req.text}`) }
     })
-    const plan = { utterances: [{ id: 'a', text: 't' }] }
-    await expect(renderSessionAudio(plan, { synth })).rejects.toThrow(
-      /upstream blew up/,
-    )
+    const plan = {
+      utterances: [
+        { id: 'ok', text: 'render-me' },
+        { id: 'bad', text: 'fail-me' },
+        { id: 'ok2', text: 'render-me-too' },
+      ],
+    }
+    const out = await renderSessionAudio(plan, { synth, concurrency: 1 })
+    expect(out.ok).toBe(true)
+    expect(out.kind).toBe('session-start')
+    expect(out.utterances.map((u) => u.id)).toEqual(['ok', 'ok2'])
+    expect(synth).toHaveBeenCalledTimes(3)
   })
 
-  it('aborts in-flight workers on first failure and does NOT leak unhandled rejections', async () => {
-    // Mid-batch failure scenario: 6 utterances, concurrency 3. Worker that
-    // picks up index 1 fails fast. The other two workers are mid-`await`
-    // on slow synths. The fix: on first failure, sibling workers see the
-    // shared `aborted` flag and short-circuit before pulling their next
-    // utterance, so their pending awaits resolve cleanly. Promise.allSettled
-    // observes every worker promise so no rejection escapes as unhandled.
+  it('returns 200 OK with empty utterances when ALL utterances fail (no 502 escalation)', async () => {
+    const synth = vi.fn(async () => {
+      throw new Error('azure fully down')
+    })
+    const plan = {
+      utterances: [
+        { id: 'a', text: 't1' },
+        { id: 'b', text: 't2' },
+      ],
+    }
+    const out = await renderSessionAudio(plan, { synth })
+    expect(out.ok).toBe(true)
+    expect(out.utterances).toEqual([])
+    expect(synth).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps draining the queue across failures (does NOT abort the pool)', async () => {
+    // Regression guard for the prior abort-on-first-failure semantics.
+    // Six utterances, concurrency 3, the SECOND synth call fails. All
+    // six utterances must still be attempted.
+    let callIndex = 0
+    const synth = vi.fn(async (req: TtsRequest) => {
+      const myIndex = callIndex++
+      if (myIndex === 1) {
+        await new Promise((r) => setTimeout(r, 5))
+        throw new Error('mid-batch boom')
+      }
+      await new Promise((r) => setTimeout(r, 1))
+      return { audio: new TextEncoder().encode(req.text) }
+    })
+    const plan = {
+      utterances: Array.from({ length: 6 }, (_, i) => ({
+        id: `u${i}`,
+        text: `t${i}`,
+      })),
+    }
+    const out = await renderSessionAudio(plan, { synth, concurrency: 3 })
+    // All six were attempted; one failed; five rendered.
+    expect(synth).toHaveBeenCalledTimes(6)
+    expect(out.utterances).toHaveLength(5)
+  })
+
+  it('preserves utterance order across mixed success/failure', async () => {
+    const synth = vi.fn(async (req: TtsRequest) => {
+      if (req.text.includes('fail')) throw new Error('boom')
+      // Vary the resolution order to prove the merge respects source order.
+      const slowFor = req.text.includes('slow') ? 20 : 1
+      await new Promise((r) => setTimeout(r, slowFor))
+      return { audio: new TextEncoder().encode(req.text) }
+    })
+    const plan = {
+      utterances: [
+        { id: 'a', text: 'a-slow' },
+        { id: 'b', text: 'b-fail' },
+        { id: 'c', text: 'c-fast' },
+        { id: 'd', text: 'd-fast' },
+      ],
+    }
+    const out = await renderSessionAudio(plan, { synth, concurrency: 4 })
+    expect(out.utterances.map((u) => u.id)).toEqual(['a', 'c', 'd'])
+  })
+
+  it('does not leak unhandled rejections when synth fails', async () => {
+    // Even though we no longer escalate to a function-level rejection,
+    // worker promises must still be settled cleanly so per-utterance
+    // failures don't bubble up to UnhandledPromiseRejection.
     const unhandled: unknown[] = []
     const onUnhandled = (reason: unknown) => unhandled.push(reason)
     process.on('unhandledRejection', onUnhandled)
 
     try {
-      let callIndex = 0
-      const synth = vi.fn(async (req: TtsRequest) => {
-        const myIndex = callIndex++
-        if (myIndex === 1) {
-          // Fail fast before the slow workers finish.
-          await new Promise((r) => setTimeout(r, 5))
-          throw new Error('mid-batch boom')
-        }
-        // Slow workers — finish AFTER the failure has propagated.
-        await new Promise((r) => setTimeout(r, 30))
-        return { audio: new TextEncoder().encode(req.text) }
+      const synth = vi.fn(async () => {
+        throw new Error('fail-quietly')
       })
-
       const plan = {
         utterances: Array.from({ length: 6 }, (_, i) => ({
           id: `u${i}`,
           text: `t${i}`,
         })),
       }
-      await expect(
-        renderSessionAudio(plan, { synth, concurrency: 3 }),
-      ).rejects.toThrow(/mid-batch boom/)
+      const out = await renderSessionAudio(plan, { synth, concurrency: 3 })
+      expect(out.utterances).toEqual([])
 
       // Give any orphan rejections a tick to surface.
-      await new Promise((r) => setTimeout(r, 50))
+      await new Promise((r) => setTimeout(r, 20))
       expect(unhandled).toEqual([])
-
-      // Work was aborted: the in-flight slow workers each completed at most
-      // their current iteration, and the queue did NOT continue draining.
-      // (Concurrency 3 with 6 items: at most 3 calls are in-flight when the
-      // boom hits; survivors complete their CURRENT item, not the queue.)
-      expect(synth.mock.calls.length).toBeLessThan(6)
     } finally {
       process.off('unhandledRejection', onUnhandled)
     }
   })
 
-  it('surfaces a non-Error rejection by wrapping it in an Error', async () => {
-    // Defensive: a synth implementation that rejects with a non-Error
-    // value (e.g. a string) shouldn't crash our Error-instanceof checks.
+  it('non-Error synth rejections still soft-fail with the stringified message', async () => {
     const synth = vi.fn(async () => {
       throw 'string-rejection'
     })
     const plan = { utterances: [{ id: 'a', text: 't' }] }
-    await expect(renderSessionAudio(plan, { synth })).rejects.toThrow(
-      /string-rejection/,
-    )
+    const out = await renderSessionAudio(plan, { synth })
+    // Soft-fail: empty utterances, 200 ok shape.
+    expect(out.utterances).toEqual([])
   })
 })

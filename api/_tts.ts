@@ -253,6 +253,222 @@ export function describeAzureFailure(status: number, bodyHint: string): Error {
 /** Test seam — a fetch-shaped function. Defaults to `globalThis.fetch`. */
 export type FetchFn = typeof fetch
 
+/**
+ * Backoff/retry policy for transient Azure failures (429 + 5xx). Tunables
+ * exposed for testability — production callers use the defaults.
+ *
+ * Rationale (ticket 86c9kjdh2)
+ * ----------------------------
+ * As of 2026-05-01 the production session-start path was 100% failing on
+ * the very first 429 from Azure F0. The fix is twofold:
+ *   - Retry transient failures (429 with Retry-After or default backoff;
+ *     5xx single retry).
+ *   - Soft-fail at the session level (api/_session.ts) so a per-utterance
+ *     final failure leaves the rest of the batch intact.
+ *
+ * 5 retries × cap=3000ms => worst-case ~6s of wall time for one utterance
+ * (200 + 400 + 800 + 1600 + 3000). That is acceptable on a single
+ * rendering and is bounded above by the per-utterance hard timeout.
+ */
+export interface BackoffPolicy {
+  /** Max retry attempts beyond the initial request. Default 5. */
+  maxAttempts?: number
+  /** Base delay for the exponential schedule, in ms. Default 200. */
+  baseDelayMs?: number
+  /** Cap on a single backoff delay, in ms. Default 3000. */
+  maxDelayMs?: number
+  /** ± random jitter applied per delay, in ms. Default 50. */
+  jitterMs?: number
+  /** Test seam: sleep for `ms`. Defaults to a real setTimeout-backed sleep. */
+  sleepFn?: (ms: number) => Promise<void>
+  /** Test seam: random number generator returning [0, 1). Default Math.random. */
+  randomFn?: () => number
+}
+
+/** Resolved policy with all defaults applied. Internal. */
+interface ResolvedBackoffPolicy {
+  maxAttempts: number
+  baseDelayMs: number
+  maxDelayMs: number
+  jitterMs: number
+  sleepFn: (ms: number) => Promise<void>
+  randomFn: () => number
+}
+
+const DEFAULT_BACKOFF: ResolvedBackoffPolicy = {
+  maxAttempts: 5,
+  baseDelayMs: 200,
+  maxDelayMs: 3_000,
+  jitterMs: 50,
+  sleepFn: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  randomFn: Math.random,
+}
+
+function resolveBackoff(p: BackoffPolicy = {}): ResolvedBackoffPolicy {
+  return {
+    maxAttempts: p.maxAttempts ?? DEFAULT_BACKOFF.maxAttempts,
+    baseDelayMs: p.baseDelayMs ?? DEFAULT_BACKOFF.baseDelayMs,
+    maxDelayMs: p.maxDelayMs ?? DEFAULT_BACKOFF.maxDelayMs,
+    jitterMs: p.jitterMs ?? DEFAULT_BACKOFF.jitterMs,
+    sleepFn: p.sleepFn ?? DEFAULT_BACKOFF.sleepFn,
+    randomFn: p.randomFn ?? DEFAULT_BACKOFF.randomFn,
+  }
+}
+
+/**
+ * Parse an Azure `Retry-After` header value (RFC 7231). Returns the
+ * number of milliseconds to wait, or null if the header is absent /
+ * malformed.
+ *
+ * Two formats per spec:
+ *   - `Retry-After: <seconds>` (e.g. `Retry-After: 1`)
+ *   - `Retry-After: <HTTP-date>` (e.g. `Retry-After: Wed, 21 Oct 2026 07:28:00 GMT`)
+ *
+ * For the date form we compute `target - now`. A negative or zero result
+ * is treated as "ready immediately" → 0ms (don't sleep). Anything we can't
+ * parse returns null so the caller falls back to the exponential default.
+ */
+export function parseRetryAfterMs(
+  header: string | null,
+  now: number = Date.now(),
+): number | null {
+  if (header === null) return null
+  const trimmed = header.trim()
+  if (trimmed === '') return null
+  // Pure non-negative seconds form (integer or decimal). Use a strict
+  // regex first so we don't mis-interpret `-1` as a year ordinal in
+  // Date.parse (which on some platforms returns a valid epoch ms for
+  // single-digit "year" inputs).
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const asNumber = Number(trimmed)
+    if (Number.isFinite(asNumber) && asNumber >= 0) {
+      return Math.round(asNumber * 1000)
+    }
+  }
+  // HTTP-date form. Date.parse returns NaN for most unparseable strings,
+  // but it's lenient enough to accept some non-date inputs (e.g. single
+  // digits as year ordinals on some platforms). Require at least one
+  // alphabetic character — every legitimate HTTP-date carries a weekday
+  // or month name (RFC 7231 §7.1.1.1) — to gate the date-parse path.
+  if (!/[A-Za-z]/.test(trimmed)) return null
+  const asDate = Date.parse(trimmed)
+  if (Number.isFinite(asDate)) {
+    const delta = asDate - now
+    return delta > 0 ? delta : 0
+  }
+  return null
+}
+
+/**
+ * Compute the backoff delay (ms) for a given retry attempt under the
+ * exponential schedule. `attempt` is 1-indexed for the first retry.
+ *
+ *   attempt=1 → base × 2^0 = base
+ *   attempt=2 → base × 2^1 = 2×base
+ *   attempt=N → base × 2^(N-1), capped at maxDelayMs
+ *
+ * Jitter is applied as ±jitterMs uniform; final value is clamped to
+ * [0, maxDelayMs + jitterMs] to avoid pathological negatives.
+ */
+export function computeBackoffDelayMs(
+  attempt: number,
+  policy: BackoffPolicy = {},
+): number {
+  const p = resolveBackoff(policy)
+  const exp = p.baseDelayMs * Math.pow(2, Math.max(0, attempt - 1))
+  const capped = Math.min(exp, p.maxDelayMs)
+  const jitter = (p.randomFn() * 2 - 1) * p.jitterMs
+  const delay = capped + jitter
+  return Math.max(0, Math.round(delay))
+}
+
+/**
+ * Issue a fetch with retry on Azure transient failures.
+ *
+ * Behaviour
+ * ---------
+ *  - 429: parse `Retry-After`. If present and parseable, sleep for that
+ *    duration (capped at maxDelayMs to avoid huge waits if Azure tells us
+ *    "come back in 30s"). If absent/malformed, fall back to the
+ *    exponential schedule with jitter.
+ *  - 5xx (500-599): retry with the exponential schedule. Capped at one
+ *    retry — if Azure's edge is flaky, a single retry usually clears it;
+ *    a sustained 5xx storm should propagate as a hard error.
+ *  - 2xx / other 4xx: return the response as-is. The caller maps non-2xx
+ *    to named errors via `describeAzureFailure`.
+ *  - Network errors (fetch throws): propagate without retry. Timeouts
+ *    are owned by the caller's AbortController.
+ *
+ * Returns the final Response (success or terminal failure). Caller is
+ * responsible for the non-2xx → Error mapping.
+ */
+export async function fetchWithBackoff(
+  fetchFn: FetchFn,
+  url: string,
+  init: RequestInit,
+  policy: BackoffPolicy = {},
+): Promise<Response> {
+  const p = resolveBackoff(policy)
+  let attempt = 0
+  let serverErrorRetried = false
+
+  // First attempt + up to maxAttempts retries.
+  // Loop bound: maxAttempts + 1 total network calls.
+  // We deliberately do not retry on network exceptions — those are owned
+  // by the caller's timeout / AbortController seam.
+
+  while (true) {
+    const response = await fetchFn(url, init)
+
+    // 2xx — done.
+    if (response.status < 400) return response
+
+    // 429 — rate limited.
+    if (response.status === 429) {
+      attempt += 1
+      if (attempt > p.maxAttempts) return response
+
+      const retryAfterMs = parseRetryAfterMs(
+        response.headers.get('Retry-After'),
+      )
+      // Drain the body so the underlying connection can be reused.
+      try {
+        await response.text()
+      } catch {
+        // best-effort drain
+      }
+
+      const delay =
+        retryAfterMs !== null
+          ? Math.min(retryAfterMs, p.maxDelayMs)
+          : computeBackoffDelayMs(attempt, p)
+      if (delay > 0) await p.sleepFn(delay)
+      continue
+    }
+
+    // 5xx — retry once with exponential cadence. After that, propagate.
+    if (response.status >= 500 && response.status < 600) {
+      if (serverErrorRetried) return response
+      serverErrorRetried = true
+      attempt += 1
+      if (attempt > p.maxAttempts) return response
+
+      try {
+        await response.text()
+      } catch {
+        // best-effort drain
+      }
+
+      const delay = computeBackoffDelayMs(attempt, p)
+      if (delay > 0) await p.sleepFn(delay)
+      continue
+    }
+
+    // Other 4xx — terminal, no retry.
+    return response
+  }
+}
+
 export interface SynthesizeOptions {
   /** Test seam: fetch implementation. Defaults to `globalThis.fetch`. */
   fetchFn?: FetchFn
@@ -264,6 +480,11 @@ export interface SynthesizeOptions {
   clearTimeoutFn?: (handle: unknown) => void
   /** Test seam: env snapshot. Defaults to `process.env`. */
   env?: NodeJS.ProcessEnv
+  /** Backoff policy for 429/5xx retries. Defaults to the exponential
+   *  schedule documented on `BackoffPolicy`. Set
+   *  `{ maxAttempts: 0 }` to disable retries entirely (some test paths
+   *  want the legacy single-shot behavior). */
+  backoff?: BackoffPolicy
 }
 
 /**
@@ -347,17 +568,22 @@ export async function synthesizeUtterance(
 
   let response: Response
   try {
-    response = await fetchFn(endpoint, {
-      method: 'POST',
-      headers: {
-        'Ocp-Apim-Subscription-Key': key,
-        'Content-Type': 'application/ssml+xml',
-        'X-Microsoft-OutputFormat': AZURE_OUTPUT_FORMAT,
-        'User-Agent': USER_AGENT,
+    response = await fetchWithBackoff(
+      fetchFn,
+      endpoint,
+      {
+        method: 'POST',
+        headers: {
+          'Ocp-Apim-Subscription-Key': key,
+          'Content-Type': 'application/ssml+xml',
+          'X-Microsoft-OutputFormat': AZURE_OUTPUT_FORMAT,
+          'User-Agent': USER_AGENT,
+        },
+        body,
+        signal: controller.signal,
       },
-      body,
-      signal: controller.signal,
-    })
+      opts.backoff,
+    )
   } catch (err) {
     cancelTimeout(timeoutHandle)
     if (timedOut) {
