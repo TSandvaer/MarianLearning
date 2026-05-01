@@ -250,6 +250,148 @@ describe('generateSessionPlan — word-song track', () => {
   })
 })
 
+describe('generateSessionPlan — Session-End utterance schema (ticket 86c9kj2u6)', () => {
+  // Provenance: ticket 86c9kj2u6. Bug 2 root cause was the planner emitted
+  // only the 8 problems × 5 slot ids; the Session-End screen looks up
+  // session.end.opener / session.end.recap.{N} / session.end.streak.{N} /
+  // session.end.goodbye and fell back to its silent shim on every miss.
+  // Fix: the system prompt now instructs Haiku to append all 19 Session-End
+  // entries (1 opener + 11 recap + 6 streak + 1 goodbye) to the flat
+  // utterances array. These tests pin two contracts:
+  //   1. The planner accepts a wire response that includes the new ids
+  //      (round-trip through the response validator).
+  //   2. The system prompt names every Session-End id family so the model
+  //      sees them deterministically.
+
+  // A response with the full 8 × 5 problem ids + the 19 Session-End ids.
+  // We don't enumerate all 59 lines individually; we list every Session-End
+  // id we expect SessionEnd.tsx to look up and a representative problem
+  // utterance, and assert the planner round-trips them unchanged.
+  const SESSION_END_IDS_MATH = [
+    'session.end.opener',
+    'session.end.recap.1',
+    'session.end.recap.2',
+    'session.end.recap.3',
+    'session.end.recap.4',
+    'session.end.recap.5',
+    'session.end.recap.6',
+    'session.end.recap.7',
+    'session.end.recap.8',
+    'session.end.recap.9',
+    'session.end.recap.10',
+    'session.end.recap.11',
+    'session.end.streak.3',
+    'session.end.streak.4',
+    'session.end.streak.5',
+    'session.end.streak.6',
+    'session.end.streak.7',
+    'session.end.streak.8',
+    'session.end.goodbye',
+  ]
+
+  function makePlanWithSessionEnd(track: 'math' | 'word'): string {
+    const problemUtterances = [
+      { id: `${track}.p1.read`, text: 'Three plus two. How many?' },
+      { id: `${track}.p1.correct`, text: 'Yes! Five!' },
+      { id: `${track}.p1.reprompt`, text: 'Hmm... try again?' },
+      { id: `${track}.p1.hint`, text: 'Look. Three. And two more.' },
+      { id: `${track}.p1.giveAnswer`, text: 'This one is five.' },
+    ]
+    const sessionEndUtterances = [
+      { id: 'session.end.opener', text: 'You did it!' },
+      ...Array.from({ length: 11 }, (_, i) => {
+        const n = i + 1
+        const word = [
+          'one',
+          'two',
+          'three',
+          'four',
+          'five',
+          'six',
+          'seven',
+          'eight',
+          'nine',
+          'ten',
+          'eleven',
+        ][i]!
+        return {
+          id: `session.end.recap.${n}`,
+          text: n === 1 ? 'You earned one star!' : `You earned ${word} stars!`,
+        }
+      }),
+      ...Array.from({ length: 6 }, (_, i) => {
+        const n = i + 3
+        const word = ['three', 'four', 'five', 'six', 'seven', 'eight'][i]!
+        return {
+          id: `session.end.streak.${n}`,
+          text: `${word.charAt(0).toUpperCase() + word.slice(1)} in a row! Wow!`,
+        }
+      }),
+      { id: 'session.end.goodbye', text: 'See you soon.' },
+    ]
+    return JSON.stringify({
+      id: `haiku-${track}-001`,
+      label: 'with-session-end',
+      utterances: [...problemUtterances, ...sessionEndUtterances],
+    })
+  }
+
+  it('round-trips Session-End utterance ids unchanged for math', async () => {
+    const client = makeMockClient(makePlanWithSessionEnd('math'))
+    const plan = await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+    const ids = plan.utterances.map((u) => u.id)
+    for (const expected of SESSION_END_IDS_MATH) {
+      expect(ids).toContain(expected)
+    }
+  })
+
+  it('round-trips Session-End utterance ids unchanged for word-song', async () => {
+    const client = makeMockClient(makePlanWithSessionEnd('word'))
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+    })
+    const ids = plan.utterances.map((u) => u.id)
+    for (const expected of SESSION_END_IDS_MATH) {
+      expect(ids).toContain(expected)
+    }
+  })
+
+  it('system prompt names every Session-End id family the screen looks up', async () => {
+    // The screen reads: session.end.opener, session.end.recap.<N>,
+    // session.end.streak.<N>, session.end.goodbye. The prompt must name
+    // each family explicitly so Haiku emits all 19 deterministically. We
+    // assert against the rendered system prompt content (not the rendered
+    // model response) so the contract is enforced at prompt-build time
+    // even when we mock the SDK.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makePlanWithSessionEnd('math'), { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+    const args = capture.lastArgs as {
+      system: Array<{ text: string }>
+    }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    expect(prompt).toContain('session.end.opener')
+    expect(prompt).toContain('session.end.recap.1')
+    expect(prompt).toContain('session.end.recap.11')
+    expect(prompt).toContain('session.end.streak.3')
+    expect(prompt).toContain('session.end.streak.8')
+    expect(prompt).toContain('session.end.goodbye')
+  })
+})
+
 describe('generateSessionPlan — error paths', () => {
   it('throws PlannerError("config-missing") when ANTHROPIC_API_KEY is unset', async () => {
     delete process.env.ANTHROPIC_API_KEY
