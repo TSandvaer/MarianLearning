@@ -81,7 +81,12 @@ describe('wordSongSessionPlanFromServer — failure paths', () => {
     expect(() => wordSongSessionPlanFromServer({})).toThrow(PlanFromServerError)
   })
 
-  it('throws when an utterance id misses the word.p<N>.<slot> template', () => {
+  it('skips utterances with ids outside the word.p<N>.<slot> namespace, but still rejects when that leaves a slot missing', () => {
+    // Replace word.p1.read with a malformed (in-namespace but bad slot)
+    // id. Under the skip-not-throw contract the parser ignores it, but
+    // problem 1's `read` slot is now genuinely missing — which the
+    // completeness check still catches with the clearer "missing slot"
+    // error.
     const wire = staticPlanAsServerShape(0)
     const broken = {
       ...wire,
@@ -91,7 +96,7 @@ describe('wordSongSessionPlanFromServer — failure paths', () => {
       ],
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
-      /word\.p<N>\.<slot>/,
+      /missing slot "read"/,
     )
   })
 
@@ -138,6 +143,57 @@ describe('wordSongSessionPlanFromServer — failure paths', () => {
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
       /non-target word/,
+    )
+  })
+})
+
+// Regression tests for ticket 86c9kj2u6 — same shape as the Math sibling.
+// The planner emits `session.end.*` ids for both Math and WordSong
+// sessions; this parser must skip them rather than throw.
+describe('wordSongSessionPlanFromServer — skip-not-throw on out-of-namespace ids (86c9kj2u6)', () => {
+  /** The 19 session.end.* ids the planner emits today. Texts are
+   *  placeholders; the parser only inspects ids. */
+  const SESSION_END_UTTERANCES: ReadonlyArray<{ id: string; text: string }> = [
+    { id: 'session.end.opener', text: 'You did it!' },
+    ...Array.from({ length: 11 }, (_, i) => ({
+      id: `session.end.recap.${i + 1}`,
+      text: `recap-${i + 1}`,
+    })),
+    ...Array.from({ length: 6 }, (_, i) => ({
+      id: `session.end.streak.${i + 3}`,
+      text: `streak-${i + 3}`,
+    })),
+    { id: 'session.end.goodbye', text: 'See you soon.' },
+  ]
+
+  it('returns the same plan whether or not session.end.* ids are present', () => {
+    const baseline = staticPlanAsServerShape(0)
+    const additive = {
+      ...baseline,
+      utterances: [...baseline.utterances, ...SESSION_END_UTTERANCES],
+    }
+    expect(additive.utterances.length).toBe(40 + 19)
+    const fromBaseline = wordSongSessionPlanFromServer(baseline)
+    const fromAdditive = wordSongSessionPlanFromServer(additive)
+    expect(fromAdditive).toEqual(fromBaseline)
+  })
+
+  it('still rejects malformed-but-namespaced ids by surfacing the missing-slot error downstream', () => {
+    // `word.p1.bogus` is in the word.* namespace but its slot doesn't
+    // match read|correct|reprompt|hint|giveAnswer. Skip-not-throw drops
+    // it; the completeness check then surfaces the missing slot.
+    const wire = staticPlanAsServerShape(0)
+    const broken = {
+      ...wire,
+      utterances: wire.utterances.map((u) =>
+        u.id === 'word.p1.read' ? { id: 'word.p1.bogus', text: u.text } : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      PlanFromServerError,
+    )
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /missing slot "read"/,
     )
   })
 })

@@ -20,6 +20,20 @@
  * embedded list — throw `PlanFromServerError`. Caller falls back to
  * silent mode + a static plan.
  *
+ * Out-of-namespace ids (skip-not-throw)
+ * -------------------------------------
+ * The server response can carry utterances whose ids fall outside the
+ * `word.p<N>.<slot>` template — e.g. the `session.end.*` family added in
+ * 86c9kj2u6. Those are loaded into the singleton howl-map for cross-screen
+ * consumption (SessionEnd reads them via `playSessionUtterance`) but they
+ * don't belong in the nested per-problem plan this parser produces. The
+ * loop below SKIPS such ids rather than throwing, so additive emissions
+ * upstream don't cascade into a silent-fallback regression for WordSong.
+ * Malformed-but-namespaced ids (e.g. `word.p1.bogus`) are also skipped
+ * here, but the per-problem completeness check downstream still catches
+ * them — the bucket for problem 1 will be missing a slot and we throw
+ * the clearer `missing slot "<slot>"` error.
+ *
  * Pure module: no React, no I/O, no side effects.
  */
 
@@ -79,14 +93,13 @@ export function wordSongSessionPlanFromServer(
     )
   }
 
+  // Out-of-namespace ids (e.g. session.end.*) are skipped — see file
+  // header. The per-problem completeness check below still catches any
+  // genuine gaps in the word.p<N>.<slot> coverage.
   const byProblem = new Map<number, Partial<WordSongProblemUtterances>>()
   for (const u of serverPlan.utterances) {
     const parsedId = parseUtteranceId(u.id)
-    if (parsedId === null) {
-      throw new PlanFromServerError(
-        `utterance id "${u.id}" did not match word.p<N>.<slot> template`,
-      )
-    }
+    if (parsedId === null) continue
     const { index, slot } = parsedId
     let bucket = byProblem.get(index)
     if (!bucket) {

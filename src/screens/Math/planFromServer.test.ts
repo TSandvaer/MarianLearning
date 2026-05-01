@@ -105,7 +105,11 @@ describe('mathSessionPlanFromServer — failure paths', () => {
     ).toThrow(PlanFromServerError)
   })
 
-  it('throws when an utterance id misses the math.p<N>.<slot> template', () => {
+  it('skips utterances with ids outside the math.p<N>.<slot> namespace, but still rejects when that leaves a slot missing', () => {
+    // Replace math.p1.read with an out-of-namespace id. Under the
+    // skip-not-throw contract the parser ignores it, but problem 1's
+    // `read` slot is now genuinely missing — which the completeness
+    // check still catches with the clearer "missing slot" error.
     const wire = staticPlanAsServerShape(0)
     const broken = {
       ...wire,
@@ -115,7 +119,7 @@ describe('mathSessionPlanFromServer — failure paths', () => {
       ],
     }
     expect(() => mathSessionPlanFromServer(broken)).toThrow(
-      /math\.p<N>\.<slot>/,
+      /missing slot "read"/,
     )
   })
 
@@ -153,5 +157,62 @@ describe('mathSessionPlanFromServer — failure paths', () => {
       ),
     }
     expect(() => mathSessionPlanFromServer(broken)).toThrow(/template/)
+  })
+})
+
+// Regression tests for ticket 86c9kj2u6 — the planner now also emits
+// `session.end.*` utterances (and may emit other cross-screen families
+// later). Per the skip-not-throw contract documented in the file header,
+// the parser must ignore those without affecting the per-problem plan.
+describe('mathSessionPlanFromServer — skip-not-throw on out-of-namespace ids (86c9kj2u6)', () => {
+  /** The 19 session.end.* ids that the planner emits today (1 opener +
+   *  11 recap.N + 6 streak.N + 1 goodbye). Texts are placeholders; the
+   *  parser only inspects ids. */
+  const SESSION_END_UTTERANCES: ReadonlyArray<{ id: string; text: string }> = [
+    { id: 'session.end.opener', text: 'You did it!' },
+    ...Array.from({ length: 11 }, (_, i) => ({
+      id: `session.end.recap.${i + 1}`,
+      text: `recap-${i + 1}`,
+    })),
+    ...Array.from({ length: 6 }, (_, i) => ({
+      id: `session.end.streak.${i + 3}`,
+      text: `streak-${i + 3}`,
+    })),
+    { id: 'session.end.goodbye', text: 'See you soon.' },
+  ]
+
+  it('returns the same plan whether or not session.end.* ids are present', () => {
+    const baseline = staticPlanAsServerShape(0)
+    const additive = {
+      ...baseline,
+      utterances: [...baseline.utterances, ...SESSION_END_UTTERANCES],
+    }
+    expect(additive.utterances.length).toBe(40 + 19)
+    const fromBaseline = mathSessionPlanFromServer(baseline)
+    const fromAdditive = mathSessionPlanFromServer(additive)
+    // Structural equality — ids/labels, problem indexes, addends, sums,
+    // and per-problem slot text all preserved.
+    expect(fromAdditive).toEqual(fromBaseline)
+  })
+
+  it('still rejects malformed-but-namespaced ids by surfacing the missing-slot error downstream', () => {
+    // `math.p1.bogus` is in the math.* namespace but its slot doesn't
+    // match read|correct|reprompt|hint|giveAnswer. Under skip-not-throw
+    // it's dropped from the bucket; problem 1 then has a missing slot
+    // (whichever real slot we replaced) and the completeness check
+    // throws the clearer message. This pins the contract: out-of-
+    // namespace ids no longer throw early, but malformed ones don't
+    // silently produce a corrupted plan either.
+    const wire = staticPlanAsServerShape(0)
+    const broken = {
+      ...wire,
+      utterances: wire.utterances.map((u) =>
+        u.id === 'math.p1.read' ? { id: 'math.p1.bogus', text: u.text } : u,
+      ),
+    }
+    expect(() => mathSessionPlanFromServer(broken)).toThrow(PlanFromServerError)
+    expect(() => mathSessionPlanFromServer(broken)).toThrow(
+      /missing slot "read"/,
+    )
   })
 })
