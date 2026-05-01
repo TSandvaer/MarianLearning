@@ -1682,4 +1682,134 @@ describe('Word Song screen', () => {
       expect(onRequestExit).toHaveBeenCalledTimes(1)
     })
   })
+
+  // ── Plan re-derivation on prop flip (ticket 86c9jteud) ─────────────────
+
+  describe('plan re-derivation on `plan` prop flip', () => {
+    /**
+     * Regression for ticket 86c9jteud. App.tsx mounts Word Song with the
+     * static fallback plan, kicks `prepareWordSongPathA()`, and once that
+     * resolves swaps the `plan` prop to the server-derived plan. The
+     * screen must pick up the new plan reference; otherwise
+     * `playUtterance(text)` lookups miss the server-rendered audio (the
+     * textToId map is keyed on Haiku-rendered text), giving silent
+     * (caption-only) sessions on iPad.
+     *
+     * The bug shape: `useMemo<WordSongSessionPlan>(() => planProp ?? ...,
+     * [])` captures the prop value at mount and ignores subsequent
+     * changes. Fix: include `planProp` in the deps array.
+     *
+     * This test FAILS on the buggy `[]` deps (problem 1's word stays at
+     * "cat" after the prop flip) and PASSES on the `[planProp]` fix
+     * (problem 1's word becomes "bag" after the flip).
+     */
+    function secondPlan(): WordSongSessionPlan {
+      // Reuse fixedPlan()'s tail so the diff is concentrated on
+      // problem 1 — the flip is observable via the word card's
+      // `data-word` attribute.
+      const base = fixedPlan()
+      const bagEntry = getWordEntry('bag')
+      return {
+        id: 'server-plan',
+        label: 'Server plan',
+        problems: [
+          {
+            index: 1,
+            target: bagEntry,
+            utterances: {
+              read: 'Tap the bag.',
+              correct: 'Yes! Bag.',
+              reprompt: 'Hmm... try again?',
+              hint: "Let's look. Bag.",
+              giveAnswer: 'This one is bag.',
+            },
+          },
+          ...base.problems.slice(1),
+        ],
+      }
+    }
+
+    it('re-derives the displayed plan when `plan` flips from fallback to server-derived without remount', () => {
+      const harness = makePlayHarness()
+      const { rerender } = render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Pre-flip — the static fallback's problem 1 word is "cat".
+      expect(screen.getByTestId('word-song-word-card')).toHaveAttribute(
+        'data-word',
+        'cat',
+      )
+
+      // Flip the prop in place — same component instance, no key change,
+      // no remount. Mirrors what App.tsx does when
+      // `prepareWordSongPathA()` settles after Word Song has already
+      // mounted.
+      rerender(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={secondPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Post-flip — server plan's problem 1 word is "bag". If the screen
+      // ignored the prop change (the buggy `useMemo([], [])` shape), it
+      // would still show "cat".
+      expect(screen.getByTestId('word-song-word-card')).toHaveAttribute(
+        'data-word',
+        'bag',
+      )
+    })
+
+    it('keeps `plan` referentially stable across re-renders with the same prop reference', () => {
+      // Sibling invariant: when `planProp` doesn't change, the memoized
+      // `plan` value MUST stay referentially stable. Several downstream
+      // `useMemo`/effect deps key on `plan`; thrashing the identity on
+      // every render would re-roll chip order + re-fire effects.
+      const planRef = fixedPlan()
+      const harness = makePlayHarness()
+      const { rerender } = render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={planRef}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const before = screen
+        .getAllByTestId('word-song-chip')
+        .map((c) => c.getAttribute('data-word'))
+
+      rerender(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={planRef}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const after = screen
+        .getAllByTestId('word-song-chip')
+        .map((c) => c.getAttribute('data-word'))
+
+      expect(after).toEqual(before)
+    })
+  })
 })

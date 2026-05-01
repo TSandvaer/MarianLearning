@@ -341,12 +341,25 @@ function MathScreen({
   // real `Howler.ctx`; tests inject a stub.
   const getHowlerRunningFn = getHowlerRunning ?? readHowlerContextRunning
 
-  // Plan is captured ONCE per mount — we never re-roll mid-session even if
-  // the parent re-renders with a fresh `now`. Tests pin via the prop.
+  // Plan re-derives whenever `planProp` flips — critical for the Path A
+  // race (ticket 86c9jteud): App.tsx mounts Math with the static fallback
+  // plan, fires `prepareMathPathA()`, and once that resolves swaps the prop
+  // to the server-derived plan. If we captured `plan` once at mount the
+  // screen would stick on the static plan AND every `playUtterance(text)`
+  // lookup would miss the server-rendered audio (textToId is keyed on the
+  // Haiku-rendered text). We exclude `now` from the deps because (a) the
+  // static fallback is deterministic per-minute so re-rolling on a same-
+  // minute `now` ref-change is pointless, (b) once `planProp` is non-null
+  // (the production case after fetch settles), `now` is unused. The
+  // parent's `key="math"` on the AnimatePresence child guarantees a fresh
+  // mount on track-change, so we can't leak a plan across screens. Within
+  // a stable `planProp`, the value is referentially stable thanks to
+  // `useMemo` — downstream `useMemo`/effect deps that key on `plan` keep
+  // working.
   const plan = useMemo<MathSessionPlan>(
     () => planProp ?? pickStaticSessionPlan(now),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
+    [planProp],
   )
 
   // Lazy SFX. Same defensive 404 pattern as Greet — the assets are still
