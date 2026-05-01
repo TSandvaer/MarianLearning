@@ -22,7 +22,7 @@ import type {
   WordSongSessionResult,
 } from './screens/WordSong'
 import SessionEnd from './screens/SessionEnd'
-import type { SessionEndPayload } from './screens/SessionEnd'
+import type { PlayUtteranceFn, SessionEndPayload } from './screens/SessionEnd'
 import {
   markTreeTouched,
   readSessionHistory,
@@ -36,7 +36,8 @@ import {
   isDebugEnabled,
   recordPathASettleEvent,
 } from './lib/debug'
-import { disableHowlerAutoSuspend } from './lib/audio'
+import { disableHowlerAutoSuspend, playSessionUtterance } from './lib/audio'
+import type { PlaySessionUtteranceOptions } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
 import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
 import type { Route } from './router/route'
@@ -283,6 +284,50 @@ export default function App() {
     [],
   )
 
+  /**
+   * Stable adapter passed to `<SessionEnd playUtteranceFn>` (ticket
+   * 86c9kj2u6). Routes the four `session.end.*` utterance ids through the
+   * singleton `playSessionUtterance` — the same howl map that was loaded
+   * by whichever pathA module ran most recently (math or word-song;
+   * `loadSessionAudio` keys by sessionId so the latest of the two wins).
+   *
+   * Why we don't branch on `surface`
+   * --------------------------------
+   * Both Math and Word Song fetch the same Session-End utterance bundle
+   * from the planner — the prompt section is identical and the surface-
+   * agnostic id strings (`session.end.opener` etc.) are picked up by
+   * either track's `prepareXPathA` call. The singleton holds whichever
+   * was last loaded; that is by construction the matching bundle for the
+   * track Marian just finished. If a future surface adds a per-track
+   * Session-End variant, branch this helper on `sessionEndPayload.surface`
+   * and select the corresponding sessionId — the wire-shape contract is
+   * already in place.
+   *
+   * Why we don't reach into `mathPlay` / `wordSongPlay`
+   * ---------------------------------------------------
+   * Those adapters are TEXT-keyed (per `mathPathA.ts` header — Math.tsx
+   * reads `problem.utterances.read` as plain strings). SessionEnd is
+   * ID-keyed because the celebration text is fixed and the screen does
+   * not parse a plan. Going through the singleton's id-keyed
+   * `playSessionUtterance` is the direct shape; the text-keyed adapters
+   * would require the celebration strings to be embedded in the planner
+   * output, which is more wire-data and a coupling we don't need.
+   *
+   * Stability: `playSessionUtterance` is a module-singleton reference;
+   * the wrapping `useMemo` keeps the React-prop identity stable across
+   * renders. SessionEnd reads `playUtteranceFn` once in its mount
+   * effect; even so, an unstable ref would risk reset-loop bugs in any
+   * follow-up that adds it to a dependency array.
+   */
+  const sessionEndPlayUtterance = useMemo<PlayUtteranceFn>(() => {
+    return (
+      utteranceId: string,
+      opts?: PlaySessionUtteranceOptions,
+    ): Promise<void> => {
+      return playSessionUtterance(utteranceId, opts)
+    }
+  }, [])
+
   // Capture once on mount — flipping debug mid-session would tear the
   // overlay in/out and isn't worth the complexity. To enable, append
   // `?debug=1` to the URL (works in Safari tab and PWA install both).
@@ -508,17 +553,32 @@ export default function App() {
 
   /**
    * Tear-down on session-end / cold-restart. Runs only when route leaves
-   * Math AND Greet — i.e. the user has either completed the session or
-   * navigated to a non-audio surface. Releases the howls, resets the
-   * latch so a future session re-fetches, and clears the audio-ready
-   * gate so the next Math mount holds again until its real player binds.
+   * Math AND Greet AND Session-End — i.e. the user has either completed
+   * the celebration screen or navigated to a non-audio surface. Releases
+   * the howls, resets the latch so a future session re-fetches, and
+   * clears the audio-ready gate so the next Math mount holds again until
+   * its real player binds.
+   *
+   * Why we keep audio alive through `route === 'session-end'`
+   * ----------------------------------------------------------
+   * Ticket 86c9kj2u6 wires SessionEnd to play `session.end.*` utterances
+   * via the singleton `playSessionUtterance` from `lib/audio`. Those howls
+   * were loaded into the same singleton during `prepareMathPathA`. If we
+   * tore down on math → session-end (the prior gate), `unloadSessionAudio`
+   * would null out the loaded map and SessionEnd's lookups would reject
+   * with "loadSessionAudio() must be called before play" — putting us
+   * straight back into the silent fallback we are trying to fix. Holding
+   * the audio alive across math → session-end keeps the howls Marian's
+   * tap on problem 8 just gesture-unlocked playable through the farewell
+   * sequence; the hub leaving session-end fires the tear-down for both
+   * tracks (Math + WordSong) so neither leaks into a follow-up session.
    *
    * setState calls deferred to a microtask to satisfy
    * `react-hooks/set-state-in-effect` — same pattern as the screen-level
    * audio-unlock effects (see Math.tsx / WordSong.tsx).
    */
   useEffect(() => {
-    if (route === 'math' || route === 'greet') return
+    if (route === 'math' || route === 'greet' || route === 'session-end') return
     const hadAudio =
       mathUnloadRef.current !== null ||
       mathPlay !== null ||
@@ -638,12 +698,16 @@ export default function App() {
   }, [route, wordSongFallbackPlan])
 
   /**
-   * Tear-down effect for Word Song. Same shape as Math's tear-down above.
+   * Tear-down effect for Word Song. Same shape as Math's tear-down above,
+   * with the same Session-End hold (ticket 86c9kj2u6 — the singleton howl
+   * map is shared with `playSessionUtterance`, so unloading on
+   * literacy → session-end would brick SessionEnd's audio).
+   *
    * setState calls deferred to a microtask to satisfy the
    * `react-hooks/set-state-in-effect` rule.
    */
   useEffect(() => {
-    if (route === 'literacy') return
+    if (route === 'literacy' || route === 'session-end') return
     const hadAudio =
       wordSongUnloadRef.current !== null ||
       wordSongPlay !== null ||
@@ -713,6 +777,7 @@ export default function App() {
             <SessionEnd
               key="session-end"
               payload={sessionEndPayload}
+              playUtteranceFn={sessionEndPlayUtterance}
               onAllDone={handleSessionEndAllDone}
             />
           )}

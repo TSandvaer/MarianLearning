@@ -69,6 +69,100 @@ function createFakePlayUtterance(): PlayUtteranceFn & {
 }
 
 /**
+ * Fake playUtterance that walks the caller-supplied caption word-by-word
+ * end-to-end. The screen's `onWordTick` only sees `wordIndex` (the screen
+ * owns the caption text), so we infer the per-utterance word count from
+ * the id family and tick once per word. Used to cover the regression
+ * fixed in ticket 86c9kj2u6 — pre-fix the silent-fallback shim ticked
+ * `wordIndex=0` exactly once and the caption appeared "stuck on the
+ * first word" of every phase.
+ */
+function createWordWalkingPlayUtterance(): PlayUtteranceFn & {
+  calls: string[]
+} {
+  // Word counts pulled from SessionEnd.tsx's caption strings:
+  //   opener: "You did it!" -> 3
+  //   recap.1: "You earned one star!" -> 4
+  //   recap.N (N>=2): "You earned <word> stars!" -> 4
+  //   streak.N: "<N> in a row! Wow!" -> 5
+  //   goodbye: "See you soon." -> 3
+  function wordCountForId(id: string): number {
+    if (id === 'session.end.opener') return 3
+    if (id.startsWith('session.end.recap.')) return 4
+    if (id.startsWith('session.end.streak.')) return 5
+    if (id === 'session.end.goodbye') return 3
+    return 1
+  }
+
+  const calls: string[] = []
+  const fn = vi.fn(
+    (
+      utteranceId: string,
+      opts?: {
+        onPlay?: () => void
+        onWordTick?: (wordIndex: number) => void
+      },
+    ) => {
+      calls.push(utteranceId)
+      opts?.onPlay?.()
+      const wc = wordCountForId(utteranceId)
+      for (let i = 0; i < wc; i++) opts?.onWordTick?.(i)
+      return Promise.resolve()
+    },
+  ) as unknown as PlayUtteranceFn & { calls: string[] }
+  fn.calls = calls
+  return fn
+}
+
+/**
+ * Fake playUtterance that misses on a given id family and otherwise
+ * walks word-by-word. Used to cover the graceful-degradation contract:
+ * a single utterance miss must not brick the phase machine; the next
+ * phase still runs and the CTA still appears.
+ */
+function createMissingIdPlayUtterance(
+  missingPrefix: string,
+): PlayUtteranceFn & {
+  calls: string[]
+} {
+  function wordCountForId(id: string): number {
+    if (id === 'session.end.opener') return 3
+    if (id.startsWith('session.end.recap.')) return 4
+    if (id.startsWith('session.end.streak.')) return 5
+    if (id === 'session.end.goodbye') return 3
+    return 1
+  }
+
+  const calls: string[] = []
+  const fn = vi.fn(
+    (
+      utteranceId: string,
+      opts?: {
+        onPlay?: () => void
+        onWordTick?: (wordIndex: number) => void
+      },
+    ) => {
+      calls.push(utteranceId)
+      if (utteranceId.startsWith(missingPrefix)) {
+        // Mirrors the production shape: when the singleton howl map has
+        // no entry for an id, `playSessionUtterance` rejects. The
+        // SessionEnd phase wrappers `.catch(resolve)` so the sequence
+        // continues regardless.
+        return Promise.reject(
+          new Error(`[fake] no utterance with id "${utteranceId}"`),
+        )
+      }
+      opts?.onPlay?.()
+      const wc = wordCountForId(utteranceId)
+      for (let i = 0; i < wc; i++) opts?.onWordTick?.(i)
+      return Promise.resolve()
+    },
+  ) as unknown as PlayUtteranceFn & { calls: string[] }
+  fn.calls = calls
+  return fn
+}
+
+/**
  * Advance fake timers and flush all pending microtasks/promises.
  * The Session End sequence is async (await on Promises that resolve
  * when timers fire), so we need to interleave timer advancement with
@@ -530,5 +624,221 @@ describe('SessionEnd', () => {
 
     const emmaImg = screen.getByTestId('session-end-emma')
     expect(emmaImg).toHaveAttribute('src', '/assets/emma-cheering.svg')
+  })
+
+  /**
+   * Regression: ticket 86c9kj2u6
+   *
+   * Pre-fix bugs (cooperating):
+   *   1. App.tsx never passed `playUtteranceFn` to <SessionEnd>, so the
+   *      silent-fallback shim fired `onPlay()` + `onWordTick(0)` once per
+   *      phase. The ribbon revealed exactly one word ("You", "you", "8",
+   *      "See") then advanced — captions appeared stuck on the first
+   *      word of every line.
+   *   2. The Haiku planner emitted only 8 problems x 5 slot ids = 40
+   *      utterances and zero `session.end.*` ids, so even with the prop
+   *      wired the singleton howl-map lookup would miss every line.
+   *
+   * These tests pin the contract that fixes both:
+   *   - `playUtteranceFn` is invoked with the four expected ids in order
+   *     (use `.toEqual([...])` count-based assertion per the
+   *     count-assertion rule, not `.toContain`).
+   *   - The caption reveals the LAST word of each phase, not just the
+   *     first — exercising the regression directly via a fake that
+   *     ticks words end-to-end.
+   *   - Graceful degradation: a single utterance miss does not brick
+   *     the phase machine; the CTA still appears via the sequence's own
+   *     dwell timers.
+   */
+  describe('Path A wiring contract (ticket 86c9kj2u6)', () => {
+    it('invokes playUtteranceFn with the four ids in opener -> recap -> streak -> goodbye order', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 9)
+      const playUtterance = createWordWalkingPlayUtterance()
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{
+              ...MATH_PAYLOAD,
+              totalStardust: 9,
+              finalStreak: 5,
+            }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      // Drain the full sequence: opener (t=0), recap (t=1400), streak
+      // (t=3400), goodbye (t=5000), CTA (t=6200).
+      await advanceSequence(8000)
+
+      // Count-based assertion per `feedback_count_assertions_on_regression_tests`:
+      // exact array equality so a duplicate or a re-ordered call fails the
+      // test loudly.
+      expect(playUtterance.calls).toEqual([
+        'session.end.opener',
+        'session.end.recap.9',
+        'session.end.streak.5',
+        'session.end.goodbye',
+      ])
+    })
+
+    it('skips the recap utterance when totalStardust is 0', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 0)
+      const playUtterance = createWordWalkingPlayUtterance()
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{
+              ...MATH_PAYLOAD,
+              totalStardust: 0,
+              finalStreak: 4,
+            }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      await advanceSequence(8000)
+
+      // No recap.* call when stardust is zero (matches the
+      // SessionEnd.tsx `if (p.totalStardust > 0)` gate). Streak still
+      // fires because finalStreak >= 3.
+      expect(playUtterance.calls).toEqual([
+        'session.end.opener',
+        'session.end.streak.4',
+        'session.end.goodbye',
+      ])
+    })
+
+    it('skips the streak utterance when finalStreak < 3', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 4)
+      const playUtterance = createWordWalkingPlayUtterance()
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{
+              ...MATH_PAYLOAD,
+              totalStardust: 4,
+              finalStreak: 2,
+            }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      await advanceSequence(8000)
+
+      expect(playUtterance.calls).toEqual([
+        'session.end.opener',
+        'session.end.recap.4',
+        'session.end.goodbye',
+      ])
+    })
+
+    it('reveals the last word of each phase, not just the first (the bug being fixed)', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 8)
+      const playUtterance = createWordWalkingPlayUtterance()
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{
+              ...MATH_PAYLOAD,
+              totalStardust: 8,
+              finalStreak: 8,
+            }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      // Goodbye text is the LAST caption to render before the CTA replaces
+      // the ribbon. We sample the caption right at the goodbye phase
+      // (5000ms in) and verify the LAST word of "See you soon." is
+      // revealed — the silent-fallback shim only ticks word 0 ("See")
+      // and the caption would be stuck there.
+      await advanceSequence(5500)
+
+      // Capture the words and their reveal state. SessionEnd renders one
+      // <span data-testid="session-end-caption-word"> per word with a
+      // data-revealed boolean attr.
+      const words = screen
+        .queryAllByTestId('session-end-caption-word')
+        .map((el) => ({
+          text: el.textContent,
+          revealed: el.getAttribute('data-revealed') === 'true',
+        }))
+
+      // Three words ("See", "you", "soon."). The fix: every word is
+      // revealed by the time we sample (the fake ticks all words on
+      // play). The bug shape: only the first word would be revealed.
+      expect(words).toHaveLength(3)
+      expect(words[0]!.revealed).toBe(true)
+      expect(words[words.length - 1]!.revealed).toBe(true)
+    })
+
+    it('continues the sequence and shows the CTA when one utterance lookup misses (graceful degradation)', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 9)
+      // Streak utterance rejects (simulates the singleton lookup failing
+      // for an id the planner did not emit, e.g. a server-subset path or
+      // an unexpected stardust value). The phase machine must still fire
+      // goodbye and reveal the CTA.
+      const playUtterance = createMissingIdPlayUtterance('session.end.streak.')
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{
+              ...MATH_PAYLOAD,
+              totalStardust: 9,
+              finalStreak: 5,
+            }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      await advanceSequence(8000)
+
+      // The miss path was still attempted — we want the call to be
+      // recorded so the diagnostic surface (console.warn) fires too.
+      expect(playUtterance.calls).toEqual([
+        'session.end.opener',
+        'session.end.recap.9',
+        'session.end.streak.5',
+        'session.end.goodbye',
+      ])
+
+      // CTA appears regardless of the streak miss.
+      expect(screen.getByTestId('session-end-cta')).toBeInTheDocument()
+    })
   })
 })
