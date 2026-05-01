@@ -82,6 +82,19 @@ export interface PrepareWordSongPathAArgs {
   childName: string
   /** Stable id used to key the IndexedDB audio cache. */
   sessionId: string
+  /**
+   * M2 (ticket 86c9kmwba). Optional adaptive-engine hint computed from
+   * `loadProgress()` via `pickFocusNode(progress, 'word-song')`.
+   * Omitted on legacy / no-progress paths — server falls back to
+   * `cvc-words`.
+   */
+  focusNode?: string
+  /**
+   * M2 (ticket 86c9kmwba). Optional last-3 mean success rate, 0..1, or
+   * `null` for "no recent data". Computed via
+   * `pickRecentSuccessRate(progress, 'word-song')`.
+   */
+  recentSuccessRate?: number | null
 }
 
 export interface PreparedWordSongPathA {
@@ -141,12 +154,30 @@ export async function prepareWordSongPathA(
   const playSession = opts.playSessionUtterance ?? defaultPlaySessionUtterance
   const unloadAudio = opts.unloadSessionAudio ?? defaultUnloadSessionAudio
 
+  // M2 (ticket 86c9kmwba): optionally include `progress.focusNode` +
+  // `progress.recentSuccessRate`. See mathPathA.ts for the full
+  // architectural rationale (same shape, same contract).
+  const progressBlock =
+    args.focusNode !== undefined || args.recentSuccessRate !== undefined
+      ? {
+          progress: {
+            ...(args.focusNode !== undefined
+              ? { focusNode: args.focusNode }
+              : {}),
+            ...(args.recentSuccessRate !== undefined
+              ? { recentSuccessRate: args.recentSuccessRate }
+              : {}),
+          },
+        }
+      : {}
+
   const body: ClaudeRequest = {
     kind: 'session-start',
     payload: {
       track: 'word-song',
       level: args.level,
       childName: args.childName,
+      ...progressBlock,
     },
   }
 

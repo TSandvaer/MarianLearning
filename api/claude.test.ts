@@ -845,3 +845,237 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
     expect(body2.utterances[0]!.text).toBe('Three plus two. How many?')
   })
 })
+
+describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba)', () => {
+  // These tests pin the M2 contract on the /api/claude handler:
+  //   1. progress.focusNode + progress.recentSuccessRate flow into the
+  //      planner via the user message.
+  //   2. The cache key includes focusNode — two requests differing only
+  //      in focusNode MUST hit the planner twice (no stale cache reuse).
+  //   3. Backwards-compat: requests WITHOUT a `progress` block still work.
+
+  let sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
+  let rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+  const nowFn = () => 1000
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+    mockedRender.mockReset()
+    sessionCache = createSessionCache({ ttlMs: 60_000, now: nowFn })
+    rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+    mockedRender.mockResolvedValue({
+      ok: true,
+      kind: 'session-start',
+      plan: { utterances: [] },
+      utterances: [
+        {
+          id: 'math.p1.read',
+          text: 'Three plus two. How many?',
+          audio: { kind: 'inline', base64: 'AAEC', mime: 'audio/mpeg' },
+        },
+      ],
+    })
+  })
+
+  it('forwards progress.focusNode + progress.recentSuccessRate into the planner user message', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-20',
+            recentSuccessRate: 0.66,
+          },
+        },
+      }),
+      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+    )
+
+    expect(res.status).toBe(200)
+    const args = capture.lastArgs as {
+      messages: Array<{ content: string }>
+    }
+    const user = args.messages[0]!.content
+    expect(user).toContain('add-to-20')
+    expect(user).toMatch(/0\.66/)
+  })
+
+  it('M2 regression — same request with DIFFERENT focusNode bypasses the cache (planner+TTS called twice)', async () => {
+    // The bug the brief warned about: PR #113's cache key was
+    // (track, level, childName) only. After M2 the planner generates
+    // genuinely different content per focusNode, so the cache key must
+    // include focusNode or focus-A's response gets served to focus-B.
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    const baseBody = {
+      kind: 'session-start' as const,
+      payload: {
+        track: 'math',
+        level: 1,
+        childName: 'Marian',
+        progress: { focusNode: 'add-to-10', recentSuccessRate: null },
+      },
+    }
+    const otherFocusBody = {
+      kind: 'session-start' as const,
+      payload: {
+        track: 'math',
+        level: 1,
+        childName: 'Marian',
+        progress: { focusNode: 'add-to-20', recentSuccessRate: null },
+      },
+    }
+
+    await handler(makeRequest(baseBody), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+    await handler(makeRequest(otherFocusBody), {
+      anthropicClient,
+      sessionCache,
+      rateLimiter,
+      now: nowFn,
+    })
+
+    // Two distinct focusNodes → two cache keys → two planner calls,
+    // two TTS renders. If the cache key regresses to omit focusNode,
+    // these are 1 each.
+    expect(anthropicClient.messages.create).toHaveBeenCalledTimes(2)
+    expect(mockedRender).toHaveBeenCalledTimes(2)
+  })
+
+  it('M2 backward-compat — request WITHOUT a progress block still succeeds (legacy clients)', async () => {
+    // Today's deployed iPad doesn't ship a progress block. After this PR
+    // lands on the server, that request must still 200 and route through
+    // the planner with default focus (level-1 / add-to-10). Pin this so
+    // the rollout order (server first, browser later) doesn't break in
+    // the gap.
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: { track: 'math', level: 1, childName: 'Marian' },
+      }),
+      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+    )
+
+    expect(res.status).toBe(200)
+    // Planner was called → server didn't trip the legacy stub path.
+    expect(anthropicClient.messages.create).toHaveBeenCalledTimes(1)
+    // The user message names the default focus node for math (add-to-10).
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).toContain('add-to-10')
+  })
+
+  it('soft-validates a malformed progress block — drops bad fields and continues', async () => {
+    // Defense in depth: a future browser bug shipping a malformed
+    // progress block should NOT 4xx — it should fall back to defaults
+    // and let Marian play. The planner-side validator still rejects
+    // unknown-but-typed focusNodes; a bad-typed value here is just
+    // dropped silently.
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            // wrong types — should all be silently dropped.
+            focusNode: 42,
+            recentSuccessRate: 'not a number',
+          },
+        },
+      }),
+      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+    )
+
+    expect(res.status).toBe(200)
+    // Planner called with default focus — bad fields dropped.
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).toContain('add-to-10')
+  })
+
+  it('rejects an out-of-range recentSuccessRate — drops it silently (must be in [0, 1])', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            recentSuccessRate: 1.5, // out of range — drop
+          },
+        },
+      }),
+      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+    )
+
+    expect(res.status).toBe(200)
+    // Out-of-range recentSuccessRate is dropped → user message reads
+    // "no data" rather than 1.5.
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/no data/i)
+    expect(user).not.toMatch(/1\.5/)
+  })
+
+  it('cross-track focusNode (math request, word-song node) → 502 planner-failed', async () => {
+    // The handler's soft-validator forwards focusNode if it's a
+    // syntactically-OK string; the planner's hard-validator rejects
+    // cross-track values. End-to-end, that surfaces as a 502
+    // planner-failed (the same shape the browser already handles by
+    // falling back to silent mode).
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+      const res = await handler(
+        makeRequest({
+          kind: 'session-start',
+          payload: {
+            track: 'math',
+            level: 1,
+            childName: 'Marian',
+            progress: { focusNode: 'cvc-words', recentSuccessRate: null },
+          },
+        }),
+        { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      )
+      expect(res.status).toBe(502)
+      const body = (await res.json()) as { error: string }
+      expect(body.error).toBe('planner-failed')
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+})

@@ -184,28 +184,53 @@ function extractPlan(payload: unknown): unknown | null {
   return p.plan
 }
 
-/** Track-based session-start payload (added ticket 86c9jdh39). When the
- *  caller doesn't ship a hand-built plan, they may instead ask the server
- *  to generate one via Haiku by passing { track, level, childName }. */
+/** Track-based session-start payload (added ticket 86c9jdh39, extended
+ *  ticket 86c9kmwba for the optional `progress` block). When the caller
+ *  doesn't ship a hand-built plan, they may instead ask the server to
+ *  generate one via Haiku by passing { track, level, childName } plus an
+ *  optional progress block carrying focus-node hints. */
 interface TrackPayload {
   track: PlannerTrack
   level: number
   childName: string
+  /** M2: optional adaptive-engine hints. Browser computes via
+   *  `pickFocusNode` / `pickRecentSuccessRate` against
+   *  `loadProgress()`. Absent for legacy clients — the planner falls
+   *  back to the level-1 default focus node for the track. */
+  focusNode?: string
+  recentSuccessRate?: number | null
 }
 
 const VALID_TRACKS: readonly PlannerTrack[] = ['math', 'word-song']
 
 /**
- * Extract the track/level/childName triple if the payload carries one.
- * Returns null if any field is missing or wrongly typed — the handler
- * falls through to the legacy stub path in that case (no breaking change
- * for callers that still pass `{ plan }`).
+ * Extract the track/level/childName triple if the payload carries one,
+ * and the optional `progress` sub-block if present.
+ *
+ * Returns null if any required field is missing or wrongly typed — the
+ * handler falls through to the legacy stub path in that case (no
+ * breaking change for callers that still pass `{ plan }`).
  *
  * Sanity: childName is also bounded — anything longer than 64 chars is
  * suspicious enough to reject (real first names don't go that long; an
  * over-long value is most likely a prompt-injection attempt or a bug).
  * Level is restricted to 1-9 since today only level 1 is implemented and
  * the prompt is forward-compatible up to 9.
+ *
+ * The `progress` sub-block (M2 — ticket 86c9kmwba) is OPTIONAL. If
+ * present, we extract `focusNode` (string) and `recentSuccessRate`
+ * (number 0..1, or null/missing). Malformed sub-fields are silently
+ * dropped rather than rejecting the whole request — a bad `progress`
+ * block should not cripple a session start; the planner falls back to
+ * the default focus node and reports "no recent score" to Haiku.
+ *
+ * Why-silent on malformed `progress`:
+ *   - The browser's selector is the source of truth for these fields;
+ *     if a future bug ships a malformed value, we'd rather degrade
+ *     gracefully than 4xx the iPad mid-session.
+ *   - The planner-side validation in `_planner.ts` still hard-rejects
+ *     an unknown-but-typed `focusNode` (cross-track, made-up node), so
+ *     coordinated attacks still surface as 4xx.
  */
 function extractTrackPayload(payload: unknown): TrackPayload | null {
   if (typeof payload !== 'object' || payload === null) return null
@@ -231,7 +256,46 @@ function extractTrackPayload(payload: unknown): TrackPayload | null {
     childName.length > 64
   )
     return null
-  return { track: track as PlannerTrack, level, childName }
+
+  const out: TrackPayload = {
+    track: track as PlannerTrack,
+    level,
+    childName,
+  }
+
+  // Optional progress sub-block. Soft-validate.
+  const progress = p.progress
+  if (
+    progress !== undefined &&
+    progress !== null &&
+    typeof progress === 'object'
+  ) {
+    const pr = progress as Record<string, unknown>
+    if (
+      typeof pr.focusNode === 'string' &&
+      pr.focusNode.length > 0 &&
+      pr.focusNode.length <= 64
+    ) {
+      out.focusNode = pr.focusNode
+    }
+    // recentSuccessRate may be:
+    //  - a finite number in [0, 1]  → forwarded
+    //  - null                       → forwarded (planner-side: "no data")
+    //  - missing                    → omitted (planner-side: "no data")
+    //  - anything else              → silently dropped
+    if (pr.recentSuccessRate === null) {
+      out.recentSuccessRate = null
+    } else if (
+      typeof pr.recentSuccessRate === 'number' &&
+      Number.isFinite(pr.recentSuccessRate) &&
+      pr.recentSuccessRate >= 0 &&
+      pr.recentSuccessRate <= 1
+    ) {
+      out.recentSuccessRate = pr.recentSuccessRate
+    }
+  }
+
+  return out
 }
 
 /**
@@ -441,11 +505,20 @@ export async function handler(
     const trackPayload = extractTrackPayload(body.payload)
     if (trackPayload !== null) {
       // Cache check (added ticket 86c9kjdh2). Identical (track, level,
-      // childName) requests within the TTL serve from the in-memory
-      // module cache — zero Azure calls and zero Anthropic calls. The
-      // cache lives outside the rate-limit gate because a hit is free
-      // (no upstream cost). See _sessionCache.ts for trade-off notes.
-      const cacheKey = buildSessionCacheKey(trackPayload)
+      // childName, focusNode) requests within the TTL serve from the
+      // in-memory module cache — zero Azure calls and zero Anthropic
+      // calls. M2 (ticket 86c9kmwba): focusNode is part of the key so
+      // a {focusNode: 'add-to-10'} hit doesn't get served to a
+      // {focusNode: 'add-to-20'} request. recentSuccessRate is NOT in
+      // the key (continuously variable, would shred the hit rate).
+      // The cache lives outside the rate-limit gate because a hit is
+      // free (no upstream cost). See _sessionCache.ts for trade-offs.
+      const cacheKey = buildSessionCacheKey({
+        track: trackPayload.track,
+        level: trackPayload.level,
+        childName: trackPayload.childName,
+        focusNode: trackPayload.focusNode,
+      })
       const cached = cache.get(cacheKey, now())
       if (cached !== null) {
         return jsonResponse(cached, 200, headers)
@@ -478,6 +551,13 @@ export async function handler(
           track: trackPayload.track,
           level: trackPayload.level,
           childName: trackPayload.childName,
+          // M2 (ticket 86c9kmwba). When the browser provided a progress
+          // block, route focusNode + recentSuccessRate into the planner
+          // user message so Haiku targets the right curriculum slice and
+          // tunes easier-vs-harder mix. Either field may be undefined —
+          // the planner has its own defaults for that case.
+          focusNode: trackPayload.focusNode,
+          recentSuccessRate: trackPayload.recentSuccessRate,
         })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)

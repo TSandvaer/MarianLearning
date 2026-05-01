@@ -542,6 +542,229 @@ describe('stripMarkdownFence — pure helper', () => {
   })
 })
 
+describe('generateSessionPlan — focusNode + recentSuccessRate (M2, ticket 86c9kmwba)', () => {
+  // The planner accepts an optional `progress`-derived pair: focusNode
+  // (string, must belong to the requested track) and recentSuccessRate
+  // (0..1 or null). Both are routed into the user message — system
+  // prompt stays static across calls so the prompt-cache prefix
+  // remains stable.
+
+  const MATH_PLAN_RESPONSE = JSON.stringify({
+    id: 'haiku-math-001',
+    label: 'M2 — focus node test',
+    utterances: [
+      { id: 'math.p1.read', text: 'Three plus two. How many?' },
+      { id: 'math.p1.correct', text: 'Yes! Five!' },
+      { id: 'math.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'math.p1.hint', text: 'Look. Three. And two more.' },
+      { id: 'math.p1.giveAnswer', text: 'This one is five.' },
+    ],
+  })
+
+  it('places focusNode in the USER message (not the system block — keeps the cache prefix stable)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+
+    const args = capture.lastArgs as {
+      system: Array<{ text: string }>
+      messages: Array<{ role: string; content: string }>
+    }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    const userText = args.messages[0]!.content
+
+    // The user message names the chosen focus node verbatim — that's the
+    // signal Haiku reads to decide which slice to generate.
+    expect(userText).toContain('add-to-20')
+    expect(userText).toMatch(/focus skill node/i)
+
+    // The system block enumerates the FULL focus-node menu (so the model
+    // knows what each one means), but does NOT shift its shape based on
+    // the per-call value — that would invalidate the prompt-cache
+    // prefix. Sanity: both add-to-10 and add-to-20 appear in the menu
+    // because the menu is static.
+    expect(systemText).toContain('add-to-10')
+    expect(systemText).toContain('add-to-20')
+  })
+
+  it('two calls with different focusNodes share the same SYSTEM prompt text (cache invariant)', async () => {
+    // Pin the prompt-cache invariant: the system block is byte-stable
+    // across calls that vary only in focusNode / recentSuccessRate.
+    // shared/prompt-caching.md requires the cached prefix to be
+    // identical — this test fails if a future edit accidentally weaves
+    // the per-call values into the system text.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(MATH_PLAN_RESPONSE, { capture: cap1 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(MATH_PLAN_RESPONSE, { capture: cap2 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+
+  it('omits focusNode → falls back to the level-1 default for the track', async () => {
+    // M2 backwards-compat: callers that don't yet ship `focusNode` must
+    // continue to work. The planner picks the level-1 default
+    // (math: add-to-10) and routes that into the user message, so
+    // Haiku's behavior matches the pre-M2 contract for those callers.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      // focusNode deliberately omitted
+    })
+
+    const args = capture.lastArgs as {
+      messages: Array<{ content: string }>
+    }
+    expect(args.messages[0]!.content).toContain('add-to-10')
+  })
+
+  it('omits focusNode for word-song → defaults to cvc-words', async () => {
+    const WORD_RESPONSE = JSON.stringify({
+      id: 'haiku-word-001',
+      label: 'M2 word default',
+      utterances: [{ id: 'word.p1.read', text: 'Tap the cat.' }],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).toContain('cvc-words')
+  })
+
+  it('rejects a focusNode that does not belong to the requested track', async () => {
+    // {track: math, focusNode: cvc-words} is malformed input — the
+    // planner enumerates one track's menu at a time so the model is
+    // unambiguously instructed. Cross-track focus is a 4xx-shape error.
+    const client = makeMockClient(MATH_PLAN_RESPONSE)
+    await expect(
+      generateSessionPlan({
+        client,
+        track: 'math',
+        level: 1,
+        childName: 'Marian',
+        focusNode: 'cvc-words',
+      }),
+    ).rejects.toMatchObject({
+      name: 'PlannerError',
+      code: 'invalid-request',
+    })
+  })
+
+  it('rejects an unknown focusNode (not in the valid set)', async () => {
+    const client = makeMockClient(MATH_PLAN_RESPONSE)
+    await expect(
+      generateSessionPlan({
+        client,
+        track: 'math',
+        level: 1,
+        childName: 'Marian',
+        focusNode: 'banana-skill',
+      }),
+    ).rejects.toMatchObject({
+      name: 'PlannerError',
+      code: 'invalid-request',
+    })
+  })
+
+  it('places recentSuccessRate in the user message when supplied', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      recentSuccessRate: 0.42,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    // The user line phrases it with two decimals so a 0.42 round-trips
+    // identifiably. The exact text is implementation detail; we just pin
+    // that the value appears.
+    expect(user).toMatch(/0\.42/)
+    expect(user).toMatch(/recent score/i)
+  })
+
+  it('reports "no data" in the user message when recentSuccessRate is null', async () => {
+    // Distinct from a 0.0 score — the planner needs to know "I have no
+    // history" so it picks a balanced mix instead of conditioning on a
+    // misleading low score.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      recentSuccessRate: null,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).toMatch(/no data/i)
+  })
+
+  it('reports "no data" when recentSuccessRate is omitted', async () => {
+    // Omitted == undefined; same UX as null on the wire.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      // recentSuccessRate intentionally omitted
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).toMatch(/no data/i)
+  })
+})
+
 describe('generateSessionPlan — Haiku fence-stripping (regression for 86c9jrwb4)', () => {
   const MATH_PLAN = {
     id: 'haiku-math-001',

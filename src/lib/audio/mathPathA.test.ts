@@ -86,11 +86,76 @@ describe('prepareMathPathA — happy path', () => {
     expect(init?.method).toBe('POST')
     const body = JSON.parse(init?.body as string) as Record<string, unknown>
     expect(body.kind).toBe('session-start')
+    // Default args (no progress fields) → no progress block on the wire.
+    // Backwards-compat with the pre-M2 server contract: legacy clients
+    // sending exactly `{track, level, childName}` must keep working.
     expect(body.payload).toEqual({
       track: 'math',
       level: 1,
       childName: 'Marian',
     })
+  })
+
+  it('attaches a progress block when focusNode + recentSuccessRate are supplied (M2 — ticket 86c9kmwba)', async () => {
+    const plan = STATIC_SESSION_PLANS[0]!
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(buildServerResponse(plan)),
+    )
+
+    await prepareMathPathA(
+      {
+        ...STD_ARGS,
+        focusNode: 'add-to-20',
+        recentSuccessRate: 0.66,
+      },
+      {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map()),
+        playSessionUtterance: vi.fn(async () => {}),
+      },
+    )
+
+    const [, init] = fetchMock.mock.calls[0]!
+    const body = JSON.parse(init?.body as string) as {
+      payload: Record<string, unknown>
+    }
+    expect(body.payload).toEqual({
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      progress: {
+        focusNode: 'add-to-20',
+        recentSuccessRate: 0.66,
+      },
+    })
+  })
+
+  it('forwards recentSuccessRate=null verbatim (planner needs to distinguish "no data" from 0.0)', async () => {
+    const plan = STATIC_SESSION_PLANS[0]!
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(buildServerResponse(plan)),
+    )
+
+    await prepareMathPathA(
+      {
+        ...STD_ARGS,
+        focusNode: 'add-to-10',
+        recentSuccessRate: null,
+      },
+      {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map()),
+        playSessionUtterance: vi.fn(async () => {}),
+      },
+    )
+
+    const [, init] = fetchMock.mock.calls[0]!
+    const body = JSON.parse(init?.body as string) as {
+      payload: { progress: { recentSuccessRate: unknown } }
+    }
+    // null is the explicit "no data" sentinel — must appear as null, not
+    // dropped to undefined or coerced to 0.
+    expect(body.payload.progress.recentSuccessRate).toBeNull()
   })
 
   it('returns the rehydrated MathSessionPlan from the server response', async () => {
