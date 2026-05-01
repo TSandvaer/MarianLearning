@@ -32,6 +32,7 @@ import StardustCounter from './StardustCounter'
 import StreakBand from './StreakBand'
 import SleepSplash from './SleepSplash'
 import { recordSessionEnd } from './sessionHistory'
+import { recordProgressOnSessionEnd } from './progressHistory'
 import type { StorageAdapter } from '../Math/stardust'
 import type { ReactElement } from 'react'
 
@@ -214,9 +215,31 @@ export default function SessionEnd({
   }, [])
 
   // ── Persist session history on mount (spec section "localStorage") ------
+  //
+  // Two writes land here, both gated to mount-once:
+  //   1. `recordSessionEnd` -> `marian-tutor.session-history.v1` (Hub stats:
+  //      session count, day-streak, lastPlayed, etc.)
+  //   2. `recordProgressOnSessionEnd` -> `marian-tutor:progress:v1` (adaptive
+  //      engine plumbing: rolling SessionHistoryEntry list capped at 30, plus
+  //      profile.lastPlayedISO). Ticket 86c9kmu63 is the first production
+  //      caller of `saveProgress` — until now the progress blob was only
+  //      exercised by unit tests.
+  //
+  // Both writes use the same wall-clock instant for clean cross-payload
+  // correlation. The progress write goes through its own helper so the
+  // SessionEnd component stays UI-only; the helper handles `loadProgress
+  // ?? defaultProgress()` and the `MAX_SESSION_HISTORY=30` trim is enforced
+  // inside `saveProgress`.
 
   useEffect(() => {
+    const clock = now ?? (() => new Date())
+    const dateISO = clock().toISOString()
     recordSessionEnd(p.finalStreak, storage, now)
+    recordProgressOnSessionEnd({
+      surface: p.surface,
+      totalCorrect: p.totalCorrect,
+      dateISO,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

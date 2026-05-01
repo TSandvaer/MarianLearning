@@ -1,0 +1,115 @@
+/**
+ * Progress-history persistence for Session End — adaptive engine plumbing.
+ *
+ * Ticket: 86c9kmu63 — feat(progress): persist session history to localStorage
+ * on session-end.
+ *
+ * This module is the production write path into the `marian-tutor:progress:v1`
+ * blob (see `src/lib/progress/`). The progress model has been fully built and
+ * unit-tested for some time; until this ticket the only callers of
+ * `saveProgress` lived in tests, so Marian's accumulating learning state was
+ * never actually being collected. The adaptive engine (separate ticket Matt is
+ * drafting) will read this data — this module just starts collecting it.
+ *
+ * What this DOES NOT do (deferred):
+ *   - Update `skillLevels` post-session (the adaptive engine owns that).
+ *   - Touch `mathFactsLeitner` (Leitner update logic deferred).
+ *   - Feed Progress into `/api/claude` request payload.
+ *
+ * Why the call site is here, not App.tsx
+ * --------------------------------------
+ * `SessionEnd.tsx` already owns one persistence side-effect on mount via
+ * `recordSessionEnd` (writing to `marian-tutor.session-history.v1`). Adding a
+ * sibling write to a different storage key in the same effect keeps both
+ * "session-end persistence" concerns co-located and avoids threading the
+ * payload shape through App's route-flip handler. App.tsx already passes the
+ * payload to SessionEnd; making SessionEnd own the write is a smaller diff
+ * with a stronger separation of concerns.
+ *
+ * Storage key
+ * -----------
+ * Writes to `marian-tutor:progress:v1` via the `saveProgress` adapter (which
+ * already enforces `MAX_SESSION_HISTORY=30` trimming). This is a different
+ * key from `sessionHistory.ts`'s `marian-tutor.session-history.v1` — the two
+ * blobs serve different consumers (Hub stats vs adaptive engine) and have
+ * different schemas. Co-located write callers, separate storage payloads.
+ */
+
+import {
+  defaultProgress,
+  loadProgress,
+  saveProgress,
+  type Progress,
+  type SessionHistoryEntry,
+  type SkillNode,
+} from '../../lib/progress'
+import type { SessionEndSurface } from './SessionEnd'
+
+/**
+ * Sessions are always 8 problems. `successRate` is `totalCorrect / 8` as a
+ * float in [0, 1] (NOT rounded — adaptive engine wants the precise value).
+ */
+const PROBLEMS_PER_SESSION = 8
+
+/**
+ * Surface → focus skill node map.
+ *
+ * Intentionally simplistic — this is the first cut, the adaptive engine will
+ * later refine to "actual nodes touched per problem". For v1, every Math
+ * session focuses `add-to-10` (Marian's diagnostic level per CLAUDE.md "Marian's
+ * current levels") and every Word Song session focuses `blending-cv` (CVC is
+ * still emerging; CV blending is the active level).
+ */
+const SURFACE_FOCUS: Record<SessionEndSurface, SkillNode[]> = {
+  math: ['add-to-10'],
+  'word-song': ['blending-cv'],
+}
+
+export interface RecordProgressInput {
+  /** Discriminant from the Session End payload. */
+  surface: SessionEndSurface
+  /** 0..8 — number of problems Marian got right this session. */
+  totalCorrect: number
+  /** ISO 8601 timestamp the session-end CTA fired. Injected for test seam. */
+  dateISO: string
+}
+
+/**
+ * Append a `SessionHistoryEntry` to the persisted Progress document and
+ * update `profile.lastPlayedISO`. If no document exists yet, seeds a fresh
+ * one via `defaultProgress()` (which encodes Marian's diagnostic baseline —
+ * see `src/lib/progress/defaults.ts`).
+ *
+ * Best-effort: storage failures (quota, private mode, missing window) are
+ * swallowed by `saveProgress` itself; this function never throws.
+ *
+ * Idempotent under repeated calls only in the trivial sense — each call
+ * appends one entry, so two calls with the same input produce two entries.
+ * That matches the `recordSessionEnd` shape next door.
+ *
+ * Returns the persisted document for tests / future consumers; production
+ * callers can ignore the return value.
+ */
+export function recordProgressOnSessionEnd(
+  input: RecordProgressInput,
+): Progress {
+  const existing = loadProgress() ?? defaultProgress()
+
+  const entry: SessionHistoryEntry = {
+    dateISO: input.dateISO,
+    skillFocus: [...SURFACE_FOCUS[input.surface]],
+    successRate: input.totalCorrect / PROBLEMS_PER_SESSION,
+  }
+
+  const next: Progress = {
+    ...existing,
+    profile: {
+      ...existing.profile,
+      lastPlayedISO: input.dateISO,
+    },
+    history: [...existing.history, entry],
+  }
+
+  saveProgress(next)
+  return next
+}
