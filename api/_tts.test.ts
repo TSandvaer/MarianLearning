@@ -19,8 +19,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   buildAzureEndpoint,
   buildSsmlBody,
+  computeBackoffDelayMs,
   describeAzureFailure,
   escapeSsml,
+  fetchWithBackoff,
+  parseRetryAfterMs,
   readAzureCredentials,
   renderSsmlInnerText,
   synthesizeUtterance,
@@ -388,17 +391,21 @@ describe('synthesizeUtterance', () => {
     ).rejects.toThrow(/tts auth failed \(401\)/)
   })
 
-  it('rejects with the rate-limited message on 429', async () => {
+  it('rejects with the rate-limited message on 429 (retries disabled)', async () => {
     const fetchFn = vi.fn(async () => fakeFailResponse(429, 'Too many'))
     await expect(
       synthesizeUtterance(HAPPY_REQ, {
         fetchFn: fetchFn as unknown as typeof fetch,
         env: TEST_ENV,
+        // Disable retries so this test pins the error-mapping semantics
+        // independently of the retry policy. The retry behaviour is
+        // covered by its own dedicated suite further down.
+        backoff: { maxAttempts: 0 },
       }),
     ).rejects.toThrow(/tts rate limited \(429\)/)
   })
 
-  it('rejects with the upstream-error message on 503', async () => {
+  it('rejects with the upstream-error message on 503 (retries disabled)', async () => {
     const fetchFn = vi.fn(async () =>
       fakeFailResponse(503, 'service unavailable'),
     )
@@ -406,6 +413,7 @@ describe('synthesizeUtterance', () => {
       synthesizeUtterance(HAPPY_REQ, {
         fetchFn: fetchFn as unknown as typeof fetch,
         env: TEST_ENV,
+        backoff: { maxAttempts: 0 },
       }),
     ).rejects.toThrow(/tts upstream error \(503\)/)
   })
@@ -461,6 +469,345 @@ describe('synthesizeUtterance', () => {
         env: TEST_ENV,
       }),
     ).rejects.toThrow(/connection reset by peer/)
+  })
+})
+
+// --- Retry + backoff (ticket 86c9kjdh2) -------------------------------
+
+describe('parseRetryAfterMs', () => {
+  it('returns null for missing or empty headers', () => {
+    expect(parseRetryAfterMs(null)).toBeNull()
+    expect(parseRetryAfterMs('')).toBeNull()
+    expect(parseRetryAfterMs('   ')).toBeNull()
+  })
+
+  it('parses integer-seconds form to ms', () => {
+    expect(parseRetryAfterMs('1')).toBe(1000)
+    expect(parseRetryAfterMs('5')).toBe(5000)
+    expect(parseRetryAfterMs('0')).toBe(0)
+  })
+
+  it('rounds decimal seconds to nearest ms', () => {
+    expect(parseRetryAfterMs('1.5')).toBe(1500)
+    expect(parseRetryAfterMs('0.25')).toBe(250)
+  })
+
+  it('parses HTTP-date form against a fixed clock', () => {
+    const now = Date.parse('2026-05-01T07:00:00.000Z')
+    const target = 'Fri, 01 May 2026 07:00:03 GMT' // 3 seconds later
+    const result = parseRetryAfterMs(target, now)
+    // Allow ±1ms tolerance for date-parser variance, though both should be exact.
+    expect(result).not.toBeNull()
+    expect(Math.abs(result! - 3000)).toBeLessThan(2)
+  })
+
+  it('returns 0 for an HTTP-date already in the past', () => {
+    const now = Date.parse('2026-05-01T07:00:00.000Z')
+    const past = 'Thu, 30 Apr 2026 12:00:00 GMT'
+    expect(parseRetryAfterMs(past, now)).toBe(0)
+  })
+
+  it('returns null for unparseable values', () => {
+    expect(parseRetryAfterMs('not-a-thing')).toBeNull()
+  })
+
+  it('rejects negative integer-seconds (treats as unparseable)', () => {
+    expect(parseRetryAfterMs('-1')).toBeNull()
+  })
+})
+
+describe('computeBackoffDelayMs', () => {
+  // Pin randomFn → 0.5 produces ZERO jitter in the (random*2 - 1) formula.
+  // Pin randomFn → 0 produces -jitterMs jitter; randomFn → 1 produces +jitterMs.
+  const noJitter = { randomFn: () => 0.5 }
+
+  it('uses base delay on the first retry attempt', () => {
+    expect(computeBackoffDelayMs(1, { baseDelayMs: 200, ...noJitter })).toBe(
+      200,
+    )
+  })
+
+  it('doubles per attempt up to the cap', () => {
+    expect(computeBackoffDelayMs(2, { baseDelayMs: 200, ...noJitter })).toBe(
+      400,
+    )
+    expect(computeBackoffDelayMs(3, { baseDelayMs: 200, ...noJitter })).toBe(
+      800,
+    )
+    expect(computeBackoffDelayMs(4, { baseDelayMs: 200, ...noJitter })).toBe(
+      1600,
+    )
+  })
+
+  it('caps the delay at maxDelayMs (default 3000)', () => {
+    expect(computeBackoffDelayMs(5, { baseDelayMs: 200, ...noJitter })).toBe(
+      3000, // 200 × 2^4 = 3200, capped to 3000
+    )
+    expect(computeBackoffDelayMs(10, { baseDelayMs: 200, ...noJitter })).toBe(
+      3000,
+    )
+  })
+
+  it('applies positive jitter when randomFn returns 1', () => {
+    // (1 × 2 - 1) × 50 = +50ms
+    expect(
+      computeBackoffDelayMs(1, {
+        baseDelayMs: 200,
+        jitterMs: 50,
+        randomFn: () => 1,
+      }),
+    ).toBe(250)
+  })
+
+  it('applies negative jitter when randomFn returns 0', () => {
+    // (0 × 2 - 1) × 50 = -50ms
+    expect(
+      computeBackoffDelayMs(1, {
+        baseDelayMs: 200,
+        jitterMs: 50,
+        randomFn: () => 0,
+      }),
+    ).toBe(150)
+  })
+
+  it('clamps the final value to >= 0 (jitter cannot drive it negative)', () => {
+    expect(
+      computeBackoffDelayMs(1, {
+        baseDelayMs: 10,
+        jitterMs: 100,
+        randomFn: () => 0,
+      }),
+    ).toBe(0) // 10 + (-100) = -90 → clamped to 0
+  })
+})
+
+describe('fetchWithBackoff', () => {
+  /** Build a fake fetchFn that returns the given sequence of Response
+   *  factories. After the sequence is exhausted, a sentinel Error is
+   *  thrown to make over-call regressions loud. */
+  function sequencedFetch(responseFactories: Array<() => Response>): {
+    fetchFn: ReturnType<typeof vi.fn>
+    callCount: () => number
+  } {
+    let i = 0
+    const fetchFn = vi.fn(async () => {
+      if (i >= responseFactories.length) {
+        throw new Error(
+          `fetchFn called ${i + 1} times, only ${responseFactories.length} responses queued`,
+        )
+      }
+      return responseFactories[i++]!()
+    })
+    return { fetchFn, callCount: () => i }
+  }
+
+  function recordingSleep(): {
+    sleepFn: (ms: number) => Promise<void>
+    delays: number[]
+  } {
+    const delays: number[] = []
+    return {
+      sleepFn: async (ms: number) => {
+        delays.push(ms)
+      },
+      delays,
+    }
+  }
+
+  it('returns a 2xx response on first try without retrying', async () => {
+    const { fetchFn, callCount } = sequencedFetch([
+      () => new Response('ok', { status: 200 }),
+    ])
+    const { sleepFn, delays } = recordingSleep()
+    const res = await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      { sleepFn, randomFn: () => 0.5 },
+    )
+    expect(res.status).toBe(200)
+    expect(callCount()).toBe(1)
+    expect(delays).toEqual([])
+  })
+
+  it('429 with Retry-After: 1 → sleeps 1000ms and retries; 200 returned', async () => {
+    const { fetchFn, callCount } = sequencedFetch([
+      () =>
+        new Response('throttled', {
+          status: 429,
+          headers: { 'Retry-After': '1' },
+        }),
+      () => new Response('ok', { status: 200 }),
+    ])
+    const { sleepFn, delays } = recordingSleep()
+    const res = await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      { sleepFn, randomFn: () => 0.5 },
+    )
+    expect(res.status).toBe(200)
+    expect(callCount()).toBe(2)
+    expect(delays).toEqual([1000])
+  })
+
+  it('429 with no Retry-After → exponential backoff delays', async () => {
+    const { fetchFn, callCount } = sequencedFetch([
+      () => new Response('', { status: 429 }),
+      () => new Response('', { status: 429 }),
+      () => new Response('', { status: 429 }),
+      () => new Response('ok', { status: 200 }),
+    ])
+    const { sleepFn, delays } = recordingSleep()
+    const res = await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      {
+        sleepFn,
+        // No-jitter randomFn so we can pin exact delays.
+        randomFn: () => 0.5,
+        baseDelayMs: 200,
+      },
+    )
+    expect(res.status).toBe(200)
+    expect(callCount()).toBe(4)
+    // Three retries: 200, 400, 800.
+    expect(delays).toEqual([200, 400, 800])
+  })
+
+  it('5 consecutive 429s → returns the final 429 unchanged (caller maps to hard error)', async () => {
+    const { fetchFn, callCount } = sequencedFetch([
+      () => new Response('', { status: 429 }),
+      () => new Response('', { status: 429 }),
+      () => new Response('', { status: 429 }),
+      () => new Response('', { status: 429 }),
+      () => new Response('', { status: 429 }),
+      () => new Response('', { status: 429 }), // 6th = exhausted, returned to caller
+    ])
+    const { sleepFn, delays } = recordingSleep()
+    const res = await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      { sleepFn, randomFn: () => 0.5, baseDelayMs: 200, maxAttempts: 5 },
+    )
+    expect(res.status).toBe(429)
+    expect(callCount()).toBe(6) // 1 initial + 5 retries
+    // Five backoff sleeps (capped at 3000): 200, 400, 800, 1600, 3000.
+    expect(delays).toEqual([200, 400, 800, 1600, 3000])
+  })
+
+  it('5xx single retry → recovers on the second call', async () => {
+    const { fetchFn, callCount } = sequencedFetch([
+      () => new Response('upstream blip', { status: 503 }),
+      () => new Response('ok', { status: 200 }),
+    ])
+    const { sleepFn, delays } = recordingSleep()
+    const res = await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      { sleepFn, randomFn: () => 0.5, baseDelayMs: 200 },
+    )
+    expect(res.status).toBe(200)
+    expect(callCount()).toBe(2)
+    expect(delays).toEqual([200])
+  })
+
+  it('5xx twice → does NOT retry a second time (single retry budget for 5xx)', async () => {
+    const { fetchFn, callCount } = sequencedFetch([
+      () => new Response('', { status: 500 }),
+      () => new Response('', { status: 500 }), // returned to caller
+    ])
+    const { sleepFn } = recordingSleep()
+    const res = await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      { sleepFn, randomFn: () => 0.5, baseDelayMs: 200 },
+    )
+    expect(res.status).toBe(500)
+    expect(callCount()).toBe(2)
+  })
+
+  it('caps a huge Retry-After at maxDelayMs (defense against pathological values)', async () => {
+    const { fetchFn } = sequencedFetch([
+      () =>
+        new Response('', {
+          status: 429,
+          headers: { 'Retry-After': '300' }, // 5 minutes
+        }),
+      () => new Response('ok', { status: 200 }),
+    ])
+    const { sleepFn, delays } = recordingSleep()
+    await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      { sleepFn, randomFn: () => 0.5, maxDelayMs: 3000 },
+    )
+    expect(delays).toEqual([3000])
+  })
+
+  it('terminal 4xx (e.g. 401) is NOT retried', async () => {
+    const { fetchFn, callCount } = sequencedFetch([
+      () => new Response('access denied', { status: 401 }),
+    ])
+    const { sleepFn, delays } = recordingSleep()
+    const res = await fetchWithBackoff(
+      fetchFn as unknown as typeof fetch,
+      'https://example.test',
+      { method: 'POST' },
+      { sleepFn, randomFn: () => 0.5 },
+    )
+    expect(res.status).toBe(401)
+    expect(callCount()).toBe(1)
+    expect(delays).toEqual([])
+  })
+})
+
+describe('synthesizeUtterance retry integration', () => {
+  it('429 with Retry-After then 200 → returns audio after one retry', async () => {
+    const audioBytes = new Uint8Array([0xff, 0xfb, 0x90, 0x44])
+    let call = 0
+    const fetchFn = vi.fn(async () => {
+      call += 1
+      if (call === 1) {
+        return new Response('', {
+          status: 429,
+          headers: { 'Retry-After': '0' },
+        })
+      }
+      return fakeOkResponse(audioBytes)
+    })
+    const result = await synthesizeUtterance(HAPPY_REQ, {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      env: TEST_ENV,
+      backoff: {
+        sleepFn: async () => {},
+        randomFn: () => 0.5,
+      },
+    })
+    expect(call).toBe(2)
+    expect(Array.from(result.audio)).toEqual([0xff, 0xfb, 0x90, 0x44])
+  })
+
+  it('5 consecutive 429s exhausts retries and surfaces the rate-limited hard error', async () => {
+    const fetchFn = vi.fn(async () => fakeFailResponse(429, 'still throttled'))
+    await expect(
+      synthesizeUtterance(HAPPY_REQ, {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        env: TEST_ENV,
+        backoff: {
+          sleepFn: async () => {},
+          randomFn: () => 0.5,
+          maxAttempts: 5,
+        },
+      }),
+    ).rejects.toThrow(/tts rate limited \(429\)/)
+    // 1 initial + 5 retries = 6 fetch calls.
+    expect(fetchFn).toHaveBeenCalledTimes(6)
   })
 })
 
