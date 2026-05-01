@@ -33,6 +33,20 @@
  * invariant is structural: 8 problems × 5 slots, every utterance id
  * matches the `math.p<N>.<slot>` template.
  *
+ * Out-of-namespace ids (skip-not-throw)
+ * -------------------------------------
+ * The server response can carry utterances whose ids fall outside the
+ * `math.p<N>.<slot>` template — e.g. the `session.end.*` family added in
+ * 86c9kj2u6. Those are loaded into the singleton howl-map for cross-screen
+ * consumption (SessionEnd reads them via `playSessionUtterance`) but they
+ * don't belong in the nested per-problem plan this parser produces. The
+ * loop below SKIPS such ids rather than throwing, so additive emissions
+ * upstream don't cascade into a silent-fallback regression for Math.
+ * Malformed-but-namespaced ids (e.g. `math.p1.bogus`) are also skipped
+ * here, but the per-problem completeness check downstream still catches
+ * them — the bucket for problem 1 will be missing a slot and we throw
+ * the clearer `missing slot "<slot>"` error.
+ *
  * Pure module: no React, no I/O, no side effects. All inputs validated;
  * throws `PlanFromServerError` on any structural issue so the caller's
  * fallback path fires cleanly.
@@ -100,15 +114,14 @@ export function mathSessionPlanFromServer(
     )
   }
 
-  // Group utterances by problem index, indexed by slot.
+  // Group utterances by problem index, indexed by slot. Out-of-namespace
+  // ids (e.g. session.end.*) are skipped — they are loaded into the
+  // singleton howl-map separately and don't belong in the nested
+  // per-problem plan. See the file header for the full contract.
   const byProblem = new Map<number, Partial<MathProblemUtterances>>()
   for (const u of serverPlan.utterances) {
     const parsedId = parseUtteranceId(u.id)
-    if (parsedId === null) {
-      throw new PlanFromServerError(
-        `utterance id "${u.id}" did not match math.p<N>.<slot> template`,
-      )
-    }
+    if (parsedId === null) continue
     const { index, slot } = parsedId
     let bucket = byProblem.get(index)
     if (!bucket) {
