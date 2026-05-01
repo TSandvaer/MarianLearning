@@ -27,5 +27,14 @@ export type Route =
   | 'literacy'
   | 'session-end'
   | 'reward'
+  /**
+   * Parent-only settings surface (M2.5 — ticket 86c9kpjc7). Reached
+   * exclusively via the 3-second long-press on Hub character art;
+   * never linked from a Marian-facing surface.
+   *
+   * Source-of-truth: `design/adaptive-engine-one-pager.md` §
+   * "Parent settings (v1 scope)".
+   */
+  | 'parent-settings'
 
 export const FIRST_ROUTE: Route = 'splash'
