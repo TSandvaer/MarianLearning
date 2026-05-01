@@ -10,6 +10,7 @@
 
 import { isProgressV1, readSchemaVersion } from './guards'
 import { migrate } from './migrate'
+import { getSettings } from './parentSettings'
 import type { Progress } from './types'
 import { CURRENT_SCHEMA_VERSION } from './types'
 
@@ -42,11 +43,34 @@ export function loadProgress(): Progress | null {
   if (version === null) return null
 
   if (version === CURRENT_SCHEMA_VERSION) {
-    return isProgressV1(parsed) ? parsed : null
+    return isProgressV1(parsed) ? withDefaultedSettings(parsed) : null
   }
 
   // Different version (older or newer) — route through migrate.
-  return migrate(parsed)
+  const migrated = migrate(parsed)
+  return migrated === null ? null : withDefaultedSettings(migrated)
+}
+
+/**
+ * Inject defaults for `parentSettings` post-parse (M2.5 — ticket
+ * 86c9kpjc7).
+ *
+ * The field is OPTIONAL on the persisted shape (additive,
+ * backward-compatible) so old blobs that predate M2.5 are valid v1
+ * documents. We layer defaults here — at the read path — so every
+ * caller of `loadProgress()` sees a fully-shaped result. The
+ * alternative (bake it into `migrate()`) is awkward because there's
+ * no actual schemaVersion bump and `migrate()` is reserved for
+ * cross-version transformations.
+ *
+ * Returns a fresh object with `parentSettings` populated; never
+ * mutates the input. If the input already carries a fully-shaped
+ * `parentSettings`, `getSettings()` returns its value verbatim
+ * (with masteryThreshold cloned), so the round-trip stays
+ * deep-equal.
+ */
+function withDefaultedSettings(p: Progress): Progress {
+  return { ...p, parentSettings: getSettings(p) }
 }
 
 /**

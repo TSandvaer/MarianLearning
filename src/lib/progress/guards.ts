@@ -95,6 +95,33 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
   )
 }
 
+function isParentSettings(v: unknown): boolean {
+  if (!isObject(v)) return false
+  if (typeof v.autoPromote !== 'boolean') return false
+  if (v.sessionModePicker !== 'on' && v.sessionModePicker !== 'off')
+    return false
+  if (typeof v.crossDayEnforcement !== 'boolean') return false
+  if (typeof v.showLevelToMarian !== 'boolean') return false
+  const mt = v.masteryThreshold
+  if (!isObject(mt)) return false
+  if (
+    typeof mt.percent !== 'number' ||
+    !Number.isFinite(mt.percent) ||
+    mt.percent < 0 ||
+    mt.percent > 1
+  ) {
+    return false
+  }
+  if (
+    typeof mt.sessions !== 'number' ||
+    !Number.isInteger(mt.sessions) ||
+    mt.sessions <= 0
+  ) {
+    return false
+  }
+  return true
+}
+
 /** True iff `v` matches the v1 Progress shape exactly. */
 export function isProgressV1(v: unknown): v is Progress {
   if (!isObject(v)) return false
@@ -108,6 +135,12 @@ export function isProgressV1(v: unknown): v is Progress {
   if (!isLeitnerBox(v.mathFactsLeitner)) return false
   if (!Array.isArray(v.history)) return false
   if (!v.history.every(isHistoryEntry)) return false
+  // parentSettings is optional (M2.5 — additive, no schemaVersion bump).
+  // Reject only on a malformed value; absent is fine and `loadProgress`
+  // injects defaults at read time.
+  if ('parentSettings' in v && v.parentSettings !== undefined) {
+    if (!isParentSettings(v.parentSettings)) return false
+  }
   return true
 }
 
