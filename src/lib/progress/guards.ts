@@ -141,6 +141,17 @@ export function isProgressV1(v: unknown): v is Progress {
   if ('parentSettings' in v && v.parentSettings !== undefined) {
     if (!isParentSettings(v.parentSettings)) return false
   }
+  // pendingPromotion is optional (M3 — additive, no schemaVersion bump).
+  // When present it must be a known SkillNode string; an empty / missing
+  // field is the normal state and means "no queued promotion".
+  if ('pendingPromotion' in v && v.pendingPromotion !== undefined) {
+    if (
+      typeof v.pendingPromotion !== 'string' ||
+      !SKILL_NODES.has(v.pendingPromotion as SkillNode)
+    ) {
+      return false
+    }
+  }
   return true
 }
 

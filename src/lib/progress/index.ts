@@ -51,3 +51,6 @@ export {
   pickRecentSuccessRate,
 } from './focusNode'
 export type { ProgressTrack } from './focusNode'
+
+export { LITERACY_TREE, MATH_TREE, applyMasteryRule, nextNode } from './mastery'
+export type { MasteryTrack } from './mastery'
