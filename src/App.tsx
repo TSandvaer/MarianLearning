@@ -23,6 +23,7 @@ import type {
 } from './screens/WordSong'
 import SessionEnd from './screens/SessionEnd'
 import type { PlayUtteranceFn, SessionEndPayload } from './screens/SessionEnd'
+import ParentSettings from './screens/ParentSettings'
 import {
   markTreeTouched,
   readSessionHistory,
@@ -103,7 +104,8 @@ function getInitialRoute(): Route {
       v === 'math' ||
       v === 'literacy' ||
       v === 'session-end' ||
-      v === 'reward'
+      v === 'reward' ||
+      v === 'parent-settings'
     ) {
       return v
     }
@@ -256,6 +258,22 @@ export default function App() {
   /** Hub parent-gate completion — v1 no-op (console.log inside the hook). */
   const handleHubParentGate = useCallback(() => {
     // v2 will navigate to a real parent area here. v1 ships invisible.
+  }, [])
+
+  /**
+   * Hub character-art 3-second long-press → Parent Settings (M2.5,
+   * ticket 86c9kpjc7). The orchestrator owns the route flip; the Hub
+   * doesn't navigate directly. Tap-and-release does NOT fire — see
+   * `useCharacterLongPress` for the timer contract.
+   */
+  const handleHubCharacterLongPress = useCallback(() => {
+    setRoute('parent-settings')
+  }, [])
+
+  /** Parent Settings → Hub when the parent taps "Done". */
+  const handleParentSettingsExit = useCallback(() => {
+    setHubEntryPath('mid-skill-back')
+    setRoute('hub')
   }, [])
 
   /**
@@ -812,6 +830,7 @@ export default function App() {
               path={hubEntryPath}
               onPickTree={handleHubPickTree}
               onParentGate={handleHubParentGate}
+              onCharacterLongPress={handleHubCharacterLongPress}
             />
           )}
           {route === 'math' && (
@@ -840,6 +859,12 @@ export default function App() {
               payload={sessionEndPayload}
               playUtteranceFn={sessionEndPlayUtterance}
               onAllDone={handleSessionEndAllDone}
+            />
+          )}
+          {route === 'parent-settings' && (
+            <ParentSettings
+              key="parent-settings"
+              onExit={handleParentSettingsExit}
             />
           )}
         </AnimatePresence>

@@ -129,6 +129,49 @@ export interface MathFact {
   op: '+' | '-' | '*'
 }
 
+// --------------------------------------------------------------------------
+// Parent settings (M2.5 — ticket 86c9kpjc7).
+// Defaults + read helper live in ./parentSettings.ts so the data shape stays
+// here (with the rest of the persisted Progress shape) and the runtime
+// API stays where it can be tree-shaken if a consumer only needs types.
+// --------------------------------------------------------------------------
+
+/**
+ * Mastery threshold preset. v1 UI exposes exactly three presets — the
+ * type widens to the shape so a forward-looking change can add more
+ * without rewriting consumers.
+ */
+export interface MasteryThreshold {
+  /** Required success rate, 0..1. */
+  percent: number
+  /** Required consecutive sessions at or above `percent` to promote. */
+  sessions: number
+}
+
+/**
+ * Session-mode picker. `'off'` (default) means the engine selects mode
+ * autonomously. `'on'` means the Hub surfaces a Marian-facing
+ * review | focus | mixed picker (M4 implements the Hub UI).
+ */
+export type SessionModePicker = 'off' | 'on'
+
+/**
+ * Parent-tunable settings — five knobs that drive the adaptive
+ * engine's behaviour. Defaults locked by Thomas on 2026-05-01.
+ *
+ * Read via `getSettings(progress)` from `./parentSettings.ts` —
+ * never reach into `progress.parentSettings` directly. The helper
+ * fills defaults for missing / partial fields so old blobs (and
+ * forward-compat changes that add fields) don't crash readers.
+ */
+export interface ParentSettings {
+  autoPromote: boolean
+  sessionModePicker: SessionModePicker
+  masteryThreshold: MasteryThreshold
+  crossDayEnforcement: boolean
+  showLevelToMarian: boolean
+}
+
 /** Top-level persisted document. Always carries `schemaVersion`. */
 export interface Progress {
   schemaVersion: 1
@@ -137,6 +180,14 @@ export interface Progress {
   /** Leitner box for math facts only (literacy uses sight-word lists later). */
   mathFactsLeitner: LeitnerBox<MathFact>
   history: SessionHistory
+  /**
+   * Parent-tunable settings (M2.5 — ticket 86c9kpjc7). Optional on the
+   * stored shape because pre-M2.5 blobs predate the field; readers
+   * obtain a fully-shaped result via `getSettings()` from
+   * `./parentSettings.ts`, never by reaching directly. Field is
+   * additive and backward-compatible; schemaVersion stays at 1.
+   */
+  parentSettings?: ParentSettings
 }
 
 export const CURRENT_SCHEMA_VERSION = 1 as const

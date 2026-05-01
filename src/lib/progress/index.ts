@@ -8,17 +8,26 @@ export type {
   LeitnerBox,
   LeitnerBoxIndex,
   LeitnerItem,
+  MasteryThreshold,
   MathFact,
   NumberGardenNode,
+  ParentSettings,
   Profile,
   Progress,
   SessionHistory,
   SessionHistoryEntry,
+  SessionModePicker,
   SkillLevel,
   SkillLevels,
   SkillNode,
   WordSongNode,
 } from './types'
+
+export {
+  DEFAULT_PARENT_SETTINGS,
+  MASTERY_THRESHOLD_PRESETS,
+  getSettings,
+} from './parentSettings'
 
 export { CURRENT_SCHEMA_VERSION } from './types'
 

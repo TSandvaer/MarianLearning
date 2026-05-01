@@ -8,6 +8,7 @@
  */
 
 import { emptyLeitner } from './leitner'
+import { DEFAULT_PARENT_SETTINGS } from './parentSettings'
 import type { Progress, SkillLevels } from './types'
 import { CURRENT_SCHEMA_VERSION } from './types'
 
@@ -17,7 +18,7 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'add-to-10': 'practicing', // sums to 10, drive automaticity
   'add-to-20': 'locked',
   'sub-to-10': 'mastered', // within 15 confident => sub-to-10 is solid
-  'sub-to-20': 'locked', // diagnostic says extend to 20 no-borrow next
+  'sub-to-20': 'intro', // diagnostic says extend to 20 no-borrow next — introduced
   'two-digit-addsub': 'locked',
   'skip-counting': 'locked',
   'mult-2-5-10': 'intro', // repeated addition concept, no x symbol
@@ -49,5 +50,14 @@ export function defaultProgress(childName = 'Marian'): Progress {
     skillLevels: { ...DEFAULT_SKILL_LEVELS },
     mathFactsLeitner: emptyLeitner(),
     history: [],
+    // Seed parent settings with the Thomas-locked defaults. Field is
+    // optional on the persisted shape (old blobs predate this milestone),
+    // so include it on fresh defaults but rely on `getSettings()` to
+    // fill it in for any blob that doesn't carry it. See
+    // `./parentSettings.ts`.
+    parentSettings: {
+      ...DEFAULT_PARENT_SETTINGS,
+      masteryThreshold: { ...DEFAULT_PARENT_SETTINGS.masteryThreshold },
+    },
   }
 }

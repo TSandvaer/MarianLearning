@@ -420,6 +420,134 @@ describe('Hub — parent-gate long-press (invisible v1)', () => {
   })
 })
 
+describe('Hub — character-art 3s long-press (M2.5)', () => {
+  it('fires onCharacterLongPress after 3s of sustained press on Emma', () => {
+    vi.useFakeTimers()
+    try {
+      const onCharacterLongPress = vi.fn()
+      renderHub({
+        storage: createMemoryStorage(),
+        onCharacterLongPress,
+      })
+      const emma = screen.getByTestId('hub-emma')
+
+      act(() => {
+        emma.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+      })
+
+      // Just under 3 s → no fire
+      act(() => {
+        vi.advanceTimersByTime(2999)
+      })
+      expect(onCharacterLongPress).not.toHaveBeenCalled()
+
+      // Past 3 s → fires exactly once
+      act(() => {
+        vi.advanceTimersByTime(2)
+      })
+      expect(onCharacterLongPress).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does NOT fire on a 1500ms tap-and-release', () => {
+    vi.useFakeTimers()
+    try {
+      const onCharacterLongPress = vi.fn()
+      renderHub({
+        storage: createMemoryStorage(),
+        onCharacterLongPress,
+      })
+      const emma = screen.getByTestId('hub-emma')
+
+      act(() => {
+        emma.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+      })
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+      act(() => {
+        emma.dispatchEvent(
+          new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }),
+        )
+      })
+      // Even past the 3s threshold post-release, no fire.
+      act(() => {
+        vi.advanceTimersByTime(5000)
+      })
+      expect(onCharacterLongPress).toHaveBeenCalledTimes(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does NOT fire on a 3s long-press of a non-character element (Math button)', () => {
+    vi.useFakeTimers()
+    try {
+      const onCharacterLongPress = vi.fn()
+      renderHub({
+        storage: createMemoryStorage(),
+        onCharacterLongPress,
+      })
+      const numberNode = screen
+        .getAllByTestId('hub-tree-node')
+        .find((n) => n.getAttribute('data-tree') === 'number-garden')!
+
+      act(() => {
+        numberNode.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+      })
+      act(() => {
+        vi.advanceTimersByTime(3500)
+      })
+      expect(onCharacterLongPress).toHaveBeenCalledTimes(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancels on pointercancel mid-press', () => {
+    vi.useFakeTimers()
+    try {
+      const onCharacterLongPress = vi.fn()
+      renderHub({
+        storage: createMemoryStorage(),
+        onCharacterLongPress,
+      })
+      const emma = screen.getByTestId('hub-emma')
+
+      act(() => {
+        emma.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+      })
+      act(() => {
+        vi.advanceTimersByTime(500)
+      })
+      act(() => {
+        emma.dispatchEvent(
+          new PointerEvent('pointercancel', {
+            bubbles: true,
+            pointerId: 1,
+          }),
+        )
+      })
+      act(() => {
+        vi.advanceTimersByTime(5000)
+      })
+      expect(onCharacterLongPress).toHaveBeenCalledTimes(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('Hub — node tap routing', () => {
   it('calls onPickTree("number-garden") when the Number Garden node is tapped', async () => {
     const user = userEvent.setup()
