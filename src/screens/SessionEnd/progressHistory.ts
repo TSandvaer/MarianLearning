@@ -11,10 +11,16 @@
  * never actually being collected. The adaptive engine (separate ticket Matt is
  * drafting) will read this data — this module just starts collecting it.
  *
+ * M3 (ticket 86c9kmwd0) layers the mastery promotion rule on top: after the
+ * history-append save lands, `applyMasteryRule()` evaluates the new history
+ * and produces an updated `skillLevels` (and possibly `pendingPromotion`) —
+ * a second `saveProgress()` lands the post-promotion shape so the next
+ * session-start fetch picks up the new focus node.
+ *
  * What this DOES NOT do (deferred):
- *   - Update `skillLevels` post-session (the adaptive engine owns that).
- *   - Touch `mathFactsLeitner` (Leitner update logic deferred).
- *   - Feed Progress into `/api/claude` request payload.
+ *   - Touch `mathFactsLeitner` (Leitner update logic deferred — M4).
+ *   - Feed Progress into `/api/claude` request payload (M2 owns that
+ *     read path; this module is the write path only).
  *
  * Why the call site is here, not App.tsx
  * --------------------------------------
@@ -36,6 +42,7 @@
  */
 
 import {
+  applyMasteryRule,
   defaultProgress,
   loadProgress,
   saveProgress,
@@ -110,6 +117,13 @@ export function recordProgressOnSessionEnd(
     history: [...existing.history, entry],
   }
 
-  saveProgress(next)
-  return next
+  // M3 (ticket 86c9kmwd0): evaluate the mastery promotion rule on the
+  // post-append history. The rule is pure and tunable via parentSettings;
+  // see `src/lib/progress/mastery.ts`. We collapse the two writes into a
+  // single `saveProgress(promoted)` so the persisted blob always reflects
+  // the post-promotion shape — there's no observable mid-state in
+  // localStorage and no double IO.
+  const promoted = applyMasteryRule(next)
+  saveProgress(promoted)
+  return promoted
 }

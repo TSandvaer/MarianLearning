@@ -188,6 +188,26 @@ export interface Progress {
    * additive and backward-compatible; schemaVersion stays at 1.
    */
   parentSettings?: ParentSettings
+  /**
+   * Pending promotion queue (M3 — ticket 86c9kmwd0). Set by
+   * `applyMasteryRule()` when the rule qualifies a node for promotion
+   * AND `parentSettings.autoPromote === false` — the parent confirms
+   * (or implicitly approves by flipping `autoPromote` back to `true`)
+   * before the node is moved on `skillLevels`. Cleared by
+   * `applyMasteryRule()` once the queued promotion has been applied.
+   *
+   * Optional on the stored shape because pre-M3 blobs predate the
+   * field; this field is additive and backward-compatible (no
+   * schemaVersion bump — same precedent as `parentSettings`).
+   *
+   * If multiple nodes qualify for promotion in a single
+   * `applyMasteryRule()` call, the EARLIEST node in tree order wins
+   * (math tree before word-song tree; within a track, nearer-to-the-
+   * root nodes first). The other qualifying nodes are evaluated again
+   * on the next session-end run, when one promotion will have already
+   * been applied (or remains queued for the same parent confirmation).
+   */
+  pendingPromotion?: SkillNode
 }
 
 export const CURRENT_SCHEMA_VERSION = 1 as const

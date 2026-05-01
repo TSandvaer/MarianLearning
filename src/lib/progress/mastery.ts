@@ -1,0 +1,314 @@
+/**
+ * Mastery promotion rule — Milestone 3 of the adaptive engine
+ * (ticket 86c9kmwd0). The first PR where the app actually changes
+ * Marian's curriculum based on her performance.
+ *
+ * Pure module. The single public entry point is `applyMasteryRule(progress)`,
+ * which returns a NEW Progress document (no mutation). It must be called
+ * after each session-end save so the next session-start picks up the new
+ * `skillLevels` shape.
+ *
+ * Tunables come from `parentSettings`
+ * -----------------------------------
+ * Per Thomas's 2026-05-01 update on the M3 ticket: the rule reads its
+ * thresholds from the M2.5 `parentSettings` shape (`getSettings()`),
+ * never from hardcoded constants in this file. Defaults: 0.95 percent /
+ * 3 sessions, cross-day enforcement on, auto-promote on.
+ *
+ * Tree adjacency lives here
+ * -------------------------
+ * `MATH_TREE` and `LITERACY_TREE` declare the curriculum order in ONE
+ * place. The focus-node selector in `focusNode.ts` predates this module
+ * and keeps its own copies (`MATH_NODES_IN_ORDER` /
+ * `WORD_SONG_NODES_IN_ORDER`) — the `mastery.test.ts` regression locks
+ * the two declarations against each other so a silent drift fails CI.
+ *
+ * Why both trees per call
+ * -----------------------
+ * A child does math one session and literacy the next. We don't want to
+ * wait for a same-track repeat session to apply a literacy promotion —
+ * the rule is cheap (a couple of array filters per track per call), so
+ * we walk both. Each node only promotes when the rule's history filter
+ * for THAT node qualifies, so cross-track noise is structurally
+ * impossible.
+ */
+
+import { getSettings } from './parentSettings'
+import type {
+  NumberGardenNode,
+  Progress,
+  SessionHistoryEntry,
+  SkillNode,
+  WordSongNode,
+} from './types'
+
+export type MasteryTrack = 'math' | 'word-song'
+
+/**
+ * Math tree (Number Garden) in promotion order. Source of truth for
+ * "what is the next downstream node when X is mastered". Mirrors the
+ * declaration order in `types.ts NumberGardenNode` and the curriculum
+ * laid out in `CLAUDE.md` `## Two skill trees`.
+ */
+export const MATH_TREE: readonly NumberGardenNode[] = [
+  'number-recog',
+  'add-to-10',
+  'add-to-20',
+  'sub-to-10',
+  'sub-to-20',
+  'two-digit-addsub',
+  'skip-counting',
+  'mult-2-5-10',
+  'mult-3-4',
+  'mult-6-9',
+]
+
+/**
+ * Word Song / literacy tree in promotion order. Same contract as
+ * `MATH_TREE`.
+ */
+export const LITERACY_TREE: readonly WordSongNode[] = [
+  'letter-names',
+  'letter-sounds',
+  'blending-cv',
+  'cvc-words',
+  'digraphs',
+  'sight-words',
+  'simple-sentences',
+]
+
+/**
+ * Return the next downstream node after `current` in `track`'s tree, or
+ * `null` when `current` is the last node. `null` is also returned when
+ * `current` doesn't appear in the named track at all (a programming
+ * error — we don't throw because the call site doesn't need to handle
+ * a thrown error).
+ */
+export function nextNode(
+  track: MasteryTrack,
+  current: SkillNode,
+): SkillNode | null {
+  const tree = track === 'math' ? MATH_TREE : LITERACY_TREE
+  const idx = tree.indexOf(current as never)
+  if (idx === -1) return null
+  if (idx === tree.length - 1) return null
+  return tree[idx + 1] ?? null
+}
+
+/**
+ * Apply the mastery rule and return an updated Progress document.
+ *
+ * Rule
+ * ----
+ * For every node in either tree whose current `skillLevels[node]` is
+ * `'practicing'`:
+ *   1. Filter `progress.history` to entries whose `skillFocus` includes
+ *      this node.
+ *   2. If `parentSettings.crossDayEnforcement === true`, dedupe to one
+ *      entry per calendar day (by `dateISO`'s `YYYY-MM-DD` prefix —
+ *      same convention recordProgressOnSessionEnd writes). Keep the
+ *      LAST entry per day (the most recent session of that day).
+ *   3. Take the last `parentSettings.masteryThreshold.sessions` entries.
+ *   4. If there are fewer entries than required, no promotion.
+ *   5. If every retained entry has
+ *      `successRate >= parentSettings.masteryThreshold.percent`, the
+ *      node qualifies for promotion.
+ *
+ * Promotion
+ * ---------
+ * - `parentSettings.autoPromote === true`: mark `node` as `'mastered'`
+ *   on a fresh `skillLevels` map. If `nextNode(track, node)` is
+ *   currently `'locked'`, move it to `'intro'`. Already-`intro` /
+ *   `practicing` / `mastered` downstream nodes are left alone (no
+ *   demotion, no backwards reset).
+ * - `parentSettings.autoPromote === false`: queue
+ *   `progress.pendingPromotion = node` and do NOT mutate `skillLevels`.
+ *   When multiple nodes qualify in a single call, the earliest node in
+ *   tree order wins (math first, then literacy; within a track, the
+ *   tree's root-to-leaf order). A `pendingPromotion` from a previous
+ *   call is preserved if the parent has not flipped `autoPromote`
+ *   between calls — the call is idempotent in that case.
+ *
+ * Auto-promote re-entry
+ * ---------------------
+ * If `progress.pendingPromotion` is set AND `autoPromote === true`,
+ * the rule applies the queued promotion immediately and clears the
+ * field. This lets the parent flip the toggle in Settings and have
+ * the queued promotion take effect on the next session-end (or any
+ * other call site we add later).
+ *
+ * Idempotence
+ * -----------
+ * `applyMasteryRule(applyMasteryRule(p))` is structurally equivalent
+ * to `applyMasteryRule(p)`. The second call sees the freshly-promoted
+ * node as `'mastered'` and skips it; the downstream node is already at
+ * `'intro'` (or higher) and is not re-touched.
+ */
+export function applyMasteryRule(progress: Progress): Progress {
+  const settings = getSettings(progress)
+
+  // Build the working document. We always clone `skillLevels` so
+  // callers can rely on the result being a fresh object — even when
+  // no promotion fires, the field reads as a different reference.
+  const out: Progress = {
+    ...progress,
+    skillLevels: { ...progress.skillLevels },
+  }
+
+  // ── Apply any queued pendingPromotion when autoPromote is now on ──
+  // Run this BEFORE the per-track scan so a queued promotion + a fresh
+  // qualifying session in the same call don't fight over the same
+  // skillLevels slot. The queued promotion takes priority — it's
+  // older.
+  if (
+    settings.autoPromote &&
+    progress.pendingPromotion !== undefined &&
+    out.skillLevels[progress.pendingPromotion] === 'practicing'
+  ) {
+    const queued = progress.pendingPromotion
+    const queuedTrack = trackOf(queued)
+    out.skillLevels[queued] = 'mastered'
+    if (queuedTrack !== null) {
+      const downstream = nextNode(queuedTrack, queued)
+      if (downstream !== null && out.skillLevels[downstream] === 'locked') {
+        out.skillLevels[downstream] = 'intro'
+      }
+    }
+    delete out.pendingPromotion
+  } else if (settings.autoPromote && progress.pendingPromotion !== undefined) {
+    // autoPromote is on but the queued node is no longer at 'practicing'
+    // (e.g. somebody else promoted it). Clear the stale queue.
+    delete out.pendingPromotion
+  }
+
+  // ── Walk both trees, evaluate promotion candidates ──
+  // We collect candidates first so the autoPromote=false branch can
+  // pick the earliest in tree order without scanning twice.
+  const candidates: { track: MasteryTrack; node: SkillNode }[] = []
+
+  const trees: readonly { track: MasteryTrack; nodes: readonly SkillNode[] }[] =
+    [
+      { track: 'math', nodes: MATH_TREE },
+      { track: 'word-song', nodes: LITERACY_TREE },
+    ]
+
+  for (const { track, nodes } of trees) {
+    for (const node of nodes) {
+      if (out.skillLevels[node] !== 'practicing') continue
+      if (!qualifies(progress.history, node, settings)) continue
+      candidates.push({ track, node })
+    }
+  }
+
+  if (candidates.length === 0) {
+    return out
+  }
+
+  if (settings.autoPromote) {
+    for (const { track, node } of candidates) {
+      // Re-check the current level — a previous candidate in this call
+      // could have moved a downstream node from `locked` to `intro`,
+      // but candidates are only at `practicing`, so this is paranoia.
+      if (out.skillLevels[node] !== 'practicing') continue
+      out.skillLevels[node] = 'mastered'
+      const downstream = nextNode(track, node)
+      if (downstream !== null && out.skillLevels[downstream] === 'locked') {
+        out.skillLevels[downstream] = 'intro'
+      }
+    }
+    return out
+  }
+
+  // autoPromote === false — queue the earliest candidate in tree order
+  // (math tree before word-song; within a track, the tree's order).
+  // If a queue already exists from a prior call (and the prior queued
+  // node is still 'practicing'), preserve it — don't stomp.
+  if (
+    progress.pendingPromotion !== undefined &&
+    out.skillLevels[progress.pendingPromotion] === 'practicing'
+  ) {
+    out.pendingPromotion = progress.pendingPromotion
+  } else {
+    out.pendingPromotion = candidates[0]!.node
+  }
+
+  return out
+}
+
+// ── internals ──────────────────────────────────────────────────────────
+
+/**
+ * Identify which track a node belongs to. Returns `null` for an unknown
+ * node (programming error — kept defensive so the caller doesn't crash
+ * on an out-of-band string).
+ */
+function trackOf(node: SkillNode): MasteryTrack | null {
+  if ((MATH_TREE as readonly string[]).includes(node)) return 'math'
+  if ((LITERACY_TREE as readonly string[]).includes(node)) return 'word-song'
+  return null
+}
+
+/**
+ * Return true iff `node` has enough recent qualifying history to be
+ * promoted under `settings`. Pure read of `history`; does not mutate.
+ */
+function qualifies(
+  history: readonly SessionHistoryEntry[],
+  node: SkillNode,
+  settings: ReturnType<typeof getSettings>,
+): boolean {
+  const focused = history.filter((entry) => entry.skillFocus.includes(node))
+  if (focused.length === 0) return false
+
+  const filtered = settings.crossDayEnforcement
+    ? dedupeByCalendarDay(focused)
+    : focused
+  if (filtered.length < settings.masteryThreshold.sessions) return false
+
+  const window = filtered.slice(-settings.masteryThreshold.sessions)
+  return window.every(
+    (entry) => entry.successRate >= settings.masteryThreshold.percent,
+  )
+}
+
+/**
+ * Reduce a list of history entries to one-per-calendar-day. The
+ * convention matches `recordProgressOnSessionEnd`: dateISO is an ISO
+ * 8601 timestamp; we take its `YYYY-MM-DD` prefix as the day key.
+ *
+ * "One per day" is the LATEST entry on that day (the entry with the
+ * highest position in the list — `Progress.history` is appended-only,
+ * most-recent-last per `saveProgress` semantics). This mirrors how a
+ * parent would think about it: "today's high score" is the one that
+ * sticks.
+ *
+ * Edge cases:
+ *   - Malformed dateISO (no YYYY-MM-DD prefix): fall back to using the
+ *     entire dateISO string as the day key. The parser is permissive
+ *     so a single weirdly-shaped entry doesn't poison promotion logic
+ *     for the whole node.
+ *   - Same-day across timezones: `dateISO` is whatever the writer
+ *     produced. The current writer uses `new Date().toISOString()`
+ *     (UTC). Cross-day enforcement uses the UTC day; this is a known
+ *     simplification — for Marian's use (Manila, single timezone), the
+ *     UTC day is wall-clock-close-enough.
+ */
+function dedupeByCalendarDay(
+  entries: readonly SessionHistoryEntry[],
+): SessionHistoryEntry[] {
+  const byDay = new Map<string, SessionHistoryEntry>()
+  for (const entry of entries) {
+    const key = entry.dateISO.slice(0, 10) || entry.dateISO
+    byDay.set(key, entry)
+  }
+  // Insertion order is the order of FIRST sight per key. We need the
+  // entries in chronological-ish order to make `slice(-N)` correct.
+  // Reconstruct by walking the source list with a "last seen" filter.
+  const lastIndexByKey = new Map<string, number>()
+  entries.forEach((entry, idx) => {
+    const key = entry.dateISO.slice(0, 10) || entry.dateISO
+    lastIndexByKey.set(key, idx)
+  })
+  const keepIndices = new Set(lastIndexByKey.values())
+  return entries.filter((_entry, idx) => keepIndices.has(idx))
+}
