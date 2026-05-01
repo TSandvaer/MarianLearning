@@ -197,3 +197,109 @@ describe('wordSongSessionPlanFromServer — skip-not-throw on out-of-namespace i
     )
   })
 })
+
+/**
+ * P0 regression — ticket 86c9kt47v.
+ *
+ * Pin that a wire shape MATCHING the server planner's post-fix output
+ * round-trips cleanly through this parser. Three failure modes silenced
+ * WordSong on prod after M2 (PR #117):
+ *   1. ids prefixed `cvc.*` instead of `word.*`
+ *   2. read text "Tap the letter that says /m/." instead of
+ *      "Tap the <word>."
+ *   3. `focusNode: 'blending-cv'` returning planner-failed
+ *
+ * The post-fix planner contract is single-mode CVC: every problem
+ * utterance starts with "word.", every read line is "Tap the <word>.",
+ * regardless of focusNode. This test simulates the exact wire shape the
+ * fixed planner emits and confirms the parser accepts it. Pairs with
+ * `api/_planner.test.ts` describe block "word-song single-mode P0
+ * regression (86c9kt47v)".
+ */
+describe('wordSongSessionPlanFromServer — round-trips post-fix planner output (P0 86c9kt47v)', () => {
+  /** Build a synthetic 8-problem CVC plan in the EXACT shape the fixed
+   *  planner promises to emit: word.p<N>.<slot> ids + "Tap the <word>."
+   *  read lines, drawn from the canonical 14-target list. */
+  function buildPostFixPlannerWire() {
+    // Use 8 distinct words from the target list — same set the planner
+    // is told to use in WORD_SONG_TARGET_WORDS_FOR_PROMPT.
+    const words = ['cat', 'hat', 'bat', 'mat', 'bag', 'fan', 'man', 'pan']
+    return {
+      id: 'haiku-word-cvc-001',
+      label: 'CVC short-a — Haiku-generated',
+      utterances: words.flatMap((word, i) => {
+        const n = i + 1
+        const cap = word.charAt(0).toUpperCase() + word.slice(1)
+        return [
+          { id: `word.p${n}.read`, text: `Tap the ${word}.` },
+          { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+          { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+        ]
+      }),
+    }
+  }
+
+  it('parses a synthetic 8-problem post-fix planner response cleanly', () => {
+    const wire = buildPostFixPlannerWire()
+    const plan = wordSongSessionPlanFromServer(wire)
+    expect(plan.id).toBe('haiku-word-cvc-001')
+    expect(plan.problems).toHaveLength(8)
+    // Every target resolves to a known WordEntry in the wordPack —
+    // pre-fix the parser would have thrown PlanFromServerError before
+    // reaching this assertion.
+    const targetWords = plan.problems.map((p) => p.target.word)
+    expect(targetWords).toEqual([
+      'cat',
+      'hat',
+      'bat',
+      'mat',
+      'bag',
+      'fan',
+      'man',
+      'pan',
+    ])
+  })
+
+  it('rejects the prod-incident "letter-sounds" content shape (the original silence)', () => {
+    // Pre-fix, the planner with focusNode=letter-sounds emitted
+    // "Tap the letter that says /m/." — parser rejected → silent.
+    // The fixed planner can't emit this shape (single-mode prompt), but
+    // the parser still rejects it as a backstop. Pin the backstop so a
+    // future planner regression that re-introduces letter-sounds content
+    // triggers a loud parser error instead of silent failure.
+    const wire = buildPostFixPlannerWire()
+    const broken = {
+      ...wire,
+      utterances: wire.utterances.map((u) =>
+        u.id === 'word.p1.read'
+          ? { ...u, text: 'Tap the letter that says /m/.' }
+          : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      PlanFromServerError,
+    )
+  })
+
+  it('rejects the prod-incident "cvc.*" id namespace (the case-1 silence)', () => {
+    // Pre-fix, the no-progress default emitted `cvc.p1.read` etc. —
+    // parser's anchored regex skipped them all → bucket map was empty
+    // → "missing problem index 1" error. Pin that contract: any
+    // non-word.* prefix on a problem utterance is silently dropped, and
+    // the resulting empty plan throws a clear missing-problem error
+    // (rather than coincidentally succeeding via partial parse).
+    const wire = buildPostFixPlannerWire()
+    const broken = {
+      ...wire,
+      utterances: wire.utterances.map((u) => ({
+        ...u,
+        id: u.id.replace(/^word\./, 'cvc.'),
+      })),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /missing problem index 1/,
+    )
+  })
+})

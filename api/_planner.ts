@@ -394,10 +394,38 @@ function buildSystemPrompt(track: PlannerTrack): PlannerSystemBlock[] {
  * Default focus node when the caller doesn't supply one. Pre-M2 callers
  * (today's deployed browser) hit this fallback; the level-1 default of
  * each track matches what the planner used to generate before focusNode
- * existed — sums to 10 for math, CVC short-a for word-song.
+ * existed — sums to 10 for math, CVC blending for word-song.
+ *
+ * Word-song clamp (P0 fix, ticket 86c9kt47v)
+ * ------------------------------------------
+ * For word-song, the value here is also the value the planner uses
+ * regardless of what the caller supplied — see effectiveFocusNode below.
+ * Word-song is single-mode (CVC "Tap the <word>." content) until M-series
+ * widens template support; the picker on the browser side clamps to
+ * `blending-cv` as well, so this default + the server-side clamp form a
+ * defense-in-depth pair.
  */
 function defaultFocusNodeForTrack(track: PlannerTrack): string {
-  return track === 'math' ? 'add-to-10' : 'cvc-words'
+  return track === 'math' ? 'add-to-10' : 'blending-cv'
+}
+
+/**
+ * Resolve the focus node the planner actually generates for. Math honours
+ * caller-supplied focusNode; word-song is hard-clamped to `blending-cv`
+ * (see header on `defaultFocusNodeForTrack`).
+ *
+ * Validation (`generateSessionPlan` above) still rejects an invalid
+ * cross-track or unknown focusNode for word-song before reaching here —
+ * the clamp is for valid-but-unsupported word-song nodes (letter-sounds,
+ * cvc-words, digraphs, etc., none of which have content templates yet).
+ *
+ * TODO: widen when wordsong content templates support letter-sounds, etc.
+ */
+function effectiveFocusNode(args: GenerateSessionPlanArgs): string {
+  if (args.track === 'word-song') {
+    return 'blending-cv'
+  }
+  return args.focusNode ?? defaultFocusNodeForTrack(args.track)
 }
 
 function buildUserMessage(args: GenerateSessionPlanArgs): string {
@@ -408,7 +436,7 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
   // depth is cheap here.
   const safeName = args.childName.replace(/[^\p{L}\p{N}\s'.-]/gu, '').trim()
   const trackLabel = args.track === 'math' ? 'Math' : 'Word Song'
-  const focusNode = args.focusNode ?? defaultFocusNodeForTrack(args.track)
+  const focusNode = effectiveFocusNode(args)
 
   // Recent score line is included verbatim only when we have data —
   // otherwise the model would condition on a numeric value we made up.
@@ -490,29 +518,63 @@ Per-problem utterance template (any focus node):
 
 Pick exactly 8 distinct problems for the focus node, ordered easier → slightly harder across problems 1-8. Spell numbers as words (one, two, ... ten, eleven, ... twenty), not digits. Capitalize the first word of each sentence. The "recent score" hint in the user message guides easier-vs-harder mix: low score → mostly the easiest end of the slice; high score → push the harder end.`
 
+// IMPORTANT (P0 fix, ticket 86c9kt47v):
+// The word-song track is single-mode today. Only the CVC "Tap the <word>."
+// content template is supported by the browser parser
+// (`wordSongSessionPlanFromServer.parseReadTarget` anchors on
+// `^Tap the <word>.$`) and only `word.p<N>.<slot>` utterance ids are
+// accepted (`wordSongSessionPlanFromServer.parseUtteranceId`).
+//
+// Multi-mode enumeration (letter-names / letter-sounds / blending-cv /
+// cvc-words / digraphs / sight-words / simple-sentences) was attempted in
+// M2 (PR #117) and silenced WordSong on prod via three distinct failure
+// modes: cvc-prefixed ids, planner-failed on `blending-cv`, unparseable
+// "Tap the letter that says /m/." read text on `letter-sounds`. Until the
+// M-series widens browser support, the prompt below names ONE content
+// mode regardless of the focusNode the user message carries; the
+// browser-side picker also clamps to `blending-cv` for
+// defense-in-depth.
+//
+// TODO: widen when wordsong content templates support letter-sounds, etc.
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
-The user message names a focus skill node. The full word-song focus-node menu is:
+The user message may name a focus skill node, but for now the planner
+ALWAYS generates the same single content mode regardless of value:
 
-- letter-names: name a letter, child taps the matching grapheme. read: "Tap the letter <Letter>." e.g. "Tap the letter B."
-- letter-sounds: produce a phoneme, child taps the matching letter. read: "Tap the letter that says /b/." (use the IPA-ish sound spelled inside slashes for the model's reference; the rendered TTS text spells the sound out as in the example).
-- blending-cv: blend a consonant + vowel into a single syllable. read: "Tap the <CV>." e.g. "Tap the ba."
-- cvc-words: CVC short-vowel words. Pick 8 distinct target words from this list (do not invent new words, do not use a target more than once):
+CVC short-vowel "Tap the <word>." problems.
+
+Pick 8 distinct target words from this list (do not invent new words, do
+not use a target more than once):
 ${WORD_SONG_TARGET_WORDS_FOR_PROMPT}
 
-  Distractor guidance (Marian sees 3 picture chips per problem; one is the target, two are distractors — but YOU are not authoring the distractors here, only the spoken lines):
+Distractor guidance (Marian sees 3 picture chips per problem; one is the
+target, two are distractors — but YOU are not authoring the distractors
+here, only the spoken lines):
 ${WORD_SONG_DISTRACTOR_HINTS}
 
-  Order easier-recognise words (cat, bag, hat, dad) in problems 1-3 and richer-rhyme/trap words (van, can, fan, man, pan, mat, bat, tag, cap, jam) in problems 4-8.
-- digraphs: words containing sh / ch / th. read: "Tap the <word>." e.g. "Tap the ship."
-- sight-words: high-frequency irregular words (the, you, are, was, ...). read: "Tap the word <word>." e.g. "Tap the word you."
-- simple-sentences: short sentences with a target word, child picks the matching picture. read: "<Sentence>. Which one?" e.g. "The cat is on the mat. Which one?"
+Order easier-recognise words (cat, bag, hat, dad) in problems 1-3 and
+richer-rhyme/trap words (van, can, fan, man, pan, mat, bat, tag, cap, jam)
+in problems 4-8.
 
-Per-problem utterance template (any focus node):
-- read: see the focus-node-specific shape above.
-- correct: "Yes! <Word>." (capitalized) e.g. "Yes! Cat."
-- reprompt: "Hmm... try again?"  (verbatim)
+Per-problem utterance template (REQUIRED — every problem follows this
+shape verbatim; do not deviate based on focusNode):
+- read: "Tap the <word>." e.g. "Tap the cat."  (lowercase target word; one
+  short sentence; ends with a period.)
+- correct: "Yes! <Word>." (capitalised target) e.g. "Yes! Cat."
+- reprompt: "Hmm... try again?"  (verbatim — do not vary)
 - hint: "Let's look. <Word>." e.g. "Let's look. Cat."
 - giveAnswer: "This one is <word>." e.g. "This one is cat."
 
-Pick exactly 8 distinct problems for the focus node. The "recent score" hint in the user message guides easier-vs-harder mix.`
+Utterance ids — REQUIRED:
+Word-song problem utterance ids ALWAYS use the literal prefix "word.",
+regardless of the focus node mentioned in the user message. Pattern:
+"word.p<N>.<slot>" where N is the 1-based problem index (1..8) and <slot>
+is one of read | correct | reprompt | hint | giveAnswer. Examples:
+"word.p1.read", "word.p1.correct", "word.p2.read". Do NOT use "cvc.",
+"blending.", "letter.", or any other prefix for problem utterances —
+those will be rejected by the browser parser and the audio will fail to
+play. (Session-End ids keep the "session.end.*" prefix as instructed in
+the system preamble.)
+
+Pick exactly 8 distinct problems. The "recent score" hint in the user
+message guides easier-vs-harder mix within the CVC slice.`

@@ -78,13 +78,31 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
  * not happen in v1 (Marian still has `locked` nodes near the end of every
  * track), but the fallback keeps the return type non-null so the call
  * site stays narrow.
+ *
+ * Word-song clamp (P0 fix, ticket 86c9kt47v)
+ * ------------------------------------------
+ * Word-song's content templates only support `blending-cv` today
+ * (CVC "Tap the <word>." shape). The browser-side parser
+ * (`wordSongSessionPlanFromServer.parseReadTarget`) rejects anything else,
+ * which silenced WordSong on prod when M2 promoted Marian's focus to
+ * `letter-sounds`. Until the M-series widens support to cover
+ * `letter-sounds`, `cvc-words` (distinct content from blending-cv),
+ * `digraphs`, etc., we hard-clamp the word-song picker to `blending-cv`
+ * regardless of `skillLevels`. Math is unaffected — its branch keeps
+ * walking the tree as designed.
+ *
+ * TODO: widen when wordsong content templates support letter-sounds, etc.
  */
 export function pickFocusNode(
   progress: Progress,
   track: ProgressTrack,
 ): SkillNode {
-  const order =
-    track === 'math' ? MATH_NODES_IN_ORDER : WORD_SONG_NODES_IN_ORDER
+  if (track === 'word-song') {
+    // Hard clamp — see header. Ignore skillLevels; the browser parser only
+    // handles the blending-cv "Tap the <word>." template today.
+    return 'blending-cv'
+  }
+  const order = MATH_NODES_IN_ORDER
   for (const node of order) {
     if (progress.skillLevels[node] !== 'mastered') return node
   }
