@@ -64,6 +64,7 @@ import {
 } from './hubLines'
 import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
+import { useCharacterLongPress } from './useCharacterLongPress'
 import { StageIcon } from './stageIcons'
 import {
   NUMBER_GARDEN_STAGES,
@@ -108,6 +109,13 @@ export interface HubProps {
    */
   onParentGate?: () => void
   /**
+   * Fires when the 3-second long-press on the character art completes
+   * (M2.5 — ticket 86c9kpjc7). The orchestrator routes to the
+   * 'parent-settings' surface as a result. Tap-and-release does NOT
+   * fire; long-press of any non-character element does NOT fire.
+   */
+  onCharacterLongPress?: () => void
+  /**
    * Test seam: optional play-line function. Default fires `onPlay`
    * synchronously and walks word-ticks at ~165 wpm so the caption
    * still reveals even without audio binaries (same shape as Math's
@@ -135,6 +143,7 @@ export default function Hub({
   progress = { numberGardenIndex: 0, wordSongIndex: 0 },
   onPickTree,
   onParentGate,
+  onCharacterLongPress,
   playLineFn,
 }: HubProps): ReactElement {
   // Read history once on mount — Hub doesn't subscribe to localStorage
@@ -278,6 +287,18 @@ export default function Hub({
     onComplete: handleParentGateComplete,
   })
 
+  // ── Character-art 3-second long-press (M2.5) -------------------------
+  // Different surface from the corner-gate above: opens the parent
+  // settings page (ticket 86c9kpjc7). Bound to the Emma `<m.img>` so a
+  // long-press anywhere else on the Hub does NOT trigger it.
+  const handleCharacterLongPressComplete = useCallback(() => {
+    onCharacterLongPress?.()
+  }, [onCharacterLongPress])
+
+  const characterLongPressProps = useCharacterLongPress({
+    onComplete: handleCharacterLongPressComplete,
+  })
+
   // ── Node-tap handler ---------------------------------------------------
 
   const handleNodeTap = useCallback(
@@ -387,7 +408,13 @@ export default function Hub({
       </div>
 
       {/* Emma centred-upper, ~22vh. layoutId carries from / to other
-          screens via Framer Motion's shared-element transition. */}
+          screens via Framer Motion's shared-element transition.
+
+          The wrapper is `pointer-events-none` so taps anywhere in the
+          22vh band fall through to whatever sits behind. The Emma
+          image itself opts back in (`pointer-events-auto`) to receive
+          the M2.5 character long-press — only the image bounds are
+          live, not the surrounding band. */}
       <div className="pointer-events-none flex h-[22vh] w-full items-center justify-center">
         <m.img
           layoutId="emma"
@@ -395,10 +422,11 @@ export default function Hub({
           src="/assets/emma-idle.svg"
           alt="Emma"
           draggable={false}
-          className="h-full w-auto select-none"
+          className="pointer-events-auto h-full w-auto select-none touch-none"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
+          {...characterLongPressProps}
         />
       </div>
 
