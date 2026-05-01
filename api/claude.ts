@@ -85,6 +85,11 @@ import {
   type PlannerTrack,
 } from './_planner.js'
 import { createRateLimiter, type RateLimiter } from './_rateLimit.js'
+import {
+  buildSessionCacheKey,
+  createSessionCache,
+  type SessionCache,
+} from './_sessionCache.js'
 
 /**
  * Cold-start runtime assertion. Throws at module load if the function is
@@ -245,6 +250,22 @@ const sessionStartLimiter: RateLimiter = createRateLimiter({
   windowMs: 60_000,
 })
 
+/**
+ * Module-singleton response cache for track-based session-start (added
+ * ticket 86c9kjdh2). 5-minute TTL matches Vercel's warm-container retention
+ * window; cold containers reset the cache cleanly. Keyed on the
+ * `(track, level, childName)` triple — see buildSessionCacheKey.
+ *
+ * Trade-off: a child replaying within the TTL gets the same problems
+ * and chatter. For QA smokes that is desirable (deterministic). For
+ * real session continuation it preserves continuity. If we ever want
+ * mid-day randomisation, that's a planner-side concern, not a cache
+ * concern.
+ */
+const sessionStartCache: SessionCache = createSessionCache({
+  ttlMs: 5 * 60_000,
+})
+
 /** Best-effort source-IP extraction. Vercel sets `x-forwarded-for`. We
  *  fall back to `x-real-ip` and finally to a fixed string — a fixed
  *  fallback means all unidentifiable callers share one bucket, which is
@@ -303,6 +324,8 @@ export interface HandlerOverrides {
   anthropicClient?: PlannerAnthropicClient
   /** Override the rate limiter. Defaults to the module-singleton. */
   rateLimiter?: RateLimiter
+  /** Override the response cache. Defaults to the module-singleton. */
+  sessionCache?: SessionCache
   /** Override the clock for rate-limit windowing. Defaults to Date.now(). */
   now?: () => number
 }
@@ -323,6 +346,7 @@ export async function handler(
   const origin = request.headers.get('origin')
   const headers = corsHeaders(origin)
   const limiter = overrides.rateLimiter ?? sessionStartLimiter
+  const cache = overrides.sessionCache ?? sessionStartCache
   const now = overrides.now ?? Date.now
 
   if (request.method === 'OPTIONS') {
@@ -416,6 +440,17 @@ export async function handler(
     // render TTS through the same _session pipeline.
     const trackPayload = extractTrackPayload(body.payload)
     if (trackPayload !== null) {
+      // Cache check (added ticket 86c9kjdh2). Identical (track, level,
+      // childName) requests within the TTL serve from the in-memory
+      // module cache — zero Azure calls and zero Anthropic calls. The
+      // cache lives outside the rate-limit gate because a hit is free
+      // (no upstream cost). See _sessionCache.ts for trade-off notes.
+      const cacheKey = buildSessionCacheKey(trackPayload)
+      const cached = cache.get(cacheKey, now())
+      if (cached !== null) {
+        return jsonResponse(cached, 200, headers)
+      }
+
       // Per-IP rate limit. We honour the limiter BEFORE calling Anthropic
       // so a leaked share-link in a tight loop can't run up a bill.
       const ip = extractSourceIp(request)
@@ -476,6 +511,13 @@ export async function handler(
       // path uses — no fork in the audio code.
       try {
         const rendered = await renderSessionAudio(plannedPlan)
+        // Cache the rendered response under the track payload key. Even
+        // partial renders (some utterances soft-failed) are cacheable —
+        // re-running the same key would just hit Azure again with the
+        // same probability of failure, which is what the cache is here
+        // to avoid. The browser's missing-utterance fallback is the same
+        // either way.
+        cache.set(cacheKey, rendered, now())
         return jsonResponse(rendered, 200, headers)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
