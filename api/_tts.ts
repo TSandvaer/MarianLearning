@@ -153,27 +153,38 @@ export function escapeSsml(text: string): string {
  *    realization; THE_OPEN_O + LENGTH_MARK + R). This is the canonical
  *    dictionary form and what every native speaker hears as "the
  *    number four", clearly distinct from "for" /fɚ/ or /fɔr/.
- *  - "two" → /tuː/ (long /u/ vowel, the canonical realization).
- *    "two" hasn't been reported as a homophone problem yet, but every
- *    Math session opens with "Two plus two. How many?" so the risk is
- *    real. Defensive symmetry — same fix shape for both number-words
- *    that share their phonetic skeleton with a high-frequency English
- *    function word ("to"/"too").
  *
- * Why ONLY "four" and "two" and not e.g. "one" / "three"
- * ------------------------------------------------------
+ * What about "two"?
+ * -----------------
+ * The first iteration of this PR also wrapped "two" in
+ * `<phoneme alphabet="ipa" ph="tuː">` for defensive symmetry against
+ * the "to"/"too" homophone family. Thomas's iPad listening pass on
+ * the preview deploy showed the "four" → /fɔːr/ override worked, but
+ * "two" → /tuː/ was NOT honored by the en-US-EmmaMultilingualNeural
+ * voice — the leading "Two" in "Two plus two" still rendered short
+ * (closer to "to") despite the IPA. Same observed shape as the
+ * original "four" issue but for a different IPA value, in this voice.
+ *
+ * Decision: ship the "four" win now and iterate on the right notation
+ * for "two" in a follow-up ticket. The helper machinery (regex builder
+ * from `Object.keys`, applyPhonemeOverrides, the SSML composition) is
+ * unchanged — only the data shrinks. Adding "two" back is a one-line
+ * edit once we have an IPA / SSML construction the voice respects.
+ *
+ * Why ONLY "four" and not e.g. "one" / "three"
+ * --------------------------------------------
  *  - "one" /wʌn/ has no homophone the voice could plausibly select.
  *  - "three" /θriː/ likewise — no high-frequency English word collides.
  *  - The override has a real cost: it disables Azure's contextual
  *    prosody for the wrapped word (the phoneme element is its own
  *    prosody scope). So we only inject it where the homophone risk
- *    has been observed or is structurally analogous.
+ *    has been observed empirically AND the override has been
+ *    listening-confirmed to actually move the voice.
  *
  * Word-boundary safety
  * --------------------
  * The regex uses `\b` so substring matches do not fire:
  *   "fourteen", "fourth", "afternoon" — leave alone.
- *   "twoscore", "Bartholomew"          — leave alone.
  * Case is preserved in the output (matched substring is reused
  * verbatim inside the tag), so "Four" stays "Four" while still being
  * voiced from the IPA. The IPA itself is identical regardless of
@@ -182,7 +193,6 @@ export function escapeSsml(text: string): string {
  */
 const PHONEME_OVERRIDES: Record<string, string> = {
   four: 'fɔːr',
-  two: 'tuː',
 }
 
 /**
@@ -199,15 +209,13 @@ const PHONEME_OVERRIDES: Record<string, string> = {
  *
  * Word-boundary handling
  * ----------------------
- * `\b(four|two)\b` — JavaScript's `\b` is the standard ASCII word-
- * boundary, which is exactly the right primitive here:
+ * `\b(four)\b` (currently — the alternation grows as overrides are
+ * added). JavaScript's `\b` is the standard ASCII word-boundary, which
+ * is exactly the right primitive here:
  *   - "fourteen"      → "four" is followed by "t" (word char) → no \b
  *                       at the right edge → no match. Correct.
  *   - "fourth"        → same. Correct.
  *   - "afternoon"     → "four" not at a left word-boundary. Correct.
- *   - "twoscore"      → same as "fourteen". Correct.
- *   - "Bartholomew"   → contains "two" as substring but not on
- *                       boundaries. Correct.
  *   - " four,"        → "four" is bordered by space and ",". Both are
  *                       non-word chars → both \b's fire → match.
  *   - "Four"          → at start of string (left \b is implicit) and

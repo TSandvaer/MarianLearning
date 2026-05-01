@@ -161,13 +161,16 @@ describe('renderSsmlInnerText (interrogative prosody hint, ticket 86c9gxup4)', (
 
   it('wraps the trailing clause of the Math hint in <break>+<prosody>', () => {
     // The exact utterance from sessionPlans.ts that the ticket targets.
-    // "two" is wrapped in <phoneme> per ticket 86c9kj2um (long-vowel
-    // override to defeat the "to"/"too" homophone selection). "How
-    // many now?" is the trailing-clause prosody hint from 86c9gxup4.
+    // "two" is NOT wrapped — Thomas's iPad listening pass on PR #115
+    // showed the en-US-EmmaMultilingualNeural voice does not honour
+    // /tuː/ for the cardinal "two" the same way it honours /fɔːr/ for
+    // "four". The "two" override is parked for a follow-up ticket;
+    // here "two" passes through plain. "How many now?" still gets the
+    // trailing-clause prosody hint from 86c9gxup4.
     expect(
       renderSsmlInnerText('Look. Three. And two more. How many now?'),
     ).toBe(
-      'Look. Three. And <phoneme alphabet="ipa" ph="tuː">two</phoneme> more. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many now?</prosody>',
+      'Look. Three. And two more. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many now?</prosody>',
     )
   })
 
@@ -197,10 +200,21 @@ describe('renderSsmlInnerText (interrogative prosody hint, ticket 86c9gxup4)', (
   })
 
   it('handles the read utterance ("X plus Y. How many?") correctly', () => {
-    // "two" wrapped per phoneme-override (86c9kj2um); the trailing
-    // interrogative still picks up the question-prosody hint.
+    // "two" is currently NOT in the override table (parked for a
+    // follow-up to 86c9kj2um; the voice didn't honour /tuː/ in
+    // listening tests). "How many?" still picks up the question-
+    // prosody hint.
     expect(renderSsmlInnerText('Three plus two. How many?')).toBe(
-      'Three plus <phoneme alphabet="ipa" ph="tuː">two</phoneme>. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
+      'Three plus two. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
+    )
+  })
+
+  it('wraps the read utterance with "four" in the trailing clause', () => {
+    // Same shape as the "two" case above but with "four" — which IS
+    // in the override table. Pin that the trailing-question prosody
+    // wrap composes correctly with the phoneme injection.
+    expect(renderSsmlInnerText('Three plus four. How many?')).toBe(
+      'Three plus <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
     )
   })
 })
@@ -224,10 +238,17 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     )
   })
 
-  it('wraps "two" in <phoneme alphabet="ipa" ph="tuː">', () => {
-    expect(applyPhonemeOverrides('Two plus two.')).toBe(
-      '<phoneme alphabet="ipa" ph="tuː">Two</phoneme> plus <phoneme alphabet="ipa" ph="tuː">two</phoneme>.',
-    )
+  it('passes "two" through unchanged (override parked for follow-up; voice did not honour /tuː/)', () => {
+    // Listening test on PR #115 showed Azure's
+    // en-US-EmmaMultilingualNeural voice did NOT honour /tuː/ for
+    // "two" the way it honoured /fɔːr/ for "four". "two" is therefore
+    // not in PHONEME_OVERRIDES (yet) — it passes through plain and
+    // the rest of the pipeline (XML-escape, prosody) handles it
+    // unchanged. This test is the contract guard: do not re-add "two"
+    // to the override map without first listening-confirming the IPA
+    // moves the voice on a preview deploy.
+    expect(applyPhonemeOverrides('Two plus two.')).toBe('Two plus two.')
+    expect(applyPhonemeOverrides('Two plus two.')).not.toContain('<phoneme')
   })
 
   it('preserves original casing inside the tag (Four stays Four)', () => {
@@ -253,7 +274,11 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     expect(applyPhonemeOverrides('fourth grade')).not.toContain('<phoneme')
   })
 
-  it('does NOT match "two" inside "twoscore" or as a substring of larger words', () => {
+  it('does NOT match a target word as a substring of larger words (twoscore / Bartholomew boundary guard)', () => {
+    // "two" is not currently in PHONEME_OVERRIDES — both expressions
+    // pass through trivially. The test is kept as a forward-compat
+    // guard: if "two" is re-added in a follow-up, this test must
+    // continue to pass (i.e. the regex still uses \b on both edges).
     expect(applyPhonemeOverrides('twoscore years')).toBe('twoscore years')
     expect(applyPhonemeOverrides('twoscore years')).not.toContain('<phoneme')
     // "Bartholomew" famously contains "two" as a substring on no
@@ -261,29 +286,45 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     expect(applyPhonemeOverrides('Bartholomew')).toBe('Bartholomew')
   })
 
-  it('matches both targets in the same string and emits exactly two <phoneme> tags for "Two plus two."', () => {
+  it('emits ZERO <phoneme> tags for "Two plus two. How many?" (override parked) and leaves the bare tokens intact', () => {
     const out = applyPhonemeOverrides('Two plus two. How many?')
     // Count-based assertion (per feedback_count_assertions_on_regression_tests):
-    // exactly two phoneme wraps for "two", zero for "four".
-    const twoMatches = out.match(/<phoneme alphabet="ipa" ph="tuː">/g) ?? []
-    expect(twoMatches).toHaveLength(2)
-    const fourMatches = out.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
-    expect(fourMatches).toHaveLength(0)
-    // And: there should be NO bare "two" tokens left outside a phoneme
-    // tag. Strip the tags and assert.
-    const stripped = out.replace(/<phoneme[^>]*>([^<]*)<\/phoneme>/g, '')
-    expect(stripped).not.toMatch(/\btwo\b/i)
+    // zero phoneme wraps for "two" (parked), zero for "four" (not in
+    // this string).
+    const phonemeMatches = out.match(/<phoneme alphabet="ipa"/g) ?? []
+    expect(phonemeMatches).toHaveLength(0)
+    // The bare "two" tokens are preserved verbatim — Azure will voice
+    // them via its default lexicon. (The voice currently picks the
+    // short /tu/ realization on the leading instance, per Thomas's
+    // listening test; that is the bug the follow-up ticket will
+    // tackle. Until then the contract is "pass through unchanged".)
+    expect(out).toBe('Two plus two. How many?')
   })
 
-  it('wraps "four" alongside other text in a math read utterance', () => {
-    expect(applyPhonemeOverrides('Two plus four. How many?')).toBe(
-      '<phoneme alphabet="ipa" ph="tuː">Two</phoneme> plus <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>. How many?',
+  it('emits exactly one <phoneme ph="fɔːr"> for a single "four" in a multi-word utterance', () => {
+    const out = applyPhonemeOverrides('Two plus four. How many?')
+    const fourMatches = out.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    expect(fourMatches).toHaveLength(1)
+    // "two" passes through plain; pin the full string for clarity.
+    expect(out).toBe(
+      'Two plus <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>. How many?',
     )
   })
 
+  it('emits exactly two <phoneme ph="fɔːr"> for "Four plus four"', () => {
+    const out = applyPhonemeOverrides('Four plus four. How many?')
+    const fourMatches = out.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    expect(fourMatches).toHaveLength(2)
+    // No bare "four" tokens outside the phoneme wrap. Strip the tags
+    // and assert — the same shape the original count-based test used
+    // for "two", retargeted to the still-active "four" override.
+    const stripped = out.replace(/<phoneme[^>]*>[^<]*<\/phoneme>/g, '')
+    expect(stripped).not.toMatch(/\bfour\b/i)
+  })
+
   it('XML-escapes plain segments around the phoneme tag', () => {
-    expect(applyPhonemeOverrides(`A & two B.`)).toBe(
-      'A &amp; <phoneme alphabet="ipa" ph="tuː">two</phoneme> B.',
+    expect(applyPhonemeOverrides(`A & four B.`)).toBe(
+      'A &amp; <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> B.',
     )
   })
 })
@@ -296,31 +337,46 @@ describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () =>
     volume: '+0%',
   }
 
-  it('emits <phoneme> tags for "Two plus two. How many?" inside the prosody+question wrappers', () => {
+  it('emits ZERO <phoneme> tags for "Two plus two. How many?" (override parked) but preserves the trailing-question prosody', () => {
     const body = buildSsmlBody({
       ...baseReq,
       text: 'Two plus two. How many?',
     })
-    // Exactly two phoneme tags for "two".
-    const twoMatches = body.match(/<phoneme alphabet="ipa" ph="tuː">/g) ?? []
-    expect(twoMatches).toHaveLength(2)
-    // No bare "two" tokens outside the phoneme wrap (i.e. nothing
-    // remains for Azure to mispronounce).
-    const stripped = body.replace(/<phoneme[^>]*>[^<]*<\/phoneme>/g, '')
-    expect(stripped).not.toMatch(/\btwo\b/i)
-    // Trailing question still gets the prosody hint.
+    // No phoneme wraps — "two" is not currently in PHONEME_OVERRIDES.
+    const phonemeMatches = body.match(/<phoneme alphabet="ipa"/g) ?? []
+    expect(phonemeMatches).toHaveLength(0)
+    // Plain "Two plus two" survives intact inside the outer prosody.
+    expect(body).toContain(
+      '<prosody pitch="+0Hz" rate="-10%" volume="+0%">Two plus two. ',
+    )
+    // Trailing question still gets the prosody hint (86c9gxup4).
     expect(body).toContain(
       '<break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
     )
   })
 
-  it('emits <phoneme ph="fɔːr"> for "Two plus four. How many?"', () => {
+  it('emits exactly one <phoneme ph="fɔːr"> for "Two plus four. How many?" ("two" passes through plain)', () => {
     const body = buildSsmlBody({
       ...baseReq,
       text: 'Two plus four. How many?',
     })
-    expect(body).toContain('<phoneme alphabet="ipa" ph="tuː">Two</phoneme>')
+    const fourMatches = body.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    expect(fourMatches).toHaveLength(1)
     expect(body).toContain('<phoneme alphabet="ipa" ph="fɔːr">four</phoneme>')
+    // "Two" is plain — no phoneme wrap on it.
+    expect(body).not.toContain('<phoneme alphabet="ipa" ph="tuː">')
+  })
+
+  it('emits two <phoneme ph="fɔːr"> tags for "Four plus four. How many?"', () => {
+    const body = buildSsmlBody({
+      ...baseReq,
+      text: 'Four plus four. How many?',
+    })
+    const fourMatches = body.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    expect(fourMatches).toHaveLength(2)
+    // No bare "four" tokens leak past the phoneme wrap.
+    const stripped = body.replace(/<phoneme[^>]*>[^<]*<\/phoneme>/g, '')
+    expect(stripped).not.toMatch(/\bfour\b/i)
   })
 
   it('does NOT emit <phoneme> tags for utterances that do not contain target words', () => {
@@ -342,14 +398,17 @@ describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () =>
   it('envelope structure: <speak version=...> + voice + outer prosody for an utterance with phoneme injection', () => {
     const body = buildSsmlBody({
       ...baseReq,
-      text: 'Two plus two. How many?',
+      text: 'Four plus four. How many?',
     })
-    // Pin the envelope shape independent of inner content. The brief
-    // calls out asserting "the body starts with `<speak version=`".
+    // Pin the envelope shape independent of inner content. Use a
+    // "four"-containing string so the envelope-with-injection
+    // invariant is exercised (the brief calls out asserting "the body
+    // starts with `<speak version=`").
     expect(body.startsWith('<speak version="1.0"')).toBe(true)
     expect(body).toContain('xml:lang="en-US"')
     expect(body).toContain('<voice name="en-US-EmmaMultilingualNeural">')
     expect(body).toContain('<prosody pitch="+0Hz" rate="-10%" volume="+0%">')
+    expect(body).toContain('<phoneme alphabet="ipa" ph="fɔːr">')
     expect(body).toMatch(/<\/prosody><\/voice><\/speak>$/)
   })
 })
@@ -367,11 +426,12 @@ describe('buildSsmlBody (prosody-hint integration)', () => {
       ...baseReq,
       text: 'Look. Three. And two more. How many now?',
     })
-    // "two" gets the IPA override (ticket 86c9kj2um); the trailing
+    // "two" passes through plain — the override is parked
+    // (86c9kj2um listening test on PR #115). The trailing
     // interrogative still gets the question-prosody wrap (86c9gxup4).
     expect(body).toContain(
       '<prosody pitch="+0Hz" rate="-10%" volume="+0%">' +
-        'Look. Three. And <phoneme alphabet="ipa" ph="tuː">two</phoneme> more. ' +
+        'Look. Three. And two more. ' +
         '<break time="250ms"/><prosody pitch="+8%" rate="-5%">How many now?</prosody>' +
         '</prosody>',
     )
