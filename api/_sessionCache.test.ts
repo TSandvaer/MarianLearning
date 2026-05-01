@@ -21,10 +21,24 @@ function makeResponse(label: string): SessionStartResponse {
 }
 
 describe('buildSessionCacheKey', () => {
-  it('joins track, level, and childName with `|`', () => {
+  it('joins track, level, childName, and an empty focusNode with `|`', () => {
+    // Default (M2 ticket 86c9kmwba): no focusNode supplied → trailing
+    // empty segment. Stable shape so legacy callers (no focusNode field)
+    // still hit the same cache key as before this change.
     expect(
       buildSessionCacheKey({ track: 'math', level: 1, childName: 'Marian' }),
-    ).toBe('math|1|Marian')
+    ).toBe('math|1|Marian|')
+  })
+
+  it('includes focusNode when supplied', () => {
+    expect(
+      buildSessionCacheKey({
+        track: 'math',
+        level: 1,
+        childName: 'Marian',
+        focusNode: 'add-to-10',
+      }),
+    ).toBe('math|1|Marian|add-to-10')
   })
 
   it('escapes a literal `|` inside childName so it cannot collide with another key', () => {
@@ -37,31 +51,77 @@ describe('buildSessionCacheKey', () => {
         level: 1,
         childName: 'evil|name',
       }),
-    ).toBe('math|1|evil\\|name')
+    ).toBe('math|1|evil\\|name|')
   })
 
-  it('different tracks/levels/names produce different keys', () => {
+  it('escapes a literal `|` inside focusNode (defense in depth — VALID nodes never contain `|`)', () => {
+    // The planner's request validator rejects unknown focus nodes, so a
+    // literal `|` in focusNode never reaches this builder in practice.
+    // We still escape it so a future widening of the allowed-set can't
+    // open a key-collision corridor.
+    expect(
+      buildSessionCacheKey({
+        track: 'math',
+        level: 1,
+        childName: 'Marian',
+        focusNode: 'evil|node',
+      }),
+    ).toBe('math|1|Marian|evil\\|node')
+  })
+
+  it('M2 regression — same (track, level, childName) but DIFFERENT focusNode produces DIFFERENT cache keys (ticket 86c9kmwba)', () => {
+    // Pin the bug the brief warned about: PR #113 keyed only on (track,
+    // level, childName), so a {focusNode: add-to-10} request followed
+    // by a {focusNode: add-to-20} request would have served the first
+    // cached response to the second call. Including focusNode in the key
+    // forces a fresh planner+TTS call for the new focus.
     const k1 = buildSessionCacheKey({
       track: 'math',
       level: 1,
       childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const k2 = buildSessionCacheKey({
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+    expect(k1).not.toBe(k2)
+  })
+
+  it('different tracks/levels/names/focusNodes produce different keys', () => {
+    const k1 = buildSessionCacheKey({
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
     })
     const k2 = buildSessionCacheKey({
       track: 'word-song',
       level: 1,
       childName: 'Marian',
+      focusNode: 'add-to-10',
     })
     const k3 = buildSessionCacheKey({
       track: 'math',
       level: 2,
       childName: 'Marian',
+      focusNode: 'add-to-10',
     })
     const k4 = buildSessionCacheKey({
       track: 'math',
       level: 1,
       childName: 'Other',
+      focusNode: 'add-to-10',
     })
-    expect(new Set([k1, k2, k3, k4]).size).toBe(4)
+    const k5 = buildSessionCacheKey({
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+    expect(new Set([k1, k2, k3, k4, k5]).size).toBe(5)
   })
 })
 

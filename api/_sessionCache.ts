@@ -59,17 +59,35 @@ export interface SessionCache {
   clear(): void
 }
 
-/** Build a cache-key for the track-based session-start payload. The three
- *  identifying fields are joined with `|` (impossible to appear in any of
- *  them — track is enum, level is integer, childName is bounded ≤64 chars
- *  but we still escape any `|` defensively below). */
+/** Build a cache-key for the track-based session-start payload.
+ *
+ * Identifying fields (joined with `|`):
+ *   - track (enum)
+ *   - level (integer)
+ *   - childName (bounded ≤64 chars; any literal `|` is escaped)
+ *   - focusNode (M2 — ticket 86c9kmwba). Cached responses depend on the
+ *     focus node now that the planner generates problems for it. Without
+ *     this in the key, a {focusNode: 'add-to-10'} request followed by
+ *     {focusNode: 'add-to-20'} would silently serve the first response
+ *     to the second call. Defaults to the empty string when omitted so
+ *     the cache key for legacy clients (no focusNode field) stays stable.
+ *
+ * NOT in the key:
+ *   - recentSuccessRate. It's a continuously variable float; including it
+ *     would shred the cache hit rate for negligible benefit (the planner
+ *     uses it as a soft hint, not a hard branch). The cost of serving a
+ *     slightly-stale "recent score" response within the 5-minute TTL is
+ *     bounded; the cache miss rate would not be.
+ */
 export function buildSessionCacheKey(args: {
   track: string
   level: number
   childName: string
+  focusNode?: string
 }): string {
   const safeName = args.childName.replace(/\|/g, '\\|')
-  return `${args.track}|${args.level}|${safeName}`
+  const focusNode = (args.focusNode ?? '').replace(/\|/g, '\\|')
+  return `${args.track}|${args.level}|${safeName}|${focusNode}`
 }
 
 /**
