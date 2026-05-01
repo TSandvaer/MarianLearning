@@ -649,7 +649,11 @@ describe('generateSessionPlan — focusNode + recentSuccessRate (M2, ticket 86c9
     expect(args.messages[0]!.content).toContain('add-to-10')
   })
 
-  it('omits focusNode for word-song → defaults to cvc-words', async () => {
+  it('omits focusNode for word-song → defaults to blending-cv (the single supported content mode)', async () => {
+    // P0 fix (ticket 86c9kt47v): word-song defaults to 'blending-cv' and
+    // is server-side clamped to 'blending-cv' regardless of caller input
+    // until M-series widens content-template support. See the
+    // `WORD_SONG_TRACK_GUIDE` comment in api/_planner.ts.
     const WORD_RESPONSE = JSON.stringify({
       id: 'haiku-word-001',
       label: 'M2 word default',
@@ -666,7 +670,7 @@ describe('generateSessionPlan — focusNode + recentSuccessRate (M2, ticket 86c9
     })
 
     const args = capture.lastArgs as { messages: Array<{ content: string }> }
-    expect(args.messages[0]!.content).toContain('cvc-words')
+    expect(args.messages[0]!.content).toContain('blending-cv')
   })
 
   it('rejects a focusNode that does not belong to the requested track', async () => {
@@ -825,5 +829,235 @@ describe('generateSessionPlan — Haiku fence-stripping (regression for 86c9jrwb
 
     expect(plan.id).toBe('haiku-math-001')
     expect(plan.utterances).toHaveLength(5)
+  })
+})
+
+/**
+ * P0 regression suite — ticket 86c9kt47v.
+ *
+ * Pin the three planner-side invariants that broke WordSong on prod after
+ * M2 (PR #117 / 8fff733):
+ *   1. Word-song problem utterance ids ALWAYS use the literal "word."
+ *      prefix, regardless of focusNode value (the prod incident emitted
+ *      "cvc.*" when focusNode was omitted, breaking the browser parser).
+ *   2. Word-song read text ALWAYS uses the "Tap the <word>." template,
+ *      even when the caller asks for letter-sounds / cvc-words / digraphs.
+ *   3. The word-song system prompt is single-mode (only the CVC content
+ *      is described) — no menu enumeration that could nudge Haiku into
+ *      letter-sounds or letter-names content.
+ *
+ * Strategy: mock Anthropic to capture the request shape; the model itself
+ * isn't exercised here. We're pinning the PROMPT contract (system prompt
+ * stays single-mode + the user message normalises focus to blending-cv)
+ * plus the response-validation contract (a mocked response with `word.*`
+ * ids round-trips cleanly).
+ */
+describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v)', () => {
+  const VALID_WORD_RESPONSE = JSON.stringify({
+    id: 'haiku-word-001',
+    label: 'CVC short-a — Haiku-generated',
+    utterances: [
+      { id: 'word.p1.read', text: 'Tap the cat.' },
+      { id: 'word.p1.correct', text: 'Yes! Cat.' },
+      { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'word.p1.hint', text: "Let's look. Cat." },
+      { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+    ],
+  })
+
+  it('system prompt instructs the model to ALWAYS use "word." id prefix', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // Pin the explicit "ALWAYS" guidance so a future prompt edit can't
+    // silently drop it. The browser parser regex is anchored on
+    // /^word\.p\d+\.<slot>$/; the prompt must reflect that exactly.
+    expect(prompt).toMatch(/word\.p<N>\.<slot>/)
+    expect(prompt).toMatch(/ALWAYS use the literal prefix "word\."/i)
+  })
+
+  it('system prompt is single-mode (does NOT enumerate letter-names / letter-sounds / etc. as content modes)', async () => {
+    // Pre-fix prompt enumerated 7 word-song nodes as content modes; that
+    // nudged Haiku into producing "Tap the letter that says /m/." for
+    // letter-sounds and "cvc.*" id prefixes for cvc-words. Single-mode
+    // means: only the CVC "Tap the <word>." mode is described.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // The CVC content mode must be described.
+    expect(prompt).toMatch(/Tap the <word>\./)
+    // The pre-fix per-node menu lines MUST be absent. We assert against
+    // the specific phrasings that named non-blending-cv modes as separate
+    // content templates — the new prompt may still mention these node
+    // names in a comment, so we anchor on the menu-entry format.
+    expect(prompt).not.toMatch(/letter-sounds:.*Tap the letter that says/i)
+    expect(prompt).not.toMatch(/letter-names:.*Tap the letter <Letter>/i)
+    expect(prompt).not.toMatch(/sight-words:.*Tap the word/i)
+  })
+
+  it('clamps focusNode "letter-sounds" to "blending-cv" in the user message (no letter-sounds reaches Haiku)', async () => {
+    // Defense-in-depth: the browser-side picker is also clamped, but the
+    // server validates and clamps independently. A direct API caller
+    // (curl, smoke test, future API consumer) sending letter-sounds must
+    // get blending-cv content back.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'letter-sounds',
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toContain('blending-cv')
+    expect(user).not.toContain('letter-sounds')
+  })
+
+  it('clamps every valid word-song focusNode to "blending-cv" (sweep)', async () => {
+    // The server clamp must hold for every value the request validator
+    // accepts. If a future edit removes the clamp without restoring
+    // multi-mode prompts, this surfaces immediately.
+    const wordSongNodes = [
+      'letter-names',
+      'letter-sounds',
+      'blending-cv',
+      'cvc-words',
+      'digraphs',
+      'sight-words',
+      'simple-sentences',
+    ]
+    for (const node of wordSongNodes) {
+      const capture: { lastArgs?: unknown } = {}
+      const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+      await generateSessionPlan({
+        client,
+        track: 'word-song',
+        level: 1,
+        childName: 'Marian',
+        focusNode: node,
+      })
+      const args = capture.lastArgs as { messages: Array<{ content: string }> }
+      // The user message names the effective focus (always blending-cv
+      // for word-song) once. Any other node name must NOT appear as a
+      // focus directive — it's silently ignored.
+      const user = args.messages[0]!.content
+      expect(user).toMatch(/Focus skill node: blending-cv\./)
+    }
+  })
+
+  it('word-song does NOT touch math focus selection (defense-in-depth: math still walks the tree)', async () => {
+    // Pin that the clamp is word-song-only. Math must continue to honour
+    // caller-supplied focusNode verbatim — that's M2's whole point.
+    const MATH_RESPONSE = JSON.stringify({
+      id: 'haiku-math-001',
+      label: 'm',
+      utterances: [{ id: 'math.p1.read', text: 'Seven plus six. How many?' }],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/Focus skill node: add-to-20\./)
+  })
+
+  it('round-trips a mocked response with word.p<N>.<slot> ids unchanged (parser-compatible shape)', async () => {
+    // Pin that the planner's response validator accepts the exact shape
+    // the browser parser (`wordSongSessionPlanFromServer`) consumes.
+    // This pairs with the parser-side regression test in
+    // src/screens/WordSong/planFromServer.test.ts.
+    const FULL_8_PROBLEM_RESPONSE = JSON.stringify({
+      id: 'haiku-word-cvc',
+      label: 'CVC sweep',
+      utterances: Array.from({ length: 8 }, (_, i) => i + 1).flatMap((n) => [
+        { id: `word.p${n}.read`, text: 'Tap the cat.' },
+        { id: `word.p${n}.correct`, text: 'Yes! Cat.' },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: "Let's look. Cat." },
+        { id: `word.p${n}.giveAnswer`, text: 'This one is cat.' },
+      ]),
+    })
+    const client = makeMockClient(FULL_8_PROBLEM_RESPONSE)
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    // Every problem utterance has the literal "word." prefix — the
+    // browser parser's anchor.
+    const problemIds = plan.utterances.map((u) => u.id)
+    expect(problemIds.length).toBeGreaterThanOrEqual(40) // 8 × 5
+    for (const id of problemIds) {
+      expect(id).toMatch(
+        /^word\.p\d+\.(read|correct|reprompt|hint|giveAnswer)$/,
+      )
+    }
+
+    // Every read line matches the "Tap the <word>." template the parser
+    // expects. We only check read slots (the others have different
+    // templates). One read per problem index (1..8).
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads.length).toBe(8)
+    for (const r of reads) {
+      expect(r.text).toMatch(/^Tap the [a-z]+\.$/)
+    }
+  })
+
+  it('a no-progress (no focusNode) word-song call hits the same clamp + emits "word." ids', async () => {
+    // Reproduces the exact prod incident "Case 1" — backwards-compat
+    // request shape with no progress block. Pre-fix this emitted
+    // `cvc.*` ids and silenced the browser. Post-fix the user message
+    // routes to blending-cv and the system prompt instructs "word." ids.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      // focusNode + recentSuccessRate omitted (legacy browser shape)
+    })
+
+    const args = capture.lastArgs as {
+      system: Array<{ text: string }>
+      messages: Array<{ content: string }>
+    }
+    expect(args.messages[0]!.content).toMatch(/Focus skill node: blending-cv\./)
+    const prompt = args.system.map((b) => b.text).join('\n')
+    expect(prompt).toMatch(/ALWAYS use the literal prefix "word\."/i)
   })
 })

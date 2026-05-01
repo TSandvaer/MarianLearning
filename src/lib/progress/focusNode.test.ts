@@ -122,24 +122,74 @@ describe('pickFocusNode — math', () => {
   })
 })
 
-describe('pickFocusNode — word-song', () => {
-  it('returns the lowest non-mastered node', () => {
+describe('pickFocusNode — word-song (clamped to blending-cv, P0 fix 86c9kt47v)', () => {
+  // Word-song is hard-clamped to 'blending-cv' until the M-series widens
+  // content-template support. Pre-clamp behavior (walking the tree) caused
+  // a silent-WordSong production incident when the picker selected
+  // 'letter-sounds' but the browser parser only handles the CVC
+  // "Tap the <word>." template. These tests pin the clamp.
+
+  it('returns blending-cv for the default Progress doc', () => {
+    // Default doc: letter-names mastered, letter-sounds practicing,
+    // blending-cv practicing. Pre-clamp this returned 'letter-sounds';
+    // post-clamp it must return 'blending-cv'.
+    const progress = defaultProgress()
+    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+  })
+
+  it('returns blending-cv even when blending-cv itself is mastered', () => {
+    // The clamp ignores skillLevels entirely until template support widens.
+    // This is intentional: a parent who somehow triggers mastery of
+    // blending-cv shouldn't get silently shifted to a node the parser
+    // can't handle.
+    const progress = buildProgress({
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'practicing',
+    })
+    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+  })
+
+  it('returns blending-cv when every node is mastered', () => {
+    // Pre-clamp this returned 'simple-sentences' (the last-node fallback).
+    // Post-clamp the clamp wins.
+    const progress = buildProgress()
+    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+  })
+
+  it('returns blending-cv when letter-sounds is the lowest non-mastered (the prod-incident shape)', () => {
+    // Reproduces the exact Progress shape that silenced WordSong on prod:
+    // letter-names mastered + letter-sounds practicing. Pre-clamp the
+    // picker returned 'letter-sounds' → planner generated
+    // "Tap the letter that says /m/." → parser rejected → silent.
+    // Post-clamp the picker returns 'blending-cv' and the parser is happy.
     const progress = buildProgress({
       'letter-names': 'mastered',
       'letter-sounds': 'practicing',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('letter-sounds')
+    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
   })
 
-  it('walks the default Progress doc — Marian lands on letter-sounds', () => {
-    // Default doc: letter-names mastered, letter-sounds practicing.
-    const progress = defaultProgress()
-    expect(pickFocusNode(progress, 'word-song')).toBe('letter-sounds')
-  })
-
-  it('falls back to the last word-song node when every node is mastered', () => {
-    const progress = buildProgress()
-    expect(pickFocusNode(progress, 'word-song')).toBe('simple-sentences')
+  it('returns blending-cv across a sweep of arbitrary skillLevels combinations', () => {
+    // Defense-in-depth: the clamp must hold for any reasonable progress
+    // shape. Sweep a handful of distinct configurations and pin the
+    // invariant. If a future edit reintroduces tree-walking on the
+    // word-song branch, this catches it.
+    const shapes: Array<Partial<SkillLevels>> = [
+      {},
+      { 'letter-names': 'practicing' },
+      { 'letter-names': 'mastered', 'letter-sounds': 'practicing' },
+      { 'letter-names': 'mastered', 'letter-sounds': 'mastered' },
+      { 'blending-cv': 'practicing' },
+      { 'cvc-words': 'practicing' },
+      { digraphs: 'practicing' },
+      { 'sight-words': 'mastered', 'simple-sentences': 'mastered' },
+    ]
+    for (const overrides of shapes) {
+      const progress = buildProgress(overrides)
+      expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+    }
   })
 })
 
