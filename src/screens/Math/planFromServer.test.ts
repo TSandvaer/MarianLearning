@@ -51,14 +51,75 @@ describe('parseReadAddends', () => {
     })
   })
 
+  // ── Carrier-prefix cases (ticket 86c9kj2um) ────────────────────────────
+  // Azure neural TTS realises sentence-leading "four"/"two" as the homophones
+  // "for"/"to". The planner now prepends "Okay, " to every read line so the
+  // number-word is never at sentence-start. The parser must accept the new
+  // shape AND keep accepting bare lines for back-compat / safety.
+
+  it('parses the canonical carrier-prefixed shape ("Okay, four plus four. How many?")', () => {
+    expect(parseReadAddends('Okay, four plus four. How many?')).toEqual({
+      addendA: 4,
+      addendB: 4,
+    })
+  })
+
+  it('parses carrier-prefixed lines with two-leading-number words ("Okay, two plus three. How many?")', () => {
+    expect(parseReadAddends('Okay, two plus three. How many?')).toEqual({
+      addendA: 2,
+      addendB: 3,
+    })
+  })
+
+  it('is case-insensitive on the carrier word ("okay, three plus two. How many?")', () => {
+    expect(parseReadAddends('okay, three plus two. How many?')).toEqual({
+      addendA: 3,
+      addendB: 2,
+    })
+  })
+
+  it('accepts a "So, " carrier (alternate Thomas-approved shape)', () => {
+    expect(parseReadAddends('So, five plus three. How many?')).toEqual({
+      addendA: 5,
+      addendB: 3,
+    })
+  })
+
+  it('accepts a "Now —" em-dash carrier', () => {
+    expect(parseReadAddends('Now — six plus two. How many?')).toEqual({
+      addendA: 6,
+      addendB: 2,
+    })
+  })
+
   it('throws on non-template lines', () => {
     expect(() => parseReadAddends('What is three plus two?')).toThrow(
       PlanFromServerError,
     )
   })
 
+  it('throws on truly-malformed lines that imitate a carrier shape', () => {
+    // "two and two equals four" — superficially resembles a math read but
+    // misses the `plus`/`how many?` anchors and has no leading carrier.
+    expect(() => parseReadAddends('two and two equals four')).toThrow(
+      PlanFromServerError,
+    )
+    // "blah blah" — no template at all.
+    expect(() => parseReadAddends('blah blah')).toThrow(PlanFromServerError)
+  })
+
+  it('throws on a carrier without the trailing template (carrier alone is not enough)', () => {
+    expect(() => parseReadAddends('Okay, hello there.')).toThrow(
+      PlanFromServerError,
+    )
+  })
+
   it('throws on unknown number words', () => {
     expect(() => parseReadAddends('Eleven plus two. How many?')).toThrow(
+      PlanFromServerError,
+    )
+    // Carrier-prefixed unknown number word is rejected the same way.
+    expect(() => parseReadAddends('Okay, eleven plus two. How many?')).toThrow(
       PlanFromServerError,
     )
   })

@@ -364,12 +364,14 @@ Curriculum slice (level 1): sums to 10. Pick 8 distinct addition facts where:
 - The sum is 3-10 (avoid trivial 1+1, avoid sums >10 entirely).
 - Mix bridge-through-5 facts (3+2, 4+3) with easy doubles (2+2, 4+4) and small near-doubles. Order: easier facts in problems 1-3, slightly harder in 4-8.
 
-Per-problem utterance templates (vary the wording slightly across problems but keep the structure):
-- read: "<addend-A> plus <addend-B>. How many?" e.g. "Three plus two. How many?"
+Per-problem utterance templates (keep the structure exactly — do not vary the carrier word, the leading "Okay, " is required):
+- read: "Okay, <addend-A> plus <addend-B>. How many?" e.g. "Okay, three plus two. How many?"
 - correct: "Yes! <sum>!" e.g. "Yes! Five!"
 - reprompt: "Hmm... try again?"  (verbatim)
 - hint: "Look. <A>. And <B> more. How many now?" e.g. "Look. Three. And two more. How many now?"
 - giveAnswer: "This one is <sum>." e.g. "This one is five."
+
+PROSODY RULE — every read line MUST begin with the carrier word "Okay, " so the leading number-word is never at sentence-start. Azure neural TTS realises sentence-leading "four" and "two" as the homophones "for" / "to" with declarative falling intonation; the carrier prevents that. The full required template is "Okay, <addend-A> plus <addend-B>. How many?" — emit it verbatim, do not paraphrase ("Alright,", "Well,", "So,") and do not drop the carrier on any problem.
 
 Spell numbers as words (one, two, ... ten), not digits. Capitalize the first word of each sentence.`
 

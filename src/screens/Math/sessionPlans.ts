@@ -165,7 +165,18 @@ export interface MathSessionPlan {
   problems: readonly MathProblem[]
 }
 
-/** Build a problem with all the canned utterances derived from its addends. */
+/** Build a problem with all the canned utterances derived from its addends.
+ *
+ *  Carrier prefix on `read` (ticket 86c9kj2um)
+ *  -------------------------------------------
+ *  Azure neural TTS realises a sentence-leading "four" / "two" as the
+ *  homophones "for" / "to" with declarative falling intonation. Every read
+ *  line is prefixed with "Okay, " so the leading number-word is never at
+ *  sentence-start. This applies to the static fallback plans too — when
+ *  /api/claude is down and Marian falls back to a static plan, she still
+ *  gets the prosody-safe carrier. The planner system prompt enforces the
+ *  same shape for Claude-generated plans (see api/_planner.ts:MATH_TRACK_GUIDE).
+ */
 function makeProblem(
   index: number,
   addendA: number,
@@ -178,7 +189,7 @@ function makeProblem(
     addendB,
     correct,
     utterances: {
-      read: `${numberWord(addendA)} plus ${numberWord(addendB)}. How many?`,
+      read: `Okay, ${numberWord(addendA)} plus ${numberWord(addendB)}. How many?`,
       correct: `Yes! ${numberWord(correct)}!`,
       reprompt: 'Hmm... try again?',
       hint: `Look. ${numberWord(addendA)}. And ${numberWord(addendB)} more. How many now?`,

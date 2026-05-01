@@ -171,6 +171,79 @@ describe('generateSessionPlan — math track', () => {
     expect(userPrompt).toMatch(/level\s*2/i)
     expect(userPrompt).toMatch(/Marian/)
   })
+
+  // ── Carrier prefix on read line (ticket 86c9kj2um) ─────────────────────
+  // Azure neural TTS realises sentence-leading "four" / "two" as homophones
+  // "for" / "to". The fix: the math system prompt MUST instruct Haiku to
+  // begin every read line with a carrier word ("Okay, ") so the number-word
+  // is never at sentence-start. These assertions pin the contract on the
+  // prompt copy itself — if the carrier instruction is removed or paraphrased
+  // away, this test fails loudly rather than letting prosody regress
+  // silently in production.
+
+  it('includes the "Okay, " carrier requirement in the math system prompt', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    const args = capture.lastArgs as {
+      system: Array<{ text: string }>
+    }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // The carrier shape is mentioned literally in the read template.
+    expect(systemText).toMatch(
+      /Okay,\s*<addend-A>\s*plus\s*<addend-B>\.\s*How many\?/,
+    )
+  })
+
+  it('explains WHY the carrier exists (prosody / homophone risk) in the math system prompt', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    const args = capture.lastArgs as {
+      system: Array<{ text: string }>
+    }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // The reason ("homophones" / "for" / "to" / "sentence-start") must be
+    // present so future copy edits don't accidentally break the rule by
+    // dropping context. We keep the assertion loose (any of the three signals)
+    // so it doesn't couple to exact wording.
+    expect(systemText).toMatch(/sentence-start|homophone|prosody/i)
+  })
+
+  it('shows the carrier in the example read line, not the bare template', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+    })
+
+    const args = capture.lastArgs as {
+      system: Array<{ text: string }>
+    }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // Example must demonstrate the carrier shape (e.g. "Okay, three plus two.
+    // How many?"). Without an in-prompt example, Haiku has been known to
+    // honour rules inconsistently — example pinning increases compliance.
+    expect(systemText).toMatch(/Okay,\s*three\s+plus\s+two\.\s*How many\?/i)
+  })
 })
 
 describe('generateSessionPlan — word-song track', () => {

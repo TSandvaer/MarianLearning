@@ -166,17 +166,34 @@ export function mathSessionPlanFromServer(
 }
 
 /** Extract `{addendA, addendB}` from a `read` line shaped like
- *  "Three plus two. How many?" — case-insensitive on the leading word.
- *  Throws on any drift. */
+ *  "Okay, three plus two. How many?" — case-insensitive on the leading word.
+ *  Throws on any drift.
+ *
+ *  Carrier prefix (ticket 86c9kj2um)
+ *  ---------------------------------
+ *  Azure neural TTS realises a sentence-leading "four" / "two" as the
+ *  homophones "for" / "to" with declarative falling intonation. The planner
+ *  fix is to prepend a carrier word ("Okay, ") to every read line so the
+ *  number word is never at sentence-start. This parser accepts BOTH
+ *  shapes:
+ *
+ *  - Carrier-prefixed (the new norm): "Okay, three plus two. How many?"
+ *  - Bare template (back-compat for older fixtures + safety):
+ *    "Three plus two. How many?"
+ *
+ *  The carrier is constrained to 1-2 letter-only words ending in `,` or `—`
+ *  (em-dash) so we don't silently absorb arbitrary text drift. Any other
+ *  shape still throws. */
 export function parseReadAddends(read: string): {
   addendA: number
   addendB: number
 } {
-  // Anchor: optional leading whitespace, capture word A, " plus ", capture
-  // word B, ". How many?" (with optional trailing whitespace / punctuation).
-  // Case-insensitive so "three" / "Three" both work.
+  // Anchor: optional leading whitespace, optional 1-2 word carrier ending
+  // in `,` or `—`, then capture word A, " plus ", capture word B,
+  // ". How many?". Case-insensitive so "Three" / "three" both work, and so
+  // the carrier "Okay," / "okay," both pass.
   const match = read.match(
-    /^\s*([a-z]+)\s+plus\s+([a-z]+)\s*\.\s*how\s+many\s*\?\s*$/i,
+    /^\s*(?:[a-z]+(?:\s+[a-z]+)?\s*[,—]\s+)?([a-z]+)\s+plus\s+([a-z]+)\s*\.\s*how\s+many\s*\?\s*$/i,
   )
   if (!match) {
     throw new PlanFromServerError(
