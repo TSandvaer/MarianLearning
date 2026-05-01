@@ -8,6 +8,11 @@ import type { Sfx } from '../../lib/sfx'
 import type { StorageAdapter } from '../Math/stardust'
 import { STARDUST_STORAGE_KEY, STARDUST_SCHEMA_VERSION } from '../Math/stardust'
 import { SESSION_HISTORY_KEY } from './sessionHistory'
+import {
+  STORAGE_KEY as PROGRESS_STORAGE_KEY,
+  isProgressV1,
+  loadProgress,
+} from '../../lib/progress'
 
 function withMotion(node: ReactNode) {
   return (
@@ -213,10 +218,17 @@ const WORD_SONG_PAYLOAD: SessionEndPayload = {
 describe('SessionEnd', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    // SessionEnd's mount effect persists to `marian-tutor:progress:v1`
+    // (ticket 86c9kmu63). That write goes through `saveProgress`, which
+    // hits `window.localStorage` directly — there's no injectable adapter
+    // on the progress module yet. Clear the slot per-test so progress
+    // entries don't leak across tests in this file.
+    if (typeof window !== 'undefined') window.localStorage.clear()
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    if (typeof window !== 'undefined') window.localStorage.clear()
   })
 
   it('renders the session-end screen with Math payload', () => {
@@ -310,6 +322,69 @@ describe('SessionEnd', () => {
     expect(history.sessionCount).toBe(1)
     expect(history.longestStreakEver).toBe(5)
     expect(history.cumulativeStardust).toBe(9)
+  })
+
+  // Adaptive-engine plumbing (ticket 86c9kmu63). The mount effect now also
+  // persists into `marian-tutor:progress:v1`. These three tests pin the
+  // wiring; the per-call shape contract is covered in
+  // `progressHistory.test.ts`.
+
+  it('persists progress to marian-tutor:progress:v1 on first mount (math)', () => {
+    const storage = createMemoryStorage()
+    seedStardust(storage, 9)
+    const fixedDate = new Date('2026-04-30T18:30:00.000Z')
+
+    render(
+      withMotion(
+        <SessionEnd
+          payload={MATH_PAYLOAD}
+          playUtteranceFn={createFakePlayUtterance()}
+          chime={createFakeSfx()}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+          now={() => fixedDate}
+        />,
+      ),
+    )
+
+    const raw = window.localStorage.getItem(PROGRESS_STORAGE_KEY)
+    expect(raw).not.toBeNull()
+    const loaded = loadProgress()
+    expect(isProgressV1(loaded)).toBe(true)
+    expect(loaded?.history).toHaveLength(1)
+    expect(loaded?.history[0]).toEqual({
+      dateISO: '2026-04-30T18:30:00.000Z',
+      skillFocus: ['add-to-10'],
+      successRate: MATH_PAYLOAD.totalCorrect / 8,
+    })
+    expect(loaded?.profile.lastPlayedISO).toBe('2026-04-30T18:30:00.000Z')
+  })
+
+  it('persists progress with the word-song skillFocus when surface is word-song', () => {
+    const storage = createMemoryStorage()
+    seedStardust(storage, 8)
+    const fixedDate = new Date('2026-04-30T19:00:00.000Z')
+
+    render(
+      withMotion(
+        <SessionEnd
+          payload={WORD_SONG_PAYLOAD}
+          playUtteranceFn={createFakePlayUtterance()}
+          chime={createFakeSfx()}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+          now={() => fixedDate}
+        />,
+      ),
+    )
+
+    const loaded = loadProgress()
+    expect(loaded?.history[0].skillFocus).toEqual(['blending-cv'])
+    expect(loaded?.history[0].successRate).toBe(
+      WORD_SONG_PAYLOAD.totalCorrect / 8,
+    )
   })
 
   it('shows the stardust counter', () => {
