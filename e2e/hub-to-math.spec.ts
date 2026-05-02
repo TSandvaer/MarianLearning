@@ -130,3 +130,119 @@ test.describe('Hub → Math golden path', () => {
     // signal we have is that math mounted at all.)
   })
 })
+
+/**
+ * E2E spec — no-swap-jolt on cold mount (ticket 86c9kxb5q).
+ *
+ * Reproduces Thomas's 2026-05-02 production bug: cold-mount Math paints
+ * the static-fallback Q1, then the canon-derived plan arrives ~1.3s
+ * later, the plan prop flips, and Q1 visibly swaps to a different
+ * problem before audio fires. Pre-fix: Marian sees one problem, then
+ * another, then audio. Post-fix: Marian sees Emma idle, then the first
+ * problem appears once with audio firing.
+ *
+ * Strategy
+ * --------
+ * The mock helper now supports `delayMs` — we hold the /api/claude route
+ * in flight for 800ms so the App.tsx state machine sits with
+ * `mathAudioReady === false` long enough for Playwright to assert
+ * against the DOM. Then the mock aborts (failNetwork: true) — App's
+ * catch flips audioReady to true and the static fallback plan renders.
+ * That's the soft-fail path; the assertion that matters is "no problem
+ * area was on screen during the in-flight window".
+ *
+ * We pick the failNetwork path (matching the existing harness) over the
+ * canonical-resolve path because the canonical response carries inline
+ * base64 audio that Howler can't reliably decode in headless browsers,
+ * and either branch flips audioReady to true the same way (App.tsx's
+ * `.catch` block mirrors its `.then` block on this point). The
+ * load-bearing assertion — "no problem text visible at mount, problem
+ * text visible after the flip" — holds either way.
+ */
+test.describe('Hub → Math no-swap-jolt on cold mount (86c9kxb5q)', () => {
+  test.beforeEach(async ({ page }) => {
+    // 3000ms delay before the route aborts. Long enough that the chain
+    // of `expect.toBeVisible({timeout:10s})` calls leading up to the
+    // pre-flip `toHaveCount(0)` assertion always lands inside the
+    // pre-flip window even under parallel-worker load on slower CI
+    // engines (WebKit observed flaking at 800ms). Total spec runtime
+    // is still well under the project's 90s timeout.
+    await installClaudeMock(page, { failNetwork: true, delayMs: 3000 })
+    await seedLocalStorage(page, {
+      sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
+    })
+  })
+
+  test('Math renders Emma + HUD on mount; problem area appears only after audioReady flips', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await forceHowlerUnlock(page)
+
+    // Splash auto-advances → Hub.
+    const hub = page.getByTestId('hub')
+    await expect(hub).toBeVisible({ timeout: 10_000 })
+
+    // Tap Number Garden — Math mounts immediately, but the parent's
+    // /api/claude fetch is held in flight by the mock for 800ms.
+    await page
+      .locator('[data-testid="hub-tree-node"][data-tree="number-garden"]')
+      .click()
+
+    // Math screen mounts with HUD chrome + Emma. These stay visible
+    // through the entire pre-flip window.
+    const math = page.getByTestId('math')
+    await expect(math).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByTestId('math-hud')).toBeVisible()
+    await expect(page.getByTestId('math-emma')).toBeVisible()
+
+    // Pre-flip: the problem area is NOT in the DOM. This is the
+    // load-bearing assertion — pre-fix the static-fallback Q1 would be
+    // visible HERE, then swap to the canon Q1 when the prop flipped.
+    // Post-fix the render gate holds these elements off-DOM until
+    // audioReady === true.
+    //
+    // We check the symbolic block, the chips wrapper, and the addend
+    // span. Hidden=visible:false is intentional — we want a hard "not in
+    // DOM" assertion, not "visible in viewport" semantics.
+    await expect(page.getByTestId('math-symbolic')).toHaveCount(0)
+    await expect(page.getByTestId('math-chips')).toHaveCount(0)
+    await expect(page.getByTestId('math-addend-a')).toHaveCount(0)
+    await expect(page.getByTestId('math-addend-b')).toHaveCount(0)
+
+    // Wait for the route to settle (abort fires after 800ms; App's
+    // catch flips mathAudioReady to true on the next microtask).
+    // Once the gate flips, the problem area renders for the first
+    // time — against the static fallback plan since the fetch failed,
+    // which is the soft-fail contract Marian sees on Anthropic outage.
+    await expect(page.getByTestId('math-symbolic')).toBeVisible({
+      timeout: 10_000,
+    })
+    await expect(page.getByTestId('math-addend-a')).toBeVisible()
+    await expect(page.getByTestId('math-addend-b')).toBeVisible()
+    await expect(page.getByTestId('math-chips')).toBeVisible()
+
+    // Capture the addend texts post-flip. These are the values Marian
+    // sees and hears once. Pre-fix they would have been preceded by
+    // different addends from the static-fallback plan (and the test
+    // would have failed the pre-flip assertion above first).
+    const firstAddendA = await page.getByTestId('math-addend-a').textContent()
+    const firstAddendB = await page.getByTestId('math-addend-b').textContent()
+    expect(firstAddendA).toMatch(/^\d+$/)
+    expect(firstAddendB).toMatch(/^\d+$/)
+
+    // Stability: the addends must NOT change in the steady-state. If
+    // any further plan flip were waiting in the wings (which it
+    // shouldn't be — the fallback plan is final once we landed in soft-
+    // fail), this catches it. We poll for ~1s of stability before
+    // calling it.
+    await page.waitForTimeout(1000)
+    await expect(page.getByTestId('math-addend-a')).toHaveText(firstAddendA!)
+    await expect(page.getByTestId('math-addend-b')).toHaveText(firstAddendB!)
+
+    // Chips eventually become tappable per the existing read-aloud gate.
+    const chips = page.getByTestId('math-chip')
+    await expect(chips).toHaveCount(3)
+    await expect(chips.first()).toBeEnabled({ timeout: 15_000 })
+  })
+})
