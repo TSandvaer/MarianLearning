@@ -1,5 +1,20 @@
 # Word Song — Short-a CVC Picture Pack v1
 
+> **SUPERSESSION NOTICE (2026-05-02, ticket `86c9kww0h`):** the canonical surface for the picture pack moved to `design/word-song/` (folder). The new folder contains the Midjourney-locked authoring workflow:
+>
+> - `design/word-song/README.md` — folder index, scope, coverage breakdown.
+> - `design/word-song/picture-pack-style-anchor.md` — locked style frame.
+> - `design/word-song/picture-pack-prompts.md` — paste-ready per-word Midjourney prompts (22 rows).
+> - `design/word-song/picture-pack-iteration-plan.md` — Thomas's MJ workflow.
+>
+> **What stayed:** the word selection (14 targets + 8 distractor-only = 22), the forbidden-pair list, the per-word L2/cultural-fit reasoning, the distractor pairing matrix, the anti-style framing, the file-naming convention. All folded into the new folder.
+>
+> **What changed:** sourcing-options A/B/C section is no longer applicable — Thomas locked Midjourney 2026-05-02. The §"Sourcing options" section in this file is historical context only; the new `picture-pack-iteration-plan.md` replaces it.
+>
+> **What still lives here:** the per-word picture briefs and distractor pairing matrix below. They remain useful as design/QA reference for the underlying picture-content decisions (why a `cat` is a domestic short-haired sitting cat, not a kitten or a tiger) — the new prompt sheet expresses these decisions as Midjourney prompts, but this file's prose explanations are still the rationale source. Treat this file as the rationale archive; treat `design/word-song/` as the live source of truth for Thomas's phase 2 generation pass.
+
+---
+
 **Audience:** Thomas (taste / curriculum sign-off), Matt (asset-pipeline routing), Kyle (author), Devon (consumes the file naming + word→asset map once approved), Jessica (validates against this list during QA).
 **Status:** Proposal — draft. Sourcing/commissioning decisions deferred to Thomas. Spec PR #61 (`design/screen-4-word-song.md`) is the parent surface; this file fills its Open Question #3 (canonical word list) and #4 (picture-asset sourcing pipeline).
 **Surface:** Picture chips and word-card pictures for the Word Song screen, v1 short-a CVC sessions.
