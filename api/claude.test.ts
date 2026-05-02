@@ -73,6 +73,22 @@ function makeRequest(body: unknown, init: RequestInit = {}): Request {
   })
 }
 
+/**
+ * Default canon stub for tests that don't care about canon (i.e. the
+ * pre-D test suites — track-based session-start, M2 progress block,
+ * etc.). Always returns null so the handler falls through to the live
+ * planner path — same behaviour those tests assumed before D landed.
+ *
+ * The canon-specific tests pass their own stub explicitly to drive
+ * hit/miss; this default just keeps the rest of the suite honest in
+ * environments where `public/canon/` actually contains baked blobs
+ * (a developer who ran `yarn canon:generate` locally would otherwise
+ * see canon hits leak into unrelated tests).
+ */
+const noCanon: NonNullable<
+  Parameters<typeof handler>[1]
+>['getCanonEntry'] = () => null
+
 beforeEach(() => {
   process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
   mockedRender.mockReset()
@@ -395,7 +411,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
         kind: 'session-start',
         payload: { track: 'math', level: 1, childName: 'Marian' },
       }),
-      { anthropicClient, sessionCache },
+      { anthropicClient, sessionCache, getCanonEntry: noCanon },
     )
 
     expect(res.status).toBe(200)
@@ -482,7 +498,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
           kind: 'session-start',
           payload: { track: 'math', level: 1, childName: 'Marian' },
         }),
-        { anthropicClient, sessionCache },
+        { anthropicClient, sessionCache, getCanonEntry: noCanon },
       )
       expect(res.status).toBe(502)
       expect(await res.json()).toMatchObject({ error: 'planner-failed' })
@@ -507,7 +523,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
           kind: 'session-start',
           payload: { track: 'math', level: 1, childName: 'Marian' },
         }),
-        { anthropicClient, sessionCache },
+        { anthropicClient, sessionCache, getCanonEntry: noCanon },
       )
       expect(res.status).toBe(502)
       const body = (await res.json()) as { error: string; message?: string }
@@ -534,7 +550,7 @@ describe('Track-based session-start (ticket 86c9jdh39 — real Anthropic wiring)
             childName: 'Marian',
           },
         }),
-        { anthropicClient, sessionCache },
+        { anthropicClient, sessionCache, getCanonEntry: noCanon },
       )
       // The planner-failed log fires once with [label, detail] — no third
       // arg, no payload echo.
@@ -598,6 +614,7 @@ describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => 
       rateLimiter,
       sessionCache,
       now: () => 3000,
+      getCanonEntry: noCanon,
     })
 
     expect(res.status).toBe(429)
@@ -645,6 +662,7 @@ describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => 
       rateLimiter,
       sessionCache,
       now: () => 2000,
+      getCanonEntry: noCanon,
     })
 
     expect(res.status).toBe(200)
@@ -698,6 +716,7 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
     expect(res1.status).toBe(200)
     expect(mockedRender).toHaveBeenCalledTimes(1)
@@ -710,6 +729,7 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
     expect(res2.status).toBe(200)
     expect(mockedRender).toHaveBeenCalledTimes(1) // STILL one call
@@ -729,21 +749,39 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
         kind: 'session-start',
         payload: { track: 'math', level: 1, childName: 'Marian' },
       }),
-      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: noCanon,
+      },
     )
     await handler(
       makeRequest({
         kind: 'session-start',
         payload: { track: 'word-song', level: 1, childName: 'Marian' },
       }),
-      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: noCanon,
+      },
     )
     await handler(
       makeRequest({
         kind: 'session-start',
         payload: { track: 'math', level: 1, childName: 'Other' },
       }),
-      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: noCanon,
+      },
     )
 
     // All three are distinct keys → all three render.
@@ -764,6 +802,7 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
     expect(mockedRender).toHaveBeenCalledTimes(1)
 
@@ -774,6 +813,7 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
     expect(mockedRender).toHaveBeenCalledTimes(2)
   })
@@ -802,6 +842,7 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
           sessionCache,
           rateLimiter,
           now: nowFn,
+          getCanonEntry: noCanon,
         }),
       ),
     )
@@ -824,6 +865,7 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
     const body1 = (await res1.json()) as {
       utterances: Array<{ text: string }>
@@ -838,6 +880,7 @@ describe('Session cache on track-based session-start (ticket 86c9kjdh2)', () => 
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
     const body2 = (await res2.json()) as {
       utterances: Array<{ text: string }>
@@ -897,7 +940,13 @@ describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba
           },
         },
       }),
-      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: noCanon,
+      },
     )
 
     expect(res.status).toBe(200)
@@ -940,12 +989,14 @@ describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
     await handler(makeRequest(otherFocusBody), {
       anthropicClient,
       sessionCache,
       rateLimiter,
       now: nowFn,
+      getCanonEntry: noCanon,
     })
 
     // Two distinct focusNodes → two cache keys → two planner calls,
@@ -972,7 +1023,13 @@ describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba
         kind: 'session-start',
         payload: { track: 'math', level: 1, childName: 'Marian' },
       }),
-      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: noCanon,
+      },
     )
 
     expect(res.status).toBe(200)
@@ -1009,7 +1066,13 @@ describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba
           },
         },
       }),
-      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: noCanon,
+      },
     )
 
     expect(res.status).toBe(200)
@@ -1038,7 +1101,13 @@ describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba
           },
         },
       }),
-      { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: noCanon,
+      },
     )
 
     expect(res.status).toBe(200)
@@ -1069,7 +1138,13 @@ describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba
             progress: { focusNode: 'cvc-words', recentSuccessRate: null },
           },
         }),
-        { anthropicClient, sessionCache, rateLimiter, now: nowFn },
+        {
+          anthropicClient,
+          sessionCache,
+          rateLimiter,
+          now: nowFn,
+          getCanonEntry: noCanon,
+        },
       )
       expect(res.status).toBe(502)
       const body = (await res.json()) as { error: string }

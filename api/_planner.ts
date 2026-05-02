@@ -268,10 +268,18 @@ export async function generateSessionPlan(
   try {
     response = await args.client.messages.create({
       model: PLANNER_MODEL_ID,
-      // 8 problems × ~5 utterances each × ~12 tokens per utterance + JSON
-      // overhead ≈ 600-800 tokens. 2000 is comfortable headroom; far below
-      // Haiku's 64K streamable cap, no streaming needed.
-      max_tokens: 2000,
+      // 8 problems × 5 utterance slots + 19 Session-End utterances = 59
+      // utterances. At ~12 tokens per line plus JSON structural overhead
+      // and Haiku's tendency to wrap in a markdown fence, a generous
+      // upper bound is ~1500 tokens. We use 4000 to leave headroom for
+      // longer utterance content (e.g. `two-digit-addsub` problems
+      // spell out two-digit numbers, "Twenty-three plus four. How many?"
+      // is ~14 tokens by itself; baking that combo with max_tokens=2000
+      // truncated the response and surfaced as `invalid-response` —
+      // see ticket 86c9kwhbc PR notes). 4000 is still far below Haiku's
+      // 64K streamable cap, so no streaming needed; the higher cap only
+      // affects truncation-prone combos and is otherwise free.
+      max_tokens: 4000,
       system,
       messages: [{ role: 'user', content: user }],
     })
