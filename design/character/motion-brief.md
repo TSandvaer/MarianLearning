@@ -33,7 +33,7 @@ What Marian feels today: pose swap is correct (right pose at right time) but fla
 
 | Behaviour | Spec source | Why it matters |
 | --- | --- | --- |
-| `rotateZ: -6` on celebration with spring `{ stiffness: 260, damping: 20 }` | `character-emma.md` §3.2 + §5.2 | Carries the "yes!" affect through Emma's body, not just the swap-in pose. Without it, the pose change is legible but flat. |
+| `rotateZ: -6` on celebration with spring `{ stiffness: 200, damping: 22 }` (iterated 2026-05-01, ticket 86c9kxmqb — was 260/20) | `character-emma.md` §3.2 + §5.2 | Carries the "yes!" affect through Emma's body, not just the swap-in pose. Without it, the pose change is legible but flat. |
 | `rotateZ: +10` on puzzled-tilt with softer spring `{ stiffness: 220, damping: 20 }` | `character-emma.md` §3.3 + §5.2 | Curiosity reads through motion; without it, puzzled is a pose change that doesn't move. |
 | `transform-origin: 50% 25%` on the `<m.img>` so head tilts and shoulders stay | `character-emma.md` §3.2 | Biologically natural — without it, the whole image rotates around its centre and the tilt looks like a falling-over animation. |
 | Idle breathing scale loop (1.0 → 1.02 → 1.0 over 4s) with `transform-origin: 50% 100%` | `character-emma.md` §3.5 | "Alive, not portrait" — the only thing that signals Marian-is-being-watched between problems. Currently absent; Emma sits still. |
@@ -62,8 +62,8 @@ T+0ms       sparkleInstance.play() + plinkInstance.play()  (already wired)
 T+0ms       setPose('celebration')                          (already wired)
 T+0ms       <m.img> swaps src to emma-celebration.svg      (already wired via AnimatePresence)
 T+0ms       <m.img> animates rotateZ: 0 → -6 with spring   (NEW — this brief)
-            { type: 'spring', stiffness: 260, damping: 20 }
-T+0..400ms  spring settles to rotateZ: -6                  (NEW)
+            { type: 'spring', stiffness: 200, damping: 22 }
+T+0..600ms  spring settles to rotateZ: -6                  (NEW — see iteration note below)
 T+0..600ms  speak(problem.utterances.correct) plays         (already wired)
 T+~600ms    speak resolves; setPose('idle')                 (already wired)
             <m.img> swaps src to emma-idle.svg              (already wired)
@@ -71,11 +71,42 @@ T+~600ms    speak resolves; setPose('idle')                 (already wired)
 T+~800ms    auto-advance fires (gated on min-dwell + speak) (already wired)
 ```
 
-**Spring config rationale.** `{ stiffness: 260, damping: 20 }` reads as a small confident bounce — under-damped enough to feel alive, not so under-damped that it overshoots and oscillates. This is also the project's house spring (used on Math ribbon scale-in, line 1490) — keeping the same spring across the app gives Marian a coherent motion vocabulary.
+**Spring config rationale (iteration #1 — superseded).** Originally specified at `{ stiffness: 260, damping: 20 }` (the project's house spring) — but Thomas's iPad Pro QA after PR #129 reported the celebration tilt felt "very fast and not so smooth" while the puzzled-tilt at 220/20 "is better". Iterated to `{ stiffness: 200, damping: 22 }` on 2026-05-01 (ticket `86c9kxmqb`, PR #131). That softened the spring but Thomas's re-test on the same iPad Pro reported "It's still too fast. I hardly see second pose of the tilt when answering successfully." The diagnosis: a spring-out + spring-back motion has no time AT the celebrate pose; the user sees the start of the tilt and then it's already returning. **Iteration #2 replaces the spring with a keyframed tilt-out → hold → tilt-back so the apex is visibly held — see §3.6 below.**
 
-**Why a spring, not a tween.** A 200ms cubic-bezier `easeOut` reads as "the animation finished" — declarative. A spring reads as "the head settled there" — biological. The 8-year-old user reads biological motion as warmth.
+The puzzled-tilt 220/20 stays untouched — Thomas approved it.
 
-**Auto-return-to-idle.** Already wired at Math.tsx:1152 (`setTimeout(... , 0)` after speak resolves). The `rotateZ` animation back to 0 is automatic via Framer Motion's `animate={{ rotateZ: TILT_BY_POSE[pose] }}` driven by the `pose` state — when state flips to `idle`, the animate value flips to 0 and the spring carries it home.
+The house-spring 260/20 is still used everywhere else (Math ribbon scale-in, listening, attentive-pointing, etc.); celebration is the one spec'd-down exception, justified by direct iPad QA.
+
+**Why a keyframe sequence, not a spring.** A spring (any stiffness/damping) settles to the apex with deceleration and then begins returning toward the rest position immediately. There is never a static moment AT the apex — the visible time at -6° is asymptotically zero. For a 600-700ms-window celebration, that's not enough for an 8-year-old looking at an iPad mid-problem to register the celebrate pose. A keyframe sequence with a `linear` hold segment between the tilt-out and tilt-back gives a real, measurable static window at the apex. The trade-off — the tilt-out is now `easeOut` rather than spring-physics — is negligible at ±6° (the curve looks nearly identical to the eye). The hold beat is what Marian sees.
+
+**Auto-return-to-idle.** Already wired at Math.tsx:1152 (`setTimeout(... , 0)` after speak resolves). The `rotateZ` animation back to 0 is automatic via Framer Motion's `animate={{ rotateZ: TILT_BY_POSE[pose] }}` driven by the `pose` state — when state flips to `idle`, the animate value flips to 0 and the spring carries it home. **Iteration #2 detail:** with the keyframed sequence (§3.6), the celebration mount itself drives rotation back to 0 over ~245ms regardless of the auto-return timing. If `speak()` resolves before the keyframes complete, the existing opacity cross-fade between celebration and idle takes over visually — no jarring rotation snap, because both poses are interpolating toward 0°.
+
+### 1.1 Iteration #2 — keyframed hold beat (the active path)
+
+**Triggered:** when `pose === 'celebration'`. The celebration mount in `EmmaCharacter` runs the keyframe sequence below instead of the spring transition used by every other pose.
+
+```
+T+0ms       <m.img> mounts; rotate starts at 0           (initial)
+T+0..200ms  rotate animates 0 → -6° with easeOut          (tilt-out)
+T+200..450ms rotate HOLDS at -6° (linear segment)         (apex visibility — Thomas's iter-#2 ask)
+T+450..700ms rotate animates -6° → 0° with easeInOut     (tilt-back)
+T+700ms     rotate sits at 0°; pose-state flip to idle    (handled by host screen)
+            cross-fades into the idle <m.img> at 0°.
+```
+
+Constants live in `src/lib/character/emmaPose.ts`:
+
+```ts
+export const CELEBRATION_HOLD_MS = 250
+export const CELEBRATION_DURATION_MS = 700
+export const CELEBRATION_TILT_KEYFRAMES = [0, -6, -6, 0] as const
+export const CELEBRATION_TILT_TIMES = [0, 0.286, 0.643, 1] as const
+export const CELEBRATION_TILT_EASES = ['easeOut', 'linear', 'easeInOut'] as const
+```
+
+The 250ms hold is a deliberate, measurable apex window. If a future round of feedback reports the motion now feels too slow, the lever is `CELEBRATION_HOLD_MS` (try 200ms first) before touching the duration.
+
+**Reduce-motion path.** Unchanged from iteration #1: rotate collapses to 0; opacity cross-fade still plays at 200ms. The hold beat is irrelevant when there's no rotation.
 
 ### 2. Wrong-answer reaction — `idle` → `puzzled-tilt` → `idle`
 
@@ -153,7 +184,10 @@ animate={{
   scale: pose === 'idle' ? [1, 1.02, 1] : 1,
 }}
 transition={{
-  rotateZ: { type: 'spring', stiffness: pose === 'puzzled-tilt' ? 220 : 260, damping: 20 },
+  // In production this looks up TILT_SPRING_BY_POSE[pose] — celebration
+  // is 200/22, puzzled-tilt 220/20, everything else the 260/20 house
+  // spring. See `src/lib/character/emmaPose.ts`.
+  rotateZ: { type: 'spring', ...TILT_SPRING_BY_POSE[pose] },
   scale: pose === 'idle'
     ? { duration: 4, repeat: Infinity, ease: 'easeInOut' }
     : { duration: 0 },
@@ -174,18 +208,16 @@ style={{ transformOrigin: '50% 100%' }}  // breathing pivots from feet
 This is what the `<m.img>` block in Math.tsx (lines 1455-1469) and WordSong.tsx (lines 1209-1218) and Greet.tsx (lines 1184-1206) and Hub.tsx (lines 419-430) becomes after this brief lands. Same shape every screen except for the `data-testid`.
 
 ```typescript
-import { TILT_BY_POSE } from '@/lib/character/emmaPose'
+import {
+  TILT_BY_POSE,
+  TILT_SPRING_BY_POSE,
+  CELEBRATION_DURATION_S,
+  CELEBRATION_TILT_KEYFRAMES,
+  CELEBRATION_TILT_TIMES,
+  CELEBRATION_TILT_EASES,
+} from '@/lib/character/emmaPose'
 
-const TILT_SPRING_BY_POSE: Record<EmmaPose, { stiffness: number; damping: number }> = {
-  idle: { stiffness: 260, damping: 20 },
-  listening: { stiffness: 260, damping: 20 },
-  celebration: { stiffness: 260, damping: 20 },
-  'puzzled-tilt': { stiffness: 220, damping: 20 },  // softer — "considering"
-  'attentive-pointing': { stiffness: 260, damping: 20 },
-  sleepy: { stiffness: 260, damping: 20 },
-  cheering: { stiffness: 260, damping: 20 },
-  waving: { stiffness: 260, damping: 20 },
-}
+const isCelebration = pose === 'celebration'
 
 <AnimatePresence initial={false}>
   <m.img
@@ -197,18 +229,31 @@ const TILT_SPRING_BY_POSE: Record<EmmaPose, { stiffness: number; damping: number
     alt="Emma"
     draggable={false}
     className="h-[26vh] w-auto select-none"
-    initial={reducedMotion ? { opacity: 0 } : { opacity: 0, rotateZ: 0 }}
+    initial={reducedMotion ? { opacity: 0 } : { opacity: 0, rotate: 0 }}
     animate={{
       opacity: 1,
-      rotateZ: reducedMotion ? 0 : TILT_BY_POSE[pose] ?? 0,
+      // Celebration uses a keyframed tilt-out → hold → tilt-back so
+      // the apex is visibly held (iter #2, ticket 86c9kxmqb). Other
+      // poses keep the per-pose spring on a single rotate target.
+      rotate: reducedMotion
+        ? 0
+        : isCelebration
+          ? [...CELEBRATION_TILT_KEYFRAMES]
+          : TILT_BY_POSE[pose] ?? 0,
       scale: pose === 'idle' && !reducedMotion ? [1, 1.02, 1] : 1,
     }}
     exit={{ opacity: 0, transition: { duration: 0.15 } }}
     transition={{
       opacity: { duration: 0.2 },
-      rotateZ: reducedMotion
+      rotate: reducedMotion
         ? { duration: 0 }
-        : { type: 'spring', ...TILT_SPRING_BY_POSE[pose] },
+        : isCelebration
+          ? {
+              duration: CELEBRATION_DURATION_S,
+              times: [...CELEBRATION_TILT_TIMES],
+              ease: [...CELEBRATION_TILT_EASES],
+            }
+          : { type: 'spring', ...TILT_SPRING_BY_POSE[pose] },
       scale:
         pose === 'idle' && !reducedMotion
           ? { duration: 4, repeat: Infinity, ease: 'easeInOut' }
@@ -258,7 +303,7 @@ Recommend Devon spins out a single follow-up ticket and ships in this order. Eac
 
 Inherits `character-emma.md` §8 "Functional correctness (animation)" boxes. Devon's PR closes:
 
-- [ ] Correct-chip tap: pose swaps idle → celebration; rotateZ animates 0 → -6 with spring (stiffness 260, damping 20); holds 600ms; rotateZ animates back to 0; pose returns to idle. Verifiable by inspecting `<m.img>` `style.transform` over time in DevTools, or by Playwright snapshot.
+- [ ] Correct-chip tap: pose swaps idle → celebration; rotate runs the keyframe sequence `[0, -6, -6, 0]` over 700ms with `times = [0, 0.286, 0.643, 1]` and `ease = [easeOut, linear, easeInOut]` (iter #2, 2026-05-02). The middle hold segment (~250ms at -6°) is the apex-visibility window Thomas asked for. Verifiable by inspecting `<m.img>` `style.transform` over time in DevTools, or by Playwright snapshot.
 - [ ] Wrong-chip tap: pose swaps idle → puzzled-tilt; rotateZ animates 0 → +10 with softer spring (stiffness 220, damping 20); holds 1500ms; returns to idle.
 - [ ] Hint state (after 2 wrong on Math): pose swaps to `attentive-pointing` concurrent with flower-group pulse; returns to idle on hint TTS `onEnd`.
 - [ ] Idle breathing: `<m.img>` scale animates `[1, 1.02, 1]` over 4s, repeats infinitely while pose is `'idle'`, halts on non-idle poses.

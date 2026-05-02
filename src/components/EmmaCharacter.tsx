@@ -33,6 +33,10 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import {
   BREATHING_PERIOD_S,
   BREATHING_SCALE_KEYFRAMES,
+  CELEBRATION_DURATION_S,
+  CELEBRATION_TILT_EASES,
+  CELEBRATION_TILT_KEYFRAMES,
+  CELEBRATION_TILT_TIMES,
   TILT_BY_POSE,
   TILT_SPRING_BY_POSE,
   type EmmaPose,
@@ -140,6 +144,12 @@ export function EmmaCharacter({
   const tilt = TILT_BY_POSE[pose] ?? 0
   const spring = TILT_SPRING_BY_POSE[pose]
   const isIdle = pose === 'idle'
+  // Celebration uses a keyframed tilt-out → hold → tilt-back sequence
+  // instead of the per-pose spring. Iteration #2 (ticket 86c9kxmqb):
+  // the hold beat at -6° is what makes the celebrate pose visible —
+  // a spring-only motion had no time AT the apex, so Marian saw the
+  // start of the tilt and then it was already returning.
+  const isCelebration = pose === 'celebration'
   const resolvedSrc = src ?? `/assets/emma-${pose}.svg`
 
   // `data-wiggling` is the historical marker WordSong's tests rely on to
@@ -167,7 +177,11 @@ export function EmmaCharacter({
         }
         animate={{
           opacity: 1,
-          rotate: reducedMotion ? 0 : tilt,
+          rotate: reducedMotion
+            ? 0
+            : isCelebration
+              ? [...CELEBRATION_TILT_KEYFRAMES]
+              : tilt,
           scale: isIdle && !reducedMotion ? [...BREATHING_SCALE_KEYFRAMES] : 1,
         }}
         exit={{ opacity: 0, transition: { duration: 0.15 } }}
@@ -175,11 +189,20 @@ export function EmmaCharacter({
           opacity: { duration: 0.2 },
           rotate: reducedMotion
             ? { duration: 0 }
-            : {
-                type: 'spring',
-                stiffness: spring.stiffness,
-                damping: spring.damping,
-              },
+            : isCelebration
+              ? {
+                  // Keyframed tilt-out → hold → tilt-back. The hold
+                  // beat at -6° (between times[1] and times[2]) is
+                  // Thomas's iteration-#2 ask for apex visibility.
+                  duration: CELEBRATION_DURATION_S,
+                  times: [...CELEBRATION_TILT_TIMES],
+                  ease: [...CELEBRATION_TILT_EASES],
+                }
+              : {
+                  type: 'spring',
+                  stiffness: spring.stiffness,
+                  damping: spring.damping,
+                },
           scale:
             isIdle && !reducedMotion
               ? {
