@@ -131,7 +131,14 @@ export interface WordSongSessionResult {
   totalCorrect: number
   totalStardust: number
   finalStreak: number
-  /** Stardust _earned in this session_, not the all-time persisted total. */
+  /**
+   * Stardust _earned in this session by Marian's chip-tap activity_, not
+   * the all-time persisted total. Per ticket 86c9kwvza this is always `0`
+   * for word-song now: per-correct grants were removed, and the flat
+   * completion bonus (+5) is granted later, inside SessionEnd's mount
+   * effect via `grantWordSongCompletionBonus`. The field is retained for
+   * payload-shape symmetry with Math (which still grants per-correct).
+   */
   earnedThisSession: number
   /** Surface tag — distinguishes Word Song from Math at the session-end
    *  consumer level (per spec line 540). */
@@ -697,15 +704,18 @@ function WordSongScreen({
     }
   }, [problemIndex, plan.problems.length, onSessionComplete, storage, now])
 
-  const grantStardust = useCallback(
-    (amount: number) => {
-      stardustTotalRef.current += amount
-      const next = writeStardust(stardustTotalRef.current, storage, now)
-      setStardust(next)
-      earnedThisSessionRef.current += amount
-    },
-    [storage, now],
-  )
+  // Per-correct stardust grants were intentionally REMOVED from word-song
+  // in ticket 86c9kwvza (Thomas locked 2026-05-02). Reasoning per Dave's
+  // audit, grounded in Deci, Koestner & Ryan (1999): performance-contingent
+  // rewards undermine intrinsic motivation on intrinsically-interesting
+  // tasks. Word-learning at 8 (especially for an L2 learner like Marian) is
+  // intrinsically interesting. Math is unchanged — drilled fact-recall is a
+  // different class of task and benefits from per-correct reinforcement.
+  //
+  // The completion bonus (+5 stardust) is granted at session-end inside
+  // SessionEnd's mount effect via `grantWordSongCompletionBonus`. Sensory
+  // rewards on chip-tap (sparkle, plink, celebration tilt, streak band)
+  // remain — those are not points-rewards.
 
   /**
    * Handle a wrong tap. Sequenced per spec §Audio dispatch (wrong path):
@@ -865,29 +875,21 @@ function WordSongScreen({
       setCelebrating(true)
       setProblemState((prev) => ({ ...prev, resolved: true }))
 
-      // Stardust + streak. Same rule as Math: stardust granted even after
-      // 1-or-2 wrongs; ONLY the guided-completion path withholds it.
+      // Streak counter still advances on a clean correct (no wrongs, no
+      // guided completion). The streak band is a sensory reward — visible
+      // momentum, not points — and it stays. What we removed (ticket
+      // 86c9kwvza) is the stardust grant on every correct tap and the
+      // streak-threshold stardust bonus. The HUD pop, sparkle burst, and
+      // celebration tilt all still fire below.
       //
-      // Read from the synchronous refs (not React state). In normal play
-      // the gates between wrong-then-correct span gestures and React has
-      // committed prior state batches, so state would also work — but
-      // the refs are the single source of truth for "what does the gate
-      // see right now", and using them here keeps `handleCorrectTap`
-      // symmetric with the wrong-tap latches above. See ticket 86c9gyb2v.
+      // Reads from the synchronous refs (not React state); see ref
+      // declarations for the rage-tap rationale (ticket 86c9gyb2v).
       const isCleanWin = wrongCountRef.current === 0 && !guidedPlayedRef.current
       if (!guidedPlayedRef.current) {
-        grantStardust(1)
         totalCorrectRef.current += 1
         if (isCleanWin) {
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)
-          if (
-            (STREAK_BONUS_THRESHOLDS as readonly number[]).includes(
-              streakRef.current,
-            )
-          ) {
-            grantStardust(1)
-          }
         }
       }
 
@@ -952,7 +954,7 @@ function WordSongScreen({
     // problemState.{wrongCount,guidedPlayed} intentionally omitted from
     // deps — the cleanWin computation reads the synchronous refs instead
     // (see `wrongCountRef` declaration; ticket 86c9gyb2v).
-    [advanceToNext, grantStardust, plinkInstance, sparkleInstance, speak],
+    [advanceToNext, plinkInstance, sparkleInstance, speak],
   )
 
   const onChipTap = useCallback(

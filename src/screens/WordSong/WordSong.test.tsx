@@ -206,7 +206,13 @@ describe('Word Song screen', () => {
     expect(words).toEqual(expect.arrayContaining(['cat', 'bus', 'sun']))
   })
 
-  it('happy path: tapping correct picture grants stardust, increments streak, advances', async () => {
+  it('happy path: tapping correct picture does NOT grant stardust per-tap (ticket 86c9kwvza), but increments streak and advances', async () => {
+    // Ticket 86c9kwvza (locked 2026-05-02): word-song stardust moved to
+    // completion-contingent. Per-correct grants were removed; the +5 flat
+    // bonus lands at session-end inside SessionEnd's mount effect (see
+    // `progressHistory.ts`-adjacent `grantWordSongCompletionBonus`). The
+    // streak counter, sparkle SFX, plink SFX, celebration animation, and
+    // HUD pop all remain — those are sensory rewards, not points-rewards.
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
     })
@@ -233,9 +239,12 @@ describe('Word Song screen', () => {
       await Promise.resolve()
     })
 
+    // Stardust is unchanged after the chip-tap reward path runs. The
+    // celebration utterance still fires; the streak counter still
+    // advances; only the points grant was removed.
     expect(screen.getByTestId('word-song-stardust')).toHaveAttribute(
       'data-total',
-      '1',
+      '0',
     )
     expect(harness.spoken()).toContain('Yes! Cat.')
     expect(screen.getByTestId('word-song')).toHaveAttribute('data-streak', '1')
@@ -251,12 +260,16 @@ describe('Word Song screen', () => {
       '1',
     )
 
+    // Storage was not bumped during play — the unmount-write flushes the
+    // current (unchanged) total. The +5 completion bonus is granted at
+    // session-end, not here.
     const stored = storage.getItem(STARDUST_STORAGE_KEY)
-    expect(stored).toBeTruthy()
-    expect(JSON.parse(stored!).total).toBe(1)
+    if (stored !== null) {
+      expect(JSON.parse(stored).total).toBe(0)
+    }
   })
 
-  it('wrong-then-right: still grants stardust, but streak does not advance', async () => {
+  it('wrong-then-right: stardust still unchanged per-tap (ticket 86c9kwvza); streak does not advance', async () => {
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
     })
@@ -290,9 +303,12 @@ describe('Word Song screen', () => {
       await Promise.resolve()
     })
 
+    // Per ticket 86c9kwvza: word-song no longer grants stardust per-correct.
+    // Streak break behaviour (resets to 0 after a wrong on this problem)
+    // is unchanged.
     expect(screen.getByTestId('word-song-stardust')).toHaveAttribute(
       'data-total',
-      '1',
+      '0',
     )
     expect(screen.getByTestId('word-song')).toHaveAttribute('data-streak', '0')
   })
@@ -339,7 +355,11 @@ describe('Word Song screen', () => {
     expect(harness.spoken()).toContain("Let's look. Cat.")
   })
 
-  it('streak threshold [3, 5, 8] grants a bonus stardust at streak 3', async () => {
+  it('streak threshold [3, 5, 8] no longer grants bonus stardust (ticket 86c9kwvza); streak still advances and pulses visually', async () => {
+    // Per ticket 86c9kwvza: word-song stardust is completion-contingent,
+    // not streak-contingent. The streak counter still increments and the
+    // streak band still pulses at threshold values (sensory reward), but
+    // the per-threshold +1 stardust grant was removed.
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
     })
@@ -377,11 +397,11 @@ describe('Word Song screen', () => {
 
     await tapCorrect() // streak=1
     await tapCorrect() // streak=2
-    await tapCorrect() // streak=3 → +1 bonus
+    await tapCorrect() // streak=3 — visual pulse, no stardust grant
 
     expect(screen.getByTestId('word-song-stardust')).toHaveAttribute(
       'data-total',
-      '4', // 3 base + 1 bonus
+      '0',
     )
     expect(screen.getByTestId('word-song')).toHaveAttribute('data-streak', '3')
     expect(screen.getByTestId('word-song-streak')).toBeInTheDocument()
@@ -500,7 +520,7 @@ describe('Word Song screen', () => {
     expect(harness.spoken()).toContain('This one is cat.')
   })
 
-  it('rage-tap: 5 rapid clicks on correct picture chip grant exactly 1 stardust and a single auto-advance', async () => {
+  it('rage-tap: 5 rapid clicks on correct picture chip do NOT grant stardust (ticket 86c9kwvza) and produce a single auto-advance', async () => {
     // Strict single-grant on rapid tap, mirrors Math's PR #66 fix to
     // ticket 86c9gy4mf.
     //
@@ -555,12 +575,14 @@ describe('Word Song screen', () => {
       await Promise.resolve()
     })
 
-    // Strict single-grant: 5 rapid taps → exactly 1 stardust, no streak
-    // compounding. Pre-fix this would have been '7' (5 base + bonuses at
-    // streak thresholds 3 and 5).
+    // Per ticket 86c9kwvza: word-song no longer grants stardust per-tap,
+    // so this counter stays at 0 regardless of how many times the chip is
+    // tapped. The original ref-guard (ticket 86c9gy4mf) still protects the
+    // streak / advance / onSessionComplete paths from compounding —
+    // exercised below.
     expect(screen.getByTestId('word-song-stardust')).toHaveAttribute(
       'data-total',
-      '1',
+      '0',
     )
     expect(screen.getByTestId('word-song')).toHaveAttribute('data-streak', '1')
 
@@ -585,10 +607,10 @@ describe('Word Song screen', () => {
     )
     // Still no session-complete; we're 1/8 deep, not 8/8.
     expect(onSessionComplete).not.toHaveBeenCalled()
-    // Stardust didn't grow during the auto-advance either.
+    // Stardust still 0 — word-song doesn't grant per-tap (ticket 86c9kwvza).
     expect(screen.getByTestId('word-song-stardust')).toHaveAttribute(
       'data-total',
-      '1',
+      '0',
     )
   })
 
@@ -894,13 +916,18 @@ describe('Word Song screen', () => {
       await tapCorrect()
     }
 
-    // 8 base + bonuses at streak 3, 5, 8 = 11 stardust
+    // Ticket 86c9kwvza: word-song no longer grants stardust per-correct
+    // or per-streak-threshold. The +5 completion bonus is granted later,
+    // inside SessionEnd's mount effect. The payload here therefore
+    // reports `totalStardust = 0` (no in-session grants) and
+    // `earnedThisSession = 0`. `totalCorrect` and `finalStreak` carry
+    // the gameplay-state Marian actually produced.
     expect(onSessionComplete).toHaveBeenCalledTimes(1)
     const arg = onSessionComplete.mock.calls[0][0]
     expect(arg.totalCorrect).toBe(8)
-    expect(arg.totalStardust).toBe(11)
+    expect(arg.totalStardust).toBe(0)
     expect(arg.finalStreak).toBe(8)
-    expect(arg.earnedThisSession).toBe(11)
+    expect(arg.earnedThisSession).toBe(0)
     expect(arg.surface).toBe('word-song')
   })
 
