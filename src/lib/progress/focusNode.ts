@@ -79,30 +79,32 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
  * track), but the fallback keeps the return type non-null so the call
  * site stays narrow.
  *
- * Word-song clamp (P0 fix, ticket 86c9kt47v)
- * ------------------------------------------
- * Word-song's content templates only support `blending-cv` today
- * (CVC "Tap the <word>." shape). The browser-side parser
- * (`wordSongSessionPlanFromServer.parseReadTarget`) rejects anything else,
- * which silenced WordSong on prod when M2 promoted Marian's focus to
- * `letter-sounds`. Until the M-series widens support to cover
- * `letter-sounds`, `cvc-words` (distinct content from blending-cv),
- * `digraphs`, etc., we hard-clamp the word-song picker to `blending-cv`
- * regardless of `skillLevels`. Math is unaffected — its branch keeps
- * walking the tree as designed.
+ * Word-song un-clamp (planner-parser contract step 2, ticket 86c9kxu07)
+ * ---------------------------------------------------------------------
+ * The clamp from the original P0 fix (ticket 86c9kt47v) was a temporary
+ * shim while the browser parser only accepted the CVC "Tap the <word>."
+ * template. PR #132 (step 1, ticket 86c9kxp08) widened the parser to
+ * also accept "Read the <word>." → cvc-word; this PR (step 2) widens the
+ * planner to emit that content. The picker is now safe to walk the
+ * LITERACY_TREE — same shape as the math walker.
  *
- * TODO: widen when wordsong content templates support letter-sounds, etc.
+ * Tier coverage today:
+ *   - blending-cv → first-class (planner emits "Tap the <word>.")
+ *   - cvc-words   → first-class (planner emits "Read the <word>.")
+ *   - letter-sounds / digraphs / sight-words / simple-sentences →
+ *     stub plans (planner falls back to blending-cv content with a
+ *     non-error log; future tier-content tickets refine these).
+ *
+ * That stub fallback is what makes it safe to surface those nodes from
+ * the picker in v1: a wrong-tier walk yields a working session, not a
+ * silent screen.
  */
 export function pickFocusNode(
   progress: Progress,
   track: ProgressTrack,
 ): SkillNode {
-  if (track === 'word-song') {
-    // Hard clamp — see header. Ignore skillLevels; the browser parser only
-    // handles the blending-cv "Tap the <word>." template today.
-    return 'blending-cv'
-  }
-  const order = MATH_NODES_IN_ORDER
+  const order =
+    track === 'math' ? MATH_NODES_IN_ORDER : WORD_SONG_NODES_IN_ORDER
   for (const node of order) {
     if (progress.skillLevels[node] !== 'mastered') return node
   }

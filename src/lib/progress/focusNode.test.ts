@@ -122,73 +122,135 @@ describe('pickFocusNode — math', () => {
   })
 })
 
-describe('pickFocusNode — word-song (clamped to blending-cv, P0 fix 86c9kt47v)', () => {
-  // Word-song is hard-clamped to 'blending-cv' until the M-series widens
-  // content-template support. Pre-clamp behavior (walking the tree) caused
-  // a silent-WordSong production incident when the picker selected
-  // 'letter-sounds' but the browser parser only handles the CVC
-  // "Tap the <word>." template. These tests pin the clamp.
+describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 2, ticket 86c9kxu07)', () => {
+  // Word-song was hard-clamped to 'blending-cv' as the P0 shim (86c9kt47v)
+  // while only the CVC "Tap the <word>." parser shape existed. PR #132
+  // widened the parser to accept "Read the <word>." → cvc-word, and this
+  // PR (step 2) widens the planner to emit that content. The picker now
+  // walks LITERACY_TREE the same way the math walker does. Letter-sounds /
+  // digraphs / sight-words / simple-sentences are safe to surface because
+  // the planner falls back to blending-cv content (a stub) for those tiers
+  // — i.e. the screen always renders, even on tiers we haven't tuned yet.
 
-  it('returns blending-cv for the default Progress doc', () => {
+  it('returns letter-sounds for the default Progress doc (Marian, post-diagnostic)', () => {
     // Default doc: letter-names mastered, letter-sounds practicing,
-    // blending-cv practicing. Pre-clamp this returned 'letter-sounds';
-    // post-clamp it must return 'blending-cv'.
+    // blending-cv practicing. Walker stops at the first non-mastered:
+    // letter-sounds. The planner stub-fallback handles letter-sounds by
+    // emitting blending-cv content, so the picker can surface it safely.
     const progress = defaultProgress()
+    expect(pickFocusNode(progress, 'word-song')).toBe('letter-sounds')
+  })
+
+  it('returns blending-cv when blending-cv is practicing (AC #1.a)', () => {
+    // AC scenario (a): blending-cv practicing → returns blending-cv.
+    const progress = buildProgress({
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'practicing',
+    })
     expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
   })
 
-  it('returns blending-cv even when blending-cv itself is mastered', () => {
-    // The clamp ignores skillLevels entirely until template support widens.
-    // This is intentional: a parent who somehow triggers mastery of
-    // blending-cv shouldn't get silently shifted to a node the parser
-    // can't handle.
+  it('returns cvc-words when blending-cv is mastered + cvc-words is practicing (AC #1.b — the August unblock)', () => {
+    // AC scenario (b): blending-cv mastered + cvc-words practicing →
+    // returns cvc-words. THIS is the path that unblocks Marian on the
+    // literacy track. Pre-step-2 the clamp returned 'blending-cv' here
+    // and Marian could never progress.
     const progress = buildProgress({
       'letter-names': 'mastered',
       'letter-sounds': 'mastered',
       'blending-cv': 'mastered',
       'cvc-words': 'practicing',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+    expect(pickFocusNode(progress, 'word-song')).toBe('cvc-words')
   })
 
-  it('returns blending-cv when every node is mastered', () => {
-    // Pre-clamp this returned 'simple-sentences' (the last-node fallback).
-    // Post-clamp the clamp wins.
-    const progress = buildProgress()
-    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+  it('returns letter-names when every literacy node is locked (AC #1.c — first non-locked up the tree)', () => {
+    // AC scenario (c): all literacy nodes locked → returns the first
+    // node in tree order. 'locked' is treated as non-mastered (same
+    // contract as the math walker — see the math test "treats 'locked'
+    // as non-mastered" above), so the walker returns the first-in-order
+    // entry: letter-names.
+    const progress = buildProgress({
+      'letter-names': 'locked',
+      'letter-sounds': 'locked',
+      'blending-cv': 'locked',
+      'cvc-words': 'locked',
+      digraphs: 'locked',
+      'sight-words': 'locked',
+      'simple-sentences': 'locked',
+    })
+    expect(pickFocusNode(progress, 'word-song')).toBe('letter-names')
   })
 
-  it('returns blending-cv when letter-sounds is the lowest non-mastered (the prod-incident shape)', () => {
-    // Reproduces the exact Progress shape that silenced WordSong on prod:
-    // letter-names mastered + letter-sounds practicing. Pre-clamp the
-    // picker returned 'letter-sounds' → planner generated
-    // "Tap the letter that says /m/." → parser rejected → silent.
-    // Post-clamp the picker returns 'blending-cv' and the parser is happy.
+  it("treats 'intro' as non-mastered (mirrors the math walker contract)", () => {
     const progress = buildProgress({
       'letter-names': 'mastered',
-      'letter-sounds': 'practicing',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      digraphs: 'intro',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+    expect(pickFocusNode(progress, 'word-song')).toBe('digraphs')
   })
 
-  it('returns blending-cv across a sweep of arbitrary skillLevels combinations', () => {
-    // Defense-in-depth: the clamp must hold for any reasonable progress
-    // shape. Sweep a handful of distinct configurations and pin the
-    // invariant. If a future edit reintroduces tree-walking on the
-    // word-song branch, this catches it.
-    const shapes: Array<Partial<SkillLevels>> = [
-      {},
-      { 'letter-names': 'practicing' },
-      { 'letter-names': 'mastered', 'letter-sounds': 'practicing' },
-      { 'letter-names': 'mastered', 'letter-sounds': 'mastered' },
-      { 'blending-cv': 'practicing' },
-      { 'cvc-words': 'practicing' },
-      { digraphs: 'practicing' },
-      { 'sight-words': 'mastered', 'simple-sentences': 'mastered' },
+  it('skips mastered nodes and lands on the first non-mastered', () => {
+    const progress = buildProgress({
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      digraphs: 'mastered',
+      'sight-words': 'practicing',
+    })
+    expect(pickFocusNode(progress, 'word-song')).toBe('sight-words')
+  })
+
+  it('falls back to the last word-song node when every node is mastered (defensive)', () => {
+    // Mirrors the math fallback at the end of MATH_NODES_IN_ORDER.
+    const progress = buildProgress() // every level → mastered via helper
+    expect(pickFocusNode(progress, 'word-song')).toBe('simple-sentences')
+  })
+
+  it('returns the lowest non-mastered across a sweep of progress shapes', () => {
+    // Sanity sweep covering common progressions Marian can plausibly
+    // reach. Each entry is [overrides, expected].
+    const shapes: Array<[Partial<SkillLevels>, string]> = [
+      // Practising the very first tier.
+      [{ 'letter-names': 'practicing' }, 'letter-names'],
+      // Past letter-names; on letter-sounds.
+      [
+        {
+          'letter-names': 'mastered',
+          'letter-sounds': 'practicing',
+        },
+        'letter-sounds',
+      ],
+      // The blending-cv → cvc-words transition.
+      [
+        {
+          'letter-names': 'mastered',
+          'letter-sounds': 'mastered',
+          'blending-cv': 'mastered',
+          'cvc-words': 'intro',
+        },
+        'cvc-words',
+      ],
+      // Every higher tier locked; walker falls onto digraphs.
+      [
+        {
+          'letter-names': 'mastered',
+          'letter-sounds': 'mastered',
+          'blending-cv': 'mastered',
+          'cvc-words': 'mastered',
+          digraphs: 'locked',
+        },
+        'digraphs',
+      ],
     ]
-    for (const overrides of shapes) {
+    for (const [overrides, expected] of shapes) {
       const progress = buildProgress(overrides)
-      expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+      expect(pickFocusNode(progress, 'word-song')).toBe(expected)
     }
   })
 })
