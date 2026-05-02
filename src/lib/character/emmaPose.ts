@@ -53,6 +53,47 @@ export const TILT_BY_POSE: Record<EmmaPose, number> = {
 }
 
 /**
+ * Per-pose spring config for the rotateZ tilt animation.
+ *
+ * Spec: `design/character/motion-brief.md` §3.2-§3.3.
+ *
+ * Default house spring is `stiffness: 260, damping: 20` — the same
+ * config used on Math's ribbon scale-in, so Emma's motion vocabulary
+ * stays coherent across the app.
+ *
+ * `puzzled-tilt` uses a softer spring (`stiffness: 220`) — 18% softer
+ * than the default. The puzzled tilt arrives with a hair more lag and
+ * reads as "considering" rather than "reacting". On iPad the difference
+ * is small but legible.
+ */
+export interface TiltSpring {
+  readonly stiffness: number
+  readonly damping: number
+}
+
+export const TILT_SPRING_BY_POSE: Record<EmmaPose, TiltSpring> = {
+  idle: { stiffness: 260, damping: 20 },
+  listening: { stiffness: 260, damping: 20 },
+  celebration: { stiffness: 260, damping: 20 },
+  'puzzled-tilt': { stiffness: 220, damping: 20 }, // softer — "considering"
+  'attentive-pointing': { stiffness: 260, damping: 20 },
+  sleepy: { stiffness: 260, damping: 20 },
+  cheering: { stiffness: 260, damping: 20 },
+  waving: { stiffness: 260, damping: 20 },
+}
+
+/**
+ * Idle breathing scale loop. Spec: `design/character/motion-brief.md`
+ * §3.5. Scales `[1, 1.02, 1]` over 4s, ease-in-out, infinite. Only
+ * applies while pose === 'idle'; non-idle poses are short and breathing
+ * during them dilutes the celebration / puzzled beats.
+ *
+ * Reduce-motion path collapses this to `scale: 1` (no keyframe array).
+ */
+export const BREATHING_SCALE_KEYFRAMES = [1, 1.02, 1] as const
+export const BREATHING_PERIOD_S = 4
+
+/**
  * How long a pose holds before auto-returning to `idle`.
  *
  * `null` ⇒ never auto-returns; the call site clears the pose another way

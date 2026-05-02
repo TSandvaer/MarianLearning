@@ -275,11 +275,17 @@ describe('App routing skeleton', () => {
                 type="button"
                 data-testid="word-song-mock-complete"
                 onClick={() =>
+                  // Per ticket 86c9kwvza: word-song no longer grants
+                  // stardust per chip-tap, so the payload reports
+                  // `totalStardust: 0` and `earnedThisSession: 0`. The
+                  // +5 completion bonus lands inside SessionEnd's mount
+                  // effect — the assertions below see the post-bonus
+                  // values.
                   onSessionComplete?.({
                     totalCorrect: 8,
-                    totalStardust: 11,
+                    totalStardust: 0,
                     finalStreak: 8,
-                    earnedThisSession: 11,
+                    earnedThisSession: 0,
                     surface: 'word-song',
                   })
                 }
@@ -305,8 +311,11 @@ describe('App routing skeleton', () => {
 
       const sessionEnd = screen.getByTestId('session-end')
       expect(sessionEnd).toHaveAttribute('data-surface', 'word-song')
-      expect(sessionEnd).toHaveAttribute('data-earned', '11')
-      expect(sessionEnd).toHaveAttribute('data-total-stardust', '11')
+      // Word-song completion-contingent stardust (ticket 86c9kwvza):
+      // SessionEnd grants +5 on word-song mount; data-earned reflects
+      // the bonus, data-total-stardust reflects payload + bonus.
+      expect(sessionEnd).toHaveAttribute('data-earned', '5')
+      expect(sessionEnd).toHaveAttribute('data-total-stardust', '5')
 
       vi.doUnmock('./screens/WordSong')
     })

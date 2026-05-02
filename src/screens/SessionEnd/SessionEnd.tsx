@@ -40,6 +40,10 @@ import {
   type ProgressTrack,
 } from '../../lib/progress'
 import type { StorageAdapter } from '../Math/stardust'
+import {
+  WORDSONG_SESSION_END_BONUS,
+  grantWordSongCompletionBonus,
+} from '../_shared/wordSongCompletionBonus'
 import type { ReactElement } from 'react'
 
 // ── Public types ------------------------------------------------------------
@@ -176,6 +180,28 @@ export default function SessionEnd({
     }
   }, [payload])
 
+  /**
+   * Word-song completion bonus (ticket 86c9kwvza, locked 2026-05-02).
+   *
+   * Per Dave's audit, word-song stardust moved from per-correct-tap to
+   * per-session-end. WordSong no longer mutates the stardust store while
+   * Marian is playing; the flat `+WORDSONG_SESSION_END_BONUS` is granted
+   * here, in the mount effect, alongside the other session-end persistence
+   * writes. Math is unchanged — its grants land per-correct inside Math.tsx.
+   *
+   * `displayedTotalStardust` is what the counter ticks up to AND what the
+   * `data-total-stardust` data-attribute exposes for QA. For math it equals
+   * `payload.totalStardust` (already includes the in-session grants). For
+   * word-song it equals `payload.totalStardust + WORDSONG_SESSION_END_BONUS`
+   * because the bonus has not yet been folded into the payload at the point
+   * Marian's last chip-tap fires `onSessionComplete`.
+   */
+  const wordSongCompletionGrant =
+    p.surface === 'word-song' ? WORDSONG_SESSION_END_BONUS : 0
+  const displayedTotalStardust = p.totalStardust + wordSongCompletionGrant
+  const displayedEarnedThisSession =
+    p.surface === 'word-song' ? wordSongCompletionGrant : p.earnedThisSession
+
   // ── SFX instances (lazy-init, one per mount) ----------------------------
 
   const [chimeInstance] = useState<Sfx>(
@@ -240,6 +266,13 @@ export default function SessionEnd({
   useEffect(() => {
     const clock = now ?? (() => new Date())
     const dateISO = clock().toISOString()
+    // Word-song completion bonus (ticket 86c9kwvza). Persists FIRST so
+    // `recordSessionEnd` (which reads stardust to compute Hub's
+    // `cumulativeStardust` field) sees the post-bonus total — otherwise
+    // Hub would understate cumulative stardust for word-song sessions.
+    if (p.surface === 'word-song') {
+      grantWordSongCompletionBonus(storage, now)
+    }
     recordSessionEnd(p.finalStreak, storage, now)
     // P0.2 fix (audit follow-up to PR #120): derive the focus node the
     // just-completed session targeted, instead of writing a hardcoded
@@ -331,12 +364,46 @@ export default function SessionEnd({
         audioFailedRef.current = true
       }
 
-      // t=1400: Recap -- "You earned N stars!" (skip if stardust === 0)
+      // t=1400: Recap -- copy is surface-dependent.
+      //
+      //   - math: "You earned N stars!" where N = totalStardust (unchanged).
+      //     Utterance id `session.end.recap.<N>` is in the planner bundle.
+      //   - word-song (ticket 86c9kwvza): "You earned 5 stars for finishing!"
+      //     Copy is fixed — the +5 is the completion bonus, not a function
+      //     of how many problems Marian got right. Utterance id
+      //     `session.end.recap.wordsong-completion` is a NEW id; until the
+      //     planner's audio bundle includes it, the silent fallback (which
+      //     fires `onWordTick(0)` once) keeps the caption pipeline alive
+      //     and the existing graceful-degradation path bridges the audio.
+      //
+      // Skip-when-zero only applies to math (word-song always has a +5
+      // grant to celebrate, even on a session where Marian got 0 correct).
       try {
         setPhase('recap')
         setShowStardustCounter(true)
 
-        if (p.totalStardust > 0) {
+        if (p.surface === 'word-song') {
+          await new Promise<void>((resolve) => {
+            addTimer(
+              () => {
+                const recapId = 'session.end.recap.wordsong-completion'
+                const copy = `You earned ${numberToWord(WORDSONG_SESSION_END_BONUS)} stars for finishing!`
+                playUtterance(recapId, {
+                  onWordTick: (wordIndex) => {
+                    setCaptionText(copy)
+                    setCaptionRevealed(wordIndex + 1)
+                  },
+                })
+                  .then(resolve)
+                  .catch((err) => {
+                    console.warn('[SessionEnd] recap utterance failed:', err)
+                    resolve()
+                  })
+              },
+              RECAP_DELAY_MS - (OPENER_DELAY_MS > 0 ? OPENER_DELAY_MS : 0),
+            )
+          })
+        } else if (p.totalStardust > 0) {
           await new Promise<void>((resolve) => {
             addTimer(
               () => {
@@ -361,7 +428,7 @@ export default function SessionEnd({
             )
           })
         } else {
-          // Zero stardust: skip the recap line but wait the expected gap
+          // Zero stardust on math: skip the recap line but wait the gap.
           await new Promise<void>((resolve) => {
             addTimer(resolve, RECAP_DELAY_MS)
           })
@@ -505,9 +572,10 @@ export default function SessionEnd({
       data-testid="session-end"
       data-surface={p.surface}
       data-phase={phase}
-      data-total-stardust={p.totalStardust}
-      data-earned={p.earnedThisSession}
+      data-total-stardust={displayedTotalStardust}
+      data-earned={displayedEarnedThisSession}
       data-final-streak={p.finalStreak}
+      data-completion-bonus={wordSongCompletionGrant}
       className="
         relative flex h-full w-full flex-col items-center
         bg-my-cream text-ink
@@ -619,10 +687,12 @@ export default function SessionEnd({
         </m.div>
       )}
 
-      {/* Stardust counter -- ~14vh band */}
+      {/* Stardust counter -- ~14vh band. For word-song, the displayed
+          total includes the +5 completion bonus so Marian sees the post-
+          grant number tick up. Math is unchanged. */}
       <div className="flex h-[14vh] items-center justify-center">
         <StardustCounter
-          totalStardust={p.totalStardust}
+          totalStardust={displayedTotalStardust}
           active={showStardustCounter}
           plink={plinkInstance}
           reducedMotion={reducedMotion}

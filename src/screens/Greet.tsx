@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 import { FIRST_UTTERANCE_RETRY_MS } from './_shared/gameplayConstants'
+import { TILT_BY_POSE, TILT_SPRING_BY_POSE } from '../lib/character/emmaPose'
 import { createSfx, type Sfx } from '../lib/sfx'
 import {
   cancelPreRecorded,
@@ -1195,12 +1196,21 @@ export default function Greet({
             }
             animate={
               reducedMotion
-                ? { opacity: 1, scale: 1 }
+                ? { opacity: 1, scale: 1, rotate: 0 }
                 : {
                     x: 0,
                     y: 0,
                     opacity: 1,
                     scale: [1, 1.05, 1],
+                    // Phase 3b motion brief (ticket 86c9kwvza): consume
+                    // `TILT_BY_POSE` on pose-swap so Emma's celebration on
+                    // a heart-tap (idle → celebration) reads as a small
+                    // head-tilt-and-smile, not just a sprite swap. Greet's
+                    // slide-in entrance + 2.4s breathing loop (intentionally
+                    // shorter than the brief's 4s value — Greet's entrance
+                    // wakes Emma up, a faster breath reads as alert) are
+                    // preserved per the brief §"Implementation order" item 7.
+                    rotate: TILT_BY_POSE[pose] ?? 0,
                   }
             }
             exit={{ opacity: 0, transition: { duration: 0.15 } }}
@@ -1215,6 +1225,11 @@ export default function Greet({
                       ease: 'easeInOut',
                       // Delay so breathing only starts after the slide-in lands.
                       delay: 0.3 + 0.7,
+                    },
+                    rotate: {
+                      type: 'spring',
+                      stiffness: TILT_SPRING_BY_POSE[pose].stiffness,
+                      damping: TILT_SPRING_BY_POSE[pose].damping,
                     },
                   }
             }

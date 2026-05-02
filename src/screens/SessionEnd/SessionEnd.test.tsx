@@ -7,6 +7,8 @@ import type { SessionEndPayload, PlayUtteranceFn } from './SessionEnd'
 import type { Sfx } from '../../lib/sfx'
 import type { StorageAdapter } from '../Math/stardust'
 import { STARDUST_STORAGE_KEY, STARDUST_SCHEMA_VERSION } from '../Math/stardust'
+import { loadStardust } from '../_shared/stardust'
+import { WORDSONG_SESSION_END_BONUS } from '../_shared/wordSongCompletionBonus'
 import { SESSION_HISTORY_KEY } from './sessionHistory'
 import {
   STORAGE_KEY as PROGRESS_STORAGE_KEY,
@@ -93,6 +95,7 @@ function createWordWalkingPlayUtterance(): PlayUtteranceFn & {
   //   goodbye: "See you soon." -> 3
   function wordCountForId(id: string): number {
     if (id === 'session.end.opener') return 3
+    if (id === 'session.end.recap.wordsong-completion') return 6
     if (id.startsWith('session.end.recap.')) return 4
     if (id.startsWith('session.end.streak.')) return 5
     if (id === 'session.end.goodbye') return 3
@@ -132,6 +135,7 @@ function createMissingIdPlayUtterance(
 } {
   function wordCountForId(id: string): number {
     if (id === 'session.end.opener') return 3
+    if (id === 'session.end.recap.wordsong-completion') return 6
     if (id.startsWith('session.end.recap.')) return 4
     if (id.startsWith('session.end.streak.')) return 5
     if (id === 'session.end.goodbye') return 3
@@ -914,6 +918,155 @@ describe('SessionEnd', () => {
 
       // CTA appears regardless of the streak miss.
       expect(screen.getByTestId('session-end-cta')).toBeInTheDocument()
+    })
+  })
+
+  /**
+   * Word-song completion-contingent stardust (ticket 86c9kwvza, locked
+   * 2026-05-02).
+   *
+   * Per Dave's audit, word-song no longer grants stardust per chip-tap.
+   * The flat +5 completion bonus lands here, in SessionEnd's mount
+   * effect. Math is unchanged and exercised by the surrounding tests.
+   *
+   * These tests pin:
+   *   - The shared stardust store gains exactly +5 on word-song mount.
+   *   - The displayed counter ticks up to `payload.totalStardust + 5`.
+   *   - The recap utterance id flips from `recap.<N>` to a fixed
+   *     `recap.wordsong-completion` id.
+   *   - The recap caption reads "You earned five stars for finishing!"
+   *   - Math sessions are NOT bumped by the bonus.
+   */
+  describe('word-song completion-contingent stardust (ticket 86c9kwvza)', () => {
+    it('grants exactly +5 stardust to the shared store on word-song mount', () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 8)
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...WORD_SONG_PAYLOAD, totalStardust: 8 }}
+            playUtteranceFn={createFakePlayUtterance()}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      expect(loadStardust(storage).total).toBe(8 + WORDSONG_SESSION_END_BONUS)
+    })
+
+    it('does NOT grant the bonus on math mount (math is unchanged)', () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 9)
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...MATH_PAYLOAD, totalStardust: 9 }}
+            playUtteranceFn={createFakePlayUtterance()}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      expect(loadStardust(storage).total).toBe(9)
+    })
+
+    it('exposes the post-bonus total via data-total-stardust on the root', () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 8)
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...WORD_SONG_PAYLOAD, totalStardust: 8 }}
+            playUtteranceFn={createFakePlayUtterance()}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      const root = screen.getByTestId('session-end')
+      expect(root).toHaveAttribute(
+        'data-total-stardust',
+        String(8 + WORDSONG_SESSION_END_BONUS),
+      )
+      expect(root).toHaveAttribute(
+        'data-completion-bonus',
+        String(WORDSONG_SESSION_END_BONUS),
+      )
+      expect(root).toHaveAttribute(
+        'data-earned',
+        String(WORDSONG_SESSION_END_BONUS),
+      )
+    })
+
+    it('plays the dedicated recap.wordsong-completion utterance id (not recap.<N>)', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 8)
+      const playUtterance = createWordWalkingPlayUtterance()
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...WORD_SONG_PAYLOAD, totalStardust: 8, finalStreak: 1 }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      await advanceSequence(8000)
+
+      // Streak is below 3 → streak utterance is skipped. Recap id is the
+      // new word-song-specific id. Count-based equality per the project
+      // regression-test convention.
+      expect(playUtterance.calls).toEqual([
+        'session.end.opener',
+        'session.end.recap.wordsong-completion',
+        'session.end.goodbye',
+      ])
+    })
+
+    it('reveals the recap caption "You earned five stars for finishing!"', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 0)
+      const playUtterance = createWordWalkingPlayUtterance()
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...WORD_SONG_PAYLOAD, totalStardust: 0, finalStreak: 0 }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      // Drain through the recap phase but stop before goodbye so the
+      // caption is still on the recap line.
+      await advanceSequence(3300)
+
+      const captionWords = screen
+        .queryAllByTestId('session-end-caption-word')
+        .map((el) => el.textContent)
+        .join(' ')
+      expect(captionWords).toBe('You earned five stars for finishing!')
     })
   })
 })

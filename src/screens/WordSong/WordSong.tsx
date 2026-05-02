@@ -16,6 +16,7 @@ import {
 import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
+import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { pickDistractors } from './wordDistractors'
 import {
   loadStardust,
@@ -79,20 +80,6 @@ import type { WordEntry } from './wordPack'
 // ── Constants ── Shared gameplay constants imported from _shared/gameplayConstants.
 // Screen-specific constants remain inline below.
 
-/** Ear-wiggle rotation duration on a correct tap. Bumped from the implicit
- *  pose-swap (~200ms cross-fade) to a visible keyframed rotation per the
- *  Word Song UX bug ticket — Thomas reports the celebration is "practically
- *  not visible" on iPad with the silent-but-captioned default audio path
- *  (no real TTS to fill the 1200ms auto-advance window).
- *
- *  Constraints:
- *  - Must be ≥600ms (ticket acceptance criterion)
- *  - Must complete strictly before ADVANCE_AFTER_CORRECT_MS (1200ms)
- *  - Skipped on prefers-reduced-motion — the static pose swap remains
- *
- *  600ms gives a clear two-tilt wiggle that lands well inside the budget. */
-const EAR_WIGGLE_MS = 600
-
 /** Sparkle-burst total reveal duration on a correct tap. Bumped from the
  *  default 0.6s spring tail to 0.85s so the stardust grant + sparkle reads
  *  as a clear ≥800ms beat per the UX bug ticket. Particles still travel
@@ -131,7 +118,14 @@ export interface WordSongSessionResult {
   totalCorrect: number
   totalStardust: number
   finalStreak: number
-  /** Stardust _earned in this session_, not the all-time persisted total. */
+  /**
+   * Stardust _earned in this session by Marian's chip-tap activity_, not
+   * the all-time persisted total. Per ticket 86c9kwvza this is always `0`
+   * for word-song now: per-correct grants were removed, and the flat
+   * completion bonus (+5) is granted later, inside SessionEnd's mount
+   * effect via `grantWordSongCompletionBonus`. The field is retained for
+   * payload-shape symmetry with Math (which still grants per-correct).
+   */
   earnedThisSession: number
   /** Surface tag — distinguishes Word Song from Math at the session-end
    *  consumer level (per spec line 540). */
@@ -697,15 +691,18 @@ function WordSongScreen({
     }
   }, [problemIndex, plan.problems.length, onSessionComplete, storage, now])
 
-  const grantStardust = useCallback(
-    (amount: number) => {
-      stardustTotalRef.current += amount
-      const next = writeStardust(stardustTotalRef.current, storage, now)
-      setStardust(next)
-      earnedThisSessionRef.current += amount
-    },
-    [storage, now],
-  )
+  // Per-correct stardust grants were intentionally REMOVED from word-song
+  // in ticket 86c9kwvza (Thomas locked 2026-05-02). Reasoning per Dave's
+  // audit, grounded in Deci, Koestner & Ryan (1999): performance-contingent
+  // rewards undermine intrinsic motivation on intrinsically-interesting
+  // tasks. Word-learning at 8 (especially for an L2 learner like Marian) is
+  // intrinsically interesting. Math is unchanged — drilled fact-recall is a
+  // different class of task and benefits from per-correct reinforcement.
+  //
+  // The completion bonus (+5 stardust) is granted at session-end inside
+  // SessionEnd's mount effect via `grantWordSongCompletionBonus`. Sensory
+  // rewards on chip-tap (sparkle, plink, celebration tilt, streak band)
+  // remain — those are not points-rewards.
 
   /**
    * Handle a wrong tap. Sequenced per spec §Audio dispatch (wrong path):
@@ -865,29 +862,21 @@ function WordSongScreen({
       setCelebrating(true)
       setProblemState((prev) => ({ ...prev, resolved: true }))
 
-      // Stardust + streak. Same rule as Math: stardust granted even after
-      // 1-or-2 wrongs; ONLY the guided-completion path withholds it.
+      // Streak counter still advances on a clean correct (no wrongs, no
+      // guided completion). The streak band is a sensory reward — visible
+      // momentum, not points — and it stays. What we removed (ticket
+      // 86c9kwvza) is the stardust grant on every correct tap and the
+      // streak-threshold stardust bonus. The HUD pop, sparkle burst, and
+      // celebration tilt all still fire below.
       //
-      // Read from the synchronous refs (not React state). In normal play
-      // the gates between wrong-then-correct span gestures and React has
-      // committed prior state batches, so state would also work — but
-      // the refs are the single source of truth for "what does the gate
-      // see right now", and using them here keeps `handleCorrectTap`
-      // symmetric with the wrong-tap latches above. See ticket 86c9gyb2v.
+      // Reads from the synchronous refs (not React state); see ref
+      // declarations for the rage-tap rationale (ticket 86c9gyb2v).
       const isCleanWin = wrongCountRef.current === 0 && !guidedPlayedRef.current
       if (!guidedPlayedRef.current) {
-        grantStardust(1)
         totalCorrectRef.current += 1
         if (isCleanWin) {
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)
-          if (
-            (STREAK_BONUS_THRESHOLDS as readonly number[]).includes(
-              streakRef.current,
-            )
-          ) {
-            grantStardust(1)
-          }
         }
       }
 
@@ -952,7 +941,7 @@ function WordSongScreen({
     // problemState.{wrongCount,guidedPlayed} intentionally omitted from
     // deps — the cleanWin computation reads the synchronous refs instead
     // (see `wrongCountRef` declaration; ticket 86c9gyb2v).
-    [advanceToNext, grantStardust, plinkInstance, sparkleInstance, speak],
+    [advanceToNext, plinkInstance, sparkleInstance, speak],
   )
 
   const onChipTap = useCallback(
@@ -1197,47 +1186,24 @@ function WordSongScreen({
       <div className="relative flex w-full items-start gap-4 px-4">
         {/* Emma — upper-left, ~26vh per spec (slightly smaller than
             Math's 30vh — see spec line 141).
-            Celebration wiggle: on a correct tap (`pose === 'celebration'`)
-            Emma plays a 600ms rotation keyframe wiggle so the celebration
-            is visibly punchy on iPad even when the Path A audio path is
-            the silent-but-captioned fallback. Skipped under
-            prefers-reduced-motion; the static-pose cross-fade still reads.
-            (The legacy ear-wiggle moniker pre-dated Emma — same animation,
-            renamed semantics.) */}
-        <AnimatePresence initial={false}>
-          <m.img
-            layoutId="emma"
-            key={pose}
-            data-testid="word-song-emma"
-            data-pose={pose}
-            data-wiggling={
-              pose === 'celebration' && !reducedMotion ? 'true' : 'false'
-            }
-            src={`/assets/emma-${pose}.svg`}
-            alt="Emma"
-            draggable={false}
-            className="h-[26vh] w-auto select-none origin-bottom"
-            initial={{ opacity: 0, rotate: 0 }}
-            animate={
-              pose === 'celebration' && !reducedMotion
-                ? { opacity: 1, rotate: [0, -8, 8, -5, 5, 0] }
-                : { opacity: 1, rotate: 0 }
-            }
-            exit={{ opacity: 0, transition: { duration: 0.15 } }}
-            transition={
-              pose === 'celebration' && !reducedMotion
-                ? {
-                    opacity: { duration: 0.2 },
-                    rotate: {
-                      duration: EAR_WIGGLE_MS / 1000,
-                      ease: 'easeInOut',
-                      times: [0, 0.2, 0.45, 0.65, 0.85, 1],
-                    },
-                  }
-                : { duration: 0.2 }
-            }
-          />
-        </AnimatePresence>
+
+            Phase 3b motion brief (ticket 86c9kwvza, locked 2026-05-02):
+            the legacy 600ms keyframe wiggle on celebration is replaced
+            by the canonical spring-tilt rotateZ (+breathing on idle)
+            inside `EmmaCharacter`. Per `design/character/motion-brief.md`
+            §3.2 celebration tilts LEFT (rotateZ -6) with stiffness 260
+            damping 20; §3.3 puzzled-tilt tilts RIGHT (rotateZ +10) with
+            softer stiffness 220 damping 20. The data-wiggling marker is
+            preserved on the rendered element for the existing QA
+            selectors — semantics widened from "the celebration keyframe
+            wiggle is firing" to "Emma is in a non-idle motion-bearing
+            pose with motion enabled". */}
+        <EmmaCharacter
+          pose={pose}
+          layoutId="emma"
+          data-testid="word-song-emma"
+          className="h-[26vh] w-auto select-none"
+        />
 
         {/* Caption ribbon — to Emma's right. Same word-by-word reveal
             as Greet/Math. */}

@@ -66,6 +66,7 @@ import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
 import { StageIcon } from './stageIcons'
+import { EmmaCharacter } from '../../components/EmmaCharacter'
 import {
   NUMBER_GARDEN_STAGES,
   WORD_SONG_STAGES,
@@ -416,16 +417,16 @@ export default function Hub({
           the M2.5 character long-press — only the image bounds are
           live, not the surrounding band. */}
       <div className="pointer-events-none flex h-[22vh] w-full items-center justify-center">
-        <m.img
+        {/* Phase 3b motion brief (ticket 86c9kwvza): consume `EmmaCharacter`
+            so Hub's idle Emma breathes (`scale [1, 1.02, 1]` over 4s) per
+            §3.5. Hub never swaps poses, so the only motion-brief item that
+            matters here is the breathing loop. The shared component also
+            wires the long-press handlers via spread. */}
+        <EmmaCharacter
+          pose="idle"
           layoutId="emma"
           data-testid="hub-emma"
-          src="/assets/emma-idle.svg"
-          alt="Emma"
-          draggable={false}
           className="pointer-events-auto h-full w-auto select-none touch-none"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
           {...characterLongPressProps}
         />
       </div>
