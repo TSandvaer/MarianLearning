@@ -559,6 +559,163 @@ describe('Math (Number Garden) screen', () => {
     expect(chime.play).toHaveBeenCalledTimes(3)
   })
 
+  it('staggers the streak chime ~320ms behind sparkle/plink (#133 follow-up mix tune)', async () => {
+    // Regression for the #133 follow-up. Pre-fix the chime fired at t=0
+    // alongside sparkle (vol 0.55) and plink (vol 0.30); Thomas's iPad
+    // ear-test (2026-05-02) heard it as "a small harmonic on top, not a
+    // distinct beat." The fix is a 320ms stagger so the chime lands as
+    // a secondary "ding" past the sparkle decay (sparkle is 400ms total
+    // with ~160-180ms half-life on its lead partials → ~22% of peak by
+    // 320ms in).
+    //
+    // We assert on the temporal gap by advancing fake timers in two
+    // chunks: sparkle/plink fire on the click, the chime fires only
+    // after the stagger elapses.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // SFX instance ordering: 0=sparkle, 1=poof, 2=plink, 3=chime.
+    const sparkle = sfxState.instances[0]
+    const plink = sfxState.instances[2]
+    const chime = sfxState.instances[3]
+    expect(sparkle).toBeDefined()
+    expect(plink).toBeDefined()
+    expect(chime).toBeDefined()
+
+    const tapCorrect = async () => {
+      const chips = screen.getAllByTestId('math-chip')
+      const idx = Number(
+        screen.getByTestId('math').getAttribute('data-problem-index'),
+      )
+      const correctValue = fixedPlan().problems[idx].correct
+      const correctChip = chips.find(
+        (c) => Number(c.getAttribute('data-value')) === correctValue,
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+    }
+
+    // Build to streak=2 (no chime expected yet).
+    await tapCorrect()
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+    await tapCorrect()
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+    expect(chime.play).toHaveBeenCalledTimes(0)
+
+    // Streak 3 (threshold crossing). Click the correct chip — sparkle
+    // and plink fire synchronously, chime is queued via setTimeout.
+    await tapCorrect()
+    expect(sparkle.play).toHaveBeenCalledTimes(3) // 3 correct taps total
+    expect(plink.play).toHaveBeenCalledTimes(3)
+    // Chime has NOT yet fired — it's pending the stagger timer.
+    expect(chime.play).toHaveBeenCalledTimes(0)
+
+    // Advance 319ms — still pending.
+    await act(async () => {
+      vi.advanceTimersByTime(319)
+      await Promise.resolve()
+    })
+    expect(chime.play).toHaveBeenCalledTimes(0)
+
+    // Advance one more ms (total 320ms past the click) — chime fires.
+    await act(async () => {
+      vi.advanceTimersByTime(1)
+      await Promise.resolve()
+    })
+    expect(chime.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels a pending streak-chime timer if the screen unmounts mid-stagger', async () => {
+    // Companion to the stagger test. The 320ms stagger means there's a
+    // window where the chime is queued but not yet played. If the
+    // screen unmounts in that window (parent route flip / Hub
+    // navigation), the cleanup must clear the timer so the chime
+    // doesn't fire onto the next screen.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    const { unmount } = render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const chime = sfxState.instances[3]
+
+    const tapCorrect = async () => {
+      const chips = screen.getAllByTestId('math-chip')
+      const idx = Number(
+        screen.getByTestId('math').getAttribute('data-problem-index'),
+      )
+      const correctValue = fixedPlan().problems[idx].correct
+      const correctChip = chips.find(
+        (c) => Number(c.getAttribute('data-value')) === correctValue,
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(1200)
+        await Promise.resolve()
+      })
+    }
+
+    await tapCorrect() // streak=1
+    await tapCorrect() // streak=2
+
+    // Trigger streak=3 — chime queued.
+    const chips = screen.getAllByTestId('math-chip')
+    const idx = Number(
+      screen.getByTestId('math').getAttribute('data-problem-index'),
+    )
+    const correctValue = fixedPlan().problems[idx].correct
+    const correctChip = chips.find(
+      (c) => Number(c.getAttribute('data-value')) === correctValue,
+    )!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+    expect(chime.play).toHaveBeenCalledTimes(0)
+
+    // Unmount before the stagger elapses.
+    unmount()
+
+    // Advance well past the stagger — chime must NOT fire.
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+    })
+    expect(chime.play).toHaveBeenCalledTimes(0)
+  })
+
   it('does NOT play the chime SFX when a wrong tap precedes the correct one (no streak progression)', async () => {
     // Companion to the streak-threshold chime test above. The streak
     // bonus only fires on a CLEAN win (no prior wrong taps); a

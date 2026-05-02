@@ -284,6 +284,33 @@ describe('Greet', () => {
       expect(h.calls).toHaveLength(0)
     })
 
+    it('does NOT play any SFX on mount (Greet is silent until and unless a downstream screen plays)', () => {
+      // Regression for the #133 follow-up. Pre-fix Greet constructed a
+      // chime SFX and later called `.play()` inside the wake-tap handler
+      // as a "WebAudio unlock probe" — silent while the chime asset was
+      // missing, audibly wrong once the asset shipped (PR #133).
+      // Greet's contract is now: silent on mount, silent on wake-tap,
+      // silent on heart-tap. The only audible output Greet produces is
+      // Emma's voice via `playGreetLine`.
+      mediaSpy = stubReducedMotion(false)
+      const h = makePlayHarness()
+      render(
+        withMotion(
+          <Greet onAdvance={vi.fn()} playGreetLineFn={h.playGreetLineFn} />,
+        ),
+      )
+
+      // Chime instance constructed for unload() bookkeeping, but never played.
+      expect(sfxState.last).not.toBeNull()
+      expect(sfxState.last?.play).toHaveBeenCalledTimes(0)
+
+      // Flushing timers does not coax a delayed play() out of Greet.
+      act(() => {
+        vi.advanceTimersByTime(10_000)
+      })
+      expect(sfxState.last?.play).toHaveBeenCalledTimes(0)
+    })
+
     it('full-viewport tap target tap synchronously fires playGreetLine("hi") and transitions to intro', () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
@@ -320,7 +347,14 @@ describe('Greet', () => {
       )
     })
 
-    it('also kicks the chime SFX synchronously inside the tap handler (WebAudio unlock)', () => {
+    it('does NOT play the chime SFX on mount or wake-tap (silent unlock contract)', () => {
+      // Regression for the #133 follow-up. Pre-fix Greet called
+      // `chimeInstance.play()` inside the wake-tap handler as a
+      // "defensive WebAudio unlock probe" — silent while the chime asset
+      // was missing, audibly wrong once the asset shipped. Greet must
+      // mount and run wake-tap without producing any audible SFX; the
+      // WebAudio unlock is already covered by `resumeAudioCtx()` +
+      // `unlockAudioSessionFn()` (both true-silent).
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -329,12 +363,14 @@ describe('Greet', () => {
         ),
       )
 
+      // The chime instance is still constructed (so unload() still runs)
+      // but no .play() is called on it at mount.
+      expect(sfxState.last?.play).toHaveBeenCalledTimes(0)
+
       fireWakeTap()
 
-      // The chime instance was constructed at mount; play() is called inside
-      // the same handler as playGreetLine() to silently unlock Howler's
-      // WebAudio context for later SFX.
-      expect(sfxState.last?.play).toHaveBeenCalledTimes(1)
+      // ...nor on the wake-tap.
+      expect(sfxState.last?.play).toHaveBeenCalledTimes(0)
     })
 
     it('forwards an onPlay callback on the line-0 play (gate watchdog signal)', () => {
@@ -740,8 +776,8 @@ describe('Greet', () => {
       fireEvent.click(target)
 
       expect(h.calls).toHaveLength(1)
-      // And only one chime play() (silent unlock).
-      expect(sfxState.last?.play).toHaveBeenCalledTimes(1)
+      // And no chime play() — Greet wake-tap is silent post-#133 follow-up.
+      expect(sfxState.last?.play).toHaveBeenCalledTimes(0)
     })
   })
 
@@ -1048,7 +1084,11 @@ describe('Greet', () => {
       }
     }
 
-    it('plays the chime, squishes, and calls onAdvance within 400ms', async () => {
+    it('squishes and calls onAdvance within 400ms — without playing any SFX', async () => {
+      // Regression for the #133 follow-up: heart tap must produce squish +
+      // advance only, no audible chime. The chime construction is still
+      // present (so `chimeInstance.unload()` on unmount remains correct),
+      // but `.play()` is never called from Greet.
       mediaSpy = stubReducedMotion(false)
       const onAdvance = vi.fn()
       const h = makePlayHarness()
@@ -1061,11 +1101,12 @@ describe('Greet', () => {
       await advanceToHeart(h)
 
       const heart = screen.getByTestId('greet-heart')
-      // Wake-tap already played the chime once (silent unlock); reset the
-      // counter so we assert on just the heart-tap chime.
+      // No chime calls expected from any Greet phase. Snapshot the
+      // count and assert it's still 0 after the heart tap.
       const chimeCallsBefore = sfxState.last?.play.mock.calls.length ?? 0
+      expect(chimeCallsBefore).toBe(0)
       fireEvent.click(heart)
-      expect(sfxState.last?.play.mock.calls.length).toBe(chimeCallsBefore + 1)
+      expect(sfxState.last?.play.mock.calls.length).toBe(0)
 
       // Hand-off has NOT happened yet — we wait for the 400ms transition.
       expect(onAdvance).not.toHaveBeenCalled()
@@ -1080,12 +1121,18 @@ describe('Greet', () => {
       expect(onAdvance).toHaveBeenCalledTimes(1)
     })
 
-    it('does not throw and still calls onAdvance when the chime asset is missing', async () => {
+    it('does not throw and still calls onAdvance when an injected chime returns false', async () => {
+      // Pre-#133 this test exercised the asset-missing soft-fallback path
+      // (play() returns false, Greet doesn't throw). Post-#133 follow-up
+      // the chime is never `.play()`d from Greet at all, so the failure
+      // mode this test guarded against is structurally unreachable from
+      // here. We keep the test (with an updated assertion) to lock the
+      // contract: any injected chime stub passes through the screen
+      // unconsumed; advance still fires.
       mediaSpy = stubReducedMotion(false)
       const onAdvance = vi.fn()
       const h = makePlayHarness()
 
-      // Custom chime that simulates a 404 — play() returns false, no throw.
       const missingChime = {
         play: vi.fn(() => false),
         unload: vi.fn(),
@@ -1106,7 +1153,9 @@ describe('Greet', () => {
       await advanceToHeart(h)
 
       fireEvent.click(screen.getByTestId('greet-heart'))
-      expect(missingChime.play).toHaveBeenCalled()
+      // Greet itself never plays the chime — confirm zero play() calls
+      // even with a stub that would otherwise be observable.
+      expect(missingChime.play).not.toHaveBeenCalled()
       // No throw; the visual flow proceeds.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(400)
@@ -1114,7 +1163,7 @@ describe('Greet', () => {
       expect(onAdvance).toHaveBeenCalledTimes(1)
     })
 
-    it('cancels in-flight pre-recorded playback on heart tap so Emma is silent during the chime', async () => {
+    it('cancels in-flight pre-recorded playback on heart tap so Emma is silent during the transition', async () => {
       mediaSpy = stubReducedMotion(false)
       const h = makePlayHarness()
       render(
@@ -1144,7 +1193,8 @@ describe('Greet', () => {
       await advanceToHeart(h)
 
       const heart = screen.getByTestId('greet-heart')
-      const chimeCallsBefore = sfxState.last?.play.mock.calls.length ?? 0
+      // Greet does not play the chime on heart tap (post-#133 follow-up)
+      // — assert zero plays regardless of how many taps land.
       fireEvent.click(heart)
       fireEvent.click(heart)
       fireEvent.click(heart)
@@ -1153,9 +1203,7 @@ describe('Greet', () => {
         await vi.advanceTimersByTimeAsync(400)
       })
       expect(onAdvance).toHaveBeenCalledTimes(1)
-      // Heart chime debounced — only one extra play() landed past the
-      // wake-tap baseline.
-      expect(sfxState.last?.play.mock.calls.length).toBe(chimeCallsBefore + 1)
+      expect(sfxState.last?.play.mock.calls.length).toBe(0)
     })
 
     it('triggers ear-wiggle (wave) on tap per spec line 189', async () => {
