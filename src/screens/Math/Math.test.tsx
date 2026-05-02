@@ -1764,6 +1764,132 @@ describe('Math (Number Garden) screen', () => {
     )
   })
 
+  /*
+   * ╔══════════════════════════════════════════════════════════════════════╗
+   * ║ COLD-MOUNT SWAP-JOLT REGRESSION TEST — ticket 86c9kxb5q              ║
+   * ║                                                                      ║
+   * ║ Reproduces Thomas's 2026-05-02 production bug: cold-mount Math       ║
+   * ║ paints the static-fallback Q1, then ~1.3s later the canon-derived    ║
+   * ║ plan arrives, the plan prop flips, and Q1 visibly swaps to a         ║
+   * ║ different problem. Marian sees one problem, then another, then       ║
+   * ║ audio fires.                                                         ║
+   * ║                                                                      ║
+   * ║ Fix: the existing `audioReady` prop already gates the cold-mount     ║
+   * ║ first read-aloud (ticket 86c9hjnn8). This test asserts the gate is   ║
+   * ║ now extended to also gate the visible problem render, so the        ║
+   * ║ fallback Q1 is never on screen long enough for a swap to land.       ║
+   * ║                                                                      ║
+   * ║ Load-bearing assertions:                                             ║
+   * ║   - When audioReady=false, math-symbolic / chips / visual-groups     ║
+   * ║     are NOT in the DOM.                                              ║
+   * ║   - HUD chrome (HUD strip, Emma) IS in the DOM — screen never goes   ║
+   * ║     blank, Marian sees her teacher idle while the line is fetched.   ║
+   * ║   - When audioReady flips to true, problem area appears.             ║
+   * ╚══════════════════════════════════════════════════════════════════════╝
+   */
+  it('render gate: audioReady=false hides the problem area; HUD + Emma stay (ticket 86c9kxb5q)', () => {
+    const harness = makePlayHarness()
+
+    render(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          audioReady={false}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // HUD chrome + Emma stay mounted — Marian's teacher is on screen.
+    expect(screen.getByTestId('math')).toBeInTheDocument()
+    expect(screen.getByTestId('math-hud')).toBeInTheDocument()
+    expect(screen.getByTestId('math-emma')).toBeInTheDocument()
+
+    // Problem area is NOT in the DOM. These are the elements that would
+    // visibly swap when the plan prop flipped pre-fix.
+    expect(screen.queryByTestId('math-symbolic')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('math-visual-groups')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('math-chips')).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId('math-chip')).toHaveLength(0)
+    expect(screen.queryByTestId('math-addend-a')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('math-addend-b')).not.toBeInTheDocument()
+  })
+
+  it('render gate: audioReady=true renders the problem area (ticket 86c9kxb5q)', () => {
+    const harness = makePlayHarness()
+
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          audioReady={true}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    expect(screen.getByTestId('math-symbolic')).toBeInTheDocument()
+    expect(screen.getByTestId('math-visual-groups')).toBeInTheDocument()
+    expect(screen.getByTestId('math-chips')).toBeInTheDocument()
+    expect(screen.getAllByTestId('math-chip')).toHaveLength(3)
+    expect(screen.getByTestId('math-addend-a')).toHaveTextContent('3')
+    expect(screen.getByTestId('math-addend-b')).toHaveTextContent('2')
+  })
+
+  it('render gate: flipping audioReady false → true makes the problem area appear (ticket 86c9kxb5q)', async () => {
+    const silentHarness = makePlayHarness()
+    const realHarness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => true)
+
+    const { rerender } = render(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={silentHarness.playUtterance}
+          audioReady={false}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    // Pre-flip: problem area absent. Critically — no chip text rendered,
+    // so the static-fallback Q1's addends aren't visible to swap from.
+    expect(screen.queryByTestId('math-symbolic')).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId('math-chip')).toHaveLength(0)
+
+    rerender(
+      withMotion(
+        <MathScreen
+          plan={fixedPlan()}
+          playUtterance={realHarness.playUtterance}
+          audioReady={true}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // Post-flip: problem area renders for the first time, against the
+    // real plan — no intermediate fallback paint.
+    expect(screen.getByTestId('math-symbolic')).toBeInTheDocument()
+    expect(screen.getAllByTestId('math-chip')).toHaveLength(3)
+    expect(screen.getByTestId('math-addend-a')).toHaveTextContent('3')
+    expect(screen.getByTestId('math-addend-b')).toHaveTextContent('2')
+
+    // Audio fired against the real player on the same flip — the
+    // existing read-aloud gate (ticket 86c9hjnn8) is unchanged by this fix.
+    expect(silentHarness.spoken()).toEqual([])
+    expect(realHarness.spoken()).toEqual(['Three plus two. How many?'])
+  })
+
   // ── Mid-skill back-arrow (#86c9j53ra) ──────────────────────────────────
 
   describe('mid-skill back-arrow (Hub navigation contract)', () => {

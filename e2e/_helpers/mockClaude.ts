@@ -30,6 +30,15 @@ export interface MockClaudeOptions {
    * paying the cost of audio decoding tests.
    */
   failNetwork?: boolean
+  /**
+   * Delay (in ms) before the route handler fulfils OR aborts. Lets specs
+   * exercise the in-flight window — e.g. the no-swap-jolt regression
+   * (ticket 86c9kxb5q) needs a deterministic stretch of time where
+   * `audioReady === false` so the render-gate's "preparing" state is
+   * observable before the fetch settles. 0 (default) means no artificial
+   * delay; the route handler resolves immediately like before.
+   */
+  delayMs?: number
 }
 
 export async function installClaudeMock(
@@ -40,7 +49,15 @@ export async function installClaudeMock(
   const wordSongFactory =
     options.wordSongResponse ?? canonicalWordSongSessionResponse
 
+  const delayMs = options.delayMs ?? 0
+
   await page.route('**/api/claude', async (route: Route) => {
+    // Hold the route in flight before either fulfilling or aborting so
+    // specs that need to observe the audioReady=false window have time
+    // to assert against the DOM before the parent flips the gate.
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
     if (options.failNetwork) {
       await route.abort('failed')
       return
