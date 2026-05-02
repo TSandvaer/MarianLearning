@@ -16,6 +16,7 @@ import {
 import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
+import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { pickDistractors } from './distractors'
 import {
   loadStardust,
@@ -1451,23 +1452,18 @@ function MathScreen({
 
       {/* Emma + ribbon row */}
       <div className="relative flex w-full items-start gap-4 px-4">
-        {/* Emma — upper-left */}
-        <AnimatePresence initial={false}>
-          <m.img
-            layoutId="emma"
-            key={pose}
-            data-testid="math-emma"
-            data-pose={pose}
-            src={`/assets/emma-${pose}.svg`}
-            alt="Emma"
-            draggable={false}
-            className="h-[26vh] w-auto select-none"
-            initial={reducedMotion ? { opacity: 0 } : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.15 } }}
-            transition={reducedMotion ? { duration: 0.2 } : { duration: 0.2 }}
-          />
-        </AnimatePresence>
+        {/* Emma — upper-left.
+            Phase 3b motion brief (ticket 86c9kwvza): pose swaps now go
+            through `EmmaCharacter`, which carries the rotateZ tilt
+            spring (+breathing on idle) per `design/character/motion-
+            brief.md` §3.2-§3.5. Reduce-motion is honoured via the
+            shared component. */}
+        <EmmaCharacter
+          pose={pose}
+          layoutId="emma"
+          data-testid="math-emma"
+          className="h-[26vh] w-auto select-none"
+        />
 
         {/* Caption ribbon — to Emma's right. Same word-by-word reveal
             pattern as Greet (spec §Audio integration "Caption rendering"). */}

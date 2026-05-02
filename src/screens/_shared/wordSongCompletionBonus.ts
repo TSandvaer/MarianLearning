@@ -60,9 +60,5 @@ export function grantWordSongCompletionBonus(
   now: () => Date = () => new Date(),
 ): StardustState {
   const before = loadStardust(storage)
-  return writeStardust(
-    before.total + WORDSONG_SESSION_END_BONUS,
-    storage,
-    now,
-  )
+  return writeStardust(before.total + WORDSONG_SESSION_END_BONUS, storage, now)
 }

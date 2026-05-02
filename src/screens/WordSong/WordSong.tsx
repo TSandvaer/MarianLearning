@@ -16,6 +16,7 @@ import {
 import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
+import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { pickDistractors } from './wordDistractors'
 import {
   loadStardust,
@@ -78,20 +79,6 @@ import type { WordEntry } from './wordPack'
 
 // ── Constants ── Shared gameplay constants imported from _shared/gameplayConstants.
 // Screen-specific constants remain inline below.
-
-/** Ear-wiggle rotation duration on a correct tap. Bumped from the implicit
- *  pose-swap (~200ms cross-fade) to a visible keyframed rotation per the
- *  Word Song UX bug ticket — Thomas reports the celebration is "practically
- *  not visible" on iPad with the silent-but-captioned default audio path
- *  (no real TTS to fill the 1200ms auto-advance window).
- *
- *  Constraints:
- *  - Must be ≥600ms (ticket acceptance criterion)
- *  - Must complete strictly before ADVANCE_AFTER_CORRECT_MS (1200ms)
- *  - Skipped on prefers-reduced-motion — the static pose swap remains
- *
- *  600ms gives a clear two-tilt wiggle that lands well inside the budget. */
-const EAR_WIGGLE_MS = 600
 
 /** Sparkle-burst total reveal duration on a correct tap. Bumped from the
  *  default 0.6s spring tail to 0.85s so the stardust grant + sparkle reads
@@ -1199,47 +1186,24 @@ function WordSongScreen({
       <div className="relative flex w-full items-start gap-4 px-4">
         {/* Emma — upper-left, ~26vh per spec (slightly smaller than
             Math's 30vh — see spec line 141).
-            Celebration wiggle: on a correct tap (`pose === 'celebration'`)
-            Emma plays a 600ms rotation keyframe wiggle so the celebration
-            is visibly punchy on iPad even when the Path A audio path is
-            the silent-but-captioned fallback. Skipped under
-            prefers-reduced-motion; the static-pose cross-fade still reads.
-            (The legacy ear-wiggle moniker pre-dated Emma — same animation,
-            renamed semantics.) */}
-        <AnimatePresence initial={false}>
-          <m.img
-            layoutId="emma"
-            key={pose}
-            data-testid="word-song-emma"
-            data-pose={pose}
-            data-wiggling={
-              pose === 'celebration' && !reducedMotion ? 'true' : 'false'
-            }
-            src={`/assets/emma-${pose}.svg`}
-            alt="Emma"
-            draggable={false}
-            className="h-[26vh] w-auto select-none origin-bottom"
-            initial={{ opacity: 0, rotate: 0 }}
-            animate={
-              pose === 'celebration' && !reducedMotion
-                ? { opacity: 1, rotate: [0, -8, 8, -5, 5, 0] }
-                : { opacity: 1, rotate: 0 }
-            }
-            exit={{ opacity: 0, transition: { duration: 0.15 } }}
-            transition={
-              pose === 'celebration' && !reducedMotion
-                ? {
-                    opacity: { duration: 0.2 },
-                    rotate: {
-                      duration: EAR_WIGGLE_MS / 1000,
-                      ease: 'easeInOut',
-                      times: [0, 0.2, 0.45, 0.65, 0.85, 1],
-                    },
-                  }
-                : { duration: 0.2 }
-            }
-          />
-        </AnimatePresence>
+
+            Phase 3b motion brief (ticket 86c9kwvza, locked 2026-05-02):
+            the legacy 600ms keyframe wiggle on celebration is replaced
+            by the canonical spring-tilt rotateZ (+breathing on idle)
+            inside `EmmaCharacter`. Per `design/character/motion-brief.md`
+            §3.2 celebration tilts LEFT (rotateZ -6) with stiffness 260
+            damping 20; §3.3 puzzled-tilt tilts RIGHT (rotateZ +10) with
+            softer stiffness 220 damping 20. The data-wiggling marker is
+            preserved on the rendered element for the existing QA
+            selectors — semantics widened from "the celebration keyframe
+            wiggle is firing" to "Emma is in a non-idle motion-bearing
+            pose with motion enabled". */}
+        <EmmaCharacter
+          pose={pose}
+          layoutId="emma"
+          data-testid="word-song-emma"
+          className="h-[26vh] w-auto select-none"
+        />
 
         {/* Caption ribbon — to Emma's right. Same word-by-word reveal
             as Greet/Math. */}
