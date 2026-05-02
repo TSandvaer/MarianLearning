@@ -106,6 +106,17 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Vitest's default include picks up `**/*.spec.ts`. The Playwright e2e
+    // suite under `e2e/` uses `.spec.ts` too — exclude that directory so
+    // `vitest run` doesn't try to import Playwright tests in jsdom (which
+    // would crash on `@playwright/test`'s test fixture API). Run e2e via
+    // `yarn e2e` (Playwright runner) instead.
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.{idea,git,cache,output,temp}/**',
+      'e2e/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

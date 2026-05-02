@@ -35,6 +35,11 @@ Thumbs.db
 # Test / coverage
 coverage
 
+# Playwright e2e harness (ticket 86c9kwnmx)
+playwright-report
+test-results
+playwright/.cache
+
 # Local progress file (family data; never commit real sessions)
 progress.json
 public/progress.json
