@@ -33,6 +33,12 @@ import StreakBand from './StreakBand'
 import SleepSplash from './SleepSplash'
 import { recordSessionEnd } from './sessionHistory'
 import { recordProgressOnSessionEnd } from './progressHistory'
+import {
+  defaultProgress,
+  loadProgress,
+  pickFocusNode,
+  type ProgressTrack,
+} from '../../lib/progress'
 import type { StorageAdapter } from '../Math/stardust'
 import type { ReactElement } from 'react'
 
@@ -235,10 +241,26 @@ export default function SessionEnd({
     const clock = now ?? (() => new Date())
     const dateISO = clock().toISOString()
     recordSessionEnd(p.finalStreak, storage, now)
+    // P0.2 fix (audit follow-up to PR #120): derive the focus node the
+    // just-completed session targeted, instead of writing a hardcoded
+    // surface-keyed constant. Reads `loadProgress()` and runs the same
+    // `pickFocusNode` selector App.tsx uses at session-start fetch time.
+    // `skillLevels` cannot have shifted between session-start and now —
+    // `applyMasteryRule()` only runs INSIDE `recordProgressOnSessionEnd`
+    // (the very next call), so the value here is exactly what the
+    // planner saw. Without this fix, M3 silently caps after one
+    // promotion hop because new history entries keep claiming the old
+    // focus node forever (audit:
+    // `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` P0.2).
+    const focusNode = pickFocusNode(
+      loadProgress() ?? defaultProgress(),
+      trackForSurface(p.surface),
+    )
     recordProgressOnSessionEnd({
       surface: p.surface,
       totalCorrect: p.totalCorrect,
       dateISO,
+      focusNode,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -730,6 +752,19 @@ function generateSparkleParticles(
     y: (Math.random() - 0.5) * spread,
     delay: Math.random() * maxDelay,
   }))
+}
+
+/**
+ * Map the SessionEnd `surface` discriminant to the `ProgressTrack` shape
+ * used by `pickFocusNode` / `pickRecentSuccessRate`. The two unions are
+ * intentionally identical today (`'math' | 'word-song'`) but live in
+ * different domains — the surface is a UI/audio routing key, the track
+ * is a curriculum partition. Funnelling through one helper keeps the
+ * coupling explicit so a future divergence (a third surface, or a track
+ * rename) only needs touching once.
+ */
+function trackForSurface(surface: SessionEndSurface): ProgressTrack {
+  return surface
 }
 
 /** Convert a number (0-19) to its English word for the TTS caption. */
