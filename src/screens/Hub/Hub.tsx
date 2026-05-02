@@ -55,7 +55,6 @@ import {
 } from './hubSuggestion'
 import {
   HUB_LINES,
-  HUB_LINE_WORD_COUNTS,
   isLastSessionRecent,
   pickHubGreeting,
   shouldShowDayStreak,
@@ -66,6 +65,7 @@ import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
 import { StageIcon } from './stageIcons'
+import { playHubLine as defaultPlayHubLine } from './playHubLine'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import {
   NUMBER_GARDEN_STAGES,
@@ -201,29 +201,14 @@ export default function Hub({
   const playLine = useCallback(
     (id: HubLineId, opts: PlayHubLineOptions = {}): Promise<void> => {
       if (playLineFn) return playLineFn(id, opts)
-      // Default: walk caption at ~165 wpm so the screen does something
-      // visible even without real audio. Same shape as Math's default.
-      return new Promise<void>((resolve) => {
-        opts.onPlay?.()
-        const wordCount = HUB_LINE_WORD_COUNTS[id]
-        const totalMs = (wordCount / 165) * 60_000
-        const interval = wordCount > 0 ? totalMs / wordCount : 0
-        let i = 0
-        opts.onWordTick?.(0)
-        if (wordCount <= 1) {
-          // Single-word lines resolve cleanly without an interval.
-          resolve()
-          return
-        }
-        const timer = window.setInterval(() => {
-          i += 1
-          opts.onWordTick?.(i)
-          if (i >= wordCount - 1) {
-            window.clearInterval(timer)
-            resolve()
-          }
-        }, interval)
-      })
+      // Default: Howler-backed playback against the line manifest. The
+      // helper soft-fails to a 165-wpm caption-walk on load/play error so
+      // the screen never bricks even when an MP3 404s. Wired in ticket
+      // 86c9kxv47 after Thomas's iPad ear-test (2026-05-02) reported "no
+      // greet when I return to hub" — Hub had been running on a silent
+      // caption-walk fallback because no production caller was supplying
+      // `playLineFn`. See `./playHubLine.ts` for the player shape.
+      return defaultPlayHubLine(id, opts)
     },
     [playLineFn],
   )
@@ -244,10 +229,29 @@ export default function Hub({
 
   const dispatchGreeting = useCallback(() => {
     if (greetingDispatchedRef.current) return
-    if (greeting.lineId === null) return
+    if (greeting.lineId === null) {
+      // Log suppression decisions exactly once per Hub mount so the
+      // iPad-export consoles show *why* the welcome-back was skipped.
+      // Added in ticket 86c9kxv47 — Thomas's "no greet when I return"
+      // report turned out to be the silent-fallback bug, but the
+      // logging was missing either way and would have made the
+      // diagnosis 30 seconds instead of an investigation.
+      greetingDispatchedRef.current = true
+      console.log(
+        '[Hub] welcome-back: suppressed',
+        suppressed ? '(rapid-remount within 30s)' : '(no line for path)',
+        { path, suggestion, suppressed },
+      )
+      return
+    }
     greetingDispatchedRef.current = true
     cancelledRef.current = false
     setCaptionRevealed(0)
+    console.log('[Hub] welcome-back: dispatching', {
+      lineId: greeting.lineId,
+      path,
+      suggestion,
+    })
     greetingPromiseRef.current = playLine(greeting.lineId, {
       onWordTick: (i) => {
         if (cancelledRef.current) return
@@ -259,7 +263,7 @@ export default function Hub({
       // nodes remain tappable.
       console.warn('[Hub] welcome-back line failed:', err)
     })
-  }, [greeting.lineId, playLine])
+  }, [greeting.lineId, path, playLine, suggestion, suppressed])
 
   // For paths where the audio context is already hot, fire on mount.
   // For app-open paths, wait for the first user gesture (tap-anywhere).
