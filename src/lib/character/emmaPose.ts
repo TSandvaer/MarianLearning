@@ -66,16 +66,15 @@ export const TILT_BY_POSE: Record<EmmaPose, number> = {
  * reads as "considering" rather than "reacting". On iPad the difference
  * is small but legible.
  *
- * `celebration` uses a yet-softer spring (`stiffness: 200, damping: 22`)
- * — iteration on 2026-05-01 (ticket 86c9kxmqb). Thomas reported on iPad
- * Pro after PR #129 that the original 260/20 felt "very fast and not so
- * smooth" while the puzzled-tilt at 220/20 "is better". 200/22 paces the
- * tilt-and-return so the success moment lands instead of flicking past;
- * the slightly higher damping reduces overshoot so it doesn't read as
- * laggy. Floor: stiffness must stay >= puzzled-tilt's 220-ish band so
- * celebration still feels positive/upward, not droopy. (We're at 200,
- * marginally below — the 22 damping compensates by removing the bounce
- * that low stiffness alone would amplify.)
+ * `celebration` is the one pose that does NOT use a spring transition —
+ * see the `CELEBRATION_*` keyframe constants below. Iteration #1 on
+ * 2026-05-01 (ticket 86c9kxmqb) softened the spring to 200/22, but
+ * Thomas's iPad Pro re-test still reported "I hardly see the second
+ * pose" — the symptom of an instantaneous apex with no hold beat.
+ * Iteration #2 (same ticket) replaces the spring with a keyframed
+ * tilt-out → hold → tilt-back so the celebrate pose is visibly held at
+ * the apex for ~250ms. The spring config below is kept for non-keyframe
+ * fallback paths only; the active path is keyframes.
  */
 export interface TiltSpring {
   readonly stiffness: number
@@ -85,13 +84,63 @@ export interface TiltSpring {
 export const TILT_SPRING_BY_POSE: Record<EmmaPose, TiltSpring> = {
   idle: { stiffness: 260, damping: 20 },
   listening: { stiffness: 260, damping: 20 },
-  celebration: { stiffness: 200, damping: 22 }, // softened per iPad feedback (86c9kxmqb)
+  // Kept for documentation / fallback. The active celebration motion is
+  // keyframed — see CELEBRATION_* constants below. Iteration #2 raised
+  // the firmness from 200 → 220 because the hold beat is doing the
+  // visibility work; the spring just needs to feel deliberate.
+  celebration: { stiffness: 220, damping: 22 },
   'puzzled-tilt': { stiffness: 220, damping: 20 }, // softer — "considering"
   'attentive-pointing': { stiffness: 260, damping: 20 },
   sleepy: { stiffness: 260, damping: 20 },
   cheering: { stiffness: 260, damping: 20 },
   waving: { stiffness: 260, damping: 20 },
 }
+
+/**
+ * Celebration tilt — keyframed sequence (iteration #2, ticket 86c9kxmqb).
+ *
+ * Why keyframes instead of a single spring
+ * ----------------------------------------
+ * Iteration #1 (PR #131) softened the spring to 200/22. Thomas's iPad
+ * Pro re-test still reported "I hardly see the second pose" — the
+ * symptom of an instantaneous apex with no hold beat. A spring-out
+ * + spring-back motion has no time AT the celebrate pose; the user
+ * sees the start of the tilt and then it's already returning.
+ *
+ * Iteration #2 inserts a hold beat at the apex. Sequence:
+ *
+ *   1. Tilt out: rotate 0 → -6° over ~200ms (`easeOut`)
+ *   2. Hold:    rotate stays at -6° for 250ms (`linear`)
+ *   3. Tilt back: rotate -6 → 0° over ~250ms (`easeInOut`)
+ *
+ * Total motion duration: 700ms. Hold = ~36% of total — plenty of apex
+ * visibility per Thomas's feedback while staying under the 800ms
+ * upper bound (above which the motion starts to feel laggy).
+ *
+ * Implementation in EmmaCharacter.tsx uses Framer Motion's keyframe
+ * + `times` form rather than a multi-segment animate sequence — same
+ * shape, simpler component, and compatible with the existing per-pose
+ * `animate.rotate` driven by `TILT_BY_POSE`.
+ *
+ * Reduce-motion path: keyframes collapse to `rotate: 0` (no tilt, no
+ * hold) — same as the spring path before iteration #2.
+ */
+export const CELEBRATION_HOLD_MS = 250
+export const CELEBRATION_DURATION_MS = 700
+export const CELEBRATION_DURATION_S = CELEBRATION_DURATION_MS / 1000
+
+/**
+ * Keyframe timing as fractions of `CELEBRATION_DURATION_MS`. The middle
+ * two keyframes (`-6, -6`) bracket the hold beat — the segment between
+ * `times[1]` and `times[2]` is the linear hold at the apex.
+ *
+ * Math: 200ms tilt-out + 250ms hold + 250ms tilt-back = 700ms total.
+ *   times[1] = 200 / 700   ≈ 0.286
+ *   times[2] = (200+250)/700 ≈ 0.643
+ */
+export const CELEBRATION_TILT_KEYFRAMES = [0, -6, -6, 0] as const
+export const CELEBRATION_TILT_TIMES = [0, 0.286, 0.643, 1] as const
+export const CELEBRATION_TILT_EASES = ['easeOut', 'linear', 'easeInOut'] as const
 
 /**
  * Idle breathing scale loop. Spec: `design/character/motion-brief.md`
