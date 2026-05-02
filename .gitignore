@@ -41,3 +41,9 @@ public/progress.json
 
 # PWA artifacts
 dev-dist
+
+# Pre-baked session canon (ticket 86c9kwhbc — D)
+# Source of truth is the prompt + voice config; canon is regenerable
+# via `scripts/generateSessionCanon.ts`. Blobs are large (~1.2MB each)
+# and generated at deploy time. Don't commit.
+public/canon/
