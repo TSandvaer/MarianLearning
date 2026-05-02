@@ -58,20 +58,6 @@ import type { SessionEndSurface } from './SessionEnd'
  */
 const PROBLEMS_PER_SESSION = 8
 
-/**
- * Surface → focus skill node map.
- *
- * Intentionally simplistic — this is the first cut, the adaptive engine will
- * later refine to "actual nodes touched per problem". For v1, every Math
- * session focuses `add-to-10` (Marian's diagnostic level per CLAUDE.md "Marian's
- * current levels") and every Word Song session focuses `blending-cv` (CVC is
- * still emerging; CV blending is the active level).
- */
-const SURFACE_FOCUS: Record<SessionEndSurface, SkillNode[]> = {
-  math: ['add-to-10'],
-  'word-song': ['blending-cv'],
-}
-
 export interface RecordProgressInput {
   /** Discriminant from the Session End payload. */
   surface: SessionEndSurface
@@ -79,6 +65,32 @@ export interface RecordProgressInput {
   totalCorrect: number
   /** ISO 8601 timestamp the session-end CTA fired. Injected for test seam. */
   dateISO: string
+  /**
+   * The skill node the just-completed session targeted.
+   *
+   * Audit follow-up to PR #120 (M3 wiring) — P0.2 fix. The earlier shape
+   * of this module hardcoded `skillFocus` per `surface` (`['add-to-10']`
+   * for math, `['blending-cv']` for word-song). That worked for the very
+   * first session but silently broke M3: once `add-to-10` was promoted
+   * to `'mastered'` and the planner moved Marian onto `add-to-20`, every
+   * subsequent history entry STILL recorded `skillFocus: ['add-to-10']`,
+   * so `applyMasteryRule()` saw zero matching entries for `add-to-20`
+   * and could never promote it. The promotion chain capped after the
+   * first hop.
+   *
+   * The caller (SessionEnd.tsx) derives this via
+   * `pickFocusNode(loadProgress() ?? defaultProgress(), trackForSurface)`
+   * at session-end mount — same function the App.tsx fetch effects use
+   * at session-start. Because `applyMasteryRule()` only runs at
+   * session-end (via this module), `skillLevels` at session-end mount
+   * are identical to what they were at session-start, so the derived
+   * focus node is exactly the node the planner targeted.
+   *
+   * Per-problem skillFocus tracking (which nodes did THIS problem
+   * touch) is a future M-series concern; this fix gets us "session
+   * knows its focus node," not "problems report their nodes."
+   */
+  focusNode: SkillNode
 }
 
 /**
@@ -104,7 +116,7 @@ export function recordProgressOnSessionEnd(
 
   const entry: SessionHistoryEntry = {
     dateISO: input.dateISO,
-    skillFocus: [...SURFACE_FOCUS[input.surface]],
+    skillFocus: [input.focusNode],
     successRate: input.totalCorrect / PROBLEMS_PER_SESSION,
   }
 

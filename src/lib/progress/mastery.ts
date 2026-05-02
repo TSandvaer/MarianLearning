@@ -272,9 +272,13 @@ function qualifies(
 }
 
 /**
- * Reduce a list of history entries to one-per-calendar-day. The
- * convention matches `recordProgressOnSessionEnd`: dateISO is an ISO
- * 8601 timestamp; we take its `YYYY-MM-DD` prefix as the day key.
+ * Reduce a list of history entries to one-per-calendar-day. The day key
+ * is computed in LOCAL time, matching the streak counter's convention
+ * (`sessionHistory.ts` uses an inline `differenceInCalendarDays` keyed
+ * on local `getFullYear/getMonth/getDate`). Two semantics for the same
+ * `dateISO` would otherwise be observable to Marian — the streak band
+ * counts a Manila-evening + Manila-morning pair as two days while the
+ * mastery rule used to collapse them to one (UTC offset = 8h).
  *
  * "One per day" is the LATEST entry on that day (the entry with the
  * highest position in the list — `Progress.history` is appended-only,
@@ -282,33 +286,61 @@ function qualifies(
  * parent would think about it: "today's high score" is the one that
  * sticks.
  *
+ * P0.3 history (audit follow-up to PR #120)
+ * -----------------------------------------
+ * Earlier shape used `entry.dateISO.slice(0, 10)` — the UTC `YYYY-MM-DD`
+ * prefix produced by `Date#toISOString()`. Under Manila (UTC+8) the
+ * 22:00–06:00 window collapses across the UTC midnight: a session at
+ * 2026-04-30 21:00 Manila and 2026-05-01 06:00 Manila both stamp UTC
+ * day `2026-04-30`, so the cross-day filter discarded one of the two
+ * and `add-to-20`'s 3-session requirement could never accumulate. The
+ * mastery rule's own header self-flagged the UTC choice as a "known
+ * simplification" — empirically it bit. Audit:
+ * `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` § P0.3.
+ *
  * Edge cases:
- *   - Malformed dateISO (no YYYY-MM-DD prefix): fall back to using the
- *     entire dateISO string as the day key. The parser is permissive
- *     so a single weirdly-shaped entry doesn't poison promotion logic
- *     for the whole node.
- *   - Same-day across timezones: `dateISO` is whatever the writer
- *     produced. The current writer uses `new Date().toISOString()`
- *     (UTC). Cross-day enforcement uses the UTC day; this is a known
- *     simplification — for Marian's use (Manila, single timezone), the
- *     UTC day is wall-clock-close-enough.
+ *   - Malformed dateISO (`Date#parse` returns NaN): fall back to using
+ *     the raw `dateISO` string as the day key. A single weirdly-shaped
+ *     entry doesn't poison promotion logic for the whole node.
+ *   - Cross-timezone playback: the day key is computed in whatever
+ *     local timezone the JS runtime is in when `applyMasteryRule()`
+ *     runs. For Marian's use (single iPad in Manila), this is
+ *     wall-clock-correct. A future multi-device / cross-tz scenario
+ *     would need an explicit per-profile timezone — out of scope here.
  */
 function dedupeByCalendarDay(
   entries: readonly SessionHistoryEntry[],
 ): SessionHistoryEntry[] {
-  const byDay = new Map<string, SessionHistoryEntry>()
-  for (const entry of entries) {
-    const key = entry.dateISO.slice(0, 10) || entry.dateISO
-    byDay.set(key, entry)
-  }
-  // Insertion order is the order of FIRST sight per key. We need the
-  // entries in chronological-ish order to make `slice(-N)` correct.
-  // Reconstruct by walking the source list with a "last seen" filter.
+  // Index of the LAST entry per local-day key. We walk the source list
+  // (most-recent-last by saveProgress contract) and remember the
+  // highest index per key; the surviving entries are exactly those
+  // indices in original order, which preserves the chronological-ish
+  // ordering `slice(-N)` upstream depends on.
   const lastIndexByKey = new Map<string, number>()
   entries.forEach((entry, idx) => {
-    const key = entry.dateISO.slice(0, 10) || entry.dateISO
-    lastIndexByKey.set(key, idx)
+    lastIndexByKey.set(localDayKey(entry.dateISO), idx)
   })
   const keepIndices = new Set(lastIndexByKey.values())
   return entries.filter((_entry, idx) => keepIndices.has(idx))
+}
+
+/**
+ * Convert an ISO 8601 timestamp into a `YYYY-MM-DD` local-tz day key.
+ * Same convention `sessionHistory.ts`'s streak counter uses (local
+ * `getFullYear/getMonth/getDate`), kept inline here to avoid pulling
+ * `date-fns` into the progress bundle for one helper. iPad budget rule.
+ *
+ * Returns the raw `dateISO` when the timestamp doesn't parse — the
+ * filter then treats the malformed entry as its own day key, which
+ * keeps it visible and prevents one bad row from collapsing the
+ * surrounding good rows.
+ */
+function localDayKey(dateISO: string): string {
+  const ms = Date.parse(dateISO)
+  if (Number.isNaN(ms)) return dateISO
+  const d = new Date(ms)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
