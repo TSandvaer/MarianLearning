@@ -1079,3 +1079,260 @@ describe('Track-based session-start with progress block (M2 — ticket 86c9kmwba
     }
   })
 })
+
+describe('Canon-first session-start (D — pre-baked canon, ticket 86c9kwhbc)', () => {
+  // Pre-baked canon short-circuits the live Haiku + Azure pipeline. A
+  // canon hit returns the static blob; a canon miss falls through to
+  // the live planner. These tests inject a fake `getCanonEntry` via
+  // the handler override seam so we don't touch the filesystem.
+
+  let sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
+  let rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+  const nowFn = () => 1000
+
+  /** Stable canon-hit fixture — distinguishable from the live mock so
+   *  tests can assert which path served the response. */
+  const CANON_FIXTURE = {
+    ok: true as const,
+    kind: 'session-start' as const,
+    plan: { id: 'canon-add-to-10', utterances: [] },
+    utterances: [
+      {
+        id: 'math.p1.read',
+        text: 'CANON: Three plus two. How many?',
+        audio: {
+          kind: 'inline' as const,
+          base64: 'Q0FOT04=', // "CANON" base64 — easy to grep in case of failure
+          mime: 'audio/mpeg' as const,
+        },
+      },
+    ],
+  }
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+    mockedRender.mockReset()
+    sessionCache = createSessionCache({ ttlMs: 60_000, now: nowFn })
+    rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+    mockedRender.mockResolvedValue({
+      ok: true,
+      kind: 'session-start',
+      plan: { utterances: [] },
+      utterances: [
+        {
+          id: 'math.p1.read',
+          text: 'LIVE: Three plus two. How many?',
+          audio: { kind: 'inline', base64: 'TElWRQ==', mime: 'audio/mpeg' },
+        },
+      ],
+    })
+  })
+
+  it('serves the canon entry on hit and skips both Anthropic and TTS', async () => {
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const anthropicCreate = vi.fn(async () => {
+      throw new Error('anthropic should not be called on a canon hit')
+    })
+    const anthropicClient = { messages: { create: anthropicCreate } }
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: { focusNode: 'add-to-10', recentSuccessRate: 0.5 },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string; audio: { base64: string } }[]
+    }
+    // Canon fixture is what came back — not the live-render mock.
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(body.utterances[0]!.audio.base64).toBe('Q0FOT04=')
+    // Anthropic + TTS pipeline both untouched on canon hit.
+    expect(anthropicCreate).not.toHaveBeenCalled()
+    expect(mockedRender).not.toHaveBeenCalled()
+    // Canon was queried exactly once with the requested combo.
+    expect(canonStub).toHaveBeenCalledTimes(1)
+    expect(canonStub).toHaveBeenCalledWith({
+      track: 'math',
+      level: 1,
+      focusNode: 'add-to-10',
+    })
+  })
+
+  it('falls through to the live planner on canon miss (returns null)', async () => {
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: { focusNode: 'add-to-10', recentSuccessRate: 0.5 },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string }[]
+    }
+    // Live render mock — text starts with "LIVE:" — was used.
+    expect(body.utterances[0]!.text).toContain('LIVE')
+    expect(canonStub).toHaveBeenCalledTimes(1)
+    expect(mockedRender).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses the track default focus node when the caller omits one (math → add-to-10)', async () => {
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: { track: 'math', level: 1, childName: 'Marian' },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(canonStub).toHaveBeenCalledWith({
+      track: 'math',
+      level: 1,
+      focusNode: 'add-to-10',
+    })
+  })
+
+  it('uses the track default focus node when the caller omits one (word-song → blending-cv)', async () => {
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: { track: 'word-song', level: 1, childName: 'Marian' },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(canonStub).toHaveBeenCalledWith({
+      track: 'word-song',
+      level: 1,
+      focusNode: 'blending-cv',
+    })
+  })
+
+  it('canon hit bypasses the rate limiter (a tight loop on a baked combo costs nothing)', async () => {
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    // Limiter at 1 request per window — the second uncached request would
+    // 429 if canon-first didn't bypass it. Three canon-hit requests should
+    // all return 200.
+    const tightLimiter = createRateLimiter({ limit: 1, windowMs: 60_000 })
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    for (let i = 0; i < 3; i++) {
+      const res = await handler(
+        makeRequest({
+          kind: 'session-start',
+          payload: {
+            track: 'math',
+            level: 1,
+            childName: 'Marian',
+            progress: { focusNode: 'add-to-10', recentSuccessRate: null },
+          },
+        }),
+        {
+          anthropicClient,
+          sessionCache,
+          rateLimiter: tightLimiter,
+          now: nowFn,
+          getCanonEntry: canonStub,
+        },
+      )
+      expect(res.status).toBe(200)
+    }
+    // Canon was hit on every call.
+    expect(canonStub).toHaveBeenCalledTimes(3)
+  })
+
+  it('logs a structured canon-miss line when the live planner is invoked', async () => {
+    // Coverage signal — production telemetry on canon hit-rate reads
+    // these log lines. Skip the warn under NODE_ENV=test by default;
+    // toggle it on for this assertion.
+    const prevNodeEnv = process.env.NODE_ENV
+    delete process.env.NODE_ENV
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const canonStub = vi.fn(() => null)
+      const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+      await handler(
+        makeRequest({
+          kind: 'session-start',
+          payload: {
+            track: 'math',
+            level: 1,
+            childName: 'Marian',
+            progress: { focusNode: 'add-to-10', recentSuccessRate: null },
+          },
+        }),
+        {
+          anthropicClient,
+          sessionCache,
+          rateLimiter,
+          now: nowFn,
+          getCanonEntry: canonStub,
+        },
+      )
+
+      const missCalls = warnSpy.mock.calls.filter(
+        (call) => call[0] === '[api/claude] canon-miss',
+      )
+      expect(missCalls).toHaveLength(1)
+      expect(missCalls[0]![1]).toMatchObject({
+        track: 'math',
+        level: 1,
+        focusNode: 'add-to-10',
+      })
+    } finally {
+      warnSpy.mockRestore()
+      if (prevNodeEnv !== undefined) {
+        process.env.NODE_ENV = prevNodeEnv
+      }
+    }
+  })
+})

@@ -79,7 +79,7 @@ import {
 } from './_types.js'
 import { renderSessionAudio } from './_session.js'
 import {
-  generateSessionPlan,
+  generateSessionStartResponse,
   PlannerError,
   type PlannerAnthropicClient,
   type PlannerTrack,
@@ -90,6 +90,7 @@ import {
   createSessionCache,
   type SessionCache,
 } from './_sessionCache.js'
+import { getCanonEntry } from './_canon.js'
 
 /**
  * Cold-start runtime assertion. Throws at module load if the function is
@@ -392,6 +393,25 @@ export interface HandlerOverrides {
   sessionCache?: SessionCache
   /** Override the clock for rate-limit windowing. Defaults to Date.now(). */
   now?: () => number
+  /** Override the canon-read function. Defaults to the file-backed
+   *  `getCanonEntry` from `_canon.ts`. Tests inject a stub so they can
+   *  drive hit/miss without touching the filesystem. Added ticket
+   *  86c9kwhbc (D — pre-baked session canon). */
+  getCanonEntry?: (key: {
+    track: PlannerTrack
+    level: number
+    focusNode: string
+  }) => Awaited<ReturnType<typeof getCanonEntry>>
+}
+
+/** Default focus node when the caller doesn't supply one. Mirrors the
+ *  same default the planner uses internally so canon lookups and live
+ *  planner calls converge on the same key. Duplicated here (not
+ *  imported) because the planner-side default is private to that
+ *  module; if it ever changes, the planner test suite catches the
+ *  drift on its prompt and this constant gets a paired edit. */
+function defaultFocusNodeForTrack(track: PlannerTrack): string {
+  return track === 'math' ? 'add-to-10' : 'blending-cv'
 }
 
 /**
@@ -500,10 +520,38 @@ export async function handler(
       }
     }
 
-    // Track-based branch: planner generates the plan via Haiku, then we
-    // render TTS through the same _session pipeline.
+    // Track-based branch: try the pre-baked canon first; fall through
+    // to Haiku + Azure on a miss.
     const trackPayload = extractTrackPayload(body.payload)
     if (trackPayload !== null) {
+      // Canon hit (ticket 86c9kwhbc, D — pre-baked session canon). We
+      // pre-render every active (track, level, focusNode) combo at
+      // build time as a static blob and ship it inside the function
+      // bundle. A canon hit short-circuits both the Anthropic call and
+      // the Azure synth — `<500ms cold-start` is the contract.
+      //
+      // childName is NOT part of the canon key. Per AC #3 of the
+      // ticket, "Marian" is baked directly into the utterance text;
+      // future multi-child support is a regen + caching strategy
+      // change, not an API surface change.
+      //
+      // Order matters: canon-first runs BEFORE the rate limiter and
+      // BEFORE the in-memory response cache. A canon hit is free —
+      // no upstream cost — so neither gate applies. A canon miss
+      // continues to the existing live pipeline, which still goes
+      // through the limiter + 5-min TTL cache.
+      const canonResolver = overrides.getCanonEntry ?? getCanonEntry
+      const canonHit = canonResolver({
+        track: trackPayload.track,
+        level: trackPayload.level,
+        focusNode:
+          trackPayload.focusNode ??
+          defaultFocusNodeForTrack(trackPayload.track),
+      })
+      if (canonHit !== null) {
+        return jsonResponse(canonHit, 200, headers)
+      }
+
       // Cache check (added ticket 86c9kjdh2). Identical (track, level,
       // childName, focusNode) requests within the TTL serve from the
       // in-memory module cache — zero Azure calls and zero Anthropic
@@ -513,6 +561,11 @@ export async function handler(
       // the key (continuously variable, would shred the hit rate).
       // The cache lives outside the rate-limit gate because a hit is
       // free (no upstream cost). See _sessionCache.ts for trade-offs.
+      //
+      // After D (canon-first), this in-memory cache only catches
+      // canon-misses that recur within a function-instance lifetime
+      // — e.g. a future-Marian focus node not yet in canon, or a
+      // staging deploy where canon hasn't been regenerated yet.
       const cacheKey = buildSessionCacheKey({
         track: trackPayload.track,
         level: trackPayload.level,
@@ -522,6 +575,21 @@ export async function handler(
       const cached = cache.get(cacheKey, now())
       if (cached !== null) {
         return jsonResponse(cached, 200, headers)
+      }
+
+      // Canon-miss log (single line per miss). Lets us monitor coverage
+      // — if production shows misses for combos we expected to bake,
+      // the generator script needs a re-run or the combo set needs
+      // extending. Logged BEFORE the rate-limit gate so we can tell
+      // "miss + throttled" apart from "miss + served".
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('[api/claude] canon-miss', {
+          track: trackPayload.track,
+          level: trackPayload.level,
+          focusNode:
+            trackPayload.focusNode ??
+            defaultFocusNodeForTrack(trackPayload.track),
+        })
       }
 
       // Per-IP rate limit. We honour the limiter BEFORE calling Anthropic
@@ -544,9 +612,14 @@ export async function handler(
 
       const client = overrides.anthropicClient ?? buildAnthropicClient()
 
-      let plannedPlan
+      // Combined planner + TTS. Pre-86c9kwhbc this was two awaits in
+      // a row (`generateSessionPlan` then `renderSessionAudio`); the
+      // canon-generator script wanted the same composition without the
+      // HTTP scaffolding so we extracted it into a single callable
+      // (`generateSessionStartResponse`). The error-mapping below is
+      // unchanged from the pre-D code path.
       try {
-        plannedPlan = await generateSessionPlan({
+        const rendered = await generateSessionStartResponse({
           client,
           track: trackPayload.track,
           level: trackPayload.level,
@@ -559,38 +632,6 @@ export async function handler(
           focusNode: trackPayload.focusNode,
           recentSuccessRate: trackPayload.recentSuccessRate,
         })
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        const stack = err instanceof Error ? err.stack : undefined
-        // Distinguish planner errors from generic upstream failures in
-        // logs so the QA sweep can attribute correctly. Same discipline
-        // as the tts-failed branch: log message + stack only, never
-        // request body / headers / key fragments.
-        console.error('[api/claude] planner-failed', { message, stack })
-        // For PlannerError("config-missing") we map to 500 — that's a
-        // server misconfiguration, not a client error. For everything
-        // else (invalid-response, upstream-error, invalid-request) we
-        // return 502, signalling "the request was fine but the upstream
-        // dependency couldn't satisfy it" — the browser's path A code
-        // treats this the same as tts-failed and falls back to silent
-        // mode.
-        if (err instanceof PlannerError && err.code === 'config-missing') {
-          return jsonResponse({ error: 'config-missing' }, 500, headers)
-        }
-        return jsonResponse(
-          {
-            error: 'planner-failed',
-            message: 'session plan generation failed',
-          },
-          502,
-          headers,
-        )
-      }
-
-      // Render audio for the planned plan. Same pipeline the v1 client
-      // path uses — no fork in the audio code.
-      try {
-        const rendered = await renderSessionAudio(plannedPlan)
         // Cache the rendered response under the track payload key. Even
         // partial renders (some utterances soft-failed) are cacheable —
         // re-running the same key would just hit Azure again with the
@@ -602,6 +643,26 @@ export async function handler(
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         const stack = err instanceof Error ? err.stack : undefined
+        // Distinguish planner errors from TTS errors in logs so the QA
+        // sweep can attribute correctly. PlannerError comes from
+        // `generateSessionPlan`; everything else is a render-pipeline
+        // surprise (since `renderSessionAudio` swallows per-utterance
+        // failures and only throws on bug-class issues like a base64
+        // encoder bug).
+        if (err instanceof PlannerError) {
+          console.error('[api/claude] planner-failed', { message, stack })
+          if (err.code === 'config-missing') {
+            return jsonResponse({ error: 'config-missing' }, 500, headers)
+          }
+          return jsonResponse(
+            {
+              error: 'planner-failed',
+              message: 'session plan generation failed',
+            },
+            502,
+            headers,
+          )
+        }
         console.error('[api/claude] tts-failed', { message, stack })
         return jsonResponse(
           {

@@ -1061,3 +1061,102 @@ describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v
     expect(prompt).toMatch(/ALWAYS use the literal prefix "word\."/i)
   })
 })
+
+describe('generateSessionStartResponse — combined planner + TTS callable (D, 86c9kwhbc)', () => {
+  // Pre-86c9kwhbc the HTTP handler awaited generateSessionPlan and
+  // renderSessionAudio in succession. The build-time canon-generator
+  // wants the same composition without HTTP scaffolding, so the pair
+  // is wrapped in `generateSessionStartResponse`. These tests pin:
+  //   1. It composes planner + TTS in one call.
+  //   2. Args route through to the planner unchanged.
+  //   3. The render seam is honoured (build script can mock TTS).
+  //   4. Planner errors propagate as PlannerError (not swallowed).
+  //
+  // We import the function dynamically inside the describe so the
+  // outer afterEach `vi.restoreAllMocks` doesn't tear down the
+  // module-loaded function between tests.
+
+  const VALID_PLAN = JSON.stringify({
+    id: 'gsr-test',
+    label: 'gsr test',
+    utterances: [{ id: 'math.p1.read', text: 'Three plus two. How many?' }],
+  })
+
+  it('returns a SessionStartResponse merging planner output with rendered audio', async () => {
+    const { generateSessionStartResponse } = await import('./_planner.js')
+    const client = makeMockClient(VALID_PLAN)
+    const synthCalls: Array<{ text: string; voice?: string }> = []
+    const fakeSynth = async (req: { text: string; voice?: string }) => {
+      synthCalls.push(req)
+      return { audio: new Uint8Array([0xff, 0xfb, 0x00]) }
+    }
+
+    const response = await generateSessionStartResponse({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      renderOptions: { synth: fakeSynth },
+    })
+
+    expect(response.ok).toBe(true)
+    expect(response.kind).toBe('session-start')
+    expect(response.utterances).toHaveLength(1)
+    expect(response.utterances[0]!.id).toBe('math.p1.read')
+    expect(response.utterances[0]!.audio.kind).toBe('inline')
+    expect(response.utterances[0]!.audio.base64.length).toBeGreaterThan(0)
+    // Synth was invoked exactly once for the one planned utterance.
+    expect(synthCalls).toHaveLength(1)
+    expect(synthCalls[0]).toMatchObject({
+      text: 'Three plus two. How many?',
+      voice: 'en-US-EmmaMultilingualNeural',
+    })
+  })
+
+  it('forwards focusNode + recentSuccessRate to the planner unchanged', async () => {
+    const { generateSessionStartResponse } = await import('./_planner.js')
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_PLAN, { capture })
+    const fakeSynth = async () => ({ audio: new Uint8Array([1, 2]) })
+
+    await generateSessionStartResponse({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+      recentSuccessRate: 0.7,
+      renderOptions: { synth: fakeSynth },
+    })
+
+    const args = capture.lastArgs as {
+      messages: Array<{ content: string }>
+    }
+    expect(args.messages[0]!.content).toContain('add-to-20')
+    expect(args.messages[0]!.content).toMatch(/0\.70/)
+  })
+
+  it('propagates PlannerError from the underlying generateSessionPlan', async () => {
+    const { generateSessionStartResponse, PlannerError } =
+      await import('./_planner.js')
+    const client = makeMockClient('not json at all')
+    let synthCalled = false
+    const fakeSynth = async () => {
+      synthCalled = true
+      return { audio: new Uint8Array([1, 2]) }
+    }
+
+    await expect(
+      generateSessionStartResponse({
+        client,
+        track: 'math',
+        level: 1,
+        childName: 'Marian',
+        renderOptions: { synth: fakeSynth },
+      }),
+    ).rejects.toBeInstanceOf(PlannerError)
+    // TTS pipeline never invoked when planner fails.
+    expect(synthCalled).toBe(false)
+  })
+})

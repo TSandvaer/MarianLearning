@@ -59,6 +59,8 @@ import {
   WORD_SONG_TARGET_WORDS_FOR_PROMPT,
   WORD_SONG_DISTRACTOR_HINTS,
 } from './_plannerWordList.js'
+import { renderSessionAudio, type RenderSessionOptions } from './_session.js'
+import type { SessionStartResponse } from './_types.js'
 
 /** What kind of session we're generating. */
 export type PlannerTrack = 'math' | 'word-song'
@@ -314,6 +316,78 @@ export async function generateSessionPlan(
   }
 
   return parsed
+}
+
+/**
+ * Args for the higher-level `generateSessionStartResponse` callable.
+ * Combines `generateSessionPlan` inputs with optional render seams so the
+ * canon-generator script (and tests) can inject mocks for both the
+ * Anthropic SDK and the TTS synth without going through the HTTP handler.
+ *
+ * Added ticket 86c9kwhbc (D — pre-baked session canon). The callable
+ * exists so the build-time canon-generator script can reuse the exact
+ * same Haiku → SSML → Azure TTS pipeline the live request handler uses,
+ * with one source of truth for both code paths.
+ */
+export interface GenerateSessionStartResponseArgs {
+  /** Anthropic SDK client (or a test stub). REQUIRED — the caller owns
+   *  construction so we have one place that reads the API key (the live
+   *  handler in api/claude.ts) and one place that can inject a stub
+   *  (tests / generator). */
+  client: PlannerAnthropicClient
+  track: PlannerTrack
+  level: number
+  childName: string
+  focusNode?: string
+  recentSuccessRate?: number | null
+  /** Optional render-pipeline overrides. Production wiring leaves this
+   *  empty — `_session.renderSessionAudio` resolves to the real Azure
+   *  synth. Tests + the canon generator can swap in a fake synth or tune
+   *  concurrency. */
+  renderOptions?: RenderSessionOptions
+}
+
+/**
+ * Generate a complete session-start response: Haiku-planned utterances
+ * rendered to base64-encoded MP3 via Azure TTS.
+ *
+ * Why a callable
+ * --------------
+ * Pre-86c9kwhbc this composition lived inline inside the
+ * `/api/claude` HTTP handler — `generateSessionPlan(...)` then
+ * `renderSessionAudio(...)`. Pulling the pair into a single callable
+ * lets the build-time canon-generator (`scripts/generateSessionCanon.ts`)
+ * pre-bake every (track, level, focusNode) combo as a static blob
+ * without spinning up an HTTP server. The HTTP handler now calls this
+ * callable too, so live and pre-baked traffic share one code path.
+ *
+ * Error semantics
+ * ---------------
+ * - Planner failures (invalid JSON, upstream SDK error, etc.) propagate
+ *   as `PlannerError` — same as `generateSessionPlan` raises. The HTTP
+ *   handler distinguishes `config-missing` (→ 500) from everything else
+ *   (→ 502 planner-failed) per its existing contract.
+ * - Render failures propagate from `renderSessionAudio`. Per its own
+ *   contract a partial render is a 200 OK with some utterances missing;
+ *   only an unexpected exception (e.g. base64 encoder bug) escapes here,
+ *   and the handler maps that to 502 tts-failed.
+ *
+ * Pure function (modulo `args.client` and `args.renderOptions.synth`):
+ * no module-scope state is mutated, no env vars are read inside this
+ * function (the planner double-checks `ANTHROPIC_API_KEY` itself).
+ */
+export async function generateSessionStartResponse(
+  args: GenerateSessionStartResponseArgs,
+): Promise<SessionStartResponse> {
+  const plan = await generateSessionPlan({
+    client: args.client,
+    track: args.track,
+    level: args.level,
+    childName: args.childName,
+    focusNode: args.focusNode,
+    recentSuccessRate: args.recentSuccessRate,
+  })
+  return renderSessionAudio(plan, args.renderOptions)
 }
 
 /**
