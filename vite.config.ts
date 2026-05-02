@@ -86,6 +86,11 @@ export default defineConfig({
         globPatterns: [
           '**/*.{js,css,html,png,svg,webmanifest,woff,woff2,ico,mp3}',
         ],
+        // Bumped from default 2 MiB so the upscaled Emma SVGs (~2.5-3.3 MB
+        // each at 2000x2000 PNG-in-SVG, see ticket 86c9kww0z) fit in the
+        // service-worker precache. Future polish-backlog options to slim
+        // these: zopfli/oxipng re-encode, WebP-in-SVG, or vector re-trace.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       devOptions: {
         enabled: false,
