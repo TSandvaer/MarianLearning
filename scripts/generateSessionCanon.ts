@@ -178,12 +178,15 @@ const MATH_FOCUS_NODES: readonly string[] = [
   'mult-6-9',
 ]
 
-// Word-song is single-mode (`blending-cv`) until the planner widens —
-// see WORD_SONG_TRACK_GUIDE in api/_planner.ts. Generating other nodes
-// would either be wasted bytes (clamp re-emits the same content) or
-// produce unparseable content if the clamp were lifted partway. Keep
-// this list trimmed; expand alongside the planner.
-const WORD_SONG_FOCUS_NODES: readonly string[] = ['blending-cv']
+// Word-song first-class content modes — must match the
+// WORD_SONG_FIRST_CLASS_FOCUS_NODES list in api/_planner.ts. Untuned
+// tiers (letter-sounds / digraphs / sight-words / simple-sentences)
+// fall back to blending-cv content via `effectiveFocusNode`, so baking
+// canon entries for them would just be a wasteful copy of the
+// blending-cv blob — they're omitted here on purpose. Future tier
+// widenings (paired parser-then-planner steps per the contract doc)
+// add their entries here when they go first-class.
+const WORD_SONG_FOCUS_NODES: readonly string[] = ['blending-cv', 'cvc-words']
 
 export function activeCombos(): readonly Combo[] {
   const out: Combo[] = []

@@ -649,11 +649,12 @@ describe('generateSessionPlan — focusNode + recentSuccessRate (M2, ticket 86c9
     expect(args.messages[0]!.content).toContain('add-to-10')
   })
 
-  it('omits focusNode for word-song → defaults to blending-cv (the single supported content mode)', async () => {
-    // P0 fix (ticket 86c9kt47v): word-song defaults to 'blending-cv' and
-    // is server-side clamped to 'blending-cv' regardless of caller input
-    // until M-series widens content-template support. See the
-    // `WORD_SONG_TRACK_GUIDE` comment in api/_planner.ts.
+  it('omits focusNode for word-song → defaults to blending-cv (the level-1 default)', async () => {
+    // Backwards-compat: callers that don't ship `focusNode` (legacy
+    // browser shape) get blending-cv content. Step 2 (ticket 86c9kxu07)
+    // un-clamped the server side, but the level-1 default is still
+    // blending-cv so legacy clients get the same content they always
+    // got.
     const WORD_RESPONSE = JSON.stringify({
       id: 'haiku-word-001',
       label: 'M2 word default',
@@ -833,26 +834,32 @@ describe('generateSessionPlan — Haiku fence-stripping (regression for 86c9jrwb
 })
 
 /**
- * P0 regression suite — ticket 86c9kt47v.
+ * P0 regression suite — ticket 86c9kt47v (original P0) +
+ * ticket 86c9kxu07 (step 2 widening).
  *
- * Pin the three planner-side invariants that broke WordSong on prod after
- * M2 (PR #117 / 8fff733):
+ * Pin the planner-side invariants that broke WordSong on prod in PR #117
+ * and that the contract widening must continue to honour. The original
+ * P0 fix (PR #118) shipped THREE invariants; step 2 (ticket 86c9kxu07)
+ * preserves them while widening the supported content surface:
+ *
  *   1. Word-song problem utterance ids ALWAYS use the literal "word."
  *      prefix, regardless of focusNode value (the prod incident emitted
  *      "cvc.*" when focusNode was omitted, breaking the browser parser).
- *   2. Word-song read text ALWAYS uses the "Tap the <word>." template,
- *      even when the caller asks for letter-sounds / cvc-words / digraphs.
- *   3. The word-song system prompt is single-mode (only the CVC content
- *      is described) — no menu enumeration that could nudge Haiku into
- *      letter-sounds or letter-names content.
+ *      STILL HOLDS — the content-type discriminant lives on the read-line
+ *      template, not the id namespace.
+ *   2. Word-song read text uses one of the parser-accepted templates:
+ *      "Tap the <word>." (blending-cv) OR "Read the <word>." (cvc-words).
+ *      Step 2 added the second template; both are now first-class.
+ *   3. The word-song system prompt names ONLY the parser-accepted content
+ *      modes — no menu enumeration that nudges Haiku into the failed
+ *      pre-fix templates ("Tap the letter that says /m/." etc.).
  *
  * Strategy: mock Anthropic to capture the request shape; the model itself
- * isn't exercised here. We're pinning the PROMPT contract (system prompt
- * stays single-mode + the user message normalises focus to blending-cv)
- * plus the response-validation contract (a mocked response with `word.*`
- * ids round-trips cleanly).
+ * isn't exercised here. We're pinning the PROMPT contract + the
+ * response-validation contract (a mocked response with `word.*` ids
+ * round-trips cleanly).
  */
-describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v)', () => {
+describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c9kt47v, 86c9kxu07)', () => {
   const VALID_WORD_RESPONSE = JSON.stringify({
     id: 'haiku-word-001',
     label: 'CVC short-a — Haiku-generated',
@@ -885,11 +892,15 @@ describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v
     expect(prompt).toMatch(/ALWAYS use the literal prefix "word\."/i)
   })
 
-  it('system prompt is single-mode (does NOT enumerate letter-names / letter-sounds / etc. as content modes)', async () => {
-    // Pre-fix prompt enumerated 7 word-song nodes as content modes; that
-    // nudged Haiku into producing "Tap the letter that says /m/." for
-    // letter-sounds and "cvc.*" id prefixes for cvc-words. Single-mode
-    // means: only the CVC "Tap the <word>." mode is described.
+  it('system prompt does NOT enumerate the failed pre-fix content modes (letter-names / letter-sounds / sight-words)', async () => {
+    // Pre-fix prompt (PR #117) enumerated 7 word-song nodes as content
+    // modes; that nudged Haiku into producing "Tap the letter that says
+    // /m/." for letter-sounds and `cvc.*` id prefixes for cvc-words.
+    // Step 2 (ticket 86c9kxu07) widens the prompt to TWO first-class
+    // content modes (blending-cv "Tap the <word>." + cvc-words "Read the
+    // <word>.") but does NOT reintroduce the per-letter / per-sight-word
+    // templates that broke prod. This test pins that the failed
+    // templates stay out.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -902,8 +913,9 @@ describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v
 
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const prompt = args.system.map((b) => b.text).join('\n')
-    // The CVC content mode must be described.
+    // The first-class content modes must be described.
     expect(prompt).toMatch(/Tap the <word>\./)
+    expect(prompt).toMatch(/Read the <word>\./)
     // The pre-fix per-node menu lines MUST be absent. We assert against
     // the specific phrasings that named non-blending-cv modes as separate
     // content templates — the new prompt may still mention these node
@@ -913,11 +925,13 @@ describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v
     expect(prompt).not.toMatch(/sight-words:.*Tap the word/i)
   })
 
-  it('clamps focusNode "letter-sounds" to "blending-cv" in the user message (no letter-sounds reaches Haiku)', async () => {
-    // Defense-in-depth: the browser-side picker is also clamped, but the
-    // server validates and clamps independently. A direct API caller
-    // (curl, smoke test, future API consumer) sending letter-sounds must
-    // get blending-cv content back.
+  it('falls back focusNode "letter-sounds" to "blending-cv" in the user message (untuned tier stub)', async () => {
+    // Step 2 (ticket 86c9kxu07): letter-sounds is a valid focus node but
+    // the planner doesn't have first-class content for it yet. Per the
+    // contract doc the server falls back to blending-cv content (a
+    // working stub) so the screen always renders, even on tiers we
+    // haven't tuned. Future tier-content tickets refine letter-sounds
+    // proper.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -935,20 +949,23 @@ describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v
     expect(user).not.toContain('letter-sounds')
   })
 
-  it('clamps every valid word-song focusNode to "blending-cv" (sweep)', async () => {
-    // The server clamp must hold for every value the request validator
-    // accepts. If a future edit removes the clamp without restoring
-    // multi-mode prompts, this surfaces immediately.
-    const wordSongNodes = [
-      'letter-names',
-      'letter-sounds',
-      'blending-cv',
-      'cvc-words',
-      'digraphs',
-      'sight-words',
-      'simple-sentences',
+  it('routes first-class focus nodes (blending-cv, cvc-words) verbatim; falls back untuned tiers to blending-cv (sweep)', async () => {
+    // Step 2 (ticket 86c9kxu07) widened the planner to first-class
+    // emit `cvc-words` content alongside `blending-cv`. Untuned tiers
+    // (letter-names / letter-sounds / digraphs / sight-words /
+    // simple-sentences) fall back to blending-cv per the contract doc's
+    // §"Tier coverage today" section. This sweep pins the routing
+    // table so a future regression on either side surfaces here.
+    const expectations: ReadonlyArray<[string, string]> = [
+      ['letter-names', 'blending-cv'],
+      ['letter-sounds', 'blending-cv'],
+      ['blending-cv', 'blending-cv'], // first-class
+      ['cvc-words', 'cvc-words'], // first-class (the unblock)
+      ['digraphs', 'blending-cv'],
+      ['sight-words', 'blending-cv'],
+      ['simple-sentences', 'blending-cv'],
     ]
-    for (const node of wordSongNodes) {
+    for (const [requested, effective] of expectations) {
       const capture: { lastArgs?: unknown } = {}
       const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
       await generateSessionPlan({
@@ -956,14 +973,21 @@ describe('generateSessionPlan — word-song single-mode P0 regression (86c9kt47v
         track: 'word-song',
         level: 1,
         childName: 'Marian',
-        focusNode: node,
+        focusNode: requested,
       })
       const args = capture.lastArgs as { messages: Array<{ content: string }> }
-      // The user message names the effective focus (always blending-cv
-      // for word-song) once. Any other node name must NOT appear as a
-      // focus directive — it's silently ignored.
       const user = args.messages[0]!.content
-      expect(user).toMatch(/Focus skill node: blending-cv\./)
+      expect(user).toMatch(new RegExp(`Focus skill node: ${effective}\\.`))
+      // For first-class nodes the requested name appears (it IS the
+      // effective name). For fallback nodes the requested untuned-tier
+      // name must NOT appear as a focus directive — it's silently
+      // remapped to blending-cv. Asserting non-presence catches a future
+      // edit that accidentally weaves the requested node back in.
+      if (requested !== effective) {
+        expect(user).not.toMatch(
+          new RegExp(`Focus skill node: ${requested}\\.`),
+        )
+      }
     }
   })
 
