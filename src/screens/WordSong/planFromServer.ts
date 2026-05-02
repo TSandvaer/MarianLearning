@@ -14,9 +14,24 @@
  * Parsing strategy
  * ----------------
  * The Haiku prompt (api/_planner.ts:WORD_SONG_TRACK_GUIDE) constrains the
- * `read` line to "Tap the <word>." Extract the word; look it up in the
- * client-side `wordPack`. If the word isn't a known target — either the
- * model drifted, or the wordPack drifted out of sync with the server's
+ * `read` line to a recognised content-type template; this parser
+ * dispatches on the template shape:
+ *
+ *   - "Tap the <word>."  → `contentType: 'blending-cv'` (v1 default).
+ *     Marian taps the matching picture chip from a trio. The current
+ *     planner emits this template exclusively; existing plans continue
+ *     to parse as `blending-cv` with zero behaviour change.
+ *
+ *   - "Read the <word>." → `contentType: 'cvc-word'` (next-tier, ticket
+ *     86c9kxp08). The planner does NOT emit this template yet — that's
+ *     planner-parser contract step 2. This parser accepts the shape now
+ *     so the planner widening is a one-side change later, eliminating
+ *     the bundling failure mode that produced the P0 in PR #117 → #118.
+ *     See `design/word-song/parser-widening-plan.md`.
+ *
+ * In both content types the word is looked up against the client-side
+ * `wordPack`. If the word isn't a known target — either the model
+ * drifted, or the wordPack drifted out of sync with the server's
  * embedded list — throw `PlanFromServerError`. Caller falls back to
  * silent mode + a static plan.
  *
@@ -38,6 +53,7 @@
  */
 
 import {
+  type WordSongContentType,
   type WordSongProblem,
   type WordSongProblemUtterances,
   type WordSongSessionPlan,
@@ -125,11 +141,12 @@ export function wordSongSessionPlanFromServer(
       }
     }
     const utterances = bucket as WordSongProblemUtterances
-    const target = parseReadTarget(utterances.read)
+    const { entry: target, contentType } = parseReadLine(utterances.read)
     problems.push({
       index,
       target,
       utterances,
+      contentType,
     })
   }
 
@@ -140,31 +157,93 @@ export function wordSongSessionPlanFromServer(
   }
 }
 
-/** Extract the `WordEntry` from a `read` line shaped like "Tap the cat." */
+/**
+ * Result of parsing a `read` line — the resolved target word entry plus
+ * the content-type discriminant inferred from the line's template.
+ */
+export interface ParsedReadLine {
+  entry: WordEntry
+  contentType: WordSongContentType
+}
+
+/** Per-content-type read-line template config. Source of truth for which
+ *  templates the parser accepts. Add a row here to widen further. */
+const READ_LINE_TEMPLATES: ReadonlyArray<{
+  contentType: WordSongContentType
+  /** Anchored, case-insensitive, captures the target word in group 1. */
+  pattern: RegExp
+  /** Human-readable form for error messages. */
+  label: string
+}> = [
+  {
+    contentType: 'blending-cv',
+    pattern: /^\s*tap\s+the\s+([a-z]+)\s*\.\s*$/i,
+    label: '"Tap the <word>."',
+  },
+  {
+    contentType: 'cvc-word',
+    pattern: /^\s*read\s+the\s+([a-z]+)\s*\.\s*$/i,
+    label: '"Read the <word>."',
+  },
+]
+
+const ACCEPTED_TEMPLATES_LABEL = READ_LINE_TEMPLATES.map((t) => t.label).join(
+  ' | ',
+)
+
+/**
+ * Parse a `read` line and return the target word entry + content type.
+ *
+ * Templates accepted:
+ *   - "Tap the <word>." → contentType: 'blending-cv'
+ *   - "Read the <word>." → contentType: 'cvc-word' (parser-only today;
+ *     planner does not emit this until step 2 — see file header)
+ *
+ * In both cases the word is membership-checked against the wordPack
+ * target set so distractor-only entries (`bus`, `sun`, etc.) cannot
+ * slip through.
+ */
+export function parseReadLine(read: string): ParsedReadLine {
+  for (const template of READ_LINE_TEMPLATES) {
+    const match = read.match(template.pattern)
+    if (!match) continue
+    const word = match[1]!.toLowerCase()
+    if (!TARGET_WORD_SET.has(word)) {
+      throw new PlanFromServerError(
+        `word-song read line "${read}" yielded non-target word "${word}"`,
+      )
+    }
+    // getWordEntry throws if the word is missing entirely; we've already
+    // membership-checked against the target set, so this should always
+    // resolve. Defensive `try` keeps the error class stable in case the
+    // wordPack drifts.
+    try {
+      return { entry: getWordEntry(word), contentType: template.contentType }
+    } catch (err) {
+      throw new PlanFromServerError(
+        `word-song wordPack lookup failed for "${word}": ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+  }
+  throw new PlanFromServerError(
+    `word-song read line "${read}" did not match any known template (accepted: ${ACCEPTED_TEMPLATES_LABEL})`,
+  )
+}
+
+/**
+ * Legacy entry point — extract the `WordEntry` only, discarding the
+ * content-type discriminant.
+ *
+ * Kept as a thin wrapper over `parseReadLine` for back-compat with
+ * callers (and the existing test suite) pinned to the original return
+ * shape. Now accepts both `blending-cv` and `cvc-word` templates — the
+ * stricter pre-widening behaviour ("only Tap the <word>." accepted) is
+ * available via `parseReadLine` + a check on the returned `contentType`.
+ *
+ * New code should call `parseReadLine` directly.
+ */
 export function parseReadTarget(read: string): WordEntry {
-  const match = read.match(/^\s*tap\s+the\s+([a-z]+)\s*\.\s*$/i)
-  if (!match) {
-    throw new PlanFromServerError(
-      `word-song read line "${read}" did not match "Tap the <word>." template`,
-    )
-  }
-  const word = match[1]!.toLowerCase()
-  if (!TARGET_WORD_SET.has(word)) {
-    throw new PlanFromServerError(
-      `word-song read line "${read}" yielded non-target word "${word}"`,
-    )
-  }
-  // getWordEntry throws if the word is missing entirely; we've already
-  // membership-checked against the target set, so this should always
-  // resolve. Defensive `try` keeps the error class stable in case the
-  // wordPack drifts.
-  try {
-    return getWordEntry(word)
-  } catch (err) {
-    throw new PlanFromServerError(
-      `word-song wordPack lookup failed for "${word}": ${err instanceof Error ? err.message : String(err)}`,
-    )
-  }
+  return parseReadLine(read).entry
 }
 
 /** Parse a `word.p<N>.<slot>` utterance id. */

@@ -1191,13 +1191,14 @@ function WordSongScreen({
             the legacy 600ms keyframe wiggle on celebration is replaced
             by the canonical spring-tilt rotateZ (+breathing on idle)
             inside `EmmaCharacter`. Per `design/character/motion-brief.md`
-            §3.2 celebration tilts LEFT (rotateZ -6) with stiffness 260
-            damping 20; §3.3 puzzled-tilt tilts RIGHT (rotateZ +10) with
-            softer stiffness 220 damping 20. The data-wiggling marker is
-            preserved on the rendered element for the existing QA
-            selectors — semantics widened from "the celebration keyframe
-            wiggle is firing" to "Emma is in a non-idle motion-bearing
-            pose with motion enabled". */}
+            §3.2 celebration tilts LEFT (rotateZ -6) with stiffness 200
+            damping 22 (softened from the original 260/20 per Thomas's
+            iPad-Pro feedback, ticket 86c9kxmqb 2026-05-01); puzzled-tilt
+            tilts RIGHT (rotateZ +10) with stiffness 220 damping 20. The
+            data-wiggling marker is preserved on the rendered element
+            for the existing QA selectors — semantics widened from "the
+            celebration keyframe wiggle is firing" to "Emma is in a
+            non-idle motion-bearing pose with motion enabled". */}
         <EmmaCharacter
           pose={pose}
           layoutId="emma"
