@@ -1236,86 +1236,109 @@ function WordSongScreen({
         )}
       </div>
 
-      {/* Word card — picture above letters (per spec §"Word card composition").
+      {/*
+       * Render gate (ticket 86c9kxb5q) — when `audioReady === false`, the
+       * parent's Path A fetch is still in flight. Rendering the problem
+       * area now would paint the static-fallback Q1's picture+letters,
+       * then visibly swap to the canon-derived Q1 when the prop flips
+       * ~1.3s later. Holding the problem area off-DOM until
+       * `audioReady !== false` eliminates the swap-jolt Thomas reported
+       * on production. The Emma + HUD chrome above stays mounted so the
+       * screen never goes blank — Marian sees her teacher idle while the
+       * line is fetched, then the word card appears with audio firing
+       * per the existing read-aloud gate.
+       *
+       * `audioReady === undefined` (no prop passed by the caller) is
+       * treated as "show the problem" — preserves backwards-compat with
+       * every test/caller that pre-dates this gate. App.tsx always passes
+       * a boolean in production. Mirrors Math.tsx's gate.
+       */}
+      {audioReady !== false && (
+        <>
+          {/* Word card — picture above letters (per spec §"Word card composition").
           Picture leads (meaning first), letters below (decoding follows). */}
-      <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
-        <div
-          data-testid="word-song-word-card"
-          data-word={currentProblem.target.word}
-          className="flex flex-col items-center gap-2"
-        >
-          {/* Picture — 180pt square. Renders inline-SVG placeholder until
+          <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
+            <div
+              data-testid="word-song-word-card"
+              data-word={currentProblem.target.word}
+              className="flex flex-col items-center gap-2"
+            >
+              {/* Picture — 180pt square. Renders inline-SVG placeholder until
               real pack ships (see wordPictures.tsx for sourcing posture). */}
-          <m.div
-            data-testid="word-song-word-picture"
-            className="flex items-center justify-center"
-            style={{ width: '180px', height: '180px' }}
-            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }}
-            animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
-            transition={
-              reducedMotion
-                ? { duration: 0.2 }
-                : { type: 'spring', stiffness: 260, damping: 16 }
-            }
-          >
-            <WordPicture
-              pictureKey={currentProblem.target.pictureKey}
-              large
-              ariaLabel={currentProblem.target.word}
-            />
-          </m.div>
+              <m.div
+                data-testid="word-song-word-picture"
+                className="flex items-center justify-center"
+                style={{ width: '180px', height: '180px' }}
+                initial={
+                  reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
+                }
+                animate={
+                  reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
+                }
+                transition={
+                  reducedMotion
+                    ? { duration: 0.2 }
+                    : { type: 'spring', stiffness: 260, damping: 16 }
+                }
+              >
+                <WordPicture
+                  pictureKey={currentProblem.target.pictureKey}
+                  large
+                  ariaLabel={currentProblem.target.word}
+                />
+              </m.div>
 
-          {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
+              {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
               phoneme playback per spec §"Audio dispatch sequence on letter
               tap". v1 keeps letter taps as visual-only (no phoneme audio
               authored yet — phoneme files are pending Matt's pipeline call,
               see spec §"Phoneme audio"). The letter pulse + colour shift
               still fires so the affordance is visible to Marian. */}
-          <div
-            data-testid="word-song-letters"
-            className="flex items-center"
-            style={{ gap: '32px' }}
-          >
-            {currentProblem.target.word.split('').map((letter, i) => (
-              <LetterGlyph
-                key={`${i}-${letter}`}
-                letter={letter}
-                index={i}
-                reducedMotion={reducedMotion}
-              />
-            ))}
+              <div
+                data-testid="word-song-letters"
+                className="flex items-center"
+                style={{ gap: '32px' }}
+              >
+                {currentProblem.target.word.split('').map((letter, i) => (
+                  <LetterGlyph
+                    key={`${i}-${letter}`}
+                    letter={letter}
+                    index={i}
+                    reducedMotion={reducedMotion}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Picture chips — 3 chips, 96×96pt with 24pt gaps per spec line 143. */}
-      <div
-        data-testid="word-song-chips"
-        className="
+          {/* Picture chips — 3 chips, 96×96pt with 24pt gaps per spec line 143. */}
+          <div
+            data-testid="word-song-chips"
+            className="
           mb-8 flex w-full items-center justify-center px-4
         "
-        style={{ gap: '24px' }}
-      >
-        {chipOrder.map((entry) => {
-          const isCorrect = entry.word === currentProblem.target.word
-          const isShaking = shakingChip === entry.word
-          const dimForGuided = guidedActive && !isCorrect
-          const guidedShimmer = guidedActive && isCorrect
-          return (
-            <m.button
-              key={entry.word}
-              type="button"
-              data-testid="word-song-chip"
-              data-word={entry.word}
-              data-picture-key={entry.pictureKey}
-              data-correct={isCorrect ? 'true' : 'false'}
-              data-shaking={isShaking ? 'true' : 'false'}
-              aria-label={`Picture of ${entry.word}`}
-              onClick={() => onChipTap(entry.word)}
-              disabled={
-                problemState.resolved || dimForGuided || !readAloudPlayed
-              }
-              className={`
+            style={{ gap: '24px' }}
+          >
+            {chipOrder.map((entry) => {
+              const isCorrect = entry.word === currentProblem.target.word
+              const isShaking = shakingChip === entry.word
+              const dimForGuided = guidedActive && !isCorrect
+              const guidedShimmer = guidedActive && isCorrect
+              return (
+                <m.button
+                  key={entry.word}
+                  type="button"
+                  data-testid="word-song-chip"
+                  data-word={entry.word}
+                  data-picture-key={entry.pictureKey}
+                  data-correct={isCorrect ? 'true' : 'false'}
+                  data-shaking={isShaking ? 'true' : 'false'}
+                  aria-label={`Picture of ${entry.word}`}
+                  onClick={() => onChipTap(entry.word)}
+                  disabled={
+                    problemState.resolved || dimForGuided || !readAloudPlayed
+                  }
+                  className={`
                 relative flex select-none items-center justify-center
                 rounded-2xl border-[3px] border-my-pink bg-white
                 transition-opacity
@@ -1324,59 +1347,66 @@ function WordSongScreen({
                 ${dimForGuided || !readAloudPlayed ? 'opacity-60' : 'opacity-100'}
                 ${guidedShimmer ? 'shadow-[0_0_24px_rgba(244,143,177,0.85)]' : 'shadow-[0_4px_12px_rgba(244,143,177,0.18)]'}
               `}
-              style={{
-                width: '96px',
-                height: '96px',
-                minWidth: '60px',
-                minHeight: '60px',
-                cursor:
-                  problemState.resolved || dimForGuided || !readAloudPlayed
-                    ? 'default'
-                    : 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-                padding: '8px',
-              }}
-              initial={{ scale: 0.9, opacity: 0, y: 40 }}
-              animate={
-                isShaking
-                  ? reducedMotion
-                    ? { scale: 1, opacity: [1, 0.7, 1], y: 0 }
-                    : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1, y: 0 }
-                  : {
-                      scale: 1,
-                      opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
-                      x: 0,
-                      y: 0,
-                    }
-              }
-              whileTap={
-                problemState.resolved || dimForGuided || !readAloudPlayed
-                  ? undefined
-                  : { scale: 0.92 }
-              }
-              transition={
-                isShaking
-                  ? reducedMotion
-                    ? { duration: WRONG_SHAKE_MS / 1000 }
-                    : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
-                  : CHIP_TAP_SPRING
-              }
-            >
-              <WordPicture
-                pictureKey={entry.pictureKey}
-                ariaLabel={entry.word}
-              />
+                  style={{
+                    width: '96px',
+                    height: '96px',
+                    minWidth: '60px',
+                    minHeight: '60px',
+                    cursor:
+                      problemState.resolved || dimForGuided || !readAloudPlayed
+                        ? 'default'
+                        : 'pointer',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    padding: '8px',
+                  }}
+                  initial={{ scale: 0.9, opacity: 0, y: 40 }}
+                  animate={
+                    isShaking
+                      ? reducedMotion
+                        ? { scale: 1, opacity: [1, 0.7, 1], y: 0 }
+                        : {
+                            x: [0, -6, 6, -4, 4, 0],
+                            scale: 1,
+                            opacity: 1,
+                            y: 0,
+                          }
+                      : {
+                          scale: 1,
+                          opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
+                          x: 0,
+                          y: 0,
+                        }
+                  }
+                  whileTap={
+                    problemState.resolved || dimForGuided || !readAloudPlayed
+                      ? undefined
+                      : { scale: 0.92 }
+                  }
+                  transition={
+                    isShaking
+                      ? reducedMotion
+                        ? { duration: WRONG_SHAKE_MS / 1000 }
+                        : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
+                      : CHIP_TAP_SPRING
+                  }
+                >
+                  <WordPicture
+                    pictureKey={entry.pictureKey}
+                    ariaLabel={entry.word}
+                  />
 
-              <AnimatePresence>
-                {celebrating && isCorrect && !reducedMotion && (
-                  <SparkleBurst key="burst" />
-                )}
-              </AnimatePresence>
-            </m.button>
-          )
-        })}
-      </div>
+                  <AnimatePresence>
+                    {celebrating && isCorrect && !reducedMotion && (
+                      <SparkleBurst key="burst" />
+                    )}
+                  </AnimatePresence>
+                </m.button>
+              )
+            })}
+          </div>
+        </>
+      )}
     </m.main>
   )
 }

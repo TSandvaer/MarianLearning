@@ -1496,61 +1496,79 @@ function MathScreen({
         )}
       </div>
 
-      {/* Problem display — symbolic + visual flowers */}
-      <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6 px-4">
-        <div
-          data-testid="math-symbolic"
-          className="flex items-center gap-4 font-display text-[6rem] leading-none"
-        >
-          <span data-testid="math-addend-a">{currentProblem.addendA}</span>
-          <span aria-hidden>+</span>
-          <span data-testid="math-addend-b">{currentProblem.addendB}</span>
-          <span aria-hidden>=</span>
-          <span data-testid="math-result-placeholder" aria-hidden>
-            ?
-          </span>
-        </div>
+      {/*
+       * Render gate (ticket 86c9kxb5q) — when `audioReady === false`, the
+       * parent's Path A fetch is still in flight. Rendering the problem
+       * area now would paint the static-fallback Q1, then visibly swap to
+       * the canon-derived Q1 when the prop flips ~1.3s later. Holding the
+       * problem area off-DOM until `audioReady !== false` eliminates the
+       * swap-jolt Thomas reported on production. The Emma + HUD chrome
+       * above stays mounted so the screen never goes blank — Marian sees
+       * her teacher idle while the line is fetched, then the problem
+       * appears with audio firing per the existing read-aloud gate.
+       *
+       * `audioReady === undefined` (no prop passed by the caller) is
+       * treated as "show the problem" — preserves backwards-compat with
+       * every test/caller that pre-dates this gate. App.tsx always passes
+       * a boolean in production.
+       */}
+      {audioReady !== false && (
+        <>
+          {/* Problem display — symbolic + visual flowers */}
+          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6 px-4">
+            <div
+              data-testid="math-symbolic"
+              className="flex items-center gap-4 font-display text-[6rem] leading-none"
+            >
+              <span data-testid="math-addend-a">{currentProblem.addendA}</span>
+              <span aria-hidden>+</span>
+              <span data-testid="math-addend-b">{currentProblem.addendB}</span>
+              <span aria-hidden>=</span>
+              <span data-testid="math-result-placeholder" aria-hidden>
+                ?
+              </span>
+            </div>
 
-        {/* Visual groups — flower glyphs. The asset is pending (see
+            {/* Visual groups — flower glyphs. The asset is pending (see
             assets-todo.md); render an inline SVG fallback so the screen
             still reads even before Thomas drops the file. */}
-        <div
-          data-testid="math-visual-groups"
-          aria-hidden
-          className="flex items-center gap-6 text-[3.2rem]"
-        >
-          <FlowerGroup count={currentProblem.addendA} />
-          <span>+</span>
-          <FlowerGroup count={currentProblem.addendB} />
-        </div>
-      </div>
+            <div
+              data-testid="math-visual-groups"
+              aria-hidden
+              className="flex items-center gap-6 text-[3.2rem]"
+            >
+              <FlowerGroup count={currentProblem.addendA} />
+              <span>+</span>
+              <FlowerGroup count={currentProblem.addendB} />
+            </div>
+          </div>
 
-      {/* Answer chips */}
-      <div
-        data-testid="math-chips"
-        className="
+          {/* Answer chips */}
+          <div
+            data-testid="math-chips"
+            className="
           mb-8 flex w-full items-center justify-center gap-8 px-4
         "
-      >
-        {chipOrder.map((value) => {
-          const isCorrect = value === currentProblem.correct
-          const isShaking = shakingChip === value
-          const dimForGuided = guidedActive && !isCorrect
-          const guidedShimmer = guidedActive && isCorrect
-          return (
-            <m.button
-              key={value}
-              type="button"
-              data-testid="math-chip"
-              data-value={value}
-              data-correct={isCorrect ? 'true' : 'false'}
-              data-shaking={isShaking ? 'true' : 'false'}
-              aria-label={`Answer ${value}`}
-              onClick={() => onChipTap(value)}
-              disabled={
-                problemState.resolved || dimForGuided || !readAloudPlayed
-              }
-              className={`
+          >
+            {chipOrder.map((value) => {
+              const isCorrect = value === currentProblem.correct
+              const isShaking = shakingChip === value
+              const dimForGuided = guidedActive && !isCorrect
+              const guidedShimmer = guidedActive && isCorrect
+              return (
+                <m.button
+                  key={value}
+                  type="button"
+                  data-testid="math-chip"
+                  data-value={value}
+                  data-correct={isCorrect ? 'true' : 'false'}
+                  data-shaking={isShaking ? 'true' : 'false'}
+                  aria-label={`Answer ${value}`}
+                  onClick={() => onChipTap(value)}
+                  disabled={
+                    problemState.resolved || dimForGuided || !readAloudPlayed
+                  }
+                  className={`
                 relative flex select-none items-center justify-center
                 rounded-3xl border-[3px] border-my-pink bg-white
                 font-display text-5xl text-ink
@@ -1560,57 +1578,59 @@ function MathScreen({
                 ${dimForGuided || !readAloudPlayed ? 'opacity-60' : 'opacity-100'}
                 ${guidedShimmer ? 'shadow-[0_0_24px_rgba(244,143,177,0.85)]' : 'shadow-[0_4px_12px_rgba(244,143,177,0.18)]'}
               `}
-              style={{
-                width: '120px',
-                height: '120px',
-                minWidth: '60px',
-                minHeight: '60px',
-                cursor:
-                  problemState.resolved || dimForGuided || !readAloudPlayed
-                    ? 'default'
-                    : 'pointer',
-                touchAction: 'manipulation',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={
-                isShaking
-                  ? reducedMotion
-                    ? { scale: 1, opacity: [1, 0.7, 1] }
-                    : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1 }
-                  : {
-                      scale: 1,
-                      opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
-                      x: 0,
-                    }
-              }
-              whileTap={
-                problemState.resolved || dimForGuided || !readAloudPlayed
-                  ? undefined
-                  : { scale: 0.92 }
-              }
-              transition={
-                isShaking
-                  ? reducedMotion
-                    ? { duration: WRONG_SHAKE_MS / 1000 }
-                    : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
-                  : CHIP_TAP_SPRING
-              }
-            >
-              {value}
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    minWidth: '60px',
+                    minHeight: '60px',
+                    cursor:
+                      problemState.resolved || dimForGuided || !readAloudPlayed
+                        ? 'default'
+                        : 'pointer',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={
+                    isShaking
+                      ? reducedMotion
+                        ? { scale: 1, opacity: [1, 0.7, 1] }
+                        : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1 }
+                      : {
+                          scale: 1,
+                          opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
+                          x: 0,
+                        }
+                  }
+                  whileTap={
+                    problemState.resolved || dimForGuided || !readAloudPlayed
+                      ? undefined
+                      : { scale: 0.92 }
+                  }
+                  transition={
+                    isShaking
+                      ? reducedMotion
+                        ? { duration: WRONG_SHAKE_MS / 1000 }
+                        : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
+                      : CHIP_TAP_SPRING
+                  }
+                >
+                  {value}
 
-              {/* Sparkle burst on correct tap. AnimatePresence so the
+                  {/* Sparkle burst on correct tap. AnimatePresence so the
                   particles unmount cleanly after the burst. Skipped
                   entirely on reduced-motion. */}
-              <AnimatePresence>
-                {celebrating && isCorrect && !reducedMotion && (
-                  <SparkleBurst key="burst" />
-                )}
-              </AnimatePresence>
-            </m.button>
-          )
-        })}
-      </div>
+                  <AnimatePresence>
+                    {celebrating && isCorrect && !reducedMotion && (
+                      <SparkleBurst key="burst" />
+                    )}
+                  </AnimatePresence>
+                </m.button>
+              )
+            })}
+          </div>
+        </>
+      )}
     </m.main>
   )
 }

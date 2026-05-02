@@ -1650,6 +1650,118 @@ describe('Word Song screen', () => {
     )
   })
 
+  /*
+   * Cold-mount swap-jolt regression — ticket 86c9kxb5q. Mirrors the Math
+   * test of the same name. The render gate hides the word card + chips
+   * while `audioReady === false`, so the static-fallback Q1's picture and
+   * letters never paint long enough to swap to the canon-derived plan.
+   * See Math.test.tsx for the long-form rationale.
+   */
+  it('render gate: audioReady=false hides the word card + chips; HUD + Emma stay (ticket 86c9kxb5q)', () => {
+    const harness = makePlayHarness()
+
+    render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          audioReady={false}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // HUD + Emma stay mounted.
+    expect(screen.getByTestId('word-song')).toBeInTheDocument()
+    expect(screen.getByTestId('word-song-hud')).toBeInTheDocument()
+    expect(screen.getByTestId('word-song-emma')).toBeInTheDocument()
+
+    // Problem area absent.
+    expect(screen.queryByTestId('word-song-word-card')).not.toBeInTheDocument()
+    expect(
+      screen.queryByTestId('word-song-word-picture'),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId('word-song-letters')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('word-song-chips')).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId('word-song-chip')).toHaveLength(0)
+  })
+
+  it('render gate: audioReady=true renders the word card + chips (ticket 86c9kxb5q)', () => {
+    const harness = makePlayHarness()
+
+    render(
+      withMotion(
+        <WordSong
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          audioReady={true}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    expect(screen.getByTestId('word-song-word-card')).toBeInTheDocument()
+    expect(screen.getByTestId('word-song-word-picture')).toBeInTheDocument()
+    expect(screen.getByTestId('word-song-letters')).toBeInTheDocument()
+    expect(screen.getByTestId('word-song-chips')).toBeInTheDocument()
+    expect(screen.getAllByTestId('word-song-chip')).toHaveLength(3)
+    expect(screen.getByTestId('word-song-word-card')).toHaveAttribute(
+      'data-word',
+      'cat',
+    )
+  })
+
+  it('render gate: flipping audioReady false → true makes the word card appear (ticket 86c9kxb5q)', async () => {
+    const silentHarness = makePlayHarness()
+    const realHarness = makePlayHarness()
+    const getHowlerRunning = vi.fn(() => true)
+
+    const { rerender } = render(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={silentHarness.playUtterance}
+          audioReady={false}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    // Pre-flip: word card absent.
+    expect(screen.queryByTestId('word-song-word-card')).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId('word-song-chip')).toHaveLength(0)
+
+    rerender(
+      withMotion(
+        <WordSong
+          plan={fixedPlan()}
+          playUtterance={realHarness.playUtterance}
+          audioReady={true}
+          storage={makeMemoryStorage()}
+          getHowlerRunning={getHowlerRunning}
+        />,
+      ),
+    )
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    // Post-flip: word card renders against the real plan.
+    expect(screen.getByTestId('word-song-word-card')).toBeInTheDocument()
+    expect(screen.getAllByTestId('word-song-chip')).toHaveLength(3)
+    expect(screen.getByTestId('word-song-word-card')).toHaveAttribute(
+      'data-word',
+      'cat',
+    )
+
+    // Audio fired against the real player on the same flip.
+    expect(silentHarness.spoken()).toEqual([])
+    expect(realHarness.spoken()).toEqual(['Tap the cat.'])
+  })
+
   // ── Mid-skill back-arrow (#86c9j53ra) ──────────────────────────────────
 
   describe('mid-skill back-arrow (Hub navigation contract)', () => {
