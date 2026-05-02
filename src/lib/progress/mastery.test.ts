@@ -10,7 +10,21 @@
  * cross-day, the threshold-override test proves settings propagate,
  * and the autoPromote / crossDayEnforcement toggles each have a paired
  * test that proves they actually steer behaviour.
+ *
+ * Manila timezone (P0.3 audit follow-up to PR #120)
+ * -------------------------------------------------
+ * `dedupeByCalendarDay` now keys on local-tz `YYYY-MM-DD` (matching the
+ * streak counter in `sessionHistory.ts`). The Manila regression below
+ * needs the runtime tz pinned to `Asia/Manila` to exercise the
+ * 22:00–06:00 wrap that previously collapsed under UTC. We set
+ * `process.env.TZ` at module load — Node reads it on first `Date`
+ * construction, vitest workers honour it because the import happens
+ * before any test body runs. The other tests in this file use UTC
+ * timestamps that produce the same number of distinct local days
+ * under either tz, so this is safe.
  */
+
+process.env.TZ = 'Asia/Manila'
 
 import { describe, expect, it } from 'vitest'
 import { LITERACY_TREE, MATH_TREE, applyMasteryRule, nextNode } from './mastery'
@@ -251,6 +265,78 @@ describe('applyMasteryRule — defaults (95/3, cross-day, autoPromote)', () => {
     // Source-of-truth input must remain at 'practicing'.
     expect(progress.skillLevels['add-to-10']).toBe('practicing')
     expect(progress.skillLevels['add-to-20']).toBe('locked')
+  })
+
+  // ── P0.3 regression: cross-day uses LOCAL day, not UTC ──────────────
+  //
+  // Audit: `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md`
+  // § P0.3. Manila is UTC+8, so the 22:00–06:00 evening/morning wrap
+  // crosses a local day even though both stamps land in the same UTC
+  // day.
+  //
+  // The bug shape is specifically about UTC `Z`-format `dateISO`
+  // values — that's what `recordProgressOnSessionEnd` writes via
+  // `clock().toISOString()`. The earlier `dedupeByCalendarDay` keyed
+  // on `dateISO.slice(0,10)`, which under Z-format gives the UTC day.
+  // We use UTC `Z` timestamps below so the test exercises the actual
+  // production write shape — not `+08:00` offset strings, which the
+  // old slice-prefix code would have day-keyed correctly by accident.
+  //
+  // Three Manila wall-clock evenings, written in UTC `Z` form:
+  //   2026-04-29T14:00:00.000Z = Manila 2026-04-29 22:00 → local 04-29
+  //   2026-04-29T23:00:00.000Z = Manila 2026-04-30 07:00 → local 04-30
+  //   2026-05-01T14:00:00.000Z = Manila 2026-05-01 22:00 → local 05-01
+  //
+  // Old behaviour: UTC slice → days = {04-29, 04-29, 05-01} → dedupe to
+  //                2 rows → < 3 threshold → no promotion.
+  // Fixed behaviour: local-tz day-key → {04-29, 04-30, 05-01} →
+  //                3 distinct days → all at 1.0 successRate → promotion
+  //                fires.
+  //
+  // Pinned by `process.env.TZ = 'Asia/Manila'` at the top of this file.
+  // The streak counter in `sessionHistory.ts` was already local-tz, so
+  // before this fix Marian's stardust display would say "3-day streak"
+  // while the mastery rule said "1 day" — same `dateISO`, two
+  // semantics. After the fix the two are aligned.
+  it('promotes when Manila evening + morning entries cross a local day (P0.3)', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T14:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-04-29T23:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-05-01T14:00:00.000Z', 'add-to-10', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['add-to-10']).toBe('mastered')
+    expect(result.skillLevels['add-to-20']).toBe('intro')
+  })
+
+  it('does not collapse two distinct local days that share a UTC day (P0.3 dedupe shape)', () => {
+    // Tighter than the promotion test above. Two UTC `Z` timestamps
+    // that share the same UTC `slice(0,10)` prefix (`2026-04-29`) but
+    // straddle the local Manila day boundary.
+    //
+    // Old behaviour (UTC slice key): both rows collapse to one →
+    // 1 deduped entry → < 2-session threshold → no promotion.
+    // Fixed behaviour (local-day key): one row per local day → 2
+    // deduped entries → meets the override 2-session threshold → promotes.
+    //
+    // The promotion outcome is the assertion vehicle for "both rows
+    // survived dedupe" (count-based exactness — never a `.toContain`,
+    // per project regression-test convention).
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T14:00:00.000Z', 'add-to-10', 1.0), // Manila 04-29 22:00
+        entry('2026-04-29T23:00:00.000Z', 'add-to-10', 1.0), // Manila 04-30 07:00
+      ],
+      parentSettings: {
+        masteryThreshold: { percent: 0.95, sessions: 2 },
+      },
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['add-to-10']).toBe('mastered')
   })
 })
 
