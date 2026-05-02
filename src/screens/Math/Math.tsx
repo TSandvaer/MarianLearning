@@ -88,6 +88,27 @@ const HUD_POP_TWEEN = {
   ease: 'easeOut' as const,
 }
 
+/**
+ * Streak-bonus chime stagger.
+ *
+ * Sparkle (volume 0.55) + plink (volume 0.30) fire on every correct tap
+ * at t=0; the chime joins them ONLY on threshold crossings ([3, 5, 8]).
+ * If the chime fires at t=0 too, sparkle's C6/E6/G6 lead masks the
+ * chime's softer C5+E5 dyad — Thomas's iPad ear-test (2026-05-02)
+ * heard "a small harmonic on top, not a distinct beat."
+ *
+ * Solution: delay the chime by 320ms. Sparkle is 400ms total with a
+ * 180/160/140ms half-life on its lead partials, so by 320ms the
+ * sparkle envelope is ~22% of peak — the chime's 500ms warm-bell
+ * carrier sits clearly on top instead of competing with the sparkle
+ * peak. Plink is already done (250ms total).
+ *
+ * 320ms is slow enough to read as a separate, celebratory beat
+ * ("yes! ... ding!") and fast enough that it's clearly tied to the
+ * same correct tap rather than feeling like a stray chime.
+ */
+const STREAK_CHIME_STAGGER_MS = 320
+
 // ── Public types ----------------------------------------------------------
 
 /** Shape the screen invokes when problem 8 finishes. Out-of-screen handler. */
@@ -176,6 +197,13 @@ export interface MathProps {
   poof?: Sfx
   /** Optional: stardust grain plink SFX on counter arrival. Silent-fallback. */
   plink?: Sfx
+  /**
+   * Optional: soft chime SFX fired when the streak counter crosses a bonus
+   * threshold (3, 5, 8 — see `STREAK_BONUS_THRESHOLDS`). Silent-fallback if
+   * unset. Wired in ticket 86c9kxv47 after Thomas's iPad ear-test reported
+   * "no sound at 3 correct streak".
+   */
+  chime?: Sfx
   /** Optional: localStorage adapter for stardust. Defaults to window.localStorage
    *  when present, in-memory shim otherwise. Same pattern as `stardust.ts`. */
   storage?: StorageAdapter
@@ -320,6 +348,7 @@ function MathScreen({
   sparkle,
   poof,
   plink,
+  chime,
   storage,
   now = () => new Date(),
   resumeAudioContext,
@@ -363,18 +392,34 @@ function MathScreen({
     [planProp],
   )
 
-  // Lazy SFX. Same defensive 404 pattern as Greet — the assets are still
-  // pending Thomas (assets-todo.md). createSfx will warn-once and play()
-  // will be a silent no-op until the files land.
+  // Lazy SFX. createSfx will warn-once and play() will be a silent no-op if
+  // an asset fails to load. Volume table re-tuned 2026-05-02 (ticket
+  // 86c9kxv47) after Thomas's iPad ear-test reported the SFX bed was "a
+  // little too bling bling" and the sparkle was masked by plink on every
+  // correct tap (plink fires on every chip-tap; it must sit subtly under
+  // sparkle, not compete with it).
   const [sparkleInstance] = useState<Sfx>(
     () =>
-      sparkle ?? createSfx({ src: '/assets/sfx-sparkle.mp3', volume: 0.85 }),
+      sparkle ?? createSfx({ src: '/assets/sfx-sparkle.mp3', volume: 0.55 }),
   )
   const [poofInstance] = useState<Sfx>(
-    () => poof ?? createSfx({ src: '/assets/sfx-poof.mp3', volume: 0.7 }),
+    () => poof ?? createSfx({ src: '/assets/sfx-poof.mp3', volume: 0.45 }),
   )
   const [plinkInstance] = useState<Sfx>(
-    () => plink ?? createSfx({ src: '/assets/sfx-plink.mp3', volume: 0.7 }),
+    () => plink ?? createSfx({ src: '/assets/sfx-plink.mp3', volume: 0.3 }),
+  )
+  // Chime volume bumped 0.5 → 0.7 in the #133 follow-up. Thomas's iPad
+  // ear-test reported the streak chime was "audible only as a small
+  // harmonic on top, not a distinct beat" — sparkle (0.55) + plink (0.3)
+  // were masking it. The chime carrier overlaps sparkle's C6 partial
+  // (chime has a C6 shimmer at weight 0.18, sparkle leads with C6/E6/G6
+  // at weight 0.35/0.3/0.25), so volume alone is fragile; we ALSO
+  // stagger the chime ~320ms after the correct-tap beat below so it
+  // lands as a secondary "ding" past the sparkle decay (sparkle is
+  // 400ms total, mostly faded by 320ms in).
+  const [chimeInstance] = useState<Sfx>(
+    () =>
+      chime ?? createSfx({ src: '/assets/sfx-chime-soft.mp3', volume: 0.7 }),
   )
 
   // Audio unlock gate — same watchdog window as Greet post-Howler era.
@@ -553,6 +598,13 @@ function MathScreen({
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * Pending streak-chime stagger timer (#133 follow-up). The chime fires
+   * `STREAK_CHIME_STAGGER_MS` after a threshold-crossing correct tap.
+   * Cleared on unmount or any other timer-cleanup pass so a screen-exit
+   * mid-stagger doesn't leak a delayed chime onto the next screen.
+   */
+  const chimeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   /**
    * Synchronous gates for the chained advance after a correct answer.
@@ -617,6 +669,7 @@ function MathScreen({
       hintTimerRef,
       poseTimerRef,
       streakFadeTimerRef,
+      chimeTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -632,6 +685,7 @@ function MathScreen({
       sparkleInstance.unload()
       poofInstance.unload()
       plinkInstance.unload()
+      chimeInstance.unload()
       // Persist any stardust earned this session — defensive in case the
       // session ends via unmount (e.g. parent-driven route change) before
       // we run the explicit on-complete write. Read from the ref so we
@@ -1101,13 +1155,31 @@ function MathScreen({
           // after this gesture's React state batch) sees the latest streak.
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)
-          // Streak bonus stardust at 3, 5, 8.
+          // Streak bonus stardust at 3, 5, 8 — paired with a soft chime so
+          // the threshold crossing is audible, not just visual. Wired in
+          // ticket 86c9kxv47 after Thomas's iPad ear-test (2026-05-02)
+          // reported "no sound at 3 correct streak". Iterated in the #133
+          // follow-up: the chime now lands `STREAK_CHIME_STAGGER_MS` after
+          // sparkle+plink so it reads as a distinct celebratory "ding"
+          // rather than a small harmonic mixed into the sparkle peak.
+          // Volume bumped to 0.7 (was 0.5) for the same reason.
           if (
             (STREAK_BONUS_THRESHOLDS as readonly number[]).includes(
               streakRef.current,
             )
           ) {
             grantStardust(1)
+            // Cancel any in-flight chime timer (rapid re-entry safeguard;
+            // shouldn't happen given the resolved-ref gate at the top of
+            // the handler, but cheap insurance).
+            if (chimeTimerRef.current !== null) {
+              clearTimeout(chimeTimerRef.current)
+              chimeTimerRef.current = null
+            }
+            chimeTimerRef.current = setTimeout(() => {
+              chimeTimerRef.current = null
+              chimeInstance.play()
+            }, STREAK_CHIME_STAGGER_MS)
           }
         } else {
           // Wrong-then-correct: still earned, but no streak progression.
@@ -1190,7 +1262,14 @@ function MathScreen({
     // problemState.{wrongCount,guidedPlayed} intentionally omitted from
     // deps — the cleanWin computation reads the synchronous refs instead
     // (see `wrongCountRef` declaration; ticket 86c9gy7ju).
-    [advanceToNext, grantStardust, plinkInstance, sparkleInstance, speak],
+    [
+      advanceToNext,
+      chimeInstance,
+      grantStardust,
+      plinkInstance,
+      sparkleInstance,
+      speak,
+    ],
   )
 
   const onChipTap = useCallback(

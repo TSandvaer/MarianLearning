@@ -95,9 +95,15 @@ export type PlayGreetLineFn = (
  *      until the Wake-tap fires.
  *   2. Calling `handle.start()` synchronously inside the Wake-tap handler
  *      — same JS tick as the gesture, no awaited promises.
- *   3. Also kicking the chime SFX synchronously to unlock the WebAudio
- *      context (Howler bridges to Web Audio for sub-frame latency on
- *      subsequent SFX plays).
+ *   3. Synchronously calling `resumeAudioCtx()` + `unlockAudioSessionFn()`
+ *      inside the same handler to silently unlock the shared Howler
+ *      AudioContext for later SFX. (Pre-#133 we ALSO called
+ *      `chimeInstance.play()` here — that was a silent no-op while the
+ *      chime asset was missing. Once #133 shipped the asset, the kick
+ *      became audible. Removed in the #133 follow-up: Greet must mount
+ *      and complete with no SFX audible; the WebAudio unlock is already
+ *      handled by `resumeAudioCtx`/`unlockAudioSessionFn` and does not
+ *      need a chime probe.)
  *
  * Pre-recorded MP3s (post-86c9gqprh)
  * ----------------------------------
@@ -190,8 +196,11 @@ export interface GreetProps {
    */
   playGreetLineFn?: PlayGreetLineFn
   /**
-   * Test seam: replace the chime SFX. Defaults to a Howler-backed chime
-   * tolerant of the asset being absent (see assets-todo.md).
+   * Test seam: replace the chime SFX. Defaults to a Howler-backed chime.
+   * NOTE: Greet itself never calls `.play()` on this instance post-#133
+   * follow-up; the prop remains so tests can inject a spy and assert the
+   * chime was NOT played on mount or heart-tap. See the chimeInstance
+   * comment in the body for the historical context.
    */
   chime?: Sfx
   /**
@@ -249,10 +258,19 @@ export default function Greet({
   // Wake ring again so the next tap can retry synchronously.
   const gate = useAudioUnlockGate({ watchdogMs: FIRST_UTTERANCE_RETRY_MS })
 
-  // Lazy-init: createSfx kicks off an XHR; we only want one per mount.
-  // TODO(86c9gnhez/sfx-chime-soft): asset is pending Thomas — see
-  // public/assets/assets-todo.md. createSfx will warn once and play() will
-  // be a silent no-op until the file lands.
+  // Lazy-init: createSfx kicks off an XHR for the asset preload. Greet
+  // itself does not `play()` the chime — see the wake-tap and heart-tap
+  // handlers below — but we keep the instance constructed (and unloaded
+  // on unmount) so the `chime?: Sfx` test seam stays addressable for
+  // tests that want to assert the unit was never `.play()`d. Production
+  // cost is a single small preload XHR; once the buffer is in Howler's
+  // cache it's available to any subsequent screen that does play it
+  // (e.g. Math streak threshold, Session-End CTA).
+  //
+  // Pre-#133 this instance WAS played here as a "WebAudio unlock probe"
+  // — silently while the asset was missing, audibly once the asset
+  // shipped. The unlock is now done by `resumeAudioCtx()` +
+  // `unlockAudioSessionFn()` alone, both already silent by design.
   const [chimeInstance] = useState<Sfx>(
     () =>
       chime ??
@@ -670,7 +688,13 @@ export default function Greet({
   //      setTimeout, no Promise, no useEffect dispatch).
   //   2. Inside its body, before any awaited work, it calls
   //      `handle.start()` which synchronously calls `speak(line0)`.
-  //   3. It also kicks the chime SFX (silent unlock for the WebAudio context).
+  //   3. The WebAudio context is already kicked synchronously inside this
+  //      same handler via `resumeAudioCtx()` + `unlockAudioSessionFn()` (the
+  //      outer dispatchGesture branch above). No chime is played here —
+  //      Greet is silent on mount and on wake-tap by contract; the chime
+  //      `play()` call was removed in the #133 follow-up because the asset
+  //      now exists and the kick had become audible (it had been a silent
+  //      no-op while the asset was missing).
   //
   // The reason for the awkward shape (`gate.wrapSpeak(() => start())` with the
   // closure) is that the gate watchdog needs to be armed in the same tick as
@@ -680,7 +704,7 @@ export default function Greet({
   const handleWakeTap = useCallback(() => {
     // Phase-3 (ticket 86c9gvd0y) instrumentation. The whole body is
     // wrapped in a try/catch so any throw — from gate calls, from
-    // resumeAudioCtx, from buildSequence, from chimeInstance.play —
+    // resumeAudioCtx, from buildSequence, from unlockAudioSessionFn —
     // gets a row in the audio-ctx log before it propagates. We
     // re-throw at the end of the catch block to preserve production
     // behaviour (React's error boundary still gets the error).
@@ -860,19 +884,17 @@ export default function Greet({
       // runs *before* wrapSpeak returns, so handle.start() — and therefore
       // speak(line0) — sits in the same JS tick as this tap. That's the
       // whole shape iPad Safari requires.
+      //
+      // No SFX `.play()` is called here. The WebAudio context unlock is
+      // already handled synchronously by `resumeAudioCtx()` and
+      // `unlockAudioSessionFn()` above (1-sample silent buffer +
+      // `Howler.ctx.resume()`). Pre-#133 we also called
+      // `chimeInstance.play()` as a defensive belt-and-braces probe; that
+      // was silently no-op while the chime asset was missing and became
+      // audibly wrong once the asset shipped. Greet must mount and run
+      // through wake-tap without producing any audible SFX.
       gate.wrapSpeak(() => {
         handle.start()
-        // Silent unlock for the WebAudio (Howler) context — covers the
-        // chime we'll need on the heart tap. .play() is defensive: if the
-        // asset 404'd, this is a silent no-op; if the engine throws
-        // (unlikely), we eat it and move on.
-        try {
-          chimeInstance.play()
-        } catch {
-          // Howler can throw synchronously if no audio backend is
-          // available. The chime missing isn't a blocker for the unlock
-          // pathway.
-        }
       })
 
       // Register a synchronous retry: if the gate watchdog expires (silent
@@ -930,7 +952,6 @@ export default function Greet({
   }, [
     buildSequence,
     cancelWakeReprompt,
-    chimeInstance,
     gate,
     resumeAudioCtx,
     screenState,
@@ -977,7 +998,8 @@ export default function Greet({
 
     tapHandledRef.current = true
 
-    // Cancel any in-flight TTS so Emma isn't talking over the chime.
+    // Cancel any in-flight TTS so Emma is silent during the heart-tap
+    // transition.
     cancelPreRecorded()
     // Cancel the re-prompt — she tapped, no nag needed.
     if (repromptTimerRef.current !== null) {
@@ -988,8 +1010,13 @@ export default function Greet({
     // Wave! Ear-wiggle on transition out per spec line 189.
     triggerEarWiggle()
 
-    // Defensive chime: silent no-op if asset is missing (assets-todo.md).
-    chimeInstance.play()
+    // No SFX is played on heart tap. Pre-#133 the chime was constructed
+    // here as a defensive belt-and-braces probe and was silently no-op
+    // while the asset was missing. Once #133 shipped the chime asset,
+    // the heart tap became audibly wrong (full chime over the squish).
+    // Heart tap is now: squish + advance, with the WebAudio context
+    // already unlocked synchronously above via `resumeAudioCtx()` +
+    // `unlockAudioSessionFn()`.
 
     setHeartSquishing(true)
     setAdvancing(true)
@@ -999,7 +1026,6 @@ export default function Greet({
       onAdvance()
     }, HEART_TAP_TRANSITION_MS)
   }, [
-    chimeInstance,
     gate,
     heartReady,
     onAdvance,

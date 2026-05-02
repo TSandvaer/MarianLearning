@@ -9,7 +9,7 @@
  * so we don't need real Howler.
  */
 
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
@@ -65,6 +65,17 @@ function renderHub(props: Partial<HubProps> = {}) {
 beforeEach(() => {
   window.sessionStorage.clear()
   window.localStorage.clear()
+  // Hub now emits a `[Hub] welcome-back: …` console.log on every dispatch
+  // (and one on suppression) — added in ticket 86c9kxv47 to make the
+  // iPad-export diagnostics readable. We silence it in tests so the suite
+  // output stays clean. Tests that care about the log content can spy on
+  // their own.
+  vi.spyOn(console, 'log').mockImplementation(() => {})
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('Hub — render states', () => {
