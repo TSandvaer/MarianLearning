@@ -486,6 +486,173 @@ describe('Math (Number Garden) screen', () => {
     expect(screen.getByTestId('math-streak')).toBeInTheDocument()
   })
 
+  it('plays the chime SFX at each streak bonus threshold (3, 5, 8) and nowhere else', async () => {
+    // Regression test for ticket 86c9kxv47. Thomas's iPad ear-test
+    // (2026-05-02) reported "no sound at 3 correct streak" — the chime
+    // asset shipped via Kyle's PR #133 was never wired to the streak grant.
+    // Contract: chime fires exactly once per threshold crossing
+    // ([3, 5, 8]), and never on non-threshold correct taps.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // SFX instance ordering matches the lazy-init order in Math.tsx:
+    // 0=sparkle, 1=poof, 2=plink, 3=chime.
+    const chime = sfxState.instances[3]
+    expect(chime).toBeDefined()
+
+    const tapCorrect = async () => {
+      const chips = screen.getAllByTestId('math-chip')
+      const idx = Number(
+        screen.getByTestId('math').getAttribute('data-problem-index'),
+      )
+      const correctValue = fixedPlan().problems[idx].correct
+      const correctChip = chips.find(
+        (c) => Number(c.getAttribute('data-value')) === correctValue,
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(1200)
+        await Promise.resolve()
+      })
+    }
+
+    // Streak 1, 2 — below threshold, no chime.
+    await tapCorrect()
+    await tapCorrect()
+    expect(chime.play).toHaveBeenCalledTimes(0)
+
+    // Streak 3 — threshold crossing, chime fires.
+    await tapCorrect()
+    expect(chime.play).toHaveBeenCalledTimes(1)
+
+    // Streak 4 — non-threshold, no extra chime.
+    await tapCorrect()
+    expect(chime.play).toHaveBeenCalledTimes(1)
+
+    // Streak 5 — threshold crossing, chime fires again.
+    await tapCorrect()
+    expect(chime.play).toHaveBeenCalledTimes(2)
+
+    // Streaks 6, 7 — non-threshold, no extra chime.
+    await tapCorrect()
+    await tapCorrect()
+    expect(chime.play).toHaveBeenCalledTimes(2)
+
+    // Streak 8 — threshold crossing, chime fires again. (8 is the final
+    // problem in fixedPlan(), so the session completes here too.)
+    await tapCorrect()
+    expect(chime.play).toHaveBeenCalledTimes(3)
+  })
+
+  it('does NOT play the chime SFX when a wrong tap precedes the correct one (no streak progression)', async () => {
+    // Companion to the streak-threshold chime test above. The streak
+    // bonus only fires on a CLEAN win (no prior wrong taps); a
+    // wrong-then-correct sequence still grants the base stardust but
+    // skips the streak ++. The chime must follow the streak gate, not
+    // the correct-tap gate, otherwise we'd reward "guessing through" with
+    // the same audible reward as a clean threshold crossing.
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const chime = sfxState.instances[3]
+    expect(chime).toBeDefined()
+
+    // Build a clean streak of 2 (problems 1, 2 — clean wins).
+    const tapCorrect = async () => {
+      const chips = screen.getAllByTestId('math-chip')
+      const idx = Number(
+        screen.getByTestId('math').getAttribute('data-problem-index'),
+      )
+      const correctValue = fixedPlan().problems[idx].correct
+      const correctChip = chips.find(
+        (c) => Number(c.getAttribute('data-value')) === correctValue,
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(1200)
+        await Promise.resolve()
+      })
+    }
+
+    await tapCorrect()
+    await tapCorrect()
+    expect(chime.play).toHaveBeenCalledTimes(0)
+
+    // Problem 3: tap wrong first (which resets the streak to 0), then
+    // tap correct. Base stardust still grants, but no streak bonus and
+    // no chime — the streak counter goes 2 → 0 → 1, never reaching 3.
+    const chips = screen.getAllByTestId('math-chip')
+    const idx = Number(
+      screen.getByTestId('math').getAttribute('data-problem-index'),
+    )
+    const wrongChip = chips.find(
+      (c) =>
+        Number(c.getAttribute('data-value')) !==
+        fixedPlan().problems[idx].correct,
+    )!
+    await act(async () => {
+      fireEvent.click(wrongChip)
+      await Promise.resolve()
+    })
+    // Drain the wrong-tap reprompt + 600ms hint timer so the next tap is
+    // a clean correct, not a guided-completion path.
+    await act(async () => {
+      vi.advanceTimersByTime(800)
+      await Promise.resolve()
+    })
+
+    const correctValue = fixedPlan().problems[idx].correct
+    const correctChip = chips.find(
+      (c) => Number(c.getAttribute('data-value')) === correctValue,
+    )!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      await Promise.resolve()
+    })
+
+    // Streak reset means problem 3 was not a clean win — no chime, ever,
+    // even though the kid has now got 3 right. Wrong-then-correct also
+    // doesn't ++ the streak (see `isCleanWin` in handleCorrectTap), so
+    // data-streak ends at 0 — not 1 — after the wrong tap reset it and
+    // the subsequent correct tap left it alone.
+    expect(chime.play).toHaveBeenCalledTimes(0)
+    expect(screen.getByTestId('math')).toHaveAttribute('data-streak', '0')
+  })
+
   it('streak indicator hides via fade on a wrong tap that breaks an active streak', async () => {
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],

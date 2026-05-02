@@ -176,6 +176,13 @@ export interface MathProps {
   poof?: Sfx
   /** Optional: stardust grain plink SFX on counter arrival. Silent-fallback. */
   plink?: Sfx
+  /**
+   * Optional: soft chime SFX fired when the streak counter crosses a bonus
+   * threshold (3, 5, 8 — see `STREAK_BONUS_THRESHOLDS`). Silent-fallback if
+   * unset. Wired in ticket 86c9kxv47 after Thomas's iPad ear-test reported
+   * "no sound at 3 correct streak".
+   */
+  chime?: Sfx
   /** Optional: localStorage adapter for stardust. Defaults to window.localStorage
    *  when present, in-memory shim otherwise. Same pattern as `stardust.ts`. */
   storage?: StorageAdapter
@@ -320,6 +327,7 @@ function MathScreen({
   sparkle,
   poof,
   plink,
+  chime,
   storage,
   now = () => new Date(),
   resumeAudioContext,
@@ -363,18 +371,25 @@ function MathScreen({
     [planProp],
   )
 
-  // Lazy SFX. Same defensive 404 pattern as Greet — the assets are still
-  // pending Thomas (assets-todo.md). createSfx will warn-once and play()
-  // will be a silent no-op until the files land.
+  // Lazy SFX. createSfx will warn-once and play() will be a silent no-op if
+  // an asset fails to load. Volume table re-tuned 2026-05-02 (ticket
+  // 86c9kxv47) after Thomas's iPad ear-test reported the SFX bed was "a
+  // little too bling bling" and the sparkle was masked by plink on every
+  // correct tap (plink fires on every chip-tap; it must sit subtly under
+  // sparkle, not compete with it).
   const [sparkleInstance] = useState<Sfx>(
     () =>
-      sparkle ?? createSfx({ src: '/assets/sfx-sparkle.mp3', volume: 0.85 }),
+      sparkle ?? createSfx({ src: '/assets/sfx-sparkle.mp3', volume: 0.55 }),
   )
   const [poofInstance] = useState<Sfx>(
-    () => poof ?? createSfx({ src: '/assets/sfx-poof.mp3', volume: 0.7 }),
+    () => poof ?? createSfx({ src: '/assets/sfx-poof.mp3', volume: 0.45 }),
   )
   const [plinkInstance] = useState<Sfx>(
-    () => plink ?? createSfx({ src: '/assets/sfx-plink.mp3', volume: 0.7 }),
+    () => plink ?? createSfx({ src: '/assets/sfx-plink.mp3', volume: 0.3 }),
+  )
+  const [chimeInstance] = useState<Sfx>(
+    () =>
+      chime ?? createSfx({ src: '/assets/sfx-chime-soft.mp3', volume: 0.5 }),
   )
 
   // Audio unlock gate — same watchdog window as Greet post-Howler era.
@@ -632,6 +647,7 @@ function MathScreen({
       sparkleInstance.unload()
       poofInstance.unload()
       plinkInstance.unload()
+      chimeInstance.unload()
       // Persist any stardust earned this session — defensive in case the
       // session ends via unmount (e.g. parent-driven route change) before
       // we run the explicit on-complete write. Read from the ref so we
@@ -1101,13 +1117,19 @@ function MathScreen({
           // after this gesture's React state batch) sees the latest streak.
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)
-          // Streak bonus stardust at 3, 5, 8.
+          // Streak bonus stardust at 3, 5, 8 — paired with a soft chime so
+          // the threshold crossing is audible, not just visual. Wired in
+          // ticket 86c9kxv47 after Thomas's iPad ear-test (2026-05-02)
+          // reported "no sound at 3 correct streak". The chime plays
+          // alongside the existing sparkle+plink on the correct tap; mix
+          // is tuned so chime sits over the rest at threshold moments.
           if (
             (STREAK_BONUS_THRESHOLDS as readonly number[]).includes(
               streakRef.current,
             )
           ) {
             grantStardust(1)
+            chimeInstance.play()
           }
         } else {
           // Wrong-then-correct: still earned, but no streak progression.
@@ -1190,7 +1212,14 @@ function MathScreen({
     // problemState.{wrongCount,guidedPlayed} intentionally omitted from
     // deps — the cleanWin computation reads the synchronous refs instead
     // (see `wrongCountRef` declaration; ticket 86c9gy7ju).
-    [advanceToNext, grantStardust, plinkInstance, sparkleInstance, speak],
+    [
+      advanceToNext,
+      chimeInstance,
+      grantStardust,
+      plinkInstance,
+      sparkleInstance,
+      speak,
+    ],
   )
 
   const onChipTap = useCallback(
