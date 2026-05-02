@@ -33,7 +33,7 @@ What Marian feels today: pose swap is correct (right pose at right time) but fla
 
 | Behaviour | Spec source | Why it matters |
 | --- | --- | --- |
-| `rotateZ: -6` on celebration with spring `{ stiffness: 260, damping: 20 }` | `character-emma.md` §3.2 + §5.2 | Carries the "yes!" affect through Emma's body, not just the swap-in pose. Without it, the pose change is legible but flat. |
+| `rotateZ: -6` on celebration with spring `{ stiffness: 200, damping: 22 }` (iterated 2026-05-01, ticket 86c9kxmqb — was 260/20) | `character-emma.md` §3.2 + §5.2 | Carries the "yes!" affect through Emma's body, not just the swap-in pose. Without it, the pose change is legible but flat. |
 | `rotateZ: +10` on puzzled-tilt with softer spring `{ stiffness: 220, damping: 20 }` | `character-emma.md` §3.3 + §5.2 | Curiosity reads through motion; without it, puzzled is a pose change that doesn't move. |
 | `transform-origin: 50% 25%` on the `<m.img>` so head tilts and shoulders stay | `character-emma.md` §3.2 | Biologically natural — without it, the whole image rotates around its centre and the tilt looks like a falling-over animation. |
 | Idle breathing scale loop (1.0 → 1.02 → 1.0 over 4s) with `transform-origin: 50% 100%` | `character-emma.md` §3.5 | "Alive, not portrait" — the only thing that signals Marian-is-being-watched between problems. Currently absent; Emma sits still. |
@@ -62,8 +62,8 @@ T+0ms       sparkleInstance.play() + plinkInstance.play()  (already wired)
 T+0ms       setPose('celebration')                          (already wired)
 T+0ms       <m.img> swaps src to emma-celebration.svg      (already wired via AnimatePresence)
 T+0ms       <m.img> animates rotateZ: 0 → -6 with spring   (NEW — this brief)
-            { type: 'spring', stiffness: 260, damping: 20 }
-T+0..400ms  spring settles to rotateZ: -6                  (NEW)
+            { type: 'spring', stiffness: 200, damping: 22 }
+T+0..600ms  spring settles to rotateZ: -6                  (NEW — see iteration note below)
 T+0..600ms  speak(problem.utterances.correct) plays         (already wired)
 T+~600ms    speak resolves; setPose('idle')                 (already wired)
             <m.img> swaps src to emma-idle.svg              (already wired)
@@ -71,7 +71,14 @@ T+~600ms    speak resolves; setPose('idle')                 (already wired)
 T+~800ms    auto-advance fires (gated on min-dwell + speak) (already wired)
 ```
 
-**Spring config rationale.** `{ stiffness: 260, damping: 20 }` reads as a small confident bounce — under-damped enough to feel alive, not so under-damped that it overshoots and oscillates. This is also the project's house spring (used on Math ribbon scale-in, line 1490) — keeping the same spring across the app gives Marian a coherent motion vocabulary.
+**Spring config rationale (iterated).** Originally specified at `{ stiffness: 260, damping: 20 }` (the project's house spring) — but Thomas's iPad Pro QA after PR #129 reported the celebration tilt felt "very fast and not so smooth" while the puzzled-tilt at 220/20 "is better". Iterated to `{ stiffness: 200, damping: 22 }` on 2026-05-01 (ticket `86c9kxmqb`):
+
+- **Lower stiffness (260 → 200)** lengthens the time the spring takes to settle, so the tilt-and-return paces the success moment instead of flicking past it.
+- **Higher damping (20 → 22)** trims the overshoot that low stiffness alone would amplify — without it the softer spring would read as a wobbly bounce. With it, the motion still settles cleanly on -6° and reads as "warm landing", not "laggy".
+- **Floor.** Stiffness must stay in the 200-220 band; below ~180 it starts reading as a head-flop. If Thomas's next round still wants softer, prefer 180/22 over going lower on damping.
+- The puzzled-tilt 220/20 stays untouched — Thomas approved it.
+
+The house-spring 260/20 is still used everywhere else (Math ribbon scale-in, listening, attentive-pointing, etc.); celebration is the one spec'd-down exception, justified by direct iPad QA.
 
 **Why a spring, not a tween.** A 200ms cubic-bezier `easeOut` reads as "the animation finished" — declarative. A spring reads as "the head settled there" — biological. The 8-year-old user reads biological motion as warmth.
 
@@ -153,7 +160,10 @@ animate={{
   scale: pose === 'idle' ? [1, 1.02, 1] : 1,
 }}
 transition={{
-  rotateZ: { type: 'spring', stiffness: pose === 'puzzled-tilt' ? 220 : 260, damping: 20 },
+  // In production this looks up TILT_SPRING_BY_POSE[pose] — celebration
+  // is 200/22, puzzled-tilt 220/20, everything else the 260/20 house
+  // spring. See `src/lib/character/emmaPose.ts`.
+  rotateZ: { type: 'spring', ...TILT_SPRING_BY_POSE[pose] },
   scale: pose === 'idle'
     ? { duration: 4, repeat: Infinity, ease: 'easeInOut' }
     : { duration: 0 },
@@ -179,7 +189,7 @@ import { TILT_BY_POSE } from '@/lib/character/emmaPose'
 const TILT_SPRING_BY_POSE: Record<EmmaPose, { stiffness: number; damping: number }> = {
   idle: { stiffness: 260, damping: 20 },
   listening: { stiffness: 260, damping: 20 },
-  celebration: { stiffness: 260, damping: 20 },
+  celebration: { stiffness: 200, damping: 22 },  // softened per iPad feedback (86c9kxmqb)
   'puzzled-tilt': { stiffness: 220, damping: 20 },  // softer — "considering"
   'attentive-pointing': { stiffness: 260, damping: 20 },
   sleepy: { stiffness: 260, damping: 20 },
@@ -258,7 +268,7 @@ Recommend Devon spins out a single follow-up ticket and ships in this order. Eac
 
 Inherits `character-emma.md` §8 "Functional correctness (animation)" boxes. Devon's PR closes:
 
-- [ ] Correct-chip tap: pose swaps idle → celebration; rotateZ animates 0 → -6 with spring (stiffness 260, damping 20); holds 600ms; rotateZ animates back to 0; pose returns to idle. Verifiable by inspecting `<m.img>` `style.transform` over time in DevTools, or by Playwright snapshot.
+- [ ] Correct-chip tap: pose swaps idle → celebration; rotateZ animates 0 → -6 with spring (stiffness 200, damping 22 — iterated 2026-05-01); holds 600ms; rotateZ animates back to 0; pose returns to idle. Verifiable by inspecting `<m.img>` `style.transform` over time in DevTools, or by Playwright snapshot.
 - [ ] Wrong-chip tap: pose swaps idle → puzzled-tilt; rotateZ animates 0 → +10 with softer spring (stiffness 220, damping 20); holds 1500ms; returns to idle.
 - [ ] Hint state (after 2 wrong on Math): pose swaps to `attentive-pointing` concurrent with flower-group pulse; returns to idle on hint TTS `onEnd`.
 - [ ] Idle breathing: `<m.img>` scale animates `[1, 1.02, 1]` over 4s, repeats infinitely while pose is `'idle'`, halts on non-idle poses.

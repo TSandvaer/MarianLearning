@@ -240,11 +240,14 @@ describe('EmmaCharacter', () => {
     expect(TILT_BY_POSE['puzzled-tilt']).toBe(10)
   })
 
-  it('TILT_SPRING_BY_POSE matches the brief: 260/20 default, 220/20 for puzzled-tilt', () => {
+  it('TILT_SPRING_BY_POSE matches the brief: 260/20 default, 200/22 celebration, 220/20 puzzled-tilt', () => {
     expect(TILT_SPRING_BY_POSE.idle).toEqual({ stiffness: 260, damping: 20 })
+    // Celebration softened per iPad-Pro feedback (ticket 86c9kxmqb): the
+    // original 260/20 read as "very fast and not so smooth"; 200/22 paces
+    // the tilt-and-return without going laggy.
     expect(TILT_SPRING_BY_POSE.celebration).toEqual({
-      stiffness: 260,
-      damping: 20,
+      stiffness: 200,
+      damping: 22,
     })
     expect(TILT_SPRING_BY_POSE['puzzled-tilt']).toEqual({
       stiffness: 220,

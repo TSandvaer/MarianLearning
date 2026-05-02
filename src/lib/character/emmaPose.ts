@@ -65,6 +65,17 @@ export const TILT_BY_POSE: Record<EmmaPose, number> = {
  * than the default. The puzzled tilt arrives with a hair more lag and
  * reads as "considering" rather than "reacting". On iPad the difference
  * is small but legible.
+ *
+ * `celebration` uses a yet-softer spring (`stiffness: 200, damping: 22`)
+ * — iteration on 2026-05-01 (ticket 86c9kxmqb). Thomas reported on iPad
+ * Pro after PR #129 that the original 260/20 felt "very fast and not so
+ * smooth" while the puzzled-tilt at 220/20 "is better". 200/22 paces the
+ * tilt-and-return so the success moment lands instead of flicking past;
+ * the slightly higher damping reduces overshoot so it doesn't read as
+ * laggy. Floor: stiffness must stay >= puzzled-tilt's 220-ish band so
+ * celebration still feels positive/upward, not droopy. (We're at 200,
+ * marginally below — the 22 damping compensates by removing the bounce
+ * that low stiffness alone would amplify.)
  */
 export interface TiltSpring {
   readonly stiffness: number
@@ -74,7 +85,7 @@ export interface TiltSpring {
 export const TILT_SPRING_BY_POSE: Record<EmmaPose, TiltSpring> = {
   idle: { stiffness: 260, damping: 20 },
   listening: { stiffness: 260, damping: 20 },
-  celebration: { stiffness: 260, damping: 20 },
+  celebration: { stiffness: 200, damping: 22 }, // softened per iPad feedback (86c9kxmqb)
   'puzzled-tilt': { stiffness: 220, damping: 20 }, // softer — "considering"
   'attentive-pointing': { stiffness: 260, damping: 20 },
   sleepy: { stiffness: 260, damping: 20 },
