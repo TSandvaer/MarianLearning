@@ -91,6 +91,29 @@ export interface WordSongProblemUtterances {
   giveAnswer: string
 }
 
+/**
+ * Content-type discriminant on a WordSong problem.
+ *
+ * `blending-cv` — the v1 default. Read line is "Tap the <word>.";
+ *   Marian taps the matching picture chip from a trio. Targets drawn
+ *   from `TARGET_WORDS` (the 14 CVC short-a words).
+ *
+ * `cvc-word` — next progression beat (ticket 86c9kxp08, planner-parser
+ *   contract step 1). Read line is "Read the <word>.". Same target pool
+ *   for now (the 14 CVC short-a words); when the planner widens in step
+ *   2 it can draw from a broader CVC list. Step 1 (this PR) only widens
+ *   the BROWSER PARSER — the planner does not emit this content yet,
+ *   the picker is still hard-clamped to `blending-cv`, so existing
+ *   sessions continue to parse as `blending-cv`.
+ *
+ * The field is optional on the public type for back-compat: callers that
+ * predate the widening (e.g. `STATIC_WORD_SONG_PLANS`) don't set it, and
+ * downstream code treats the absence as `blending-cv`. The parser always
+ * sets it explicitly so plans rebuilt from the wire always carry the
+ * discriminant.
+ */
+export type WordSongContentType = 'blending-cv' | 'cvc-word'
+
 /** A single problem in the session. */
 export interface WordSongProblem {
   /** 1-based position in the session (1..8). */
@@ -99,6 +122,12 @@ export interface WordSongProblem {
   target: WordEntry
   /** Pre-canned utterance lines for this problem. */
   utterances: WordSongProblemUtterances
+  /**
+   * Content-type discriminant. Optional for back-compat with hand-built
+   * static plans; absent === `blending-cv`. The server-plan parser always
+   * sets it explicitly.
+   */
+  contentType?: WordSongContentType
 }
 
 /** A full Word Song session plan — exactly 8 problems, all short-a CVC. */

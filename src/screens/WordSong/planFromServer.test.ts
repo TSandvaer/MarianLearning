@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   PlanFromServerError,
+  parseReadLine,
   parseReadTarget,
   wordSongSessionPlanFromServer,
 } from './planFromServer'
@@ -8,6 +9,11 @@ import {
   STATIC_WORD_SONG_PLANS,
   wordSongSessionPlanToUtteranceSources,
 } from './wordSessionPlans'
+import { SAMPLE_CV_BLEND_PLAN } from './__fixtures__/sample-cv-blend-plan'
+import {
+  SAMPLE_CVC_WORD_PLAN,
+  SAMPLE_MIXED_PLAN,
+} from './__fixtures__/sample-cvc-word-plan'
 
 function staticPlanAsServerShape(planIndex = 0) {
   const plan = STATIC_WORD_SONG_PLANS[planIndex]!
@@ -301,5 +307,187 @@ describe('wordSongSessionPlanFromServer — round-trips post-fix planner output 
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
       /missing problem index 1/,
     )
+  })
+})
+
+/**
+ * Parser widening — ticket 86c9kxp08, planner-parser contract step 1.
+ *
+ * The browser parser is widened to accept a second content type
+ * (`cvc-word`, "Read the <word>." template) in addition to the existing
+ * `blending-cv` ("Tap the <word>."). The PLANNER does not emit
+ * `cvc-word` content yet — that's step 2. These tests pin the parser
+ * surface so when the planner widens later, this side is already proven.
+ *
+ * See `design/word-song/parser-widening-plan.md` for the full plan and
+ * `project_planner_parser_contract` memory for the binding ordering.
+ */
+describe('parseReadLine — content-type discriminant routing (86c9kxp08)', () => {
+  it('routes "Tap the <word>." to contentType: blending-cv', () => {
+    const result = parseReadLine('Tap the cat.')
+    expect(result.entry.word).toBe('cat')
+    expect(result.contentType).toBe('blending-cv')
+  })
+
+  it('routes "Read the <word>." to contentType: cvc-word', () => {
+    const result = parseReadLine('Read the cat.')
+    expect(result.entry.word).toBe('cat')
+    expect(result.contentType).toBe('cvc-word')
+  })
+
+  it('is case-insensitive on both templates', () => {
+    expect(parseReadLine('tap the bat.').contentType).toBe('blending-cv')
+    expect(parseReadLine('READ THE BAT.').contentType).toBe('cvc-word')
+  })
+
+  it('rejects words outside the target list on both templates', () => {
+    expect(() => parseReadLine('Tap the bus.')).toThrow(/non-target word/)
+    expect(() => parseReadLine('Read the bus.')).toThrow(/non-target word/)
+  })
+
+  it('rejects unrecognised templates with a helpful message', () => {
+    expect(() => parseReadLine('Find the cat.')).toThrow(PlanFromServerError)
+    expect(() => parseReadLine('Find the cat.')).toThrow(
+      /did not match any known template/,
+    )
+    // Error message should mention BOTH accepted templates so a future
+    // dev grepping for the template form discovers both surfaces.
+    expect(() => parseReadLine('Find the cat.')).toThrow(/Tap the/)
+    expect(() => parseReadLine('Find the cat.')).toThrow(/Read the/)
+  })
+})
+
+describe('wordSongSessionPlanFromServer — cv-blend fixture (regression)', () => {
+  it('parses sample-cv-blend-plan and stamps contentType: blending-cv on every problem', () => {
+    const plan = wordSongSessionPlanFromServer(SAMPLE_CV_BLEND_PLAN)
+    expect(plan.id).toBe('haiku-word-cvblend-001')
+    expect(plan.problems).toHaveLength(8)
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('blending-cv')
+    }
+    // Spot-check the target words round-trip via the wordPack.
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'cat',
+      'hat',
+      'bat',
+      'mat',
+      'bag',
+      'fan',
+      'man',
+      'pan',
+    ])
+  })
+})
+
+describe('wordSongSessionPlanFromServer — cvc-word fixture (new acceptance)', () => {
+  it('parses sample-cvc-word-plan and stamps contentType: cvc-word on every problem', () => {
+    const plan = wordSongSessionPlanFromServer(SAMPLE_CVC_WORD_PLAN)
+    expect(plan.id).toBe('haiku-word-cvcword-001')
+    expect(plan.problems).toHaveLength(8)
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('cvc-word')
+    }
+    // Targets resolve to known wordPack entries — same canonical pool.
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'cat',
+      'hat',
+      'bat',
+      'mat',
+      'bag',
+      'fan',
+      'man',
+      'pan',
+    ])
+    // Read text is preserved verbatim — important for the audio script
+    // / on-screen caption mirror principle.
+    expect(plan.problems[0]!.utterances.read).toBe('Read the cat.')
+  })
+
+  it('rejects a cvc-word entry with a missing target word slot', () => {
+    // Drop the read line for problem 1 entirely — the completeness
+    // check should surface "missing slot read".
+    const broken: typeof SAMPLE_CVC_WORD_PLAN = {
+      ...SAMPLE_CVC_WORD_PLAN,
+      utterances: SAMPLE_CVC_WORD_PLAN.utterances.filter(
+        (u) => u.id !== 'word.p1.read',
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /missing slot "read"/,
+    )
+  })
+
+  it('rejects a cvc-word entry with type-confused fields', () => {
+    // Replace the read line text with a non-string. The shape guard at
+    // the top of `wordSongSessionPlanFromServer` rejects the whole blob
+    // because the inner utterance no longer matches { id:string, text:string }.
+    const broken = {
+      ...SAMPLE_CVC_WORD_PLAN,
+      utterances: SAMPLE_CVC_WORD_PLAN.utterances.map((u) =>
+        u.id === 'word.p1.read'
+          ? { id: u.id, text: 12345 as unknown as string }
+          : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      PlanFromServerError,
+    )
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /server plan did not match/,
+    )
+  })
+
+  it('rejects a cvc-word entry with a malformed read template', () => {
+    // "Show the cat." is neither "Tap the" nor "Read the" — should
+    // surface the unknown-template error.
+    const broken = {
+      ...SAMPLE_CVC_WORD_PLAN,
+      utterances: SAMPLE_CVC_WORD_PLAN.utterances.map((u) =>
+        u.id === 'word.p1.read' ? { ...u, text: 'Show the cat.' } : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /did not match any known template/,
+    )
+  })
+
+  it('rejects a cvc-word entry whose word is not in the target pool', () => {
+    // "bus" is a distractor-only word — same rejection as the cv-blend
+    // path. The membership check is shared across templates by design.
+    const broken = {
+      ...SAMPLE_CVC_WORD_PLAN,
+      utterances: SAMPLE_CVC_WORD_PLAN.utterances.map((u) =>
+        u.id === 'word.p1.read' ? { ...u, text: 'Read the bus.' } : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /non-target word "bus"/,
+    )
+  })
+})
+
+describe('wordSongSessionPlanFromServer — mixed cv-blend + cvc-word (sanity)', () => {
+  it('routes per-problem contentType correctly within a single plan', () => {
+    const plan = wordSongSessionPlanFromServer(SAMPLE_MIXED_PLAN)
+    expect(plan.problems).toHaveLength(8)
+    // First 4 problems use "Tap the" → blending-cv.
+    for (const problem of plan.problems.slice(0, 4)) {
+      expect(problem.contentType).toBe('blending-cv')
+    }
+    // Last 4 problems use "Read the" → cvc-word.
+    for (const problem of plan.problems.slice(4)) {
+      expect(problem.contentType).toBe('cvc-word')
+    }
+    // Every target still resolves cleanly via the wordPack.
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'cat',
+      'hat',
+      'bat',
+      'mat',
+      'bag',
+      'fan',
+      'man',
+      'pan',
+    ])
   })
 })
