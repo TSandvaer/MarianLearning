@@ -30,12 +30,31 @@ import { test, expect } from '@playwright/test'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
+  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
 
 test.describe('Hub → Math golden path', () => {
   test.beforeEach(async ({ page }) => {
-    await installClaudeMock(page)
+    // `failNetwork: true` forces the planner fetch to abort, so the
+    // browser falls into the silent-caption-walk fallback path. Why
+    // not the canonical-response path?
+    //
+    // The canonical response carries inline base64 audio. In headless
+    // Chromium / WebKit, Howler's decode of that audio is brittle —
+    // `loaderror` fires, `playSession` rejects, and "cancelled" lands
+    // on the speak() catch before `setReadAloudPlayed(true)` ever
+    // commits. Chips stay disabled; the test hangs.
+    //
+    // The silent-fallback path is ALSO production-real: when Anthropic
+    // is down, this is exactly what Marian sees on her iPad. Locking
+    // it in a regression test catches every cross-screen state-machine
+    // bug the audit flagged (PR #111 / #117 / #118 family) without
+    // depending on a working audio decoder.
+    //
+    // A follow-up spec under `e2e/audio-real-fixtures/` will exercise
+    // the real Path A path with captured-from-Azure MP3 fixtures.
+    await installClaudeMock(page, { failNetwork: true })
     // Returning-user seed: sessionCount >= 1 routes Splash → Hub
     // (skipping the once-ever Greet path), so we land on Hub directly
     // and exercise the production "tap a tree from Hub" flow rather
@@ -49,6 +68,14 @@ test.describe('Hub → Math golden path', () => {
     page,
   }) => {
     await page.goto('/')
+
+    // Bridge the headless-browser gesture-unlock gap. See
+    // `forceHowlerUnlock`'s docstring for the rationale; production
+    // never calls this. Without it, the read-aloud effect's
+    // `getHowlerRunning()` returns false, the chips stay disabled
+    // forever, and we'd be testing the gesture chain instead of the
+    // cross-screen state machine.
+    await forceHowlerUnlock(page)
 
     // Splash auto-advances → Hub (because sessionCount >= 1).
     const hub = page.getByTestId('hub')

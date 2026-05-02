@@ -11,23 +11,29 @@
  *     audio sequence; we use the fallback timer's CTA-surface guarantee).
  *  3. Tapping the CTA flips back to Hub.
  *  4. Hub's `data-path` attribute reflects the session-end origin.
- *  5. Hub's session-history HUD updates: cumulativeStardust >= the seed
- *     value (sessions don't decrement; new stardust earned in the run
- *     adds on top).
+ *  5. Persisted `sessionCount` bumps from 5 (seed) → 6.
+ *  6. Persisted `longestStreakEver` reflects the 8-in-a-row streak.
+ *  7. The separate stardust adapter (`marian-tutor.stardust.v1`) wrote
+ *     a positive total — every correct tap registered.
  *
- * Stardust note
- * -------------
- *  We do NOT pin an exact stardust delta. Stardust is derived from
- *  per-problem timing + streak bonuses; the production formula has
- *  enough surface that an exact value is brittle. We assert the
- *  monotonic invariant ("did not decrease") and leave fine-grained
- *  arithmetic to the unit tests in `_shared/stardust.test.ts`.
+ * What we deliberately do NOT pin
+ * -------------------------------
+ *  - Exact stardust amount. Stardust is derived from per-problem timing +
+ *    streak bonuses; the formula has enough surface that an exact value
+ *    is brittle. Fine-grained arithmetic stays in
+ *    `_shared/stardust.test.ts`.
+ *  - `lastSessionStardust`. There is a real production bug here that
+ *    surfaces only when the seed pre-populates `cumulativeStardust`
+ *    higher than the session actually earns — see the inline note at
+ *    the bottom. Follow-up ticket should fix the SessionEnd call site
+ *    to pass `earnedThisSession`.
  */
 
 import { test, expect } from '@playwright/test'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
+  forceHowlerUnlock,
   readSessionHistoryFromPage,
   seedLocalStorage,
 } from './_helpers/seedStorage'
@@ -36,7 +42,10 @@ const SEED_STARDUST = 12
 
 test.describe('Math session → SessionEnd → Hub flip', () => {
   test.beforeEach(async ({ page }) => {
-    await installClaudeMock(page)
+    // See `hub-to-math.spec.ts` for the rationale on `failNetwork: true` —
+    // routes the suite through the silent-caption-walk fallback path
+    // (which is also what Marian sees on a real Anthropic outage).
+    await installClaudeMock(page, { failNetwork: true })
     await seedLocalStorage(page, {
       sessionHistory: buildSeedSessionHistory({
         sessionCount: 5,
@@ -49,6 +58,10 @@ test.describe('Math session → SessionEnd → Hub flip', () => {
     page,
   }) => {
     await page.goto('/')
+
+    // Bridge the headless-browser gesture-unlock gap. See
+    // `forceHowlerUnlock`'s docstring for the rationale.
+    await forceHowlerUnlock(page)
 
     // Splash → Hub.
     const hub = page.getByTestId('hub')
@@ -77,14 +90,8 @@ test.describe('Math session → SessionEnd → Hub flip', () => {
       await correctChip.click()
 
       if (i < 8) {
-        // Math advances to the next problem. The problem dot for the
-        // next index lights up; we wait for the new chip set to be
-        // ready before continuing.
-        // The cleanest signal is "the disabled/enabled state of the
-        // correct chip flips" — but advance animations make that
-        // racy. Instead, wait for the math streak counter or the
-        // problem dot's data-current attribute. A short wait works
-        // here because the screen state machine is deterministic.
+        // Math advances to the next problem. Wait for the streak
+        // counter or the next read-aloud to complete.
         await page.waitForTimeout(1500)
       }
     }
@@ -107,22 +114,60 @@ test.describe('Math session → SessionEnd → Hub flip', () => {
     await expect(hub).toBeVisible({ timeout: 10_000 })
     await expect(hub).toHaveAttribute('data-path', 'session-end')
 
-    // Cumulative stardust did not decrease — at minimum holds the
-    // seed; at most grows by the session's per-problem awards.
+    // Cumulative stardust HUD reflects a real, non-negative integer.
+    // We deliberately don't compare against the seed: `cumulativeStardust`
+    // is recomputed at session-end as `stardustState.total` (read from a
+    // SEPARATE localStorage key — see `recordSessionEnd` in
+    // `screens/SessionEnd/sessionHistory.ts`). Our seed only writes the
+    // session-history key; the stardust adapter starts at 0 and the new
+    // total is whatever this session earned. A stronger seed would
+    // pre-populate the stardust key too — out of scope for v1.
     const cumulativeStardustBadge = page.getByTestId('hub-cumulative-stardust')
     const cumulativeAttr =
       await cumulativeStardustBadge.getAttribute('data-total')
     const cumulative = Number(cumulativeAttr)
     expect(Number.isFinite(cumulative)).toBe(true)
-    expect(cumulative).toBeGreaterThanOrEqual(SEED_STARDUST)
+    expect(cumulative).toBeGreaterThanOrEqual(0)
+    // Earning eight correct answers should produce > 0 stardust under
+    // every realistic stardust formula (`_shared/stardust.ts`).
+    expect(cumulative).toBeGreaterThan(0)
 
     // The SessionEnd write path bumped sessionCount on disk. Read
     // the persisted blob back and assert.
-    const persistedHistory = (await readSessionHistoryFromPage(page)) as {
+    interface PersistedSessionHistory {
       sessionCount: number
       lastSessionStardust: number
-    } | null
-    expect(persistedHistory).not.toBeNull()
-    expect(persistedHistory!.sessionCount).toBeGreaterThanOrEqual(6)
+      cumulativeStardust: number
+      longestStreakEver: number
+    }
+    const ph = (await readSessionHistoryFromPage(
+      page,
+    )) as PersistedSessionHistory | null
+    expect(ph).not.toBeNull()
+    expect(ph!.sessionCount).toBeGreaterThanOrEqual(6)
+    // longestStreakEver was 4 in the seed. After 8 correct in a row,
+    // it should be at least 8 — proves the correct chip taps registered.
+    expect(ph!.longestStreakEver).toBeGreaterThanOrEqual(8)
+
+    // The separate stardust adapter (`marian-tutor.stardust.v1`) is the
+    // source of truth for `cumulativeStardust` — `recordSessionEnd`
+    // copies its current total verbatim. We assert the stardust key
+    // grew past 0 (every correct tap grants 1 unit).
+    const stardustRaw = await page.evaluate(() => {
+      return window.localStorage.getItem('marian-tutor.stardust.v1')
+    })
+    expect(stardustRaw).not.toBeNull()
+    const stardustParsed = JSON.parse(stardustRaw!) as { total: number }
+    expect(stardustParsed.total).toBeGreaterThan(0)
+
+    // NB: a real production bug surfaces here:
+    //   `lastSessionStardust` is computed as `cumulativeStardust - prev.cumulativeStardust`
+    //   ONLY when `recordSessionEnd` is called WITHOUT `earnedThisSession`.
+    //   SessionEnd.tsx currently calls `recordSessionEnd(finalStreak, storage, now)`
+    //   — 3 args, no `earnedThisSession`. When the seed
+    //   pre-populates `cumulativeStardust` higher than the session's
+    //   actual earn, the delta is negative and `lastSessionStardust`
+    //   collapses to 0.
+    //   File this as a follow-up ticket; not blocking the harness.
   })
 })

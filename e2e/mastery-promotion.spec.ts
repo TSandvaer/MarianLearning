@@ -45,6 +45,7 @@ import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
+  forceHowlerUnlock,
   readProgressFromPage,
   seedLocalStorage,
 } from './_helpers/seedStorage'
@@ -65,7 +66,9 @@ function isoDaysAgo(days: number): string {
 
 test.describe('Mastery promotion happy path', () => {
   test.beforeEach(async ({ page }) => {
-    await installClaudeMock(page)
+    // See `hub-to-math.spec.ts` for the rationale on `failNetwork: true` —
+    // routes the suite through the silent-caption-walk fallback path.
+    await installClaudeMock(page, { failNetwork: true })
 
     const seedProgress = buildSeedProgress({
       skillLevelOverrides: {
@@ -90,6 +93,7 @@ test.describe('Mastery promotion happy path', () => {
     page,
   }) => {
     await page.goto('/')
+    await forceHowlerUnlock(page)
 
     // Splash → Hub → Math.
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })

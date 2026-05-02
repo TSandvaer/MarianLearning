@@ -1,0 +1,81 @@
+# Playwright e2e harness — runs against the production build.
+#
+# Ticket 86c9kwnmx (P0.1 from the 2026-05-02 polish audit). Closes the
+# "no e2e on PRs" gap that allowed every cross-screen audio-race P0 of the
+# last 10 PRs to ship undetected.
+#
+# Trigger: every push to a feature branch with an open PR, plus pushes to
+# main. The job builds the prod bundle, boots `vite preview`, and runs all
+# Playwright specs against it. /api/claude is mocked at the route level
+# (see e2e/_helpers/mockClaude.ts) so the suite never hits Anthropic / Azure.
+#
+# Why we don't run only on PRs
+# -----------------------------
+# A push to a feature branch without a PR (e.g. early prototype) still
+# produces useful CI signal — the harness is fast (~1 min), and catching
+# a regression at push-time beats catching it after PR-open.
+
+name: e2e
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'fix/**'
+      - 'infra/**'
+      - 'chore/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  playwright:
+    name: Playwright (Chromium + WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # Bump key when @playwright/test version in package.json bumps
+          # so a stale cache doesn't pin us to an outdated browser bundle.
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package.json') }}
+
+      - name: Install Playwright browsers
+        # `--with-deps` pulls in the system libraries Chromium / WebKit need
+        # on Ubuntu (libgbm, libnss3, etc.). On a cache HIT this still runs
+        # but is a no-op for the binaries.
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run e2e suite
+        run: yarn e2e
+        env:
+          CI: 'true'
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test artifacts (traces, screenshots)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7

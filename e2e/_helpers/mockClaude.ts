@@ -22,6 +22,14 @@ export interface MockClaudeOptions {
   mathResponse?: () => unknown
   /** Override the word-song response. */
   wordSongResponse?: () => unknown
+  /**
+   * Force the planner fetch to fail at the network layer. App.tsx catches
+   * the rejection and Math falls through to its silent caption-walk
+   * default — which is the same path Marian sees on a real outage. Useful
+   * for specs that want to exercise the screen state machine without
+   * paying the cost of audio decoding tests.
+   */
+  failNetwork?: boolean
 }
 
 export async function installClaudeMock(
@@ -33,6 +41,10 @@ export async function installClaudeMock(
     options.wordSongResponse ?? canonicalWordSongSessionResponse
 
   await page.route('**/api/claude', async (route: Route) => {
+    if (options.failNetwork) {
+      await route.abort('failed')
+      return
+    }
     const request = route.request()
 
     // Allow the CORS preflight to fall through with a friendly 204 so the

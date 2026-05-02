@@ -31,6 +31,19 @@ const IPAD_PRO_PORTRAIT = { width: 1024, height: 1366 }
 
 export default defineConfig({
   testDir: './e2e',
+  // Per-test timeout. The math-session walk-through specs take ~30 s
+  // wall-time on the silent caption fallback path (8 problems × ~2 s
+  // read + ~1.5 s advance = ~28 s, plus session-end ~5 s). Bump above
+  // the 30 s default with comfort for WebKit + slow CI.
+  timeout: 90_000,
+  expect: {
+    // Default `expect` timeout. Most assertions converge well under
+    // this; a higher ceiling hides slow expectations more than it
+    // helps. 10 s matches the per-locator timeouts the specs use
+    // explicitly so behaviour is consistent whether or not the spec
+    // passes a custom value.
+    timeout: 10_000,
+  },
   // Each spec is independent; allow parallel execution within a project.
   fullyParallel: true,
   // Fail the suite if a test calls `.only` — guards against accidentally
