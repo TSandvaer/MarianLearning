@@ -95,6 +95,26 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
   )
 }
 
+function isMasteryThresholdShape(v: unknown): boolean {
+  if (!isObject(v)) return false
+  if (
+    typeof v.percent !== 'number' ||
+    !Number.isFinite(v.percent) ||
+    v.percent < 0 ||
+    v.percent > 1
+  ) {
+    return false
+  }
+  if (
+    typeof v.sessions !== 'number' ||
+    !Number.isInteger(v.sessions) ||
+    v.sessions <= 0
+  ) {
+    return false
+  }
+  return true
+}
+
 function isParentSettings(v: unknown): boolean {
   if (!isObject(v)) return false
   if (typeof v.autoPromote !== 'boolean') return false
@@ -104,22 +124,23 @@ function isParentSettings(v: unknown): boolean {
   if (typeof v.showLevelToMarian !== 'boolean') return false
   const mt = v.masteryThreshold
   if (!isObject(mt)) return false
-  if (
-    typeof mt.percent !== 'number' ||
-    !Number.isFinite(mt.percent) ||
-    mt.percent < 0 ||
-    mt.percent > 1
-  ) {
-    return false
+  // Accept BOTH the new per-track shape (math + word-song each have a
+  // valid threshold) AND the legacy single shape (percent + sessions).
+  // The read-side defaulter (`getSettings()` in `parentSettings.ts`)
+  // promotes a legacy single shape to per-track at load time, so an
+  // old persisted blob remains a valid Progress document under the
+  // new code — no schema bump required (ticket 86c9kwvy0).
+  const hasPerTrack = 'math' in mt || 'word-song' in mt
+  const hasSingle = 'percent' in mt || 'sessions' in mt
+  if (hasPerTrack) {
+    if (!isMasteryThresholdShape(mt.math)) return false
+    if (!isMasteryThresholdShape(mt['word-song'])) return false
+    return true
   }
-  if (
-    typeof mt.sessions !== 'number' ||
-    !Number.isInteger(mt.sessions) ||
-    mt.sessions <= 0
-  ) {
-    return false
+  if (hasSingle) {
+    return isMasteryThresholdShape(mt)
   }
-  return true
+  return false
 }
 
 /** True iff `v` matches the v1 Progress shape exactly. */

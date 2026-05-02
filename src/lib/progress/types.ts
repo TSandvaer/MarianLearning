@@ -149,6 +149,32 @@ export interface MasteryThreshold {
 }
 
 /**
+ * Track key used to address a per-track mastery threshold. Mirrors the
+ * `MasteryTrack` union in `./mastery.ts`; declared here on the data side
+ * so the shape of `ParentSettings.masteryThreshold` doesn't pull a
+ * runtime module into pure type imports.
+ */
+export type MasteryTrackKey = 'math' | 'word-song'
+
+/**
+ * Per-track mastery threshold map (ticket 86c9kwvy0, locked 2026-05-02).
+ *
+ * Math and word-song each carry their own threshold:
+ *  - math: 95/3 default — math-fact automaticity benefits from
+ *    over-practice; the durability gain at 95% vs 90% may be real even
+ *    if the literature doesn't quantify it cleanly.
+ *  - word-song: 90/3 default — per Pickering et al. (PMC5843573), 90%
+ *    over-learning produces durable maintenance; 95% adds practice
+ *    time without clear benefit. Marian's August timeline makes
+ *    literacy progression the binding constraint.
+ *
+ * Cross-day enforcement (PMC8164994: sleep consolidation) stays on for
+ * BOTH tracks regardless of percent threshold — see
+ * `parentSettings.crossDayEnforcement`.
+ */
+export type PerTrackMasteryThreshold = Record<MasteryTrackKey, MasteryThreshold>
+
+/**
  * Session-mode picker. `'off'` (default) means the engine selects mode
  * autonomously. `'on'` means the Hub surfaces a Marian-facing
  * review | focus | mixed picker (M4 implements the Hub UI).
@@ -167,7 +193,14 @@ export type SessionModePicker = 'off' | 'on'
 export interface ParentSettings {
   autoPromote: boolean
   sessionModePicker: SessionModePicker
-  masteryThreshold: MasteryThreshold
+  /**
+   * Per-track mastery threshold (ticket 86c9kwvy0, locked 2026-05-02).
+   * Was a single `MasteryThreshold` prior; widened to a per-track map
+   * so math and word-song can carry distinct values. Backward-compat
+   * for old single-shape blobs is handled at the read path
+   * (`getSettings()` in `./parentSettings.ts`); no schema bump.
+   */
+  masteryThreshold: PerTrackMasteryThreshold
   crossDayEnforcement: boolean
   showLevelToMarian: boolean
 }

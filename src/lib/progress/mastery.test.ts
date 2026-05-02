@@ -47,7 +47,14 @@ function levels(overrides: Partial<SkillLevels> = {}): SkillLevels {
   return { ...allLocked, ...overrides }
 }
 
-/** Build a `Progress` with the supplied skillLevels, history, and settings. */
+/**
+ * Build a `Progress` with the supplied skillLevels, history, and settings.
+ *
+ * `parentSettings.masteryThreshold` accepts a partial per-track map
+ * (math and/or word-song). Missing tracks are filled from the per-track
+ * defaults so a test that overrides only math doesn't accidentally
+ * shift word-song's threshold.
+ */
 function buildProgress(args: {
   skillLevels: SkillLevels
   history?: SessionHistoryEntry[]
@@ -332,7 +339,10 @@ describe('applyMasteryRule — defaults (95/3, cross-day, autoPromote)', () => {
         entry('2026-04-29T23:00:00.000Z', 'add-to-10', 1.0), // Manila 04-30 07:00
       ],
       parentSettings: {
-        masteryThreshold: { percent: 0.95, sessions: 2 },
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 2 },
+          'word-song': { percent: 0.9, sessions: 3 },
+        },
       },
     })
     const result = applyMasteryRule(progress)
@@ -344,7 +354,7 @@ describe('applyMasteryRule — defaults (95/3, cross-day, autoPromote)', () => {
 // Threshold override — proves settings propagate
 // --------------------------------------------------------------------------
 
-describe('applyMasteryRule — threshold override 80/2', () => {
+describe('applyMasteryRule — threshold override 80/2 (math track)', () => {
   it('promotes with 2 cross-day entries at 0.81', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'add-to-10': 'practicing' }),
@@ -353,7 +363,10 @@ describe('applyMasteryRule — threshold override 80/2', () => {
         entry('2026-05-01T10:00:00.000Z', 'add-to-10', 0.81),
       ],
       parentSettings: {
-        masteryThreshold: { percent: 0.8, sessions: 2 },
+        masteryThreshold: {
+          math: { percent: 0.8, sessions: 2 },
+          'word-song': { percent: 0.9, sessions: 3 },
+        },
       },
     })
     const result = applyMasteryRule(progress)
@@ -369,7 +382,10 @@ describe('applyMasteryRule — threshold override 80/2', () => {
         entry('2026-05-01T10:00:00.000Z', 'add-to-10', 0.85),
       ],
       parentSettings: {
-        masteryThreshold: { percent: 0.8, sessions: 2 },
+        masteryThreshold: {
+          math: { percent: 0.8, sessions: 2 },
+          'word-song': { percent: 0.9, sessions: 3 },
+        },
       },
     })
     const result = applyMasteryRule(progress)
@@ -536,5 +552,82 @@ describe('applyMasteryRule — pendingPromotion edge cases', () => {
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['add-to-20']).toBe('locked')
     expect(result.pendingPromotion).toBeUndefined()
+  })
+})
+
+// --------------------------------------------------------------------------
+// Per-track defaults — math 95/3 + word-song 90/3 (ticket 86c9kwvy0)
+// --------------------------------------------------------------------------
+//
+// Default behaviour after the 2026-05-02 split: math demands 95% over
+// 3 sessions; word-song accepts 90% over 3 sessions. The two tests
+// below pin both halves of that asymmetry on the SAME data shape (3
+// cross-day entries at 0.91 success), demonstrating that the rule
+// reads the per-track threshold and not a single global value.
+//
+// Math at 0.91 < 0.95 → no promotion.
+// Word-song at 0.91 ≥ 0.90 → promotion.
+//
+// `buildProgress` here passes NO parentSettings override so the
+// defaults from `defaultProgress()` flow through — the assertion
+// vehicle is the divergent outcome on identical successRate data.
+
+describe('applyMasteryRule — per-track defaults (ticket 86c9kwvy0)', () => {
+  it('promotes word-song with 3 sessions at 0.91 under the 90/3 default', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'blending-cv': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 0.91),
+        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 0.91),
+        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 0.91),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['blending-cv']).toBe('mastered')
+    // Downstream node was 'intro' in defaultProgress() seed; it's not
+    // 'locked' so the rule leaves it as-is. The promotion of
+    // blending-cv is the assertion vehicle here.
+  })
+
+  it('does NOT promote math with 3 sessions at 0.91 under the 95/3 default', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'add-to-10', 0.91),
+        entry('2026-04-30T10:00:00.000Z', 'add-to-10', 0.91),
+        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 0.91),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    // 0.91 < 0.95 — fails the math threshold.
+    expect(result.skillLevels['add-to-10']).toBe('practicing')
+    expect(result.skillLevels['add-to-20']).toBe('locked')
+    expect(result.pendingPromotion).toBeUndefined()
+  })
+
+  it('reads the math threshold for math nodes and the word-song threshold for literacy nodes within a single call', () => {
+    // Both tracks have qualifying 0.91 history — but only word-song
+    // promotes under defaults. This proves the per-track lookup happens
+    // once per track, not once per node-from-the-same-settings.
+    const progress = buildProgress({
+      skillLevels: levels({
+        'add-to-10': 'practicing',
+        'blending-cv': 'practicing',
+      }),
+      history: [
+        entry('2026-04-29T08:00:00.000Z', 'add-to-10', 0.91),
+        entry('2026-04-30T08:00:00.000Z', 'add-to-10', 0.91),
+        entry('2026-05-01T08:00:00.000Z', 'add-to-10', 0.91),
+        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 0.91),
+        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 0.91),
+        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 0.91),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    // Math: 0.91 < 0.95 — no promotion.
+    expect(result.skillLevels['add-to-10']).toBe('practicing')
+    expect(result.skillLevels['add-to-20']).toBe('locked')
+    // Word-song: 0.91 ≥ 0.90 — promotion fires.
+    expect(result.skillLevels['blending-cv']).toBe('mastered')
   })
 })
