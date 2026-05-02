@@ -566,3 +566,29 @@ Owned by other tickets / specs:
 ---
 
 **No ticket assigned yet — orchestrator will spin one out from this PR.**
+
+---
+
+## 12. Phase 3b status — what shipped vs what's outstanding
+
+**Update authored 2026-05-01 under ticket `86c9kwh66` (Phase 3b documentation closure).** The ticket below the original spec was issued, implemented, and merged. This footer captures the resulting state for future readers.
+
+### Shipped on `main` 2026-04-29 (PR #104, commit `861bb0a`, ticket `86c9jccp7`)
+
+- All 8 Emma SVG slots filled at `public/assets/emma-{idle,listening,celebration,puzzled-tilt,attentive-pointing,sleepy,cheering,waving}.svg` (PR #103 + PR #107 + commit `0591415`).
+- `emma-logo.svg` splash wordmark.
+- App code migration per §7: `melody-*` → `emma-*` paths, `alt`, `layoutId`, `data-testid`, pose-name remap (`'happy'` → `'celebration'`, `'puzzled'` → `'puzzled-tilt'`).
+- Shared module `src/lib/character/emmaPose.ts` exporting `EmmaPose`, `TILT_BY_POSE`, `POSE_HOLD_MS` per §5.2.
+- Legacy `melody-*.svg` assets deleted (commit `af3b0b9`).
+- `MELODY_VOICE_CONFIG` → `EMMA_VOICE_CONFIG` rename (commit `95241b6`).
+
+### Outstanding — captured in `design/character/` (this PR)
+
+- **Tilt + breathing animation choreography from §3.2-§3.5 not yet wired.** `TILT_BY_POSE` is exported but no screen consumes it. Captured in `design/character/motion-brief.md`.
+- **Asset fidelity gap.** Shipped SVGs are PNG-in-SVG wrappers (~150-220 KB each), 22× over the §4.1 8-9 KB vector-SVG budget. Captured in `design/character/asset-fidelity-followup.md`.
+- **Reference-style citations and pose catalogue** (named in the Phase 3b dispatch but never landed as discrete documents). Captured in `design/character/reference-styles.md` + `design/character/expressions/README.md`.
+
+### Stale `CLAUDE.md` line
+
+The project root `CLAUDE.md` includes the line "_Phase 3b (visual pivot to manhwa-style art) is in design via Kyle and will land separately. Until Phase 3b, the character visually remains the bunny — audio + text say "Emma" while visuals still show Melody. This mismatch is temporary and known._" This is **stale** as of 2026-04-29 — the bunny is gone visually. Recommend Matt routes a one-line `CLAUDE.md` edit through Thomas to drop that paragraph. Tracked in `design/character/README.md` §"Outstanding decisions for Thomas".
+
