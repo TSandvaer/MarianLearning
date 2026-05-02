@@ -12,8 +12,13 @@
  * -----------------------------------
  * Per Thomas's 2026-05-01 update on the M3 ticket: the rule reads its
  * thresholds from the M2.5 `parentSettings` shape (`getSettings()`),
- * never from hardcoded constants in this file. Defaults: 0.95 percent /
- * 3 sessions, cross-day enforcement on, auto-promote on.
+ * never from hardcoded constants in this file. Defaults (per-track,
+ * 2026-05-02 update / ticket 86c9kwvy0):
+ *  - math: 0.95 percent / 3 sessions
+ *  - word-song: 0.90 percent / 3 sessions
+ * Cross-day enforcement on, auto-promote on. The percent/sessions are
+ * looked up per track inside the per-track scan loop, so a single
+ * call walks both trees with each track's own threshold.
  *
  * Tree adjacency lives here
  * -------------------------
@@ -35,7 +40,9 @@
 
 import { getSettings } from './parentSettings'
 import type {
+  MasteryThreshold,
   NumberGardenNode,
+  ParentSettings,
   Progress,
   SessionHistoryEntry,
   SkillNode,
@@ -101,18 +108,19 @@ export function nextNode(
  * Rule
  * ----
  * For every node in either tree whose current `skillLevels[node]` is
- * `'practicing'`:
+ * `'practicing'` (where `track` = the node's track, math or word-song):
  *   1. Filter `progress.history` to entries whose `skillFocus` includes
  *      this node.
  *   2. If `parentSettings.crossDayEnforcement === true`, dedupe to one
  *      entry per calendar day (by `dateISO`'s `YYYY-MM-DD` prefix —
  *      same convention recordProgressOnSessionEnd writes). Keep the
  *      LAST entry per day (the most recent session of that day).
- *   3. Take the last `parentSettings.masteryThreshold.sessions` entries.
+ *   3. Take the last `parentSettings.masteryThreshold[track].sessions`
+ *      entries.
  *   4. If there are fewer entries than required, no promotion.
  *   5. If every retained entry has
- *      `successRate >= parentSettings.masteryThreshold.percent`, the
- *      node qualifies for promotion.
+ *      `successRate >= parentSettings.masteryThreshold[track].percent`,
+ *      the node qualifies for promotion.
  *
  * Promotion
  * ---------
@@ -193,9 +201,13 @@ export function applyMasteryRule(progress: Progress): Progress {
     ]
 
   for (const { track, nodes } of trees) {
+    // Per-track threshold (ticket 86c9kwvy0) — math and word-song
+    // each get their own percent/sessions pair. Read it once per
+    // track outside the inner loop.
+    const trackThreshold = settings.masteryThreshold[track]
     for (const node of nodes) {
       if (out.skillLevels[node] !== 'practicing') continue
-      if (!qualifies(progress.history, node, settings)) continue
+      if (!qualifies(progress.history, node, trackThreshold, settings)) continue
       candidates.push({ track, node })
     }
   }
@@ -250,12 +262,16 @@ function trackOf(node: SkillNode): MasteryTrack | null {
 
 /**
  * Return true iff `node` has enough recent qualifying history to be
- * promoted under `settings`. Pure read of `history`; does not mutate.
+ * promoted under `threshold`. Pure read of `history`; does not mutate.
+ *
+ * `threshold` is the per-track value (math vs word-song); `settings`
+ * still carries the rule-level toggles (`crossDayEnforcement`).
  */
 function qualifies(
   history: readonly SessionHistoryEntry[],
   node: SkillNode,
-  settings: ReturnType<typeof getSettings>,
+  threshold: MasteryThreshold,
+  settings: ParentSettings,
 ): boolean {
   const focused = history.filter((entry) => entry.skillFocus.includes(node))
   if (focused.length === 0) return false
@@ -263,12 +279,10 @@ function qualifies(
   const filtered = settings.crossDayEnforcement
     ? dedupeByCalendarDay(focused)
     : focused
-  if (filtered.length < settings.masteryThreshold.sessions) return false
+  if (filtered.length < threshold.sessions) return false
 
-  const window = filtered.slice(-settings.masteryThreshold.sessions)
-  return window.every(
-    (entry) => entry.successRate >= settings.masteryThreshold.percent,
-  )
+  const window = filtered.slice(-threshold.sessions)
+  return window.every((entry) => entry.successRate >= threshold.percent)
 }
 
 /**

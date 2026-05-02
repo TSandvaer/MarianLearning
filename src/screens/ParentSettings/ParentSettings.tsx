@@ -5,7 +5,9 @@
  * Hub character art. Renders one row per setting with a control:
  *  - autoPromote: toggle
  *  - sessionModePicker: two-way segmented (off | on)
- *  - masteryThreshold: three-way segmented (80/2 | 90/2 | 95/3)
+ *  - masteryThreshold: TWO three-way segmented controls — one for
+ *    math (default 95/3), one for word-song (default 90/3). Presets:
+ *    80/2 | 90/3 | 95/3 (ticket 86c9kwvy0).
  *  - crossDayEnforcement: toggle
  *  - showLevelToMarian: toggle
  *
@@ -34,6 +36,7 @@ import {
   loadProgress,
   saveProgress,
   type MasteryThreshold,
+  type MasteryTrackKey,
   type ParentSettings,
   type Progress,
   type SessionModePicker,
@@ -55,6 +58,17 @@ export interface ParentSettingsProps {
 export interface ParentSettingsStorage {
   load: () => Progress | null
   save: (p: Progress) => void
+}
+
+/**
+ * Sparse patch shape for the local `update()` callback. `Partial<>`
+ * widens every top-level field to optional, AND widens the nested
+ * `masteryThreshold` so a single-track update doesn't have to supply
+ * both tracks. The merge in `update()` fills the missing track from
+ * the current value.
+ */
+type ParentSettingsPatch = Partial<Omit<ParentSettings, 'masteryThreshold'>> & {
+  masteryThreshold?: Partial<ParentSettings['masteryThreshold']>
 }
 
 const DEFAULT_STORAGE: ParentSettingsStorage = {
@@ -92,15 +106,22 @@ export default function ParentSettings({
    * Apply a settings patch and write through. Always merges OVER the
    * fully-defaulted current settings so a sparse patch doesn't drop
    * keys.
+   *
+   * `masteryThreshold` is a per-track map (ticket 86c9kwvy0); the
+   * patch carries a `Partial<PerTrackMasteryThreshold>` so a control
+   * can update one track at a time. Missing tracks are preserved
+   * from the current value.
    */
   const update = useCallback(
-    (patch: Partial<ParentSettings>) => {
+    (patch: ParentSettingsPatch) => {
       setProgress((prev) => {
         const current = getSettings(prev)
         const next: ParentSettings = {
           ...current,
           ...patch,
-          // Nested object — patch may carry a partial; merge per-key.
+          // Nested per-track object — patch may carry one or both
+          // tracks. Merge per-key so a single-track patch doesn't drop
+          // the other track.
           masteryThreshold: patch.masteryThreshold
             ? { ...current.masteryThreshold, ...patch.masteryThreshold }
             : current.masteryThreshold,
@@ -172,8 +193,15 @@ export default function ParentSettings({
           />
 
           <MasteryThresholdRow
-            value={settings.masteryThreshold}
-            onChange={(v) => update({ masteryThreshold: v })}
+            track="math"
+            value={settings.masteryThreshold.math}
+            onChange={(v) => update({ masteryThreshold: { math: v } })}
+          />
+
+          <MasteryThresholdRow
+            track="word-song"
+            value={settings.masteryThreshold['word-song']}
+            onChange={(v) => update({ masteryThreshold: { 'word-song': v } })}
           />
 
           <ToggleRow
@@ -194,8 +222,9 @@ export default function ParentSettings({
         </div>
 
         <p className="mt-6 text-xs text-slate-400">
-          Defaults: auto-promote on, fresh-day mastery on, threshold 95% over 3
-          sessions, level hidden, mode picker off.
+          Defaults: auto-promote on, fresh-day mastery on, math threshold 95% /
+          3 sessions, word-song threshold 90% / 3 sessions, level hidden, mode
+          picker off.
         </p>
       </div>
     </main>
@@ -355,44 +384,55 @@ const SESSION_MODE_OPTIONS: readonly SegmentedOption<SessionModePicker>[] = [
 // ── Mastery threshold row ───────────────────────────────────────────────
 
 interface MasteryThresholdRowProps {
+  track: MasteryTrackKey
   value: MasteryThreshold
   onChange: (next: MasteryThreshold) => void
 }
 
+const TRACK_LABELS: Record<MasteryTrackKey, { label: string; rowId: string }> =
+  {
+    math: { label: 'Math threshold', rowId: 'masteryThreshold-math' },
+    'word-song': {
+      label: 'Word Song threshold',
+      rowId: 'masteryThreshold-word-song',
+    },
+  }
+
 function MasteryThresholdRow({
+  track,
   value,
   onChange,
 }: MasteryThresholdRowProps): ReactElement {
   /**
    * Match the current value to a preset by exact equality. If somehow
    * none match (a future schema-shape that didn't propagate to the UI),
-   * treat the highest preset (95/3) as the visual fallback so the
-   * control still has SOMETHING selected — matches the
-   * Thomas-locked default.
+   * fall back to the per-track default for THIS track so the control
+   * still has SOMETHING selected — matches the Thomas-locked default.
    */
   const presetIndex = useMemo(() => {
     const idx = MASTERY_THRESHOLD_PRESETS.findIndex(
       (p) => p.percent === value.percent && p.sessions === value.sessions,
     )
-    return idx === -1
-      ? MASTERY_THRESHOLD_PRESETS.findIndex(
-          (p) =>
-            p.percent === DEFAULT_PARENT_SETTINGS.masteryThreshold.percent &&
-            p.sessions === DEFAULT_PARENT_SETTINGS.masteryThreshold.sessions,
-        )
-      : idx
-  }, [value])
+    if (idx !== -1) return idx
+    const fallback = DEFAULT_PARENT_SETTINGS.masteryThreshold[track]
+    return MASTERY_THRESHOLD_PRESETS.findIndex(
+      (p) => p.percent === fallback.percent && p.sessions === fallback.sessions,
+    )
+  }, [value, track])
+
+  const { label, rowId } = TRACK_LABELS[track]
 
   return (
     <RowFrame
-      id="masteryThreshold"
-      label="Mastery threshold"
+      id={rowId}
+      label={label}
       description="How many in-a-row sessions Marian needs at this success rate before a skill counts as mastered."
       control={
         <div
           role="radiogroup"
-          aria-label="Mastery threshold"
-          data-testid="parent-settings-segmented-masteryThreshold"
+          aria-label={label}
+          data-testid={`parent-settings-segmented-${rowId}`}
+          data-track={track}
           data-percent={value.percent}
           data-sessions={value.sessions}
           className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white"
@@ -406,7 +446,7 @@ function MasteryThresholdRow({
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                data-testid={`parent-settings-segmented-masteryThreshold-${presetId}`}
+                data-testid={`parent-settings-segmented-${rowId}-${presetId}`}
                 data-selected={selected ? 'true' : 'false'}
                 data-percent={preset.percent}
                 data-sessions={preset.sessions}

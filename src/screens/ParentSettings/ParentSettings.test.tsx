@@ -49,15 +49,16 @@ afterEach(() => {
 })
 
 describe('ParentSettings — rendering', () => {
-  it('renders five rows in the documented order', () => {
+  it('renders six rows in the documented order (per-track threshold split adds one row, ticket 86c9kwvy0)', () => {
     const { storage } = createMemoryStorage(defaultProgress())
     render(<ParentSettings storage={storage} />)
     const rows = screen.getAllByTestId('parent-settings-row')
-    expect(rows).toHaveLength(5)
+    expect(rows).toHaveLength(6)
     expect(rows.map((r) => r.getAttribute('data-row-id'))).toEqual([
       'autoPromote',
       'sessionModePicker',
-      'masteryThreshold',
+      'masteryThreshold-math',
+      'masteryThreshold-word-song',
       'crossDayEnforcement',
       'showLevelToMarian',
     ])
@@ -67,7 +68,10 @@ describe('ParentSettings — rendering', () => {
     const custom: ParentSettingsType = {
       autoPromote: false,
       sessionModePicker: 'on',
-      masteryThreshold: { percent: 0.8, sessions: 2 },
+      masteryThreshold: {
+        math: { percent: 0.8, sessions: 2 },
+        'word-song': { percent: 0.8, sessions: 2 },
+      },
       crossDayEnforcement: false,
       showLevelToMarian: true,
     }
@@ -89,7 +93,14 @@ describe('ParentSettings — rendering', () => {
     ).toBe('true')
     expect(
       screen
-        .getByTestId('parent-settings-segmented-masteryThreshold-80-2')
+        .getByTestId('parent-settings-segmented-masteryThreshold-math-80-2')
+        .getAttribute('data-selected'),
+    ).toBe('true')
+    expect(
+      screen
+        .getByTestId(
+          'parent-settings-segmented-masteryThreshold-word-song-80-2',
+        )
         .getAttribute('data-selected'),
     ).toBe('true')
     expect(
@@ -107,7 +118,8 @@ describe('ParentSettings — rendering', () => {
   it('falls back to defaults when storage is empty (no progress yet)', () => {
     const { storage } = createMemoryStorage(null)
     render(<ParentSettings storage={storage} />)
-    // Default is autoPromote=true, sessionModePicker=off, threshold=95/3
+    // Default is autoPromote=true, sessionModePicker=off,
+    // math threshold=95/3, word-song threshold=90/3.
     expect(
       screen
         .getByTestId('parent-settings-toggle-autoPromote')
@@ -120,7 +132,14 @@ describe('ParentSettings — rendering', () => {
     ).toBe('true')
     expect(
       screen
-        .getByTestId('parent-settings-segmented-masteryThreshold-95-3')
+        .getByTestId('parent-settings-segmented-masteryThreshold-math-95-3')
+        .getAttribute('data-selected'),
+    ).toBe('true')
+    expect(
+      screen
+        .getByTestId(
+          'parent-settings-segmented-masteryThreshold-word-song-90-3',
+        )
         .getAttribute('data-selected'),
     ).toBe('true')
   })
@@ -140,8 +159,8 @@ describe('ParentSettings — save-on-change', () => {
     // The other defaults must be preserved.
     expect(last.parentSettings?.sessionModePicker).toBe('off')
     expect(last.parentSettings?.masteryThreshold).toEqual({
-      percent: 0.95,
-      sessions: 3,
+      math: { percent: 0.95, sessions: 3 },
+      'word-song': { percent: 0.9, sessions: 3 },
     })
   })
 
@@ -157,33 +176,80 @@ describe('ParentSettings — save-on-change', () => {
     expect(last.parentSettings?.sessionModePicker).toBe('on')
   })
 
-  it('selects each mastery threshold preset and persists exactly that pair', async () => {
+  it('selects each math-track preset independently and preserves word-song', async () => {
     const user = userEvent.setup()
     const ctx = createMemoryStorage(defaultProgress())
     render(<ParentSettings storage={ctx.storage} />)
 
     await user.click(
-      screen.getByTestId('parent-settings-segmented-masteryThreshold-80-2'),
+      screen.getByTestId(
+        'parent-settings-segmented-masteryThreshold-math-80-2',
+      ),
     )
     expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
-      percent: 0.8,
-      sessions: 2,
+      math: { percent: 0.8, sessions: 2 },
+      // word-song untouched at its 90/3 default.
+      'word-song': { percent: 0.9, sessions: 3 },
     })
 
     await user.click(
-      screen.getByTestId('parent-settings-segmented-masteryThreshold-90-2'),
+      screen.getByTestId(
+        'parent-settings-segmented-masteryThreshold-math-95-3',
+      ),
     )
     expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
-      percent: 0.9,
-      sessions: 2,
+      math: { percent: 0.95, sessions: 3 },
+      'word-song': { percent: 0.9, sessions: 3 },
+    })
+  })
+
+  it('selects each word-song-track preset independently and preserves math', async () => {
+    const user = userEvent.setup()
+    const ctx = createMemoryStorage(defaultProgress())
+    render(<ParentSettings storage={ctx.storage} />)
+
+    await user.click(
+      screen.getByTestId(
+        'parent-settings-segmented-masteryThreshold-word-song-80-2',
+      ),
+    )
+    expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
+      // math untouched at its 95/3 default.
+      math: { percent: 0.95, sessions: 3 },
+      'word-song': { percent: 0.8, sessions: 2 },
     })
 
     await user.click(
-      screen.getByTestId('parent-settings-segmented-masteryThreshold-95-3'),
+      screen.getByTestId(
+        'parent-settings-segmented-masteryThreshold-word-song-95-3',
+      ),
     )
     expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
-      percent: 0.95,
-      sessions: 3,
+      math: { percent: 0.95, sessions: 3 },
+      'word-song': { percent: 0.95, sessions: 3 },
+    })
+  })
+
+  it('per-track selections are independent across two clicks', async () => {
+    // Click math 80/2, then word-song 95/3 — both selections survive,
+    // neither resets the other.
+    const user = userEvent.setup()
+    const ctx = createMemoryStorage(defaultProgress())
+    render(<ParentSettings storage={ctx.storage} />)
+
+    await user.click(
+      screen.getByTestId(
+        'parent-settings-segmented-masteryThreshold-math-80-2',
+      ),
+    )
+    await user.click(
+      screen.getByTestId(
+        'parent-settings-segmented-masteryThreshold-word-song-95-3',
+      ),
+    )
+    expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
+      math: { percent: 0.8, sessions: 2 },
+      'word-song': { percent: 0.95, sessions: 3 },
     })
   })
 
