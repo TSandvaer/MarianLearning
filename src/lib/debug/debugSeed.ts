@@ -2,14 +2,14 @@
  * One-shot localStorage seeder for QA / iPad ear-test workflows.
  *
  * When the URL has `?debug=1&seed=<value>`, this module pre-populates
- * `marian-tutor:progress:v1` and `marian-tutor.session-history.v1` so a
- * fresh browser session can deep-launch into a specific learning state
- * (e.g. "Marian as if she had mastered blending-cv and is now practicing
- * cvc-words"). Without this, the only way to test downstream-screen
- * behaviour is to play the natural progression from a fresh-storage
- * Splash → Greet → Math → ... — which on a desktop QA pass meant
- * pasting localStorage seed snippets into DevTools, and on iPad PWA
- * meant remote-debugger access (which most testers don't have).
+ * the persisted Progress + SessionHistory blobs so a fresh browser can
+ * deep-launch into a specific learning state (e.g. "Marian as if she
+ * had mastered through `blending-cv` and is now practicing `cvc-words`").
+ * Without this, the only way to reach a downstream-screen behaviour was
+ * to play the natural progression from a fresh-storage Splash → Greet →
+ * Math → ... — which on a desktop QA pass meant pasting localStorage
+ * snippets into DevTools, and on iPad PWA meant a remote-debugger session
+ * (which most testers don't have).
  *
  * Why `?debug=1` is the gate
  * --------------------------
@@ -20,83 +20,124 @@
  *
  * Why module-load (not useEffect)
  * -------------------------------
- * The seed must land in localStorage BEFORE any of the React-tree's
+ * The seed must land in localStorage BEFORE the React-tree's
  * `useState(loadProgress)` initializers, `getInitialRoute()`, or
- * `getInitialPostSplashRoute()` run — otherwise the first render reads
- * stale values and we'd need a forced reload to reflect the seed.
+ * `nextAfterSplash()` run — otherwise the first render reads stale
+ * values and a forced reload would be needed to reflect the seed.
  * Module-load timing puts this BEFORE the React tree even imports.
  * Mirrors the `disableHowlerAutoSuspend()` pattern at the top of
- * App.tsx.
+ * `App.tsx`.
+ *
+ * Type-driven schema sharing (post 2026-05-02 rework)
+ * ---------------------------------------------------
+ * The original 2026-05-02 implementation hand-mirrored the on-disk
+ * shape (`{version: 2, sessions: [...]}`) — wrong format for the
+ * canonical reader (which expects a flat `SessionHistoryV2` with
+ * `schemaVersion: 2`), so the reader fell back to `emptySessionHistory()`
+ * with `sessionCount: 0`, defeating the skip-Greet behaviour. Thomas
+ * caught the regression on iPad.
+ *
+ * To eliminate that whole class of bug:
+ *   - We import `SessionHistoryV2` and `emptySessionHistory()` from
+ *     `screens/SessionEnd/sessionHistory.ts` and use the real
+ *     `writeSessionHistory()` writer rather than hand-rolled JSON.
+ *     Schema drift becomes a TypeScript error, not a silent runtime
+ *     bug.
+ *   - We import `defaultProgress()` and `saveProgress()` from
+ *     `lib/progress` for the user-progress blob, so the seeder can
+ *     never produce a partial blob that fails `isProgressV1` — the
+ *     `loadProgress()` reader would otherwise return `null` and the
+ *     seeded `skillLevels` would be invisible to `pickFocusNode()`.
+ *
+ * No import cycle: the canonical modules (`sessionHistory.ts`,
+ * `lib/progress/storage.ts`, and their transitive deps) do not import
+ * anything under `lib/debug/`. Verified 2026-05-02 with a one-way
+ * grep before this rework.
  *
  * Idempotency
  * -----------
- * Reload-safe. The seeder checks if the requested progress is already
- * applied AND if a fake session-history entry already exists; if both
- * are true, it no-ops. So pasting the URL twice doesn't pile up
- * duplicate sessions, and the user can iterate freely on the same tab.
+ * Reload-safe.
+ *   - For progress: applying the same skillLevels patch a second time
+ *     short-circuits via a no-op write (the `changed` flag).
+ *   - For session-history: the seed only bumps `sessionCount` to 1 if
+ *     the existing value is 0. A real returning user with
+ *     `sessionCount > 0` is never displaced — the seeder MUST NOT
+ *     overwrite Marian's actual progress on a real device that
+ *     happens to load a `?debug=1&seed=...` URL.
  *
  * Recognized seed values
  * ----------------------
- * - `cvc-words`: Marian as if she's mastered blending-cv and is
- *   practicing cvc-words. Skips Greet (sets sessionCount to 1 via a
- *   fake math session in history) so the app deep-routes to Hub on
- *   first mount, where the user taps "Word Song" → picker reads the
- *   seeded `skillLevels` → routes to cvc-words content.
+ * - `cvc-words`: Marian as if she's mastered everything through
+ *   `blending-cv` and is now practicing `cvc-words`. Skips Greet (sets
+ *   sessionCount to 1) so the app deep-routes to Hub on first mount,
+ *   where the user taps "Word Song" → `pickFocusNode()` walks the
+ *   word-song tree and returns `cvc-words` (because every earlier node
+ *   is `mastered`) → planner emits cvc-words content.
  *
  * Adding new seeds
  * ----------------
  * Extend the `SEEDS` table below. Each entry declares (a) the
- * `skillLevels` patch and (b) whether to skip Greet. Test the new seed
- * value in `debugSeed.test.ts` against the same shape as the existing
- * entries.
+ * `skillLevels` patch and (b) whether to skip Greet. Make sure the
+ * patch marks ALL preceding nodes in the relevant track as `'mastered'`
+ * — `pickFocusNode()` walks left-to-right in declaration order and
+ * stops at the first non-mastered node, so a half-patched track lands
+ * on the wrong focus.
  */
 
+import {
+  defaultProgress,
+  loadProgress,
+  saveProgress,
+  type Progress,
+  type SkillLevel,
+  type SkillLevels,
+  type SkillNode,
+} from '../progress'
+import {
+  emptySessionHistory,
+  readSessionHistory,
+  writeSessionHistory,
+  type SessionHistoryV2,
+} from '../../screens/SessionEnd/sessionHistory'
 import { isDebugEnabled } from './isDebugEnabled'
 
-/** Storage key for the user-progress blob. Mirrors the constant in
- * `src/lib/progress/loadProgress.ts` (kept private here to avoid an
- * import cycle on the seeder, which must run at module load). */
-const PROGRESS_KEY = 'marian-tutor:progress:v1'
-
-/** Storage key for the session-history blob. Mirrors the constant in
- * `src/screens/SessionEnd/sessionHistory.ts` (same import-cycle reason). */
-const SESSION_HISTORY_KEY = 'marian-tutor.session-history.v1'
-
-/** Marker we stamp on a seeded fake session so the idempotency check
- * can recognize "this entry came from the seeder, not a real run". */
-const SEEDER_MARKER = '__debug_seed__'
-
 interface SeedRecipe {
-  /** skillLevels to merge over the existing progress. Keys not listed
-   * are left untouched; values 'locked' | 'practicing' | 'mastered'. */
-  readonly skillLevels: Readonly<
-    Record<string, 'locked' | 'practicing' | 'mastered'>
-  >
-  /** Whether to insert a fake session-history entry so sessionCount > 0
-   * and Splash routes to Hub instead of Greet. */
+  /**
+   * skillLevels to merge over the existing progress. Keys not listed
+   * are left untouched.
+   *
+   * NOTE: the picker walks the track in declaration order and stops at
+   * the first non-mastered node — when targeting a deep node, mark
+   * EVERY preceding node in that track as `'mastered'`, otherwise the
+   * picker lands on an earlier node and the seed misses its target.
+   */
+  readonly skillLevels: Readonly<Partial<Record<SkillNode, SkillLevel>>>
+  /**
+   * Whether to bump session-history's `sessionCount` to 1 (if currently
+   * 0) so Splash routes to Hub instead of Greet on the next mount.
+   */
   readonly skipGreet: boolean
-  /** Which surface the fake session pretends to come from. Must match
-   * a SessionEndPayload['surface']. */
-  readonly fakeSessionSurface: 'math' | 'word-song'
-  /** Which focus node the fake session records. Must be valid for the
-   * fakeSessionSurface track. */
-  readonly fakeSessionFocusNode: string
 }
 
 const SEEDS: Readonly<Record<string, SeedRecipe>> = {
   'cvc-words': {
     skillLevels: {
+      // Mark every preceding word-song node as mastered so the picker
+      // walks past them and lands on `cvc-words`. Order mirrors
+      // WORD_SONG_NODES_IN_ORDER in lib/progress/focusNode.ts.
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
       'blending-cv': 'mastered',
       'cvc-words': 'practicing',
     },
     skipGreet: true,
-    fakeSessionSurface: 'math',
-    fakeSessionFocusNode: 'add-to-10',
   },
 }
 
-/** Returns the seed value from `?seed=<value>` if `?debug=1` is also
- * present. Returns `null` when no debug seed is requested. */
+/**
+ * Returns the seed value from `?seed=<value>` if `?debug=1` is also
+ * present. Returns `null` when no debug seed is requested.
+ */
 export function readDebugSeedParam(): string | null {
   if (typeof window === 'undefined' || !window.location) return null
   if (!isDebugEnabled()) return null
@@ -107,10 +148,12 @@ export function readDebugSeedParam(): string | null {
   }
 }
 
-/** Apply a recognized debug seed exactly once per stored state. Safe
+/**
+ * Apply a recognized debug seed exactly once per stored state. Safe
  * to call multiple times — idempotent on the persisted blobs. No-op
  * when `?debug=1` is missing, when no `?seed=` is provided, or when
- * the seed value is not in the SEEDS table. */
+ * the seed value is not in the SEEDS table.
+ */
 export function maybeApplyDebugSeed(): void {
   const value = readDebugSeedParam()
   if (value === null) return
@@ -126,83 +169,66 @@ export function maybeApplyDebugSeed(): void {
 
   applySkillLevelsPatch(recipe.skillLevels)
   if (recipe.skipGreet) {
-    insertFakeSessionIfMissing(
-      recipe.fakeSessionSurface,
-      recipe.fakeSessionFocusNode,
-    )
+    bumpSessionCountIfZero()
   }
 }
 
+/**
+ * Merge the recipe's skillLevels patch over the persisted Progress
+ * document, then save via the canonical `saveProgress()` writer.
+ *
+ * If no progress exists (fresh storage), starts from `defaultProgress()`
+ * so the resulting blob fully validates as v1 — `loadProgress()` would
+ * otherwise return `null` for a partial blob and `pickFocusNode()`
+ * would never see the seeded skill levels.
+ *
+ * Idempotent: a second call with the same patch detects "no change" and
+ * skips the write.
+ */
 function applySkillLevelsPatch(
-  patch: Readonly<Record<string, 'locked' | 'practicing' | 'mastered'>>,
+  patch: Readonly<Partial<Record<SkillNode, SkillLevel>>>,
 ): void {
-  let progress: Record<string, unknown>
-  try {
-    const raw = window.localStorage.getItem(PROGRESS_KEY)
-    progress = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
-  } catch {
-    progress = {}
-  }
-  const skillLevels =
-    typeof progress.skillLevels === 'object' && progress.skillLevels !== null
-      ? (progress.skillLevels as Record<string, string>)
-      : {}
+  const stored = loadProgress()
+  const existing: Progress = stored ?? defaultProgress()
+  const nextSkillLevels: SkillLevels = { ...existing.skillLevels }
   let changed = false
-  for (const [key, value] of Object.entries(patch)) {
-    if (skillLevels[key] !== value) {
-      skillLevels[key] = value
+  for (const [key, value] of Object.entries(patch) as Array<
+    [SkillNode, SkillLevel]
+  >) {
+    if (nextSkillLevels[key] !== value) {
+      nextSkillLevels[key] = value
       changed = true
     }
   }
-  if (!changed) return
-  progress.skillLevels = skillLevels
-  try {
-    window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress))
-  } catch {
-    // Storage write failed (quota, private mode, etc.) — surface but
-    // don't throw. The seeder is best-effort.
-    console.warn('[debugSeed] Failed to persist progress patch')
-  }
+  // If nothing changed AND we already had a valid stored blob, skip the
+  // write. If `stored === null` (fresh storage), we still write so a
+  // valid blob lands on disk for downstream readers (`loadProgress()`
+  // would otherwise keep returning null and `pickFocusNode()` would
+  // never see the seed).
+  if (!changed && stored !== null) return
+  saveProgress({ ...existing, skillLevels: nextSkillLevels })
 }
 
-function insertFakeSessionIfMissing(
-  surface: 'math' | 'word-song',
-  focusNode: string,
-): void {
-  let history: { version?: number; sessions?: unknown[] }
-  try {
-    const raw = window.localStorage.getItem(SESSION_HISTORY_KEY)
-    history = raw
-      ? (JSON.parse(raw) as { version?: number; sessions?: unknown[] })
-      : { version: 2, sessions: [] }
-  } catch {
-    history = { version: 2, sessions: [] }
+/**
+ * Write a minimal valid `SessionHistoryV2` with `sessionCount: 1` if
+ * the stored value parses to a sessionCount of 0 (i.e. a fresh-storage
+ * profile). If a real session history already exists with
+ * sessionCount > 0, it's preserved verbatim — the debug seeder MUST
+ * NOT displace Marian's actual progress on a real-user device that
+ * happens to load a `?debug=1&seed=...` URL.
+ *
+ * The fake history is built off `emptySessionHistory()` so its shape
+ * is whatever the canonical reader produces. Type-anchored to
+ * `SessionHistoryV2`; any drift in the canonical type fails this file
+ * at compile time, not at the user's iPad.
+ */
+function bumpSessionCountIfZero(): void {
+  const existing = readSessionHistory()
+  if (existing.sessionCount > 0) return
+  const fakeHistory: SessionHistoryV2 = {
+    ...emptySessionHistory(),
+    sessionCount: 1,
+    lastSessionCompletedAt: new Date().toISOString(),
   }
-  const sessions = Array.isArray(history.sessions) ? history.sessions : []
-  // Idempotency check — already seeded?
-  const alreadySeeded = sessions.some(
-    (s) =>
-      typeof s === 'object' &&
-      s !== null &&
-      (s as Record<string, unknown>)[SEEDER_MARKER] === true,
-  )
-  if (alreadySeeded) return
-  sessions.push({
-    [SEEDER_MARKER]: true,
-    surface,
-    dateISO: new Date().toISOString(),
-    totalCorrect: 8,
-    totalStardust: 8,
-    finalStreak: 8,
-    earnedThisSession: 8,
-    focusNode,
-  })
-  try {
-    window.localStorage.setItem(
-      SESSION_HISTORY_KEY,
-      JSON.stringify({ version: history.version ?? 2, sessions }),
-    )
-  } catch {
-    console.warn('[debugSeed] Failed to persist fake session entry')
-  }
+  writeSessionHistory(fakeHistory)
 }

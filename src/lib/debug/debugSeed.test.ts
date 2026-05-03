@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { maybeApplyDebugSeed, readDebugSeedParam } from './debugSeed'
-
-const PROGRESS_KEY = 'marian-tutor:progress:v1'
-const SESSION_HISTORY_KEY = 'marian-tutor.session-history.v1'
+import {
+  STORAGE_KEY as PROGRESS_KEY,
+  loadProgress,
+  pickFocusNode,
+} from '../progress'
+import {
+  SESSION_HISTORY_KEY,
+  readSessionHistory,
+} from '../../screens/SessionEnd/sessionHistory'
 
 function setSearch(search: string): void {
   Object.defineProperty(window, 'location', {
@@ -79,78 +85,103 @@ describe('maybeApplyDebugSeed', () => {
 
     it('writes blending-cv: mastered + cvc-words: practicing into progress', () => {
       maybeApplyDebugSeed()
-      const progress = JSON.parse(
-        window.localStorage.getItem(PROGRESS_KEY) ?? '{}',
-      ) as { skillLevels?: Record<string, string> }
-      expect(progress.skillLevels?.['blending-cv']).toBe('mastered')
-      expect(progress.skillLevels?.['cvc-words']).toBe('practicing')
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(progress?.skillLevels['blending-cv']).toBe('mastered')
+      expect(progress?.skillLevels['cvc-words']).toBe('practicing')
+    })
+
+    it('round-trip integration: maybeApplyDebugSeed → pickFocusNode("word-song") → "cvc-words"', () => {
+      // The acceptance criterion the orchestrator's 2026-05-02 partial
+      // fix did not cover: the seed must mark every preceding word-song
+      // node as mastered, otherwise pickFocusNode walks the tree and
+      // stops at the first non-mastered earlier node ("letter-sounds"
+      // by default). loadProgress() must also accept the persisted blob
+      // (a partial blob fails isProgressV1 → null → undefined hint to
+      // the planner → server falls back to the track default
+      // "blending-cv", not "cvc-words").
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(pickFocusNode(progress!, 'word-song')).toBe('cvc-words')
     })
 
     it('preserves any pre-existing skillLevels not in the patch', () => {
-      window.localStorage.setItem(
-        PROGRESS_KEY,
-        JSON.stringify({ skillLevels: { 'add-to-10': 'mastered' } }),
-      )
+      // Apply once to land a fully-shaped Progress blob, then
+      // hand-mutate a math node and re-apply. The patch only touches
+      // word-song nodes, so the math mutation must round-trip.
       maybeApplyDebugSeed()
-      const progress = JSON.parse(
-        window.localStorage.getItem(PROGRESS_KEY) ?? '{}',
-      ) as { skillLevels?: Record<string, string> }
-      expect(progress.skillLevels?.['add-to-10']).toBe('mastered')
-      expect(progress.skillLevels?.['blending-cv']).toBe('mastered')
-      expect(progress.skillLevels?.['cvc-words']).toBe('practicing')
+      const seeded = loadProgress()
+      expect(seeded).not.toBeNull()
+      const mutated = {
+        ...seeded!,
+        skillLevels: {
+          ...seeded!.skillLevels,
+          'add-to-20': 'mastered' as const,
+        },
+      }
+      window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(mutated))
+      maybeApplyDebugSeed()
+      const after = loadProgress()
+      expect(after?.skillLevels['add-to-20']).toBe('mastered')
+      expect(after?.skillLevels['blending-cv']).toBe('mastered')
+      expect(after?.skillLevels['cvc-words']).toBe('practicing')
     })
 
-    it('inserts a fake session-history entry so sessionCount > 0 (skip Greet)', () => {
+    it('round-trip integration: maybeApplyDebugSeed → readSessionHistory().sessionCount === 1', () => {
+      // This is the regression test for the bug Thomas caught on iPad
+      // 2026-05-02. The original seeder wrote {version, sessions} and
+      // the canonical readSessionHistory() — which validates strictly
+      // against the SessionHistoryV2 shape — fell back to
+      // emptySessionHistory() with sessionCount: 0. Splash then routed
+      // to Greet instead of Hub. This test exercises the full
+      // seeder → reader round-trip; if either side drifts in shape, it
+      // fails.
       maybeApplyDebugSeed()
-      const history = JSON.parse(
-        window.localStorage.getItem(SESSION_HISTORY_KEY) ?? '{}',
-      ) as { version?: number; sessions?: Array<Record<string, unknown>> }
-      expect(history.version).toBe(2)
-      expect(history.sessions).toHaveLength(1)
-      expect(history.sessions?.[0]?.['__debug_seed__']).toBe(true)
-      expect(history.sessions?.[0]?.['surface']).toBe('math')
-      expect(history.sessions?.[0]?.['focusNode']).toBe('add-to-10')
+      const history = readSessionHistory()
+      expect(history.sessionCount).toBe(1)
+      expect(history.schemaVersion).toBe(2)
+      // Non-empty timestamp: we wrote new Date().toISOString().
+      expect(history.lastSessionCompletedAt).not.toBe('')
     })
 
-    it('is idempotent — calling twice does not double-insert sessions or re-write unchanged progress', () => {
+    it('is idempotent on session-history — second call does not displace existing seeded state', () => {
       maybeApplyDebugSeed()
       const after1 = window.localStorage.getItem(SESSION_HISTORY_KEY)
       maybeApplyDebugSeed()
       const after2 = window.localStorage.getItem(SESSION_HISTORY_KEY)
+      // Same blob — second call's readSessionHistory() returns
+      // sessionCount: 1 from the first call, and bumpSessionCountIfZero
+      // short-circuits.
       expect(after2).toBe(after1)
-      const history = JSON.parse(after2 ?? '{}') as {
-        sessions?: unknown[]
-      }
-      expect(history.sessions).toHaveLength(1)
     })
 
-    it('does not displace a real session that already exists', () => {
+    it('does not displace a real session-history that already has sessionCount > 0', () => {
+      // Real-ish v2 history that a returning user would have.
+      const realHistory = {
+        schemaVersion: 2,
+        sessionCount: 5,
+        lastSessionCompletedAt: '2026-05-01T10:00:00.000Z',
+        longestStreakEver: 12,
+        cumulativeStardust: 47,
+        lastSessionStardust: 9,
+        dayStreak: 3,
+        todayTreesTouched: { date: '2026-05-01', trees: ['number-garden'] },
+        lastSuggestion: null,
+        consecutiveOverrides: 0,
+        suggestionCooldownUntil: null,
+      }
       window.localStorage.setItem(
         SESSION_HISTORY_KEY,
-        JSON.stringify({
-          version: 2,
-          sessions: [
-            {
-              surface: 'math',
-              dateISO: '2026-05-01T10:00:00.000Z',
-              totalCorrect: 7,
-              totalStardust: 9,
-              finalStreak: 5,
-              earnedThisSession: 9,
-              focusNode: 'add-to-10',
-              // No __debug_seed__ marker — this is a "real" session.
-            },
-          ],
-        }),
+        JSON.stringify(realHistory),
       )
       maybeApplyDebugSeed()
-      const history = JSON.parse(
-        window.localStorage.getItem(SESSION_HISTORY_KEY) ?? '{}',
-      ) as { sessions?: Array<Record<string, unknown>> }
-      // Real session preserved + 1 seeded session inserted.
-      expect(history.sessions).toHaveLength(2)
-      expect(history.sessions?.[0]?.['__debug_seed__']).toBeUndefined()
-      expect(history.sessions?.[1]?.['__debug_seed__']).toBe(true)
+      const after = readSessionHistory()
+      // Real session count + all real fields preserved verbatim.
+      expect(after.sessionCount).toBe(5)
+      expect(after.cumulativeStardust).toBe(47)
+      expect(after.longestStreakEver).toBe(12)
+      expect(after.lastSessionCompletedAt).toBe('2026-05-01T10:00:00.000Z')
     })
   })
 })
