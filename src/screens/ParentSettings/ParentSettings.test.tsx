@@ -307,6 +307,74 @@ describe('ParentSettings — exit', () => {
   })
 })
 
+describe('ParentSettings — pending-promotion banner (M3 audit, ticket 86c9kwnkw)', () => {
+  function progressWithPending(): Progress {
+    const base = defaultProgress()
+    return {
+      ...base,
+      pendingPromotion: 'add-to-10',
+      parentSettings: {
+        ...DEFAULT_PARENT_SETTINGS,
+        autoPromote: false,
+      },
+      skillLevels: { ...base.skillLevels, 'add-to-10': 'practicing' },
+    }
+  }
+
+  it('hides the banner when pendingPromotion is undefined', () => {
+    const { storage } = createMemoryStorage(defaultProgress())
+    render(<ParentSettings storage={storage} />)
+    expect(screen.queryByTestId('parent-settings-pending-promotion')).toBeNull()
+  })
+
+  it('hides the banner when autoPromote is true (engine never queues in that case)', () => {
+    // Defensive: even if a stale `pendingPromotion` somehow exists with
+    // autoPromote=true, we don't surface the banner — the engine's
+    // auto-promote re-entry will clear the queue on the next session-end.
+    const stale: Progress = {
+      ...defaultProgress(),
+      pendingPromotion: 'add-to-10',
+      // autoPromote stays true via DEFAULT_PARENT_SETTINGS in
+      // defaultProgress(), so no override needed.
+    }
+    const { storage } = createMemoryStorage(stale)
+    render(<ParentSettings storage={storage} />)
+    expect(screen.queryByTestId('parent-settings-pending-promotion')).toBeNull()
+  })
+
+  it('surfaces the banner when autoPromote is off AND pendingPromotion is set', () => {
+    const { storage } = createMemoryStorage(progressWithPending())
+    render(<ParentSettings storage={storage} />)
+    const banner = screen.getByTestId('parent-settings-pending-promotion')
+    expect(banner.getAttribute('data-node')).toBe('add-to-10')
+    expect(
+      screen.getByTestId('parent-settings-pending-promotion-label').textContent,
+    ).toBe('add to 10')
+  })
+
+  it('Confirm button applies the promotion and clears pendingPromotion', async () => {
+    const user = userEvent.setup()
+    const { storage, saved, current } = createMemoryStorage(
+      progressWithPending(),
+    )
+    render(<ParentSettings storage={storage} />)
+    await user.click(screen.getByTestId('parent-settings-confirm-promotion'))
+
+    // The save count reflects exactly one save for the confirm.
+    expect(saved).toHaveLength(1)
+    const after = current()!
+    expect(after.pendingPromotion).toBeUndefined()
+    expect(after.skillLevels['add-to-10']).toBe('mastered')
+    // Downstream node was unlocked.
+    expect(after.skillLevels['add-to-20']).toBe('intro')
+    // Parent's autoPromote preference (false) is preserved.
+    expect(after.parentSettings?.autoPromote).toBe(false)
+
+    // Banner unmounts after the apply.
+    expect(screen.queryByTestId('parent-settings-pending-promotion')).toBeNull()
+  })
+})
+
 describe('ParentSettings — DEFAULT_PARENT_SETTINGS contract', () => {
   it('matches the seed defaults shown in the empty-storage path', () => {
     const { storage } = createMemoryStorage(null)

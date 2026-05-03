@@ -140,7 +140,11 @@ export const CELEBRATION_DURATION_S = CELEBRATION_DURATION_MS / 1000
  */
 export const CELEBRATION_TILT_KEYFRAMES = [0, -6, -6, 0] as const
 export const CELEBRATION_TILT_TIMES = [0, 0.286, 0.643, 1] as const
-export const CELEBRATION_TILT_EASES = ['easeOut', 'linear', 'easeInOut'] as const
+export const CELEBRATION_TILT_EASES = [
+  'easeOut',
+  'linear',
+  'easeInOut',
+] as const
 
 /**
  * Idle breathing scale loop. Spec: `design/character/motion-brief.md`

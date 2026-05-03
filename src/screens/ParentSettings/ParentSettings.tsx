@@ -31,6 +31,7 @@ import { useCallback, useMemo, useState, type ReactElement } from 'react'
 import {
   DEFAULT_PARENT_SETTINGS,
   MASTERY_THRESHOLD_PRESETS,
+  applyMasteryRule,
   defaultProgress,
   getSettings,
   loadProgress,
@@ -41,6 +42,7 @@ import {
   type Progress,
   type SessionModePicker,
 } from '../../lib/progress'
+import { labelForSkillNode } from '../Hub/progressProjection'
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -134,6 +136,46 @@ export default function ParentSettings({
     [storage],
   )
 
+  /**
+   * Confirm the queued `pendingPromotion` (M3 audit follow-up, ticket
+   * 86c9kwnkw). Applies the promotion via `applyMasteryRule()` against a
+   * temporarily-`autoPromote=true` view of the document — the rule's
+   * "auto-promote re-entry" branch picks up the queued node, marks it
+   * `'mastered'`, unlocks the downstream node, and clears the field.
+   *
+   * After the apply, we restore the parent's actual `autoPromote`
+   * preference. Side effect: any FRESH promotion that the rule would
+   * have queued in the same call is also applied (unlikely — it requires
+   * a second node to qualify on the current history). That's acceptable;
+   * the alternative (carrying the parent's autoPromote=false and
+   * synthesising a single-node mutation) duplicates the rule's logic.
+   */
+  const handleConfirmPromotion = useCallback(() => {
+    setProgress((prev) => {
+      if (prev.pendingPromotion === undefined) return prev
+      const trueAutoPromote: Progress = {
+        ...prev,
+        parentSettings: {
+          ...getSettings(prev),
+          autoPromote: true,
+        },
+      }
+      const promoted = applyMasteryRule(trueAutoPromote)
+      // Restore the parent's actual autoPromote setting in the persisted
+      // shape — they didn't ask to flip the toggle, just to confirm one
+      // queued promotion.
+      const restored: Progress = {
+        ...promoted,
+        parentSettings: {
+          ...getSettings(promoted),
+          autoPromote: getSettings(prev).autoPromote,
+        },
+      }
+      storage.save(restored)
+      return restored
+    })
+  }, [storage])
+
   return (
     <main
       data-testid="parent-settings"
@@ -170,6 +212,48 @@ export default function ParentSettings({
             Done
           </button>
         </header>
+
+        {/* Pending-promotion banner (M3 audit follow-up, ticket 86c9kwnkw).
+            Surfaced ONLY when auto-promote is off AND the engine has queued
+            a node. When auto-promote is on the engine applies promotions
+            silently and `pendingPromotion` is never written, so this banner
+            stays hidden in the default flow. */}
+        {progress.pendingPromotion !== undefined && !settings.autoPromote && (
+          <section
+            data-testid="parent-settings-pending-promotion"
+            data-node={progress.pendingPromotion}
+            className="
+              mb-6 rounded-md border border-emerald-300 bg-emerald-50 p-4
+            "
+          >
+            <h2 className="text-base font-semibold text-emerald-900">
+              Promotion ready to confirm
+            </h2>
+            <p className="mt-1 text-sm text-emerald-900/80">
+              Marian has met the mastery threshold for{' '}
+              <span
+                data-testid="parent-settings-pending-promotion-label"
+                className="font-medium"
+              >
+                {labelForSkillNode(progress.pendingPromotion)}
+              </span>
+              . Confirm to advance her to the next skill.
+            </p>
+            <button
+              type="button"
+              data-testid="parent-settings-confirm-promotion"
+              onClick={handleConfirmPromotion}
+              className="
+                mt-3 rounded-md border border-emerald-700 bg-emerald-700
+                px-4 py-2 text-sm font-medium text-white
+                hover:bg-emerald-800
+                focus:outline-none focus:ring-2 focus:ring-emerald-500
+              "
+            >
+              Confirm promotion
+            </button>
+          </section>
+        )}
 
         <div
           data-testid="parent-settings-rows"
