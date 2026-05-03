@@ -385,7 +385,18 @@ describe('SessionEnd', () => {
     )
 
     const loaded = loadProgress()
-    expect(loaded?.history[0].skillFocus).toEqual(['blending-cv'])
+    // Pre-step-2 (the original P0 clamp, ticket 86c9kt47v) this expected
+    // 'blending-cv' because pickFocusNode was hard-clamped on the
+    // word-song branch. Step 2 (ticket 86c9kxu07) un-clamped the picker
+    // — it now walks LITERACY_TREE honouring skillLevels, same as the
+    // math walker. The default Progress doc has letter-sounds as the
+    // first non-mastered literacy node (per `defaults.ts` — Marian's
+    // April 2026 diagnostic), so a fresh-profile word-song session
+    // attributes its history to letter-sounds. This is the intended
+    // behaviour: even though the planner falls back to blending-cv
+    // content for letter-sounds (untuned tier), the recorded focus is
+    // what the picker actually selected.
+    expect(loaded?.history[0].skillFocus).toEqual(['letter-sounds'])
     expect(loaded?.history[0].successRate).toBe(
       WORD_SONG_PAYLOAD.totalCorrect / 8,
     )

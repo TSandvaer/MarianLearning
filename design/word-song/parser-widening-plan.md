@@ -1,8 +1,9 @@
 # Word Song parser-widening plan
 
-**Ticket:** `86c9kxp08` (step 1) and follow-up step-2 ticket (TBD).
+**Ticket:** `86c9kxp08` (step 1, MERGED as PR #132) +
+`86c9kxu07` (step 2).
 **Author:** Kevin (rule logic + adaptive engine ownership).
-**Status:** Step 1 in flight.
+**Status:** Step 1 MERGED. Step 2 in flight (this PR).
 
 This document is the canonical hand-off between the browser parser and
 the Haiku planner system prompt for the Word Song track. It is the
@@ -99,39 +100,49 @@ different UI affordance than tap-a-picture-chip; see §Out of scope).
 
 ---
 
-## Step 2 (next PR — separate ticket)
+## Step 2 (this PR — ticket `86c9kxu07`)
 
 Goal of step 2: **make the planner emit `cvc-word` content + un-clamp
 the picker** so Marian's focus moves to `cvc-words` once she masters
-`blending-cv`.
+`blending-cv`. **This is the August 2026 timeline unblock for the
+literacy track.**
 
-**Concrete changes:**
+**Concrete changes (DONE — this PR):**
 
-1. **`api/_planner.ts WORD_SONG_TRACK_GUIDE` widens.** Today it says
-   "ALWAYS generates the same single content mode". Step 2 changes it
-   to dispatch on the user-message focus node:
+1. **`api/_planner.ts WORD_SONG_TRACK_GUIDE` widens.** The previous
+   single-mode prompt now describes TWO first-class content modes:
    - `focusNode === 'blending-cv'` → emit `"Tap the <word>."` problems
      (status quo).
    - `focusNode === 'cvc-words'` → emit `"Read the <word>."` problems.
      Word pool is the same 14 short-a CVC words; broader CVC pools
      are gated on Marian's vowel progression (see §Future tiers).
-   - All other focus nodes → fall back to `blending-cv` for now (the
-     planner explicitly clamps unsupported nodes; the parser side will
-     widen further in step 3+).
-2. **`api/_planner.test.ts` gains regression tests.** Mirror the
-   parser's content-type round-trip: a synthetic plan emitted under
-   `focusNode: 'cvc-words'` must round-trip through the browser
-   parser as `contentType: 'cvc-word'` for every problem.
-3. **`src/lib/progress/focusNode.ts pickFocusNode` un-clamps the
-   `'word-song'` branch.** The hard return of `'blending-cv'` becomes
-   a guarded return: walk the tree, but stop at `'cvc-words'` (the
-   highest content the planner emits today). Anything beyond
-   `'cvc-words'` falls back to `'blending-cv'` until the next
-   widening step ships. The TODO comment migrates with the clamp
-   line.
+   - All other focus nodes (`letter-sounds`, `digraphs`,
+     `sight-words`, `simple-sentences`) → fall back to `blending-cv`
+     content as a STUB so the screen always renders. This is handled
+     by `effectiveFocusNode` server-side; the user message just names
+     `blending-cv` for those nodes. Future paired parser-then-planner
+     widenings move each tier to first-class.
+2. **`api/_planner.test.ts` regression tests updated.** The pre-step-2
+   "single-mode" describe block becomes a "first-class blending-cv +
+   cvc-words, untuned tiers stub" sweep. New round-trip tests live in
+   `src/screens/WordSong/plannerRoundTrip.test.ts` and exercise
+   planner→parser integration for both first-class modes plus the
+   stub-fallback path.
+3. **`src/lib/progress/focusNode.ts pickFocusNode` un-clamped.** The
+   word-song branch now walks `WORD_SONG_NODES_IN_ORDER` honouring
+   `skillLevels`, identical pattern to the math walker. Untuned tiers
+   are safe to surface because the planner's stub-fallback content
+   keeps them rendering. Tests pin AC scenarios (a/b/c) from ticket
+   `86c9kxu07`.
 4. **`MATH_FOCUS_NODE_GUIDE` is unchanged** (math track is not in
    scope).
-5. **No picture-asset dependency.** The cvc-word pictures are the
+5. **`scripts/generateSessionCanon.ts` adds `cvc-words`** to the
+   word-song combo enumeration. Pre-step-2 the script baked only
+   `blending-cv`; post-step-2 it bakes both first-class modes. Untuned
+   tiers stay out of canon on purpose — they fall back to blending-cv
+   content, so baking them would just be a wasteful duplicate of the
+   blending-cv blob.
+6. **No picture-asset dependency.** The cvc-word pictures are the
    same 22 the v1 pack already covers — see §Picture asset
    dependency.
 
@@ -139,15 +150,14 @@ the picker** so Marian's focus moves to `cvc-words` once she masters
 exactly the failure mode that produced the P0 in PR #117. By splitting
 the work, each side ships in isolation:
 
-- Step 1 (this PR) is a pure-additive parser change. Existing prod
-  sessions cannot regress because the planner doesn't emit the new
-  template yet.
-- Step 2 ships only after step 1 is on `main`. The parser is then
-  proven to accept the shape; the planner change is a one-sided
-  emission delta.
-
-If step 2 introduces a planner regression, step 1 stays valid and the
-revert surface is small (one file: `api/_planner.ts`).
+- Step 1 (PR #132 / `86c9kxp08`) was a pure-additive parser change.
+  Existing prod sessions could not regress because the planner didn't
+  emit the new template yet.
+- Step 2 (this PR / `86c9kxu07`) ships only after step 1 is on `main`.
+  The parser is proven to accept the shape; the planner change is a
+  one-sided emission delta. If step 2 introduces a planner regression,
+  step 1 stays valid and the revert surface is small (one file:
+  `api/_planner.ts`).
 
 ---
 
@@ -179,7 +189,7 @@ Same parser-first ordering applies to every future widening. Per
 
 | Tier               | Read-line template (proposed)                                                                                                                                                                                          | Parser change                                        | Planner change             |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------- |
-| `cvc-words`        | `"Read the <word>."`                                                                                                                                                                                                   | This PR (step 1)                                     | Step 2 (next ticket)       |
+| `cvc-words`        | `"Read the <word>."`                                                                                                                                                                                                   | DONE (PR #132, step 1)                               | DONE (this PR, step 2)     |
 | `digraphs`         | TBD — likely `"Read the <word>."` with broader pool, or `"Find <digraph> in <word>."` if a tap-a-digraph-tile UI surface lands                                                                                         | Future PR — parser first                             | Future PR — planner second |
 | `sight-words`      | TBD — likely `"Read the <word>."` with sight-word pool. Decoding strategy differs (memorisation, not sound-out) but the parser surface can be identical to cvc-word. UI affordance is the deciding factor.             | Future PR — parser first                             | Future PR — planner second |
 | `simple-sentences` | Brand new shape — sentence + missing-word picker, or sentence + read-aloud confirmation. Not a `"<verb> the <word>."` template. The wire-shape contract may need to grow a `kind` field on each problem at this point. | Future PR — parser-design first, then implementation | Future PR                  |
