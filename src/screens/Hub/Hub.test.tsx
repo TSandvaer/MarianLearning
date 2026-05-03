@@ -675,6 +675,31 @@ describe('Hub — promotion celebration (M3 audit follow-up, ticket 86c9kwnkw)',
     })
     expect(screen.getAllByTestId('hub-tree-node')).toHaveLength(2)
   })
+
+  it('renders exactly one Emma at a time (mutual exclusion: idle vs celebration)', () => {
+    // Regression for the iPad double-Emma stacking bug surfaced on
+    // PR #140: the idle Hub Emma was rendering as a sibling of the
+    // celebration Emma, so both were visible. Gate is a hard
+    // mutual-exclusion — count assertion per
+    // `feedback_count_assertions_on_regression_tests.md`.
+
+    // (1) No pendingPromotion → only the idle Emma renders.
+    const { unmount } = renderHub({ storage: createMemoryStorage() })
+    expect(screen.getByTestId('hub-emma')).toBeInTheDocument()
+    expect(screen.queryByTestId('hub-promotion-emma')).toBeNull()
+    expect(screen.queryAllByTestId(/^hub(-promotion)?-emma$/)).toHaveLength(1)
+    unmount()
+
+    // (2) pendingPromotion set → only the celebration Emma renders;
+    //     the idle Emma is unmounted.
+    renderHub({
+      storage: createMemoryStorage(),
+      pendingPromotion: 'add-to-20',
+    })
+    expect(screen.queryByTestId('hub-emma')).toBeNull()
+    expect(screen.getByTestId('hub-promotion-emma')).toBeInTheDocument()
+    expect(screen.queryAllByTestId(/^hub(-promotion)?-emma$/)).toHaveLength(1)
+  })
 })
 
 describe('Hub — anti-dark-pattern', () => {

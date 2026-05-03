@@ -458,20 +458,31 @@ export default function Hub({
           22vh band fall through to whatever sits behind. The Emma
           image itself opts back in (`pointer-events-auto`) to receive
           the M2.5 character long-press — only the image bounds are
-          live, not the surrounding band. */}
+          live, not the surrounding band.
+
+          Idle Emma is suppressed while the promotion celebration is
+          visible (ticket 86c9m4afh follow-up): the celebration mounts
+          its own Emma (`hub-promotion-emma`) and the two were stacking
+          visibly on iPad because they live in sibling subtrees rather
+          than under a shared `AnimatePresence` that could perform the
+          `layoutId="emma"` morph. v1 fix is a hard mutual-exclusion
+          gate — clean unmount/remount, no double-Emma. A real shared-
+          element morph is filed as a separate polish ticket. */}
       <div className="pointer-events-none flex h-[22vh] w-full items-center justify-center">
         {/* Phase 3b motion brief (ticket 86c9kwvza): consume `EmmaCharacter`
             so Hub's idle Emma breathes (`scale [1, 1.02, 1]` over 4s) per
             §3.5. Hub never swaps poses, so the only motion-brief item that
             matters here is the breathing loop. The shared component also
             wires the long-press handlers via spread. */}
-        <EmmaCharacter
-          pose="idle"
-          layoutId="emma"
-          data-testid="hub-emma"
-          className="pointer-events-auto h-full w-auto select-none touch-none"
-          {...characterLongPressProps}
-        />
+        {!celebrationVisible && (
+          <EmmaCharacter
+            pose="idle"
+            layoutId="emma"
+            data-testid="hub-emma"
+            className="pointer-events-auto h-full w-auto select-none touch-none"
+            {...characterLongPressProps}
+          />
+        )}
       </div>
 
       {/* Speech ribbon — same word-by-word reveal pattern as
