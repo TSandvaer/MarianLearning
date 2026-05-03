@@ -109,6 +109,42 @@ const HUD_POP_TWEEN = {
   ease: 'easeOut' as const,
 }
 
+/**
+ * Silent-text window for `cvc-word` problems (ticket 86c9m3ae6).
+ *
+ * On a `cvc-word` problem mount the word text renders immediately, but
+ * Emma's read-aloud is delayed by this many milliseconds. The intent is
+ * to preserve a decoding opportunity: Marian sees "cat" silently, has
+ * a beat to sound it out, THEN hears Emma read the line. Without this
+ * window, hearing the word converts the phonics task into a listening
+ * task (Dave's developmental review on PR #135 / PR #139).
+ *
+ * Scope: applies ONLY to `cvc-word` content (the "Read the X." template).
+ * `blending-cv` problems ("Tap the X.") fire audio immediately as before
+ * — that flow is recognise-by-name and doesn't benefit from a silent
+ * decode beat.
+ *
+ * Reduced-motion: `prefers-reduced-motion: reduce` does NOT skip this
+ * window. The silent beat is a *cognitive* affordance (decoding time),
+ * not a motion affordance. Skipping it for reduced-motion users would
+ * degrade the phonics value of the screen for the population the setting
+ * targets (vestibular sensitivity), which has no relation to phonics
+ * decoding speed. Document-here choice; revisit if user research surfaces
+ * a different signal.
+ *
+ * Visibility: if the page is hidden when the window elapses, fire the
+ * read-aloud on the next `visibilitychange → visible`. Same `unmount /
+ * problem-advance / spokeReadAloudRef` guards apply, so a re-arm cannot
+ * double-fire. The simpler "check at window-end" pattern was preferred
+ * over a tick-by-tick pause/resume — the silent window is short (1.5s)
+ * and the round-trip via the visibility listener is functionally
+ * indistinguishable to a user.
+ *
+ * Tuning: 1500ms is the starting value per Thomas's brief; iterate via
+ * iPad ear-test if the beat reads as too short or too long.
+ */
+const SILENT_TEXT_WINDOW_MS = 1500
+
 // ── Public types ----------------------------------------------------------
 
 /** Shape the screen invokes when problem 8 finishes. Per spec §"Transition
@@ -457,6 +493,19 @@ function WordSongScreen({
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const poseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const streakFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * Silent-text window timer (cvc-word problems only). Cleared on
+   * unmount, problem advance, or replaced by a re-arm fired from
+   * `visibilitychange → visible`. Ticket 86c9m3ae6.
+   */
+  const silentTextTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /**
+   * Subscription handle for the `visibilitychange` re-arm listener used
+   * by the silent-text window when the page is hidden at window-end.
+   * Cleared in `clearAllTimers` so a unit-test or unmount path tears it
+   * down deterministically. Ticket 86c9m3ae6.
+   */
+  const silentTextVisibilityListenerRef = useRef<(() => void) | null>(null)
 
   /**
    * Synchronous gates for the chained advance after a correct answer.
@@ -483,11 +532,16 @@ function WordSongScreen({
       hintTimerRef,
       poseTimerRef,
       streakFadeTimerRef,
+      silentTextTimerRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
         ref.current = null
       }
+    }
+    if (silentTextVisibilityListenerRef.current !== null) {
+      silentTextVisibilityListenerRef.current()
+      silentTextVisibilityListenerRef.current = null
     }
   }, [])
 
@@ -613,7 +667,15 @@ function WordSongScreen({
 
     const problem = plan.problems[problemIndex]
     const myProblemIndex = problemIndex
-    queueMicrotask(() => {
+
+    /**
+     * Actually fire the read-aloud microtask. Lifted out of the
+     * synchronous effect body so the silent-text window (cvc-word only)
+     * can defer this through a `setTimeout` while sharing the exact same
+     * dispatch path with the immediate (`blending-cv`) flow. Ticket
+     * 86c9m3ae6.
+     */
+    const dispatchReadAloud = () => {
       if (unmountedRef.current) return
       if (problemIndexRef.current !== myProblemIndex) return
       // Synchronous double-speak latch (ticket 86c9hf4ef). Flips before
@@ -636,7 +698,73 @@ function WordSongScreen({
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
       })
-    })
+    }
+
+    // Silent-text window for `cvc-word` problems (ticket 86c9m3ae6).
+    // The word text is already on screen — only the read-aloud is
+    // delayed. `blending-cv` (and any future content type that lacks the
+    // discriminant) keeps the legacy immediate-fire behaviour. `contentType`
+    // is optional on the public type for back-compat with hand-built static
+    // plans, hence the explicit equality check.
+    const isCvcWord = problem.contentType === 'cvc-word'
+
+    if (!isCvcWord) {
+      queueMicrotask(dispatchReadAloud)
+      // `audioReady` IS in the deps so the effect re-runs when the parent
+      // flips it from `false` → `true` (Path A fetch settled). The
+      // `spokeReadAloudRef` latch ensures a re-run after read-aloud fired
+      // is a no-op. Ticket 86c9hjnn8 — see Math.tsx for the rationale.
+      return
+    }
+
+    /**
+     * Fire the read-aloud iff the page is currently visible. If hidden
+     * (Marian backgrounded the iPad mid-window), attach a one-shot
+     * `visibilitychange` listener that re-fires this same fn when the
+     * page comes back. Ticket 86c9m3ae6 AC #5.
+     *
+     * The double-speak latch (`spokeReadAloudRef`) and the unmount /
+     * problem-advance refs guard against duplicate dispatch — a re-arm
+     * is safe to fire even if the user un-hides quickly after the timer
+     * already elapsed once. (Effect cleanup also detaches the listener.)
+     */
+    const fireOrReArmOnVisibility = () => {
+      if (unmountedRef.current) return
+      if (problemIndexRef.current !== myProblemIndex) return
+      if (typeof document !== 'undefined' && document.hidden) {
+        const onVisible = () => {
+          if (typeof document !== 'undefined' && document.hidden) return
+          document.removeEventListener('visibilitychange', onVisible)
+          silentTextVisibilityListenerRef.current = null
+          fireOrReArmOnVisibility()
+        }
+        document.addEventListener('visibilitychange', onVisible)
+        silentTextVisibilityListenerRef.current = () => {
+          document.removeEventListener('visibilitychange', onVisible)
+        }
+        return
+      }
+      dispatchReadAloud()
+    }
+
+    silentTextTimerRef.current = setTimeout(() => {
+      silentTextTimerRef.current = null
+      fireOrReArmOnVisibility()
+    }, SILENT_TEXT_WINDOW_MS)
+
+    return () => {
+      // Cleanup on problem-advance / unmount / dep-change. Clears the
+      // pending silent-text timer and any visibility re-arm so a stale
+      // window can never fire against the next problem's state.
+      if (silentTextTimerRef.current !== null) {
+        clearTimeout(silentTextTimerRef.current)
+        silentTextTimerRef.current = null
+      }
+      if (silentTextVisibilityListenerRef.current !== null) {
+        silentTextVisibilityListenerRef.current()
+        silentTextVisibilityListenerRef.current = null
+      }
+    }
     // `audioReady` IS in the deps so the effect re-runs when the parent
     // flips it from `false` → `true` (Path A fetch settled). The
     // `spokeReadAloudRef` latch ensures a re-run after read-aloud fired
