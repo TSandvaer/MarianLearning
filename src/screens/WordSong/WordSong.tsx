@@ -8,6 +8,7 @@ import {
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
 } from '../../lib/audio/howlerContext'
+import { drainOnGesture } from '../../lib/audio/pendingResumeGate'
 import {
   recordAudioReadyStateEvent,
   recordPlayUtteranceDispatchEvent,
@@ -1138,6 +1139,10 @@ function WordSongScreen({
       // snapshot. The pre/post pair surfaces the Phase-6 pool refill
       // (pool=N → pool=10) in the iPad export.
       recordUnlockStateEvent()
+      // PR #137 round 2 (ticket 86c9kxtmu) — gesture-deferred recovery
+      // drain. Mirrors Math's drain call. See Math.tsx onChipTap for
+      // the full rationale.
+      drainOnGesture(resumeAudioCtx, unlockAudioSessionFn)
       resumeAudioCtx()
       const unlockResult = unlockAudioSessionFn()
       // Phase-8 (ticket 86c9gvd0y): thread the helper's

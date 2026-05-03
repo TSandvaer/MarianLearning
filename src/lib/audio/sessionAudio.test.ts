@@ -6,7 +6,13 @@ import {
   type HowlLike,
   type SessionAudioCache,
 } from './sessionAudio'
+import * as gate from './pendingResumeGate'
 import type { Utterance } from '../../../api/_types'
+import {
+  AUDIO_CTX_LOG_STORAGE_KEY,
+  _resetAudioContextProbeForTests,
+  activateAudioContextProbe,
+} from '../debug/audioContextProbe'
 
 // --- Test helpers --------------------------------------------------------
 
@@ -413,6 +419,88 @@ describe('clearSessionAudio', () => {
   })
 })
 
+describe('onplay watchdog (ticket 86c9kxtmu round 2)', () => {
+  function makeMemoryStorage(): {
+    storage: Map<string, string>
+    adapter: {
+      getItem: (k: string) => string | null
+      setItem: (k: string, v: string) => void
+      removeItem: (k: string) => void
+    }
+  } {
+    const storage = new Map<string, string>()
+    return {
+      storage,
+      adapter: {
+        getItem: (k) => storage.get(k) ?? null,
+        setItem: (k, v) => {
+          storage.set(k, v)
+        },
+        removeItem: (k) => {
+          storage.delete(k)
+        },
+      },
+    }
+  }
+
+  afterEach(() => {
+    _resetAudioContextProbeForTests()
+  })
+
+  it('records onplay-watchdog-missed when play() never fires its play event', async () => {
+    const { storage, adapter } = makeMemoryStorage()
+    activateAudioContextProbe({ storage: adapter })
+
+    const h = makeHarness()
+    await h.audio.loadSessionAudio('s', [makeUtterance('u1', 'hi')])
+    const promise = h.audio.playSessionUtterance('u1')
+    // Drain the load() microtask so the play() call lands.
+    await Promise.resolve()
+    // Do NOT fire `__fire('play')` — simulate iOS PWA WebAudio
+    // interruption: Howler accepted the play call but the play event
+    // never fires. Advance fake timers past the watchdog deadline
+    // (800 ms).
+    vi.advanceTimersByTime(900)
+
+    const persisted = storage.get(AUDIO_CTX_LOG_STORAGE_KEY)
+    expect(persisted).toBeTruthy()
+    const log = JSON.parse(persisted!) as Array<{
+      cause: string
+      utteranceId?: string
+    }>
+    const watchdogRows = log.filter((r) => r.cause === 'onplay-watchdog-missed')
+    expect(watchdogRows).toHaveLength(1)
+    expect(watchdogRows[0]?.utteranceId).toBe('u1')
+
+    // Cancel so the promise settles for cleanup.
+    h.audio.cancel()
+    await expect(promise).rejects.toThrow(/cancelled/)
+  })
+
+  it('does NOT record onplay-watchdog-missed when play event fires before deadline', async () => {
+    const { storage, adapter } = makeMemoryStorage()
+    activateAudioContextProbe({ storage: adapter })
+
+    const h = makeHarness({ duration: 1.0 })
+    await h.audio.loadSessionAudio('s', [makeUtterance('u1', 'hi')])
+    const promise = h.audio.playSessionUtterance('u1')
+    await Promise.resolve()
+    // Fire play() within the watchdog window.
+    h.fakes.get('blob:test://0')!.__fire('play')
+    // Advance past watchdog deadline.
+    vi.advanceTimersByTime(900)
+
+    const persisted = storage.get(AUDIO_CTX_LOG_STORAGE_KEY)
+    expect(persisted).toBeTruthy()
+    const log = JSON.parse(persisted!) as Array<{ cause: string }>
+    const watchdogRows = log.filter((r) => r.cause === 'onplay-watchdog-missed')
+    expect(watchdogRows).toHaveLength(0)
+
+    h.fakes.get('blob:test://0')!.__fire('end')
+    await expect(promise).resolves.toBeUndefined()
+  })
+})
+
 describe('quota / cache resilience', () => {
   it('survives a cache.put that rejects (in-memory copy still works)', async () => {
     const h = makeHarness()
@@ -427,5 +515,111 @@ describe('quota / cache resilience', () => {
     const h = makeHarness({ cachedBase64: null })
     const map = await h.audio.loadSessionAudio('s', [makeUtterance('u1', 'a')])
     expect(map.size).toBe(1)
+  })
+})
+
+describe('pending-resume gate integration (PR #137 round 2, ticket 86c9kxtmu)', () => {
+  beforeEach(() => {
+    gate._resetPendingResumeGateForTests()
+  })
+
+  afterEach(() => {
+    gate._resetPendingResumeGateForTests()
+  })
+
+  it('defers playback when gate is pending; play fires after drainOnGesture', async () => {
+    // Brief req: integration that proves the playSession deferral
+    // round-trips. The gate marks pending → play is enqueued → drain
+    // runs the play synchronously inside the gesture window.
+    const h = makeHarness({ duration: 1.0 })
+    await h.audio.loadSessionAudio('s', [
+      makeUtterance('u1', 'Two plus three.'),
+    ])
+
+    // Mark the gate pending — same edge `useHowlerSuspendOnHide`
+    // would trigger on a `'visible'` transition with iOS-handed
+    // suspended/interrupted state.
+    gate.markPendingResume()
+
+    // Dispatch the play. Pre-fix (round 1) this would have called
+    // Howl.play() immediately and the iPad would have returned a
+    // soundId without emitting audio. Round 2 enqueues instead.
+    const promise = h.audio.playSessionUtterance('u1')
+
+    // Drain microtask to let the inner Promise body run.
+    await Promise.resolve()
+
+    // The fake Howl was constructed for u1 but play() must NOT have
+    // been called yet — the dispatch was queued.
+    const fake = h.fakes.get('blob:test://0')!
+    expect(fake.__playCalls).toBe(0)
+
+    // Simulate the user-gesture drain (chip-tap path).
+    const resumeFn = vi.fn()
+    const unlockFn = vi.fn()
+    gate.drainOnGesture(resumeFn, unlockFn)
+
+    expect(resumeFn).toHaveBeenCalledTimes(1)
+    expect(unlockFn).toHaveBeenCalledTimes(1)
+
+    // Drain the microtask scheduled by the queued thunk's recursive
+    // dispatch.
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Now play() has fired — the queued thunk re-entered the play
+    // body via `playSessionUtteranceImmediate`.
+    expect(fake.__playCalls).toBe(1)
+
+    // Settle the play with a fake `end` event so the promise
+    // resolves cleanly (otherwise the test runner sees a leak).
+    fake.__fire('play')
+    fake.__fire('end')
+    await expect(promise).resolves.toBeUndefined()
+  })
+
+  it('most-recent-only queue: rapid back-to-back deferred plays — only the latest fires', async () => {
+    const h = makeHarness({ duration: 1.0 })
+    await h.audio.loadSessionAudio('s', [
+      makeUtterance('u1', 'first.'),
+      makeUtterance('u2', 'second.'),
+    ])
+
+    gate.markPendingResume()
+
+    // Dispatch u1, then u2. Pre-resume, both are queued; only the
+    // most recent (u2) survives to drain.
+    const p1 = h.audio.playSessionUtterance('u1').catch(() => {
+      // u1 will never resolve under most-recent-only semantics —
+      // attach a no-op rejection guard so the unhandled-rejection
+      // tracker in vitest stays quiet. The behaviour we're asserting
+      // is "u1's Howl never plays", not "u1's promise resolves".
+    })
+    const p2 = h.audio.playSessionUtterance('u2')
+    await Promise.resolve()
+
+    const fake1 = h.fakes.get('blob:test://0')!
+    const fake2 = h.fakes.get('blob:test://1')!
+    expect(fake1.__playCalls).toBe(0)
+    expect(fake2.__playCalls).toBe(0)
+
+    gate.drainOnGesture(vi.fn(), vi.fn())
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // Only u2 dispatched — u1 was discarded by the most-recent
+    // queue replacement.
+    expect(fake1.__playCalls).toBe(0)
+    expect(fake2.__playCalls).toBe(1)
+
+    fake2.__fire('play')
+    fake2.__fire('end')
+    await expect(p2).resolves.toBeUndefined()
+    // p1's promise was abandoned by the most-recent-only queue. The
+    // local catch handler we attached above keeps vitest's unhandled-
+    // rejection tracker quiet — we deliberately do NOT await p1
+    // (it never settles under round-2 semantics, and awaiting under
+    // fake timers would hang the test).
+    void p1
   })
 })

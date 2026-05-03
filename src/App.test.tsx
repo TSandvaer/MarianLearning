@@ -239,6 +239,228 @@ describe('App routing skeleton', () => {
       vi.doUnmock('./screens/Greet')
       fetchSpy.mockRestore()
     })
+
+    // Regression test for the Jessica e2e batch — Bug A
+    // (ticket 86c9kxtm5):
+    //
+    // The leave-effect's prior shape was:
+    //   if (!hadAudio) return     <-- early return BEFORE latch reset
+    //   ...abort + reset latch
+    //
+    // Symptom: a rapid route bounce (greet → leave to a non-audio
+    // surface BEFORE the in-flight fetch had set any of mathPlay /
+    // mathAudioReady / mathPlan / mathUnloadRef) skipped the latch
+    // reset entirely. `mathFetchStartedRef` stayed `true`. Re-entering
+    // greet/math then short-circuited at `if (mathFetchStartedRef.current)
+    // return` and Marian rode the original (orphaned, never aborted)
+    // fetch from the first mount — no fresh fetch was issued.
+    //
+    // Asserts:
+    //   (i)  greet mounts, fires fetch #1 (latch true, controller live)
+    //   (ii) leave to a non-audio route BEFORE fetch settles → leave
+    //        effect must abort + reset latch (verified by the next
+    //        re-entry firing a fresh fetch)
+    //   (iii) re-enter greet → fetch #2 fires (count == 2)
+    //
+    // Pre-fix, the third assertion stayed at count == 1.
+    it('rapid bounce greet → non-audio → greet re-fires fetch (Bug A latch leak — ticket 86c9kxtm5)', async () => {
+      // Hold every fetch open so the bounce happens deterministically
+      // BEFORE any settle path could clear the audio state. This pins
+      // the pre-fix bug shape (no audio state set when the leave
+      // effect runs).
+      const fetchPromise = new Promise<Response>(() => {
+        /* never resolves */
+      })
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockReturnValue(fetchPromise as Promise<Response>)
+
+      // Mock Math and Greet to one-tap shims so we can drive route
+      // transitions synchronously without walking real timelines.
+      vi.doMock('./screens/Math', async () => {
+        const actual: Record<string, unknown> =
+          await vi.importActual('./screens/Math')
+        return {
+          ...actual,
+          default: () => <div data-testid="math-mock" />,
+        }
+      })
+      vi.doMock('./screens/Greet', () => ({
+        default: ({ onAdvance }: { onAdvance: () => void }) => (
+          <button
+            type="button"
+            data-testid="greet-mock-advance"
+            onClick={onAdvance}
+          />
+        ),
+      }))
+
+      vi.resetModules()
+      const { default: AppFresh } = await import('./App')
+
+      // Direct-launch into greet so the kick-effect fires fetch #1
+      // immediately on mount (the pre-warm contract from
+      // ticket 86c9hjnn8).
+      setSearch('?route=greet')
+      const { unmount } = render(<AppFresh />)
+
+      // Drain microtasks so the kick-effect runs and the in-flight
+      // fetch is in the controller.
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      let claudeCalls = fetchSpy.mock.calls.filter(
+        (c) => c[0] === '/api/claude',
+      )
+      expect(claudeCalls.length).toBe(1)
+
+      // Bounce away from greet to a non-audio surface BEFORE any
+      // settle path runs. We use the Greet-mock's onAdvance to flip
+      // to math (which is still an audio surface, so the leave-effect
+      // doesn't fire), then drive Math → parent-settings to actually
+      // leave the audio surfaces. The cleanest scenario:
+      // greet → directly to a non-audio surface. We can't trigger
+      // that from the App's public API without a back-arrow on Greet,
+      // so instead we use a route-state forced transition through
+      // the existing Math → parent-settings escape: greet → math
+      // (still audio, no leave-effect) → use Hub-side parent-gate
+      // logic via a direct route flip. Easier: re-mount the App to
+      // simulate the route-state reset, with the latch ref carried
+      // over... no — the latch lives in `useRef` inside App, so
+      // unmounting clears it. To exercise the pre-fix bug we need
+      // a route transition WITHIN one App instance.
+      //
+      // Drive: greet → math (kick-effect re-runs, latch already true,
+      // no new fetch); Math is mounted. Then Math → parent-settings
+      // via the explicit handler. The leave-effect should fire and
+      // — post-fix — reset the latch.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('greet-mock-advance'))
+        await Promise.resolve()
+      })
+      // Sanity: no fetch on the greet → math hop (latch active).
+      claudeCalls = fetchSpy.mock.calls.filter((c) => c[0] === '/api/claude')
+      expect(claudeCalls.length).toBe(1)
+      // Math mounted with the in-flight fetch still pending.
+      expect(screen.getByTestId('math-mock')).toBeInTheDocument()
+
+      // Now leave the audio surfaces entirely. The screen-level
+      // exit handler walks math → hub (a non-audio surface) which
+      // is what the leave-effect keys on. We don't have a direct
+      // public route-flipper in the test, but we can drive it with
+      // a direct `?route=hub` re-mount — that destroys the App
+      // instance and clears refs, so it doesn't exercise the bug.
+      //
+      // Instead: trigger Math's onRequestExit by clicking the
+      // back-arrow. The mock above doesn't render one, so re-do the
+      // mock to expose a back-arrow shim.
+      unmount()
+      vi.doUnmock('./screens/Math')
+      vi.doUnmock('./screens/Greet')
+      vi.doMock('./screens/Math', async () => {
+        const actual: Record<string, unknown> =
+          await vi.importActual('./screens/Math')
+        return {
+          ...actual,
+          default: ({ onRequestExit }: { onRequestExit?: () => void }) => (
+            <div data-testid="math-mock">
+              {onRequestExit && (
+                <button
+                  type="button"
+                  data-testid="math-mock-back"
+                  onClick={onRequestExit}
+                />
+              )}
+            </div>
+          ),
+        }
+      })
+      vi.doMock('./screens/Greet', () => ({
+        default: ({ onAdvance }: { onAdvance: () => void }) => (
+          <button
+            type="button"
+            data-testid="greet-mock-advance"
+            onClick={onAdvance}
+          />
+        ),
+      }))
+      vi.doMock('./screens/Hub', () => ({
+        default: ({
+          onPickTree,
+        }: {
+          onPickTree?: (tree: 'number-garden' | 'word-song') => void
+        }) => (
+          <div data-testid="hub-mock">
+            <button
+              type="button"
+              data-testid="hub-mock-pick-math"
+              onClick={() => onPickTree?.('number-garden')}
+            />
+          </div>
+        ),
+      }))
+
+      vi.resetModules()
+      const { default: AppFresh2 } = await import('./App')
+
+      // Re-fetch spy — fresh instance, fresh refs.
+      const fetchSpy2 = vi.spyOn(globalThis, 'fetch').mockReturnValue(
+        new Promise<Response>(() => {
+          /* never resolves */
+        }) as Promise<Response>,
+      )
+
+      setSearch('?route=greet')
+      render(<AppFresh2 />)
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+      // Fetch #1 fires on greet mount.
+      let calls2 = fetchSpy2.mock.calls.filter((c) => c[0] === '/api/claude')
+      expect(calls2.length).toBe(1)
+
+      // greet → math (still audio, no leave-effect, latch unchanged).
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('greet-mock-advance'))
+        await Promise.resolve()
+      })
+      calls2 = fetchSpy2.mock.calls.filter((c) => c[0] === '/api/claude')
+      expect(calls2.length).toBe(1)
+
+      // math → hub via the back-arrow. Hub is a non-audio surface so
+      // the leave-effect fires. Pre-fix: hadAudio=false (fetch never
+      // settled, no audio state set), early return SKIPS the latch
+      // reset; the latch stays true and the next greet/math entry
+      // short-circuits.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('math-mock-back'))
+        await Promise.resolve()
+        // Drain the microtask queue so the queueMicrotask in the
+        // leave-effect runs. Multiple awaits to be safe.
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // Re-enter math via Hub. Post-fix: latch was reset, kick-effect
+      // re-runs and issues fetch #2.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('hub-mock-pick-math'))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      calls2 = fetchSpy2.mock.calls.filter((c) => c[0] === '/api/claude')
+      // Pre-fix: still 1 (latch leak). Post-fix: 2.
+      expect(calls2.length).toBe(2)
+
+      vi.doUnmock('./screens/Math')
+      vi.doUnmock('./screens/Greet')
+      vi.doUnmock('./screens/Hub')
+      fetchSpy.mockRestore()
+      fetchSpy2.mockRestore()
+    })
   })
 
   describe('Session-End handoff wiring (App ↔ screens)', () => {

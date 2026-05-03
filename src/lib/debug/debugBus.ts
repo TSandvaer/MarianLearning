@@ -199,6 +199,56 @@ export interface AudioCtxEventRecord {
      * because it could not decode the blob". Carries `errorMessage`.
      */
     | 'howl-loaderror-event'
+    /**
+     * Visibility-transition probe rows (ticket 86c9kxtmu round 2 — iPad
+     * PWA WebAudio interruption diagnostic).
+     *
+     * Two pairs of rows bracket the suspend/resume calls in
+     * `useHowlerSuspendOnHide`:
+     *
+     *   - `'visibility-hidden-pre'` — captured the instant `visibilitychange`
+     *     fires with `document.visibilityState === 'hidden'`, BEFORE the
+     *     hook calls `Howler.ctx.suspend()`. The `ctxState` field is the
+     *     state iOS handed us at hide time.
+     *   - `'visibility-hidden-post'` — captured immediately AFTER the
+     *     hook's `suspend()` invocation. Same row shape; the state shows
+     *     whether suspend transitioned the context synchronously.
+     *   - `'visibility-visible-pre'` — captured on the hidden→visible
+     *     transition BEFORE `resume()`. The diagnostic question:
+     *     does iPad return `ctxState === 'interrupted'` here? The
+     *     hypothesis (PR #137 round 2) is yes; that's the iOS-only
+     *     recovery path.
+     *   - `'visibility-visible-post'` — AFTER `resume()`. If the state
+     *     stayed `'interrupted'`, plain `resume()` did not recover and the
+     *     unlock-buffer path was needed.
+     *
+     * All four rows omit Howler-specific extras; the `ctxState` and the
+     * implicit timestamp delta are the load-bearing diagnostic.
+     */
+    | 'visibility-hidden-pre'
+    | 'visibility-hidden-post'
+    | 'visibility-visible-pre'
+    | 'visibility-visible-post'
+    /**
+     * `'visibility-recovery-buffer'` — emitted from `useHowlerSuspendOnHide`
+     * when the post-resume state is still `'interrupted'` and the
+     * silent-buffer recovery kick fires. Carries the result of the kick
+     * via `bufferStarted` (whether `createBufferSource().start()` was
+     * called without throwing). The diagnostic question: did we reach
+     * the recovery path at all?
+     */
+    | 'visibility-recovery-buffer'
+    /**
+     * `'onplay-watchdog-missed'` — emitted from `playSessionUtterance` when
+     * the watchdog deadline (default 800 ms) elapses without Howler
+     * firing the `play` event for the most recent `howl.play()` call.
+     * The pre-existing `howl-play-event` row is the positive signal; this
+     * row is the negative signal. Carries `utteranceId` to pair with the
+     * preceding `howl-play-call` row. iPad PWA WebAudio interruption
+     * (ticket 86c9kxtmu round 2) is the dominant cause: `play()` returns
+     * a sound id but the `'play'` event never fires.
+     */
+    | 'onplay-watchdog-missed'
   /**
    * Optional companion: the audio-unlock-gate state at the same instant.
    * The gate already pushes its state to the bus on every transition;
@@ -378,6 +428,13 @@ export interface AudioCtxEventRecord {
    * with their event responses across interleaved rows.
    */
   utteranceId?: string
+  /**
+   * For `cause === 'visibility-recovery-buffer'` rows (ticket
+   * 86c9kxtmu round 2): whether the silent-buffer kick actually called
+   * `createBufferSource().start()` without throwing. `false` means the
+   * recovery attempt itself failed (rare — closed/unavailable ctx).
+   */
+  bufferStarted?: boolean
 }
 
 export interface DebugSnapshot {

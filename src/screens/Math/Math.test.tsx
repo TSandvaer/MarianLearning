@@ -34,6 +34,7 @@ import MathScreen from './Math'
 import type { PlayMathUtteranceFn } from './Math'
 import type { MathSessionPlan } from './sessionPlans'
 import { STARDUST_STORAGE_KEY, type StorageAdapter } from '../_shared/stardust'
+import { ADVANCE_HARD_CEILING_MS } from '../_shared/gameplayConstants'
 
 /*
  * NOTE on `__testInitiallyAudioUnlocked` threaded through every render below:
@@ -2409,6 +2410,195 @@ describe('Math (Number Garden) screen', () => {
         .map((c) => c.getAttribute('data-value'))
 
       expect(after).toEqual(before)
+    })
+  })
+
+  /**
+   * Visibility-resume guard tests (ticket 86c9kxtmu round 2). Thomas's
+   * PR #137 ear-test on real iPad PWA: tap correct chip, immediately
+   * background, wait, reopen — the next problem was already showing.
+   * Root cause: the `pageHiddenRef.current` mirror is updated in a
+   * `useEffect`, which lands AFTER React commit. `setTimeout` bodies
+   * firing in the window between `visibilitychange` and the effect
+   * commit saw stale `false` and advanced through.
+   *
+   * Round-2 fix: the timer-body advance gates read `getIsPageHidden()`
+   * directly from the DOM (live `document.visibilityState`). These
+   * tests pin that contract by setting `document.visibilityState`
+   * synchronously BEFORE advancing the fake timers — no React commit
+   * in between, so any logic that relied on the ref would stale-read
+   * `false` and incorrectly advance.
+   */
+  describe('Visibility-resume guard (round-2 fix, ticket 86c9kxtmu)', () => {
+    function setVisibility(state: 'visible' | 'hidden'): void {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => state,
+      })
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        get: () => state === 'hidden',
+      })
+    }
+
+    afterEach(() => {
+      // Restore visibility default for the next test (jsdom defaults to
+      // 'visible' but we redefine the property; restore to the stable
+      // configurable accessor returning 'visible').
+      setVisibility('visible')
+    })
+
+    it('correct-tap then hide synchronously: min-dwell timer reads live DOM and parks the advance', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const correctChip = screen
+        .getAllByTestId('math-chip')
+        .find((c) => c.getAttribute('data-value') === '5')!
+      expect(correctChip).toBeDefined()
+
+      // Tap correct, then IMMEDIATELY (before any React effect runs) flip
+      // the DOM visibility to hidden. This simulates the iPad path where
+      // `visibilitychange` fires but the React effect updating the ref
+      // hasn't committed yet — the round-1 fix would stale-read here.
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+      // Set DOM hidden BEFORE advancing the fake timers — and crucially
+      // do NOT dispatch the visibilitychange event yet. The round-1
+      // implementation would only see `pageHiddenRef.current === true`
+      // AFTER the `useIsPageHidden()` hook re-rendered + the mirror
+      // effect committed. The round-2 fix reads `document.visibilityState`
+      // live; this test exercises exactly that contract.
+      setVisibility('hidden')
+
+      // Advance past the auto-advance (1.2 s) AND the hard ceiling
+      // (5 s) so both timer paths fire — neither should advance the
+      // problem index while hidden.
+      await act(async () => {
+        vi.advanceTimersByTime(ADVANCE_HARD_CEILING_MS + 1000)
+        await Promise.resolve()
+      })
+
+      // Problem index unchanged.
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-problem-index',
+        '0',
+      )
+    })
+
+    it('correct-tap then hide: hard-ceiling timer reads live DOM and parks the advance', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      // Use autoResolve:false so the speak() never resolves — forces the
+      // hard-ceiling timer to be the only candidate to advance.
+      const harness = makePlayHarness({ autoResolve: false })
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const correctChip = screen
+        .getAllByTestId('math-chip')
+        .find((c) => c.getAttribute('data-value') === '5')!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+
+      // Hide BEFORE the hard-ceiling fires.
+      setVisibility('hidden')
+
+      // Advance past the hard-ceiling (5 s) — the speak() never
+      // resolves so this is the only path that could advance.
+      await act(async () => {
+        vi.advanceTimersByTime(ADVANCE_HARD_CEILING_MS + 500)
+        await Promise.resolve()
+      })
+
+      // Still on the same problem. The hard-ceiling timer fired but
+      // its body read `getIsPageHidden()` and parked the advance.
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-problem-index',
+        '0',
+      )
+    })
+
+    it('on resume (visible + visibilitychange), the parked advance drains and the index increments', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const correctChip = screen
+        .getAllByTestId('math-chip')
+        .find((c) => c.getAttribute('data-value') === '5')!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+
+      // Hide, advance timers (advance gets parked), then make-visible
+      // and dispatch the change so the React state flips and the
+      // resume-drain effect fires.
+      setVisibility('hidden')
+      // Dispatch the visibilitychange so React's
+      // useSyncExternalStore picks up the hidden state. (Without
+      // this, `pageHidden` React state stays false; the round-2 fix's
+      // timer-body DOM read is what actually parks the advance.)
+      document.dispatchEvent(new Event('visibilitychange'))
+
+      await act(async () => {
+        vi.advanceTimersByTime(ADVANCE_HARD_CEILING_MS + 500)
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-problem-index',
+        '0',
+      )
+
+      // Now resume.
+      setVisibility('visible')
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'))
+        await Promise.resolve()
+      })
+
+      // Drain effect calls advanceToNext() — index advances.
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-problem-index',
+        '1',
+      )
     })
   })
 })
