@@ -81,6 +81,37 @@ function fixedPlan(): WordSongSessionPlan {
   }
 }
 
+/**
+ * A `cvc-word` content-type plan for the silent-text-window tests.
+ * Identical shape to `fixedPlan()` except every problem carries
+ * `contentType: 'cvc-word'` and the read line uses the "Read the X."
+ * template (matching what `planFromServer.parse` emits for the
+ * `cvc-word` content type). Ticket 86c9m3ae6.
+ */
+function cvcWordPlan(): WordSongSessionPlan {
+  const words = ['cat', 'bag', 'jam', 'fan', 'pan', 'man', 'tag', 'cap']
+  return {
+    id: 'test-plan-cvc-word',
+    label: 'Test plan (cvc-word)',
+    problems: words.map((word, i) => {
+      const target = getWordEntry(word)
+      const Word = word[0].toUpperCase() + word.slice(1)
+      return {
+        index: i + 1,
+        target,
+        contentType: 'cvc-word',
+        utterances: {
+          read: `Read the ${word}.`,
+          correct: `Yes! ${Word}.`,
+          reprompt: 'Hmm... try again?',
+          hint: `Let's look. ${Word}.`,
+          giveAnswer: `This one is ${word}.`,
+        },
+      }
+    }),
+  }
+}
+
 function makeMemoryStorage(): StorageAdapter {
   const map = new Map<string, string>()
   return {
@@ -1819,6 +1850,207 @@ describe('Word Song screen', () => {
       const back = screen.getByTestId('word-song-back-to-hub')
       back.click()
       expect(onRequestExit).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ── Silent-text window for cvc-word problems (ticket 86c9m3ae6) ─────────
+
+  describe('silent-text window on cvc-word problems', () => {
+    /*
+     * NOTE on harness setup: the read-aloud effect short-circuits when
+     * `spokeReadAloudRef` is already true, and `__testInitiallyAudioUnlocked`
+     * pre-arms that ref. So these tests use the cold-mount real-flow path
+     * (`getHowlerRunning={() => true}`, NO `__testInitiallyAudioUnlocked`)
+     * to actually exercise the read-aloud effect end-to-end. Mirrors the
+     * cold-mount tests further up the file.
+     */
+
+    /**
+     * AC #1: cvc-word problems must NOT fire `playUtterance(read)`
+     * synchronously on mount. The text renders immediately so Marian can
+     * decode it; the read-aloud is deferred by 1500ms.
+     *
+     * This test FAILS without the fix — pre-fix the read fires on the
+     * mount microtask, so `harness.spoken()` is `['Read the cat.']`
+     * immediately after the microtask drain (long before any fake-timer
+     * advance).
+     */
+    it('cvc-word: defers read-aloud by ≥1500ms after mount; word text is on screen the whole time', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      const getHowlerRunning = vi.fn(() => true)
+      render(
+        withMotion(
+          <WordSong
+            plan={cvcWordPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Word text is on screen from first paint — the silent window only
+      // delays AUDIO, not the visual reveal.
+      expect(screen.getByTestId('word-song-word-card')).toHaveAttribute(
+        'data-word',
+        'cat',
+      )
+
+      // Drain pending microtasks. Pre-fix the read-aloud microtask would
+      // run here and `harness.spoken()` would already contain
+      // `'Read the cat.'`. Post-fix it must still be empty.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(harness.spoken()).toEqual([])
+
+      // Step to just BEFORE the 1500ms boundary — still silent.
+      await act(async () => {
+        vi.advanceTimersByTime(1499)
+        await Promise.resolve()
+      })
+      expect(harness.spoken()).toEqual([])
+
+      // Cross the boundary — read fires exactly once.
+      await act(async () => {
+        vi.advanceTimersByTime(1)
+        await Promise.resolve()
+      })
+      expect(harness.spoken()).toEqual(['Read the cat.'])
+    })
+
+    /**
+     * AC #4: blending-cv problems are UNAFFECTED. The "Tap the X." flow
+     * must continue to fire audio immediately on mount — that flow is
+     * recognise-by-name and doesn't benefit from a decode beat.
+     *
+     * Negative test: regression guard on the immediate-fire path.
+     */
+    it('blending-cv: read-aloud fires immediately on mount (no silent window)', async () => {
+      const harness = makePlayHarness()
+      const getHowlerRunning = vi.fn(() => true)
+      render(
+        withMotion(
+          <WordSong
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // No fake-timer advance — only microtask drain. The blending-cv
+      // path schedules the read on the same mount microtask as the
+      // legacy immediate-fire flow. `setTimeout(0)` flushes both.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(harness.spoken()).toEqual(['Tap the cat.'])
+    })
+
+    /**
+     * AC #5: visibility-pause integration. If Marian backgrounds the
+     * iPad mid-window, the read must NOT fire while the page is hidden.
+     * When she un-hides, the read fires exactly once (no double-fire).
+     *
+     * Implementation: when the silent-text setTimeout fires, we check
+     * `document.hidden`; if true, we attach a one-shot
+     * `visibilitychange` listener that re-fires the same dispatch path
+     * when the page becomes visible.
+     */
+    it('cvc-word: visibility-hidden mid-window defers read; un-hide fires read exactly once', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      const getHowlerRunning = vi.fn(() => true)
+
+      // Simulate the iPad backgrounding mid-window: stub document.hidden.
+      const hiddenDescriptor = Object.getOwnPropertyDescriptor(
+        Document.prototype,
+        'hidden',
+      )
+      let hiddenValue = false
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        get: () => hiddenValue,
+      })
+
+      try {
+        render(
+          withMotion(
+            <WordSong
+              plan={cvcWordPlan()}
+              playUtterance={harness.playUtterance}
+              storage={makeMemoryStorage()}
+              getHowlerRunning={getHowlerRunning}
+            />,
+          ),
+        )
+
+        // Drain initial microtasks (read-aloud effect schedules its
+        // setTimeout here).
+        await act(async () => {
+          await Promise.resolve()
+        })
+
+        // Background the page mid-window (before the 1500ms timer fires).
+        hiddenValue = true
+        await act(async () => {
+          document.dispatchEvent(new Event('visibilitychange'))
+          await Promise.resolve()
+        })
+
+        // Cross the silent-window boundary — read MUST stay silent
+        // because document.hidden is true. 1500ms matches the constant
+        // in WordSong.tsx; if production retunes, update both.
+        await act(async () => {
+          vi.advanceTimersByTime(1500)
+          await Promise.resolve()
+        })
+        expect(harness.spoken()).toEqual([])
+
+        // Stay hidden for a long time — still silent (proves no orphan
+        // setTimeout is going to fire late).
+        await act(async () => {
+          vi.advanceTimersByTime(5000)
+          await Promise.resolve()
+        })
+        expect(harness.spoken()).toEqual([])
+
+        // Foreground — the listener should re-arm and fire the read once.
+        hiddenValue = false
+        await act(async () => {
+          document.dispatchEvent(new Event('visibilitychange'))
+          await Promise.resolve()
+        })
+        expect(harness.spoken()).toEqual(['Read the cat.'])
+
+        // Bouncing visibility again must not double-fire (latch holds).
+        hiddenValue = true
+        await act(async () => {
+          document.dispatchEvent(new Event('visibilitychange'))
+          await Promise.resolve()
+        })
+        hiddenValue = false
+        await act(async () => {
+          document.dispatchEvent(new Event('visibilitychange'))
+          await Promise.resolve()
+        })
+        expect(harness.spoken()).toEqual(['Read the cat.'])
+      } finally {
+        if (hiddenDescriptor) {
+          Object.defineProperty(Document.prototype, 'hidden', hiddenDescriptor)
+        } else {
+          // jsdom default: re-delete the override.
+          delete (document as unknown as { hidden?: boolean }).hidden
+        }
+      }
     })
   })
 
