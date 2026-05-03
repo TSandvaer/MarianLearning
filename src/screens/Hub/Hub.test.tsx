@@ -625,6 +625,58 @@ describe('Hub — path-strip sliding window', () => {
   })
 })
 
+describe('Hub — promotion celebration (M3 audit follow-up, ticket 86c9kwnkw)', () => {
+  it('does NOT render the celebration overlay when pendingPromotion is undefined', () => {
+    renderHub({ storage: createMemoryStorage() })
+    expect(screen.queryByTestId('hub-promotion-celebration')).toBeNull()
+    expect(screen.queryByTestId('hub-promotion-emma')).toBeNull()
+  })
+
+  it('renders the celebration overlay when pendingPromotion is set', () => {
+    renderHub({
+      storage: createMemoryStorage(),
+      pendingPromotion: 'add-to-20',
+    })
+    const overlay = screen.getByTestId('hub-promotion-celebration')
+    expect(overlay).toBeInTheDocument()
+    expect(overlay.getAttribute('data-node')).toBe('add-to-20')
+    // Caption surfaces the human-readable label (not the raw id).
+    const label = screen.getByTestId('hub-promotion-node-label')
+    expect(label.textContent).toBe('add to 20')
+    // Emma's celebration pose is rendered (replaces the idle Emma).
+    expect(screen.getByTestId('hub-promotion-emma')).toBeInTheDocument()
+  })
+
+  it('renders the sparkle burst (8 sparkles) when celebration is visible', () => {
+    renderHub({
+      storage: createMemoryStorage(),
+      pendingPromotion: 'cvc-words',
+    })
+    const sparkles = screen.getAllByTestId('hub-promotion-sparkle')
+    expect(sparkles).toHaveLength(8)
+  })
+
+  it('uses the human-readable label for word-song nodes', () => {
+    renderHub({
+      storage: createMemoryStorage(),
+      pendingPromotion: 'cvc-words',
+    })
+    expect(screen.getByTestId('hub-promotion-node-label').textContent).toBe(
+      'CVC words',
+    )
+  })
+
+  it('still renders the skill-tree picker beneath the celebration overlay', () => {
+    // The picker must remain functional — Marian can tap a tree even
+    // while the celebration auto-fades.
+    renderHub({
+      storage: createMemoryStorage(),
+      pendingPromotion: 'add-to-20',
+    })
+    expect(screen.getAllByTestId('hub-tree-node')).toHaveLength(2)
+  })
+})
+
 describe('Hub — anti-dark-pattern', () => {
   it('never displays the wrong-answer counter or red-x text', () => {
     const adapter = createMemoryStorage()

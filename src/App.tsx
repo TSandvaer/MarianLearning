@@ -46,8 +46,11 @@ import {
   loadProgress,
   pickFocusNode,
   pickRecentSuccessRate,
+  type Progress,
   type ProgressTrack,
 } from './lib/progress'
+import { projectHubTreeProgress } from './screens/Hub/progressProjection'
+import type { HubTreeProgress } from './screens/Hub'
 import type { Route } from './router/route'
 import { FIRST_ROUTE } from './router/route'
 
@@ -206,6 +209,50 @@ export default function App() {
    * the once-ever first Hub mount post-Greet sets 'first-ever'.
    */
   const [hubEntryPath, setHubEntryPath] = useState<HubEntryPath>('app-open')
+
+  /**
+   * Snapshot of `loadProgress()` taken whenever the route becomes 'hub'
+   * (ticket 86c9kwnkw — wire Progress prop into Hub).
+   *
+   * Read on EVERY hub-route entry, not once per app mount, so:
+   *   - The post-session-end Hub mount sees the freshly-saved Progress
+   *     (the M3 mastery rule writes new `skillLevels` and possibly
+   *     `pendingPromotion` during SessionEnd's mount effect).
+   *   - The mid-skill-back Hub mount sees the latest persisted state
+   *     even if a sibling tab wrote to localStorage.
+   *   - The Parent-Settings → Hub return reflects any threshold changes
+   *     that the engine consults on the next session-end (no Hub-side
+   *     re-render is needed for Parent Settings itself, but the celebration
+   *     state can change on confirm).
+   *
+   * Held as Progress | null so Hub's defaults still apply when storage is
+   * empty (first run / private mode). The projection below maps null to
+   * the Hub-default `{ numberGardenIndex: 0, wordSongIndex: 0 }`.
+   */
+  const [hubProgressSnapshot, setHubProgressSnapshot] =
+    useState<Progress | null>(() => loadProgress())
+
+  useEffect(() => {
+    if (route !== 'hub') return
+    // Re-read on every hub-route entry so a Session-End → Hub flip picks
+    // up the just-written promotion state. `loadProgress()` is a single
+    // localStorage read — cheap. Deferred to a microtask to satisfy the
+    // `react-hooks/set-state-in-effect` rule (same pattern Math/WordSong
+    // tear-down effects use).
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      setHubProgressSnapshot(loadProgress())
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [route])
+
+  const hubTreeProgress = useMemo<HubTreeProgress>(
+    () => projectHubTreeProgress(hubProgressSnapshot),
+    [hubProgressSnapshot],
+  )
 
   /**
    * Splash advance — branches on session-history per the Hub navigation
@@ -839,6 +886,8 @@ export default function App() {
             <Hub
               key="hub"
               path={hubEntryPath}
+              progress={hubTreeProgress}
+              pendingPromotion={hubProgressSnapshot?.pendingPromotion}
               onPickTree={handleHubPickTree}
               onParentGate={handleHubParentGate}
               onCharacterLongPress={handleHubCharacterLongPress}
