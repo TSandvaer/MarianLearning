@@ -200,6 +200,16 @@ interface TrackPayload {
    *  back to the level-1 default focus node for the track. */
   focusNode?: string
   recentSuccessRate?: number | null
+  /**
+   * Graduation-session hint (ticket 86c9m3aec). Browser computes via
+   * `isGraduationSessionPending(progress, focusNode, track)` at
+   * session-start fetch time. When `true` AND the effective focus
+   * node is `cvc-words`, the planner mixes 2–3 novel short-a probe
+   * words into the 8-problem set. Other tracks / focus nodes ignore
+   * the flag silently. Absent for legacy clients — server treats
+   * undefined as `false`.
+   */
+  isGraduationSession?: boolean
 }
 
 const VALID_TRACKS: readonly PlannerTrack[] = ['math', 'word-song']
@@ -293,6 +303,14 @@ function extractTrackPayload(payload: unknown): TrackPayload | null {
       pr.recentSuccessRate <= 1
     ) {
       out.recentSuccessRate = pr.recentSuccessRate
+    }
+    // isGraduationSession (ticket 86c9m3aec): boolean only.
+    // Anything else silently dropped (same posture as the other
+    // optional progress fields). The planner internally ignores the
+    // flag for non-cvc-words focus / non-word-song tracks, so a
+    // misrouted true is harmless beyond skipping a canon hit.
+    if (typeof pr.isGraduationSession === 'boolean') {
+      out.isGraduationSession = pr.isGraduationSession
     }
   }
 
@@ -540,16 +558,24 @@ export async function handler(
       // no upstream cost — so neither gate applies. A canon miss
       // continues to the existing live pipeline, which still goes
       // through the limiter + 5-min TTL cache.
+      //
+      // Graduation-session bypass (ticket 86c9m3aec): a graduation
+      // run needs novel-pool words mixed in, which the canon JSON
+      // does NOT carry. Skip canon (and the in-memory cache for the
+      // same reason) when the flag is set so the live planner runs
+      // and emits the directive-aware plan.
       const canonResolver = overrides.getCanonEntry ?? getCanonEntry
-      const canonHit = canonResolver({
-        track: trackPayload.track,
-        level: trackPayload.level,
-        focusNode:
-          trackPayload.focusNode ??
-          defaultFocusNodeForTrack(trackPayload.track),
-      })
-      if (canonHit !== null) {
-        return jsonResponse(canonHit, 200, headers)
+      if (trackPayload.isGraduationSession !== true) {
+        const canonHit = canonResolver({
+          track: trackPayload.track,
+          level: trackPayload.level,
+          focusNode:
+            trackPayload.focusNode ??
+            defaultFocusNodeForTrack(trackPayload.track),
+        })
+        if (canonHit !== null) {
+          return jsonResponse(canonHit, 200, headers)
+        }
       }
 
       // Cache check (added ticket 86c9kjdh2). Identical (track, level,
@@ -572,9 +598,16 @@ export async function handler(
         childName: trackPayload.childName,
         focusNode: trackPayload.focusNode,
       })
-      const cached = cache.get(cacheKey, now())
-      if (cached !== null) {
-        return jsonResponse(cached, 200, headers)
+      // Graduation-session bypass (ticket 86c9m3aec): same reasoning
+      // as the canon bypass above — graduation runs need their own
+      // fresh planner output. Re-using a cached non-graduation
+      // response on a graduation request would feed a canonical-only
+      // plan into the dual-gate pipeline, defeating the probe.
+      if (trackPayload.isGraduationSession !== true) {
+        const cached = cache.get(cacheKey, now())
+        if (cached !== null) {
+          return jsonResponse(cached, 200, headers)
+        }
       }
 
       // Canon-miss log (single line per miss). Lets us monitor coverage
@@ -631,6 +664,12 @@ export async function handler(
           // the planner has its own defaults for that case.
           focusNode: trackPayload.focusNode,
           recentSuccessRate: trackPayload.recentSuccessRate,
+          // Graduation-session flag (ticket 86c9m3aec). When true, the
+          // planner mixes 2–3 novel short-a probe words into the
+          // 8-problem set. Server-side filtering of which focus nodes
+          // honour the flag lives in the planner's
+          // `buildUserMessage` — passing the raw flag through is safe.
+          isGraduationSession: trackPayload.isGraduationSession,
         })
         // Cache the rendered response under the track payload key. Even
         // partial renders (some utterances soft-failed) are cacheable —
@@ -638,7 +677,16 @@ export async function handler(
         // same probability of failure, which is what the cache is here
         // to avoid. The browser's missing-utterance fallback is the same
         // either way.
-        cache.set(cacheKey, rendered, now())
+        //
+        // Graduation-session bypass (ticket 86c9m3aec): do NOT cache a
+        // graduation response under the standard key — the next regular
+        // request for the same (track, level, focusNode) tuple would
+        // serve a graduation plan, leaking novel-pool words into a
+        // non-graduation session. The browser's session-end logic would
+        // then mis-classify and the dual-gate accounting would shred.
+        if (trackPayload.isGraduationSession !== true) {
+          cache.set(cacheKey, rendered, now())
+        }
         return jsonResponse(rendered, 200, headers)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)

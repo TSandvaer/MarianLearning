@@ -52,6 +52,46 @@ import type {
 export type MasteryTrack = 'math' | 'word-song'
 
 /**
+ * Graduation-gated word-song nodes (ticket 86c9m3aec, novel-word
+ * generalization check on cvc-words mastery graduation).
+ *
+ * Per Dave's developmental review (`design/research/cvc-words-
+ * developmental-review.md` § P1.2), a 90/3 mastery threshold over the
+ * fixed 8-word canonical pool can reflect item familiarity rather than
+ * decoding ability. For nodes in this set, the standard 90/3 rule is a
+ * NECESSARY but not SUFFICIENT condition for promotion: the most
+ * recent qualifying entry must additionally carry a
+ * `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD` — meaning Marian
+ * generalised her decoding to 2–3 NOVEL short-a words she had not
+ * seen in the canonical 8-pool.
+ *
+ * The set is intentionally narrow: only `cvc-words` today. Future
+ * sibling-vowel tiers (`cvc-words-short-o`, etc. — see
+ * `design/word-song/short-o-pool-expansion.md`) will join the set when
+ * those tickets ship.
+ */
+export const WORD_SONG_GRADUATION_GATED_NODES: readonly WordSongNode[] = [
+  'cvc-words',
+]
+
+/**
+ * Promotion-gate threshold on the novel-pool slice of a graduation
+ * session (ticket 86c9m3aec). Lower than the canonical 90/3 percent
+ * because novel-pool items are TRULY new to Marian — Dave §6 P1
+ * argues that 50–80% on 2–3 novel items is a reasonable
+ * generalization signal; the conservative-but-not-impossible 80%
+ * is the locked v1 value.
+ *
+ * Tunable: keep this as a single exported constant rather than a
+ * per-track parentSettings field for now — the gate is currently
+ * cvc-words-only and the value is research-informed (not parent-
+ * tunable in v1). When short-o pool ships and the gate generalises
+ * across nodes, the value can move into parentSettings if the v2
+ * UI surfaces it.
+ */
+export const NOVEL_POOL_THRESHOLD = 0.8
+
+/**
  * Math tree (Number Garden) in promotion order. Source of truth for
  * "what is the next downstream node when X is mastered". Mirrors the
  * declaration order in `types.ts NumberGardenNode` and the curriculum
@@ -208,6 +248,18 @@ export function applyMasteryRule(progress: Progress): Progress {
     for (const node of nodes) {
       if (out.skillLevels[node] !== 'practicing') continue
       if (!qualifies(progress.history, node, trackThreshold, settings)) continue
+      // Graduation gate (ticket 86c9m3aec). For graduation-gated nodes
+      // the standard rule is necessary but not sufficient — the most
+      // recent qualifying entry must additionally carry a passing
+      // novelPoolSuccessRate. If the gate isn't satisfied, the node
+      // stays at 'practicing'; the next session-start picks it up as
+      // graduation-pending and the planner emits the novel-word probe.
+      if (
+        isGraduationGated(node) &&
+        !graduationGateClears(progress.history, node, trackThreshold, settings)
+      ) {
+        continue
+      }
       candidates.push({ track, node })
     }
   }
@@ -357,4 +409,111 @@ function localDayKey(dateISO: string): string {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+// ── Graduation-gate helpers (ticket 86c9m3aec) ─────────────────────────
+
+/** True when `node` is in the graduation-gated set. */
+function isGraduationGated(node: SkillNode): boolean {
+  return (WORD_SONG_GRADUATION_GATED_NODES as readonly string[]).includes(node)
+}
+
+/**
+ * For a graduation-gated node already passing `qualifies()`, return
+ * true iff the MOST RECENT entry in the qualifying window carries a
+ * `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD`. The shared filter
+ * pipeline (skillFocus filter + cross-day dedupe + last-N window)
+ * mirrors `qualifies()` so the two stay in lockstep on history shape.
+ *
+ * Why "most recent" and not "all of the window"
+ * ---------------------------------------------
+ * The novel-pool gate is a single-session generalization probe. The
+ * graduation session IS the most recent of the window. Earlier
+ * sessions in the window are non-graduation entries (no
+ * `novelPoolSuccessRate`); requiring them to clear the novel gate
+ * would never be satisfiable. So the gate reads only the tail entry.
+ */
+function graduationGateClears(
+  history: readonly SessionHistoryEntry[],
+  node: SkillNode,
+  threshold: MasteryThreshold,
+  settings: ParentSettings,
+): boolean {
+  const focused = history.filter((entry) => entry.skillFocus.includes(node))
+  if (focused.length === 0) return false
+  const filtered = settings.crossDayEnforcement
+    ? dedupeByCalendarDay(focused)
+    : focused
+  if (filtered.length < threshold.sessions) return false
+  const window = filtered.slice(-threshold.sessions)
+  const tail = window[window.length - 1]!
+  return (
+    typeof tail.novelPoolSuccessRate === 'number' &&
+    tail.novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD
+  )
+}
+
+/**
+ * Return true iff the next session for `node` on `track` should be
+ * flagged as a graduation session — meaning the planner should mix
+ * 2–3 novel-pool probe words into the 8-problem set so the engine
+ * can verify Marian's decoding generalises beyond the canonical
+ * pool (ticket 86c9m3aec).
+ *
+ * Rules (all must hold):
+ *   1. `node` is in `WORD_SONG_GRADUATION_GATED_NODES`.
+ *   2. `node` is currently at `'practicing'` (a `'mastered'` node has
+ *      already promoted; an `'intro'` / `'locked'` node hasn't reached
+ *      a graduation gate yet).
+ *   3. The last `threshold.sessions` qualifying entries (cross-day-
+ *      deduped per `parentSettings.crossDayEnforcement`) all hit
+ *      `successRate >= threshold.percent`.
+ *   4. NONE of those tail entries already carries a
+ *      `novelPoolSuccessRate` — i.e. graduation hasn't happened yet,
+ *      or the previous attempt's novel-tagged entry has aged out of
+ *      the tail window.
+ *
+ * Rule (4) is the "engine waits for canonical 90/3 to reset" guarantee
+ * from the AC. After a failed graduation (novel < 80%), the failed
+ * entry sits at the tail of the qualifying window with a
+ * `novelPoolSuccessRate` set — predicate returns false, so the next
+ * session is a regular cvc-words session. Only after 3 fresh
+ * non-graduation sessions push the failed entry out of the tail
+ * window does the predicate flip true again.
+ *
+ * Pure read of `progress`; does not mutate. Safe to call at session-
+ * start (after `loadProgress()`) or at session-end before
+ * `recordProgressOnSessionEnd` runs.
+ */
+export function isGraduationSessionPending(
+  progress: Progress,
+  node: SkillNode,
+  track: MasteryTrack,
+): boolean {
+  if (!isGraduationGated(node)) return false
+  if (progress.skillLevels[node] !== 'practicing') return false
+
+  const settings = getSettings(progress)
+  const threshold = settings.masteryThreshold[track]
+
+  const focused = progress.history.filter((entry) =>
+    entry.skillFocus.includes(node),
+  )
+  if (focused.length === 0) return false
+
+  const filtered = settings.crossDayEnforcement
+    ? dedupeByCalendarDay(focused)
+    : focused
+  if (filtered.length < threshold.sessions) return false
+
+  const window = filtered.slice(-threshold.sessions)
+  // Every entry in the window must hit the canonical threshold AND none
+  // may already be tagged with a novelPoolSuccessRate. The latter
+  // ensures a previous graduation (whether passing or failing) blocks
+  // an immediate re-attempt.
+  for (const entry of window) {
+    if (entry.successRate < threshold.percent) return false
+    if (entry.novelPoolSuccessRate !== undefined) return false
+  }
+  return true
 }

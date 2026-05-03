@@ -58,6 +58,31 @@ import type { SessionEndSurface } from './SessionEnd'
  */
 const PROBLEMS_PER_SESSION = 8
 
+/**
+ * Split-pool result for a graduation session (ticket 86c9m3aec).
+ *
+ * When the just-completed session was a graduation run for cvc-words,
+ * the planner mixed 2–3 novel short-a probe words into the 8-problem
+ * set. The mastery engine evaluates two gates separately: the
+ * canonical pool against the standard 90/3 rule, and the novel pool
+ * against `NOVEL_POOL_THRESHOLD`. The caller (SessionEnd.tsx)
+ * computes this shape from the per-problem outcomes + the rehydrated
+ * plan and passes it through to `recordProgressOnSessionEnd`.
+ *
+ * Counts are independent because the planner picks 5–6 canonical + 2–3
+ * novel; the totals must add to 8 but the split is not fixed.
+ */
+export interface GraduationSessionSplit {
+  /** Number of canonical-pool problems Marian got right this session. */
+  canonicalCorrect: number
+  /** Number of canonical-pool problems in the session (5 or 6). */
+  canonicalCount: number
+  /** Number of novel-pool problems Marian got right this session. */
+  novelCorrect: number
+  /** Number of novel-pool problems in the session (2 or 3). */
+  novelCount: number
+}
+
 export interface RecordProgressInput {
   /** Discriminant from the Session End payload. */
   surface: SessionEndSurface
@@ -91,6 +116,29 @@ export interface RecordProgressInput {
    * knows its focus node," not "problems report their nodes."
    */
   focusNode: SkillNode
+  /**
+   * Graduation-session split (ticket 86c9m3aec). Present ONLY when
+   * the just-completed session was a graduation run for cvc-words —
+   * the caller decides this by reading
+   * `isGraduationSessionPending(loadProgress(), focusNode, track)`
+   * BEFORE recording the new entry.
+   *
+   * When supplied AND both counts are positive:
+   *  - The recorded entry's `successRate` becomes
+   *    `canonicalCorrect / canonicalCount` (canonical-pool only) so
+   *    the existing 90/3 rule continues to gate on canonical accuracy
+   *    per PR #127.
+   *  - The recorded entry gains a `novelPoolSuccessRate` field equal
+   *    to `novelCorrect / novelCount`, which the mastery engine reads
+   *    as the second gate at `NOVEL_POOL_THRESHOLD`.
+   *
+   * When omitted (or one of the counts is 0): the recorded entry uses
+   * the legacy `totalCorrect / 8` semantics and no
+   * `novelPoolSuccessRate` field is attached — exactly the
+   * pre-86c9m3aec shape. Defensive zero-handling protects against an
+   * upstream bug computing a 0-count slice.
+   */
+  graduationSplit?: GraduationSessionSplit
 }
 
 /**
@@ -114,11 +162,7 @@ export function recordProgressOnSessionEnd(
 ): Progress {
   const existing = loadProgress() ?? defaultProgress()
 
-  const entry: SessionHistoryEntry = {
-    dateISO: input.dateISO,
-    skillFocus: [input.focusNode],
-    successRate: input.totalCorrect / PROBLEMS_PER_SESSION,
-  }
+  const entry = buildEntry(input)
 
   const next: Progress = {
     ...existing,
@@ -138,4 +182,39 @@ export function recordProgressOnSessionEnd(
   const promoted = applyMasteryRule(next)
   saveProgress(promoted)
   return promoted
+}
+
+/**
+ * Construct the SessionHistoryEntry from the input shape, branching on
+ * whether a graduation split was supplied (ticket 86c9m3aec).
+ *
+ * Defensive: an inadvertent zero-count split (e.g. an upstream bug that
+ * misclassifies all 8 problems as canonical) falls back to the legacy
+ * `totalCorrect / 8` shape rather than producing a NaN successRate. The
+ * graduation gate then can't fire on this entry, which is the right
+ * conservative behaviour — better to under-promote than to feed garbage
+ * into the mastery rule.
+ */
+function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
+  const { graduationSplit } = input
+  const useSplit =
+    graduationSplit !== undefined &&
+    graduationSplit.canonicalCount > 0 &&
+    graduationSplit.novelCount > 0
+
+  if (!useSplit) {
+    return {
+      dateISO: input.dateISO,
+      skillFocus: [input.focusNode],
+      successRate: input.totalCorrect / PROBLEMS_PER_SESSION,
+    }
+  }
+
+  const split = graduationSplit
+  return {
+    dateISO: input.dateISO,
+    skillFocus: [input.focusNode],
+    successRate: split.canonicalCorrect / split.canonicalCount,
+    novelPoolSuccessRate: split.novelCorrect / split.novelCount,
+  }
 }

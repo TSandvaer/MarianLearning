@@ -95,6 +95,15 @@ export interface PrepareWordSongPathAArgs {
    * `pickRecentSuccessRate(progress, 'word-song')`.
    */
   recentSuccessRate?: number | null
+  /**
+   * Graduation-session hint (ticket 86c9m3aec). Computed by the
+   * caller via `isGraduationSessionPending(progress, focusNode,
+   * 'word-song')` at session-start fetch time. When `true` AND the
+   * server-side effective focus node is `cvc-words`, the planner
+   * mixes 2–3 novel short-a probe words into the 8-problem set
+   * for a generalization probe. Defaults to `false` when omitted.
+   */
+  isGraduationSession?: boolean
 }
 
 export interface PreparedWordSongPathA {
@@ -157,19 +166,26 @@ export async function prepareWordSongPathA(
   // M2 (ticket 86c9kmwba): optionally include `progress.focusNode` +
   // `progress.recentSuccessRate`. See mathPathA.ts for the full
   // architectural rationale (same shape, same contract).
-  const progressBlock =
-    args.focusNode !== undefined || args.recentSuccessRate !== undefined
-      ? {
-          progress: {
-            ...(args.focusNode !== undefined
-              ? { focusNode: args.focusNode }
-              : {}),
-            ...(args.recentSuccessRate !== undefined
-              ? { recentSuccessRate: args.recentSuccessRate }
-              : {}),
-          },
-        }
-      : {}
+  // 86c9m3aec: extended to optionally carry `isGraduationSession`.
+  const hasProgress =
+    args.focusNode !== undefined ||
+    args.recentSuccessRate !== undefined ||
+    args.isGraduationSession !== undefined
+  const progressBlock = hasProgress
+    ? {
+        progress: {
+          ...(args.focusNode !== undefined
+            ? { focusNode: args.focusNode }
+            : {}),
+          ...(args.recentSuccessRate !== undefined
+            ? { recentSuccessRate: args.recentSuccessRate }
+            : {}),
+          ...(args.isGraduationSession !== undefined
+            ? { isGraduationSession: args.isGraduationSession }
+            : {}),
+        },
+      }
+    : {}
 
   const body: ClaudeRequest = {
     kind: 'session-start',

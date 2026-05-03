@@ -166,6 +166,30 @@ export interface WordSongSessionResult {
   /** Surface tag — distinguishes Word Song from Math at the session-end
    *  consumer level (per spec line 540). */
   surface: 'word-song'
+  /**
+   * Per-problem outcome — `true` if Marian got the problem correct
+   * without a 3-strike give-answer (same definition `totalCorrect`
+   * counts). Length always 8.
+   *
+   * Added 2026-05-02 for the cvc-words graduation gate (ticket
+   * 86c9m3aec). SessionEnd cross-references this against
+   * `targetWords` to compute the canonical/novel split for a
+   * graduation-session entry.
+   *
+   * Optional on the public type for back-compat with hand-built
+   * test fixtures; the live screen always sets it.
+   */
+  perProblemCorrect?: readonly boolean[]
+  /**
+   * Target word per problem (lowercase, length always 8). Mirrors
+   * `plan.problems[i].target.word`. Same back-compat caveat as
+   * `perProblemCorrect`.
+   *
+   * Added for the graduation gate (ticket 86c9m3aec) — SessionEnd
+   * detects which problems used novel-pool words by intersecting
+   * this list with `WORD_SONG_NOVEL_PROBE_WORDS`.
+   */
+  targetWords?: readonly string[]
 }
 
 /** Function signature for playing one canonical Word Song utterance. */
@@ -434,6 +458,18 @@ function WordSongScreen({
   const [streak, setStreak] = useState(0)
   const streakRef = useRef(0)
   const totalCorrectRef = useRef(0)
+  /**
+   * Per-problem clean-win outcome (ticket 86c9m3aec). Mirrors what
+   * `totalCorrectRef` counts (correct on first/subsequent tap WITHOUT
+   * the 3-strike guided completion firing) but indexed per problem.
+   * SessionEnd cross-references this against the plan's target words
+   * to compute the canonical/novel split for a graduation-session
+   * entry. Indexed 0..7; `false` until the problem resolves with a
+   * clean correct.
+   */
+  const perProblemCorrectRef = useRef<boolean[]>(
+    Array.from({ length: plan.problems.length }, () => false),
+  )
   /** Test seam: when `__testInitiallyAudioUnlocked` is set, this starts
    *  true so chips render tappable from first paint. See `WordSongProps`. */
   const [audioUnlocked, setAudioUnlocked] = useState(
@@ -815,9 +851,17 @@ function WordSongScreen({
         finalStreak: streakRef.current,
         earnedThisSession: earnedThisSessionRef.current,
         surface: 'word-song',
+        // Per-problem outcome + target word vector (ticket
+        // 86c9m3aec). SessionEnd uses these to compute the
+        // canonical/novel split when the just-completed session
+        // was a graduation run for cvc-words. We slice the per-
+        // problem array (a snapshot — the ref is mutable by
+        // construction) and read targets straight from the plan.
+        perProblemCorrect: perProblemCorrectRef.current.slice(),
+        targetWords: plan.problems.map((p) => p.target.word),
       })
     }
-  }, [problemIndex, plan.problems.length, onSessionComplete, storage, now])
+  }, [problemIndex, plan.problems, onSessionComplete, storage, now])
 
   // Per-correct stardust grants were intentionally REMOVED from word-song
   // in ticket 86c9kwvza (Thomas locked 2026-05-02). Reasoning per Dave's
@@ -1002,6 +1046,15 @@ function WordSongScreen({
       const isCleanWin = wrongCountRef.current === 0 && !guidedPlayedRef.current
       if (!guidedPlayedRef.current) {
         totalCorrectRef.current += 1
+        // Mark this problem as a non-guided correct on the per-problem
+        // outcome ref (ticket 86c9m3aec). Index is 0-based; `problem.index`
+        // is 1-based per the spec.
+        if (
+          problem.index >= 1 &&
+          problem.index <= perProblemCorrectRef.current.length
+        ) {
+          perProblemCorrectRef.current[problem.index - 1] = true
+        }
         if (isCleanWin) {
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)

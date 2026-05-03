@@ -35,10 +35,15 @@ import { recordSessionEnd } from './sessionHistory'
 import { recordProgressOnSessionEnd } from './progressHistory'
 import {
   defaultProgress,
+  isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
+  type Progress,
   type ProgressTrack,
+  type SkillNode,
 } from '../../lib/progress'
+import { WORD_SONG_NOVEL_PROBE_WORDS } from '../../../api/_plannerWordList'
+import type { GraduationSessionSplit } from './progressHistory'
 import type { StorageAdapter } from '../Math/stardust'
 import {
   WORDSONG_SESSION_END_BONUS,
@@ -56,6 +61,20 @@ export interface SessionEndPayload {
   finalStreak: number
   earnedThisSession: number
   surface: SessionEndSurface
+  /**
+   * Per-problem clean-win outcome (ticket 86c9m3aec). Word-song only;
+   * undefined for math sessions and for hand-built test fixtures. Used
+   * by SessionEnd to compute the canonical/novel split on a
+   * graduation session.
+   */
+  perProblemCorrect?: readonly boolean[]
+  /**
+   * Target word per problem (lowercase). Word-song only; undefined for
+   * math. Cross-references against
+   * `WORD_SONG_NOVEL_PROBE_WORDS` to determine the canonical/novel
+   * split.
+   */
+  targetWords?: readonly string[]
 }
 
 /**
@@ -285,15 +304,37 @@ export default function SessionEnd({
     // promotion hop because new history entries keep claiming the old
     // focus node forever (audit:
     // `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` P0.2).
-    const focusNode = pickFocusNode(
-      loadProgress() ?? defaultProgress(),
-      trackForSurface(p.surface),
+    const progressForFocus = loadProgress() ?? defaultProgress()
+    const track = trackForSurface(p.surface)
+    const focusNode = pickFocusNode(progressForFocus, track)
+    // 86c9m3aec: graduation-session split computation. Lives at the
+    // session-end persistence boundary because:
+    //   1. We need to read `loadProgress()` at the same instant we
+    //      record — same `progressForFocus` snapshot used for focus
+    //      derivation.
+    //   2. The `WordSongSessionResult.targetWords / perProblemCorrect`
+    //      shipped from the screen carries the per-problem state
+    //      needed to compute the split.
+    //
+    // Two-step verification: (a) the engine flagged the upcoming
+    // session as graduation when the planner request was issued, AND
+    // (b) the rendered plan actually contained novel-pool words. The
+    // second check guards the fallback path — if the live planner
+    // failed and the static `STATIC_WORD_SONG_PLANS` rotation served
+    // the screen, no novel words were used and we must NOT compute a
+    // split (would mis-classify a fallback session as failed graduation).
+    const graduationSplit = computeGraduationSplit(
+      progressForFocus,
+      track,
+      focusNode,
+      p,
     )
     recordProgressOnSessionEnd({
       surface: p.surface,
       totalCorrect: p.totalCorrect,
       dateISO,
       focusNode,
+      ...(graduationSplit !== null ? { graduationSplit } : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -835,6 +876,83 @@ function generateSparkleParticles(
  */
 function trackForSurface(surface: SessionEndSurface): ProgressTrack {
   return surface
+}
+
+/**
+ * Compute the graduation-session split for the just-completed session
+ * (ticket 86c9m3aec). Returns `null` when this was NOT a graduation
+ * run, in which case `recordProgressOnSessionEnd` falls back to the
+ * legacy `totalCorrect / 8` shape.
+ *
+ * Two-step verification (both must hold):
+ *   1. The engine flagged the upcoming session as graduation when the
+ *      planner request was issued — meaning at session-start, the last
+ *      `threshold.sessions` qualifying entries were all canonical and
+ *      the node was at 'practicing'. Re-evaluated here by reading
+ *      `loadProgress()` BEFORE the new entry is appended; the value is
+ *      identical to what App.tsx computed at session-start because
+ *      `applyMasteryRule` only runs INSIDE
+ *      `recordProgressOnSessionEnd` (the very next call after this
+ *      function returns).
+ *   2. The rendered plan actually contained novel-pool words.
+ *      `targetWords` is the 8-word vector the screen displayed; we
+ *      intersect with `WORD_SONG_NOVEL_PROBE_WORDS`. If the
+ *      intersection is empty the live planner did NOT honour the
+ *      graduation flag (likely the static `STATIC_WORD_SONG_PLANS`
+ *      fallback ran). We treat that as a non-graduation session — the
+ *      next session will re-attempt graduation per the detector.
+ *
+ * Defensive: when `targetWords` or `perProblemCorrect` is missing
+ * (math sessions, hand-built test fixtures), this returns `null`
+ * without inspecting the inputs further. Math sessions always return
+ * `null` because `WORD_SONG_NOVEL_PROBE_WORDS` only resolves on the
+ * word-song track.
+ */
+function computeGraduationSplit(
+  progress: Progress,
+  track: ProgressTrack,
+  focusNode: SkillNode,
+  payload: SessionEndPayload,
+): GraduationSessionSplit | null {
+  if (track !== 'word-song') return null
+  const targetWords = payload.targetWords
+  const perProblemCorrect = payload.perProblemCorrect
+  if (!targetWords || !perProblemCorrect) return null
+  if (targetWords.length !== perProblemCorrect.length) return null
+
+  // Step 1: was the upcoming session flagged as graduation?
+  if (!isGraduationSessionPending(progress, focusNode, track)) return null
+
+  // Step 2: did the rendered plan actually use novel-pool words?
+  const novelSet: ReadonlySet<string> = new Set(WORD_SONG_NOVEL_PROBE_WORDS)
+  let canonicalCount = 0
+  let canonicalCorrect = 0
+  let novelCount = 0
+  let novelCorrect = 0
+  for (let i = 0; i < targetWords.length; i++) {
+    const word = targetWords[i]!
+    const correct = perProblemCorrect[i] === true
+    if (novelSet.has(word)) {
+      novelCount += 1
+      if (correct) novelCorrect += 1
+    } else {
+      canonicalCount += 1
+      if (correct) canonicalCorrect += 1
+    }
+  }
+
+  // Live planner did not honour the graduation directive (likely
+  // fallback static plan ran). Don't compute split — let the engine
+  // treat this as a regular session and re-attempt graduation next
+  // time.
+  if (novelCount === 0) return null
+
+  return {
+    canonicalCorrect,
+    canonicalCount,
+    novelCorrect,
+    novelCount,
+  }
 }
 
 /** Convert a number (0-19) to its English word for the TTS caption. */

@@ -43,6 +43,7 @@ import type { PlaySessionUtteranceOptions } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
 import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
 import {
+  isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
   pickRecentSuccessRate,
@@ -172,14 +173,30 @@ function nextAfterSplash(): Route {
 function readProgressHintsForTrack(track: ProgressTrack): {
   focusNode: string | undefined
   recentSuccessRate: number | null | undefined
+  isGraduationSession: boolean | undefined
 } {
   const progress = loadProgress()
   if (progress === null) {
-    return { focusNode: undefined, recentSuccessRate: undefined }
+    return {
+      focusNode: undefined,
+      recentSuccessRate: undefined,
+      isGraduationSession: undefined,
+    }
   }
+  const focusNode = pickFocusNode(progress, track)
+  // 86c9m3aec: graduation-session hint piggy-backs on the same hint
+  // read. Only word-song carries graduation-gated nodes today; the
+  // helper itself returns false for non-gated nodes / wrong tracks,
+  // so calling it on math is safe but always false.
+  const isGraduationSession = isGraduationSessionPending(
+    progress,
+    focusNode,
+    track,
+  )
   return {
-    focusNode: pickFocusNode(progress, track),
+    focusNode,
     recentSuccessRate: pickRecentSuccessRate(progress, track),
+    isGraduationSession,
   }
 }
 
@@ -392,6 +409,12 @@ export default function App() {
         finalStreak: result.finalStreak,
         earnedThisSession: result.earnedThisSession,
         surface: result.surface,
+        // Forward per-problem outcomes + target words for the
+        // graduation gate (ticket 86c9m3aec). SessionEnd computes the
+        // canonical/novel split and persists the dual-pool entry when
+        // the just-completed session was a graduation run.
+        perProblemCorrect: result.perProblemCorrect,
+        targetWords: result.targetWords,
       })
       setRoute('session-end')
     },
@@ -784,6 +807,10 @@ export default function App() {
     // M2 (ticket 86c9kmwba): focus-node hint for the word-song track.
     // Same shape as the math fetch effect above — see that block for
     // the rationale.
+    // 86c9m3aec: ALSO carries the graduation-session flag — when the
+    // last 3 cvc-words sessions all hit ≥90% canonical and no novel-
+    // probe entry has tagged the tail window yet, the planner mixes
+    // 2–3 novel short-a probe words into the 8-problem set.
     const sessionId = `word-song-${wordSongFallbackPlan.id}-${Date.now()}`
     const wordSongHints = readProgressHintsForTrack('word-song')
     void prepareWordSongPathA(
@@ -793,6 +820,7 @@ export default function App() {
         sessionId,
         focusNode: wordSongHints.focusNode,
         recentSuccessRate: wordSongHints.recentSuccessRate,
+        isGraduationSession: wordSongHints.isGraduationSession,
       },
       { signal: controller.signal },
     )

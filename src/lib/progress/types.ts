@@ -82,8 +82,40 @@ export interface SessionHistoryEntry {
   /**
    * Success rate over the session, 0..1.
    * `correct / attempts`. Sessions with zero attempts are not recorded.
+   *
+   * For non-graduation sessions: `correct / 8` over the full 8-problem
+   * pool — the existing semantics, unchanged.
+   *
+   * For graduation sessions (ticket 86c9m3aec, novel-word generalization
+   * check on cvc-words): `canonicalCorrect / canonicalCount` over ONLY
+   * the canonical-pool slice (5–6 problems). The novel-pool slice (2–3
+   * problems drawn from `nap, rat, map, tap`) is recorded separately on
+   * `novelPoolSuccessRate` below. The split is required because the
+   * canonical 90/3 mastery rule per PR #127 gates on the canonical pool
+   * only; the novel pool gates promotion separately at ≥80%.
    */
   successRate: number
+  /**
+   * Novel-pool accuracy on a graduation session, 0..1, or absent for
+   * non-graduation sessions (ticket 86c9m3aec).
+   *
+   * Present only on entries written for a graduation-session run —
+   * those are the cvc-words sessions where the planner mixed 2–3 novel
+   * short-a probe words into the 8-problem set to verify
+   * generalization. The mastery engine reads this field as a second
+   * gate: even when `successRate` (canonical) clears the per-track
+   * threshold, promotion of a graduation-gated node only fires when
+   * `novelPoolSuccessRate >= 0.80`.
+   *
+   * Absence is meaningful: it signals "this was a regular (non-
+   * graduation) session" to the graduation-pending detector. Once a
+   * graduation entry has been recorded, the next `threshold.sessions`
+   * cross-day qualifying entries must again all be regular (no
+   * `novelPoolSuccessRate`) before the engine reflags graduation —
+   * matches the AC contract that a failed graduation doesn't
+   * immediately re-trigger another attempt.
+   */
+  novelPoolSuccessRate?: number
 }
 
 export type SessionHistory = SessionHistoryEntry[]

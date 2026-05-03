@@ -33,3 +33,35 @@ export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /æd/ rhyme family: dad.',
   '- /æm/ rhyme family: jam.',
 ].join('\n')
+
+/**
+ * Novel short-a CVC probe words used on the cvc-words graduation
+ * session (ticket 86c9m3aec). These are NOT in the canonical 14-word
+ * pack — Marian must decode them cold. Source: Dave's developmental
+ * review § P1 + Kyle's short-o pool spec recommendation
+ * (`design/word-song/short-o-pool-expansion.md` § 4 Stage 2).
+ *
+ * `cap` was excluded from the spec's tentative `nap, cap, rat, map,
+ * tap` list because it already lives in the canonical 14-word pack —
+ * using it as a "novel" probe would defeat the generalization signal.
+ *
+ * IMPORTANT: this list MUST stay aligned with the client-side
+ * `wordPack.ts` — every novel probe needs a matching `WordEntry`
+ * (`isTarget: true`) and a `TARGET_PAIRINGS` row, otherwise the
+ * browser parser rejects the read line ("non-target word") and
+ * `pickDistractors` throws on a missing pairing. The pair is
+ * enforced by code review + the round-trip test
+ * `src/screens/WordSong/plannerRoundTrip.test.ts`.
+ */
+export const WORD_SONG_NOVEL_PROBE_WORDS: readonly string[] = [
+  'nap',
+  'rat',
+  'map',
+  'tap',
+] as const
+
+/** Same shape as WORD_SONG_TARGET_WORDS_FOR_PROMPT — comma-joined for
+ *  embedding inside a Markdown list. The graduation prompt names this
+ *  list explicitly so Haiku knows which words count as "novel". */
+export const WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT =
+  WORD_SONG_NOVEL_PROBE_WORDS.join(', ')

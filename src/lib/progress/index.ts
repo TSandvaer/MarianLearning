@@ -54,5 +54,13 @@ export {
 } from './focusNode'
 export type { ProgressTrack } from './focusNode'
 
-export { LITERACY_TREE, MATH_TREE, applyMasteryRule, nextNode } from './mastery'
+export {
+  LITERACY_TREE,
+  MATH_TREE,
+  NOVEL_POOL_THRESHOLD,
+  WORD_SONG_GRADUATION_GATED_NODES,
+  applyMasteryRule,
+  isGraduationSessionPending,
+  nextNode,
+} from './mastery'
 export type { MasteryTrack } from './mastery'

@@ -165,6 +165,52 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'vehicle',
     isTarget: true,
   },
+  // ── Novel-pool probe words (ticket 86c9m3aec) ──────────────────────
+  // These four short-a CVC words are NOT part of the canonical 14-word
+  // pack — they are emitted ONLY by the planner on a graduation-session
+  // run (`isGraduationSession=true` in the request). The mastery
+  // engine reads novel-pool accuracy as a second gate on cvc-words
+  // promotion (`NOVEL_POOL_THRESHOLD = 0.80`).
+  //
+  // Picture chips fall back to silhouette placeholders rendered by
+  // `wordPictures.tsx` for v1 (per the ticket recommendation: "ship
+  // with silhouettes and file a follow-up Kyle ticket"). Real
+  // illustrations are blocked on the probe-word picture-pack ticket
+  // Kyle owns; the silhouette path is the same path the canonical
+  // pack used pre-Phase-3 Midjourney pipeline.
+  //
+  // The static `STATIC_WORD_SONG_PLANS` rotation in `wordSessionPlans`
+  // does NOT pick from these — only the live planner can route a
+  // novel word into a chip render, and only when the graduation flag
+  // is set. The Hub's local fallback path stays canonical-only.
+  {
+    word: 'nap',
+    pictureKey: 'nap',
+    vowel: 'a',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'rat',
+    pictureKey: 'rat',
+    vowel: 'a',
+    category: 'animal',
+    isTarget: true,
+  },
+  {
+    word: 'map',
+    pictureKey: 'map',
+    vowel: 'a',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'tap',
+    pictureKey: 'tap',
+    vowel: 'a',
+    category: 'household',
+    isTarget: true,
+  },
 ] as const
 
 /**
@@ -295,6 +341,25 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   dad: { gentle: ['bus', 'cup'], trap: ['bag', 'bat'] },
   jam: { gentle: ['bus', 'dog'], trap: ['bag', 'pan'] },
   van: { gentle: ['pen', 'cup'], trap: ['man', 'fan'] },
+  // ── Novel-pool probes (ticket 86c9m3aec) ──────────────────────────
+  // Distractor pairs use existing canonical/distractor pictures so the
+  // chip render works without new picture assets. Trap-tier pairs lean
+  // on rhyme/alliteration with the novel target where pedagogically
+  // apt; gentle-tier pairs use clearly-different distractor-only
+  // pictures. Forbidden-pair audit verified against
+  // `FORBIDDEN_PAIRS` above (cat-dog, bus-van, pan-pot, cap-hat,
+  // man-dad) — none of the pairs below trigger.
+  //
+  // The novel words can land in ANY problem index 1-8 per the
+  // graduation directive in `_planner.ts`, so each gets BOTH a
+  // gentle-tier pair (for problems 1-3) and a trap-tier pair (for
+  // problems 4-8). The runtime tier-from-index logic in
+  // `pickDistractors` reads `wordDistractors.pickTier(problemIndex)`
+  // — the same path the canonical pack uses.
+  nap: { gentle: ['bus', 'sun'], trap: ['fan', 'pan'] }, // /æn/ trap
+  rat: { gentle: ['bus', 'cup'], trap: ['bat', 'mat'] }, // /æt/ trap
+  map: { gentle: ['dog', 'sun'], trap: ['cap', 'mat'] }, // /æp/ + /æt/ trap
+  tap: { gentle: ['dog', 'cup'], trap: ['cap', 'pan'] }, // /æp/ + /p/-alliteration
 } as const
 
 /** Look up a word entry by word string. Throws on missing — every word in

@@ -58,6 +58,7 @@
 import {
   WORD_SONG_TARGET_WORDS_FOR_PROMPT,
   WORD_SONG_DISTRACTOR_HINTS,
+  WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
 } from './_plannerWordList.js'
 import { renderSessionAudio, type RenderSessionOptions } from './_session.js'
 import type { SessionStartResponse } from './_types.js'
@@ -176,6 +177,23 @@ export interface GenerateSessionPlanArgs {
    * the user message (NOT the cache prefix).
    */
   recentSuccessRate?: number | null
+  /**
+   * Graduation-session hint (ticket 86c9m3aec). When `true` AND the
+   * effective focus node is `cvc-words`, the planner instructs Haiku
+   * to mix 2–3 novel short-a probe words (`nap, rat, map, tap`) into
+   * the 8-problem set so the mastery engine can verify Marian
+   * generalises her decoding beyond the canonical 14-word pack. Other
+   * focus nodes ignore the flag — graduation is currently
+   * cvc-words-only.
+   *
+   * Volatile per call: lives in the user message, not the system
+   * prompt. Two graduation-on calls share the same system text as a
+   * graduation-off call so the prompt-cache prefix stays stable.
+   *
+   * Defaults to `false` when omitted (back-compat with pre-86c9m3aec
+   * callers).
+   */
+  isGraduationSession?: boolean
 }
 
 /** Plan shape returned by the planner — flat, wire-ready. Mirrors what
@@ -348,6 +366,9 @@ export interface GenerateSessionStartResponseArgs {
   childName: string
   focusNode?: string
   recentSuccessRate?: number | null
+  /** Graduation-session hint (ticket 86c9m3aec). See
+   *  `GenerateSessionPlanArgs.isGraduationSession`. */
+  isGraduationSession?: boolean
   /** Optional render-pipeline overrides. Production wiring leaves this
    *  empty — `_session.renderSessionAudio` resolves to the real Azure
    *  synth. Tests + the canon generator can swap in a fake synth or tune
@@ -394,6 +415,7 @@ export async function generateSessionStartResponse(
     childName: args.childName,
     focusNode: args.focusNode,
     recentSuccessRate: args.recentSuccessRate,
+    isGraduationSession: args.isGraduationSession,
   })
   return renderSessionAudio(plan, args.renderOptions)
 }
@@ -543,12 +565,56 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
       ? `Recent score on this skill: ${args.recentSuccessRate.toFixed(2)} (0..1).`
       : `Recent score on this skill: no data yet — pick a balanced mix.`
 
-  return [
+  // Graduation-session directive (ticket 86c9m3aec). Only fires when
+  // the caller explicitly flags the session AND the effective focus
+  // node is `cvc-words` — the gate is currently cvc-words-only. Other
+  // tracks / focus nodes ignore the flag silently.
+  //
+  // Lives in the user message (volatile per call) so two graduation
+  // calls share the same cached system prefix as a regular call.
+  const isGraduation =
+    args.isGraduationSession === true &&
+    args.track === 'word-song' &&
+    focusNode === 'cvc-words'
+  const graduationLine = isGraduation ? buildGraduationDirective() : null
+
+  const lines = [
     `Generate a session plan for the ${trackLabel} track at level ${args.level}.`,
     `Focus skill node: ${focusNode}.`,
     recentScoreLine,
+    ...(graduationLine !== null ? [graduationLine] : []),
     `Child's name: ${safeName || 'friend'}.`,
     `Return JSON only — no surrounding prose, no markdown fences.`,
+  ]
+  return lines.join('\n')
+}
+
+/**
+ * Build the graduation-session directive that goes into the user
+ * message (ticket 86c9m3aec). Spelled out as a multi-line block so
+ * Haiku has unambiguous guidance on which words count as novel and
+ * how many to mix in.
+ *
+ * Note: the directive uses the SAME read-line template as a regular
+ * cvc-words session — `"Read the <word>."` — and the same utterance
+ * id namespace (`word.p<N>.<slot>`). The browser parser doesn't need
+ * to know which problems were novel; the screen renders them
+ * identically to canonical problems, with picture chips drawn from
+ * the per-target `TARGET_PAIRINGS`. The split-aware accounting
+ * happens at session-end inside `recordProgressOnSessionEnd`.
+ */
+function buildGraduationDirective(): string {
+  return [
+    `GRADUATION SESSION — novel-word generalization probe (ticket 86c9m3aec).`,
+    `This session must mix 2 or 3 problems whose target word is drawn`,
+    `from the NOVEL pool below — these are NOT in the canonical 14-word`,
+    `list. The remaining 5 or 6 problems use canonical pool words as`,
+    `usual. Place the novel-pool problems anywhere in problems 1–8 (do`,
+    `not cluster all novel words at the end).`,
+    `Novel pool: ${WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT}.`,
+    `Use the same "Read the <word>." template for novel words as for`,
+    `canonical words. The word.p<N>.<slot> id namespace and all other`,
+    `slot copy rules apply to novel-word problems unchanged.`,
   ].join('\n')
 }
 
@@ -646,10 +712,19 @@ matching that node. Two first-class content modes today:
     utterance ids are IDENTICAL to blending-cv; only the read-line
     template differs.
 
-Pick 8 distinct target words from this list (do not invent new words, do
-not use a target more than once). The same 14-word short-a CVC pool
-serves both content modes:
+Pick 8 distinct target words from the canonical list below (do not invent
+new words, do not use a target more than once). The same 14-word short-a
+CVC pool serves both content modes:
 ${WORD_SONG_TARGET_WORDS_FOR_PROMPT}
+
+GRADUATION-SESSION EXCEPTION: when the user message contains the
+"GRADUATION SESSION" directive, that directive supplies an additional
+NOVEL pool of words (e.g. nap, rat, map, tap) to be mixed with the
+canonical pool for that session only. In that case the directive's
+novel words are also valid targets — pick the 2-3 specified novel
+problems from the directive's pool and the remaining 5-6 from the
+canonical pool above. The "do not invent new words" rule still
+forbids any word that is in NEITHER pool.
 
 Distractor guidance (Marian sees 3 picture chips per problem; one is the
 target, two are distractors — but YOU are not authoring the distractors
