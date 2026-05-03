@@ -56,11 +56,16 @@
  *    fires inside the gesture's synchronous JS task — the iOS contract
  *    that the round-1 fix violated.
  *
- * 5. **Affordance subscription** — when a fallback timer fires (the
- *    user hasn't tapped within 3 s of the visible edge), the gate
- *    transitions to `'awaiting-tap'` and emits to subscribers. App.tsx
- *    renders a "tap to continue" affordance against this state — Kyle's
- *    Greet wake-tap ring shape, reused.
+ * 5. **Affordance subscription** — App.tsx renders a "tap to continue"
+ *    affordance whenever the gate state is `'pending'` OR
+ *    `'awaiting-tap'` (round-4, ticket 86c9kxtmu — Thomas's iPad
+ *    capture showed Marian staying silent for the full 3 s fallback
+ *    window, so the affordance now mounts on the visibility-recovery
+ *    edge immediately rather than waiting for the fallback timer).
+ *    Kyle's Greet wake-tap ring shape, reused. The fallback timer
+ *    still transitions `'pending' → 'awaiting-tap'` so the
+ *    audioCtxLog distinguishes "tapped within ms of returning" from
+ *    "real walked-away" cases.
  *
  * What this module does NOT do
  * ----------------------------
@@ -86,20 +91,35 @@
  * `playSessionUtterance` does. Cleared on `_resetForTests()` only.
  */
 
+import {
+  recordPendingResumeGateState,
+  type PendingResumeGateStateName,
+} from '../debug/debugBus'
+
 export type PendingResumeAffordanceState =
   /** No iOS interruption pending. Audio dispatches play normally. */
   | 'idle'
   /**
    * Visible edge fired with state `'suspended'`/`'interrupted'`; we've
    * marked the gate but the user hasn't tapped yet. Audio dispatches
-   * are queued. Affordance NOT shown — the next chip / node tap will
-   * unstick within the gesture window.
+   * are queued.
+   *
+   * Round-4 (PR #137 v4 — ticket 86c9kxtmu): the affordance now mounts
+   * on `'pending'` immediately, NOT only on `'awaiting-tap'`. Thomas's
+   * 2026-05-03 iPad capture showed Marian staying silent for the full
+   * 3 s fallback window — she does not reflexively tap on
+   * return-from-background, so the affordance has to be visible
+   * immediately for audio to recover.
    */
   | 'pending'
   /**
-   * Fallback timer elapsed without a user tap. The pending state has
-   * persisted long enough that we surface a "tap to continue"
-   * affordance so Marian doesn't stare at a silent screen.
+   * Fallback timer elapsed without a user tap. Round-3 distinguished
+   * `'pending'` (silent) from `'awaiting-tap'` (affordance mounted);
+   * round-4 mounts the affordance on both states and uses this
+   * transition only as a diagnostic signal in the audioCtxLog
+   * (`pendingResumeGateState: 'awaiting-tap'` rows tell Thomas the
+   * fallback fired without a gesture, distinguishing "real
+   * walked-away" from "tapped within ms of returning").
    */
   | 'awaiting-tap'
 
@@ -199,9 +219,39 @@ function clearFallback(): void {
   }
 }
 
+/**
+ * Map this module's internal affordance state to the audioCtxLog mirror
+ * value (`PendingResumeGateStateName`). The internal `'pending'` state
+ * surfaces as `'pending-resume'` in the log so a localStorage paste-back
+ * is unambiguous next to the older audio-unlock gate's `'pending'` value
+ * — different state machines, different semantics.
+ *
+ * PR #137 round 4 (ticket 86c9kxtmu) — Thomas's 2026-05-03 capture
+ * showed only the OLD `gateState` field; round-3 had no way to confirm
+ * the new gate flipped at the visible-edge of an interruption. The
+ * mirror under its own field closes that diagnostic gap.
+ */
+function toLogState(
+  affordance: PendingResumeAffordanceState,
+): PendingResumeGateStateName {
+  switch (affordance) {
+    case 'idle':
+      return 'idle'
+    case 'pending':
+      return 'pending-resume'
+    case 'awaiting-tap':
+      return 'awaiting-tap'
+  }
+}
+
 function setAffordance(next: PendingResumeAffordanceState): void {
   if (state.affordance === next) return
   state.affordance = next
+  // Mirror to the debug bus before notifying subscribers — the bus value
+  // is read by `audioContextProbe` for every emit, and we want the next
+  // probe row (which may fire synchronously inside a subscriber) to see
+  // the up-to-date value.
+  recordPendingResumeGateState(toLogState(next))
   emitState()
 }
 

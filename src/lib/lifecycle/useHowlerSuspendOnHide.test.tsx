@@ -260,6 +260,51 @@ describe('useHowlerSuspendOnHide', () => {
       expect(recovery?.bufferStarted).toBe(false)
     })
 
+    it('audioCtxLog mirrors pendingResumeGateState=pending-resume after visible-edge interrupted (round-4 — ticket 86c9kxtmu)', () => {
+      // Round-4 contract: the visibility-recovery-buffer row (and every
+      // subsequent emit until the gate clears) carries
+      // `pendingResumeGateState: 'pending-resume'` so Thomas's iPad
+      // paste-back can confirm the gate fired without ambiguity.
+      //
+      // This test FAILS on v3 (PR #137 round 3) because round-3 did not
+      // mirror the new gate's state into the audioCtxLog — only the
+      // older `gateState` field was emitted. Thomas's 2026-05-03 capture
+      // showed `gateState: "unlocked"` (the OLD gate, post-Greet
+      // unlocked) and the orchestrator misread that as proof the new
+      // gate hadn't fired. Round-4 surfaces the new gate explicitly.
+      const storage = new Map<string, string>()
+      const memStorage = {
+        getItem: (k: string) => storage.get(k) ?? null,
+        setItem: (k: string, v: string) => {
+          storage.set(k, v)
+        },
+        removeItem: (k: string) => {
+          storage.delete(k)
+        },
+      }
+      activateAudioContextProbe({ storage: memStorage })
+
+      const fakeCtx = makeFakeCtx('interrupted')
+      ;(Howler as unknown as { ctx?: unknown }).ctx = fakeCtx
+      setDocumentVisibility('hidden')
+      render(<Probe />)
+      setDocumentVisibility('visible')
+      document.dispatchEvent(new Event('visibilitychange'))
+
+      const persisted = storage.get(AUDIO_CTX_LOG_STORAGE_KEY)
+      const log = JSON.parse(persisted!) as Array<{
+        cause: string
+        pendingResumeGateState?: string
+      }>
+      const recovery = log.find((r) => r.cause === 'visibility-recovery-buffer')
+      // The gate flips before the recovery-buffer row is emitted (see
+      // useHowlerSuspendOnHide line ordering: markPendingResume() runs
+      // before recordVisibilityRecoveryBufferEvent). So the recovery row
+      // itself carries the pending-resume state.
+      expect(recovery).toBeDefined()
+      expect(recovery?.pendingResumeGateState).toBe('pending-resume')
+    })
+
     afterEach(() => {
       _resetAudioContextProbeForTests()
     })

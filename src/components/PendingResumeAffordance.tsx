@@ -21,12 +21,20 @@
  *
  * When it shows
  * -------------
- * Subscribes to `pendingResumeGate`'s affordance state. Renders only
- * when the state is `'awaiting-tap'` — i.e. the visible edge marked
- * pending AND the 3 s fallback timer elapsed without a real gesture
- * draining the queue. The `'pending'` state is silent (the affordance
- * doesn't flash up during the brief common-case window where Marian
- * tapped within a few hundred ms of returning).
+ * Subscribes to `pendingResumeGate`'s affordance state. Renders when the
+ * state is `'pending'` or `'awaiting-tap'` — i.e. the visible edge has
+ * marked pending and the queue is waiting on a gesture to drain. PR
+ * #137 round 4 (ticket 86c9kxtmu) brought the mount forward from the
+ * `'awaiting-tap'`-only behaviour after Thomas's iPad capture showed
+ * Marian sitting silent for the full 3 s fallback window most of the
+ * time — she does not reflexively tap on return-from-background, so
+ * the affordance has to be visible immediately to recover audio.
+ *
+ * The `'pending'` → `'awaiting-tap'` transition still happens on the
+ * fallback timer (the gate machine's existing behaviour), but it no
+ * longer gates the visible affordance — both pending states render
+ * the same UI. The transition is now purely a diagnostic signal in
+ * the audioCtxLog.
  *
  * Tap handling
  * ------------
@@ -73,7 +81,14 @@ export function PendingResumeAffordance({
     return subscribePendingResumeGate(setState)
   }, [])
 
-  if (state !== 'awaiting-tap') return null
+  // PR #137 round 4 (ticket 86c9kxtmu): mount on `'pending'` AND
+  // `'awaiting-tap'`. The previous awaiting-tap-only gate left Marian
+  // staring at silent UI for the full fallback window; the new
+  // contract puts the affordance up immediately on the visibility-
+  // recovery edge so any tap resumes audio. The fallback timer is
+  // retained for the diagnostic transition in the audioCtxLog but no
+  // longer gates the affordance's mount.
+  if (state !== 'pending' && state !== 'awaiting-tap') return null
 
   const handleTap = (): void => {
     drainOnGesture(

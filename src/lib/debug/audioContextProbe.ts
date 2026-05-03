@@ -77,6 +77,7 @@
 import { Howler } from 'howler'
 import {
   readGateState,
+  readPendingResumeGateState,
   recordAudioCtxEvent,
   type AudioCtxEventRecord,
   type AudioCtxState,
@@ -580,11 +581,16 @@ export function startAudioContextProbe(
     // the latest value here. `null` when the gate hasn't reported yet —
     // we omit the field rather than write `null` to keep the JSON tight.
     const gateState = readGateState()
+    // PR #137 round 4 (ticket 86c9kxtmu): same mirror pattern for the
+    // pending-resume gate, under its own field so an iPad export carries
+    // both timelines unambiguously. See debugBus PendingResumeGateStateName.
+    const pendingResumeGateState = readPendingResumeGateState()
     const record: AudioCtxEventRecord = {
       timestamp: now(),
       ctxState,
       cause,
       ...(gateState !== null ? { gateState } : {}),
+      ...(pendingResumeGateState !== null ? { pendingResumeGateState } : {}),
       ...(extra.speakResult !== undefined
         ? { speakResult: extra.speakResult }
         : {}),

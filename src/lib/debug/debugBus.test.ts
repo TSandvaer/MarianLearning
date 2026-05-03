@@ -61,6 +61,7 @@ describe('debugBus', () => {
         recentTaps: [],
         recentRawEvents: [],
         gateState: null,
+        pendingResumeGateState: null,
         audioCtxState: null,
         audioCtxEvents: [],
       })

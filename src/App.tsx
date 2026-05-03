@@ -1000,12 +1000,14 @@ export default function App() {
             QA usage notes. */}
         {debugOn && <DebugOverlay />}
         {/* PR #137 round 2 (ticket 86c9kxtmu) — "tap to continue" affordance
-            for the iPad PWA visibility-recovery edge case. Renders only
-            when the pending-resume gate's affordance state reaches
-            `'awaiting-tap'` (visibility marked pending AND no user
-            gesture within the 3 s fallback). Lives outside the
-            AnimatePresence so a backgrounded session that returns mid-
-            screen-transition still gets the affordance promptly. See
+            for the iPad PWA visibility-recovery edge case. Round-4 mounts
+            the affordance immediately on the visibility-recovery edge
+            (gate state `'pending'`) rather than waiting for the 3 s
+            fallback to reach `'awaiting-tap'`; Thomas's iPad capture
+            showed Marian sitting silent for the full fallback window
+            most of the time. Lives outside the AnimatePresence so a
+            backgrounded session that returns mid-screen-transition
+            still gets the affordance promptly. See
             `components/PendingResumeAffordance.tsx`. */}
         <PendingResumeAffordance />
       </MotionConfig>
