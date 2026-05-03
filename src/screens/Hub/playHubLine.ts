@@ -29,10 +29,13 @@
  *   resolves the same way the silent fallback does — `onWordTick` walks
  *   at 165 wpm and the promise settles. The screen never bricks.
  * - **One-line-at-a-time.** Hub plays at most one welcome-back line per
- *   mount, so we don't need the `cancel()` / `activeStop` plumbing the
- *   Greet `preRecorded.ts` carries. The `cancel()` helper exists for
- *   completeness but Hub never calls it (the cancel-on-node-tap path is
- *   handled at the consumer level via `cancelledRef`).
+ *   mount, but the in-flight utterance MUST be cancellable mid-play —
+ *   when Marian taps a skill-tree chip, the Hub line has to stop cleanly
+ *   so it doesn't leak into Math/WordSong's read-aloud (ticket
+ *   86c9m4afh, surfaced 2026-05-03). `cancelActive()` stops the
+ *   most-recently-played Howl AND short-circuits the caption-walk
+ *   fallback path (which was the audible source on a load-error path).
+ *   Mirrors the `activeStop` plumbing in `lib/audio/preRecorded.ts`.
  * - **Test seam.** `createHubLinePlayer({ HowlCtor })` lets tests inject
  *   a fake Howl — same shape as `lib/sfx/sfx.ts` and
  *   `lib/audio/preRecorded.ts`. Production callers use the module-level
@@ -85,6 +88,19 @@ export interface HubLinePlayer {
    * always finishes.
    */
   playHubLine: (id: HubLineId, opts?: PlayHubLineOptions) => Promise<void>
+  /**
+   * Cancel the most-recently-started Hub utterance. Stops the in-flight
+   * Howl and any pending caption-walk fallback timer; resolves the
+   * outstanding `playHubLine` promise without firing further `onWordTick`
+   * callbacks. Idempotent — calling when nothing is playing is a no-op.
+   *
+   * Wired in ticket 86c9m4afh (2026-05-03) — Thomas's iPad ear-test
+   * confirmed the Hub line was leaking past the route-flip into
+   * Math/WordSong's read-aloud, because `Hub.tsx`'s old `cancelledRef`
+   * only short-circuited caption-tick state updates and never told the
+   * Howl to stop.
+   */
+  cancelActive: () => void
   /** Tear down all cached Howls. Idempotent. */
   unload: () => void
 }
@@ -95,11 +111,33 @@ export interface CreateHubLinePlayerOptions {
 }
 
 /**
+ * Internal handle used by `cancelActive()` to stop whatever play path is
+ * currently in flight. Either path (Howl or caption-walk) registers a
+ * single one of these into the player's `activeHandle` slot when it
+ * starts and clears it when it settles naturally.
+ */
+interface ActivePlayHandle {
+  /** Stop the underlying audio + timers and resolve the outer promise. */
+  cancel: () => void
+}
+
+/**
  * Caption-walk fallback. Same 165 wpm shape Hub.tsx had inline before
  * this module landed; lifted here so both the no-Howl path and the
  * load-failure path call the same code.
+ *
+ * `registerHandle` is invoked synchronously with a cancel handle so the
+ * caller (createHubLinePlayer) can wire it into the active-play slot.
+ * On normal completion the walker clears its own slot via the supplied
+ * `onSettle` callback so a stale `cancelActive()` after natural end is
+ * a no-op.
  */
-function walkCaption(id: HubLineId, opts: PlayHubLineOptions): Promise<void> {
+function walkCaption(
+  id: HubLineId,
+  opts: PlayHubLineOptions,
+  registerHandle?: (handle: ActivePlayHandle) => void,
+  onSettle?: () => void,
+): Promise<void> {
   return new Promise<void>((resolve) => {
     opts.onPlay?.()
     const wordCount = HUB_LINE_WORD_COUNTS[id]
@@ -107,21 +145,34 @@ function walkCaption(id: HubLineId, opts: PlayHubLineOptions): Promise<void> {
     const interval = wordCount > 0 ? totalMs / wordCount : 0
     opts.onWordTick?.(0)
     if (wordCount <= 1) {
+      onSettle?.()
       resolve()
       return
     }
     const schedule = opts.schedule ?? ((cb, ms) => window.setInterval(cb, ms))
     const cancelSchedule =
       opts.cancelSchedule ?? ((h) => window.clearInterval(h as number))
+    let cancelled = false
     let i = 0
     const handle = schedule(() => {
+      if (cancelled) return
       i += 1
       opts.onWordTick?.(i)
       if (i >= wordCount - 1) {
         cancelSchedule(handle)
+        onSettle?.()
         resolve()
       }
     }, interval)
+    registerHandle?.({
+      cancel: () => {
+        if (cancelled) return
+        cancelled = true
+        cancelSchedule(handle)
+        onSettle?.()
+        resolve()
+      },
+    })
   })
 }
 
@@ -139,6 +190,11 @@ export function createHubLinePlayer(
   // walk fallback without re-attempting the Howl.
   const failed = new Set<HubLineId>()
   let warnedHowlerUnavailable = false
+  // Most-recently-started utterance, or null when nothing is playing.
+  // `playHubLine` writes here on dispatch; both the natural-end path and
+  // the explicit `cancelActive()` clear it. Hub plays at most one line
+  // at a time so a single slot is sufficient (no FIFO queue).
+  let activeHandle: ActivePlayHandle | null = null
 
   function ensureHowl(id: HubLineId): HubHowlLike | null {
     if (failed.has(id)) return null
@@ -165,12 +221,31 @@ export function createHubLinePlayer(
     }
   }
 
+  function clearActive(handle: ActivePlayHandle): void {
+    if (activeHandle === handle) activeHandle = null
+  }
+
   function playHubLine(
     id: HubLineId,
     playOpts: PlayHubLineOptions = {},
   ): Promise<void> {
     const howl = ensureHowl(id)
-    if (!howl) return walkCaption(id, playOpts)
+    if (!howl) {
+      // No Howl path — register the walker's cancel directly.
+      let walkHandle: ActivePlayHandle | null = null
+      const promise = walkCaption(
+        id,
+        playOpts,
+        (h) => {
+          walkHandle = h
+          activeHandle = h
+        },
+        () => {
+          if (walkHandle) clearActive(walkHandle)
+        },
+      )
+      return promise
+    }
 
     return new Promise<void>((resolve) => {
       const schedule =
@@ -196,10 +271,32 @@ export function createHubLinePlayer(
         }
       }
 
+      const handle: ActivePlayHandle = {
+        cancel: () => {
+          if (resolved) return
+          resolved = true
+          // Stop the Howl FIRST so the audio actually goes silent on iPad.
+          // `Howl.stop()` synchronously kills any in-flight playback;
+          // detach() then nukes the event listeners so a late `end` event
+          // (some Howler versions emit one on stop) doesn't double-resolve
+          // or refire onWordTick callbacks.
+          try {
+            howl.stop()
+          } catch {
+            // best-effort — never throw on cancel
+          }
+          detach()
+          clearActive(handle)
+          resolve()
+        },
+      }
+      activeHandle = handle
+
       const settle = () => {
         if (resolved) return
         resolved = true
         detach()
+        clearActive(handle)
         resolve()
       }
 
@@ -215,7 +312,20 @@ export function createHubLinePlayer(
         // (which schedules its own interval).
         detach()
         resolved = true
-        walkCaption(id, playOpts).then(resolve)
+        // Hand the active-slot to the walker's own cancel handle so a
+        // subsequent cancelActive() during the fallback walk also works.
+        let walkHandle: ActivePlayHandle | null = null
+        walkCaption(
+          id,
+          playOpts,
+          (h) => {
+            walkHandle = h
+            activeHandle = h
+          },
+          () => {
+            if (walkHandle) clearActive(walkHandle)
+          },
+        ).then(resolve)
       }
 
       howl.on('play', () => {
@@ -265,6 +375,13 @@ export function createHubLinePlayer(
     })
   }
 
+  function cancelActive(): void {
+    const handle = activeHandle
+    if (!handle) return
+    activeHandle = null
+    handle.cancel()
+  }
+
   function unload(): void {
     for (const howl of cache.values()) {
       try {
@@ -277,10 +394,11 @@ export function createHubLinePlayer(
     failed.clear()
   }
 
-  return { playHubLine, unload }
+  return { playHubLine, cancelActive, unload }
 }
 
 /** Module-level singleton — the default Hub.tsx wires in. */
 const defaultPlayer = createHubLinePlayer()
 export const playHubLine = defaultPlayer.playHubLine
+export const cancelActiveHubLine = defaultPlayer.cancelActive
 export const unloadHubLines = defaultPlayer.unload
