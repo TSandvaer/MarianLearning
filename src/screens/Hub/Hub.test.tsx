@@ -584,6 +584,90 @@ describe('Hub — node tap routing', () => {
   })
 })
 
+describe('Hub — audio-handoff cancellation (ticket 86c9m4afh)', () => {
+  /**
+   * Regression tests for the iPad audio-leak bug surfaced 2026-05-03.
+   *
+   * Before this fix, tapping a skill-tree chip while the Hub welcome-back
+   * line was still playing only set `cancelledRef.current = true`, which
+   * short-circuits subsequent caption-tick state updates. The underlying
+   * Howl was never told to stop, so its audio kept playing past the
+   * route-flip and bled into Math/WordSong's read-aloud.
+   *
+   * The fix wires `cancelLineFn` (default: module-level
+   * `cancelActiveHubLine`) into `handleNodeTap` so the in-flight Hub
+   * utterance is stopped synchronously on chip tap.
+   */
+  it('invokes cancelLineFn exactly once when a tree node is tapped', async () => {
+    const user = userEvent.setup()
+    const cancelLineFn = vi.fn()
+    const playLineFn = vi.fn(() => new Promise<void>(() => {})) // never resolves
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'session-end', // gate already unlocked → greeting fires on mount
+      playLineFn,
+      cancelLineFn,
+    })
+    const wordNode = screen
+      .getAllByTestId('hub-tree-node')
+      .find((n) => n.getAttribute('data-tree') === 'word-song')!
+    await user.click(wordNode)
+    expect(cancelLineFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('invokes cancelLineFn on either chip tap (number-garden too)', async () => {
+    const user = userEvent.setup()
+    const cancelLineFn = vi.fn()
+    const playLineFn = vi.fn(() => new Promise<void>(() => {}))
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'session-end',
+      playLineFn,
+      cancelLineFn,
+    })
+    const numberNode = screen
+      .getAllByTestId('hub-tree-node')
+      .find((n) => n.getAttribute('data-tree') === 'number-garden')!
+    await user.click(numberNode)
+    expect(cancelLineFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('invokes cancelLineFn on chip tap even when the greeting is suppressed (rapid-remount path)', async () => {
+    // Rapid-remount path: no welcome-back line dispatches, but
+    // `cancelLine()` is still called on tap. This is intentional — the
+    // call is idempotent, and treating "did we play a line?" as the gate
+    // is more error-prone than just always calling cancel. The
+    // underlying player's `cancelActive()` is itself a no-op when
+    // nothing is playing (covered in playHubLine.test.ts).
+    const user = userEvent.setup()
+    const adapter = createMemoryStorage()
+    window.sessionStorage.setItem(
+      HUB_LAST_UNMOUNT_KEY,
+      String(Date.now() - (RAPID_REMOUNT_THRESHOLD_MS - 1000)),
+    )
+    const cancelLineFn = vi.fn()
+    renderHub({ storage: adapter, cancelLineFn })
+    const wordNode = screen
+      .getAllByTestId('hub-tree-node')
+      .find((n) => n.getAttribute('data-tree') === 'word-song')!
+    await user.click(wordNode)
+    expect(cancelLineFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT invoke cancelLineFn on cold mount (no chip tap)', () => {
+    // Direct deep-launch / cold mount path. The screen never tapped a
+    // chip → cancel must not fire. This is the regression test that
+    // proves we don't accidentally cancel on mount or on every render.
+    const cancelLineFn = vi.fn()
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'app-open',
+      cancelLineFn,
+    })
+    expect(cancelLineFn).toHaveBeenCalledTimes(0)
+  })
+})
+
 describe('Hub — path-strip sliding window', () => {
   it('renders 5 cells per tree at default (currentIndex=0)', () => {
     renderHub({ storage: createMemoryStorage() })

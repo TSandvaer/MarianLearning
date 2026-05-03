@@ -209,6 +209,129 @@ describe('createHubLinePlayer', () => {
     )
   })
 
+  describe('cancelActive — audio-handoff bug fix (ticket 86c9m4afh)', () => {
+    it('stops the in-flight Howl exactly once when invoked mid-play', async () => {
+      const { HowlCtor, instances } = makeFakeHowl()
+      const player = createHubLinePlayer({ HowlCtor })
+
+      const promise = player.playHubLine('hub.welcome.what-today')
+      // Mid-play: Howl emitted `play` but not yet `end`.
+      instances[0]._emit('play')
+      expect(instances[0].stop).toHaveBeenCalledTimes(0)
+
+      player.cancelActive()
+      expect(instances[0].stop).toHaveBeenCalledTimes(1)
+
+      // The play promise resolves on cancel — not stuck pending.
+      await promise
+    })
+
+    it('resolves the outstanding playHubLine promise without firing further onWordTick', async () => {
+      const { HowlCtor, instances } = makeFakeHowl()
+      const player = createHubLinePlayer({ HowlCtor })
+      const onWordTick = vi.fn()
+
+      const promise = player.playHubLine('hub.welcome.what-today', {
+        onWordTick,
+      })
+      instances[0]._emit('play')
+      // Word 0 has fired synchronously on play.
+      expect(onWordTick).toHaveBeenCalledTimes(1)
+      expect(onWordTick).toHaveBeenCalledWith(0)
+
+      player.cancelActive()
+
+      // After cancel, the timer interval that would have fired words 1+2
+      // is torn down. Drain a generous window — onWordTick must NOT
+      // fire again.
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(onWordTick).toHaveBeenCalledTimes(1)
+
+      await promise
+    })
+
+    it('is a no-op when nothing is playing (idempotent)', () => {
+      const { HowlCtor, instances } = makeFakeHowl()
+      const player = createHubLinePlayer({ HowlCtor })
+
+      // Cold start — never called playHubLine.
+      expect(() => player.cancelActive()).not.toThrow()
+      expect(instances).toHaveLength(0)
+    })
+
+    it('is a no-op when called after the line ended naturally', async () => {
+      const { HowlCtor, instances } = makeFakeHowl()
+      const player = createHubLinePlayer({ HowlCtor })
+
+      const p = player.playHubLine('hub.welcome.what-today')
+      instances[0]._emit('play')
+      instances[0]._emit('end')
+      await p
+
+      // Stale cancel — the play resolved already, so no new stop should
+      // fire (Howl was never told to stop on natural end).
+      player.cancelActive()
+      expect(instances[0].stop).toHaveBeenCalledTimes(0)
+    })
+
+    it('cancels exactly once even if invoked repeatedly', async () => {
+      const { HowlCtor, instances } = makeFakeHowl()
+      const player = createHubLinePlayer({ HowlCtor })
+
+      const promise = player.playHubLine('hub.welcome.what-today')
+      instances[0]._emit('play')
+
+      player.cancelActive()
+      player.cancelActive()
+      player.cancelActive()
+
+      // Howl.stop should fire exactly once on the first cancel.
+      expect(instances[0].stop).toHaveBeenCalledTimes(1)
+      await promise
+    })
+
+    it('cancels the caption-walk fallback path when Howl construction throws', async () => {
+      const HowlCtor = vi.fn(() => {
+        throw new Error('audio backend unavailable')
+      }) as unknown as typeof Howl
+      const player = createHubLinePlayer({ HowlCtor })
+      const onWordTick = vi.fn()
+
+      const promise = player.playHubLine('hub.welcome.what-today', {
+        onWordTick,
+      })
+      // Word 0 fired synchronously on the walker path.
+      expect(onWordTick).toHaveBeenCalledTimes(1)
+
+      player.cancelActive()
+
+      // Walker timer is torn down — no further ticks fire.
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(onWordTick).toHaveBeenCalledTimes(1)
+      await promise
+    })
+
+    it('cancels the caption-walk fallback after a Howl loaderror', async () => {
+      const { HowlCtor, instances } = makeFakeHowl()
+      const player = createHubLinePlayer({ HowlCtor })
+      const onWordTick = vi.fn()
+
+      const promise = player.playHubLine('hub.welcome.what-today', {
+        onWordTick,
+      })
+      // Howl loaderror → fallback walker takes over.
+      instances[0]._emit('loaderror')
+      expect(onWordTick).toHaveBeenCalledWith(0)
+      const ticksBefore = onWordTick.mock.calls.length
+
+      // Now cancel mid-walk. The fallback walker's timer must tear down.
+      player.cancelActive()
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(onWordTick).toHaveBeenCalledTimes(ticksBefore)
+      await promise
+    })
+  })
+
   it('unload() tears down all cached Howls and is idempotent', async () => {
     const { HowlCtor, instances } = makeFakeHowl()
     const player = createHubLinePlayer({ HowlCtor })

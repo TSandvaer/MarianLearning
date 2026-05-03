@@ -65,7 +65,10 @@ import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
 import { StageIcon } from './stageIcons'
-import { playHubLine as defaultPlayHubLine } from './playHubLine'
+import {
+  playHubLine as defaultPlayHubLine,
+  cancelActiveHubLine as defaultCancelHubLine,
+} from './playHubLine'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import {
   NUMBER_GARDEN_STAGES,
@@ -147,6 +150,20 @@ export interface HubProps {
    * default).
    */
   playLineFn?: PlayHubLineFn
+  /**
+   * Test seam: optional cancel-line function. Invoked from
+   * `handleNodeTap` to stop the in-flight Hub utterance so it doesn't
+   * leak past the route-flip into Math/WordSong's read-aloud (ticket
+   * 86c9m4afh). Production default is the module-level
+   * `cancelActiveHubLine` paired with `defaultPlayHubLine`. Tests
+   * supplying a custom `playLineFn` typically pass a `vi.fn()` here so
+   * they can assert the cancel was invoked exactly once.
+   *
+   * Idempotent — Hub calls this on every chip tap regardless of
+   * whether a line is currently playing, and the underlying player
+   * treats "no active utterance" as a no-op.
+   */
+  cancelLineFn?: () => void
 }
 
 export interface PlayHubLineOptions {
@@ -171,6 +188,7 @@ export default function Hub({
   onParentGate,
   onCharacterLongPress,
   playLineFn,
+  cancelLineFn,
 }: HubProps): ReactElement {
   // Celebration overlay state — driven by `pendingPromotion`. The state
   // is the dismissed-pose marker; visibility is derived from the prop.
@@ -251,6 +269,27 @@ export default function Hub({
     },
     [playLineFn],
   )
+
+  /**
+   * Cancel any in-flight Hub utterance — called from `handleNodeTap`
+   * when Marian taps a skill-tree chip. Defaults to the module-level
+   * `cancelActiveHubLine` paired with `defaultPlayHubLine`; tests can
+   * inject a custom `cancelLineFn`. When the consumer supplies their
+   * own `playLineFn` but no `cancelLineFn` the cancel is a no-op (the
+   * test-injected player is responsible for its own teardown via the
+   * existing `cancelledRef` short-circuit).
+   *
+   * Wired in ticket 86c9m4afh — see playHubLine.ts header for the
+   * audio-handoff bug context.
+   */
+  const cancelLine = useCallback((): void => {
+    if (cancelLineFn) {
+      cancelLineFn()
+      return
+    }
+    if (playLineFn) return // injected player without injected canceller
+    defaultCancelHubLine()
+  }, [cancelLineFn, playLineFn])
 
   /**
    * Whether the welcome-back line has been dispatched this mount. Held
@@ -347,8 +386,16 @@ export default function Hub({
 
   const handleNodeTap = useCallback(
     (tree: SkillTreeId) => {
-      // Cancel any in-flight greeting.
+      // Cancel any in-flight greeting. `cancelledRef` short-circuits
+      // caption-walk state updates inside the play promise; `cancelLine()`
+      // is the audio-side stop — tells the underlying Howl (or caption-
+      // walk fallback) to actually go silent. Both are needed: the ref
+      // guard stops React state updates during teardown, and the line-
+      // cancel stops the audio. Without the audio-side cancel, Hub
+      // utterances were leaking into Math/WordSong's read-aloud past the
+      // route-flip (ticket 86c9m4afh, Thomas's iPad ear-test 2026-05-03).
       cancelledRef.current = true
+      cancelLine()
       // Unlock audio gate if this is the first gesture on app-open path.
       if (!gestureUnlocked) setGestureUnlocked(true)
 
@@ -363,7 +410,15 @@ export default function Hub({
       // change to Math / WordSong; Hub doesn't navigate directly.
       onPickTree?.(tree)
     },
-    [history, suggestion, now, storage, onPickTree, gestureUnlocked],
+    [
+      history,
+      suggestion,
+      now,
+      storage,
+      onPickTree,
+      gestureUnlocked,
+      cancelLine,
+    ],
   )
 
   // ── First-tap audio unlock for the app-open path ----------------------
