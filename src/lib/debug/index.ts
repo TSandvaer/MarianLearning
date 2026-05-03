@@ -1,5 +1,6 @@
 export { default as DebugOverlay } from './DebugOverlay'
 export { isDebugEnabled } from './isDebugEnabled'
+export { maybeApplyDebugSeed, readDebugSeedParam } from './debugSeed'
 export { emitBundleInit } from './bundleInit'
 export { getPlayerKind } from './playerKind'
 export type { PlayerKindTagged } from './playerKind'

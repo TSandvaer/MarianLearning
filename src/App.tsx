@@ -35,6 +35,7 @@ import {
   activateAudioContextProbe,
   emitBundleInit,
   isDebugEnabled,
+  maybeApplyDebugSeed,
   recordPathASettleEvent,
 } from './lib/debug'
 import { disableHowlerAutoSuspend, playSessionUtterance } from './lib/audio'
@@ -84,6 +85,16 @@ import { FIRST_ROUTE } from './router/route'
  * connected when idle).
  */
 disableHowlerAutoSuspend()
+
+/**
+ * Apply `?debug=1&seed=<value>` localStorage seed BEFORE any React
+ * tree imports run their `useState(loadProgress)` initializers. Module-
+ * load timing is essential — a `useEffect` would land after the first
+ * render reads stale storage. No-op when `?debug=1` is missing or the
+ * seed value is unrecognized; never runs in Marian's normal flow. See
+ * `src/lib/debug/debugSeed.ts` for recognized seed values + rationale.
+ */
+maybeApplyDebugSeed()
 
 /**
  * Optional initial-route override via `?route=literacy` etc. Used for
