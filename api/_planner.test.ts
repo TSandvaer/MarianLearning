@@ -1086,6 +1086,182 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
   })
 })
 
+/**
+ * Graduation-session directive (ticket 86c9m3aec).
+ *
+ * The planner accepts an optional `isGraduationSession: boolean`. When
+ * true AND the effective focus node is `cvc-words`, the user message
+ * gains a directive instructing Haiku to mix 2–3 words from the novel
+ * pool (`nap, rat, map, tap`) into the 8-problem set. Other tracks /
+ * focus nodes ignore the flag silently.
+ *
+ * The system prompt acknowledges the graduation exception so Haiku
+ * doesn't refuse the novel words under the "do not invent new words"
+ * rule. The system text stays byte-stable across calls — the
+ * cache-prefix invariant is preserved.
+ */
+describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec)', () => {
+  const VALID_WORD_RESPONSE = JSON.stringify({
+    id: 'haiku-word-grad-001',
+    label: 'graduation session',
+    utterances: [
+      { id: 'word.p1.read', text: 'Read the cat.' },
+      { id: 'word.p1.correct', text: 'Yes! Cat.' },
+      { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'word.p1.hint', text: "Let's look. Cat." },
+      { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+    ],
+  })
+
+  it('places the GRADUATION SESSION directive in the user message when isGraduationSession=true on cvc-words', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+      isGraduationSession: true,
+    })
+
+    const args = capture.lastArgs as {
+      messages: Array<{ content: string }>
+    }
+    const user = args.messages[0]!.content
+    // The directive header is the deterministic anchor.
+    expect(user).toContain('GRADUATION SESSION')
+    // The novel pool must be enumerated verbatim — Haiku needs the
+    // exact word list to obey the "novel pool" instruction.
+    expect(user).toContain('nap')
+    expect(user).toContain('rat')
+    expect(user).toContain('map')
+    expect(user).toContain('tap')
+    // 2 or 3 problems is the spec's fence — pin it as a regex anchor
+    // so a future copy edit that drops the count fails this test.
+    expect(user).toMatch(/2 or 3 problems/i)
+  })
+
+  it('omits the graduation directive when isGraduationSession is false / undefined', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+      // isGraduationSession omitted (undefined)
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
+  })
+
+  it('ignores isGraduationSession=true on the math track (graduation is cvc-words-only today)', async () => {
+    // Defense-in-depth: graduation is currently scoped to cvc-words.
+    // A misrouted flag on a math request must not leak the novel-pool
+    // directive (which would be nonsensical for math problems).
+    const MATH_RESPONSE = JSON.stringify({
+      id: 'haiku-math-001',
+      label: 'm',
+      utterances: [{ id: 'math.p1.read', text: 'Three plus two. How many?' }],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      isGraduationSession: true,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
+  })
+
+  it('ignores isGraduationSession=true on word-song untuned tiers (stub-fallback to blending-cv)', async () => {
+    // Untuned tiers (e.g. digraphs) fall back to blending-cv content
+    // per `effectiveFocusNode`. The graduation directive is gated on
+    // the EFFECTIVE focus node being cvc-words, so an untuned-tier
+    // request with the flag set must not carry the directive — the
+    // session would otherwise emit graduation content under a
+    // non-graduation focus.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs',
+      isGraduationSession: true,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
+  })
+
+  it('a graduation call shares the same SYSTEM prompt text as a non-graduation call (cache invariant)', async () => {
+    // Pin the prompt-cache invariant: the graduation flag is
+    // user-message-only. Two calls that differ only in the flag must
+    // produce byte-identical system text.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(VALID_WORD_RESPONSE, { capture: cap1 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(VALID_WORD_RESPONSE, { capture: cap2 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+      isGraduationSession: true,
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+
+  it('the system prompt acknowledges the graduation exception (Haiku will not refuse novel words)', async () => {
+    // Defensive prompt-content pin: the system prompt must mention
+    // the graduation exception so Haiku doesn't enforce the "do not
+    // invent new words" rule against the novel pool. We anchor on a
+    // deterministic substring rather than the full block to keep the
+    // test robust against benign copy edits.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+      isGraduationSession: true,
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    expect(prompt).toMatch(/GRADUATION-SESSION EXCEPTION/i)
+  })
+})
+
 describe('generateSessionStartResponse — combined planner + TTS callable (D, 86c9kwhbc)', () => {
   // Pre-86c9kwhbc the HTTP handler awaited generateSessionPlan and
   // renderSessionAudio in succession. The build-time canon-generator

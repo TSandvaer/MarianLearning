@@ -27,7 +27,15 @@
 process.env.TZ = 'Asia/Manila'
 
 import { describe, expect, it } from 'vitest'
-import { LITERACY_TREE, MATH_TREE, applyMasteryRule, nextNode } from './mastery'
+import {
+  LITERACY_TREE,
+  MATH_TREE,
+  NOVEL_POOL_THRESHOLD,
+  WORD_SONG_GRADUATION_GATED_NODES,
+  applyMasteryRule,
+  isGraduationSessionPending,
+  nextNode,
+} from './mastery'
 import { defaultProgress } from './defaults'
 import { MATH_NODES_IN_ORDER, WORD_SONG_NODES_IN_ORDER } from './focusNode'
 import type {
@@ -89,6 +97,26 @@ function entry(
   successRate: number,
 ): SessionHistoryEntry {
   return { dateISO, skillFocus: [node], successRate }
+}
+
+/**
+ * Build a graduation-session entry — same shape as `entry()` plus the
+ * `novelPoolSuccessRate` tag (ticket 86c9m3aec). The presence of the
+ * tag is what tells the engine "this was a graduation run, not a
+ * regular session".
+ */
+function graduationEntry(
+  dateISO: string,
+  node: SkillNode,
+  canonicalRate: number,
+  novelRate: number,
+): SessionHistoryEntry {
+  return {
+    dateISO,
+    skillFocus: [node],
+    successRate: canonicalRate,
+    novelPoolSuccessRate: novelRate,
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -628,6 +656,285 @@ describe('applyMasteryRule — per-track defaults (ticket 86c9kwvy0)', () => {
     expect(result.skillLevels['add-to-10']).toBe('practicing')
     expect(result.skillLevels['add-to-20']).toBe('locked')
     // Word-song: 0.91 ≥ 0.90 — promotion fires.
+    expect(result.skillLevels['blending-cv']).toBe('mastered')
+  })
+})
+
+// --------------------------------------------------------------------------
+// Graduation gate — novel-word generalization check (ticket 86c9m3aec)
+// --------------------------------------------------------------------------
+//
+// Per Dave's developmental review (`design/research/cvc-words-developmental-
+// review.md` § P1.2), the standard 90/3 rule on the canonical 8-word
+// pool can reflect item familiarity rather than decoding skill.
+// `cvc-words` joins `WORD_SONG_GRADUATION_GATED_NODES`: promotion
+// requires (a) the canonical 90/3 to clear AND (b) the most recent
+// qualifying entry to carry a `novelPoolSuccessRate >= 0.80`. The
+// detection helper `isGraduationSessionPending` flags the next
+// session for novel-word probe insertion when the canonical window
+// is full but the gate hasn't fired yet.
+
+describe('WORD_SONG_GRADUATION_GATED_NODES + NOVEL_POOL_THRESHOLD constants', () => {
+  it('cvc-words is the only graduation-gated node in v1', () => {
+    // Pin the graduation set explicitly (count-based exactness) so a
+    // future widening (short-o / short-u sibling nodes) lands as a
+    // deliberate paired edit on this test, not as silent drift.
+    expect(WORD_SONG_GRADUATION_GATED_NODES).toEqual(['cvc-words'])
+  })
+
+  it('novel-pool threshold is 0.80', () => {
+    // Locked at 0.80 per Dave §6 P1 ("50% on 2 novel items is a
+    // reasonable generalization signal"; 80% is the conservative
+    // v1 bar). A future tunability move to parentSettings would
+    // change this constant + the test together.
+    expect(NOVEL_POOL_THRESHOLD).toBe(0.8)
+  })
+})
+
+describe('isGraduationSessionPending — cvc-words detector (ticket 86c9m3aec)', () => {
+  it('returns true after 3 cross-day canonical sessions at 100% with no novelPoolSuccessRate', () => {
+    // AC#4 round-trip part 1: "Simulate 3 sessions of canonical 8
+    // cvc-words at 100% → assert next session is flagged as
+    // graduation".
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      true,
+    )
+  })
+
+  it('returns false when the node is at intro (default seed level)', () => {
+    // cvc-words starts at 'intro' in defaultProgress(); a graduation
+    // gate cannot fire until the node has reached 'practicing'.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'intro' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      false,
+    )
+  })
+
+  it('returns false for a non-graduation-gated node (blending-cv)', () => {
+    // The graduation gate is currently cvc-words-only. Other word-song
+    // nodes (blending-cv, etc.) follow the standard 90/3 rule with no
+    // novel-word probe. Pinning here so a future widening to short-o
+    // sibling nodes is a paired edit on the gated set + this test.
+    const progress = buildProgress({
+      skillLevels: levels({ 'blending-cv': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 1.0),
+      ],
+    })
+    expect(
+      isGraduationSessionPending(progress, 'blending-cv', 'word-song'),
+    ).toBe(false)
+  })
+
+  it('returns false with only 2 cross-day qualifying entries', () => {
+    // Need exactly threshold.sessions cross-day entries for the
+    // canonical window to be full. Two days short → no graduation.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      false,
+    )
+  })
+
+  it('returns false when one of the last 3 entries dipped below threshold', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 0.5), // dip
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      false,
+    )
+  })
+
+  it('returns false when the most recent qualifying entry already carries novelPoolSuccessRate (post-graduation cooldown)', () => {
+    // After a previous graduation attempt (passing or failing) the
+    // tail entry has novelPoolSuccessRate set. Per the AC, the engine
+    // "waits for the canonical 90/3 condition to reset" — meaning we
+    // need fresh non-graduation sessions to push the tagged entry out
+    // of the tail window before another graduation fires.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-28T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        // failed graduation: canonical 100%, novel 50% (< 0.80)
+        graduationEntry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0, 0.5),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      false,
+    )
+  })
+
+  it('returns true again after the cooldown — 3 fresh non-graduation sessions push the tagged entry out of the tail window', () => {
+    // Same scenario as the cooldown test, plus 3 new non-graduation
+    // sessions. The graduation-tagged entry is now older than the
+    // tail-3 window; the engine reflags graduation.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        graduationEntry('2026-04-28T10:00:00.000Z', 'cvc-words', 1.0, 0.5),
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      true,
+    )
+  })
+
+  it('returns false when the most recent entry is a PASSING graduation (gate already cleared)', () => {
+    // After a passing graduation the engine should promote on the
+    // next applyMasteryRule call (verified separately below). Until
+    // that promotion fires, the node is still at 'practicing' and
+    // the graduation-pending detector must NOT re-flag — that would
+    // double up the probe insertion on the very next session.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      false,
+    )
+  })
+})
+
+describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)', () => {
+  it('does NOT promote cvc-words after 3 canonical sessions at 100% (graduation pending)', () => {
+    // The standard 90/3 rule WOULD have fired here; the graduation
+    // gate holds promotion until the next session lands a
+    // novelPoolSuccessRate. This is the behaviour change vs. the
+    // pre-86c9m3aec rule.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('practicing')
+    // Downstream stays locked — no cascade.
+    expect(result.skillLevels['digraphs']).toBe('locked')
+    // No queued pendingPromotion either — the gate is unmet, not a
+    // parent-confirmation hold.
+    expect(result.pendingPromotion).toBeUndefined()
+  })
+
+  it('promotes cvc-words after a graduation session with novel-pool ≥ 0.80', () => {
+    // AC#4 round-trip part 2: "Simulate graduation session with
+    // novel words at 100% → assert pickFocusNode advances past
+    // cvc-words to next node". Asserted here on skillLevels; the
+    // pickFocusNode walk is tested in focusNode.test.ts and is a
+    // pure read of the resulting skillLevels.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    // Downstream `digraphs` was 'locked' — should now be 'intro'.
+    expect(result.skillLevels['digraphs']).toBe('intro')
+  })
+
+  it('does NOT promote when the graduation session lands novel-pool below 0.80', () => {
+    // AC#4 round-trip part 3: "Simulate graduation session with
+    // novel words at 50% → assert promotion does NOT fire; focus
+    // stays on cvc-words". 0.5 < 0.80 → gate fails, node stays at
+    // 'practicing'.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0, 0.5),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('practicing')
+    expect(result.skillLevels['digraphs']).toBe('locked')
+  })
+
+  it('promotes at exactly 0.80 novel-pool (boundary inclusive)', () => {
+    // The threshold is `>=`, not `>`. A novel-pool rate sitting
+    // exactly on the boundary clears the gate.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0, 0.8),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+  })
+
+  it('does NOT promote when canonical dipped below threshold even with novel ≥ 0.80', () => {
+    // The canonical 90/3 rule remains a NECESSARY condition. A
+    // graduation session with great novel performance but a
+    // canonical dip below 0.90 still fails the standard rule.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 0.85), // canonical dip
+        graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('practicing')
+  })
+
+  it('blending-cv (non-gated) still promotes under the standard rule alone', () => {
+    // Defense-in-depth: the gate is cvc-words-only. A non-gated
+    // word-song node continues to promote on the canonical 90/3
+    // rule with no novelPoolSuccessRate involvement.
+    const progress = buildProgress({
+      skillLevels: levels({ 'blending-cv': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
     expect(result.skillLevels['blending-cv']).toBe('mastered')
   })
 })

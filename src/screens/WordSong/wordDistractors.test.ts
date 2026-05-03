@@ -51,7 +51,7 @@ describe('pickDistractors', () => {
     }
   })
 
-  it('all 14 target words have a deterministic gentle + trap pair', () => {
+  it('every target word has a deterministic gentle + trap pair', () => {
     for (const target of TARGET_WORDS) {
       const gentle = pickDistractors(target, 1)
       const trap = pickDistractors(target, 5)

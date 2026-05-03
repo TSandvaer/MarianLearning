@@ -89,6 +89,7 @@ import {
   loadProgress,
   saveProgress,
   type Progress,
+  type SessionHistoryEntry,
   type SkillLevel,
   type SkillLevels,
   type SkillNode,
@@ -117,6 +118,31 @@ interface SeedRecipe {
    * 0) so Splash routes to Hub instead of Greet on the next mount.
    */
   readonly skipGreet: boolean
+  /**
+   * Optional history-seed factory (ticket 86c9m3aec). When supplied,
+   * applied AFTER the skillLevels patch — the seeded entries land
+   * unconditionally (they are debug fixtures, no idempotency
+   * guarantee needed). Returning an empty array is equivalent to
+   * omitting the field.
+   */
+  readonly historyFactory?: () => SessionHistoryEntry[]
+}
+
+/**
+ * Build three cross-day cvc-words history entries at 100% canonical
+ * — the exact pre-graduation state per ticket 86c9m3aec AC#4 part 1.
+ * The dates are pinned three calendar days backward from the seed's
+ * application instant so cross-day dedupe sees three distinct local
+ * days under any timezone.
+ */
+function buildGraduationReadyHistory(): SessionHistoryEntry[] {
+  const now = Date.now()
+  const oneDayMs = 24 * 60 * 60 * 1000
+  return [3, 2, 1].map((daysAgo) => ({
+    dateISO: new Date(now - daysAgo * oneDayMs).toISOString(),
+    skillFocus: ['cvc-words' as const],
+    successRate: 1.0,
+  }))
 }
 
 const SEEDS: Readonly<Record<string, SeedRecipe>> = {
@@ -131,6 +157,21 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'cvc-words': 'practicing',
     },
     skipGreet: true,
+  },
+  // Ticket 86c9m3aec: deep-launch into the cvc-words graduation state.
+  // Pre-populates 3 cross-day canonical sessions at 100% so the next
+  // session-start fetch flags `isGraduationSession=true` and the
+  // planner mixes 2-3 novel short-a probe words. Used by the SAR
+  // walkthrough on the Vercel preview URL.
+  'cvc-words-graduation-ready': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'practicing',
+    },
+    skipGreet: true,
+    historyFactory: buildGraduationReadyHistory,
   },
 }
 
@@ -168,9 +209,32 @@ export function maybeApplyDebugSeed(): void {
   }
 
   applySkillLevelsPatch(recipe.skillLevels)
+  if (recipe.historyFactory) {
+    applyHistorySeed(recipe.historyFactory())
+  }
   if (recipe.skipGreet) {
     bumpSessionCountIfZero()
   }
+}
+
+/**
+ * Append `entries` to the persisted Progress document's `history`
+ * (ticket 86c9m3aec). Used by the `cvc-words-graduation-ready` seed
+ * to deep-launch into a state where the next session-start fetch
+ * flags graduation. Non-idempotent: a second invocation appends
+ * again. Acceptable for a debug seed — testers re-launch on a fresh
+ * storage clear.
+ *
+ * If no progress exists yet, seeds via `defaultProgress()` first so
+ * the persisted blob always validates as v1.
+ */
+function applyHistorySeed(entries: SessionHistoryEntry[]): void {
+  if (entries.length === 0) return
+  const existing = loadProgress() ?? defaultProgress()
+  saveProgress({
+    ...existing,
+    history: [...existing.history, ...entries],
+  })
 }
 
 /**
