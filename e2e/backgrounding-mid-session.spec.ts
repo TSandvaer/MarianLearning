@@ -240,16 +240,62 @@ test.describe('Backgrounding mid-session (audit P1.1)', () => {
    * `'interrupted'` recovery path. We pin `Howler.ctx.state` to
    * `'interrupted'` after the hide so the visible-pre read in
    * `useHowlerSuspendOnHide` sees the iPad shape, then assert the
-   * audioCtxLog carries the `visibility-recovery-buffer` row plus a
-   * `howl-play-event` row from the next problem's read-aloud — that
-   * is, audio actually played post-resume, not just the React state
-   * advanced.
+   * audioCtxLog carries the `visibility-recovery-buffer` row + the
+   * pendingResumeGate transitions back to `'idle'` after a gesture
+   * tap on the affordance — proving the `drainOnGesture` path ran
+   * end-to-end.
+   *
+   * What this spec proves vs what it cannot prove
+   * ---------------------------------------------
+   * The test environment uses `failNetwork: true` (see beforeEach),
+   * which forces `prepareMathPathA` to reject and Math falls through
+   * to the silent-but-captioned `defaultPlayUtterance` (no Howler
+   * instances are constructed for read-alouds). That means
+   * `howl-play-event` rows — which require a real `Howl.on('play')`
+   * — cannot land in this harness no matter how well the recovery
+   * worked. The earlier shape of this assertion was unreachable in CI
+   * regardless of correctness; main was red on it for the entire
+   * window between PR #137 merge and this fix.
+   *
+   * What we CAN observe in CI is the `pendingResumeGate` state
+   * machine: it transitions `idle → pending-resume` at the visible-
+   * edge with state `'interrupted'`, and `pending-resume → idle`
+   * when `drainOnGesture` runs. Every audioCtxLog row mirrors the
+   * latest `pendingResumeGateState` as a sticky field. So a row
+   * landing AFTER the recovery row with `pendingResumeGateState ===
+   * 'idle'` is unambiguous proof that the gesture-deferred drain
+   * fired end-to-end. The "audio actually played" assertion is owned
+   * by Thomas's iPad ear-test (the production-only signal).
+   *
+   * Why we tap the `pending-resume-affordance` and not a chip
+   * ---------------------------------------------------------
+   * The earlier shape clicked the first `[data-testid="math-chip"]`
+   * with `force: true`, expecting `onChipTap` → `drainOnGesture` to
+   * fire. But the chip is rendered as `<button disabled>` until the
+   * new problem's read-aloud completes (`readAloudPlayed=true`), and
+   * browsers do not fire click events on `<button disabled>` even
+   * with Playwright's `force: true` (which only bypasses Playwright's
+   * actionability checks, not DOM-level disabled). React 19 also
+   * skips synthetic events on disabled buttons. The drain never
+   * ran in CI; the `pendingResumeGateState` stayed `'pending-resume'`
+   * forever; the polled `howl-play-event` could never land.
+   *
+   * The `PendingResumeAffordance` overlay (mounted at App root, see
+   * `src/components/PendingResumeAffordance.tsx`) renders whenever
+   * the gate is `'pending'` or `'awaiting-tap'`, and its
+   * `onPointerDown` calls `drainOnGesture` directly. That's the
+   * canonical "any tap anywhere drains the gate" target the round-4
+   * fix added precisely so Marian's tap doesn't have to land on a
+   * specific control. Tapping it from the spec exercises the same
+   * code path Marian's tap would on a real iPad return-from-
+   * background, without depending on chip enablement.
    */
   test('Math hidden during correct-tap advance — advance does not fire while hidden', async ({
     page,
   }) => {
     // Enable `?debug=1` so the audioCtxLog probe is active and we can
-    // read back the visibility-recovery-buffer + howl-play-event rows.
+    // read back the visibility-recovery-buffer row + the
+    // pendingResumeGateState transitions on every emit.
     await page.goto('/?debug=1')
     await forceHowlerUnlock(page)
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
@@ -295,58 +341,19 @@ test.describe('Backgrounding mid-session (audit P1.1)', () => {
       { timeout: 5_000 },
     )
 
-    // PR #137 round 2 (ticket 86c9kxtmu) — the round-1 fix that
-    // tried to call `Howler.ctx.resume()` + `unlockIosAudioSession()`
-    // from the visibilitychange handler did NOT actually unstick the
-    // OS audio session on real iPad PWA (Thomas's audioCtxLog dump
-    // proved the context stays `'suspended'` despite the recovery
-    // buffer firing). Round-2 fix defers the recovery to the next
-    // user gesture.
-    //
-    // To exercise that path here, we simulate a chip-tap on the new
-    // problem after the resume — that's the gesture iOS would
-    // associate with the audio recovery on a real device. The
-    // `drainOnGesture` call inside Math.tsx's `onChipTap` runs
-    // resume + unlock + drains the queued read-aloud.
-    //
-    // Wait for the new problem's chip to be enabled (read-aloud has
-    // been queued OR has played + flipped readAloudPlayed). On the
-    // round-2 path with a pending gate, the read-aloud is queued
-    // until the chip-tap below drains it; the chip itself stays
-    // disabled until readAloudPlayed flips. We bridge this by
-    // unpinning the ctx state back to 'running' before the chip-tap
-    // (so the queued play actually emits when drained), then
-    // dispatching a synthetic chip-tap (the `audioUnlocked` first-
-    // gesture path consumes the tap and fires drainOnGesture).
-    await pinHowlerCtxState(page, 'running')
-
-    // Click the chip area — even a disabled chip tap reaches the
-    // onChipTap handler in Math.tsx, which short-circuits on
-    // `!audioUnlocked` AFTER running the drain. That's the
-    // gesture-deferred recovery path the round-2 fix relies on.
-    const newChip = page.locator('[data-testid="math-chip"]').first()
-    await newChip.click({ force: true })
-
-    // Round-2 strengthening: the audio actually played post-resume,
-    // not just the React state advanced. The audioCtxLog carries
-    // both proofs:
-    //
-    //   - `visibility-recovery-buffer` row: confirms the
-    //     visibility-edge marked the gate pending (bufferStarted=false
-    //     under round-2 contract — the buffer kick is gesture-deferred).
-    //   - `howl-play-event` row landed AFTER the recovery row:
-    //     proves an actual `'play'` event fired on a Howl post-
-    //     recovery (i.e. audio is no longer dead). The
-    //     `drainOnGesture` invoked by the chip-tap above runs the
-    //     queued read-aloud inside the gesture window.
-    //
-    // The previous shape only asserted React state advanced — green
-    // even if audio was bricked for the rest of the session, which
-    // was Thomas's PR #137 ear-test failure mode.
+    // The visibility-edge handler in `useHowlerSuspendOnHide` saw
+    // ctx state `'interrupted'` and called `markPendingResume()` —
+    // recording a `visibility-recovery-buffer` row with
+    // `bufferStarted=false` (round-2 contract: the buffer kick is
+    // gesture-deferred).
     const log = await page.evaluate(() => {
       const raw = window.localStorage.getItem('debug:audioCtxLog:v1')
       return raw
-        ? (JSON.parse(raw) as Array<{ cause: string; timestamp: number }>)
+        ? (JSON.parse(raw) as Array<{
+            cause: string
+            timestamp: number
+            pendingResumeGateState?: string
+          }>)
         : []
     })
     const recoveryRows = log.filter(
@@ -354,25 +361,46 @@ test.describe('Backgrounding mid-session (audit P1.1)', () => {
     )
     expect(recoveryRows.length).toBeGreaterThanOrEqual(1)
 
-    // Wait for a `howl-play-event` row to land AFTER the recovery
-    // row's timestamp, indicating a Howl on the resumed problem
-    // actually fired its `'play'` event. Poll up to 10 s; iPad
-    // Howler-on-iOS post-recovery onplay latency is usually under
-    // 500 ms but the cold-mount path adds the read-aloud setup time.
+    // The pending-resume affordance is mounted at App level
+    // (`src/components/PendingResumeAffordance.tsx`) and renders
+    // whenever the gate is `'pending'` / `'awaiting-tap'`. Its
+    // pointerdown handler calls `drainOnGesture` synchronously —
+    // the canonical gesture-deferred recovery path on real iPad.
+    // Unpin the ctx state to `'running'` first so the synchronous
+    // resume call inside the drain sees a recoverable shape.
+    await pinHowlerCtxState(page, 'running')
+    const affordance = page.locator('[data-testid="pending-resume-affordance"]')
+    await expect(affordance).toBeVisible({ timeout: 5_000 })
+    await affordance.dispatchEvent('pointerdown')
+
+    // Drain ran → gate flipped `'pending-resume' → 'idle'`. Every
+    // subsequent audioCtxLog row mirrors `pendingResumeGateState`
+    // as a sticky field; the 1Hz poll guarantees a fresh emit
+    // lands within ~1.5 s of the gate transition. We poll for a
+    // row landing AFTER the recovery row's timestamp with the
+    // sticky field reading `'idle'`. That is the production-
+    // realistic proof that `drainOnGesture` ran end-to-end —
+    // observable in CI without depending on Path A audio (which
+    // is mocked off via `failNetwork: true` in this suite).
     await expect
       .poll(
         async () => {
           const fresh = await page.evaluate(() => {
             const raw = window.localStorage.getItem('debug:audioCtxLog:v1')
             return raw
-              ? (JSON.parse(raw) as Array<{ cause: string; timestamp: number }>)
+              ? (JSON.parse(raw) as Array<{
+                  cause: string
+                  timestamp: number
+                  pendingResumeGateState?: string
+                }>)
               : []
           })
           const recoveryAt =
             fresh.filter((r) => r.cause === 'visibility-recovery-buffer').pop()
               ?.timestamp ?? 0
           return fresh.some(
-            (r) => r.cause === 'howl-play-event' && r.timestamp >= recoveryAt,
+            (r) =>
+              r.timestamp > recoveryAt && r.pendingResumeGateState === 'idle',
           )
         },
         { timeout: 10_000 },
