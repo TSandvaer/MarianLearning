@@ -77,6 +77,7 @@
 import { Howler } from 'howler'
 import {
   readGateState,
+  readPendingResumeGateState,
   recordAudioCtxEvent,
   type AudioCtxEventRecord,
   type AudioCtxState,
@@ -195,6 +196,32 @@ export interface AudioContextProbeHandle {
     dtFromCallMs: number,
     errorMessage: string,
   ) => void
+  /**
+   * Visibility-transition probe (ticket 86c9kxtmu round 2). Records four
+   * row variants — `'visibility-hidden-pre'`, `'visibility-hidden-post'`,
+   * `'visibility-visible-pre'`, `'visibility-visible-post'` — bracketing
+   * the suspend/resume calls in `useHowlerSuspendOnHide`. The `ctxState`
+   * field is the load-bearing diagnostic; iPad PWA WebAudio interruption
+   * surfaces here as `ctxState === 'interrupted'` on the visible-pre row.
+   */
+  recordVisibilityTransition: (
+    phase: 'hidden-pre' | 'hidden-post' | 'visible-pre' | 'visible-post',
+  ) => void
+  /**
+   * Recovery-buffer probe (ticket 86c9kxtmu round 2). Emitted when the
+   * post-resume state is still `'interrupted'` and the silent-buffer
+   * recovery kick fires. `bufferStarted` tells us whether the kick
+   * actually called `createBufferSource().start()`.
+   */
+  recordVisibilityRecoveryBuffer: (bufferStarted: boolean) => void
+  /**
+   * Watchdog probe (ticket 86c9kxtmu round 2). Emitted from
+   * `playSessionUtterance` when its watchdog deadline elapses without
+   * Howler firing the `'play'` event for the most recent `howl.play()`
+   * call. Pairs with the preceding `'howl-play-call'` row via
+   * `utteranceId`.
+   */
+  recordOnplayWatchdogMissed: (utteranceId: string) => void
 }
 
 /**
@@ -542,6 +569,8 @@ export function startAudioContextProbe(
       | 'howlDuration'
       | 'dtFromCallMs'
       | 'utteranceId'
+      // Ticket 86c9kxtmu round 2 — visibility recovery diagnostic
+      | 'bufferStarted'
     > = {},
   ): AudioCtxState {
     const ctxState = readCtxState(ctx)
@@ -552,11 +581,16 @@ export function startAudioContextProbe(
     // the latest value here. `null` when the gate hasn't reported yet —
     // we omit the field rather than write `null` to keep the JSON tight.
     const gateState = readGateState()
+    // PR #137 round 4 (ticket 86c9kxtmu): same mirror pattern for the
+    // pending-resume gate, under its own field so an iPad export carries
+    // both timelines unambiguously. See debugBus PendingResumeGateStateName.
+    const pendingResumeGateState = readPendingResumeGateState()
     const record: AudioCtxEventRecord = {
       timestamp: now(),
       ctxState,
       cause,
       ...(gateState !== null ? { gateState } : {}),
+      ...(pendingResumeGateState !== null ? { pendingResumeGateState } : {}),
       ...(extra.speakResult !== undefined
         ? { speakResult: extra.speakResult }
         : {}),
@@ -619,6 +653,9 @@ export function startAudioContextProbe(
         : {}),
       ...(extra.utteranceId !== undefined
         ? { utteranceId: extra.utteranceId }
+        : {}),
+      ...(extra.bufferStarted !== undefined
+        ? { bufferStarted: extra.bufferStarted }
         : {}),
     }
     recordAudioCtxEvent(record)
@@ -877,6 +914,34 @@ export function startAudioContextProbe(
     })
   }
 
+  function recordVisibilityTransition(
+    phase: 'hidden-pre' | 'hidden-post' | 'visible-pre' | 'visible-post',
+  ): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    const cause: AudioCtxEventRecord['cause'] =
+      phase === 'hidden-pre'
+        ? 'visibility-hidden-pre'
+        : phase === 'hidden-post'
+          ? 'visibility-hidden-post'
+          : phase === 'visible-pre'
+            ? 'visibility-visible-pre'
+            : 'visibility-visible-post'
+    emit(cause, ctx)
+  }
+
+  function recordVisibilityRecoveryBuffer(bufferStarted: boolean): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('visibility-recovery-buffer', ctx, { bufferStarted })
+  }
+
+  function recordOnplayWatchdogMissed(utteranceId: string): void {
+    if (internal.stopped) return
+    const ctx = readHowlerCtx(opts.howlerLike)
+    emit('onplay-watchdog-missed', ctx, { utteranceId })
+  }
+
   return {
     stop,
     sampleNow,
@@ -893,6 +958,9 @@ export function startAudioContextProbe(
     recordHowlPlayEvent,
     recordHowlEndEvent,
     recordHowlLoaderrorEvent,
+    recordVisibilityTransition,
+    recordVisibilityRecoveryBuffer,
+    recordOnplayWatchdogMissed,
   }
 }
 
@@ -1085,6 +1153,39 @@ export function recordHowlLoaderrorEventEvent(
 ): void {
   if (!activeProbe) return
   activeProbe.recordHowlLoaderrorEvent(utteranceId, dtFromCallMs, errorMessage)
+}
+
+/**
+ * Visibility-transition probe singleton (ticket 86c9kxtmu round 2).
+ * Records pre/post rows around `Howler.ctx.suspend()` / `resume()` calls
+ * in `useHowlerSuspendOnHide`. No-op when no probe is active.
+ */
+export function recordVisibilityTransitionEvent(
+  phase: 'hidden-pre' | 'hidden-post' | 'visible-pre' | 'visible-post',
+): void {
+  if (!activeProbe) return
+  activeProbe.recordVisibilityTransition(phase)
+}
+
+/**
+ * Recovery-buffer probe singleton (ticket 86c9kxtmu round 2). Recorded
+ * only on the iOS-specific `'interrupted'` recovery path.
+ */
+export function recordVisibilityRecoveryBufferEvent(
+  bufferStarted: boolean,
+): void {
+  if (!activeProbe) return
+  activeProbe.recordVisibilityRecoveryBuffer(bufferStarted)
+}
+
+/**
+ * Onplay-watchdog probe singleton (ticket 86c9kxtmu round 2). Producer
+ * is `playSessionUtterance` in `lib/audio/sessionAudio.ts`; emit when
+ * the watchdog deadline elapses without `play` having fired.
+ */
+export function recordOnplayWatchdogMissedEvent(utteranceId: string): void {
+  if (!activeProbe) return
+  activeProbe.recordOnplayWatchdogMissed(utteranceId)
 }
 
 /**

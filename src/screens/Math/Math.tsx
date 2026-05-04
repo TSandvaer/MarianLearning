@@ -3,11 +3,13 @@ import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
 import { cancelSessionAudio } from '../../lib/audio'
+import { getIsPageHidden, useIsPageHidden } from '../../lib/lifecycle'
 import {
   readHowlerContextRunning,
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
 } from '../../lib/audio/howlerContext'
+import { drainOnGesture } from '../../lib/audio/pendingResumeGate'
 import {
   recordAudioReadyStateEvent,
   recordPlayUtteranceDispatchEvent,
@@ -627,6 +629,36 @@ function MathScreen({
   const advanceFiredRef = useRef(false)
 
   /**
+   * Page-visibility state — drives the `data-paused` attribute (e2e
+   * regression coverage) and triggers the resume-drain effect that
+   * fires the deferred advance once the page returns visible.
+   *
+   * Ticket 86c9kxtmu (Jessica e2e batch — Bug B). Round 2 fix: the
+   * timer-body advance gates (`tryAdvance` and the hard-ceiling timer)
+   * read `getIsPageHidden()` directly from the DOM rather than this
+   * React-derived state — see those call sites for the race-window
+   * rationale. We still keep the React state for two reasons:
+   *
+   *   1. The `data-paused` attribute drives e2e assertions; that has
+   *      to be a React-rendered value, not a DOM-direct read.
+   *   2. The visibility-resume drain runs as a `useEffect` keyed on
+   *      `pageHidden`; React's commit fires the effect when the value
+   *      flips back to `false`, which is the canonical "we are now
+   *      visible again" trigger. That timing is fine for the drain
+   *      direction (we're not racing a timer body any more — the
+   *      drain is a one-shot fire-and-go).
+   */
+  const pageHidden = useIsPageHidden()
+  const pageHiddenRef = useRef(pageHidden)
+  /**
+   * True when `tryAdvance` (or the hard-ceiling timer) wanted to advance
+   * but `pageHidden` was true. Drained by the visibility-resume effect
+   * once `pageHidden` flips back to false; re-entry into the advance
+   * path then calls `advanceToNext()` directly.
+   */
+  const pendingAdvanceRef = useRef(false)
+
+  /**
    * Unmount latch for the read-aloud `.then()` resolution path. Set to
    * `true` inside the lifetime cleanup effect; the read-aloud effect's
    * deferred `.then()` reads this to bail before calling
@@ -980,6 +1012,42 @@ function MathScreen({
     }
   }, [problemIndex, plan.problems.length, onSessionComplete, storage, now])
 
+  // ── Page-visibility resume-drain (ticket 86c9kxtmu — Jessica e2e batch) ──
+  //
+  // When the page transitions hidden → visible, drain any deferred
+  // advance: a correct-tap that landed during hidden parked its intent
+  // in `pendingAdvanceRef` and bailed without flipping `advanceFiredRef`,
+  // so calling `advanceToNext()` here is the canonical resume.
+  //
+  // The `pageHiddenRef` mirror is kept synchronized for any future
+  // closures that need a snapshot of "was hidden last commit" — but the
+  // round-2 fix moved the per-timer hide check off the ref and onto a
+  // direct `getIsPageHidden()` DOM read (see `tryAdvance` and the
+  // hard-ceiling timer body). The ref is now used only for `wasHidden`
+  // edge detection inside this effect.
+  useEffect(() => {
+    const wasHidden = pageHiddenRef.current
+    pageHiddenRef.current = pageHidden
+
+    if (!pageHidden && wasHidden && pendingAdvanceRef.current) {
+      pendingAdvanceRef.current = false
+      // Mirror the cleanup `tryAdvance` would have done on the happy
+      // path. The ceiling/min-dwell timers may have already cleared
+      // themselves; double-clear is harmless.
+      if (advanceCeilingTimerRef.current !== null) {
+        clearTimeout(advanceCeilingTimerRef.current)
+        advanceCeilingTimerRef.current = null
+      }
+      if (advanceTimerRef.current !== null) {
+        clearTimeout(advanceTimerRef.current)
+        advanceTimerRef.current = null
+      }
+      advanceFiredRef.current = true
+      setCelebrating(false)
+      advanceToNext()
+    }
+  }, [pageHidden, advanceToNext])
+
   const grantStardust = useCallback(
     (amount: number) => {
       // Update the ref synchronously so back-to-back grants within the
@@ -1206,6 +1274,33 @@ function MathScreen({
         if (!minDwellElapsedRef.current || !correctSpeakResolvedRef.current) {
           return
         }
+        // Visibility gate (ticket 86c9kxtmu — Jessica e2e batch — Bug B).
+        // If the tab is currently hidden, defer the advance: park the
+        // intent in `pendingAdvanceRef` and bail without flipping
+        // `advanceFiredRef`. The visibility-resume effect picks it up
+        // when `pageHidden` returns to false. We keep the celebration
+        // visual frame in place — Marian sees the same screen on
+        // resume, then advances cleanly.
+        //
+        // Round 2 fix (ticket 86c9kxtmu, Thomas's PR #137 ear-test):
+        // read the LIVE DOM `document.visibilityState` here rather than
+        // the React-derived `pageHiddenRef.current`. The ref is mirrored
+        // from `useIsPageHidden()` via a `useEffect`, which lands AFTER
+        // React commit. There is a window between the `visibilitychange`
+        // event firing and the effect running where a `setTimeout` body
+        // resolving in that interval would see stale `false` and advance
+        // through. iOS Safari empirically DOES keep the JS event loop
+        // running for some milliseconds after `visibilitychange` fires
+        // before pausing for backgrounding — long enough for the 1.2 s
+        // min-dwell timer to fire if we tap-and-immediately-background
+        // the iPad. Direct DOM read closes the race: `document.visibilityState`
+        // is always the live truth at the moment we ask. The `pageHidden`
+        // React state still drives the `data-paused` attribute and the
+        // resume drain (those need React-driven re-renders).
+        if (getIsPageHidden()) {
+          pendingAdvanceRef.current = true
+          return
+        }
         advanceFiredRef.current = true
         // Clear the hard-ceiling timer — we're advancing on the normal path.
         if (advanceCeilingTimerRef.current !== null) {
@@ -1249,6 +1344,19 @@ function MathScreen({
       advanceCeilingTimerRef.current = setTimeout(() => {
         advanceCeilingTimerRef.current = null
         if (advanceFiredRef.current) return
+        // Same visibility gate as `tryAdvance` above. If the tab is
+        // hidden when the ceiling fires, park the advance in
+        // `pendingAdvanceRef` and let the visibility-resume effect
+        // drain it. The min-dwell timer's callback already covers the
+        // happy path; the ceiling exists only for the wedged-audio
+        // case, which we treat the same way under hide.
+        //
+        // Round 2 fix (ticket 86c9kxtmu): live DOM read for the same
+        // race-window reason — see the `tryAdvance` block above.
+        if (getIsPageHidden()) {
+          pendingAdvanceRef.current = true
+          return
+        }
         advanceFiredRef.current = true
         // Clear the (likely already-fired) min-dwell timer for tidiness.
         if (advanceTimerRef.current !== null) {
@@ -1283,6 +1391,26 @@ function MathScreen({
       // inside the chip-tap gesture window. Pairs with the post-call row
       // below; the iPad export shows pool=N → pool=10 across the helper.
       recordUnlockStateEvent()
+
+      // PR #137 round 2 (ticket 86c9kxtmu) — gesture-deferred recovery
+      // drain. If `useHowlerSuspendOnHide` marked the visibility-recovery
+      // gate pending (iOS handed us suspended/interrupted on the visible
+      // edge), this call runs `Howler.ctx.resume()` + `unlockIosAudioSession()`
+      // SYNCHRONOUSLY inside this user-gesture handler — the iOS-required
+      // contract that the iteration-1 visibilitychange-handler resume
+      // violated — then drains any queued `playSessionUtterance` thunk
+      // so the read-aloud Marian was waiting for fires inside this same
+      // gesture window.
+      //
+      // When the gate is idle (no recent visibility-recovery), this is
+      // a no-op for the queue; it still runs resume + unlock as belt-
+      // and-suspenders against any latent iOS preempt the visibility
+      // probe didn't catch. The Phase-2/5/6 calls below cover the
+      // separate "gesture every chip tap" iOS contract — they are not
+      // duplicated work since this drain runs them via the injected fns
+      // and they are idempotent within the same gesture tick.
+      drainOnGesture(resumeAudioCtx, unlockAudioSessionFn)
+
       // Phase-2 fix for ticket 86c9gvd0y. Kick `Howler.ctx.resume()`
       // synchronously inside this user-gesture handler. Splash → Greet →
       // Math navigation can leave the Howler context in `'suspended'`
@@ -1294,6 +1422,12 @@ function MathScreen({
       // racing the suspended → running transition. No-op when ctx is
       // already running. See `lib/audio/howlerContext.ts` for the full
       // rationale.
+      //
+      // Note (round-2): `drainOnGesture` above also calls these fns
+      // when the gate is pending. The redundant call here is intentional
+      // — `drainOnGesture` short-circuits the queue clear when the gate
+      // is idle, in which case the call below is the ONLY one that
+      // resumes / unlocks. Both paths are idempotent on a running ctx.
       resumeAudioCtx()
       // Phase-5 fix for ticket 86c9gvd0y. Re-engage the OS-level iOS
       // audio session by playing a 1-sample silent buffer in the
@@ -1370,6 +1504,7 @@ function MathScreen({
       data-gate-state={gate.state}
       data-guided={guidedActive ? 'true' : 'false'}
       data-read-aloud-played={readAloudPlayed ? 'true' : 'false'}
+      data-paused={pageHidden ? 'true' : 'false'}
       className="
         relative flex h-full w-full flex-col
         bg-my-cream text-ink

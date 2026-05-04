@@ -45,6 +45,9 @@ export {
   recordHowlPlayEventEvent,
   recordHowlEndEventEvent,
   recordHowlLoaderrorEventEvent,
+  recordVisibilityTransitionEvent,
+  recordVisibilityRecoveryBufferEvent,
+  recordOnplayWatchdogMissedEvent,
   AUDIO_CTX_LOG_STORAGE_KEY,
   _resetAudioContextProbeForTests,
 } from './audioContextProbe'

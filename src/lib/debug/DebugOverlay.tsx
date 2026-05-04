@@ -254,6 +254,7 @@ export default function DebugOverlay({
     recentTaps: [],
     recentRawEvents: [],
     gateState: null,
+    pendingResumeGateState: null,
     audioCtxState: null,
     audioCtxEvents: [],
   })

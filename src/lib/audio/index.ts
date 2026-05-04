@@ -11,6 +11,22 @@ export {
   disableHowlerAutoSuspend,
   readHowlerContextRunning,
 } from './howlerContext'
+export {
+  markPendingResume,
+  isPendingResume,
+  getPendingResumeAffordanceState,
+  subscribePendingResumeGate,
+  enqueueOnResume,
+  drainOnGesture,
+  cancelPendingResume,
+  configurePendingResumeGate,
+  _resetPendingResumeGateForTests,
+} from './pendingResumeGate'
+export type {
+  PendingResumeAffordanceState,
+  PendingResumeGateOptions,
+  QueuedHandler,
+} from './pendingResumeGate'
 export type {
   HowlerContextState,
   ResumeAudioContextOptions,

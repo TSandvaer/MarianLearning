@@ -58,7 +58,23 @@ import {
   recordHowlLoaderrorEventEvent,
   recordHowlPlayCallEvent,
   recordHowlPlayEventEvent,
+  recordOnplayWatchdogMissedEvent,
 } from '../debug/audioContextProbe'
+import { enqueueOnResume, isPendingResume } from './pendingResumeGate'
+
+/**
+ * Onplay watchdog deadline (ticket 86c9kxtmu round 2). If Howler's
+ * `'play'` event hasn't fired this many ms after `howl.play()`, we
+ * record an `'onplay-watchdog-missed'` row in the audioCtxLog. Pure
+ * diagnostic — does NOT abort or retry playback. The deadline is
+ * deliberately conservative: the cold-mount onplay latency on real
+ * iPad is typically under 200 ms; 800 ms is well past where the
+ * onplay event SHOULD have fired but short enough that the watchdog
+ * fires within the same problem window. iPad PWA WebAudio
+ * interruption (the round-2 hypothesis) drops the play event entirely;
+ * this watchdog is the negative diagnostic for that.
+ */
+const ONPLAY_WATCHDOG_MS = 800
 
 /** Minimal Howl-shape we depend on. Identical to preRecorded.HowlLike;
  *  duplicated rather than imported to keep the modules independent. */
@@ -464,6 +480,109 @@ export function createSessionAudio(
         activeStop = null
       }
 
+      // PR #137 round 2 (ticket 86c9kxtmu) — gesture-deferred recovery.
+      // If the visibility-recovery gate is pending (iOS handed us a
+      // suspended/interrupted ctx on the visible edge and we deferred
+      // the resume to the next user gesture), DO NOT dispatch the play
+      // here. Howler would return a sound id but the OS audio session
+      // is still preempted; the play emits no audio (Thomas's PR #137
+      // iPad capture proved this). Enqueue the dispatch instead — the
+      // most-recent enqueue wins, and the next chip-tap / hub-node tap
+      // / "tap to continue" affordance fires `drainOnGesture()` which
+      // runs resume + unlock + invokes our queued thunk.
+      //
+      // The Promise returned by this function resolves/rejects on the
+      // queued play's own settle path. If a NEWER play call replaces
+      // ours in the queue, our promise stays pending until cancel()
+      // settles it as 'cancelled' (per the existing single-line
+      // semantic). Marian's Math/WordSong screens consume that
+      // rejection-on-cancel via the read-aloud effect's catch.
+      if (isPendingResume()) {
+        enqueueOnResume({
+          label: `sessionAudio:${utteranceId}`,
+          run: () => {
+            // The recursive call lands AFTER the gate has cleared
+            // (drainOnGesture() clears affordance to 'idle' before
+            // running queued handlers — but the order is: resume →
+            // unlock → drain → clear). Wait, see pendingResumeGate.ts:
+            // drain runs handlers BEFORE clear so the handler sees the
+            // gate still as 'pending'. To avoid re-enqueue, we use a
+            // direct `playRunSynchronously` path below. Easier: just
+            // dispatch directly here, knowing the gate's drain runs us
+            // inside the gesture window.
+            //
+            // We can't simply call `playSessionUtterance` recursively
+            // — it would see `isPendingResume()` still true and re-
+            // queue forever. Instead, dispatch the inner play synchronously
+            // by re-entering the play body via `playSessionUtteranceImmediate`.
+            playSessionUtteranceImmediate(utteranceId, playOpts).then(
+              resolve,
+              reject,
+            )
+          },
+        })
+        return
+      }
+
+      // Fallthrough — gate is idle, dispatch immediately.
+      runImmediate(utteranceId, entry, playOpts, resolve, reject)
+    })
+  }
+
+  /**
+   * Internal — re-enter the play body without the pending-resume gate
+   * check. Called by the `enqueueOnResume` thunk above; the gate's
+   * `drainOnGesture` invokes us inside the user-gesture's tick, AFTER
+   * the resume + silent-buffer kick. By that point the OS audio session
+   * is re-engaged and the play call can dispatch normally.
+   *
+   * Mirrors the public `playSessionUtterance` shape (returns a Promise)
+   * because the outer queued thunk wires resolve/reject to this
+   * promise's settle path.
+   */
+  function playSessionUtteranceImmediate(
+    utteranceId: string,
+    playOpts: PlaySessionUtteranceOptions = {},
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (!loaded) {
+        reject(
+          new Error(
+            '[sessionAudio] loadSessionAudio() must be called before play',
+          ),
+        )
+        return
+      }
+      const entry = loaded.get(utteranceId)
+      if (!entry) {
+        reject(
+          new Error(
+            `[sessionAudio] no utterance with id "${utteranceId}" — call load again?`,
+          ),
+        )
+        return
+      }
+      if (activeStop) {
+        activeStop()
+        activeStop = null
+      }
+      runImmediate(utteranceId, entry, playOpts, resolve, reject)
+    })
+  }
+
+  /**
+   * Shared body for the "actually dispatch the howl" path. Pulled out
+   * so the public entry point and the gesture-drain re-entry both run
+   * the same listener-attach + watchdog + play sequence.
+   */
+  function runImmediate(
+    utteranceId: string,
+    entry: LoadedHowl,
+    playOpts: PlaySessionUtteranceOptions,
+    resolve: () => void,
+    reject: (err: Error) => void,
+  ): void {
+    {
       const { howl, text } = entry
       const wordCount = Math.max(1, countWords(text))
 
@@ -473,6 +592,8 @@ export function createSessionAudio(
         playOpts.cancelSchedule ?? ((h) => window.clearInterval(h as number))
 
       let tickHandle: unknown = null
+      let watchdogHandle: ReturnType<typeof setTimeout> | null = null
+      let onplaySeen = false
       let resolved = false
       let stopped = false
 
@@ -488,6 +609,10 @@ export function createSessionAudio(
         if (tickHandle !== null) {
           cancelSchedule(tickHandle)
           tickHandle = null
+        }
+        if (watchdogHandle !== null) {
+          clearTimeout(watchdogHandle)
+          watchdogHandle = null
         }
         activeStop = null
       }
@@ -525,6 +650,11 @@ export function createSessionAudio(
 
       howl.on('play', () => {
         if (resolved || stopped) return
+        onplaySeen = true
+        if (watchdogHandle !== null) {
+          clearTimeout(watchdogHandle)
+          watchdogHandle = null
+        }
         recordHowlPlayEventEvent(utteranceId, Date.now() - playCallTimestamp)
         playOpts.onPlay?.()
         playOpts.onWordTick?.(0)
@@ -594,6 +724,19 @@ export function createSessionAudio(
           howlDuration: internals.howlDuration,
         })
         howl.play()
+        // Onplay watchdog (ticket 86c9kxtmu round 2). Pure diagnostic
+        // — does NOT abort or retry. iPad PWA WebAudio interruption
+        // surfaces here as `play()` returning a sound id but the
+        // `'play'` event never firing; the audioCtxLog will then
+        // carry a `'howl-play-call'` row with no matching
+        // `'howl-play-event'` row, plus this watchdog row at +800 ms.
+        // The pre-existing `recordHowlPlayCallEvent` row pairs by
+        // `utteranceId`.
+        watchdogHandle = setTimeout(() => {
+          watchdogHandle = null
+          if (resolved || stopped || onplaySeen) return
+          recordOnplayWatchdogMissedEvent(utteranceId)
+        }, ONPLAY_WATCHDOG_MS)
       } catch (err) {
         settleReject(
           err instanceof Error
@@ -601,7 +744,7 @@ export function createSessionAudio(
             : new Error(`[sessionAudio] play() threw: ${String(err)}`),
         )
       }
-    })
+    }
   }
 
   function cancel(): void {

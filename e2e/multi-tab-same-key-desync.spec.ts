@@ -165,7 +165,7 @@ test.describe('Multi-tab same-key desync (audit P1.2)', () => {
    * the HUD stays stale. .fixme until the product adds a `storage`
    * subscription.
    */
-  test.fixme('session-history write in tab A reflects in tab B Hub HUD', async ({
+  test('session-history write in tab A reflects in tab B Hub HUD', async ({
     page,
     context,
   }) => {
@@ -226,7 +226,7 @@ test.describe('Multi-tab same-key desync (audit P1.2)', () => {
    *
    * .fixme today; flips live with the same product fix.
    */
-  test.fixme('progress write in tab A reflects in tab B in-app state', async ({
+  test('progress write in tab A reflects in tab B in-app state', async ({
     page,
     context,
   }) => {

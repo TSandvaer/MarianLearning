@@ -69,7 +69,16 @@ import {
   playHubLine as defaultPlayHubLine,
   cancelActiveHubLine as defaultCancelHubLine,
 } from './playHubLine'
+import {
+  resumeHowlerContextOnGesture,
+  unlockIosAudioSession,
+} from '../../lib/audio/howlerContext'
+import { drainOnGesture } from '../../lib/audio/pendingResumeGate'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
+import {
+  SESSION_HISTORY_STORAGE_KEY,
+  useStorageSync,
+} from '../../lib/lifecycle'
 import {
   NUMBER_GARDEN_STAGES,
   WORD_SONG_STAGES,
@@ -204,14 +213,35 @@ export default function Hub({
   const handleCelebrationDismiss = useCallback(() => {
     if (pendingPromotion !== undefined) setDismissedFor(pendingPromotion)
   }, [pendingPromotion])
-  // Read history once on mount — Hub doesn't subscribe to localStorage
-  // changes, the orchestrator unmounts/remounts when needed.
+
+  // Read history once on mount + subscribe to cross-tab writes.
+  //
+  // Cross-tab sync (ticket 86c9kxtn1 — Jessica e2e batch — Bug C):
+  // when Marian (or her sibling) opens the PWA in a second tab and a
+  // session-history write lands there, the standard `storage` event
+  // fires here. We re-read the blob and project it into state so the
+  // HUD reflects the latest cumulative-stardust / sessionCount /
+  // streak without a hard reload.
   const [history, setHistory] = useState<SessionHistoryV2>(() => {
     try {
       return readSessionHistoryForToday(now(), storage)
     } catch {
       return emptySessionHistory()
     }
+  })
+
+  const refreshHistoryFromStorage = useCallback(() => {
+    try {
+      setHistory(readSessionHistoryForToday(now(), storage))
+    } catch {
+      // Read failure (private mode, etc.) — keep the in-memory copy
+      // rather than clobber to defaults.
+    }
+  }, [now, storage])
+
+  useStorageSync({
+    key: SESSION_HISTORY_STORAGE_KEY,
+    onChange: refreshHistoryFromStorage,
   })
 
   // Decide the soft suggestion target (or null) for this mount.
@@ -360,6 +390,36 @@ export default function Hub({
     }
   }, [gestureUnlocked, dispatchGreeting])
 
+  /**
+   * Cross-screen audio leak fix (PR #137 round 2, ticket 86c9kxtmu).
+   *
+   * Stop any in-flight Hub-line Howl on unmount. Without this cleanup,
+   * a Howl that was dispatched while the OS audio session was preempted
+   * (iPad PWA visibility-recovery edge) can sit queued waiting for the
+   * context to come back; when a future user gesture (chip-tap on
+   * Math, for instance) re-engages the session, the queued Hub Howl
+   * fires into a screen that's no longer Hub. Thomas's iPad ear-test
+   * heard exactly this — a "Hi.. try word song" line bleeding into a
+   * Math problem.
+   *
+   * `defaultCancelHubLine()` is the singleton wrapper around the player's
+   * `cancelActive`, calling `Howl.stop()` on whatever Howl was
+   * registered as active by the most recent `playHubLine` dispatch.
+   * Idempotent — safe to fire even when no Howl is in flight (the
+   * common case when Hub re-mounts cleanly after a Session-End hand-
+   * off, where the welcome-back has already settled).
+   *
+   * Note: we DO NOT call this when only the playback prop swapped out
+   * via `playLineFn` — that's an injected test seam and the test owns
+   * its own cleanup. The unmount cleanup attaches to the Hub component
+   * lifecycle, not the prop reference.
+   */
+  useEffect(() => {
+    return () => {
+      defaultCancelHubLine()
+    }
+  }, [])
+
   // ── Parent-gate long-press --------------------------------------------
 
   const handleParentGateComplete = useCallback(() => {
@@ -386,6 +446,18 @@ export default function Hub({
 
   const handleNodeTap = useCallback(
     (tree: SkillTreeId) => {
+      // PR #137 round 3 (ticket 86c9kxtmu) — gesture-deferred recovery
+      // drain. If the visibility-recovery gate is pending (Marian
+      // backgrounded the PWA on Hub, returned, and iOS handed us a
+      // suspended/interrupted ctx on the visible edge), this call
+      // runs `Howler.ctx.resume()` + `unlockIosAudioSession()` SYNCHRONOUSLY
+      // inside this user-gesture handler — the iOS-required contract.
+      // Drains any queued Hub welcome-back Howl so the line plays
+      // inside this gesture window. When the gate is idle, this is
+      // effectively a belt-and-suspenders resume + unlock for first-
+      // gesture iOS unlocks.
+      drainOnGesture(resumeHowlerContextOnGesture, unlockIosAudioSession)
+
       // Cancel any in-flight greeting. `cancelledRef` short-circuits
       // caption-walk state updates inside the play promise; `cancelLine()`
       // is the audio-side stop — tells the underlying Howl (or caption-
@@ -424,6 +496,11 @@ export default function Hub({
   // ── First-tap audio unlock for the app-open path ----------------------
 
   const handleFirstTap = useCallback(() => {
+    // PR #137 round 2 (ticket 86c9kxtmu) — same as `handleNodeTap`.
+    // The wake-tap on app-open paths IS the user gesture iOS needs to
+    // unstick a backgrounded audio context; drain inside this handler
+    // so any pending utterance fires in the gesture window.
+    drainOnGesture(resumeHowlerContextOnGesture, unlockIosAudioSession)
     if (gestureUnlocked) return
     setGestureUnlocked(true)
   }, [gestureUnlocked])

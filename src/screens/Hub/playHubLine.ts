@@ -36,6 +36,15 @@
  *   most-recently-played Howl AND short-circuits the caption-walk
  *   fallback path (which was the audible source on a load-error path).
  *   Mirrors the `activeStop` plumbing in `lib/audio/preRecorded.ts`.
+ * - **Gesture-deferred dispatch.** PR #137 round 3 (ticket 86c9kxtmu)
+ *   adds a `pendingResumeGate` consultation at the top of `playHubLine`.
+ *   When iOS hands us a suspended/interrupted AudioContext after a
+ *   visibility change, the gate latches and any incoming utterance gets
+ *   queued for drain inside the next user gesture. Without this, Howler
+ *   accepts the play, returns a soundId, but emits no audio while the OS
+ *   audio session is preempted — and the moment a future gesture
+ *   re-engages the session, the queued buffer fires into whatever screen
+ *   is showing (the cross-screen leak Thomas heard from Hub into Math).
  * - **Test seam.** `createHubLinePlayer({ HowlCtor })` lets tests inject
  *   a fake Howl — same shape as `lib/sfx/sfx.ts` and
  *   `lib/audio/preRecorded.ts`. Production callers use the module-level
@@ -53,6 +62,10 @@
  */
 
 import { Howl } from 'howler'
+import {
+  enqueueOnResume,
+  isPendingResume,
+} from '../../lib/audio/pendingResumeGate'
 import { HUB_LINES, HUB_LINE_WORD_COUNTS, type HubLineId } from './hubLines'
 
 /** Minimal Howl shape we depend on — keeps the test surface tiny. */
@@ -94,8 +107,8 @@ export interface HubLinePlayer {
    * outstanding `playHubLine` promise without firing further `onWordTick`
    * callbacks. Idempotent — calling when nothing is playing is a no-op.
    *
-   * Wired in ticket 86c9m4afh (2026-05-03) — Thomas's iPad ear-test
-   * confirmed the Hub line was leaking past the route-flip into
+   * Wired in ticket 86c9m4afh (2026-05-03, PR #144) — Thomas's iPad
+   * ear-test confirmed the Hub line was leaking past the route-flip into
    * Math/WordSong's read-aloud, because `Hub.tsx`'s old `cancelledRef`
    * only short-circuited caption-tick state updates and never told the
    * Howl to stop.
@@ -226,6 +239,40 @@ export function createHubLinePlayer(
   }
 
   function playHubLine(
+    id: HubLineId,
+    playOpts: PlayHubLineOptions = {},
+  ): Promise<void> {
+    // PR #137 round 3 (ticket 86c9kxtmu) — gesture-deferred recovery.
+    // If the visibility-recovery gate is pending (iOS handed us a
+    // suspended/interrupted ctx and we deferred resume to the next
+    // user gesture), enqueue the play instead of dispatching now.
+    // Howler would otherwise return a soundId but the OS audio session
+    // is still preempted; the play emits no audio AND the Howl sits
+    // queued — and the moment a future gesture unsticks the context,
+    // it leaks into whatever screen is showing. (The cross-screen leak
+    // Thomas heard.)
+    //
+    // Most-recent-only queue semantics: if Marian backgrounds Hub then
+    // returns, the most recent enqueue replaces any prior one. The
+    // greeting promise the caller awaits resolves on the deferred play
+    // settling normally.
+    if (isPendingResume()) {
+      return new Promise<void>((resolve) => {
+        enqueueOnResume({
+          label: `hubLine:${id}`,
+          run: () => {
+            // The drain runs inside the gesture window after resume +
+            // unlock. Re-enter the play body via `playRunImmediate` —
+            // by that point ctx is running and the dispatch succeeds.
+            playRunImmediate(id, playOpts).then(resolve)
+          },
+        })
+      })
+    }
+    return playRunImmediate(id, playOpts)
+  }
+
+  function playRunImmediate(
     id: HubLineId,
     playOpts: PlayHubLineOptions = {},
   ): Promise<void> {

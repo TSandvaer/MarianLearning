@@ -69,6 +69,31 @@ export interface RawTapEventRecord {
 export type GateStateName = 'idle' | 'pending' | 'unlocked' | 'relock'
 
 /**
+ * Pending-resume gate state values, as surfaced to the audioCtxLog. This
+ * is a SEPARATE state machine from `GateStateName` (which tracks the
+ * older `useAudioUnlockGate` first-tap unlock flow). Mirroring it into
+ * the log under its own field keeps Thomas's iPad paste-back unambiguous
+ * — the older `gateState` and the new `pendingResumeGateState` carry
+ * different semantics and should not collide.
+ *
+ * Values:
+ *   - `'idle'` — no iOS audio-session preempt pending; dispatches play
+ *     normally.
+ *   - `'pending-resume'` — `useHowlerSuspendOnHide` saw `'suspended'` /
+ *     `'interrupted'` on the visible edge and marked the gate. Audio
+ *     dispatches are queued; the next user gesture's `drainOnGesture`
+ *     will run resume + unlock + drain. This is the load-bearing
+ *     diagnostic for ticket 86c9kxtmu — its presence in an iPad capture
+ *     proves the gate fired on the recovery edge.
+ *   - `'awaiting-tap'` — the fallback timer elapsed without a gesture
+ *     and the affordance is now showing.
+ */
+export type PendingResumeGateStateName =
+  | 'idle'
+  | 'pending-resume'
+  | 'awaiting-tap'
+
+/**
  * Possible AudioContext states. Mirrors the W3C Web Audio spec values plus
  * `'interrupted'` — a non-standard but documented WebKit/iOS-only value
  * that surfaces when the audio session is preempted (phone call, Siri, or
@@ -199,6 +224,56 @@ export interface AudioCtxEventRecord {
      * because it could not decode the blob". Carries `errorMessage`.
      */
     | 'howl-loaderror-event'
+    /**
+     * Visibility-transition probe rows (ticket 86c9kxtmu round 2 — iPad
+     * PWA WebAudio interruption diagnostic).
+     *
+     * Two pairs of rows bracket the suspend/resume calls in
+     * `useHowlerSuspendOnHide`:
+     *
+     *   - `'visibility-hidden-pre'` — captured the instant `visibilitychange`
+     *     fires with `document.visibilityState === 'hidden'`, BEFORE the
+     *     hook calls `Howler.ctx.suspend()`. The `ctxState` field is the
+     *     state iOS handed us at hide time.
+     *   - `'visibility-hidden-post'` — captured immediately AFTER the
+     *     hook's `suspend()` invocation. Same row shape; the state shows
+     *     whether suspend transitioned the context synchronously.
+     *   - `'visibility-visible-pre'` — captured on the hidden→visible
+     *     transition BEFORE `resume()`. The diagnostic question:
+     *     does iPad return `ctxState === 'interrupted'` here? The
+     *     hypothesis (PR #137 round 2) is yes; that's the iOS-only
+     *     recovery path.
+     *   - `'visibility-visible-post'` — AFTER `resume()`. If the state
+     *     stayed `'interrupted'`, plain `resume()` did not recover and the
+     *     unlock-buffer path was needed.
+     *
+     * All four rows omit Howler-specific extras; the `ctxState` and the
+     * implicit timestamp delta are the load-bearing diagnostic.
+     */
+    | 'visibility-hidden-pre'
+    | 'visibility-hidden-post'
+    | 'visibility-visible-pre'
+    | 'visibility-visible-post'
+    /**
+     * `'visibility-recovery-buffer'` — emitted from `useHowlerSuspendOnHide`
+     * when the post-resume state is still `'interrupted'` and the
+     * silent-buffer recovery kick fires. Carries the result of the kick
+     * via `bufferStarted` (whether `createBufferSource().start()` was
+     * called without throwing). The diagnostic question: did we reach
+     * the recovery path at all?
+     */
+    | 'visibility-recovery-buffer'
+    /**
+     * `'onplay-watchdog-missed'` — emitted from `playSessionUtterance` when
+     * the watchdog deadline (default 800 ms) elapses without Howler
+     * firing the `play` event for the most recent `howl.play()` call.
+     * The pre-existing `howl-play-event` row is the positive signal; this
+     * row is the negative signal. Carries `utteranceId` to pair with the
+     * preceding `howl-play-call` row. iPad PWA WebAudio interruption
+     * (ticket 86c9kxtmu round 2) is the dominant cause: `play()` returns
+     * a sound id but the `'play'` event never fires.
+     */
+    | 'onplay-watchdog-missed'
   /**
    * Optional companion: the audio-unlock-gate state at the same instant.
    * The gate already pushes its state to the bus on every transition;
@@ -207,6 +282,21 @@ export interface AudioCtxEventRecord {
    * timeline AND the gate timeline aligned by timestamp.
    */
   gateState?: GateStateName
+  /**
+   * Pending-resume gate state at the same instant. Mirrored from the
+   * pendingResumeGate via `recordPendingResumeGateState`. Separate field
+   * from `gateState` (the older audio-unlock gate) so an iPad export
+   * shows both timelines without confusion.
+   *
+   * Load-bearing diagnostic for ticket 86c9kxtmu (PR #137 round 4):
+   * presence of `pendingResumeGateState: 'pending-resume'` rows on the
+   * `'visibility-visible-post'` / `'visibility-recovery-buffer'` causes
+   * proves the gate flipped on the recovery edge. Round-3 emitted the
+   * recovery-buffer row (`bufferStarted: false`) but did not surface
+   * the new gate's state — Thomas's 2026-05-03 capture had no way to
+   * confirm the gate flipped.
+   */
+  pendingResumeGateState?: PendingResumeGateStateName
   /**
    * For `cause === 'speak-call'` rows: the synchronous return value of
    * `Howl.play()`. Howler returns a numeric sound id on success; we
@@ -378,6 +468,13 @@ export interface AudioCtxEventRecord {
    * with their event responses across interleaved rows.
    */
   utteranceId?: string
+  /**
+   * For `cause === 'visibility-recovery-buffer'` rows (ticket
+   * 86c9kxtmu round 2): whether the silent-buffer kick actually called
+   * `createBufferSource().start()` without throwing. `false` means the
+   * recovery attempt itself failed (rare — closed/unavailable ctx).
+   */
+  bufferStarted?: boolean
 }
 
 export interface DebugSnapshot {
@@ -393,6 +490,13 @@ export interface DebugSnapshot {
    */
   recentRawEvents: RawTapEventRecord[]
   gateState: GateStateName | null
+  /**
+   * Pending-resume gate state — separate machine from `gateState`, see
+   * `PendingResumeGateStateName` for full semantics. `null` when the
+   * gate hasn't reported yet (Hub-only sessions before the first
+   * background event).
+   */
+  pendingResumeGateState: PendingResumeGateStateName | null
   /**
    * Most-recently-observed AudioContext.state. Updated on every poll tick,
    * statechange event, or tap. `null` when no probe is running (debug
@@ -424,6 +528,7 @@ const state: DebugSnapshot = {
   recentTaps: [],
   recentRawEvents: [],
   gateState: null,
+  pendingResumeGateState: null,
   audioCtxState: null,
   audioCtxEvents: [],
 }
@@ -441,6 +546,7 @@ function notify(): void {
     recentTaps: state.recentTaps.slice(),
     recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
+    pendingResumeGateState: state.pendingResumeGateState,
     audioCtxState: state.audioCtxState,
     audioCtxEvents: state.audioCtxEvents.slice(),
   }
@@ -533,6 +639,28 @@ export function recordGateState(gateState: GateStateName): void {
 }
 
 /**
+ * Record the pending-resume gate's current value. Wired from
+ * `pendingResumeGate` (PR #137 round 4 — ticket 86c9kxtmu). The gate
+ * pushes its state to this bus on every transition; the audio-context
+ * probe mirrors `readPendingResumeGateState()` into every emitted
+ * `AudioCtxEventRecord` under the `pendingResumeGateState` field, so a
+ * single localStorage paste-back from Thomas's iPad shows whether the
+ * gate flipped at the visible-edge of an interruption.
+ *
+ * Round-3 (PR #137 v3) DID flip the gate to `'pending'` on `'interrupted'`
+ * but did not surface that state into the audioCtxLog — Thomas's
+ * 2026-05-03 capture showed only the OLD `gateState: "unlocked"` field
+ * and there was no way to confirm the new gate had fired. Round-4
+ * closes that diagnostic gap.
+ */
+export function recordPendingResumeGateState(
+  pendingResumeGateState: PendingResumeGateStateName,
+): void {
+  state.pendingResumeGateState = pendingResumeGateState
+  notify()
+}
+
+/**
  * Record one observation of the AudioContext's state. Called by the
  * Phase-1 audio-context probe (`audioContextProbe.ts`) on its 1Hz poll
  * tick, on `statechange` events, and synchronously inside tap handlers.
@@ -559,6 +687,7 @@ export function subscribe(listener: Listener): () => void {
     recentTaps: state.recentTaps.slice(),
     recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
+    pendingResumeGateState: state.pendingResumeGateState,
     audioCtxState: state.audioCtxState,
     audioCtxEvents: state.audioCtxEvents.slice(),
   })
@@ -576,6 +705,7 @@ export function _resetForTests(): void {
   state.recentTaps = []
   state.recentRawEvents = []
   state.gateState = null
+  state.pendingResumeGateState = null
   state.audioCtxState = null
   state.audioCtxEvents = []
   listeners.clear()
@@ -596,6 +726,16 @@ export function readGateState(): GateStateName | null {
 }
 
 /**
+ * Accessor for the pending-resume gate's current value. Used by the
+ * audio-context probe to mirror the new gate's state into every
+ * emitted `AudioCtxEventRecord` under the `pendingResumeGateState`
+ * field. Returns `null` when the gate hasn't reported yet.
+ */
+export function readPendingResumeGateState(): PendingResumeGateStateName | null {
+  return state.pendingResumeGateState
+}
+
+/**
  * Snapshot accessor for tests / one-off reads. Production code should
  * subscribe instead.
  */
@@ -605,6 +745,7 @@ export function snapshot(): DebugSnapshot {
     recentTaps: state.recentTaps.slice(),
     recentRawEvents: state.recentRawEvents.slice(),
     gateState: state.gateState,
+    pendingResumeGateState: state.pendingResumeGateState,
     audioCtxState: state.audioCtxState,
     audioCtxEvents: state.audioCtxEvents.slice(),
   }

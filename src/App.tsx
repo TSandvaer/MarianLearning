@@ -39,9 +39,11 @@ import {
   recordPathASettleEvent,
 } from './lib/debug'
 import { disableHowlerAutoSuspend, playSessionUtterance } from './lib/audio'
+import { PendingResumeAffordance } from './components/PendingResumeAffordance'
 import type { PlaySessionUtteranceOptions } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
 import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
+import { useHowlerSuspendOnHide } from './lib/lifecycle'
 import {
   isGraduationSessionPending,
   loadProgress,
@@ -216,6 +218,14 @@ function readProgressHintsForTrack(track: ProgressTrack): {
  */
 export default function App() {
   const [route, setRoute] = useState<Route>(() => getInitialRoute())
+
+  // ── Page-lifecycle hooks (Jessica e2e batch — Bugs B + C) ──
+  //
+  // These mount-once hooks live at the App root so we install exactly
+  // one document-level listener for `visibilitychange` and one for
+  // `storage`, regardless of how many screens consume the signals.
+  // See lib/lifecycle/* for the per-hook docstrings.
+  useHowlerSuspendOnHide()
 
   /**
    * Hub-entry path tracked in state so Hub mounts know which welcome-back
@@ -729,6 +739,32 @@ export default function App() {
    */
   useEffect(() => {
     if (route === 'math' || route === 'greet' || route === 'session-end') return
+
+    // ── Latch + abort cleanup ALWAYS runs when leaving the audio surfaces.
+    //
+    // Bug fix (ticket 86c9kxtm5, Jessica e2e batch): the prior shape
+    // early-returned on `!hadAudio` BEFORE resetting the latch and
+    // aborting the controller. If Marian rapid-bounced away from
+    // greet/math BEFORE the in-flight fetch had set any of
+    // {mathUnloadRef, mathPlay, mathAudioReady, mathPlan}, the latch
+    // (`mathFetchStartedRef`) stayed `true`. A subsequent re-entry into
+    // greet/math would short-circuit the kick-effect at
+    // `if (mathFetchStartedRef.current) return` and Marian would silently
+    // ride the still-in-flight fetch from the first mount — duplicate
+    // requests on real fixes, brick on stale state on the corner. Worse:
+    // the controller never aborted, so the orphaned fetch settled into
+    // the singleton howl map and leaked across sessions.
+    //
+    // The latch reset + abort are essential and must fire whether or not
+    // the fetch had progressed. The state-clear pass below is the only
+    // part the `hadAudio` guard usefully gates — there's no point queuing
+    // a microtask to set already-null state to null.
+    if (mathAbortRef.current) {
+      mathAbortRef.current.abort()
+      mathAbortRef.current = null
+    }
+    mathFetchStartedRef.current = false
+
     const hadAudio =
       mathUnloadRef.current !== null ||
       mathPlay !== null ||
@@ -739,11 +775,6 @@ export default function App() {
       mathUnloadRef.current()
       mathUnloadRef.current = null
     }
-    if (mathAbortRef.current) {
-      mathAbortRef.current.abort()
-      mathAbortRef.current = null
-    }
-    mathFetchStartedRef.current = false
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
@@ -873,6 +904,18 @@ export default function App() {
    */
   useEffect(() => {
     if (route === 'literacy' || route === 'session-end') return
+
+    // Mirror of the Math leave-effect's latch-leak fix
+    // (ticket 86c9kxtm5). Reset the latch + abort the controller
+    // unconditionally; only the state-clear pass is gated on `hadAudio`.
+    // See the Math leave-effect's comment block above for the full
+    // rationale on why pre-`hadAudio` reset is essential.
+    if (wordSongAbortRef.current) {
+      wordSongAbortRef.current.abort()
+      wordSongAbortRef.current = null
+    }
+    wordSongFetchStartedRef.current = false
+
     const hadAudio =
       wordSongUnloadRef.current !== null ||
       wordSongPlay !== null ||
@@ -883,11 +926,6 @@ export default function App() {
       wordSongUnloadRef.current()
       wordSongUnloadRef.current = null
     }
-    if (wordSongAbortRef.current) {
-      wordSongAbortRef.current.abort()
-      wordSongAbortRef.current = null
-    }
-    wordSongFetchStartedRef.current = false
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
@@ -961,6 +999,17 @@ export default function App() {
             in normal sessions. See lib/debug/DebugOverlay.tsx for the iPad
             QA usage notes. */}
         {debugOn && <DebugOverlay />}
+        {/* PR #137 round 2 (ticket 86c9kxtmu) — "tap to continue" affordance
+            for the iPad PWA visibility-recovery edge case. Round-4 mounts
+            the affordance immediately on the visibility-recovery edge
+            (gate state `'pending'`) rather than waiting for the 3 s
+            fallback to reach `'awaiting-tap'`; Thomas's iPad capture
+            showed Marian sitting silent for the full fallback window
+            most of the time. Lives outside the AnimatePresence so a
+            backgrounded session that returns mid-screen-transition
+            still gets the affordance promptly. See
+            `components/PendingResumeAffordance.tsx`. */}
+        <PendingResumeAffordance />
       </MotionConfig>
     </LazyMotion>
   )

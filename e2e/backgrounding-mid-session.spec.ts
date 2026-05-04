@@ -101,6 +101,34 @@ async function setVisibility(
   }, state)
 }
 
+/**
+ * Pin `Howler.ctx.state` to a literal value. Lets the spec exercise
+ * iOS-only paths (`'interrupted'`) that desktop chromium / webkit
+ * don't naturally produce.
+ *
+ * Round-2 use (ticket 86c9kxtmu): set state to `'interrupted'` AFTER
+ * suspending so `useHowlerSuspendOnHide`'s visible-pre read sees the
+ * iOS shape. The spec then asserts the recovery-buffer row landed
+ * AND the next playSession's onstart fired.
+ */
+async function pinHowlerCtxState(
+  page: import('@playwright/test').Page,
+  state: 'running' | 'suspended' | 'interrupted',
+): Promise<void> {
+  await page.evaluate((nextState) => {
+    interface HowlerWindow {
+      Howler?: { ctx?: AudioContext | null }
+    }
+    const w = window as Window & HowlerWindow
+    const ctx = w.Howler?.ctx
+    if (!ctx) return
+    Object.defineProperty(ctx, 'state', {
+      configurable: true,
+      get: () => nextState,
+    })
+  }, state)
+}
+
 test.describe('Backgrounding mid-session (audit P1.1)', () => {
   test.beforeEach(async ({ page }) => {
     await installClaudeMock(page, { failNetwork: true })
@@ -158,7 +186,7 @@ test.describe('Backgrounding mid-session (audit P1.1)', () => {
    * Today this is .fixme — no handler exists. When the product fix
    * lands, flip `.fixme(` to `(` and the spec runs live.
    */
-  test.fixme('Math mid-problem hidden → audio pauses; show → audio resumes cleanly', async ({
+  test('Math mid-problem hidden → audio pauses; show → audio resumes cleanly', async ({
     page,
   }) => {
     await page.goto('/')
@@ -207,12 +235,22 @@ test.describe('Backgrounding mid-session (audit P1.1)', () => {
    * just before backgrounding can resolve while hidden — and on
    * resume Marian sees an "already advanced past my answer" screen.)
    *
-   * .fixme today; flip live with the same product fix.
+   * Round 2 (ticket 86c9kxtmu): the spec is strengthened beyond
+   * "data-problem-index advanced" to include the iOS-specific
+   * `'interrupted'` recovery path. We pin `Howler.ctx.state` to
+   * `'interrupted'` after the hide so the visible-pre read in
+   * `useHowlerSuspendOnHide` sees the iPad shape, then assert the
+   * audioCtxLog carries the `visibility-recovery-buffer` row plus a
+   * `howl-play-event` row from the next problem's read-aloud — that
+   * is, audio actually played post-resume, not just the React state
+   * advanced.
    */
-  test.fixme('Math hidden during correct-tap advance — advance does not fire while hidden', async ({
+  test('Math hidden during correct-tap advance — advance does not fire while hidden', async ({
     page,
   }) => {
-    await page.goto('/')
+    // Enable `?debug=1` so the audioCtxLog probe is active and we can
+    // read back the visibility-recovery-buffer + howl-play-event rows.
+    await page.goto('/?debug=1')
     await forceHowlerUnlock(page)
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
 
@@ -235,6 +273,11 @@ test.describe('Backgrounding mid-session (audit P1.1)', () => {
     // be suppressed while hidden.
     await setVisibility(page, 'hidden')
 
+    // Pin `Howler.ctx.state` to `'interrupted'` so the visible-pre
+    // read sees the iOS shape on resume. Round-2 contract: this
+    // should trigger the recovery-buffer kick.
+    await pinHowlerCtxState(page, 'interrupted')
+
     // Wait past when the advance would normally fire.
     await page.waitForTimeout(2_000)
 
@@ -251,5 +294,89 @@ test.describe('Backgrounding mid-session (audit P1.1)', () => {
       initialIndex!,
       { timeout: 5_000 },
     )
+
+    // PR #137 round 2 (ticket 86c9kxtmu) — the round-1 fix that
+    // tried to call `Howler.ctx.resume()` + `unlockIosAudioSession()`
+    // from the visibilitychange handler did NOT actually unstick the
+    // OS audio session on real iPad PWA (Thomas's audioCtxLog dump
+    // proved the context stays `'suspended'` despite the recovery
+    // buffer firing). Round-2 fix defers the recovery to the next
+    // user gesture.
+    //
+    // To exercise that path here, we simulate a chip-tap on the new
+    // problem after the resume — that's the gesture iOS would
+    // associate with the audio recovery on a real device. The
+    // `drainOnGesture` call inside Math.tsx's `onChipTap` runs
+    // resume + unlock + drains the queued read-aloud.
+    //
+    // Wait for the new problem's chip to be enabled (read-aloud has
+    // been queued OR has played + flipped readAloudPlayed). On the
+    // round-2 path with a pending gate, the read-aloud is queued
+    // until the chip-tap below drains it; the chip itself stays
+    // disabled until readAloudPlayed flips. We bridge this by
+    // unpinning the ctx state back to 'running' before the chip-tap
+    // (so the queued play actually emits when drained), then
+    // dispatching a synthetic chip-tap (the `audioUnlocked` first-
+    // gesture path consumes the tap and fires drainOnGesture).
+    await pinHowlerCtxState(page, 'running')
+
+    // Click the chip area — even a disabled chip tap reaches the
+    // onChipTap handler in Math.tsx, which short-circuits on
+    // `!audioUnlocked` AFTER running the drain. That's the
+    // gesture-deferred recovery path the round-2 fix relies on.
+    const newChip = page.locator('[data-testid="math-chip"]').first()
+    await newChip.click({ force: true })
+
+    // Round-2 strengthening: the audio actually played post-resume,
+    // not just the React state advanced. The audioCtxLog carries
+    // both proofs:
+    //
+    //   - `visibility-recovery-buffer` row: confirms the
+    //     visibility-edge marked the gate pending (bufferStarted=false
+    //     under round-2 contract — the buffer kick is gesture-deferred).
+    //   - `howl-play-event` row landed AFTER the recovery row:
+    //     proves an actual `'play'` event fired on a Howl post-
+    //     recovery (i.e. audio is no longer dead). The
+    //     `drainOnGesture` invoked by the chip-tap above runs the
+    //     queued read-aloud inside the gesture window.
+    //
+    // The previous shape only asserted React state advanced — green
+    // even if audio was bricked for the rest of the session, which
+    // was Thomas's PR #137 ear-test failure mode.
+    const log = await page.evaluate(() => {
+      const raw = window.localStorage.getItem('debug:audioCtxLog:v1')
+      return raw
+        ? (JSON.parse(raw) as Array<{ cause: string; timestamp: number }>)
+        : []
+    })
+    const recoveryRows = log.filter(
+      (r) => r.cause === 'visibility-recovery-buffer',
+    )
+    expect(recoveryRows.length).toBeGreaterThanOrEqual(1)
+
+    // Wait for a `howl-play-event` row to land AFTER the recovery
+    // row's timestamp, indicating a Howl on the resumed problem
+    // actually fired its `'play'` event. Poll up to 10 s; iPad
+    // Howler-on-iOS post-recovery onplay latency is usually under
+    // 500 ms but the cold-mount path adds the read-aloud setup time.
+    await expect
+      .poll(
+        async () => {
+          const fresh = await page.evaluate(() => {
+            const raw = window.localStorage.getItem('debug:audioCtxLog:v1')
+            return raw
+              ? (JSON.parse(raw) as Array<{ cause: string; timestamp: number }>)
+              : []
+          })
+          const recoveryAt =
+            fresh.filter((r) => r.cause === 'visibility-recovery-buffer').pop()
+              ?.timestamp ?? 0
+          return fresh.some(
+            (r) => r.cause === 'howl-play-event' && r.timestamp >= recoveryAt,
+          )
+        },
+        { timeout: 10_000 },
+      )
+      .toBe(true)
   })
 })

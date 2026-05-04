@@ -35,22 +35,16 @@
  *    underlying latch leaks (see the empirical finding below), the
  *    SCREEN must recover.
  *
- * Empirical finding for follow-up ticket
- * --------------------------------------
- * While building this spec we observed only **one** POST to
- * `/api/claude` across the bounce sequence — meaning the latch
- * (`mathFetchStartedRef`) is in fact NOT being reset on the bounce
- * back to Hub when the fetch is still in flight. App.tsx's
- * leave-effect early-returns when no audio state has been set yet
- * (`hadAudio === false`), so it never aborts the controller nor
- * resets the latch. The screen still recovers because the original
- * in-flight fetch eventually settles against the second Math mount
- * via the persistent `mathFetchStartedRef === true` short-circuit;
- * Marian sees no brick, but the bug shape — duplicate fetches when
- * the first wasn't actually aborted, audio cache leak across
- * sessions, etc. — is real. File as a P2 product fix; this spec's
- * positive contract holds either way and remains the regression
- * canary.
+ * Latch-leak fix landed (ticket 86c9kxtm5)
+ * ----------------------------------------
+ * The Jessica-batch fix (`fix/jessica-e2e-batch`) rearranged the
+ * leave-effect so the latch reset + abort fire BEFORE the
+ * `if (!hadAudio) return` guard. Post-fix, a Math → Hub bounce while
+ * the fetch is in flight aborts the controller and resets the latch;
+ * the re-entry into Math fires a fresh fetch. We now assert
+ * `claudePosts.length >= 2` to pin that behaviour and prevent a
+ * regression back to the latch-leak shape (where Marian rode the
+ * still-in-flight first fetch from the second mount).
  *
  * Why this regression test is worth its weight
  * --------------------------------------------
@@ -165,14 +159,11 @@ test.describe('Path A fetch abort on rapid Hub ↔ Math bounce (audit P1.6)', ()
     await expect(page.getByTestId('math-symbolic')).toBeVisible()
     await expect(page.getByTestId('math-chips')).toBeVisible()
 
-    // Diagnostic log of POST count. Currently expected to be 1
-    // (latch leak — see header note). When the product fix lands,
-    // this will rise to >= 2. Not asserted; the user-facing contract
-    // is the gate flip above, and this test serves the spec's stated
-    // brief — "doesn't brick on stale latch".
-    //
-    // We DO assert >= 1: at least the first fetch must have happened
-    // or something else would be wrong with the harness.
-    expect(claudePosts.length).toBeGreaterThanOrEqual(1)
+    // Post-fix (ticket 86c9kxtm5): the bounce-to-Hub aborts the
+    // first in-flight controller and resets `mathFetchStartedRef`.
+    // The re-entry then issues a SECOND fetch. Pre-fix this stayed
+    // at 1 (latch leak); the count assertion is the regression
+    // canary for the leave-effect's pre-`hadAudio` reset shape.
+    expect(claudePosts.length).toBeGreaterThanOrEqual(2)
   })
 })
