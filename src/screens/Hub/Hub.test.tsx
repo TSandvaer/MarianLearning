@@ -668,6 +668,133 @@ describe('Hub — audio-handoff cancellation (ticket 86c9m4afh)', () => {
   })
 })
 
+describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
+  /**
+   * Regression tests for the chip-tap-as-first-gesture audio leak
+   * surfaced 2026-05-03 evening.
+   *
+   * Symptom: when Marian's first interaction with the page is the chip
+   * tap (no prior splash tap consumed for audio unlock), the queued Hub
+   * greeting plays AFTER the route-flip — she arrives at Word Song,
+   * then hears "Try Word Song" play over the destination screen.
+   *
+   * Root cause: `dispatchGreeting` was queued behind `gestureUnlocked`,
+   * which only flipped to `true` inside `handleNodeTap` AFTER
+   * `cancelLine()` ran. Cancel ran against an empty active slot
+   * (greeting was queued, not playing); then `setGestureUnlocked(true)`
+   * triggered the deferred effect, which fired the greeting
+   * post-render — bleeding into the destination screen.
+   *
+   * Fix: mark `greetingDispatchedRef.current = true` synchronously in
+   * the chip-tap handler BEFORE flipping `setGestureUnlocked`. The
+   * effect still runs (it's gated on `gestureUnlocked`), but
+   * `dispatchGreeting()` short-circuits on the ref check.
+   */
+  it('does NOT play the greeting when the chip tap is the first user gesture (app-open path)', async () => {
+    const user = userEvent.setup()
+    const playLineFn = vi.fn(() => Promise.resolve())
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'app-open', // gate starts locked
+      playLineFn,
+    })
+    // No prior gesture → greeting queued, not yet dispatched.
+    expect(playLineFn).toHaveBeenCalledTimes(0)
+    // Chip tap IS the first gesture.
+    const wordNode = screen
+      .getAllByTestId('hub-tree-node')
+      .find((n) => n.getAttribute('data-tree') === 'word-song')!
+    await user.click(wordNode)
+    // Flush any deferred microtasks the gesture-unlock effect might
+    // have scheduled.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    // Greeting must NOT fire — Marian is already on her way to Word Song.
+    expect(playLineFn).toHaveBeenCalledTimes(0)
+  })
+
+  it('does NOT play the greeting when the chip tap is the first user gesture (app-open-recent path)', async () => {
+    // Same gate-locked path as 'app-open'; both await first gesture.
+    const user = userEvent.setup()
+    const playLineFn = vi.fn(() => Promise.resolve())
+    const adapter = createMemoryStorage()
+    seed(adapter, {
+      sessionCount: 4,
+      lastSessionCompletedAt: new Date(2026, 3, 29, 8, 0).toISOString(),
+    })
+    renderHub({
+      storage: adapter,
+      path: 'app-open-recent',
+      playLineFn,
+      now: () => new Date(2026, 3, 29, 18, 0),
+    })
+    expect(playLineFn).toHaveBeenCalledTimes(0)
+    const numberNode = screen
+      .getAllByTestId('hub-tree-node')
+      .find((n) => n.getAttribute('data-tree') === 'number-garden')!
+    await user.click(numberNode)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(playLineFn).toHaveBeenCalledTimes(0)
+  })
+
+  it('still cancels an already-mid-flight greeting on chip tap (PR #144 regression guard)', async () => {
+    // The gate is already unlocked (session-end path), greeting fires
+    // on mount, chip tap then cancels it. This is the PR #144 behavior;
+    // the fix for 86c9m4u13 must not regress this.
+    const user = userEvent.setup()
+    const cancelLineFn = vi.fn()
+    // playLineFn returns a never-resolving promise so the greeting
+    // stays "in flight" through the chip tap.
+    const playLineFn = vi.fn(() => new Promise<void>(() => {}))
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'session-end', // gate already unlocked → greeting fires on mount
+      playLineFn,
+      cancelLineFn,
+    })
+    // Wait for the mount-time dispatch.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(playLineFn).toHaveBeenCalledTimes(1)
+    const wordNode = screen
+      .getAllByTestId('hub-tree-node')
+      .find((n) => n.getAttribute('data-tree') === 'word-song')!
+    await user.click(wordNode)
+    expect(cancelLineFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('still plays the greeting when first gesture is a non-chip tap (handleFirstTap path)', async () => {
+    // If Marian taps anywhere on Hub OTHER than a chip — the body of
+    // the screen, the Emma image, the recent-stats area — the gate
+    // unlocks via `handleFirstTap` and the greeting SHOULD fire. Only
+    // a chip tap suppresses the greeting (because she's leaving).
+    const playLineFn = vi.fn(() => Promise.resolve())
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'app-open',
+      playLineFn,
+    })
+    expect(playLineFn).toHaveBeenCalledTimes(0)
+    // Tap the hub root (not a chip) — fires `handleFirstTap` via
+    // `onPointerDown` on `<m.main>`.
+    const hubRoot = screen.getByTestId('hub')
+    act(() => {
+      hubRoot.dispatchEvent(
+        new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+      )
+    })
+    // Effect runs after gesture flip; flush microtasks.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(playLineFn).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('Hub — path-strip sliding window', () => {
   it('renders 5 cells per tree at default (currentIndex=0)', () => {
     renderHub({ storage: createMemoryStorage() })
