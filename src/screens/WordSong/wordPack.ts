@@ -37,10 +37,11 @@ export interface WordEntry {
   /** Picture key — used by `wordPictures.tsx` to render the placeholder
    *  SVG and (when real assets land) to resolve `picture-{key}.svg`. */
   pictureKey: string
-  /** Short-vowel sound. Target words are all 'a' (v1 scope). Distractor-
-   *  only words carry their actual short-vowel for the trap-tier
-   *  same-vowel/different-vowel discrimination check (spec §Distractor
-   *  policy → Trap tier). */
+  /** Short-vowel sound. v1 targets were all 'a'; v2 adds 'o' (short-o
+   *  sibling tier — see `design/word-song/short-o-pool-expansion.md`).
+   *  Distractor-only words carry their actual short-vowel for the
+   *  trap-tier same-vowel/different-vowel discrimination check (spec
+   *  §Distractor policy → Trap tier). */
   vowel: 'a' | 'o' | 'u' | 'i' | 'e'
   /** Coarse category — used by the gentle-tier filter. */
   category: WordCategory
@@ -211,13 +212,102 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'household',
     isTarget: true,
   },
+  // ── Short-o pool (ticket 86c9m3ae3, v2 vowel tier) ──────────────────
+  // Per `design/word-song/short-o-pool-expansion.md` §1 with Thomas's
+  // 2026-05-04 lock: 8 short-o words drawn from a mix of promoted v1
+  // distractors (`dog, log, pot, fox`) + 4 wholly new entries
+  // (`mop, box, mom, hot`). Pool reaches Marian only when the planner
+  // emits content for `cvc-words-short-o` (the sibling node added to
+  // `WordSongNode` / `LITERACY_TREE` between `cvc-words` and
+  // `digraphs`); short-a sessions continue to draw from the canonical
+  // 14-word pool above and short-o words don't leak into them
+  // (planner-side guarantee — see `WORD_SONG_TRACK_GUIDE` in
+  // `api/_planner.ts`).
+  //
+  // The 4 promoted entries USED to live in `DISTRACTOR_ONLY_WORDS`
+  // (see git blame). They retain their distractor pictures
+  // (`pic-{key}.svg` placeholder until Kyle's Midjourney trace
+  // ships) — `getWordEntry()` reads whichever array carries them, so
+  // the v1 short-a `TARGET_PAIRINGS` rows that point to `dog`/`log`/
+  // `pot`/`fox` continue to resolve unchanged.
+  //
+  // Picture-pack note: `mop, box, mom, hot` fall back to silhouettes
+  // in `wordPictures.tsx` for v1 (per the dispatch brief — real
+  // Midjourney → SVG illustrations land in a separate Kyle ticket).
+  {
+    word: 'dog',
+    pictureKey: 'dog',
+    vowel: 'o',
+    category: 'animal',
+    isTarget: true,
+  },
+  {
+    word: 'mop',
+    pictureKey: 'mop',
+    vowel: 'o',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'log',
+    pictureKey: 'log',
+    vowel: 'o',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'pot',
+    pictureKey: 'pot',
+    vowel: 'o',
+    category: 'kitchen',
+    isTarget: true,
+  },
+  {
+    word: 'box',
+    pictureKey: 'box',
+    vowel: 'o',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'fox',
+    pictureKey: 'fox',
+    vowel: 'o',
+    category: 'animal',
+    isTarget: true,
+  },
+  {
+    word: 'mom',
+    pictureKey: 'mom',
+    vowel: 'o',
+    category: 'person',
+    isTarget: true,
+  },
+  {
+    word: 'hot',
+    pictureKey: 'hot',
+    vowel: 'o',
+    category: 'object',
+    isTarget: true,
+  },
 ] as const
 
 /**
- * The 8 distractor-only pictures — never appear as the target word, only
- * as the distractor chips. These have non-short-a vowels (per spec
+ * The distractor-only pictures — never appear as the target word, only
+ * as the distractor chips. These carry non-short-a vowels (per spec
  * §Distractor policy constraint #4 — distractor _words_ don't have to be
  * CVC short-a; what matters is their _picture_ is recognisable).
+ *
+ * v2 note (ticket 86c9m3ae3, short-o pool expansion): four entries —
+ * `dog, log, pot, fox` — moved out of this array into `TARGET_WORDS`
+ * with `isTarget: true`. They still appear here in spirit because the
+ * v1 short-a `TARGET_PAIRINGS` rows reference them as gentle-tier
+ * distractors; `getWordEntry()` resolves them from `TARGET_WORDS` now,
+ * so the matrix continues to work unchanged. The "DISTRACTOR_ONLY"
+ * label still holds — these 4 pictures cannot serve as the right
+ * answer in a short-a session (`WORD_SONG_TARGET_WORDS_FOR_PROMPT`
+ * doesn't list them) and the planner's pool-by-focus-node split keeps
+ * short-a + short-o sessions from cross-pollinating.
  */
 export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
   {
@@ -235,20 +325,6 @@ export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
     isTarget: false,
   },
   {
-    word: 'dog',
-    pictureKey: 'dog',
-    vowel: 'o',
-    category: 'animal',
-    isTarget: false,
-  },
-  {
-    word: 'fox',
-    pictureKey: 'fox',
-    vowel: 'o',
-    category: 'animal',
-    isTarget: false,
-  },
-  {
     word: 'cup',
     pictureKey: 'cup',
     vowel: 'u',
@@ -260,20 +336,6 @@ export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
     pictureKey: 'pen',
     vowel: 'e',
     category: 'stationery',
-    isTarget: false,
-  },
-  {
-    word: 'log',
-    pictureKey: 'log',
-    vowel: 'o',
-    category: 'object',
-    isTarget: false,
-  },
-  {
-    word: 'pot',
-    pictureKey: 'pot',
-    vowel: 'o',
-    category: 'kitchen',
     isTarget: false,
   },
 ] as const
@@ -298,6 +360,8 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['pan', 'pot'], // both cooking vessels in three-quarter view
   ['cap', 'hat'], // both head-coverings, similar mass at 96pt
   ['man', 'dad'], // both human figures
+  // Short-o pool additions (ticket 86c9m3ae3) — composition collisions:
+  ['mom', 'dad'], // parent-with-child compositions; differ on hair/outfit
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -360,6 +424,29 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   rat: { gentle: ['bus', 'cup'], trap: ['bat', 'mat'] }, // /æt/ trap
   map: { gentle: ['dog', 'sun'], trap: ['cap', 'mat'] }, // /æp/ + /æt/ trap
   tap: { gentle: ['dog', 'cup'], trap: ['cap', 'pan'] }, // /æp/ + /p/-alliteration
+  // ── Short-o pool (ticket 86c9m3ae3) ───────────────────────────────
+  // Per `design/word-song/short-o-pool-expansion.md` §8: same-vowel
+  // only — every distractor for a short-o target is drawn from the
+  // short-o pool itself (`dog, mop, log, pot, box, fox, mom, hot`).
+  // No cross-vowel mixing in v1; that's a separate downstream ticket
+  // (Dave §6 P2). Trap-tier pairs lean on /ɒ/ rhyme or alliteration
+  // with the target where one exists; gentle-tier pairs are visually
+  // / categorically distinct (animal vs. object vs. person).
+  //
+  // FORBIDDEN_PAIRS audit — none of the pairs below trigger. The new
+  // mom-dad pair added in this ticket is intra-cross-vowel (`dad` is
+  // short-a, not in this pool), so it never surfaces in a short-o
+  // trio. The other existing forbidden pairs (cat-dog, bus-van,
+  // pan-pot, cap-hat, man-dad) are all cross-vowel from a short-o
+  // target's perspective.
+  dog: { gentle: ['box', 'hot'], trap: ['log', 'fox'] }, // /ɒg/ rhyme + animal trap
+  mop: { gentle: ['dog', 'fox'], trap: ['mom', 'hot'] }, // m-alliteration + /ɒ/ vowel trap
+  log: { gentle: ['box', 'mom'], trap: ['dog', 'fox'] }, // /ɒg/ rhyme + animal trap
+  pot: { gentle: ['dog', 'mom'], trap: ['hot', 'mop'] }, // /ɒt/ rhyme + p-/m- alliteration trap
+  box: { gentle: ['mom', 'hot'], trap: ['fox', 'log'] }, // /ɒks/ rhyme trap
+  fox: { gentle: ['pot', 'mom'], trap: ['box', 'dog'] }, // /ɒks/ rhyme + animal trap
+  mom: { gentle: ['box', 'hot'], trap: ['mop', 'log'] }, // m-alliteration + /ɒ/ vowel trap
+  hot: { gentle: ['dog', 'fox'], trap: ['pot', 'mop'] }, // /ɒt/ rhyme + p-/m- alliteration trap
 } as const
 
 /** Look up a word entry by word string. Throws on missing — every word in

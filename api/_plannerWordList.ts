@@ -22,6 +22,29 @@ export const WORD_SONG_TARGET_WORDS_FOR_PROMPT = [
   'cat, hat, bat, mat, bag, fan, man, pan, cap, can, tag, dad, jam, van',
 ].join('\n')
 
+/**
+ * The 8 target words for the short-o sibling tier (`cvc-words-short-o`).
+ * Locked by Thomas 2026-05-04 per
+ * `design/word-song/short-o-pool-expansion.md` §1 with the §10 Q1/Q2
+ * decisions applied (keep box+fox with first-encounter scaffolding,
+ * `hot` over `dot` for the 8th slot — steaming-bowl picture is a
+ * stronger anchor for an L2 8-year-old than an abstract circle).
+ *
+ * Pool composition:
+ *  - 4 promoted from the v1 distractor-only pool: `dog, log, pot, fox`
+ *    (their `WordEntry.isTarget` flips to true in `wordPack.ts` while
+ *    they remain valid distractors for short-a sessions — the two
+ *    flags are independent).
+ *  - 4 wholly new entries: `mop, box, mom, hot`.
+ *
+ * Same alignment contract as `WORD_SONG_TARGET_WORDS_FOR_PROMPT`: the
+ * client-side `wordPack.ts` MUST carry every word here as
+ * `isTarget: true` plus a `TARGET_PAIRINGS` row. The smoke test in
+ * `claude.test.ts` round-trips this list to enforce that.
+ */
+export const WORD_SONG_TARGET_WORDS_SHORT_O =
+  'dog, mop, log, pot, box, fox, mom, hot'
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec). */

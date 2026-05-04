@@ -113,12 +113,17 @@ export const MATH_TREE: readonly NumberGardenNode[] = [
 /**
  * Word Song / literacy tree in promotion order. Same contract as
  * `MATH_TREE`.
+ *
+ * cvc-words = short-a CVC. Subsequent vowels get sibling nodes
+ * (cvc-words-short-o, cvc-words-short-u, …). This was a deliberate
+ * backward-compat choice — see design/word-song/short-o-pool-expansion.md §2.
  */
 export const LITERACY_TREE: readonly WordSongNode[] = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
   'cvc-words',
+  'cvc-words-short-o',
   'digraphs',
   'sight-words',
   'simple-sentences',

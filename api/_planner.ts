@@ -57,6 +57,7 @@
 
 import {
   WORD_SONG_TARGET_WORDS_FOR_PROMPT,
+  WORD_SONG_TARGET_WORDS_SHORT_O,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
 } from './_plannerWordList.js'
@@ -134,6 +135,7 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   'letter-sounds',
   'blending-cv',
   'cvc-words',
+  'cvc-words-short-o',
   'digraphs',
   'sight-words',
   'simple-sentences',
@@ -518,6 +520,7 @@ function defaultFocusNodeForTrack(track: PlannerTrack): string {
 const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'blending-cv',
   'cvc-words',
+  'cvc-words-short-o',
 ]
 
 /**
@@ -681,41 +684,53 @@ Per-problem utterance template (any focus node):
 Pick exactly 8 distinct problems for the focus node, ordered easier → slightly harder across problems 1-8. Spell numbers as words (one, two, ... ten, eleven, ... twenty), not digits. Capitalize the first word of each sentence. The "recent score" hint in the user message guides easier-vs-harder mix: low score → mostly the easiest end of the slice; high score → push the harder end.`
 
 // Word-song planner system prompt — ticket 86c9kxu07 (planner-parser
-// contract step 2). Two first-class content modes today:
+// contract step 2) + ticket 86c9m3ae3 (short-o pool sibling tier).
+// Three first-class content modes today:
 //
-//   - blending-cv  → "Tap the <word>." (match-picture-to-spoken-word)
-//   - cvc-words    → "Read the <word>." (decode-printed-word)
+//   - blending-cv         → "Tap the <word>." (match-picture-to-spoken-word)
+//   - cvc-words           → "Read the <word>." (decode-printed-word, short-a)
+//   - cvc-words-short-o   → "Read the <word>." (decode-printed-word, short-o)
 //
-// Both are gated by the browser parser (PR #132 widened it to dispatch
-// on the read-line template). Other valid focus nodes
-// (letter-sounds, digraphs, sight-words, simple-sentences) reach this
-// prompt as `blending-cv` after `effectiveFocusNode`'s stub-fallback
-// — the user message will name `blending-cv` for those. This is the
-// "always render something" posture from the contract doc.
+// All gated by the browser parser (PR #132 widened it to dispatch on
+// the read-line template). Other valid focus nodes (letter-sounds,
+// digraphs, sight-words, simple-sentences) reach this prompt as
+// `blending-cv` after `effectiveFocusNode`'s stub-fallback — the user
+// message will name `blending-cv` for those. This is the "always
+// render something" posture from the contract doc.
 //
 // Utterance ids ALWAYS use the "word." prefix regardless of content mode.
 // The P0 incident (PR #117 → #118) was caused by `cvc.*` prefixes — the
 // content-type discriminant lives on the read-line template, NOT the id
 // namespace, by design (see design/word-song/parser-widening-plan.md
-// §"Why no new id namespace").
+// §"Why no new id namespace"). cvc-words and cvc-words-short-o share
+// the "Read the <word>." template; the focus-node name in the user
+// message is what tells the planner which word pool to draw from.
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Two first-class content modes today:
+matching that node. Three first-class content modes today:
 
   - blending-cv: "Tap the <word>." problems. Marian hears the word
     spoken and taps the matching picture chip from a trio. This is the
     earlier-tier content (matching pictures to spoken words).
-  - cvc-words: "Read the <word>." problems. Marian sees the printed
-    word and decodes it aloud, then the picture chip confirms. This is
-    the next-tier content (decoding printed words). The wire shape and
-    utterance ids are IDENTICAL to blending-cv; only the read-line
-    template differs.
+  - cvc-words: "Read the <word>." problems with SHORT-A target words.
+    Marian sees the printed word and decodes it aloud, then the picture
+    chip confirms. This is the next-tier content (decoding printed
+    words). The wire shape and utterance ids are IDENTICAL to
+    blending-cv; only the read-line template differs.
+  - cvc-words-short-o: "Read the <word>." problems with SHORT-O target
+    words. Same wire shape and templates as cvc-words; only the word
+    pool differs (short-o instead of short-a). This is the next-vowel
+    sibling tier — Marian arrives here after she's mastered short-a.
 
-Pick 8 distinct target words from the canonical list below (do not invent
-new words, do not use a target more than once). The same 14-word short-a
-CVC pool serves both content modes:
+Pick 8 distinct target words from the focus-node-specific pool below
+(do not invent new words, do not use a target more than once).
+
+Pool for blending-cv and cvc-words (14-word short-a CVC):
 ${WORD_SONG_TARGET_WORDS_FOR_PROMPT}
+
+Pool for cvc-words-short-o (8-word short-o CVC):
+${WORD_SONG_TARGET_WORDS_SHORT_O}
 
 GRADUATION-SESSION EXCEPTION: when the user message contains the
 "GRADUATION SESSION" directive, that directive supplies an additional
@@ -731,9 +746,10 @@ target, two are distractors — but YOU are not authoring the distractors
 here, only the spoken lines):
 ${WORD_SONG_DISTRACTOR_HINTS}
 
-Order easier-recognise words (cat, bag, hat, dad) in problems 1-3 and
-richer-rhyme/trap words (van, can, fan, man, pan, mat, bat, tag, cap, jam)
-in problems 4-8.
+Order easier-recognise words (cat, bag, hat, dad for short-a; dog, mom,
+pot, log for short-o) in problems 1-3 and richer-rhyme/trap words
+(van, can, fan, man, pan, mat, bat, tag, cap, jam for short-a; mop, box,
+fox, hot for short-o) in problems 4-8.
 
 Per-problem utterance template — the read line varies by focus node;
 all other slots are content-mode-agnostic:
@@ -741,9 +757,11 @@ all other slots are content-mode-agnostic:
 - read (varies by focus skill node):
     - blending-cv: "Tap the <word>." e.g. "Tap the cat."
     - cvc-words:   "Read the <word>." e.g. "Read the cat."
+    - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."
   Use lowercase target word; one short sentence; ends with a period.
   Use the EXACT verb for the focus node — "Tap" for blending-cv,
-  "Read" for cvc-words. Do not mix templates within a single plan.
+  "Read" for cvc-words and cvc-words-short-o. Do not mix templates
+  within a single plan.
 - correct: "Yes! <Word>." (capitalised target) e.g. "Yes! Cat."
 - reprompt: "Hmm... try again?"  (verbatim — do not vary)
 - hint: "Let's look. <Word>." e.g. "Let's look. Cat."

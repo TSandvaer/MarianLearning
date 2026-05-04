@@ -218,9 +218,11 @@ describe('pickDistractors — defensive assertions (matrix-drift guards)', () =>
 })
 
 describe('FORBIDDEN_PAIRS', () => {
-  it("contains the 5 silhouette-similarity pairs from Kyle's pack-doc", () => {
+  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o additions (ticket 86c9m3ae3)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
-    // implementation hand-off note — exact list, in any order.
+    // implementation hand-off note + design/word-song/short-o-pool-
+    // expansion.md §3 (mom↔dad composition collision). Exact list, in
+    // any order.
     const pairs = FORBIDDEN_PAIRS.map((p) => [...p].sort().join(','))
     const expectedPairs = [
       ['cat', 'dog'],
@@ -228,6 +230,7 @@ describe('FORBIDDEN_PAIRS', () => {
       ['pan', 'pot'],
       ['cap', 'hat'],
       ['man', 'dad'],
+      ['mom', 'dad'], // ticket 86c9m3ae3 — both parent-with-child compositions
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {

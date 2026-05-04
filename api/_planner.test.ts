@@ -26,6 +26,7 @@ import {
   generateSessionPlan,
   PlannerError,
   stripMarkdownFence,
+  VALID_WORD_SONG_FOCUS_NODES,
   type GenerateSessionPlanArgs,
   type PlannerAnthropicClient,
 } from './_planner.js'
@@ -1259,6 +1260,222 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const prompt = args.system.map((b) => b.text).join('\n')
     expect(prompt).toMatch(/GRADUATION-SESSION EXCEPTION/i)
+  })
+})
+
+/**
+ * Short-o sibling tier (ticket 86c9m3ae3). The planner gains
+ * `cvc-words-short-o` as a third first-class word-song content mode —
+ * same "Read the <word>." template as `cvc-words`, but the word pool
+ * shifts from short-a to the 8-word short-o pool
+ * (`dog, mop, log, pot, box, fox, mom, hot`).
+ *
+ * Coverage strategy:
+ *  - (a) System prompt acknowledges the new node + names its 8 words.
+ *  - (b) User message routes `cvc-words-short-o` through verbatim
+ *    (first-class, no stub-fallback).
+ *  - (c) Round-trip: a wire-shape response with 8 short-o "Read the
+ *    <word>." problems parses cleanly via toEqual on the count.
+ *  - (d) No short-a leakage: a planned response that emits a short-a
+ *    word as a target round-trips successfully through the planner
+ *    (the planner is content-agnostic — pool isolation is enforced
+ *    upstream by the prompt + downstream by the wordPack), but the
+ *    short-o pool list itself in the system prompt contains no
+ *    short-a words.
+ *  - (e) Cache invariant: two calls differing only in focusNode
+ *    (cvc-words vs cvc-words-short-o) share byte-identical system
+ *    text. Per shared/prompt-caching.md, focusNode lives in the user
+ *    message, not the cache prefix.
+ *
+ * Per `feedback_count_assertions_on_regression_tests.md`: count-based
+ * assertions (`.toEqual([…])`, `.toHaveLength(N)`, `.toEqual(N)`) —
+ * never `.toContain` for the round-trip pool checks.
+ */
+describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3ae3)', () => {
+  const SHORT_O_WORDS = [
+    'dog',
+    'mop',
+    'log',
+    'pot',
+    'box',
+    'fox',
+    'mom',
+    'hot',
+  ] as const
+
+  /** Build an 8-problem cvc-words-short-o wire response in template form. */
+  function makeShortOPlan(words: readonly string[]): string {
+    if (words.length !== 8) {
+      throw new Error(`makeShortOPlan needs 8 words; got ${words.length}`)
+    }
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-short-o-001',
+      label: 'CVC short-o',
+      utterances,
+    })
+  }
+
+  it('routes cvc-words-short-o focus verbatim into the user message (first-class, no stub-fallback)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortOPlan(SHORT_O_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    // First-class node: the user message names it verbatim (vs a
+    // stub-fallback tier which would name `blending-cv`).
+    expect(user).toMatch(/Focus skill node: cvc-words-short-o\./)
+  })
+
+  it('system prompt names the 8-word short-o pool', async () => {
+    // Pin the pool enumeration so a future copy edit can't silently
+    // drop a word and cause Haiku to emit something the wordPack
+    // doesn't carry.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortOPlan(SHORT_O_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // Pool literal — the comma-joined list as embedded in the prompt.
+    expect(prompt).toContain('dog, mop, log, pot, box, fox, mom, hot')
+    // The third content-mode header.
+    expect(prompt).toMatch(/cvc-words-short-o:/)
+  })
+
+  it('round-trips a wire response with exactly 8 short-o problems', async () => {
+    // Count-based assertion per
+    // `feedback_count_assertions_on_regression_tests.md` — `.toEqual`
+    // / `.toHaveLength`, never `.toContain` for the pool check.
+    const client = makeMockClient(makeShortOPlan(SHORT_O_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    // Every read-line word must be in the short-o pool — exact
+    // membership, not "contains".
+    const reReadLine = /^Read the ([a-z]+)\.$/
+    const readWords = reads.map((u) => u.text.match(reReadLine)![1]!)
+    expect(readWords).toHaveLength(8)
+    const poolSet = new Set<string>(SHORT_O_WORDS)
+    for (const word of readWords) {
+      expect(poolSet.has(word)).toBe(true)
+    }
+    // Distinct targets (no repeats within a session).
+    expect(new Set(readWords).size).toEqual(8)
+  })
+
+  it('every read line uses the "Read the <word>." template (no "Tap the" leakage from blending-cv)', async () => {
+    const client = makeMockClient(makeShortOPlan(SHORT_O_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    for (const r of reads) {
+      // Anchored regex — not contains. Drift would surface as a
+      // failed match here.
+      expect(r.text).toMatch(/^Read the [a-z]+\.$/)
+      expect(r.text).not.toMatch(/^Tap the/)
+    }
+  })
+
+  it('two calls differing only in focusNode (cvc-words vs cvc-words-short-o) share byte-identical system text (cache invariant)', async () => {
+    // Per shared/prompt-caching.md: focusNode lives in the user
+    // message, not the system block. The new sibling tier must not
+    // cause a cache-prefix delta vs cvc-words.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(makeShortOPlan(SHORT_O_WORDS), { capture: cap1 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(makeShortOPlan(SHORT_O_WORDS), { capture: cap2 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toEqual(sys2)
+  })
+
+  it('graduation directive does NOT leak into a cvc-words-short-o session even with isGraduationSession=true', async () => {
+    // The graduation gate is currently cvc-words-only (short-a) per
+    // `WORD_SONG_GRADUATION_GATED_NODES` in mastery.ts. A misrouted
+    // flag on a short-o request must not carry the directive — the
+    // session would otherwise receive novel short-a words alongside
+    // its short-o pool, which is nonsense for the new tier.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortOPlan(SHORT_O_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+      isGraduationSession: true,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
+  })
+
+  it('cvc-words-short-o is in VALID_WORD_SONG_FOCUS_NODES (drift tripwire)', () => {
+    // Direct contract pin: the planner's accept-set must include the
+    // new sibling node. Without this, the handler would 4xx every
+    // short-o request before reaching the planner.
+    expect(VALID_WORD_SONG_FOCUS_NODES.includes('cvc-words-short-o')).toBe(true)
   })
 })
 

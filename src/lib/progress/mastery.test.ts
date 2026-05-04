@@ -664,6 +664,12 @@ describe('applyMasteryRule — autoPromote=true sets pendingPromotion (ticket 86
     // celebration cue must surface alongside the skillLevels mutation
     // just like the non-gated path. Verifies my change interacts
     // cleanly with the graduation gate.
+    //
+    // Ticket 86c9m3ae3 inserted `cvc-words-short-o` between `cvc-words`
+    // and `digraphs` in LITERACY_TREE — so the downstream node that
+    // unlocks on cvc-words promotion is now `cvc-words-short-o` (not
+    // `digraphs` directly). `digraphs` only unlocks once short-o
+    // graduates; that's a separate session.
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
@@ -674,7 +680,8 @@ describe('applyMasteryRule — autoPromote=true sets pendingPromotion (ticket 86
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['cvc-words']).toBe('mastered')
-    expect(result.skillLevels['digraphs']).toBe('intro')
+    expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
+    expect(result.skillLevels['digraphs']).toBe('locked')
     expect(result.pendingPromotion).toBe('cvc-words')
   })
 
@@ -1043,6 +1050,10 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     // cvc-words to next node". Asserted here on skillLevels; the
     // pickFocusNode walk is tested in focusNode.test.ts and is a
     // pure read of the resulting skillLevels.
+    //
+    // Ticket 86c9m3ae3 inserted `cvc-words-short-o` between `cvc-words`
+    // and `digraphs` — the downstream that unlocks on cvc-words
+    // promotion is now `cvc-words-short-o`.
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
@@ -1053,8 +1064,10 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['cvc-words']).toBe('mastered')
-    // Downstream `digraphs` was 'locked' — should now be 'intro'.
-    expect(result.skillLevels['digraphs']).toBe('intro')
+    // Downstream `cvc-words-short-o` was 'locked' — should now be
+    // 'intro'. `digraphs` stays 'locked' until short-o promotes.
+    expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
+    expect(result.skillLevels['digraphs']).toBe('locked')
   })
 
   it('does NOT promote when the graduation session lands novel-pool below 0.80', () => {

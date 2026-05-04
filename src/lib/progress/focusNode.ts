@@ -58,12 +58,17 @@ export const MATH_NODES_IN_ORDER: readonly NumberGardenNode[] = [
 /**
  * The word-song track in declaration order. Same contract as
  * MATH_NODES_IN_ORDER.
+ *
+ * cvc-words = short-a CVC. Subsequent vowels get sibling nodes
+ * (cvc-words-short-o, cvc-words-short-u, …). This was a deliberate
+ * backward-compat choice — see design/word-song/short-o-pool-expansion.md §2.
  */
 export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'letter-names',
   'letter-sounds',
   'blending-cv',
   'cvc-words',
+  'cvc-words-short-o',
   'digraphs',
   'sight-words',
   'simple-sentences',
