@@ -1,7 +1,7 @@
 # Word Song — short-o pool expansion (v2 vowel tier)
 
 **Ticket:** TBD (Matt is filing the spec ticket and the implementation ticket in parallel — this doc is the design surface; impl is downstream).
-**Status:** Draft for Thomas review.
+**Status:** Locked — decisions captured 2026-05-04 (Thomas).
 **Author:** Marian Tutor design persona.
 **Predecessors:** PR #132 (parser widening), PR #135 (cvc-words first-class shipped), PR #139 (developmental review merged 2026-05-02).
 **Companion specs:** `design/word-song/parser-widening-plan.md`, `design/word-song/README.md`.
@@ -39,7 +39,7 @@ Dave proposed `dog, mop, top, log, hop, pot, box, fox`. Audit against the v1 wor
 | box  | C-V-C ✓ (technically — `b-o-x` where `x` is `/ks/`, a single-letter-two-phoneme code, but the spelling pattern is CVC) | ✓ | ✓        | High-frequency | Distinct (rectangular) | **KEEP — with note** (see decoding-load note below) |
 | fox  | C-V-C ✓ (same `x = /ks/` note as `box`) | ✓ | ✓ (already shipped as distractor `pic-fox.svg`) | Familiar from picture books, but not a Tagalog-frequent animal. Picture carries it. | Distinct (pointed ears, bushy tail) | **KEEP — with note** |
 
-**Notes on the `box` / `fox` exception.** The `x` in `box` and `fox` decodes as `/ks/` — a two-phoneme grapheme. Strictly, these are not pure C-V-C from a phoneme standpoint; they are C-V-CC. They are universally listed as short-o CVC words in practitioner phonics curricula (UFLI, OG-based programs) because the *spelling pattern* is three letters and short-o word lists without `box`/`fox` are short. Decoding-load is fractionally higher. **Recommendation:** keep both, and have Emma's first-introduction line for each name the trick explicitly: *"Box. The x sounds like /ks/."* This is the same kind of one-time scaffolding short-a got with `jam` (silent expectation that `j` says `/dʒ/`) — fine for Marian. **Open question for Thomas:** see §9 Q1.
+**Notes on the `box` / `fox` exception.** The `x` in `box` and `fox` decodes as `/ks/` — a two-phoneme grapheme. Strictly, these are not pure C-V-C from a phoneme standpoint; they are C-V-CC. They are universally listed as short-o CVC words in practitioner phonics curricula (UFLI, OG-based programs) because the *spelling pattern* is three letters and short-o word lists without `box`/`fox` are short. Decoding-load is fractionally higher. **Decision (locked 2026-05-04):** keep both, and have Emma's first-introduction line for each name the trick explicitly: *"Box. The x sounds like /ks/."* This is the same kind of one-time scaffolding short-a got with `jam` (silent expectation that `j` says `/dʒ/`) — fine for Marian. Alternatives (`cob, jog`) were weaker — `cob` carries L2 vocab risk, `jog` is a verb.
 
 ### Substitutions for `top` and `hop`
 
@@ -65,13 +65,11 @@ Replacement candidates from the phonics doc's tentative short-o pool (`design/wo
    - Gender-balances the existing `dad` target in the short-a pack — pedagogically clean parallelism.
    - Picturable as parent-with-child composition (mirroring the `dad` distinguisher rule from `wordPack.ts FORBIDDEN_PAIRS`). The composition rule generalises: `mom`/`dad` are both two-figure parent-with-child compositions, and the discriminator becomes hair length / outfit / pose. **NEW FORBIDDEN_PAIR proposed: `mom ↔ dad`** — same single-discriminator rule we apply elsewhere. Documented in §Picture-pack requirements below.
 
-2. **`box`** is already KEEP — it covers what `hop` was meant to cover (everyday concrete object). For the `hop` slot, choose **`dot`** as the lightest-vocab replacement. Rationale:
+2. **`hot`** replaces `hop`. Rationale:
    - True CVC, no `x` exception.
-   - Concrete and picturable — a single coloured circle on the chip background. The picture chip is unambiguous.
-   - Marian doesn't need to know the English word *dot* in advance; the picture (a single circle) is its own definition. This is exactly the L2-vocabulary path Colorín Colorado recommends (phonics doc §Q2 source 6).
-   - Low silhouette-collision risk with the rest of the pack — no other circular-only chip exists.
-
-**Alternative:** if Thomas vetoes `dot` as too abstract, fall back to **`hot`** — a true CVC, picturable as an obvious hot-food steam-rising icon (a steaming bowl, or a chili pepper). Trade-off: `hot` is an adjective, but unlike `hop` (a verb) the picture-chip can stably depict a *hot thing* (steaming bowl) and the word reads as the property of the depicted object. This is the same logical move that lets `bag`, `tag`, `jam` work as nouns even when their semantic form is closer to mass/abstract (jam-the-substance is fine because jam-in-a-jar is depictable). **Open question for Thomas:** see §9 Q2.
+   - Higher L2 vocabulary value than `dot` — `hot` is a high-frequency English property word Marian will hear daily (food, weather, drinks); `dot` is a low-frequency abstract.
+   - Picture-grounds as an obvious hot-food steam-rising icon (a steaming bowl). `hot` is an adjective, but unlike `hop` (a verb) the picture-chip can stably depict a *hot thing* (steaming bowl) and the word reads as the property of the depicted object. This is the same logical move that lets `bag`, `tag`, `jam` work as nouns even when their semantic form is closer to mass/abstract (jam-the-substance is fine because jam-in-a-jar is depictable).
+   - Distinct silhouette from the rest of the pack — and specifically from `pot` (the closest collision risk) via open-bowl + steam-curls vs. pot's lid + handles. May need a `hot ↔ pot` discriminator entry in `FORBIDDEN_PAIRS` pending visual review (see §3).
 
 ### Final v1 short-o pool (8 words)
 
@@ -84,14 +82,15 @@ Replacement candidates from the phonics doc's tentative short-o pool (`design/wo
 | 5 | box  | box         | o     | object   | New picture; first-time `x = /ks/` introduction |
 | 6 | fox  | fox         | o     | animal   | Re-purposed from distractor; placeholder SVG today |
 | 7 | mom  | mom         | o     | person   | New picture; parent-with-child composition (gender-balances `dad`) |
-| 8 | dot  | dot         | o     | object   | New picture; default — `hot` is the fallback if Thomas vetoes |
+| 8 | hot  | hot         | o     | property | New picture; steaming bowl with rising steam-curls; needs `hot ↔ pot` collision audit (see §3) |
 
 **Pool composition cross-check:**
 
-- All 8 are concrete-noun (or noun-like, in the case of `dot` / fallback `hot`) — no verbs.
+- All 8 are concrete-noun (or noun-like, in the case of `hot` — adjective whose picture-chip stably depicts a *hot thing*, the steaming bowl) — no verbs.
 - All 8 are CVC by spelling; `box` and `fox` carry the `x = /ks/` decoding note (Emma scaffolds on first encounter — see §4).
-- 4 of the 8 are already in the v1 distractor pool (`dog, log, pot, fox`) — picture assets exist as placeholders today, will be upgraded to real Midjourney pictures alongside the new 4 (`mop, box, mom, dot`).
-- 2 animals (`dog, fox`), 2 objects (`log, dot`), 1 household (`mop`), 1 kitchen (`pot`), 1 person (`mom`), 1 multi-purpose object (`box`). Category spread mirrors the short-a pack's variety.
+- 4 of the 8 are already in the v1 distractor pool (`dog, log, pot, fox`) — picture assets exist as placeholders today, will be upgraded to real Midjourney pictures alongside the new 4 (`mop, box, mom, hot`).
+- `hot` is the only wholly-new word with no prior pool footprint (the other three new entries — `mop, box, mom` — are wholly new pictures but the words slot into the same noun-shape the existing pack already uses).
+- 2 animals (`dog, fox`), 1 object (`log`), 1 household (`mop`), 1 kitchen (`pot`), 1 person (`mom`), 1 multi-purpose object (`box`), 1 property word (`hot`). Category spread mirrors the short-a pack's variety.
 
 ---
 
@@ -122,7 +121,7 @@ Rationale:
 // backward-compat choice — see design/word-song/short-o-pool-expansion.md §2.
 ```
 
-The renaming option (B) is *not foreclosed*. If Marian's progress doc gets cleared (e.g. she switches to a new iPad) before short-o ships, the rename becomes free and is the cleaner option. The migration tradeoff is the only thing keeping us off it. **Open question for Thomas:** see §9 Q3.
+The renaming option (B) is *not foreclosed*. If Marian's progress doc gets cleared (e.g. she switches to a new iPad) before short-o ships, the rename becomes free and is the cleaner option. The migration tradeoff is the only thing keeping us off it.
 
 ---
 
@@ -149,9 +148,9 @@ Match the short-a pack's locked decision: **SVG vector** (per `project_pic_dog_s
 | 5 | box  | NEW | `public/assets/pictures/picture-box.svg` | Cardboard box with closed flaps, three-quarter view |
 | 6 | fox  | NEW (silhouette placeholder today) | `public/assets/pictures/picture-fox.svg` | Pointed ears, bushy tail, side profile |
 | 7 | mom  | NEW | `public/assets/pictures/picture-mom.svg` | Parent-with-child composition. **NEW FORBIDDEN_PAIR with `dad`** — both two-figure compositions; distinguisher is hair-length + outfit silhouette (mom = longer hair, skirt-or-dress silhouette; dad = shorter hair, pants silhouette). Both deliberately stylised, ethnicity-neutral, per the §Anti-dark-pattern audit rules in the picture-pack README. |
-| 8 | dot  | NEW | `public/assets/pictures/picture-dot.svg` | Single solid-coloured circle, large, on the standard cream background. Borderline-abstract but pictorially unambiguous. (If Thomas picks `hot` fallback per §9 Q2: `picture-hot.svg` — steaming bowl with three rising steam-curls.) |
+| 8 | hot  | NEW | `public/assets/pictures/picture-hot.svg` | Steaming bowl with three rising steam-curls; collision audit vs. picture-pot — pot has lid + handles, hot is open bowl + steam. **Possible NEW FORBIDDEN_PAIR `hot ↔ pot`** depending on visual review (both are kitchen vessels in side-profile). |
 
-**Total new SVG assets needed: 7** (`mop, box, mom, dot` are wholly new; `log, pot, fox` upgrade silhouette placeholders to real SVGs; `dog` is a re-trace for stylistic consistency, debatable whether it's "new" — Phase 3 reviews this). If Thomas picks `hot` over `dot`: same total of 7.
+**Total new SVG assets needed: 7** (`mop, box, mom, hot` are wholly new; `log, pot, fox` upgrade silhouette placeholders to real SVGs; `dog` is a re-trace for stylistic consistency, debatable whether it's "new" — Phase 3 reviews this).
 
 ### Pipeline for the 7 short-o pictures
 
@@ -161,7 +160,7 @@ Same 3-phase pipeline as the short-a pack (`design/word-song/README.md` Phase mo
 | ----- | ----- | ------ | ------------------- |
 | 1. Prompt sheet | Kyle | `design/word-song/picture-pack-prompts-short-o.md` (per the future-work skeleton in the README) | Short-a pack's `picture-pack-style-anchor.md` — the style frame is shared, so short-o inherits without re-derivation. |
 | 2. Midjourney generation | Thomas | 7 source PNGs (≥1024×1024) | Phase 1 merged. **Cost note:** Thomas's Midjourney subscription is the source per `design/word-song/README.md` §"Source decision". 7 pictures at ~4 grids × 4 variations + iteration overhead. Empirically (per the short-a pack iteration plan), budget ~30–60 min of generation time. No incremental subscription cost beyond what the short-a pack consumes. |
-| 3. SVG trace + integration | Kyle (trace direction) + Devon (integration) | 7 `picture-{word}.svg` files at `public/assets/pictures/` + `wordPictures.tsx` updates (new keys + renderer wiring) | Phase 2 merged. **No new wordPack.ts entries needed** for `dog/log/pot/fox` (already in `DISTRACTOR_ONLY_WORDS` — they switch to `isTarget: true` in a separate code change tracked under the impl ticket); 4 wholly new entries needed for `mop, box, mom, dot`. |
+| 3. SVG trace + integration | Kyle (trace direction) + Devon (integration) | 7 `picture-{word}.svg` files at `public/assets/pictures/` + `wordPictures.tsx` updates (new keys + renderer wiring) | Phase 2 merged. **No new wordPack.ts entries needed** for `dog/log/pot/fox` (already in `DISTRACTOR_ONLY_WORDS` — they switch to `isTarget: true` in a separate code change tracked under the impl ticket); 4 wholly new entries needed for `mop, box, mom, hot`. |
 
 **Internal SVG drafts as v1 stopgap?** Not recommended. The short-a pack is already gated on Thomas's Midjourney pipeline (`design/word-song/README.md` Phase model) and the merge cadence is fast — phase 1 spec → phase 2 generation → phase 3 trace is on the order of days, not weeks. Shipping internal SVG drafts for short-o would create exactly the "21 fresh + 1 vintage" style mismatch the README explicitly avoids. **Recommendation:** short-o ships its picture pack through the same Midjourney pipeline; the impl ticket for the planner widening is gated on phase 3 of the short-o pack.
 
@@ -201,7 +200,7 @@ Picker walks past `cvc-words` (now `mastered`) and lands on `cvc-words-short-o` 
 
 The picker's job (`pickFocusNode`) does not change for short-o vs. short-a — it walks `WORD_SONG_NODES_IN_ORDER` and stops at the first non-`mastered` node. Adding `cvc-words-short-o` between `cvc-words` and `digraphs` automatically routes Marian to short-o once short-a is mastered. **No bespoke graduation logic in the picker** — the mastery rule does the work, the picker just reads `skillLevels`.
 
-The planner gets the only new logic: when `focusNode === 'cvc-words-short-o'`, emit `"Read the <word>."` problems drawn from the short-o word list (`api/_plannerWordList.ts` adds `WORD_SONG_TARGET_WORDS_SHORT_O = 'dog, mop, log, pot, box, fox, mom, dot'`).
+The planner gets the only new logic: when `focusNode === 'cvc-words-short-o'`, emit `"Read the <word>."` problems drawn from the short-o word list (`api/_plannerWordList.ts` adds `WORD_SONG_TARGET_WORDS_SHORT_O = 'dog, mop, log, pot, box, fox, mom, hot'`).
 
 ### Why "first short-o session" is not gated on probe
 
@@ -296,7 +295,7 @@ Rationale for rejection:
 - The highlight risks reading as a *correction prompt* rather than a *learning aid* — and "never a red X" energy carries over: any visual emphasis on a single grapheme can read as "this letter is wrong" to an 8-year-old.
 - Emma's verbal scaffolding (*"This one says /ɒ/, like 'dog'."*) is the right channel for vowel-attention work. It's audio-first, in-character, and does the job without re-coding the visual surface.
 
-If Thomas wants the highlight, it should be applied symmetrically across all vowels (highlight `a` in short-a, `o` in short-o, etc.) — that's a separate "vowel-emphasis" feature, not a short-o-only thing. **Open question for Thomas:** see §9 Q4.
+If Thomas wants the highlight, it should be applied symmetrically across all vowels (highlight `a` in short-a, `o` in short-o, etc.) — that's a separate "vowel-emphasis" feature, not a short-o-only thing.
 
 ### Other visual candidates considered
 
@@ -335,10 +334,10 @@ Kevin and Thomas use these. Jessica validates against them.
 - [ ] **AC1.** `WordSongNode` union in `src/lib/progress/types.ts` includes `'cvc-words-short-o'`. `LITERACY_TREE` and `WORD_SONG_NODES_IN_ORDER` both have `'cvc-words-short-o'` between `'cvc-words'` and `'digraphs'`.
 - [ ] **AC2.** `api/_planner.ts WORD_SONG_TRACK_GUIDE` adds a `cvc-words-short-o` branch emitting `"Read the <word>."` problems from the 8-word short-o pool. The 8 words match this spec §1 final pool exactly. `VALID_WORD_SONG_FOCUS_NODES` and `WORD_SONG_FIRST_CLASS_FOCUS_NODES` both gain the new node.
 - [ ] **AC3.** `api/_plannerWordList.ts` exports a new `WORD_SONG_TARGET_WORDS_SHORT_O` constant matching the 8 words from §1. The smoke test in `claude.test.ts` is extended to assert short-o words round-trip.
-- [ ] **AC4.** `src/screens/WordSong/wordPack.ts` adds 8 short-o entries: 4 new (`mop, box, mom, dot` — or `hot` per §9 Q2 outcome) plus 4 promoted-from-distractor (`dog, log, pot, fox` flip `isTarget: true`). The 4 promoted entries also retain their old role (still pickable as distractors when the focus is short-a) — `isTarget: true` and distractor-pool membership are independent flags.
+- [ ] **AC4.** `src/screens/WordSong/wordPack.ts` adds 8 short-o entries: 4 new (`mop, box, mom, hot`) plus 4 promoted-from-distractor (`dog, log, pot, fox` flip `isTarget: true`). The 4 promoted entries also retain their old role (still pickable as distractors when the focus is short-a) — `isTarget: true` and distractor-pool membership are independent flags.
 - [ ] **AC5.** `wordPack.ts FORBIDDEN_PAIRS` adds `['mom', 'dad']` (composition collision per §3).
 - [ ] **AC6.** `wordPack.ts TARGET_PAIRINGS` adds 8 entries for the short-o targets, drawing distractors from the short-o pool only (same-vowel constraint per §8).
-- [ ] **AC7.** 7 new SVG picture assets at `public/assets/pictures/picture-{mop,log,pot,fox,box,mom,dot}.svg`, plus a re-traced `picture-dog.svg` per §3. (`hot` substituted for `dot` if Thomas picks the fallback per §9 Q2.) `wordPictures.tsx` resolves all 8 short-o keys without hitting the inline-SVG fallback.
+- [ ] **AC7.** 7 new SVG picture assets at `public/assets/pictures/picture-{mop,log,pot,fox,box,mom,hot}.svg`, plus a re-traced `picture-dog.svg` per §3. `wordPictures.tsx` resolves all 8 short-o keys without hitting the inline-SVG fallback.
 - [ ] **AC8.** `scripts/generateSessionCanon.ts WORD_SONG_FOCUS_NODES` includes `'cvc-words-short-o'`. `generateSessionCanon.test.ts` regression stays green.
 - [ ] **AC9.** Canon JSON ships at `public/canon/word-song/level-1/cvc-words-short-o.json` after a fresh bake. The PWA cold-start session-fetch for short-o is under 500ms (matches the existing cvc-words canon-hit benchmark).
 - [ ] **AC10.** `src/lib/progress/mastery.ts applyMasteryRule` promotes `cvc-words-short-o` from `practicing` to `mastered` under the same 90/3 rule used for `cvc-words` (no special-casing). The downstream `digraphs` node moves from `locked` to `intro` on promotion.
@@ -348,13 +347,16 @@ Kevin and Thomas use these. Jessica validates against them.
 
 ---
 
-## 10. Open questions for Thomas
+## 10. Resolved decisions (locked 2026-05-04)
 
-**Q1. `box` and `fox` decoding-load.** These two words break the strict C-V-C phoneme pattern (`x = /ks/`). They are universally listed in practitioner short-o pools and Emma scaffolds them on first encounter (*"Box. The x sounds like /ks/."*). **Question:** approve the inclusion of `box`/`fox` with the scaffolded introduction, or replace with a stricter short-o pair (e.g., `cob, jog`) at the cost of weaker picturability and lower-frequency vocabulary?
+**Q1. `box`/`fox` decoding load.** Keep these two `x = /ks/` words in the pool, or replace with a stricter pair (e.g., `cob, jog`)?
+**DECIDED: KEEP** — Emma scaffolds on first encounter (*"Box. The x sounds like /ks/."*). Alternatives (`cob, jog`) were weaker — `cob` has L2 vocab risk, `jog` is a verb.
 
-**Q2. `dot` vs. `hot` for the 8th slot.** `dot` is borderline-abstract but pictorially trivial (a single circle). `hot` is an adjective but picture-grounds as "steaming bowl." **Question:** which goes in the v1 pool? Default (this spec): `dot`.
+**Q2. `dot` vs. `hot` for the 8th slot.** Which word fills the slot vacated by `hop`?
+**DECIDED: HOT** — higher L2 vocabulary value than `dot`; picture-grounds as steaming bowl; distinct silhouette from `pot` via open-bowl + steam-curls (FORBIDDEN_PAIRS may need a discriminator if visual review confirms collision risk).
 
-**Q3. Focus-node naming — sibling vs. rename.** This spec recommends Option A (sibling node `cvc-words-short-o`, leaving `cvc-words` as the implicit short-a node). The alternative (rename `cvc-words` → `cvc-words-short-a`) is cleaner long-term but requires a one-shot localStorage migration shim. **Question:** approve sibling naming, or accept the migration cost for symmetry? Migration ships as a small PR before the short-o impl PR if you pick rename.
+**Q3. Focus-node naming — sibling vs. rename.** Add `cvc-words-short-o` as a sibling of `cvc-words`, or rename `cvc-words` → `cvc-words-short-a` and migrate localStorage?
+**DECIDED: SIBLING (Option A)** — `cvc-words-short-o` lands as a sibling of `cvc-words`. No localStorage migration. The asymmetric naming (implicit short-a) is a documented smell, not a behavior smell. Rename remains an option later if Marian's progress doc gets cleared.
 
 ---
 
