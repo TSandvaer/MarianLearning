@@ -444,6 +444,38 @@ export default function Hub({
 
   // ── Node-tap handler ---------------------------------------------------
 
+  /**
+   * Synchronous chip `pointerdown` handler — runs BEFORE the event
+   * bubbles up to `<m.main>`'s `handleFirstTap`. Marks the welcome-back
+   * greeting as already-dispatched so the gesture-unlock effect's
+   * post-commit microtask sees the ref set and short-circuits inside
+   * `dispatchGreeting()`.
+   *
+   * Why a separate handler from `handleNodeTap`: `onClick` fires on
+   * `pointerup` AFTER the parent's `pointerdown` has already flipped
+   * `gestureUnlocked` and re-rendered. The effect runs between
+   * pointerdown and pointerup; by the time `handleNodeTap` sets the
+   * ref, the greeting has already been dispatched. We need the suppression
+   * to be a child-bubbles-first `pointerdown` (DOM event-bubble order is
+   * child → parent, so this fires before `handleFirstTap` on the parent).
+   *
+   * Idempotent: if `greetingDispatchedRef.current` is already `true`
+   * (greeting already played, or rapid-remount suppression already
+   * marked it), this is a no-op.
+   *
+   * Does NOT regress PR #144's cancel-on-tap behavior: when the greeting
+   * is already mid-flight (gate unlocked at chip-tap time), this ref
+   * write is a no-op (ref was set inside the original dispatch); the
+   * `cancelLine()` call inside `handleNodeTap` is what stops the
+   * audible Howl.
+   *
+   * Ticket 86c9m4u13 (2026-05-03 evening). Thomas's iPad: chip tap as
+   * first gesture → "Try Word Song" played over the destination screen.
+   */
+  const handleNodePress = useCallback(() => {
+    greetingDispatchedRef.current = true
+  }, [])
+
   const handleNodeTap = useCallback(
     (tree: SkillTreeId) => {
       // PR #137 round 3 (ticket 86c9kxtmu) — gesture-deferred recovery
@@ -468,6 +500,16 @@ export default function Hub({
       // route-flip (ticket 86c9m4afh, Thomas's iPad ear-test 2026-05-03).
       cancelledRef.current = true
       cancelLine()
+
+      // Gesture-unlock race fix (ticket 86c9m4u13, 2026-05-03 evening).
+      // The synchronous `greetingDispatchedRef.current = true` flip lives
+      // in `handleNodePress` (chip `onPointerDown`) so it runs BEFORE the
+      // event bubbles up to `<m.main>`'s `handleFirstTap`. By the time
+      // React commits the gate-unlock state and runs the effect, the ref
+      // is already true and `dispatchGreeting()` short-circuits — Marian
+      // is already on her way to her chosen tree, no greeting needed.
+      // See `handleNodePress` below for the rationale + ordering proof.
+
       // Unlock audio gate if this is the first gesture on app-open path.
       if (!gestureUnlocked) setGestureUnlocked(true)
 
@@ -674,6 +716,7 @@ export default function Hub({
           currentIndex={progress.numberGardenIndex}
           suggested={suggestion === 'number-garden'}
           onTap={() => handleNodeTap('number-garden')}
+          onPress={handleNodePress}
         />
         <SkillTreeNode
           tree="word-song"
@@ -683,6 +726,7 @@ export default function Hub({
           currentIndex={progress.wordSongIndex}
           suggested={suggestion === 'word-song'}
           onTap={() => handleNodeTap('word-song')}
+          onPress={handleNodePress}
         />
       </div>
 
@@ -757,6 +801,15 @@ interface SkillTreeNodeProps {
   currentIndex: number
   suggested: boolean
   onTap: () => void
+  /**
+   * Fires synchronously on `pointerdown` BEFORE the event bubbles up to
+   * `<m.main>`'s `handleFirstTap`. Hub uses this to mark the greeting
+   * as "dispatched" when the chip tap is the first user gesture, so the
+   * gesture-unlock effect's microtask sees the ref already set and the
+   * `dispatchGreeting()` body short-circuits. See the chip-tap comment
+   * block in `handleNodeTap` for the full rationale (ticket 86c9m4u13).
+   */
+  onPress?: () => void
 }
 
 function SkillTreeNode({
@@ -767,6 +820,7 @@ function SkillTreeNode({
   currentIndex,
   suggested,
   onTap,
+  onPress,
 }: SkillTreeNodeProps): ReactElement {
   const window5 = useMemo(
     () => slidingWindow(stages, currentIndex, 5),
@@ -779,6 +833,7 @@ function SkillTreeNode({
       data-testid="hub-tree-node"
       data-tree={tree}
       data-suggested={suggested ? 'true' : 'false'}
+      onPointerDown={onPress}
       onClick={onTap}
       aria-label={label}
       className={[
