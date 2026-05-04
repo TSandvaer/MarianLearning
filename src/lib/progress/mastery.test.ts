@@ -179,7 +179,11 @@ describe('applyMasteryRule — defaults (95/3, cross-day, autoPromote)', () => {
     expect(result.skillLevels['add-to-10']).toBe('mastered')
     // Downstream node was locked; should now be intro.
     expect(result.skillLevels['add-to-20']).toBe('intro')
-    expect(result.pendingPromotion).toBeUndefined()
+    // Ticket 86c9m3brc — pendingPromotion is set under autoPromote=true
+    // so the Hub celebration fires for default users. The flag is
+    // cleared by the stale-clear branch on the next applyMasteryRule
+    // call (covered by the transient-clear lifecycle test below).
+    expect(result.pendingPromotion).toBe('add-to-10')
   })
 
   it('does not promote with only 2 cross-day high-score entries', () => {
@@ -247,7 +251,14 @@ describe('applyMasteryRule — defaults (95/3, cross-day, autoPromote)', () => {
     expect(result.skillLevels['add-to-20']).toBe('practicing')
   })
 
-  it('is idempotent — running twice equals running once', () => {
+  it('is idempotent on skillLevels — running twice yields the same skill-level shape', () => {
+    // Idempotence is asserted on `skillLevels` only. The
+    // `pendingPromotion` field is intentionally transient under
+    // autoPromote=true (ticket 86c9m3brc): set on the first call to
+    // drive the Hub celebration, cleared by the stale-clear branch on
+    // the second call (since the queued node is now 'mastered', no
+    // longer 'practicing'). See the dedicated test below for the
+    // transient-clear lifecycle.
     const progress = buildProgress({
       skillLevels: levels({ 'add-to-10': 'practicing' }),
       history: [
@@ -258,7 +269,7 @@ describe('applyMasteryRule — defaults (95/3, cross-day, autoPromote)', () => {
     })
     const once = applyMasteryRule(progress)
     const twice = applyMasteryRule(once)
-    expect(twice).toEqual(once)
+    expect(twice.skillLevels).toEqual(once.skillLevels)
   })
 
   it('walks both tracks per call', () => {
@@ -527,6 +538,179 @@ describe('applyMasteryRule — autoPromote=false', () => {
     // mult-2-5-10 is index 7. add-to-10 wins.
     expect(result.pendingPromotion).toBe('add-to-10')
     expect(result.skillLevels).toEqual(progress.skillLevels)
+  })
+})
+
+// --------------------------------------------------------------------------
+// autoPromote=true — sets transient pendingPromotion alongside skillLevels
+// (ticket 86c9m3brc — drives Hub celebration for default users)
+// --------------------------------------------------------------------------
+//
+// Background: PR #140 wired the Hub celebration to read
+// `progress.pendingPromotion`. But the M3 mastery engine only wrote that
+// field in the autoPromote=false branch (parent-confirms flow). Since
+// autoPromote defaults to true per the M2.5 ParentSettings contract,
+// virtually no one saw the celebration — the default-user path mutated
+// `skillLevels` silently and never set the celebration cue.
+//
+// Fix: under autoPromote=true, ALSO set `pendingPromotion` to the
+// earliest tree-order node that promoted this call, in addition to the
+// `skillLevels` mutation. The flag is transient — the next
+// `applyMasteryRule` run sees the queued node is no longer 'practicing'
+// (it's now 'mastered') and the stale-clear branch deletes it. So the
+// field exists ONLY to drive the next Hub mount's celebration; once the
+// next session-end runs the rule again, the field clears.
+
+describe('applyMasteryRule — autoPromote=true sets pendingPromotion (ticket 86c9m3brc)', () => {
+  it('sets pendingPromotion alongside skillLevels mutation under default settings', () => {
+    // The core AC — under default settings (autoPromote=true), a
+    // qualifying promotion must produce BOTH:
+    //   - skillLevels[node] = 'mastered' (today's behaviour)
+    //   - pendingPromotion = node       (the new write)
+    // …in a single applyMasteryRule call. Without this, default users
+    // (everyone) never see the Hub celebration that PR #140 shipped.
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 1.0),
+      ],
+      // No parentSettings override — defaultProgress() ships
+      // autoPromote=true and the math 95/3 threshold.
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['add-to-10']).toBe('mastered')
+    expect(result.skillLevels['add-to-20']).toBe('intro')
+    expect(result.pendingPromotion).toBe('add-to-10')
+  })
+
+  it('clears the transient pendingPromotion on the next applyMasteryRule call', () => {
+    // The transient-clear lifecycle: session-end 1 sets the flag,
+    // session-end 2 clears it via the stale-clear branch (queued node
+    // is now 'mastered', so the existing line 226-230 delete fires).
+    // This is what makes the field "exists ONLY to drive the next Hub
+    // mount, then clears" per the AC — no parent-confirm involvement.
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 1.0),
+      ],
+    })
+    const sessionEnd1 = applyMasteryRule(progress)
+    expect(sessionEnd1.pendingPromotion).toBe('add-to-10')
+
+    // Simulate the next session-end with no fresh qualifying history
+    // for any other node — the rule re-runs against the now-promoted
+    // state and clears the transient flag.
+    const sessionEnd2 = applyMasteryRule(sessionEnd1)
+    expect(sessionEnd2.pendingPromotion).toBeUndefined()
+    // skillLevels stay where they were — no double-promotion.
+    expect(sessionEnd2.skillLevels['add-to-10']).toBe('mastered')
+    expect(sessionEnd2.skillLevels['add-to-20']).toBe('intro')
+  })
+
+  it('queues the earliest tree-order node when multiple qualify in a single call', () => {
+    // When two nodes both qualify in one session (rare but possible —
+    // e.g. a long history catches up multiple branches), pendingPromotion
+    // surfaces only the earliest in tree order. Both nodes still mutate
+    // on `skillLevels`; only the celebration cue is single-valued.
+    // Mirrors the autoPromote=false ordering convention (math first,
+    // then literacy; within a track, root-to-leaf order).
+    const progress = buildProgress({
+      skillLevels: levels({
+        'add-to-10': 'practicing',
+        'blending-cv': 'practicing',
+      }),
+      history: [
+        entry('2026-04-29T08:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-04-30T08:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-05-01T08:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    // Both promote on skillLevels.
+    expect(result.skillLevels['add-to-10']).toBe('mastered')
+    expect(result.skillLevels['blending-cv']).toBe('mastered')
+    // Earliest tree-order is math 'add-to-10'.
+    expect(result.pendingPromotion).toBe('add-to-10')
+  })
+
+  it('does not set pendingPromotion when no candidate qualifies', () => {
+    // Mid-progression no-cross — the engine runs at every session-end
+    // even when no threshold is met. We must not leak a stale flag in
+    // that case.
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'practicing' }),
+      history: [
+        // Two qualifying entries; threshold is 3. No promotion.
+        entry('2026-04-30T10:00:00.000Z', 'add-to-10', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['add-to-10']).toBe('practicing')
+    expect(result.pendingPromotion).toBeUndefined()
+  })
+
+  it('promotes cvc-words via graduation gate AND sets pendingPromotion under autoPromote=true', () => {
+    // Graduation-gated path (PR #145): canonical 90/3 + novel ≥ 0.80
+    // both clear → promotion fires under default autoPromote=true. The
+    // celebration cue must surface alongside the skillLevels mutation
+    // just like the non-gated path. Verifies my change interacts
+    // cleanly with the graduation gate.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.skillLevels['digraphs']).toBe('intro')
+    expect(result.pendingPromotion).toBe('cvc-words')
+  })
+
+  it('does not re-fire pendingPromotion on subsequent session ends after a graduation promotion', () => {
+    // The brief flagged this edge case explicitly: "After a successful
+    // graduation under autoPromote=true: cvc-words → mastered,
+    // digraphs → intro, AND pendingPromotion = 'cvc-words'. The
+    // graduation gate's 'any novelPoolSuccessRate in tail blocks
+    // re-graduation' rule already ensures cvc-words doesn't re-trigger;
+    // but verify that the pendingPromotion setter doesn't accidentally
+    // re-fire on subsequent sessions where the engine re-runs."
+    //
+    // Walk: graduation session → applyMasteryRule (sets flag) →
+    // simulated next session-end at non-promotion threshold → second
+    // applyMasteryRule (clears flag) → no re-fire on a third pass.
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+    })
+    const sessionEnd1 = applyMasteryRule(progress)
+    expect(sessionEnd1.pendingPromotion).toBe('cvc-words')
+    expect(sessionEnd1.skillLevels['cvc-words']).toBe('mastered')
+
+    // Second session-end (no fresh history relevant): clear.
+    const sessionEnd2 = applyMasteryRule(sessionEnd1)
+    expect(sessionEnd2.pendingPromotion).toBeUndefined()
+    expect(sessionEnd2.skillLevels['cvc-words']).toBe('mastered')
+
+    // Third pass for paranoia — confirm no resurrection.
+    const sessionEnd3 = applyMasteryRule(sessionEnd2)
+    expect(sessionEnd3.pendingPromotion).toBeUndefined()
+    expect(sessionEnd3.skillLevels['cvc-words']).toBe('mastered')
   })
 })
 

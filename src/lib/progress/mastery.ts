@@ -168,7 +168,15 @@ export function nextNode(
  *   on a fresh `skillLevels` map. If `nextNode(track, node)` is
  *   currently `'locked'`, move it to `'intro'`. Already-`intro` /
  *   `practicing` / `mastered` downstream nodes are left alone (no
- *   demotion, no backwards reset).
+ *   demotion, no backwards reset). ADDITIONALLY (ticket 86c9m3brc) the
+ *   rule sets `progress.pendingPromotion = <earliest-candidate-node>`
+ *   so the Hub celebration fires on the next mount. The flag is
+ *   transient: the next `applyMasteryRule()` call sees the queued
+ *   node is no longer `'practicing'` (it's now `'mastered'`) and the
+ *   stale-clear branch at the top of the function deletes it. Without
+ *   this write, the celebration was effectively dead code for default
+ *   users — `autoPromote` defaults to `true` and the field was only
+ *   set in the `false` branch.
  * - `parentSettings.autoPromote === false`: queue
  *   `progress.pendingPromotion = node` and do NOT mutate `skillLevels`.
  *   When multiple nodes qualify in a single call, the earliest node in
@@ -187,10 +195,18 @@ export function nextNode(
  *
  * Idempotence
  * -----------
- * `applyMasteryRule(applyMasteryRule(p))` is structurally equivalent
- * to `applyMasteryRule(p)`. The second call sees the freshly-promoted
- * node as `'mastered'` and skips it; the downstream node is already at
- * `'intro'` (or higher) and is not re-touched.
+ * `applyMasteryRule(applyMasteryRule(p))` produces the same
+ * `skillLevels` shape on both calls. The second call sees the freshly-
+ * promoted node as `'mastered'` and skips it; the downstream node is
+ * already at `'intro'` (or higher) and is not re-touched.
+ *
+ * The `pendingPromotion` field is INTENTIONALLY transient under
+ * autoPromote=true (ticket 86c9m3brc): the first call sets it, the
+ * second call's stale-clear branch deletes it. This is the natural
+ * lifecycle — the field exists to drive a single Hub celebration; the
+ * "next applyMasteryRule run" (ie. the next session-end) is when the
+ * cleanup happens. Tests on idempotence assert on `skillLevels`
+ * shape, not on `pendingPromotion`.
  */
 export function applyMasteryRule(progress: Progress): Progress {
   const settings = getSettings(progress)
@@ -269,16 +285,35 @@ export function applyMasteryRule(progress: Progress): Progress {
   }
 
   if (settings.autoPromote) {
+    // Track which candidates actually promoted this call (re-check guard
+    // below could in theory skip one). The earliest in tree order is the
+    // node we surface to Hub via `pendingPromotion`.
+    const promotedThisCall: SkillNode[] = []
     for (const { track, node } of candidates) {
       // Re-check the current level — a previous candidate in this call
       // could have moved a downstream node from `locked` to `intro`,
       // but candidates are only at `practicing`, so this is paranoia.
       if (out.skillLevels[node] !== 'practicing') continue
       out.skillLevels[node] = 'mastered'
+      promotedThisCall.push(node)
       const downstream = nextNode(track, node)
       if (downstream !== null && out.skillLevels[downstream] === 'locked') {
         out.skillLevels[downstream] = 'intro'
       }
+    }
+    // Ticket 86c9m3brc — surface a celebration cue for the Hub. We set
+    // `pendingPromotion` to the earliest tree-order node that promoted
+    // this call (mirroring the autoPromote=false ordering). The flag is
+    // transient: the next applyMasteryRule call will see the node is
+    // `'mastered'` and the stale-clear branch above clears it, so neither
+    // mode leaves a persistent artifact once the celebration plays.
+    //
+    // We only WRITE the field when at least one promotion fired. The
+    // re-entry branch above may have already deleted a stale queue from
+    // an earlier call; preserving that delete by skipping the write here
+    // when no fresh candidate landed keeps the field clean.
+    if (promotedThisCall.length > 0) {
+      out.pendingPromotion = promotedThisCall[0]!
     }
     return out
   }
