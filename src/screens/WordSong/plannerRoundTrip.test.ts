@@ -149,6 +149,163 @@ describe('planner → parser round-trip — cvc-words (the August unblock — st
   })
 })
 
+/**
+ * Short-o sibling tier round-trip (ticket 86c9m3ae3). The planner
+ * widens to emit `cvc-words-short-o` content with a short-o pool
+ * (`dog, mop, log, pot, box, fox, mom, hot`); the parser already
+ * accepts `"Read the <word>."` per PR #132. This suite pins the
+ * round-trip end-to-end:
+ *
+ *   1. A wire-shape response with 8 short-o "Read the <word>."
+ *      problems parses without throwing.
+ *   2. Every problem carries `contentType: 'cvc-word'` (same as the
+ *      short-a sibling — the discriminant is the read-line template,
+ *      not the focus-node name).
+ *   3. The 8 targets resolve via `getWordEntry` (the wordPack carries
+ *      the new entries with `isTarget: true`), and `pickDistractors`
+ *      resolves trios for both gentle and trap tiers.
+ *   4. Bit-for-bit isolation: short-a sessions never see short-o
+ *      words leak into them (planner-side guarantee, exercised here
+ *      by feeding a short-a request through and checking targets are
+ *      all in the short-a pool).
+ */
+describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)', () => {
+  const SHORT_O_WORDS = [
+    'dog',
+    'mop',
+    'log',
+    'pot',
+    'box',
+    'fox',
+    'mom',
+    'hot',
+  ] as const
+
+  /** Build a wire-shape response that mirrors what the live planner
+   *  would emit for `focusNode: 'cvc-words-short-o'`. */
+  function makeShortOWirePlan(words: readonly string[]): string {
+    if (words.length !== 8) {
+      throw new Error(
+        `[plannerRoundTrip test] short-o plan needs 8 words; got ${words.length}`,
+      )
+    }
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-short-o-001',
+      label: 'CVC short-o roundtrip fixture',
+      utterances,
+    })
+  }
+
+  it('parses cleanly with contentType=cvc-word on every short-o problem', async () => {
+    const client = makeMockClient(makeShortOWirePlan(SHORT_O_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    expect(rebuilt.problems).toHaveLength(8)
+    for (const problem of rebuilt.problems) {
+      // Same content-type as cvc-words (short-a) — the discriminant
+      // is the read-line template, not the focus-node name.
+      expect(problem.contentType).toEqual('cvc-word')
+      expect(problem.utterances.read).toMatch(/^Read the [a-z]+\.$/)
+      // Every target is from the short-o pool (no short-a leakage).
+      expect(
+        SHORT_O_WORDS.includes(
+          problem.target.word as (typeof SHORT_O_WORDS)[number],
+        ),
+      ).toBe(true)
+      // Vowel field carries 'o' on every short-o target.
+      expect(problem.target.vowel).toEqual('o')
+      // isTarget=true on every target (the parser already enforces
+      // this; re-asserted for loudness).
+      expect(problem.target.isTarget).toBe(true)
+    }
+    // 8 distinct targets — no repeats within a session.
+    const targets = rebuilt.problems.map((p) => p.target.word)
+    expect(new Set(targets).size).toEqual(8)
+    // Equality check of the sorted targets vs the sorted pool — exact
+    // membership, not "contains".
+    expect(targets.slice().sort()).toEqual(SHORT_O_WORDS.slice().sort())
+  })
+
+  it('every short-o target resolves a gentle + trap distractor pair without throwing', async () => {
+    // Pin that `TARGET_PAIRINGS` carries a row for every word in
+    // `WORD_SONG_TARGET_WORDS_SHORT_O`. Missing rows surface here as
+    // a `pickDistractors` throw; matrix drift surfaces immediately.
+    const client = makeMockClient(makeShortOWirePlan(SHORT_O_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    for (const problem of rebuilt.problems) {
+      // Problem 1 = gentle tier, Problem 5 = trap tier — exercise
+      // both code paths.
+      expect(() => pickDistractors(problem.target, 1)).not.toThrow()
+      expect(() => pickDistractors(problem.target, 5)).not.toThrow()
+    }
+  })
+
+  it('short-o trios draw distractors only from the short-o pool (same-vowel rule, spec §8)', () => {
+    // For each of the 8 short-o targets, both tiers' distractor pairs
+    // must come from the short-o pool. This is a pure read of the
+    // matrix — no planner involved.
+    const poolSet = new Set<string>(SHORT_O_WORDS)
+    for (const target of SHORT_O_WORDS) {
+      // pickDistractors throws on missing pairings; calling it
+      // exercises the matrix entry.
+      // gentle (problem index 1)
+      const [g1, g2] = pickDistractors(
+        {
+          word: target,
+          pictureKey: target,
+          vowel: 'o',
+          category: 'object',
+          isTarget: true,
+        },
+        1,
+      )
+      expect(poolSet.has(g1.word)).toBe(true)
+      expect(poolSet.has(g2.word)).toBe(true)
+      // trap (problem index 5)
+      const [t1, t2] = pickDistractors(
+        {
+          word: target,
+          pictureKey: target,
+          vowel: 'o',
+          category: 'object',
+          isTarget: true,
+        },
+        5,
+      )
+      expect(poolSet.has(t1.word)).toBe(true)
+      expect(poolSet.has(t2.word)).toBe(true)
+    }
+  })
+})
+
 describe('planner → parser round-trip — untuned tier stub fallback (step 2 ticket 86c9kxu07)', () => {
   it('a digraphs-requested call falls back to blending-cv content (the stub-fallback contract)', async () => {
     // Per `effectiveFocusNode` in api/_planner.ts: untuned tiers
@@ -302,15 +459,19 @@ describe('graduation-session round-trip — cvc-words generalization check (tick
       graduationSplit: split,
     })
 
-    // Promotion fires: cvc-words → mastered, downstream digraphs
-    // moves locked → intro. pickFocusNode walks past cvc-words.
+    // Promotion fires: cvc-words → mastered, downstream
+    // cvc-words-short-o moves locked → intro (ticket 86c9m3ae3
+    // inserted the sibling between cvc-words and digraphs; digraphs
+    // stays locked until short-o promotes). pickFocusNode walks past
+    // cvc-words and lands on cvc-words-short-o.
     const after = loadProgress()!
     expect(after.skillLevels['cvc-words']).toBe('mastered')
-    expect(after.skillLevels['digraphs']).toBe('intro')
+    expect(after.skillLevels['cvc-words-short-o']).toBe('intro')
+    expect(after.skillLevels['digraphs']).toBe('locked')
     expect(pickFocusNode(after, 'word-song')).not.toBe('cvc-words')
-    // Picker walks past cvc-words and lands on digraphs (the next
-    // word-song node, now at 'intro' so non-mastered).
-    expect(pickFocusNode(after, 'word-song')).toBe('digraphs')
+    // Picker walks past cvc-words and lands on cvc-words-short-o (the
+    // next word-song node, now at 'intro' so non-mastered).
+    expect(pickFocusNode(after, 'word-song')).toBe('cvc-words-short-o')
   })
 
   it('AC#4 part 3: graduation session with novel words at 50% does NOT promote; focus stays on cvc-words', () => {

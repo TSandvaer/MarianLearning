@@ -739,13 +739,15 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     await expect(hub).toBeVisible({ timeout: 10_000 })
 
     // Word-song path-strip — 5 cells (sliding-window helper). With
-    // wordSongIndex=3 and a 7-node track, `slidingWindow(stages, 3, 5)`
-    // yields offset=2 (clamped to maxOffset=2 for a 7-stage track), so
-    // the rendered slice is [blending-cv, cvc-words, digraphs,
-    // sight-words, simple-sentences] — the FIRST cell is `blending-cv`
-    // and the cell at absolute index 3 (cvc-words) is `current`. The
+    // wordSongIndex=3 and an 8-node track, `slidingWindow(stages, 3, 5)`
+    // yields desiredOffset=2, maxOffset=3, offset=2 (uncamped), so the
+    // rendered slice is [blending-cv, cvc-words, cvc-words-short-o,
+    // digraphs, sight-words] — the FIRST cell is `blending-cv` and the
+    // cell at absolute index 3 (cvc-words) is `current`. The
     // earlier-mastered nodes (letter-names, letter-sounds) are
-    // off-window and therefore intentionally not rendered.
+    // off-window and therefore intentionally not rendered, and
+    // `simple-sentences` drops out of the right edge of the window now
+    // that the track is 8 nodes long.
     const wordSongStrip = page.locator(
       '[data-testid="hub-path-strip"][data-tree="word-song"]',
     )
@@ -765,9 +767,9 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     expect(wordSongProjection).toEqual([
       { stage: 'blending-cv', kind: 'mastered' },
       { stage: 'cvc-words', kind: 'current' },
+      { stage: 'cvc-words-short-o', kind: 'locked' },
       { stage: 'digraphs', kind: 'locked' },
       { stage: 'sight-words', kind: 'locked' },
-      { stage: 'simple-sentences', kind: 'locked' },
     ])
 
     // No pendingPromotion seeded → celebration overlay must NOT render.
@@ -830,6 +832,7 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
           'letter-sounds': 'mastered',
           'blending-cv': 'mastered',
           'cvc-words': 'practicing',
+          'cvc-words-short-o': 'locked',
           digraphs: 'locked',
           'sight-words': 'intro',
           'simple-sentences': 'locked',

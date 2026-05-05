@@ -52,6 +52,7 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       'letter-sounds',
       'blending-cv',
       'cvc-words',
+      'cvc-words-short-o',
       'digraphs',
       'sight-words',
       'simple-sentences',
@@ -176,6 +177,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'letter-sounds': 'locked',
       'blending-cv': 'locked',
       'cvc-words': 'locked',
+      'cvc-words-short-o': 'locked',
       digraphs: 'locked',
       'sight-words': 'locked',
       'simple-sentences': 'locked',
@@ -189,6 +191,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'letter-sounds': 'mastered',
       'blending-cv': 'mastered',
       'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
       digraphs: 'intro',
     })
     expect(pickFocusNode(progress, 'word-song')).toBe('digraphs')
@@ -200,6 +203,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'letter-sounds': 'mastered',
       'blending-cv': 'mastered',
       'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
       digraphs: 'mastered',
       'sight-words': 'practicing',
     })
@@ -236,6 +240,17 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
         },
         'cvc-words',
       ],
+      // The cvc-words → cvc-words-short-o (sibling) transition.
+      [
+        {
+          'letter-names': 'mastered',
+          'letter-sounds': 'mastered',
+          'blending-cv': 'mastered',
+          'cvc-words': 'mastered',
+          'cvc-words-short-o': 'practicing',
+        },
+        'cvc-words-short-o',
+      ],
       // Every higher tier locked; walker falls onto digraphs.
       [
         {
@@ -243,6 +258,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
           'letter-sounds': 'mastered',
           'blending-cv': 'mastered',
           'cvc-words': 'mastered',
+          'cvc-words-short-o': 'mastered',
           digraphs: 'locked',
         },
         'digraphs',

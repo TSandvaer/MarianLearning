@@ -30,6 +30,10 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'letter-sounds': 'practicing', // consonants mastered, vowels mid-flight (only short a)
   'blending-cv': 'practicing', // CV confident
   'cvc-words': 'intro', // emerging
+  // cvc-words-short-o is the next-vowel sibling tier. Locked at v1 default
+  // — unlocks to 'intro' when cvc-words (short-a) is mastered. See
+  // design/word-song/short-o-pool-expansion.md §2 + §4.
+  'cvc-words-short-o': 'locked',
   digraphs: 'locked',
   'sight-words': 'intro', // introduce gradually
   'simple-sentences': 'locked',
