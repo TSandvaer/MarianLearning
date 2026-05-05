@@ -156,9 +156,11 @@ Match the short-a pack's locked decision: **SVG vector** (per `project_pic_dog_s
 
 Same 3-phase pipeline as the short-a pack (`design/word-song/README.md` Phase model):
 
+**Phase 1 prompt sheet for the 4 wholly-new words (`mop`, `box`, `mom`, `hot`):** see [`short-o-picture-pack-prompts.md`](./short-o-picture-pack-prompts.md). The 4 promoted-from-distractor words (`dog`, `log`, `pot`, `fox`) are NOT in that prompt sheet's scope — they belong to the short-a pack's eventual cohesion pass per `picture-pack-prompts.md` §1 / short-a README §"Why not o/u/e/i in v1".
+
 | Phase | Owner | Output | Blocking dependency |
 | ----- | ----- | ------ | ------------------- |
-| 1. Prompt sheet | Kyle | `design/word-song/picture-pack-prompts-short-o.md` (per the future-work skeleton in the README) | Short-a pack's `picture-pack-style-anchor.md` — the style frame is shared, so short-o inherits without re-derivation. |
+| 1. Prompt sheet | Kyle | `design/word-song/short-o-picture-pack-prompts.md` (4 wholly-new words: mop, box, mom, hot) | Short-a pack's `picture-pack-style-anchor.md` — the style frame is shared, so short-o inherits without re-derivation. |
 | 2. Midjourney generation | Thomas | 7 source PNGs (≥1024×1024) | Phase 1 merged. **Cost note:** Thomas's Midjourney subscription is the source per `design/word-song/README.md` §"Source decision". 7 pictures at ~4 grids × 4 variations + iteration overhead. Empirically (per the short-a pack iteration plan), budget ~30–60 min of generation time. No incremental subscription cost beyond what the short-a pack consumes. |
 | 3. SVG trace + integration | Kyle (trace direction) + Devon (integration) | 7 `picture-{word}.svg` files at `public/assets/pictures/` + `wordPictures.tsx` updates (new keys + renderer wiring) | Phase 2 merged. **No new wordPack.ts entries needed** for `dog/log/pot/fox` (already in `DISTRACTOR_ONLY_WORDS` — they switch to `isTarget: true` in a separate code change tracked under the impl ticket); 4 wholly new entries needed for `mop, box, mom, hot`. |
 
