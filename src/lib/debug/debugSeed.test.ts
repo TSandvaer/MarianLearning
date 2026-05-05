@@ -184,4 +184,36 @@ describe('maybeApplyDebugSeed', () => {
       expect(after.lastSessionCompletedAt).toBe('2026-05-01T10:00:00.000Z')
     })
   })
+
+  describe('cvc-words-short-o seed', () => {
+    beforeEach(() => {
+      setSearch('?debug=1&seed=cvc-words-short-o')
+    })
+
+    it('writes cvc-words: mastered + cvc-words-short-o: practicing into progress', () => {
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(progress?.skillLevels['cvc-words']).toBe('mastered')
+      expect(progress?.skillLevels['cvc-words-short-o']).toBe('practicing')
+    })
+
+    it('round-trip integration: maybeApplyDebugSeed → pickFocusNode("word-song") → "cvc-words-short-o"', () => {
+      // Every preceding word-song node (letter-names, letter-sounds,
+      // blending-cv, cvc-words) must be marked mastered so the picker
+      // walks past them and lands on the short-o sibling. Mirrors the
+      // cvc-words round-trip test above.
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(pickFocusNode(progress!, 'word-song')).toBe('cvc-words-short-o')
+    })
+
+    it('bumps session-history sessionCount to 1 (skips Greet on next mount)', () => {
+      maybeApplyDebugSeed()
+      const history = readSessionHistory()
+      expect(history.sessionCount).toBe(1)
+      expect(history.schemaVersion).toBe(2)
+    })
+  })
 })
