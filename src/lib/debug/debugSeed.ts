@@ -73,6 +73,13 @@
  *   where the user taps "Word Song" → `pickFocusNode()` walks the
  *   word-song tree and returns `cvc-words` (because every earlier node
  *   is `mastered`) → planner emits cvc-words content.
+ * - `cvc-words-graduation-ready`: same as `cvc-words`, plus 3 cross-day
+ *   canonical history entries at 100% so the next session-start fetch
+ *   flags `isGraduationSession=true`.
+ * - `cvc-words-short-o`: Marian as if the short-a CVC pool is fully
+ *   mastered and she's now practicing the short-o sibling node. The
+ *   picker walks past `cvc-words` (mastered) and lands on
+ *   `cvc-words-short-o` (practicing) per WORD_SONG_NODES_IN_ORDER.
  *
  * Adding new seeds
  * ----------------
@@ -172,6 +179,22 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
     historyFactory: buildGraduationReadyHistory,
+  },
+  // Short-o sibling node smoke-test entry (PR #151 follow-up). Marian
+  // has fully mastered the short-a CVC pool and is now practicing the
+  // short-o tier. The picker walks WORD_SONG_NODES_IN_ORDER, sees every
+  // earlier word-song node mastered (including `cvc-words`), and lands
+  // on `cvc-words-short-o`. Used by Thomas's iPad smoke-test for the
+  // short-o focus session.
+  'cvc-words-short-o': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'practicing',
+    },
+    skipGreet: true,
   },
 }
 
