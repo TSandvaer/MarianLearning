@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-jam.svg
+  Glass jar of jam for the CVC word "jam" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-jam.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: glass cream tint #FCEEE2 / shadow #F5DCC9, contents
+    soft-rose #FFB7C5 / darker rose-red #C77A7A, lid soft-cream
+    #F5DCC9 / shadow #D9A079, ribbon detail soft-rose.
+  - Distinctness gate (per spec §1.13 jam AC, load-bearing):
+    VISIBLE JAM CONTENTS through clear glass — soft rose-red fills
+    ~70% from the bottom up. Recognisable jar silhouette + visible
+    contents disambiguate from `can` (opaque metal cylinder).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Jam">
+  <title>Jam</title>
+
+  <!-- Jar shadow companion (right side) -->
+  <path d="M 100 56
+           L 144 56
+           Q 150 62, 150 70
+           L 150 168
+           Q 150 178, 138 178
+           L 100 178 Z"
+        fill="#F5DCC9"/>
+
+  <!-- Jar body (glass — slightly tinted cream) -->
+  <path d="M 56 70
+           Q 56 60, 64 56
+           L 136 56
+           Q 144 60, 144 70
+           L 144 170
+           Q 144 178, 134 178
+           L 66 178
+           Q 56 178, 56 170 Z"
+        fill="#FCEEE2"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Jam contents shadow (right side, darker rose) -->
+  <path d="M 100 96
+           L 142 96
+           L 142 168
+           Q 142 174, 134 174
+           L 100 174 Z"
+        fill="#C77A7A"/>
+
+  <!-- Jam contents (soft rose, fills ~70% of jar) -->
+  <path d="M 58 96
+           Q 100 86, 142 96
+           L 142 170
+           Q 142 174, 134 174
+           L 66 174
+           Q 58 174, 58 170 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Wavy top edge of jam contents (visible meniscus) -->
+  <path d="M 58 96
+           Q 80 92, 100 96
+           Q 120 100, 142 96"
+        fill="none"
+        stroke="#C77A7A"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        opacity="0.7"/>
+
+  <!-- Lid shadow -->
+  <rect x="100" y="36" width="44" height="22"
+        fill="#D9A079"
+        stroke="#3E2818"
+        stroke-width="2.2"/>
+  <!-- Lid (warm cream, slightly wider than jar mouth) -->
+  <rect x="52" y="32" width="96" height="22"
+        rx="3"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.2"/>
+  <!-- Lid top dimple line -->
+  <line x1="60" y1="42" x2="140" y2="42"
+        stroke="#C77A7A" stroke-width="1.2" opacity="0.6"/>
+
+  <!-- Small ribbon bow tied around the neck (decorative cottage style) -->
+  <path d="M 90 56
+           Q 86 50, 80 52
+           Q 84 56, 86 60 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="1.2"
+        stroke-linejoin="round"/>
+  <path d="M 110 56
+           Q 114 50, 120 52
+           Q 116 56, 114 60 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="1.2"
+        stroke-linejoin="round"/>
+  <circle cx="100" cy="56" r="2.5"
+          fill="#FFB7C5"
+          stroke="#3E2818"
+          stroke-width="1.2"/>
+
+  <!-- Highlight stripe on left of jar (glass shine) -->
+  <path d="M 64 80 L 64 162"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="3"
+        stroke-linecap="round"
+        opacity="0.6"/>
+</svg>

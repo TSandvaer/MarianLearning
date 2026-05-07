@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-cup.svg
+  Mug with handle for the CVC word "cup" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-cup.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: body soft-cream-rose #F5DCC9 toned slightly pink
+    #FBD6CD / shadow #E5BBB0, interior darker brown #8B6749, rim
+    contour #C77A7A.
+  - Distinctness gate (per spec §2.5 cup AC, load-bearing):
+    OPEN TOP and CURVED HANDLE on the right — discriminator from can
+    (flat ring-pull top, no handle). Mug shape, slight depth visible
+    inside the rim.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Cup">
+  <title>Cup</title>
+
+  <!-- Body shadow (right side, cel-companion) -->
+  <path d="M 100 60
+           L 138 60
+           Q 142 60, 142 64
+           L 142 156
+           Q 142 168, 130 168
+           L 100 168 Z"
+        fill="#E5BBB0"/>
+
+  <!-- Body (mug cylinder, slight tapered) -->
+  <path d="M 60 60
+           L 138 60
+           Q 142 60, 142 64
+           L 140 156
+           Q 138 168, 124 168
+           L 76 168
+           Q 62 168, 60 156
+           L 58 64
+           Q 58 60, 60 60 Z"
+        fill="#FBD6CD"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Top rim ellipse (open mouth of mug — interior visible) -->
+  <ellipse cx="100" cy="60" rx="40" ry="9"
+           fill="#8B6749"
+           stroke="#3E2818"
+           stroke-width="2.2"/>
+
+  <!-- Inner rim highlight (top-front edge of mug interior) -->
+  <ellipse cx="100" cy="58" rx="36" ry="6"
+           fill="#6B4A30"
+           stroke="#3E2818"
+           stroke-width="1"
+           opacity="0.7"/>
+
+  <!-- Handle (curved C-loop on right side — defining feature) -->
+  <path d="M 140 86
+           Q 174 88, 174 120
+           Q 174 152, 140 150"
+        fill="none"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linecap="round"/>
+  <path d="M 144 92
+           Q 168 96, 168 120
+           Q 168 146, 144 144"
+        fill="none"
+        stroke="#FBD6CD"
+        stroke-width="6"
+        stroke-linecap="round"/>
+  <path d="M 144 92
+           Q 168 96, 168 120
+           Q 168 146, 144 144"
+        fill="none"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linecap="round"
+        opacity="0.9"/>
+
+  <!-- Inner highlight on body left side -->
+  <path d="M 70 80 L 70 156"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="3"
+        stroke-linecap="round"
+        opacity="0.5"/>
+
+  <!-- Foot of mug (subtle base ring) -->
+  <ellipse cx="100" cy="168" rx="34" ry="3"
+           fill="#9C6B3A"
+           opacity="0.4"/>
+</svg>

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-cat.svg
+  Sitting cat for the CVC word "cat" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-cat.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.5px (animal subjects per spec §6 budget)
+  - Palette: tabby warm-cream coat #F5DCC9 / shadow #E5C9B0, stripe
+    contour warm-brown #8B6749, ear-pink soft-rose #FFB7C5,
+    eye highlight cream #FCEEE2.
+  - Distinctness gates (per spec §1.1 + AC10 cat AC, load-bearing):
+    1. POINTED TRIANGULAR EARS (NOT floppy/round) — discriminator
+       from dog.
+    2. WHISKERS visible (3 strokes per side) — discriminator from
+       dog.
+    3. NARROW MUZZLE — discriminator from dog (broader muzzle).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Cat">
+  <title>Cat</title>
+
+  <!-- Tail (curled at side, behind body) -->
+  <path d="M 156 158
+           Q 178 152, 180 132
+           Q 178 122, 168 122
+           Q 162 130, 162 138
+           Q 162 148, 156 158 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <path d="M 168 130 Q 174 134, 174 140"
+        fill="none" stroke="#8B6749" stroke-width="1.2" opacity="0.6"/>
+
+  <!-- Body shadow companion (right side) -->
+  <path d="M 100 108
+           Q 130 106, 144 134
+           Q 148 156, 138 174
+           Q 122 178, 100 178 Z"
+        fill="#E5C9B0"/>
+
+  <!-- Body (sitting, soft pear shape) -->
+  <path d="M 60 108
+           Q 70 102, 100 102
+           Q 130 102, 142 116
+           Q 148 142, 142 168
+           Q 122 178, 100 178
+           Q 78 178, 60 168
+           Q 56 142, 60 116 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Tabby stripes on body (subtle) -->
+  <path d="M 78 122 Q 88 124, 96 122" fill="none" stroke="#8B6749" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <path d="M 76 138 Q 90 140, 100 138" fill="none" stroke="#8B6749" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+  <path d="M 78 152 Q 92 154, 102 152" fill="none" stroke="#8B6749" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Front paws (visible at bottom of body) -->
+  <ellipse cx="80" cy="178" rx="10" ry="6"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <ellipse cx="118" cy="178" rx="10" ry="6"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <line x1="76" y1="178" x2="76" y2="184" stroke="#3E2818" stroke-width="1"/>
+  <line x1="80" y1="180" x2="80" y2="184" stroke="#3E2818" stroke-width="1"/>
+  <line x1="84" y1="178" x2="84" y2="184" stroke="#3E2818" stroke-width="1"/>
+  <line x1="114" y1="178" x2="114" y2="184" stroke="#3E2818" stroke-width="1"/>
+  <line x1="118" y1="180" x2="118" y2="184" stroke="#3E2818" stroke-width="1"/>
+  <line x1="122" y1="178" x2="122" y2="184" stroke="#3E2818" stroke-width="1"/>
+
+  <!-- ===== HEAD ===== -->
+
+  <!-- Head shadow companion -->
+  <ellipse cx="106" cy="76" r="34"
+           fill="#E5C9B0"/>
+  <!-- Head (round face with subtle cheek bulges, tabby cream) -->
+  <path d="M 70 70
+           Q 70 50, 88 44
+           Q 100 42, 112 44
+           Q 130 50, 130 70
+           Q 130 92, 118 102
+           Q 100 108, 82 102
+           Q 70 92, 70 70 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- POINTED TRIANGULAR EARS (LEFT — load-bearing distinguisher) -->
+  <path d="M 72 56 L 64 22 L 88 44 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Inner ear pink (left) -->
+  <path d="M 76 46 L 70 30 L 84 44 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="1"
+        stroke-linejoin="round"
+        opacity="0.85"/>
+
+  <!-- POINTED TRIANGULAR EARS (RIGHT) -->
+  <path d="M 128 56 L 136 22 L 112 44 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Inner ear pink (right) -->
+  <path d="M 124 46 L 130 30 L 116 44 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="1"
+        stroke-linejoin="round"
+        opacity="0.85"/>
+
+  <!-- Tabby forehead M-marks -->
+  <path d="M 88 56 Q 90 64, 92 56 Q 94 64, 96 56" fill="none" stroke="#8B6749" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <path d="M 104 56 Q 106 64, 108 56 Q 110 64, 112 56" fill="none" stroke="#8B6749" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Eyes (large warm) -->
+  <ellipse cx="86" cy="74" rx="5" ry="6"
+           fill="#FCEEE2"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <ellipse cx="114" cy="74" rx="5" ry="6"
+           fill="#FCEEE2"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <circle cx="86" cy="74" r="2.5" fill="#3E2818"/>
+  <circle cx="114" cy="74" r="2.5" fill="#3E2818"/>
+  <!-- Eye highlights -->
+  <circle cx="87" cy="73" r="0.8" fill="#FFFFFF"/>
+  <circle cx="115" cy="73" r="0.8" fill="#FFFFFF"/>
+
+  <!-- NARROW MUZZLE (load-bearing — narrow vs dog's broader) -->
+  <ellipse cx="100" cy="86" rx="8" ry="5"
+           fill="#FFE0E8"
+           stroke="#3E2818"
+           stroke-width="1.5"/>
+
+  <!-- Pink nose -->
+  <path d="M 96 84 L 104 84 L 100 89 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="1.2"/>
+
+  <!-- Mouth (small W under muzzle) -->
+  <path d="M 100 90 L 100 94 Q 96 96, 92 94"
+        fill="none" stroke="#3E2818" stroke-width="1.2" stroke-linecap="round"/>
+  <path d="M 100 94 Q 104 96, 108 94"
+        fill="none" stroke="#3E2818" stroke-width="1.2" stroke-linecap="round"/>
+
+  <!-- WHISKERS (load-bearing — 3 strokes per side, the distinguisher) -->
+  <g stroke="#3E2818" stroke-width="1.2" stroke-linecap="round" fill="none">
+    <line x1="84" y1="86" x2="58" y2="82"/>
+    <line x1="84" y1="90" x2="60" y2="92"/>
+    <line x1="84" y1="94" x2="58" y2="100"/>
+    <line x1="116" y1="86" x2="142" y2="82"/>
+    <line x1="116" y1="90" x2="140" y2="92"/>
+    <line x1="116" y1="94" x2="142" y2="100"/>
+  </g>
+</svg>

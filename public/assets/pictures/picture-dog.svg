@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-dog.svg
+  Sitting golden retriever for the CVC word "dog" in Word Song
+  (distractor-only entry, promoted to short-o target). Replaces the
+  legacy pic-dog.svg per ticket 86c9p5epc — new convention is
+  picture-{word}.svg.
+  Phase 3 trace of design/references/picture-pack/picture-dog.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.5px (animal budget per spec §6)
+  - Palette: golden coat #F0CDB8 / shadow #D9A079, ear shadow
+    #C8946C, snout cream #F5DCC9, nose & eye #3E2818, tongue
+    soft-rose #FFB7C5.
+  - Distinctness gates (per spec §2.3 + AC10 dog AC, load-bearing):
+    1. FLOPPY / ROUNDED EARS (NOT pointed-up triangular) — vs cat.
+    2. NO WHISKERS — vs cat.
+    3. BROADER MUZZLE — vs cat (narrow muzzle).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Dog">
+  <title>Dog</title>
+
+  <!-- Tail (feathered, behind right side of body) -->
+  <path d="M 158 148
+           Q 178 138, 180 122
+           Q 176 110, 168 116
+           Q 162 130, 158 148 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Tail feather strokes -->
+  <path d="M 168 122 Q 170 128, 168 134" fill="none" stroke="#D9A079" stroke-width="1.2" opacity="0.7"/>
+  <path d="M 174 124 Q 176 130, 174 136" fill="none" stroke="#D9A079" stroke-width="1.2" opacity="0.7"/>
+
+  <!-- Body shadow (right side) -->
+  <path d="M 100 108
+           Q 132 106, 146 134
+           Q 152 158, 142 178
+           Q 122 184, 100 184 Z"
+        fill="#D9A079"/>
+
+  <!-- Body (sitting golden retriever, broad chest) -->
+  <path d="M 56 110
+           Q 66 102, 100 102
+           Q 132 102, 144 118
+           Q 152 144, 144 174
+           Q 122 184, 100 184
+           Q 78 184, 56 174
+           Q 50 144, 56 118 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Chest fur tuft suggestion (slightly lighter cream stripe) -->
+  <path d="M 88 116 Q 100 112, 112 116
+           Q 110 158, 100 168
+           Q 90 158, 88 116 Z"
+        fill="#F5DCC9"
+        opacity="0.75"/>
+
+  <!-- Front paws (with toe lines) -->
+  <ellipse cx="78" cy="180" rx="11" ry="7"
+           fill="#F0CDB8"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <ellipse cx="122" cy="180" rx="11" ry="7"
+           fill="#F0CDB8"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <line x1="74" y1="180" x2="74" y2="186" stroke="#3E2818" stroke-width="1.2"/>
+  <line x1="78" y1="182" x2="78" y2="186" stroke="#3E2818" stroke-width="1.2"/>
+  <line x1="82" y1="180" x2="82" y2="186" stroke="#3E2818" stroke-width="1.2"/>
+  <line x1="118" y1="180" x2="118" y2="186" stroke="#3E2818" stroke-width="1.2"/>
+  <line x1="122" y1="182" x2="122" y2="186" stroke="#3E2818" stroke-width="1.2"/>
+  <line x1="126" y1="180" x2="126" y2="186" stroke="#3E2818" stroke-width="1.2"/>
+
+  <!-- ===== HEAD ===== -->
+
+  <!-- FLOPPY EARS (LEFT — drops down past the cheek; load-bearing
+       distinguisher from cat's pointed-up triangle) -->
+  <path d="M 64 56
+           Q 50 60, 48 80
+           Q 50 100, 60 102
+           Q 70 96, 72 78
+           Q 72 64, 64 56 Z"
+        fill="#D9A079"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Inner-ear shadow companion (left) -->
+  <path d="M 60 70 Q 56 84, 60 96"
+        fill="none" stroke="#8B6749" stroke-width="1.5" opacity="0.7"/>
+
+  <!-- FLOPPY EARS (RIGHT — symmetric drop) -->
+  <path d="M 136 56
+           Q 150 60, 152 80
+           Q 150 100, 140 102
+           Q 130 96, 128 78
+           Q 128 64, 136 56 Z"
+        fill="#D9A079"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Inner-ear shadow companion (right) -->
+  <path d="M 140 70 Q 144 84, 140 96"
+        fill="none" stroke="#8B6749" stroke-width="1.5" opacity="0.7"/>
+
+  <!-- Head shadow companion -->
+  <ellipse cx="106" cy="78" rx="34" ry="32"
+           fill="#D9A079"/>
+  <!-- Head body (golden, rounded) -->
+  <ellipse cx="100" cy="76" rx="34" ry="32"
+           fill="#F0CDB8"
+           stroke="#3E2818"
+           stroke-width="2.5"/>
+
+  <!-- Eyes (round, friendly) -->
+  <circle cx="86" cy="74" r="3.5"
+          fill="#3E2818"/>
+  <circle cx="114" cy="74" r="3.5"
+          fill="#3E2818"/>
+  <!-- Eye highlights -->
+  <circle cx="87" cy="73" r="1.2" fill="#FFFFFF"/>
+  <circle cx="115" cy="73" r="1.2" fill="#FFFFFF"/>
+
+  <!-- BROADER MUZZLE (load-bearing — wider than cat's narrow muzzle) -->
+  <ellipse cx="100" cy="92" rx="14" ry="10"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2"/>
+
+  <!-- Nose (large dark blob, classic dog feature) -->
+  <ellipse cx="100" cy="86" rx="5" ry="4"
+           fill="#3E2818"
+           stroke="#3E2818"
+           stroke-width="1"/>
+  <!-- Nose highlight -->
+  <ellipse cx="98" cy="84" rx="1.5" ry="1" fill="#FFFFFF" opacity="0.7"/>
+
+  <!-- Mouth (open downward curve, friendly) -->
+  <path d="M 100 92
+           L 100 98
+           Q 92 102, 88 98"
+        fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 100 98
+           Q 108 102, 112 98"
+        fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Tongue (small soft pink, peeking out) -->
+  <ellipse cx="100" cy="100" rx="3" ry="2"
+           fill="#FFB7C5"
+           stroke="#3E2818"
+           stroke-width="1"
+           opacity="0.9"/>
+
+  <!-- Forehead crease (subtle warmth line) -->
+  <path d="M 88 60 Q 100 56, 112 60"
+        fill="none" stroke="#D9A079" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+</svg>

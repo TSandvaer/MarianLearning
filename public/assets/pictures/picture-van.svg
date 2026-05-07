@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-van.svg
+  Boxy panel van for the CVC word "van" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-van.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: body soft-rose-coral #E89F8A / shadow #C97863, windows
+    soft-blue #C5DFE8 / shadow #A5C4D8, wheels #3E2818 / hub #807468.
+  - Distinctness gates (per spec §1.14 + AC10 van AC, load-bearing):
+    1. EXACTLY 2 WINDOWS visible on the side — discriminator from
+       bus (3+ windows).
+    2. SHORT car-like proportions — discriminator from bus (long).
+    3. NO smiley face — pure object render (per pack-wide rule).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Van">
+  <title>Van</title>
+
+  <!-- Body shadow companion (under-belly) -->
+  <ellipse cx="100" cy="156" rx="80" ry="6"
+           fill="#3E2818" opacity="0.25"/>
+
+  <!-- Body shadow (right side cel-companion) -->
+  <path d="M 100 70 L 174 70 L 176 100 L 174 144 L 100 144 Z"
+        fill="#C97863"/>
+
+  <!-- Van body (boxy short proportions, panel van silhouette) -->
+  <path d="M 26 100
+           Q 26 78, 36 76
+           L 58 76
+           L 70 70
+           L 158 70
+           Q 168 70, 174 78
+           L 178 100
+           L 178 134
+           Q 178 144, 168 144
+           L 32 144
+           Q 22 144, 22 134 Z"
+        fill="#E89F8A"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- ===== EXACTLY TWO WINDOWS (load-bearing) ===== -->
+
+  <!-- Window 1 (driver/cab, front-right) -->
+  <path d="M 124 78
+           L 162 78
+           Q 168 80, 168 92
+           L 168 102
+           L 124 102 Z"
+        fill="#C5DFE8"
+        stroke="#3E2818"
+        stroke-width="2"
+        stroke-linejoin="round"/>
+  <!-- Window 1 shadow streak -->
+  <path d="M 156 80 L 168 92 L 168 100 L 158 100 Z"
+        fill="#A5C4D8"/>
+  <!-- Window 1 highlight stripe -->
+  <line x1="128" y1="82" x2="156" y2="82" stroke="#FFFFFF" stroke-width="1.2" opacity="0.6"/>
+
+  <!-- Window 2 (passenger compartment, behind cab) -->
+  <rect x="64" y="80" width="50" height="22"
+        rx="2"
+        fill="#C5DFE8"
+        stroke="#3E2818"
+        stroke-width="2"/>
+  <!-- Window 2 shadow streak -->
+  <path d="M 100 82 L 114 94 L 114 100 L 104 100 Z"
+        fill="#A5C4D8"/>
+  <!-- Window 2 highlight -->
+  <line x1="68" y1="84" x2="100" y2="84" stroke="#FFFFFF" stroke-width="1.2" opacity="0.6"/>
+
+  <!-- Cab pillar (dividing the two windows) -->
+  <line x1="120" y1="80" x2="120" y2="102" stroke="#3E2818" stroke-width="2.5"/>
+
+  <!-- Side door seam -->
+  <line x1="64" y1="104" x2="64" y2="144" stroke="#3E2818" stroke-width="1.5"/>
+  <line x1="114" y1="104" x2="114" y2="144" stroke="#3E2818" stroke-width="1.5"/>
+
+  <!-- Door handle -->
+  <rect x="76" y="118" width="8" height="3" rx="1" fill="#3E2818"/>
+
+  <!-- Antenna on top -->
+  <line x1="160" y1="70" x2="166" y2="48" stroke="#3E2818" stroke-width="1.2"/>
+  <circle cx="166" cy="48" r="1.2" fill="#3E2818"/>
+
+  <!-- Front headlight (small circle near front) -->
+  <circle cx="170" cy="120" r="3"
+          fill="#F4D89B"
+          stroke="#3E2818"
+          stroke-width="1.5"/>
+
+  <!-- Wheels (left + right) -->
+  <circle cx="56" cy="148" r="14"
+          fill="#3E2818"
+          stroke="#3E2818"
+          stroke-width="2"/>
+  <circle cx="56" cy="148" r="6"
+          fill="#807468"
+          stroke="#3E2818"
+          stroke-width="1.5"/>
+  <circle cx="56" cy="148" r="2"
+          fill="#3E2818"/>
+
+  <circle cx="148" cy="148" r="14"
+          fill="#3E2818"
+          stroke="#3E2818"
+          stroke-width="2"/>
+  <circle cx="148" cy="148" r="6"
+          fill="#807468"
+          stroke="#3E2818"
+          stroke-width="1.5"/>
+  <circle cx="148" cy="148" r="2"
+          fill="#3E2818"/>
+
+  <!-- Wheel arch lines on body -->
+  <path d="M 40 144 Q 56 130, 72 144" fill="none" stroke="#3E2818" stroke-width="1.5"/>
+  <path d="M 132 144 Q 148 130, 164 144" fill="none" stroke="#3E2818" stroke-width="1.5"/>
+</svg>

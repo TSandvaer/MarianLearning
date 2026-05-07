@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-bat.svg
+  Friendly Sanrio-style flying bat for the CVC word "bat" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-bat.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.5px (animal budget per spec §6)
+  - Palette: body soft warm-grey #B5A3B5 / shadow #8E7E8E, wing
+    soft-mauve #C4A2C8 / shadow #A084A8 / membrane lining #E5D5E8,
+    belly cream #F5DCC9, eye dark #3E2818.
+  - Distinctness gates (per spec §1.3 + AC10 bat AC, load-bearing):
+    1. WINGS SPREAD on both sides — auto-fail if collapsed.
+    2. FRIENDLY Sanrio-style — NO fangs, NO Halloween, big eyes.
+    3. POINTED ear-tips (small triangles on top of head).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Bat">
+  <title>Bat</title>
+
+  <!-- ===== LEFT WING (spread, scalloped) ===== -->
+  <!-- Wing shadow (under-side of left wing, darker mauve) -->
+  <path d="M 70 90
+           L 8 80
+           Q 4 90, 12 110
+           L 24 122
+           Q 38 132, 56 132
+           Q 64 130, 70 130 Z"
+        fill="#A084A8"/>
+  <!-- Left wing body (lit, soft mauve, scalloped fingers) -->
+  <path d="M 70 90
+           Q 40 78, 16 76
+           Q 6 80, 8 96
+           Q 14 116, 30 124
+           Q 36 122, 36 116
+           L 36 124
+           Q 46 128, 50 122
+           L 50 130
+           Q 58 132, 64 124
+           Q 70 116, 70 90 Z"
+        fill="#C4A2C8"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Wing membrane lining (lighter inner stripe) -->
+  <path d="M 22 90 Q 34 100, 50 110"
+        fill="none" stroke="#E5D5E8" stroke-width="2" opacity="0.7" stroke-linecap="round"/>
+
+  <!-- ===== RIGHT WING (mirror) ===== -->
+  <!-- Wing shadow -->
+  <path d="M 130 90
+           L 192 80
+           Q 196 90, 188 110
+           L 176 122
+           Q 162 132, 144 132
+           Q 136 130, 130 130 Z"
+        fill="#A084A8"/>
+  <!-- Right wing body (lit) -->
+  <path d="M 130 90
+           Q 160 78, 184 76
+           Q 194 80, 192 96
+           Q 186 116, 170 124
+           Q 164 122, 164 116
+           L 164 124
+           Q 154 128, 150 122
+           L 150 130
+           Q 142 132, 136 124
+           Q 130 116, 130 90 Z"
+        fill="#C4A2C8"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+  <!-- Wing membrane lining -->
+  <path d="M 178 90 Q 166 100, 150 110"
+        fill="none" stroke="#E5D5E8" stroke-width="2" opacity="0.7" stroke-linecap="round"/>
+
+  <!-- ===== BODY (small rounded torso) ===== -->
+
+  <!-- Body shadow companion -->
+  <ellipse cx="106" cy="124" rx="32" ry="34"
+           fill="#8E7E8E"/>
+  <!-- Body (oval, soft warm-grey) -->
+  <ellipse cx="100" cy="120" rx="32" ry="34"
+           fill="#B5A3B5"
+           stroke="#3E2818"
+           stroke-width="2.5"/>
+
+  <!-- Belly cream patch (lighter front fur) -->
+  <ellipse cx="100" cy="132" rx="20" ry="20"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="1.2"/>
+
+  <!-- Tiny feet (peeking below body) -->
+  <path d="M 84 152 L 80 162 L 88 162 Z"
+        fill="#3E2818" stroke="#3E2818" stroke-width="1"/>
+  <path d="M 116 152 L 112 162 L 120 162 Z"
+        fill="#3E2818" stroke="#3E2818" stroke-width="1"/>
+
+  <!-- ===== HEAD AREA ===== -->
+
+  <!-- Pointed ear-tips on top of head (small soft triangles) -->
+  <path d="M 78 86 L 76 64 L 90 80 Z"
+        fill="#B5A3B5"
+        stroke="#3E2818"
+        stroke-width="2"
+        stroke-linejoin="round"/>
+  <!-- Inner ear (left, soft mauve) -->
+  <path d="M 82 80 L 80 70 L 86 78 Z"
+        fill="#C4A2C8"
+        opacity="0.7"/>
+
+  <path d="M 122 86 L 124 64 L 110 80 Z"
+        fill="#B5A3B5"
+        stroke="#3E2818"
+        stroke-width="2"
+        stroke-linejoin="round"/>
+  <!-- Inner ear (right, soft mauve) -->
+  <path d="M 118 80 L 120 70 L 114 78 Z"
+        fill="#C4A2C8"
+        opacity="0.7"/>
+
+  <!-- Big friendly eyes (Sanrio-style, big and warm) -->
+  <ellipse cx="88" cy="106" rx="6" ry="7"
+           fill="#FCEEE2"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <ellipse cx="112" cy="106" rx="6" ry="7"
+           fill="#FCEEE2"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <!-- Pupils -->
+  <circle cx="88" cy="108" r="3.5" fill="#3E2818"/>
+  <circle cx="112" cy="108" r="3.5" fill="#3E2818"/>
+  <!-- Eye highlights (sparkle, twin) -->
+  <circle cx="89" cy="106" r="1.2" fill="#FFFFFF"/>
+  <circle cx="113" cy="106" r="1.2" fill="#FFFFFF"/>
+  <circle cx="86" cy="110" r="0.6" fill="#FFFFFF"/>
+  <circle cx="110" cy="110" r="0.6" fill="#FFFFFF"/>
+
+  <!-- Tiny nose (cute round) -->
+  <ellipse cx="100" cy="118" rx="2.5" ry="2"
+           fill="#3E2818"/>
+
+  <!-- Small smile (NO FANGS — per spec) -->
+  <path d="M 96 124 Q 100 128, 104 124"
+        fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Soft cheek blush (Sanrio-style, friendly) -->
+  <ellipse cx="80" cy="120" rx="3" ry="2" fill="#FFB7C5" opacity="0.6"/>
+  <ellipse cx="120" cy="120" rx="3" ry="2" fill="#FFB7C5" opacity="0.6"/>
+</svg>
