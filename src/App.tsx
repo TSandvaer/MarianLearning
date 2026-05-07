@@ -43,7 +43,10 @@ import { PendingResumeAffordance } from './components/PendingResumeAffordance'
 import type { PlaySessionUtteranceOptions } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
 import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
-import { useHowlerSuspendOnHide } from './lib/lifecycle'
+import {
+  useHowlerSuspendOnHide,
+  useRequestPersistentStorageOnGesture,
+} from './lib/lifecycle'
 import {
   isGraduationSessionPending,
   loadProgress,
@@ -226,6 +229,13 @@ export default function App() {
   // `storage`, regardless of how many screens consume the signals.
   // See lib/lifecycle/* for the per-hook docstrings.
   useHowlerSuspendOnHide()
+
+  // Request persistent localStorage on the first user gesture (ticket
+  // 86c9pkfth). Reduces iOS Safari storage-eviction probability for
+  // Marian's progress blob; deferred to first gesture so the (rare)
+  // permission prompt doesn't land mid-Splash. Fire-and-forget — no
+  // UI surface, no error toast.
+  useRequestPersistentStorageOnGesture()
 
   /**
    * Hub-entry path tracked in state so Hub mounts know which welcome-back

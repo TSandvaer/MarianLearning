@@ -9,6 +9,7 @@ export {
 } from './pageVisibility'
 export { useIsPageHidden } from './useIsPageHidden'
 export { useHowlerSuspendOnHide } from './useHowlerSuspendOnHide'
+export { useRequestPersistentStorageOnGesture } from './useRequestPersistentStorageOnGesture'
 export {
   useStorageSync,
   PROGRESS_STORAGE_KEY,
