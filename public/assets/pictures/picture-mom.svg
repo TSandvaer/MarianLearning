@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-mom.svg
+  Mom + child two-figure composition for the CVC word "mom" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-mom.png.
+  - viewBox 0 0 200 200 (matches pic-dog.svg + pack convention)
+  - Cream background keyed away (transparent)
+  - Outer contour #3E2818 2.2px
+  - Palette: skin warm-cream #F5DCC9, hair warm-dark-brown #5C3F31,
+    mom top peach #F0CDB8, mom A-line skirt darker peach #E5B894,
+    child dress peach-yellow #F0CDB8, cheeks soft-rose #FFB7C5,
+    mouth #C77A7A.
+  - Distinctness gates (per spec §5.2 mom AC, load-bearing):
+    1. TWO figures preserved (parent + child holding hands)
+    2. Shoulder-length-or-longer hair on the parent
+    3. A-line / flared-skirt silhouette on the parent (wider at hem
+       than shoulders) — discriminator from dad's straight-leg pants
+    4. Minimal-detail faces on both figures (per spec_drift_decisions L
+       lock — must not compete with Emma)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Mom">
+  <title>Mom</title>
+
+  <!-- ===== MOM (left, taller figure) ===== -->
+
+  <!-- Hair back layer — shoulder-length, falling around the head -->
+  <path d="M 50 56
+           Q 46 38, 64 32
+           Q 78 28, 92 32
+           Q 100 38, 96 56
+           L 96 92
+           Q 92 96, 86 96
+           L 56 96
+           Q 50 96, 50 92 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Mom head (skin) -->
+  <circle cx="72" cy="60" r="16"
+          fill="#F5DCC9"
+          stroke="#3E2818"
+          stroke-width="2.2"/>
+
+  <!-- Hair front (bangs / fringe partially over forehead) -->
+  <path d="M 56 54
+           Q 60 42, 72 42
+           Q 84 42, 88 54
+           Q 80 50, 72 52
+           Q 64 50, 56 54 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Mom cheeks (rosy soft blush) -->
+  <ellipse cx="62" cy="64" rx="3" ry="2" fill="#FFB7C5" opacity="0.7"/>
+  <ellipse cx="82" cy="64" rx="3" ry="2" fill="#FFB7C5" opacity="0.7"/>
+
+  <!-- Mom eyes (minimal — two small dots) -->
+  <circle cx="66" cy="60" r="1.4" fill="#3E2818"/>
+  <circle cx="78" cy="60" r="1.4" fill="#3E2818"/>
+
+  <!-- Mom mouth (small soft arc) -->
+  <path d="M 69 68 Q 72 70 75 68"
+        fill="none"
+        stroke="#C77A7A"
+        stroke-width="1.5"
+        stroke-linecap="round"/>
+
+  <!-- Mom top shadow (cel-companion, light upper-left) -->
+  <path d="M 80 76 L 92 76 L 96 110 L 84 112 Z"
+        fill="#E5B894"/>
+  <!-- Mom top (peach blouse) -->
+  <path d="M 56 76
+           Q 60 74, 72 74
+           Q 84 74, 88 76
+           L 92 110
+           L 52 110 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Mom skirt shadow (cel-companion, A-line, darker right side) -->
+  <path d="M 78 110 L 92 110 L 102 184 L 88 186 Z"
+        fill="#D9A079"/>
+  <!-- Mom A-line skirt (FLARES wider at hem than at waist —
+       this is the load-bearing discriminator from dad's pants) -->
+  <path d="M 52 110
+           L 92 110
+           L 102 184
+           L 42 184 Z"
+        fill="#E5B894"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Mom arms (visible at sides, simple flat shapes) -->
+  <path d="M 52 80 L 44 110 L 50 112 L 56 86 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+  <!-- Right arm reaches across to child's hand -->
+  <path d="M 92 88 L 116 116 L 120 112 L 96 82 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Mom legs (visible below skirt hem) -->
+  <rect x="64" y="184" width="6" height="10" fill="#F5DCC9" stroke="#3E2818" stroke-width="1.5"/>
+  <rect x="78" y="184" width="6" height="10" fill="#F5DCC9" stroke="#3E2818" stroke-width="1.5"/>
+
+  <!-- ===== CHILD (right, shorter figure) ===== -->
+
+  <!-- Child hair (back layer) -->
+  <path d="M 134 92
+           Q 130 80, 146 76
+           Q 160 76, 162 88
+           L 162 110
+           Q 158 112, 154 112
+           L 138 112
+           Q 134 110, 134 92 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Child side hair tuft (small ponytail on top, picture cue) -->
+  <path d="M 144 72
+           Q 142 64, 148 62
+           Q 152 64, 152 72 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Child head (skin) -->
+  <circle cx="148" cy="92" r="12"
+          fill="#F5DCC9"
+          stroke="#3E2818"
+          stroke-width="2.2"/>
+
+  <!-- Child bangs (front fringe) -->
+  <path d="M 138 88
+           Q 142 80, 148 80
+           Q 156 80, 158 88
+           Q 152 86, 148 87
+           Q 142 86, 138 88 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="1.2"
+        stroke-linejoin="round"/>
+
+  <!-- Child cheeks -->
+  <ellipse cx="141" cy="95" rx="2" ry="1.5" fill="#FFB7C5" opacity="0.7"/>
+  <ellipse cx="155" cy="95" rx="2" ry="1.5" fill="#FFB7C5" opacity="0.7"/>
+
+  <!-- Child eyes -->
+  <circle cx="144" cy="92" r="1.2" fill="#3E2818"/>
+  <circle cx="152" cy="92" r="1.2" fill="#3E2818"/>
+
+  <!-- Child mouth -->
+  <path d="M 146 98 Q 148 100 150 98"
+        fill="none"
+        stroke="#C77A7A"
+        stroke-width="1.2"
+        stroke-linecap="round"/>
+
+  <!-- Child dress shadow (cel-companion) -->
+  <path d="M 154 104 L 162 106 L 166 178 L 160 180 Z"
+        fill="#D9A079"/>
+  <!-- Child dress (peach, slight A-line) -->
+  <path d="M 138 104
+           Q 142 102, 148 102
+           Q 156 102, 160 104
+           L 166 178
+           L 132 178 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Child arm reaches left (to mom's hand) -->
+  <path d="M 134 110 L 122 116 L 124 120 L 138 114 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Child legs (visible below dress) -->
+  <rect x="142" y="178" width="5" height="10" fill="#F5DCC9" stroke="#3E2818" stroke-width="1.5"/>
+  <rect x="153" y="178" width="5" height="10" fill="#F5DCC9" stroke="#3E2818" stroke-width="1.5"/>
+
+  <!-- ===== HANDS HELD (visual hand-clasp between mom right arm + child left arm) ===== -->
+  <ellipse cx="120" cy="116" rx="5" ry="4"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="1.5"/>
+</svg>
