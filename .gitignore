@@ -57,4 +57,4 @@ dev-dist
 # These are trace-references only — Phase 3 SVGs go in
 # `public/assets/pictures/` instead. The PNGs are large (~3.9 MB combined)
 # and have no runtime use; keep them out of the bundle.
-design/references/picture-pack/*.png
+design/references/picture-pack/**/*.png
