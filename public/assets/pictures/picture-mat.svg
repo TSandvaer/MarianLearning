@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-mat.svg
+  Striped woven mat for the CVC word "mat" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-mat.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: stripes soft-rose #FFB7C5, soft-cream #F5DCC9, soft-grey
+    #C8C2BD, soft-peach #F0CDB8 (alternating), fringe warm-brown
+    #8B6749 with darker stroke.
+  - Distinctness gate (per spec §1.4 mat AC, load-bearing):
+    Visible woven STRIPES (horizontal) + bottom FRINGE — disambiguates
+    from a generic rectangle. ISOLATED to the mat object only — the MJ
+    PNG had a "WELCOME" panel/text around the mat; we trace only the
+    mat itself, no surrounding text.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Mat">
+  <title>Mat</title>
+
+  <!-- Mat shadow companion (right edge, soft) -->
+  <rect x="100" y="50" width="64" height="116"
+        fill="#D9A079" opacity="0.4"/>
+
+  <!-- Mat body base (rectangle, soft cream, slight perspective) -->
+  <path d="M 36 50
+           L 164 50
+           Q 168 50, 168 54
+           L 162 166
+           Q 162 170, 158 170
+           L 42 170
+           Q 38 170, 38 166
+           L 32 54
+           Q 32 50, 36 50 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Stripe 1 (top, soft-grey) -->
+  <rect x="34" y="58" width="132" height="22"
+        fill="#C8C2BD"/>
+  <line x1="34" y1="58" x2="166" y2="58" stroke="#3E2818" stroke-width="1.5"/>
+  <line x1="34" y1="80" x2="166" y2="80" stroke="#3E2818" stroke-width="1.5"/>
+
+  <!-- Stripe 2 (cream, lighter inner band) -->
+  <rect x="34" y="84" width="132" height="14"
+        fill="#FCEEE2"/>
+
+  <!-- Stripe 3 (soft rose) -->
+  <rect x="34" y="100" width="132" height="22"
+        fill="#FFB7C5"/>
+  <line x1="34" y1="100" x2="166" y2="100" stroke="#3E2818" stroke-width="1.5"/>
+  <line x1="34" y1="122" x2="166" y2="122" stroke="#3E2818" stroke-width="1.5"/>
+
+  <!-- Stripe 4 (soft cream, lighter mid band) -->
+  <rect x="34" y="126" width="132" height="14"
+        fill="#FCEEE2"/>
+
+  <!-- Stripe 5 (warm peach bottom band) -->
+  <rect x="34" y="144" width="132" height="22"
+        fill="#F0CDB8"/>
+  <line x1="34" y1="144" x2="166" y2="144" stroke="#3E2818" stroke-width="1.5"/>
+
+  <!-- Subtle weave-texture cross-hatching (very sparse) -->
+  <line x1="60" y1="60" x2="60" y2="166" stroke="#3E2818" stroke-width="0.6" opacity="0.25"/>
+  <line x1="100" y1="60" x2="100" y2="166" stroke="#3E2818" stroke-width="0.6" opacity="0.25"/>
+  <line x1="140" y1="60" x2="140" y2="166" stroke="#3E2818" stroke-width="0.6" opacity="0.25"/>
+
+  <!-- Bottom fringe (short tassel strands hanging down) -->
+  <g stroke="#8B6749" stroke-width="1.5" stroke-linecap="round" fill="none">
+    <line x1="42" y1="170" x2="40" y2="184"/>
+    <line x1="50" y1="170" x2="48" y2="184"/>
+    <line x1="58" y1="170" x2="58" y2="184"/>
+    <line x1="66" y1="170" x2="65" y2="184"/>
+    <line x1="74" y1="170" x2="74" y2="184"/>
+    <line x1="82" y1="170" x2="82" y2="184"/>
+    <line x1="90" y1="170" x2="90" y2="184"/>
+    <line x1="98" y1="170" x2="98" y2="184"/>
+    <line x1="106" y1="170" x2="106" y2="184"/>
+    <line x1="114" y1="170" x2="114" y2="184"/>
+    <line x1="122" y1="170" x2="122" y2="184"/>
+    <line x1="130" y1="170" x2="131" y2="184"/>
+    <line x1="138" y1="170" x2="139" y2="184"/>
+    <line x1="146" y1="170" x2="148" y2="184"/>
+    <line x1="154" y1="170" x2="156" y2="184"/>
+    <line x1="162" y1="170" x2="162" y2="184"/>
+  </g>
+</svg>

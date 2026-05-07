@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-dad.svg
+  Dad + child two-figure composition for the CVC word "dad" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-dad.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.5px (human-figure budget per spec §6)
+  - Palette: skin warm-cream #F5DCC9 / shadow #E5C9B0, hair warm-brown
+    #5C3F31, dad shirt soft-cream #F0CDB8 / shadow #D9A079, jeans
+    soft-blue-grey #A5B5C0 / shadow #7F90A0, child dress soft-peach
+    #F0CDB8 / shadow #D9A079, shoes #5C3F31.
+  - Distinctness gates (per spec §1.12 + AC10 + project_spec_drift L,
+    load-bearing — auto-fail if violated):
+    1. TWO FIGURES preserved (parent + child holding hands) —
+       NEVER collapse to a single figure during simplification.
+       This is the discriminator from `man` (single figure).
+    2. SHORT HAIR + STRAIGHT-LEG PANTS on dad — discriminator
+       from mom (shoulder-length hair + A-line dress).
+    3. MINIMAL facial detail on both figures (eyes as small dots,
+       soft mouth arc) — must not compete with Emma.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Dad">
+  <title>Dad</title>
+
+  <!-- ===== DAD (left, taller figure) ===== -->
+
+  <!-- Dad hair back (short crop, slightly tousled top) -->
+  <path d="M 50 32
+           Q 56 18, 70 18
+           Q 84 18, 90 32
+           L 90 48
+           L 50 48 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Small hair tuft on top (a couple of fly-aways suggesting
+       casual short hair, NOT shoulder-length) -->
+  <path d="M 64 22 L 60 14 L 68 18 Z" fill="#5C3F31" stroke="#3E2818" stroke-width="1.2"/>
+  <path d="M 76 22 L 80 14 L 72 18 Z" fill="#5C3F31" stroke="#3E2818" stroke-width="1.2"/>
+
+  <!-- Dad head (skin) -->
+  <circle cx="70" cy="42" r="14"
+          fill="#F5DCC9"
+          stroke="#3E2818"
+          stroke-width="2.5"/>
+
+  <!-- Dad bangs (front, brief) -->
+  <path d="M 56 36
+           Q 62 30, 70 30
+           Q 80 30, 84 36
+           Q 78 34, 70 34
+           Q 62 34, 56 36 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="1.2"
+        stroke-linejoin="round"/>
+
+  <!-- Dad cheek blush -->
+  <ellipse cx="62" cy="46" rx="2.5" ry="1.8" fill="#FFB7C5" opacity="0.5"/>
+  <ellipse cx="78" cy="46" rx="2.5" ry="1.8" fill="#FFB7C5" opacity="0.5"/>
+
+  <!-- Dad eyes (small dots) -->
+  <circle cx="64" cy="42" r="1.3" fill="#3E2818"/>
+  <circle cx="76" cy="42" r="1.3" fill="#3E2818"/>
+
+  <!-- Dad mouth (soft smile arc) -->
+  <path d="M 66 50 Q 70 52, 74 50"
+        fill="none"
+        stroke="#C77A7A"
+        stroke-width="1.4"
+        stroke-linecap="round"/>
+
+  <!-- Dad neck -->
+  <rect x="64" y="56" width="12" height="8"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2"/>
+
+  <!-- Dad shirt shadow -->
+  <path d="M 70 64 L 96 72 L 100 116 L 70 116 Z"
+        fill="#D9A079"/>
+  <!-- Dad shirt (cream-peach simple t-shirt) -->
+  <path d="M 46 72
+           L 58 64
+           L 82 64
+           L 96 72
+           L 100 86
+           L 90 88
+           L 90 116
+           L 50 116
+           L 50 88
+           L 40 86 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- T-shirt collar -->
+  <path d="M 64 64 Q 70 70, 76 64"
+        fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Dad left arm (down at side) -->
+  <ellipse cx="40" cy="120" rx="5" ry="6"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2"/>
+
+  <!-- Dad jeans shadow (STRAIGHT-LEG pants — load-bearing
+       distinguisher from mom's A-line) -->
+  <path d="M 70 116 L 90 116 L 88 184 L 72 184 Z"
+        fill="#7F90A0"/>
+  <!-- Dad jeans (STRAIGHT-LEG, NOT flared) -->
+  <path d="M 50 116
+           L 90 116
+           L 88 184
+           L 74 184
+           L 70 130
+           L 66 184
+           L 52 184 Z"
+        fill="#A5B5C0"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Dad centre seam -->
+  <line x1="70" y1="118" x2="70" y2="130" stroke="#3E2818" stroke-width="1.2"/>
+
+  <!-- Dad shoes -->
+  <ellipse cx="58" cy="186" rx="8" ry="4"
+           fill="#5C3F31"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <ellipse cx="82" cy="186" rx="8" ry="4"
+           fill="#5C3F31"
+           stroke="#3E2818"
+           stroke-width="2"/>
+
+  <!-- ===== CHILD (right, shorter figure) ===== -->
+
+  <!-- Child hair (small with side tuft) -->
+  <path d="M 132 88
+           Q 136 76, 148 76
+           Q 160 76, 162 88
+           L 162 104
+           L 132 104 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Small hair side tuft -->
+  <path d="M 144 78 L 142 70 L 150 74 Z" fill="#5C3F31" stroke="#3E2818" stroke-width="1.2"/>
+
+  <!-- Child head (skin) -->
+  <circle cx="148" cy="92" r="11"
+          fill="#F5DCC9"
+          stroke="#3E2818"
+          stroke-width="2.2"/>
+
+  <!-- Child bangs -->
+  <path d="M 138 88
+           Q 142 82, 148 82
+           Q 156 82, 158 88
+           Q 152 86, 148 87
+           Q 142 86, 138 88 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="1.2"
+        stroke-linejoin="round"/>
+
+  <!-- Child cheek blush -->
+  <ellipse cx="141" cy="95" rx="2" ry="1.5" fill="#FFB7C5" opacity="0.6"/>
+  <ellipse cx="155" cy="95" rx="2" ry="1.5" fill="#FFB7C5" opacity="0.6"/>
+
+  <!-- Child eyes (small dots) -->
+  <circle cx="144" cy="92" r="1.2" fill="#3E2818"/>
+  <circle cx="152" cy="92" r="1.2" fill="#3E2818"/>
+
+  <!-- Child mouth -->
+  <path d="M 145 98 Q 148 100, 151 98"
+        fill="none"
+        stroke="#C77A7A"
+        stroke-width="1.2"
+        stroke-linecap="round"/>
+
+  <!-- Child neck -->
+  <rect x="143" y="102" width="10" height="6"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"/>
+
+  <!-- Child dress shadow (cel-companion) -->
+  <path d="M 148 108 L 162 110 L 168 178 L 158 180 Z"
+        fill="#D9A079"/>
+  <!-- Child dress (slight A-line, peach) -->
+  <path d="M 134 108
+           Q 140 106, 148 106
+           Q 156 106, 162 108
+           L 168 178
+           L 130 178 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Child arm reaches LEFT to dad's hand (held hand connection —
+       the load-bearing two-figure cue) -->
+  <path d="M 136 112 L 122 122 L 124 126 L 138 116 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Dad right arm reaches RIGHT toward child's hand -->
+  <path d="M 90 92 L 116 122 L 120 118 L 96 86 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- HANDS HELD (the visual hand-clasp between dad's right arm + child's left arm) -->
+  <ellipse cx="120" cy="122" rx="5" ry="4"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2"/>
+
+  <!-- Child legs -->
+  <rect x="142" y="178" width="5" height="10"
+        fill="#F5DCC9" stroke="#3E2818" stroke-width="1.5"/>
+  <rect x="153" y="178" width="5" height="10"
+        fill="#F5DCC9" stroke="#3E2818" stroke-width="1.5"/>
+
+  <!-- Child shoes -->
+  <ellipse cx="144" cy="190" rx="4.5" ry="2.5"
+           fill="#5C3F31"
+           stroke="#3E2818"
+           stroke-width="1.5"/>
+  <ellipse cx="156" cy="190" rx="4.5" ry="2.5"
+           fill="#5C3F31"
+           stroke="#3E2818"
+           stroke-width="1.5"/>
+</svg>

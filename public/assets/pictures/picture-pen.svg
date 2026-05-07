@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-pen.svg
+  Ballpoint pen for the CVC word "pen" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-pen.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: body soft-blue #A5C4D8 / shadow #7FA0B5, cap & nib
+    soft-rose #F0CDB8 / shadow #D9A079, metal nib tip dark #3E2818.
+  - Distinctness gate (per spec §2.6 pen AC, load-bearing):
+    POINTED METAL NIB on one end + clip on the other — discriminator
+    from mop (yarn fringe head). Diagonal pose for clear silhouette.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Pen">
+  <title>Pen</title>
+
+  <!-- Pen body shadow (right-bottom side of cylinder) -->
+  <path d="M 56 168
+           L 50 162
+           L 138 38
+           L 144 44 Z"
+        fill="#7FA0B5"/>
+
+  <!-- Pen body (diagonal cylinder, soft-blue) -->
+  <path d="M 50 162
+           L 60 172
+           L 152 50
+           L 142 40 Z"
+        fill="#A5C4D8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Body highlight stripe (top edge) -->
+  <line x1="54" y1="158" x2="146" y2="44"
+        stroke="#FFFFFF" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- Cap collar (where peach cap meets blue body, near upper-right) -->
+  <path d="M 130 26
+           L 144 38
+           L 152 50
+           L 140 62 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Cap top (peach end of pen at top-right) -->
+  <path d="M 130 26
+           L 144 38
+           L 168 16
+           L 154 6 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Cap shadow companion -->
+  <path d="M 144 38 L 168 16 L 162 12 L 140 36 Z"
+        fill="#D9A079"/>
+
+  <!-- Clip (tab projecting from cap, clip-style) -->
+  <path d="M 158 30
+           L 174 16
+           L 178 22
+           L 162 36 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2"
+        stroke-linejoin="round"/>
+
+  <!-- Pointed metal nib at bottom-left (the load-bearing distinguisher) -->
+  <path d="M 50 162
+           L 60 172
+           L 36 194
+           L 30 184 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Nib tip (dark pointed end) -->
+  <path d="M 36 194
+           L 30 184
+           L 26 192 Z"
+        fill="#3E2818"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Faint ink dot at very tip -->
+  <circle cx="29" cy="190" r="1.5" fill="#3E2818"/>
+</svg>

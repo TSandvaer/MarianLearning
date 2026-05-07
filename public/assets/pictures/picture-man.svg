@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-man.svg
+  Adult man standing alone for the CVC word "man" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-man.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.5px (human-figure budget per spec §6)
+  - Palette: skin warm-cream #F5DCC9 / shadow #E5C9B0, hair warm-brown
+    #5C3F31, t-shirt soft-cream #F0CDB8 / shadow #D9A079, jeans
+    soft-blue-grey #A5B5C0 / shadow #7F90A0, shoes #5C3F31.
+  - Distinctness gates (per spec §1.7 + AC10 + project_spec_drift L,
+    load-bearing):
+    1. SINGLE FIGURE STANDING ALONE — discriminator from dad
+       (two-figure parent-with-child). NEVER add a second figure.
+    2. SHORT HAIR + STRAIGHT-LEG PANTS — discriminator from mom
+       (shoulder-length hair + A-line dress).
+    3. MINIMAL facial detail (small dots for eyes, soft mouth arc) so
+       he doesn't compete with Emma.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Man">
+  <title>Man</title>
+
+  <!-- ===== HEAD ===== -->
+
+  <!-- Hair back layer (short crop, behind head — minimal silhouette) -->
+  <path d="M 78 32
+           Q 84 22, 100 22
+           Q 116 22, 122 32
+           L 122 50
+           L 78 50 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Head (skin) -->
+  <circle cx="100" cy="44" r="16"
+          fill="#F5DCC9"
+          stroke="#3E2818"
+          stroke-width="2.5"/>
+
+  <!-- Short hair front (small bangs, forehead line) -->
+  <path d="M 84 38
+           Q 90 30, 100 30
+           Q 110 30, 116 38
+           Q 110 36, 100 36
+           Q 90 36, 84 38 Z"
+        fill="#5C3F31"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Cheek blush (subtle warmth) -->
+  <ellipse cx="90" cy="48" rx="2.5" ry="2" fill="#FFB7C5" opacity="0.5"/>
+  <ellipse cx="110" cy="48" rx="2.5" ry="2" fill="#FFB7C5" opacity="0.5"/>
+
+  <!-- Eyes (small dots — per minimal-detail lock) -->
+  <circle cx="94" cy="44" r="1.4" fill="#3E2818"/>
+  <circle cx="106" cy="44" r="1.4" fill="#3E2818"/>
+
+  <!-- Mouth (small soft upward arc) -->
+  <path d="M 96 52 Q 100 54, 104 52"
+        fill="none"
+        stroke="#C77A7A"
+        stroke-width="1.5"
+        stroke-linecap="round"/>
+
+  <!-- Neck -->
+  <rect x="94" y="58" width="12" height="10"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2"/>
+
+  <!-- ===== BODY (t-shirt + jeans, single standing figure) ===== -->
+
+  <!-- T-shirt shadow (right side, cel-companion) -->
+  <path d="M 100 68 L 130 76 L 134 122 L 100 122 Z"
+        fill="#D9A079"/>
+  <!-- T-shirt body (cream-peach, simple silhouette) -->
+  <path d="M 70 76
+           L 84 68
+           L 116 68
+           L 130 76
+           L 134 90
+           L 124 92
+           L 124 122
+           L 76 122
+           L 76 92
+           L 66 90 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- T-shirt collar/neckline -->
+  <path d="M 92 68 Q 100 74, 108 68"
+        fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Sleeve hem lines -->
+  <line x1="68" y1="86" x2="78" y2="92" stroke="#3E2818" stroke-width="1.2"/>
+  <line x1="132" y1="86" x2="122" y2="92" stroke="#3E2818" stroke-width="1.2"/>
+
+  <!-- Hands (visible at sides) -->
+  <ellipse cx="68" cy="124" rx="5" ry="6"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <ellipse cx="132" cy="124" rx="5" ry="6"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2"/>
+
+  <!-- Jeans shadow (right leg) -->
+  <path d="M 100 122 L 124 122 L 122 184 L 102 184 Z"
+        fill="#7F90A0"/>
+  <!-- Jeans (STRAIGHT-LEG pants — load-bearing distinguisher from
+       mom's A-line dress) -->
+  <path d="M 76 122
+           L 124 122
+           L 122 184
+           L 104 184
+           L 100 134
+           L 96 184
+           L 78 184 Z"
+        fill="#A5B5C0"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Centre seam line on jeans -->
+  <line x1="100" y1="124" x2="100" y2="134" stroke="#3E2818" stroke-width="1.2"/>
+
+  <!-- Shoes (simple darker silhouettes at feet) -->
+  <ellipse cx="86" cy="186" rx="9" ry="4"
+           fill="#5C3F31"
+           stroke="#3E2818"
+           stroke-width="2"/>
+  <ellipse cx="114" cy="186" rx="9" ry="4"
+           fill="#5C3F31"
+           stroke="#3E2818"
+           stroke-width="2"/>
+</svg>

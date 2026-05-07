@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-can.svg
+  Soft drink can for the CVC word "can" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-can.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: top stripe soft-rose #FFB7C5 / shadow #E89AAA, mid label
+    soft-blue #A5C4D8 / shadow #7FA0B5, bottom stripe soft-cream
+    #F5DCC9, top metal grey #C8C2BD.
+  - Distinctness gate (per spec §1.10 can AC, load-bearing):
+    FLAT RING-PULL TOP and NO HANDLE — discriminator from cup (open top
+    + handle). The ring-pull tab on the flat metal top is the
+    load-bearing detail.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Can">
+  <title>Can</title>
+
+  <!-- Body shadow (right side, cel-companion across all stripes) -->
+  <rect x="98" y="46" width="46" height="124"
+        fill="#E89AAA" opacity="0.55"/>
+
+  <!-- Top stripe (soft rose) -->
+  <rect x="56" y="46" width="88" height="36"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Middle label band (soft blue — pastel) -->
+  <rect x="56" y="82" width="88" height="58"
+        fill="#A5C4D8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Mid-band shadow (right vertical companion) -->
+  <rect x="120" y="82" width="24" height="58"
+        fill="#7FA0B5" opacity="0.6"/>
+
+  <!-- Bottom stripe (warm cream) -->
+  <rect x="56" y="140" width="88" height="30"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Top metal disc (visible upper ellipse) -->
+  <ellipse cx="100" cy="46" rx="44" ry="10"
+           fill="#C8C2BD"
+           stroke="#3E2818"
+           stroke-width="2.2"/>
+
+  <!-- Inner top ellipse (slight inset) -->
+  <ellipse cx="100" cy="44" rx="40" ry="7"
+           fill="#E0DAD5"
+           stroke="#3E2818"
+           stroke-width="1.2"/>
+
+  <!-- Ring-pull tab (the load-bearing detail) -->
+  <ellipse cx="106" cy="44" rx="10" ry="3"
+           fill="#807468"
+           stroke="#3E2818"
+           stroke-width="1.5"/>
+  <ellipse cx="106" cy="44" rx="6" ry="1.5"
+           fill="#FFF6EE"
+           stroke="#3E2818"
+           stroke-width="0.8"/>
+  <!-- Pull tab pivot dot -->
+  <circle cx="100" cy="44" r="1.2" fill="#3E2818"/>
+
+  <!-- Bottom rim (subtle ellipse base contour) -->
+  <ellipse cx="100" cy="170" rx="44" ry="6"
+           fill="#D9A079"
+           stroke="#3E2818"
+           stroke-width="1.5"
+           opacity="0.6"/>
+
+  <!-- Vertical highlight on left side -->
+  <path d="M 64 60 L 64 168"
+        fill="none"
+        stroke="#FFFFFF"
+        stroke-width="2"
+        stroke-linecap="round"
+        opacity="0.4"/>
+</svg>

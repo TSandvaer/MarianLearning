@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-hat.svg
+  Wide-brim sun hat for the CVC word "hat" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-hat.png.
+  - viewBox 0 0 200 200 (matches pack convention)
+  - Cream background keyed away (transparent)
+  - Outer contour #3E2818 2.2px
+  - Palette: crown peach #F0CDB8 / shadow #D9A079, brim cream #F5DCC9 /
+    shadow #E5C9B0, ribbon soft-rose #FFB7C5 / dark #C77A7A.
+  - Distinctness gate (per spec §1.2 hat AC, load-bearing):
+    WIDE CIRCULAR BRIM all the way around — discriminator from cap
+    (cap has forward peak only). Round crown + full ellipse brim.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Hat">
+  <title>Hat</title>
+
+  <!-- Brim shadow (darker companion under-side) -->
+  <ellipse cx="100" cy="142" rx="84" ry="20"
+           fill="#E5C9B0"
+           stroke="#3E2818"
+           stroke-width="2.2"/>
+  <!-- Brim top face (lit) -->
+  <ellipse cx="100" cy="134" rx="84" ry="18"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2.2"/>
+
+  <!-- Crown shadow (right side, cel-companion) -->
+  <path d="M 102 134
+           Q 138 134, 138 92
+           Q 138 50, 100 50
+           Z"
+        fill="#D9A079"/>
+  <!-- Crown body (lit, peach) -->
+  <path d="M 62 134
+           Q 62 50, 100 50
+           Q 138 50, 138 134
+           Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Ribbon band around the crown base -->
+  <path d="M 62 124
+           Q 100 130, 138 124
+           L 138 134
+           Q 100 140, 62 134 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Ribbon bow tail (right side, simple drape) -->
+  <path d="M 138 130
+           Q 154 134, 158 148
+           Q 152 146, 148 142
+           Q 144 138, 138 134 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="1.8"
+        stroke-linejoin="round"/>
+  <path d="M 152 142
+           Q 156 146, 160 144"
+        fill="none"
+        stroke="#C77A7A"
+        stroke-width="1.2"
+        stroke-linecap="round"/>
+
+  <!-- Inner brim contour line (top edge of brim) -->
+  <path d="M 28 134 Q 100 124, 172 134"
+        fill="none"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        opacity="0.6"/>
+</svg>

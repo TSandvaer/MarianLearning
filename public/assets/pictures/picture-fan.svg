@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-fan.svg
+  Pedestal electric fan for the CVC word "fan" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-fan.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: body cream #F5DCC9 / shadow #E5C9B0, grille warm-grey
+    #C8C2BD outline, blade peach #F0CDB8 / shadow #D9A079, hub
+    warm-brown #8B6749.
+  - Distinctness gate (per spec §1.6 fan AC, load-bearing):
+    VERTICAL PEDESTAL + CIRCULAR GRILLE + BASE — discriminator from
+    hand-fan, ceiling fan, or anthropomorphised smiley fan. Three
+    blade silhouettes radiating from central hub. NO face.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Fan">
+  <title>Fan</title>
+
+  <!-- Base shadow (under flat disc base) -->
+  <ellipse cx="104" cy="186" rx="34" ry="6"
+           fill="#9C6B3A" opacity="0.45"/>
+  <!-- Base disc (flat rounded base) -->
+  <ellipse cx="100" cy="180" rx="32" ry="8"
+           fill="#F5DCC9"
+           stroke="#3E2818"
+           stroke-width="2.2"/>
+  <ellipse cx="100" cy="178" rx="28" ry="5"
+           fill="#FCEEE2"
+           stroke="#3E2818"
+           stroke-width="1"/>
+
+  <!-- Pedestal post shadow -->
+  <rect x="100" y="100" width="6" height="80"
+        fill="#E5C9B0"/>
+  <!-- Pedestal post (cream cylinder) -->
+  <rect x="94" y="100" width="12" height="80"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Power-cord trailing down (subtle line wrap) -->
+  <path d="M 106 130 Q 116 144, 110 168 Q 106 178, 124 184"
+        fill="none"
+        stroke="#3E2818"
+        stroke-width="1.2"
+        stroke-linecap="round"
+        opacity="0.6"/>
+
+  <!-- Grille shadow (right side companion) -->
+  <circle cx="104" cy="76" r="48"
+          fill="#E5C9B0"/>
+
+  <!-- Grille outer ring (circular guard housing) -->
+  <circle cx="100" cy="74" r="48"
+          fill="#FCEEE2"
+          stroke="#3E2818"
+          stroke-width="2.5"/>
+
+  <!-- Grille inner disc (lighter cream backing for blades) -->
+  <circle cx="100" cy="74" r="42"
+          fill="#F5DCC9"
+          stroke="#3E2818"
+          stroke-width="1.5"/>
+
+  <!-- Blades (3 fan-blade silhouettes radiating from hub, soft peach) -->
+  <!-- Blade 1 (top) -->
+  <path d="M 100 74
+           Q 96 50, 86 36
+           Q 96 32, 106 36
+           Q 104 50, 100 74 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+  <!-- Blade 2 (lower-right) -->
+  <path d="M 100 74
+           Q 124 86, 138 100
+           Q 134 110, 122 110
+           Q 110 92, 100 74 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+  <!-- Blade 3 (lower-left) -->
+  <path d="M 100 74
+           Q 76 86, 62 100
+           Q 66 110, 78 110
+           Q 90 92, 100 74 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Blade shadow companions (lower edge of each blade) -->
+  <path d="M 100 74 L 90 50 L 100 50 Z" fill="#D9A079" opacity="0.4"/>
+  <path d="M 100 74 L 122 100 L 110 100 Z" fill="#D9A079" opacity="0.4"/>
+  <path d="M 100 74 L 78 100 L 90 100 Z" fill="#D9A079" opacity="0.4"/>
+
+  <!-- Centre hub (where blades meet) -->
+  <circle cx="100" cy="74" r="8"
+          fill="#8B6749"
+          stroke="#3E2818"
+          stroke-width="2"/>
+  <circle cx="100" cy="74" r="3"
+          fill="#3E2818"/>
+
+  <!-- Spoke marks on grille (radiating, sparse) -->
+  <line x1="100" y1="30" x2="100" y2="118" stroke="#3E2818" stroke-width="0.6" opacity="0.3"/>
+  <line x1="56" y1="74" x2="144" y2="74" stroke="#3E2818" stroke-width="0.6" opacity="0.3"/>
+  <line x1="68" y1="42" x2="132" y2="106" stroke="#3E2818" stroke-width="0.6" opacity="0.3"/>
+  <line x1="132" y1="42" x2="68" y2="106" stroke="#3E2818" stroke-width="0.6" opacity="0.3"/>
+</svg>

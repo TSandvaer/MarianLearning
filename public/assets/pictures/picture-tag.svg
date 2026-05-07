@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-tag.svg
+  Paper price tag with string loop for the CVC word "tag" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-tag.png.
+  - viewBox 0 0 200 200
+  - Outer contour #3E2818 2.2px
+  - Palette: tag soft-rose #FFB7C5 / shadow #E89AAA, string warm-cream
+    #F5DCC9 + cream-brown twist #C8946C.
+  - Distinctness gate (per spec §1.11 tag AC, load-bearing):
+    SMALL FLAT CARD WITH STRING LOOP at top — discriminator from bag
+    (body-with-handle). Notched top edge gives the classic price-tag
+    silhouette.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Tag">
+  <title>Tag</title>
+
+  <!-- String loop (soft cotton twist hanging up from hole) -->
+  <path d="M 100 56
+           Q 96 30, 88 24
+           Q 80 20, 86 14"
+        fill="none"
+        stroke="#C8946C"
+        stroke-width="3"
+        stroke-linecap="round"/>
+  <path d="M 100 56
+           Q 104 30, 112 24
+           Q 120 20, 114 14"
+        fill="none"
+        stroke="#F5DCC9"
+        stroke-width="3"
+        stroke-linecap="round"/>
+  <!-- Twist marks on string -->
+  <line x1="92" y1="32" x2="98" y2="34" stroke="#3E2818" stroke-width="1" opacity="0.5"/>
+  <line x1="102" y1="34" x2="108" y2="32" stroke="#3E2818" stroke-width="1" opacity="0.5"/>
+
+  <!-- Tag shadow (cel-companion, right side) -->
+  <path d="M 100 50
+           L 138 70
+           L 138 168
+           L 110 178 Z"
+        fill="#E89AAA"/>
+
+  <!-- Tag body (notched-top rectangle — classic price-tag shape) -->
+  <path d="M 100 50
+           L 138 70
+           L 138 168
+           Q 138 174, 132 174
+           L 68 174
+           Q 62 174, 62 168
+           L 62 70 Z"
+        fill="#FFB7C5"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Top angled edge (left side of notched top) -->
+  <path d="M 62 70 L 100 50"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linecap="round"
+        fill="none"/>
+
+  <!-- Hole for string (punched through tag near top) -->
+  <circle cx="100" cy="68" r="6"
+          fill="#FFF6EE"
+          stroke="#3E2818"
+          stroke-width="2"/>
+  <circle cx="100" cy="68" r="4"
+          fill="none"
+          stroke="#C77A7A"
+          stroke-width="0.8"
+          opacity="0.5"/>
+
+  <!-- Subtle highlight on left edge -->
+  <path d="M 66 86 Q 66 130, 66 168"
+        fill="none"
+        stroke="#FFE0E8"
+        stroke-width="2"
+        stroke-linecap="round"
+        opacity="0.6"/>
+</svg>
