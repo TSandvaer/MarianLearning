@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-mop.svg
+  Cleaning mop for the CVC word "mop" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-mop.png.
+  - viewBox 0 0 200 200 (matches pic-dog.svg + pack convention)
+  - Cream background keyed away (transparent)
+  - Outer contour #3E2818 2.2px (warm dark brown, never pure black)
+  - Palette: warm-brown handle (#8B6749 / #6B4A30 shadow), grey collar
+    (#B8B0A8 / #807468 shadow), warm-rose / cream fringe strands
+    (#FFB7C5 + #F5DCC9), single cel-shadow companion per zone.
+  - Distinctness gate: visible individual yarn strands hanging downward
+    (per spec §5.2 mop AC) — 11 strands flaring outward to disambiguate
+    from pen (no strands) / pan (no strands) / generic stick.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Mop">
+  <title>Mop</title>
+
+  <!-- Handle shadow (warm-brown, darker right side, light from upper-left) -->
+  <path d="M 100 18 L 108 18 L 108 122 L 100 122 Z"
+        fill="#6B4A30"/>
+  <!-- Handle (warm-brown wood) -->
+  <path d="M 92 18 L 100 18 L 100 122 L 92 122 Z"
+        fill="#8B6749"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+  <!-- Right edge contour on shadow side -->
+  <line x1="108" y1="18" x2="108" y2="122"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linecap="round"/>
+
+  <!-- Metal collar shadow -->
+  <rect x="86" y="124" width="28" height="14"
+        fill="#807468"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+  <!-- Metal collar (light cap) -->
+  <rect x="86" y="120" width="28" height="10"
+        fill="#B8B0A8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Fringe-head body shadow (under-fan, warm-rose darker companion) -->
+  <path d="M 56 138
+           Q 100 132, 144 138
+           L 162 184
+           Q 100 192, 38 184 Z"
+        fill="#E89AAA"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+  <!-- Fringe-head body (warm-rose top layer) -->
+  <path d="M 60 138
+           Q 100 132, 140 138
+           L 156 178
+           Q 100 184, 44 178 Z"
+        fill="#FFB7C5"/>
+
+  <!-- Individual yarn strands — 11 strands hanging downward,
+       alternating cream (#F5DCC9) and rose (#FFB7C5), with light
+       contour. Strand-individuality is the disambiguator from pen/pan. -->
+  <!-- Strand 1 (far left) -->
+  <path d="M 50 144 Q 42 168 38 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 52 146 Q 46 168 44 182" fill="none" stroke="#F5DCC9" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 2 -->
+  <path d="M 60 142 Q 56 168 52 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 60 144 Q 58 168 56 182" fill="none" stroke="#FFB7C5" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 3 -->
+  <path d="M 70 140 Q 68 168 66 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 70 142 Q 70 168 68 182" fill="none" stroke="#F5DCC9" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 4 -->
+  <path d="M 80 140 Q 80 168 78 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 80 142 Q 80 168 80 182" fill="none" stroke="#FFB7C5" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 5 -->
+  <path d="M 90 138 Q 90 168 90 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 90 140 Q 90 168 90 182" fill="none" stroke="#F5DCC9" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 6 (center) -->
+  <path d="M 100 138 Q 100 168 100 186" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 100 140 Q 100 168 100 184" fill="none" stroke="#FFB7C5" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 7 -->
+  <path d="M 110 138 Q 110 168 110 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 110 140 Q 110 168 110 182" fill="none" stroke="#F5DCC9" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 8 -->
+  <path d="M 120 140 Q 120 168 122 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 120 142 Q 120 168 120 182" fill="none" stroke="#FFB7C5" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 9 -->
+  <path d="M 130 140 Q 132 168 134 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 130 142 Q 130 168 132 182" fill="none" stroke="#F5DCC9" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 10 -->
+  <path d="M 140 142 Q 144 168 148 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 140 144 Q 142 168 144 182" fill="none" stroke="#FFB7C5" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Strand 11 (far right) -->
+  <path d="M 150 144 Q 158 168 162 184" fill="none" stroke="#3E2818" stroke-width="1.5" stroke-linecap="round"/>
+  <path d="M 150 146 Q 154 168 156 182" fill="none" stroke="#F5DCC9" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

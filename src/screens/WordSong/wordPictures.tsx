@@ -1211,217 +1211,41 @@ function renderPictureBody(key: string): ReactNode {
         </g>
       )
 
-    // ── Short-o pool silhouettes (ticket 86c9m3ae3) ─────────────────────
-    // Placeholder silhouettes for the 4 wholly-new short-o entries
-    // (`mop, box, mom, hot`). Per the dispatch brief, real Midjourney →
-    // SVG illustrations land in a separate Kyle ticket; these
-    // silhouettes ship now so the chip render works for v1 short-o
-    // sessions. Each silhouette is visually distinct from every
-    // existing pack entry (forbidden-pair audit in `wordPack.ts`
-    // covers the dad↔mom composition collision; the other three
-    // shapes have no silhouette twin in the pack).
+    // ── Short-o pool real SVG artwork (ticket 86c9p4uw3 — Phase 3) ────
+    // Real SVG artwork for the 4 wholly-new short-o entries
+    // (`mop, box, mom, hot`), traced from Thomas's Phase 2 Midjourney
+    // PNGs. Files live at `public/assets/pictures/picture-{word}.svg`
+    // and are served over the Vite static-asset path; the service
+    // worker's `**/*.svg` precache pattern picks them up so they
+    // ship offline-first alongside the rest of the bundle.
     //
     // The 4 PROMOTED short-o entries (`dog, log, pot, fox`) keep
-    // their existing silhouettes above — they used to be distractors,
-    // now they're targets too, but the picture surface is unchanged.
+    // their existing inline silhouettes above — they belong to the
+    // short-a pack's eventual cohesion pass per
+    // `design/word-song/short-o-picture-pack-prompts.md` §6, not this
+    // PR's scope.
+    //
+    // Distinctness gates per the Phase 1 spec §5.2 are preserved by
+    // each asset's authoring (see header comments inside each SVG).
 
     case 'mop':
-      // Cleaning mop — long handle + fringe head. Distinct from pen
-      // (long but no fringe) and pan (round + flat handle).
-      return (
-        <g>
-          {/* Handle */}
-          <rect
-            x="44"
-            y="14"
-            width="6"
-            height="46"
-            rx="2"
-            fill={STROKE}
-            stroke={INK}
-            strokeWidth="1"
-          />
-          {/* Fringe head — strands hanging down */}
-          <rect
-            x="26"
-            y="56"
-            width="44"
-            height="6"
-            rx="1"
-            fill={ROSE}
-            stroke={STROKE}
-            strokeWidth="2"
-          />
-          <line x1="30" y1="62" x2="28" y2="82" stroke={ROSE} strokeWidth="2" />
-          <line x1="36" y1="62" x2="36" y2="84" stroke={ROSE} strokeWidth="2" />
-          <line x1="42" y1="62" x2="40" y2="82" stroke={ROSE} strokeWidth="2" />
-          <line x1="48" y1="62" x2="50" y2="84" stroke={ROSE} strokeWidth="2" />
-          <line x1="54" y1="62" x2="54" y2="82" stroke={ROSE} strokeWidth="2" />
-          <line x1="60" y1="62" x2="62" y2="84" stroke={ROSE} strokeWidth="2" />
-          <line x1="66" y1="62" x2="66" y2="82" stroke={ROSE} strokeWidth="2" />
-        </g>
-      )
-
     case 'box':
-      // Cardboard box — closed flaps, three-quarter view. Distinct
-      // from bag (rounded with handle) and tag (parallelogram).
-      return (
-        <g>
-          {/* Front face */}
-          <rect
-            x="20"
-            y="38"
-            width="50"
-            height="40"
-            fill="#C8946C"
-            stroke={STROKE}
-            strokeWidth="2"
-          />
-          {/* Top face (perspective slant) */}
-          <polygon
-            points="20,38 32,24 82,24 70,38"
-            fill="#A88060"
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          {/* Right side face */}
-          <polygon
-            points="70,38 82,24 82,64 70,78"
-            fill="#9C6B3A"
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          {/* Tape line across top */}
-          <line
-            x1="26"
-            y1="31"
-            x2="76"
-            y2="31"
-            stroke={CREAM}
-            strokeWidth="2"
-          />
-          {/* Tape line down front (closure seam) */}
-          <line
-            x1="45"
-            y1="38"
-            x2="45"
-            y2="78"
-            stroke={STROKE}
-            strokeWidth="1"
-          />
-        </g>
-      )
-
     case 'mom':
-      // Parent + child — mirrors `dad` composition but with longer
-      // hair + skirt-silhouette pose for the parent. The mom-dad pair
-      // is in FORBIDDEN_PAIRS so they never co-occur in a trio; the
-      // discriminator here is hair-length + outfit silhouette.
-      return (
-        <g>
-          {/* Parent — taller, on left, longer hair */}
-          <circle
-            cx="32"
-            cy="22"
-            r="8"
-            fill={CREAM}
-            stroke={STROKE}
-            strokeWidth="2"
-          />
-          {/* Hair — covers head sides + reaches shoulders */}
-          <path
-            d="M 24 22 Q 22 14 32 12 Q 42 14 40 22 L 40 38 L 24 38 Z"
-            fill={STROKE}
-            stroke={INK}
-            strokeWidth="1"
-            strokeLinejoin="round"
-          />
-          {/* Body — A-line dress silhouette (wider at hem than shoulders) */}
-          <path
-            d="M 24 36 L 40 36 L 46 84 L 18 84 Z"
-            fill={ROSE}
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          {/* Child — smaller, on right (matches `dad` composition) */}
-          <circle
-            cx="64"
-            cy="38"
-            r="6"
-            fill={CREAM}
-            stroke={STROKE}
-            strokeWidth="2"
-          />
-          <path
-            d="M 56 50 L 60 48 L 60 64 L 58 84 L 64 84 L 66 64 L 66 64 L 66 48 L 70 50 L 70 60 Z"
-            fill={SPARKLE}
-            stroke={STROKE}
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-          {/* Connecting hands */}
-          <line
-            x1="42"
-            y1="58"
-            x2="56"
-            y2="58"
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </g>
-      )
-
     case 'hot':
-      // Steaming bowl — anchors the property "hot" via a depictable
-      // hot thing. Three steam curls rise above a bowl. Distinct from
-      // cup (mug with handle) and pot (cooking pot with two handles).
+      // External SVG — rendered as <image> inside the wrapper <svg>
+      // so the WordPicture outer envelope (data-testid, role, aria-label)
+      // stays identical to the inline silhouettes. The 0..96 viewBox
+      // matches the source SVGs' 0..200 design — preserveAspectRatio
+      // keeps each picture centred at any chip / large size.
       return (
-        <g>
-          {/* Bowl — wider at top, tapered at base */}
-          <path
-            d="M 20 50 L 76 50 L 68 78 L 28 78 Z"
-            fill={CREAM}
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          {/* Top opening (rim) */}
-          <ellipse
-            cx="48"
-            cy="50"
-            rx="28"
-            ry="4"
-            fill={ROSE}
-            stroke={STROKE}
-            strokeWidth="1.5"
-          />
-          {/* Steam curls — three rising swirls */}
-          <path
-            d="M 34 44 Q 30 36 34 30 Q 38 22 34 14"
-            fill="none"
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 48 42 Q 44 34 48 28 Q 52 20 48 12"
-            fill="none"
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 62 44 Q 58 36 62 30 Q 66 22 62 14"
-            fill="none"
-            stroke={STROKE}
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </g>
+        <image
+          href={`/assets/pictures/picture-${key}.svg`}
+          x="0"
+          y="0"
+          width="96"
+          height="96"
+          preserveAspectRatio="xMidYMid meet"
+        />
       )
 
     case 'tap':

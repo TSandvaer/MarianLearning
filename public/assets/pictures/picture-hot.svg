@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-hot.svg
+  Steaming bowl for the CVC word "hot" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-hot.png.
+  - viewBox 0 0 200 200 (matches pic-dog.svg + pack convention)
+  - Cream background keyed away (transparent)
+  - Outer contour #3E2818 2.2px
+  - Palette: bowl body soft-peach #F0CDB8 (lit) + #D9A079 (shadow),
+    rim darker #C8946C, contents abstract soft-rose #FFB7C5,
+    steam soft-warm-grey #B8B0A8.
+  - Distinctness gates (per spec §5.2 hot AC, load-bearing):
+    1. THREE rising steam curls preserved (S-shaped curves)
+    2. Shallow-wide bowl proportions (wider than deep)
+    3. NO side handles — discriminator from pot
+  - Light direction upper-left (cel-shadow on right side of bowl).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Hot">
+  <title>Hot</title>
+
+  <!-- ===== STEAM CURLS (3 rising S-shaped wisps) ===== -->
+  <!-- Steam 1 (left) -->
+  <path d="M 70 100
+           Q 64 86, 70 74
+           Q 76 60, 70 46"
+        fill="none"
+        stroke="#B8B0A8"
+        stroke-width="3.5"
+        stroke-linecap="round"/>
+  <!-- Steam 2 (centre, slightly taller) -->
+  <path d="M 100 102
+           Q 94 86, 100 70
+           Q 106 54, 100 38"
+        fill="none"
+        stroke="#B8B0A8"
+        stroke-width="3.5"
+        stroke-linecap="round"/>
+  <!-- Steam 3 (right) -->
+  <path d="M 130 100
+           Q 136 86, 130 74
+           Q 124 60, 130 46"
+        fill="none"
+        stroke="#B8B0A8"
+        stroke-width="3.5"
+        stroke-linecap="round"/>
+
+  <!-- ===== BOWL ===== -->
+
+  <!-- Soft cel-shadow companion under bowl (light upper-left) -->
+  <ellipse cx="116" cy="172" rx="60" ry="6"
+           fill="#9C6B3A"
+           opacity="0.25"/>
+
+  <!-- Bowl body shadow (cel-companion, right side darker) -->
+  <path d="M 110 110
+           L 168 110
+           Q 168 120, 158 144
+           Q 148 162, 130 168
+           Q 124 170, 116 170 Z"
+        fill="#D9A079"/>
+
+  <!-- Bowl body (light face, soft peach) -->
+  <path d="M 32 110
+           Q 100 122, 168 110
+           Q 168 120, 158 144
+           Q 148 162, 130 168
+           Q 100 174, 70 168
+           Q 52 162, 42 144
+           Q 32 120, 32 110 Z"
+        fill="#F0CDB8"
+        stroke="#3E2818"
+        stroke-width="2.2"
+        stroke-linejoin="round"/>
+
+  <!-- Bowl rim (darker peach top edge — ellipse) -->
+  <ellipse cx="100" cy="110" rx="68" ry="10"
+           fill="#C8946C"
+           stroke="#3E2818"
+           stroke-width="2.2"/>
+
+  <!-- Bowl rim inner (suggests an opening into the contents) -->
+  <ellipse cx="100" cy="110" rx="60" ry="6"
+           fill="#FFB7C5"
+           opacity="0.6"/>
+
+  <!-- Bowl rim highlight (top sliver, soft cream) -->
+  <path d="M 44 108
+           Q 100 100, 156 108"
+        fill="none"
+        stroke="#F5DCC9"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        opacity="0.7"/>
+
+  <!-- Foot of bowl (small base ring, soft cel-shadow companion) -->
+  <ellipse cx="100" cy="170" rx="20" ry="3"
+           fill="#9C6B3A"
+           opacity="0.6"/>
+</svg>

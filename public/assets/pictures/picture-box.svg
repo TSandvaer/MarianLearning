@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  picture-box.svg
+  Closed cardboard box for the CVC word "box" in Word Song.
+  Phase 3 trace of design/references/picture-pack/picture-box.png.
+  - viewBox 0 0 200 200 (matches pic-dog.svg + pack convention)
+  - Cream background keyed away (transparent)
+  - Outer contour #3E2818 2.5px
+  - Palette: cardboard browns — top face #E0AA86 (lit), front face
+    #C8946C (mid), side face #9C6B3A (shadow), tape cream #F5DCC9.
+    Light from upper-left.
+  - Distinctness gate: three visible faces (top + front + side); single
+    horizontal tape seam across top + small fold-tape pieces near top
+    corners. Cuboid-with-tape silhouette readable at 96pt; corners
+    softened (not sharp angular) per spec §2.2 notes.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Box">
+  <title>Box</title>
+
+  <!-- Top face (lit, lightest) — three-quarter perspective slant -->
+  <path d="M 38 64
+           L 84 38
+           L 174 38
+           L 138 64 Z"
+        fill="#E0AA86"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Right side face (deepest shadow) -->
+  <path d="M 138 64
+           L 174 38
+           L 174 144
+           L 138 174 Z"
+        fill="#9C6B3A"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Front face (mid-tone) -->
+  <path d="M 38 64
+           L 138 64
+           L 138 174
+           L 38 174 Z"
+        fill="#C8946C"
+        stroke="#3E2818"
+        stroke-width="2.5"
+        stroke-linejoin="round"/>
+
+  <!-- Tape across top face (single horizontal seam) -->
+  <path d="M 56 56 L 152 56 L 156 50 L 60 50 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Front-left fold-tape piece (small, near top-left corner) -->
+  <path d="M 46 64 L 60 64 L 60 76 L 46 76 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+  <!-- Front-right fold-tape piece (small, near top-right corner) -->
+  <path d="M 116 64 L 130 64 L 130 76 L 116 76 Z"
+        fill="#F5DCC9"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linejoin="round"/>
+
+  <!-- Front face vertical seam (centre flap line) -->
+  <line x1="88" y1="64" x2="88" y2="174"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linecap="round"/>
+
+  <!-- Top face seam (down centre) -->
+  <line x1="84" y1="38" x2="138" y2="64"
+        stroke="#3E2818"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        opacity="0.5"/>
+
+  <!-- Soft cel-shadow companion on bottom-front-left (light upper-left) -->
+  <path d="M 38 174 L 38 156 L 56 174 Z"
+        fill="#9C6B3A"
+        opacity="0.5"/>
+</svg>

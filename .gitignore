@@ -52,3 +52,9 @@ dev-dist
 # (the script's skip-if-exists logic short-circuits before any API call).
 # Re-generate locally with `npm run canon:regen` only when prompts or
 # curriculum change, then commit the diff alongside the change.
+
+# Picture-pack reference assets (Phase 2 Midjourney PNGs)
+# These are trace-references only — Phase 3 SVGs go in
+# `public/assets/pictures/` instead. The PNGs are large (~3.9 MB combined)
+# and have no runtime use; keep them out of the bundle.
+design/references/picture-pack/*.png
