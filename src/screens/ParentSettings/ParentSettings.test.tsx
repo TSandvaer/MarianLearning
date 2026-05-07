@@ -390,3 +390,168 @@ describe('ParentSettings — DEFAULT_PARENT_SETTINGS contract', () => {
     ).toBe('on')
   })
 })
+
+describe('ParentSettings — Backup section (ticket 86c9pkfth)', () => {
+  /**
+   * The Backup section reads BOTH the Progress doc (via `storage.load()`)
+   * AND the session-history blob (via `storage.loadSessionHistory()`).
+   * To exercise the section deterministically, tests need a memory
+   * storage that exposes both seams.
+   */
+  function createBackupStorage(opts?: { progress?: Progress | null }): {
+    storage: ParentSettingsStorage
+    clipboardWrites: string[]
+    rejectClipboard: boolean
+  } {
+    const clipboardWrites: string[] = []
+    const state = { rejectClipboard: false }
+    const sessionHistoryStub = {
+      schemaVersion: 2 as const,
+      sessionCount: 5,
+      lastSessionCompletedAt: '2026-05-06T10:00:00.000Z',
+      longestStreakEver: 3,
+      cumulativeStardust: 12,
+      lastSessionStardust: 4,
+      dayStreak: 1,
+      todayTreesTouched: { date: '2026-05-06', trees: [] },
+      lastSuggestion: null,
+      consecutiveOverrides: 0,
+      suggestionCooldownUntil: null,
+    }
+    const storage: ParentSettingsStorage = {
+      load: () => opts?.progress ?? defaultProgress(),
+      save: () => {
+        /* no-op for backup tests */
+      },
+      loadSessionHistory: () => sessionHistoryStub,
+      writeClipboard: async (text: string) => {
+        if (state.rejectClipboard) throw new Error('NotAllowedError')
+        clipboardWrites.push(text)
+      },
+    }
+    return {
+      storage,
+      clipboardWrites,
+      get rejectClipboard() {
+        return state.rejectClipboard
+      },
+      set rejectClipboard(v: boolean) {
+        state.rejectClipboard = v
+      },
+    } as ReturnType<typeof createBackupStorage>
+  }
+
+  it('renders the Backup section with a read-only textarea and Copy button', () => {
+    const { storage } = createBackupStorage()
+    render(<ParentSettings storage={storage} />)
+    const section = screen.getByTestId('parent-settings-backup')
+    expect(section).toBeTruthy()
+    const textarea = screen.getByTestId(
+      'parent-settings-backup-json',
+    ) as HTMLTextAreaElement
+    expect(textarea.readOnly).toBe(true)
+    expect(screen.getByTestId('parent-settings-backup-copy')).toBeTruthy()
+  })
+
+  it('the textarea contents parse as JSON with the expected envelope shape', () => {
+    const { storage } = createBackupStorage()
+    render(<ParentSettings storage={storage} />)
+    const textarea = screen.getByTestId(
+      'parent-settings-backup-json',
+    ) as HTMLTextAreaElement
+    const parsed = JSON.parse(textarea.value)
+    expect(parsed.kind).toBe('marian-tutor.backup')
+    expect(parsed.version).toBe(1)
+    expect(typeof parsed.exportedAtISO).toBe('string')
+    expect(parsed.progress).toBeTruthy()
+    expect(parsed.progress.schemaVersion).toBe(1)
+    expect(parsed.sessionHistory).toBeTruthy()
+    expect(parsed.sessionHistory.sessionCount).toBe(5)
+  })
+
+  it('Copy button calls writeClipboard with the textarea value', async () => {
+    const user = userEvent.setup()
+    const ctx = createBackupStorage()
+    render(<ParentSettings storage={ctx.storage} />)
+    const textarea = screen.getByTestId(
+      'parent-settings-backup-json',
+    ) as HTMLTextAreaElement
+    await user.click(screen.getByTestId('parent-settings-backup-copy'))
+    expect(ctx.clipboardWrites).toHaveLength(1)
+    expect(ctx.clipboardWrites[0]).toBe(textarea.value)
+  })
+
+  it('renders a "copied" status after a successful Copy', async () => {
+    const user = userEvent.setup()
+    const { storage } = createBackupStorage()
+    render(<ParentSettings storage={storage} />)
+    expect(screen.queryByTestId('parent-settings-backup-status')).toBeNull()
+    await user.click(screen.getByTestId('parent-settings-backup-copy'))
+    const status = await screen.findByTestId('parent-settings-backup-status')
+    expect(status.getAttribute('data-status')).toBe('copied')
+  })
+
+  it('renders an "error" status when writeClipboard rejects', async () => {
+    const user = userEvent.setup()
+    const ctx = createBackupStorage()
+    ctx.rejectClipboard = true
+    render(<ParentSettings storage={ctx.storage} />)
+    await user.click(screen.getByTestId('parent-settings-backup-copy'))
+    const status = await screen.findByTestId('parent-settings-backup-status')
+    expect(status.getAttribute('data-status')).toBe('error')
+    // Textarea still shows the JSON — manual select-and-copy fallback.
+    const textarea = screen.getByTestId(
+      'parent-settings-backup-json',
+    ) as HTMLTextAreaElement
+    expect(textarea.value.length).toBeGreaterThan(0)
+  })
+
+  it('survives a session-history read that throws (defensive — adapter failure)', () => {
+    // Seam adapter returns a thrown error — the backup still renders
+    // with `sessionHistory: null` rather than crashing the screen.
+    const storage: ParentSettingsStorage = {
+      load: () => defaultProgress(),
+      save: () => {},
+      loadSessionHistory: () => {
+        throw new Error('storage-unavailable')
+      },
+      writeClipboard: async () => {},
+    }
+    render(<ParentSettings storage={storage} />)
+    const textarea = screen.getByTestId(
+      'parent-settings-backup-json',
+    ) as HTMLTextAreaElement
+    const parsed = JSON.parse(textarea.value)
+    expect(parsed.progress).toBeTruthy()
+    expect(parsed.sessionHistory).toBeNull()
+  })
+
+  it('renders an "error" status when writeClipboard is undefined (test-seam contract)', async () => {
+    // A storage that doesn't supply writeClipboard at all (legacy
+    // consumer) — the Copy click surfaces an error rather than
+    // throwing.
+    const user = userEvent.setup()
+    const storage: ParentSettingsStorage = {
+      load: () => defaultProgress(),
+      save: () => {},
+      loadSessionHistory: () => ({
+        schemaVersion: 2,
+        sessionCount: 0,
+        lastSessionCompletedAt: '',
+        longestStreakEver: 0,
+        cumulativeStardust: 0,
+        lastSessionStardust: 0,
+        dayStreak: 0,
+        todayTreesTouched: { date: '', trees: [] },
+        lastSuggestion: null,
+        consecutiveOverrides: 0,
+        suggestionCooldownUntil: null,
+      }),
+      // writeClipboard intentionally omitted
+    }
+    render(<ParentSettings storage={storage} />)
+    await user.click(screen.getByTestId('parent-settings-backup-copy'))
+    const status = await screen.findByTestId('parent-settings-backup-status')
+    expect(status.getAttribute('data-status')).toBe('error')
+  })
+})

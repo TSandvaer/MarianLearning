@@ -9,8 +9,75 @@
 
 import { emptyLeitner } from './leitner'
 import { DEFAULT_PARENT_SETTINGS } from './parentSettings'
-import type { Progress, SkillLevels } from './types'
+import type { Progress, SkillLevels, SkillNode } from './types'
 import { CURRENT_SCHEMA_VERSION } from './types'
+
+/**
+ * Schema-floor skill-level keys (ticket 86c9pkfth).
+ *
+ * Single source of truth for "every node the schema knows about". Used by
+ * the storage read-path defaulter (`withDefaultedSkillLevels`) to fill
+ * missing keys on persisted blobs that predate a node addition. Lives
+ * here rather than `guards.ts` so the defaulter and the guard share the
+ * same enumeration without an import cycle (guards.ts already imports
+ * types.ts, and the defaulter would be importing both).
+ *
+ * IMPORTANT: when a new skill node is added to the `SkillNode` union,
+ * extend this list AND the `SKILL_NODES` set in `guards.ts` in the same
+ * change. The `schema-floor coverage` regression in `storage.test.ts`
+ * fails first if they drift.
+ */
+const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
+  // Number Garden
+  'number-recog',
+  'add-to-10',
+  'add-to-20',
+  'sub-to-10',
+  'sub-to-20',
+  'two-digit-addsub',
+  'skip-counting',
+  'mult-2-5-10',
+  'mult-3-4',
+  'mult-6-9',
+  // Word Song
+  'letter-names',
+  'letter-sounds',
+  'blending-cv',
+  'cvc-words',
+  'cvc-words-short-o',
+  'digraphs',
+  'sight-words',
+  'simple-sentences',
+] as const
+
+/**
+ * Schema-floor skill levels — every node `'locked'` (ticket 86c9pkfth).
+ *
+ * NOT the same as `defaultProgress().skillLevels` — that factory carries
+ * Marian's April 2026 diagnostic baseline (`add-to-10: practicing`,
+ * `cvc-words: intro`, etc.) which is correct for a brand-new profile
+ * but WRONG as a fill-source for the read-path defaulter. If the
+ * defaulter merged the diagnostic baseline over a partially-corrupt
+ * blob, a missing `add-to-10` key would silently grant Marian
+ * `'practicing'` access she never earned (or, in a forward-compat
+ * scenario, that the blob's owner had already mastered past).
+ *
+ * The schema floor is the SAFE fill: a missing key cannot grant access
+ * the user didn't have. Every node defaults to `'locked'`. The
+ * downstream tree-walking logic (`pickFocusNode`, `applyMasteryRule`)
+ * then unlocks adjacency in the normal way once Marian completes a
+ * session.
+ *
+ * Returns a fresh object each call so callers can spread + mutate
+ * without touching the singleton.
+ */
+export function defaultLockedSkillLevels(): SkillLevels {
+  const out = {} as SkillLevels
+  for (const node of SCHEMA_FLOOR_NODES) {
+    out[node] = 'locked'
+  }
+  return out
+}
 
 const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // Number Garden — math

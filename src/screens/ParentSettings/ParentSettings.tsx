@@ -43,6 +43,10 @@ import {
   type SessionModePicker,
 } from '../../lib/progress'
 import { labelForSkillNode } from '../Hub/progressProjection'
+import {
+  readSessionHistory,
+  type SessionHistoryV2,
+} from '../SessionEnd/sessionHistory'
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -60,6 +64,19 @@ export interface ParentSettingsProps {
 export interface ParentSettingsStorage {
   load: () => Progress | null
   save: (p: Progress) => void
+  /**
+   * Read the persisted session-history blob (Hub stats / streak /
+   * sessionCount). Optional test seam for the Backup section
+   * (ticket 86c9pkfth) — production defaults to
+   * `readSessionHistory()` from `screens/SessionEnd/sessionHistory.ts`.
+   */
+  loadSessionHistory?: () => SessionHistoryV2
+  /**
+   * Write text to the OS clipboard. Optional test seam — production
+   * defaults to `navigator.clipboard.writeText`. Returning a Promise
+   * lets the screen surface success/failure UI.
+   */
+  writeClipboard?: (text: string) => Promise<void>
 }
 
 /**
@@ -73,9 +90,37 @@ type ParentSettingsPatch = Partial<Omit<ParentSettings, 'masteryThreshold'>> & {
   masteryThreshold?: Partial<ParentSettings['masteryThreshold']>
 }
 
+/**
+ * Defensive wrapper around the test-seam `loadSessionHistory()` — a
+ * thrown adapter (e.g. localStorage unavailable, JSON parse fail at
+ * a lower layer) MUST NOT crash Parent Settings. Falls back to null
+ * so the backup payload still renders with `sessionHistory: null`.
+ */
+function safelyReadSessionHistory(
+  read: () => SessionHistoryV2,
+): SessionHistoryV2 | null {
+  try {
+    return read()
+  } catch {
+    return null
+  }
+}
+
 const DEFAULT_STORAGE: ParentSettingsStorage = {
   load: loadProgress,
   save: saveProgress,
+  loadSessionHistory: () => readSessionHistory(),
+  writeClipboard: async (text: string): Promise<void> => {
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator.clipboard &&
+      typeof navigator.clipboard.writeText === 'function'
+    ) {
+      await navigator.clipboard.writeText(text)
+      return
+    }
+    throw new Error('clipboard-unavailable')
+  },
 }
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -150,6 +195,60 @@ export default function ParentSettings({
    * the alternative (carrying the parent's autoPromote=false and
    * synthesising a single-node mutation) duplicates the rule's logic.
    */
+  /**
+   * Backup section state (ticket 86c9pkfth) — escape hatch for parents
+   * to copy Marian's full progress + session-history JSON to clipboard.
+   * Pairs with the upcoming cloud-sync ticket (T2).
+   *
+   * `copyState` is a minimal three-value FSM: `'idle' | 'copied' | 'error'`.
+   * The `copied`/`error` states reset to `'idle'` after a short timer
+   * so a parent who taps multiple times sees fresh feedback. We don't
+   * surface the error reason inline — clipboard rejection on iOS PWA
+   * is one of "permission-denied", "no-clipboard-API", or "writeText
+   * threw"; none of which a parent can act on. The textarea always
+   * shows the live JSON so they can manually select-and-copy as a
+   * fallback path.
+   */
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>(
+    'idle',
+  )
+
+  const backupJson = useMemo(() => {
+    // Read both blobs at render time so the textarea reflects the
+    // current persisted state — including any in-session writes from
+    // the controls above. `JSON.stringify` is cheap; the blob is
+    // O(KB) at worst.
+    const sessionHistory = storage.loadSessionHistory
+      ? safelyReadSessionHistory(storage.loadSessionHistory)
+      : null
+    const payload = {
+      // Schema-explicit at the wrapper level so a future restore-from-
+      // paste path (T2) can validate provenance before installing.
+      kind: 'marian-tutor.backup' as const,
+      version: 1 as const,
+      exportedAtISO: new Date().toISOString(),
+      progress,
+      sessionHistory,
+    }
+    return JSON.stringify(payload, null, 2)
+  }, [progress, storage])
+
+  const handleCopyBackup = useCallback(() => {
+    const writeClipboard = storage.writeClipboard
+    if (!writeClipboard) {
+      setCopyState('error')
+      return
+    }
+    void writeClipboard(backupJson).then(
+      () => {
+        setCopyState('copied')
+      },
+      () => {
+        setCopyState('error')
+      },
+    )
+  }, [backupJson, storage])
+
   const handleConfirmPromotion = useCallback(() => {
     setProgress((prev) => {
       if (prev.pendingPromotion === undefined) return prev
@@ -310,6 +409,80 @@ export default function ParentSettings({
           3 sessions, word-song threshold 90% / 3 sessions, level hidden, mode
           picker off.
         </p>
+
+        {/* Backup section (ticket 86c9pkfth — escape hatch for cloud-sync).
+            Read-only JSON view + Copy button. Parents can paste the JSON
+            into a notes app / email-to-self as a manual backup until the
+            cloud-sync ticket lands. The textarea is selectable as a
+            fallback path if the Copy button's clipboard call fails (iOS
+            PWA permission edge cases). */}
+        <section
+          data-testid="parent-settings-backup"
+          className="mt-8 rounded-md border border-slate-200 bg-white p-5"
+        >
+          <div className="mb-3 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-base font-semibold text-slate-800">Backup</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                A copy of Marian&apos;s progress and session history. Tap Copy
+                and paste it somewhere safe (notes app, email to yourself).
+                Helpful if her tablet is lost or reset.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <button
+                type="button"
+                data-testid="parent-settings-backup-copy"
+                onClick={handleCopyBackup}
+                className="
+                  rounded-md border border-slate-700 bg-slate-700 px-4 py-2
+                  text-sm font-medium text-white
+                  hover:bg-slate-800
+                  focus:outline-none focus:ring-2 focus:ring-slate-400
+                "
+              >
+                Copy
+              </button>
+              {copyState === 'copied' && (
+                <span
+                  data-testid="parent-settings-backup-status"
+                  data-status="copied"
+                  className="text-xs text-emerald-700"
+                >
+                  Copied to clipboard.
+                </span>
+              )}
+              {copyState === 'error' && (
+                <span
+                  data-testid="parent-settings-backup-status"
+                  data-status="error"
+                  className="text-xs text-amber-700"
+                >
+                  Couldn&apos;t copy — select the text and copy manually.
+                </span>
+              )}
+            </div>
+          </div>
+          <textarea
+            data-testid="parent-settings-backup-json"
+            readOnly
+            spellCheck={false}
+            value={backupJson}
+            onClick={(e) => {
+              // Convenience: tapping the textarea selects everything
+              // so the parent can OS-copy as a fallback. Doesn't
+              // interfere with manual range selection — onClick fires
+              // on a click-without-drag.
+              ;(e.currentTarget as HTMLTextAreaElement).select()
+            }}
+            aria-label="Marian's progress backup JSON"
+            className="
+              h-48 w-full rounded-md border border-slate-300 bg-slate-50 p-3
+              font-mono text-xs text-slate-700
+              focus:outline-none focus:ring-2 focus:ring-slate-400
+            "
+          />
+        </section>
       </div>
     </main>
   )

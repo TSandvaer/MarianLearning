@@ -8,10 +8,11 @@
  * Pure module: zero React, zero side effects beyond `window.localStorage`.
  */
 
+import { defaultLockedSkillLevels } from './defaults'
 import { isProgressV1, readSchemaVersion } from './guards'
 import { migrate } from './migrate'
 import { getSettings } from './parentSettings'
-import type { Progress } from './types'
+import type { Progress, SkillLevels } from './types'
 import { CURRENT_SCHEMA_VERSION } from './types'
 
 export const STORAGE_KEY = 'marian-tutor:progress:v1'
@@ -43,12 +44,99 @@ export function loadProgress(): Progress | null {
   if (version === null) return null
 
   if (version === CURRENT_SCHEMA_VERSION) {
-    return isProgressV1(parsed) ? withDefaultedSettings(parsed) : null
+    // Defaulter runs BEFORE the strict guard (ticket 86c9pkfth). Filling
+    // missing skill-level keys with the schema-floor 'locked' value lets a
+    // pre-node-addition blob round-trip cleanly post-addition; the strict
+    // guard stays strict and rejects truly-corrupt input.
+    const defaulted = withDefaultedSkillLevels(parsed)
+    return isProgressV1(defaulted) ? withDefaultedSettings(defaulted) : null
   }
 
   // Different version (older or newer) — route through migrate.
   const migrated = migrate(parsed)
   return migrated === null ? null : withDefaultedSettings(migrated)
+}
+
+/**
+ * Read-path skill-level defaulter (ticket 86c9pkfth).
+ *
+ * Fills missing keys on the parsed `skillLevels` object with the
+ * schema-floor value `'locked'`. Mirror-of-shape for `withDefaultedSettings`
+ * below: layered post-parse so the strict `isProgressV1` guard never sees
+ * a missing-key shape it would reject.
+ *
+ * The trip-wire it defends against: `isSkillLevels` in `guards.ts`
+ * requires every node in the current `SKILL_NODES` set to appear as a
+ * key. When a new skill node lands (next short vowel, future digraphs
+ * tier, etc.), Marian's existing localStorage blob would otherwise
+ * fail the guard, `loadProgress()` would return null, and defaults
+ * would clobber her progress. PR #151 hit this on test fixtures; the
+ * defaulter prevents production from ever hitting it.
+ *
+ * Implementation notes:
+ *
+ * 1. The fill SOURCE is `defaultLockedSkillLevels()` (schema-floor),
+ *    NOT `defaultProgress().skillLevels` (Marian's diagnostic
+ *    baseline). The diagnostic carries `'practicing'`/`'intro'` for
+ *    several nodes; using it as a fill-source could silently grant
+ *    access a user hasn't earned. The schema-floor is a true minimum.
+ *
+ * 2. Defaulter ONLY fills missing keys. A present-but-invalid value
+ *    (`add-to-10: 'super-mastered'`) is left untouched so the
+ *    downstream guard rejects the blob. We don't want silent
+ *    coercion to mask real corruption.
+ *
+ * 3. Defaulter is a no-op when `skillLevels` is not an object —
+ *    `null`, `undefined`, an array, a string. The guard rejects those
+ *    cases verbatim; recovering from them would mean fabricating data.
+ *
+ * 4. Returns a fresh `Progress`-shaped object on the modified path
+ *    so the input parsed value is never mutated. When no fill is
+ *    needed, returns the input unchanged.
+ *
+ * Input is `unknown` because this runs BEFORE `isProgressV1`. We
+ * downcast defensively and only touch the `skillLevels` field.
+ */
+function withDefaultedSkillLevels(parsed: unknown): unknown {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return parsed
+  }
+  const obj = parsed as Record<string, unknown>
+  const skillLevels = obj.skillLevels
+  if (
+    typeof skillLevels !== 'object' ||
+    skillLevels === null ||
+    Array.isArray(skillLevels)
+  ) {
+    // Truly corrupt — let the guard reject. We don't fabricate
+    // skillLevels from thin air.
+    return parsed
+  }
+  const present = skillLevels as Record<string, unknown>
+  const floor = defaultLockedSkillLevels()
+  let mutated = false
+  const filled: SkillLevels = { ...floor }
+  for (const key of Object.keys(floor) as Array<keyof SkillLevels>) {
+    if (key in present && present[key] !== undefined) {
+      // Preserve the existing value verbatim — even if invalid; the
+      // guard catches that downstream.
+      filled[key] = present[key] as SkillLevels[typeof key]
+    } else {
+      mutated = true
+    }
+  }
+  // Preserve any additional keys the parsed blob carried (forward-
+  // compat: if a future schema added keys we don't know about yet,
+  // leaving them in lets the guard surface them as a real error
+  // rather than silently dropping them). This is parallel to how
+  // `withDefaultedSettings` is non-destructive.
+  for (const key of Object.keys(present)) {
+    if (!(key in floor)) {
+      ;(filled as Record<string, unknown>)[key] = present[key]
+    }
+  }
+  if (!mutated) return parsed
+  return { ...obj, skillLevels: filled }
 }
 
 /**
