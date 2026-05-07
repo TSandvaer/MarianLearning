@@ -555,3 +555,161 @@ describe('ParentSettings — Backup section (ticket 86c9pkfth)', () => {
     expect(status.getAttribute('data-status')).toBe('error')
   })
 })
+
+// ── Cloud Backup section (ticket 86c9pkfyu) ───────────────────────────────
+
+describe('ParentSettings — Cloud Backup section', () => {
+  const VALID_UUID = '11111111-2222-4333-8444-555555555555'
+
+  it('renders the device id, last-synced timestamp, and Push now button', () => {
+    const seeded = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-05-07T10:00:00.000Z',
+      },
+    }
+    const { storage } = createMemoryStorage(seeded)
+    storage.getDeviceId = () => VALID_UUID
+    render(<ParentSettings storage={storage} />)
+    expect(
+      screen.getByTestId('parent-settings-cloud-device-id').textContent,
+    ).toBe(VALID_UUID)
+    expect(
+      screen.getByTestId('parent-settings-cloud-last-synced').textContent,
+    ).toBe('2026-05-07T10:00:00.000Z')
+    expect(
+      screen.getByTestId('parent-settings-cloud-push-now'),
+    ).toBeInTheDocument()
+  })
+
+  it('shows "Never" when no session has been played yet', () => {
+    const { storage } = createMemoryStorage(defaultProgress())
+    storage.getDeviceId = () => VALID_UUID
+    render(<ParentSettings storage={storage} />)
+    expect(
+      screen.getByTestId('parent-settings-cloud-last-synced').textContent,
+    ).toBe('Never')
+  })
+
+  it('Push now triggers storage.pushNow and surfaces "sent" status', async () => {
+    const user = userEvent.setup()
+    const { storage } = createMemoryStorage(defaultProgress())
+    const pushNow = vi.fn(async () => 'sent' as const)
+    storage.getDeviceId = () => VALID_UUID
+    storage.pushNow = pushNow
+    render(<ParentSettings storage={storage} />)
+    await user.click(screen.getByTestId('parent-settings-cloud-push-now'))
+    const status = await screen.findByTestId(
+      'parent-settings-cloud-push-status',
+    )
+    expect(status.getAttribute('data-status')).toBe('sent')
+    expect(pushNow).toHaveBeenCalledTimes(1)
+  })
+
+  it('Push now shows "failed" when pushNow rejects', async () => {
+    const user = userEvent.setup()
+    const { storage } = createMemoryStorage(defaultProgress())
+    const pushNow = vi.fn(async () => 'failed' as const)
+    storage.getDeviceId = () => VALID_UUID
+    storage.pushNow = pushNow
+    render(<ParentSettings storage={storage} />)
+    await user.click(screen.getByTestId('parent-settings-cloud-push-now'))
+    const status = await screen.findByTestId(
+      'parent-settings-cloud-push-status',
+    )
+    expect(status.getAttribute('data-status')).toBe('failed')
+  })
+
+  it('Restore from device ID rejects malformed UUIDs without calling the seam', async () => {
+    const user = userEvent.setup()
+    const { storage } = createMemoryStorage(defaultProgress())
+    const restoreFromDeviceId = vi.fn()
+    storage.getDeviceId = () => VALID_UUID
+    storage.restoreFromDeviceId = restoreFromDeviceId
+    render(<ParentSettings storage={storage} />)
+    await user.type(
+      screen.getByTestId('parent-settings-cloud-restore-input'),
+      'not-a-uuid',
+    )
+    await user.click(screen.getByTestId('parent-settings-cloud-restore-submit'))
+    const status = await screen.findByTestId(
+      'parent-settings-cloud-restore-status',
+    )
+    expect(status.getAttribute('data-status')).toBe('invalid-format')
+    expect(restoreFromDeviceId).not.toHaveBeenCalled()
+  })
+
+  it('Restore from device ID with valid UUID + cloud install refreshes the in-memory progress', async () => {
+    const user = userEvent.setup()
+    const cloudBlob: Progress = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-05-07T10:00:00.000Z',
+      },
+    }
+    const { storage } = createMemoryStorage(defaultProgress())
+    storage.getDeviceId = () => VALID_UUID
+    storage.restoreFromDeviceId = vi.fn(async () => ({
+      kind: 'installed-from-cloud' as const,
+      progress: cloudBlob,
+    }))
+    render(<ParentSettings storage={storage} />)
+    await user.type(
+      screen.getByTestId('parent-settings-cloud-restore-input'),
+      VALID_UUID,
+    )
+    await user.click(screen.getByTestId('parent-settings-cloud-restore-submit'))
+    const status = await screen.findByTestId(
+      'parent-settings-cloud-restore-status',
+    )
+    expect(status.getAttribute('data-status')).toBe(
+      'restored-installed-from-cloud',
+    )
+    // The new device id is reflected in the display.
+    expect(
+      screen.getByTestId('parent-settings-cloud-device-id').textContent,
+    ).toBe(VALID_UUID)
+    // The last-synced timestamp picked up the cloud blob's
+    // lastPlayedISO via the post-restore re-render.
+    expect(
+      screen.getByTestId('parent-settings-cloud-last-synced').textContent,
+    ).toBe('2026-05-07T10:00:00.000Z')
+  })
+
+  it('Restore from device ID returns "no-cloud-record" outcome when KV reports 404', async () => {
+    const user = userEvent.setup()
+    const { storage } = createMemoryStorage(defaultProgress())
+    storage.getDeviceId = () => VALID_UUID
+    storage.restoreFromDeviceId = vi.fn(async () => ({
+      kind: 'noop' as const,
+      reason: 'no-local-blob' as const,
+    }))
+    render(<ParentSettings storage={storage} />)
+    await user.type(
+      screen.getByTestId('parent-settings-cloud-restore-input'),
+      VALID_UUID,
+    )
+    await user.click(screen.getByTestId('parent-settings-cloud-restore-submit'))
+    const status = await screen.findByTestId(
+      'parent-settings-cloud-restore-status',
+    )
+    expect(status.getAttribute('data-status')).toBe('restored-noop')
+  })
+
+  it('Copy device ID dispatches storage.writeClipboard and surfaces "copied"', async () => {
+    const user = userEvent.setup()
+    const { storage } = createMemoryStorage(defaultProgress())
+    const writeClipboard = vi.fn(async () => undefined)
+    storage.getDeviceId = () => VALID_UUID
+    storage.writeClipboard = writeClipboard
+    render(<ParentSettings storage={storage} />)
+    await user.click(screen.getByTestId('parent-settings-cloud-copy-device-id'))
+    const status = await screen.findByTestId(
+      'parent-settings-cloud-device-id-status',
+    )
+    expect(status.getAttribute('data-status')).toBe('copied')
+    expect(writeClipboard).toHaveBeenCalledWith(VALID_UUID)
+  })
+})

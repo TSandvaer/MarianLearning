@@ -64,3 +64,23 @@ export {
   nextNode,
 } from './mastery'
 export type { MasteryTrack } from './mastery'
+
+// Cloud-sync (ticket 86c9pkfyu).
+export {
+  DEVICE_ID_STORAGE_KEY,
+  getOrCreateDeviceId,
+  isValidUuid,
+  readStoredDeviceId,
+  writeStoredDeviceId,
+} from './deviceId'
+export {
+  fetchProgressFromCloud,
+  pushProgressToCloud,
+  reconcileWithCloud,
+} from './cloudSync'
+export type {
+  CloudErrorReason,
+  FetchResult,
+  PushResult,
+  ReconcileOutcome,
+} from './cloudSync'

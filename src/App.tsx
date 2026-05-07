@@ -48,10 +48,12 @@ import {
   useRequestPersistentStorageOnGesture,
 } from './lib/lifecycle'
 import {
+  getOrCreateDeviceId,
   isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
   pickRecentSuccessRate,
+  reconcileWithCloud,
   type Progress,
   type ProgressTrack,
 } from './lib/progress'
@@ -238,12 +240,19 @@ export default function App() {
   useRequestPersistentStorageOnGesture()
 
   /**
-   * Hub-entry path tracked in state so Hub mounts know which welcome-back
-   * variant to play and whether the audio gate is needed. Updated by the
-   * route transitions below: Splash → Hub sets 'app-open' (or
-   * 'app-open-recent' if the last session was within 6h); Session-End →
-   * Hub sets 'session-end'; mid-skill back-arrow sets 'mid-skill-back';
-   * the once-ever first Hub mount post-Greet sets 'first-ever'.
+   * Boot-time cloud-sync reconcile (ticket 86c9pkfyu — T2).
+   *
+   * Fire-and-forget: kicks off a GET against /api/progress with a 3s
+   * timeout. localStorage stays the source-of-truth — this effect only
+   * mutates state when the CLOUD blob is strictly newer. The 3s
+   * timeout guarantees we never block Marian on a slow / offline KV
+   * read; the rest of the App tree boots in parallel and the worst
+   * case is a delayed install AFTER Splash → Greet/Hub.
+   *
+   * The post-install side-effect: refresh `hubProgressSnapshot` so a
+   * subsequent Hub mount sees the cloud-installed blob. Math /
+   * WordSong fetch effects re-read `loadProgress()` per session-start
+   * already, so they pick up the install on the next session.
    */
   const [hubEntryPath, setHubEntryPath] = useState<HubEntryPath>('app-open')
 
@@ -285,6 +294,37 @@ export default function App() {
       cancelled = true
     }
   }, [route])
+
+  /**
+   * Boot-time cloud reconcile (ticket 86c9pkfyu). Runs once per app
+   * lifetime. The promise NEVER throws — see `reconcileWithCloud`.
+   * On a successful cloud install, we re-read storage to refresh the
+   * Hub snapshot so any active Hub render reflects the freshly
+   * installed blob.
+   */
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const deviceId = getOrCreateDeviceId()
+        const local = loadProgress()
+        const outcome = await reconcileWithCloud(deviceId, local)
+        if (cancelled) return
+        if (outcome.kind === 'installed-from-cloud') {
+          // localStorage now holds the cloud blob. Refresh the snapshot
+          // state so a Hub render that's already mounted re-projects.
+          setHubProgressSnapshot(outcome.progress)
+        }
+      } catch {
+        // Unreachable — reconcileWithCloud catches its own errors. The
+        // try/catch is belt-and-braces in case a future refactor leaks
+        // a throw; we never want boot to fail because of cloud-sync.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const hubTreeProgress = useMemo<HubTreeProgress>(
     () => projectHubTreeProgress(hubProgressSnapshot),
