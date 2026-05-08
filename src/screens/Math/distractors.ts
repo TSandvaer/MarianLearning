@@ -66,6 +66,42 @@ export const ANSWER_RANGE_MAX = 10
 export const ANSWER_RANGE_MAX_TO_20 = 20
 
 /**
+ * Pick the answer-range ceiling that fits a list of correct answers.
+ *
+ * Returns the smallest tier ceiling (`ANSWER_RANGE_MAX = 10` or
+ * `ANSWER_RANGE_MAX_TO_20 = 20`) that contains every value in `corrects`.
+ * Used by the Math screen to thread the right `maxAnswer` into
+ * `pickDistractors` based on the active plan's actual content, instead of
+ * pattern-matching plan ids (`sums-to-20-A`, `add-to-20-level-1`, etc.) at
+ * the screen layer.
+ *
+ * Why a single derivation
+ * -----------------------
+ * Both the static fallback (`STATIC_ADD_TO_20_PLANS`) and the canon
+ * (`add-to-20-level-1`) emit problems with `correct ∈ [11, 18]`. Walking
+ * the actual correct values is robust against either source — and against
+ * future tier additions that don't follow the same id naming convention.
+ *
+ * @param corrects The correct answers across the plan (typically
+ *                 `plan.problems.map((p) => p.correct)`).
+ * @returns The smallest known tier ceiling that contains every correct.
+ *          Defaults to `ANSWER_RANGE_MAX` (10) when `corrects` is empty —
+ *          a degenerate plan defensively renders inside the smaller range.
+ * @throws if any correct exceeds the largest known tier ceiling. Higher
+ *         tiers (sub-to-20 widens to its own range; two-digit-addsub up to
+ *         99; etc.) plug in by extending the tier table here.
+ */
+export function chipMaxAnswerForCorrects(corrects: readonly number[]): number {
+  if (corrects.length === 0) return ANSWER_RANGE_MAX
+  const maxCorrect = Math.max(...corrects)
+  if (maxCorrect <= ANSWER_RANGE_MAX) return ANSWER_RANGE_MAX
+  if (maxCorrect <= ANSWER_RANGE_MAX_TO_20) return ANSWER_RANGE_MAX_TO_20
+  throw new Error(
+    `[distractors] no tier ceiling covers correct=${maxCorrect}; extend chipMaxAnswerForCorrects`,
+  )
+}
+
+/**
  * Last problem index (1-based) that uses gentle-ramp distractors. Problems
  * 1..GENTLE_RAMP_THROUGH use 'gentle'; the rest use 'offByOne'. Per Dave's
  * 2026-04-25 consult this is 3 (was 2 in Kyle's first draft).

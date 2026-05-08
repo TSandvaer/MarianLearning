@@ -4,6 +4,7 @@ import {
   ANSWER_RANGE_MAX_TO_20,
   ANSWER_RANGE_MIN,
   GENTLE_RAMP_THROUGH,
+  chipMaxAnswerForCorrects,
   pickDistractors,
   pickTier,
 } from './distractors'
@@ -308,5 +309,53 @@ describe('pickDistractors — sums-to-20 range (ticket 86c9q5q13)', () => {
     expect(pickDistractors(5, 4, ANSWER_RANGE_MAX)).toEqual(
       pickDistractors(5, 4),
     )
+  })
+})
+
+describe('chipMaxAnswerForCorrects', () => {
+  it('returns ANSWER_RANGE_MAX (10) for add-to-10-shaped corrects', () => {
+    // Static plan A: sums-to-10 correct values.
+    const corrects = [5, 5, 6, 8, 7, 9, 8, 10]
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(ANSWER_RANGE_MAX)
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(10)
+  })
+
+  it('returns ANSWER_RANGE_MAX_TO_20 (20) for add-to-20-shaped corrects', () => {
+    // STATIC_ADD_TO_20_PLANS slot A — sums in [11, 18].
+    const corrects = [12, 14, 12, 13, 13, 13, 16, 18]
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(ANSWER_RANGE_MAX_TO_20)
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(20)
+  })
+
+  it('returns ANSWER_RANGE_MAX_TO_20 (20) for canon add-to-20 corrects', () => {
+    // Canon's `add-to-20-level-1` plan — sums climb to 18 (Nine plus nine).
+    const corrects = [11, 15, 12, 11, 13, 14, 17, 18]
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(20)
+  })
+
+  it('promotes to the 20 ceiling as soon as ANY correct exceeds 10', () => {
+    // A single boundary-crosser (11) is enough — defends against a future
+    // mixed plan that opens with sums-to-10 problems then bridges to 20.
+    expect(chipMaxAnswerForCorrects([3, 5, 7, 9, 10, 11, 8, 6])).toBe(20)
+  })
+
+  it('returns 10 at the boundary correct=10 (not 20)', () => {
+    expect(chipMaxAnswerForCorrects([10])).toBe(10)
+  })
+
+  it('promotes to 20 at the boundary correct=11', () => {
+    expect(chipMaxAnswerForCorrects([11])).toBe(20)
+  })
+
+  it('returns ANSWER_RANGE_MAX (10) for an empty plan (defensive default)', () => {
+    expect(chipMaxAnswerForCorrects([])).toBe(ANSWER_RANGE_MAX)
+  })
+
+  it('throws when correct exceeds the largest known tier ceiling', () => {
+    // A two-digit-addsub tier or beyond would land here. We throw rather
+    // than silently expanding — extending the function is a deliberate
+    // change with its own tier-add ticket.
+    expect(() => chipMaxAnswerForCorrects([21])).toThrow(/no tier ceiling/)
+    expect(() => chipMaxAnswerForCorrects([5, 99])).toThrow(/no tier ceiling/)
   })
 })

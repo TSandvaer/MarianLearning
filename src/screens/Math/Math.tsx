@@ -19,7 +19,7 @@ import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
-import { pickDistractors } from './distractors'
+import { chipMaxAnswerForCorrects, pickDistractors } from './distractors'
 import {
   loadStardust,
   writeStardust,
@@ -677,12 +677,26 @@ function MathScreen({
   /** Whether the guided completion has highlighted the correct chip. */
   const [guidedActive, setGuidedActive] = useState(false)
 
+  /**
+   * Tier-aware chip ceiling for the active plan. Derived once per plan
+   * from the actual correct values (works for both fallback ids like
+   * `sums-to-20-A` and canon ids like `add-to-20-level-1` without the
+   * screen needing to know either string). Threaded into `buildChipOrder`
+   * so `pickDistractors` validates `correct` against the right answer
+   * range — an add-to-20 plan would otherwise crash the chip render
+   * because the default `maxAnswer` is 10. See ticket 86c9q5q13 review.
+   */
+  const planMaxAnswer = useMemo(
+    () => chipMaxAnswerForCorrects(plan.problems.map((p) => p.correct)),
+    [plan],
+  )
+
   /** Stable seed for `Math.random` substitute on chip-position shuffle. We
    *  avoid Math.random because it makes tests flaky; instead we shuffle
    *  deterministically per problemIndex via a tiny LCG. */
   const chipOrder = useMemo(
-    () => buildChipOrder(plan.problems[problemIndex]),
-    [plan, problemIndex],
+    () => buildChipOrder(plan.problems[problemIndex], planMaxAnswer),
+    [plan, problemIndex, planMaxAnswer],
   )
 
   // ── Refs for in-flight cleanup -----------------------------------------
@@ -2176,9 +2190,18 @@ function SparkleBurst() {
  * positions). The shuffle uses a tiny LCG seeded from the problem index +
  * the correct answer so two different problems with the same correct value
  * produce different orderings.
+ *
+ * `maxAnswer` is the tier ceiling threaded down from the active plan via
+ * `chipMaxAnswerForCorrects`. It scopes the distractor pool — sums-to-10
+ * plans pass 10, add-to-20 plans pass 20. Without it, `pickDistractors`
+ * defaults to 10 and throws on any `correct >= 11`, crashing the screen
+ * (ticket 86c9q5q13 review).
  */
-function buildChipOrder(problem: MathProblem): readonly number[] {
-  const [d1, d2] = pickDistractors(problem.correct, problem.index)
+function buildChipOrder(
+  problem: MathProblem,
+  maxAnswer: number,
+): readonly number[] {
+  const [d1, d2] = pickDistractors(problem.correct, problem.index, maxAnswer)
   const values = [problem.correct, d1, d2]
   // Deterministic Fisher-Yates with a per-problem seed.
   const seed = (problem.index * 31 + problem.correct * 17 + 1) >>> 0
