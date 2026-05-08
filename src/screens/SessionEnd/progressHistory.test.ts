@@ -306,4 +306,307 @@ describe('recordProgressOnSessionEnd', () => {
       expect(loaded.history[0].skillFocus).toEqual(['cvc-words'])
     })
   })
+
+  // ── M4 Leitner outcomes (ticket 86c9pwgc8) ─────────────────────────────
+  describe('M4 Leitner outcomes', () => {
+    it('promotes a fact one box on a clean win (first-tap correct)', () => {
+      // Pre-load a box with the fact at box 2 so we can observe the
+      // promote behaviour (cap-aware).
+      const seed = defaultProgress()
+      saveProgress({
+        ...seed,
+        mathFactsLeitner: {
+          items: [{ item: { a: 3, b: 4, op: '+' }, box: 2, lastSeen: 100 }],
+        },
+      })
+
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 1,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: { a: 3, b: 4, op: '+' }, correct: true }],
+      })
+
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner.items).toHaveLength(1)
+      expect(after.mathFactsLeitner.items[0].box).toBe(3)
+      // lastSeen updated to the dateISO instant
+      expect(after.mathFactsLeitner.items[0].lastSeen).toBe(
+        new Date('2026-05-08T19:00:00.000Z').getTime(),
+      )
+    })
+
+    it('demotes a fact to box 1 on a wrong first tap', () => {
+      const seed = defaultProgress()
+      saveProgress({
+        ...seed,
+        mathFactsLeitner: {
+          items: [{ item: { a: 6, b: 4, op: '+' }, box: 4, lastSeen: 100 }],
+        },
+      })
+
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 0,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: { a: 6, b: 4, op: '+' }, correct: false }],
+      })
+
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner.items).toHaveLength(1)
+      expect(after.mathFactsLeitner.items[0].box).toBe(1)
+    })
+
+    it('caps promotion at box 5', () => {
+      const seed = defaultProgress()
+      saveProgress({
+        ...seed,
+        mathFactsLeitner: {
+          items: [{ item: { a: 5, b: 5, op: '+' }, box: 5, lastSeen: 100 }],
+        },
+      })
+
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 1,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: { a: 5, b: 5, op: '+' }, correct: true }],
+      })
+
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner.items[0].box).toBe(5)
+    })
+
+    it('seeds new facts at box 1 on first encounter', () => {
+      // Empty box; first session populates it. Mirrors Q1 of the
+      // dispatch contract — accept 2-3 seed sessions to populate.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 1,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [
+          { fact: { a: 3, b: 2, op: '+' }, correct: true },
+          { fact: { a: 6, b: 4, op: '+' }, correct: false },
+        ],
+      })
+
+      const after = loadProgress()!
+      // Both facts present; correct→box2 (started at 1, promoted to 2),
+      // wrong→box1 (started at 1, demoted to 1).
+      expect(after.mathFactsLeitner.items).toHaveLength(2)
+      const correctFact = after.mathFactsLeitner.items.find(
+        (i) => i.item.a === 3 && i.item.b === 2,
+      )
+      const wrongFact = after.mathFactsLeitner.items.find(
+        (i) => i.item.a === 6 && i.item.b === 4,
+      )
+      expect(correctFact?.box).toBe(2)
+      expect(wrongFact?.box).toBe(1)
+    })
+
+    it('"undefined" correctness adds the fact at box 1 but does not change rank', () => {
+      // Sentinel for "first-tap not measured" — e.g. screen abandoned.
+      const seed = defaultProgress()
+      saveProgress({
+        ...seed,
+        mathFactsLeitner: {
+          items: [{ item: { a: 3, b: 4, op: '+' }, box: 3, lastSeen: 50 }],
+        },
+      })
+
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 0,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [
+          // Unrecorded fact — addItem should make it land at box 1.
+          { fact: { a: 1, b: 2, op: '+' }, correct: undefined },
+          // Existing fact — addItem is no-op, undefined leaves rank.
+          { fact: { a: 3, b: 4, op: '+' }, correct: undefined },
+        ],
+      })
+
+      const after = loadProgress()!
+      const newFact = after.mathFactsLeitner.items.find(
+        (i) => i.item.a === 1 && i.item.b === 2,
+      )
+      const existingFact = after.mathFactsLeitner.items.find(
+        (i) => i.item.a === 3 && i.item.b === 4,
+      )
+      expect(newFact?.box).toBe(1)
+      expect(existingFact?.box).toBe(3)
+      expect(existingFact?.lastSeen).toBe(50)
+    })
+
+    it('handles an 8-problem session with mixed outcomes', () => {
+      // Realistic shape: 8 outcomes, 6 correct + 2 wrong. Mirrors
+      // the Math screen's MathSessionResult.perProblemCorrect emission.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [
+          { fact: { a: 3, b: 2, op: '+' }, correct: true },
+          { fact: { a: 1, b: 4, op: '+' }, correct: true },
+          { fact: { a: 4, b: 2, op: '+' }, correct: true },
+          { fact: { a: 5, b: 3, op: '+' }, correct: false },
+          { fact: { a: 2, b: 5, op: '+' }, correct: true },
+          { fact: { a: 6, b: 3, op: '+' }, correct: false },
+          { fact: { a: 4, b: 4, op: '+' }, correct: true },
+          { fact: { a: 5, b: 5, op: '+' }, correct: true },
+        ],
+      })
+
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner.items).toHaveLength(8)
+      // All 6 correct facts at box 2 (added at 1 + promoted to 2).
+      // All 2 wrong facts at box 1 (added at 1 + demoted to 1).
+      const boxes = after.mathFactsLeitner.items.map((i) => i.box)
+      expect(boxes.filter((b) => b === 2)).toHaveLength(6)
+      expect(boxes.filter((b) => b === 1)).toHaveLength(2)
+    })
+
+    it('does NOT touch the box when leitnerOutcomes is omitted', () => {
+      // The empty-leitnerOutcomes call path must remain a no-op so
+      // legacy callers / tests don't suddenly mutate state.
+      const seed = defaultProgress()
+      const before: Progress = {
+        ...seed,
+        mathFactsLeitner: {
+          items: [
+            { item: { a: 3, b: 4, op: '+' as const }, box: 3, lastSeen: 1234 },
+          ],
+        },
+      }
+      saveProgress(before)
+
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 7,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+      })
+
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner).toEqual(before.mathFactsLeitner)
+    })
+
+    it('ignores leitnerOutcomes when surface !== "math"', () => {
+      // Word-song never uses the Leitner box. A misrouted outcome
+      // array on a word-song session must not corrupt the math box.
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 4,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'blending-cv',
+        leitnerOutcomes: [{ fact: { a: 3, b: 2, op: '+' }, correct: true }],
+      })
+
+      const after = loadProgress()!
+      expect(after.mathFactsLeitner.items).toHaveLength(0)
+    })
+
+    it('idempotent under React StrictMode double-invocation (two identical calls)', () => {
+      // applyLeitnerOutcomes is pure but the writer wraps it; two back-
+      // to-back calls (the worst-case React strict-mode double-mount)
+      // would otherwise stack two promotes per fact. We don't currently
+      // de-duplicate on the dateISO key — so each call DOES advance the
+      // box one step. The test pins the EXPECTED current behaviour so
+      // any future de-dup change is visible. If this becomes a UX
+      // problem, add dateISO-based dedup at the writer.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 1,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: { a: 3, b: 2, op: '+' }, correct: true }],
+      })
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 1,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        leitnerOutcomes: [{ fact: { a: 3, b: 2, op: '+' }, correct: true }],
+      })
+
+      const after = loadProgress()!
+      // After 2 identical calls: addItem (box 1) + promote → 2; then
+      // addItem no-op + promote → 3. This is double-counted but
+      // intentional for the current contract. SessionEnd's mount
+      // effect already runs once per actual session-end via its
+      // `[]` deps; React strict-mode double-mount in dev would
+      // produce this state but is acceptable per the spec.
+      expect(after.mathFactsLeitner.items[0].box).toBe(3)
+      // Two history entries also recorded.
+      expect(after.history).toHaveLength(2)
+    })
+  })
+
+  // ── M4 latency persistence (ticket 86c9pwgc8) ──────────────────────────
+  describe('M4 latency persistence', () => {
+    it('persists latencyMs onto the SessionHistoryEntry when supplied', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        latencyMs: [1200, 800, 950, 1500, 2100, 700, 1800, 1100],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].latencyMs).toEqual([
+        1200, 800, 950, 1500, 2100, 700, 1800, 1100,
+      ])
+    })
+
+    it('omits latencyMs from the entry when not supplied (back-compat)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 7,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].latencyMs).toBeUndefined()
+    })
+
+    it('persists the -1 sentinel for unmeasured problems', () => {
+      // Real production case: read-aloud failed for problem 3, so its
+      // chip-render timestamp stayed null and the latency captures as
+      // sentinel -1.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 7,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        latencyMs: [1200, 800, -1, 1500, 2100, 700, 1800, 1100],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].latencyMs?.[2]).toBe(-1)
+    })
+
+    it('shallow-clones the input array (caller can mutate after)', () => {
+      const arr = [1000, 800, 900, 1100, 1300, 700, 950, 850]
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-08T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        latencyMs: arr,
+      })
+
+      // Caller mutation post-call must not corrupt the persisted entry.
+      arr[0] = 999_999
+      const after = loadProgress()!
+      expect(after.history[0].latencyMs?.[0]).toBe(1000)
+    })
+  })
 })

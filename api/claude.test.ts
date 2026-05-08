@@ -1411,3 +1411,314 @@ describe('Canon-first session-start (D — pre-baked canon, ticket 86c9kwhbc)', 
     }
   })
 })
+
+describe('M4 Leitner-hint payload (ticket 86c9pwgc8)', () => {
+  let sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
+  let rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+  const nowFn = () => 1000
+
+  const CANON_FIXTURE = {
+    ok: true as const,
+    kind: 'session-start' as const,
+    plan: { id: 'canon-add-to-10', utterances: [] },
+    utterances: [
+      {
+        id: 'math.p1.read',
+        text: 'CANON: Three plus two. How many?',
+        audio: {
+          kind: 'inline' as const,
+          base64: 'Q0FOT04=',
+          mime: 'audio/mpeg' as const,
+        },
+      },
+    ],
+  }
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+    mockedRender.mockReset()
+    sessionCache = createSessionCache({ ttlMs: 60_000, now: nowFn })
+    rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+    mockedRender.mockResolvedValue({
+      ok: true,
+      kind: 'session-start',
+      plan: { utterances: [] },
+      utterances: [
+        {
+          id: 'math.p1.read',
+          text: 'LIVE: Three plus two. How many?',
+          audio: { kind: 'inline', base64: 'TElWRQ==', mime: 'audio/mpeg' },
+        },
+      ],
+    })
+  })
+
+  it('extracts a valid leitner array from the progress block onto the planner call', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            recentSuccessRate: 0.6,
+            leitner: [
+              { a: 6, b: 4, op: '+', box: 1 },
+              { a: 5, b: 5, op: '+', box: 2 },
+            ],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    // The planner directive lives in the user message — we proxy that
+    // assertion via the stubbed Anthropic call's args.
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).toContain('LEITNER PRIORITY DIRECTIVE')
+    expect(args.messages[0]!.content).toContain('Box 1: 6+4.')
+    expect(args.messages[0]!.content).toContain('Box 2: 5+5.')
+  })
+
+  it('non-empty leitner BYPASSES canon (live planner runs even on a canon hit)', async () => {
+    // Mirrors graduation-session bypass posture. Canon JSON is keyed
+    // without Leitner state, so serving the cached non-Leitner-aware
+    // plan would defeat the box-1 weighting contract.
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            leitner: [{ a: 3, b: 2, op: '+', box: 1 }],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string }[]
+    }
+    // Live mock served (LIVE:), NOT the canon fixture (CANON:).
+    expect(body.utterances[0]!.text).toContain('LIVE')
+    // Live planner invoked exactly once.
+    expect(capture.lastArgs).toBeDefined()
+    // Canon was either not called OR called and ignored — the test
+    // doesn't pin which (the implementation may short-circuit before
+    // calling the resolver). What matters: the response is the live
+    // one, not the canon one. Defensive check anyway:
+    expect(canonStub.mock.calls.length).toBeLessThanOrEqual(1)
+  })
+
+  it('empty leitner array still hits canon (browser should not have shipped it, but defend)', async () => {
+    // The browser's `readProgressHintsForTrack` omits the field when
+    // the box is empty — but defense in depth: if a future change
+    // ships an empty array, the server must NOT bypass canon (would
+    // pay an Anthropic call for no reason).
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            leitner: [],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { utterances: { text: string }[] }
+    // Canon served — empty leitner did not bypass.
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(canonStub).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects malformed leitner (out-of-range box) by silently dropping the field', async () => {
+    // Soft validation: if any item is malformed, drop the whole
+    // array. Better to under-direct the planner than to skew the
+    // priority list with garbage.
+    const capture: { lastArgs?: unknown } = {}
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            leitner: [
+              { a: 3, b: 2, op: '+', box: 1 },
+              { a: 5, b: 5, op: '+', box: 99 }, // invalid box
+            ],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    // Live planner ran (handler didn't 4xx), but the directive is absent
+    // — leitner array was dropped at validation.
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain(
+      'LEITNER PRIORITY DIRECTIVE',
+    )
+  })
+
+  it('does NOT cache a Leitner-active response under the standard key', async () => {
+    // A cached Leitner-weighted plan would leak into a regular session
+    // under the same (track, level, childName, focusNode) key. Same
+    // bypass posture as graduation-session.
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(STUB_MATH_PLAN_BODY)
+
+    // First call — Leitner active.
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            leitner: [{ a: 6, b: 4, op: '+', box: 1 }],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    // Second call — same key, no Leitner. Canon stub returns null so
+    // the call falls through to the planner. If the cache had stored
+    // the first call's response, this second call would return without
+    // hitting the planner. The fact that mockedRender is called twice
+    // proves the cache is bypassed.
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: { focusNode: 'add-to-10' },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    // Both calls invoked the live planner (renderSessionAudio).
+    // First was the Leitner-active call (skipped both canon + cache);
+    // second was the normal call (cache miss, since #1 didn't store).
+    expect(mockedRender).toHaveBeenCalledTimes(2)
+  })
+
+  it('non-array leitner (silently dropped — graceful degrade)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-10',
+            leitner: 'not-an-array',
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain(
+      'LEITNER PRIORITY DIRECTIVE',
+    )
+  })
+})

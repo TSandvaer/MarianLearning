@@ -43,11 +43,16 @@
 
 import {
   applyMasteryRule,
+  addItem,
   defaultProgress,
+  demote,
   getOrCreateDeviceId,
   loadProgress,
+  promote,
   pushProgressToCloud,
   saveProgress,
+  type LeitnerBox,
+  type MathFact,
   type Progress,
   type SessionHistoryEntry,
   type SkillNode,
@@ -83,6 +88,24 @@ export interface GraduationSessionSplit {
   novelCorrect: number
   /** Number of novel-pool problems in the session (2 or 3). */
   novelCount: number
+}
+
+/**
+ * Per-problem Leitner outcome (ticket 86c9pwgc8 — M4). The math
+ * surface ships one entry per problem; the array length equals the
+ * number of problems Marian saw (8 in v1).
+ *
+ * - `fact` is the math fact (addends + operator) the problem
+ *   targeted, used as the Leitner-box key.
+ * - `correct` is Marian's FIRST-tap correctness on that problem.
+ *   `true` promotes the fact one box (cap 5); `false` demotes to
+ *   box 1; `undefined` adds the fact at box 1 if missing but leaves
+ *   any existing rank unchanged (sentinel for "not measured", e.g.
+ *   the screen was abandoned before the chip was tapped).
+ */
+export interface LeitnerOutcome {
+  fact: MathFact
+  correct: boolean | undefined
 }
 
 export interface RecordProgressInput {
@@ -141,6 +164,29 @@ export interface RecordProgressInput {
    * upstream bug computing a 0-count slice.
    */
   graduationSplit?: GraduationSessionSplit
+  /**
+   * Per-problem Leitner outcomes (ticket 86c9pwgc8 — M4). Math only.
+   * When supplied AND `surface === 'math'`, the writer:
+   *   - Promotes / demotes each fact in `progress.mathFactsLeitner`
+   *     per its first-tap correctness (Leitner classical rule).
+   *   - Adds new facts at box 1 so the box self-populates over a
+   *     handful of sessions (per Q1 — accept 2-3 seed sessions
+   *     instead of retroactively populating from history).
+   *
+   * When absent, the box is unchanged. Word-song sessions have no
+   * Leitner box in v1 and should not ship this field.
+   */
+  leitnerOutcomes?: readonly LeitnerOutcome[]
+  /**
+   * Per-problem first-tap latency in milliseconds (ticket 86c9pwgc8
+   * — M4). Indexed 0..N-1; sentinel `-1` means the problem was never
+   * tapped. When supplied, persists onto the recorded
+   * `SessionHistoryEntry.latencyMs` field for future "slow facts"
+   * surfacing work. Length must match the session's problem count
+   * (8 in v1) — the writer makes a defensive copy and trusts the
+   * caller's framing.
+   */
+  latencyMs?: readonly number[]
 }
 
 /**
@@ -166,6 +212,19 @@ export function recordProgressOnSessionEnd(
 
   const entry = buildEntry(input)
 
+  // M4 Leitner update (ticket 86c9pwgc8). Math-surface sessions that
+  // ship per-problem outcomes get their facts promoted / demoted.
+  // Other surfaces (word-song) and math sessions without outcomes
+  // (legacy / test fixtures) leave the box unchanged.
+  const nextLeitner =
+    input.surface === 'math' && input.leitnerOutcomes !== undefined
+      ? applyLeitnerOutcomes(
+          existing.mathFactsLeitner,
+          input.leitnerOutcomes,
+          new Date(input.dateISO).getTime(),
+        )
+      : existing.mathFactsLeitner
+
   const next: Progress = {
     ...existing,
     profile: {
@@ -173,6 +232,7 @@ export function recordProgressOnSessionEnd(
       lastPlayedISO: input.dateISO,
     },
     history: [...existing.history, entry],
+    mathFactsLeitner: nextLeitner,
   }
 
   // M3 (ticket 86c9kmwd0): evaluate the mastery promotion rule on the
@@ -208,17 +268,25 @@ export function recordProgressOnSessionEnd(
  * into the mastery rule.
  */
 function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
-  const { graduationSplit } = input
+  const { graduationSplit, latencyMs } = input
   const useSplit =
     graduationSplit !== undefined &&
     graduationSplit.canonicalCount > 0 &&
     graduationSplit.novelCount > 0
+
+  // Latency persistence (ticket 86c9pwgc8 — M4). When supplied, the
+  // array is shallow-cloned onto the entry; when absent the field is
+  // omitted to keep the existing on-disk shape unchanged for callers
+  // that don't ship it.
+  const latencyClone =
+    latencyMs !== undefined ? Array.from(latencyMs) : undefined
 
   if (!useSplit) {
     return {
       dateISO: input.dateISO,
       skillFocus: [input.focusNode],
       successRate: input.totalCorrect / PROBLEMS_PER_SESSION,
+      ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
     }
   }
 
@@ -228,5 +296,50 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
     skillFocus: [input.focusNode],
     successRate: split.canonicalCorrect / split.canonicalCount,
     novelPoolSuccessRate: split.novelCorrect / split.novelCount,
+    ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
   }
 }
+
+/**
+ * Update `mathFactsLeitner` from a session's per-problem outcomes
+ * (ticket 86c9pwgc8 — M4). For each problem:
+ *   - First-tap correct  → promote (cap 5).
+ *   - First-tap wrong    → demote to box 1.
+ *   - No measurement (`undefined`) → fact added to box 1 if missing,
+ *     existing rank unchanged.
+ *
+ * `addItem` runs first for every outcome so brand-new facts land in
+ * the box at box 1 before the promote / demote step. Without this
+ * the very first session-end after a new fact is introduced wouldn't
+ * be able to promote it (promote / demote are no-ops on missing
+ * items by the existing leitner.ts contract).
+ *
+ * Pure — returns a new box, never mutates input. Mirrors the helper
+ * conventions in `lib/progress/leitner.ts`.
+ */
+function applyLeitnerOutcomes(
+  box: LeitnerBox<MathFact>,
+  outcomes: ReadonlyArray<LeitnerOutcome>,
+  now: number,
+): LeitnerBox<MathFact> {
+  let next = box
+  for (const { fact, correct } of outcomes) {
+    next = addItem(next, mathFactKey, fact)
+    if (correct === true) {
+      next = promote(next, mathFactKey, fact, now)
+    } else if (correct === false) {
+      next = demote(next, mathFactKey, fact, now)
+    }
+    // correct === undefined: addItem already ran; no rank change.
+  }
+  return next
+}
+
+/**
+ * Stable key for math facts in the Leitner box. Mirrors the test
+ * fixture `progress.test.ts` (`${a}${op}${b}`) so the on-disk fact
+ * key is invariant across promote / demote calls. Local because the
+ * Leitner public surface uses caller-supplied key fns by design — no
+ * other module should pluck this without explicit thought.
+ */
+const mathFactKey = (f: MathFact): string => `${f.a}${f.op}${f.b}`

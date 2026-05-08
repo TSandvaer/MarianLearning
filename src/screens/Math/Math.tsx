@@ -120,6 +120,40 @@ export interface MathSessionResult {
   finalStreak: number
   /** Stardust _earned in this session_, not the all-time persisted total. */
   earnedThisSession: number
+  /**
+   * Per-problem first-tap correctness, indexed 0..N-1 (parallel to
+   * `plan.problems`). True iff the FIRST chip tap on that problem hit
+   * the correct answer (clean win). Wrong-then-correct retries set
+   * `false` here even though the problem eventually resolved correctly.
+   *
+   * Used by SessionEnd's progress-write path to drive Leitner box
+   * promotion / demotion (ticket 86c9pwgc8 — M4): a clean-win promotes
+   * the corresponding fact one box (cap 5); a first-tap miss demotes
+   * to box 1. This matches the Leitner classical rule and matches
+   * how the streak counter already counts "consecutive clean wins."
+   */
+  perProblemCorrect: readonly boolean[]
+  /**
+   * Per-problem first-tap latency in milliseconds, indexed 0..N-1.
+   * Length matches `plan.problems.length`. Each entry measures wall-
+   * clock ms from when the chip row first became tappable for that
+   * problem (read-aloud completed → `readAloudPlayed` flipped to
+   * `true`) to Marian's first chip tap, regardless of correctness.
+   * Subsequent retry taps within the same problem are NOT captured
+   * here. Sentinel `-1` means the problem was never tapped (e.g. the
+   * screen was abandoned, or read-aloud somehow never completed).
+   *
+   * The "decision time" diagnostic Dave's research deliverable
+   * flagged as the actionable signal for the counting → retrieval
+   * transition (per
+   * `MarianLearning/design/research/add-to-10-counting-to-recall.md`
+   * §6 P3 — "accurate but slow" facts are the canary for finger-
+   * counting dependency). M4 ships latency capture without yet wiring
+   * a consumer; future M4.x work that surfaces "slow facts" to the
+   * planner reads from this field via the persisted
+   * `SessionHistoryEntry.latencyMs`.
+   */
+  latencyMs: readonly number[]
 }
 
 /** Function signature for playing one canonical Math utterance. */
@@ -511,6 +545,67 @@ function MathScreen({
   /** Total clean-correct answers; used for the session-complete callback. */
   const totalCorrectRef = useRef(0)
 
+  /**
+   * Per-problem first-tap correctness mirror (ticket 86c9pwgc8 — M4
+   * Leitner wiring). Indexed 0..N-1; entry N is `true` iff Marian's
+   * FIRST chip tap on problem N was the correct chip. Wrong-then-
+   * correct retries set `false` even though the problem eventually
+   * resolved correctly. Initialised to `false` per problem; flipped
+   * exactly once on the first chip-tap entry into `onChipTap` per
+   * problem (right after `latencyMsByProblemRef` capture).
+   *
+   * SessionEnd reads this via `MathSessionResult.perProblemCorrect` to
+   * drive Leitner promotion / demotion at session-end.
+   */
+  // Initialised to a fixed-size empty array; resized to match the active
+  // plan via an effect below. The two-step (init + sync effect) keeps
+  // the refs valid across the App.tsx mount-with-fallback-plan →
+  // swap-to-server-plan transition, where `plan.problems.length` could
+  // in theory differ between the two snapshots. Today both are always 8;
+  // the resize-on-plan-change pattern is defensive against future tier
+  // additions where length might change at the intermediate render.
+  const perProblemCorrectRef = useRef<boolean[]>(plan.problems.map(() => false))
+
+  /**
+   * Per-problem first-tap latency mirror (ticket 86c9pwgc8 — M4).
+   * Indexed 0..N-1; entry N is the wall-clock ms from chip-render-
+   * time (read-aloud completed → `readAloudPlayed` flipped to `true`)
+   * to Marian's FIRST chip tap. Initialised to `-1` per problem
+   * (sentinel for "not yet measured"). Flipped exactly once per
+   * problem on the first `onChipTap` entry that passes the
+   * read-aloud gate; subsequent retry taps within the same problem
+   * are NOT captured.
+   *
+   * SessionEnd reads this via `MathSessionResult.latencyMs` and
+   * persists it on the new `SessionHistoryEntry.latencyMs` field
+   * for future "slow facts" surfacing work.
+   */
+  const latencyMsByProblemRef = useRef<number[]>(plan.problems.map(() => -1))
+
+  /**
+   * Wall-clock timestamp captured when chips first become tappable for
+   * the current problem (ticket 86c9pwgc8 — M4). Set inside the
+   * read-aloud effect's `.then()` immediately before
+   * `setReadAloudPlayed(true)`. Reset to `null` on problem advance.
+   *
+   * The first chip tap that passes the read-aloud gate computes
+   * `performance.now() - chipReadyAtRef.current` and writes the
+   * result into `latencyMsByProblemRef`. Tests set the optional
+   * `now` injection seam if they need a deterministic clock; in
+   * production this reads `performance.now()` for monotonic timing
+   * (immune to wall-clock skew).
+   */
+  const chipReadyAtRef = useRef<number | null>(null)
+
+  /**
+   * Whether the FIRST chip tap on the current problem has been
+   * recorded yet (ticket 86c9pwgc8 — M4). Flipped to `true` inside
+   * `onChipTap` immediately after the latency + correctness capture
+   * for the current problem, so subsequent retry taps don't re-record.
+   * Reset to `false` on problem advance.
+   */
+  const firstTapRecordedRef = useRef(false)
+
   /** True while the screen is in the "first tap unlocks audio" window —
    *  we keep this one-shot so we don't kick the unlock gate on every chip tap.
    *
@@ -870,6 +965,31 @@ function MathScreen({
     problemIndexRef.current = problemIndex
   }, [problemIndex])
 
+  // Resize the M4 capture arrays if the plan length changes (ticket
+  // 86c9pwgc8). Today both fallback + server plans are 8 problems,
+  // but if a future tier mounts with a different count, this keeps
+  // the per-problem mirrors aligned without dropping mid-session
+  // captures (the resize copies forward as much as it can).
+  const planLength = plan.problems.length
+  useEffect(() => {
+    const correct = perProblemCorrectRef.current
+    if (correct.length !== planLength) {
+      const next = new Array<boolean>(planLength).fill(false)
+      for (let i = 0; i < Math.min(correct.length, planLength); i++) {
+        next[i] = correct[i]
+      }
+      perProblemCorrectRef.current = next
+    }
+    const latency = latencyMsByProblemRef.current
+    if (latency.length !== planLength) {
+      const next = new Array<number>(planLength).fill(-1)
+      for (let i = 0; i < Math.min(latency.length, planLength); i++) {
+        next[i] = latency[i]
+      }
+      latencyMsByProblemRef.current = next
+    }
+  }, [planLength])
+
   useEffect(() => {
     if (guidedActive) return // mid-guided playback owns the audio
 
@@ -938,6 +1058,14 @@ function MathScreen({
         // race the production bug fix removed (ticket 86c9hf4ef round 2).
         if (unmountedRef.current) return
         if (problemIndexRef.current !== myProblemIndex) return
+        // Capture chip-render-time (ticket 86c9pwgc8 — M4 latency
+        // capture). Set BEFORE flipping the gate so the very first
+        // chip-tap that observes `readAloudPlayedRef.current === true`
+        // also sees a non-null `chipReadyAtRef.current`. Using
+        // `performance.now()` (monotonic clock) instead of `Date.now()`
+        // immunises latency math against wall-clock skew during a
+        // session.
+        chipReadyAtRef.current = performance.now()
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
       })
@@ -988,6 +1116,13 @@ function MathScreen({
       // Reset the synchronous double-speak latch so the next problem's
       // read-aloud effect can fire. See ticket 86c9hf4ef.
       spokeReadAloudRef.current = false
+      // Reset the M4 latency-capture refs so the next problem's first
+      // tap measures from its own read-aloud completion (ticket
+      // 86c9pwgc8). `chipReadyAtRef` is set inside the next problem's
+      // read-aloud `.then()`; `firstTapRecordedRef` is the once-per-
+      // problem latch.
+      chipReadyAtRef.current = null
+      firstTapRecordedRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
@@ -1008,6 +1143,14 @@ function MathScreen({
         totalStardust: finalState.total,
         finalStreak: streakRef.current,
         earnedThisSession: earnedThisSessionRef.current,
+        // M4 Leitner wiring (ticket 86c9pwgc8). Per-problem first-tap
+        // outcomes drive Leitner box promotion / demotion at session-
+        // end; per-problem first-tap latency persists for the future
+        // "slow facts" surfacing work. Both arrays are slice()'d so
+        // downstream consumers can't mutate the screen's internal
+        // state.
+        perProblemCorrect: perProblemCorrectRef.current.slice(),
+        latencyMs: latencyMsByProblemRef.current.slice(),
       })
     }
   }, [problemIndex, plan.problems.length, onSessionComplete, storage, now])
@@ -1465,10 +1608,41 @@ function MathScreen({
       // speak() resolves. See ticket 86c9guh4y.
       if (!readAloudPlayedRef.current) return
 
+      // First-tap capture for the current problem (ticket 86c9pwgc8 —
+      // M4 Leitner wiring). Records BOTH the latency (ms from chip-
+      // render-time to first tap) AND the first-tap correctness.
+      // Subsequent retry taps within the same problem are NOT
+      // captured — `firstTapRecordedRef` is the once-per-problem latch.
+      //
+      // The capture happens BEFORE the correct/wrong dispatch below
+      // so retry taps that would re-enter `handleCorrectTap` after a
+      // wrong (which sets `resolved = true`) still see the latch and
+      // skip re-recording.
+      const isCorrect = chipValue === problem.correct
+      if (!firstTapRecordedRef.current) {
+        firstTapRecordedRef.current = true
+        const idx = problemIndex
+        if (idx >= 0 && idx < perProblemCorrectRef.current.length) {
+          perProblemCorrectRef.current[idx] = isCorrect
+        }
+        if (
+          idx >= 0 &&
+          idx < latencyMsByProblemRef.current.length &&
+          chipReadyAtRef.current !== null
+        ) {
+          // Math.max guard: if some pathological clock skew or
+          // timer race produces a negative latency, clamp to 0
+          // rather than persisting a sentinel-shaped negative.
+          latencyMsByProblemRef.current[idx] = Math.max(
+            0,
+            performance.now() - chipReadyAtRef.current,
+          )
+        }
+      }
+
       // Block guided-completion path on non-correct chips.
       if (guidedActive && chipValue !== problem.correct) return
 
-      const isCorrect = chipValue === problem.correct
       if (isCorrect) {
         handleCorrectTap(problem)
       } else {

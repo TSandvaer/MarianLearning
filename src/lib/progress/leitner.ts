@@ -81,6 +81,71 @@ export function emptyLeitner<T>(): LeitnerBox<T> {
 }
 
 // --------------------------------------------------------------------------
+// Session-generation hint (ticket 86c9pwgc8 — M4 Leitner wiring).
+//
+// The shape below is what App.tsx ships in its `/api/claude` payload's
+// `progress.leitner` block so the planner can weight box-1 (least
+// familiar) facts toward problems 4-8 in an 8-problem session, leaving
+// the gentle-ramp problems 1-3 unaffected (per Dave's research
+// deliverable `MarianLearning/design/research/add-to-10-counting-to-recall.md`).
+//
+// Wire shape is deliberately compact (`{ a, b, op, box }`) — Haiku
+// already knows the focus-node-specific fact pool from the prompt; the
+// hint just names the priority subset by box.
+// --------------------------------------------------------------------------
+
+/**
+ * One fact + its current box, ready for the wire. Mirrors the planner's
+ * `LeitnerHintItem` shape on the server side (see
+ * `MarianLearning/api/_planner.ts`). The shape is duplicated rather
+ * than imported because the api/ tsconfig builds independently from
+ * src/.
+ */
+export interface LeitnerSessionHintItem {
+  a: number
+  b: number
+  op: '+' | '-' | '*'
+  box: 1 | 2 | 3 | 4 | 5
+}
+
+/**
+ * Cap on how many facts we ship per request. The add-to-10 universe is
+ * 36 unordered pairs (`a + b` with `a, b ∈ [1, 9]` and `a + b ≤ 10`),
+ * which all comfortably fit. The cap exists as a forward-compatibility
+ * brake for the day a richer fact universe (e.g. `mult-6-9`) lands and
+ * the box could grow much larger. 60 is well above any single-tier
+ * universe size we expect this year and well below the request-body
+ * soft ceiling.
+ */
+export const LEITNER_HINT_MAX_ITEMS = 60
+
+/**
+ * Flatten a `LeitnerBox<MathFact>` into the wire-shape hint, sorted
+ * box-ascending (least familiar first). Empty box returns an empty
+ * array — the caller is expected to OMIT the field on the wire entirely
+ * when length is 0 so the canon-served path stays free of charge.
+ *
+ * `Array.prototype.sort` is stable in every JS engine we target
+ * (ES2019+), so within a box level the input order is preserved —
+ * keeps the round-trip deterministic for tests.
+ */
+export function buildLeitnerSessionHint(
+  box: LeitnerBox<{ a: number; b: number; op: '+' | '-' | '*' }>,
+): LeitnerSessionHintItem[] {
+  const out: LeitnerSessionHintItem[] = box.items.map((entry) => ({
+    a: entry.item.a,
+    b: entry.item.b,
+    op: entry.item.op,
+    box: entry.box,
+  }))
+  out.sort((x, y) => x.box - y.box)
+  if (out.length > LEITNER_HINT_MAX_ITEMS) {
+    out.length = LEITNER_HINT_MAX_ITEMS
+  }
+  return out
+}
+
+// --------------------------------------------------------------------------
 // internals
 // --------------------------------------------------------------------------
 

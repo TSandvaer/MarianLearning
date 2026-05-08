@@ -120,6 +120,33 @@ export interface SessionHistoryEntry {
    * immediately re-trigger another attempt.
    */
   novelPoolSuccessRate?: number
+  /**
+   * Per-problem first-tap latency in milliseconds (ticket 86c9pwgc8 — M4
+   * Leitner wiring). Length matches the number of problems Marian saw
+   * (8 in v1).
+   *
+   * Each entry measures wall-clock ms from when the chip row first
+   * became tappable for that problem (the read-aloud completed →
+   * `readAloudPlayed` flipped to `true`) to the FIRST chip tap on the
+   * problem, regardless of correctness. Subsequent retry taps within
+   * the same problem are NOT captured here. Sentinel `-1` means the
+   * problem was abandoned / never tapped.
+   *
+   * This is the "decision time" diagnostic Dave's research deliverable
+   * flagged as the actionable signal for the counting → retrieval
+   * transition (see
+   * `MarianLearning/design/research/add-to-10-counting-to-recall.md`):
+   * an "accurate but slow" fact is the canary for finger-counting
+   * dependency. M4 ships latency capture without yet wiring a consumer;
+   * the future M4.x work that surfaces "slow facts" to the planner
+   * reads from this field directly.
+   *
+   * Optional + additive — pre-86c9pwgc8 entries do not carry it; the
+   * field is omitted on read. Word-song captures latency too (same
+   * shape) for forward compatibility, even though no current consumer
+   * reads it.
+   */
+  latencyMs?: number[]
 }
 
 export type SessionHistory = SessionHistoryEntry[]

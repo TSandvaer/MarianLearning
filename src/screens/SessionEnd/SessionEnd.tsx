@@ -43,7 +43,7 @@ import {
   type SkillNode,
 } from '../../lib/progress'
 import { WORD_SONG_NOVEL_PROBE_WORDS } from '../../../api/_plannerWordList'
-import type { GraduationSessionSplit } from './progressHistory'
+import type { GraduationSessionSplit, LeitnerOutcome } from './progressHistory'
 import type { StorageAdapter } from '../Math/stardust'
 import {
   WORDSONG_SESSION_END_BONUS,
@@ -62,10 +62,16 @@ export interface SessionEndPayload {
   earnedThisSession: number
   surface: SessionEndSurface
   /**
-   * Per-problem clean-win outcome (ticket 86c9m3aec). Word-song only;
-   * undefined for math sessions and for hand-built test fixtures. Used
-   * by SessionEnd to compute the canonical/novel split on a
-   * graduation session.
+   * Per-problem clean-win outcome.
+   *
+   * Original use (ticket 86c9m3aec — word-song graduation): the screen
+   * computes the canonical/novel pool split for graduation-session
+   * accounting.
+   *
+   * Extended use (ticket 86c9pwgc8 — M4 Leitner wiring, math): the
+   * screen forwards this into `recordProgressOnSessionEnd` so the
+   * progress write path can promote / demote each session's facts in
+   * `mathFactsLeitner`. Both surfaces emit the field now.
    */
   perProblemCorrect?: readonly boolean[]
   /**
@@ -75,6 +81,23 @@ export interface SessionEndPayload {
    * split.
    */
   targetWords?: readonly string[]
+  /**
+   * Per-problem first-tap latency in milliseconds, indexed 0..N-1
+   * (math only — ticket 86c9pwgc8 M4). Sentinel `-1` means the
+   * problem was never tapped. Forwarded into the progress write path
+   * for persistence on `SessionHistoryEntry.latencyMs`. Word-song
+   * sessions don't ship this field today.
+   */
+  latencyMs?: readonly number[]
+  /**
+   * Per-problem math fact, indexed 0..N-1 (math only — ticket
+   * 86c9pwgc8 M4). Each entry mirrors the corresponding
+   * `MathProblem.{addendA, addendB, correct}` so SessionEnd can map
+   * `perProblemCorrect[i]` to a Leitner-box fact key without re-
+   * deriving from the audio plan. Word-song sessions don't ship this
+   * field; literacy has no Leitner box in v1.
+   */
+  mathFacts?: readonly { a: number; b: number; op: '+' | '-' | '*' }[]
 }
 
 /**
@@ -329,12 +352,32 @@ export default function SessionEnd({
       focusNode,
       p,
     )
+    // M4 Leitner outcomes (ticket 86c9pwgc8). Math sessions ship
+    // `mathFacts` + `perProblemCorrect`; SessionEnd zips them into
+    // `LeitnerOutcome[]` so the progress writer can promote / demote
+    // each fact. Word-song sessions never ship `mathFacts` (no
+    // Leitner box on literacy in v1) so the field stays absent.
+    let leitnerOutcomes: ReturnType<typeof buildLeitnerOutcomes> = undefined
+    if (
+      p.surface === 'math' &&
+      p.mathFacts !== undefined &&
+      p.perProblemCorrect !== undefined
+    ) {
+      leitnerOutcomes = buildLeitnerOutcomes(p.mathFacts, p.perProblemCorrect)
+    }
+
     recordProgressOnSessionEnd({
       surface: p.surface,
       totalCorrect: p.totalCorrect,
       dateISO,
       focusNode,
       ...(graduationSplit !== null ? { graduationSplit } : {}),
+      ...(leitnerOutcomes !== undefined ? { leitnerOutcomes } : {}),
+      // Latency persistence (ticket 86c9pwgc8 — M4). Math only;
+      // word-song doesn't ship `latencyMs` today.
+      ...(p.surface === 'math' && p.latencyMs !== undefined
+        ? { latencyMs: p.latencyMs }
+        : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -953,6 +996,36 @@ function computeGraduationSplit(
     novelCorrect,
     novelCount,
   }
+}
+
+/**
+ * Zip math facts + per-problem first-tap outcomes into the Leitner-
+ * outcome shape the progress writer consumes (ticket 86c9pwgc8 — M4).
+ *
+ * Defensive shape:
+ *   - When the two arrays have unequal lengths, emit only the
+ *     overlapping prefix. A length mismatch indicates an upstream
+ *     bug; emitting the partial set is safer than throwing (the
+ *     screen has already done its job and bricking the session-end
+ *     persistence over a length skew is the wrong tradeoff).
+ *   - When `correct` is undefined (out-of-range index), the outcome
+ *     still carries the fact so the box self-populates; the rank is
+ *     left unchanged in the writer.
+ */
+function buildLeitnerOutcomes(
+  facts: ReadonlyArray<{ a: number; b: number; op: '+' | '-' | '*' }>,
+  perProblemCorrect: readonly boolean[],
+): LeitnerOutcome[] | undefined {
+  const n = Math.min(facts.length, perProblemCorrect.length)
+  if (n === 0) return undefined
+  const out: LeitnerOutcome[] = new Array(n)
+  for (let i = 0; i < n; i++) {
+    out[i] = {
+      fact: { a: facts[i]!.a, b: facts[i]!.b, op: facts[i]!.op },
+      correct: perProblemCorrect[i],
+    }
+  }
+  return out
 }
 
 /** Convert a number (0-19) to its English word for the TTS caption. */

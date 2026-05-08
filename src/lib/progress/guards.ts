@@ -91,9 +91,24 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
     return false
   }
   if (!Array.isArray(v.skillFocus)) return false
-  return v.skillFocus.every(
-    (n) => typeof n === 'string' && SKILL_NODES.has(n as SkillNode),
-  )
+  if (
+    !v.skillFocus.every(
+      (n) => typeof n === 'string' && SKILL_NODES.has(n as SkillNode),
+    )
+  ) {
+    return false
+  }
+  // latencyMs is optional (ticket 86c9pwgc8 — additive, no schemaVersion
+  // bump). When present it must be an array of finite numbers; the `-1`
+  // sentinel for "no measurement" is allowed (so we accept any finite
+  // numeric — negative-or-positive — rather than forcing >= 0).
+  if ('latencyMs' in v && v.latencyMs !== undefined) {
+    if (!Array.isArray(v.latencyMs)) return false
+    for (const n of v.latencyMs) {
+      if (typeof n !== 'number' || !Number.isFinite(n)) return false
+    }
+  }
+  return true
 }
 
 function isMasteryThresholdShape(v: unknown): boolean {
