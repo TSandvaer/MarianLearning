@@ -216,4 +216,83 @@ describe('maybeApplyDebugSeed', () => {
       expect(history.schemaVersion).toBe(2)
     })
   })
+
+  describe('add-to-20 seed (ticket 86c9q5q13)', () => {
+    beforeEach(() => {
+      setSearch('?debug=1&seed=add-to-20')
+    })
+
+    it('writes add-to-10: mastered + add-to-20: practicing into progress', () => {
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(progress?.skillLevels['number-recog']).toBe('mastered')
+      expect(progress?.skillLevels['add-to-10']).toBe('mastered')
+      expect(progress?.skillLevels['add-to-20']).toBe('practicing')
+    })
+
+    it('round-trip integration: maybeApplyDebugSeed → pickFocusNode("math") → "add-to-20"', () => {
+      // pickFocusNode walks MATH_NODES_IN_ORDER and stops at the first
+      // non-mastered node. With number-recog + add-to-10 mastered and
+      // add-to-20 set to practicing, the picker must land on add-to-20.
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(pickFocusNode(progress!, 'math')).toBe('add-to-20')
+    })
+
+    it('leaves mathFactsLeitner empty (per AC #6 — fresh box for the new tier)', () => {
+      // The seed only patches skillLevels; the canonical defaultProgress()
+      // initialiser sets mathFactsLeitner to emptyLeitner(). Together
+      // these mean the seed lands a Progress where the box is empty —
+      // the canon path is hit on the first session-start fetch, no
+      // Leitner directive is injected (active scope is add-to-10 only
+      // anyway).
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(progress?.mathFactsLeitner.items).toEqual([])
+    })
+
+    it('bumps session-history sessionCount to 1 (skips Greet on next mount)', () => {
+      maybeApplyDebugSeed()
+      const history = readSessionHistory()
+      expect(history.sessionCount).toBe(1)
+      expect(history.schemaVersion).toBe(2)
+    })
+
+    it('is idempotent on progress — second call does not change skillLevels', () => {
+      maybeApplyDebugSeed()
+      const after1 = window.localStorage.getItem(PROGRESS_KEY)
+      maybeApplyDebugSeed()
+      const after2 = window.localStorage.getItem(PROGRESS_KEY)
+      expect(after2).toBe(after1)
+    })
+
+    it('does not displace a real returning-user state (sessionCount > 0)', () => {
+      // Same defensive check as the cvc-words seed: a debug URL loaded
+      // on a real iPad must not overwrite real Marian state.
+      const realHistory = {
+        schemaVersion: 2,
+        sessionCount: 12,
+        lastSessionCompletedAt: '2026-05-08T10:00:00.000Z',
+        longestStreakEver: 8,
+        cumulativeStardust: 95,
+        lastSessionStardust: 7,
+        dayStreak: 6,
+        todayTreesTouched: { date: '2026-05-08', trees: ['number-garden'] },
+        lastSuggestion: null,
+        consecutiveOverrides: 0,
+        suggestionCooldownUntil: null,
+      }
+      window.localStorage.setItem(
+        SESSION_HISTORY_KEY,
+        JSON.stringify(realHistory),
+      )
+      maybeApplyDebugSeed()
+      const after = readSessionHistory()
+      expect(after.sessionCount).toBe(12)
+      expect(after.cumulativeStardust).toBe(95)
+    })
+  })
 })
