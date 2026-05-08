@@ -48,12 +48,14 @@ import {
   useRequestPersistentStorageOnGesture,
 } from './lib/lifecycle'
 import {
+  buildLeitnerSessionHint,
   getOrCreateDeviceId,
   isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
   pickRecentSuccessRate,
   reconcileWithCloud,
+  type LeitnerSessionHintItem,
   type Progress,
   type ProgressTrack,
 } from './lib/progress'
@@ -181,6 +183,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   focusNode: string | undefined
   recentSuccessRate: number | null | undefined
   isGraduationSession: boolean | undefined
+  leitner: LeitnerSessionHintItem[] | undefined
 } {
   const progress = loadProgress()
   if (progress === null) {
@@ -188,6 +191,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       focusNode: undefined,
       recentSuccessRate: undefined,
       isGraduationSession: undefined,
+      leitner: undefined,
     }
   }
   const focusNode = pickFocusNode(progress, track)
@@ -200,10 +204,23 @@ function readProgressHintsForTrack(track: ProgressTrack): {
     focusNode,
     track,
   )
+  // 86c9pwgc8 (M4): ship the Leitner hint for the math track only.
+  // Word-song has no Leitner box in v1. Empty box → undefined so the
+  // wire field is omitted entirely and the canon-served path stays
+  // free; non-empty box → an array sorted box-ascending the planner
+  // weights toward problems 4-8.
+  let leitner: LeitnerSessionHintItem[] | undefined = undefined
+  if (track === 'math') {
+    const hint = buildLeitnerSessionHint(progress.mathFactsLeitner)
+    if (hint.length > 0) {
+      leitner = hint
+    }
+  }
   return {
     focusNode,
     recentSuccessRate: pickRecentSuccessRate(progress, track),
     isGraduationSession,
+    leitner,
   }
 }
 
@@ -445,18 +462,48 @@ export default function App() {
   const [sessionEndPayload, setSessionEndPayload] =
     useState<SessionEndPayload | null>(null)
 
+  /**
+   * Always-fresh mirror of the active math plan (ticket 86c9pwgc8 — M4).
+   * Read by `handleMathComplete` to derive the per-problem `mathFacts`
+   * forwarded to SessionEnd for Leitner promotion. The ref pattern
+   * lets the handler stay declared early in the component (before
+   * `mathPlan` / `mathFallbackPlan`) without forcing those values into
+   * the dep array, which would re-create the handler on every fetch
+   * resolve. Set inside an effect after both plans are declared.
+   */
+  const activeMathPlanRef = useRef<MathSessionPlan | null>(null)
+
   const handleMathComplete = useCallback((result: MathSessionResult) => {
     // Math's existing payload omits the `surface` discriminant per
     // PR #54 / screen-3-math.md:411 — the Session-End spec's
     // backwards-compat shim defaults missing `surface` to `'math'`
     // (screen-5-session-end.md:96-102). We materialise the default
     // here so downstream consumers always see a complete payload.
+    //
+    // Forward the M4 Leitner-wiring fields (ticket 86c9pwgc8):
+    // per-problem first-tap correctness drives Leitner box
+    // promotion / demotion at session-end; latency persists on the
+    // history entry for future "slow facts" surfacing; mathFacts
+    // gives the progress writer a key without re-deriving from the
+    // active plan (which may have been swapped for the static
+    // fallback by then).
+    const activePlan = activeMathPlanRef.current
+    const mathFacts = activePlan
+      ? activePlan.problems.map((p) => ({
+          a: p.addendA,
+          b: p.addendB,
+          op: '+' as const,
+        }))
+      : undefined
     setSessionEndPayload({
       totalCorrect: result.totalCorrect,
       totalStardust: result.totalStardust,
       finalStreak: result.finalStreak,
       earnedThisSession: result.earnedThisSession,
       surface: 'math',
+      perProblemCorrect: result.perProblemCorrect,
+      latencyMs: result.latencyMs,
+      ...(mathFacts !== undefined ? { mathFacts } : {}),
     })
     setRoute('session-end')
   }, [])
@@ -568,6 +615,14 @@ export default function App() {
     [],
   )
   const [mathPlan, setMathPlan] = useState<MathSessionPlan | null>(null)
+
+  // Keep the active-math-plan ref synced with whichever plan is rendering
+  // (ticket 86c9pwgc8 — M4). Effect runs post-render so we satisfy the
+  // "no ref mutation during render" lint guidance. Reads `mathPlan` first
+  // (server-derived); falls back to `mathFallbackPlan` (static rotation).
+  useEffect(() => {
+    activeMathPlanRef.current = mathPlan ?? mathFallbackPlan
+  }, [mathPlan, mathFallbackPlan])
 
   // The live `playUtterance` becomes non-null once the /api/claude fetch
   // resolves and the audio is loaded. Until then (or on any failure),
@@ -681,6 +736,12 @@ export default function App() {
         sessionId,
         focusNode: mathHints.focusNode,
         recentSuccessRate: mathHints.recentSuccessRate,
+        // 86c9pwgc8 (M4): forward the Leitner hint for the math track.
+        // Server-side planner reads this via the `progress.leitner`
+        // wire field and weights box-1 facts toward problems 4-8.
+        // Empty box → undefined here, which keeps the canon-served
+        // free path active.
+        leitner: mathHints.leitner,
       },
       { signal: controller.signal },
     )

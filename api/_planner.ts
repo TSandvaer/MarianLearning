@@ -196,6 +196,39 @@ export interface GenerateSessionPlanArgs {
    * callers).
    */
   isGraduationSession?: boolean
+  /**
+   * Leitner hint (ticket 86c9pwgc8 — M4). Sorted box-ascending list of
+   * the math facts in the child's `Progress.mathFactsLeitner` box.
+   * When supplied AND the effective focus node is `add-to-10`, the
+   * planner instructs Haiku to weight box-1 (least familiar) facts
+   * toward problems 4-8 in the 8-problem session. Other focus nodes
+   * ignore the hint — Leitner-driven generation is currently
+   * add-to-10-only.
+   *
+   * Volatile per call: lives in the user message, not the system
+   * prompt. Two Leitner-on calls share the same system text as a
+   * Leitner-off call so the prompt-cache prefix stays stable.
+   *
+   * Caller responsibility: ship only when non-empty. Empty / absent
+   * lets the planner pick freely from the focus-node fact pool.
+   */
+  leitner?: LeitnerHintItem[]
+}
+
+/**
+ * One Leitner-box fact, ready for the planner directive (ticket
+ * 86c9pwgc8 — M4 Leitner wiring). Mirrors the browser-side wire
+ * shape (`LeitnerSessionHintItem` in `src/lib/progress/leitner.ts`).
+ *
+ * Browser → server: shipped on `/api/claude` payload as
+ * `progress.leitner: LeitnerHintItem[]`. Server → browser: not
+ * round-tripped — this is purely an input directive.
+ */
+export interface LeitnerHintItem {
+  a: number
+  b: number
+  op: '+' | '-' | '*'
+  box: 1 | 2 | 3 | 4 | 5
 }
 
 /** Plan shape returned by the planner — flat, wire-ready. Mirrors what
@@ -371,6 +404,9 @@ export interface GenerateSessionStartResponseArgs {
   /** Graduation-session hint (ticket 86c9m3aec). See
    *  `GenerateSessionPlanArgs.isGraduationSession`. */
   isGraduationSession?: boolean
+  /** Leitner hint (ticket 86c9pwgc8 — M4). See
+   *  `GenerateSessionPlanArgs.leitner`. */
+  leitner?: LeitnerHintItem[]
   /** Optional render-pipeline overrides. Production wiring leaves this
    *  empty — `_session.renderSessionAudio` resolves to the real Azure
    *  synth. Tests + the canon generator can swap in a fake synth or tune
@@ -418,6 +454,7 @@ export async function generateSessionStartResponse(
     focusNode: args.focusNode,
     recentSuccessRate: args.recentSuccessRate,
     isGraduationSession: args.isGraduationSession,
+    leitner: args.leitner,
   })
   return renderSessionAudio(plan, args.renderOptions)
 }
@@ -581,15 +618,85 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
     focusNode === 'cvc-words'
   const graduationLine = isGraduation ? buildGraduationDirective() : null
 
+  // Leitner directive (ticket 86c9pwgc8 — M4). Only fires when the
+  // caller supplied a non-empty array AND the effective focus node is
+  // `add-to-10` — Leitner-driven session generation is currently
+  // add-to-10-only (matches the only Leitner box that exists in v1
+  // progress shape). Other focus nodes / tracks ignore the array
+  // silently.
+  //
+  // Lives in the user message (volatile per call). The cache prefix
+  // (system prompt) is unchanged so two Leitner-on calls share the
+  // same prompt-cache hits as a Leitner-off call.
+  const isLeitnerActive =
+    args.track === 'math' &&
+    focusNode === 'add-to-10' &&
+    args.leitner !== undefined &&
+    args.leitner.length > 0
+  const leitnerLine = isLeitnerActive
+    ? buildLeitnerDirective(args.leitner!)
+    : null
+
   const lines = [
     `Generate a session plan for the ${trackLabel} track at level ${args.level}.`,
     `Focus skill node: ${focusNode}.`,
     recentScoreLine,
     ...(graduationLine !== null ? [graduationLine] : []),
+    ...(leitnerLine !== null ? [leitnerLine] : []),
     `Child's name: ${safeName || 'friend'}.`,
     `Return JSON only — no surrounding prose, no markdown fences.`,
   ]
   return lines.join('\n')
+}
+
+/**
+ * Build the Leitner-weighting directive that goes into the user
+ * message (ticket 86c9pwgc8 — M4 Leitner wiring). Spelled out as a
+ * multi-line block so Haiku has unambiguous guidance on which fact
+ * pairs to surface and which problems they should land in.
+ *
+ * The directive carries every fact in the box, grouped by box level.
+ * Box 1 = "least familiar / due for review" (top priority for
+ * problems 4-8); boxes 3-5 = "long review" (drop in occasionally).
+ * Problems 1-3 stay unaffected by the directive — those keep their
+ * gentle-ramp role per Kyle's spec / Dave's research §6 P1, so a
+ * cold-start session never opens with a stumble fact.
+ *
+ * The fact list is passed verbatim — no per-fact text generation
+ * here. Haiku's existing per-focus-node template ("Three plus two.
+ * How many?") handles the surface text from the chosen pair.
+ */
+function buildLeitnerDirective(items: readonly LeitnerHintItem[]): string {
+  const byBox = new Map<number, LeitnerHintItem[]>()
+  for (const item of items) {
+    if (!byBox.has(item.box)) byBox.set(item.box, [])
+    byBox.get(item.box)!.push(item)
+  }
+  const formatPair = (i: LeitnerHintItem): string => `${i.a}${i.op}${i.b}`
+  const boxLines: string[] = []
+  for (let b = 1; b <= 5; b++) {
+    const list = byBox.get(b)
+    if (!list || list.length === 0) continue
+    boxLines.push(`Box ${b}: ${list.map(formatPair).join(', ')}.`)
+  }
+  return [
+    `LEITNER PRIORITY DIRECTIVE (ticket 86c9pwgc8). The child has`,
+    `practiced these specific facts before. Box 1 = least familiar /`,
+    `most due for review. Box 5 = long-review (well known).`,
+    ...boxLines,
+    `When picking the 8 problems for this session, OBEY THIS RULE:`,
+    `- Problems 1-3 stay easy / gentle-ramp; pick freely from the`,
+    `  focus-node fact pool (Box-1 facts are FORBIDDEN here so the`,
+    `  child does not open the session on a known-stumble fact).`,
+    `- Problems 4-8 should LEAN INTO Box-1 facts — at least 2 of`,
+    `  these 5 problems must use a fact from the Box-1 list above`,
+    `  when at least 2 Box-1 facts exist; if fewer Box-1 facts exist,`,
+    `  use all of them. Fill the remainder with Box 2-3 facts when`,
+    `  available, and any focus-node fact otherwise. Sprinkle one`,
+    `  Box 4-5 fact for spaced review when possible.`,
+    `- Do not repeat any fact within the 8-problem set.`,
+    `- Number-word and read-line templates remain unchanged.`,
+  ].join('\n')
 }
 
 /**

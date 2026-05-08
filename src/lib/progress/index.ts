@@ -33,7 +33,16 @@ export {
 
 export { CURRENT_SCHEMA_VERSION } from './types'
 
-export { addItem, demote, emptyLeitner, findItem, promote } from './leitner'
+export {
+  LEITNER_HINT_MAX_ITEMS,
+  addItem,
+  buildLeitnerSessionHint,
+  demote,
+  emptyLeitner,
+  findItem,
+  promote,
+} from './leitner'
+export type { LeitnerSessionHintItem } from './leitner'
 
 export { defaultProgress } from './defaults'
 export { migrate } from './migrate'

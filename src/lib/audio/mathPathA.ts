@@ -77,6 +77,7 @@ import {
   type SessionStartResponse,
   type Utterance,
 } from '../../../api/_types'
+import type { LeitnerSessionHintItem } from '../progress'
 
 /** The endpoint App.tsx POSTs to. Lifted to a constant so tests can stub
  *  fetch by URL match. */
@@ -125,6 +126,23 @@ export interface PrepareMathPathAArgs {
    * `pickRecentSuccessRate(progress, 'math')`.
    */
   recentSuccessRate?: number | null
+  /**
+   * M4 (ticket 86c9pwgc8). Optional Leitner hint — a flat list of
+   * `{a, b, op, box}` for every fact in `progress.mathFactsLeitner`,
+   * sorted box-ascending. The server's planner reads it from
+   * `progress.leitner` and weights box-1 (least familiar) facts toward
+   * problems 4-8 in the 8-problem session, leaving the gentle-ramp
+   * problems 1-3 unaffected.
+   *
+   * Caller policy: omit (i.e. leave undefined) when the box is empty
+   * so the canon-served free path stays active. Once the box has at
+   * least one item, ship it — the server bypasses canon AND the in-
+   * memory cache because canon is keyed without Leitner state and
+   * serving a non-Leitner-aware plan would defeat the M4 contract.
+   * Same posture as `isGraduationSession`. See `App.tsx`'s
+   * `readProgressHintsForTrack` for the gate.
+   */
+  leitner?: LeitnerSessionHintItem[]
 }
 
 export interface PreparedMathPathA {
@@ -201,8 +219,14 @@ export async function prepareMathPathA(
   // calling this function — keeping the storage read out of this
   // module preserves the unit-test seam (tests inject the values
   // directly without needing to set up localStorage).
+  // M4 (ticket 86c9pwgc8): forward `leitner` when the caller supplied a
+  // non-empty array. Empty / absent leaves the canon-served free path
+  // active — same posture as graduation-session.
+  const hasLeitner = args.leitner !== undefined && args.leitner.length > 0
   const progressBlock =
-    args.focusNode !== undefined || args.recentSuccessRate !== undefined
+    args.focusNode !== undefined ||
+    args.recentSuccessRate !== undefined ||
+    hasLeitner
       ? {
           progress: {
             ...(args.focusNode !== undefined
@@ -211,6 +235,7 @@ export async function prepareMathPathA(
             ...(args.recentSuccessRate !== undefined
               ? { recentSuccessRate: args.recentSuccessRate }
               : {}),
+            ...(hasLeitner ? { leitner: args.leitner } : {}),
           },
         }
       : {}

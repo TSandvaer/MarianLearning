@@ -81,6 +81,7 @@ import { renderSessionAudio } from './_session.js'
 import {
   generateSessionStartResponse,
   PlannerError,
+  type LeitnerHintItem,
   type PlannerAnthropicClient,
   type PlannerTrack,
 } from './_planner.js'
@@ -210,6 +211,20 @@ interface TrackPayload {
    * undefined as `false`.
    */
   isGraduationSession?: boolean
+  /**
+   * Leitner-box hint (ticket 86c9pwgc8 — M4 Leitner wiring). Browser
+   * computes via `buildLeitnerSessionHint(progress.mathFactsLeitner)`
+   * at session-start fetch time and ships only when length > 0. Each
+   * entry names one fact + its current box (1..5). The planner uses
+   * the hint to weight box-1 (least familiar) facts toward problems
+   * 4-8 in an 8-problem session, leaving the gentle-ramp problems
+   * 1-3 unaffected.
+   *
+   * Active for math today (no Leitner box on the literacy track in
+   * v1). Absent for legacy clients — server treats undefined as "no
+   * hint" and the planner picks freely.
+   */
+  leitner?: LeitnerHintItem[]
 }
 
 const VALID_TRACKS: readonly PlannerTrack[] = ['math', 'word-song']
@@ -312,8 +327,60 @@ function extractTrackPayload(payload: unknown): TrackPayload | null {
     if (typeof pr.isGraduationSession === 'boolean') {
       out.isGraduationSession = pr.isGraduationSession
     }
+    // leitner (ticket 86c9pwgc8): array of {a, b, op, box}.
+    // Soft-validate shape per item; reject the whole array if any item
+    // is malformed (the alternative — partial drop — would silently
+    // skew the priority list). Cap at LEITNER_MAX_ITEMS to bound payload.
+    if (Array.isArray(pr.leitner)) {
+      const valid = parseLeitnerHint(pr.leitner)
+      if (valid !== null && valid.length > 0) {
+        out.leitner = valid
+      }
+    }
   }
 
+  return out
+}
+
+/**
+ * Parse and validate the wire-shape Leitner hint. Returns the parsed
+ * array on success (capped at `LEITNER_MAX_ITEMS`) or null on any
+ * shape error in any item. Caller drops the whole field on null —
+ * partial validity would silently skew the priority list and the
+ * cost surface (canon bypass) is bounded either way.
+ */
+const LEITNER_MAX_ITEMS = 60
+const VALID_OPS: ReadonlySet<string> = new Set(['+', '-', '*'])
+function parseLeitnerHint(raw: unknown[]): LeitnerHintItem[] | null {
+  if (raw.length > LEITNER_MAX_ITEMS) return null
+  const out: LeitnerHintItem[] = []
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) return null
+    const r = item as Record<string, unknown>
+    const a = r.a
+    const b = r.b
+    const op = r.op
+    const box = r.box
+    if (
+      typeof a !== 'number' ||
+      !Number.isInteger(a) ||
+      a < 0 ||
+      a > 99 ||
+      typeof b !== 'number' ||
+      !Number.isInteger(b) ||
+      b < 0 ||
+      b > 99 ||
+      typeof op !== 'string' ||
+      !VALID_OPS.has(op) ||
+      typeof box !== 'number' ||
+      !Number.isInteger(box) ||
+      box < 1 ||
+      box > 5
+    ) {
+      return null
+    }
+    out.push({ a, b, op: op as '+' | '-' | '*', box: box as 1 | 2 | 3 | 4 | 5 })
+  }
   return out
 }
 
@@ -564,8 +631,17 @@ export async function handler(
       // does NOT carry. Skip canon (and the in-memory cache for the
       // same reason) when the flag is set so the live planner runs
       // and emits the directive-aware plan.
+      //
+      // Leitner-hint bypass (ticket 86c9pwgc8 — M4): same posture.
+      // Canon is keyed on (track, level, focusNode) only; serving a
+      // cached non-Leitner-aware plan defeats the M4 contract that
+      // the planner weights box-1 facts toward problems 4-8. The
+      // hint only ships when the box has at least one item, so the
+      // empty-box first-session case still hits canon (free).
       const canonResolver = overrides.getCanonEntry ?? getCanonEntry
-      if (trackPayload.isGraduationSession !== true) {
+      const hasLeitnerHint =
+        trackPayload.leitner !== undefined && trackPayload.leitner.length > 0
+      if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
         const canonHit = canonResolver({
           track: trackPayload.track,
           level: trackPayload.level,
@@ -603,7 +679,14 @@ export async function handler(
       // fresh planner output. Re-using a cached non-graduation
       // response on a graduation request would feed a canonical-only
       // plan into the dual-gate pipeline, defeating the probe.
-      if (trackPayload.isGraduationSession !== true) {
+      //
+      // Leitner-hint bypass (ticket 86c9pwgc8 — M4): same posture.
+      // The cache key doesn't include the Leitner state, so a cached
+      // non-Leitner plan would win on a Leitner request, defeating
+      // the box-1 weighting contract. Bypassing here means a Leitner-
+      // active session always pays one Anthropic + Azure round-trip;
+      // empty-box sessions still hit the cache.
+      if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
         const cached = cache.get(cacheKey, now())
         if (cached !== null) {
           return jsonResponse(cached, 200, headers)
@@ -670,6 +753,12 @@ export async function handler(
           // honour the flag lives in the planner's
           // `buildUserMessage` — passing the raw flag through is safe.
           isGraduationSession: trackPayload.isGraduationSession,
+          // Leitner hint (ticket 86c9pwgc8 — M4). When non-empty, the
+          // planner adds a directive to the user message so Haiku
+          // weights box-1 facts toward problems 4-8. Server-side
+          // filtering — only math + add-to-10 today — lives in
+          // `buildUserMessage`; passing the raw array through is safe.
+          leitner: trackPayload.leitner,
         })
         // Cache the rendered response under the track payload key. Even
         // partial renders (some utterances soft-failed) are cacheable —
@@ -684,7 +773,12 @@ export async function handler(
         // serve a graduation plan, leaking novel-pool words into a
         // non-graduation session. The browser's session-end logic would
         // then mis-classify and the dual-gate accounting would shred.
-        if (trackPayload.isGraduationSession !== true) {
+        //
+        // Leitner-hint bypass (ticket 86c9pwgc8): same — caching a
+        // Leitner-weighted plan under the standard key would leak it
+        // into a regular (or different-Leitner-state) session and the
+        // box-1-priority contract would silently rotate.
+        if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
           cache.set(cacheKey, rendered, now())
         }
         return jsonResponse(rendered, 200, headers)
