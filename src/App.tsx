@@ -412,24 +412,43 @@ export default function App() {
   }, [])
 
   /**
-   * Mid-skill back-arrow → Hub. Wired into Math/WordSong via their
-   * `onRequestExit` callback (added in slice 4).
+   * Imperative teardown for the Word Song Path A pre-warm
+   * (ticket 86c9pr4h9). Declared as a ref-stored callback so handlers
+   * declared earlier in the component can invoke it without holding
+   * a forward reference to the word-song state/refs that live further
+   * down. The actual function body is wired below where those refs
+   * are declared (search for `tearDownWordSongAudioRef.current = ...`).
+   *
+   * Invoked from `handleSessionEndAllDone` (post-completion) and
+   * `handleBackToHub` (mid-skill abandon) when the surface in play
+   * was word-song. The leave-effect previously handled both via
+   * literacy → hub transitions, but now excepts `hub` to keep the
+   * pre-warm fetch alive on `splash → hub` — so the post-session
+   * teardown is driven imperatively from the matching gestures.
    */
-  const handleBackToHub = useCallback(() => {
-    setHubEntryPath('mid-skill-back')
-    setRoute('hub')
-  }, [])
+  const tearDownWordSongAudioRef = useRef<(() => void) | null>(null)
 
   /**
-   * Session-End "All done!" → Hub. Wired into SessionEnd via the new
-   * `onAllDone` prop (slice 6 ties the route flip; spec calls for a
-   * one-line change in SessionEnd.tsx, this orchestrator-side handler
-   * is the receiving side of that handoff).
+   * Mid-skill back-arrow → Hub. Wired into Math/WordSong via their
+   * `onRequestExit` callback (added in slice 4).
+   *
+   * 86c9pr4h9 — when the back-arrow is pressed mid-Word Song, this
+   * handler also tears down the word-song Path A audio + resets the
+   * latch so the next hub-mount pre-warm fetches fresh content. Same
+   * rationale as the matching teardown in `handleSessionEndAllDone`:
+   * the leave-effect for word-song now excepts `hub` (because the
+   * kick-effect fires there for pre-warm), so the prior literacy →
+   * hub teardown that the leave-effect used to do no longer fires
+   * here. Discriminated on the current `route` because the same
+   * handler is wired to both Math and Word Song's onRequestExit.
    */
-  const handleSessionEndAllDone = useCallback(() => {
-    setHubEntryPath('session-end')
+  const handleBackToHub = useCallback(() => {
+    if (route === 'literacy') {
+      tearDownWordSongAudioRef.current?.()
+    }
+    setHubEntryPath('mid-skill-back')
     setRoute('hub')
-  }, [])
+  }, [route])
 
   /**
    * Session-End handoff state. Captured from the originating screen's
@@ -441,9 +460,38 @@ export default function App() {
    * The full Session-End screen (ticket 86c9hb2r6) replaces the
    * earlier placeholder. Thomas decided Option C for the CTA
    * destination: "Come back soon" sleep splash.
+   *
+   * Declared above `handleSessionEndAllDone` so that handler can read
+   * `sessionEndPayload?.surface` to drive the post-session word-song
+   * audio teardown (ticket 86c9pr4h9).
    */
   const [sessionEndPayload, setSessionEndPayload] =
     useState<SessionEndPayload | null>(null)
+
+  /**
+   * Session-End "All done!" → Hub. Wired into SessionEnd via the new
+   * `onAllDone` prop (slice 6 ties the route flip; spec calls for a
+   * one-line change in SessionEnd.tsx, this orchestrator-side handler
+   * is the receiving side of that handoff).
+   *
+   * 86c9pr4h9 — when the just-completed session was word-song, this
+   * handler also tears down the word-song Path A audio + resets the
+   * latch so the next hub-mount pre-warm fetches fresh content. The
+   * leave-effect for word-song now excepts `hub` (because the kick-
+   * effect fires there for pre-warm), so the prior session-end → hub
+   * teardown that the leave-effect used to do no longer fires here.
+   * Hooking the teardown to the deterministic "All done" tap is
+   * cleaner than detecting transitions in the leave-effect: it fires
+   * exactly once, has access to the surface tag, and lives next to
+   * the matching route flip.
+   */
+  const handleSessionEndAllDone = useCallback(() => {
+    if (sessionEndPayload?.surface === 'word-song') {
+      tearDownWordSongAudioRef.current?.()
+    }
+    setHubEntryPath('session-end')
+    setRoute('hub')
+  }, [sessionEndPayload])
 
   const handleMathComplete = useCallback((result: MathSessionResult) => {
     // Math's existing payload omits the `surface` discriminant per
@@ -871,15 +919,82 @@ export default function App() {
   const [wordSongAudioReady, setWordSongAudioReady] = useState(false)
 
   /**
-   * Same shape as the Math fetch-effect above (no cleanup; settle
-   * handlers gate on `controller.signal.aborted`). The Word Song
-   * deps `[route, wordSongPlan]` would have caused literacy →
-   * non-literacy transitions to abort an in-flight fetch and brick
-   * `wordSongAudioReady`. See the Math fetch-effect's header for the
-   * full rationale.
+   * Wire the imperative teardown ref now that the word-song state and
+   * refs are declared (ticket 86c9pr4h9). Body mirrors the leave-
+   * effect's tear-down branch: abort the controller, unload howls,
+   * reset the latch, clear plan/play/audioReady. Used by
+   * `handleSessionEndAllDone` and `handleBackToHub` to substitute for
+   * the `literacy → hub` teardown that the leave-effect used to drive
+   * (the leave-effect now excepts `hub` to keep the pre-warm fetch
+   * alive across `splash → hub`).
+   *
+   * Idempotent — calling on an already-clean state is a no-op.
+   *
+   * Wired via `useEffect` (rather than a render-time ref assignment)
+   * to satisfy React 19's `react-hooks/refs` rule — refs may not be
+   * mutated during render. The effect runs once per render with the
+   * current setters in scope; React's render-after-state-change
+   * cycle keeps the bound function fresh.
    */
   useEffect(() => {
-    if (route !== 'literacy') return
+    tearDownWordSongAudioRef.current = () => {
+      if (wordSongAbortRef.current) {
+        wordSongAbortRef.current.abort()
+        wordSongAbortRef.current = null
+      }
+      if (wordSongUnloadRef.current) {
+        wordSongUnloadRef.current()
+        wordSongUnloadRef.current = null
+      }
+      wordSongFetchStartedRef.current = false
+      setWordSongPlay(null)
+      setWordSongAudioReady(false)
+      setWordSongPlan(null)
+    }
+  })
+
+  /**
+   * Kick the Word Song Path A fetch as soon as Hub mounts (ticket
+   * 86c9pr4h9 — mirrors the Math pre-warm shape from 86c9hjnn8).
+   *
+   * Pre-86c9pr4h9 the kick fired only on `route === 'literacy'`, which
+   * meant the cold-mount race between Marian's tap on the Word Song
+   * chip and the /api/claude POST + 8× Azure TTS render + canon
+   * lookup landed entirely AFTER the route flip. On real iPad signal
+   * (Marian, 2026-05-08) this was a noticeable wait the first time she
+   * tried Word Song. Math had no equivalent wait because its kick
+   * fires on `greet || math` — the 4-line Greet intro + heart-tap
+   * window is plenty for the network to settle.
+   *
+   * Hub is the right anchor: a returning user (sessionCount ≥ 1)
+   * lands on Hub via Splash → Hub, and a first-launch user reaches
+   * Hub via Greet → Math → SessionEnd → Hub before any literacy
+   * entry. Either way, by the time Marian taps the Word Song chip
+   * the network has been working for at least a few hundred ms (and
+   * usually seconds).
+   *
+   * Direct `?route=literacy` QA launches still trigger the fetch (the
+   * latch fires the first time route enters [hub, literacy], whichever
+   * comes first), so the QA path is not regressed.
+   *
+   * Same no-cleanup shape as the Math fetch-effect — settle handlers
+   * gate on `controller.signal.aborted`. See that effect's header for
+   * the full rationale on why a per-render cleanup re-creates the
+   * brick-shape this latch is here to avoid.
+   *
+   * Why hub joins the leave-effect's exception list (below)
+   * -------------------------------------------------------
+   * If we kicked on hub but DIDN'T except hub in the leave-effect, the
+   * `splash → hub` transition would fire BOTH effects in one commit:
+   * the kick starts the fetch, then the leave-effect aborts it (hub
+   * not in `[literacy, session-end]`). The exception list is widened
+   * to `[hub, literacy, session-end]` so an in-flight pre-warm
+   * survives Marian's first hub mount. The post-session teardown that
+   * the prior leave-effect handled on `literacy → hub` is now driven
+   * imperatively from `handleSessionEndAllDone` (see below).
+   */
+  useEffect(() => {
+    if (route !== 'hub' && route !== 'literacy') return
     if (wordSongFetchStartedRef.current) return
     wordSongFetchStartedRef.current = true
 
@@ -949,11 +1064,23 @@ export default function App() {
    * map is shared with `playSessionUtterance`, so unloading on
    * literacy → session-end would brick SessionEnd's audio).
    *
+   * 86c9pr4h9: `hub` is now in the exception list because the kick-
+   * effect above fires on hub mount for the Word Song pre-warm. If hub
+   * weren't excepted, the `splash → hub` route flip would run both
+   * effects in the same commit — the kick starts the fetch, this
+   * leave-effect aborts it. The post-session-end teardown that this
+   * effect previously handled on `literacy → hub` is now driven
+   * imperatively from `handleSessionEndAllDone` (see that handler for
+   * the rationale; the short version: deterministic "session done"
+   * signal beats reading transition state from the leave-effect).
+   *
    * setState calls deferred to a microtask to satisfy the
    * `react-hooks/set-state-in-effect` rule.
    */
   useEffect(() => {
-    if (route === 'literacy' || route === 'session-end') return
+    if (route === 'hub' || route === 'literacy' || route === 'session-end') {
+      return
+    }
 
     // Mirror of the Math leave-effect's latch-leak fix
     // (ticket 86c9kxtm5). Reset the latch + abort the controller
