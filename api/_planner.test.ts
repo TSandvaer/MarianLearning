@@ -1577,3 +1577,221 @@ describe('generateSessionStartResponse — combined planner + TTS callable (D, 8
     expect(synthCalled).toBe(false)
   })
 })
+
+/**
+ * M4 Leitner-wiring directive tests (ticket 86c9pwgc8).
+ *
+ * The Leitner directive sits in the user message (volatile per call)
+ * so the system prefix stays cache-stable. Active only on math +
+ * add-to-10 with a non-empty array; ignored otherwise.
+ */
+describe('generateSessionPlan — Leitner directive (ticket 86c9pwgc8 — M4)', () => {
+  const MATH_PLAN_RESPONSE = JSON.stringify({
+    id: 'haiku-math-leitner',
+    label: 'leitner-weighted',
+    utterances: [
+      { id: 'math.p1.read', text: 'Three plus two. How many?' },
+      { id: 'math.p1.correct', text: 'Yes! Five!' },
+      { id: 'math.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'math.p1.hint', text: 'Look. Three. And two more. How many now?' },
+      { id: 'math.p1.giveAnswer', text: 'This one is five.' },
+    ],
+  })
+
+  it('places the LEITNER PRIORITY DIRECTIVE in the user message when leitner is non-empty (math+add-to-10)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      leitner: [
+        { a: 6, b: 4, op: '+', box: 1 },
+        { a: 5, b: 5, op: '+', box: 1 },
+        { a: 3, b: 2, op: '+', box: 3 },
+      ],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toContain('LEITNER PRIORITY DIRECTIVE')
+    // Each box is enumerated by its facts, in `a±b` form.
+    expect(user).toContain('Box 1: 6+4, 5+5.')
+    expect(user).toContain('Box 3: 3+2.')
+    // The "weight box-1 toward problems 4-8" rule is the actionable
+    // guidance — pin its presence so a future copy edit that drops
+    // it fails this test.
+    expect(user).toMatch(/problems? 4-8/i)
+    // The "forbidden in problems 1-3" rule is the gentle-ramp
+    // guarantee from AC #2/#3.
+    expect(user).toMatch(/problems? 1-3/i)
+  })
+
+  it('omits the directive when leitner is undefined (default, back-compat)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      // leitner omitted
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain(
+      'LEITNER PRIORITY DIRECTIVE',
+    )
+  })
+
+  it('omits the directive when leitner is empty', async () => {
+    // Empty array reads "I have a Leitner box but nothing in it" — same
+    // semantics as undefined for the planner. The browser is supposed
+    // to omit the field entirely on the wire when the box is empty
+    // (so the canon-served free path stays active), but the planner
+    // defends in depth.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      leitner: [],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain(
+      'LEITNER PRIORITY DIRECTIVE',
+    )
+  })
+
+  it('ignores the directive on the word-song track (Leitner is math-only today)', async () => {
+    const WORD_RESPONSE = JSON.stringify({
+      id: 'haiku-word-001',
+      label: 'word session',
+      utterances: [
+        { id: 'word.p1.read', text: 'Tap the cat.' },
+        { id: 'word.p1.correct', text: 'Yes! Cat.' },
+        { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+        { id: 'word.p1.hint', text: "Let's look. Cat." },
+        { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+      ],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'blending-cv',
+      // Misrouted leitner — should be silently ignored.
+      leitner: [{ a: 3, b: 2, op: '+', box: 1 }],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain(
+      'LEITNER PRIORITY DIRECTIVE',
+    )
+  })
+
+  it('ignores the directive on math focus nodes other than add-to-10', async () => {
+    // Defense-in-depth: Leitner-driven session generation is currently
+    // add-to-10-only because that's the only level/node Marian is
+    // touching today. A misrouted leitner on add-to-20 must not leak
+    // the directive (which would reference add-to-10-shaped facts on
+    // an add-to-20 problem set).
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+      leitner: [{ a: 3, b: 2, op: '+', box: 1 }],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain(
+      'LEITNER PRIORITY DIRECTIVE',
+    )
+  })
+
+  it('a Leitner-active call shares the SAME system prompt as a Leitner-off call (cache invariant)', async () => {
+    // Pin: the leitner field is user-message-only. Two calls that
+    // differ only in `leitner` MUST produce byte-identical system
+    // text so prompt-cache hits stay maximal.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(MATH_PLAN_RESPONSE, { capture: cap1 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(MATH_PLAN_RESPONSE, { capture: cap2 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      leitner: [{ a: 6, b: 4, op: '+', box: 1 }],
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+
+  it('groups facts by box level, listing box 1 first', async () => {
+    // The directive composition rule: emit one line per non-empty
+    // box level, ascending. This pins the format Haiku is reading.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      leitner: [
+        { a: 1, b: 1, op: '+', box: 4 },
+        { a: 2, b: 2, op: '+', box: 1 },
+        { a: 3, b: 3, op: '+', box: 2 },
+        { a: 4, b: 4, op: '+', box: 1 },
+      ],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    // Box 1 line lists both facts; box 2 lists one; box 4 lists one.
+    expect(user).toContain('Box 1: 2+2, 4+4.')
+    expect(user).toContain('Box 2: 3+3.')
+    expect(user).toContain('Box 4: 1+1.')
+    // Box 1 appears before box 2 in the directive body.
+    const idxB1 = user.indexOf('Box 1:')
+    const idxB2 = user.indexOf('Box 2:')
+    const idxB4 = user.indexOf('Box 4:')
+    expect(idxB1).toBeGreaterThanOrEqual(0)
+    expect(idxB2).toBeGreaterThan(idxB1)
+    expect(idxB4).toBeGreaterThan(idxB2)
+  })
+})

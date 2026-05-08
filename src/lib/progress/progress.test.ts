@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CURRENT_SCHEMA_VERSION,
+  LEITNER_HINT_MAX_ITEMS,
   MAX_SESSION_HISTORY,
   STORAGE_KEY,
   addItem,
+  buildLeitnerSessionHint,
   clearProgress,
   defaultProgress,
   demote,
@@ -15,7 +17,12 @@ import {
   saveProgress,
 } from './index'
 import { migrate } from './migrate'
-import type { MathFact, Progress, SessionHistoryEntry } from './types'
+import type {
+  LeitnerBox,
+  MathFact,
+  Progress,
+  SessionHistoryEntry,
+} from './types'
 
 const factKey = (f: MathFact) => `${f.a}${f.op}${f.b}`
 
@@ -218,6 +225,63 @@ describe('Leitner box', () => {
   })
 })
 
+describe('buildLeitnerSessionHint', () => {
+  it('returns empty array on an empty box', () => {
+    expect(buildLeitnerSessionHint(emptyLeitner<MathFact>())).toEqual([])
+  })
+
+  it('flattens to {a,b,op,box} entries', () => {
+    const box: LeitnerBox<MathFact> = {
+      items: [
+        { item: { a: 3, b: 4, op: '+' }, box: 1, lastSeen: 100 },
+        { item: { a: 5, b: 5, op: '+' }, box: 3, lastSeen: 50 },
+      ],
+    }
+    const out = buildLeitnerSessionHint(box)
+    expect(out).toHaveLength(2)
+    // Sorted box-ascending: box 1 first, then box 3.
+    expect(out[0]).toEqual({ a: 3, b: 4, op: '+', box: 1 })
+    expect(out[1]).toEqual({ a: 5, b: 5, op: '+', box: 3 })
+  })
+
+  it('sorts box-ascending (least familiar first)', () => {
+    const box: LeitnerBox<MathFact> = {
+      items: [
+        { item: { a: 1, b: 1, op: '+' }, box: 4, lastSeen: 0 },
+        { item: { a: 2, b: 2, op: '+' }, box: 1, lastSeen: 0 },
+        { item: { a: 3, b: 3, op: '+' }, box: 2, lastSeen: 0 },
+        { item: { a: 4, b: 4, op: '+' }, box: 1, lastSeen: 0 },
+      ],
+    }
+    const out = buildLeitnerSessionHint(box)
+    expect(out.map((i) => i.box)).toEqual([1, 1, 2, 4])
+  })
+
+  it('caps at LEITNER_HINT_MAX_ITEMS entries', () => {
+    // Synthesize a box with twice the cap to verify truncation.
+    const overflow = LEITNER_HINT_MAX_ITEMS + 5
+    const items = Array.from({ length: overflow }, (_, i) => ({
+      item: { a: i, b: i + 1, op: '+' as const },
+      box: 1 as const,
+      lastSeen: 0,
+    }))
+    const out = buildLeitnerSessionHint({ items })
+    expect(out).toHaveLength(LEITNER_HINT_MAX_ITEMS)
+  })
+
+  it('does not mutate the input box', () => {
+    const original: LeitnerBox<MathFact> = {
+      items: [
+        { item: { a: 3, b: 4, op: '+' }, box: 2, lastSeen: 100 },
+        { item: { a: 1, b: 1, op: '+' }, box: 1, lastSeen: 50 },
+      ],
+    }
+    const snapshot = JSON.stringify(original)
+    buildLeitnerSessionHint(original)
+    expect(JSON.stringify(original)).toBe(snapshot)
+  })
+})
+
 describe('isProgressV1', () => {
   it('accepts default progress', () => {
     expect(isProgressV1(defaultProgress())).toBe(true)
@@ -247,5 +311,85 @@ describe('isProgressV1', () => {
       },
     }
     expect(isProgressV1(broken)).toBe(false)
+  })
+
+  // ── M4 latencyMs additive field (ticket 86c9pwgc8) ─────────────────────
+  it('accepts SessionHistoryEntry with valid latencyMs', () => {
+    const p = defaultProgress()
+    const withLatency: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-08T19:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.875,
+          latencyMs: [1200, 800, 950, 1500, 2100, 700, 1800, 1100],
+        },
+      ],
+    }
+    expect(isProgressV1(withLatency)).toBe(true)
+  })
+
+  it('accepts the -1 sentinel inside latencyMs', () => {
+    const p = defaultProgress()
+    const withSentinel: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-08T19:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          latencyMs: [1000, -1, 800, -1, 900, -1, 1100, -1],
+        },
+      ],
+    }
+    expect(isProgressV1(withSentinel)).toBe(true)
+  })
+
+  it('rejects non-array latencyMs', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-08T19:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          latencyMs: 'not-an-array',
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('rejects non-numeric latencyMs entries', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-08T19:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          latencyMs: [1000, 'fast', 800],
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('omitted latencyMs is fine (additive, back-compat)', () => {
+    const p = defaultProgress()
+    const noLatency: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-08T19:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+        },
+      ],
+    }
+    expect(isProgressV1(noLatency)).toBe(true)
   })
 })
