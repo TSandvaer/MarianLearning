@@ -1836,12 +1836,25 @@ describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', 
     expect(systemText).toContain('cross-10-bridge')
   })
 
-  it('the add-to-20 menu line allows ten-plus-single (10+5=15) form (system prompt)', async () => {
-    // Per the curriculum tree memo, ten-plus-single facts are a valid
-    // not-cross-10 form for this tier. The visual flower row is fine
-    // with one addend = 10 because only the planner emits it (canon /
-    // live), not the static-fallback rotation (which holds at addends
-    // ≤ 9 to keep the offline render iPad-friendly).
+  it('the add-to-20 menu line forbids ten-plus-single (10+5=15) and any addend = 10 (system prompt)', async () => {
+    // Devon's PR #166 review (2026-05-08): aligns the canon prompt with
+    // the static-fallback rotation, which already holds both addends in
+    // 1-9. Reasons for forbidding ten-plus-single:
+    //
+    //   1. Visual: a 10-flower row at text-[3.2rem] overflows the iPad
+    //      portrait safe area when paired with the second-addend group
+    //      (canon's pre-fix P2 "Ten plus five" sat ~52rem wide vs ~752pt
+    //      available). Single visual contract across canon + fallback.
+    //   2. Pedagogy: 10+5=15 is *easier* than cross-10-bridge 8+5=13;
+    //      the actual learning target at this tier is cross-10-bridge.
+    //   3. Distractor scoping: keeping `correct` in the same range the
+    //      fallback emits simplifies threading `maxAnswer` through
+    //      `pickDistractors`; the boundary stays at the natural [1, 20]
+    //      tier ceiling without further branching.
+    //
+    // These pins lock the tightened phrasing so a future "let me
+    // simplify this prompt" pass can't accidentally re-allow ten-plus-
+    // single forms.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(STUB_RESPONSE, { capture })
     await generateSessionPlan({
@@ -1853,8 +1866,22 @@ describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', 
     })
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
-    expect(systemText).toMatch(/exactly one addend\s*=\s*10/)
-    expect(systemText).toContain('Never use addends > 10')
+    // Both addends must be in 1-9; ten-plus-single is explicitly forbidden.
+    expect(systemText).toContain('BOTH addends MUST be in 1-9')
+    expect(systemText).toContain('Ten-plus-single forms are FORBIDDEN')
+    expect(systemText).toMatch(/neither addend may equal 10/)
+    // The COMPUTE+CONFIRM directive that drove the earlier sums fix is
+    // extended to also confirm addend bounds; pin that load-bearing
+    // language too.
+    expect(systemText).toContain(
+      'CONFIRM that addendA in 1-9 AND addendB in 1-9',
+    )
+    // Concrete forbidden-addend exemplars exist in the prompt.
+    expect(systemText).toContain('10+5=15')
+    expect(systemText).toContain('10+8=18')
+    // And the prompt must NOT lean back into the previous phrasing — the
+    // earlier draft said "exactly one addend = 10" was permitted.
+    expect(systemText).not.toMatch(/exactly one addend\s*=\s*10/)
   })
 
   it('add-to-20 prompt is byte-stable across calls (cache prefix invariant)', async () => {
