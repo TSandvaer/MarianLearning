@@ -80,6 +80,11 @@
  *   mastered and she's now practicing the short-o sibling node. The
  *   picker walks past `cvc-words` (mastered) and lands on
  *   `cvc-words-short-o` (practicing) per WORD_SONG_NODES_IN_ORDER.
+ * - `add-to-20`: Marian as if she's mastered `number-recog` and
+ *   `add-to-10` and is now practicing the next math tier. The picker
+ *   walks past those two and lands on `add-to-20` (practicing) per
+ *   MATH_NODES_IN_ORDER. Used by Thomas's iPad smoke-test for the
+ *   add-to-20 focus session (ticket 86c9q5q13).
  *
  * Adding new seeds
  * ----------------
@@ -193,6 +198,23 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'blending-cv': 'mastered',
       'cvc-words': 'mastered',
       'cvc-words-short-o': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Add-to-20 sibling tier smoke-test entry (ticket 86c9q5q13). Marian
+  // has mastered the prerequisites (number-recog and add-to-10) and is
+  // now practicing the next math tier. The picker walks
+  // MATH_NODES_IN_ORDER, sees every earlier math node mastered, and
+  // lands on `add-to-20`. Other math nodes that are downstream stay at
+  // their default levels — only the predecessors of the target need
+  // coercion. Used by Thomas's iPad smoke-test for the add-to-20 focus
+  // session AND by QA for the deep-launch path verifying static plans /
+  // canon / planner all work end-to-end on the new tier.
+  'add-to-20': {
+    skillLevels: {
+      'number-recog': 'mastered',
+      'add-to-10': 'mastered',
+      'add-to-20': 'practicing',
     },
     skipGreet: true,
   },

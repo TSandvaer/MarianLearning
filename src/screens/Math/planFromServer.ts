@@ -67,9 +67,20 @@ const ALL_SLOTS: readonly MathUtteranceSlot[] = [
   'giveAnswer',
 ]
 
-/** Words that can appear as an addend in the `read` template. The Haiku
- *  prompt restricts addends to 1..9 with sums in 3..10; we accept ten as
- *  defense in depth in case the prompt drifts. */
+/** Words that can appear as an addend in the `read` template. Covers
+ *  1..20 because:
+ *
+ *   - add-to-10 (sums 3..10) restricts addends to 1..9 — the 10 entry is
+ *     defense in depth in case the prompt drifts.
+ *   - add-to-20 (ticket 86c9q5q13, sums 11..20) restricts addends to 1..9
+ *     OR a teen + 1, so 11..20 entries cover the teen-plus-single pattern
+ *     (e.g. "Twelve plus five. How many?" parses as addendA=12, addendB=5,
+ *     correct=17).
+ *
+ *  Anything beyond 20 stays out of this table — that signals a prompt
+ *  drift the parser shouldn't silently absorb (`two-digit-addsub` has its
+ *  own template / focus node and would route through a different parser
+ *  if we ever ship one). */
 const NUMBER_WORDS: Record<string, number> = {
   one: 1,
   two: 2,
@@ -81,6 +92,16 @@ const NUMBER_WORDS: Record<string, number> = {
   eight: 8,
   nine: 9,
   ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
 }
 
 /** Flat plan shape returned by /api/claude — mirrors `PlannerPlan` in

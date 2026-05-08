@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  STATIC_ADD_TO_20_PLANS,
   STATIC_SESSION_PLANS,
   mathSessionPlanFromWire,
   mathSessionPlanToUtteranceSources,
   mathUtteranceId,
+  pickStaticAddTo20Plan,
   pickStaticSessionPlan,
   type MathSessionPlan,
   type MathUtteranceSlot,
@@ -295,5 +297,215 @@ describe('STATIC_SESSION_PLANS shape contract (regression — ticket 86c9gumhp)'
         ).toBe(i + 1)
       }
     }
+  })
+})
+
+// ── Add-to-20 (ticket 86c9q5q13) ─────────────────────────────────────────
+
+describe('STATIC_ADD_TO_20_PLANS shape contract (ticket 86c9q5q13)', () => {
+  // Sibling rotation for the add-to-20 tier. Same shape contract as
+  // STATIC_SESSION_PLANS, but with sums constrained to [11, 20] — never
+  // <=10 (that's add-to-10's territory) and never >20 (downstream tier).
+
+  it('ships at least one plan in the rotation', () => {
+    expect(STATIC_ADD_TO_20_PLANS.length).toBeGreaterThan(0)
+  })
+
+  it('ships at least 2 rotation slots so consecutive sessions vary', () => {
+    // Per the ticket AC #1: "at least 2 (recommend 3) rotations".
+    expect(STATIC_ADD_TO_20_PLANS.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('every plan has a unique id (rotation collision guard)', () => {
+    const ids = STATIC_ADD_TO_20_PLANS.map((p) => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('every plan id is distinct from STATIC_SESSION_PLANS (cross-tier collision guard)', () => {
+    const tier10Ids = new Set(STATIC_SESSION_PLANS.map((p) => p.id))
+    for (const plan of STATIC_ADD_TO_20_PLANS) {
+      expect(tier10Ids.has(plan.id)).toBe(false)
+    }
+  })
+
+  it('every plan has exactly 8 problems', () => {
+    for (const plan of STATIC_ADD_TO_20_PLANS) {
+      expect(
+        plan.problems.length,
+        `plan "${plan.id}" should have exactly 8 problems`,
+      ).toBe(8)
+    }
+  })
+
+  it("every problem's correct === addendA + addendB", () => {
+    for (const plan of STATIC_ADD_TO_20_PLANS) {
+      for (const problem of plan.problems) {
+        expect(
+          problem.correct,
+          `plan "${plan.id}" problem ${problem.index}: ` +
+            `correct (${problem.correct}) must equal addendA (${problem.addendA}) + addendB (${problem.addendB})`,
+        ).toBe(problem.addendA + problem.addendB)
+      }
+    }
+  })
+
+  it('every problem sum is in [11, 20] (never the add-to-10 tier, never beyond 20)', () => {
+    // The pedagogical heart of add-to-20: every problem MUST stretch
+    // Marian past sums-to-10, but must not jump beyond Marian's
+    // documented add-to-20 ceiling. A plan that drifted to sum=10 would
+    // belong on the add-to-10 rotation; a plan that drifted to sum=21+
+    // would belong on a downstream tier.
+    for (const plan of STATIC_ADD_TO_20_PLANS) {
+      for (const problem of plan.problems) {
+        expect(
+          problem.correct,
+          `plan "${plan.id}" problem ${problem.index}: correct must be >= 11`,
+        ).toBeGreaterThanOrEqual(11)
+        expect(
+          problem.correct,
+          `plan "${plan.id}" problem ${problem.index}: correct must be <= 20`,
+        ).toBeLessThanOrEqual(20)
+      }
+    }
+  })
+
+  it('every addend is in [1, 9] — keeps FlowerGroup visuals legible', () => {
+    // Per design/screen-3-math.md the flower-glyph row renders one glyph
+    // per addend unit. At addendA=10 the row pushes past iPad portrait
+    // width on the visual-groups display. Static plans hold the line at
+    // ≤9 even though the planner prompt allows 10+single forms — those
+    // route through the canon / live planner where the visual layout is
+    // less constrained (the glyphs squeeze tighter).
+    for (const plan of STATIC_ADD_TO_20_PLANS) {
+      for (const problem of plan.problems) {
+        expect(
+          problem.addendA,
+          `plan "${plan.id}" problem ${problem.index}: addendA out of range`,
+        ).toBeGreaterThanOrEqual(1)
+        expect(
+          problem.addendA,
+          `plan "${plan.id}" problem ${problem.index}: addendA out of range`,
+        ).toBeLessThanOrEqual(9)
+        expect(
+          problem.addendB,
+          `plan "${plan.id}" problem ${problem.index}: addendB out of range`,
+        ).toBeGreaterThanOrEqual(1)
+        expect(
+          problem.addendB,
+          `plan "${plan.id}" problem ${problem.index}: addendB out of range`,
+        ).toBeLessThanOrEqual(9)
+      }
+    }
+  })
+
+  it('every problem has 1-based index matching its position', () => {
+    for (const plan of STATIC_ADD_TO_20_PLANS) {
+      for (let i = 0; i < plan.problems.length; i++) {
+        expect(
+          plan.problems[i]!.index,
+          `plan "${plan.id}" position ${i}: index should be ${i + 1}`,
+        ).toBe(i + 1)
+      }
+    }
+  })
+
+  it('utterance read templates render number words for sums in [11, 20]', () => {
+    // Sanity-check that numberWord() lookups for both addends and the
+    // sum produce non-empty templates. A drift past 20 in the table
+    // would throw at plan construction; this assertion just confirms
+    // the strings landed.
+    for (const plan of STATIC_ADD_TO_20_PLANS) {
+      for (const problem of plan.problems) {
+        expect(problem.utterances.read).toMatch(
+          /^[a-z]+ plus [a-z]+\. How many\?$/i,
+        )
+        expect(problem.utterances.correct).toMatch(/^Yes! [a-z]+!$/i)
+        expect(problem.utterances.giveAnswer).toMatch(/^This one is [a-z]+\.$/)
+      }
+    }
+  })
+
+  it('flattens to wire shape with the canonical math.p<N>.<slot> id namespace', () => {
+    // Same wire-shape contract as the sums-to-10 rotation. The id
+    // namespace does not branch on tier — Math.tsx + the planner share
+    // a single `math.p<N>.<slot>` template across every focus node.
+    const plan = STATIC_ADD_TO_20_PLANS[0]!
+    const sources = mathSessionPlanToUtteranceSources(plan)
+    expect(sources).toHaveLength(plan.problems.length * 5)
+    expect(sources.slice(0, 5).map((s) => s.id)).toEqual([
+      'math.p1.read',
+      'math.p1.correct',
+      'math.p1.reprompt',
+      'math.p1.hint',
+      'math.p1.giveAnswer',
+    ])
+  })
+})
+
+describe('pickStaticAddTo20Plan rotation', () => {
+  it('returns a deterministic plan for a fixed time', () => {
+    const fixedTime = new Date('2026-05-08T12:00:00Z')
+    const a = pickStaticAddTo20Plan(() => fixedTime)
+    const b = pickStaticAddTo20Plan(() => fixedTime)
+    expect(a).toBe(b)
+  })
+
+  it('cycles through every slot over consecutive minutes', () => {
+    const seen = new Set<string>()
+    for (let m = 0; m < 6; m++) {
+      const t = new Date(`2026-05-08T12:0${m}:00Z`)
+      seen.add(pickStaticAddTo20Plan(() => t).id)
+    }
+    expect(seen.size).toBe(STATIC_ADD_TO_20_PLANS.length)
+  })
+
+  it('returns a plan with the expected MathSessionPlan shape', () => {
+    const plan: MathSessionPlan = pickStaticAddTo20Plan(() => new Date(0))
+    expect(plan.problems).toHaveLength(8)
+    for (const p of plan.problems) {
+      expect(p.correct).toBe(p.addendA + p.addendB)
+      expect(p.utterances.read).toMatch(/plus/)
+      expect(p.correct).toBeGreaterThanOrEqual(11)
+      expect(p.correct).toBeLessThanOrEqual(20)
+    }
+  })
+})
+
+describe('pickStaticSessionPlan focus-node dispatch (ticket 86c9q5q13)', () => {
+  // The wrapper routes on focusNode so App.tsx's mathFallbackPlan can
+  // drop straight onto the right tier. Backwards-compat: omitting
+  // focusNode falls back to the sums-to-10 rotation that pre-existed.
+
+  it('routes to STATIC_ADD_TO_20_PLANS when focusNode === "add-to-20"', () => {
+    const fixedTime = new Date('2026-05-08T12:00:00Z')
+    const picked = pickStaticSessionPlan(() => fixedTime, 'add-to-20')
+    const expected = pickStaticAddTo20Plan(() => fixedTime)
+    expect(picked).toBe(expected)
+    // And it's in the add-to-20 rotation, not the sums-to-10 rotation.
+    expect(STATIC_ADD_TO_20_PLANS.map((p) => p.id)).toContain(picked.id)
+    expect(STATIC_SESSION_PLANS.map((p) => p.id)).not.toContain(picked.id)
+  })
+
+  it('falls back to sums-to-10 rotation when focusNode is omitted (back-compat)', () => {
+    const fixedTime = new Date('2026-05-08T12:00:00Z')
+    const picked = pickStaticSessionPlan(() => fixedTime)
+    expect(STATIC_SESSION_PLANS.map((p) => p.id)).toContain(picked.id)
+  })
+
+  it('falls back to sums-to-10 rotation for unknown / non-add-to-20 focusNodes', () => {
+    // Unknown focus nodes (sub-to-10, two-digit-addsub, etc.) don't
+    // have first-class fallback rotations yet; they all degrade to the
+    // sums-to-10 default. This is the "always render something" posture
+    // — a missing tier-fallback never bricks the screen.
+    const fixedTime = new Date('2026-05-08T12:00:00Z')
+    expect(pickStaticSessionPlan(() => fixedTime, 'sub-to-10').id).toBe(
+      pickStaticSessionPlan(() => fixedTime, 'add-to-10').id,
+    )
+    expect(pickStaticSessionPlan(() => fixedTime, 'two-digit-addsub').id).toBe(
+      pickStaticSessionPlan(() => fixedTime, 'add-to-10').id,
+    )
+    expect(STATIC_SESSION_PLANS.map((p) => p.id)).toContain(
+      pickStaticSessionPlan(() => fixedTime, 'mult-2-5-10').id,
+    )
   })
 })

@@ -772,7 +772,7 @@ The user message names a focus skill node. Generate problems specifically for th
 
 - number-recog: number recognition. Say a numeral, child taps it. Numerals 1-10. read: "Tap the <number>." e.g. "Tap the five."
 - add-to-10: addition with sums 3-10. Both addends 1-9. read: "<addend-A> plus <addend-B>. How many?" e.g. "Three plus two. How many?" Prefer bridge-through-5 (3+2, 4+3), easy doubles (2+2, 4+4), and small near-doubles. Sums must be <= 10.
-- add-to-20: addition with sums 11-20. Both addends 1-9 (or use a teen + 1). read: same template — "Seven plus six. How many?" Sums must be in 11-20 (never <=10 — that's add-to-10).
+- add-to-20: addition with sums STRICTLY in 11-20 (inclusive). Every problem's sum MUST be at least 11 and at most 20 — a sum of 10 or below is FORBIDDEN here (that's add-to-10's territory). Both addends in 1-9 (cross-10-bridge facts like 8+5=13, 7+6=13, 9+4=13) OR exactly one addend = 10 with the other in 1-9 (ten-plus-single facts like 10+5=15, 10+8=18). Never use addends > 10. read: same template — e.g. "Seven plus six. How many?" or "Ten plus five. How many?" Lean on doubles and near-doubles within range: 6+6=12, 7+7=14, 8+8=16, 9+9=18, 6+7=13, 7+8=15, 8+9=17.
 - sub-to-10: subtraction with both operands and answer in 1-10. read: "<A> minus <B>. How many?" e.g. "Seven minus three. How many?"
 - sub-to-20: subtraction within 20. read: same template; the answer may be 1-19.
 - two-digit-addsub: addition or subtraction with at least one two-digit addend. read: "Twenty-three plus four. How many?" Answer < 100, no carrying/borrowing in this slice.

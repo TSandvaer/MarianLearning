@@ -1,5 +1,5 @@
 /**
- * Distractor generation for the Math screen (sums to 10).
+ * Distractor generation for the Math screen.
  *
  * Pure functions, fully unit-testable. No DOM, no React, no audio.
  *
@@ -9,15 +9,20 @@
  * `design/research/math-distractor-and-streak-decisions.md`. Two tiers:
  *
  *   - **gentle** (problems 1-3 of the session): distractors are at least 2
- *     away from the correct answer, biased toward the extremes of [1, 10].
- *     Marian's session opening shouldn't trip on an off-by-one.
+ *     away from the correct answer, biased toward the extremes of the
+ *     answer range. Marian's session opening shouldn't trip on an
+ *     off-by-one.
  *   - **offByOne** (problems 4-8 of the session): distractors are
- *     `correct - 1` and `correct + 1`, clamped into [1, 10] by substituting
- *     the next-nearest in-range non-correct number when one falls out.
+ *     `correct - 1` and `correct + 1`, clamped into the answer range by
+ *     substituting the next-nearest in-range non-correct number when one
+ *     falls out.
  *
  * Constraints (must hold for both tiers):
  *
- *   1. Distractors live in `[1, 10]` — the problem space for sums to 10.
+ *   1. Distractors live in `[ANSWER_RANGE_MIN, maxAnswer]` — `maxAnswer`
+ *      defaults to 10 (sums-to-10 ceiling) and is widened to 20 by the
+ *      add-to-20 caller (ticket 86c9q5q13). Larger ceilings (sub-to-20,
+ *      two-digit-addsub, etc.) plug in via the same parameter.
  *   2. The two distractors are distinct from each other and from `correct`.
  *   3. Output is a tuple `[d1, d2]`. Position randomisation across the 3
  *      chips lives in `AnswerChips` — `pickDistractors` is deterministic so
@@ -32,14 +37,33 @@
  * Siegler's overlapping-waves model). Switch now sits between problems 3
  * and 4. Single source of truth for the cutoff is the `pickTier` constant
  * below; if Dave revisits, change one number.
+ *
+ * Why a parameterised maxAnswer (vs duplicate modules per focus node)
+ * --------------------------------------------------------------------
+ * The add-to-20 tier (ticket 86c9q5q13) is the first focus node where
+ * the answer range exceeds 10. Rather than spinning up a parallel
+ * `distractorsTo20.ts` with the same logic re-keyed on a different upper
+ * bound, the single algorithm parameterises on `maxAnswer`. Future tiers
+ * (sub-to-20, two-digit-addsub answers <100) plug in the same way. The
+ * lower bound stays fixed at 1 — every tier on Marian's curriculum has
+ * at least one positive integer as a valid chip value.
  */
 
 /** The two distractor flavours. */
 export type DistractorTier = 'gentle' | 'offByOne'
 
-/** Inclusive lower / upper bound on chip values for sums-to-10. */
+/** Default inclusive lower / upper bound on chip values for the sums-to-10
+ *  tier. Other tiers (sums-to-20) override `ANSWER_RANGE_MAX` via the
+ *  `maxAnswer` parameter on `pickDistractors`. */
 export const ANSWER_RANGE_MIN = 1
 export const ANSWER_RANGE_MAX = 10
+
+/**
+ * Answer-range upper bound for the add-to-20 tier (ticket 86c9q5q13).
+ * Exposed as a named constant rather than an inline magic number so the
+ * planner / canon / tests can pin against the same value.
+ */
+export const ANSWER_RANGE_MAX_TO_20 = 20
 
 /**
  * Last problem index (1-based) that uses gentle-ramp distractors. Problems
@@ -62,14 +86,18 @@ export function pickTier(problemIndex: number): DistractorTier {
 /**
  * Pick two distinct in-range distractors for a given correct answer.
  *
- * Deterministic per (correct, problemIndex) pair. The position of the
- * correct chip among the three rendered chips is randomised separately at
- * render time (`AnswerChips`), so two sessions running back-to-back with
- * the same plan won't put the right chip in the same slot — but the chip
- * *values* themselves are stable, which is what tests want to assert against.
+ * Deterministic per (correct, problemIndex, maxAnswer) tuple. The position
+ * of the correct chip among the three rendered chips is randomised
+ * separately at render time (`AnswerChips`), so two sessions running
+ * back-to-back with the same plan won't put the right chip in the same
+ * slot — but the chip *values* themselves are stable, which is what tests
+ * want to assert against.
  *
- * @param correct The right answer. Must be in [ANSWER_RANGE_MIN, ANSWER_RANGE_MAX].
+ * @param correct The right answer. Must be in [ANSWER_RANGE_MIN, maxAnswer].
  * @param problemIndex 1-based session position. Drives the tier choice.
+ * @param maxAnswer Upper bound of the answer range (inclusive). Defaults
+ *                  to ANSWER_RANGE_MAX (10). Pass ANSWER_RANGE_MAX_TO_20
+ *                  for the add-to-20 tier.
  * @returns A tuple [d1, d2] of distractor values, both in range, both
  *          distinct, and both different from `correct`.
  *
@@ -80,57 +108,75 @@ export function pickTier(problemIndex: number): DistractorTier {
 export function pickDistractors(
   correct: number,
   problemIndex: number,
+  maxAnswer: number = ANSWER_RANGE_MAX,
 ): [number, number] {
+  if (!Number.isInteger(maxAnswer) || maxAnswer < ANSWER_RANGE_MIN + 2) {
+    // Need at least 2 valid distractors to satisfy the distinctness +
+    // ≥2-gap constraints; a too-narrow range is a configuration bug
+    // upstream, not a user-facing failure mode.
+    throw new Error(
+      `[distractors] maxAnswer=${maxAnswer} must be an integer >= ${ANSWER_RANGE_MIN + 2}`,
+    )
+  }
   if (
     !Number.isInteger(correct) ||
     correct < ANSWER_RANGE_MIN ||
-    correct > ANSWER_RANGE_MAX
+    correct > maxAnswer
   ) {
     throw new Error(
-      `[distractors] correct=${correct} is outside [${ANSWER_RANGE_MIN}, ${ANSWER_RANGE_MAX}]`,
+      `[distractors] correct=${correct} is outside [${ANSWER_RANGE_MIN}, ${maxAnswer}]`,
     )
   }
 
   const tier = pickTier(problemIndex)
   return tier === 'gentle'
-    ? gentleDistractors(correct)
-    : offByOneDistractors(correct)
+    ? gentleDistractors(correct, maxAnswer)
+    : offByOneDistractors(correct, maxAnswer)
 }
 
 /**
  * Gentle ramp: pick two values that are at least 2 away from the correct
- * answer, biased toward the extremes of [1, 10]. The bias matters
- * pedagogically — `1` and `10` look obviously different from "five-ish",
- * which is the whole point of the warm-up.
+ * answer, biased toward the extremes of [ANSWER_RANGE_MIN, maxAnswer].
+ * The bias matters pedagogically — the smallest and largest in-range
+ * values look obviously different from a middle-ish target, which is the
+ * whole point of the warm-up.
  *
  * Deterministic strategy: prefer the two range-extremes that sit at least
  * 2 away from `correct`. If both are valid (i.e. correct is somewhere in
- * the middle), return [MIN, MAX]. If only one extreme is valid (correct
- * sits within 2 of the other extreme), return that extreme paired with the
- * next-furthest in-range value that still satisfies the ≥2 gap and the
- * distinctness rule.
+ * the middle), return [MIN, maxAnswer]. If only one extreme is valid
+ * (correct sits within 2 of the other extreme), return that extreme
+ * paired with the next-furthest in-range value that still satisfies the
+ * ≥2 gap and the distinctness rule.
  *
- * Worked examples:
+ * Worked examples (sums-to-10, maxAnswer=10):
  *   correct=5  → [1, 10] (both extremes ≥2 away)
- *   correct=2  → [10, 5]  (MIN=1 is only 1 away → reject; MAX=10 is 8 away → take;
- *                          then look for a second value ≥2 away from 2 and ≠10:
- *                          start from MAX-1=9, walk down → 9, 8, 7, ... first
- *                          that satisfies is 5? Actually 9 satisfies — see impl.)
- *   correct=10 → [1, 5]   (MAX is correct, so MIN=1 is 9 away → take;
- *                          second pick walks from MIN+1=2 up; 2 is 8 away, take 2? No,
- *                          we bias toward middle for the second so the two distractors
- *                          aren't visually adjacent. See impl notes.)
+ *   correct=2  → [10, 4] (MIN=1 is only 1 away → reject; MAX=10 anchor;
+ *                         second pick walks down from 10 — 10 == anchor so
+ *                         skip; 9 satisfies ≥2 gap and is in range; etc.
+ *                         see impl)
+ *   correct=10 → [1, 4]  (MAX is correct, MIN=1 is 9 away → anchor;
+ *                         second pick walks up from MIN+1; 2 is too close,
+ *                         walk further; first acceptable is 8 → see impl)
+ *
+ * Worked examples (sums-to-20, maxAnswer=20):
+ *   correct=15 → [1, 20] (both extremes ≥2 away)
+ *   correct=20 → [1, 18] (MAX is correct → MIN=1 is anchor; second pick
+ *                         walks from MAX downward, skipping correct and
+ *                         the values within 2 of it)
  *
  * Implementation notes:
  *
- *   - We don't actually need cleverness for sums-to-10. The space is tiny
- *     (10 possible answers); a deterministic search works in microseconds.
+ *   - We don't actually need cleverness for the sizes we run on (10 or
+ *     20 possible answers); a deterministic search works in microseconds.
  *   - We always emit [low, high] sorted ascending so tests don't have to
  *     guess the order. AnswerChips re-shuffles position at render time.
  */
-function gentleDistractors(correct: number): [number, number] {
+function gentleDistractors(
+  correct: number,
+  maxAnswer: number,
+): [number, number] {
   const minOk = correct - ANSWER_RANGE_MIN >= 2 ? ANSWER_RANGE_MIN : null
-  const maxOk = ANSWER_RANGE_MAX - correct >= 2 ? ANSWER_RANGE_MAX : null
+  const maxOk = maxAnswer - correct >= 2 ? maxAnswer : null
 
   if (minOk !== null && maxOk !== null) {
     // Easy case: middle-ish correct answer.
@@ -142,13 +188,13 @@ function gentleDistractors(correct: number): [number, number] {
   // ≥2 gap, distinct, in-range, ≠ the first pick.
   const anchor = (minOk ?? maxOk) as number
 
-  // Walk inward from the opposite end. For correct in {1, 2}, anchor=MAX,
-  // so search from MIN upward; for correct in {9, 10}, anchor=MIN, so
-  // search from MAX downward.
+  // Walk inward from the opposite end. When anchor=MIN (correct sits high),
+  // search from maxAnswer downward; when anchor=maxAnswer (correct sits
+  // low), search from MIN upward.
   const searchOrder =
     anchor === ANSWER_RANGE_MIN
-      ? rangeDescending(ANSWER_RANGE_MAX, ANSWER_RANGE_MIN)
-      : rangeAscending(ANSWER_RANGE_MIN, ANSWER_RANGE_MAX)
+      ? rangeDescending(maxAnswer, ANSWER_RANGE_MIN)
+      : rangeAscending(ANSWER_RANGE_MIN, maxAnswer)
 
   for (const candidate of searchOrder) {
     if (candidate === anchor) continue
@@ -158,10 +204,11 @@ function gentleDistractors(correct: number): [number, number] {
   }
 
   // Pathological fallback — by construction this is unreachable for any
-  // correct in [1, 10] because the gentle-distance constraint is satisfiable.
-  // Throw rather than silently returning bad data.
+  // correct in [ANSWER_RANGE_MIN, maxAnswer] because the gentle-distance
+  // constraint is satisfiable on any range with maxAnswer >= 3. Throw
+  // rather than silently returning bad data.
   throw new Error(
-    `[distractors] gentle ramp could not satisfy ≥2 gap for correct=${correct}`,
+    `[distractors] gentle ramp could not satisfy ≥2 gap for correct=${correct} (maxAnswer=${maxAnswer})`,
   )
 }
 
@@ -172,28 +219,36 @@ function gentleDistractors(correct: number): [number, number] {
  * falls out of range, we substitute `correct - 2` (the next-nearest
  * adjacent number that's still in range), and symmetrically on the low end.
  *
- * Worked examples (per spec line 134-136):
+ * Worked examples (sums-to-10, maxAnswer=10):
  *   correct=2  → [1, 3]
  *   correct=5  → [4, 6]
- *   correct=10 → [9, 8]  (correct+1=11 is OOR → substitute 8 = correct-2)
+ *   correct=10 → [8, 9]  (correct+1=11 is OOR → substitute 8 = correct-2)
  *   correct=1  → [2, 3]  (correct-1=0 is OOR → substitute 3 = correct+2)
+ *
+ * Worked examples (sums-to-20, maxAnswer=20):
+ *   correct=15 → [14, 16]
+ *   correct=20 → [18, 19] (correct+1=21 is OOR → substitute 18 = correct-2)
+ *   correct=11 → [10, 12]
  */
-function offByOneDistractors(correct: number): [number, number] {
+function offByOneDistractors(
+  correct: number,
+  maxAnswer: number,
+): [number, number] {
   const low = correct - 1
   const high = correct + 1
 
   const lowOk = low >= ANSWER_RANGE_MIN
-  const highOk = high <= ANSWER_RANGE_MAX
+  const highOk = high <= maxAnswer
 
   if (lowOk && highOk) return [low, high]
 
   if (!lowOk) {
-    // correct === 1: low=0 invalid. Take high=2, then the next in-range
-    // adjacent on the high side: high+1=3.
+    // correct === ANSWER_RANGE_MIN: low=0 invalid. Take high, then the
+    // next in-range adjacent on the high side.
     return [high, high + 1]
   }
 
-  // !highOk: correct === ANSWER_RANGE_MAX. Take low=correct-1, then walk
+  // !highOk: correct === maxAnswer. Take low=correct-1, then walk
   // further down for the second pick.
   return [low - 1, low]
 }
