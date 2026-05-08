@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useAudioUnlockGate } from '../../lib/audio/useAudioUnlockGate'
@@ -111,6 +118,38 @@ const HUD_POP_TWEEN = {
  */
 const STREAK_CHIME_STAGGER_MS = 320
 
+/**
+ * Human-reaction-time floor for an 8-yo on a known-target visual stimulus
+ * (ticket 86c9q5au3 — latency capture sanity bound).
+ *
+ * Per developmental-psych literature (Kail 1991 meta-analysis; Whetstone
+ * et al. 2017 for choice-reaction tasks in 7-9 yo), simple reaction time
+ * for children in this age range is empirically 230-280 ms; choice
+ * reaction time (which a chip-tap is — Marian must pick among ≥ 2 chips)
+ * runs ~50-100 ms slower again. 250 ms is a generous lower bound; any
+ * value below this is physically implausible and indicates measurement
+ * noise (e.g. iPad Safari touchstart-pre-queued race against the chip's
+ * disabled→enabled DOM transition). We persist `-1` (the existing
+ * "not measured" sentinel — see `MathSessionResult.latencyMs` doc) on
+ * sub-floor measurements so future M4.x consumers can skip them rather
+ * than ingesting garbage.
+ */
+const LATENCY_FLOOR_MS = 250
+
+/**
+ * Upper sanity bound for per-problem first-tap latency (ticket 86c9q5au3).
+ *
+ * Past 60 s the user has clearly walked away from the iPad — the value
+ * is no longer a "decision time" measurement, it's a session-abandonment
+ * signal. We persist `-1` rather than the literal value so the future
+ * "slow facts" diagnostic doesn't fold a 3-minute walk-away into a
+ * "this fact takes Marian 3 minutes to retrieve" misclassification.
+ *
+ * A genuine "still finger-counting" extreme on add-to-10 sums caps in the
+ * 15-20 s range; 60 s is well above that.
+ */
+const LATENCY_CEILING_MS = 60_000
+
 // ── Public types ----------------------------------------------------------
 
 /** Shape the screen invokes when problem 8 finishes. Out-of-screen handler. */
@@ -136,12 +175,31 @@ export interface MathSessionResult {
   /**
    * Per-problem first-tap latency in milliseconds, indexed 0..N-1.
    * Length matches `plan.problems.length`. Each entry measures wall-
-   * clock ms from when the chip row first became tappable for that
-   * problem (read-aloud completed → `readAloudPlayed` flipped to
-   * `true`) to Marian's first chip tap, regardless of correctness.
-   * Subsequent retry taps within the same problem are NOT captured
-   * here. Sentinel `-1` means the problem was never tapped (e.g. the
-   * screen was abandoned, or read-aloud somehow never completed).
+   * clock ms from when the chip row first became actually tappable
+   * for that problem (the React commit carrying `readAloudPlayed=true`
+   * has landed and the chip's `disabled` attribute has flipped) to
+   * Marian's first chip tap, regardless of correctness. Subsequent
+   * retry taps within the same problem are NOT captured here.
+   *
+   * Persisted values in [`LATENCY_FLOOR_MS`, `LATENCY_CEILING_MS`] —
+   * 250 ms (human-reaction-time floor for an 8-yo choice-reaction
+   * task) to 60 000 ms (session-abandonment ceiling). Out-of-bounds
+   * measurements are persisted as `-1` (the existing "not measured"
+   * sentinel) so future M4.x consumers can skip them rather than
+   * ingesting garbage:
+   *
+   * - latency < 250 ms → measurement noise (touchstart-pre-queued
+   *   race on iPad Safari against the chip's disabled→enabled DOM
+   *   transition). Per ticket 86c9q5au3, real iPad data 2026-05-08
+   *   showed values like 9 / 69 / 178 ms — physically impossible
+   *   for a 7-9 yo on a choice-reaction task. The floor is a
+   *   generous lower bound (Kail 1991, Whetstone 2017).
+   * - latency > 60 000 ms → user walked away (e.g. 181 331 ms = 3
+   *   min observed in the same iPad data). Folding this into a
+   *   "decision time" is misclassification — it's an abandonment
+   *   signal.
+   * - never tapped (e.g. read-aloud failed, screen abandoned mid-
+   *   problem) → also `-1`, the original Kevin-defined semantic.
    *
    * The "decision time" diagnostic Dave's research deliverable
    * flagged as the actionable signal for the counting → retrieval
@@ -567,14 +625,22 @@ function MathScreen({
   const perProblemCorrectRef = useRef<boolean[]>(plan.problems.map(() => false))
 
   /**
-   * Per-problem first-tap latency mirror (ticket 86c9pwgc8 — M4).
+   * Per-problem first-tap latency mirror (ticket 86c9pwgc8 — M4;
+   * sanity-bound semantics added 86c9q5au3).
+   *
    * Indexed 0..N-1; entry N is the wall-clock ms from chip-render-
-   * time (read-aloud completed → `readAloudPlayed` flipped to `true`)
-   * to Marian's FIRST chip tap. Initialised to `-1` per problem
-   * (sentinel for "not yet measured"). Flipped exactly once per
-   * problem on the first `onChipTap` entry that passes the
-   * read-aloud gate; subsequent retry taps within the same problem
-   * are NOT captured.
+   * time (the React commit carrying `readAloudPlayed=true` landed and
+   * the chip's `disabled` flipped to `false`) to Marian's FIRST chip
+   * tap. Initialised to `-1` per problem (sentinel for "not yet
+   * measured"). Flipped exactly once per problem on the first
+   * `onChipTap` entry that passes the read-aloud gate; subsequent
+   * retry taps within the same problem are NOT captured.
+   *
+   * Persisted values are sanity-bounded to
+   * `[LATENCY_FLOOR_MS, LATENCY_CEILING_MS]` — out-of-bounds
+   * measurements (touchstart-pre-queued race below the floor; user
+   * walked away above the ceiling) collapse to `-1`. See the public
+   * `MathSessionResult.latencyMs` doc above for the full rationale.
    *
    * SessionEnd reads this via `MathSessionResult.latencyMs` and
    * persists it on the new `SessionHistoryEntry.latencyMs` field
@@ -583,17 +649,37 @@ function MathScreen({
   const latencyMsByProblemRef = useRef<number[]>(plan.problems.map(() => -1))
 
   /**
-   * Wall-clock timestamp captured when chips first become tappable for
-   * the current problem (ticket 86c9pwgc8 — M4). Set inside the
-   * read-aloud effect's `.then()` immediately before
-   * `setReadAloudPlayed(true)`. Reset to `null` on problem advance.
+   * Wall-clock timestamp captured when chips first become actually
+   * tappable for the current problem (ticket 86c9pwgc8 — M4; anchor
+   * moved to React-commit boundary in 86c9q5au3).
+   *
+   * Set inside a `useLayoutEffect` keyed on `[readAloudPlayed]`
+   * — runs synchronously AFTER React commits the render that flips
+   * the chip's `disabled` to `false`, but BEFORE the browser paints.
+   * This is as close as JS can get to "the moment Marian sees a
+   * tappable chip." Reset to `null` on problem advance and on the
+   * `readAloudPlayed=false` re-render that the new problem's read-
+   * aloud effect triggers.
+   *
+   * **Why not inside `speak().then()` (the original site)?** The
+   * .then() callback runs before React schedules the
+   * `setReadAloudPlayed(true)` commit — anchoring there leaks the
+   * (.then()-entry → commit) gap into the latency calculation in the
+   * wrong direction. On iPad, where touchstart events can be queued
+   * against a `<button disabled>` and dispatch their click handler
+   * the moment the `disabled` attribute flips, the resulting click-
+   * handler `performance.now()` reads a value microseconds later than
+   * the .then()-entry timestamp — producing the sub-reaction-time
+   * 9 / 69 / 178 ms values observed in production 2026-05-08.
+   * Anchoring in `useLayoutEffect` puts the start of the measurement
+   * window AFTER the disabled-flip commit, so any tap captured here
+   * is by definition a real reaction to the chip-paint event.
    *
    * The first chip tap that passes the read-aloud gate computes
    * `performance.now() - chipReadyAtRef.current` and writes the
-   * result into `latencyMsByProblemRef`. Tests set the optional
-   * `now` injection seam if they need a deterministic clock; in
-   * production this reads `performance.now()` for monotonic timing
-   * (immune to wall-clock skew).
+   * sanity-bounded result into `latencyMsByProblemRef`. Production
+   * uses `performance.now()` (monotonic clock) — immune to wall-
+   * clock skew during a session.
    */
   const chipReadyAtRef = useRef<number | null>(null)
 
@@ -1058,14 +1144,14 @@ function MathScreen({
         // race the production bug fix removed (ticket 86c9hf4ef round 2).
         if (unmountedRef.current) return
         if (problemIndexRef.current !== myProblemIndex) return
-        // Capture chip-render-time (ticket 86c9pwgc8 — M4 latency
-        // capture). Set BEFORE flipping the gate so the very first
-        // chip-tap that observes `readAloudPlayedRef.current === true`
-        // also sees a non-null `chipReadyAtRef.current`. Using
-        // `performance.now()` (monotonic clock) instead of `Date.now()`
-        // immunises latency math against wall-clock skew during a
-        // session.
-        chipReadyAtRef.current = performance.now()
+        // Flip the read-aloud gate so chips become tappable. The
+        // companion `chipReadyAtRef` capture (latency anchor) NO
+        // LONGER lives here — it now runs in a useLayoutEffect keyed
+        // on [readAloudPlayed === true], which lands AFTER React's
+        // commit of this state change. See the `chipReadyAtRef`
+        // declaration above and ticket 86c9q5au3 for the rationale
+        // (touchstart-pre-queued race on iPad produced sub-reaction-
+        // time values when the anchor lived here).
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
       })
@@ -1094,6 +1180,47 @@ function MathScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemIndex, audioUnlocked, audioReady])
 
+  // ── M4 latency-anchor commit (ticket 86c9q5au3) ────────────────────────
+  //
+  // Capture `chipReadyAtRef.current` at the moment React commits the
+  // render that flips `readAloudPlayed` to `true` — i.e. the moment
+  // the chip's `disabled` attribute flips to `false` in the DOM. This
+  // is the latency-window START.
+  //
+  // Why `useLayoutEffect` and not `useEffect`: layout effects run
+  // synchronously after DOM mutation but BEFORE the browser paints.
+  // On iPad Safari, touchstart events queued during the disabled→
+  // enabled transition can dispatch their click handler within
+  // microseconds of the disabled flip — so we want the anchor as
+  // close to the DOM mutation as possible. A regular useEffect runs
+  // AFTER paint, which means a fast iPad tap could land BETWEEN the
+  // commit and the effect, capturing a sub-zero / near-zero gap.
+  //
+  // The reset branch (`readAloudPlayed === false` → null the ref) is
+  // load-bearing: when `advanceToNext` queues `setReadAloudPlayed(false)`
+  // for the next problem, this effect re-runs and clears the anchor
+  // BEFORE the new problem's read-aloud has set it. Otherwise a
+  // chip-tap that lands during the new problem's read-aloud window
+  // (blocked at the read-aloud-played gate, but the latency math
+  // would still see a stale chip-ready value if the gate were ever
+  // bypassed) would attribute a stale anchor.
+  useLayoutEffect(() => {
+    if (readAloudPlayed) {
+      // Set only if not already set for this problem — defensive
+      // against StrictMode double-invocation in dev (ticket 86c9q5au3
+      // AC4(b)). Production runs each effect once per render, so the
+      // null-check is a no-op in normal flow.
+      if (chipReadyAtRef.current === null) {
+        chipReadyAtRef.current = performance.now()
+      }
+    } else {
+      // Re-armed for the next problem: the read-aloud effect has
+      // queued setReadAloudPlayed(false) on advance and we're here
+      // pre-commit-of-true for the next problem.
+      chipReadyAtRef.current = null
+    }
+  }, [readAloudPlayed])
+
   // ── Chip tap handler ---------------------------------------------------
 
   const advanceToNext = useCallback(() => {
@@ -1117,10 +1244,15 @@ function MathScreen({
       // read-aloud effect can fire. See ticket 86c9hf4ef.
       spokeReadAloudRef.current = false
       // Reset the M4 latency-capture refs so the next problem's first
-      // tap measures from its own read-aloud completion (ticket
-      // 86c9pwgc8). `chipReadyAtRef` is set inside the next problem's
-      // read-aloud `.then()`; `firstTapRecordedRef` is the once-per-
-      // problem latch.
+      // tap measures from its own chip-paint event (ticket 86c9pwgc8;
+      // anchor moved to React-commit boundary in 86c9q5au3).
+      // `chipReadyAtRef` is also nulled by the
+      // `useLayoutEffect([readAloudPlayed])` block above when the
+      // setReadAloudPlayed(false) call below commits, but we clear it
+      // synchronously here too so any tap landing in the window
+      // between this gesture and the commit sees a null anchor (the
+      // capture path skips when `chipReadyAtRef.current === null`).
+      // `firstTapRecordedRef` is the once-per-problem latch.
       chipReadyAtRef.current = null
       firstTapRecordedRef.current = false
       setShakingChip(null)
@@ -1609,10 +1741,11 @@ function MathScreen({
       if (!readAloudPlayedRef.current) return
 
       // First-tap capture for the current problem (ticket 86c9pwgc8 —
-      // M4 Leitner wiring). Records BOTH the latency (ms from chip-
-      // render-time to first tap) AND the first-tap correctness.
-      // Subsequent retry taps within the same problem are NOT
-      // captured — `firstTapRecordedRef` is the once-per-problem latch.
+      // M4 Leitner wiring; sanity bounds added 86c9q5au3). Records
+      // BOTH the latency (ms from chip-render-time to first tap) AND
+      // the first-tap correctness. Subsequent retry taps within the
+      // same problem are NOT captured — `firstTapRecordedRef` is the
+      // once-per-problem latch.
       //
       // The capture happens BEFORE the correct/wrong dispatch below
       // so retry taps that would re-enter `handleCorrectTap` after a
@@ -1630,13 +1763,26 @@ function MathScreen({
           idx < latencyMsByProblemRef.current.length &&
           chipReadyAtRef.current !== null
         ) {
-          // Math.max guard: if some pathological clock skew or
-          // timer race produces a negative latency, clamp to 0
-          // rather than persisting a sentinel-shaped negative.
-          latencyMsByProblemRef.current[idx] = Math.max(
-            0,
-            performance.now() - chipReadyAtRef.current,
-          )
+          // Sanity-bounded capture (ticket 86c9q5au3). Compute the
+          // raw delta first; collapse to `-1` (the "not measured"
+          // sentinel) if it falls below the human-reaction-time
+          // floor or above the session-abandonment ceiling.
+          //
+          // Sub-floor: touchstart-pre-queued race on iPad Safari
+          // (iPad data 2026-05-08 showed values like 9 / 69 / 178
+          // ms — physically impossible for an 8-yo on a choice-
+          // reaction task).
+          //
+          // Above-ceiling: user walked away (same iPad data showed
+          // 181 331 ms on problem 1).
+          //
+          // Folding both into the existing `-1` sentinel preserves
+          // the future M4.x consumer's invariant: persisted values
+          // are either in [floor, ceiling] or the explicit
+          // "unreliable" marker.
+          const raw = performance.now() - chipReadyAtRef.current
+          const isInBand = raw >= LATENCY_FLOOR_MS && raw <= LATENCY_CEILING_MS
+          latencyMsByProblemRef.current[idx] = isInBand ? raw : -1
         }
       }
 
