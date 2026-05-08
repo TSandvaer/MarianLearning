@@ -94,7 +94,7 @@ Flagging as Q1 in §10 — Thomas can override with "force 14" if he wants the l
 | 3   | bus  | EXISTS as distractor; re-trace per pack-cohesion pass | u     | vehicle   | Promoted from distractor → target.                                                |
 | 4   | bug  | NEW                                                   | u     | animal    | Insect archetype.                                                                 |
 | 5   | nut  | NEW                                                   | u     | food      | Almond/peanut shape with seam line.                                               |
-| 6   | tub  | NEW                                                   | u     | household | Free-standing footed bathtub. **Cup collision watch — §3.**                       |
+| 6   | tub  | NEW                                                   | u     | household | Free-standing footed bathtub. **`[tub, cup]` FORBIDDEN_PAIR LOCKED §3 / §10 Q3.** |
 | 7   | bun  | NEW                                                   | u     | food      | Round bread roll, seam on top.                                                    |
 | 8   | jug  | NEW                                                   | u     | vessel    | Handled vessel with prominent spout. **Spout is the load-bearing distinguisher.** |
 | 9   | rug  | NEW                                                   | u     | household | Rectangular fringed floor covering. **NEW FORBIDDEN_PAIR with `mat` — §3.**       |
@@ -159,11 +159,11 @@ The full `TARGET_PAIRINGS` rows are an AC item for Kevin's impl ticket (§9 AC6)
 
 ```ts
 sun: { gentle: ['hut',  'rug'], trap: ['bun', 'jug'] },  // /ʌn/ rhyme + cross-category
-cup: { gentle: ['bug',  'rug'], trap: ['tub', 'jug'] },  // vessel-trap (jug/tub share vessel category)
+cup: { gentle: ['bug',  'rug'], trap: ['nut', 'jug'] },  // vessel-trap (jug shares vessel category); tub excluded per the §3 LOCKED `[tub, cup]` FORBIDDEN_PAIR (Q3 lock 2026-05-08)
 bus: { gentle: ['nut',  'sun'], trap: ['hut', 'bug'] },  // /ʌs/ has no rhyme partner; trap on /ʌt/+/ʌg/ near-miss
 bug: { gentle: ['tub',  'sun'], trap: ['jug', 'rug'] },  // /ʌg/ rhyme triplet trap
 nut: { gentle: ['rug',  'cup'], trap: ['hut', 'bun'] },  // /ʌt/ rhyme + /ʌn/ near-rhyme
-tub: { gentle: ['bug',  'sun'], trap: ['cup', 'jug'] },  // vessel-trap; cup is the FORBIDDEN_PAIR partner — not allowed (§3); replace with another pairing
+tub: { gentle: ['hut',  'sun'], trap: ['bug', 'jug'] },  // vessel-trap (jug shares vessel category, bug shares /ʌ/ vowel); cup excluded per the §3 LOCKED `[tub, cup]` FORBIDDEN_PAIR (Q3 lock 2026-05-08)
 bun: { gentle: ['rug',  'tub'], trap: ['sun', 'gum'] },  // /ʌn/ rhyme + /ʌm/ near-miss
 jug: { gentle: ['nut',  'sun'], trap: ['bug', 'rug'] },  // /ʌg/ rhyme triplet trap
 rug: { gentle: ['cup',  'sun'], trap: ['bug', 'jug'] },  // /ʌg/ rhyme triplet trap; mat is the FORBIDDEN_PAIR partner — cross-vowel anyway, not in pool
@@ -171,7 +171,7 @@ hut: { gentle: ['cup',  'sun'], trap: ['nut', 'bun'] },  // /ʌt/ rhyme + /ʌn/ 
 gum: { gentle: ['bug',  'rug'], trap: ['bun', 'sun'] },  // /ʌm/ has no in-pool rhyme partner; /ʌn/ near-miss
 ```
 
-**Note on `tub`'s row:** the working draft above pairs `tub` trap with `cup`. If Phase 2 review confirms the silhouette-collision and we add `tub ↔ cup` to `FORBIDDEN_PAIRS` (§3 Q3), Kevin re-pairs `tub`'s trap to `[bug, jug]` or `[hut, bun]` instead. The matrix is mechanical; Kevin owns it under his impl ticket — design lock here is the _constraint_, not the exact pairs.
+**Note on `tub`'s row:** the preview above pre-resolves to `trap: ['bug', 'jug']` (matching the Q3-locked `[tub, cup]` FORBIDDEN*PAIR — see §3 / §10 Q3, locked 2026-05-08 per Devon's review). Kevin can swap to `[hut, bun]` if the `[bug, jug]` rhyme/vessel pairing reads weakly in Phase 2 visual review, but the matrix-as-written passes `assertNotForbidden` against the locked FORBIDDEN_PAIRS today. The matrix is mechanical; Kevin owns it under his impl ticket — design lock here is the \_constraint*, not the exact pairs.
 
 **Note on `rug`:** `rug ↔ mat` IS a forbidden pair (added in §3) but `mat` is short-a, never appears in a short-u trio under the same-vowel-only rule. So the FORBIDDEN_PAIR addition is for cross-pack hygiene, not for in-pool selection.
 
@@ -209,7 +209,7 @@ Per `.claude/docs/skill-trees-and-content.md` §3 "Three viable Phase 3 paths," 
 | 3   | bus  | EXISTS as distractor; re-trace optional in v1 | `public/assets/pictures/picture-bus.svg` | Same rationale.                                                                                                                                                                                                                       |
 | 4   | bug  | NEW                                           | `public/assets/pictures/picture-bug.svg` | Single insect, oval body, six legs, antennae. Distinct from any animal in the pack.                                                                                                                                                   |
 | 5   | nut  | NEW                                           | `public/assets/pictures/picture-nut.svg` | Single nut (almond or peanut), seam line, soft warm-brown.                                                                                                                                                                            |
-| 6   | tub  | NEW                                           | `public/assets/pictures/picture-tub.svg` | Free-standing footed bathtub, three-quarter view, optional bubble-bath dome. **Watch `cup` collision (Q3 in §10 — possible new FORBIDDEN_PAIR `tub ↔ cup`).**                                                                         |
+| 6   | tub  | NEW                                           | `public/assets/pictures/picture-tub.svg` | Free-standing footed bathtub, three-quarter view, optional bubble-bath dome. **`tub ↔ cup` is now a LOCKED FORBIDDEN_PAIR (§10 Q3 LOCKED 2026-05-08 per Devon's review).**                                                            |
 | 7   | bun  | NEW                                           | `public/assets/pictures/picture-bun.svg` | Round bread roll, seam line on top, soft warm-brown crust.                                                                                                                                                                            |
 | 8   | jug  | NEW                                           | `public/assets/pictures/picture-jug.svg` | Handled vessel with prominent spout. **Spout is the load-bearing distinguisher** vs. `cup` and `tub`.                                                                                                                                 |
 | 9   | rug  | NEW                                           | `public/assets/pictures/picture-rug.svg` | Rectangular floor covering, fringe at both short ends, simple geometric pattern (stripes or diamonds). **NEW FORBIDDEN_PAIR with `mat`.**                                                                                             |
@@ -234,7 +234,7 @@ Two new entries to `wordPack.ts` `FORBIDDEN_PAIRS`:
 
 1. **`['rug', 'mat']`** — both flat-rectangular floor coverings. The short-u `rug` and short-a `mat` are in different vowel pools so they never appear in the same trio under the same-vowel-only rule, BUT this entry guards against a future cross-vowel mixing ticket (`86c9m3aek`) accidentally mixing them. Cheap insurance, zero current cost.
 
-2. **`['tub', 'cup']`** _(conditional, pending Phase 2 visual review — Q3 in §10)_ — both vessels in side profile. `tub` is large + footed + no handle; `cup` is small + handled. The size + handle discriminators _should_ hold, but at 96pt with PNG-embed compression they may collapse. Add to `FORBIDDEN_PAIRS` if Phase 2 review confirms collision; otherwise leave out.
+2. **`['tub', 'cup']`** _(LOCKED 2026-05-08 per Devon's review — see §10 Q3)_ — both vessels in side profile. `tub` is large + footed + no handle; `cup` is small + handled. The size + handle discriminators _should_ hold, but at 96pt with PNG-embed compression they may collapse. Cost-asymmetry favours add-now: cost-of-adding is one line, cost-of-not-adding-and-being-wrong is a Phase 2 round-trip. If Phase 2 review shows the discriminators hold cleanly, removing the entry is a one-line revert.
 
 The `[mom, dad]` and existing pairs from short-o stand unchanged.
 
@@ -242,11 +242,11 @@ The `[mom, dad]` and existing pairs from short-o stand unchanged.
 
 Same 3-phase pipeline as the short-o pack (`design/word-song/short-o-pool-expansion.md` §3, `design/word-song/README.md` Phase model):
 
-| Phase                                             | Owner          | Output                                                                                                                                         | Blocking dependency                                                                                                                                                                                                                                                                                               |
-| ------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Prompt sheet                                   | Kyle (this PR) | [`short-u-picture-pack-prompts.md`](./short-u-picture-pack-prompts.md) (8 wholly-new short-u words: bug, nut, tub, bun, jug, rug, hut, gum)    | Short-a pack's `picture-pack-style-anchor.md` — style frame is shared.                                                                                                                                                                                                                                            |
-| 2. Midjourney generation + transparent-PNG export | Thomas         | 8 source PNGs (≥1024×1024 source, exported transparent at ~512×512 via remove.bg)                                                              | Phase 1 merged. ~30–60 min generation time at the per-pack cadence Thomas's done before; the pack-batching note in the brief ("50+ images one-time deal") suggests Thomas is bundling short-u with the future short-i + short-e + cohesion re-trace passes into one MJ session. No incremental subscription cost. |
-| 3. PNG-embed integration                          | Devon          | 8 (or 7) `picture-{word}.svg` files at `public/assets/pictures/` via `yarn embed-pictures` + `wordPictures.tsx` switch arm extension if needed | Phase 2 PNGs delivered. Per `.claude/docs/skill-trees-and-content.md` §"Rendering pattern post-PR #157," the existing `wordPictures.tsx` shared switch arm collapses 26 cases into one `<image href>` block; new picture-pack words slot in without case-body code.                                               |
+| Phase                                             | Owner          | Output                                                                                                                                         | Blocking dependency                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Prompt sheet                                   | Kyle (this PR) | [`short-u-picture-pack-prompts.md`](./short-u-picture-pack-prompts.md) (8 wholly-new short-u words: bug, nut, tub, bun, jug, rug, hut, gum)    | Short-a pack's `picture-pack-style-anchor.md` — style frame is shared.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2. Midjourney generation + transparent-PNG export | Thomas         | 8 source PNGs (≥1024×1024 source, exported transparent at ~512×512 via remove.bg)                                                              | Phase 1 merged. ~30–60 min MJ generation time at the per-pack cadence Thomas's done before, **plus ~5–10 min/asset for the remove.bg transparent-export step** (so ~40–80 extra min on top of the MJ generation for an 8-asset pack). Path 2 has a different time profile from the Path-1 agent-delegated cadence — `picture-pack-iteration-plan.md` §3's published cadence figures are for Path 1. The pack-batching note in the brief ("50+ images one-time deal") suggests Thomas is bundling short-u with the future short-i + short-e + cohesion re-trace passes into one MJ session. No incremental subscription cost. |
+| 3. PNG-embed integration                          | Devon          | 8 (or 7) `picture-{word}.svg` files at `public/assets/pictures/` via `yarn embed-pictures` + `wordPictures.tsx` switch arm extension if needed | Phase 2 PNGs delivered. Per `.claude/docs/skill-trees-and-content.md` §"Rendering pattern post-PR #157," the existing `wordPictures.tsx` shared switch arm collapses 26 cases into one `<image href>` block; new picture-pack words slot in without case-body code.                                                                                                                                                                                                                                                                                                                                                          |
 
 **Pack-cohesion lever**: same `--cref` / `--sref` to short-a `dog` pose-zero as short-o used. See [`short-u-picture-pack-prompts.md`](./short-u-picture-pack-prompts.md) §1.3.
 
@@ -283,11 +283,25 @@ The planner gets one new branch in `WORD_SONG_TRACK_GUIDE`: when `focusNode === 
 - No mixed-vowel sessions. `cvc-words-short-u` is short-u-only in v1. Cross-vowel mixing is ticket `86c9m3aek` and stays out of v1 (§ 8).
 - No re-test of short-a or short-o inside short-u sessions. The Leitner spaced-review system handles maintenance load (out of scope here; M4 ticket Leitner-for-literacy is downstream of v1).
 - No second graduation probe at the short-o → short-u boundary. The `cvc-words` graduation probe was the dual-gate verification needed before exiting short-a; subsequent vowel-tier transitions are standard mastery-rule.
-- **First-encounter scaffolding for individual short-u words is OUT OF SCOPE.** Short-o introduced one-time scaffolding for `box`/`fox` because of the `x = /ks/` decoding load. Short-u has no analogous decoding-load entry — every word in the 11-word pool is a clean C-V-C with a familiar grapheme. Emma's session-open vowel introduction (above) is the only short-u-specific scaffolding.
+- **No PER-WORD first-encounter scaffolding for individual short-u target words.** Short-o introduced one-time scaffolding for `box`/`fox` because of the `x = /ks/` decoding load. Short-u has no analogous decoding-load entry — every word in the 11-word pool is a clean C-V-C with a familiar grapheme. The session-1 `/u/` vs. `/ʌ/` minimal-pair opener (next subsection) IS in scope; per-word first-encounter lines are not.
 
-### Phonics-doc note on `/u/` vs. `/ʌ/`
+### First-encounter `/u/` vs. `/ʌ/` minimal-pair scaffolding (LOAD-BEARING)
 
-Per `design/research/phonics-sequence-marian.md` §Application: short-u "requires /u/ vs. /ʌ/ contrast work." This refers to the distinction between the English short-u sound `/ʌ/` (as in "bus") and the long-u or "true u" sound `/u:/` (as in "moon"). Tagalog has /u/ but not /ʌ/, so Marian may approximate. **This is NOT a content concern for v1** — the pool is all short-u CVCs, and Emma's pronunciation models the right phoneme. The contrast work happens implicitly via repeated exposure. Future work (post-v1) could introduce explicit `/u/` vs. `/ʌ/` minimal-pair drills, but that's out of scope for the pool spec.
+Per `design/research/phonics-sequence-marian.md` lines 203-206 + 339, the **first short-u session opens with an explicit `/u/` vs. `/ʌ/` minimal-pair contrast line**:
+
+> _"Listen carefully: 'sun' — not 'soon.' Sun! /s/-/ʌ/-/n/."_
+
+This is **load-bearing first-encounter scaffolding for L1 Tagalog interference**, not optional drill-work — Tagalog has `/u/` (the "soon" vowel) but not `/ʌ/` (the "sun" vowel), so Marian's L1 default substitution is `/u:/` for English short-u. The contrast line resets the prediction at first encounter and is structurally identical to short-o's `box`/`fox` `/ks/` first-encounter line (per [`short-o-pool-expansion.md`](./short-o-pool-expansion.md) §1 + §4 + §10 Q1 lock).
+
+**Where this lands in code:** `WORD_SONG_TRACK_GUIDE` in `api/_planner.ts` ([line 815 today](#)) gains a short-u branch whose per-problem chatter, when the focus is `cvc-words-short-u` AND it is the first short-u session for this Marian, includes the contrast opener as a baked planner-template constant. The first-short-u-session detection is the same "first time across her career" tracking gap that short-o §4 flagged for Kevin's impl spec — that gap is still open and applies here verbatim.
+
+The artifact that captures the baked line is the canon JSON at `public/canon/word-song/level-1/cvc-words-short-u.json`. AC9b (below, between AC9 and AC10) pins this contract.
+
+Subsequent short-u sessions do NOT replay the contrast — repeated exposure consolidates `/ʌ/`, and replaying the contrast line would itself become friction. The "first encounter" gate is canonical (per-Marian, lifetime-once), shared with the short-o `box`/`fox` `/ks/` mechanism Kevin's impl ticket will resolve.
+
+### Parser-before-planner reminder (defensive)
+
+Per `project_planner_parser_contract`, the planner-parser contract requires widening the browser parser BEFORE widening the planner. **For this short-u tier no parser change is required** — the cvc-word `"Read the <word>."` template was widened in PR #132 ([`src/screens/WordSong/planFromServer.ts:171`](#) accepts both `Tap the …` and `Read the …`); short-u rides on the existing template. The new short-u opener line baked in AC9b is a session-start utterance with utterance-id namespace `word.session-open.*` (or equivalent — Kevin owns the exact id at impl time per `project_planner_parser_contract` and the `screens-and-flows.md` spec-authoring convention to anchor on stable name primitives, not line numbers); the existing parser's "out-of-namespace ids skip-not-throw" rule (per [`skill-trees-and-content.md`](../../.claude/docs/skill-trees-and-content.md) §"Word `planFromServer`") covers cross-screen utterances cleanly. No parser delta needed; the contract is invoked here defensively for the impl-ticket reviewer.
 
 ---
 
@@ -339,7 +353,7 @@ Two new entries to `wordPack.ts FORBIDDEN_PAIRS`:
 
 ```ts
 ['rug', 'mat'],   // ticket 86c9q5q2d — flat-rectangular floor coverings, fringe vs. plain
-['tub', 'cup'],   // CONDITIONAL — pending Phase 2 visual review (Q3 in §10)
+['tub', 'cup'],   // ticket 86c9q5q2d — vessels in side profile (LOCKED 2026-05-08 per Devon's review, §10 Q3)
 ```
 
 The `mom-dad` pair from short-o stands; the rest of `FORBIDDEN_PAIRS` is unchanged.
@@ -434,8 +448,8 @@ Per the brief AC7, explicitly listing out-of-scope items so they don't get confl
 - **React component changes** — Kevin handles canon + planner + sibling-node wiring AFTER this spec lands. Devon handles `wordPack.ts` entries + picture-embedding via `yarn embed-pictures` AFTER Thomas's MJ pass. The existing `cvc-words` / `cvc-words-short-o` screen renders short-u unchanged.
 - **Wider literacy-tree expansion** — `digraphs`, `sight-words`, `simple-sentences` stay as `letter-sounds`-style stubs in the planner per `parser-widening-plan.md` §"Future tiers." Out of v1.
 - **Audio-before-text "silent text window" intervention** — separate Kyle ticket; not blocking this spec.
-- **First-encounter Emma scaffolding for individual short-u words** — short-u has no decoding-load words analogous to short-o's `box`/`fox` (per §4). The vowel-introduction line at session-open is the only scaffolding.
-- **`/u/` vs. `/ʌ/` minimal-pair contrast drills** — flagged in §4 phonics-doc note. Future work post-v1; out of scope.
+- **First-encounter Emma scaffolding for individual short-u words** — short-u has no decoding-load words analogous to short-o's `box`/`fox` (per §4). The vowel-introduction line at session-open is the only scaffolding. **Note:** the `/u/` vs. `/ʌ/` minimal-pair opener (`sun, not soon`) is IN scope — see §4 "First-encounter `/u/` vs. `/ʌ/` minimal-pair scaffolding" + AC9b.
+- **`/u/` vs. `/ʌ/` minimal-pair drills BEYOND the first-session opener** — repeated drill sessions for `/u/` vs. `/ʌ/` discrimination are future work post-v1. The single first-encounter opener line baked into the canon is in scope (§4); a recurring drill program is not.
 - **Leitner-for-literacy** — math facts have a Leitner box (M4); literacy spaced-repetition is downstream. Out of scope.
 - **Probe-word picture pack for short-u → short-i transition** — N/A. The graduation-probe gate exists only for `cvc-words` (short-a → short-o). No probe pack needed for short-u → short-i (or any subsequent vowel hop).
 
@@ -454,12 +468,22 @@ Kevin and Thomas use these. Jessica validates against them. Mirrors short-o spec
 - [ ] **AC1.** `WordSongNode` union in `src/lib/progress/types.ts` includes `'cvc-words-short-u'`. `LITERACY_TREE` and `WORD_SONG_NODES_IN_ORDER` both have `'cvc-words-short-u'` between `'cvc-words-short-o'` and `'digraphs'`.
 - [ ] **AC2.** `api/_planner.ts WORD_SONG_TRACK_GUIDE` adds a `cvc-words-short-u` branch emitting `"Read the <word>."` problems from the 11-word short-u pool. The 11 words match this spec §1 final pool exactly. `VALID_WORD_SONG_FOCUS_NODES` and `WORD_SONG_FIRST_CLASS_FOCUS_NODES` both gain the new node.
 - [ ] **AC3.** `api/_plannerWordList.ts` exports a new `WORD_SONG_TARGET_WORDS_SHORT_U` constant matching the 11 words from §1 (`'sun, cup, bus, bug, nut, tub, bun, jug, rug, hut, gum'` — pending Q1 final-list confirmation). The smoke test in `claude.test.ts` is extended to assert short-u words round-trip.
+- [ ] **AC3b.** `api/_plannerWordList.ts WORD_SONG_DISTRACTOR_HINTS` gains a short-u rhyme-family block — same structural shape as the existing short-a block at [`api/_plannerWordList.ts:48-58`](#) (the comma-joined per-rhyme bullets). New short-u entries:
+  - `/ʌn/ rhyme family: sun, bun — pack these in the trap window when one is the target.`
+  - `/ʌp/ rhyme family: cup.`
+  - `/ʌs/ rhyme family: bus.`
+  - `/ʌg/ rhyme family: bug, jug, rug — pack these in the trap window when one is the target.`
+  - `/ʌt/ rhyme family: nut, hut.`
+  - `/ʌb/ rhyme family: tub.`
+  - `/ʌm/ rhyme family: gum.`
+    The constant is conditioned on focus-node track at prompt-render time so short-a sessions don't see short-u rhyme hints (and vice versa). Source: §1 phonetic-spread table — the table already enumerates the rhyme families; this AC surfaces the data as an explicit planner-prompt artifact. The deliberate `/ʌg/` triplet (bug/jug/rug, per §1) is the load-bearing reason short-u needs its own block — short-o was 8 words with limited rhyme-family coverage and skipped this extension; short-u's tight `/ʌg/` cluster benefits from explicit Haiku ordering guidance the way short-a's `/æt/` family does today. If Q1 drops `gum`, drop the `/ʌm/` line.
 - [ ] **AC4.** `src/screens/WordSong/wordPack.ts` adds 11 short-u entries: 8 new (`bug, nut, tub, bun, jug, rug, hut, gum`) plus 3 promoted-from-distractor (`sun, cup, bus` flip `isTarget: true`). The 3 promoted entries also retain their old role (still pickable as distractors when the focus is short-a or short-o) — `isTarget: true` and distractor-pool membership are independent flags. Mirrors the short-o pattern (§3 of short-o spec).
-- [ ] **AC5.** `wordPack.ts FORBIDDEN_PAIRS` adds `['rug', 'mat']` (per §3 / §5). Conditional addition `['tub', 'cup']` pending Q3 Phase 2 visual review.
+- [ ] **AC5.** `wordPack.ts FORBIDDEN_PAIRS` adds two entries: `['rug', 'mat']` and `['tub', 'cup']` (both locked per §3 / §5; §10 Q3 LOCKED 2026-05-08 per Devon's review).
 - [ ] **AC6.** `wordPack.ts TARGET_PAIRINGS` adds 11 entries for the short-u targets, drawing distractors from the short-u pool only (same-vowel constraint per §8). Defensive-audit step: each row passes `assertNotForbidden` against `FORBIDDEN_PAIRS` after the new entries land.
 - [ ] **AC7.** 8 new SVG picture assets at `public/assets/pictures/picture-{bug,nut,tub,bun,jug,rug,hut,gum}.svg` via Thomas's MJ → remove.bg → `yarn embed-pictures` pipeline (Path 2). `wordPictures.tsx` resolves all 11 short-u keys without hitting the inline-SVG fallback (`sun/cup/bus` already resolve via existing assets). If Q1 drops `gum`, drop to 7 new SVG files.
 - [ ] **AC8.** `scripts/generateSessionCanon.ts WORD_SONG_FOCUS_NODES` includes `'cvc-words-short-u'`. `generateSessionCanon.test.ts` regression stays green.
 - [ ] **AC9.** Canon JSON ships at `public/canon/word-song/level-1/cvc-words-short-u.json` after a fresh bake. The PWA cold-start session-fetch for short-u is under 500ms (matches the existing cvc-words / cvc-words-short-o canon-hit benchmark).
+- [ ] **AC9b.** Emma's session-1 opener for `cvc-words-short-u` includes a `/u/` vs. `/ʌ/` minimal-pair contrast line — _"Listen carefully: 'sun' — not 'soon.' Sun! /s/-/ʌ/-/n/."_ — baked into `WORD_SONG_TRACK_GUIDE` in `api/_planner.ts` as a planner-template constant for the short-u tier (same shape as short-o's `box`/`fox` `/ks/` first-encounter scaffolding mechanism). The line emits ONLY when the focus is `cvc-words-short-u` AND it is the first short-u session for this Marian; subsequent short-u sessions skip it. The "first time across her career" detection mechanism is shared with the short-o `box`/`fox` mechanism Kevin's impl spec is open on — short-u rides on the same `Progress`-field tracking. The opener is captured as part of the canon JSON at AC9 and loaded as a session-start utterance the same way other Emma chatter is. Source: `design/research/phonics-sequence-marian.md` lines 203-206 + 339; cross-doc reference: §4 of this spec.
 - [ ] **AC10.** `src/lib/progress/mastery.ts applyMasteryRule` promotes `cvc-words-short-u` from `practicing` to `mastered` under the same per-track word-song threshold (default 90/3) used for `cvc-words` and `cvc-words-short-o` — no special-casing. The downstream `digraphs` node moves from `locked` to `intro` on promotion.
 - [ ] **AC11.** No regression on existing `cvc-words` (short-a) or `cvc-words-short-o` sessions. Snapshot of `cvc-words.json` and `cvc-words-short-o.json` canon stays unchanged across the short-u-adding PR.
 - [ ] **AC12.** Planner-output regression tests (`api/_planner.test.ts` + `src/screens/WordSong/plannerRoundTrip.test.ts`) cover: (a) `cvc-words-short-u` focus emits 8 short-u problems, (b) every problem's read line matches `"Read the <word>."` and the word is in the short-u pool, (c) no short-a or short-o words leak into short-u sessions in v1, (d) every target.vowel === 'u', (e) every target resolves a gentle + trap distractor pair without throwing, (f) distractors stay inside the short-u pool (same-vowel rule).
@@ -490,22 +514,11 @@ Two options:
 
 **Decision:** Recommend B (defer) for v1 — the short-a pack is cohesive enough that the existing distractor pictures don't visibly mis-match. Re-trace as future polish if it bothers Thomas. Thomas — confirm or pick A.
 
-**Q3. `[tub, cup]` FORBIDDEN_PAIR — add now or after Phase 2 review?** Both are vessels in side profile. Discriminators (size + handle vs. feet) _should_ hold at 96pt. Three options:
+**Q3. `[tub, cup]` FORBIDDEN_PAIR — add now or after Phase 2 review?** **LOCKED 2026-05-08 per Devon's review (option A — add now).** Both are vessels in side profile. The cost-asymmetry favours add-now: cost-of-adding is one line in `wordPack.ts`; cost-of-not-adding-and-being-wrong is a Phase 2 round-trip + canon re-bake. If Phase 2 review confirms the discriminators (size + handle vs. feet) hold cleanly at 96pt, removing the entry is a one-line revert. Net: free insurance. AC5 includes `[tub, cup]` as part of the locked FORBIDDEN_PAIRS additions; the §2 matrix preview's `tub` row is pre-resolved to `trap: ['bug', 'jug']` to match.
 
-- **A. Add now** — defensive, costs nothing (in same-vowel-only sessions, both are short-u; the planner rule could trio them otherwise).
-- **B. Add only if Phase 2 visual review confirms collision.**
-- **C. Don't add** — trust the discriminators.
+**Q4. Distractor-only short-u entries — Reading A vs. Reading B.** **LOCKED 2026-05-08 per Devon's review (option B — use the 11-word pool as both target and distractor list).** The audit explicitly demonstrates Reading A doesn't yield 8 strong distractor-only candidates (every candidate has a stated defect — `pup` silhouette-collision with `dog`, `mug` cup-collision, `mud` mass-noun-instability). Reading B is structurally consistent with [`short-o-pool-expansion.md`](./short-o-pool-expansion.md) §8 (same-vowel-only). `wordPack.ts:312-341` shows that `DISTRACTOR_ONLY_WORDS` is a 4-entry minimal set, not an 8-entry-per-vowel set — Reading A would fight that shape. AC4 + AC6 reflect Reading B (the 11 short-u entries are simultaneously the in-tier distractor pool; no separate "distractor-only" list).
 
-**Decision:** Recommend A (add now). It's free insurance; if Phase 2 review shows the discriminators hold cleanly at 96pt, removing the entry is a one-line revert. Thomas — confirm or pick B/C.
-
-**Q4. Distractor-only short-u entries — Reading A vs. Reading B.** The brief asked for ~8 distractor-only short-u words (Reading A). The same-vowel-only rule (§ 8) makes the in-tier pool serve as both target and distractor list (Reading B), and the strict audit doesn't yield 8 strong distractor-only candidates anyway. Two options:
-
-- **A. Force 8 distractor-only entries** — drags in `pup`, `mug`, `mud` despite audit defects.
-- **B. Use the 11-word pool as both target and distractor list** — mirrors short-o §8.
-
-**Decision:** Recommend B. Thomas — confirm or override.
-
-These four Qs are the only design-level questions. All other AC items are mechanical (Kevin's impl ticket).
+These two Qs (Q1 + Q2) are the only remaining design-level questions for Thomas. Q3 + Q4 are locked. All other AC items are mechanical (Kevin's impl ticket).
 
 ---
 
