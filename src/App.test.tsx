@@ -411,6 +411,29 @@ describe('App routing skeleton', () => {
         }) as Promise<Response>,
       )
 
+      // Helper: filter `/api/claude` calls by track. Word Song's
+      // hub-mount pre-warm (ticket 86c9pr4h9) ALSO POSTs to /api/claude
+      // when the route reaches Hub mid-test, so we have to discriminate
+      // by `payload.track` to count math-only fetches. The request body
+      // is the second arg to fetch (RequestInit). When undefined or
+      // unparseable, treat as non-math.
+      const mathClaudeCalls = (spy: {
+        mock: { calls: unknown[][] }
+      }): Array<unknown[]> =>
+        spy.mock.calls.filter((c) => {
+          if (c[0] !== '/api/claude') return false
+          const init = c[1] as RequestInit | undefined
+          if (typeof init?.body !== 'string') return false
+          try {
+            const parsed = JSON.parse(init.body) as {
+              payload?: { track?: string }
+            }
+            return parsed.payload?.track === 'math'
+          } catch {
+            return false
+          }
+        })
+
       setSearch('?route=greet')
       render(<AppFresh2 />)
 
@@ -418,16 +441,14 @@ describe('App routing skeleton', () => {
         await Promise.resolve()
       })
       // Fetch #1 fires on greet mount.
-      let calls2 = fetchSpy2.mock.calls.filter((c) => c[0] === '/api/claude')
-      expect(calls2.length).toBe(1)
+      expect(mathClaudeCalls(fetchSpy2).length).toBe(1)
 
       // greet → math (still audio, no leave-effect, latch unchanged).
       await act(async () => {
         fireEvent.click(screen.getByTestId('greet-mock-advance'))
         await Promise.resolve()
       })
-      calls2 = fetchSpy2.mock.calls.filter((c) => c[0] === '/api/claude')
-      expect(calls2.length).toBe(1)
+      expect(mathClaudeCalls(fetchSpy2).length).toBe(1)
 
       // math → hub via the back-arrow. Hub is a non-audio surface so
       // the leave-effect fires. Pre-fix: hadAudio=false (fetch never
@@ -451,15 +472,333 @@ describe('App routing skeleton', () => {
         await Promise.resolve()
       })
 
-      calls2 = fetchSpy2.mock.calls.filter((c) => c[0] === '/api/claude')
-      // Pre-fix: still 1 (latch leak). Post-fix: 2.
-      expect(calls2.length).toBe(2)
+      // Pre-fix (latch leak): 1 math fetch (the original orphan). Post-
+      // fix: 2 math fetches — first one aborted on math → hub leave,
+      // second one fired by the hub → math kick after the latch reset.
+      expect(mathClaudeCalls(fetchSpy2).length).toBe(2)
 
       vi.doUnmock('./screens/Math')
       vi.doUnmock('./screens/Greet')
       vi.doUnmock('./screens/Hub')
       fetchSpy.mockRestore()
       fetchSpy2.mockRestore()
+    })
+  })
+
+  describe('Word Song Path A pre-warm wiring (#86c9pr4h9)', () => {
+    // Pre-warm fix for ticket 86c9pr4h9: Word Song's /api/claude POST
+    // now kicks on Hub mount, mirroring the Math pre-warm shape from
+    // 86c9hjnn8 (which kicks on Greet). On real iPad signal Marian
+    // noticeably waited the first time she tried Word Song while the
+    // server-side render finished; pre-warming on Hub means by the
+    // time she taps the Word Song chip the audio is loaded (or settles
+    // within ~1s of the tap on a slow network).
+    //
+    // Helper: filter `/api/claude` calls by track. Both Math and Word
+    // Song POST to the same endpoint with `payload.track` discriminating.
+    // We type the spy loosely as `{ mock: { calls: unknown[][] } }` so
+    // the helper composes with vi.spyOn(globalThis, 'fetch') (whose
+    // ReturnType is awkward to spell explicitly here).
+    function fetchCallsForTrack(
+      spy: { mock: { calls: unknown[][] } },
+      track: 'math' | 'word-song',
+    ): Array<unknown[]> {
+      return spy.mock.calls.filter((c) => {
+        if (c[0] !== '/api/claude') return false
+        const init = c[1] as RequestInit | undefined
+        if (typeof init?.body !== 'string') return false
+        try {
+          const parsed = JSON.parse(init.body) as {
+            payload?: { track?: string }
+          }
+          return parsed.payload?.track === track
+        } catch {
+          return false
+        }
+      })
+    }
+
+    // AC #1 + AC #2 (acceptance criteria from the ticket): Hub is the
+    // chosen pre-warm anchor. `?route=hub` direct-launch fires the
+    // word-song fetch BEFORE any literacy entry.
+    it('POSTs to /api/claude with track=word-song on Hub mount (pre-warm anchor)', async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response('{}', { status: 200 }))
+
+      setSearch('?route=hub')
+      render(<App />)
+
+      // Drain microtasks so the kick-effect runs on first commit.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // Word-song fetch fired on Hub mount.
+      expect(
+        fetchCallsForTrack(fetchSpy, 'word-song').length,
+      ).toBeGreaterThanOrEqual(1)
+
+      // Drain the .then/.catch so the audioReady setState resolves
+      // inside act() rather than escaping the test boundary.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      fetchSpy.mockRestore()
+    })
+
+    // AC #3 (latch ensures one fetch per app session): Hub → Literacy
+    // transition does NOT issue a duplicate fetch — the latch from
+    // the hub-mount fires once, the literacy entry sees it active and
+    // short-circuits the kick-effect.
+    it('hub → literacy does NOT duplicate the word-song fetch (latch)', async () => {
+      // Hold the fetch open so the latch stays armed across the
+      // route flip.
+      const fetchPromise = new Promise<Response>(() => {
+        /* never resolves */
+      })
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockReturnValue(fetchPromise as Promise<Response>)
+
+      // Mock WordSong to a no-op shim so we don't pay its render cost.
+      vi.doMock('./screens/WordSong', async () => {
+        const actual: Record<string, unknown> =
+          await vi.importActual('./screens/WordSong')
+        return {
+          ...actual,
+          default: () => <div data-testid="word-song-mock" />,
+        }
+      })
+      // Mock Hub to expose a "go to literacy" button so we can drive
+      // the route flip without walking the real Hub greeting timeline.
+      vi.doMock('./screens/Hub', () => ({
+        default: ({
+          onPickTree,
+        }: {
+          onPickTree?: (tree: 'number-garden' | 'word-song') => void
+        }) => (
+          <div data-testid="hub-mock">
+            <button
+              type="button"
+              data-testid="hub-mock-pick-word-song"
+              onClick={() => onPickTree?.('word-song')}
+            />
+          </div>
+        ),
+      }))
+
+      vi.resetModules()
+      const { default: AppFresh } = await import('./App')
+
+      setSearch('?route=hub')
+      render(<AppFresh />)
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      // Fetch #1 fires on Hub mount.
+      expect(fetchCallsForTrack(fetchSpy, 'word-song').length).toBe(1)
+
+      // Hub → Literacy. The kick-effect re-runs but the latch is true.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('hub-mock-pick-word-song'))
+        await Promise.resolve()
+      })
+
+      // Still exactly 1 word-song fetch — no duplicate.
+      expect(fetchCallsForTrack(fetchSpy, 'word-song').length).toBe(1)
+      expect(screen.getByTestId('word-song-mock')).toBeInTheDocument()
+
+      vi.doUnmock('./screens/WordSong')
+      vi.doUnmock('./screens/Hub')
+      fetchSpy.mockRestore()
+    })
+
+    // AC #4 + AC #6/#7 (leave-effect lifecycle, no regression to fetch
+    // correctness): completing a Word Song session and returning to Hub
+    // tears down the audio + resets the latch via
+    // `handleSessionEndAllDone`, so the next Hub-mount kick fires a
+    // FRESH fetch. The leave-effect now excepts `hub` (because pre-warm
+    // kicks there), so this teardown is the imperative replacement for
+    // the prior literacy → hub leave-effect path.
+    it('post-Word-Song SessionEnd → Hub tears down audio + re-fires the kick', async () => {
+      // Hold every fetch open so we can count them deterministically.
+      const fetchPromise = new Promise<Response>(() => {
+        /* never resolves */
+      })
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockReturnValue(fetchPromise as Promise<Response>)
+
+      // Word Song shim that synchronously reports completion with
+      // surface=word-song on a button click. Same shape the
+      // SessionEnd handoff suite uses below.
+      vi.doMock('./screens/WordSong', async () => {
+        const actual: Record<string, unknown> =
+          await vi.importActual('./screens/WordSong')
+        return {
+          ...actual,
+          default: ({
+            onSessionComplete,
+          }: {
+            onSessionComplete?: (r: {
+              totalCorrect: number
+              totalStardust: number
+              finalStreak: number
+              earnedThisSession: number
+              surface: 'word-song'
+            }) => void
+          }) => (
+            <button
+              type="button"
+              data-testid="word-song-mock-complete"
+              onClick={() =>
+                onSessionComplete?.({
+                  totalCorrect: 8,
+                  totalStardust: 0,
+                  finalStreak: 8,
+                  earnedThisSession: 0,
+                  surface: 'word-song',
+                })
+              }
+            />
+          ),
+        }
+      })
+      // SessionEnd shim that exposes onAllDone as a single-tap button
+      // — the real screen has a 6.2s phase chain before the CTA reveals,
+      // and we don't need the full timeline here. We DO want to keep
+      // the real SessionEnd's data-testid="session-end" visible so the
+      // mid-test assertion can still find it; the shim renders that.
+      vi.doMock('./screens/SessionEnd', async () => {
+        const actual: Record<string, unknown> = await vi.importActual(
+          './screens/SessionEnd',
+        )
+        return {
+          ...actual,
+          default: ({ onAllDone }: { onAllDone?: () => void }) => (
+            <div data-testid="session-end">
+              <button
+                type="button"
+                data-testid="session-end-mock-all-done"
+                onClick={() => onAllDone?.()}
+              />
+            </div>
+          ),
+        }
+      })
+
+      vi.resetModules()
+      const { default: AppFresh } = await import('./App')
+
+      // Direct-launch into literacy so the kick-effect's latch flips
+      // on the literacy entry (the path Marian can also take via
+      // ?route=literacy QA launches).
+      setSearch('?route=literacy')
+      render(<AppFresh />)
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      // Fetch #1 fires on literacy mount (the latch's first arming).
+      expect(fetchCallsForTrack(fetchSpy, 'word-song').length).toBe(1)
+
+      // Complete the session. App routes to session-end with
+      // surface=word-song.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('word-song-mock-complete'))
+        await Promise.resolve()
+      })
+
+      // SessionEnd is mounted; the leave-effect's exception list
+      // includes session-end so no teardown ran here yet.
+      expect(screen.getByTestId('session-end')).toBeInTheDocument()
+      expect(fetchCallsForTrack(fetchSpy, 'word-song').length).toBe(1)
+
+      // Tap "All done" to drive session-end → hub. This is the gesture
+      // that drives `handleSessionEndAllDone`, which now imperatively
+      // tears down the word-song audio when surface was word-song.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('session-end-mock-all-done'))
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // Hub is now mounted; the kick-effect re-runs (latch was reset
+      // by the imperative teardown) and fires a fresh fetch #2.
+      expect(screen.getByTestId('hub')).toBeInTheDocument()
+      expect(fetchCallsForTrack(fetchSpy, 'word-song').length).toBe(2)
+
+      vi.doUnmock('./screens/WordSong')
+      vi.doUnmock('./screens/SessionEnd')
+      fetchSpy.mockRestore()
+    })
+
+    // No regression to existing behavior: when route flips to a
+    // non-audio surface (parent-settings) the leave-effect still aborts
+    // the in-flight fetch + resets the latch. This pins the behavior
+    // for the path that's NOT covered by the imperative teardown
+    // (handleSessionEndAllDone / handleBackToHub) — the leave-effect
+    // is still the safety net for "any other route exit".
+    it('hub → parent-settings tears down word-song audio via leave-effect', async () => {
+      const fetchPromise = new Promise<Response>(() => {
+        /* never resolves */
+      })
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockReturnValue(fetchPromise as Promise<Response>)
+
+      // Hub shim that exposes the long-press handler so we can flip
+      // route to parent-settings without simulating a 3-second pointer.
+      vi.doMock('./screens/Hub', () => ({
+        default: ({
+          onCharacterLongPress,
+        }: {
+          onCharacterLongPress?: () => void
+        }) => (
+          <div data-testid="hub-mock">
+            <button
+              type="button"
+              data-testid="hub-mock-long-press"
+              onClick={() => onCharacterLongPress?.()}
+            />
+          </div>
+        ),
+      }))
+
+      vi.resetModules()
+      const { default: AppFresh } = await import('./App')
+
+      setSearch('?route=hub')
+      render(<AppFresh />)
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      // Fetch #1 fires on Hub mount.
+      expect(fetchCallsForTrack(fetchSpy, 'word-song').length).toBe(1)
+
+      // Hub → parent-settings (non-audio). Leave-effect should fire
+      // and reset the latch.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('hub-mock-long-press'))
+        await Promise.resolve()
+        // Drain the queueMicrotask in the leave-effect.
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      expect(screen.getByTestId('parent-settings')).toBeInTheDocument()
+
+      vi.doUnmock('./screens/Hub')
+      fetchSpy.mockRestore()
     })
   })
 
