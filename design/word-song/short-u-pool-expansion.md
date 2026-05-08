@@ -73,38 +73,19 @@ Candidates from standard short-u CVC lists (Big City Readers source 5; Reading R
 
 **Other candidates briefly considered and dropped:** `lug` (verb), `jut` (verb), `rum` (alcohol — content), `pun` (abstract), `lull` (CVCC), `hum` (verb / abstract), `tug` (verb), `but` (function word, not concrete), `up` (function word + 2-letter), `buzz` (CVCC + verb), `cuff` (CVCC), `dust` (CVCC), `bull` (CVCC), `pull` (CVCC).
 
-### Final v1 short-u pool (14 words)
+### Pool-size recommendation — 11, not 14
 
-| #   | Word   | Picture status                                                             | Vowel | Category  | Notes                                                                                                                                                                    |
-| --- | ------ | -------------------------------------------------------------------------- | ----- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | sun    | EXISTS as `picture-sun.svg` (distractor) — re-trace per pack-cohesion pass | u     | celestial | Re-purposed from distractor; `vowel` already `'u'` in `wordPack.ts`. Diagnostic-flagged: Marian decoded "sun" but didn't know its meaning; perfect first short-u target. |
-| 2   | cup    | EXISTS as `picture-cup.svg` (distractor) — re-trace per pack-cohesion pass | u     | vessel    | Re-purposed from distractor; `vowel` already `'u'`.                                                                                                                      |
-| 3   | bus    | EXISTS as `picture-bus.svg` (distractor) — re-trace per pack-cohesion pass | u     | vehicle   | Re-purposed from distractor; `vowel` already `'u'`.                                                                                                                      |
-| 4   | bug    | NEW picture                                                                | u     | animal    | Wholly new entry; insect-archetype (oval body, antennae, six legs).                                                                                                      |
-| 5   | nut    | NEW picture                                                                | u     | food      | Wholly new entry; almond-or-peanut shape with seam line.                                                                                                                 |
-| 6   | tub    | NEW picture                                                                | u     | household | Wholly new entry; free-standing footed bathtub silhouette. Watch `cup` collision (§3).                                                                                   |
-| 7   | bun    | NEW picture                                                                | u     | food      | Wholly new entry; round bread roll with seam line on top.                                                                                                                |
-| 8   | jug    | NEW picture                                                                | u     | vessel    | Wholly new entry; handled vessel with prominent spout — spout is the load-bearing feature for `cup`/`tub` distinguishing.                                                |
-| 9   | rug    | NEW picture                                                                | u     | household | Wholly new entry; rectangular floor covering with visible fringe + simple pattern. **NEW FORBIDDEN_PAIR with `mat`** (§3).                                               |
-| 10  | hut    | NEW picture                                                                | u     | object    | Wholly new entry; simple A-frame dwelling with door.                                                                                                                     |
-| 11  | gum    | NEW picture                                                                | u     | food      | Open Q1 — see §10. Wrapped chewing-gum stick is the strongest read. Substituting if Q1 returns "drop."                                                                   |
-| 12  | hum    | —                                                                          | —     | —         | Reserved row — placeholder if Q1 drops `gum`. NOT in the recommended final 14.                                                                                           |
-| 13  | fun    | —                                                                          | —     | —         | Reserved row — see Q1 fallback. NOT in the recommended final 14.                                                                                                         |
-| 14  | (slot) | —                                                                          | —     | —         | See Q1 fallback discussion in §10.                                                                                                                                       |
+The brief asked for ~14 short-u target words. After the strict audit, **the rigor lands at 11 strong entries**: 5 from the brief's 10 (sun, cup, bug, nut, tub — keeping; replacing mud/run/hug/pup/cut), plus 6 sourced from standard short-u CVC lists (bus by promotion-from-distractor, bun, jug, rug, hut, gum). Forcing 14 would drag in weaker entries (`pup`/`mug` silhouette-collision, `mud` mass-noun-instability, `pug`/`bud` picture-instability) — that's a worse pool.
 
-Wait — that's not right. Let me redo §1's final-list table cleanly. The list above has 11 confirmed strong entries (sun, cup, bus, bug, nut, tub, bun, jug, rug, hut, plus `gum` if Q1 keeps it). To hit 14 we need 3-4 more. Let me reconsider:
-
-The honest pool size after a strict audit is **11 strong entries** (sun, cup, bus, bug, nut, tub, bun, jug, rug, hut, plus optionally `gum` as a borderline mass-noun). Forcing 14 by adding weaker entries (`pup`/`mug` collision-risk, `mud`/`gum` mass-noun-risk, `pug`/`bud` picture-instability) would weaken the pool.
-
-**Resolution: ship 11 short-u target words, not 14.** This is fewer than short-a's 14 and more than short-o's 8 — calibrated to the actual vocabulary surface short-u offers without forcing weak entries. Specifically:
+This is fewer than short-a's 14 and more than short-o's 8 — calibrated to the actual vocabulary surface short-u offers without forcing weak entries:
 
 - Short-a has 14 because it's the most-prolific English short-vowel CVC family (5 rhyme groups: /æt/, /æn/, /æg/, /æp/, /æd/, /æm/, plus the loose `dad`/`man`).
 - Short-o has 8 because Dave's source 5 and the spec audit converged at exactly 8 strong entries.
-- Short-u sits between, with **11** entries holding their weight against the audit. Forcing a 14-entry pool drags in weaker chips.
+- Short-u sits between, with **11** entries that hold their weight against the audit.
 
-The ticket asked for ~14; the audit returns 11 because that's where the rigor lands. Flagging as Q1 in §10 — Thomas can override with "force 14" if he wants the larger pool, in which case the substitution candidates live in §10 Q1 alternatives.
+Flagging as Q1 in §10 — Thomas can override with "force 14" if he wants the larger pool, in which case the substitution candidates from the §1 audit kick in. Default lock: 11.
 
-**Updated final v1 short-u pool (11 words):**
+### Final v1 short-u pool (11 words)
 
 | #   | Word | Picture status                                        | Vowel | Category  | Notes                                                                             |
 | --- | ---- | ----------------------------------------------------- | ----- | --------- | --------------------------------------------------------------------------------- |
@@ -124,7 +105,7 @@ The ticket asked for ~14; the audit returns 11 because that's where the rigor la
 
 - **All 11 are concrete or noun-form-pictureable.** `gum` is a mass noun but the wrapped-stick picture-chip stably depicts the noun form (same logical move as `jam` from short-a where jam-in-a-jar = "jam"). If Thomas finds the gum-stick read unstable in Phase 2, drop to 10 entries — see Q1.
 - **All 11 are CVC by spelling.** No `x = /ks/` exception in this pool (unlike short-o's `box`/`fox`). `nut`, `cup`, `bug`, `bun`, `jug`, `rug`, `hut`, `gum`, `tub` all decode cleanly.
-- **3 of 11 are already in the v1 distractor pool** (`sun, cup, bus`) — picture assets exist as silhouettes / hand-authored SVGs today; they re-trace alongside the new 8 in Phase 3 for stylistic cohesion. The 4 wholly-new picture subjects shipped to Thomas are `bug, nut, tub, bun, jug, rug, hut, gum` (8 generations). NOTE: `gum` is conditional on Q1.
+- **3 of 11 are already in the v1 distractor pool** (`sun, cup, bus`) — picture assets exist as hand-authored SVGs today (PR #157); optional re-trace alongside the new 8 in Phase 3 for stylistic cohesion (Q2 in §10). The 8 wholly-new picture subjects shipped to Thomas are `bug, nut, tub, bun, jug, rug, hut, gum` (8 generations; or 7 if Q1 drops `gum`).
 - **Category spread:** 1 celestial (sun), 1 vehicle (bus), 1 vessel-cup (cup), 1 vessel-jug (jug), 1 animal (bug), 1 dwelling (hut), 2 household (tub, rug), 3 food (nut, bun, gum). Spread mirrors short-a's variety; less concentrated on kitchen than short-o.
 
 ### Phonetic spread within the pool (rhyme-family coverage)
