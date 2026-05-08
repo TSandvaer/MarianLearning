@@ -7,7 +7,7 @@
  * function); these tests pin the per-call shape contract.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   MAX_SESSION_HISTORY,
   STORAGE_KEY,
@@ -23,10 +23,15 @@ import { recordProgressOnSessionEnd } from './progressHistory'
 describe('recordProgressOnSessionEnd', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    // Silence the cloud-sync fire-and-forget warn (T2 ticket 86c9pkfyu)
+    // — the push fails in jsdom because '/api/progress' isn't a parseable
+    // URL, but the warn isn't relevant to these tests' assertions.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
   afterEach(() => {
     window.localStorage.clear()
+    vi.restoreAllMocks()
   })
 
   // ── Shape pins ─────────────────────────────────────────────────────────

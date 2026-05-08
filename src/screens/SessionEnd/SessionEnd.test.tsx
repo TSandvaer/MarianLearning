@@ -228,11 +228,17 @@ describe('SessionEnd', () => {
     // on the progress module yet. Clear the slot per-test so progress
     // entries don't leak across tests in this file.
     if (typeof window !== 'undefined') window.localStorage.clear()
+    // T2 cloud-sync (ticket 86c9pkfyu) — silence the fire-and-forget
+    // warn from `pushProgressToCloud`. The push fails in jsdom because
+    // '/api/progress' isn't a parseable URL; the warn isn't relevant
+    // to these tests' assertions.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
   })
 
   afterEach(() => {
     vi.useRealTimers()
     if (typeof window !== 'undefined') window.localStorage.clear()
+    vi.restoreAllMocks()
   })
 
   it('renders the session-end screen with Math payload', () => {

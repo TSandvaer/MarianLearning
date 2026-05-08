@@ -27,19 +27,31 @@
  * persists the values.
  */
 
-import { useCallback, useMemo, useState, type ReactElement } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+} from 'react'
 import {
   DEFAULT_PARENT_SETTINGS,
   MASTERY_THRESHOLD_PRESETS,
   applyMasteryRule,
   defaultProgress,
+  getOrCreateDeviceId,
   getSettings,
+  isValidUuid,
   loadProgress,
+  pushProgressToCloud,
+  reconcileWithCloud,
   saveProgress,
+  writeStoredDeviceId,
   type MasteryThreshold,
   type MasteryTrackKey,
   type ParentSettings,
   type Progress,
+  type ReconcileOutcome,
   type SessionModePicker,
 } from '../../lib/progress'
 import { labelForSkillNode } from '../Hub/progressProjection'
@@ -77,6 +89,18 @@ export interface ParentSettingsStorage {
    * lets the screen surface success/failure UI.
    */
   writeClipboard?: (text: string) => Promise<void>
+  /**
+   * Cloud-sync test seams (ticket 86c9pkfyu). All optional — production
+   * defaults to the canonical helpers from `lib/progress`.
+   *
+   * `getDeviceId` returns the persisted device UUID (or generates one).
+   * `pushNow` POSTs the current progress to /api/progress immediately.
+   * `restoreFromDeviceId` writes the supplied UUID to localStorage and
+   *   runs a reconcile that pulls that device's blob.
+   */
+  getDeviceId?: () => string
+  pushNow?: (progress: Progress) => Promise<'sent' | 'failed' | 'skipped'>
+  restoreFromDeviceId?: (uuid: string) => Promise<ReconcileOutcome>
 }
 
 /**
@@ -120,6 +144,16 @@ const DEFAULT_STORAGE: ParentSettingsStorage = {
       return
     }
     throw new Error('clipboard-unavailable')
+  },
+  getDeviceId: () => getOrCreateDeviceId(),
+  pushNow: (progress: Progress) =>
+    pushProgressToCloud(getOrCreateDeviceId(), progress),
+  restoreFromDeviceId: async (uuid: string) => {
+    // Install the new device id, then reconcile against it. The
+    // cloud-newer branch installs the cloud blob and the helper
+    // returns the structured outcome the UI uses to refresh.
+    writeStoredDeviceId(uuid)
+    return reconcileWithCloud(uuid, loadProgress())
   },
 }
 
@@ -274,6 +308,122 @@ export default function ParentSettings({
       return restored
     })
   }, [storage])
+
+  // ── Cloud Backup section state (ticket 86c9pkfyu) ─────────────────────
+  //
+  // Read the device id once on mount. The default seam falls back to
+  // `getOrCreateDeviceId()` which generates a fresh UUID if none is
+  // stored — that matches the rest of the app's behaviour, so even if a
+  // parent opens Settings before the boot reconcile fired they see the
+  // device id.
+  const [deviceId, setDeviceId] = useState<string>(() => {
+    if (storage.getDeviceId) return storage.getDeviceId()
+    return ''
+  })
+  const [deviceIdCopyState, setDeviceIdCopyState] = useState<
+    'idle' | 'copied' | 'error'
+  >('idle')
+  const [pushState, setPushState] = useState<
+    'idle' | 'sending' | 'sent' | 'failed' | 'skipped'
+  >('idle')
+  const [restoreInput, setRestoreInput] = useState('')
+  const [restoreState, setRestoreState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'invalid-format' }
+    | { kind: 'restoring' }
+    | { kind: 'restored'; outcome: ReconcileOutcome }
+    | { kind: 'restore-failed'; reason: string }
+  >({ kind: 'idle' })
+
+  // The Last-synced timestamp is `progress.profile.lastPlayedISO`. The
+  // session-end fire-and-forget POST stamps this exact value before
+  // pushing, so the value here matches what the cloud holds for
+  // successful syncs. For never-synced devices it's null.
+  const lastSyncedISO = progress.profile.lastPlayedISO
+
+  // Reset state badges after a short while so a parent who taps
+  // multiple times always sees fresh feedback.
+  useEffect(() => {
+    if (
+      pushState === 'sent' ||
+      pushState === 'failed' ||
+      pushState === 'skipped'
+    ) {
+      const handle = window.setTimeout(() => setPushState('idle'), 2400)
+      return () => window.clearTimeout(handle)
+    }
+    return undefined
+  }, [pushState])
+
+  useEffect(() => {
+    if (deviceIdCopyState !== 'idle') {
+      const handle = window.setTimeout(() => setDeviceIdCopyState('idle'), 2400)
+      return () => window.clearTimeout(handle)
+    }
+    return undefined
+  }, [deviceIdCopyState])
+
+  const handleCopyDeviceId = useCallback(() => {
+    const writeClipboard = storage.writeClipboard
+    if (!writeClipboard) {
+      setDeviceIdCopyState('error')
+      return
+    }
+    void writeClipboard(deviceId).then(
+      () => setDeviceIdCopyState('copied'),
+      () => setDeviceIdCopyState('error'),
+    )
+  }, [deviceId, storage])
+
+  const handlePushNow = useCallback(() => {
+    const pushNow = storage.pushNow
+    if (!pushNow) {
+      setPushState('skipped')
+      return
+    }
+    setPushState('sending')
+    void pushNow(progress).then(
+      (result) => setPushState(result),
+      () => setPushState('failed'),
+    )
+  }, [progress, storage])
+
+  const handleRestoreFromDeviceId = useCallback(() => {
+    const trimmed = restoreInput.trim()
+    if (!isValidUuid(trimmed)) {
+      setRestoreState({ kind: 'invalid-format' })
+      return
+    }
+    const restoreFn = storage.restoreFromDeviceId
+    if (!restoreFn) {
+      setRestoreState({
+        kind: 'restore-failed',
+        reason: 'restore-not-configured',
+      })
+      return
+    }
+    setRestoreState({ kind: 'restoring' })
+    void restoreFn(trimmed).then(
+      (outcome) => {
+        setRestoreState({ kind: 'restored', outcome })
+        setDeviceId(trimmed)
+        // Refresh the in-memory progress copy if the restore installed
+        // a new blob locally.
+        if (outcome.kind === 'installed-from-cloud') {
+          setProgress(outcome.progress)
+        } else {
+          // Still re-read storage in case the restore wrote nothing
+          // but the blob was previously different.
+          const fresh = storage.load()
+          if (fresh !== null) setProgress(fresh)
+        }
+      },
+      (err: unknown) => {
+        const reason = err instanceof Error ? err.message : 'unknown'
+        setRestoreState({ kind: 'restore-failed', reason })
+      },
+    )
+  }, [restoreInput, storage])
 
   return (
     <main
@@ -483,9 +633,251 @@ export default function ParentSettings({
             "
           />
         </section>
+
+        {/* Cloud Backup section (ticket 86c9pkfyu — durable off-device
+            backup keyed by per-device UUID). Three pieces:
+              1. Device ID display + Copy button + last-synced timestamp
+              2. "Push now" — manual fire of the same POST that
+                 session-end runs automatically
+              3. "Restore from device ID" — paste a UUID from another
+                 device, validate, run reconcile to pull that device's
+                 cloud blob locally */}
+        <section
+          data-testid="parent-settings-cloud-backup"
+          className="mt-8 rounded-md border border-slate-200 bg-white p-5"
+        >
+          <div className="mb-3 min-w-0">
+            <h2 className="text-base font-semibold text-slate-800">
+              Cloud backup
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Marian&apos;s progress is also saved to the cloud after every
+              session. If her tablet is lost or reset, paste this device ID on
+              the new device to restore.
+            </p>
+          </div>
+
+          {/* Device ID row */}
+          <div className="mt-4">
+            <label className="block text-xs font-medium text-slate-600">
+              Device ID
+            </label>
+            <div className="mt-1 flex items-center gap-3">
+              <code
+                data-testid="parent-settings-cloud-device-id"
+                className="
+                  flex-1 select-all rounded-md border border-slate-300
+                  bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700
+                "
+              >
+                {deviceId || '(unavailable)'}
+              </code>
+              <button
+                type="button"
+                data-testid="parent-settings-cloud-copy-device-id"
+                onClick={handleCopyDeviceId}
+                className="
+                  shrink-0 rounded-md border border-slate-700 bg-slate-700 px-3
+                  py-2 text-sm font-medium text-white
+                  hover:bg-slate-800
+                  focus:outline-none focus:ring-2 focus:ring-slate-400
+                  disabled:bg-slate-300 disabled:text-slate-500
+                "
+                disabled={!deviceId}
+              >
+                Copy
+              </button>
+            </div>
+            {deviceIdCopyState === 'copied' && (
+              <p
+                data-testid="parent-settings-cloud-device-id-status"
+                data-status="copied"
+                className="mt-1 text-xs text-emerald-700"
+              >
+                Copied to clipboard.
+              </p>
+            )}
+            {deviceIdCopyState === 'error' && (
+              <p
+                data-testid="parent-settings-cloud-device-id-status"
+                data-status="error"
+                className="mt-1 text-xs text-amber-700"
+              >
+                Couldn&apos;t copy — select the text and copy manually.
+              </p>
+            )}
+          </div>
+
+          {/* Last-synced + Push now row */}
+          <div className="mt-4 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <label className="block text-xs font-medium text-slate-600">
+                Last synced
+              </label>
+              <p
+                data-testid="parent-settings-cloud-last-synced"
+                className="mt-1 text-sm text-slate-700"
+              >
+                {lastSyncedISO ?? 'Never'}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <button
+                type="button"
+                data-testid="parent-settings-cloud-push-now"
+                onClick={handlePushNow}
+                disabled={pushState === 'sending'}
+                className="
+                  rounded-md border border-slate-700 bg-slate-700 px-3 py-2
+                  text-sm font-medium text-white
+                  hover:bg-slate-800
+                  focus:outline-none focus:ring-2 focus:ring-slate-400
+                  disabled:bg-slate-300 disabled:text-slate-500
+                "
+              >
+                {pushState === 'sending' ? 'Sending…' : 'Push now'}
+              </button>
+              {pushState === 'sent' && (
+                <span
+                  data-testid="parent-settings-cloud-push-status"
+                  data-status="sent"
+                  className="text-xs text-emerald-700"
+                >
+                  Synced.
+                </span>
+              )}
+              {pushState === 'failed' && (
+                <span
+                  data-testid="parent-settings-cloud-push-status"
+                  data-status="failed"
+                  className="text-xs text-amber-700"
+                >
+                  Couldn&apos;t reach the server.
+                </span>
+              )}
+              {pushState === 'skipped' && (
+                <span
+                  data-testid="parent-settings-cloud-push-status"
+                  data-status="skipped"
+                  className="text-xs text-slate-500"
+                >
+                  Cloud sync isn&apos;t configured.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Restore-from-device-id row */}
+          <div className="mt-4">
+            <label
+              htmlFor="parent-settings-cloud-restore-input"
+              className="block text-xs font-medium text-slate-600"
+            >
+              Restore from device ID
+            </label>
+            <div className="mt-1 flex items-center gap-3">
+              <input
+                id="parent-settings-cloud-restore-input"
+                data-testid="parent-settings-cloud-restore-input"
+                type="text"
+                spellCheck={false}
+                autoComplete="off"
+                value={restoreInput}
+                onChange={(e) => {
+                  setRestoreInput(e.currentTarget.value)
+                  if (restoreState.kind === 'invalid-format') {
+                    setRestoreState({ kind: 'idle' })
+                  }
+                }}
+                placeholder="paste UUID here"
+                aria-invalid={restoreState.kind === 'invalid-format'}
+                className="
+                  flex-1 rounded-md border border-slate-300 bg-white px-3 py-2
+                  font-mono text-xs text-slate-800
+                  focus:outline-none focus:ring-2 focus:ring-slate-400
+                "
+              />
+              <button
+                type="button"
+                data-testid="parent-settings-cloud-restore-submit"
+                onClick={handleRestoreFromDeviceId}
+                disabled={
+                  restoreInput.trim().length === 0 ||
+                  restoreState.kind === 'restoring'
+                }
+                className="
+                  shrink-0 rounded-md border border-slate-700 bg-slate-700 px-3
+                  py-2 text-sm font-medium text-white
+                  hover:bg-slate-800
+                  focus:outline-none focus:ring-2 focus:ring-slate-400
+                  disabled:bg-slate-300 disabled:text-slate-500
+                "
+              >
+                {restoreState.kind === 'restoring' ? 'Restoring…' : 'Restore'}
+              </button>
+            </div>
+            {restoreState.kind === 'invalid-format' && (
+              <p
+                data-testid="parent-settings-cloud-restore-status"
+                data-status="invalid-format"
+                className="mt-1 text-xs text-amber-700"
+              >
+                That doesn&apos;t look like a device ID. Expected:
+                xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.
+              </p>
+            )}
+            {restoreState.kind === 'restored' && (
+              <p
+                data-testid="parent-settings-cloud-restore-status"
+                data-status={`restored-${restoreState.outcome.kind}`}
+                className="mt-1 text-xs text-emerald-700"
+              >
+                {restoreOutcomeMessage(restoreState.outcome)}
+              </p>
+            )}
+            {restoreState.kind === 'restore-failed' && (
+              <p
+                data-testid="parent-settings-cloud-restore-status"
+                data-status="restore-failed"
+                className="mt-1 text-xs text-amber-700"
+              >
+                Restore failed ({restoreState.reason}).
+              </p>
+            )}
+          </div>
+        </section>
       </div>
     </main>
   )
+}
+
+/**
+ * Map a `ReconcileOutcome` to a parent-readable status line for the
+ * Restore section. Internal — we don't surface every nuance, just the
+ * three meaningful end-states.
+ */
+function restoreOutcomeMessage(outcome: ReconcileOutcome): string {
+  switch (outcome.kind) {
+    case 'installed-from-cloud':
+      return "Restored Marian's progress from that device."
+    case 'pushed-to-cloud':
+      // Edge case: this device's progress was newer than the target's.
+      // Tell the parent the truth so they don't think it silently
+      // worked.
+      return "That device had older progress; this device's progress was kept."
+    case 'noop':
+      if (outcome.reason === 'no-cloud-record') {
+        return 'No progress found for that device ID.'
+      }
+      if (outcome.reason === 'no-local-blob') {
+        return "That device hasn't synced anything yet."
+      }
+      return 'Both devices have the same progress.'
+    case 'cloud-blob-rejected':
+      return "That device's backup is in an unexpected format."
+    case 'cloud-error':
+      return `Couldn't reach the server (${outcome.reason}).`
+  }
 }
 
 // ── Row components ──────────────────────────────────────────────────────

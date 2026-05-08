@@ -44,7 +44,9 @@
 import {
   applyMasteryRule,
   defaultProgress,
+  getOrCreateDeviceId,
   loadProgress,
+  pushProgressToCloud,
   saveProgress,
   type Progress,
   type SessionHistoryEntry,
@@ -181,6 +183,16 @@ export function recordProgressOnSessionEnd(
   // localStorage and no double IO.
   const promoted = applyMasteryRule(next)
   saveProgress(promoted)
+
+  // T2 cloud-sync (ticket 86c9pkfyu) — fire-and-forget POST so a future
+  // iPad-loss / app-deletion / restore-from-device-id flow can recover
+  // Marian's progress. localStorage stays the source of truth; the
+  // cloud is a backup. The call NEVER blocks the session-end choreography
+  // (the promise is intentionally not awaited) and NEVER throws — see
+  // `pushProgressToCloud`'s contract. Failures land as `console.warn`
+  // only.
+  void pushProgressToCloud(getOrCreateDeviceId(), promoted)
+
   return promoted
 }
 
