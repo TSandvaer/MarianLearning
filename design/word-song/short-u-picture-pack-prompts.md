@@ -7,18 +7,24 @@
 
 ---
 
-## 0. Scope — exactly 8 words
+## 0. Scope — exactly 11 words (Q2 locked A: full tier visual cohesion)
 
-This pack covers the **wholly-new short-u targets the upcoming short-u tier ships with no existing picture asset**:
+This pack covers **all 11 short-u targets** so they are visually cohesive within the tier (single MJ session, same model / prompts / style across every chip Marian sees on a short-u session). Q1 LOCKED A 2026-05-09 (ship 11) and Q2 LOCKED A 2026-05-09 (re-trace `sun`/`cup`/`bus` alongside the 8 wholly-new generations) per Thomas — see [`short-u-pool-expansion.md`](./short-u-pool-expansion.md) §10 Q1 and §10 Q2.
+
+**Wholly-new short-u targets (8 — no existing picture asset):**
 
 > **`bug`, `nut`, `tub`, `bun`, `jug`, `rug`, `hut`, `gum`.**
 
-The other three short-u words — `sun`, `cup`, `bus` — are promoted-from-distractor entries. They already have shipped picture-pack SVGs from PR #157 (the canonical short-a + short-o pack ship). Per `short-u-pool-expansion.md` §3 (Q2 in §10), re-tracing them for stylistic cohesion is **OPTIONAL** in v1 — defer unless Thomas finds visible style mismatch on iPad. Out-of-scope explicitly listed in §6 below.
+**Re-traces of existing distractor pictures (3 — overwrite existing PR #157 SVG files for tier cohesion):**
 
-**Total new generations needed for this pack: 8** (or 7 if Q1 in the pool spec drops `gum`).
-**Total new SVG assets after Phase 3: 8** (or 7).
+> **`sun`, `cup`, `bus`.**
 
-If Thomas opts to bundle this pack with future short-i or short-e generation in one MJ session ("50+ images one-time deal" per the dispatch brief), insert these eight into the bundle. Cross-pack visual cohesion is the goal — same `--cref` / `--sref` to short-a `dog` pose-zero across all packs.
+These three originally shipped as hand-authored short-a-pack SVGs (PR #157) when they were distractor-only entries. Now that they are short-u targets in the new tier, Thomas wants them re-generated in the same MJ session as the 8 wholly-new prompts so all 11 chips Marian taps on a short-u session share one stylization. The new prompts for `sun`, `cup`, `bus` are authored fresh in this short-u sheet's row format (§§ 2.9, 2.10, 2.11) — they reference the prior short-a-pack treatments at [`picture-pack-prompts.md`](./picture-pack-prompts.md) §§ 2.2 / 2.5 / 2.1 only as continuity signal (vocabulary cue, distinguishing features), not as binding copy. Pack cohesion within short-u takes precedence over backwards-cohesion with the prior short-a sheet.
+
+**Total generations needed for this pack: 11** (or 10 if Phase 2 fallback drops `gum` per §2.8).
+**Total SVG file changes after Phase 3: 8 new + 3 overwrites** (or 7 new + 3 overwrites under the `gum` fallback).
+
+If Thomas opts to bundle this pack with future short-i or short-e generation in one MJ session ("50+ images one-time deal" per the dispatch brief), insert these eleven into the bundle. Cross-pack visual cohesion is the goal — same `--cref` / `--sref` to short-a `dog` pose-zero across all packs.
 
 ---
 
@@ -59,9 +65,9 @@ Every generation appends:
 --cref <short-a-dog-pose-zero-url> --cw 80 --sref <short-a-dog-pose-zero-url>
 ```
 
-Use the SAME `dog` pose-zero URL Thomas captured during the short-a / short-o packs' Phase 2 sessions. Pack-wide style cohesion across the whole eventual 30+-picture corpus (22 short-a + 4 short-o-new + 4 probe + 8 short-u-new) is the goal.
+Use the SAME `dog` pose-zero URL Thomas captured during the short-a / short-o packs' Phase 2 sessions. Pack-wide style cohesion across the whole eventual 30+-picture corpus (22 short-a + 4 short-o-new + 4 probe + 8 short-u-new + 3 short-u-retraces of `sun`/`cup`/`bus` per Q2 locked A) is the goal.
 
-If the dog pose-zero URL has been lost between sessions, re-derive it per `picture-pack-iteration-plan.md` §1 BEFORE running this pack. Do not run this pack standalone — that produces an 8-picture island that won't match the eventual cross-pack corpus.
+If the dog pose-zero URL has been lost between sessions, re-derive it per `picture-pack-iteration-plan.md` §1 BEFORE running this pack. Do not run this pack standalone — that produces an 11-picture island that won't match the eventual cross-pack corpus.
 
 ### 1.4 Universal trailing parameters (append to every prompt in this pack)
 
@@ -322,22 +328,128 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
   - Filename: `public/assets/pictures/picture-gum.svg` via `yarn embed-pictures`.
   - Source PNG: ≥1024×1024 → transparent ~512×512 via remove.bg.
   - Final SVG file size: target **~40–80 KB**.
-- **Notes:** **Conditional on Q1.** The mass-noun risk is the picture-side concern: a wrapped-package render gives us a stable noun-form (_a piece of gum_) the way `jam` got from jam-in-a-jar. If Phase 2 review shows the package-shape reads as "candy bar" or "stick of butter" rather than "gum", regenerate with the half-unwrap detail to anchor the read. If multiple iterations fail to land, fall back to dropping the word from the pool (Q1 path B).
+- **Notes:** **Q1 LOCKED A — `gum` ships in v1.** The mass-noun risk is the picture-side concern: a wrapped-package render gives us a stable noun-form (_a piece of gum_) the way `jam` got from jam-in-a-jar. If Phase 2 review shows the package-shape reads as "candy bar" or "stick of butter" rather than "gum", regenerate with the half-unwrap detail to anchor the read. If multiple iterations fail to land, the documented Phase 2 fallback is to drop the word from the pool (10-word fallback per [`short-u-pool-expansion.md`](./short-u-pool-expansion.md) §10 Q1).
+
+---
+
+### 2.9 `sun` — celestial — `/ʌn/` rhyme family — RE-TRACE (Q2 locked A)
+
+> **Re-trace of an existing distractor picture.** The current `public/assets/pictures/picture-sun.svg` is a hand-authored SVG from PR #157. This row authors a fresh prompt in the short-u sheet style so the new MJ generation overwrites the existing file via `yarn embed-pictures` for tier visual cohesion. Prior short-a-pack treatment at [`picture-pack-prompts.md`](./picture-pack-prompts.md) §2.2 is reference-only; this prompt is the binding copy.
+
+- **Vocabulary cue:** A round disc with simple radiating triangular rays, soft warm yellow with a slight rose tint. The radiating-rays-around-a-disc silhouette carries "sun" recognition.
+- **Distinctness check:**
+  - **vs. `bun` (pack neighbour, food):** `sun` has **radiating rays** outside the disc; `bun` is a **closed round shape with a horizontal score-mark on top**. Different silhouettes. **No risk.**
+  - **vs. `nut` (pack neighbour, food):** `sun` is **round with rays**; `nut` is **oval with vertical seam**. **No risk.**
+  - **vs. `bug` (pack neighbour, animal):** `sun` is **non-living disc with rays**; `bug` is **insect with legs and antennae**. **No risk.**
+  - **vs. cream background:** the sun must contrast cleanly against the soft cream `#FFF6EE` background. Push the disc + rays toward warm-yellow (`#F4D89B`) with a slight rose tint at the rim so it doesn't disappear into the cream when transparent-keyed.
+  - **No FORBIDDEN_PAIR entry needed.**
+- **Full prompt:**
+
+> Single subject, centered, square 1:1 composition. A child-friendly illustrated **simple sun, viewed front-on, a round disc center with simple radiating triangular rays (8-12 rays evenly distributed around the disc, each ray a clean triangular shape pointing outward), the disc body in a soft warm yellow (#F4D89B family) with a gentle rose-tinted edge from cel-shading where the disc meets the rays, the rays in the same warm yellow as the disc with the same gentle cel-shading, a soft warm-cream highlight on the upper-left where imaginary upper-left light catches the disc, NO face on the sun, NO eyes, NO mouth, NO smile — pure abstract sun shape with friendliness conveyed via warmth and rounded ray-tips alone, NO clouds, NO sky, NO horizon, NO sun-rays-of-light effect, just a clean simple sun shape on its own** in the style of modern slice-of-life Korean manhwa / webtoon children's book illustration. Clean digital line art with soft pastel color fills, line weight roughly 2 pixels at 1024×1024 render, gentle cel-shading with a single soft shadow companion per color zone. Palette: warm pastels with warm-yellow disc and rose-tinted edge. Background: solid soft cream (#FFF6EE) — flat, mask-friendly, no environment, no scene, no shadow drop. **The sun must contrast cleanly against the cream background — push the disc warmth to a warm-yellow that reads against cream.** Single subject only — no other figures, no text. Friendly tone, rounded forms. Tonal sibling: Studio Ghibli's calm-observant-kind warmth. **The sun is a SIMPLE DISC WITH 8-12 RADIATING TRIANGULAR RAYS — the rays are the load-bearing recognition cue. NO smiling face on the sun, NO eyes — pure shape, no anthropomorphism. Same rule as the rest of the pack: friendliness comes from warmth + roundness, not from faces.** Drawn for a children's vocabulary book.
+
+- **Negatives / what to avoid:**
+  - Smiling face on the sun (anthropomorphism — known children's-book attractor for sun).
+  - Sun with eyes / eyebrows / mouth / blush.
+  - Sun behind clouds (introduces second visual element).
+  - Sunset with horizon line (reads as "sky" or "scene", not "sun" object).
+  - Sunburst with photographic light-rays / lens flare (rendering complexity + anti-photographic rule).
+  - Saturated primary yellow + saturated red tips (palette stays warm-pastel).
+  - Sun-as-character with arms and legs.
+  - Sun-with-sunglasses.
+  - Multiple suns / double-sun composition.
+  - Crescent / partial sun (reads as "moon").
+- **Asset spec output (Phase 3):**
+  - Filename: `public/assets/pictures/picture-sun.svg` via `yarn embed-pictures` — **OVERWRITES** the existing PR #157 file.
+  - Source PNG: ≥1024×1024 from MJ; transparent-PNG export at ~512×512 via remove.bg "Regular" output size.
+  - Final SVG file size: target **~40–80 KB** (geometric simplicity compresses cleanly).
+- **Notes:** The cream-on-cream contrast risk is the load-bearing concern for this re-trace. The sun-disc must be warm-yellow enough to read against `#FFF6EE` cream once the background is keyed transparent. If Phase 2 Midjourney drifts toward pale-cream sun, regenerate with the disc warmth pushed. The no-face rule is locked across the whole pack (per §1.1 + §1.4 + the prior short-a-pack `sun` treatment) — friendly shape, no anthropomorphism.
+
+---
+
+### 2.10 `cup` — vessel — `/ʌp/` rhyme family — RE-TRACE (Q2 locked A)
+
+> **Re-trace of an existing distractor picture.** The current `public/assets/pictures/picture-cup.svg` is a hand-authored SVG from PR #157. This row authors a fresh prompt in the short-u sheet style so the new MJ generation overwrites the existing file via `yarn embed-pictures`. Prior short-a-pack treatment at [`picture-pack-prompts.md`](./picture-pack-prompts.md) §2.5 is reference-only; this prompt is the binding copy. **Pair-review against `tub` at 96pt is mandatory** — Q3 LOCKED FORBIDDEN_PAIR `[tub, cup]` per pool spec §10 Q3.
+
+- **Vocabulary cue:** A simple mug or teacup with a single curved handle, viewed three-quarter so the open-top + body + handle are all visible. The handle-plus-open-top-on-flat-base silhouette carries "cup" recognition vs. tub/jug.
+- **Distinctness check (load-bearing):**
+  - **vs. `tub` (pack neighbour, vessel, FORBIDDEN_PAIR):** `cup` is **small + handled + flat base + smaller open-top**; `tub` is **large + footed + NO handle + larger open-top**. **Two discriminators must BOTH land:** (1) flat base vs. four small feet; (2) handle vs. no handle. **Both discriminators must be visible at 96pt — pair-review at chip size with `tub` is mandatory** (Q3 LOCKED FORBIDDEN_PAIR `[tub, cup]`).
+  - **vs. `jug` (pack neighbour, vessel):** `cup` is **smaller + NO spout + walls go straight up**; `jug` is **larger + has a SPOUT + belly-curves outward**. The spout on jug is the load-bearing discriminator on the jug side. On the cup side, keep the cup walls clean-vertical / no spout / smaller in proportion. **Low-to-moderate risk** at 96pt.
+  - **vs. `can` (canonical short-a target — same shape class):** `cup` has **handle + open top**; `can` has **flat ring-pull top + NO handle**. Cross-vowel rule keeps them apart in trios. Low risk with same-vowel constraint.
+  - **vs. `pot` (short-o target):** `cup` is **single curved handle + smaller**; `pot` is **two side handles + deeper cylinder**. Cross-vowel rule keeps them apart. Low risk.
+- **Full prompt:**
+
+> Single subject, centered, square 1:1 composition. A child-friendly illustrated **simple mug or teacup, viewed in three-quarter perspective so the curved body and the open-top oval and the curved handle are all visible, the body is a simple cylinder shape with walls that go essentially straight up (NOT bellied-outward like a jug, NOT spouted), a single curved handle attached to the right side of the body (top and bottom of the handle attach to the body — a clean simple loop), the open-top of the cup clearly visible as a darker-shaded oval at the rim showing the inside of the cup is empty (no contents, no steam, no liquid), the cup sits on a FLAT BASE (NOT footed like a tub — this is the load-bearing discriminator vs. tub), soft warm-cream or soft warm-rose body color with a slightly darker contour and a soft cel-shadow on the right side, the cup is small in proportion (clearly smaller than a tub or jug — chip-sized vessel for one drink), NO printed pattern on the cup body, NO logo, NO text, NO floral motif, just a clean simple cup or mug shape on its own** in the style of modern slice-of-life Korean manhwa / webtoon children's book illustration. Clean digital line art with soft pastel color fills, line weight roughly 2 pixels at 1024×1024 render, gentle cel-shading with a single soft shadow companion per color zone. Palette: warm pastels. Background: solid soft cream (#FFF6EE) — flat, mask-friendly, no environment, no scene, no shadow drop. Single subject only — no other figures, no text. Friendly tone, rounded forms. Tonal sibling: Studio Ghibli's calm-observant-kind warmth. **The cup is a SMALL HANDLED VESSEL with an OPEN TOP and a FLAT BASE — handle + flat-base together carry "cup" recognition and distinguish it from a tub (footed + no handle) and a jug (spouted + larger). The walls go essentially straight up — NO outward belly-curve, NO pour-spout. NO smiling face on the cup, NO eyes — pure object render.** Drawn for a children's vocabulary book.
+
+- **Negatives / what to avoid:**
+  - Footed cup (collapses the discriminator from `tub`).
+  - Cup with a spout (collapses the discriminator from `jug` — and reads as a jug or pitcher).
+  - Steam rising from the cup (introduces second visual element).
+  - Liquid inside the cup (introduces second visual element).
+  - Saucer under the cup (introduces second subject).
+  - Two-handled cup (reads as "trophy" or generic vessel).
+  - Lid on the cup (reads as "travel mug").
+  - Tea bag string hanging out (introduces second visual element + brand-association).
+  - Decorative pattern / floral motif on the body (visual noise at 96pt).
+  - Anthropomorphised cup with a face on the body.
+  - Saturated primary red or saturated yellow (palette stays warm-pastel).
+- **Asset spec output (Phase 3):**
+  - Filename: `public/assets/pictures/picture-cup.svg` via `yarn embed-pictures` — **OVERWRITES** the existing PR #157 file.
+  - Source PNG: ≥1024×1024 from MJ; transparent-PNG export at ~512×512 via remove.bg "Regular" output size.
+  - Final SVG file size: target **~40–80 KB**.
+- **Notes:** **Phase 2 review at chip size paired with `tub` is mandatory** per pool spec §10 Q3. Generate `cup` AFTER `tub` so the pair can be A/B-reviewed at 96pt to confirm the flat-base vs. footed + handle vs. no-handle discriminators both hold. If at 96pt the `tub`/`cup` discrimination collapses (e.g. because `tub`'s feet read as a single grey blur or because `cup`'s handle compresses to a side-bump), regenerate the weaker side with the load-bearing feature exaggerated. The `[tub, cup]` FORBIDDEN_PAIR is locked in `wordPack.ts` regardless of how cleanly the discriminators land — see §3 of pool spec.
+
+---
+
+### 2.11 `bus` — vehicle — `/ʌs/` rhyme family — RE-TRACE (Q2 locked A)
+
+> **Re-trace of an existing distractor picture.** The current `public/assets/pictures/picture-bus.svg` is a hand-authored SVG from PR #157. This row authors a fresh prompt in the short-u sheet style so the new MJ generation overwrites the existing file via `yarn embed-pictures`. Prior short-a-pack treatment at [`picture-pack-prompts.md`](./picture-pack-prompts.md) §2.1 is reference-only; this prompt is the binding copy.
+
+- **Vocabulary cue:** A long vehicle viewed three-quarter front-side, with multiple windows along the side, a distinctive bus-front (two headlights, a destination panel area but no text), and at least two visible wheels. The length-plus-multi-window-count silhouette carries "bus" recognition vs. van.
+- **Distinctness check:**
+  - **vs. `van` (canonical short-a target — `[bus, van]` is an existing FORBIDDEN_PAIR):** `bus` is **longer + has 3+ windows along the side + distinctive bus-front (two headlights, large windshield)**; `van` is **shorter + has 2 windows + smaller more rounded car-like front**. The length + window-count are the load-bearing discriminators. Same-vowel-only rule keeps them apart in trios + the existing `[bus, van]` FORBIDDEN_PAIR is the cross-pack guard. **Low risk** with same-vowel constraint, but cross-pack visual hygiene matters.
+  - **vs. `pan` (canonical short-a target):** Different categories entirely (vehicle vs. cookware). **No risk.**
+  - **vs. `cup` (pack neighbour):** Different categories. **No risk.**
+  - **No NEW FORBIDDEN_PAIR entry needed** (existing `[bus, van]` already covers the cross-pack guard).
+- **Full prompt:**
+
+> Single subject, centered, square 1:1 composition. A child-friendly illustrated **simple school bus or city bus, viewed in three-quarter front-side perspective so both the front face and one side face are visible, the vehicle is LONG (long enough that at least 3 side windows are visible — this is the load-bearing length discriminator vs. a van which has only 2 windows), a distinctive flat or gently-rounded BUS FRONT with two simple round front headlights and a large simple front windshield (NO driver figure visible inside, NO interior detail, the windshield reads as a clean dark-tinted shape), at least 2 visible wheels (one front and one back showing through the three-quarter angle), the body color in soft desaturated warm-cream-yellow (#F4D89B family — a school-bus yellow but desaturated to stay in the warm-pastel palette) with a slightly darker contour and a soft cel-shadow on the right side, simple wheel-fender curves visible above each wheel, NO logos, NO printed text, NO route number, NO destination text on the front panel, NO advertising panels on the side, NO bus stop, NO road, NO trees, NO scene around the bus, just a clean simple bus shape on its own** in the style of modern slice-of-life Korean manhwa / webtoon children's book illustration. Clean digital line art with soft pastel color fills, line weight roughly 2 pixels at 1024×1024 render, gentle cel-shading with a single soft shadow companion per color zone. Palette: warm pastels with desaturated warm-cream-yellow body. Background: solid soft cream (#FFF6EE) — flat, mask-friendly, no environment, no scene, no shadow drop. Single subject only — no other figures, no text. Friendly tone, rounded forms. Tonal sibling: Studio Ghibli's calm-observant-kind warmth. **The bus is a LONG VEHICLE with 3+ SIDE WINDOWS and a DISTINCTIVE BUS FRONT — these together carry "bus" recognition and distinguish it from a van (shorter, 2 windows, car-like front). The desaturated warm-cream-yellow body keeps the palette family — pure school-bus yellow is too saturated. NO smiling face on the bus, NO anthropomorphisation, NO eyes for headlights, NO mouth for grille — pure vehicle render (per the pack-wide "no anthropomorphised vehicle" negation).** Drawn for a children's vocabulary book.
+
+- **Negatives / what to avoid:**
+  - Anthropomorphised bus with eyes-for-headlights and mouth-for-grille (known children's-book attractor — pure vehicle only).
+  - Short bus (collapses the length discriminator from `van`).
+  - Only 2 windows visible (collapses the window-count discriminator from `van`).
+  - Bus stop / road / sidewalk in frame (introduces scene).
+  - Trees, sky, mountains, buildings (strip all environment).
+  - Driver visible through windshield (introduces second subject).
+  - Children visible inside the bus through windows (introduces second subjects).
+  - Logos / text / route numbers / destination text on the front panel (anti-text rule).
+  - Saturated primary yellow + saturated black trim (palette stays warm-pastel).
+  - Double-decker bus (reads as "double-decker", not generic bus).
+  - 3D photo-realistic render with chrome and reflections.
+  - Smoke from exhaust pipe.
+- **Asset spec output (Phase 3):**
+  - Filename: `public/assets/pictures/picture-bus.svg` via `yarn embed-pictures` — **OVERWRITES** the existing PR #157 file.
+  - Source PNG: ≥1024×1024 from MJ; transparent-PNG export at ~512×512 via remove.bg "Regular" output size.
+  - Final SVG file size: target **~50–100 KB**.
+- **Notes:** Pair-review against the existing `picture-van.svg` from PR #157 at 96pt — even though `[bus, van]` are already a FORBIDDEN_PAIR (so they never trio together) and same-vowel-only rule keeps them apart in trios anyway, the cross-pack visual hygiene matters because Marian sees both pictures across her sessions. The length + window-count discriminators must hold. If MJ drifts toward a stubbier-front van-shape, regenerate with the bus length emphasised.
 
 ---
 
 ## 3. Quick reference — pack index
 
-| #   | Word | Type                                | Pack neighbour requiring discrimination                                        | Picture-side discriminator                                      |
-| --- | ---- | ----------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------- |
-| 1   | bug  | new short-u target                  | `cat`/`rat`/`fox`/`dog` (all animals)                                          | insect (6 legs + antennae) vs. mammal (4 legs)                  |
-| 2   | nut  | new short-u target                  | `bun` (pack-neighbour food)                                                    | oval + vertical seam vs. round + horizontal score               |
-| 3   | tub  | new short-u target                  | **`cup` (pool spec §10 Q3 — FORBIDDEN_PAIR conditional)**, `pot` (cross-vowel) | feet + no handle + larger vs. handle + flat base + smaller      |
-| 4   | bun  | new short-u target                  | `nut` (pack-neighbour food)                                                    | round + horizontal score vs. oval + vertical seam               |
-| 5   | jug  | new short-u target                  | `cup` (pack-neighbour vessel)                                                  | spout (load-bearing) + larger body vs. no spout + smaller       |
-| 6   | rug  | new short-u target                  | **`mat` (cross-vowel — FORBIDDEN_PAIR added)**                                 | fringe + pattern vs. plain hemmed edges                         |
-| 7   | hut  | new short-u target                  | `hat` (cross-vowel — similar triangular silhouette)                            | door + walls (dwelling-scale) vs. brim + crown (wearable-scale) |
-| 8   | gum  | new short-u target (conditional Q1) | none in-pack; `tag` (cross-vowel — both small flat objects)                    | wrapped package (no string) vs. paper-card with string-loop     |
+| #   | Word | Type                                                | Pack neighbour requiring discrimination                                      | Picture-side discriminator                                      |
+| --- | ---- | --------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1   | bug  | new short-u target                                  | `cat`/`rat`/`fox`/`dog` (all animals)                                        | insect (6 legs + antennae) vs. mammal (4 legs)                  |
+| 2   | nut  | new short-u target                                  | `bun` (pack-neighbour food)                                                  | oval + vertical seam vs. round + horizontal score               |
+| 3   | tub  | new short-u target                                  | **`cup` (pool spec §10 Q3 — FORBIDDEN_PAIR LOCKED)**, `pot` (cross-vowel)    | feet + no handle + larger vs. handle + flat base + smaller      |
+| 4   | bun  | new short-u target                                  | `nut` (pack-neighbour food)                                                  | round + horizontal score vs. oval + vertical seam               |
+| 5   | jug  | new short-u target                                  | `cup` (pack-neighbour vessel)                                                | spout (load-bearing) + larger body vs. no spout + smaller       |
+| 6   | rug  | new short-u target                                  | **`mat` (cross-vowel — FORBIDDEN_PAIR added)**                               | fringe + pattern vs. plain hemmed edges                         |
+| 7   | hut  | new short-u target                                  | `hat` (cross-vowel — similar triangular silhouette)                          | door + walls (dwelling-scale) vs. brim + crown (wearable-scale) |
+| 8   | gum  | new short-u target (Q1 locked A — Phase 2 fallback) | none in-pack; `tag` (cross-vowel — both small flat objects)                  | wrapped package (no string) vs. paper-card with string-loop     |
+| 9   | sun  | re-trace short-u target (Q2 locked A)               | cream background (low-contrast risk); `bun` (pack neighbour, both round)     | radiating rays around disc vs. closed round shape with score    |
+| 10  | cup  | re-trace short-u target (Q2 locked A)               | **`tub` (pool spec §10 Q3 — FORBIDDEN_PAIR LOCKED)**, `jug` (pack neighbour) | handle + flat base + smaller vs. footed + no handle + larger    |
+| 11  | bus  | re-trace short-u target (Q2 locked A)               | `van` (cross-vowel — existing FORBIDDEN_PAIR `[bus, van]` already in pack)   | length + 3+ windows + bus-front vs. shorter + 2 windows         |
 
 **Highest-distinctness-risk pair in this pack: `tub` ↔ `cup`.** Both are vessels. The footed-large-no-handle vs. handled-small-flat-base split is what makes them readable as different words at 96pt. Phase 2 review at chip size is mandatory for this pair before acceptance — see pool spec §10 Q3.
 
@@ -347,20 +459,27 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
 
 ---
 
-## 4. Generation order recommendation
+## 4. Generation order recommendation (Q2 locked A — reflects 11-prompt pack with retraces)
 
-Per `picture-pack-iteration-plan.md` §3 — same surface-the-hardest-cases-early principle:
+Per `picture-pack-iteration-plan.md` §3 — same surface-the-hardest-cases-early principle, plus a Q2-locked-A constraint: **the pair-review reference for `tub` and `jug` is the NEW `cup`, not the existing PR #157 `cup` asset** (which is being overwritten in this same MJ session per Q2 locked A). That changes the order — `cup` must be generated alongside `tub` and `jug` so the pair-review can happen against the new style, not against an asset that's about to be replaced.
 
-1. **`tub`** first — highest risk (silhouette discriminator vs. `cup` per Q3 in pool spec). Generate alongside the existing PR #157 `cup` asset for side-by-side review at 96pt.
-2. **`jug`** second — second-highest risk (spout discriminator vs. `cup`). Same A/B-review setup as `tub`.
-3. **`rug`** third — third-highest risk (fringe + pattern discriminator vs. `mat`). Generate alongside the existing PR #157 `mat` asset for side-by-side review.
-4. **`hut`** fourth — moderate risk (door discriminator vs. `hat`). Generate alongside the existing PR #157 `hat` asset for review.
-5. **`bug`** fifth — animal-archetype, low-to-moderate risk. The antennae are load-bearing; verify they survive at 96pt.
-6. **`bun`** sixth — geometric food, low risk; lock the score-mark feature.
-7. **`nut`** seventh — geometric food, low risk; lock the seam-line feature.
-8. **`gum`** last (or skip if Q1 path B) — borderline picture-stability; iterate if needed and don't block the pack on it.
+**Rationale for retrace placement:** Thomas's Q2 LOCK A is "single MJ session, all 11 chips share one stylization." That means the retrace targets (`sun`, `cup`, `bus`) must enter the queue early enough to A/B-pair-review them against their pack neighbours — `cup` against `tub`/`jug` for the FORBIDDEN_PAIR + spout discriminator, `bus` against the existing `van` asset for the cross-pack length discriminator, `sun` last among the retraces because it's lowest risk (no in-pack pair-review concerns). The original 8-prompt order (tub/jug/rug/hut first, then bun/nut/gum, with bug somewhere in the middle) stays — what changes is `cup` slots in alongside `tub`+`jug` early, and `bus`+`sun` slot in late.
 
-**If Thomas bundles this pack with future short-i + short-e generation in one MJ session** ("50+ images one-time deal" per the dispatch brief), the per-pack tier ordering still applies — within the short-u block, run tub/jug/rug/hut first so pair-review at chip size can happen before drifting to other vowels.
+**Order:**
+
+1. **`tub`** first — highest risk (silhouette discriminator vs. `cup` per Q3 LOCKED FORBIDDEN_PAIR). Generated as the first member of the load-bearing tub/cup/jug pair-review trio.
+2. **`cup`** second (RETRACE — Q2 locked A) — generated immediately after `tub` so the new-style `tub`/`cup` pair can be A/B'd at 96pt. This is the load-bearing pair-review for the Q3 LOCKED FORBIDDEN_PAIR `[tub, cup]`. Pair-review against the existing PR #157 `cup` is no longer the right reference — Thomas's Q2 LOCK A overwrites that asset, so the new `cup` is the binding reference for `tub`'s discriminator gate.
+3. **`jug`** third — second-highest risk (spout discriminator vs. `cup`). Pair-review against the new-style `cup` from step 2.
+4. **`rug`** fourth — third-highest risk (fringe + pattern discriminator vs. `mat`). Pair-review against the existing PR #157 `mat` asset (cross-vowel — `mat` is short-a, NOT being retraced in this pack).
+5. **`hut`** fifth — moderate risk (door discriminator vs. `hat`). Pair-review against the existing PR #157 `hat` asset (cross-vowel — `hat` is short-a, NOT being retraced in this pack).
+6. **`bug`** sixth — animal-archetype, low-to-moderate risk. The antennae are load-bearing; verify they survive at 96pt.
+7. **`bun`** seventh — geometric food, low risk; lock the score-mark feature.
+8. **`nut`** eighth — geometric food, low risk; lock the seam-line feature.
+9. **`bus`** ninth (RETRACE — Q2 locked A) — pair-review against the existing PR #157 `van` asset for the length + window-count discriminator (cross-vowel — `van` is short-a, NOT being retraced). The existing `[bus, van]` FORBIDDEN_PAIR + same-vowel-only rule mean trio collisions are already prevented; this is cross-pack visual hygiene.
+10. **`sun`** tenth (RETRACE — Q2 locked A) — lowest-risk retrace; no pack neighbour requires pair-review. Watch the cream-on-cream contrast risk — push the disc warmth so the sun reads against the cream background once transparent-keyed.
+11. **`gum`** last — borderline picture-stability; iterate if needed and don't block the pack on it. If Phase 2 fallback drops `gum` per pool spec §10 Q1, this row drops without affecting the other 10.
+
+**If Thomas bundles this pack with future short-i + short-e generation in one MJ session** ("50+ images one-time deal" per the dispatch brief), the per-pack tier ordering still applies — within the short-u block, run tub/cup/jug/rug/hut first so pair-review at chip size can happen before drifting to other vowels. The retrace targets (`sun, cup, bus`) belong inside the short-u block, NOT scheduled into the future short-i / short-e blocks — they are short-u targets and the pack-cohesion guarantee Q2 LOCK A buys depends on them generating in the same model run as the other 8 short-u prompts.
 
 ---
 
@@ -374,7 +493,7 @@ Each generation in this pack must pass ALL of these gates before Thomas accepts 
 - [ ] Style preamble honored: line weight ~2 px at 1024×1024, palette warm-pastel, line color warm-dark-brown not pure black, background solid soft cream flat.
 - [ ] Subject fills 60-75% of frame, centered, single subject only.
 - [ ] No text, no watermark, no signature, no logo, no UI overlay anywhere in the image.
-- [ ] No anthropomorphism (`bug` is a friendly insect with simple eyes per the style spec, NOT a smiling cartoon-face anthropomorphised version; `tub`/`jug`/`bun`/`nut`/`rug`/`hut`/`gum` are pure objects with no faces).
+- [ ] No anthropomorphism (`bug` is a friendly insect with simple eyes per the style spec, NOT a smiling cartoon-face anthropomorphised version; `tub`/`jug`/`bun`/`nut`/`rug`/`hut`/`gum`/`cup`/`bus` are pure objects with no faces; `sun` is a pure shape with no face — no eyes, no smile, no anthropomorphism on any retrace either).
 - [ ] Visual cohesion with the locked short-a pose-zero (typically `dog`) — line weight, palette, shading style match.
 - [ ] No weapons, blades, sharp objects (defensive — `cut` was rejected partly for weapon-imagery risk).
 
@@ -388,12 +507,15 @@ Each generation in this pack must pass ALL of these gates before Thomas accepts 
 - [ ] **`rug`:** **VISIBLE FRINGE on both short ends** + simple geometric pattern on the surface. **At 96pt side-by-side with `mat`, the fringe-vs-plain-edge discriminator is readable.** Pattern simple, not busy.
 - [ ] **`hut`:** **Clear DOOR on the front face** + roof + walls. **At 96pt side-by-side with `hat`, the door + walls vs. brim + crown discrimination is readable.** No environmental scene.
 - [ ] **`gum`:** Wrapped rectangular package shape clearly visible (3:1 proportions); cannot be mistaken for a candy bar or a stick of butter. Optional half-unwrap detail shows gum content.
+- [ ] **`sun` (RETRACE):** Round disc with 8-12 radiating triangular rays; warm-yellow disc reads cleanly against `#FFF6EE` cream background once transparent-keyed (no cream-on-cream collapse); NO face, NO eyes, NO smile.
+- [ ] **`cup` (RETRACE):** Single curved handle visible + open-top oval visible + flat base (NOT footed). **At 96pt side-by-side with the new `tub` from this pack, the handle vs. no-handle and flat-base vs. footed discriminators both hold (Q3 LOCKED FORBIDDEN_PAIR `[tub, cup]`).** No spout. No steam, no contents.
+- [ ] **`bus` (RETRACE):** Long vehicle silhouette with 3+ side windows + distinctive bus-front (two headlights + large windshield) + at least 2 visible wheels. **At 96pt side-by-side with the existing `picture-van.svg` from PR #157, the length + window-count discriminators are readable.** Desaturated warm-cream-yellow body, NOT saturated school-bus yellow. NO logos, NO destination text, NO anthropomorphisation.
 
 ### 5.3 "Regenerate" triggers
 
 If any of the following appear, regenerate (do not proceed to embed):
 
-- Anthropomorphised object (smiling face on tub/jug/rug/hut/bun/nut/gum, eyes on the side).
+- Anthropomorphised object (smiling face on tub/jug/rug/hut/bun/nut/gum/cup/bus, eyes on the side; sun-with-face).
 - `bug` with 8 legs (spider) or no antennae (generic blob).
 - `tub` with no feet (collapses cup-discrimination) or with a handle (collapses cup-discrimination).
 - `jug` with no spout (collapses cup-discrimination).
@@ -407,20 +529,22 @@ If any of the following appear, regenerate (do not proceed to embed):
 - Text on any subject.
 - Multiple subjects (e.g. multiple bugs, basket of buns, pile of nuts, rug-with-pet).
 - Weapons / blades / sharp objects in the frame (defensive).
+- `sun` that disappears against the cream background once transparent-keyed (push disc warmth toward warm-yellow).
+- `cup` that's footed (collapses tub-discrimination) or has a spout (collapses jug-discrimination).
+- `bus` that's too short (collapses van-discrimination) or has only 2 side windows (collapses van-discrimination) or has eyes-for-headlights (anthropomorphisation).
 
 ---
 
 ## 6. Out of scope
 
-- **The 3 promoted-from-distractor short-u words** (`sun`, `cup`, `bus`) — already shipped as picture-pack SVGs from PR #157. Their re-trace for stylistic cohesion is **OPTIONAL in v1 (pool spec §10 Q2)** and a separate generation set if Thomas opts in. Do not regenerate them under this pack's primary scope.
+- **The 3 promoted-from-distractor short-u words** (`sun`, `cup`, `bus`) are **IN SCOPE** for this pack (Q2 LOCKED A 2026-05-09 by Thomas — see [`short-u-pool-expansion.md`](./short-u-pool-expansion.md) §10 Q2). They are authored as §§ 2.9, 2.10, 2.11 of this prompt sheet and overwrite the existing PR #157 SVG files via `yarn embed-pictures` in Phase 3. Pack-cohesion within the short-u tier is the rationale.
 - **Short-i and short-e picture packs** — separate per-vowel packs when those tiers scope. Per `design/word-song/README.md` §Future work + the README skeleton.
 - **Phase 2 generation itself** — this is a Phase 1 prompt sheet. Thomas runs MJ in Phase 2 (per `user_midjourney_web` — MJ Web UI workflow with prompt-box paste + drag-drop upload, not Discord slash-commands).
 - **Phase 3 PNG-embed integration** — Devon owns this PR via `yarn embed-pictures` (per `.claude/docs/skill-trees-and-content.md` §"Tooling for path 2"). The script wraps each transparent PNG into the canonical `<svg><image href="data:image/png;base64,...">` format. No code changes in this prompt-sheet PR.
 - **Code changes to `wordPack.ts`, `wordPictures.tsx`, or canon files** — Kevin's downstream impl ticket. The pool spec §9 ACs cover those.
 - **Cross-vowel distractor mixing** — out of v1 per pool spec §8 + short-o §8. Tracked as ticket `86c9m3aek`.
-- **Adding `[tub, cup]` FORBIDDEN_PAIR before Phase 2 review** — recommendation in pool spec §10 Q3 is "add now defensively"; if Thomas picks Q3 path B, deferred to Phase 2. Not in this prompt sheet's scope to lock either way.
-- **Re-naming any existing `picture-{word}.svg` files** — out of scope (no renames needed for this pack; the pattern is already canonical post-PR #157).
-- **`gum` if Q1 in pool spec drops it** — entry §2.8 is conditional on Q1 keep-gum decision.
+- **Re-naming any existing `picture-{word}.svg` files** — out of scope (no renames needed for this pack; the 3 retraces overwrite at the same path; the 8 wholly-new files use the canonical `picture-{word}.svg` naming convention).
+- **`gum` Phase 2 fallback** — entry §2.8 documents the regenerate-then-drop trigger if 96pt review can't land the wrapped-stick read. Q1 LOCKED A says ship 11; the 10-word fallback is a Phase 2 contingency, not a Phase 1 scope question.
 
 ---
 
@@ -430,8 +554,9 @@ If any of the following appear, regenerate (do not proceed to embed):
 - **Style preamble + universal parameters + locked attributes:** `design/word-song/picture-pack-style-anchor.md` §2 + §3.
 - **Workflow + drift table + escalation ladder:** `design/word-song/picture-pack-iteration-plan.md` §3 + §5 + §6.
 - **Per-row prompt structure inheritance:** `design/word-song/short-o-picture-pack-prompts.md` (sibling MJ prompt sheet) — this pack mirrors that file's row format.
-- **Word-list lock:** `design/word-song/short-u-pool-expansion.md` §1 final pool of 11 short-u target words. The 8 wholly-new words covered here are `bug, nut, tub, bun, jug, rug, hut, gum`.
-- **Q1/Q2/Q3/Q4 lock:** pool spec §10 — Q1 drives whether `gum` ships in §2.8; Q2 drives whether `sun/cup/bus` are re-traced (out of scope here either way); Q3 drives whether `[tub, cup]` is FORBIDDEN_PAIR (relevant to §2.3 acceptance criteria).
+- **Word-list lock:** `design/word-song/short-u-pool-expansion.md` §1 final pool of 11 short-u target words. The 8 wholly-new words covered here are `bug, nut, tub, bun, jug, rug, hut, gum`; the 3 retraces (Q2 LOCKED A) are `sun, cup, bus`.
+- **Q1/Q2/Q3/Q4 lock:** pool spec §10 — Q1 LOCKED A 2026-05-09 (ship 11, including `gum`; Phase 2 fallback to 10 documented in §2.8); Q2 LOCKED A 2026-05-09 (re-trace `sun, cup, bus` alongside the 8 wholly-new generations — drives §§ 2.9–2.11 of this sheet); Q3 LOCKED A 2026-05-08 (`[tub, cup]` FORBIDDEN_PAIR added — drives §2.3 acceptance + §2.10 cup pair-review gate); Q4 LOCKED A 2026-05-08 (same-vowel-only distractor pool — drives matrix preview in pool spec §2).
+- **Prior short-a-pack reference (continuity-only, NOT binding):** `design/word-song/picture-pack-prompts.md` §2.1 (`bus`), §2.2 (`sun`), §2.5 (`cup`) — the original treatments are reference-only signal for vocabulary cue and distinguishing features. The short-u sheet's §§ 2.9–2.11 are the binding prompts; pack cohesion within short-u takes precedence over backwards-cohesion with the prior short-a sheet.
 - **Phase 3 path locked to Path 2 (PNG-embed):** `.claude/docs/skill-trees-and-content.md` §"Three viable Phase 3 paths" + Thomas's "50+ images one-time deal" preference per the dispatch brief.
 - **PWA cache budget:** `reference_pwa_asset_size_limits` memory — 4 MiB cache cap; ~50–150 KB per SVG fits comfortably for the cumulative picture-pack budget.
 - **MJ Web UI workflow:** `user_midjourney_web` memory — Thomas operates MJ via Web UI (prompt-box + drag-drop upload), not Discord slash-commands. Prompt sheet copy is paste-ready for the Web UI's prompt input.
