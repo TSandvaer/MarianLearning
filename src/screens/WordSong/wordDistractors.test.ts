@@ -140,8 +140,11 @@ describe('pickDistractors', () => {
 
   it('throws for a target word that is not in the pairings matrix', () => {
     // Distractor-only word as target — should fail because TARGET_PAIRINGS
-    // only has entries for the 14 target words.
-    const fakeTarget = getWordEntry('bus') // distractor-only
+    // only has entries for the target-flagged words. After the short-u
+    // pool promotion (ticket 86c9q9ben) flipped `sun, cup, bus` to
+    // `isTarget: true`, the only remaining distractor-only entry is
+    // `pen` — that's our negative case here.
+    const fakeTarget = getWordEntry('pen') // distractor-only
     expect(() => pickDistractors(fakeTarget, 1)).toThrow(
       /no pairing matrix entry/,
     )
@@ -218,11 +221,13 @@ describe('pickDistractors — defensive assertions (matrix-drift guards)', () =>
 })
 
 describe('FORBIDDEN_PAIRS', () => {
-  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o additions (ticket 86c9m3ae3)", () => {
+  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u additions (tickets 86c9m3ae3 / 86c9q9ben)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
     // implementation hand-off note + design/word-song/short-o-pool-
-    // expansion.md §3 (mom↔dad composition collision). Exact list, in
-    // any order.
+    // expansion.md §3 (mom↔dad composition collision) +
+    // design/word-song/short-u-pool-expansion.md §3 / §10 Q3 lock
+    // 2026-05-08 (rug↔mat flat-rectangle floor coverings; tub↔cup
+    // side-profile vessels). Exact list, in any order.
     const pairs = FORBIDDEN_PAIRS.map((p) => [...p].sort().join(','))
     const expectedPairs = [
       ['cat', 'dog'],
@@ -231,6 +236,8 @@ describe('FORBIDDEN_PAIRS', () => {
       ['cap', 'hat'],
       ['man', 'dad'],
       ['mom', 'dad'], // ticket 86c9m3ae3 — both parent-with-child compositions
+      ['rug', 'mat'], // ticket 86c9q9ben — flat-rectangular floor coverings
+      ['tub', 'cup'], // ticket 86c9q9ben — vessels in side profile
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {

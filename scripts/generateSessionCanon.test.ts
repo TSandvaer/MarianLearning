@@ -29,21 +29,22 @@ import {
 } from '../api/_planner.js'
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 13 combos: 10 math nodes × level 1 + 3 word-song nodes × level 1 (short-o sibling tier, ticket 86c9m3ae3)', () => {
+  it('produces 14 combos: 10 math nodes × level 1 + 4 word-song nodes × level 1 (short-u sibling tier added, ticket 86c9q9ben)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
-    // tier (see `design/word-song/short-o-pool-expansion.md`).
+    // tier; ticket 86c9q9ben added `cvc-words-short-u` as the third
+    // vowel-tier sibling (see `design/word-song/short-u-pool-expansion.md`).
     // Untuned tiers (letter-sounds / digraphs / sight-words /
     // simple-sentences) are deliberately NOT in canon — they fall back
     // to blending-cv content via the planner's `effectiveFocusNode`,
     // so baking a duplicate blob would be wasted bytes.
     const combos = activeCombos()
-    expect(combos).toHaveLength(13)
+    expect(combos).toHaveLength(14)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
     expect(mathCount).toBe(10)
-    expect(wordSongCount).toBe(3)
+    expect(wordSongCount).toBe(4)
   })
 
   it('every math combo names a node from VALID_MATH_FOCUS_NODES', () => {
@@ -54,14 +55,15 @@ describe('activeCombos — coverage matches the curriculum', () => {
     }
   })
 
-  it('word-song combos are blending-cv + cvc-words + cvc-words-short-o (planner first-class scope)', () => {
+  it('word-song combos are blending-cv + cvc-words + cvc-words-short-o + cvc-words-short-u (planner first-class scope)', () => {
     const combos = activeCombos().filter((c) => c.track === 'word-song')
-    expect(combos).toHaveLength(3)
+    expect(combos).toHaveLength(4)
     const focusNodes = combos.map((c) => c.focusNode).sort()
     expect(focusNodes).toEqual([
       'blending-cv',
       'cvc-words',
       'cvc-words-short-o',
+      'cvc-words-short-u',
     ])
     // All must be valid focus-node names per the planner's allow-list
     // — drift tripwire if the planner's accept set contracts.

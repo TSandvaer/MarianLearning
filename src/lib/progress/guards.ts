@@ -34,6 +34,7 @@ const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
+  'cvc-words-short-u',
   'digraphs',
   'sight-words',
   'simple-sentences',
@@ -187,6 +188,25 @@ export function isProgressV1(v: unknown): v is Progress {
       !SKILL_NODES.has(v.pendingPromotion as SkillNode)
     ) {
       return false
+    }
+  }
+  // lifetimeFirstEncounters is optional (ticket 86c9q9ben — additive,
+  // no schemaVersion bump). When present it must be an array of known
+  // SkillNode strings (typed as WordSongNode[] in types.ts; we widen
+  // to SKILL_NODES here because the runtime guard set is already
+  // shaped that way and the WordSongNode subset is structurally
+  // enforced by the producers). Duplicates are tolerated — the
+  // read-time predicate uses Set semantics. An empty array is the
+  // normal greenfield state.
+  if (
+    'lifetimeFirstEncounters' in v &&
+    v.lifetimeFirstEncounters !== undefined
+  ) {
+    if (!Array.isArray(v.lifetimeFirstEncounters)) return false
+    for (const node of v.lifetimeFirstEncounters) {
+      if (typeof node !== 'string' || !SKILL_NODES.has(node as SkillNode)) {
+        return false
+      }
     }
   }
   return true

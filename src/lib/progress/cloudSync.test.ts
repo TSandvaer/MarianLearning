@@ -446,6 +446,82 @@ describe('reconcileWithCloud', () => {
     expect(isProgressV1(installed[0]!)).toBe(true)
   })
 
+  it('cloud blob without lifetimeFirstEncounters (pre-86c9q9ben device) → field inferred at install time', async () => {
+    // T1 parity for the lifetimeFirstEncounters defaulter (ticket
+    // 86c9q9ben — AC9e). A cloud blob written by a device on an
+    // older bundle that doesn't know about the field comes in with
+    // it absent. The cloudSync install path must run the same
+    // inference rule the storage adapter does — short-a Marian
+    // gets letter-names / letter-sounds / blending-cv / cvc-words /
+    // sight-words filled in from her diagnostic skillLevels;
+    // short-o + short-u stay greenfield.
+    const seed = defaultProgress()
+    // Strip the field as if the blob came from an older device.
+    const cloudBlob: Record<string, unknown> = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-05-09T10:00:00.000Z' },
+    }
+    delete cloudBlob.lifetimeFirstEncounters
+    const local = defaultProgress()
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-05-09T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    const installedProgress = installed[0]!
+    // Defaulter inferred from skillLevels — same rule as
+    // storage.ts:withDefaultedLifetimeFirstEncounters.
+    expect(installedProgress.lifetimeFirstEncounters).toEqual([
+      'letter-names',
+      'letter-sounds',
+      'blending-cv',
+      'cvc-words',
+      'sight-words',
+    ])
+    expect(isProgressV1(installedProgress)).toBe(true)
+  })
+
+  it('cloud blob with present lifetimeFirstEncounters preserves it verbatim across install', async () => {
+    // Round-trip pin: a cloud blob that already carries the field
+    // (from a device on the same bundle) must NOT have it
+    // overwritten by the inference rule. The defaulter only fills
+    // when the field is missing.
+    const cloudBlob: Progress = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-05-09T10:00:00.000Z',
+      },
+      // Hand-set list — different from what the inference rule
+      // would produce — so we can prove the defaulter respects
+      // the existing value.
+      lifetimeFirstEncounters: ['cvc-words-short-u'],
+    }
+    const local = defaultProgress()
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-05-09T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.lifetimeFirstEncounters).toEqual(['cvc-words-short-u'])
+  })
+
   it('cloud blob with completely invalid shape → cloud-blob-rejected (local kept)', async () => {
     const local = defaultProgress()
     const installed: Progress[] = []

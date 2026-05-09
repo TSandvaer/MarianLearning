@@ -165,6 +165,7 @@ const STAGE_LABEL: Record<StageId, string> = {
   'blending-cv': 'ca',
   'cvc-words': 'cat',
   'cvc-words-short-o': 'dog',
+  'cvc-words-short-u': 'sun',
   digraphs: 'sh',
   'sight-words': 'the',
   'simple-sentences': 'I',

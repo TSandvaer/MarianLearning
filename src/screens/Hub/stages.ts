@@ -28,6 +28,7 @@ export type WordSongStageId =
   | 'blending-cv'
   | 'cvc-words'
   | 'cvc-words-short-o'
+  | 'cvc-words-short-u'
   | 'digraphs'
   | 'sight-words'
   | 'simple-sentences'
@@ -54,6 +55,7 @@ export const WORD_SONG_STAGES: WordSongStageId[] = [
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
+  'cvc-words-short-u',
   'digraphs',
   'sight-words',
   'simple-sentences',

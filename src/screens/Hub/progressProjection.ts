@@ -105,6 +105,7 @@ const WORD_SONG_LABELS: Record<WordSongNode, string> = {
   'blending-cv': 'blending sounds',
   'cvc-words': 'CVC words',
   'cvc-words-short-o': 'CVC words (short o)',
+  'cvc-words-short-u': 'CVC words (short u)',
   digraphs: 'digraphs',
   'sight-words': 'sight words',
   'simple-sentences': 'simple sentences',

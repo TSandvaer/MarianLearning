@@ -45,7 +45,10 @@ describe('parseReadTarget', () => {
   })
 
   it('throws on words outside the target list', () => {
-    expect(() => parseReadTarget('Tap the bus.')).toThrow(/non-target word/)
+    // After the short-u promotion (ticket 86c9q9ben), `pen` is the only
+    // remaining distractor-only entry. Use it to exercise the
+    // non-target rejection path.
+    expect(() => parseReadTarget('Tap the pen.')).toThrow(/non-target word/)
   })
 })
 
@@ -144,7 +147,11 @@ describe('wordSongSessionPlanFromServer — failure paths', () => {
     const broken = {
       ...wire,
       utterances: wire.utterances.map((u) =>
-        u.id === 'word.p1.read' ? { ...u, text: 'Tap the bus.' } : u,
+        // `pen` is the only remaining distractor-only entry post the
+        // short-u promotion (ticket 86c9q9ben moved `bus, sun, cup`
+        // out of DISTRACTOR_ONLY_WORDS). Use `pen` here so the test
+        // continues to exercise the non-target rejection path.
+        u.id === 'word.p1.read' ? { ...u, text: 'Tap the pen.' } : u,
       ),
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
@@ -341,8 +348,11 @@ describe('parseReadLine — content-type discriminant routing (86c9kxp08)', () =
   })
 
   it('rejects words outside the target list on both templates', () => {
-    expect(() => parseReadLine('Tap the bus.')).toThrow(/non-target word/)
-    expect(() => parseReadLine('Read the bus.')).toThrow(/non-target word/)
+    // After the short-u promotion (ticket 86c9q9ben) flipped `bus, sun,
+    // cup` to `isTarget: true`, `pen` is the only remaining
+    // distractor-only entry — that's the negative case here.
+    expect(() => parseReadLine('Tap the pen.')).toThrow(/non-target word/)
+    expect(() => parseReadLine('Read the pen.')).toThrow(/non-target word/)
   })
 
   it('rejects unrecognised templates with a helpful message', () => {
@@ -452,16 +462,18 @@ describe('wordSongSessionPlanFromServer — cvc-word fixture (new acceptance)', 
   })
 
   it('rejects a cvc-word entry whose word is not in the target pool', () => {
-    // "bus" is a distractor-only word — same rejection as the cv-blend
-    // path. The membership check is shared across templates by design.
+    // "pen" is the only remaining distractor-only word post the
+    // short-u promotion (ticket 86c9q9ben moved `bus, sun, cup` to
+    // `isTarget: true`). Same rejection as the cv-blend path — the
+    // membership check is shared across templates by design.
     const broken = {
       ...SAMPLE_CVC_WORD_PLAN,
       utterances: SAMPLE_CVC_WORD_PLAN.utterances.map((u) =>
-        u.id === 'word.p1.read' ? { ...u, text: 'Read the bus.' } : u,
+        u.id === 'word.p1.read' ? { ...u, text: 'Read the pen.' } : u,
       ),
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
-      /non-target word "bus"/,
+      /non-target word "pen"/,
     )
   })
 })

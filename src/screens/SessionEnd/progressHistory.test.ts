@@ -671,4 +671,99 @@ describe('recordProgressOnSessionEnd', () => {
       expect(after.history[0].latencyMs?.[0]).toBe(1000)
     })
   })
+
+  // ── Lifetime-first-encounter append (ticket 86c9q9ben — AC9f) ──────────
+  // The session-start gate reads `lifetimeFirstEncounters` to decide
+  // whether to fire tier-specific scaffolding; this writer appends the
+  // session's focus node so the NEXT session's gate substitutes vanilla.
+  describe('lifetimeFirstEncounters append (ticket 86c9q9ben)', () => {
+    it('appends a word-song focus node when not already present', () => {
+      // Greenfield Marian. cvc-words-short-u as her first short-u
+      // session-end → field becomes ['cvc-words-short-u'] (or wider
+      // — diagnostic baseline pre-fills letter-names etc., but
+      // short-u is what THIS session adds).
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 8,
+        dateISO: '2026-05-09T18:00:00.000Z',
+        focusNode: 'cvc-words-short-u',
+      })
+
+      const loaded = loadProgress()!
+      expect(loaded.lifetimeFirstEncounters).toContain('cvc-words-short-u')
+    })
+
+    it('is idempotent on repeated short-u session-ends — no duplicate', () => {
+      // First session-end appends.
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 8,
+        dateISO: '2026-05-09T18:00:00.000Z',
+        focusNode: 'cvc-words-short-u',
+      })
+      // Second session-end re-appends same node — should be a no-op.
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 7,
+        dateISO: '2026-05-09T19:00:00.000Z',
+        focusNode: 'cvc-words-short-u',
+      })
+
+      const loaded = loadProgress()!
+      const occurrences = (loaded.lifetimeFirstEncounters ?? []).filter(
+        (n) => n === 'cvc-words-short-u',
+      )
+      expect(occurrences).toEqual(['cvc-words-short-u'])
+    })
+
+    it('does NOT append a math focus node (no math first-encounter scaffolding today)', () => {
+      // Seed an empty list so we can assert the math append is
+      // suppressed rather than relying on the diagnostic baseline.
+      saveProgress({
+        ...defaultProgress(),
+        lifetimeFirstEncounters: [],
+      })
+
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-09T18:00:00.000Z',
+        focusNode: 'add-to-10',
+      })
+
+      const loaded = loadProgress()!
+      expect(loaded.lifetimeFirstEncounters).toEqual([])
+    })
+
+    it('preserves prior list entries — append-only, never truncates', () => {
+      // Seed a Marian whose list already carries letter-names +
+      // letter-sounds + cvc-words (the diagnostic-baseline shape
+      // post-migration).
+      saveProgress({
+        ...defaultProgress(),
+        lifetimeFirstEncounters: [
+          'letter-names',
+          'letter-sounds',
+          'blending-cv',
+          'cvc-words',
+        ],
+      })
+
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 8,
+        dateISO: '2026-05-09T18:00:00.000Z',
+        focusNode: 'cvc-words-short-u',
+      })
+
+      const loaded = loadProgress()!
+      expect(loaded.lifetimeFirstEncounters).toEqual([
+        'letter-names',
+        'letter-sounds',
+        'blending-cv',
+        'cvc-words',
+        'cvc-words-short-u',
+      ])
+    })
+  })
 })

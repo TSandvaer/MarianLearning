@@ -184,6 +184,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   recentSuccessRate: number | null | undefined
   isGraduationSession: boolean | undefined
   leitner: LeitnerSessionHintItem[] | undefined
+  lifetimeFirstEncounters: readonly string[] | undefined
 } {
   const progress = loadProgress()
   if (progress === null) {
@@ -192,6 +193,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       recentSuccessRate: undefined,
       isGraduationSession: undefined,
       leitner: undefined,
+      lifetimeFirstEncounters: undefined,
     }
   }
   const focusNode = pickFocusNode(progress, track)
@@ -216,11 +218,22 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       leitner = hint
     }
   }
+  // 86c9q9ben (AC9c-AC9f): ship the lifetime-first-encounter list
+  // for the word-song track only. Math has no first-encounter
+  // scaffolding today. The server uses this to gate the
+  // session.end.opener rewrite (contrast line for short-u, future
+  // box/fox for short-o). Always include the field for word-song
+  // when progress exists — empty array is meaningful (greenfield
+  // Marian, fire scaffolding on every tier's first session). The
+  // read-path defaulter ensures the field is never undefined here.
+  const lifetimeFirstEncounters: readonly string[] | undefined =
+    track === 'word-song' ? (progress.lifetimeFirstEncounters ?? []) : undefined
   return {
     focusNode,
     recentSuccessRate: pickRecentSuccessRate(progress, track),
     isGraduationSession,
     leitner,
+    lifetimeFirstEncounters,
   }
 }
 
@@ -1091,6 +1104,9 @@ export default function App() {
         focusNode: wordSongHints.focusNode,
         recentSuccessRate: wordSongHints.recentSuccessRate,
         isGraduationSession: wordSongHints.isGraduationSession,
+        // 86c9q9ben (AC9f): drives the server-side session.end.opener
+        // gate for tier-specific first-encounter scaffolding.
+        lifetimeFirstEncounters: wordSongHints.lifetimeFirstEncounters,
       },
       { signal: controller.signal },
     )

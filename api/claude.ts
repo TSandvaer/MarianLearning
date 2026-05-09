@@ -92,6 +92,7 @@ import {
   type SessionCache,
 } from './_sessionCache.js'
 import { getCanonEntry } from './_canon.js'
+import { applyFirstEncounterGate } from './_firstEncounterGate.js'
 
 /**
  * Cold-start runtime assertion. Throws at module load if the function is
@@ -212,6 +213,22 @@ interface TrackPayload {
    */
   isGraduationSession?: boolean
   /**
+   * Lifetime-first-encounter list (ticket 86c9q9ben — AC9f). Browser
+   * reads `Progress.lifetimeFirstEncounters` and ships it for the
+   * word-song track. Server consults this to gate the
+   * `session.end.opener` rewrite:
+   *  - focus node ∉ list → first encounter; canon's tier-specific
+   *    contrast / scaffolding line is delivered as-is.
+   *  - focus node ∈ list → already encountered; server rewrites the
+   *    opener to vanilla "You did it!" using a sibling canon's
+   *    vanilla audio.
+   * Always shipped (even empty) when the browser has a Progress doc
+   * and the track is `word-song`. Empty array means greenfield —
+   * fire scaffolding on every tier's first encounter. Absent for
+   * legacy clients / math track.
+   */
+  lifetimeFirstEncounters?: readonly string[]
+  /**
    * Leitner-box hint (ticket 86c9pwgc8 — M4 Leitner wiring). Browser
    * computes via `buildLeitnerSessionHint(progress.mathFactsLeitner)`
    * at session-start fetch time and ships only when length > 0. Each
@@ -326,6 +343,28 @@ function extractTrackPayload(payload: unknown): TrackPayload | null {
     // misrouted true is harmless beyond skipping a canon hit.
     if (typeof pr.isGraduationSession === 'boolean') {
       out.isGraduationSession = pr.isGraduationSession
+    }
+    // lifetimeFirstEncounters (ticket 86c9q9ben — AC9f): array of
+    // string SkillNode ids. Soft-validate per-item: each must be a
+    // non-empty string ≤64 chars. Reject the whole array on any
+    // malformed item to avoid partial-list ambiguity (would the
+    // gate fire or not? — the safe interpretation depends on the
+    // pre-malformed state, which we don't have). Drop silently on
+    // non-array. Server-side gate ignores the list entirely for
+    // non-word-song tracks, so a misrouted list is harmless.
+    if (Array.isArray(pr.lifetimeFirstEncounters)) {
+      const validated: string[] = []
+      let allValid = true
+      for (const node of pr.lifetimeFirstEncounters) {
+        if (typeof node !== 'string' || node.length === 0 || node.length > 64) {
+          allValid = false
+          break
+        }
+        validated.push(node)
+      }
+      if (allValid) {
+        out.lifetimeFirstEncounters = validated
+      }
     }
     // leitner (ticket 86c9pwgc8): array of {a, b, op, box}.
     // Soft-validate shape per item; reject the whole array if any item
@@ -641,16 +680,28 @@ export async function handler(
       const canonResolver = overrides.getCanonEntry ?? getCanonEntry
       const hasLeitnerHint =
         trackPayload.leitner !== undefined && trackPayload.leitner.length > 0
+      // Effective focus node for downstream gating. Same default-
+      // resolution shape `effectiveFocusNode` uses inside the
+      // planner; pulled out here so the first-encounter gate gets
+      // the same answer the canon resolver does.
+      const effectiveFocus =
+        trackPayload.focusNode ?? defaultFocusNodeForTrack(trackPayload.track)
       if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
         const canonHit = canonResolver({
           track: trackPayload.track,
           level: trackPayload.level,
-          focusNode:
-            trackPayload.focusNode ??
-            defaultFocusNodeForTrack(trackPayload.track),
+          focusNode: effectiveFocus,
         })
         if (canonHit !== null) {
-          return jsonResponse(canonHit, 200, headers)
+          // 86c9q9ben (AC9f): rewrite session.end.opener to vanilla
+          // when the child has already encountered this focus node.
+          // The gate is a no-op for non-gated nodes / first-encounter
+          // sessions / missing vanilla source — pass-through.
+          const gated = applyFirstEncounterGate(canonHit, {
+            focusNode: effectiveFocus,
+            lifetimeFirstEncounters: trackPayload.lifetimeFirstEncounters,
+          })
+          return jsonResponse(gated, 200, headers)
         }
       }
 
@@ -689,7 +740,16 @@ export async function handler(
       if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
         const cached = cache.get(cacheKey, now())
         if (cached !== null) {
-          return jsonResponse(cached, 200, headers)
+          // 86c9q9ben (AC9f): same gate as the canon-hit path. The
+          // in-memory cache stores the pre-gate response so a single
+          // cached entry can serve both first-encounter and
+          // already-encountered requests correctly without
+          // re-fetching from the planner.
+          const gated = applyFirstEncounterGate(cached, {
+            focusNode: effectiveFocus,
+            lifetimeFirstEncounters: trackPayload.lifetimeFirstEncounters,
+          })
+          return jsonResponse(gated, 200, headers)
         }
       }
 
@@ -779,9 +839,20 @@ export async function handler(
         // into a regular (or different-Leitner-state) session and the
         // box-1-priority contract would silently rotate.
         if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
+          // Cache the PRE-GATE response. The in-memory cache stores
+          // the canon-shaped output (with the tier-specific opener
+          // intact for first-encounter); the gate runs on the
+          // serve-out path so a single cache entry serves both
+          // first-encounter and already-encountered requests.
           cache.set(cacheKey, rendered, now())
         }
-        return jsonResponse(rendered, 200, headers)
+        // 86c9q9ben (AC9f): rewrite session.end.opener to vanilla
+        // when the child has already encountered this focus node.
+        const gated = applyFirstEncounterGate(rendered, {
+          focusNode: effectiveFocus,
+          lifetimeFirstEncounters: trackPayload.lifetimeFirstEncounters,
+        })
+        return jsonResponse(gated, 200, headers)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         const stack = err instanceof Error ? err.stack : undefined

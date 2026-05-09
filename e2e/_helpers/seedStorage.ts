@@ -32,6 +32,17 @@ export interface SeedProgressOptions {
    * need a faster promotion path.
    */
   masteryThreshold?: { percent: number; sessions: number }
+  /**
+   * Override `lifetimeFirstEncounters` (ticket 86c9q9ben — AC9f).
+   * When omitted, the field is left absent on the seeded blob —
+   * the storage adapter's read-path defaulter fills it from the
+   * skillLevels at load time, which means a seeded
+   * `cvc-words-short-u: 'practicing'` Marian gets that node
+   * inferred into the list (treated as already-encountered).
+   * Tests that need to simulate a greenfield first encounter MUST
+   * pass `lifetimeFirstEncounters: []` here so the gate fires.
+   */
+  lifetimeFirstEncounters?: ReadonlyArray<string>
 }
 
 /** Diagnostic defaults from `src/lib/progress/defaults.ts`. Mirrored here
@@ -52,6 +63,7 @@ const DEFAULT_SKILL_LEVELS = {
   'blending-cv': 'practicing',
   'cvc-words': 'intro',
   'cvc-words-short-o': 'locked',
+  'cvc-words-short-u': 'locked',
   digraphs: 'locked',
   'sight-words': 'intro',
   'simple-sentences': 'locked',
@@ -96,6 +108,16 @@ export function buildSeedProgress(opts: SeedProgressOptions = {}): unknown {
       crossDayEnforcement: true,
       showLevelToMarian: false,
     },
+    // Seed `lifetimeFirstEncounters` ONLY when the caller asks
+    // explicitly. Otherwise leave the field absent — the production
+    // read-path defaulter then fills it from skillLevels at load
+    // time (ticket 86c9q9ben). Existing tests that don't care about
+    // first-encounter scaffolding inherit the inferred-from-skillLevels
+    // shape, which mirrors what a real Marian's localStorage would
+    // produce after one read-cycle post-deploy.
+    ...(opts.lifetimeFirstEncounters !== undefined
+      ? { lifetimeFirstEncounters: [...opts.lifetimeFirstEncounters] }
+      : {}),
   }
 }
 
