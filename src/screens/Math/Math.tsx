@@ -359,16 +359,27 @@ export interface MathProps {
    */
   __testInitiallyAudioUnlocked?: boolean
   /**
-   * Test seam ONLY — when `true`, the subitising dot-card overlay short-
-   * circuits its lifecycle on mount (synchronous `onComplete`, immediate
-   * unmount) so tests that don't care about the dot-card affordance
-   * don't pay the 1100ms wait.
+   * Test seam ONLY — when `true`, the subitising dot-card overlay's
+   * lifecycle is FROZEN: phase stays at its initial value
+   * (`fadingIn` or, under reduced-motion, `holding`), no timers are
+   * armed, and `onComplete` is NEVER fired. The dot-card cells stay
+   * rendered indefinitely so tests that don't care about the
+   * dismissal cascade can pin count selectors against
+   * `[data-testid="math-dot-card-cell"]` without racing the 1100ms
+   * fade-out. The flower row stays at `opacity:0` for the duration
+   * of the test (because `onComplete` is what flips
+   * `flowersVisible`); tests that need the flower row visible should
+   * NOT set this seam.
    *
-   * The dot-card cells STILL render briefly inside the test DOM so
-   * spec-pinned count selectors (`[data-testid="math-dot-card-cell"]`)
-   * remain assertable — see `DotCardOverlay`'s `__testSkipLifecycle`.
+   * This forwards to `DotCardOverlay`'s `__testSkipLifecycle` prop;
+   * see that prop's documentation for the same contract on the
+   * receiving side. The lifecycle itself (timers, phase advance,
+   * page-hidden pause, completedRef latch) is covered by
+   * `DotCardOverlay.test.tsx`, where `vi.useFakeTimers()` drives the
+   * timing deterministically.
    *
-   * Production must NEVER pass this. Ticket 86c9q5j9a.
+   * Production must NEVER pass this. Ticket 86c9q5j9a; doc-comment
+   * fix per ticket 86c9q9p8w AC3.
    */
   __testDisableDotCard?: boolean
 }
