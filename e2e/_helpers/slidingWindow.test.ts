@@ -9,6 +9,19 @@
 
 import { describe, expect, it } from 'vitest'
 import { slidingWindow } from './slidingWindow'
+// Import the canonical Hub helper for the parity test below. Crossing
+// the e2e/src boundary is safe here because vitest consumes this file
+// under the app's bundler resolution (vite.config.ts), and the file's
+// only consumer is vitest — Playwright's `testMatch: '**/*.spec.ts'`
+// excludes it from the e2e runtime. The e2e tsconfig's typecheck pass
+// resolves the import via `moduleResolution: 'bundler'` + the file
+// existing on disk; `skipLibCheck` keeps cross-config drift quiet.
+//
+// Per Kevin's PR #183 review: importing the source-of-truth makes the
+// "catches drift if either helper's geometry shifts" promise actually
+// hold. An inline transcription of Hub's geometry only catches e2e-side
+// drift; this import catches Hub-side drift too.
+import { slidingWindow as hubSlidingWindow } from '../../src/screens/Hub/stages'
 
 const NODES = [
   'letter-names',
@@ -185,29 +198,16 @@ describe('slidingWindow — parity with Hub stages.ts shape', () => {
   // The Hub's `slidingWindow(stages, currentIndex, size = 5)` helper
   // computes `desiredOffset = currentIndex - 1`, which is equivalent
   // to the e2e helper's `(before=1, after=3)` shape when size=5.
-  // This case asserts that equivalence for every focus index across
-  // the full word-song nodes list — a forward-compat guard that
-  // catches drift if either helper's geometry shifts.
-  function hubShapeSlide<T>(
-    arr: readonly T[],
-    currentIndex: number,
-    size = 5,
-  ): { items: T[]; offset: number } {
-    if (arr.length === 0) return { items: [], offset: 0 }
-    const desiredOffset = currentIndex - 1
-    const maxOffset = Math.max(0, arr.length - size)
-    const offset = Math.max(0, Math.min(maxOffset, desiredOffset))
-    const items: T[] = []
-    for (let i = offset; i < Math.min(arr.length, offset + size); i++) {
-      items.push(arr[i] as T)
-    }
-    return { items, offset }
-  }
-
-  it('produces identical output to the Hub-shape helper for every focus index in the word-song track', () => {
+  // This case imports the canonical Hub helper (rather than
+  // re-implementing it inline) and asserts equivalence for every focus
+  // index across the full word-song nodes list — a forward-compat
+  // guard that catches drift on EITHER helper. Pre-PR-#183-review the
+  // test inlined a copy of Hub's body, which only caught e2e-side
+  // drift; the import above closes that asymmetry.
+  it('produces identical output to the canonical Hub `slidingWindow` for every focus index in the word-song track', () => {
     for (let i = 0; i < NODES.length; i++) {
       const e2eResult = slidingWindow(NODES, i, 1, 3)
-      const hubResult = hubShapeSlide(NODES, i, 5)
+      const hubResult = hubSlidingWindow(NODES, i, 5)
       expect(e2eResult.offset).toBe(hubResult.offset)
       expect(e2eResult.items).toEqual(hubResult.items)
     }

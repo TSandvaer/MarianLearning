@@ -4,19 +4,33 @@
  *
  * Why a shim instead of a direct import
  * -------------------------------------
- * The e2e tsconfig (`tsconfig.e2e.json`) only includes `e2e/**` and
- * `playwright.config.ts`. Importing from `src/lib/progress/focusNode`
- * would not type-check under the e2e config and would couple the
- * Playwright harness to the App's internal module graph.
+ * The e2e tsconfig (`tsconfig.e2e.json`) declares
+ * `include: ["e2e", "playwright.config.ts"]` — `src/` is outside the
+ * include set, so `tsc -b` won't add the canonical
+ * `src/lib/progress/focusNode.ts` to the e2e project's compilation
+ * unit. (DOM types are already in scope via
+ * `lib: ["ES2023", "DOM", "DOM.Iterable"]` — those are not the
+ * blocker.) The shim keeps spec consumers decoupled from the App's
+ * internal module graph and avoids reaching across tsconfig
+ * project boundaries.
  *
  * Source-of-truth alignment
  * -------------------------
  * This shim MUST stay in lockstep with the canonical
  * `WORD_SONG_NODES_IN_ORDER` constant in
- * `src/lib/progress/focusNode.ts`. Any new sibling vowel-tier node
- * inserted into that list (the tier-widening pattern Marian's
- * curriculum follows — short-o, short-u, future short-i / short-e)
- * MUST be reflected here in the same position.
+ * `src/lib/progress/focusNode.ts`. Drift is guarded at CI time by a
+ * vitest equality test at
+ * `e2e/_helpers/wordSongNodesInOrder.test.ts` that imports both the
+ * shim AND the source-of-truth and `expect.toEqual()`s them — if a
+ * future tier insertion lands in one list but not the other, that
+ * test fails loudly. Per Kevin's PR #183 review: closes the same
+ * developer-discipline fragility class this refactor eliminates at
+ * the spec layer.
+ *
+ * Any new sibling vowel-tier node inserted into the canonical list
+ * (the tier-widening pattern Marian's curriculum follows — short-o,
+ * short-u, future short-i / short-e) MUST be reflected here in the
+ * same position.
  *
  * The path-strip projection assertions in
  * `cvc-words-regression.spec.ts`, `cvc-words-short-o-regression.spec.ts`,
