@@ -86,11 +86,30 @@ export default defineConfig({
         globPatterns: [
           '**/*.{js,css,html,png,svg,webmanifest,woff,woff2,ico,mp3}',
         ],
-        // Bumped from default 2 MiB so the upscaled Emma SVGs (~2.5-3.3 MB
-        // each at 2000x2000 PNG-in-SVG, see ticket 86c9kww0z) fit in the
-        // service-worker precache. Future polish-backlog options to slim
-        // these: zopfli/oxipng re-encode, WebP-in-SVG, or vector re-trace.
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        // PER-FILE precache gate (NOT cumulative). Workbox excludes any
+        // single asset larger than this from the precache manifest; total
+        // precache size has no cap here — it's bounded only by browser
+        // quota at install time.
+        //
+        // Lifted from default 2 MiB → 4 MiB (PR #104, Emma assets) → 8 MiB
+        // (this ticket, 86c9qa7uh) so the upscaled Emma SVGs (~2.5-3.3 MB
+        // each at 2000x2000 PNG-in-SVG, ticket 86c9kww0z) fit comfortably
+        // with headroom for future asset additions. Picture-pack SVGs
+        // (~73-414 KB each at 500x500 PNG-in-SVG via scripts/embed-pictures.ts)
+        // are nowhere near the cap and don't drive this value.
+        //
+        // Cumulative-size concerns (PWA install footprint as the picture
+        // pack grows across short-i / short-e / future tiers) do NOT
+        // interact with this setting. Build-time precache-size signal is
+        // surfaced in the `vite-plugin-pwa` build output ("precache N
+        // entries (X KiB)"); review that figure when adding new asset
+        // families. As of this writing, with 34 picture-pack SVGs +
+        // Emma + audio, the precache totals ~30 MiB — well under typical
+        // installed-PWA quotas on iPad Safari.
+        //
+        // Future polish-backlog options to slim individual assets:
+        // zopfli/oxipng re-encode, WebP-in-SVG, or vector re-trace.
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
       devOptions: {
         enabled: false,
