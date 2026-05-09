@@ -28,11 +28,13 @@ process.env.TZ = 'Asia/Manila'
 
 import { describe, expect, it } from 'vitest'
 import {
+  CVC_CROSS_VOWEL_NODES,
   LITERACY_TREE,
   MATH_TREE,
   NOVEL_POOL_THRESHOLD,
   WORD_SONG_GRADUATION_GATED_NODES,
   applyMasteryRule,
+  crossVowelMixingActive,
   isGraduationSessionPending,
   nextNode,
 } from './mastery'
@@ -1133,5 +1135,159 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['blending-cv']).toBe('mastered')
+  })
+})
+
+// --------------------------------------------------------------------------
+// Cross-vowel mix predicate (ticket 86c9qa0kf)
+// --------------------------------------------------------------------------
+
+describe('CVC_CROSS_VOWEL_NODES', () => {
+  it('lists the three v1 CVC vowel-tier nodes in declaration order', () => {
+    // Declaration order matches LITERACY_TREE so future short-i / short-e
+    // additions slot in cleanly. The set membership is what the predicate
+    // reads — the array form is exposed for the parent-settings UI / debug
+    // tooling that wants to enumerate the participating tiers.
+    expect(CVC_CROSS_VOWEL_NODES).toEqual([
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+    ])
+  })
+})
+
+describe('crossVowelMixingActive', () => {
+  // Helper: build a Progress with the three CVC tiers at given levels +
+  // an explicit parentSettings.crossVowelMixingEnabled toggle.
+  function buildCrossVowelProgress(args: {
+    cvcWords: 'mastered' | 'practicing' | 'intro' | 'locked'
+    cvcShortO: 'mastered' | 'practicing' | 'intro' | 'locked'
+    cvcShortU: 'mastered' | 'practicing' | 'intro' | 'locked'
+    crossVowelMixingEnabled?: boolean
+    omitParentSettings?: boolean
+  }): Progress {
+    const base = defaultProgress()
+    const out: Progress = {
+      ...base,
+      skillLevels: levels({
+        'cvc-words': args.cvcWords,
+        'cvc-words-short-o': args.cvcShortO,
+        'cvc-words-short-u': args.cvcShortU,
+      }),
+      parentSettings: {
+        ...base.parentSettings!,
+        crossVowelMixingEnabled: args.crossVowelMixingEnabled ?? true,
+      },
+    }
+    if (args.omitParentSettings) {
+      // Strip parentSettings — `getSettings()` should default it on
+      // the inner read, including `crossVowelMixingEnabled: true`.
+      delete out.parentSettings
+    }
+    return out
+  }
+
+  it('returns true when all three CVC tiers are mastered AND the toggle is on (default)', () => {
+    const progress = buildCrossVowelProgress({
+      cvcWords: 'mastered',
+      cvcShortO: 'mastered',
+      cvcShortU: 'mastered',
+      crossVowelMixingEnabled: true,
+    })
+    expect(crossVowelMixingActive(progress)).toBe(true)
+  })
+
+  it('returns false when the parent toggle is off, even with all three mastered (escape-valve)', () => {
+    // Per spec §10 Q1 lock + Dave's research §4.4 — toggle is the
+    // hard off switch.
+    const progress = buildCrossVowelProgress({
+      cvcWords: 'mastered',
+      cvcShortO: 'mastered',
+      cvcShortU: 'mastered',
+      crossVowelMixingEnabled: false,
+    })
+    expect(crossVowelMixingActive(progress)).toBe(false)
+  })
+
+  it('returns false when one tier is at "practicing" (per-aggregate gate)', () => {
+    const progress = buildCrossVowelProgress({
+      cvcWords: 'mastered',
+      cvcShortO: 'mastered',
+      cvcShortU: 'practicing',
+      crossVowelMixingEnabled: true,
+    })
+    expect(crossVowelMixingActive(progress)).toBe(false)
+  })
+
+  it('returns false when one tier is at "intro" (per-aggregate gate)', () => {
+    const progress = buildCrossVowelProgress({
+      cvcWords: 'mastered',
+      cvcShortO: 'intro',
+      cvcShortU: 'mastered',
+      crossVowelMixingEnabled: true,
+    })
+    expect(crossVowelMixingActive(progress)).toBe(false)
+  })
+
+  it('returns false when one tier is at "locked" (per-aggregate gate)', () => {
+    const progress = buildCrossVowelProgress({
+      cvcWords: 'practicing',
+      cvcShortO: 'locked',
+      cvcShortU: 'locked',
+      crossVowelMixingEnabled: true,
+    })
+    expect(crossVowelMixingActive(progress)).toBe(false)
+  })
+
+  it('returns true when parentSettings is omitted entirely (defaulter fills crossVowelMixingEnabled = true)', () => {
+    // Old blob without parentSettings → withDefaultedSettings fills the
+    // defaults, including `crossVowelMixingEnabled: true`. The
+    // predicate then sees toggle=true.
+    const progress = buildCrossVowelProgress({
+      cvcWords: 'mastered',
+      cvcShortO: 'mastered',
+      cvcShortU: 'mastered',
+      omitParentSettings: true,
+    })
+    expect(crossVowelMixingActive(progress)).toBe(true)
+  })
+
+  it('reads an explicit ParentSettings argument when supplied (saves a getSettings call)', () => {
+    // Optional 2nd arg lets callers (App.tsx kick-effect) avoid double-
+    // resolving parentSettings when they already have it in scope.
+    const progress = buildCrossVowelProgress({
+      cvcWords: 'mastered',
+      cvcShortO: 'mastered',
+      cvcShortU: 'mastered',
+      crossVowelMixingEnabled: true,
+    })
+    // Override via the explicit arg (toggle off) — the predicate
+    // should respect the passed value, not re-read from progress.
+    const explicitSettings: ParentSettings = {
+      ...progress.parentSettings!,
+      crossVowelMixingEnabled: false,
+    }
+    expect(crossVowelMixingActive(progress, explicitSettings)).toBe(false)
+  })
+
+  it('is O(1) — does not consult history', () => {
+    // Construct a Progress with a populated history that would clear
+    // the qualifies() filter on cvc-words. The predicate should not
+    // care about it (mirrors `isGraduationSessionPending`'s
+    // skillLevels-first short-circuit ordering).
+    const progress: Progress = {
+      ...defaultProgress(),
+      skillLevels: levels({
+        'cvc-words': 'mastered',
+        'cvc-words-short-o': 'mastered',
+        'cvc-words-short-u': 'mastered',
+      }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 0.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 0.0),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 0.0),
+      ],
+    }
+    expect(crossVowelMixingActive(progress)).toBe(true)
   })
 })

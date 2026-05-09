@@ -552,12 +552,26 @@ export default function ParentSettings({
             value={settings.showLevelToMarian}
             onChange={(v) => update({ showLevelToMarian: v })}
           />
+
+          {/* Ticket 86c9qa0kf — cross-vowel distractor mix v1 toggle.
+              Activates only when all three CVC tiers (cvc-words,
+              cvc-words-short-o, cvc-words-short-u) are mastered;
+              flipping off here is the parent-facing escape valve per
+              `cross-vowel-mix-spec.md` §10 Q1 + Dave's research §4.4. */}
+          <ToggleRow
+            id="crossVowelMixingEnabled"
+            label="Mix vowels in chip trios"
+            description="After Marian masters all three short-vowel CVC tiers, mix vowels across her chip choices to test discrimination. Defaults on."
+            value={settings.crossVowelMixingEnabled}
+            onChange={(v) => update({ crossVowelMixingEnabled: v })}
+          />
         </div>
 
         <p className="mt-6 text-xs text-slate-400">
           Defaults: auto-promote on, fresh-day mastery on, math threshold 95% /
           3 sessions, word-song threshold 90% / 3 sessions, level hidden, mode
-          picker off.
+          picker off, cross-vowel mixing on (active after all three short-vowel
+          CVC tiers master).
         </p>
 
         {/* Backup section (ticket 86c9pkfth — escape hatch for cloud-sync).

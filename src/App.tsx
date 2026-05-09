@@ -49,7 +49,9 @@ import {
 } from './lib/lifecycle'
 import {
   buildLeitnerSessionHint,
+  crossVowelMixingActive,
   getOrCreateDeviceId,
+  getSettings,
   isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
@@ -993,6 +995,16 @@ export default function App() {
   )
   const [wordSongPlay, setWordSongPlay] =
     useState<PlayWordSongUtteranceFn | null>(null)
+  /**
+   * Cross-vowel distractor mix mode for the active session (ticket
+   * 86c9qa0kf). Computed once from `loadProgress()` + the live
+   * parentSettings at session-start kick-time, frozen on the
+   * `<WordSong>` prop for the session's lifetime per spec §4 "uniform
+   * per session" rule. Reset to `false` whenever the word-song fetch
+   * latch resets (so the next session re-evaluates against
+   * potentially-updated progress + parentSettings).
+   */
+  const [wordSongCrossVowel, setWordSongCrossVowel] = useState(false)
   const wordSongUnloadRef = useRef<(() => void) | null>(null)
   const wordSongAbortRef = useRef<AbortController | null>(null)
   const wordSongFetchStartedRef = useRef(false)
@@ -1037,6 +1049,10 @@ export default function App() {
       setWordSongPlay(null)
       setWordSongAudioReady(false)
       setWordSongPlan(null)
+      // Ticket 86c9qa0kf — reset cross-vowel state so the next session
+      // re-evaluates the predicate against potentially-updated progress
+      // (e.g. mid-session a parent toggled the setting in another tab).
+      setWordSongCrossVowel(false)
     }
   })
 
@@ -1096,6 +1112,31 @@ export default function App() {
     // 2–3 novel short-a probe words into the 8-problem set.
     const sessionId = `word-song-${wordSongFallbackPlan.id}-${Date.now()}`
     const wordSongHints = readProgressHintsForTrack('word-song')
+
+    // Cross-vowel mix mode (ticket 86c9qa0kf — cross-vowel mix v1
+    // impl). Compute once at session-start kick-time:
+    //   - All three CVC tiers must be `'mastered'`
+    //   - parentSettings.crossVowelMixingEnabled must be `true`
+    //   - The picked focusNode must be a CVC tier (caller-side gate
+    //     per spec §2 condition 1).
+    // Frozen on the `<WordSong>` prop for the session's lifetime.
+    // The session is uniformly cross-vowel or uniformly same-vowel —
+    // never half-and-half (per spec §4 "uniform per session" rule).
+    let nextCrossVowel = false
+    {
+      const wordSongProgress = loadProgress()
+      if (wordSongProgress !== null) {
+        const settings = getSettings(wordSongProgress)
+        const focus = wordSongHints.focusNode
+        const focusIsCvcTier =
+          focus === 'cvc-words' ||
+          focus === 'cvc-words-short-o' ||
+          focus === 'cvc-words-short-u'
+        nextCrossVowel =
+          focusIsCvcTier && crossVowelMixingActive(wordSongProgress, settings)
+      }
+    }
+    setWordSongCrossVowel(nextCrossVowel)
     void prepareWordSongPathA(
       {
         level: 1,
@@ -1199,6 +1240,8 @@ export default function App() {
       setWordSongPlay(null)
       setWordSongAudioReady(false)
       setWordSongPlan(null)
+      // Ticket 86c9qa0kf — symmetry with the imperative tear-down above.
+      setWordSongCrossVowel(false)
     })
     return () => {
       cancelled = true
@@ -1242,6 +1285,7 @@ export default function App() {
               plan={wordSongPlan ?? wordSongFallbackPlan}
               playUtterance={wordSongPlay ?? undefined}
               audioReady={wordSongAudioReady}
+              crossVowelMixing={wordSongCrossVowel}
               onSessionComplete={handleWordSongComplete}
               onRequestExit={handleBackToHub}
             />

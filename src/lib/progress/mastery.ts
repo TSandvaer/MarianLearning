@@ -528,6 +528,82 @@ function graduationGateClears(
  * start (after `loadProgress()`) or at session-end before
  * `recordProgressOnSessionEnd` runs.
  */
+// ── Cross-vowel mix gate (ticket 86c9qa0kf) ─────────────────────────────
+
+/**
+ * The three CVC-tier word-song nodes that participate in cross-vowel
+ * distractor mixing per `design/word-song/cross-vowel-mix-spec.md` §2.
+ *
+ * When ALL three are `'mastered'` AND `parentSettings.crossVowelMixingEnabled`
+ * is `true`, sessions on any of these tiers can pull distractors from any
+ * vowel pool — testing cross-vowel discrimination as a deliberate skill.
+ *
+ * This is a deliberate change point — when short-i / short-e ship,
+ * Kevin or Devon adds the new node literal here. The explicit Set
+ * makes the dependency visible (Dave's research §4.3 flagged this as
+ * a virtue, not a bug surface).
+ */
+export const CVC_CROSS_VOWEL_NODES: readonly WordSongNode[] = [
+  'cvc-words',
+  'cvc-words-short-o',
+  'cvc-words-short-u',
+]
+
+/**
+ * True iff cross-vowel distractor mixing is active on this Progress
+ * document — meaning sessions on any of the three CVC tiers will draw
+ * distractors from any vowel pool, exercising cross-vowel
+ * discrimination per `design/word-song/cross-vowel-mix-spec.md` §2 +
+ * Dave's research (PR #175) §3.
+ *
+ * Returns `true` only when ALL of:
+ *   1. `cvc-words === 'mastered'`
+ *   2. `cvc-words-short-o === 'mastered'`
+ *   3. `cvc-words-short-u === 'mastered'`
+ *   4. `parentSettings.crossVowelMixingEnabled === true` (default `true`).
+ *
+ * O(1). No history traversal — three skillLevels reads + one settings
+ * read. Mirrors the `isGraduationSessionPending` shape.
+ *
+ * The predicate intentionally does NOT check the session's `focusNode`.
+ * Per the dispatch contract (ticket 86c9qa0kf AC2/AC4) the caller
+ * (`wordDistractors.ts pickDistractors` + `WordSong.tsx` problem-render
+ * path + `api/_planner.ts` cross-vowel branch) gates on focus being a
+ * CVC tier separately. The two-stage gate keeps the predicate's
+ * concern (engine-level "does Marian's profile clear cross-vowel?")
+ * separate from the call-site concern (focus-tier check). It also
+ * makes the predicate trivially callable from non-WordSong contexts
+ * (parent settings UI displaying "is mixing currently active?", debug
+ * overlays, future analytics) without forcing them to invent a focus
+ * value.
+ *
+ * Pure read of `progress` + `parentSettings`; does not mutate.
+ *
+ * Pool-size-floor caveat
+ * ----------------------
+ * `cross-vowel-mix-spec.md` §6 notes "same-tier pools have ≥ 11 entries
+ * each" before cross-vowel mode fires. As of 2026-05-09: short-a = 14,
+ * short-u = 11, short-o = 8 (under floor; Kyle's expansion ticket in
+ * flight). The predicate does NOT gate on pool size — cross-vowel
+ * firing with an 8-word short-o pool is graceful degradation, not a
+ * bug. Distractor authoring just picks from whatever the pool offers;
+ * if short-o is small, short-o targets pull from 7 same-tier
+ * candidates instead of 10. Dave's research §3 supports this. When
+ * Kyle's expansion ships, the floor is met without a code change.
+ */
+export function crossVowelMixingActive(
+  progress: Progress,
+  parentSettings?: ParentSettings,
+): boolean {
+  const settings = parentSettings ?? getSettings(progress)
+  if (settings.crossVowelMixingEnabled !== true) return false
+  const sl = progress.skillLevels
+  for (const node of CVC_CROSS_VOWEL_NODES) {
+    if (sl[node] !== 'mastered') return false
+  }
+  return true
+}
+
 export function isGraduationSessionPending(
   progress: Progress,
   node: SkillNode,

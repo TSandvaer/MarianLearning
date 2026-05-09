@@ -236,6 +236,26 @@ export interface WordSongProps {
    * Path A fetch settles.
    */
   audioReady?: boolean
+  /**
+   * Cross-vowel distractor mix mode (ticket 86c9qa0kf — cross-vowel mix
+   * v1 impl). When `true`, every `pickDistractors` call in the session
+   * threads `{ crossVowel: true }` and reads from
+   * `TARGET_PAIRINGS_CROSSVOWEL` instead of the same-vowel
+   * `TARGET_PAIRINGS`. The session is uniformly cross-vowel or uniformly
+   * same-vowel — never half-and-half (per `cross-vowel-mix-spec.md` §4).
+   *
+   * Default: `false` (same-vowel only — back-compat).
+   *
+   * The parent (`App.tsx`) computes this once at session-start by
+   * calling `crossVowelMixingActive(progress, parentSettings)` from
+   * `lib/progress`. The predicate gates on (a) all three CVC tiers
+   * `'mastered'`, (b) `parentSettings.crossVowelMixingEnabled === true`.
+   * The CVC-tier-focus check (the third gate per spec §2) is the
+   * caller's responsibility — App.tsx only passes `true` when the
+   * focus is one of `cvc-words`, `cvc-words-short-o`,
+   * `cvc-words-short-u`.
+   */
+  crossVowelMixing?: boolean
   /** Optional: sparkle SFX on correct. Default a Howler-backed silent-fallback. */
   sparkle?: Sfx
   /** Optional: poof SFX on wrong. Default a Howler-backed silent-fallback. */
@@ -341,6 +361,7 @@ function WordSongScreen({
   plan: planProp,
   playUtterance = defaultPlayUtterance,
   audioReady,
+  crossVowelMixing = false,
   sparkle,
   poof,
   plink,
@@ -516,8 +537,8 @@ function WordSongScreen({
    *  shuffled by an LCG seeded on the problem index. Same shuffle pattern
    *  as Math, no Math.random for test-stability. */
   const chipOrder = useMemo(
-    () => buildChipOrder(plan.problems[problemIndex]),
-    [plan, problemIndex],
+    () => buildChipOrder(plan.problems[problemIndex], crossVowelMixing),
+    [plan, problemIndex, crossVowelMixing],
   )
 
   // ── Refs for in-flight cleanup -----------------------------------------
@@ -1754,9 +1775,22 @@ function SparkleBurst() {
  * Build the chip order: target + 2 distractors, shuffled deterministically
  * per problem. Same shuffle pattern as Math (LCG seeded on problem index +
  * a hash of the target word).
+ *
+ * `crossVowel` (ticket 86c9qa0kf) — when `true`, distractors are drawn
+ * from `TARGET_PAIRINGS_CROSSVOWEL` (cross-vowel mix mode). When
+ * `false`, the existing same-vowel `TARGET_PAIRINGS` matrix is read.
+ * The parent (`WordSongScreen`) computes this once per session from
+ * `crossVowelMixingActive(progress, parentSettings)` and passes the
+ * boolean down — uniform per session, never per-problem (per spec §4
+ * "uniform per session" rule).
  */
-function buildChipOrder(problem: WordSongProblem): readonly WordEntry[] {
-  const [d1, d2] = pickDistractors(problem.target, problem.index)
+function buildChipOrder(
+  problem: WordSongProblem,
+  crossVowel: boolean,
+): readonly WordEntry[] {
+  const [d1, d2] = pickDistractors(problem.target, problem.index, {
+    crossVowel,
+  })
   const values = [problem.target, d1, d2]
   // Hash word → number for the seed (so different targets shuffle
   // differently for the same problem index in cross-plan QA replay).

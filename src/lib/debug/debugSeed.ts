@@ -87,6 +87,20 @@
  *   `cvc-words-short-u` (practicing) per WORD_SONG_NODES_IN_ORDER.
  *   Mirrors the `cvc-words-short-o` recipe one step further down the
  *   tree.
+ * - `cross-vowel-mixing`: Marian as if all three CVC tiers
+ *   (`cvc-words`, `cvc-words-short-o`, `cvc-words-short-u`) are fully
+ *   mastered and she's now practicing `digraphs` — the next node in
+ *   word-song promotion order (ticket 86c9qa0kf). With every CVC tier
+ *   mastered, `crossVowelMixingActive(progress, parentSettings)`
+ *   returns `true`; the next session on any of the three CVC tiers
+ *   would draw from `TARGET_PAIRINGS_CROSSVOWEL`. Note: with all three
+ *   CVC tiers mastered the picker actually walks past them and lands
+ *   on `digraphs` — to exercise cross-vowel chip rendering, test
+ *   harnesses bump one CVC tier back to `'practicing'` (the e2e
+ *   regression spec does this directly via `seedLocalStorage` with
+ *   tier-specific overrides; the seed here is the ear-test recipe for
+ *   "all three mastered, predicate active"). `parentSettings.crossVowelMixingEnabled`
+ *   is left at the default `true` — no override needed.
  * - `add-to-20`: Marian as if she's mastered `number-recog` and
  *   `add-to-10` and is now practicing the next math tier. The picker
  *   walks past those two and lands on `add-to-20` (practicing) per
@@ -226,6 +240,40 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'cvc-words': 'mastered',
       'cvc-words-short-o': 'mastered',
       'cvc-words-short-u': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Cross-vowel mixing smoke-test entry (ticket 86c9qa0kf). Marian as
+  // if all three CVC vowel tiers are mastered. The predicate
+  // `crossVowelMixingActive(progress, parentSettings)` returns `true`
+  // for this state (assuming default `parentSettings.crossVowelMixingEnabled
+  // = true`). For practical chip rendering: with all three CVC tiers
+  // mastered, `pickFocusNode` walks past them and lands on the next
+  // non-mastered node — the seed sets `digraphs: 'practicing'` so the
+  // picker has somewhere to land. Cross-vowel chips don't render in the
+  // natural session flow (focus is `digraphs`, NOT a CVC tier; the
+  // caller-side `focusIsCvcTier` gate in App.tsx returns `false` and
+  // `wordSongCrossVowel` stays `false`).
+  //
+  // Why ship the seed at all in v1 if cross-vowel never fires? Two
+  // reasons: (a) the seed exercises the predicate-true branch end-to-end
+  // for the parent-settings UI display ("cross-vowel mixing: enabled"
+  // visible to the parent); (b) it's the deep-launch state for any
+  // future review-mode work that revisits mastered CVC tiers, at which
+  // point the seed becomes the cross-vowel-fires entry-point without
+  // recipe changes. Predicate-level + matrix-level testing happens in
+  // unit tests (mastery.test.ts + wordDistractors.test.ts); the e2e
+  // regression spec covers the wiring + the predicate-OFF-by-toggle and
+  // predicate-OFF-by-incomplete-mastery paths.
+  'cross-vowel-mixing': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      digraphs: 'practicing',
     },
     skipGreet: true,
   },

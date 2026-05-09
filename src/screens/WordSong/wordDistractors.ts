@@ -49,6 +49,7 @@
 import {
   FORBIDDEN_PAIRS,
   TARGET_PAIRINGS,
+  TARGET_PAIRINGS_CROSSVOWEL,
   getWordEntry,
   isForbiddenPair,
   type WordEntry,
@@ -75,34 +76,62 @@ export function pickTier(problemIndex: number): DistractorTier {
 }
 
 /**
+ * Optional second arg controlling which distractor matrix to consult
+ * (ticket 86c9qa0kf — cross-vowel mix v1 impl).
+ *
+ * Default: `crossVowel: false` — the same-vowel-only `TARGET_PAIRINGS`
+ * matrix, matching every pre-cross-vowel-mode caller (back-compat).
+ *
+ * `crossVowel: true` — `TARGET_PAIRINGS_CROSSVOWEL`. The caller
+ * (`WordSong.tsx`'s problem-render path) should compute this once at
+ * session-start by calling `crossVowelMixingActive(progress,
+ * parentSettings)` (from `lib/progress`) AND verifying the focus is a
+ * CVC tier — see `cross-vowel-mix-spec.md` §2 for the gate. A session
+ * is uniformly cross-vowel or uniformly same-vowel — never half-and-
+ * half (spec §4 "uniform per session" rule).
+ */
+export interface PickDistractorsOptions {
+  crossVowel?: boolean
+}
+
+/**
  * Pick two distinct distractors for a given target word.
  *
- * Deterministic per (target, problemIndex) pair — the matrix in
- * `wordPack.TARGET_PAIRINGS` carries the per-tier pair, and the tier
+ * Deterministic per (target, problemIndex, crossVowel?) tuple — the
+ * active matrix in `wordPack` carries the per-tier pair, and the tier
  * comes from the problem index. The position of the correct chip among
  * the three rendered chips is randomised separately at render time
  * (deterministic per problem via the same LCG pattern Math uses).
  *
  * @param target The right answer's word entry.
  * @param problemIndex 1-based session position. Drives the tier choice.
+ * @param options Optional. `{ crossVowel: true }` consults
+ *   `TARGET_PAIRINGS_CROSSVOWEL` instead of the default same-vowel
+ *   `TARGET_PAIRINGS`. Defaults to `{ crossVowel: false }` for
+ *   back-compat.
  * @returns A tuple [d1, d2] of distractor entries, both distinct from
  *          each other and from the target, both passing the forbidden-
  *          pair check against the target and against each other.
  *
- * @throws if the matrix doesn't have a pairing for `target.word`, or if
- *         the matrix's pair somehow violates the forbidden-pair rule
- *         (defensive — should never happen since the matrix is curated).
+ * @throws if the active matrix doesn't have a pairing for `target.word`,
+ *         or if the matrix's pair somehow violates the forbidden-pair
+ *         rule (defensive — should never happen since the matrix is
+ *         curated).
  */
 export function pickDistractors(
   target: WordEntry,
   problemIndex: number,
+  options?: PickDistractorsOptions,
 ): [WordEntry, WordEntry] {
   const tier = pickTier(problemIndex)
-  const pairings = TARGET_PAIRINGS[target.word]
+  const useCrossVowel = options?.crossVowel === true
+  const matrix = useCrossVowel ? TARGET_PAIRINGS_CROSSVOWEL : TARGET_PAIRINGS
+  const pairings = matrix[target.word]
   if (!pairings) {
     throw new Error(
-      `[wordDistractors] no pairing matrix entry for target "${target.word}" — ` +
-        'every TARGET_WORDS entry must have a TARGET_PAIRINGS entry',
+      `[wordDistractors] no pairing matrix entry for target "${target.word}" ` +
+        `in ${useCrossVowel ? 'TARGET_PAIRINGS_CROSSVOWEL' : 'TARGET_PAIRINGS'} — ` +
+        'every TARGET_WORDS entry must have an entry in the active matrix',
     )
   }
 

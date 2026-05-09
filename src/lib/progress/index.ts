@@ -71,11 +71,13 @@ export {
 export type { ProgressTrack } from './focusNode'
 
 export {
+  CVC_CROSS_VOWEL_NODES,
   LITERACY_TREE,
   MATH_TREE,
   NOVEL_POOL_THRESHOLD,
   WORD_SONG_GRADUATION_GATED_NODES,
   applyMasteryRule,
+  crossVowelMixingActive,
   isGraduationSessionPending,
   nextNode,
 } from './mastery'

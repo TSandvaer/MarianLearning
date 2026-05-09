@@ -7,6 +7,7 @@ import {
 import {
   FORBIDDEN_PAIRS,
   TARGET_PAIRINGS,
+  TARGET_PAIRINGS_CROSSVOWEL,
   TARGET_WORDS,
   getWordEntry,
   isForbiddenPair,
@@ -253,5 +254,248 @@ describe('FORBIDDEN_PAIRS', () => {
     // Self-pair is technically not in FORBIDDEN_PAIRS — distinctness is
     // a separate rule.
     expect(isForbiddenPair('cat', 'cat')).toBe(false)
+  })
+})
+
+// --------------------------------------------------------------------------
+// Cross-vowel distractor matrix (ticket 86c9qa0kf — cross-vowel mix v1 impl)
+// --------------------------------------------------------------------------
+
+describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
+  // The 33 effective candidate pool (14 short-a target + 8 short-o + 11
+  // short-u — excluding the 4 short-a probes).
+  const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+  const CROSS_VOWEL_TARGETS = TARGET_WORDS.filter(
+    (w) => w.isTarget && !PROBE_WORDS.has(w.word),
+  )
+
+  it('has exactly 33 rows — 14 short-a canonical + 8 short-o + 11 short-u (probes excluded)', () => {
+    // Spec §4 AC4 — 33 rows total. Probes (`nap, rat, map, tap`)
+    // intentionally excluded so they remain graduation-session-only
+    // emit-paths.
+    const rowCount = Object.keys(TARGET_PAIRINGS_CROSSVOWEL).length
+    expect(rowCount).toBe(33)
+  })
+
+  it('every cross-vowel target has a row; no probe word does', () => {
+    for (const target of CROSS_VOWEL_TARGETS) {
+      expect(
+        TARGET_PAIRINGS_CROSSVOWEL[target.word],
+        `cross-vowel matrix missing row for "${target.word}"`,
+      ).toBeDefined()
+    }
+    // Probe words MUST NOT have rows — they would break the
+    // generalization-probe-only invariant if they leaked into chip
+    // trios outside graduation sessions.
+    for (const probe of PROBE_WORDS) {
+      expect(
+        TARGET_PAIRINGS_CROSSVOWEL[probe],
+        `probe word "${probe}" must not appear in TARGET_PAIRINGS_CROSSVOWEL`,
+      ).toBeUndefined()
+    }
+  })
+
+  it('every distractor referenced is a known WordEntry (resolves via getWordEntry)', () => {
+    for (const [, pairings] of Object.entries(TARGET_PAIRINGS_CROSSVOWEL)) {
+      for (const word of [...pairings.gentle, ...pairings.trap]) {
+        expect(() => getWordEntry(word)).not.toThrow()
+      }
+    }
+  })
+
+  it('no row references a probe word as a distractor (probes stay graduation-only)', () => {
+    for (const [target, pairings] of Object.entries(
+      TARGET_PAIRINGS_CROSSVOWEL,
+    )) {
+      for (const word of [...pairings.gentle, ...pairings.trap]) {
+        expect(
+          PROBE_WORDS.has(word),
+          `cross-vowel distractor "${word}" for target "${target}" is a probe word — must be excluded`,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('every row has at least one cross-vowel distractor (vowel-mix preference)', () => {
+    // Spec §4 rule 1 — at least one cross-vowel chip per pair, ideally
+    // both. This loose check enforces "at least one" per the spec
+    // language ("ideally both" is a preference, not a hard rule).
+    for (const target of CROSS_VOWEL_TARGETS) {
+      const pairings = TARGET_PAIRINGS_CROSSVOWEL[target.word]!
+      for (const tier of ['gentle', 'trap'] as const) {
+        const [w1, w2] = pairings[tier]
+        const e1 = getWordEntry(w1)
+        const e2 = getWordEntry(w2)
+        const atLeastOneCrossVowel =
+          e1.vowel !== target.vowel || e2.vowel !== target.vowel
+        expect(
+          atLeastOneCrossVowel,
+          `${target.word} ${tier} pair [${w1}, ${w2}] has no cross-vowel distractor`,
+        ).toBe(true)
+      }
+    }
+  })
+
+  it('no pair surfaces a forbidden silhouette pair (target↔d1, target↔d2, d1↔d2)', () => {
+    // Same defensive audit as TARGET_PAIRINGS — matrix-author drift
+    // surfaces here before runtime. Spec §5 confirms zero new
+    // FORBIDDEN_PAIRS entries needed; this test is the regression
+    // guard.
+    for (const [target, pairings] of Object.entries(
+      TARGET_PAIRINGS_CROSSVOWEL,
+    )) {
+      for (const tier of ['gentle', 'trap'] as const) {
+        const [d1, d2] = pairings[tier]
+        expect(
+          isForbiddenPair(target, d1),
+          `target=${target} d1=${d1} (tier ${tier})`,
+        ).toBe(false)
+        expect(
+          isForbiddenPair(target, d2),
+          `target=${target} d2=${d2} (tier ${tier})`,
+        ).toBe(false)
+        expect(
+          isForbiddenPair(d1, d2),
+          `d1=${d1} d2=${d2} (tier ${tier})`,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('every row passes distinctness — d1 ≠ d2, d1 ≠ target, d2 ≠ target', () => {
+    for (const [target, pairings] of Object.entries(
+      TARGET_PAIRINGS_CROSSVOWEL,
+    )) {
+      for (const tier of ['gentle', 'trap'] as const) {
+        const [d1, d2] = pairings[tier]
+        expect(d1).not.toBe(target)
+        expect(d2).not.toBe(target)
+        expect(d1).not.toBe(d2)
+      }
+    }
+  })
+
+  it('no row uses the borderline-avoided pairs (spec §5: [cat,fox], [mom,man], [pot,tub])', () => {
+    // Spec §5 author-avoid: these are not in FORBIDDEN_PAIRS (kept the
+    // matrix author flexible) but the spec recommends avoiding them.
+    // This test pins that decision.
+    const avoidedPairs: ReadonlyArray<readonly [string, string]> = [
+      ['cat', 'fox'],
+      ['mom', 'man'],
+      ['pot', 'tub'],
+    ]
+    function pairMatches(
+      a: string,
+      b: string,
+      [x, y]: readonly [string, string],
+    ): boolean {
+      return (a === x && b === y) || (a === y && b === x)
+    }
+    for (const [target, pairings] of Object.entries(
+      TARGET_PAIRINGS_CROSSVOWEL,
+    )) {
+      for (const tier of ['gentle', 'trap'] as const) {
+        const [d1, d2] = pairings[tier]
+        for (const avoid of avoidedPairs) {
+          expect(
+            pairMatches(target, d1, avoid),
+            `target=${target} d1=${d1} hits avoided pair ${avoid.join('/')}`,
+          ).toBe(false)
+          expect(
+            pairMatches(target, d2, avoid),
+            `target=${target} d2=${d2} hits avoided pair ${avoid.join('/')}`,
+          ).toBe(false)
+          expect(
+            pairMatches(d1, d2, avoid),
+            `tier=${tier} d1=${d1} d2=${d2} hits avoided pair ${avoid.join('/')}`,
+          ).toBe(false)
+        }
+      }
+    }
+  })
+})
+
+describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
+  it('reads from TARGET_PAIRINGS by default (back-compat)', () => {
+    const cat = getWordEntry('cat')
+    // Same-vowel matrix's cat-gentle is ['bus','sun']; cross-vowel
+    // matrix's cat-gentle is ['log','cup']. The default call must
+    // return the same-vowel pair.
+    const [d1, d2] = pickDistractors(cat, 1)
+    expect([d1.word, d2.word]).toEqual(['bus', 'sun'])
+  })
+
+  it('reads from TARGET_PAIRINGS_CROSSVOWEL when {crossVowel: true} is passed', () => {
+    const cat = getWordEntry('cat')
+    // Cross-vowel matrix's cat-gentle is ['log','cup'].
+    const [d1, d2] = pickDistractors(cat, 1, { crossVowel: true })
+    expect([d1.word, d2.word]).toEqual(['log', 'cup'])
+  })
+
+  it('reads cross-vowel trap pair for problems 4-8', () => {
+    const cat = getWordEntry('cat')
+    // Cross-vowel matrix's cat-trap is ['hot','nut'].
+    for (let problem = 4; problem <= 8; problem++) {
+      const [d1, d2] = pickDistractors(cat, problem, { crossVowel: true })
+      expect([d1.word, d2.word]).toEqual(['hot', 'nut'])
+    }
+  })
+
+  it('cross-vowel distractors are honoured for short-o targets', () => {
+    const dog = getWordEntry('dog')
+    // Cross-vowel matrix's dog-gentle is ['hat','cup']; trap is the
+    // textbook bag/dog/bug minimal triplet → ['bag','bug'].
+    const [g1, g2] = pickDistractors(dog, 1, { crossVowel: true })
+    expect([g1.word, g2.word]).toEqual(['hat', 'cup'])
+    const [t1, t2] = pickDistractors(dog, 5, { crossVowel: true })
+    expect([t1.word, t2.word]).toEqual(['bag', 'bug'])
+  })
+
+  it('cross-vowel distractors are honoured for short-u targets', () => {
+    const sun = getWordEntry('sun')
+    const [g1, g2] = pickDistractors(sun, 1, { crossVowel: true })
+    expect([g1.word, g2.word]).toEqual(['cat', 'mom'])
+    const [t1, t2] = pickDistractors(sun, 5, { crossVowel: true })
+    expect([t1.word, t2.word]).toEqual(['fan', 'man'])
+  })
+
+  it('throws when called with a probe target in cross-vowel mode (probes excluded)', () => {
+    // Probes (`nap, rat, map, tap`) have rows in TARGET_PAIRINGS but
+    // NOT in TARGET_PAIRINGS_CROSSVOWEL. A cross-vowel call with a
+    // probe target would have nothing to look up — the explicit
+    // throw surfaces the contract violation rather than silently
+    // returning a bad pair.
+    const nap = getWordEntry('nap')
+    expect(() => pickDistractors(nap, 1, { crossVowel: true })).toThrow(
+      /TARGET_PAIRINGS_CROSSVOWEL/,
+    )
+  })
+
+  it('every cross-vowel target resolves a gentle + trap pair without throwing', () => {
+    // Defense-in-depth — exercises every row through the full
+    // pickDistractors path including the assertNotForbidden /
+    // distinctness defensive checks.
+    const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+    const targets = TARGET_WORDS.filter(
+      (w) => w.isTarget && !PROBE_WORDS.has(w.word),
+    )
+    for (const target of targets) {
+      expect(
+        () => pickDistractors(target, 1, { crossVowel: true }),
+        `gentle pair throws for ${target.word}`,
+      ).not.toThrow()
+      expect(
+        () => pickDistractors(target, 5, { crossVowel: true }),
+        `trap pair throws for ${target.word}`,
+      ).not.toThrow()
+    }
+  })
+
+  it('explicit {crossVowel: false} reads from TARGET_PAIRINGS', () => {
+    // Distinct from the default-undefined branch — covers the explicit
+    // false case.
+    const cat = getWordEntry('cat')
+    const [d1, d2] = pickDistractors(cat, 1, { crossVowel: false })
+    expect([d1.word, d2.word]).toEqual(['bus', 'sun'])
   })
 })
