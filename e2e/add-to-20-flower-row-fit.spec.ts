@@ -130,16 +130,20 @@ test.describe('add-to-20 flower-row fits inside iPad-portrait viewport', () => {
       // block. Wait for it to be in DOM and laid out.
       await expect(visualGroups).toBeVisible({ timeout: 10_000 })
 
-      // Capture the layout rect. `boundingBox()` returns DOMRect-like
-      // coordinates in the layout viewport (the same coordinate space
-      // as `viewport.width`).
+      // Capture the layout rect. Playwright's `boundingBox()` returns
+      // `{ x, y, width, height }` in CSS pixels relative to the layout
+      // viewport — the same coordinate space as `viewport.width`. We
+      // derive `left = x` and `right = x + width` to express the fit
+      // invariant in DOMRect-natural terms.
       const rect = await visualGroups.boundingBox()
       expect(
         rect,
         `problem ${i}: visual-groups boundingBox is null`,
       ).not.toBeNull()
       // Type-narrow.
-      const { left, right, top, width, height } = rect!
+      const { x, y, width, height } = rect!
+      const left = x
+      const right = x + width
 
       // Capture the addend values for diagnostic context. If the
       // assertion fails, the failure message + the attached rect blob
@@ -147,7 +151,7 @@ test.describe('add-to-20 flower-row fits inside iPad-portrait viewport', () => {
       const addendA = await page.getByTestId('math-addend-a').textContent()
       const addendB = await page.getByTestId('math-addend-b').textContent()
 
-      const diag = `problem ${i} addends ${addendA}+${addendB}: rect={left:${left}, right:${right}, top:${top}, width:${width}, height:${height}}, viewport.width=${IPAD_PORTRAIT_VIEWPORT.width}`
+      const diag = `problem ${i} addends ${addendA}+${addendB}: rect={x:${x}, y:${y}, width:${width}, height:${height}, left:${left}, right:${right}}, viewport.width=${IPAD_PORTRAIT_VIEWPORT.width}`
       await testInfo.attach(`visual-groups-rect-p${i}`, {
         body: diag,
         contentType: 'text/plain',
