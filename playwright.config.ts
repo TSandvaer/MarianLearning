@@ -105,5 +105,29 @@ export default defineConfig({
     timeout: 3 * 60 * 1000,
     stdout: 'pipe',
     stderr: 'pipe',
+    // Bake a deterministic test secret into the bundle so cloud-sync
+    // e2e specs always exercise the wired code path. Vite reads
+    // `import.meta.env.VITE_*` at build time; without this, CI builds
+    // produce a bundle where `readAuthSecret()` returns null, every
+    // cloud-sync helper short-circuits to "skipped" /
+    // "auth-not-configured", and the conflict spec's strict
+    // `expect(mock.gets).toHaveLength(1)` fails because the App
+    // never makes a request. Local dev workstations with a populated
+    // `.env.local` masked this — CI doesn't have `.env.local`. PR #182
+    // CI run on `ba175d1` surfaced this as 10/10 cloud-sync test
+    // failures.
+    //
+    // Value is intentionally non-secret (it's just a marker that the
+    // browser bundle has SOME bearer token to ship); the e2e mock
+    // route handler in `cloudSyncFixtures.ts` accepts any non-empty
+    // Authorization header. Safe to commit.
+    //
+    // `process.env.VITE_PROGRESS_API_SECRET ?? '...'` lets a developer
+    // with a real `.env.local` keep their existing flow; the explicit
+    // assignment is only the CI/greenfield default.
+    env: {
+      VITE_PROGRESS_API_SECRET:
+        process.env.VITE_PROGRESS_API_SECRET ?? 'e2e-test-secret',
+    },
   },
 })
