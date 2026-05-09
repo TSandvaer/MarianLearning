@@ -109,6 +109,34 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
       if (typeof n !== 'number' || !Number.isFinite(n)) return false
     }
   }
+  // mathFacts is optional (M4.x slow-fact directive — additive, no
+  // schemaVersion bump; same precedent as `latencyMs`). When present
+  // each entry must be `{ a, b, op }` with `a`/`b` integer in [0, 99]
+  // and `op ∈ {+, -, *}` — same bounds the server-side
+  // `parseLeitnerHint` enforces, so on-disk facts always round-trip
+  // the wire.
+  if ('mathFacts' in v && v.mathFacts !== undefined) {
+    if (!Array.isArray(v.mathFacts)) return false
+    for (const f of v.mathFacts) {
+      if (!isObject(f)) return false
+      const a = f.a
+      const b = f.b
+      const op = f.op
+      if (
+        typeof a !== 'number' ||
+        !Number.isInteger(a) ||
+        a < 0 ||
+        a > 99 ||
+        typeof b !== 'number' ||
+        !Number.isInteger(b) ||
+        b < 0 ||
+        b > 99 ||
+        (op !== '+' && op !== '-' && op !== '*')
+      ) {
+        return false
+      }
+    }
+  }
   return true
 }
 

@@ -190,6 +190,17 @@ export interface RecordProgressInput {
    * caller's framing.
    */
   latencyMs?: readonly number[]
+  /**
+   * Per-problem math fact (M4.x slow-fact directive — follow-up to
+   * 86c9pwgc8). Math only; word-song doesn't ship this. When supplied,
+   * persists onto the recorded `SessionHistoryEntry.mathFacts` field
+   * so the slow-fact session-gen hint can join `latencyMs[i]` to a
+   * concrete fact key without re-deriving from the audio plan.
+   *
+   * Defensive copy at write time (shallow per-element); writer trusts
+   * the caller's framing on length / contents.
+   */
+  mathFacts?: readonly { a: number; b: number; op: '+' | '-' | '*' }[]
 }
 
 /**
@@ -286,7 +297,7 @@ export function recordProgressOnSessionEnd(
  * into the mastery rule.
  */
 function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
-  const { graduationSplit, latencyMs } = input
+  const { graduationSplit, latencyMs, mathFacts } = input
   const useSplit =
     graduationSplit !== undefined &&
     graduationSplit.canonicalCount > 0 &&
@@ -299,12 +310,22 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
   const latencyClone =
     latencyMs !== undefined ? Array.from(latencyMs) : undefined
 
+  // mathFacts persistence (M4.x slow-fact directive). Same posture as
+  // latencyMs — shallow-clone when supplied (per-element copy so a
+  // post-record mutation by the caller can't corrupt on-disk data),
+  // omit when absent.
+  const mathFactsClone =
+    mathFacts !== undefined
+      ? mathFacts.map((f) => ({ a: f.a, b: f.b, op: f.op }))
+      : undefined
+
   if (!useSplit) {
     return {
       dateISO: input.dateISO,
       skillFocus: [input.focusNode],
       successRate: input.totalCorrect / PROBLEMS_PER_SESSION,
       ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
+      ...(mathFactsClone !== undefined ? { mathFacts: mathFactsClone } : {}),
     }
   }
 
@@ -315,6 +336,7 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
     successRate: split.canonicalCorrect / split.canonicalCount,
     novelPoolSuccessRate: split.novelCorrect / split.novelCount,
     ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
+    ...(mathFactsClone !== undefined ? { mathFacts: mathFactsClone } : {}),
   }
 }
 

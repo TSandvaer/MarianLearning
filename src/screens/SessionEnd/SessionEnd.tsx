@@ -378,6 +378,14 @@ export default function SessionEnd({
       ...(p.surface === 'math' && p.latencyMs !== undefined
         ? { latencyMs: p.latencyMs }
         : {}),
+      // mathFacts persistence (M4.x slow-fact directive — follow-up
+      // to 86c9pwgc8). Math only; word-song has no Leitner box on
+      // literacy in v1. Persisted as a parallel array to `latencyMs`
+      // so the slow-fact session-gen hint can join latency to a
+      // concrete fact key without re-deriving from the audio plan.
+      ...(p.surface === 'math' && p.mathFacts !== undefined
+        ? { mathFacts: p.mathFacts }
+        : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

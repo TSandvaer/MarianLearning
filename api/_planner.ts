@@ -215,6 +215,23 @@ export interface GenerateSessionPlanArgs {
    * lets the planner pick freely from the focus-node fact pool.
    */
   leitner?: LeitnerHintItem[]
+  /**
+   * Slow-fact hint (M4.x — follow-up to 86c9pwgc8). List of
+   * "accurate but slow" facts: Marian gets these right reliably
+   * (≥80% over ≥5 attempts) but answers slowly (median latency
+   * ≥5000ms). The planner adds a directive instructing Haiku to
+   * dose these back in for automaticity-building practice.
+   *
+   * Active only on math + add-to-10 — same gating posture as the
+   * Leitner hint above. Other focus nodes / tracks ignore the field
+   * silently. Volatile per call: lives in the user message, not the
+   * system prompt. Two slow-fact-on calls share the same cached
+   * system prefix as a slow-fact-off call.
+   *
+   * Caller responsibility: ship only when non-empty. Empty / absent
+   * lets the planner pick freely from the focus-node fact pool.
+   */
+  slowFacts?: SlowFactHintItem[]
 }
 
 /**
@@ -231,6 +248,27 @@ export interface LeitnerHintItem {
   b: number
   op: '+' | '-' | '*'
   box: 1 | 2 | 3 | 4 | 5
+}
+
+/**
+ * One slow-fact hint, ready for the planner directive (M4.x
+ * follow-up to 86c9pwgc8). Mirrors the browser-side wire shape
+ * (`SlowFactHint` in `src/lib/progress/slowFacts.ts`).
+ *
+ * Browser → server: shipped on `/api/claude` payload as
+ * `progress.slowFacts: SlowFactHintItem[]`. Server → browser: not
+ * round-tripped — this is purely an input directive.
+ *
+ * Wire is verbose (attempts/correctRate/medianLatencyMs alongside
+ * the fact triple) so the directive copy can read naturally
+ * ("4+2 — answers ~6.2s; over 7 attempts, 100% correct.") without
+ * the server re-deriving stats.
+ */
+export interface SlowFactHintItem {
+  fact: { a: number; b: number; op: '+' | '-' | '*' }
+  attempts: number
+  correctRate: number
+  medianLatencyMs: number
 }
 
 /** Plan shape returned by the planner — flat, wire-ready. Mirrors what
@@ -409,6 +447,9 @@ export interface GenerateSessionStartResponseArgs {
   /** Leitner hint (ticket 86c9pwgc8 — M4). See
    *  `GenerateSessionPlanArgs.leitner`. */
   leitner?: LeitnerHintItem[]
+  /** Slow-fact hint (M4.x — follow-up to 86c9pwgc8). See
+   *  `GenerateSessionPlanArgs.slowFacts`. */
+  slowFacts?: SlowFactHintItem[]
   /** Optional render-pipeline overrides. Production wiring leaves this
    *  empty — `_session.renderSessionAudio` resolves to the real Azure
    *  synth. Tests + the canon generator can swap in a fake synth or tune
@@ -457,6 +498,7 @@ export async function generateSessionStartResponse(
     recentSuccessRate: args.recentSuccessRate,
     isGraduationSession: args.isGraduationSession,
     leitner: args.leitner,
+    slowFacts: args.slowFacts,
   })
   return renderSessionAudio(plan, args.renderOptions)
 }
@@ -640,12 +682,27 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
     ? buildLeitnerDirective(args.leitner!)
     : null
 
+  // Slow-fact directive (M4.x — follow-up to 86c9pwgc8). Same gating
+  // posture as Leitner: math + add-to-10 + non-empty array. Surfaces
+  // accurate-but-slow facts so Haiku can dose them in for
+  // automaticity practice. Lives in the user message; cache prefix
+  // unchanged.
+  const isSlowFactsActive =
+    args.track === 'math' &&
+    focusNode === 'add-to-10' &&
+    args.slowFacts !== undefined &&
+    args.slowFacts.length > 0
+  const slowFactsLine = isSlowFactsActive
+    ? buildSlowFactDirective(args.slowFacts!)
+    : null
+
   const lines = [
     `Generate a session plan for the ${trackLabel} track at level ${args.level}.`,
     `Focus skill node: ${focusNode}.`,
     recentScoreLine,
     ...(graduationLine !== null ? [graduationLine] : []),
     ...(leitnerLine !== null ? [leitnerLine] : []),
+    ...(slowFactsLine !== null ? [slowFactsLine] : []),
     `Child's name: ${safeName || 'friend'}.`,
     `Return JSON only — no surrounding prose, no markdown fences.`,
   ]
@@ -699,6 +756,54 @@ function buildLeitnerDirective(items: readonly LeitnerHintItem[]): string {
     `  Box 4-5 fact for spaced review when possible.`,
     `- Do not repeat any fact within the 8-problem set.`,
     `- Number-word and read-line templates remain unchanged.`,
+  ].join('\n')
+}
+
+/**
+ * Build the slow-fact directive that goes into the user message (M4.x
+ * — follow-up to 86c9pwgc8). Surfaces "accurate but slow" facts so
+ * Haiku can dose them in for automaticity-building practice — the
+ * canary for finger-counting dependency per Dave's research § 6 P3.
+ *
+ * The directive carries every supplied entry as a bullet line: fact
+ * + ~latency + accuracy summary. Haiku is instructed to weave 1-2
+ * of these into the 8-problem set, with mild preference for the
+ * shorter-latency-but-still-slow facts (closer to the
+ * counting → retrieval flip than the deeply-counting facts).
+ *
+ * Distinct from the Leitner directive — Leitner targets correctness
+ * gaps (wrong / box-1 facts); slow-facts targets latency gaps
+ * (correct but slow). Both can fire on the same session; they
+ * shouldn't conflict on fact selection because the Leitner box-1
+ * predicate (low correctness) and the slow-fact predicate
+ * (≥80% correctness) are mutually exclusive by construction.
+ */
+function buildSlowFactDirective(items: readonly SlowFactHintItem[]): string {
+  const formatItem = (i: SlowFactHintItem): string => {
+    const seconds = (i.medianLatencyMs / 1000).toFixed(1)
+    const pct = Math.round(i.correctRate * 100)
+    const fact = `${i.fact.a}${i.fact.op}${i.fact.b}`
+    return `- ${fact} — answers ~${seconds}s; over ${i.attempts} attempts, ${pct}% correct.`
+  }
+  const bullets = items.map(formatItem)
+  return [
+    `SLOW-FACT DIRECTIVE (M4.x). The child has practiced these facts to`,
+    `accuracy but is still SLOW on them — the canary for finger-counting`,
+    `dependency. Practice list (accurate but slow):`,
+    ...bullets,
+    `When picking the 8 problems for this session, OBEY THIS RULE:`,
+    `- Include 1 to 2 facts from the slow list above when choosing the`,
+    `  problems for this session, mixed in with the rest of the focus-`,
+    `  node fact pool. Prefer the shorter-latency-but-still-slow facts`,
+    `  (closer to the counting → retrieval flip) over the deepest-`,
+    `  counting facts.`,
+    `- These slow facts are CORRECT-but-slow. They are not stumbles —`,
+    `  do not use the hint or giveAnswer slot copy as if Marian is`,
+    `  expected to fail. Use the standard "<addend-A> plus <addend-B>.`,
+    `  How many?" template.`,
+    `- The slow-fact picks count toward the no-repeat rule (do not`,
+    `  emit the same fact twice in one session, including across the`,
+    `  Leitner directive's picks if both directives fire).`,
   ].join('\n')
 }
 
