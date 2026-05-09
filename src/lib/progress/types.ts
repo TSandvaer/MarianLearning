@@ -150,6 +150,23 @@ export interface SessionHistoryEntry {
    * reads it.
    */
   latencyMs?: number[]
+  /**
+   * Per-problem math fact, indexed 0..N-1 — math sessions only (M4.x
+   * slow-fact directive follow-up to 86c9pwgc8). Each entry mirrors the
+   * fact the corresponding problem targeted (`{ a, b, op }`), so the
+   * future "accurate but slow" surfacing can join `latencyMs[i]` to a
+   * specific Leitner-key without re-deriving from the audio plan.
+   *
+   * Without this parallel array, latency on its own can't be attributed
+   * to a fact — `skillFocus` only names the focus node, not the per-
+   * problem pair. Word-song sessions don't carry this field (no Leitner
+   * box on literacy in v1).
+   *
+   * Optional + additive — pre-M4.x entries do not carry it; the field
+   * is omitted on read. Same precedent as `latencyMs` itself: an
+   * additive optional field, no `schemaVersion` bump.
+   */
+  mathFacts?: { a: number; b: number; op: '+' | '-' | '*' }[]
 }
 
 export type SessionHistory = SessionHistoryEntry[]

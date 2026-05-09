@@ -44,6 +44,16 @@ export {
 } from './leitner'
 export type { LeitnerSessionHintItem } from './leitner'
 
+// Slow-fact session-gen hint (M4.x — follow-up to 86c9pwgc8).
+export {
+  SLOW_FACT_HINT_MAX_ITEMS,
+  SLOW_FACT_MIN_ATTEMPTS,
+  SLOW_FACT_MIN_CORRECT_RATE,
+  SLOW_FACT_MIN_MEDIAN_LATENCY_MS,
+  buildSlowFactSessionHint,
+} from './slowFacts'
+export type { SlowFactHint } from './slowFacts'
+
 export { defaultProgress } from './defaults'
 export { migrate } from './migrate'
 export { isProgressV1 } from './guards'

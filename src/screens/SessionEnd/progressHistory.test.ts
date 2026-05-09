@@ -672,6 +672,91 @@ describe('recordProgressOnSessionEnd', () => {
     })
   })
 
+  // ── M4.x mathFacts persistence (slow-fact directive follow-up) ─────────
+  describe('M4.x mathFacts persistence', () => {
+    it('persists mathFacts onto the SessionHistoryEntry when supplied', () => {
+      const facts: { a: number; b: number; op: '+' | '-' | '*' }[] = [
+        { a: 3, b: 2, op: '+' },
+        { a: 4, b: 1, op: '+' },
+        { a: 5, b: 5, op: '+' },
+        { a: 2, b: 7, op: '+' },
+        { a: 6, b: 3, op: '+' },
+        { a: 1, b: 8, op: '+' },
+        { a: 4, b: 2, op: '+' },
+        { a: 7, b: 1, op: '+' },
+      ]
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-09T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        mathFacts: facts,
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].mathFacts).toEqual(facts)
+    })
+
+    it('omits mathFacts from the entry when not supplied (back-compat)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 7,
+        dateISO: '2026-05-09T19:00:00.000Z',
+        focusNode: 'add-to-10',
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].mathFacts).toBeUndefined()
+    })
+
+    it('per-element clones the input array (caller can mutate after)', () => {
+      const facts: { a: number; b: number; op: '+' | '-' | '*' }[] = [
+        { a: 4, b: 2, op: '+' },
+      ]
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-09T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        mathFacts: facts,
+      })
+
+      // Mutate caller's array post-call. Persisted entry must not
+      // shift — defends against a downstream caller's lint-pin
+      // failure cascading into on-disk corruption.
+      facts[0]!.a = 99
+      const after = loadProgress()!
+      expect(after.history[0].mathFacts?.[0]).toEqual({ a: 4, b: 2, op: '+' })
+    })
+
+    it('persists mathFacts and latencyMs together as parallel arrays', () => {
+      // The slow-fact aggregator joins these two arrays element-wise
+      // — a regression that wrote one without the other would defeat
+      // the join. Pin the parallel-array shape.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-09T19:00:00.000Z',
+        focusNode: 'add-to-10',
+        latencyMs: [6000, 5500, 6200, 5800, 6100, 5700, -1, 6300],
+        mathFacts: [
+          { a: 4, b: 2, op: '+' },
+          { a: 4, b: 2, op: '+' },
+          { a: 4, b: 2, op: '+' },
+          { a: 4, b: 2, op: '+' },
+          { a: 4, b: 2, op: '+' },
+          { a: 4, b: 2, op: '+' },
+          { a: 4, b: 2, op: '+' },
+          { a: 4, b: 2, op: '+' },
+        ],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].latencyMs).toHaveLength(8)
+      expect(after.history[0].mathFacts).toHaveLength(8)
+    })
+  })
+
   // ── Lifetime-first-encounter append (ticket 86c9q9ben — AC9f) ──────────
   // The session-start gate reads `lifetimeFirstEncounters` to decide
   // whether to fire tier-specific scaffolding; this writer appends the

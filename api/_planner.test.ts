@@ -2202,3 +2202,243 @@ describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', 
     expect(user).not.toContain('Box 1:')
   })
 })
+
+/**
+ * M4.x slow-fact directive tests (follow-up to ticket 86c9pwgc8).
+ *
+ * The slow-fact directive sits in the user message (volatile per
+ * call) — same posture as the Leitner directive. Active only on
+ * math + add-to-10 with a non-empty array; ignored otherwise.
+ */
+describe('generateSessionPlan — slow-fact directive (M4.x)', () => {
+  const MATH_PLAN_RESPONSE = JSON.stringify({
+    id: 'haiku-math-slow',
+    label: 'slow-fact-weighted',
+    utterances: [
+      { id: 'math.p1.read', text: 'Four plus two. How many?' },
+      { id: 'math.p1.correct', text: 'Yes! Six!' },
+      { id: 'math.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'math.p1.hint', text: 'Look. Four. And two more. How many now?' },
+      { id: 'math.p1.giveAnswer', text: 'This one is six.' },
+    ],
+  })
+
+  it('places the SLOW-FACT DIRECTIVE in the user message when slowFacts is non-empty (math+add-to-10)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      slowFacts: [
+        {
+          fact: { a: 4, b: 2, op: '+' },
+          attempts: 7,
+          correctRate: 1,
+          medianLatencyMs: 6200,
+        },
+        {
+          fact: { a: 7, b: 1, op: '+' },
+          attempts: 5,
+          correctRate: 0.8,
+          medianLatencyMs: 5400,
+        },
+      ],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toContain('SLOW-FACT DIRECTIVE')
+    // Bullet copy includes the per-fact stats verbatim.
+    expect(user).toContain(
+      '- 4+2 — answers ~6.2s; over 7 attempts, 100% correct.',
+    )
+    expect(user).toContain(
+      '- 7+1 — answers ~5.4s; over 5 attempts, 80% correct.',
+    )
+    // Actionable rule — pin presence so a future copy edit fails this
+    // test if it drops the dosing rule.
+    expect(user).toMatch(/Include 1 to 2 facts/i)
+    // The "not stumbles" guidance is the load-bearing distinction
+    // from Leitner — pin it so a future merge of the two directives
+    // doesn't lose this nuance.
+    expect(user).toMatch(/correct[- ]but[- ]slow/i)
+  })
+
+  it('omits the directive when slowFacts is undefined (default, back-compat)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      // slowFacts omitted
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('SLOW-FACT DIRECTIVE')
+    expect(args.messages[0]!.content).not.toContain('Practice list')
+  })
+
+  it('omits the directive when slowFacts is empty', async () => {
+    // The browser is supposed to omit the field entirely on the wire
+    // when the predicate finds no qualifying facts; the planner
+    // defends in depth.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      slowFacts: [],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('SLOW-FACT DIRECTIVE')
+  })
+
+  it('ignores the directive on the word-song track (slow-facts is math-only today)', async () => {
+    const WORD_RESPONSE = JSON.stringify({
+      id: 'haiku-word-001',
+      label: 'word session',
+      utterances: [
+        { id: 'word.p1.read', text: 'Tap the cat.' },
+        { id: 'word.p1.correct', text: 'Yes! Cat.' },
+        { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+        { id: 'word.p1.hint', text: "Let's look. Cat." },
+        { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+      ],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'blending-cv',
+      // Misrouted slowFacts — should be silently ignored.
+      slowFacts: [
+        {
+          fact: { a: 4, b: 2, op: '+' },
+          attempts: 5,
+          correctRate: 1,
+          medianLatencyMs: 6000,
+        },
+      ],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('SLOW-FACT DIRECTIVE')
+  })
+
+  it('ignores the directive on math focus nodes other than add-to-10', async () => {
+    // Defense-in-depth: slow-fact directive is currently add-to-10-
+    // only because that's the only Leitner-bearing tier Marian is
+    // touching today. A misrouted slowFacts array on add-to-20 must
+    // not leak the directive.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+      slowFacts: [
+        {
+          fact: { a: 8, b: 5, op: '+' },
+          attempts: 5,
+          correctRate: 1,
+          medianLatencyMs: 6000,
+        },
+      ],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('SLOW-FACT DIRECTIVE')
+  })
+
+  it('a slow-fact-active call shares the SAME system prompt as a slow-fact-off call (cache invariant)', async () => {
+    // Pin: the slowFacts field is user-message-only. Two calls that
+    // differ only in `slowFacts` MUST produce byte-identical system
+    // text so prompt-cache hits stay maximal.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(MATH_PLAN_RESPONSE, { capture: cap1 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(MATH_PLAN_RESPONSE, { capture: cap2 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      slowFacts: [
+        {
+          fact: { a: 4, b: 2, op: '+' },
+          attempts: 5,
+          correctRate: 1,
+          medianLatencyMs: 6000,
+        },
+      ],
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+
+  it('formats latency as one-decimal seconds, correctRate as integer percent', async () => {
+    // Pin the bullet-line shape Haiku reads. A regression that
+    // emitted `6200ms` (raw) or `1.0` (correctRate as float) would
+    // produce noisier directive copy and could confuse Haiku's
+    // selection heuristic.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_PLAN_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      slowFacts: [
+        {
+          fact: { a: 3, b: 5, op: '+' },
+          attempts: 6,
+          correctRate: 0.8333,
+          medianLatencyMs: 5750,
+        },
+      ],
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    // 5750ms → ~5.8s (toFixed(1) rounds half-to-even on most engines
+    // but consistently to 5.8 for 5750/1000 = 5.75 → 5.8).
+    expect(user).toContain(
+      '- 3+5 — answers ~5.8s; over 6 attempts, 83% correct.',
+    )
+  })
+})

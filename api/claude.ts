@@ -84,6 +84,7 @@ import {
   type LeitnerHintItem,
   type PlannerAnthropicClient,
   type PlannerTrack,
+  type SlowFactHintItem,
 } from './_planner.js'
 import { createRateLimiter, type RateLimiter } from './_rateLimit.js'
 import {
@@ -242,6 +243,19 @@ interface TrackPayload {
    * hint" and the planner picks freely.
    */
   leitner?: LeitnerHintItem[]
+  /**
+   * Slow-fact hint (M4.x — follow-up to 86c9pwgc8). Browser computes
+   * via `buildSlowFactSessionHint(progress)` at session-start fetch
+   * time and ships only when at least one fact qualifies. Each entry
+   * names one fact + its accuracy / median latency stats. The planner
+   * adds a directive instructing Haiku to dose these into 1-2 of the
+   * 8 problems for automaticity-building practice.
+   *
+   * Active for math + add-to-10 today — same gating posture as the
+   * Leitner hint. Absent for legacy clients / non-qualifying state —
+   * server treats undefined as "no hint" and the planner picks freely.
+   */
+  slowFacts?: SlowFactHintItem[]
 }
 
 const VALID_TRACKS: readonly PlannerTrack[] = ['math', 'word-song']
@@ -376,6 +390,17 @@ function extractTrackPayload(payload: unknown): TrackPayload | null {
         out.leitner = valid
       }
     }
+    // slowFacts (M4.x — follow-up to 86c9pwgc8): array of
+    // { fact: {a, b, op}, attempts, correctRate, medianLatencyMs }.
+    // Same validation posture as leitner — reject the whole array on
+    // any malformed item rather than partial-drop. Cap at
+    // SLOW_FACT_HINT_MAX_ITEMS_SERVER to bound payload.
+    if (Array.isArray(pr.slowFacts)) {
+      const valid = parseSlowFactHint(pr.slowFacts)
+      if (valid !== null && valid.length > 0) {
+        out.slowFacts = valid
+      }
+    }
   }
 
   return out
@@ -419,6 +444,70 @@ function parseLeitnerHint(raw: unknown[]): LeitnerHintItem[] | null {
       return null
     }
     out.push({ a, b, op: op as '+' | '-' | '*', box: box as 1 | 2 | 3 | 4 | 5 })
+  }
+  return out
+}
+
+/**
+ * Parse and validate the wire-shape slow-fact hint (M4.x — follow-up
+ * to 86c9pwgc8). Returns the parsed array on success (capped at
+ * `SLOW_FACT_HINT_MAX_ITEMS_SERVER`) or `null` on any shape error in
+ * any item. Caller drops the whole field on null — partial validity
+ * would silently skew the directive composition and the cost surface
+ * (canon bypass) is bounded either way.
+ *
+ * Cap chosen to mirror the browser-side `SLOW_FACT_HINT_MAX_ITEMS`
+ * (8) plus generous headroom — the server defends against a leaked-
+ * link client overshooting; legitimate clients ship at most 8.
+ */
+const SLOW_FACT_HINT_MAX_ITEMS_SERVER = 16
+function parseSlowFactHint(raw: unknown[]): SlowFactHintItem[] | null {
+  if (raw.length > SLOW_FACT_HINT_MAX_ITEMS_SERVER) return null
+  const out: SlowFactHintItem[] = []
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) return null
+    const r = item as Record<string, unknown>
+    const fact = r.fact
+    const attempts = r.attempts
+    const correctRate = r.correctRate
+    const medianLatencyMs = r.medianLatencyMs
+    if (typeof fact !== 'object' || fact === null) return null
+    const f = fact as Record<string, unknown>
+    const a = f.a
+    const b = f.b
+    const op = f.op
+    if (
+      typeof a !== 'number' ||
+      !Number.isInteger(a) ||
+      a < 0 ||
+      a > 99 ||
+      typeof b !== 'number' ||
+      !Number.isInteger(b) ||
+      b < 0 ||
+      b > 99 ||
+      typeof op !== 'string' ||
+      !VALID_OPS.has(op) ||
+      typeof attempts !== 'number' ||
+      !Number.isInteger(attempts) ||
+      attempts < 1 ||
+      attempts > 1000 ||
+      typeof correctRate !== 'number' ||
+      !Number.isFinite(correctRate) ||
+      correctRate < 0 ||
+      correctRate > 1 ||
+      typeof medianLatencyMs !== 'number' ||
+      !Number.isFinite(medianLatencyMs) ||
+      medianLatencyMs < 0 ||
+      medianLatencyMs > 600_000
+    ) {
+      return null
+    }
+    out.push({
+      fact: { a, b, op: op as '+' | '-' | '*' },
+      attempts,
+      correctRate,
+      medianLatencyMs,
+    })
   }
   return out
 }
@@ -680,13 +769,28 @@ export async function handler(
       const canonResolver = overrides.getCanonEntry ?? getCanonEntry
       const hasLeitnerHint =
         trackPayload.leitner !== undefined && trackPayload.leitner.length > 0
+      // Slow-fact-hint bypass (M4.x — follow-up to 86c9pwgc8). Same
+      // posture as Leitner: the canon JSON is keyed on
+      // (track, level, focusNode) only and doesn't carry slow-fact
+      // directive material; serving a cached non-slow-fact-aware
+      // plan would defeat the directive contract. The hint only
+      // ships when at least one fact qualifies (5+ attempts, 80%+
+      // correct, ≥5000ms median), so the empty / greenfield case
+      // still hits canon (free).
+      const hasSlowFactHint =
+        trackPayload.slowFacts !== undefined &&
+        trackPayload.slowFacts.length > 0
+      const bypassCanonAndCache =
+        trackPayload.isGraduationSession === true ||
+        hasLeitnerHint ||
+        hasSlowFactHint
       // Effective focus node for downstream gating. Same default-
       // resolution shape `effectiveFocusNode` uses inside the
       // planner; pulled out here so the first-encounter gate gets
       // the same answer the canon resolver does.
       const effectiveFocus =
         trackPayload.focusNode ?? defaultFocusNodeForTrack(trackPayload.track)
-      if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
+      if (!bypassCanonAndCache) {
         const canonHit = canonResolver({
           track: trackPayload.track,
           level: trackPayload.level,
@@ -737,7 +841,11 @@ export async function handler(
       // the box-1 weighting contract. Bypassing here means a Leitner-
       // active session always pays one Anthropic + Azure round-trip;
       // empty-box sessions still hit the cache.
-      if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
+      //
+      // Slow-fact-hint bypass (M4.x — follow-up to 86c9pwgc8): same
+      // posture for the same reason — the cache key doesn't carry
+      // slow-fact state.
+      if (!bypassCanonAndCache) {
         const cached = cache.get(cacheKey, now())
         if (cached !== null) {
           // 86c9q9ben (AC9f): same gate as the canon-hit path. The
@@ -819,6 +927,13 @@ export async function handler(
           // filtering — only math + add-to-10 today — lives in
           // `buildUserMessage`; passing the raw array through is safe.
           leitner: trackPayload.leitner,
+          // Slow-fact hint (M4.x — follow-up to 86c9pwgc8). When
+          // non-empty, the planner adds a directive instructing Haiku
+          // to dose 1-2 accurate-but-slow facts into the 8-problem
+          // set for automaticity practice. Server-side filtering —
+          // math + add-to-10 only — lives in `buildUserMessage`;
+          // passing the raw array through is safe.
+          slowFacts: trackPayload.slowFacts,
         })
         // Cache the rendered response under the track payload key. Even
         // partial renders (some utterances soft-failed) are cacheable —
@@ -838,7 +953,10 @@ export async function handler(
         // Leitner-weighted plan under the standard key would leak it
         // into a regular (or different-Leitner-state) session and the
         // box-1-priority contract would silently rotate.
-        if (trackPayload.isGraduationSession !== true && !hasLeitnerHint) {
+        //
+        // Slow-fact-hint bypass (M4.x — follow-up to 86c9pwgc8): same
+        // for the same reason.
+        if (!bypassCanonAndCache) {
           // Cache the PRE-GATE response. The in-memory cache stores
           // the canon-shaped output (with the tier-specific opener
           // intact for first-encounter); the gate runs on the

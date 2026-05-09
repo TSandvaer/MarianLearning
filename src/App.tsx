@@ -49,6 +49,7 @@ import {
 } from './lib/lifecycle'
 import {
   buildLeitnerSessionHint,
+  buildSlowFactSessionHint,
   crossVowelMixingActive,
   getOrCreateDeviceId,
   getSettings,
@@ -60,6 +61,7 @@ import {
   type LeitnerSessionHintItem,
   type Progress,
   type ProgressTrack,
+  type SlowFactHint,
 } from './lib/progress'
 import { projectHubTreeProgress } from './screens/Hub/progressProjection'
 import type { HubTreeProgress } from './screens/Hub'
@@ -186,6 +188,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   recentSuccessRate: number | null | undefined
   isGraduationSession: boolean | undefined
   leitner: LeitnerSessionHintItem[] | undefined
+  slowFacts: SlowFactHint[] | undefined
   lifetimeFirstEncounters: readonly string[] | undefined
 } {
   const progress = loadProgress()
@@ -195,6 +198,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       recentSuccessRate: undefined,
       isGraduationSession: undefined,
       leitner: undefined,
+      slowFacts: undefined,
       lifetimeFirstEncounters: undefined,
     }
   }
@@ -220,6 +224,18 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       leitner = hint
     }
   }
+  // M4.x slow-fact directive (follow-up to 86c9pwgc8). Math track only —
+  // mirrors the Leitner posture. Empty result → undefined so the wire
+  // field is omitted entirely and the canon-served path stays free for
+  // greenfield Marian. Non-empty → list sorted by median-latency-
+  // descending (slowest-first), capped at SLOW_FACT_HINT_MAX_ITEMS.
+  let slowFacts: SlowFactHint[] | undefined = undefined
+  if (track === 'math') {
+    const hint = buildSlowFactSessionHint(progress)
+    if (hint.length > 0) {
+      slowFacts = hint
+    }
+  }
   // 86c9q9ben (AC9c-AC9f): ship the lifetime-first-encounter list
   // for the word-song track only. Math has no first-encounter
   // scaffolding today. The server uses this to gate the
@@ -235,6 +251,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
     recentSuccessRate: pickRecentSuccessRate(progress, track),
     isGraduationSession,
     leitner,
+    slowFacts,
     lifetimeFirstEncounters,
   }
 }
@@ -818,6 +835,12 @@ export default function App() {
         // Empty box → undefined here, which keeps the canon-served
         // free path active.
         leitner: mathHints.leitner,
+        // M4.x slow-fact directive (follow-up to 86c9pwgc8). Forward
+        // the "accurate but slow" fact list. Server-side planner reads
+        // this via the `progress.slowFacts` wire field and dosed-back
+        // for automaticity-building practice. Empty list → undefined,
+        // canon-served path stays free.
+        slowFacts: mathHints.slowFacts,
       },
       { signal: controller.signal },
     )

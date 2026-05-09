@@ -77,7 +77,7 @@ import {
   type SessionStartResponse,
   type Utterance,
 } from '../../../api/_types'
-import type { LeitnerSessionHintItem } from '../progress'
+import type { LeitnerSessionHintItem, SlowFactHint } from '../progress'
 
 /** The endpoint App.tsx POSTs to. Lifted to a constant so tests can stub
  *  fetch by URL match. */
@@ -143,6 +143,21 @@ export interface PrepareMathPathAArgs {
    * `readProgressHintsForTrack` for the gate.
    */
   leitner?: LeitnerSessionHintItem[]
+  /**
+   * M4.x slow-fact directive (follow-up to 86c9pwgc8). Optional list
+   * of "accurate but slow" facts — Marian gets these right reliably
+   * but answers slowly (median latency ≥ threshold), the canary for
+   * finger-counting dependency. The server's planner reads from
+   * `progress.slowFacts` and dosed-back for automaticity-building
+   * practice in the 8-problem session.
+   *
+   * Caller policy: omit (i.e. leave undefined) when no fact qualifies
+   * (greenfield Marian, or every fact still under the latency floor).
+   * Empty list is mapped to undefined upstream in
+   * `readProgressHintsForTrack` so the canon-served free path stays
+   * active. Same posture as `leitner` and `isGraduationSession`.
+   */
+  slowFacts?: SlowFactHint[]
 }
 
 export interface PreparedMathPathA {
@@ -222,11 +237,16 @@ export async function prepareMathPathA(
   // M4 (ticket 86c9pwgc8): forward `leitner` when the caller supplied a
   // non-empty array. Empty / absent leaves the canon-served free path
   // active — same posture as graduation-session.
+  // M4.x slow-fact directive (follow-up to 86c9pwgc8): same posture for
+  // `slowFacts` — only ship when the upstream caller supplied a non-
+  // empty list.
   const hasLeitner = args.leitner !== undefined && args.leitner.length > 0
+  const hasSlowFacts = args.slowFacts !== undefined && args.slowFacts.length > 0
   const progressBlock =
     args.focusNode !== undefined ||
     args.recentSuccessRate !== undefined ||
-    hasLeitner
+    hasLeitner ||
+    hasSlowFacts
       ? {
           progress: {
             ...(args.focusNode !== undefined
@@ -236,6 +256,7 @@ export async function prepareMathPathA(
               ? { recentSuccessRate: args.recentSuccessRate }
               : {}),
             ...(hasLeitner ? { leitner: args.leitner } : {}),
+            ...(hasSlowFacts ? { slowFacts: args.slowFacts } : {}),
           },
         }
       : {}
