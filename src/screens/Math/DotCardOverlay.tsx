@@ -34,7 +34,7 @@
  * of dot-card visible".
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { m } from 'motion/react'
 import { DotCardCell } from './DotCardCell'
 import {
@@ -112,6 +112,25 @@ export function DotCardOverlay({
   // even if React re-renders during phase transitions (StrictMode).
   const completedRef = useRef(false)
 
+  // Stable ref to `onComplete` so the lifecycle effect doesn't re-arm
+  // on every parent render. Math.tsx passes an inline arrow
+  // (`onComplete={() => setActiveDismissForIndex(...)}`) which is a
+  // fresh function reference per render — without this indirection,
+  // any state update in Math.tsx during the 1100ms window would
+  // re-trigger the effect, clear the in-flight `setTimeout`, and
+  // re-arm a fresh one (timer drift up to ~200ms in practice).
+  // We intentionally OMIT `onComplete` from the lifecycle effect's
+  // dep array (see `eslint-disable react-hooks/exhaustive-deps`
+  // below) because the callback is write-only — no value flows from
+  // the closure into the effect's logic, only OUT via the call. The
+  // `useLayoutEffect` ref-sync keeps the latest reference visible to
+  // the timer callback without participating in dependency tracking.
+  // Predecessor finding: ticket 86c9q9p8w AC2 (Kevin's PR #176 review).
+  const onCompleteRef = useRef(onComplete)
+  useLayoutEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
+
   // Lifecycle orchestration. We use plain `setTimeout` and cancel/
   // restart on `pageHidden` flips so a backgrounded iPad doesn't fire
   // onComplete in the dark. The fade-in step is only scheduled when
@@ -138,7 +157,7 @@ export function DotCardOverlay({
       timeoutId = setTimeout(() => {
         if (!completedRef.current) {
           completedRef.current = true
-          onComplete?.()
+          onCompleteRef.current?.()
         }
       }, DOT_CARD_FADE_OUT_MS)
     }
@@ -146,7 +165,12 @@ export function DotCardOverlay({
     return () => {
       if (timeoutId !== undefined) clearTimeout(timeoutId)
     }
-  }, [phase, pageHidden, reducedMotion, __testSkipLifecycle, onComplete])
+    // `onComplete` is intentionally OMITTED from the dep array — see
+    // the `onCompleteRef` block above for the full rationale. The
+    // callback is read via the ref so an inline-arrow parent prop
+    // doesn't re-arm the timer on every parent render. AC2 of
+    // ticket 86c9q9p8w.
+  }, [phase, pageHidden, reducedMotion, __testSkipLifecycle])
 
   // Animation targets per phase. We drive these through Framer Motion
   // so the global `MotionConfig reducedMotion="user"` collapses springs
