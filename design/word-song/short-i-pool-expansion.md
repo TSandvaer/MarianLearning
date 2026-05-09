@@ -629,7 +629,7 @@ Kevin and Thomas use these. Jessica validates against them. Mirrors short-u spec
 - **Option B: ship 8.** Mirrors short-o precedent. Drop the audit-relaxation entries from the spec entirely; ship `pig, pin, bin, wig, bib, fig` plus 2 stronger entries Phase 2 review confirms. The risk: short-o-precedent's 8-word pool was Dave-flagged for matrix-saturation (4-of-8 distinct trios saturate within ~3 sessions); short-i would inherit that risk.
 - **Option C: ship 6.** Strict-audit only. Highest defensibility per audit but **breaks the planner's 8-distinct-problems-per-session contract** — pool size 6 forces target repetition within a session, which is a worse pedagogical posture than fewer-but-distinct targets across more sessions.
 
-**RECOMMENDATION (default-A — Thomas confirms or overrides):** Ship 11 with Phase 2 fallbacks documented. Cost-asymmetry favors option A: the 11 recommends gives Kevin the planner pool to work with; if Phase 2 picture review forces a drop to 10, 9, or 8, the canon re-bake is a one-PR delta. The reverse (ship 8, then add 3 more later) is two separate PRs + canon re-bakes + impl ticket revisits.
+**LOCKED 2026-05-09 by Thomas (Option A — ship 11 with Phase 2 fallbacks).** Cost-asymmetry favors A: the 11-word recommendation gives Kevin the planner pool to work with; if Phase 2 picture review forces a drop to 10, 9, or 8, the canon re-bake is a one-PR delta. The reverse (ship 8, then add 3 more later) is two separate PRs + canon re-bakes + impl ticket revisits. Phase 2 drop priority remains `sip → hip → rim → lid` per Q3.
 
 **Q2. FORBIDDEN_PAIR additions — confirm.** Recommended set:
 - `['pig', 'dog']` (animal-pack hygiene; cross-pack only — same-vowel-only rule keeps them apart in trios anyway).
