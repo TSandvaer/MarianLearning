@@ -739,15 +739,16 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     await expect(hub).toBeVisible({ timeout: 10_000 })
 
     // Word-song path-strip — 5 cells (sliding-window helper). With
-    // wordSongIndex=3 and an 8-node track, `slidingWindow(stages, 3, 5)`
-    // yields desiredOffset=2, maxOffset=3, offset=2 (uncamped), so the
-    // rendered slice is [blending-cv, cvc-words, cvc-words-short-o,
-    // digraphs, sight-words] — the FIRST cell is `blending-cv` and the
-    // cell at absolute index 3 (cvc-words) is `current`. The
-    // earlier-mastered nodes (letter-names, letter-sounds) are
-    // off-window and therefore intentionally not rendered, and
-    // `simple-sentences` drops out of the right edge of the window now
-    // that the track is 8 nodes long.
+    // wordSongIndex=3 and a 9-node track (ticket 86c9q9ben added
+    // `cvc-words-short-u` between `cvc-words-short-o` and
+    // `digraphs`), `slidingWindow(stages, 3, 5)` yields
+    // desiredOffset=2, maxOffset = 9-5 = 4, offset=2 (uncamped),
+    // so the rendered slice is [blending-cv, cvc-words,
+    // cvc-words-short-o, cvc-words-short-u, digraphs]. The FIRST
+    // cell is `blending-cv` and the cell at absolute index 3
+    // (cvc-words) is `current`. Earlier-mastered nodes
+    // (letter-names, letter-sounds) are off-window; sight-words
+    // and simple-sentences drop out of the right edge.
     const wordSongStrip = page.locator(
       '[data-testid="hub-path-strip"][data-tree="word-song"]',
     )
@@ -768,8 +769,8 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
       { stage: 'blending-cv', kind: 'mastered' },
       { stage: 'cvc-words', kind: 'current' },
       { stage: 'cvc-words-short-o', kind: 'locked' },
+      { stage: 'cvc-words-short-u', kind: 'locked' },
       { stage: 'digraphs', kind: 'locked' },
-      { stage: 'sight-words', kind: 'locked' },
     ])
 
     // No pendingPromotion seeded → celebration overlay must NOT render.

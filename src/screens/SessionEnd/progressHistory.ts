@@ -48,14 +48,17 @@ import {
   demote,
   getOrCreateDeviceId,
   loadProgress,
+  markFirstEncounterSeen,
   promote,
   pushProgressToCloud,
   saveProgress,
+  WORD_SONG_NODES_IN_ORDER,
   type LeitnerBox,
   type MathFact,
   type Progress,
   type SessionHistoryEntry,
   type SkillNode,
+  type WordSongNode,
 } from '../../lib/progress'
 import type { SessionEndSurface } from './SessionEnd'
 
@@ -235,13 +238,28 @@ export function recordProgressOnSessionEnd(
     mathFactsLeitner: nextLeitner,
   }
 
+  // 86c9q9ben (AC9f): mark the just-completed session's focus node as
+  // encountered. The session-start gate read this flag BEFORE this
+  // session ran (the contrast / scaffolding line fired iff the node
+  // was NOT in the list at that point). Now that the session has
+  // finished, append so the NEXT session-start ships the updated
+  // list and the gate substitutes vanilla "You did it!".
+  //
+  // Idempotent: append-only when not already present. Word-song nodes
+  // only — math has no first-encounter scaffolding today and the
+  // type narrows enforce it. Non-word-song focus (math surface) is a
+  // no-op pass-through.
+  const withFirstEncounter = isWordSongNode(input.focusNode)
+    ? markFirstEncounterSeen(next, input.focusNode)
+    : next
+
   // M3 (ticket 86c9kmwd0): evaluate the mastery promotion rule on the
   // post-append history. The rule is pure and tunable via parentSettings;
   // see `src/lib/progress/mastery.ts`. We collapse the two writes into a
   // single `saveProgress(promoted)` so the persisted blob always reflects
   // the post-promotion shape — there's no observable mid-state in
   // localStorage and no double IO.
-  const promoted = applyMasteryRule(next)
+  const promoted = applyMasteryRule(withFirstEncounter)
   saveProgress(promoted)
 
   // T2 cloud-sync (ticket 86c9pkfyu) — fire-and-forget POST so a future
@@ -343,3 +361,13 @@ function applyLeitnerOutcomes(
  * other module should pluck this without explicit thought.
  */
 const mathFactKey = (f: MathFact): string => `${f.a}${f.op}${f.b}`
+
+/**
+ * Narrow a `SkillNode` to the `WordSongNode` subset for the
+ * lifetime-first-encounter append (ticket 86c9q9ben). Math nodes
+ * never get appended — no first-encounter scaffolding lives on the
+ * math track today.
+ */
+function isWordSongNode(node: SkillNode): node is WordSongNode {
+  return (WORD_SONG_NODES_IN_ORDER as readonly string[]).includes(node)
+}

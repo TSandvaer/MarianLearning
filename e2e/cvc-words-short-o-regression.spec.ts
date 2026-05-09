@@ -303,9 +303,12 @@ test.describe('cvc-words-short-o flow regression (PR #151)', () => {
 
     // Word-song path-strip projection. With letter-names, letter-sounds,
     // blending-cv AND cvc-words all `mastered`, `wordSongIndex = 4`.
-    // `slidingWindow(stages, 4, 5)` yields desiredOffset=3, maxOffset=3,
-    // offset=3 — slice = nodes[3..7] = [cvc-words, cvc-words-short-o,
-    // digraphs, sight-words, simple-sentences].
+    // Ticket 86c9q9ben added `cvc-words-short-u` between
+    // `cvc-words-short-o` and `digraphs`, widening the track to 9
+    // nodes. `slidingWindow(stages, 4, 5)` yields desiredOffset=3,
+    // maxOffset = 9-5 = 4, offset=3 (uncamped) — slice = nodes[3..7]
+    // = [cvc-words, cvc-words-short-o, cvc-words-short-u, digraphs,
+    // sight-words]. simple-sentences drops out of the right edge.
     const wordSongStrip = page.locator(
       '[data-testid="hub-path-strip"][data-tree="word-song"]',
     )
@@ -324,9 +327,9 @@ test.describe('cvc-words-short-o flow regression (PR #151)', () => {
     expect(wordSongProjection).toEqual([
       { stage: 'cvc-words', kind: 'mastered' },
       { stage: 'cvc-words-short-o', kind: 'current' },
+      { stage: 'cvc-words-short-u', kind: 'locked' },
       { stage: 'digraphs', kind: 'locked' },
       { stage: 'sight-words', kind: 'locked' },
-      { stage: 'simple-sentences', kind: 'locked' },
     ])
 
     // No pendingPromotion seeded → celebration overlay must NOT render.

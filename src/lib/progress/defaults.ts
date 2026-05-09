@@ -136,5 +136,11 @@ export function defaultProgress(childName = 'Marian'): Progress {
       ...DEFAULT_PARENT_SETTINGS,
       masteryThreshold: { ...DEFAULT_PARENT_SETTINGS.masteryThreshold },
     },
+    // Lifetime-first-encounter gate (ticket 86c9q9ben). Greenfield
+    // Marian sees every tier's first-encounter scaffolding the first
+    // time her session-start request lands on it; the field is
+    // appended at session-end. See types.ts comment + the migration
+    // path in `migrate.ts` for the existing-blob fill rule.
+    lifetimeFirstEncounters: [],
   }
 }

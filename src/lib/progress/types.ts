@@ -307,6 +307,41 @@ export interface Progress {
    * been applied (or remains queued for the same parent confirmation).
    */
   pendingPromotion?: SkillNode
+  /**
+   * Lifetime-first-encounter gate (ticket 86c9q9ben AC9c).
+   *
+   * List of `WordSongNode` ids the child has already seen the
+   * tier-specific first-encounter scaffolding for. Currently consumed
+   * by the `session.end.opener` rewrite at /api/claude render time:
+   *   - `cvc-words-short-u`: the /u/ vs /ʌ/ minimal-pair contrast
+   *     opener ("Listen carefully: 'sun' — not 'soon.' …") fires
+   *     ONLY when this list does NOT contain `cvc-words-short-u`.
+   *   - `cvc-words-short-o`: the box/fox /ks/ first-encounter line
+   *     uses the same gate — infrastructure-ready; the canon variant
+   *     ships in a future PR.
+   *
+   * Rendered + appended at session-end: when the session-start fetch
+   * fired the first-encounter scaffolding for `focusNode`,
+   * `progressHistory.recordProgressOnSessionEnd` adds `focusNode` to
+   * this list so subsequent sessions on the same focus node skip the
+   * scaffolding.
+   *
+   * Optional on the persisted shape because pre-86c9q9ben blobs
+   * predate the field. The migration framework + read-path defaulter
+   * fills it from the existing `history` + `skillLevels` shape (any
+   * non-locked word-song node is treated as already-encountered, so
+   * the migration doesn't replay first-encounter scaffolding the
+   * child has missed by virtue of having already passed the tier).
+   * Field is additive and backward-compatible (no schemaVersion bump
+   * — same precedent as `parentSettings` and `pendingPromotion`).
+   *
+   * Gate at the NODE level, not the word level — Dave's PR #173 §4
+   * recommendation. Future cross-vowel mixing (#86c9m3aek) won't
+   * accidentally re-fire when a short-u word surfaces in a mixed-
+   * vowel session: the gate keys on `focusNode`, which is set
+   * once-per-session at session-start fetch time.
+   */
+  lifetimeFirstEncounters?: WordSongNode[]
 }
 
 export const CURRENT_SCHEMA_VERSION = 1 as const

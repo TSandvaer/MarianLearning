@@ -104,6 +104,20 @@ export interface PrepareWordSongPathAArgs {
    * for a generalization probe. Defaults to `false` when omitted.
    */
   isGraduationSession?: boolean
+  /**
+   * Lifetime-first-encounter list (ticket 86c9q9ben — AC9f). Read
+   * from `Progress.lifetimeFirstEncounters` for the word-song track.
+   * Server consults this to decide whether to fire tier-specific
+   * first-encounter scaffolding on `session.end.opener`:
+   *   - focus node ∉ list → first encounter; canon's contrast/scaffolding
+   *     line is delivered as-is.
+   *   - focus node ∈ list → already encountered; server rewrites the
+   *     opener to vanilla "You did it!" using a sibling canon's
+   *     vanilla audio.
+   * Always shipped (even when empty) for the word-song track when
+   * progress exists; `[]` is meaningful (greenfield Marian).
+   */
+  lifetimeFirstEncounters?: readonly string[]
 }
 
 export interface PreparedWordSongPathA {
@@ -167,10 +181,12 @@ export async function prepareWordSongPathA(
   // `progress.recentSuccessRate`. See mathPathA.ts for the full
   // architectural rationale (same shape, same contract).
   // 86c9m3aec: extended to optionally carry `isGraduationSession`.
+  // 86c9q9ben: extended to optionally carry `lifetimeFirstEncounters`.
   const hasProgress =
     args.focusNode !== undefined ||
     args.recentSuccessRate !== undefined ||
-    args.isGraduationSession !== undefined
+    args.isGraduationSession !== undefined ||
+    args.lifetimeFirstEncounters !== undefined
   const progressBlock = hasProgress
     ? {
         progress: {
@@ -182,6 +198,11 @@ export async function prepareWordSongPathA(
             : {}),
           ...(args.isGraduationSession !== undefined
             ? { isGraduationSession: args.isGraduationSession }
+            : {}),
+          ...(args.lifetimeFirstEncounters !== undefined
+            ? {
+                lifetimeFirstEncounters: [...args.lifetimeFirstEncounters],
+              }
             : {}),
         },
       }

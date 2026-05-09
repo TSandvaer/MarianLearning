@@ -10,6 +10,7 @@
 
 import { defaultLockedSkillLevels } from './defaults'
 import { isProgressV1, readSchemaVersion } from './guards'
+import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { migrate } from './migrate'
 import { getSettings } from './parentSettings'
 import type { Progress, SkillLevels } from './types'
@@ -49,12 +50,22 @@ export function loadProgress(): Progress | null {
     // pre-node-addition blob round-trip cleanly post-addition; the strict
     // guard stays strict and rejects truly-corrupt input.
     const defaulted = withDefaultedSkillLevels(parsed)
-    return isProgressV1(defaulted) ? withDefaultedSettings(defaulted) : null
+    if (!isProgressV1(defaulted)) return null
+    // Two layered post-guard defaulters: first parentSettings (M2.5),
+    // then lifetimeFirstEncounters (ticket 86c9q9ben). Both are
+    // additive-no-bump optional fields whose absence on a pre-feature
+    // blob is fine but whose presence is preferred by downstream
+    // consumers (the planner-side gate doesn't have to short-circuit
+    // a missing list when the field is always set after load).
+    return withDefaultedLifetimeFirstEncounters(
+      withDefaultedSettings(defaulted),
+    )
   }
 
   // Different version (older or newer) — route through migrate.
   const migrated = migrate(parsed)
-  return migrated === null ? null : withDefaultedSettings(migrated)
+  if (migrated === null) return null
+  return withDefaultedLifetimeFirstEncounters(withDefaultedSettings(migrated))
 }
 
 /**
@@ -159,6 +170,39 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
  */
 function withDefaultedSettings(p: Progress): Progress {
   return { ...p, parentSettings: getSettings(p) }
+}
+
+/**
+ * Inject defaults for `lifetimeFirstEncounters` post-parse (ticket
+ * 86c9q9ben — additive, no schemaVersion bump).
+ *
+ * The field is OPTIONAL on the persisted shape — pre-86c9q9ben blobs
+ * predate it. We layer the defaulter at the read path so every
+ * caller of `loadProgress()` sees a fully-shaped result and the
+ * downstream planner-gate (`isFirstEncounter`) doesn't need to
+ * short-circuit a missing list.
+ *
+ * Inference rule: any non-locked word-song node is treated as
+ * already-encountered. Pre-86c9q9ben Marians whose
+ * `cvc-words: 'practicing'` (or higher) means the migration does
+ * NOT replay short-a scaffolding for them on next session-start.
+ * See `inferLifetimeFirstEncountersFromProgress` for the full
+ * rationale.
+ *
+ * Idempotent: when the input already carries the field (any value,
+ * including empty), pass it through untouched. The "fresh-blob
+ * default to []" semantic comes from `defaultProgress()`, not from
+ * this defaulter — which means a fresh-storage Marian created via
+ * `defaultProgress()` and saved gets `[]` on disk, while an old
+ * pre-86c9q9ben blob gets the inferred list filled in here at
+ * read time.
+ */
+function withDefaultedLifetimeFirstEncounters(p: Progress): Progress {
+  if (p.lifetimeFirstEncounters !== undefined) return p
+  return {
+    ...p,
+    lifetimeFirstEncounters: inferLifetimeFirstEncountersFromProgress(p),
+  }
 }
 
 /**

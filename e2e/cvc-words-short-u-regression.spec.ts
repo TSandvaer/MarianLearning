@@ -244,6 +244,26 @@ async function seedShortUProgress(
         'cvc-words-short-o': 'mastered',
         'cvc-words-short-u': 'practicing',
       },
+      // Greenfield short-u (ticket 86c9q9ben — AC9f): Marian has
+      // mastered every prior word-song tier but has NOT yet
+      // encountered cvc-words-short-u. The migration default would
+      // infer her practicing-on-short-u state as already-encountered;
+      // we override to `[]` (excluding short-u) so the first session
+      // sees the contrast-line opener via the gate. Tests 1-7 don't
+      // assert on opener content so the gate state is invisible to
+      // them; test 8 (greenfield first-encounter) explicitly verifies
+      // the gate behavior.
+      lifetimeFirstEncounters: [
+        // Earlier mastered tiers stay seeded as already-encountered
+        // — they would have triggered any earlier first-encounter
+        // scaffolding before we got here.
+        'letter-names',
+        'letter-sounds',
+        'blending-cv',
+        'cvc-words',
+        'cvc-words-short-o',
+        // cvc-words-short-u is intentionally absent — first encounter.
+      ],
     }),
     sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
   })
@@ -675,5 +695,131 @@ test.describe('cvc-words-short-u flow regression (ticket 86c9q9ben)', () => {
     await expect(page.getByTestId('session-end')).toBeVisible({
       timeout: 20_000,
     })
+  })
+
+  /**
+   * Lifetime-first-encounter gate (ticket 86c9q9ben — AC9g).
+   *
+   * Greenfield Marian seeded with `cvc-words-short-u: 'practicing'`
+   * AND `lifetimeFirstEncounters: []` (no prior tier-encounters
+   * recorded — true cold-start) ships an empty list on the
+   * session-start request → server sees the focus node is NOT in
+   * the list → first-encounter posture, contrast-line opener
+   * delivered as canon ships it. Second session simulates the
+   * post-first-session state by seeding `lifetimeFirstEncounters:
+   * ['cvc-words-short-u']` directly → server rewrites to vanilla.
+   *
+   * Why this is two browser contexts (not one walk-through-and-walk-back)
+   * --------------------------------------------------------------------
+   * The session-start request fires once when WordSong mounts (via
+   * `prepareWordSongPathA`). On a single browser, the ONLY time we
+   * see the gate fire is the first time WordSong mounts in that
+   * page lifecycle. Re-mounting WordSong in the same browser would
+   * require navigating Hub → WordSong → SessionEnd → Hub →
+   * WordSong, with the in-between session-end actually appending
+   * `cvc-words-short-u` to lifetimeFirstEncounters. That works but
+   * adds 30+ seconds of test runtime. Seeding the pre/post state in
+   * separate contexts is simpler and faster. The "really walks
+   * through a session" assertion is already covered by tests 6, 7
+   * (which use the default seedShortUProgress that DOES fire first-
+   * encounter via the empty-short-u list).
+   */
+  test('9. AC9g — first session ships empty short-u list (gate fires); pre-recorded second session ships short-u in list (gate does NOT fire)', async ({
+    page,
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
+
+    // ── Step 1: First session — greenfield, gate fires ─────────────
+    // Re-seed with an empty lifetimeFirstEncounters list to model
+    // a true greenfield Marian (overrides the test.beforeEach seed).
+    await seedLocalStorage(page, {
+      progress: buildSeedProgress({
+        skillLevelOverrides: {
+          'letter-sounds': 'mastered',
+          'blending-cv': 'mastered',
+          'cvc-words': 'mastered',
+          'cvc-words-short-o': 'mastered',
+          'cvc-words-short-u': 'practicing',
+        },
+        lifetimeFirstEncounters: [],
+      }),
+      sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
+    })
+    const { requests: firstRequests } =
+      await installCvcWordsShortUClaudeMock(page)
+    await page.goto('/')
+
+    await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+    await page
+      .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
+      .click()
+    await expect(page.getByTestId('word-song')).toBeVisible({
+      timeout: 15_000,
+    })
+
+    expect(firstRequests).toHaveLength(1)
+    const firstBody = JSON.parse(firstRequests[0]!.postData() ?? '{}') as {
+      payload?: { progress?: { lifetimeFirstEncounters?: unknown } }
+    }
+    const firstList = firstBody.payload?.progress?.lifetimeFirstEncounters
+    // The browser ships an array (always, when progress exists for
+    // word-song). Greenfield = empty array.
+    expect(Array.isArray(firstList)).toBe(true)
+    expect(firstList).toEqual([])
+    // Server's first-encounter gate sees `cvc-words-short-u` NOT in
+    // [] → contrast line is delivered as canon ships it.
+
+    // ── Step 2: Already-encountered — gate does NOT fire ───────────
+    // Fresh page context; re-seed with cvc-words-short-u in the
+    // list (post-first-session state). The browser ships the
+    // populated list; the server's gate substitutes the vanilla
+    // opener.
+    await page.context().clearCookies()
+    await page.evaluate(() => window.localStorage.clear())
+    await seedLocalStorage(page, {
+      progress: buildSeedProgress({
+        skillLevelOverrides: {
+          'letter-sounds': 'mastered',
+          'blending-cv': 'mastered',
+          'cvc-words': 'mastered',
+          'cvc-words-short-o': 'mastered',
+          'cvc-words-short-u': 'practicing',
+        },
+        lifetimeFirstEncounters: ['cvc-words-short-u'],
+      }),
+      sessionHistory: buildSeedSessionHistory({ sessionCount: 6 }),
+    })
+    // installCvcWordsShortUClaudeMock was already installed; the
+    // existing route handler captures the new request.
+    await page.goto('/')
+
+    await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+    await page
+      .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
+      .click()
+    await expect(page.getByTestId('word-song')).toBeVisible({
+      timeout: 15_000,
+    })
+
+    // Two POSTs total now — the second carries the populated list.
+    expect(firstRequests.length).toBeGreaterThanOrEqual(2)
+    const secondBody = JSON.parse(
+      firstRequests[firstRequests.length - 1]!.postData() ?? '{}',
+    ) as {
+      payload?: { progress?: { lifetimeFirstEncounters?: unknown } }
+    }
+    const secondList = secondBody.payload?.progress?.lifetimeFirstEncounters
+    expect(Array.isArray(secondList)).toBe(true)
+    expect(secondList).toEqual(['cvc-words-short-u'])
+    // Server's first-encounter gate sees `cvc-words-short-u` IN the
+    // list → vanilla "You did it!" opener substituted. Direct
+    // assertion of the audio bytes is hard to do via Playwright's
+    // mock-fulfill path (the canon mock returns the canon bytes
+    // unmodified — the gate runs against the live server in
+    // production but in this test the mock IS the server). Test
+    // boundary: we verify the wire shape (browser ships the right
+    // list); the server-side gate is exercised by
+    // `api/_firstEncounterGate.test.ts` (vitest) where we can
+    // assert the rewrite output directly.
   })
 })

@@ -46,6 +46,7 @@
 
 import { defaultLockedSkillLevels } from './defaults'
 import { isProgressV1 } from './guards'
+import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { saveProgress } from './storage'
 import type { Progress, SkillLevels } from './types'
 
@@ -418,6 +419,22 @@ export async function reconcileWithCloud(
 function installCloudBlob(blob: unknown): Progress | null {
   const defaulted = withDefaultedSkillLevels(blob)
   if (!isProgressV1(defaulted)) return null
+  // Mirror of `storage.ts:withDefaultedLifetimeFirstEncounters`. A
+  // cloud blob written by an older device that doesn't know about
+  // `lifetimeFirstEncounters` (ticket 86c9q9ben) gets the field
+  // inferred at install time so the downstream planner-gate doesn't
+  // see a missing list. Same shape + rule as the storage adapter's
+  // post-guard defaulter; if either drifts, the cloud-installed
+  // blob and the locally-loaded blob would default different lists,
+  // which is exactly the parity hazard the cloudSync.test.ts tests
+  // pin against.
+  if (defaulted.lifetimeFirstEncounters === undefined) {
+    return {
+      ...defaulted,
+      lifetimeFirstEncounters:
+        inferLifetimeFirstEncountersFromProgress(defaulted),
+    }
+  }
   return defaulted
 }
 

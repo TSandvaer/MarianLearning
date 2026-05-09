@@ -47,6 +47,13 @@ export type { LeitnerSessionHintItem } from './leitner'
 export { defaultProgress } from './defaults'
 export { migrate } from './migrate'
 export { isProgressV1 } from './guards'
+
+// Lifetime-first-encounter gate (ticket 86c9q9ben).
+export {
+  inferLifetimeFirstEncountersFromProgress,
+  isFirstEncounter,
+  markFirstEncounterSeen,
+} from './lifetimeFirstEncounters'
 export {
   MAX_SESSION_HISTORY,
   STORAGE_KEY,
