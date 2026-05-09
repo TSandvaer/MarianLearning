@@ -4,28 +4,21 @@
 # "no e2e on PRs" gap that allowed every cross-screen audio-race P0 of the
 # last 10 PRs to ship undetected.
 #
-# Trigger: every push to a feature branch with an open PR, plus pushes to
-# main. The job builds the prod bundle, boots `vite preview`, and runs all
+# Trigger: every pull_request targeting main (PR review gate), plus every
+# push to main (post-merge regression coverage). Feature-branch pushes
+# DON'T fire e2e directly — `pull_request` already covers them once a PR
+# exists, and pre-PR prototype pushes don't need a CI gate. This avoids
+# the double-fire that ran e2e twice per PR push under the old config.
+# The job builds the prod bundle, boots `vite preview`, and runs all
 # Playwright specs against it. /api/claude is mocked at the route level
 # (see e2e/_helpers/mockClaude.ts) so the suite never hits Anthropic / Azure.
-#
-# Why we don't run only on PRs
-# -----------------------------
-# A push to a feature branch without a PR (e.g. early prototype) still
-# produces useful CI signal — the harness is fast (~1 min), and catching
-# a regression at push-time beats catching it after PR-open.
 
 name: e2e
 
 on:
-  push:
-    branches:
-      - main
-      - 'feat/**'
-      - 'fix/**'
-      - 'infra/**'
-      - 'chore/**'
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
 
 jobs:
