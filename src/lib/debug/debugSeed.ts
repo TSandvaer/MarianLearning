@@ -80,6 +80,13 @@
  *   mastered and she's now practicing the short-o sibling node. The
  *   picker walks past `cvc-words` (mastered) and lands on
  *   `cvc-words-short-o` (practicing) per WORD_SONG_NODES_IN_ORDER.
+ * - `cvc-words-short-u`: Marian as if both short-a AND short-o CVC
+ *   pools are fully mastered and she's now practicing the short-u
+ *   sibling node (ticket 86c9q9ben). The picker walks past `cvc-words`
+ *   AND `cvc-words-short-o` (both mastered) and lands on
+ *   `cvc-words-short-u` (practicing) per WORD_SONG_NODES_IN_ORDER.
+ *   Mirrors the `cvc-words-short-o` recipe one step further down the
+ *   tree.
  * - `add-to-20`: Marian as if she's mastered `number-recog` and
  *   `add-to-10` and is now practicing the next math tier. The picker
  *   walks past those two and lands on `add-to-20` (practicing) per
@@ -198,6 +205,27 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'blending-cv': 'mastered',
       'cvc-words': 'mastered',
       'cvc-words-short-o': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Short-u sibling node smoke-test entry (ticket 86c9q9ben — third
+  // vowel-tier sibling). Marian has fully mastered both short-a AND
+  // short-o CVC pools and is now practicing the short-u tier. The
+  // picker walks WORD_SONG_NODES_IN_ORDER, sees every earlier
+  // word-song node mastered (including `cvc-words` and
+  // `cvc-words-short-o`), and lands on `cvc-words-short-u`. Used by
+  // Thomas's iPad smoke-test for the short-u focus session AND by QA
+  // for the deep-launch path verifying the new tier renders end-to-end.
+  // Mirrors the `cvc-words-short-o` recipe with one additional
+  // mastered prerequisite.
+  'cvc-words-short-u': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'practicing',
     },
     skipGreet: true,
   },

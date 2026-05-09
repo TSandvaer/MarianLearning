@@ -45,6 +45,7 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
+  'cvc-words-short-u',
   'digraphs',
   'sight-words',
   'simple-sentences',
@@ -101,6 +102,11 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // — unlocks to 'intro' when cvc-words (short-a) is mastered. See
   // design/word-song/short-o-pool-expansion.md §2 + §4.
   'cvc-words-short-o': 'locked',
+  // cvc-words-short-u is the third vowel-tier sibling (ticket 86c9q5q2d /
+  // 86c9q9ben). Locked at v1 default — unlocks to 'intro' when
+  // cvc-words-short-o is mastered. See
+  // design/word-song/short-u-pool-expansion.md §2 + §4.
+  'cvc-words-short-u': 'locked',
   digraphs: 'locked',
   'sight-words': 'intro', // introduce gradually
   'simple-sentences': 'locked',

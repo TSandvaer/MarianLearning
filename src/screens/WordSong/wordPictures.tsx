@@ -148,6 +148,22 @@ function renderPictureBody(key: string): ReactNode {
     case 'box':
     case 'mom':
     case 'hot':
+    case 'bug':
+    case 'nut':
+    case 'tub':
+    case 'bun':
+    case 'jug':
+    case 'rug':
+    case 'hut':
+    case 'gum':
+      // Short-u pack additions (ticket 86c9q5q2d / 86c9q9ben). 8
+      // wholly-new (`bug, nut, tub, bun, jug, rug, hut, gum`) plus
+      // 3 retraces of existing distractor pictures (`sun, cup, bus`
+      // — already in the case list above; their SVG files were
+      // overwritten in PR #170 / commit ba08b69 with the new
+      // short-u tier traces). PNG-in-SVG embed per
+      // `.claude/docs/skill-trees-and-content.md` §"Rendering pattern
+      // post-PR #157" + spec §3 Path 2.
       // External SVG — rendered as <image> inside the wrapper <svg>
       // so the WordPicture outer envelope (data-testid, role,
       // aria-label, data-large, data-picture-key) stays identical to

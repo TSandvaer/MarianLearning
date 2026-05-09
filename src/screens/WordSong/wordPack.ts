@@ -290,6 +290,106 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'object',
     isTarget: true,
   },
+  // ── Short-u pool (ticket 86c9q5q2d / 86c9q9ben, v3 vowel tier) ──────
+  // Per `design/word-song/short-u-pool-expansion.md` §1 with Thomas's
+  // 2026-05-09 lock (Q1=A): 11 short-u target words spanning seven
+  // rhyme families (/ʌn/, /ʌp/, /ʌs/, /ʌg/, /ʌt/, /ʌb/, /ʌm/). Pool
+  // reaches Marian only when the planner emits content for
+  // `cvc-words-short-u` (the next-vowel sibling node added between
+  // `cvc-words-short-o` and `digraphs` in WordSongNode / LITERACY_TREE).
+  // Short-a / short-o sessions continue to draw from their own pools and
+  // short-u words don't leak into them (planner-side guarantee — see
+  // `WORD_SONG_TRACK_GUIDE` in `api/_planner.ts`).
+  //
+  // Three of the entries (`sun, cup, bus`) USED to live in
+  // `DISTRACTOR_ONLY_WORDS` (see git blame); per Q2=A (2026-05-09) they
+  // are promoted target → distractor with `isTarget: true` flipped on.
+  // They retain their distractor pictures (re-traced in Phase 3 of the
+  // short-u pack — see `design/word-song/short-u-pool-expansion.md`
+  // §3 Q2 lock). They remain pickable as distractors in short-a /
+  // short-o sessions (the two flags are independent) — same precedent
+  // as the short-o promotions of `dog, log, pot, fox`.
+  //
+  // Same-vowel-only rule (spec §8): every distractor for a short-u
+  // target is drawn from the short-u pool itself. No cross-vowel mixing
+  // in v1 — that's a separate downstream ticket (`86c9m3aek`).
+  {
+    word: 'sun',
+    pictureKey: 'sun',
+    vowel: 'u',
+    category: 'celestial',
+    isTarget: true,
+  },
+  {
+    word: 'cup',
+    pictureKey: 'cup',
+    vowel: 'u',
+    category: 'vessel',
+    isTarget: true,
+  },
+  {
+    word: 'bus',
+    pictureKey: 'bus',
+    vowel: 'u',
+    category: 'vehicle',
+    isTarget: true,
+  },
+  {
+    word: 'bug',
+    pictureKey: 'bug',
+    vowel: 'u',
+    category: 'animal',
+    isTarget: true,
+  },
+  {
+    word: 'nut',
+    pictureKey: 'nut',
+    vowel: 'u',
+    category: 'food',
+    isTarget: true,
+  },
+  {
+    word: 'tub',
+    pictureKey: 'tub',
+    vowel: 'u',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'bun',
+    pictureKey: 'bun',
+    vowel: 'u',
+    category: 'food',
+    isTarget: true,
+  },
+  {
+    word: 'jug',
+    pictureKey: 'jug',
+    vowel: 'u',
+    category: 'vessel',
+    isTarget: true,
+  },
+  {
+    word: 'rug',
+    pictureKey: 'rug',
+    vowel: 'u',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'hut',
+    pictureKey: 'hut',
+    vowel: 'u',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'gum',
+    pictureKey: 'gum',
+    vowel: 'u',
+    category: 'food',
+    isTarget: true,
+  },
 ] as const
 
 /**
@@ -300,37 +400,27 @@ export const TARGET_WORDS: readonly WordEntry[] = [
  *
  * v2 note (ticket 86c9m3ae3, short-o pool expansion): four entries —
  * `dog, log, pot, fox` — moved out of this array into `TARGET_WORDS`
- * with `isTarget: true`. They still appear here in spirit because the
+ * with `isTarget: true`. They still appear in spirit because the
  * v1 short-a `TARGET_PAIRINGS` rows reference them as gentle-tier
  * distractors; `getWordEntry()` resolves them from `TARGET_WORDS` now,
  * so the matrix continues to work unchanged. The "DISTRACTOR_ONLY"
- * label still holds — these 4 pictures cannot serve as the right
- * answer in a short-a session (`WORD_SONG_TARGET_WORDS_FOR_PROMPT`
- * doesn't list them) and the planner's pool-by-focus-node split keeps
- * short-a + short-o sessions from cross-pollinating.
+ * label still holds — these pictures cannot serve as the right answer
+ * in a short-a session (`WORD_SONG_TARGET_WORDS_FOR_PROMPT` doesn't
+ * list them) and the planner's pool-by-focus-node split keeps the
+ * vowel tiers from cross-pollinating.
+ *
+ * v3 note (ticket 86c9q5q2d / 86c9q9ben, short-u pool expansion):
+ * three more entries — `sun, cup, bus` — were promoted distractor →
+ * target by Thomas's 2026-05-09 Q2=A lock. They now live in
+ * `TARGET_WORDS` with `isTarget: true` and `vowel: 'u'`. They remain
+ * pickable as distractors in short-a / short-o sessions because
+ * `getWordEntry()` resolves them from `TARGET_WORDS` and the existing
+ * `TARGET_PAIRINGS` rows for short-a (e.g. `cat: { gentle: ['bus',
+ * 'sun'], … }`) point at them by string — same shape as the short-o
+ * promotion handled `dog/log/pot/fox`. Only `pen` (short-e) remains
+ * as a distractor-only entry today.
  */
 export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
-  {
-    word: 'bus',
-    pictureKey: 'bus',
-    vowel: 'u',
-    category: 'vehicle',
-    isTarget: false,
-  },
-  {
-    word: 'sun',
-    pictureKey: 'sun',
-    vowel: 'u',
-    category: 'celestial',
-    isTarget: false,
-  },
-  {
-    word: 'cup',
-    pictureKey: 'cup',
-    vowel: 'u',
-    category: 'vessel',
-    isTarget: false,
-  },
   {
     word: 'pen',
     pictureKey: 'pen',
@@ -362,6 +452,14 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['man', 'dad'], // both human figures
   // Short-o pool additions (ticket 86c9m3ae3) — composition collisions:
   ['mom', 'dad'], // parent-with-child compositions; differ on hair/outfit
+  // Short-u pool additions (ticket 86c9q5q2d / 86c9q9ben, §3 / §10 Q3
+  // LOCKED 2026-05-08 per Devon's review). The same-vowel-only rule
+  // (spec §8) keeps both pairs from co-occurring in v1 trios anyway,
+  // but the entries are cheap insurance against future cross-vowel
+  // mixing (ticket 86c9m3aek) and against a Phase-2 picture-pack
+  // review showing the discriminators don't hold at 96pt.
+  ['rug', 'mat'], // flat-rectangular floor coverings (rug fringed, mat plain)
+  ['tub', 'cup'], // vessels in side profile (tub footed, cup handled)
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -447,6 +545,40 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   fox: { gentle: ['pot', 'mom'], trap: ['box', 'dog'] }, // /ɒks/ rhyme + animal trap
   mom: { gentle: ['box', 'hot'], trap: ['mop', 'log'] }, // m-alliteration + /ɒ/ vowel trap
   hot: { gentle: ['dog', 'fox'], trap: ['pot', 'mop'] }, // /ɒt/ rhyme + p-/m- alliteration trap
+  // ── Short-u pool (ticket 86c9q5q2d / 86c9q9ben) ────────────────────
+  // Per `design/word-song/short-u-pool-expansion.md` §2.4 matrix
+  // preview + §8 same-vowel-only rule: every distractor for a short-u
+  // target is drawn from the short-u pool itself (`sun, cup, bus, bug,
+  // nut, tub, bun, jug, rug, hut, gum`). No cross-vowel mixing in v1;
+  // that's a separate ticket (`86c9m3aek`).
+  //
+  // Trap-tier pairs lean on the rhyme families enumerated in spec §1
+  // (`/ʌn/`, `/ʌp/`, `/ʌs/`, `/ʌg/`, `/ʌt/`, `/ʌb/`, `/ʌm/`); the
+  // /ʌg/ triplet (bug/jug/rug) is the densest cluster and is
+  // intentionally exploited as the trap-tier pair when one of the
+  // three is the target. Gentle-tier pairs are visually /
+  // categorically distinct from the target (object vs. food vs.
+  // vehicle vs. animal).
+  //
+  // FORBIDDEN_PAIRS audit — none of the rows below trigger.
+  //   - `[tub, cup]`: `tub` row's trap is `['bug', 'jug']` and `cup`'s
+  //     trap is `['nut', 'jug']`; neither row co-pairs them.
+  //   - `[rug, mat]`: `mat` is short-a — the same-vowel rule keeps it
+  //     out of any short-u trio.
+  //   - all other existing forbidden pairs (cat-dog, bus-van, pan-pot,
+  //     cap-hat, man-dad, mom-dad) involve at least one non-short-u
+  //     word and so are unreachable here.
+  sun: { gentle: ['hut', 'rug'], trap: ['bun', 'jug'] }, // /ʌn/ rhyme + cross-category
+  cup: { gentle: ['bug', 'rug'], trap: ['nut', 'jug'] }, // vessel trap (jug); tub excluded per [tub,cup] FORBIDDEN_PAIR
+  bus: { gentle: ['nut', 'sun'], trap: ['hut', 'bug'] }, // /ʌs/ has no rhyme partner; near-miss /ʌt/ + /ʌg/ trap
+  bug: { gentle: ['tub', 'sun'], trap: ['jug', 'rug'] }, // /ʌg/ rhyme triplet trap
+  nut: { gentle: ['rug', 'cup'], trap: ['hut', 'bun'] }, // /ʌt/ rhyme + /ʌn/ near-miss
+  tub: { gentle: ['hut', 'sun'], trap: ['bug', 'jug'] }, // vessel/vowel trap; cup excluded per [tub,cup] FORBIDDEN_PAIR
+  bun: { gentle: ['rug', 'tub'], trap: ['sun', 'gum'] }, // /ʌn/ rhyme + /ʌm/ near-miss
+  jug: { gentle: ['nut', 'sun'], trap: ['bug', 'rug'] }, // /ʌg/ rhyme triplet trap
+  rug: { gentle: ['cup', 'sun'], trap: ['bug', 'jug'] }, // /ʌg/ rhyme triplet trap (mat is FORBIDDEN_PAIR + cross-vowel)
+  hut: { gentle: ['cup', 'sun'], trap: ['nut', 'bun'] }, // /ʌt/ rhyme + /ʌn/ near-miss
+  gum: { gentle: ['bug', 'rug'], trap: ['bun', 'sun'] }, // /ʌm/ has no in-pool rhyme partner; /ʌn/ near-miss
 } as const
 
 /** Look up a word entry by word string. Throws on missing — every word in

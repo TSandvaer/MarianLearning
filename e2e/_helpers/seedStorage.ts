@@ -52,6 +52,7 @@ const DEFAULT_SKILL_LEVELS = {
   'blending-cv': 'practicing',
   'cvc-words': 'intro',
   'cvc-words-short-o': 'locked',
+  'cvc-words-short-u': 'locked',
   digraphs: 'locked',
   'sight-words': 'intro',
   'simple-sentences': 'locked',

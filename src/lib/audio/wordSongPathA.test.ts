@@ -355,7 +355,10 @@ describe('prepareWordSongPathA — error paths', () => {
         id: plan.id,
         label: plan.label,
         utterances: wordSongSessionPlanToUtteranceSources(plan).map((u) =>
-          u.id === 'word.p1.read' ? { ...u, text: 'Tap the bus.' } : u,
+          // After the short-u promotion (ticket 86c9q9ben), `pen` is
+          // the only remaining distractor-only entry — non-target rejection
+          // path now exercised against `pen` rather than `bus`.
+          u.id === 'word.p1.read' ? { ...u, text: 'Tap the pen.' } : u,
         ),
       },
     }

@@ -399,8 +399,8 @@ export async function reconcileWithCloud(
  * Validate the cloud blob and shape it into a strict `Progress` if
  * possible. Runs the T1 read-path defenders (`withDefaultedSkillLevels`)
  * before the strict guard so older-schema cloud blobs (e.g. blob written
- * by a device that didn't yet know about `cvc-words-short-o`) are healed
- * at install time.
+ * by a device that didn't yet know about `cvc-words-short-o` or
+ * `cvc-words-short-u`) are healed at install time.
  *
  * Returns null when the blob can't be repaired into a valid v1 Progress.
  *

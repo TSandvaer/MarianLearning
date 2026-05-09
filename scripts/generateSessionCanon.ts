@@ -189,11 +189,14 @@ const MATH_FOCUS_NODES: readonly string[] = [
 //
 // Ticket 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
 // tier — see `design/word-song/short-o-pool-expansion.md` §6 (canon-
-// bake plan).
+// bake plan). Ticket 86c9q9ben added `cvc-words-short-u` as the third
+// vowel-tier sibling — see `design/word-song/short-u-pool-expansion.md`
+// §6.
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
+  'cvc-words-short-u',
 ]
 
 export function activeCombos(): readonly Combo[] {

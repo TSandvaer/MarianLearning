@@ -45,9 +45,40 @@ export const WORD_SONG_TARGET_WORDS_FOR_PROMPT = [
 export const WORD_SONG_TARGET_WORDS_SHORT_O =
   'dog, mop, log, pot, box, fox, mom, hot'
 
+/**
+ * The 11 target words for the short-u sibling tier (`cvc-words-short-u`).
+ * Locked by Thomas 2026-05-09 per
+ * `design/word-song/short-u-pool-expansion.md` §1 / §10 Q1=A. Eleven
+ * entries spanning seven rhyme families (`/ʌn/`, `/ʌp/`, `/ʌs/`,
+ * `/ʌg/`, `/ʌt/`, `/ʌb/`, `/ʌm/`) with the `/ʌg/` triplet
+ * (`bug, jug, rug`) as the densest cluster — a deliberate trap-window
+ * lever for Haiku's distractor-window guidance.
+ *
+ * Pool composition:
+ *  - 3 promoted from the v1 distractor-only pool: `sun, cup, bus`
+ *    (their `WordEntry.isTarget` flips to true in `wordPack.ts`).
+ *  - 8 wholly new entries: `bug, nut, tub, bun, jug, rug, hut, gum`.
+ *
+ * Same alignment contract as `WORD_SONG_TARGET_WORDS_FOR_PROMPT` /
+ * `WORD_SONG_TARGET_WORDS_SHORT_O`: the client-side `wordPack.ts`
+ * MUST carry every word here as `isTarget: true` plus a
+ * `TARGET_PAIRINGS` row. The round-trip suite in
+ * `src/screens/WordSong/plannerRoundTrip.test.ts` enforces it.
+ */
+export const WORD_SONG_TARGET_WORDS_SHORT_U =
+  'sun, cup, bus, bug, nut, tub, bun, jug, rug, hut, gum'
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
- *  the gentle-vs-trap window correctly (per Kyle's distractor spec). */
+ *  the gentle-vs-trap window correctly (per Kyle's distractor spec).
+ *
+ *  Short-a rhyme block stays unconditioned for now — it's harmless on
+ *  short-o and short-u sessions because those tracks override the pool
+ *  upstream in the system prompt. The short-u block (ticket 86c9q9ben /
+ *  AC3b) is included to give Haiku explicit cluster guidance on the
+ *  /ʌg/ triplet (`bug, jug, rug`) which is the densest rhyme family in
+ *  the v3 short-u pool — same shape and motivation as short-a's `/æt/`
+ *  cluster gets a "pack these in the trap window" annotation. */
 export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /æt/ rhyme family: cat, hat, bat, mat — pack these in the trap window when one is the target.',
   '- /æn/ rhyme family: fan, man, pan, can, van — same.',
@@ -55,6 +86,13 @@ export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /æp/ rhyme family: cap.',
   '- /æd/ rhyme family: dad.',
   '- /æm/ rhyme family: jam.',
+  '- /ʌn/ rhyme family: sun, bun — pack these in the trap window when one is the target.',
+  '- /ʌp/ rhyme family: cup.',
+  '- /ʌs/ rhyme family: bus.',
+  '- /ʌg/ rhyme family: bug, jug, rug — pack these in the trap window when one is the target.',
+  '- /ʌt/ rhyme family: nut, hut.',
+  '- /ʌb/ rhyme family: tub.',
+  '- /ʌm/ rhyme family: gum.',
 ].join('\n')
 
 /**
