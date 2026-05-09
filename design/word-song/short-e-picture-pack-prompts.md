@@ -244,7 +244,7 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
 
 - **Vocabulary cue:** A fishing or butterfly net — open-mesh weave inside a circular or oval frame attached to a handle. The mesh-pattern + frame + handle silhouette carries "net" recognition vs. bag.
 - **Distinctness check (load-bearing):**
-  - **vs. `bag` (canonical short-a target — FORBIDDEN_PAIR partner per pool spec §3 + §5):** Both fabric-with-handle objects. **Discriminator: mesh-vs-solid.** `net` has **VISIBLE MESH WEAVE** (open holes in a regular grid pattern); `bag` has **solid fabric surface**. **The mesh must be visible at 96pt.** Cross-vowel rule keeps them apart in trios under same-vowel-only, BUT cross-pack visual hygiene matters. **NEW FORBIDDEN_PAIR `[net, bag]` added in pool spec §3 / §5.**
+  - **vs. `bag` (canonical short-a target — FORBIDDEN_PAIR partner per pool spec §3 + §6):** Both fabric-with-handle objects. **Discriminator: mesh-vs-solid.** `net` has **VISIBLE MESH WEAVE** (open holes in a regular grid pattern); `bag` has **solid fabric surface**. **The mesh must be visible at 96pt.** Cross-vowel rule keeps them apart in trios under same-vowel-only, BUT cross-pack visual hygiene matters. **NEW FORBIDDEN_PAIR `[net, bag]` added in pool spec §3 / §6.**
   - **vs. `web` (pack neighbour, mesh):** `net` is **handled tool with even orthogonal grid mesh + frame**; `web` is **free-floating concentric-radial pattern, no handle, no frame**. Different geometries. **Low risk.**
   - **vs. `rug` (short-u target):** `net` is **handled mesh tool**; `rug` is **flat floor covering with fringe**. Cross-vowel + different shapes. **No risk.**
   - **vs. `pan` (canonical):** Both have handles. `net` is **mesh inside frame**; `pan` is **solid disc with horizontal handle**. Different fills (mesh vs. solid). **Low risk.**
@@ -335,8 +335,8 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
 
 - **Vocabulary cue:** A single smooth ovoid egg, viewed three-quarter from slightly above. The smooth-uniform-oval silhouette carries "egg" recognition.
 - **Distinctness check (load-bearing):**
-  - **vs. `nut` (short-u target — FORBIDDEN_PAIR partner per pool spec §3 + §5):** Both ovals. **Discriminator: smooth-vs-seam.** `egg` is **smooth-ovoid with NO seam line, NO surface detail beyond gentle shading**; `nut` is **oval with VERTICAL SEAM LINE down middle**. Cross-vowel rule keeps them apart in trios but cross-pack hygiene. **NEW FORBIDDEN_PAIR `[egg, nut]` added in pool spec §3 / §5.**
-  - **vs. `bun` (short-u target — FORBIDDEN_PAIR partner per pool spec §3 + §5):** `egg` is **smooth-ovoid with NO score-mark**; `bun` is **round bread-roll with HORIZONTAL SCORE-MARK on top**. Cross-vowel rule keeps them apart in trios but cross-pack hygiene. **NEW FORBIDDEN_PAIR `[egg, bun]` added in pool spec §3 / §5.**
+  - **vs. `nut` (short-u target — FORBIDDEN_PAIR partner per pool spec §3 + §6):** Both ovals. **Discriminator: smooth-vs-seam.** `egg` is **smooth-ovoid with NO seam line, NO surface detail beyond gentle shading**; `nut` is **oval with VERTICAL SEAM LINE down middle**. Cross-vowel rule keeps them apart in trios but cross-pack hygiene. **NEW FORBIDDEN_PAIR `[egg, nut]` added in pool spec §3 / §6.**
+  - **vs. `bun` (short-u target — FORBIDDEN_PAIR partner per pool spec §3 + §6):** `egg` is **smooth-ovoid with NO score-mark**; `bun` is **round bread-roll with HORIZONTAL SCORE-MARK on top**. Cross-vowel rule keeps them apart in trios but cross-pack hygiene. **NEW FORBIDDEN_PAIR `[egg, bun]` added in pool spec §3 / §6.**
   - **vs. `gem` (pack neighbour):** Cross-category — gem is geometric crystal with facets; egg is smooth organic oval. **No risk.**
 - **Full prompt:**
 
@@ -376,7 +376,7 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
 | 8   | gem  | new short-e target                | none in-pack; `gum` (cross-vowel — both small handheld objects) | geometric crystal with facets vs. wrapped rectangular package |
 | 9   | egg  | new short-e target (Phase 2 fallback drops if unstable) | **`nut` and `bun` (cross-vowel — FORBIDDEN_PAIRS added)** + cream background (low-contrast risk) | smooth-ovoid (no marks) vs. oval-with-vertical-seam vs. round-with-horizontal-score |
 
-**Highest-distinctness-risk pair in this pack: `net` ↔ `bag` (cross-pack).** Both fabric-with-handle objects. The mesh-vs-solid-surface discriminator is what makes them readable as different words at 96pt. Phase 2 review at chip size IS mandatory for this pair before acceptance — see pool spec §3 + §5. **NEW FORBIDDEN_PAIR `[net, bag]` is the cross-pack guard.**
+**Highest-distinctness-risk pair in this pack: `net` ↔ `bag` (cross-pack).** Both fabric-with-handle objects. The mesh-vs-solid-surface discriminator is what makes them readable as different words at 96pt. Phase 2 review at chip size IS mandatory for this pair before acceptance — see pool spec §3 + §6. **NEW FORBIDDEN_PAIR `[net, bag]` is the cross-pack guard.**
 
 **Second-highest-distinctness-risk pair in this pack: `egg` ↔ `nut` and `egg` ↔ `bun` (cross-pack).** All ovals/round food. The smooth-vs-seam (egg/nut) and smooth-vs-score (egg/bun) discriminators carry the discrimination. Pair-review at 96pt with both forbidden pairs is mandatory. **NEW FORBIDDEN_PAIRS `[egg, nut]` and `[egg, bun]` are the cross-pack guards.**
 
@@ -428,10 +428,10 @@ Each generation in this pack must pass ALL of these gates before Thomas accepts 
 - [ ] **`hen`:** Clear bird with characteristic comb on head + beak + 2 legs visible + plump body. The comb is the load-bearing recognition feature. NO eggs visible (would conflict with `egg` chip).
 - [ ] **`pen` (RETRACE — conditional):** Slim cylinder with VISIBLE NIB at the writing end + VISIBLE CLIP on the body. NIB + CLIP together carry recognition. No paper / no hand / no ink-line.
 - [ ] **`web`:** Clear concentric-radial pattern with about 5-7 concentric rings + 8-12 radial spokes converging at center. NO spider visible. The thin-line geometry must contrast cleanly against the cream background.
-- [ ] **`net`:** **VISIBLE MESH GRID inside a clear FRAME + a HANDLE.** **At 96pt side-by-side with `bag`, the mesh-vs-solid discriminator holds (Q5 LOCKED FORBIDDEN_PAIR `[net, bag]`).** No fish or butterfly caught.
+- [ ] **`net`:** **VISIBLE MESH GRID inside a clear FRAME + a HANDLE.** **At 96pt side-by-side with `bag`, the mesh-vs-solid discriminator holds (FORBIDDEN_PAIR `[net, bag]` per pool spec §3 + §6).** No fish or butterfly caught.
 - [ ] **`jet`:** Aircraft with wings + tail + cockpit, in flight (NOT on runway). Pair-review against `bus`/`van` at 96pt — the aircraft-vs-ground-vehicle category split is obvious.
 - [ ] **`gem`:** Geometric crystal with 4-6 visible facets. NO sparkle-rays radiating outward (would conflict with `sun` recognition). NO ring / crown / jewelry setting.
-- [ ] **`egg`:** Smooth ovoid with NO seam line, NO score-mark, NO cracks. Shell color warm-tan enough to contrast against cream background. **At 96pt side-by-side with `nut` and `bun`, the smooth-vs-seam-vs-score three-way discriminator holds (Q5 LOCKED FORBIDDEN_PAIRS `[egg, nut]` and `[egg, bun]`).**
+- [ ] **`egg`:** Smooth ovoid with NO seam line, NO score-mark, NO cracks. Shell color warm-tan enough to contrast against cream background. **At 96pt side-by-side with `nut` and `bun`, the smooth-vs-seam-vs-score three-way discriminator holds (FORBIDDEN_PAIRS `[egg, nut]` and `[egg, bun]` per pool spec §3 + §6).**
 
 ### 5.3 "Regenerate" triggers
 

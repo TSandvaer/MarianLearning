@@ -483,9 +483,9 @@ Short-i pool is not yet specced (§10 Q5). Probable members per `phonics-sequenc
 | cup | bed | Cup is handled vessel; bed is rectangular furniture. Different categories. **No risk.** |
 | bus | jet | Both vehicles. Bus is ground vehicle (wheels + windows); jet is aircraft (wings + tail). Different categories. **Low risk.** |
 | bug | hen | Bug is insect; hen is bird. Different animal classes. **Low risk.** |
-| nut | egg | **HIGH same-silhouette risk.** Both ovals. Nut has vertical seam; egg is smooth-ovoid. Cross-vowel rule keeps them apart in trios but cross-pack visual hygiene matters. **NEW FORBIDDEN_PAIR `[egg, nut]` added (§3 + §5).** |
+| nut | egg | **HIGH same-silhouette risk.** Both ovals. Nut has vertical seam; egg is smooth-ovoid. Cross-vowel rule keeps them apart in trios but cross-pack visual hygiene matters. **NEW FORBIDDEN_PAIR `[egg, nut]` added (§3 + §6).** |
 | tub | bed | Both household. Tub is footed open vessel; bed is on legs with pillow + headboard. Different shapes. **Low risk.** |
-| bun | egg | **HIGH same-silhouette risk.** Both round food. Bun has horizontal score; egg is smooth-ovoid. Cross-vowel + cross-pack hygiene. **NEW FORBIDDEN_PAIR `[egg, bun]` added (§3 + §5).** |
+| bun | egg | **HIGH same-silhouette risk.** Both round food. Bun has horizontal score; egg is smooth-ovoid. Cross-vowel + cross-pack hygiene. **NEW FORBIDDEN_PAIR `[egg, bun]` added (§3 + §6).** |
 | jug | net | Jug is handled vessel with spout; net is mesh-with-handle. Different surfaces (solid vs. mesh). **Low risk.** |
 | rug | bed | Rug is flat floor covering; bed is furniture-on-legs. Different shapes. **Low risk.** |
 | hut | bed | Hut is dwelling with roof + walls + door; bed is furniture-on-legs with pillow + headboard. Different shapes. **Low risk.** |
@@ -512,7 +512,7 @@ Short-i pool is not yet specced (§10 Q5). Probable members per `phonics-sequenc
 | hat | gem | Hat is wearable; gem is jewel. Different. **Low risk.** |
 | bat | bed | Bat is mammal/animal; bed is furniture. Different. **No risk.** |
 | mat | net | **MODERATE** — both flat-fabric-ish objects. Mat is plain rectangular floor covering; net is mesh-with-handle. Different surfaces (solid vs. mesh). Cross-pack hygiene important. **No new FORBIDDEN_PAIR needed** — the mesh-vs-solid discriminator is robust. |
-| bag | net | **HIGH same-silhouette risk** — both fabric-with-handle objects. Bag is solid tote with handle; net is mesh-with-handle. Discriminator: mesh-vs-solid is the load-bearing feature. **NEW FORBIDDEN_PAIR `[net, bag]` added (§3 + §5).** |
+| bag | net | **HIGH same-silhouette risk** — both fabric-with-handle objects. Bag is solid tote with handle; net is mesh-with-handle. Discriminator: mesh-vs-solid is the load-bearing feature. **NEW FORBIDDEN_PAIR `[net, bag]` added (§3 + §6).** |
 | fan | leg | Fan is pedestal/desk fan; leg is elongated single shape. Different. **Low risk.** |
 | man | hen | Man is human figure; hen is bird. Different. **No risk.** |
 | pan | net | Pan is shallow disc + horizontal handle; net is mesh + handle. **Low risk** — pan is solid; net is mesh. |
