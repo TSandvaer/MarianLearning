@@ -76,10 +76,16 @@ interface DotCardOverlayProps {
    */
   onComplete?: () => void
   /**
-   * Test seam — when `true`, the lifecycle is short-circuited:
-   * `onComplete` fires synchronously on mount and the visible cards
-   * are still rendered for assertion convenience. Production never
-   * sets this. Default `false`.
+   * Test seam — when `true`, the lifecycle is FROZEN: phase stays at
+   * its initial value (`fadingIn` or `holding`), no timers are armed,
+   * and `onComplete` is NEVER fired. The dot-card cells stay rendered
+   * indefinitely so spec count selectors can assert against them
+   * without racing the dismissal cascade.
+   *
+   * Component-tests opt in via Math.tsx's `__testDisableDotCard` prop;
+   * production never sets this. The lifecycle itself (timers, phase
+   * advance, page-hidden pause) is covered in the dedicated overlay
+   * test file, where motion-engine fakes drive the timing.
    */
   __testSkipLifecycle?: boolean
 }
@@ -105,14 +111,6 @@ export function DotCardOverlay({
   // Latch — `onComplete` must fire exactly once across the lifecycle,
   // even if React re-renders during phase transitions (StrictMode).
   const completedRef = useRef(false)
-
-  // Test seam: synchronously fire onComplete and skip the timeline.
-  useEffect(() => {
-    if (!__testSkipLifecycle) return
-    if (completedRef.current) return
-    completedRef.current = true
-    onComplete?.()
-  }, [__testSkipLifecycle, onComplete])
 
   // Lifecycle orchestration. We use plain `setTimeout` and cancel/
   // restart on `pageHidden` flips so a backgrounded iPad doesn't fire
