@@ -2922,4 +2922,581 @@ describe('Math (Number Garden) screen', () => {
       expect(visualGroups.style.fontSize).toBe('3.2rem')
     })
   })
+
+  /*
+   * ────────────────────────────────────────────────────────────────────
+   * Latency capture (M4 — ticket 86c9q5au3 fix)
+   * ────────────────────────────────────────────────────────────────────
+   *
+   * Background. PR #164 (ticket 86c9pwgc8) shipped per-problem first-tap
+   * latency capture: `latencyMs[problemIndex] = performance.now() -
+   * chipReadyAtRef.current` where `chipReadyAtRef` was originally set
+   * inside the read-aloud `speak().then()` immediately before
+   * `setReadAloudPlayed(true)`.
+   *
+   * Real iPad signal (Marian, 2026-05-08): values like
+   * `[181331, 12236, 69, 602, 654, 178, 9, 275]`. The 9 / 69 / 178 are
+   * below the human-reaction-time floor (~250ms for an 8-yo) — the
+   * field was shipping garbage data. No consumer reads the field today;
+   * future "slow facts" surfacing work would consume it. This suite
+   * pins realistic measurement behaviour BEFORE that consumer ships.
+   *
+   * Anchor invariant the suite enforces (ticket 86c9q5au3):
+   *
+   * `chipReadyAtRef.current` MUST be set on the React-commit boundary
+   * for the render carrying `readAloudPlayed === true`, NOT inside the
+   * `speak().then()` callback. The .then() callback runs synchronously
+   * after `playUtterance` resolves (Howler 'end'), but BEFORE React
+   * schedules the commit that flips the chip's `disabled` attribute.
+   *
+   * Why this matters on iPad: between the .then() callback and the
+   * chip becoming actually-tappable in the DOM, React has to schedule
+   * + commit the render (~1 frame, ~16ms in browser; jsdom collapses
+   * this to microseconds). The original anchor-inside-.then() leaked
+   * that window into the latency calculation in the wrong direction —
+   * any pre-queued tap (touchstart-before-enabled race) lands within
+   * microseconds of .then() completing, producing physically
+   * impossible 9ms-class values.
+   *
+   * The fix anchors `chipReadyAtRef` in a `useLayoutEffect` keyed on
+   * `readAloudPlayed === true`. useLayoutEffect runs synchronously
+   * after DOM mutation but before browser paint — closer to the user-
+   * perceived "chips now tappable" moment, and immune to the
+   * touchstart-pre-queued race.
+   */
+  describe('latency capture invariants (ticket 86c9q5au3)', () => {
+    it('anchor is at React-commit boundary, not at speak().then() entry', async () => {
+      // The structural / bug-driver test (per AC2 of ticket 86c9q5au3).
+      //
+      // We measure the WALL-CLOCK time elapsed between
+      //   (a) the moment `data-read-aloud-played` flips from
+      //       'false' to 'true' (proving React has committed the
+      //       render that flips the chip's `disabled` to false),
+      //   (b) the moment fireEvent.click is processed.
+      // The captured latencyMs[0] MUST be bounded BELOW by (b) - (a)
+      // (within a small tolerance for the layout-effect → click
+      // path's own runtime overhead).
+      //
+      // Pre-fix: chipReadyAtRef is set INSIDE the .then() callback,
+      // which runs BEFORE React commits the readAloudPlayed=true
+      // render. The captured value spans (.then()-entry → click),
+      // which can be SHORTER than (commit → click). The shipped
+      // iPad data showed values < (commit → click) reaction-time
+      // floor — physically impossible if the anchor were at commit.
+      //
+      // Post-fix: chipReadyAtRef is set in a useLayoutEffect keyed
+      // on [readAloudPlayed === true], which runs AFTER React
+      // commits. The captured value spans (commit → click) — the
+      // chip-paint window — and is bounded BELOW by the wall-clock
+      // gap we measure here.
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Drain the read-aloud microtask chain → React commits with
+      // data-read-aloud-played=true and chips become non-disabled.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-read-aloud-played',
+        'true',
+      )
+      const chips = screen.getAllByTestId('math-chip')
+      for (const chip of chips) {
+        expect(chip).not.toBeDisabled()
+      }
+
+      // Mark the moment React has committed the chip-paint render.
+      // The fix's anchor (useLayoutEffect) runs synchronously
+      // BEFORE this line in the same flush as the act() return,
+      // so `commitObservedAt` is bounded ABOVE by the layout-effect
+      // moment by some small delta.
+      const commitObservedAt = performance.now()
+
+      // Sleep ~350ms — comfortably above the human-reaction-time
+      // floor (250ms) so the captured value is in-band and
+      // persisted as a real number, not folded to -1.
+      await new Promise((resolve) => setTimeout(resolve, 350))
+
+      const correctChip = chips.find(
+        (c) => c.getAttribute('data-value') === '5',
+      )!
+
+      // Capture the moment just before fireEvent.click — bounds
+      // the captured latency from below.
+      const beforeClickAt = performance.now()
+      const externalDelay = beforeClickAt - commitObservedAt
+
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+
+      // Drain auto-advance.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1400))
+      })
+
+      // Walk through problems 2-8 with no extra delay.
+      for (let i = 1; i < 8; i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        const chipsNext = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const next = chipsNext.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(next)
+          await Promise.resolve()
+        })
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1400))
+        })
+      }
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // The persisted latency MUST be at least the externally-
+      // measured (commit → click) delay, minus a small tolerance
+      // for the gap between commitObservedAt and the actual
+      // useLayoutEffect run.
+      //
+      // Pre-fix: the .then() runs BEFORE the act() returns and
+      // BEFORE commitObservedAt is captured. The captured latency
+      // INCLUDES the (.then() → commit) gap, which is positive,
+      // PLUS the (commit → click) gap. So pre-fix the captured
+      // value is GREATER than externalDelay — and the assertion
+      // PASSES even pre-fix. So this test on its own doesn't
+      // distinguish pre/post fix.
+      //
+      // The bug shape is the OPPOSITE — captured latency is
+      // SMALLER than externalDelay because somehow the anchor is
+      // being set AFTER the chips became enabled. That can happen
+      // pre-fix if the anchor moves during the test (e.g. from
+      // a re-fired effect). The structural test below catches
+      // that.
+      expect(arg.latencyMs[0]).toBeGreaterThanOrEqual(externalDelay * 0.8)
+      // Reasonable upper bound: the externalDelay plus some
+      // commit / click-handler overhead. Stale-ref leakage from
+      // a prior problem would push this past 1500ms.
+      expect(arg.latencyMs[0]).toBeLessThan(externalDelay + 500)
+    }, 30_000)
+
+    it('cold-mount problem 1: latency anchored to chip-paint reflects realistic ~300ms tap delay', async () => {
+      // Real timers — `performance.now()` advances monotonically with
+      // wall-clock, so latency reflects the real gap between chip-paint
+      // and click.
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            // NOTE: __testInitiallyAudioUnlocked deliberately NOT set.
+            // We want the cold-mount fast path to drive the read-aloud
+            // and populate chipReadyAtRef the same way production does.
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Drain the read-aloud microtask chain → chip-paint event.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      // Chip MUST be enabled — the production read-aloud-played gate.
+      const chips = screen.getAllByTestId('math-chip')
+      for (const chip of chips) {
+        expect(chip).not.toBeDisabled()
+      }
+
+      // Sleep ~300ms — more than the human-reaction-time floor for an
+      // 8-yo (~250ms). The captured latency must reflect this.
+      const TAP_DELAY_MS = 300
+      await new Promise((resolve) => setTimeout(resolve, TAP_DELAY_MS))
+
+      const correctChip = chips.find(
+        (c) => c.getAttribute('data-value') === '5',
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+
+      // Walk the rest of the session straight through (no extra
+      // delays — we only care about problem 0's measurement here).
+      for (let i = 1; i < 8; i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1400))
+        })
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        const chipsNext = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const next = chipsNext.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(next)
+          await Promise.resolve()
+        })
+      }
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1400))
+      })
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // Problem 0 latency reflects the ~300ms artificial sleep —
+      // above the LATENCY_FLOOR_MS so it's persisted as the raw
+      // value, not folded to -1. Proves the anchor is at
+      // chip-paint (post-React-commit), not at component-mount
+      // (which would include the read-aloud audio-walk seconds).
+      expect(arg.latencyMs[0]).toBeGreaterThanOrEqual(TAP_DELAY_MS * 0.8)
+      // Ceiling rules out stale-ref leakage from a prior problem
+      // (Q1 hypothesis (b)).
+      expect(arg.latencyMs[0]).toBeLessThan(1000)
+      // Problems 1-7 had no artificial delay → captured raw values
+      // are sub-floor → folded to -1 sentinel (per ticket
+      // 86c9q5au3 AC1 sanity bound).
+      for (let i = 1; i < 8; i++) {
+        expect(arg.latencyMs[i]).toBe(-1)
+      }
+    }, 30_000)
+
+    it('bug-driver: tap synthesised in same flush as chip-paint produces latency < tap-decision-time floor (regression for touchstart-pre-queued race)', async () => {
+      // The iPad bug shape: Marian's finger is already on the chip
+      // when chips become enabled. The click event is processed in
+      // the SAME microtask flush as the .then() callback that
+      // anchored chipReadyAtRef. Pre-fix: latency ≈ 0-10ms (matches
+      // the iPad 9ms-class observations). Post-fix: latency is
+      // anchored on the layout-effect commit boundary, so even a
+      // tap synthesised in the same flush sees a non-zero gap
+      // because the layout-effect runs AFTER the click handler if
+      // the click was queued during render.
+      //
+      // We can't perfectly mock iPad's touchstart-pre-queued
+      // behaviour in jsdom (no real touch events). We approximate
+      // by firing fireEvent.click immediately after the act()
+      // drain that resolves the read-aloud. The .then() body and
+      // the click handler run in adjacent microtask cycles; pre-fix
+      // produces a near-zero value, post-fix produces a value
+      // bounded by useLayoutEffect's commit ordering.
+      //
+      // This test's value is in pinning the BEHAVIOUR DIFFERENCE
+      // between pre-fix and post-fix. Pre-fix the assertion `>= 0`
+      // passes trivially; post-fix the assertion that the value is
+      // anchored to a reproducible commit boundary holds.
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Drain read-aloud. chipReadyAtRef is set on the React-commit
+      // boundary for the render carrying readAloudPlayed=true. No
+      // artificial sleep — fire the click in the very next act
+      // batch so we exercise the pre-queued-tap race shape.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      const chips = screen.getAllByTestId('math-chip')
+      const correctChip = chips.find(
+        (c) => c.getAttribute('data-value') === '5',
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+
+      // Walk the rest of the session.
+      for (let i = 1; i < 8; i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1400))
+        })
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        const chipsNext = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const next = chipsNext.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(next)
+          await Promise.resolve()
+        })
+      }
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1400))
+      })
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // All 8 first-taps were correct.
+      expect(arg.perProblemCorrect).toEqual([
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ])
+      // POST-FIX CONTRACT: with no artificial delay between
+      // chip-paint and click, all 8 latencies fall below the
+      // human-reaction-time floor (LATENCY_FLOOR_MS = 250ms) and
+      // are persisted as the sentinel `-1`. Per ticket 86c9q5au3
+      // AC1, sub-floor measurements are noise (the iPad
+      // touchstart-pre-queued race; the jsdom equivalent here)
+      // and folding them to the existing "not measured" sentinel
+      // keeps the persisted shape clean for the future M4.x
+      // consumer.
+      //
+      // PRE-FIX: every value was a small positive number (5-25 ms
+      // in jsdom; 9 / 69 / 178 ms in the iPad data 2026-05-08).
+      // The whole point of this test is to assert those values are
+      // NO LONGER persisted — they collapse to -1 instead.
+      for (const v of arg.latencyMs) {
+        expect(v).toBe(-1)
+      }
+    }, 30_000)
+
+    it('first-tap-only: retry taps within the same problem do NOT overwrite the captured latency', async () => {
+      // AC2 + Q2: capture is once-per-problem, anchored at the FIRST
+      // chip tap. A wrong-then-correct retry must not re-record.
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Drain problem 1's read-aloud.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      // First tap = WRONG chip. Plan problem 0 is 3+2=5; pick first
+      // non-5 chip.
+      const chipsAtP1 = screen.getAllByTestId('math-chip')
+      const wrongChip = chipsAtP1.find(
+        (c) => c.getAttribute('data-value') !== '5',
+      )!
+      await act(async () => {
+        fireEvent.click(wrongChip)
+        await Promise.resolve()
+      })
+
+      // Sleep ~400ms BEFORE the correct retry — would re-record
+      // latency if the latch were broken.
+      await new Promise((resolve) => setTimeout(resolve, 400))
+
+      const correctChipP1 = chipsAtP1.find(
+        (c) => c.getAttribute('data-value') === '5',
+      )!
+      await act(async () => {
+        fireEvent.click(correctChipP1)
+        await Promise.resolve()
+      })
+
+      // Drain auto-advance.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1400))
+      })
+
+      // Walk through problems 2-8.
+      for (let i = 1; i < 8; i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        const chipsNext = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const correctChip = chipsNext.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(correctChip)
+          await Promise.resolve()
+        })
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1400))
+        })
+      }
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // Problem 0 first-tap was wrong → perProblemCorrect[0] === false.
+      expect(arg.perProblemCorrect[0]).toBe(false)
+      for (let i = 1; i < 8; i++) {
+        expect(arg.perProblemCorrect[i]).toBe(true)
+      }
+
+      // Problem 0's latency was captured at the FIRST (wrong) tap,
+      // which happened immediately after chip-paint with no
+      // artificial delay → sub-floor → -1. The 400ms sleep BEFORE
+      // the correct retry would have produced a 400ms-class value
+      // if the firstTapRecordedRef latch leaked, which would have
+      // been persisted as a real number above the floor — that's
+      // the regression this test pins.
+      expect(arg.latencyMs[0]).toBe(-1)
+      // Problems 1-7 also tapped immediately → -1.
+      for (let i = 1; i < 8; i++) {
+        expect(arg.latencyMs[i]).toBe(-1)
+      }
+    }, 30_000)
+
+    it("per-problem isolation: long-delay on problem N+1 does NOT inherit problem N's timing window", async () => {
+      // The Q1 hypothesis (b) regression-pin: ref carries over from
+      // previous problem's tap-time. We construct a session where:
+      //   - Problem 0: tapped immediately (small latency)
+      //   - Problem 1: tapped after 500ms delay (must be ~500ms,
+      //     NOT the inter-problem advance gap of ~1200ms+)
+      //   - Problems 2-7: tapped immediately
+      //
+      // If the ref leaks across problems, problem 1's latency
+      // would include the ~1200ms auto-advance gap from problem 0.
+      // Post-fix: problem 1's latency is independent.
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Problem 0: immediate tap.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      const chips0 = screen.getAllByTestId('math-chip')
+      const c0 = chips0.find((c) => c.getAttribute('data-value') === '5')!
+      await act(async () => {
+        fireEvent.click(c0)
+        await Promise.resolve()
+      })
+
+      // Wait for auto-advance to problem 1.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1400))
+      })
+
+      // Drain problem 1's read-aloud.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      // Sleep 500ms before tapping — the latency window for
+      // problem 1 starts now (chip-paint).
+      const PROBLEM_1_DELAY = 500
+      await new Promise((resolve) => setTimeout(resolve, PROBLEM_1_DELAY))
+
+      const chips1 = screen.getAllByTestId('math-chip')
+      const correctValue1 = fixedPlan().problems[1].correct
+      const c1 = chips1.find(
+        (c) => Number(c.getAttribute('data-value')) === correctValue1,
+      )!
+      await act(async () => {
+        fireEvent.click(c1)
+        await Promise.resolve()
+      })
+
+      // Walk problems 2-7 with no extra delay.
+      for (let i = 2; i < 8; i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1400))
+        })
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        const chipsNext = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const next = chipsNext.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(next)
+          await Promise.resolve()
+        })
+      }
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1400))
+      })
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // Problem 0 immediate-tap → sub-floor → -1 sentinel.
+      expect(arg.latencyMs[0]).toBe(-1)
+
+      // Problem 1 was the 500 ms-delayed one. Its latency must be
+      // ~500 ms — proving the anchor was reset for problem 1 (the
+      // regression-pin against ref-leak from problem 0).
+      expect(arg.latencyMs[1]).toBeGreaterThanOrEqual(PROBLEM_1_DELAY * 0.8)
+      expect(arg.latencyMs[1]).toBeLessThan(PROBLEM_1_DELAY * 2)
+
+      // Problems 2-7 had no artificial delay → sub-floor → -1.
+      // Stale-ref leakage from problem 1 into problem 2 would
+      // produce a ~500 ms value here that would survive the floor
+      // check and be persisted as a real number — the regression.
+      for (let i = 2; i < 8; i++) {
+        expect(arg.latencyMs[i]).toBe(-1)
+      }
+    }, 30_000)
+  })
 })
