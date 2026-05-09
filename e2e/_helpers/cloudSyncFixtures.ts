@@ -174,36 +174,31 @@ export async function seedDeviceId(
 }
 
 /**
- * Pre-seed a `VITE_PROGRESS_API_SECRET` value so the cloud-sync helpers
- * actually fire. The browser reads `import.meta.env.VITE_PROGRESS_API_SECRET`
- * at call time, which is baked at build time — `vite preview` (the
- * harness's web server) serves the value baked from `.env.local`. If
- * the project's `.env.local` doesn't carry the value, cloud-sync
- * helpers short-circuit to "skipped" and the conflict assertions all
- * silently pass for the wrong reason.
+ * Wiring sanity note (Devon PR #182 P3 follow-up)
+ * -----------------------------------------------
+ * The browser reads `import.meta.env.VITE_PROGRESS_API_SECRET` at call
+ * time; the value is baked into the bundle at build time. If
+ * `.env.local` doesn't carry the secret, every cloud-sync helper
+ * short-circuits to `'skipped'` / `'auth-not-configured'` and never
+ * fires a network request.
  *
- * This helper does NOT modify the bundle (it can't — vite-preview
- * serves the artefact). It instead ASSERTS at runtime that the bundle
- * carries a non-empty secret. If the assertion fails, the spec fails
- * loudly with a clear message rather than silently masking the cloud
- * surface.
+ * Earlier revisions of this module exported an `assertCloudSyncWiredOrSkip`
+ * helper that pretended to detect this, but it always returned `true`
+ * because the baked value cannot be read from a running bundle without
+ * a production-side test seam (e.g. `window.__viteEnv`). That helper
+ * was misleading shape and is removed.
+ *
+ * Misconfiguration signal: the strict count-based assertions in the
+ * conflict spec (`expect(mock.gets).toHaveLength(1)` etc.) FAIL on a
+ * bundle without the secret because the App never makes the request.
+ * Failure surfaces as `expected length 1, got 0` — clear enough that
+ * a future investigator finds the auth wiring in two minutes.
+ *
+ * Future work (out of scope here): a vite plugin that exposes
+ * `import.meta.env.VITE_PROGRESS_API_SECRET` via a window hook in
+ * dev/test only would let a sibling helper here probe + skip-with-
+ * reason. Production code stays unchanged today.
  */
-export async function assertCloudSyncWiredOrSkip(page: Page): Promise<boolean> {
-  const wired = await page.evaluate(() => {
-    // import.meta.env is replaced at build time; in the running bundle
-    // the value is a baked string (or empty). We probe it via a
-    // synthetic getter the App doesn't expose directly — read from the
-    // module via dynamic import so jsdom test-runner skips don't
-    // affect us.
-    //
-    // In practice the value is baked into the bundle source; we can't
-    // read it from window without an instrumentation helper. Fall
-    // through: assume wired and let the request count assertion catch
-    // a misconfiguration (zero requests = misconfigured).
-    return true
-  })
-  return wired
-}
 
 /**
  * Compose a cloud-side `Progress` blob for conflict-scenario tests.
@@ -252,6 +247,14 @@ export function buildCloudProgressBlob(opts: {
     schemaVersion: 1,
     profile: {
       childName: 'Marian',
+      // Schema literal stays 'melody' verbatim — see types.ts:177
+      // (`export type Character = 'melody'`). Phase-3b character pivot
+      // (2026-04-29) intentionally did NOT rename this literal because
+      // doing so would require a v1 → v2 schema migration; the field
+      // is invisible to Marian (no UI reads it). Devon's PR #182 P3
+      // nit was a doc misread — changing this to 'emma' would FAIL
+      // `isProgressV1` on the cloud-installed blob and break the
+      // conflict tests below.
       character: 'melody',
       lastPlayedISO: opts.lastPlayedISO,
     },
