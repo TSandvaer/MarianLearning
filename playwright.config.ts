@@ -31,6 +31,15 @@ const IPAD_PRO_PORTRAIT = { width: 1024, height: 1366 }
 
 export default defineConfig({
   testDir: './e2e',
+  // Two-runner invariant: vitest owns `.test.ts`, Playwright owns
+  // `.spec.ts`. Without this restriction, Playwright's default
+  // `testMatch` picks up unit-test files under `e2e/_helpers/` (e.g.
+  // `slidingWindow.test.ts`, ticket 86c9qa0kq) and crashes on Vitest's
+  // `expect` extending Playwright's matcher symbol
+  // (`TypeError: Cannot redefine property: Symbol($$jest-matchers-object)`).
+  // Mirrors the symmetric narrowing applied to vitest's `exclude` in
+  // `vite.config.ts`.
+  testMatch: '**/*.spec.ts',
   // Per-test timeout. The math-session walk-through specs take ~30 s
   // wall-time on the silent caption fallback path (8 problems × ~2 s
   // read + ~1.5 s advance = ~28 s, plus session-end ~5 s). Bump above

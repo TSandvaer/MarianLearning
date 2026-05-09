@@ -107,15 +107,21 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: false,
     // Vitest's default include picks up `**/*.spec.ts`. The Playwright e2e
-    // suite under `e2e/` uses `.spec.ts` too — exclude that directory so
+    // suite under `e2e/` uses `.spec.ts` too — exclude those files so
     // `vitest run` doesn't try to import Playwright tests in jsdom (which
     // would crash on `@playwright/test`'s test fixture API). Run e2e via
     // `yarn e2e` (Playwright runner) instead.
+    //
+    // Narrowed from `e2e/**` to `e2e/**/*.spec.ts` in ticket 86c9qa0kq so
+    // helper-level `.test.ts` files under `e2e/_helpers/` (which exercise
+    // pure-function helpers consumed by the Playwright specs) can be
+    // picked up by vitest. Playwright's runner only ever consumes
+    // `.spec.ts`, so this stays a clean two-runner split.
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/.{idea,git,cache,output,temp}/**',
-      'e2e/**',
+      'e2e/**/*.spec.ts',
     ],
     coverage: {
       provider: 'v8',
