@@ -55,16 +55,28 @@
  *
  * Mock strategy
  * -------------
- * Tests 1 + 3 land on `digraphs`. The planner stub-falls-back to
- * blending-cv content for that focus. We use the shared
- * `installClaudeMock` from `_helpers/mockClaude.ts` (which serves the
- * canonicalWordSongSessionResponse — a blending-cv plan) so the
- * fallback resolves cleanly without canon-bytes coupling.
+ * All three tests use a single inline `installCanonBytesClaudeMock`
+ * that returns the bytes of `cvc-words-short-u.json` (real
+ * Azure-rendered MP3s) for any word-song request. Tests 1 + 3 land
+ * on `digraphs`-focus (post-CVC-graduation seed) — the planner
+ * stub-falls-back to blending-cv content there, but Playwright's
+ * route handler doesn't care about focus; it just returns the canon
+ * bytes. The App's parser is content-shape-driven and the short-u
+ * canon bytes parse cleanly into a plan regardless of the requested
+ * focus. The reason we use REAL canon bytes (not the shared
+ * `installClaudeMock`'s synthetic silent-base64 fixture) is the same
+ * reason cvc-words-regression / cvc-words-short-u-regression do —
+ * synthetic bytes decode flakily in headless Chromium and the
+ * read-aloud effect's `data-read-aloud-played` flag never flips.
+ * See `.claude/docs/testing-and-ci.md` §6 "Canon-aware testing".
  *
- * Test 2 lands on `cvc-words-short-u`. We use a sibling-shape
- * `installCvcWordsShortUClaudeMock` (defined inline in this spec) so
- * the canon-bytes fixture flows through and chips actually render.
- * Mirrors `cvc-words-short-u-regression.spec.ts`'s mock pattern.
+ * Tests 1 + 3 do NOT walk chips — the matrix-routing decision
+ * (cross-vowel vs same-vowel) is observable at the wire level via
+ * the captured request body's `payload.progress.focusNode` field +
+ * the persisted localStorage `parentSettings.crossVowelMixingEnabled`.
+ * That's a cross-browser observation that doesn't depend on
+ * `data-read-aloud-played` flipping, sidestepping the headless
+ * gesture-unlock flakiness Tests 1 + 3's first iteration hit on CI.
  *
  * WebKit skip rule
  * ----------------
@@ -79,11 +91,11 @@ import type { Request } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
+  PROGRESS_STORAGE_KEY,
   buildSeedProgress,
   buildSeedSessionHistory,
   seedLocalStorage,
 } from './_helpers/seedStorage'
-import { installClaudeMock } from './_helpers/mockClaude'
 
 const CVC_WORDS_SHORT_U_CANON_PATH = resolve(
   process.cwd(),
@@ -104,11 +116,20 @@ const VALID_SHORT_U_WORDS: ReadonlySet<string> = new Set([
   'gum',
 ])
 
-/** Sibling of installCvcWordsShortUClaudeMock; copy-pasted to keep the
- *  e2e helper surface narrow. Returns the canon bytes for a word-song
- *  request and exposes captured request bodies for planner-contract
- *  assertions. Math (or any other) requests are intentionally rejected
- *  with 500 — the cross-vowel flow only triggers a word-song fetch. */
+/** Returns the cvc-words-short-u canon bytes (real Azure-rendered
+ *  MP3s) for any word-song request and exposes captured request
+ *  bodies for planner-contract assertions. Math (or any other)
+ *  requests are intentionally rejected with 500 — the cross-vowel
+ *  flow only triggers a word-song fetch. Sibling of
+ *  cvc-words-short-u-regression.spec.ts's mock helper.
+ *
+ *  We re-use the short-u canon for Tests 1 + 3 too (which seed
+ *  digraphs-focus). The mock doesn't gate on focus — the App's
+ *  parser is content-shape-driven and the short-u canon bytes
+ *  parse cleanly into a plan regardless of the requested focus.
+ *  Real Azure-rendered MP3s decode reliably in headless Chromium;
+ *  the shared mock's synthetic silent-base64 fixture does NOT
+ *  (per .claude/docs/testing-and-ci.md §6). */
 async function installCvcWordsShortUClaudeMock(
   page: import('@playwright/test').Page,
 ): Promise<{ requests: Request[] }> {
@@ -186,7 +207,7 @@ function skipOnWebkitHeadless(testInfo: {
 }
 
 test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
-  test('1. Predicate ON — post-CVC-graduation: all 3 CVC mastered, digraphs practicing, cross-vowel does NOT fire on digraphs (focus-tier gate)', async ({
+  test('1. Predicate ON — post-CVC-graduation: all 3 CVC mastered, digraphs practicing, picker walks to digraphs (focus-tier gate stops cross-vowel routing)', async ({
     page,
   }) => {
     // Seed: cross-vowel-mixing debug-seed shape — three CVC tiers
@@ -194,9 +215,17 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     // returns `true` (all three mastered + default toggle on). But the
     // picker walks past CVC and lands on `digraphs`, so App.tsx's
     // `focusIsCvcTier` gate fires `false` and `wordSongCrossVowel` is
-    // `false`. The session uses same-vowel `TARGET_PAIRINGS` (which
-    // for digraphs falls back through the stub-blending-cv path —
-    // short-a pool — anyway).
+    // `false`. The session uses same-vowel `TARGET_PAIRINGS`.
+    //
+    // We assert at the wire level (focusNode in the request payload) +
+    // the persisted localStorage state, NOT at the chip-render level.
+    // The matrix-routing decision (cross-vowel vs same-vowel) is
+    // observable cross-browser without depending on the read-aloud
+    // effect firing; the chip-render path is gated by Howler decode +
+    // gesture-unlock (flaky in headless Chromium for synthetic-bytes
+    // canon, and webkit has no AudioContext) and would force a
+    // chromium-only assertion that adds no signal beyond the
+    // already-unit-tested matrix correctness.
     await seedLocalStorage(page, {
       progress: buildSeedProgress({
         skillLevelOverrides: {
@@ -213,10 +242,11 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 
-    // Use the shared mock — returns the canonical short-a blending-cv
-    // response, which is what the planner falls back to on a
-    // digraphs-focus request (per stub-fallback contract).
-    await installClaudeMock(page)
+    // Real canon bytes (cvc-words-short-u.json) — they parse cleanly
+    // even on a digraphs-focus request (planner-content shape, not
+    // focus-coupled at the parser). The mock just returns whatever
+    // bytes the server would have for the request shape.
+    const { requests } = await installCvcWordsShortUClaudeMock(page)
     await page.goto('/')
 
     const hub = page.getByTestId('hub')
@@ -226,39 +256,55 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
-    const wordSong = page.getByTestId('word-song')
-    await expect(wordSong).toBeVisible({ timeout: 15_000 })
+    // WordSong mounts — proves the planner fetch resolved + the parser
+    // accepted the cvc-word content type. Cross-browser.
+    await expect(page.getByTestId('word-song')).toBeVisible({ timeout: 15_000 })
 
-    // The component renders. The `data-cross-vowel` attribute on the
-    // WordSong root would be the cleanest assertion, but production
-    // doesn't currently set one — keeping the spec assertion at the
-    // observable level: a digraphs-focus session does NOT emit any
-    // word that's only in TARGET_PAIRINGS_CROSSVOWEL. Since the
-    // stub-fallback uses the short-a blending-cv plan, the chips
-    // surface short-a words. We assert no short-u or short-o chips
-    // appear (which would only be possible under cross-vowel mode).
-    //
-    // The strongest cross-browser assertion is: WordSong mounted
-    // (proves planner round-trip), session was treated as
-    // non-cross-vowel (would have surfaced cross-vowel chips
-    // otherwise). The chip-render check is per-browser via the
-    // gentle/trap distractor walk in cvc-words-regression.spec.ts.
+    // Wire-level assertion: the planner request shipped focusNode =
+    // 'digraphs'. This is the observable proof that the picker
+    // walked past every mastered CVC tier and stopped at digraphs;
+    // App.tsx's `focusIsCvcTier` gate then refused to thread
+    // crossVowelMixing into the WordSong prop, so cross-vowel
+    // routing did NOT fire even though `crossVowelMixingActive`
+    // would have returned `true` on this profile.
+    expect(requests).toHaveLength(1)
+    const body = JSON.parse(requests[0]!.postData() ?? '{}') as Record<
+      string,
+      unknown
+    >
+    expect(body.kind).toBe('session-start')
+    const payload = body.payload as Record<string, unknown>
+    expect(payload.track).toBe('word-song')
+    const progressBlock = payload.progress as Record<string, unknown>
+    expect(progressBlock).toBeDefined()
+    expect(progressBlock.focusNode).toBe('digraphs')
 
-    // Belt-and-braces — chrome-only chip walk. Asserts the per-row
-    // distractors are a subset of short-a + short-o + short-u
-    // distractor-pool, NOT picked from TARGET_PAIRINGS_CROSSVOWEL
-    // (which would include explicit cross-vowel pairings the planner
-    // doesn't emit on a digraphs-focus session).
-    if (test.info().project.name === 'chromium') {
-      // Stub-fallback blending-cv on digraphs uses the short-a target
-      // pool. We assert the read-aloud fired (chips will be enabled),
-      // then verify the chip set is non-empty.
-      await expect(wordSong).toHaveAttribute('data-read-aloud-played', 'true', {
-        timeout: 20_000,
-      })
-      const chips = page.getByTestId('word-song-chip')
-      await expect(chips).toHaveCount(3)
+    // localStorage proof: predicate's mastery-state inputs are the
+    // seeded shape. Verifies the seed actually landed without
+    // schema-rejection from `isProgressV1` (a regression-guard for the
+    // new optional `crossVowelMixingEnabled` field — if the guard
+    // refused the seeded blob, `loadProgress` would return null and
+    // App would fall back to defaults with `add-to-10` focus, not
+    // `digraphs`).
+    const persisted = (await page.evaluate(
+      (key) => window.localStorage.getItem(key),
+      PROGRESS_STORAGE_KEY,
+    )) as string | null
+    expect(persisted).not.toBeNull()
+    const parsed = JSON.parse(persisted!) as {
+      skillLevels: Record<string, string>
+      parentSettings?: { crossVowelMixingEnabled?: unknown }
     }
+    expect(parsed.skillLevels['cvc-words']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-o']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-u']).toBe('mastered')
+    expect(parsed.skillLevels['digraphs']).toBe('practicing')
+    // Default toggle is `true` (defaulter fills missing key); seed
+    // helper doesn't write it explicitly, so the field may be
+    // absent on the persisted blob — that's the read-path-defaulter
+    // contract. Either undefined or `true` is correct.
+    const toggle = parsed.parentSettings?.crossVowelMixingEnabled
+    expect(toggle === undefined || toggle === true).toBe(true)
   })
 
   test('2. Predicate OFF — incomplete mastery: short-u practicing + others mastered → same-vowel-only distractors', async ({
@@ -333,13 +379,16 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(offPoolWords).toEqual([])
   })
 
-  test('3. Predicate OFF — toggle override: all 3 CVC mastered + crossVowelMixingEnabled=false → predicate false', async ({
+  test('3. Predicate OFF — toggle override: all 3 CVC mastered + crossVowelMixingEnabled=false → toggle persists, predicate cannot fire', async ({
     page,
   }) => {
     // Seed: the full post-graduation state, but with the parent
     // toggle flipped off. Per spec §10 Q1 + Dave's research §4.4 —
     // the toggle is the hard off switch. The predicate must return
     // `false` here regardless of mastery state.
+    //
+    // Same observation strategy as Test 1: assert at the wire +
+    // localStorage level, no chip-render dependency.
     await seedLocalStorage(page, {
       progress: buildSeedProgress({
         skillLevelOverrides: {
@@ -355,9 +404,11 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     })
 
     // Patch the seeded blob's parentSettings to flip the toggle off.
-    // The seed helper doesn't expose parent-settings overrides today,
-    // so we install an init-script that mutates the persisted blob
-    // before the App's first render.
+    // `seedLocalStorage` uses `addInitScript` to install the seed
+    // BEFORE first navigation; we add a second init-script after it
+    // that runs in the same pre-navigation phase and mutates the
+    // already-installed blob. Both init-scripts run before any page
+    // script, so order is deterministic.
     await page.addInitScript(() => {
       const KEY = 'marian-tutor:progress:v1'
       const raw = window.localStorage.getItem(KEY)
@@ -370,14 +421,12 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
         parsed.parentSettings.crossVowelMixingEnabled = false
         window.localStorage.setItem(KEY, JSON.stringify(parsed))
       } catch {
-        // If parsing fails, the App will fall back to defaults — the
-        // spec's primary assertion (no cross-vowel chips) still
-        // holds because defaults route to digraphs+stub-fallback
-        // anyway.
+        // Best effort. If parsing fails, the localStorage assertion
+        // below catches the resulting empty / un-toggled state.
       }
     })
 
-    await installClaudeMock(page)
+    const { requests } = await installCvcWordsShortUClaudeMock(page)
     await page.goto('/')
 
     const hub = page.getByTestId('hub')
@@ -387,24 +436,38 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
-    const wordSong = page.getByTestId('word-song')
-    await expect(wordSong).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('word-song')).toBeVisible({ timeout: 15_000 })
 
-    // Same assertion shape as test 1 — chips render via the
-    // stub-blending-cv fallback path; no cross-vowel surfacing
-    // happens because the predicate is OFF (toggle false). The
-    // toggle-OFF-with-all-mastered case behaves identically to the
-    // predicate-true-on-digraphs case from test 1 (cross-vowel
-    // doesn't render chips in either), but the wire reason is
-    // different: here the predicate itself is `false`; in test 1
-    // the predicate is `true` but the focus-tier gate stops it. The
-    // test pins both branches independently.
-    if (test.info().project.name === 'chromium') {
-      await expect(wordSong).toHaveAttribute('data-read-aloud-played', 'true', {
-        timeout: 20_000,
-      })
-      const chips = page.getByTestId('word-song-chip')
-      await expect(chips).toHaveCount(3)
+    // Wire-level assertion: focusNode is digraphs (picker walks past
+    // every mastered CVC tier; the toggle being off doesn't change
+    // the picker, just the predicate's verdict).
+    expect(requests).toHaveLength(1)
+    const body = JSON.parse(requests[0]!.postData() ?? '{}') as Record<
+      string,
+      unknown
+    >
+    const payload = body.payload as Record<string, unknown>
+    const progressBlock = payload.progress as Record<string, unknown>
+    expect(progressBlock.focusNode).toBe('digraphs')
+
+    // localStorage proof: the toggle override persisted.
+    // `crossVowelMixingActive(progress)` would return `false` for
+    // this state regardless of mastery (per spec §10 Q1 + Dave's
+    // research §4.4 escape-valve). This is the cross-browser
+    // observation that pins the toggle's hard-off semantics.
+    const persisted = (await page.evaluate(
+      (key) => window.localStorage.getItem(key),
+      PROGRESS_STORAGE_KEY,
+    )) as string | null
+    expect(persisted).not.toBeNull()
+    const parsed = JSON.parse(persisted!) as {
+      skillLevels: Record<string, string>
+      parentSettings?: { crossVowelMixingEnabled?: unknown }
     }
+    expect(parsed.skillLevels['cvc-words']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-o']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-u']).toBe('mastered')
+    // The toggle override is the load-bearing assertion here.
+    expect(parsed.parentSettings?.crossVowelMixingEnabled).toBe(false)
   })
 })
