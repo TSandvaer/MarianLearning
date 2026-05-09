@@ -23,7 +23,7 @@ import {
 import type { ParentSettings, Progress } from './types'
 
 describe('DEFAULT_PARENT_SETTINGS', () => {
-  it('matches the Thomas-locked 2026-05-02 per-track values (ticket 86c9kwvy0)', () => {
+  it('matches the Thomas-locked 2026-05-02 per-track values (ticket 86c9kwvy0) + 2026-05-09 cross-vowel mix lock (ticket 86c9qa0kf)', () => {
     expect(DEFAULT_PARENT_SETTINGS).toEqual({
       autoPromote: true,
       sessionModePicker: 'off',
@@ -33,6 +33,7 @@ describe('DEFAULT_PARENT_SETTINGS', () => {
       },
       crossDayEnforcement: true,
       showLevelToMarian: false,
+      crossVowelMixingEnabled: true,
     })
   })
 
@@ -72,6 +73,7 @@ describe('getSettings', () => {
       },
       crossDayEnforcement: false,
       showLevelToMarian: true,
+      crossVowelMixingEnabled: false,
     }
     const p: Progress = { ...defaultProgress(), parentSettings: custom }
     expect(getSettings(p)).toEqual(custom)
@@ -100,6 +102,8 @@ describe('getSettings', () => {
     expect(result.autoPromote).toBe(true)
     expect(result.crossDayEnforcement).toBe(true)
     expect(result.showLevelToMarian).toBe(false)
+    // Ticket 86c9qa0kf — cross-vowel default is `true` when missing.
+    expect(result.crossVowelMixingEnabled).toBe(true)
     expect(result.masteryThreshold).toEqual({
       math: { percent: 0.95, sessions: 3 },
       'word-song': { percent: 0.9, sessions: 3 },
@@ -251,6 +255,57 @@ describe('getSettings', () => {
     })
   })
 
+  // Ticket 86c9qa0kf — cross-vowel mix default-ON + defaulter coverage.
+  describe('crossVowelMixingEnabled (ticket 86c9qa0kf)', () => {
+    it('defaults to `true` when the field is missing on the loaded blob', () => {
+      const partial = {
+        ...defaultProgress(),
+        parentSettings: {
+          ...DEFAULT_PARENT_SETTINGS,
+          // Spread strips undefined; force-delete to simulate an old
+          // blob that never carried the field.
+        } as ParentSettings,
+      } as Progress
+      // Directly manipulate to remove the key.
+      delete (partial.parentSettings as Partial<ParentSettings>)
+        .crossVowelMixingEnabled
+      expect(getSettings(partial).crossVowelMixingEnabled).toBe(true)
+    })
+
+    it('preserves an explicit `false` value (parent-toggled-off)', () => {
+      const off: Progress = {
+        ...defaultProgress(),
+        parentSettings: {
+          ...DEFAULT_PARENT_SETTINGS,
+          crossVowelMixingEnabled: false,
+        },
+      }
+      expect(getSettings(off).crossVowelMixingEnabled).toBe(false)
+    })
+
+    it('preserves an explicit `true` value', () => {
+      const on: Progress = {
+        ...defaultProgress(),
+        parentSettings: {
+          ...DEFAULT_PARENT_SETTINGS,
+          crossVowelMixingEnabled: true,
+        },
+      }
+      expect(getSettings(on).crossVowelMixingEnabled).toBe(true)
+    })
+
+    it('falls back to default `true` when the field is non-boolean garbage', () => {
+      const bad: Progress = {
+        ...defaultProgress(),
+        parentSettings: {
+          ...DEFAULT_PARENT_SETTINGS,
+          crossVowelMixingEnabled: 'yes' as unknown as boolean,
+        },
+      }
+      expect(getSettings(bad).crossVowelMixingEnabled).toBe(true)
+    })
+  })
+
   it('rejects an unrecognised sessionModePicker and falls back to "off"', () => {
     const weird: Progress = {
       ...defaultProgress(),
@@ -293,6 +348,7 @@ describe('loadProgress + parentSettings', () => {
       },
       crossDayEnforcement: false,
       showLevelToMarian: true,
+      crossVowelMixingEnabled: false,
     }
     const p: Progress = { ...defaultProgress(), parentSettings: custom }
     saveProgress(p)

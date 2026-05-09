@@ -49,11 +49,11 @@ afterEach(() => {
 })
 
 describe('ParentSettings — rendering', () => {
-  it('renders six rows in the documented order (per-track threshold split adds one row, ticket 86c9kwvy0)', () => {
+  it('renders seven rows in the documented order (per-track threshold split + ticket 86c9qa0kf cross-vowel toggle)', () => {
     const { storage } = createMemoryStorage(defaultProgress())
     render(<ParentSettings storage={storage} />)
     const rows = screen.getAllByTestId('parent-settings-row')
-    expect(rows).toHaveLength(6)
+    expect(rows).toHaveLength(7)
     expect(rows.map((r) => r.getAttribute('data-row-id'))).toEqual([
       'autoPromote',
       'sessionModePicker',
@@ -61,6 +61,7 @@ describe('ParentSettings — rendering', () => {
       'masteryThreshold-word-song',
       'crossDayEnforcement',
       'showLevelToMarian',
+      'crossVowelMixingEnabled',
     ])
   })
 
@@ -74,6 +75,7 @@ describe('ParentSettings — rendering', () => {
       },
       crossDayEnforcement: false,
       showLevelToMarian: true,
+      crossVowelMixingEnabled: false,
     }
     const { storage } = createMemoryStorage({
       ...defaultProgress(),
@@ -273,6 +275,34 @@ describe('ParentSettings — save-on-change', () => {
     // autoPromote and sessionModePicker remain at defaults.
     expect(last.parentSettings?.autoPromote).toBe(true)
     expect(last.parentSettings?.sessionModePicker).toBe('off')
+  })
+
+  // Ticket 86c9qa0kf — cross-vowel mix toggle row.
+  it('flips crossVowelMixingEnabled and preserves other fields (ticket 86c9qa0kf)', async () => {
+    const user = userEvent.setup()
+    const ctx = createMemoryStorage(defaultProgress())
+    render(<ParentSettings storage={ctx.storage} />)
+
+    // Default is `true`; click flips to `false`.
+    await user.click(
+      screen.getByTestId('parent-settings-toggle-crossVowelMixingEnabled'),
+    )
+    const last = ctx.saved.at(-1)!
+    expect(last.parentSettings?.crossVowelMixingEnabled).toBe(false)
+    // Other defaults preserved.
+    expect(last.parentSettings?.autoPromote).toBe(true)
+    expect(last.parentSettings?.crossDayEnforcement).toBe(true)
+    expect(last.parentSettings?.showLevelToMarian).toBe(false)
+  })
+
+  it('crossVowelMixingEnabled defaults to "on" in the UI', () => {
+    const { storage } = createMemoryStorage(defaultProgress())
+    render(<ParentSettings storage={storage} />)
+    expect(
+      screen
+        .getByTestId('parent-settings-toggle-crossVowelMixingEnabled')
+        .getAttribute('data-value'),
+    ).toBe('on')
   })
 
   it('does not destroy the existing Progress fields (history, leitner, profile)', async () => {

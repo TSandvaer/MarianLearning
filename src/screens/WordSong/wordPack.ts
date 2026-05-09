@@ -581,6 +581,109 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   gum: { gentle: ['bug', 'rug'], trap: ['bun', 'sun'] }, // /ʌm/ has no in-pool rhyme partner; /ʌn/ near-miss
 } as const
 
+/**
+ * Cross-vowel distractor matrix (ticket 86c9qa0kf — cross-vowel mix v1
+ * impl). Active when `crossVowelMixingActive(progress, parentSettings)`
+ * returns `true` AND the focus is one of the three CVC tiers.
+ *
+ * Source-of-truth: `design/word-song/cross-vowel-mix-spec.md` §4
+ * (constraints) + Dave's research at
+ * `design/research/cross-vowel-discrimination-threshold.md` §3
+ * (predicate-shape pin).
+ *
+ * Each row carries a `gentle` pair (problems 1-3) + a `trap` pair
+ * (problems 4-8) for one target across the three CVC tiers (14 short-a
+ * canonical + 8 short-o + 11 short-u = 33 rows). The 4 short-a
+ * novel-pool probes (`nap, rat, map, tap`) are EXCLUDED — they remain
+ * graduation-session-only emit-paths (per spec §4 rule 4 +
+ * `cvc-words-developmental-review.md`); accidentally surfacing them as
+ * cross-vowel distractors would break their generalization-probe-only
+ * invariant.
+ *
+ * Authoring constraints (each row honours all five):
+ *
+ *   1. **Vowel-mix preference** — each row's two distractors should
+ *      EACH carry a *different* vowel from the target. Trap-tier
+ *      prefers a vowel-contrast pair (e.g. `[short-o, short-u]` for a
+ *      short-a target) because that maximises discriminative pressure
+ *      on Marian's reading of the vowel as a load-bearing decoding
+ *      dimension. Where the matrix author can hit a clean cross-vowel
+ *      minimal triplet (`hat / hot / hut`, `bag / dog / bug`), they do
+ *      — those are the textbook 3-vowel discrimination drills.
+ *   2. **FORBIDDEN_PAIRS** — honoured strictly. The 8 existing entries
+ *      cover all hard collisions; the 3 borderline pairs flagged by
+ *      spec §5 (`[cat, fox]`, `[mom, man]`, `[pot, tub]`) are
+ *      matrix-author-avoided per the spec note.
+ *   3. **Distinctness** — `target ≠ d1 ≠ d2`.
+ *   4. **Picture availability** — every word here resolves via
+ *      `getWordEntry()` (33-word effective pool). Probe words excluded.
+ *   5. **Category-spread for gentle** — gentle-tier distractors are
+ *      clearly different from target on category + onset axes; the
+ *      cross-vowel difference replaces the same-vowel "different vowel
+ *      sound" axis automatically. Trap-tier may share category or
+ *      onset since the vowel difference is the load.
+ *
+ * Spec §4 example rows used as templates: `hat`, `dog`, `sun` — see
+ * the spec for the full tradeoff discussion (especially `sun`'s case
+ * where `/ʌn/` rhyme doesn't extend to short-o in the v1 pool).
+ *
+ * Pool-size-floor caveat (spec §6): short-o pool is 8 entries (under
+ * the spec's "≥11" floor); short-o targets pull from 7 same-tier
+ * candidates if a same-tier distractor is needed. Cross-vowel firing
+ * with an 8-word short-o pool is graceful degradation, not a bug —
+ * Dave's research §3 supports this. Kyle's short-o expansion ticket is
+ * in flight; the matrix below works regardless of whether/when that
+ * lands.
+ */
+export const TARGET_PAIRINGS_CROSSVOWEL: Readonly<
+  Record<string, TargetPairings>
+> = {
+  // ── Short-a targets (cross-vowel distractors from short-o + short-u) ──
+  // Trap-tier prefers cross-three-vowel rhyme triplets where the pack
+  // supports them (hat/hot/hut for /-t/-coda; bag/dog/bug for /-g/-coda;
+  // man/mom/bun for human-or-food /m-/-onset).
+  cat: { gentle: ['log', 'cup'], trap: ['hot', 'nut'] }, // /-t/ coda + cross-vowel; [cat,dog] FORBIDDEN, [cat,fox] avoided per spec §5
+  hat: { gentle: ['log', 'bug'], trap: ['hot', 'hut'] }, // textbook hat/hot/hut minimal triplet (spec §4 example 1)
+  bat: { gentle: ['mom', 'cup'], trap: ['hot', 'hut'] }, // /-t/ coda cross-vowel (avoid [bat,rat] probe)
+  mat: { gentle: ['fox', 'jug'], trap: ['hot', 'nut'] }, // /-t/ coda + cross-vowel; [rug,mat] FORBIDDEN
+  bag: { gentle: ['mom', 'sun'], trap: ['dog', 'bug'] }, // textbook bag/dog/bug minimal triplet (/-g/ coda)
+  fan: { gentle: ['box', 'tub'], trap: ['sun', 'bun'] }, // /-n/ coda cross-vowel
+  man: { gentle: ['box', 'jug'], trap: ['sun', 'bun'] }, // /-n/ coda; [man,dad]/[mom,man] FORBIDDEN/avoided
+  pan: { gentle: ['mom', 'sun'], trap: ['mop', 'cup'] }, // /p-/ alliteration cross-vowel; [pan,pot] FORBIDDEN
+  cap: { gentle: ['log', 'bug'], trap: ['mop', 'cup'] }, // /-p/ coda cross-vowel; [cap,hat] FORBIDDEN
+  can: { gentle: ['fox', 'rug'], trap: ['sun', 'bun'] }, // /-n/ coda cross-vowel
+  tag: { gentle: ['mom', 'cup'], trap: ['dog', 'bug'] }, // /-g/ coda cross-vowel
+  dad: { gentle: ['box', 'sun'], trap: ['hot', 'gum'] }, // [man,dad]/[mom,dad] FORBIDDEN — keep both distractors cross-vowel
+  jam: { gentle: ['log', 'bus'], trap: ['mom', 'gum'] }, // /-m/ coda cross-vowel
+  van: { gentle: ['mom', 'rug'], trap: ['fox', 'sun'] }, // /-n/ coda; [bus,van] FORBIDDEN
+  // ── Short-o targets (cross-vowel distractors from short-a + short-u) ──
+  // Trap-tier prefers cross-vowel rhyme bridges where the pack offers
+  // them; gentle-tier reaches across category + vowel.
+  dog: { gentle: ['hat', 'cup'], trap: ['bag', 'bug'] }, // textbook bag/dog/bug minimal triplet; [cat,dog] FORBIDDEN
+  mop: { gentle: ['cat', 'sun'], trap: ['cap', 'cup'] }, // /-p/ coda cross-vowel
+  log: { gentle: ['cat', 'cup'], trap: ['bag', 'bug'] }, // /-g/ coda cross-vowel rhyme bridge
+  pot: { gentle: ['cat', 'sun'], trap: ['hat', 'nut'] }, // /-t/ coda cross-vowel; [pan,pot] FORBIDDEN, [pot,tub] avoided
+  box: { gentle: ['cat', 'cup'], trap: ['bag', 'bug'] }, // /-g/-ish-coda fallback (no clean /-ks/ cross-vowel partner in pool)
+  fox: { gentle: ['hat', 'sun'], trap: ['bag', 'bug'] }, // /-g/-ish-coda fallback; [cat,fox] avoided
+  mom: { gentle: ['cat', 'cup'], trap: ['jam', 'gum'] }, // /-m/ coda cross-vowel; [mom,dad]/[mom,man] FORBIDDEN/avoided
+  hot: { gentle: ['cat', 'sun'], trap: ['hat', 'hut'] }, // textbook hat/hot/hut minimal triplet
+  // ── Short-u targets (cross-vowel distractors from short-a + short-o) ──
+  // /ʌn/ has no short-o partner (con/son not in pack); /ʌm/ has only
+  // mom; /ʌg/ bridges to short-a `bag` and short-o `dog`. Author leans
+  // on what the pack offers, prefers minimal triplets where they exist.
+  sun: { gentle: ['cat', 'mom'], trap: ['fan', 'man'] }, // /-n/ coda cross-vowel (mom is /-m/ but onset-share, gentle-tier OK)
+  cup: { gentle: ['cat', 'mom'], trap: ['cap', 'mop'] }, // /-p/ coda cross-vowel; [tub,cup] FORBIDDEN
+  bus: { gentle: ['cat', 'mom'], trap: ['bag', 'box'] }, // /b-/ alliteration cross-vowel; [bus,van] FORBIDDEN
+  bug: { gentle: ['hat', 'mom'], trap: ['bag', 'dog'] }, // textbook bag/dog/bug minimal triplet
+  nut: { gentle: ['mom', 'cat'], trap: ['hat', 'hot'] }, // /-t/ coda cross-vowel
+  tub: { gentle: ['cat', 'mom'], trap: ['bag', 'dog'] }, // /-g/-ish coda fallback; [tub,cup]/[pot,tub] FORBIDDEN/avoided
+  bun: { gentle: ['cat', 'mom'], trap: ['fan', 'man'] }, // /-n/ coda cross-vowel
+  jug: { gentle: ['hat', 'mom'], trap: ['bag', 'dog'] }, // /-g/ coda cross-vowel
+  rug: { gentle: ['cat', 'mom'], trap: ['bag', 'dog'] }, // /-g/ coda; [rug,mat] FORBIDDEN
+  hut: { gentle: ['cat', 'mom'], trap: ['hat', 'hot'] }, // textbook hat/hot/hut minimal triplet
+  gum: { gentle: ['hat', 'dog'], trap: ['jam', 'mom'] }, // /-m/ coda cross-vowel ([cat,dog] FORBIDDEN, [cat,fox] avoided per spec §5)
+} as const
+
 /** Look up a word entry by word string. Throws on missing — every word in
  *  the pack matrix must resolve. */
 export function getWordEntry(word: string): WordEntry {

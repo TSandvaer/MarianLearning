@@ -248,8 +248,10 @@ export type PerTrackMasteryThreshold = Record<MasteryTrackKey, MasteryThreshold>
 export type SessionModePicker = 'off' | 'on'
 
 /**
- * Parent-tunable settings — five knobs that drive the adaptive
- * engine's behaviour. Defaults locked by Thomas on 2026-05-01.
+ * Parent-tunable settings — six knobs that drive the adaptive
+ * engine's behaviour. Defaults locked by Thomas on 2026-05-01;
+ * `crossVowelMixingEnabled` added 2026-05-09 per ticket 86c9qa0kf
+ * (cross-vowel mix v1 impl).
  *
  * Read via `getSettings(progress)` from `./parentSettings.ts` —
  * never reach into `progress.parentSettings` directly. The helper
@@ -269,6 +271,22 @@ export interface ParentSettings {
   masteryThreshold: PerTrackMasteryThreshold
   crossDayEnforcement: boolean
   showLevelToMarian: boolean
+  /**
+   * Cross-vowel distractor mixing toggle (ticket 86c9qa0kf, default
+   * `true` per spec §10 Q1 lock 2026-05-09). When `true` AND all three
+   * CVC tiers (`cvc-words`, `cvc-words-short-o`, `cvc-words-short-u`)
+   * are `'mastered'`, sessions on any of those tiers can pull
+   * distractors from any vowel pool, exercising vowel-discrimination
+   * as a deliberate skill. When `false`, sessions stay same-vowel-only
+   * regardless of mastery state — the parent-facing escape valve per
+   * cross-vowel-mix-spec.md §2 + Dave's research (PR #175) §4.4.
+   *
+   * Field is additive and backward-compatible — old blobs predate it,
+   * `getSettings()` defaults missing values to `true`. Schema
+   * stays at v1 (same precedent as `masteryThreshold` per-track shape
+   * widening, ticket 86c9kwvy0).
+   */
+  crossVowelMixingEnabled: boolean
 }
 
 /** Top-level persisted document. Always carries `schemaVersion`. */

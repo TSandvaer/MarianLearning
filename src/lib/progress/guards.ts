@@ -139,6 +139,18 @@ function isParentSettings(v: unknown): boolean {
     return false
   if (typeof v.crossDayEnforcement !== 'boolean') return false
   if (typeof v.showLevelToMarian !== 'boolean') return false
+  // crossVowelMixingEnabled (ticket 86c9qa0kf) is an OPTIONAL additive
+  // field. Old blobs (pre-86c9qa0kf) won't carry it; the read-path
+  // defaulter in parentSettings.ts fills it to `true`. We accept
+  // `undefined` (legitimately absent) OR a boolean here. Anything else
+  // (`null`, string, number) is malformed → reject so the upstream
+  // fallback fires.
+  if (
+    v.crossVowelMixingEnabled !== undefined &&
+    typeof v.crossVowelMixingEnabled !== 'boolean'
+  ) {
+    return false
+  }
   const mt = v.masteryThreshold
   if (!isObject(mt)) return false
   // Accept BOTH the new per-track shape (math + word-song each have a

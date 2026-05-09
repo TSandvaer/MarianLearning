@@ -79,6 +79,14 @@ export const DEFAULT_PARENT_SETTINGS: ParentSettings = Object.freeze({
   masteryThreshold: DEFAULT_PER_TRACK_THRESHOLD,
   crossDayEnforcement: true,
   showLevelToMarian: false,
+  // Ticket 86c9qa0kf — cross-vowel distractor mix v1. Default ON per
+  // spec §10 Q1 lock 2026-05-09 + Dave's research (PR #175) §4.4: the
+  // per-aggregate mastery gate (all three CVC tiers `'mastered'`)
+  // already encodes "she's ready for harder discrimination work" —
+  // a default-OFF setting would require Thomas to flip a hidden toggle
+  // to unlock the pedagogically appropriate next step. Reversible —
+  // if Marian struggles, the parent flips this to `false`.
+  crossVowelMixingEnabled: true,
 }) as ParentSettings
 
 /**
@@ -121,6 +129,13 @@ export function getSettings(
       typeof loaded.showLevelToMarian === 'boolean'
         ? loaded.showLevelToMarian
         : DEFAULT_PARENT_SETTINGS.showLevelToMarian,
+    // Ticket 86c9qa0kf — additive optional field, defaults to `true`
+    // when missing (old blobs) or non-boolean (malformed). Mirrors
+    // the autoPromote / crossDayEnforcement defaulter pattern.
+    crossVowelMixingEnabled:
+      typeof loaded.crossVowelMixingEnabled === 'boolean'
+        ? loaded.crossVowelMixingEnabled
+        : DEFAULT_PARENT_SETTINGS.crossVowelMixingEnabled,
   }
 }
 
@@ -133,6 +148,7 @@ function cloneDefaults(): ParentSettings {
     masteryThreshold: clonePerTrackDefaults(),
     crossDayEnforcement: DEFAULT_PARENT_SETTINGS.crossDayEnforcement,
     showLevelToMarian: DEFAULT_PARENT_SETTINGS.showLevelToMarian,
+    crossVowelMixingEnabled: DEFAULT_PARENT_SETTINGS.crossVowelMixingEnabled,
   }
 }
 

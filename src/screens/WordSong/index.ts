@@ -35,12 +35,13 @@ export {
   pickDistractors,
   pickTier,
 } from './wordDistractors'
-export type { DistractorTier } from './wordDistractors'
+export type { DistractorTier, PickDistractorsOptions } from './wordDistractors'
 export {
   ALL_WORDS,
   DISTRACTOR_ONLY_WORDS,
   FORBIDDEN_PAIRS,
   TARGET_PAIRINGS,
+  TARGET_PAIRINGS_CROSSVOWEL,
   getWordEntry,
   isForbiddenPair,
 } from './wordPack'
