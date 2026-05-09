@@ -2820,4 +2820,106 @@ describe('Math (Number Garden) screen', () => {
     expect(new Set(values).size).toBe(3)
     expect(values).toContain(18)
   })
+
+  /**
+   * Visual-fit regression for the add-to-20 tier flower row (ticket
+   * 86c9q5q13 — Thomas's iPad smoke 2026-05-09).
+   *
+   * The P0 this pins: the flower-row font size was hard-coded to
+   * `text-[3.2rem]`, so the `math-visual-groups` row's painted width
+   * scaled linearly with `addendA + addendB`. On real iPad portrait,
+   * `7+7=14` rendered cramped and `9+9=18` clipped past the right edge.
+   *
+   * Discipline: the visual fit *itself* (px width) cannot be asserted
+   * in jsdom (no layout). We instead pin the upstream contract — the
+   * pure `flowerRowFontSizeRem(addendA, addendB)` helper — AND assert
+   * the `math-visual-groups` div carries the matching `data-flower-rem`
+   * attribute on render. If a future change breaks the wiring (helper
+   * not invoked, attribute not set, fontSize not threaded through to
+   * the inline style), this test catches it.
+   *
+   * Anchors:
+   *   - total ≤ 10 → 3.2rem (unchanged from pre-fix; add-to-10 plans
+   *     render identically to before)
+   *   - total = 14 → 2.6rem (Thomas's "cramped" threshold)
+   *   - total = 18 → 2.0rem (Thomas's "clipping" threshold; capstone)
+   */
+  describe('add-to-20 visual-fit (flower row scaling)', () => {
+    // Helper-only invariants (sweep + interpolation + edge cases) live in
+    // `flowerRowFit.test.ts`. The two cases below are screen-level: they
+    // confirm the helper output is actually wired through to the
+    // `math-visual-groups` element via inline fontSize + data-flower-rem.
+
+    it('Math screen: math-visual-groups carries data-flower-rem matching the helper', () => {
+      const harness = makePlayHarness()
+      // 9+9=18 — the worst-case clip Thomas observed on iPad.
+      const capstonePlan: MathSessionPlan = {
+        id: 'sums-to-20-capstone-test',
+        label: 'capstone smoke',
+        problems: Array.from({ length: 8 }, (_, i) => ({
+          index: i + 1,
+          addendA: 9,
+          addendB: 9,
+          correct: 18,
+          utterances: {
+            read: 'Nine plus nine. How many?',
+            correct: 'Yes! Eighteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Nine. And nine more. How many now?',
+            giveAnswer: 'This one is eighteen.',
+          },
+        })),
+      }
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={capstonePlan}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+      const visualGroups = screen.getByTestId('math-visual-groups')
+      // Helper says 9+9 → 2.0rem; toFixed(2) is the on-DOM contract.
+      expect(visualGroups.getAttribute('data-flower-rem')).toBe('2.00')
+      // The inline fontSize style threads the helper output verbatim.
+      expect(visualGroups.style.fontSize).toBe('2rem')
+    })
+
+    it('Math screen: add-to-10 plan keeps the historical 3.2rem flower size', () => {
+      const harness = makePlayHarness()
+      // 5+5=10 — the largest add-to-10 sum; pre-fix 3.2rem rendered fine.
+      const addTo10Plan: MathSessionPlan = {
+        id: 'sums-to-10-cap-test',
+        label: 'add-to-10 cap smoke',
+        problems: Array.from({ length: 8 }, (_, i) => ({
+          index: i + 1,
+          addendA: 5,
+          addendB: 5,
+          correct: 10,
+          utterances: {
+            read: 'Five plus five. How many?',
+            correct: 'Yes! Ten!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Five. And five more. How many now?',
+            giveAnswer: 'This one is ten.',
+          },
+        })),
+      }
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={addTo10Plan}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+      const visualGroups = screen.getByTestId('math-visual-groups')
+      expect(visualGroups.getAttribute('data-flower-rem')).toBe('3.20')
+      expect(visualGroups.style.fontSize).toBe('3.2rem')
+    })
+  })
 })

@@ -20,6 +20,7 @@ import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { chipMaxAnswerForCorrects, pickDistractors } from './distractors'
+import { flowerRowFontSizeRem } from './flowerRowFit'
 import {
   loadStardust,
   writeStardust,
@@ -1933,11 +1934,28 @@ function MathScreen({
 
             {/* Visual groups — flower glyphs. The asset is pending (see
             assets-todo.md); render an inline SVG fallback so the screen
-            still reads even before Thomas drops the file. */}
+            still reads even before Thomas drops the file.
+
+            Font-size is continuously scaled by the total flower count
+            so the add-to-20 tier (totals 11–18) never clips past the
+            iPad portrait safe area. See `flowerRowFontSizeRem` above
+            for the formula and rationale. `data-flower-rem` is the
+            visual-fit regression-test seam (asserts the scale fired
+            without depending on jsdom layout). */}
             <div
               data-testid="math-visual-groups"
+              data-flower-rem={flowerRowFontSizeRem(
+                currentProblem.addendA,
+                currentProblem.addendB,
+              ).toFixed(2)}
               aria-hidden
-              className="flex items-center gap-6 text-[3.2rem]"
+              className="flex items-center gap-6"
+              style={{
+                fontSize: `${flowerRowFontSizeRem(
+                  currentProblem.addendA,
+                  currentProblem.addendB,
+                )}rem`,
+              }}
             >
               <FlowerGroup count={currentProblem.addendA} />
               <span>+</span>
