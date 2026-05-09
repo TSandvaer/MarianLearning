@@ -1,0 +1,123 @@
+/**
+ * Leitner-fixture builders for e2e specs.
+ *
+ * Ticket follow-up to PR #164 (M4 Leitner session-gen wiring). These
+ * helpers compose `mathFactsLeitner` blobs that the seeder ships into
+ * `marian-tutor:progress:v1` so the App's `readProgressHintsForTrack('math')`
+ * flattens them via `buildLeitnerSessionHint` and ships them on the
+ * `/api/claude` payload's `progress.leitner` block.
+ *
+ * Why a dedicated builder
+ * -----------------------
+ * `buildSeedProgress()` in `seedStorage.ts` always emits
+ * `mathFactsLeitner: { items: [] }` — empty box, no Leitner directive
+ * fires. Multiple Leitner specs need to seed varied box-state shapes
+ * (mixed boxes, single box-1, all box-5, etc.); this module is where
+ * the canonical fixture shapes live.
+ *
+ * Wire-shape source of truth
+ * --------------------------
+ * `LeitnerItem` and `LeitnerBox` from `src/lib/progress/types.ts`. The
+ * App reads via `buildLeitnerSessionHint(progress.mathFactsLeitner)`
+ * (in `src/lib/progress/leitner.ts`) which flattens the box and sorts
+ * box-ascending. The hint reaches the planner request body as
+ * `payload.progress.leitner: { a, b, op, box }[]`.
+ */
+
+export type LeitnerOp = '+' | '-' | '*'
+export type LeitnerBoxIndex = 1 | 2 | 3 | 4 | 5
+
+export interface LeitnerFactSpec {
+  a: number
+  b: number
+  op: LeitnerOp
+  box: LeitnerBoxIndex
+  /** Optional `lastSeen` ms-since-epoch. Defaults to 0 ("never shown"). */
+  lastSeen?: number
+}
+
+/**
+ * Build a `mathFactsLeitner` blob (the persisted shape) from a flat
+ * list of fact specs. Mirrors what `addItem` + `promote` / `demote`
+ * would produce after a stream of session-ends.
+ */
+export function buildMathFactsLeitner(facts: ReadonlyArray<LeitnerFactSpec>): {
+  items: Array<{
+    item: { a: number; b: number; op: LeitnerOp }
+    box: LeitnerBoxIndex
+    lastSeen: number
+  }>
+} {
+  return {
+    items: facts.map((f) => ({
+      item: { a: f.a, b: f.b, op: f.op },
+      box: f.box,
+      lastSeen: f.lastSeen ?? 0,
+    })),
+  }
+}
+
+/**
+ * Marian's plausible mid-flight `add-to-10` Leitner state — a mix of
+ * box-1 (least familiar / due for review) facts and a couple of
+ * higher-box facts so the flatten-and-sort path is exercised non-
+ * trivially. All facts are valid `add-to-10` pairs (a + b ≤ 10, both
+ * addends 1-9) so the planner accepts them.
+ *
+ * Box-ascending after flatten:
+ *   - Box 1: 3+4, 5+2, 6+3, 4+5  (4 box-1 facts)
+ *   - Box 2: 2+2
+ *   - Box 3: 1+1, 2+1
+ *   - Box 5: 5+5
+ *
+ * The four box-1 facts ensure the planner directive's "lean into Box-1
+ * facts on problems 4-8" rule has enough material to satisfy the
+ * "at least 2 of these 5 problems must use a fact from the Box-1 list"
+ * constraint without exhausting the pool.
+ */
+export const MIXED_BOX_FIXTURE: ReadonlyArray<LeitnerFactSpec> = [
+  { a: 3, b: 4, op: '+', box: 1 },
+  { a: 5, b: 2, op: '+', box: 1 },
+  { a: 6, b: 3, op: '+', box: 1 },
+  { a: 4, b: 5, op: '+', box: 1 },
+  { a: 2, b: 2, op: '+', box: 2 },
+  { a: 1, b: 1, op: '+', box: 3 },
+  { a: 2, b: 1, op: '+', box: 3 },
+  { a: 5, b: 5, op: '+', box: 5 },
+]
+
+/**
+ * "Marian knows everything" — every fact is mastered (box 5). The
+ * planner directive should still fire (any non-empty box triggers
+ * the directive) but no fact lands on the Box-1 forbidden list. The
+ * critical assertion this enables: the wire field is non-empty AND
+ * box-1 facts in the directive list are zero — the priority-list
+ * phrasing remains coherent on a fully-mastered learner.
+ */
+export const ALL_MASTERED_FIXTURE: ReadonlyArray<LeitnerFactSpec> = [
+  { a: 1, b: 1, op: '+', box: 5 },
+  { a: 2, b: 1, op: '+', box: 5 },
+  { a: 3, b: 2, op: '+', box: 5 },
+  { a: 4, b: 3, op: '+', box: 5 },
+]
+
+/**
+ * The fact strings the wire ships for a given fixture, in box-ascending
+ * order. Tests assert this list against the captured request body so a
+ * future bug that swaps operands (3+4 vs 4+3 — different fact) or drops
+ * the operator surfaces as a count-based assertion failure.
+ */
+export function expectedWireFacts(
+  fixture: ReadonlyArray<LeitnerFactSpec>,
+): Array<{ a: number; b: number; op: LeitnerOp; box: LeitnerBoxIndex }> {
+  // Stable sort by box ascending; preserves insertion order within a
+  // box level — same contract as `buildLeitnerSessionHint` documents.
+  const out = fixture.map((f) => ({
+    a: f.a,
+    b: f.b,
+    op: f.op,
+    box: f.box,
+  }))
+  out.sort((x, y) => x.box - y.box)
+  return out
+}
