@@ -39,6 +39,8 @@ import {
   type MathSessionPlan,
   type MathProblem,
 } from './sessionPlans'
+import { shouldShowDotCard, pipsFromProblem } from './dotCard'
+import { DotCardOverlay } from './DotCardOverlay'
 import {
   ADVANCE_AFTER_CORRECT_MS,
   ADVANCE_HARD_CEILING_MS,
@@ -356,6 +358,19 @@ export interface MathProps {
    * silently swallow). See ticket 86c9guh4y test fix-forward.
    */
   __testInitiallyAudioUnlocked?: boolean
+  /**
+   * Test seam ONLY — when `true`, the subitising dot-card overlay short-
+   * circuits its lifecycle on mount (synchronous `onComplete`, immediate
+   * unmount) so tests that don't care about the dot-card affordance
+   * don't pay the 1100ms wait.
+   *
+   * The dot-card cells STILL render briefly inside the test DOM so
+   * spec-pinned count selectors (`[data-testid="math-dot-card-cell"]`)
+   * remain assertable — see `DotCardOverlay`'s `__testSkipLifecycle`.
+   *
+   * Production must NEVER pass this. Ticket 86c9q5j9a.
+   */
+  __testDisableDotCard?: boolean
 }
 
 // ── Default no-op playback (spec note: silent-but-captioned fallback) ------
@@ -450,6 +465,7 @@ function MathScreen({
   unlockAudioSession,
   getHowlerRunning,
   __testInitiallyAudioUnlocked = false,
+  __testDisableDotCard = false,
 }: MathProps) {
   const reducedMotion = usePrefersReducedMotion()
 
@@ -549,6 +565,32 @@ function MathScreen({
 
   /** 0-based problem cursor (0..7). Public-facing index is `problemIndex+1`. */
   const [problemIndex, setProblemIndex] = useState(0)
+
+  /**
+   * Tracks which problem index has had its subitising dot-card overlay
+   * actively dismissed (i.e. the overlay's `onComplete` fired). The
+   * value is the LATEST dismissed problem index, or `null` if no
+   * dismissal has happened yet this session.
+   *
+   * The derived `dotCardDismissed` boolean (computed near the render
+   * block below) is `true` if EITHER (a) the current problem is out of
+   * scope per `shouldShowDotCard`, OR (b) `activeDismissForIndex ===
+   * problemIndex` — the overlay has completed for THIS problem.
+   *
+   * Storing the index (rather than a per-problem-resetting boolean)
+   * sidesteps the React 19 "setState inside effect" rule: the dismissed
+   * flag flips automatically when `problemIndex` advances because the
+   * comparison no longer matches. No effect is needed to reset between
+   * problems.
+   *
+   * Spec: `design/screen-math-subitising-prompt.md` § "First-read vs
+   * retry" — once dismissed, the overlay never re-shows on the same
+   * problem, even after wrong taps / hint / guided completion. Ticket
+   * 86c9q5j9a.
+   */
+  const [activeDismissForIndex, setActiveDismissForIndex] = useState<
+    number | null
+  >(null)
 
   /** Per-problem state — resets on advance via setProblemState(FRESH). */
   const [problemState, setProblemState] =
@@ -1829,6 +1871,46 @@ function MathScreen({
   const currentProblem = plan.problems[problemIndex]
   const showStreak = streak >= 2 || streakFadingOut
 
+  /**
+   * Subitising dot-card scope decision for the current problem (ticket
+   * 86c9q5j9a). Pure function of the problem's addends — does not couple
+   * to Leitner state, accuracy history, or any dynamic signal. See
+   * `dotCard.ts` for the full rationale.
+   */
+  const dotCardInScope = shouldShowDotCard(currentProblem)
+  const dotCardPips = dotCardInScope ? pipsFromProblem(currentProblem) : null
+  /**
+   * Has the dot-card lifecycle already completed for THIS problem?
+   *   - Out-of-scope problems are treated as already-dismissed so
+   *     flowers paint at full opacity from t=0.
+   *   - In-scope problems are dismissed iff the overlay's onComplete
+   *     fired for the CURRENT problem index. When `problemIndex`
+   *     advances, the comparison breaks and the flag implicitly resets
+   *     — no effect required, no setState-inside-render.
+   */
+  const dotCardDismissed =
+    !dotCardInScope || activeDismissForIndex === problemIndex
+  /**
+   * Should the dot-card overlay be rendered right now? Three conditions:
+   *   - The current problem qualifies (`dotCardInScope`).
+   *   - The lifecycle hasn't already completed for THIS problem
+   *     (`!dotCardDismissed`). Once dismissed it never re-shows on the
+   *     same problem (spec § "First-read vs retry").
+   *   - The pre-validated `[pipsA, pipsB]` pair narrowed cleanly. (The
+   *     two predicates are equivalent in practice; the explicit null-
+   *     check keeps TypeScript narrow without a non-null assertion.)
+   */
+  const showDotCardOverlay =
+    dotCardInScope && !dotCardDismissed && dotCardPips !== null
+  /**
+   * Flower-row opacity gate. While the overlay is on-screen, flowers
+   * are held at opacity 0; once the overlay completes (or on out-of-
+   * scope problems where it never mounted), flowers display at full
+   * opacity. The cross-fade is driven by Framer Motion on the flower
+   * container itself — see the render block below.
+   */
+  const flowersVisible = !showDotCardOverlay
+
   return (
     <m.main
       data-testid="math"
@@ -2078,34 +2160,85 @@ function MathScreen({
               </span>
             </div>
 
-            {/* Visual groups — flower glyphs. The asset is pending (see
-            assets-todo.md); render an inline SVG fallback so the screen
-            still reads even before Thomas drops the file.
+            {/* Visual groups + subitising dot-card overlay (ticket
+            86c9q5j9a). The flower glyphs are the primary affordance;
+            the dot-card overlay is a brief 1100ms recognition flash
+            that mounts on top when both addends ≤ 5. The overlay is
+            absolutely positioned within this `relative` wrapper so the
+            flower row keeps its flow-layout slot and the rest of the
+            screen does NOT shift when the overlay mounts/unmounts.
+            See `design/screen-math-subitising-prompt.md` § "Layout-
+            stability rule" — preserving the math-symbolic / math-chips
+            positions across the dot-card lifecycle is load-bearing.
 
-            Font-size is continuously scaled by the total flower count
-            so the add-to-20 tier (totals 11–18) never clips past the
-            iPad portrait safe area. See `flowerRowFontSizeRem` above
-            for the formula and rationale. `data-flower-rem` is the
-            visual-fit regression-test seam (asserts the scale fired
-            without depending on jsdom layout). */}
-            <div
-              data-testid="math-visual-groups"
-              data-flower-rem={flowerRowFontSizeRem(
-                currentProblem.addendA,
-                currentProblem.addendB,
-              ).toFixed(2)}
-              aria-hidden
-              className="flex items-center gap-6"
-              style={{
-                fontSize: `${flowerRowFontSizeRem(
+            Font-size on the flower row is continuously scaled by the
+            total flower count so the add-to-20 tier (totals 11-18)
+            never clips past the iPad portrait safe area. See
+            `flowerRowFontSizeRem` above for the formula and rationale.
+            `data-flower-rem` is the visual-fit regression-test seam
+            (asserts the scale fired without depending on jsdom layout).
+
+            `data-flowers-visible` mirrors the dot-card lifecycle for
+            QA — `false` while the overlay is on screen, `true`
+            otherwise. */}
+            <div className="relative flex items-center justify-center">
+              <m.div
+                data-testid="math-visual-groups"
+                data-flower-rem={flowerRowFontSizeRem(
                   currentProblem.addendA,
                   currentProblem.addendB,
-                )}rem`,
-              }}
-            >
-              <FlowerGroup count={currentProblem.addendA} />
-              <span>+</span>
-              <FlowerGroup count={currentProblem.addendB} />
+                ).toFixed(2)}
+                data-flowers-visible={flowersVisible ? 'true' : 'false'}
+                aria-hidden
+                className="flex items-center gap-6"
+                style={{
+                  fontSize: `${flowerRowFontSizeRem(
+                    currentProblem.addendA,
+                    currentProblem.addendB,
+                  )}rem`,
+                }}
+                /*
+                 * Flower opacity is the single visual we cross-fade
+                 * across the dot-card lifecycle. Initial mount on an
+                 * in-scope problem starts at 0 (overlay covers it);
+                 * out-of-scope problems initialise `dotCardDismissed
+                 * = true` in the effect above so flowers paint at
+                 * opacity 1 from t=0 — matching today's behaviour for
+                 * any problem with addend > 5.
+                 *
+                 * The 250ms tween cross-fades into the dot-card's
+                 * 200ms fade-out (overlap of 200ms, dot-card unmounts
+                 * 50ms before flowers fully settle). Spec § "Flower
+                 * coordination".
+                 */
+                initial={false}
+                animate={{ opacity: flowersVisible ? 1 : 0 }}
+                transition={{
+                  duration: reducedMotion ? 0.2 : 0.25,
+                  ease: 'easeOut',
+                }}
+              >
+                <FlowerGroup count={currentProblem.addendA} />
+                <span>+</span>
+                <FlowerGroup count={currentProblem.addendB} />
+              </m.div>
+              {showDotCardOverlay && dotCardPips !== null && (
+                <DotCardOverlay
+                  // `key` per problemIndex guarantees the overlay
+                  // unmounts/remounts cleanly when Marian advances —
+                  // its internal phase machine resets on each new
+                  // problem. Without this, a tight advance during the
+                  // overlay's `holding` phase could land the next
+                  // problem's overlay mid-cycle.
+                  key={problemIndex}
+                  pipsA={dotCardPips[0]}
+                  pipsB={dotCardPips[1]}
+                  pageHidden={pageHidden}
+                  reducedMotion={reducedMotion}
+                  onComplete={() => setActiveDismissForIndex(problemIndex)}
+                  __testSkipLifecycle={__testDisableDotCard}
+                />
+              )}
             </div>
           </div>
 

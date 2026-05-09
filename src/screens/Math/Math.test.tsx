@@ -3499,4 +3499,177 @@ describe('Math (Number Garden) screen', () => {
       }
     }, 30_000)
   })
+
+  // ─── Subitising dot-card overlay (ticket 86c9q5j9a) ─────────────────────
+  describe('subitising dot-card overlay (ticket 86c9q5j9a)', () => {
+    /*
+     * Tests use `__testDisableDotCard` to skip the 1100ms lifecycle
+     * timer and assert the rendered shape directly. The lifecycle
+     * itself is covered in DotCardOverlay.test.tsx (motion-engine
+     * driven; tests here would be flaky against real timers).
+     *
+     * Done-when (per dispatch contract):
+     *   [data-testid="math-dot-card-cell"] count is 2 on 3+2 mount
+     *   and 0 on 6+4 mount, with no layout shift on math-symbolic /
+     *   math-chips between the two states.
+     */
+
+    it('mounts 2 dot-card cells on an in-scope problem (3+2)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Problem 1 of fixedPlan() is 3+2 — both addends ≤ 5, in scope.
+      const cells = screen.queryAllByTestId('math-dot-card-cell')
+      expect(cells).toHaveLength(2)
+
+      // Cells expose data-pips for the addend they represent.
+      expect(cells[0]).toHaveAttribute('data-pips', '3')
+      expect(cells[1]).toHaveAttribute('data-pips', '2')
+
+      // The overlay container exposes a single math-dot-card testid so
+      // a count-based selector at the e2e layer can match the spec
+      // contract.
+      expect(screen.queryAllByTestId('math-dot-card')).toHaveLength(1)
+    })
+
+    it('does NOT mount the overlay on an out-of-scope problem (6+4)', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      // Build a plan that opens with 6+4 (out of scope) so we can pin
+      // the absence of the overlay on the FIRST render — no advance
+      // needed.
+      const outOfScopePlan: MathSessionPlan = {
+        ...fixedPlan(),
+        problems: [
+          {
+            index: 1,
+            addendA: 6,
+            addendB: 4,
+            correct: 10,
+            utterances: {
+              read: 'Six plus four. How many?',
+              correct: 'Yes! Ten!',
+              reprompt: 'Hmm... try again?',
+              hint: 'Look. Six. And four more. How many now?',
+              giveAnswer: 'This one is ten.',
+            },
+          },
+          ...fixedPlan().problems.slice(1),
+        ],
+      }
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={outOfScopePlan}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Done-when assertion: zero dot-card cells on an out-of-scope
+      // problem.
+      expect(screen.queryAllByTestId('math-dot-card-cell')).toHaveLength(0)
+      expect(screen.queryAllByTestId('math-dot-card')).toHaveLength(0)
+
+      // The flower row is visible from t=0 — `data-flowers-visible`
+      // attribute mirrors the dot-card lifecycle for QA.
+      expect(screen.getByTestId('math-visual-groups')).toHaveAttribute(
+        'data-flowers-visible',
+        'true',
+      )
+    })
+
+    it('preserves the math-symbolic and math-chips testids alongside the overlay', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Layout-stability rule: even when the overlay is mounted (its
+      // cells are present in the DOM via the test seam's render-only
+      // path), the symbolic row + chips row remain in the DOM. The
+      // overlay is position:absolute and does NOT push them out of
+      // flow.
+      expect(screen.getByTestId('math-symbolic')).toBeInTheDocument()
+      expect(screen.getByTestId('math-chips')).toBeInTheDocument()
+      expect(screen.queryAllByTestId('math-dot-card-cell')).toHaveLength(2)
+    })
+
+    it('omits the overlay across all 8 problems when none are in scope', () => {
+      const harness = makePlayHarness()
+      // Construct a plan where every problem has at least one addend > 5.
+      const allOutOfScope: MathSessionPlan = {
+        id: 'out-of-scope-plan',
+        label: 'all-out-of-scope',
+        problems: Array.from({ length: 8 }, (_, i) => ({
+          index: i + 1,
+          addendA: 6,
+          addendB: i % 4 === 0 ? 4 : 1,
+          correct: 6 + (i % 4 === 0 ? 4 : 1),
+          utterances: {
+            read: 'Six plus four. How many?',
+            correct: 'Yes!',
+            reprompt: 'Hmm...',
+            hint: 'Look.',
+            giveAnswer: 'This one.',
+          },
+        })),
+      }
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={allOutOfScope}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+      expect(screen.queryAllByTestId('math-dot-card')).toHaveLength(0)
+      expect(screen.queryAllByTestId('math-dot-card-cell')).toHaveLength(0)
+    })
+
+    it('renders the overlay on every in-scope problem encountered', () => {
+      const harness = makePlayHarness()
+      // Plan opens with 3+2 (in scope) AT INDEX 0.
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Problem 1: 3+2 → in scope → overlay present.
+      expect(screen.queryAllByTestId('math-dot-card-cell')).toHaveLength(2)
+    })
+  })
 })
