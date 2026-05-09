@@ -37,6 +37,7 @@ import {
 import { WORD_SONG_NOVEL_PROBE_WORDS } from '../../../api/_plannerWordList'
 import { wordSongSessionPlanFromServer } from './planFromServer'
 import { pickDistractors } from './wordDistractors'
+import { getWordEntry } from './wordPack'
 import {
   defaultProgress,
   isGraduationSessionPending,
@@ -303,6 +304,179 @@ describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)
       expect(poolSet.has(t1.word)).toBe(true)
       expect(poolSet.has(t2.word)).toBe(true)
     }
+  })
+})
+
+/**
+ * Short-u sibling tier round-trip (ticket 86c9q9ben). Mirrors the
+ * short-o block above, one tier further down the literacy ladder.
+ * The planner widens to emit `cvc-words-short-u` content with an
+ * 11-word short-u pool (`sun, cup, bus, bug, nut, tub, bun, jug,
+ * rug, hut, gum`); the parser already accepts `"Read the <word>."`
+ * per PR #132. This suite pins the round-trip end-to-end:
+ *
+ *   1. A wire-shape response with 8 short-u "Read the <word>."
+ *      problems parses without throwing.
+ *   2. Every problem carries `contentType: 'cvc-word'` (same as the
+ *      short-a / short-o siblings — the discriminant is the read-line
+ *      template, not the focus-node name).
+ *   3. The 8 targets resolve via `getWordEntry` (the wordPack carries
+ *      the new 11 entries with `isTarget: true`), and `pickDistractors`
+ *      resolves trios for both gentle and trap tiers.
+ *   4. Distractor pool isolation: same-vowel-only rule (spec §8) —
+ *      every distractor for a short-u target is drawn from the
+ *      short-u pool itself.
+ */
+describe('planner → parser round-trip — cvc-words-short-u (ticket 86c9q9ben)', () => {
+  const SHORT_U_WORDS = [
+    'sun',
+    'cup',
+    'bus',
+    'bug',
+    'nut',
+    'tub',
+    'bun',
+    'jug',
+  ] as const
+
+  const FULL_SHORT_U_POOL: ReadonlySet<string> = new Set([
+    'sun',
+    'cup',
+    'bus',
+    'bug',
+    'nut',
+    'tub',
+    'bun',
+    'jug',
+    'rug',
+    'hut',
+    'gum',
+  ])
+
+  /** Build a wire-shape response that mirrors what the live planner
+   *  would emit for `focusNode: 'cvc-words-short-u'`. */
+  function makeShortUWirePlan(words: readonly string[]): string {
+    if (words.length !== 8) {
+      throw new Error(
+        `[plannerRoundTrip test] short-u plan needs 8 words; got ${words.length}`,
+      )
+    }
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-short-u-001',
+      label: 'CVC short-u roundtrip fixture',
+      utterances,
+    })
+  }
+
+  it('parses cleanly with contentType=cvc-word on every short-u problem', async () => {
+    const client = makeMockClient(makeShortUWirePlan(SHORT_U_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    expect(rebuilt.problems).toHaveLength(8)
+    for (const problem of rebuilt.problems) {
+      expect(problem.contentType).toEqual('cvc-word')
+      expect(problem.utterances.read).toMatch(/^Read the [a-z]+\.$/)
+      // Every target is from the short-u pool (no short-a / short-o
+      // leakage at the planner-output level).
+      expect(FULL_SHORT_U_POOL.has(problem.target.word)).toBe(true)
+      // Vowel field carries 'u' on every short-u target.
+      expect(problem.target.vowel).toEqual('u')
+      // isTarget=true on every target.
+      expect(problem.target.isTarget).toBe(true)
+    }
+    // 8 distinct targets — no repeats within a session.
+    const targets = rebuilt.problems.map((p) => p.target.word)
+    expect(new Set(targets).size).toEqual(8)
+  })
+
+  it('every short-u target resolves a gentle + trap distractor pair without throwing', async () => {
+    // Pin that `TARGET_PAIRINGS` carries a row for every word in the
+    // 11-word short-u pool. Missing rows surface here as a
+    // `pickDistractors` throw; matrix drift surfaces immediately.
+    const client = makeMockClient(makeShortUWirePlan(SHORT_U_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    for (const problem of rebuilt.problems) {
+      expect(() => pickDistractors(problem.target, 1)).not.toThrow()
+      expect(() => pickDistractors(problem.target, 5)).not.toThrow()
+    }
+  })
+
+  it('short-u trios draw distractors only from the short-u pool (same-vowel rule, spec §8)', () => {
+    // For each of the 11 short-u targets, both tiers' distractor pairs
+    // must come from the short-u pool. Pure read of the matrix —
+    // exercises every TARGET_PAIRINGS row including `rug, hut, gum`
+    // which aren't in the SHORT_U_WORDS sample above.
+    for (const target of FULL_SHORT_U_POOL) {
+      const [g1, g2] = pickDistractors(
+        {
+          word: target,
+          pictureKey: target,
+          vowel: 'u',
+          category: 'object',
+          isTarget: true,
+        },
+        1,
+      )
+      expect(FULL_SHORT_U_POOL.has(g1.word)).toBe(true)
+      expect(FULL_SHORT_U_POOL.has(g2.word)).toBe(true)
+      const [t1, t2] = pickDistractors(
+        {
+          word: target,
+          pictureKey: target,
+          vowel: 'u',
+          category: 'object',
+          isTarget: true,
+        },
+        5,
+      )
+      expect(FULL_SHORT_U_POOL.has(t1.word)).toBe(true)
+      expect(FULL_SHORT_U_POOL.has(t2.word)).toBe(true)
+    }
+  })
+
+  it('every short-u target resolves via getWordEntry with isTarget=true AND vowel="u" (alignment contract)', () => {
+    // Defensive contract pin: the wordPack must carry every entry in
+    // `WORD_SONG_TARGET_WORDS_SHORT_U` as `isTarget: true` with
+    // `vowel: 'u'`. Drift between _plannerWordList.ts and wordPack.ts
+    // would surface as either a missing entry (getWordEntry throws)
+    // or a false isTarget flag (the parser would reject it as a
+    // "non-target word"). Direct read of the wordPack — no planner
+    // mock needed.
+    for (const word of FULL_SHORT_U_POOL) {
+      const entry = getWordEntry(word)
+      expect(entry.isTarget).toBe(true)
+      expect(entry.vowel).toBe('u')
+    }
+    // Sanity: exactly 11 short-u entries.
+    expect(FULL_SHORT_U_POOL.size).toEqual(11)
   })
 })
 

@@ -1479,6 +1479,250 @@ describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3a
   })
 })
 
+/**
+ * Short-u sibling tier (ticket 86c9q9ben). Mirrors the short-o block
+ * above one tier further down the literacy ladder. The planner gains
+ * `cvc-words-short-u` as a fourth first-class word-song content mode —
+ * same "Read the <word>." template as `cvc-words` and
+ * `cvc-words-short-o`, but the word pool shifts to the 11-word
+ * short-u pool (`sun, cup, bus, bug, nut, tub, bun, jug, rug, hut,
+ * gum`).
+ *
+ * Coverage strategy mirrors the short-o block:
+ *  - (a) System prompt acknowledges the new node + names its 11 words.
+ *  - (b) User message routes `cvc-words-short-u` through verbatim
+ *    (first-class, no stub-fallback).
+ *  - (c) Round-trip: a wire-shape response with 8 short-u "Read the
+ *    <word>." problems parses cleanly via toEqual on the count.
+ *  - (d) Cache invariant: two calls differing only in focusNode
+ *    (cvc-words vs cvc-words-short-u) share byte-identical system
+ *    text. focusNode lives in the user message, not the cache prefix.
+ *  - (e) Graduation directive does not leak into a short-u session
+ *    (the gate is currently cvc-words-only per
+ *    `WORD_SONG_GRADUATION_GATED_NODES`).
+ *  - (f) Direct membership pin in VALID_WORD_SONG_FOCUS_NODES.
+ *
+ * Per `feedback_count_assertions_on_regression_tests.md`: count-based
+ * assertions (`.toEqual([…])`, `.toHaveLength(N)`, `.toEqual(N)`) —
+ * never `.toContain` for the round-trip pool checks.
+ */
+describe('generateSessionPlan — cvc-words-short-u sibling tier (ticket 86c9q9ben)', () => {
+  const SHORT_U_WORDS = [
+    'sun',
+    'cup',
+    'bus',
+    'bug',
+    'nut',
+    'tub',
+    'bun',
+    'jug',
+  ] as const
+
+  /** Build an 8-problem cvc-words-short-u wire response in template
+   *  form. The pool has 11 entries; we sample 8 distinct ones for the
+   *  fixture (matching the planner's "exactly 8 distinct words"
+   *  rule). */
+  function makeShortUPlan(words: readonly string[]): string {
+    if (words.length !== 8) {
+      throw new Error(`makeShortUPlan needs 8 words; got ${words.length}`)
+    }
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-short-u-001',
+      label: 'CVC short-u',
+      utterances,
+    })
+  }
+
+  it('routes cvc-words-short-u focus verbatim into the user message (first-class, no stub-fallback)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/Focus skill node: cvc-words-short-u\./)
+  })
+
+  it('system prompt names the 11-word short-u pool', async () => {
+    // Pin the pool enumeration so a future copy edit can't silently
+    // drop a word and cause Haiku to emit something the wordPack
+    // doesn't carry.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // Pool literal — the comma-joined list as embedded in the prompt.
+    expect(prompt).toContain(
+      'sun, cup, bus, bug, nut, tub, bun, jug, rug, hut, gum',
+    )
+    // The fourth content-mode header.
+    expect(prompt).toMatch(/cvc-words-short-u:/)
+  })
+
+  it('system prompt carries the AC9b /u/ vs /ʌ/ minimal-pair contrast line for the short-u tier', async () => {
+    // Spec §4 + AC9b: the contrast opener "Listen carefully: 'sun' —
+    // not 'soon.' Sun! /s/ /ʌ/ /n/." is baked into the planner template
+    // so Haiku emits it on the first short-u session-end opener (the
+    // "first time across her career" gate is downstream of this PR;
+    // see WORD_SONG_TRACK_GUIDE comment).
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    expect(prompt).toContain("'sun' — not 'soon.' Sun! /s/ /ʌ/ /n/.")
+  })
+
+  it('round-trips a wire response with exactly 8 short-u problems', async () => {
+    // Count-based assertion per
+    // `feedback_count_assertions_on_regression_tests.md`.
+    const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    const reReadLine = /^Read the ([a-z]+)\.$/
+    const readWords = reads.map((u) => u.text.match(reReadLine)![1]!)
+    expect(readWords).toHaveLength(8)
+    const poolSet = new Set<string>([
+      'sun',
+      'cup',
+      'bus',
+      'bug',
+      'nut',
+      'tub',
+      'bun',
+      'jug',
+      'rug',
+      'hut',
+      'gum',
+    ])
+    for (const word of readWords) {
+      expect(poolSet.has(word)).toBe(true)
+    }
+    // Distinct targets (no repeats within a session).
+    expect(new Set(readWords).size).toEqual(8)
+  })
+
+  it('every read line uses the "Read the <word>." template (no "Tap the" leakage from blending-cv)', async () => {
+    const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    for (const r of reads) {
+      expect(r.text).toMatch(/^Read the [a-z]+\.$/)
+      expect(r.text).not.toMatch(/^Tap the/)
+    }
+  })
+
+  it('two calls differing only in focusNode (cvc-words vs cvc-words-short-u) share byte-identical system text (cache invariant)', async () => {
+    // Per shared/prompt-caching.md: focusNode lives in the user
+    // message, not the system block. The new sibling tier must not
+    // cause a cache-prefix delta vs cvc-words.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture: cap1 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture: cap2 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toEqual(sys2)
+  })
+
+  it('graduation directive does NOT leak into a cvc-words-short-u session even with isGraduationSession=true', async () => {
+    // The graduation gate is currently cvc-words-only (short-a) per
+    // `WORD_SONG_GRADUATION_GATED_NODES` in mastery.ts. A misrouted
+    // flag on a short-u request must not carry the directive — the
+    // session would otherwise receive novel short-a words alongside
+    // its short-u pool, which is nonsense for the new tier.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+      isGraduationSession: true,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
+  })
+
+  it('cvc-words-short-u is in VALID_WORD_SONG_FOCUS_NODES (drift tripwire)', () => {
+    expect(VALID_WORD_SONG_FOCUS_NODES.includes('cvc-words-short-u')).toBe(true)
+  })
+})
+
 describe('generateSessionStartResponse — combined planner + TTS callable (D, 86c9kwhbc)', () => {
   // Pre-86c9kwhbc the HTTP handler awaited generateSessionPlan and
   // renderSessionAudio in succession. The build-time canon-generator
