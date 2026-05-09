@@ -68,6 +68,18 @@ import {
   buildSeedSessionHistory,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+// Path-strip projection helpers — derive the expected slice from
+// `WORD_SONG_NODES_IN_ORDER` instead of hardcoding stage counts.
+// Refactored under ticket 86c9qa0kq (4th occurrence — Kevin and Devon
+// both flagged the pattern on PR #174 review; Devon's #174 review
+// noted this short-u spec ITSELF was a 4th carbon-copy of the
+// hardcoded-slice pattern). Helper unit tests live at
+// `e2e/_helpers/slidingWindow.test.ts`.
+import { slidingWindow } from './_helpers/slidingWindow'
+import {
+  WORD_SONG_NODES_IN_ORDER,
+  projectExpectedCells,
+} from './_helpers/wordSongNodesInOrder'
 
 /**
  * Path to the production canon file the spec serves as the mock
@@ -304,12 +316,25 @@ test.describe('cvc-words-short-u flow regression (ticket 86c9q9ben)', () => {
     // bumped sessionCount past the Greet gate.
     await expect(page.getByTestId('greet')).toHaveCount(0)
 
-    // Word-song path-strip projection. With letter-names,
-    // letter-sounds, blending-cv, cvc-words AND cvc-words-short-o all
-    // `mastered`, `wordSongIndex = 5`. `slidingWindow(stages, 5, 5)`
-    // yields desiredOffset=4, maxOffset = 9-5 = 4, offset=4 — slice =
-    // nodes[4..8] = [cvc-words-short-o, cvc-words-short-u, digraphs,
-    // sight-words, simple-sentences].
+    // Word-song path-strip projection. With every node up to and
+    // including `cvc-words-short-o` `mastered`, `pickFocusNode()`
+    // returns `cvc-words-short-u` → focus index = 5 in
+    // `WORD_SONG_NODES_IN_ORDER`. Expected slice + projection are
+    // derived from the canonical node list — no hardcoded stage
+    // counts. Future tier insertions update only the helper shim.
+    const focusIndex = WORD_SONG_NODES_IN_ORDER.indexOf('cvc-words-short-u')
+    const { items: expectedSlice, offset: expectedOffset } = slidingWindow(
+      WORD_SONG_NODES_IN_ORDER,
+      focusIndex,
+      1,
+      3,
+    )
+    const expectedProjection = projectExpectedCells(
+      expectedSlice,
+      expectedOffset,
+      focusIndex,
+    )
+
     const wordSongStrip = page.locator(
       '[data-testid="hub-path-strip"][data-tree="word-song"]',
     )
@@ -317,7 +342,7 @@ test.describe('cvc-words-short-u flow regression (ticket 86c9q9ben)', () => {
     const wordSongCells = wordSongStrip.locator(
       '[data-testid="hub-path-strip-cell"]',
     )
-    await expect(wordSongCells).toHaveCount(5)
+    await expect(wordSongCells).toHaveCount(expectedSlice.length)
 
     const wordSongProjection = await wordSongCells.evaluateAll((nodes) =>
       nodes.map((n) => ({
@@ -325,13 +350,7 @@ test.describe('cvc-words-short-u flow regression (ticket 86c9q9ben)', () => {
         kind: (n as HTMLElement).getAttribute('data-kind'),
       })),
     )
-    expect(wordSongProjection).toEqual([
-      { stage: 'cvc-words-short-o', kind: 'mastered' },
-      { stage: 'cvc-words-short-u', kind: 'current' },
-      { stage: 'digraphs', kind: 'locked' },
-      { stage: 'sight-words', kind: 'locked' },
-      { stage: 'simple-sentences', kind: 'locked' },
-    ])
+    expect(wordSongProjection).toEqual(expectedProjection)
 
     // No pendingPromotion seeded → celebration overlay must NOT render.
     await expect(page.getByTestId('hub-promotion-celebration')).toHaveCount(0)
