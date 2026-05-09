@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   ANSWER_RANGE_MAX,
+  ANSWER_RANGE_MAX_TO_20,
   ANSWER_RANGE_MIN,
   GENTLE_RAMP_THROUGH,
+  chipMaxAnswerForCorrects,
   pickDistractors,
   pickTier,
 } from './distractors'
@@ -187,5 +189,173 @@ describe('pickDistractors — input validation', () => {
   it('throws when correct is non-integer', () => {
     expect(() => pickDistractors(3.5, 1)).toThrow(/outside/)
     expect(() => pickDistractors(NaN, 1)).toThrow(/outside/)
+  })
+
+  it('throws when correct is out of range for the supplied maxAnswer (ticket 86c9q5q13)', () => {
+    expect(() => pickDistractors(21, 1, ANSWER_RANGE_MAX_TO_20)).toThrow(
+      /outside/,
+    )
+    expect(() => pickDistractors(0, 1, ANSWER_RANGE_MAX_TO_20)).toThrow(
+      /outside/,
+    )
+  })
+
+  it('throws when maxAnswer is too narrow to satisfy the constraints', () => {
+    // maxAnswer must allow at least 2 valid distractors (correct +
+    // ≥2-gap distinct values). maxAnswer < ANSWER_RANGE_MIN + 2 = 3 is
+    // a configuration bug.
+    expect(() => pickDistractors(1, 1, 2)).toThrow(/maxAnswer/)
+    expect(() => pickDistractors(1, 1, 0)).toThrow(/maxAnswer/)
+  })
+})
+
+// ── Add-to-20 boundary (ticket 86c9q5q13) ────────────────────────────────
+
+describe('pickDistractors — sums-to-20 range (ticket 86c9q5q13)', () => {
+  // Same algorithm, wider ceiling. Constraint sweep mirrors the
+  // sums-to-10 invariant block above but pinned to maxAnswer=20.
+
+  const ALL_CORRECT_TO_20 = Array.from(
+    { length: ANSWER_RANGE_MAX_TO_20 - ANSWER_RANGE_MIN + 1 },
+    (_, i) => ANSWER_RANGE_MIN + i,
+  )
+
+  const TIER_REPRESENTATIVES = [
+    { problemIndex: 1, tier: 'gentle' as const },
+    { problemIndex: 3, tier: 'gentle' as const },
+    { problemIndex: 4, tier: 'offByOne' as const },
+    { problemIndex: 8, tier: 'offByOne' as const },
+  ]
+
+  for (const correct of ALL_CORRECT_TO_20) {
+    for (const { problemIndex, tier } of TIER_REPRESENTATIVES) {
+      it(`(correct=${correct}/20, problem=${problemIndex}/${tier}) yields valid distractors`, () => {
+        const [d1, d2] = pickDistractors(
+          correct,
+          problemIndex,
+          ANSWER_RANGE_MAX_TO_20,
+        )
+
+        // Constraint 1 — both distractors in [1, 20].
+        expect(d1).toBeGreaterThanOrEqual(ANSWER_RANGE_MIN)
+        expect(d1).toBeLessThanOrEqual(ANSWER_RANGE_MAX_TO_20)
+        expect(d2).toBeGreaterThanOrEqual(ANSWER_RANGE_MIN)
+        expect(d2).toBeLessThanOrEqual(ANSWER_RANGE_MAX_TO_20)
+
+        // Constraint 2 — distinct from each other and from correct.
+        expect(d1).not.toBe(d2)
+        expect(d1).not.toBe(correct)
+        expect(d2).not.toBe(correct)
+
+        // Constraint 3 — integers.
+        expect(Number.isInteger(d1)).toBe(true)
+        expect(Number.isInteger(d2)).toBe(true)
+      })
+    }
+  }
+
+  it('off-by-one returns [correct-1, correct+1] for sums in the middle of [11, 20]', () => {
+    expect(pickDistractors(15, 4, ANSWER_RANGE_MAX_TO_20)).toEqual([14, 16])
+    expect(pickDistractors(11, 4, ANSWER_RANGE_MAX_TO_20)).toEqual([10, 12])
+    expect(pickDistractors(13, 5, ANSWER_RANGE_MAX_TO_20)).toEqual([12, 14])
+  })
+
+  it('off-by-one substitutes when correct === 20 (high-end clamp)', () => {
+    // correct=20: high=21 invalid → substitute correct-2=18.
+    // Output is [low-1, low] in impl order = [18, 19].
+    expect(pickDistractors(20, 8, ANSWER_RANGE_MAX_TO_20)).toEqual([18, 19])
+  })
+
+  it('off-by-one substitutes when correct === 1 (low-end clamp at the wider range)', () => {
+    expect(pickDistractors(1, 4, ANSWER_RANGE_MAX_TO_20)).toEqual([2, 3])
+  })
+
+  it('gentle ramp returns range extremes for middle-ish correct in [11, 20]', () => {
+    // correct=15: both extremes ([1, 20]) are ≥2 away.
+    expect(pickDistractors(15, 1, ANSWER_RANGE_MAX_TO_20)).toEqual([1, 20])
+    expect(pickDistractors(11, 1, ANSWER_RANGE_MAX_TO_20)).toEqual([1, 20])
+    expect(pickDistractors(13, 2, ANSWER_RANGE_MAX_TO_20)).toEqual([1, 20])
+  })
+
+  it('gentle ramp anchors to MIN when correct sits within 2 of MAX', () => {
+    // correct=20: MAX is correct → MIN=1 is anchor; second pick walks
+    // down from MAX skipping correct and values within 2 of it.
+    const [d1, d2] = pickDistractors(20, 1, ANSWER_RANGE_MAX_TO_20)
+    expect([d1, d2]).toContain(ANSWER_RANGE_MIN)
+    expect(d1).not.toBe(d2)
+    expect(d1).not.toBe(20)
+    expect(d2).not.toBe(20)
+    expect(Math.abs(d1 - 20)).toBeGreaterThanOrEqual(2)
+    expect(Math.abs(d2 - 20)).toBeGreaterThanOrEqual(2)
+  })
+
+  it('gentle ramp anchors to MAX when correct sits within 2 of MIN at maxAnswer=20', () => {
+    const [d1, d2] = pickDistractors(2, 1, ANSWER_RANGE_MAX_TO_20)
+    expect([d1, d2]).toContain(ANSWER_RANGE_MAX_TO_20)
+    expect(d1).not.toBe(d2)
+    expect(d1).not.toBe(2)
+    expect(d2).not.toBe(2)
+    expect(Math.abs(d1 - 2)).toBeGreaterThanOrEqual(2)
+    expect(Math.abs(d2 - 2)).toBeGreaterThanOrEqual(2)
+  })
+
+  it('default maxAnswer (10) still applies when not supplied — backwards compat', () => {
+    // No third arg → defaults to ANSWER_RANGE_MAX = 10. Pinning the
+    // existing add-to-10 contract under the new optional parameter.
+    expect(ANSWER_RANGE_MAX).toBe(10)
+    expect(pickDistractors(5, 4)).toEqual([4, 6])
+    expect(pickDistractors(10, 8)).toEqual([8, 9])
+    // And explicitly supplying maxAnswer=10 produces the identical result.
+    expect(pickDistractors(5, 4, ANSWER_RANGE_MAX)).toEqual(
+      pickDistractors(5, 4),
+    )
+  })
+})
+
+describe('chipMaxAnswerForCorrects', () => {
+  it('returns ANSWER_RANGE_MAX (10) for add-to-10-shaped corrects', () => {
+    // Static plan A: sums-to-10 correct values.
+    const corrects = [5, 5, 6, 8, 7, 9, 8, 10]
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(ANSWER_RANGE_MAX)
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(10)
+  })
+
+  it('returns ANSWER_RANGE_MAX_TO_20 (20) for add-to-20-shaped corrects', () => {
+    // STATIC_ADD_TO_20_PLANS slot A — sums in [11, 18].
+    const corrects = [12, 14, 12, 13, 13, 13, 16, 18]
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(ANSWER_RANGE_MAX_TO_20)
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(20)
+  })
+
+  it('returns ANSWER_RANGE_MAX_TO_20 (20) for canon add-to-20 corrects', () => {
+    // Canon's `add-to-20-level-1` plan — sums climb to 18 (Nine plus nine).
+    const corrects = [11, 15, 12, 11, 13, 14, 17, 18]
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(20)
+  })
+
+  it('promotes to the 20 ceiling as soon as ANY correct exceeds 10', () => {
+    // A single boundary-crosser (11) is enough — defends against a future
+    // mixed plan that opens with sums-to-10 problems then bridges to 20.
+    expect(chipMaxAnswerForCorrects([3, 5, 7, 9, 10, 11, 8, 6])).toBe(20)
+  })
+
+  it('returns 10 at the boundary correct=10 (not 20)', () => {
+    expect(chipMaxAnswerForCorrects([10])).toBe(10)
+  })
+
+  it('promotes to 20 at the boundary correct=11', () => {
+    expect(chipMaxAnswerForCorrects([11])).toBe(20)
+  })
+
+  it('returns ANSWER_RANGE_MAX (10) for an empty plan (defensive default)', () => {
+    expect(chipMaxAnswerForCorrects([])).toBe(ANSWER_RANGE_MAX)
+  })
+
+  it('throws when correct exceeds the largest known tier ceiling', () => {
+    // A two-digit-addsub tier or beyond would land here. We throw rather
+    // than silently expanding — extending the function is a deliberate
+    // change with its own tier-add ticket.
+    expect(() => chipMaxAnswerForCorrects([21])).toThrow(/no tier ceiling/)
+    expect(() => chipMaxAnswerForCorrects([5, 99])).toThrow(/no tier ceiling/)
   })
 })

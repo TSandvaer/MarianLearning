@@ -51,14 +51,46 @@ describe('parseReadAddends', () => {
     })
   })
 
+  it('accepts 11..20 number words for add-to-20 teen+single facts (ticket 86c9q5q13)', () => {
+    // Per the planner prompt, add-to-20 allows "Ten plus five. How many?"
+    // (10+5=15) and the canon may also emit teen+single forms. Parser
+    // covers up to twenty as defense in depth.
+    expect(parseReadAddends('Ten plus five. How many?')).toEqual({
+      addendA: 10,
+      addendB: 5,
+    })
+    expect(parseReadAddends('Eleven plus two. How many?')).toEqual({
+      addendA: 11,
+      addendB: 2,
+    })
+    expect(parseReadAddends('Twelve plus seven. How many?')).toEqual({
+      addendA: 12,
+      addendB: 7,
+    })
+    expect(parseReadAddends('Eight plus nine. How many?')).toEqual({
+      addendA: 8,
+      addendB: 9,
+    })
+    expect(parseReadAddends('One plus twenty. How many?')).toEqual({
+      addendA: 1,
+      addendB: 20,
+    })
+  })
+
   it('throws on non-template lines', () => {
     expect(() => parseReadAddends('What is three plus two?')).toThrow(
       PlanFromServerError,
     )
   })
 
-  it('throws on unknown number words', () => {
-    expect(() => parseReadAddends('Eleven plus two. How many?')).toThrow(
+  it('throws on number words beyond 20 (defense against prompt drift)', () => {
+    // Anything > 20 should NOT be silently absorbed — that signals a prompt
+    // drift the parser shouldn't normalize away. The two-digit-addsub tier
+    // would route through a different parser if we ever ship one.
+    expect(() => parseReadAddends('Twentyone plus two. How many?')).toThrow(
+      PlanFromServerError,
+    )
+    expect(() => parseReadAddends('Hundred plus two. How many?')).toThrow(
       PlanFromServerError,
     )
   })

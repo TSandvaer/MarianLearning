@@ -512,6 +512,68 @@ describe('recordProgressOnSessionEnd', () => {
       expect(after.mathFactsLeitner.items).toHaveLength(0)
     })
 
+    it('promotes/demotes against add-to-20 facts the same way as add-to-10 (ticket 86c9q5q13)', () => {
+      // The Leitner box is fact-keyed (a, b, op), not focus-node-keyed.
+      // Promotion/demotion semantics must hold for any math fact the
+      // engine surfaces — including add-to-20 facts (e.g. 8+5=13).
+      // Server-side directive-injection is currently scoped to
+      // add-to-10 (M4 ticket 86c9pwgc8) but the per-fact promotion
+      // bookkeeping at session-end is universal.
+      const seed = defaultProgress()
+      saveProgress({
+        ...seed,
+        skillLevels: {
+          ...seed.skillLevels,
+          'add-to-10': 'mastered',
+          'add-to-20': 'practicing',
+        },
+        mathFactsLeitner: {
+          items: [
+            { item: { a: 8, b: 5, op: '+' }, box: 2, lastSeen: 100 },
+            { item: { a: 9, b: 9, op: '+' }, box: 3, lastSeen: 100 },
+          ],
+        },
+      })
+
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 7,
+        dateISO: '2026-05-08T19:30:00.000Z',
+        focusNode: 'add-to-20',
+        leitnerOutcomes: [
+          // 8+5=13 advanced (correct first tap on a cross-10-bridge fact).
+          { fact: { a: 8, b: 5, op: '+' }, correct: true },
+          // 9+9=18 demoted (wrong first tap on a double).
+          { fact: { a: 9, b: 9, op: '+' }, correct: false },
+          // New fact 6+7=13 added at box 1 (correct, but never seen
+          // before — matches the addItem-then-promote contract).
+          { fact: { a: 6, b: 7, op: '+' }, correct: true },
+        ],
+      })
+
+      const after = loadProgress()!
+
+      // Skill-focus on the new tier.
+      expect(after.history[after.history.length - 1].skillFocus).toEqual([
+        'add-to-20',
+      ])
+
+      // Box 2 → 3 for 8+5; box 3 → 1 for 9+9; new 6+7 at box 1 → 2 (added
+      // then promoted in one step per the leitner.ts contract).
+      const eightPlusFive = after.mathFactsLeitner.items.find(
+        (i) => i.item.a === 8 && i.item.b === 5,
+      )
+      const ninePlusNine = after.mathFactsLeitner.items.find(
+        (i) => i.item.a === 9 && i.item.b === 9,
+      )
+      const sixPlusSeven = after.mathFactsLeitner.items.find(
+        (i) => i.item.a === 6 && i.item.b === 7,
+      )
+      expect(eightPlusFive?.box).toBe(3)
+      expect(ninePlusNine?.box).toBe(1)
+      expect(sixPlusSeven?.box).toBe(2)
+    })
+
     it('idempotent under React StrictMode double-invocation (two identical calls)', () => {
       // applyLeitnerOutcomes is pure but the writer wraps it; two back-
       // to-back calls (the worst-case React strict-mode double-mount)

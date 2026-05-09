@@ -188,9 +188,17 @@ function makeProblem(
 }
 
 /**
- * Number word lookup — sums-to-10 only needs 1..10, so we hand-author for
- * absolute spelling control rather than pulling in a humanize-numbers dep.
+ * Number word lookup — covers 1..20 to span both the sums-to-10 and the
+ * sums-to-20 (ticket 86c9q5q13) tier surfaces. Hand-authored for absolute
+ * spelling control rather than pulling in a humanize-numbers dep.
  * Capitalised nowhere — the templates above set sentence case via context.
+ *
+ * Why a single 1..20 table (not separate per-tier tables): the static
+ * fallback plans for both add-to-10 and add-to-20 share `makeProblem`
+ * which calls `numberWord` on the addends AND on the sum. add-to-20 sums
+ * fall in 11..20; add-to-10 sums fall in 2..10. Splitting the table would
+ * force two render paths for a function that doesn't care which tier it's
+ * serving.
  */
 function numberWord(n: number): string {
   const words: Record<number, string> = {
@@ -204,24 +212,36 @@ function numberWord(n: number): string {
     8: 'eight',
     9: 'nine',
     10: 'ten',
+    11: 'eleven',
+    12: 'twelve',
+    13: 'thirteen',
+    14: 'fourteen',
+    15: 'fifteen',
+    16: 'sixteen',
+    17: 'seventeen',
+    18: 'eighteen',
+    19: 'nineteen',
+    20: 'twenty',
   }
   const w = words[n]
   if (!w) {
     // Defensive — every plan in this file is hand-authored to stay within
-    // [1, 10], but if someone adds a plan that drifts out, throw rather
-    // than silently producing "11" in Emma's mouth.
+    // [1, 20], but if someone adds a plan that drifts out, throw rather
+    // than silently producing "21" in Emma's mouth.
     throw new Error(`[sessionPlans] no word for number ${n}`)
   }
   return w
 }
 
 /**
- * The hardcoded plans. Three rotation slots so two back-to-back sessions
- * don't repeat. Each picks 8 facts spanning the sums-to-10 surface; the
- * problem order matters because Kyle's distractor ramp (gentle → off-by-one)
- * is positional, so we keep the easier "bridge through 5" facts in the
- * gentle window (problems 1-3) and let the trickier doubles or near-doubles
- * land in the off-by-one window (4-8).
+ * The hardcoded sums-to-10 plans. Three rotation slots so two back-to-back
+ * sessions don't repeat. Each picks 8 facts spanning the sums-to-10
+ * surface; the problem order matters because Kyle's distractor ramp
+ * (gentle → off-by-one) is positional, so we keep the easier "bridge
+ * through 5" facts in the gentle window (problems 1-3) and let the
+ * trickier doubles or near-doubles land in the off-by-one window (4-8).
+ *
+ * For the add-to-20 sibling rotation, see {@link STATIC_ADD_TO_20_PLANS}.
  */
 export const STATIC_SESSION_PLANS: readonly MathSessionPlan[] = [
   {
@@ -269,22 +289,130 @@ export const STATIC_SESSION_PLANS: readonly MathSessionPlan[] = [
 ]
 
 /**
+ * The hardcoded sums-to-20 plans (ticket 86c9q5q13). Same 3-slot rotation
+ * shape as `STATIC_SESSION_PLANS`. Every problem's sum is in [11, 20] —
+ * never ≤ 10 (that's `add-to-10`'s territory) and never > 20 (downstream
+ * tiers). Both addends are bounded to [1, 9] so the visual flower groups
+ * stay legible (FlowerGroup at addendA=10 would push past Math.tsx's
+ * available width).
+ *
+ * Curriculum slice priorities (per Marian's May 2026 in-app observation —
+ * memory `project_diagnostic_results` § "Update — May 2026"):
+ *   - Cross-10-bridge facts (8+5, 7+6, 9+4, 6+7, 7+5, 9+6) — the central
+ *     skill of add-to-20. Distributed across both gentle and off-by-one
+ *     tiers so Marian sees them on every plan.
+ *   - Doubles + near-doubles (6+6, 7+7, 8+8, 9+9, 6+7, 7+8, 8+9) — high
+ *     retrievability for an 8-yo per Pickering 2018; these stretch the
+ *     range without raising the cognitive load.
+ *   - Teen-plus-single (12+5, 11+8, 13+4, 14+5, 11+7) — these reduce to
+ *     "10+5 then add the teen offset", which Marian's near-retrieval
+ *     speed on sums ≤ 10 (May 2026 observation) makes accessible.
+ *
+ * Gentle-tier (problems 1-3) leans on doubles and teen+single; off-by-one
+ * tier (4-8) leans on cross-10-bridge facts where the off-by-one trap is
+ * the actual learning target.
+ */
+export const STATIC_ADD_TO_20_PLANS: readonly MathSessionPlan[] = [
+  {
+    id: 'sums-to-20-A',
+    label: 'Sums to 20 — doubles + near-doubles warm-up',
+    problems: [
+      makeProblem(1, 6, 6), //  = 12 (gentle, double — Marian's likely retrieval anchor)
+      makeProblem(2, 7, 7), //  = 14 (gentle, double)
+      makeProblem(3, 5, 7), //  = 12 (gentle, near-double, cross-10-bridge)
+      makeProblem(4, 8, 5), //  = 13 (off-by-one, cross-10-bridge)
+      makeProblem(5, 7, 6), //  = 13 (off-by-one, cross-10-bridge commutative)
+      makeProblem(6, 9, 4), //  = 13 (off-by-one, cross-10-bridge)
+      makeProblem(7, 8, 8), //  = 16 (off-by-one, near-double)
+      makeProblem(8, 9, 9), //  = 18 (off-by-one, double — capstone)
+    ],
+  },
+  {
+    id: 'sums-to-20-B',
+    label: 'Sums to 20 — cross-10-bridge focus',
+    problems: [
+      makeProblem(1, 6, 6), //  = 12 (gentle, double opener)
+      makeProblem(2, 8, 4), //  = 12 (gentle, cross-10-bridge, low-load)
+      makeProblem(3, 7, 5), //  = 12 (gentle, cross-10-bridge)
+      makeProblem(4, 6, 7), //  = 13 (off-by-one, cross-10-bridge)
+      makeProblem(5, 8, 6), //  = 14 (off-by-one, cross-10-bridge)
+      makeProblem(6, 9, 5), //  = 14 (off-by-one, cross-10-bridge)
+      makeProblem(7, 7, 8), //  = 15 (off-by-one, near-double)
+      makeProblem(8, 8, 7), //  = 15 (off-by-one, near-double commutative)
+    ],
+  },
+  {
+    id: 'sums-to-20-C',
+    label: 'Sums to 20 — full-range mix',
+    problems: [
+      makeProblem(1, 7, 4), //  = 11 (gentle, smallest sum in tier)
+      makeProblem(2, 5, 6), //  = 11 (gentle, near-double)
+      makeProblem(3, 6, 5), //  = 11 (gentle, near-double commutative)
+      makeProblem(4, 9, 6), //  = 15 (off-by-one, cross-10-bridge)
+      makeProblem(5, 8, 9), //  = 17 (off-by-one, near-double)
+      makeProblem(6, 9, 8), //  = 17 (off-by-one, near-double commutative)
+      makeProblem(7, 9, 7), //  = 16 (off-by-one, cross-10-bridge)
+      makeProblem(8, 9, 9), //  = 18 (off-by-one, double — capstone)
+    ],
+  },
+]
+
+/**
  * Pick a static plan deterministically from the rotation. Two sessions
  * started in the same minute see the same plan; consecutive minutes
  * advance one slot. Tests pass `now` to pin the choice.
  *
- * When real Claude prompt wiring lands, this function gets replaced (or
- * wrapped) with a fetch to `/api/claude` kind=`session-start`. The
- * adapter functions below survive that swap unchanged.
+ * Routes on `focusNode` (ticket 86c9q5q13). Defaults to the sums-to-10
+ * rotation for backwards-compat and for any call site that hasn't yet
+ * been threaded with the focus-node hint. Callers that know which tier
+ * Marian is on should pass `focusNode` so the right rotation lands.
+ *
+ * When real Claude prompt wiring is the only path (i.e. canon + live
+ * planner cover every focus node), this function exists as a never-empty
+ * fallback that ships with the bundle. The adapter functions below
+ * survive any future swap unchanged.
  */
 export function pickStaticSessionPlan(
   now: () => Date = () => new Date(),
+  focusNode?: string,
 ): MathSessionPlan {
+  if (focusNode === 'add-to-20') {
+    return pickStaticAddTo20Plan(now)
+  }
+  // Default: sums-to-10. Includes any focus node we don't yet ship a
+  // first-class fallback for; renders a working session every time.
+  return pickFromRotation(STATIC_SESSION_PLANS, now)
+}
+
+/**
+ * Pick a static add-to-20 plan from the rotation (ticket 86c9q5q13).
+ * Mirrors {@link pickStaticSessionPlan}'s rotation rule but on
+ * {@link STATIC_ADD_TO_20_PLANS}. Tests pass `now` to pin the choice.
+ *
+ * Exposed as a named export so a future tier-aware caller can request
+ * the add-to-20 fallback directly without going through the dispatch
+ * wrapper. Today only `pickStaticSessionPlan(now, 'add-to-20')` calls
+ * it from production code.
+ */
+export function pickStaticAddTo20Plan(
+  now: () => Date = () => new Date(),
+): MathSessionPlan {
+  return pickFromRotation(STATIC_ADD_TO_20_PLANS, now)
+}
+
+/** Shared rotation primitive — picks one slot from `plans` based on the
+ *  current minute. Pure: deterministic for a given `now`, no module-state
+ *  reads. */
+function pickFromRotation(
+  plans: readonly MathSessionPlan[],
+  now: () => Date,
+): MathSessionPlan {
+  if (plans.length === 0) {
+    throw new Error('[sessionPlans] pickFromRotation: empty plans array')
+  }
   const minute = Math.floor(now().getTime() / 60_000)
-  const idx =
-    ((minute % STATIC_SESSION_PLANS.length) + STATIC_SESSION_PLANS.length) %
-    STATIC_SESSION_PLANS.length
-  return STATIC_SESSION_PLANS[idx]
+  const idx = ((minute % plans.length) + plans.length) % plans.length
+  return plans[idx]!
 }
 
 // ── Wire-shape adapters ──────────────────────────────────────────────────

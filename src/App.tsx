@@ -658,9 +658,22 @@ export default function App() {
   // plan — Marian sees a working Math screen with on-curriculum problems
   // and the silent-but-captioned default `playUtterance`. Audio-only
   // degradation, no UX brick.
+  // The static rotation that Math renders when the live Path A fetch
+  // hasn't resolved yet (or rejected). Picks the right tier for Marian's
+  // current focus node so a fresh-mount cold render shows on-tier
+  // problems even before the canon / live planner lands. Read once at
+  // App mount via `pickFocusNode(loadProgress(), 'math')` rather than
+  // re-fetching per render — focus node only changes on mastery
+  // promotion, which happens at session-end and the next App mount picks
+  // it up.
+  const mathFallbackFocusNode = useMemo<string | undefined>(() => {
+    const progress = loadProgress()
+    if (progress === null) return undefined
+    return pickFocusNode(progress, 'math')
+  }, [])
   const mathFallbackPlan = useMemo<MathSessionPlan>(
-    () => pickStaticSessionPlan(),
-    [],
+    () => pickStaticSessionPlan(undefined, mathFallbackFocusNode),
+    [mathFallbackFocusNode],
   )
   const [mathPlan, setMathPlan] = useState<MathSessionPlan | null>(null)
 

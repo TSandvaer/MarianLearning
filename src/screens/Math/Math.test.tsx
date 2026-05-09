@@ -2602,6 +2602,327 @@ describe('Math (Number Garden) screen', () => {
     })
   })
 
+  /**
+   * Render-actually-happens regression for the add-to-20 tier
+   * (ticket 86c9q5q13 — Devon's review of PR #166).
+   *
+   * The P0 this pins: pre-fix `buildChipOrder` called
+   * `pickDistractors(problem.correct, problem.index)` with no third arg,
+   * so `maxAnswer` defaulted to `ANSWER_RANGE_MAX` (10). On any add-to-20
+   * problem (correct ∈ [11, 18]) the input-validation throw inside
+   * `pickDistractors` fired during the chip `useMemo`, and React tore the
+   * screen out. None of the existing 39 Math.test.tsx cases used a plan
+   * with `correct >= 11`, so the suite stayed green while production
+   * crashed.
+   *
+   * Discipline: the test renders a real add-to-20 plan shape (matching
+   * the canon's `add-to-20-level-1` payload), then asserts both the
+   * structural promise (3 distinct integer chips in [1, 20], correct
+   * always one of them) AND the absence of the previously-thrown error.
+   * If `buildChipOrder` regresses to passing the wrong `maxAnswer`, the
+   * `useMemo` body throws and React's render error surfaces from
+   * `render()`.
+   */
+  it('add-to-20 plan: chips render with values in [1, 20] without crashing (regression for #166)', () => {
+    const harness = makePlayHarness()
+    const addTo20Plan: MathSessionPlan = {
+      id: 'add-to-20-level-1',
+      label: 'Addition with sums 11–20',
+      problems: [
+        {
+          index: 1,
+          addendA: 6,
+          addendB: 6,
+          correct: 12,
+          utterances: {
+            read: 'Six plus six. How many?',
+            correct: 'Yes! Twelve!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Six. And six more. How many now?',
+            giveAnswer: 'This one is twelve.',
+          },
+        },
+        {
+          index: 2,
+          addendA: 7,
+          addendB: 7,
+          correct: 14,
+          utterances: {
+            read: 'Seven plus seven. How many?',
+            correct: 'Yes! Fourteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Seven. And seven more. How many now?',
+            giveAnswer: 'This one is fourteen.',
+          },
+        },
+        {
+          index: 3,
+          addendA: 5,
+          addendB: 7,
+          correct: 12,
+          utterances: {
+            read: 'Five plus seven. How many?',
+            correct: 'Yes! Twelve!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Five. And seven more. How many now?',
+            giveAnswer: 'This one is twelve.',
+          },
+        },
+        {
+          index: 4,
+          addendA: 8,
+          addendB: 5,
+          correct: 13,
+          utterances: {
+            read: 'Eight plus five. How many?',
+            correct: 'Yes! Thirteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Eight. And five more. How many now?',
+            giveAnswer: 'This one is thirteen.',
+          },
+        },
+        {
+          index: 5,
+          addendA: 9,
+          addendB: 9,
+          correct: 18,
+          utterances: {
+            read: 'Nine plus nine. How many?',
+            correct: 'Yes! Eighteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Nine. And nine more. How many now?',
+            giveAnswer: 'This one is eighteen.',
+          },
+        },
+        {
+          index: 6,
+          addendA: 7,
+          addendB: 6,
+          correct: 13,
+          utterances: {
+            read: 'Seven plus six. How many?',
+            correct: 'Yes! Thirteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Seven. And six more. How many now?',
+            giveAnswer: 'This one is thirteen.',
+          },
+        },
+        {
+          index: 7,
+          addendA: 9,
+          addendB: 4,
+          correct: 13,
+          utterances: {
+            read: 'Nine plus four. How many?',
+            correct: 'Yes! Thirteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Nine. And four more. How many now?',
+            giveAnswer: 'This one is thirteen.',
+          },
+        },
+        {
+          index: 8,
+          addendA: 8,
+          addendB: 8,
+          correct: 16,
+          utterances: {
+            read: 'Eight plus eight. How many?',
+            correct: 'Yes! Sixteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Eight. And eight more. How many now?',
+            giveAnswer: 'This one is sixteen.',
+          },
+        },
+      ],
+    }
+
+    // Pre-fix this render() throws inside buildChipOrder's useMemo because
+    // pickDistractors's input validation rejects correct=12 against the
+    // default maxAnswer=10.
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={addTo20Plan}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    // Screen mounted — no error boundary fired.
+    expect(screen.getByTestId('math')).toBeInTheDocument()
+
+    // Problem 1: 6 + 6 — both addends visible.
+    const symbolic = screen.getByTestId('math-symbolic')
+    expect(within(symbolic).getByTestId('math-addend-a')).toHaveTextContent('6')
+    expect(within(symbolic).getByTestId('math-addend-b')).toHaveTextContent('6')
+
+    // 3 chips, every value in [1, 20], all integers, all distinct, correct
+    // (12) is one of them.
+    const chips = screen.getAllByTestId('math-chip')
+    expect(chips).toHaveLength(3)
+    const values = chips.map((c) => Number(c.getAttribute('data-value')))
+    for (const value of values) {
+      expect(Number.isInteger(value)).toBe(true)
+      expect(value).toBeGreaterThanOrEqual(1)
+      expect(value).toBeLessThanOrEqual(20)
+    }
+    expect(new Set(values).size).toBe(3)
+    expect(values).toContain(12)
+  })
+
+  /**
+   * Sweep variant — exercises a problem whose correct (18) sits at the
+   * tier ceiling, the spot where pre-fix `pickDistractors` would also
+   * have thrown when the off-by-one branch tried `correct + 1 = 19`
+   * against `maxAnswer = 10`. This locks the high end of the range
+   * separately from the mid-range case above.
+   */
+  it('add-to-20 plan: capstone problem (correct=18) renders chips without crashing', () => {
+    const harness = makePlayHarness()
+    const planWithCapstoneFirst: MathSessionPlan = {
+      id: 'sums-to-20-A',
+      label: 'Sums to 20 — capstone first',
+      problems: Array.from({ length: 8 }, (_, i) => ({
+        index: i + 1,
+        addendA: 9,
+        addendB: 9,
+        correct: 18,
+        utterances: {
+          read: 'Nine plus nine. How many?',
+          correct: 'Yes! Eighteen!',
+          reprompt: 'Hmm... try again?',
+          hint: 'Look. Nine. And nine more. How many now?',
+          giveAnswer: 'This one is eighteen.',
+        },
+      })),
+    }
+
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={planWithCapstoneFirst}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    expect(screen.getByTestId('math')).toBeInTheDocument()
+    const chips = screen.getAllByTestId('math-chip')
+    const values = chips.map((c) => Number(c.getAttribute('data-value')))
+    for (const value of values) {
+      expect(value).toBeGreaterThanOrEqual(1)
+      expect(value).toBeLessThanOrEqual(20)
+    }
+    expect(new Set(values).size).toBe(3)
+    expect(values).toContain(18)
+  })
+
+  /**
+   * Visual-fit regression for the add-to-20 tier flower row (ticket
+   * 86c9q5q13 — Thomas's iPad smoke 2026-05-09).
+   *
+   * The P0 this pins: the flower-row font size was hard-coded to
+   * `text-[3.2rem]`, so the `math-visual-groups` row's painted width
+   * scaled linearly with `addendA + addendB`. On real iPad portrait,
+   * `7+7=14` rendered cramped and `9+9=18` clipped past the right edge.
+   *
+   * Discipline: the visual fit *itself* (px width) cannot be asserted
+   * in jsdom (no layout). We instead pin the upstream contract — the
+   * pure `flowerRowFontSizeRem(addendA, addendB)` helper — AND assert
+   * the `math-visual-groups` div carries the matching `data-flower-rem`
+   * attribute on render. If a future change breaks the wiring (helper
+   * not invoked, attribute not set, fontSize not threaded through to
+   * the inline style), this test catches it.
+   *
+   * Anchors:
+   *   - total ≤ 10 → 3.2rem (unchanged from pre-fix; add-to-10 plans
+   *     render identically to before)
+   *   - total = 14 → 2.6rem (Thomas's "cramped" threshold)
+   *   - total = 18 → 2.0rem (Thomas's "clipping" threshold; capstone)
+   */
+  describe('add-to-20 visual-fit (flower row scaling)', () => {
+    // Helper-only invariants (sweep + interpolation + edge cases) live in
+    // `flowerRowFit.test.ts`. The two cases below are screen-level: they
+    // confirm the helper output is actually wired through to the
+    // `math-visual-groups` element via inline fontSize + data-flower-rem.
+
+    it('Math screen: math-visual-groups carries data-flower-rem matching the helper', () => {
+      const harness = makePlayHarness()
+      // 9+9=18 — the worst-case clip Thomas observed on iPad.
+      const capstonePlan: MathSessionPlan = {
+        id: 'sums-to-20-capstone-test',
+        label: 'capstone smoke',
+        problems: Array.from({ length: 8 }, (_, i) => ({
+          index: i + 1,
+          addendA: 9,
+          addendB: 9,
+          correct: 18,
+          utterances: {
+            read: 'Nine plus nine. How many?',
+            correct: 'Yes! Eighteen!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Nine. And nine more. How many now?',
+            giveAnswer: 'This one is eighteen.',
+          },
+        })),
+      }
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={capstonePlan}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+      const visualGroups = screen.getByTestId('math-visual-groups')
+      // Helper says 9+9 → 2.0rem; toFixed(2) is the on-DOM contract.
+      expect(visualGroups.getAttribute('data-flower-rem')).toBe('2.00')
+      // The inline fontSize style threads the helper output verbatim.
+      expect(visualGroups.style.fontSize).toBe('2rem')
+    })
+
+    it('Math screen: add-to-10 plan keeps the historical 3.2rem flower size', () => {
+      const harness = makePlayHarness()
+      // 5+5=10 — the largest add-to-10 sum; pre-fix 3.2rem rendered fine.
+      const addTo10Plan: MathSessionPlan = {
+        id: 'sums-to-10-cap-test',
+        label: 'add-to-10 cap smoke',
+        problems: Array.from({ length: 8 }, (_, i) => ({
+          index: i + 1,
+          addendA: 5,
+          addendB: 5,
+          correct: 10,
+          utterances: {
+            read: 'Five plus five. How many?',
+            correct: 'Yes! Ten!',
+            reprompt: 'Hmm... try again?',
+            hint: 'Look. Five. And five more. How many now?',
+            giveAnswer: 'This one is ten.',
+          },
+        })),
+      }
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={addTo10Plan}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+      const visualGroups = screen.getByTestId('math-visual-groups')
+      expect(visualGroups.getAttribute('data-flower-rem')).toBe('3.20')
+      expect(visualGroups.style.fontSize).toBe('3.2rem')
+    })
+  })
+
   /*
    * ────────────────────────────────────────────────────────────────────
    * Latency capture (M4 — ticket 86c9q5au3 fix)

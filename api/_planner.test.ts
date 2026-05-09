@@ -1795,3 +1795,166 @@ describe('generateSessionPlan — Leitner directive (ticket 86c9pwgc8 — M4)', 
     expect(idxB4).toBeGreaterThan(idxB2)
   })
 })
+
+// ── add-to-20 prompt tightening (ticket 86c9q5q13) ─────────────────────
+
+describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', () => {
+  // Pins the prompt's add-to-20 directive language. The May 2026 canon
+  // bake had Haiku emit a 4+4=8 problem under the previous looser
+  // wording — that's add-to-10's territory, not add-to-20's. The
+  // tightened prompt forbids it explicitly. These tests pin the load-
+  // bearing phrases so a future "let me simplify the prompt" edit can't
+  // accidentally relax the constraint.
+
+  const STUB_RESPONSE = JSON.stringify({
+    id: 'haiku-add20',
+    label: 'a',
+    utterances: [{ id: 'math.p1.read', text: 'Seven plus six. How many?' }],
+  })
+
+  it('the add-to-20 menu line forbids sums <= 10 explicitly (system prompt)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+
+    // The tightened phrasing — Haiku has misfired here before, so we
+    // pin both the strict-range and the FORBIDDEN markers.
+    expect(systemText).toContain('sums STRICTLY in 11-20')
+    expect(systemText).toContain('FORBIDDEN here')
+    // The cross-10-bridge guidance is the heart of the tier; pin it so
+    // a future prompt slimming pass can't drop it accidentally.
+    expect(systemText).toContain('cross-10-bridge')
+  })
+
+  it('the add-to-20 menu line forbids ten-plus-single (10+5=15) and any addend = 10 (system prompt)', async () => {
+    // Devon's PR #166 review (2026-05-08): aligns the canon prompt with
+    // the static-fallback rotation, which already holds both addends in
+    // 1-9. Reasons for forbidding ten-plus-single:
+    //
+    //   1. Visual: a 10-flower row at text-[3.2rem] overflows the iPad
+    //      portrait safe area when paired with the second-addend group
+    //      (canon's pre-fix P2 "Ten plus five" sat ~52rem wide vs ~752pt
+    //      available). Single visual contract across canon + fallback.
+    //   2. Pedagogy: 10+5=15 is *easier* than cross-10-bridge 8+5=13;
+    //      the actual learning target at this tier is cross-10-bridge.
+    //   3. Distractor scoping: keeping `correct` in the same range the
+    //      fallback emits simplifies threading `maxAnswer` through
+    //      `pickDistractors`; the boundary stays at the natural [1, 20]
+    //      tier ceiling without further branching.
+    //
+    // These pins lock the tightened phrasing so a future "let me
+    // simplify this prompt" pass can't accidentally re-allow ten-plus-
+    // single forms.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // Both addends must be in 1-9; ten-plus-single is explicitly forbidden.
+    expect(systemText).toContain('BOTH addends MUST be in 1-9')
+    expect(systemText).toContain('Ten-plus-single forms are FORBIDDEN')
+    expect(systemText).toMatch(/neither addend may equal 10/)
+    // The COMPUTE+CONFIRM directive that drove the earlier sums fix is
+    // extended to also confirm addend bounds; pin that load-bearing
+    // language too.
+    expect(systemText).toContain(
+      'CONFIRM that addendA in 1-9 AND addendB in 1-9',
+    )
+    // Concrete forbidden-addend exemplars exist in the prompt.
+    expect(systemText).toContain('10+5=15')
+    expect(systemText).toContain('10+8=18')
+    // And the prompt must NOT lean back into the previous phrasing — the
+    // earlier draft said "exactly one addend = 10" was permitted.
+    expect(systemText).not.toMatch(/exactly one addend\s*=\s*10/)
+  })
+
+  it('add-to-20 prompt is byte-stable across calls (cache prefix invariant)', async () => {
+    // Same shape pin as the focusNode test block. The system prompt MUST
+    // NOT change between successive add-to-20 calls — otherwise Anthropic
+    // prompt caching would break across calls and the per-session cost
+    // would jump.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap1 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap2 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+      recentSuccessRate: 0.5,
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+
+  it('add-to-20 user message names the focus node and preserves the shape', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+      recentSuccessRate: 0.85,
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/Focus skill node: add-to-20\./)
+    expect(user).toContain('Marian')
+    expect(user).toContain('0.85')
+  })
+
+  it('Leitner directive is NOT injected for add-to-20 (active scope = add-to-10 only)', async () => {
+    // M4 wiring (ticket 86c9pwgc8) is currently scoped to add-to-10.
+    // A future ticket will widen Leitner to add-to-20 once Marian has
+    // accumulated enough box content there — but for now a misrouted
+    // leitner array must be silently ignored (not added to the user
+    // message, not throwing). This is the same posture as in the
+    // existing add-to-20 / two-digit-addsub Leitner tests above.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-20',
+      leitner: [{ a: 8, b: 5, op: '+', box: 1 }],
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).not.toContain('LEITNER PRIORITY DIRECTIVE')
+    expect(user).not.toContain('Box 1:')
+  })
+})
