@@ -222,13 +222,16 @@ describe('pickDistractors — defensive assertions (matrix-drift guards)', () =>
 })
 
 describe('FORBIDDEN_PAIRS', () => {
-  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u additions (tickets 86c9m3ae3 / 86c9q9ben)", () => {
+  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
     // implementation hand-off note + design/word-song/short-o-pool-
     // expansion.md §3 (mom↔dad composition collision) +
     // design/word-song/short-u-pool-expansion.md §3 / §10 Q3 lock
     // 2026-05-08 (rug↔mat flat-rectangle floor coverings; tub↔cup
-    // side-profile vessels). Exact list, in any order.
+    // side-profile vessels) + design/word-song/short-i-pool-expansion.md
+    // §3 / §10 Q2 LOCKED 2026-05-09 (fig↔bun round-food; pig↔dog and
+    // pig↔cat four-legged-animal cross-pack hygiene). Exact list, in
+    // any order.
     const pairs = FORBIDDEN_PAIRS.map((p) => [...p].sort().join(','))
     const expectedPairs = [
       ['cat', 'dog'],
@@ -239,6 +242,9 @@ describe('FORBIDDEN_PAIRS', () => {
       ['mom', 'dad'], // ticket 86c9m3ae3 — both parent-with-child compositions
       ['rug', 'mat'], // ticket 86c9q9ben — flat-rectangular floor coverings
       ['tub', 'cup'], // ticket 86c9q9ben — vessels in side profile
+      ['fig', 'bun'], // ticket 86c9qdba4 — round food with top-feature (mandatory per spec §3)
+      ['pig', 'dog'], // ticket 86c9qdba4 — four-legged mammal cross-pack hygiene
+      ['pig', 'cat'], // ticket 86c9qdba4 — four-legged animal cross-pack hygiene
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {
@@ -264,12 +270,31 @@ describe('FORBIDDEN_PAIRS', () => {
 describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
   // The 33 effective candidate pool (14 short-a target + 8 short-o + 11
   // short-u — excluding the 4 short-a probes).
+  //
+  // Scope note (ticket 86c9qdba4): the cross-vowel matrix's coverage
+  // tracks `mastery.ts CVC_CROSS_VOWEL_NODES` — only the CVC tiers the
+  // `crossVowelMixingActive` predicate gates on. Adding a new vowel-tier
+  // sibling to TARGET_WORDS (e.g. the short-i pool added under
+  // 86c9qdba4) does NOT automatically add rows to the cross-vowel
+  // matrix; widening the matrix is gated on a corresponding update to
+  // `CVC_CROSS_VOWEL_NODES` (separately ticketed under cross-vowel
+  // matrix v2). Scoping `CROSS_VOWEL_TARGETS` here by vowel keeps the
+  // exhaustiveness invariant correctly aligned with the runtime
+  // contract — adding a new tier to TARGET_WORDS doesn't false-fail
+  // this test until the cross-vowel matrix expands to cover it. When
+  // it does, add the new vowel literal to `CROSS_VOWEL_VOWELS` below.
   const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+  const CROSS_VOWEL_VOWELS: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> = new Set([
+    'a',
+    'o',
+    'u',
+  ])
   const CROSS_VOWEL_TARGETS = TARGET_WORDS.filter(
-    (w) => w.isTarget && !PROBE_WORDS.has(w.word),
+    (w) =>
+      w.isTarget && !PROBE_WORDS.has(w.word) && CROSS_VOWEL_VOWELS.has(w.vowel),
   )
 
-  it('has exactly 33 rows — 14 short-a canonical + 8 short-o + 11 short-u (probes excluded)', () => {
+  it('has exactly 33 rows — 14 short-a canonical + 8 short-o + 11 short-u (probes + non-cross-vowel-tier targets excluded)', () => {
     // Spec §4 AC4 — 33 rows total. Probes (`nap, rat, map, tap`)
     // intentionally excluded so they remain graduation-session-only
     // emit-paths.
@@ -475,9 +500,19 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
     // Defense-in-depth — exercises every row through the full
     // pickDistractors path including the assertNotForbidden /
     // distinctness defensive checks.
+    //
+    // Scope note (ticket 86c9qdba4): see the parent describe block's
+    // CROSS_VOWEL_VOWELS rationale. New vowel tiers (short-i, future
+    // short-e) are intentionally excluded from the cross-vowel matrix
+    // until the matrix is explicitly widened under a separate ticket.
     const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+    const CROSS_VOWEL_VOWELS_LOCAL: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
+      new Set(['a', 'o', 'u'])
     const targets = TARGET_WORDS.filter(
-      (w) => w.isTarget && !PROBE_WORDS.has(w.word),
+      (w) =>
+        w.isTarget &&
+        !PROBE_WORDS.has(w.word) &&
+        CROSS_VOWEL_VOWELS_LOCAL.has(w.vowel),
     )
     for (const target of targets) {
       expect(

@@ -54,6 +54,7 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       'cvc-words',
       'cvc-words-short-o',
       'cvc-words-short-u',
+      'cvc-words-short-i',
       'digraphs',
       'sight-words',
       'simple-sentences',
