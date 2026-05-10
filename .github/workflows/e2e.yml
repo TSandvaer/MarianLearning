@@ -38,6 +38,14 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Canon lint (ASCII / SSML-notation guard)
+        # Ticket 86c9qhr9k. Walks public/canon/**/*.json and fails on any
+        # non-ASCII codepoint, slash-IPA notation (`/p/`), or angle-tag
+        # (`<phoneme...>`) substring in utterance `text`. Runs BEFORE the
+        # browser install so a corrupt-canon PR fails the cheap node-only
+        # job (~2s) instead of waiting on browsers + the full e2e suite.
+        run: yarn canon:lint
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
