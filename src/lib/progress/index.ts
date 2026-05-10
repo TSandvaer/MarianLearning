@@ -82,6 +82,7 @@ export type { ProgressTrack } from './focusNode'
 
 export {
   CVC_CROSS_VOWEL_NODES,
+  CVC_CROSS_VOWEL_VOWELS,
   LITERACY_TREE,
   MATH_TREE,
   NOVEL_POOL_THRESHOLD,

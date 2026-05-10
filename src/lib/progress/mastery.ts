@@ -554,6 +554,30 @@ export const CVC_CROSS_VOWEL_NODES: readonly WordSongNode[] = [
 ]
 
 /**
+ * The vowel literals that participate in cross-vowel distractor mixing,
+ * paired 1:1 with `CVC_CROSS_VOWEL_NODES` above (`cvc-words` → `'a'`,
+ * `cvc-words-short-o` → `'o'`, `cvc-words-short-u` → `'u'`).
+ *
+ * Single source of truth for the cross-vowel vowel set. Consumed by
+ * `wordDistractors.test.ts` to scope the `TARGET_PAIRINGS_CROSSVOWEL`
+ * exhaustiveness invariants to vowels actually in the matrix — this
+ * prevents new vowel-tier additions (e.g. short-i added under ticket
+ * 86c9qdba4 in PR #190) from false-failing the test until the
+ * cross-vowel matrix is explicitly widened to cover them.
+ *
+ * Widening contract: when a new tier (e.g. `cvc-words-short-i`) is
+ * promoted into the cross-vowel matrix, add the matching vowel literal
+ * here AND extend `CVC_CROSS_VOWEL_NODES` above. The pair must stay
+ * aligned. Widening tracked under the cross-vowel matrix v2 ticket
+ * (`86c9qahq7`-adjacent) per PR #190 review note.
+ *
+ * Typed against the same union as `WordEntry.vowel` in
+ * `src/screens/WordSong/wordPack.ts` (`'a' | 'o' | 'u' | 'i' | 'e'`).
+ */
+export const CVC_CROSS_VOWEL_VOWELS: readonly ('a' | 'o' | 'u' | 'i' | 'e')[] =
+  ['a', 'o', 'u']
+
+/**
  * True iff cross-vowel distractor mixing is active on this Progress
  * document — meaning sessions on any of the three CVC tiers will draw
  * distractors from any vowel pool, exercising cross-vowel

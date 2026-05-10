@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { CVC_CROSS_VOWEL_VOWELS } from '../../lib/progress'
 import {
   GENTLE_RAMP_THROUGH,
   pickDistractors,
@@ -281,17 +282,19 @@ describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
   // matrix v2). Scoping `CROSS_VOWEL_TARGETS` here by vowel keeps the
   // exhaustiveness invariant correctly aligned with the runtime
   // contract — adding a new tier to TARGET_WORDS doesn't false-fail
-  // this test until the cross-vowel matrix expands to cover it. When
-  // it does, add the new vowel literal to `CROSS_VOWEL_VOWELS` below.
+  // this test until the cross-vowel matrix expands to cover it.
+  //
+  // Single source of truth (ticket 86c9qdp2n): `CVC_CROSS_VOWEL_VOWELS`
+  // is exported from `mastery.ts` paired with `CVC_CROSS_VOWEL_NODES`.
+  // When the cross-vowel matrix widens, both constants update together.
   const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
-  const CROSS_VOWEL_VOWELS: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> = new Set([
-    'a',
-    'o',
-    'u',
-  ])
+  const CROSS_VOWEL_VOWEL_SET: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
+    new Set(CVC_CROSS_VOWEL_VOWELS)
   const CROSS_VOWEL_TARGETS = TARGET_WORDS.filter(
     (w) =>
-      w.isTarget && !PROBE_WORDS.has(w.word) && CROSS_VOWEL_VOWELS.has(w.vowel),
+      w.isTarget &&
+      !PROBE_WORDS.has(w.word) &&
+      CROSS_VOWEL_VOWEL_SET.has(w.vowel),
   )
 
   it('has exactly 33 rows — 14 short-a canonical + 8 short-o + 11 short-u (probes + non-cross-vowel-tier targets excluded)', () => {
@@ -502,17 +505,20 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
     // distinctness defensive checks.
     //
     // Scope note (ticket 86c9qdba4): see the parent describe block's
-    // CROSS_VOWEL_VOWELS rationale. New vowel tiers (short-i, future
-    // short-e) are intentionally excluded from the cross-vowel matrix
-    // until the matrix is explicitly widened under a separate ticket.
+    // scoping rationale. New vowel tiers (short-i, future short-e) are
+    // intentionally excluded from the cross-vowel matrix until the
+    // matrix is explicitly widened under a separate ticket.
+    //
+    // Single source of truth (ticket 86c9qdp2n): pulls
+    // `CVC_CROSS_VOWEL_VOWELS` from `mastery.ts`.
     const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
-    const CROSS_VOWEL_VOWELS_LOCAL: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
-      new Set(['a', 'o', 'u'])
+    const CROSS_VOWEL_VOWEL_SET: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
+      new Set(CVC_CROSS_VOWEL_VOWELS)
     const targets = TARGET_WORDS.filter(
       (w) =>
         w.isTarget &&
         !PROBE_WORDS.has(w.word) &&
-        CROSS_VOWEL_VOWELS_LOCAL.has(w.vowel),
+        CROSS_VOWEL_VOWEL_SET.has(w.vowel),
     )
     for (const target of targets) {
       expect(
