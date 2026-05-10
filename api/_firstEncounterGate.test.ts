@@ -111,7 +111,7 @@ describe('applyFirstEncounterGate — pass-through cases', () => {
 
   it('gated focus + node NOT in lifetimeFirstEncounters → first encounter, pass through', () => {
     const response = buildResponse({
-      openerText: "You did it! Listen carefully: 'sun' — not 'soon.'",
+      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
     })
     const out = applyFirstEncounterGate(response, {
       focusNode: 'cvc-words-short-u',
@@ -123,7 +123,7 @@ describe('applyFirstEncounterGate — pass-through cases', () => {
 
   it('gated focus + empty lifetimeFirstEncounters → first encounter, pass through', () => {
     const response = buildResponse({
-      openerText: "You did it! Listen carefully: 'sun' — not 'soon.'",
+      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
     })
     const out = applyFirstEncounterGate(response, {
       focusNode: 'cvc-words-short-u',
@@ -136,7 +136,7 @@ describe('applyFirstEncounterGate — pass-through cases', () => {
     // Legacy clients that don't ship the field get the contrast
     // line — safest interpretation per the type doc-comment.
     const response = buildResponse({
-      openerText: "You did it! Listen carefully: 'sun' — not 'soon.'",
+      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
     })
     const out = applyFirstEncounterGate(response, {
       focusNode: 'cvc-words-short-u',
@@ -193,7 +193,7 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
 
   it('gated focus + node IN lifetimeFirstEncounters → rewrites opener to vanilla', () => {
     const response = buildResponse({
-      openerText: "You did it! Listen carefully: 'sun' — not 'soon.'",
+      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
       openerAudioBase64: 'BASE64_CONTRAST_LINE_AUDIO',
     })
     const out = applyFirstEncounterGate(response, {
@@ -214,7 +214,7 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
 
   it('rewrite preserves other utterances unchanged', () => {
     const response = buildResponse({
-      openerText: "You did it! Listen carefully: 'sun' — not 'soon.'",
+      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
     })
     const out = applyFirstEncounterGate(response, {
       focusNode: 'cvc-words-short-u',
@@ -231,7 +231,7 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
 
   it('rewrite is non-mutating — input response is unchanged', () => {
     const response = buildResponse({
-      openerText: "You did it! Listen carefully: 'sun' — not 'soon.'",
+      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
       openerAudioBase64: 'BASE64_CONTRAST_LINE_AUDIO',
     })
     const beforeOpener = response.utterances[0]
@@ -242,7 +242,7 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
     // Input opener unchanged.
     expect(response.utterances[0]).toBe(beforeOpener)
     expect(response.utterances[0]!.text).toBe(
-      "You did it! Listen carefully: 'sun' — not 'soon.'",
+      'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
     )
   })
 
