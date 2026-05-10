@@ -156,6 +156,14 @@ function renderPictureBody(key: string): ReactNode {
     case 'rug':
     case 'hut':
     case 'gum':
+    case 'pig':
+    case 'pin':
+    case 'bin':
+    case 'wig':
+    case 'bib':
+    case 'fig':
+    case 'lid':
+    case 'sip':
       // Short-u pack additions (ticket 86c9q5q2d / 86c9q9ben). 8
       // wholly-new (`bug, nut, tub, bun, jug, rug, hut, gum`) plus
       // 3 retraces of existing distractor pictures (`sun, cup, bus`
@@ -164,6 +172,14 @@ function renderPictureBody(key: string): ReactNode {
       // short-u tier traces). PNG-in-SVG embed per
       // `.claude/docs/skill-trees-and-content.md` §"Rendering pattern
       // post-PR #157" + spec §3 Path 2.
+      //
+      // Short-i pack additions (ticket 86c9qdb95). 8 wholly-new
+      // entries (`pig, pin, bin, wig, bib, fig, lid, sip`) — Phase 2
+      // PNGs from Thomas's MJ + remove.bg pipeline embedded via
+      // `yarn embed-pictures`. Same Path 2 wrapper convention; only
+      // the case-list expanded. Canon wiring (planner branches,
+      // WordSongNode union, debug seed) is gated on this PR shipping
+      // and lands in Kevin's follow-up ticket 86c9qdba4.
       // External SVG — rendered as <image> inside the wrapper <svg>
       // so the WordPicture outer envelope (data-testid, role,
       // aria-label, data-large, data-picture-key) stays identical to
