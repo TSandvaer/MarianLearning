@@ -1,14 +1,1 @@
-[
-  {
-    "filePath": "canon/word-song/level-1/cvc-words-short-u.json",
-    "utteranceId": "session.end.opener",
-    "rule": "non-ascii",
-    "_note": "Em-dash (U+2014) + IPA char ʌ (U+028C). Codepoints round-tripped cleanly through this bake (NOT mojibake'd), but Azure still vocalizes the IPA bracket notation '/s/ /ʌ/ /n/' as 'slash s slash slash UH slash slash n slash'. Ticket 86c9qhr9k initial audit (2026-05-10). Cleanup is a separate ticket per ticket scope rules."
-  },
-  {
-    "filePath": "canon/word-song/level-1/cvc-words-short-u.json",
-    "utteranceId": "session.end.opener",
-    "rule": "slash-ipa",
-    "_note": "See sibling non-ascii entry. The slash-IPA notation '/s/ /ʌ/ /n/' would be vocalized character-by-character. Same source utterance, separate rule for triage clarity."
-  }
-]
+[]

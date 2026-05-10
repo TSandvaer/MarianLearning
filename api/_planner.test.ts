@@ -1586,12 +1586,22 @@ describe('generateSessionPlan — cvc-words-short-u sibling tier (ticket 86c9q9b
     expect(prompt).toMatch(/cvc-words-short-u:/)
   })
 
-  it('system prompt carries the AC9b /u/ vs /ʌ/ minimal-pair contrast line for the short-u tier', async () => {
-    // Spec §4 + AC9b: the contrast opener "Listen carefully: 'sun' —
-    // not 'soon.' Sun! /s/ /ʌ/ /n/." is baked into the planner template
-    // so Haiku emits it on the first short-u session-end opener (the
-    // "first time across her career" gate is downstream of this PR;
-    // see WORD_SONG_TRACK_GUIDE comment).
+  it('system prompt carries the AC9b short-u vs long-oo minimal-pair contrast line for the short-u tier', async () => {
+    // Spec §4 + AC9b: the contrast opener "You did it! Listen.
+    // Sun, not soon. Sun! Sss, uh, nnn." is baked into the planner
+    // template so Haiku emits it on the first short-u session-end
+    // opener (the lifetime first-encounter gate downstream rewrites
+    // it to vanilla "You did it!" once Marian has heard it once).
+    //
+    // Re-baked 2026-05-10 under ticket 86c9qhxyd to drop the
+    // em-dash + slash-IPA notation (`'sun' — not 'soon.' Sun! /s/
+    // /ʌ/ /n/.`) that Azure was vocalizing literally as
+    // "slash s slash slash UH slash slash n slash" gibberish. The
+    // canonical phonetic-approximation form is documented in
+    // `.claude/docs/planner-and-canon.md` § "Canon text must be
+    // naturally pronounceable English" + § "Stick to ASCII-7
+    // punctuation". Pin the new ASCII-clean form here so future
+    // drift is caught at vitest time, not at ear-test time.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture })
 
@@ -1605,7 +1615,14 @@ describe('generateSessionPlan — cvc-words-short-u sibling tier (ticket 86c9q9b
 
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const prompt = args.system.map((b) => b.text).join('\n')
-    expect(prompt).toContain("'sun' — not 'soon.' Sun! /s/ /ʌ/ /n/.")
+    expect(prompt).toContain(
+      '"You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn."',
+    )
+    // Defensive: assert the corrupt notation does NOT reappear in
+    // the prompt (regression guard against re-introducing the
+    // slash-IPA / em-dash form in a future planner refactor).
+    expect(prompt).not.toContain('/s/ /ʌ/ /n/')
+    expect(prompt).not.toContain("'sun' — not 'soon.'")
   })
 
   it('round-trips a wire response with exactly 8 short-u problems', async () => {

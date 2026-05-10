@@ -928,23 +928,29 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // template; the focus-node name in the user message is what tells the
 // planner which word pool to draw from.
 //
-// Short-u first-encounter scaffolding (ticket 86c9q9ben AC9b)
+// Short-u first-encounter scaffolding (ticket 86c9q9ben AC9b;
+// re-baked under ticket 86c9qhxyd 2026-05-10 to drop em-dash +
+// slash-IPA notation Azure was vocalizing literally — see
+// `.claude/docs/planner-and-canon.md` §"Canon text must be
+// naturally pronounceable English" + §"Stick to ASCII-7
+// punctuation")
 // -----------------------------------------------------------
 // Per `design/word-song/short-u-pool-expansion.md` §4 + §10 Q1 lock,
-// the first short-u session opens with an explicit `/u/` vs. `/ʌ/`
-// minimal-pair contrast line — load-bearing for L1 Tagalog interference
-// (Tagalog has `/u/` but not `/ʌ/`, so Marian's L1 default is `/uː/`
-// for English short-u). The line is baked into the prompt below for
-// the `cvc-words-short-u` branch so Haiku emits it as part of the
-// session-open chatter (`session.end.opener`-adjacent — the planner
-// is currently silent on opener wording, so the first session's
-// chatter naturally carries it). The "lifetime first-encounter only"
-// per-Marian gate shares the same open mechanism the short-o
-// `box`/`fox` `/ks/` line has been waiting on; until that mechanism
-// lands, the canon ships the contrast line on every short-u session.
-// Subsequent sessions hearing the same opener line is an acceptable
-// near-term posture — the alternative ("never emit the line") would
-// drop the load-bearing Tagalog scaffolding entirely.
+// the first short-u session opens with an explicit short-u vs.
+// long-oo minimal-pair contrast line — load-bearing for L1 Tagalog
+// interference (Tagalog has long-oo but not English short-u, so
+// Marian's L1 default is long-oo for English short-u). The line is
+// baked into the prompt below for the `cvc-words-short-u` branch
+// so Haiku emits it as part of the `session.end.opener`. The
+// "lifetime first-encounter only" gate (api/_firstEncounterGate.ts)
+// rewrites this opener back to the vanilla "You did it!" for
+// already-encountered users so subsequent sessions get a normal
+// closer. The per-segment phoneme scaffold uses natural-English
+// approximations (Sss, uh, nnn) instead of slash-IPA notation
+// (`/s/ /ʌ/ /n/`) because Azure vocalizes the latter character-
+// by-character ("slash s slash slash UH slash slash n slash"),
+// which is what Marian was hearing live in production from PR
+// #174 ship through the cleanup landing.
 //
 // Short-i first-encounter scaffolding — DEFERRED (ticket 86c9qdba4)
 // -----------------------------------------------------------------
@@ -1023,15 +1029,23 @@ problems from the directive's pool and the remaining 5-6 from the
 canonical pool above. The "do not invent new words" rule still
 forbids any word that is in NEITHER pool.
 
-SHORT-U FIRST-ENCOUNTER SCAFFOLDING (ticket 86c9q9ben AC9b): when
-focus is cvc-words-short-u, append the following minimal-pair
-contrast line to "session.end.opener" so Marian's first short-u
-session opens with an explicit /u/ vs. /ʌ/ contrast — Tagalog has
-/u/ but not /ʌ/, so the contrast line resets her L1 default
-substitution at first encounter:
-  "You did it! Listen carefully: 'sun' — not 'soon.' Sun! /s/ /ʌ/ /n/."
+SHORT-U FIRST-ENCOUNTER SCAFFOLDING (ticket 86c9q9ben AC9b,
+re-baked under ticket 86c9qhxyd to drop em-dash + slash-IPA
+notation that Azure was vocalizing literally): when focus is
+cvc-words-short-u, use the following minimal-pair contrast line
+for "session.end.opener" so Marian's first short-u session opens
+with an explicit short-u vs. long-oo contrast (Tagalog has long
+oo but not English short-u, so the contrast line resets her L1
+default substitution at first encounter). The per-segment
+breakdown uses natural-English phonetic approximations
+(Sss / uh / nnn) instead of slash-IPA notation, which Azure
+otherwise reads literally as "slash s slash slash UH slash":
+  "You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn."
 Use this exact text for "session.end.opener" when focus is
 cvc-words-short-u; for any other focus node use "You did it!" alone.
+Keep the text ASCII-7 only — no em-dashes, en-dashes, curly
+quotes, IPA characters, or forward-slash notation. The bake-time
+canon lint (scripts/canonLint.ts) enforces this rule.
 
 Distractor guidance (Marian sees 3 picture chips per problem; one is the
 target, two are distractors — but YOU are not authoring the distractors
