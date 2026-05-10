@@ -1723,6 +1723,80 @@ describe('generateSessionPlan — cvc-words-short-u sibling tier (ticket 86c9q9b
   })
 })
 
+/**
+ * Short-i first-encounter scaffolding (ticket 86c9qdp1q).
+ *
+ * Pin the SHORT-I FIRST-ENCOUNTER SCAFFOLDING block carries the exact
+ * /i/ vs /ɪ/ contrast line into the system prompt for short-i
+ * sessions. Mirror of the short-u AC9b directive test above.
+ *
+ * The directive is what tells Haiku to emit the contrast text in its
+ * `session.end.opener` field; the lifetime gate downstream
+ * (api/_firstEncounterGate.ts) handles the second-session vanilla
+ * rewrite. This test pins the upstream wiring; the gate's own pin
+ * lives in `_firstEncounterGate.test.ts`.
+ */
+describe('generateSessionPlan — cvc-words-short-i first-encounter scaffolding (ticket 86c9qdp1q)', () => {
+  const SHORT_I_WORDS = [
+    'pig',
+    'pin',
+    'bin',
+    'wig',
+    'bib',
+    'fig',
+    'lid',
+    'sip',
+  ] as const
+
+  function makeShortIPlan(words: readonly string[]): string {
+    if (words.length !== 8) {
+      throw new Error(`makeShortIPlan needs 8 words; got ${words.length}`)
+    }
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-short-i-001',
+      label: 'CVC short-i',
+      utterances,
+    })
+  }
+
+  it('system prompt carries the /i/ vs /ɪ/ minimal-pair contrast line for the short-i tier', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeShortIPlan(SHORT_I_WORDS), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-i',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // The exact contrast-opener line baked into the directive. Drift
+    // here would mean the canon re-bake produces a different opener
+    // than the one the gate pins against.
+    expect(prompt).toContain(
+      "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
+    )
+  })
+
+  it('cvc-words-short-i is in VALID_WORD_SONG_FOCUS_NODES (drift tripwire)', () => {
+    expect(VALID_WORD_SONG_FOCUS_NODES.includes('cvc-words-short-i')).toBe(true)
+  })
+})
+
 describe('generateSessionStartResponse — combined planner + TTS callable (D, 86c9kwhbc)', () => {
   // Pre-86c9kwhbc the HTTP handler awaited generateSessionPlan and
   // renderSessionAudio in succession. The build-time canon-generator

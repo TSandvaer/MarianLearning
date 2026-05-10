@@ -327,6 +327,74 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
       'A &amp; <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> B.',
     )
   })
+
+  // ── Short-i opener IPA scaffolding (ticket 86c9qdp1q) ────────────
+  // Pin the three new overrides: `ih → /ɪ/`, `ee → /iː/`, `pig → /pɪɡ/`.
+  // The rationale is in `design/research/short-i-opener-phrasing.md` —
+  // these are content-scoped (the tokens only appear in
+  // cvc-words-short-i copy) so the overrides have zero false-fire
+  // surface in any other planner output.
+
+  it('wraps "ih" (short-i opener token) in <phoneme alphabet="ipa" ph="ɪ">', () => {
+    expect(applyPhonemeOverrides('says ih.')).toBe(
+      'says <phoneme alphabet="ipa" ph="ɪ">ih</phoneme>.',
+    )
+  })
+
+  it('wraps "ee" (contrast partner) in <phoneme alphabet="ipa" ph="iː">', () => {
+    expect(applyPhonemeOverrides("not 'ee' —")).toBe(
+      'not &apos;<phoneme alphabet="ipa" ph="iː">ee</phoneme>&apos; —',
+    )
+  })
+
+  it('wraps "pig" (anchor word) in <phoneme alphabet="ipa" ph="pɪɡ">', () => {
+    expect(applyPhonemeOverrides('Read the pig.')).toBe(
+      'Read the <phoneme alphabet="ipa" ph="pɪɡ">pig</phoneme>.',
+    )
+  })
+
+  it('preserves casing on "Pig" capitalised target line', () => {
+    expect(applyPhonemeOverrides('Yes! Pig.')).toBe(
+      'Yes! <phoneme alphabet="ipa" ph="pɪɡ">Pig</phoneme>.',
+    )
+  })
+
+  it('emits all three overrides on the full short-i opener line', () => {
+    // The exact line the canon will bake. Pin all wraps in one pass.
+    const out = applyPhonemeOverrides(
+      "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
+    )
+    // Two `ih` wraps + one `ee` wrap + one `pig` wrap = 4 phoneme tags.
+    const phonemeCount = (out.match(/<phoneme alphabet="ipa"/g) ?? []).length
+    expect(phonemeCount).toBe(4)
+    const ihCount = (out.match(/<phoneme alphabet="ipa" ph="ɪ">/g) ?? []).length
+    expect(ihCount).toBe(2)
+    const eeCount = (out.match(/<phoneme alphabet="ipa" ph="iː">/g) ?? [])
+      .length
+    expect(eeCount).toBe(1)
+    const pigCount = (out.match(/<phoneme alphabet="ipa" ph="pɪɡ">/g) ?? [])
+      .length
+    expect(pigCount).toBe(1)
+  })
+
+  it('does NOT match "ih" or "ee" inside larger words (boundary guard)', () => {
+    // "withholding", "shih-tzu", "feed", "speedy" all contain "ih"/"ee"
+    // as a substring but never on word boundaries. The \b regex must
+    // not fire.
+    expect(applyPhonemeOverrides('withholding')).toBe('withholding')
+    expect(applyPhonemeOverrides('feed the cat')).toBe('feed the cat')
+    expect(applyPhonemeOverrides('speedy')).toBe('speedy')
+    expect(applyPhonemeOverrides('withholding')).not.toContain('<phoneme')
+    expect(applyPhonemeOverrides('feed the cat')).not.toContain('<phoneme')
+    expect(applyPhonemeOverrides('speedy')).not.toContain('<phoneme')
+  })
+
+  it('does NOT match "pig" inside larger words (pigeon / pigsty boundary guard)', () => {
+    expect(applyPhonemeOverrides('pigeon')).toBe('pigeon')
+    expect(applyPhonemeOverrides('pigeon')).not.toContain('<phoneme')
+    expect(applyPhonemeOverrides('pigsty')).toBe('pigsty')
+    expect(applyPhonemeOverrides('pigsty')).not.toContain('<phoneme')
+  })
 })
 
 describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () => {

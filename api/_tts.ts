@@ -153,6 +153,27 @@ export function escapeSsml(text: string): string {
  *    realization; THE_OPEN_O + LENGTH_MARK + R). This is the canonical
  *    dictionary form and what every native speaker hears as "the
  *    number four", clearly distinct from "for" /fɚ/ or /fɔr/.
+ *  - "ih" → /ɪ/ (lax high-front vowel — the short-i opener token).
+ *    Without markup, Emma's neural prosody predictor reads bare "ih"
+ *    as a hesitation schwa /ə/ or conflates it with /iː/. The IPA tag
+ *    forces the lax-high-front quality. Only used in the
+ *    `cvc-words-short-i` first-encounter opener line; "ih" is not a
+ *    real English word so the global regex match has no false-fire
+ *    surface in any other planner copy. Ticket 86c9qdp1q; full
+ *    rationale in `design/research/short-i-opener-phrasing.md`.
+ *  - "ee" → /iː/ (tense high-front vowel — the short-i opener
+ *    contrast partner). Without markup, Emma may read bare "ee" as a
+ *    letter-name or unstressed schwa. Same scoping rationale as "ih"
+ *    — only used in the short-i opener line; "ee" never appears as
+ *    standalone-word content in any other planner template.
+ *  - "pig" → /pɪɡ/ (anchor word — applies on every short-i utterance
+ *    containing "pig", which is exactly correct behaviour: the
+ *    `cvc-words-short-i` canon's `Read the pig.` / `Yes! Pig.` /
+ *    `Let's look. Pig.` / `This one is pig.` / opener-line's
+ *    `Like pig:` should ALL render with the explicit /ɪ/ vowel
+ *    quality. The anchor word "pig" does not appear in any other
+ *    track / focus node's planner copy, so the override is scoped
+ *    by content rather than by context. Ticket 86c9qdp1q.
  *
  * What about "two"?
  * -----------------
@@ -193,6 +214,14 @@ export function escapeSsml(text: string): string {
  */
 const PHONEME_OVERRIDES: Record<string, string> = {
   four: 'fɔːr',
+  // Ticket 86c9qdp1q — short-i opener IPA scaffolding. See
+  // `design/research/short-i-opener-phrasing.md` for the
+  // PAM/SLM-r-derived rationale. "ih" and "ee" are content-scoped
+  // (only appear in the cvc-words-short-i opener line); "pig" is
+  // anchor-word-scoped (only appears in cvc-words-short-i targets).
+  ih: 'ɪ',
+  ee: 'iː',
+  pig: 'pɪɡ',
 }
 
 /**

@@ -946,31 +946,34 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // near-term posture — the alternative ("never emit the line") would
 // drop the load-bearing Tagalog scaffolding entirely.
 //
-// Short-i first-encounter scaffolding — DEFERRED (ticket 86c9qdba4)
+// Short-i first-encounter scaffolding — SHIPPED (ticket 86c9qdp1q)
 // -----------------------------------------------------------------
 // Per `design/word-song/short-i-pool-expansion.md` §4 + Dave's research
-// at `design/research/short-u-minimal-pair-and-future-vowel-openers.md`
-// §3.1, the first short-i session SHOULD open with an explicit `/i/`
-// vs. `/ɪ/` minimal-pair contrast line ("Listen carefully: 'sit' — not
-// 'seat.'"). This is documented in the spec as load-bearing
-// scaffolding for both L1 Tagalog interference AND intra-English
-// short-vowel confusion (Marian's diagnostic flagged `/ɪ/` as her
-// weakest vowel).
+// at `design/research/short-i-opener-phrasing.md`, the first short-i
+// session opens with an explicit `/i/` vs. `/ɪ/` minimal-pair contrast
+// line ("Listen — short i says ih. Not 'ee' — just ih. Like pig:
+// /p/-/ɪ/-/g/."). This is load-bearing scaffolding for both L1 Tagalog
+// interference (Marian's L1 has `/i/` but not `/ɪ/`, so per SLM-r her
+// predicted error is "pig → peeg") AND intra-English short-vowel
+// confusion (her diagnostic flagged `/ɪ/` as her weakest vowel).
 //
-// The contrast opener is INTENTIONALLY OUT OF SCOPE for this PR per
-// the dispatch contract (ticket 86c9qdba4 brief). The contract scoped
-// the lifetime-first-encounter gate as "NOT needed for short-i (no
-// /ks/ opener-line equivalent; that was short-o box/fox-specific)" —
-// a scoping decision made by the orchestrator. The vanilla "You did
-// it!" opener ships with this PR's canon; the contrast-opener
-// scaffolding is filed as a follow-up ticket (TBD — Matt to file once
-// the short-i tier is shipping and Marian's first short-i session is
-// imminent). When that follow-up lands, it adds:
-//   - a SHORT-I FIRST-ENCOUNTER SCAFFOLDING block to this prompt,
-//     mirroring the short-u block below;
-//   - `cvc-words-short-i` to `FIRST_ENCOUNTER_GATED_NODES` in
-//     `api/_firstEncounterGate.ts`;
-//   - a canon re-bake to pick up the new opener.
+// The contrast wording deviates from the short-u shape (`Sun! /s/ /ʌ/
+// /n/.`) because the IPA-letter rendition Azure produced for short-u
+// would not work for short-i: the relevant phonetic distinction is
+// vowel quality, not the consonant frame. Dave's chosen anchor word
+// `pig` keeps both consonants in Tagalog L1 phoneme inventory, leaving
+// the vowel as the single new element to attend to.
+//
+// Wiring shape mirrors short-u's:
+//   - SHORT-I FIRST-ENCOUNTER SCAFFOLDING block below tells Haiku the
+//     exact opener text;
+//   - `cvc-words-short-i` is in `FIRST_ENCOUNTER_GATED_NODES` in
+//     `api/_firstEncounterGate.ts` so subsequent sessions get the
+//     vanilla "You did it!" rewrite;
+//   - the canon re-bake picks up the new opener via the planner;
+//   - SSML phoneme overrides for `ih`, `ee`, `pig` in
+//     `api/_tts.ts`'s `PHONEME_OVERRIDES` table force the correct
+//     vowel quality at Azure render time.
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
@@ -1032,6 +1035,21 @@ substitution at first encounter:
   "You did it! Listen carefully: 'sun' — not 'soon.' Sun! /s/ /ʌ/ /n/."
 Use this exact text for "session.end.opener" when focus is
 cvc-words-short-u; for any other focus node use "You did it!" alone.
+
+SHORT-I FIRST-ENCOUNTER SCAFFOLDING (ticket 86c9qdp1q): when focus
+is cvc-words-short-i, replace the default opener with the following
+minimal-pair contrast line so Marian's first short-i session opens
+with an explicit /i/ vs. /ɪ/ contrast — Tagalog has /i/ (= English
+long /iː/) but not /ɪ/, so per SLM-r her L1 default substitution
+for English short-i is /iː/ ("pig → peeg"); the contrast line
+resets that default at first encounter. Anchor word "pig" — both
+consonants exist in Tagalog so the vowel is the only new element:
+  "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/."
+Use this exact text for "session.end.opener" when focus is
+cvc-words-short-i. The browser-side server gate
+(api/_firstEncounterGate.ts) substitutes the vanilla "You did it!"
+on second + subsequent sessions; the canon always ships the
+contrast variant.
 
 Distractor guidance (Marian sees 3 picture chips per problem; one is the
 target, two are distractors — but YOU are not authoring the distractors

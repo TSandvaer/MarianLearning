@@ -34,12 +34,13 @@
 // `cvc-words-short-o.json` to carry a box/fox first-encounter
 // opener variant, this module's gate fires for it too — no new
 // code needed beyond extending the FIRST_ENCOUNTER_GATED_NODES
-// list below. Today only `cvc-words-short-u` ships a tier-
-// specific opener; `cvc-words-short-o` is on the gated-list as
-// infrastructure-ready (gate is a no-op for a canon that already
-// has vanilla "You did it!", since the rewrite would substitute
-// "You did it!" with itself — but the cost is one extra disk read,
-// which we still skip via the FIRST_ENCOUNTER_GATED_NODES check).
+// list below. Today `cvc-words-short-u` and `cvc-words-short-i`
+// ship tier-specific openers; `cvc-words-short-o` is on the gated-
+// list as infrastructure-ready (gate is a no-op for a canon that
+// already has vanilla "You did it!", since the rewrite would
+// substitute "You did it!" with itself — but the cost is one extra
+// disk read, which we still skip via the FIRST_ENCOUNTER_GATED_NODES
+// check).
 //
 // Defensive: the gate is also a no-op when:
 //  - the response doesn't carry a `session.end.opener` utterance
@@ -71,6 +72,16 @@ const FIRST_ENCOUNTER_GATED_NODES: ReadonlySet<string> = new Set([
   // it; gate fires the rewrite when Marian has already encountered
   // `cvc-words-short-u`.
   'cvc-words-short-u',
+  // Ticket 86c9qdp1q — short-i `/i/` vs `/ɪ/` contrast opener. Canon
+  // ships the contrast line ("Listen — short i says ih. Not 'ee' —
+  // just ih. Like pig: /p/-/ɪ/-/g/."). Gate fires the rewrite when
+  // Marian has already encountered `cvc-words-short-i`. Mechanism
+  // identical to the short-u branch above; rationale is Dave's
+  // research note `design/research/short-i-opener-phrasing.md`
+  // (load-bearing minimal-pair scaffolding for L1 Tagalog +
+  // intra-English vowel discrimination — Marian's diagnostic
+  // flagged `/ɪ/` as her weakest vowel).
+  'cvc-words-short-i',
   // Ticket 86c9q9ben (infrastructure-ready) — short-o box/fox /ks/
   // opener. Canon currently has VANILLA "You did it!"; the gate is
   // a no-op until a future canon re-bake adds the box/fox variant.
@@ -216,8 +227,8 @@ export function applyFirstEncounterGate(
 }
 
 /** Test-introspection helper: list the gated nodes. Used by unit
- *  tests to pin the contract that `cvc-words-short-u` and
- *  `cvc-words-short-o` are both included. */
+ *  tests to pin the contract that `cvc-words-short-u`,
+ *  `cvc-words-short-i`, and `cvc-words-short-o` are all included. */
 export function getFirstEncounterGatedNodes(): readonly string[] {
   return Array.from(FIRST_ENCOUNTER_GATED_NODES).sort()
 }

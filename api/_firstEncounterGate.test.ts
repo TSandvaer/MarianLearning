@@ -70,9 +70,10 @@ function buildResponse(opts: {
 }
 
 describe('getFirstEncounterGatedNodes', () => {
-  it('includes both cvc-words-short-u (active) and cvc-words-short-o (infra-ready)', () => {
+  it('includes cvc-words-short-u (active), cvc-words-short-i (active, ticket 86c9qdp1q), and cvc-words-short-o (infra-ready)', () => {
     const gated = getFirstEncounterGatedNodes()
     expect(gated).toContain('cvc-words-short-u')
+    expect(gated).toContain('cvc-words-short-i')
     expect(gated).toContain('cvc-words-short-o')
   })
 
@@ -244,6 +245,43 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
     expect(response.utterances[0]!.text).toBe(
       "You did it! Listen carefully: 'sun' — not 'soon.'",
     )
+  })
+
+  it('short-i tier (ticket 86c9qdp1q) — gated focus + already-encountered → rewrites contrast opener to vanilla', () => {
+    // Mirror of the short-u rewrite test above. Greenfield ships the
+    // contrast line; once `cvc-words-short-i` is in
+    // lifetimeFirstEncounters, the gate substitutes the vanilla
+    // "You did it!" opener.
+    const response = buildResponse({
+      openerText:
+        "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
+      openerAudioBase64: 'BASE64_SHORT_I_CONTRAST_LINE_AUDIO',
+    })
+    const out = applyFirstEncounterGate(response, {
+      focusNode: 'cvc-words-short-i',
+      lifetimeFirstEncounters: ['cvc-words-short-i'],
+    })
+
+    expect(out).not.toBe(response)
+    const opener = out.utterances.find((u) => u.id === 'session.end.opener')!
+    expect(opener.text).toBe('You did it!')
+    expect(opener.audio.base64).not.toBe('BASE64_SHORT_I_CONTRAST_LINE_AUDIO')
+  })
+
+  it('short-i tier (ticket 86c9qdp1q) — first encounter (focus NOT in list) → contrast opener delivered as canon ships it', () => {
+    // Pin the greenfield path: an empty list (or any list lacking
+    // short-i) leaves the canon's contrast variant intact.
+    const response = buildResponse({
+      openerText:
+        "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
+    })
+    const out = applyFirstEncounterGate(response, {
+      focusNode: 'cvc-words-short-i',
+      lifetimeFirstEncounters: ['cvc-words', 'cvc-words-short-o'],
+    })
+    // First encounter for short-i: the canon's contrast variant is
+    // delivered as-is (same reference).
+    expect(out).toBe(response)
   })
 
   it('short-o tier — gate is wired, but with vanilla canon today the rewrite is functionally a no-op (canon is already vanilla)', () => {
