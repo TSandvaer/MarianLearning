@@ -106,6 +106,7 @@ const WORD_SONG_LABELS: Record<WordSongNode, string> = {
   'cvc-words': 'CVC words',
   'cvc-words-short-o': 'CVC words (short o)',
   'cvc-words-short-u': 'CVC words (short u)',
+  'cvc-words-short-i': 'CVC words (short i)',
   digraphs: 'digraphs',
   'sight-words': 'sight words',
   'simple-sentences': 'simple sentences',

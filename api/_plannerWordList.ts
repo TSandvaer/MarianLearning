@@ -68,17 +68,47 @@ export const WORD_SONG_TARGET_WORDS_SHORT_O =
 export const WORD_SONG_TARGET_WORDS_SHORT_U =
   'sun, cup, bus, bug, nut, tub, bun, jug, rug, hut, gum'
 
+/**
+ * The 8 target words for the short-i sibling tier (`cvc-words-short-i`).
+ * Locked by Thomas 2026-05-09 per
+ * `design/word-song/short-i-pool-expansion.md` §1 / §10 Q1=A
+ * (recommended 11-word pool with Phase-2 fallback). Phase-2 voluntary
+ * drop: `hip` and `rim` removed from the recommended pool for vocab
+ * unfamiliarity (rosehip + bicycle wheel rim were both Phase-2-flagged
+ * in the spec audit). Final ship pool is 8 entries spanning four rhyme
+ * families (`/ɪg/`, `/ɪn/`, `/ɪb/`, `/ɪd/`) plus a singleton `/ɪp/`
+ * (sip). The `/ɪg/` triplet (`pig, wig, fig`) is the densest cluster —
+ * a deliberate trap-window lever for Haiku's distractor-window guidance,
+ * mirroring short-u's `/ʌg/` triplet (`bug, jug, rug`) and short-a's
+ * `/æt/` cluster.
+ *
+ * Pool composition:
+ *  - 0 promoted from the v1 distractor-only pool. Short-i had no
+ *    candidates that survived the strict audit for distractor-only use
+ *    (verbs/digraphs/picture-instability dominated the rejected pool).
+ *  - 8 wholly new entries: `pig, pin, bin, wig, bib, fig, lid, sip`.
+ *
+ * Same alignment contract as the prior tiers: the client-side
+ * `wordPack.ts` MUST carry every word here as `isTarget: true` plus a
+ * `TARGET_PAIRINGS` row. The round-trip suite in
+ * `src/screens/WordSong/plannerRoundTrip.test.ts` enforces it.
+ */
+export const WORD_SONG_TARGET_WORDS_SHORT_I =
+  'pig, pin, bin, wig, bib, fig, lid, sip'
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).
  *
  *  Short-a rhyme block stays unconditioned for now — it's harmless on
- *  short-o and short-u sessions because those tracks override the pool
- *  upstream in the system prompt. The short-u block (ticket 86c9q9ben /
- *  AC3b) is included to give Haiku explicit cluster guidance on the
- *  /ʌg/ triplet (`bug, jug, rug`) which is the densest rhyme family in
- *  the v3 short-u pool — same shape and motivation as short-a's `/æt/`
- *  cluster gets a "pack these in the trap window" annotation. */
+ *  short-o, short-u, and short-i sessions because those tracks override
+ *  the pool upstream in the system prompt. The short-u block (ticket
+ *  86c9q9ben / AC3b) was included to give Haiku explicit cluster
+ *  guidance on the /ʌg/ triplet (`bug, jug, rug`) which is the densest
+ *  rhyme family in the v3 short-u pool — same shape and motivation as
+ *  short-a's `/æt/` cluster. The short-i block (ticket 86c9qdba4) is
+ *  included for the same reason: the `/ɪg/` triplet (`pig, wig, fig`)
+ *  is the densest rhyme family in the v4 short-i pool. */
 export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /æt/ rhyme family: cat, hat, bat, mat — pack these in the trap window when one is the target.',
   '- /æn/ rhyme family: fan, man, pan, can, van — same.',
@@ -93,6 +123,11 @@ export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /ʌt/ rhyme family: nut, hut.',
   '- /ʌb/ rhyme family: tub.',
   '- /ʌm/ rhyme family: gum.',
+  '- /ɪg/ rhyme family: pig, wig, fig — pack these in the trap window when one is the target.',
+  '- /ɪn/ rhyme family: pin, bin — same.',
+  '- /ɪb/ rhyme family: bib.',
+  '- /ɪd/ rhyme family: lid.',
+  '- /ɪp/ rhyme family: sip.',
 ].join('\n')
 
 /**

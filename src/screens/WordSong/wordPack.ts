@@ -390,6 +390,91 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'food',
     isTarget: true,
   },
+  // ── Short-i pool (ticket 86c9qdba4, v4 vowel tier) ─────────────────
+  // Per `design/word-song/short-i-pool-expansion.md` §1 with Thomas's
+  // 2026-05-09 lock (Q1=A — recommended 11-word pool with Phase-2
+  // fallbacks). Phase-2 voluntary drop: hip + rim removed for vocab
+  // unfamiliarity (rosehip + bicycle wheel rim were both Phase-2-flagged
+  // for picture-stability + vocab risk in the spec audit). Final ship
+  // pool is **8 words** spanning four rhyme families (`/ɪg/`, `/ɪn/`,
+  // `/ɪb/`, `/ɪd/`) plus a singleton `/ɪp/` (sip). Pool reaches Marian
+  // only when the planner emits content for `cvc-words-short-i` (the
+  // fourth-vowel sibling node added between `cvc-words-short-u` and
+  // `digraphs` in WordSongNode / LITERACY_TREE). Short-a / short-o /
+  // short-u sessions continue to draw from their own pools and short-i
+  // words don't leak into them (planner-side guarantee — see
+  // `WORD_SONG_TRACK_GUIDE` in `api/_planner.ts`).
+  //
+  // All 8 entries are wholly-new — none re-purposes an existing
+  // distractor or canonical-pack picture (verified against pre-86c9qdba4
+  // `TARGET_WORDS` + `DISTRACTOR_ONLY_WORDS`). PNG-in-SVG embed via
+  // `yarn embed-pictures` shipped in PR #188 (ticket 86c9qdb95).
+  //
+  // Same-vowel-only rule (spec §8): every distractor for a short-i
+  // target is drawn from the short-i pool itself. No cross-vowel mixing
+  // in v1 — that's a separate downstream ticket (`86c9m3aek`). The
+  // `crossVowelMixingActive` predicate gate at `mastery.ts
+  // CVC_CROSS_VOWEL_NODES` is intentionally NOT widened to include
+  // `cvc-words-short-i` in this PR — adding short-i to that set would
+  // require corresponding `TARGET_PAIRINGS_CROSSVOWEL` rows for every
+  // short-i target, which is out of scope per the dispatch contract
+  // (cross-vowel matrix updates separately ticketed).
+  {
+    word: 'pig',
+    pictureKey: 'pig',
+    vowel: 'i',
+    category: 'animal',
+    isTarget: true,
+  },
+  {
+    word: 'pin',
+    pictureKey: 'pin',
+    vowel: 'i',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'bin',
+    pictureKey: 'bin',
+    vowel: 'i',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'wig',
+    pictureKey: 'wig',
+    vowel: 'i',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'bib',
+    pictureKey: 'bib',
+    vowel: 'i',
+    category: 'clothing',
+    isTarget: true,
+  },
+  {
+    word: 'fig',
+    pictureKey: 'fig',
+    vowel: 'i',
+    category: 'food',
+    isTarget: true,
+  },
+  {
+    word: 'lid',
+    pictureKey: 'lid',
+    vowel: 'i',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'sip',
+    pictureKey: 'sip',
+    vowel: 'i',
+    category: 'object',
+    isTarget: true,
+  },
 ] as const
 
 /**
@@ -417,8 +502,14 @@ export const TARGET_WORDS: readonly WordEntry[] = [
  * `getWordEntry()` resolves them from `TARGET_WORDS` and the existing
  * `TARGET_PAIRINGS` rows for short-a (e.g. `cat: { gentle: ['bus',
  * 'sun'], … }`) point at them by string — same shape as the short-o
- * promotion handled `dog/log/pot/fox`. Only `pen` (short-e) remains
- * as a distractor-only entry today.
+ * promotion handled `dog/log/pot/fox`.
+ *
+ * v4 note (ticket 86c9qdba4, short-i pool expansion): no further
+ * distractor-only promotions. All 8 short-i entries (`pig, pin, bin,
+ * wig, bib, fig, lid, sip`) are wholly-new in `TARGET_WORDS` — short-i
+ * had no existing distractor-only candidates per spec §1 audit
+ * (verbs/digraphs/picture-instability dominated the rejected pool).
+ * `pen` (short-e) remains the only distractor-only entry today.
  */
 export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
   {
@@ -460,6 +551,23 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   // review showing the discriminators don't hold at 96pt.
   ['rug', 'mat'], // flat-rectangular floor coverings (rug fringed, mat plain)
   ['tub', 'cup'], // vessels in side profile (tub footed, cup handled)
+  // Short-i pool additions (ticket 86c9qdba4, §3 / §10 Q2 LOCKED 2026-05-09).
+  // Same posture as the short-u additions: same-vowel-only rule (spec §8)
+  // keeps these pairs from co-occurring in v1 trios anyway, but the entries
+  // are cheap insurance against future cross-vowel mixing (ticket
+  // 86c9m3aek) — when cross-vowel fires across all four CVC tiers, a
+  // short-i target landing alongside a short-a/short-o distractor must
+  // not collide on silhouette. Per Kyle's spec §3, only `[fig, bun]` is
+  // mandatory for the 8-word ship; `[pig, dog]` and `[pig, cat]` are
+  // recommended forward-looking insurance against animal-pack collision.
+  // The conditional `[lid, mat]` from spec §3 is INTENTIONALLY OMITTED —
+  // `lid` shipped as oval (not rectangular) per spec §2.7 + Phase 2 PR
+  // #188's actual asset, and the conditional only applied to the
+  // rectangular rendering. If a future re-trace ships a rectangular `lid`,
+  // add the pair then.
+  ['fig', 'bun'], // both round food with top-feature (stem-cap vs score-mark)
+  ['pig', 'dog'], // both four-legged mammals; snout/curly-tail vs ears/non-curly-tail
+  ['pig', 'cat'], // both four-legged animals; snout/curly-tail vs whiskers/pointed-ears
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -579,6 +687,52 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   rug: { gentle: ['cup', 'sun'], trap: ['bug', 'jug'] }, // /ʌg/ rhyme triplet trap (mat is FORBIDDEN_PAIR + cross-vowel)
   hut: { gentle: ['cup', 'sun'], trap: ['nut', 'bun'] }, // /ʌt/ rhyme + /ʌn/ near-miss
   gum: { gentle: ['bug', 'rug'], trap: ['bun', 'sun'] }, // /ʌm/ has no in-pool rhyme partner; /ʌn/ near-miss
+  // ── Short-i pool (ticket 86c9qdba4) ─────────────────────────────────
+  // Per `design/word-song/short-i-pool-expansion.md` §2.1 matrix preview
+  // + §8 same-vowel-only rule: every distractor for a short-i target is
+  // drawn from the short-i pool itself (`pig, pin, bin, wig, bib, fig,
+  // lid, sip`). No cross-vowel mixing in v1; that's a separate ticket
+  // (`86c9m3aek`).
+  //
+  // Phase-2 voluntary drop: Thomas dropped `hip` and `rim` from the
+  // 11-word recommended pool for vocab unfamiliarity (rosehip + bicycle
+  // wheel rim were both Phase-2-flagged for picture-stability). The
+  // matrix below is the spec preview matrix MINUS `hip`/`rim` references
+  // — wherever the spec preview used `hip` or `rim` as a distractor, a
+  // pool-internal substitute was chosen following the same rhyme/category
+  // logic. Specifically:
+  //  - `bib` trap was `['hip', 'wig']` (clothing/fabric trap with hip).
+  //    Replaced with `['pig', 'wig']` — pig/bib share /b/ onset (bib) +
+  //    /p/ onset (pig); /-ib/ + /-ig/ near-coda. Same-tier insurance.
+  //  - `lid` trap was `['bin', 'rim']` (container-top + metal-near-miss).
+  //    Replaced with `['bin', 'sip']` — keeps the bin container trap, and
+  //    sip is /-ip/ near-/-id/ coda (alveolar stop variation).
+  //  - `sip` gentle was `['fig', 'wig']`, trap was `['hip', 'rim']`.
+  //    Trap replaced with `['pin', 'lid']` — without an in-pool /ɪp/
+  //    rhyme partner (hip dropped), the trap leans on minimal-pair-ish
+  //    coda contrast.
+  //
+  // Trap-tier pairs lean on the rhyme families enumerated in spec §1
+  // (`/ɪg/`, `/ɪn/`, `/ɪb/`, `/ɪd/`, `/ɪp/`); the /ɪg/ triplet
+  // (pig/wig/fig) is the densest cluster and is intentionally exploited
+  // as the trap-tier pair when one of the three is the target. Gentle-
+  // tier pairs are visually / categorically distinct from the target
+  // (animal vs. household vs. food vs. clothing).
+  //
+  // FORBIDDEN_PAIRS audit — none of the rows below trigger:
+  //  - new short-i additions `[fig, bun]`, `[pig, dog]`, `[pig, cat]`
+  //    are all cross-vowel — same-vowel-only rule keeps them apart.
+  //  - all existing forbidden pairs (cat-dog, bus-van, pan-pot, cap-hat,
+  //    man-dad, mom-dad, rug-mat, tub-cup) involve at least one
+  //    non-short-i word and so are unreachable here.
+  pig: { gentle: ['lid', 'bin'], trap: ['wig', 'fig'] }, // /ɪg/ rhyme triplet trap
+  pin: { gentle: ['fig', 'bib'], trap: ['bin', 'wig'] }, // /ɪn/ rhyme + /ɪg/ near-miss
+  bin: { gentle: ['fig', 'pig'], trap: ['pin', 'lid'] }, // /ɪn/ rhyme + container trap (bin/lid)
+  wig: { gentle: ['bib', 'pin'], trap: ['pig', 'fig'] }, // /ɪg/ rhyme triplet trap
+  bib: { gentle: ['lid', 'pin'], trap: ['pig', 'wig'] }, // /ɪb/ has no in-pool rhyme; /b/-onset (bib/pig) + /-ig/-near-/-ib/-coda
+  fig: { gentle: ['lid', 'bin'], trap: ['pig', 'wig'] }, // /ɪg/ rhyme triplet trap
+  lid: { gentle: ['wig', 'pig'], trap: ['bin', 'sip'] }, // /ɪd/ has no in-pool rhyme; container/coda trap
+  sip: { gentle: ['fig', 'wig'], trap: ['pin', 'lid'] }, // /ɪp/ singleton (hip dropped); coda-contrast trap
 } as const
 
 /**

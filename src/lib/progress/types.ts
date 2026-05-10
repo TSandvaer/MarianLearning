@@ -25,10 +25,14 @@ export type NumberGardenNode =
   | 'mult-6-9'
 
 // cvc-words = short-a CVC. Subsequent vowels get sibling nodes
-// (cvc-words-short-o, cvc-words-short-u, …). This was a deliberate
-// backward-compat choice — see design/word-song/short-o-pool-expansion.md §2
-// (and the analogous short-u spec at design/word-song/short-u-pool-expansion.md
-// §2 / §10 Q1 lock for the 11-word short-u pool, ticket 86c9q5q2d).
+// (cvc-words-short-o, cvc-words-short-u, cvc-words-short-i, …). This
+// was a deliberate backward-compat choice — see design/word-song/
+// short-o-pool-expansion.md §2 (and the analogous short-u spec at
+// design/word-song/short-u-pool-expansion.md §2 / §10 Q1 lock for the
+// 11-word short-u pool, ticket 86c9q5q2d, and the short-i spec at
+// design/word-song/short-i-pool-expansion.md §2 / §10 Q1 lock for the
+// 8-word ship pool — drop hip+rim per Thomas's Phase-2 voluntary
+// fallback for vocab unfamiliarity, ticket 86c9qdba4).
 export type WordSongNode =
   | 'letter-names'
   | 'letter-sounds'
@@ -36,6 +40,7 @@ export type WordSongNode =
   | 'cvc-words'
   | 'cvc-words-short-o'
   | 'cvc-words-short-u'
+  | 'cvc-words-short-i'
   | 'digraphs'
   | 'sight-words'
   | 'simple-sentences'
