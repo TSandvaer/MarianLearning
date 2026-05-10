@@ -21,6 +21,12 @@
 
 **Generalizable lesson:** literal IPA characters and `/segmented/` notation in canon text ship as TTS-bait. The original Option A specified IPA-bracketed text in markdown, intending a hand-authored SSML wrap; what actually shipped was the plain-text rendition through `applyPhonemeOverrides`'s word-boundary-only wrapping. Future opener authors writing in this doc should either (a) wrap any non-word-boundary IPA in `<phoneme>` SSML inline AND ensure the canon-bake pipeline preserves it, or (b) use only word-boundary tokens that the existing `PHONEME_OVERRIDES` table can wrap. A canon-bake-time lint that flags literal `/` or unicode IPA characters in `text` fields would have caught this before Thomas's ear-test (see Kevin's findings in the PR #192 follow-up #2 commit).
 
+**Update post-PR-#192 ear-test #3 (2026-05-10 — em-dash mojibake discovery).** Thomas's third iPad ear-test revealed Emma was STILL emitting gibberish on the opener — sounds like "asesinati" mid-sentence, twice. The canon `text` field on disk stored em-dashes (U+2014) as clean UTF-8 bytes (E2 80 94), but at canon-bake time the SSML payload posted to Azure was being double-encoded somewhere in the Windows + PowerShell + tsx + undici roundtrip. Azure received mojibake'd em-dashes (`â€"`) and faithfully vocalized the corrupt bytes as phantom syllables. Fix: replaced the em-dashes in the planner directive with ASCII-only punctuation. New canonical text:
+
+> "Listen. Short i says _ih_, not _ee_. Like pig. Listen: pig."
+
+The contrast pedagogy is preserved in full via the same `ih` → /ɪ/ and `ee` → /iː/ `PHONEME_OVERRIDES` wraps. Net prosody trade-off: periods create a stronger break than em-dashes did; the IPA-anchored contrast does the heavy lifting either way. Until the bake-pipeline encoding bug is root-caused (filed as a separate ticket), ALL canon `text` fields must stay ASCII-7 only — no em-dashes, no en-dashes, no curly quotes, no other unicode punctuation. The same canon-bake-time lint Devon flagged for the slash-notation issue in follow-up #2 would also catch this — second strike for canon-text validation, worth elevating.
+
 The original recommendation below is preserved for historical accuracy.
 
 ---

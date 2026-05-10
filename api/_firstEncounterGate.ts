@@ -73,8 +73,8 @@ const FIRST_ENCOUNTER_GATED_NODES: ReadonlySet<string> = new Set([
   // `cvc-words-short-u`.
   'cvc-words-short-u',
   // Ticket 86c9qdp1q — short-i `/i/` vs `/ɪ/` contrast opener. Canon
-  // ships the contrast line ("Listen — short i says ih, not ee. Like
-  // pig — listen: pig."). Gate fires the rewrite when Marian has
+  // ships the contrast line ("Listen. Short i says ih, not ee. Like
+  // pig. Listen: pig."). Gate fires the rewrite when Marian has
   // already encountered `cvc-words-short-i`. Mechanism
   // identical to the short-u branch above; rationale is Dave's
   // research note `design/research/short-i-opener-phrasing.md`

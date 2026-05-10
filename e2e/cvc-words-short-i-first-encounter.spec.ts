@@ -373,7 +373,7 @@ test.describe('cvc-words-short-i first-encounter gate (ticket 86c9qdp1q)', () =>
     // regen produces different text, this fails loudly so the
     // mismatch can't sneak past code review.
     expect(opener!.text).toBe(
-      'Listen — short i says ih, not ee. Like pig — listen: pig.',
+      'Listen. Short i says ih, not ee. Like pig. Listen: pig.',
     )
   })
 })

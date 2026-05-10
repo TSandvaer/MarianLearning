@@ -951,7 +951,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // Per `design/word-song/short-i-pool-expansion.md` §4 + Dave's research
 // at `design/research/short-i-opener-phrasing.md`, the first short-i
 // session opens with an explicit `/i/` vs. `/ɪ/` minimal-pair contrast
-// line ("Listen — short i says ih, not ee. Like pig — listen: pig.").
+// line ("Listen. Short i says ih, not ee. Like pig. Listen: pig.").
 // This is load-bearing scaffolding for both L1 Tagalog
 // interference (Marian's L1 has `/i/` but not `/ɪ/`, so per SLM-r her
 // predicted error is "pig → peeg") AND intra-English short-vowel
@@ -1039,12 +1039,12 @@ cvc-words-short-u; for any other focus node use "You did it!" alone.
 SHORT-I FIRST-ENCOUNTER SCAFFOLDING (ticket 86c9qdp1q): when focus
 is cvc-words-short-i, replace the default opener with the following
 minimal-pair contrast line so Marian's first short-i session opens
-with an explicit /i/ vs. /ɪ/ contrast — Tagalog has /i/ (= English
+with an explicit /i/ vs. /ɪ/ contrast. Tagalog has /i/ (= English
 long /iː/) but not /ɪ/, so per SLM-r her L1 default substitution
-for English short-i is /iː/ ("pig → peeg"); the contrast line
+for English short-i is /iː/ ("pig -> peeg"); the contrast line
 resets that default at first encounter. Anchor word "pig" — both
 consonants exist in Tagalog so the vowel is the only new element:
-  "Listen — short i says ih, not ee. Like pig — listen: pig."
+  "Listen. Short i says ih, not ee. Like pig. Listen: pig."
 Use this exact text for "session.end.opener" when focus is
 cvc-words-short-i. The browser-side server gate
 (api/_firstEncounterGate.ts) substitutes the vanilla "You did it!"
@@ -1063,6 +1063,23 @@ the slash-segmented breakdown. The "pig" IPA wrap from Option B's
 literal SSML is intentionally NOT introduced — it would re-trigger
 the celebration-prosody clash fixed in commit f473312. See
 design/research/short-i-opener-phrasing.md "Update 2026-05-10".
+
+NOTE (PR #192 ear-test #3 follow-up, 2026-05-10): the Option B text
+that shipped used em-dashes ("Listen, em-dash, short i says ih...").
+The em-dash bytes (UTF-8 E2 80 94) survive in the canon JSON cleanly,
+but at canon-bake time the SSML payload sent to Azure was being
+double-encoded somewhere in the Windows, PowerShell, tsx, undici
+roundtrip. Azure received mojibake'd em-dashes and faithfully
+vocalized the corrupt bytes as phantom syllables; Thomas heard
+"asesinati"-style gibberish twice in the line. Switched to
+ASCII-only punctuation (periods plus colon, no em-dashes, no
+en-dashes, no curly quotes). The contrast pedagogy is preserved
+in full via the same ih and ee PHONEME_OVERRIDES wraps. Net
+prosody trade-off: periods create a stronger break than em-dashes
+did; the IPA-anchored contrast does the heavy lifting either way.
+The bake-pipeline encoding bug itself is filed as a separate
+ticket; until that is root-caused, ALL canon text fields must
+stay ASCII-7 only.
 
 Distractor guidance (Marian sees 3 picture chips per problem; one is the
 target, two are distractors — but YOU are not authoring the distractors

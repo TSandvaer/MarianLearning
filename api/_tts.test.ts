@@ -396,8 +396,18 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     // text which preserves the /ɪ/-vs-/iː/ contrast pedagogy via
     // exactly two phoneme wraps. See
     // `design/research/short-i-opener-phrasing.md` § "Update 2026-05-10".
+    //
+    // PR #192 follow-up #3 (2026-05-10): the Option B text used em-dashes
+    // (U+2014). The canon `text` field stored them cleanly as UTF-8
+    // (E2 80 94), but at canon-bake time the SSML payload posted to
+    // Azure was double-encoded somewhere in the
+    // Windows + PowerShell + tsx + undici roundtrip — Azure received
+    // mojibake'd em-dashes (â€") and vocalized the corrupt bytes as
+    // phantom syllables (Thomas heard "asesinati"-style gibberish).
+    // Switched to ASCII-only punctuation (periods + colon). Same two
+    // phoneme wraps; same pedagogy.
     const out = applyPhonemeOverrides(
-      'Listen — short i says ih, not ee. Like pig — listen: pig.',
+      'Listen. Short i says ih, not ee. Like pig. Listen: pig.',
     )
     // One `ih` wrap + one `ee` wrap + ZERO `pig` wraps = 2 phoneme tags.
     const phonemeCount = (out.match(/<phoneme alphabet="ipa"/g) ?? []).length
@@ -411,9 +421,12 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     expect(out).not.toContain('<phoneme alphabet="ipa" ph="pɪɡ">')
     // Both bare "pig" tokens are preserved verbatim inside the opener
     // (Azure's default lexicon voices "pig" correctly on the slow read
-    // prosody used for the opener line).
+    // prosody used for the opener line). After follow-up #3 the second
+    // "Listen" is capitalised (it's now its own sentence after the
+    // period replaced the em-dash), so the second pig appears as
+    // "Listen: pig." not "listen: pig.".
     expect(out).toContain('Like pig')
-    expect(out).toContain('listen: pig.')
+    expect(out).toContain('Listen: pig.')
   })
 
   it('does NOT match "ih" or "ee" inside larger words (boundary guard)', () => {

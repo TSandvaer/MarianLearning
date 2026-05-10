@@ -1788,7 +1788,7 @@ describe('generateSessionPlan — cvc-words-short-i first-encounter scaffolding 
     // here would mean the canon re-bake produces a different opener
     // than the one the gate pins against.
     expect(prompt).toContain(
-      'Listen — short i says ih, not ee. Like pig — listen: pig.',
+      'Listen. Short i says ih, not ee. Like pig. Listen: pig.',
     )
   })
 
