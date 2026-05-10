@@ -63,9 +63,20 @@
  *   npx tsx scripts/generateSessionCanon.ts --force         # regenerate
  *   npx tsx scripts/generateSessionCanon.ts --child Marian  # explicit
  *   npx tsx scripts/generateSessionCanon.ts --dry-run       # plan only
+ *   npx tsx scripts/generateSessionCanon.ts --lint-warn     # warn-only lint
  *
  * Run from the repo root, with .env.local providing both ANTHROPIC and
  * Azure keys (or with the same keys exported into the shell).
+ *
+ * Bake-time lint
+ * --------------
+ * Every successfully-rendered SessionStartResponse is passed through
+ * `lintCanonResponse` (see scripts/canonLint.ts, ticket 86c9qhr9k)
+ * BEFORE it's written to disk. Default behaviour: any violation throws
+ * `CanonLintError`, the bake fails for that combo, and the corrupt JSON
+ * never reaches `public/canon/`. Use `--lint-warn` to downgrade to
+ * warn-only during prompt-iteration dev cycles. CI never sets
+ * `--lint-warn`.
  *
  * Cost
  * ----
@@ -89,6 +100,11 @@ import {
 } from '../api/_planner.js'
 import { canonFilePath } from '../api/_canon.js'
 import { synthesizeUtterance } from '../api/_tts.js'
+import {
+  CanonLintError,
+  formatLintReport,
+  lintCanonResponse,
+} from './canonLint.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
@@ -128,12 +144,17 @@ interface CliArgs {
   dryRun: boolean
   child: string
   out: string
+  /** When true, lint violations are logged as warnings instead of
+   *  aborting the bake. Default false (fail-fast). Use during local
+   *  prompt-iteration only — CI never sets this. Ticket 86c9qhr9k. */
+  lintWarn: boolean
 }
 
 function parseArgs(argv: readonly string[]): CliArgs {
   const args: CliArgs = {
     force: argv.includes('--force'),
     dryRun: argv.includes('--dry-run'),
+    lintWarn: argv.includes('--lint-warn'),
     child: 'Marian',
     out: join(REPO_ROOT, 'public', 'canon'),
   }
@@ -250,6 +271,7 @@ async function bakeOne(
   client: PlannerAnthropicClient,
   childName: string,
   outRoot: string,
+  lintWarn: boolean,
 ): Promise<{ bytes: number }> {
   const response = await generateSessionStartResponse({
     client,
@@ -267,6 +289,31 @@ async function bakeOne(
       synth: synthesizeUtterance,
     },
   })
+
+  // Bake-time lint gate (ticket 86c9qhr9k). Default behaviour: any
+  // non-ASCII / slash-IPA / angle-tag violation throws, the bake fails,
+  // and the corrupt JSON never reaches disk. `--lint-warn` downgrades
+  // to a printed warning + writes anyway (prompt-iteration dev only).
+  const violations = lintCanonResponse(response)
+  if (violations.length > 0) {
+    const summary = formatLintReport({
+      filesScanned: 1,
+      totalViolations: violations.length,
+      baselineViolations: 0,
+      findings: [{ filePath: `${combo.track}/${combo.focusNode}`, violations }],
+      baselineFindings: [],
+      unparseable: [],
+    })
+    if (lintWarn) {
+      console.warn(
+        `\n[canon-lint] WARN — writing despite violations:\n${summary}\n`,
+      )
+    } else {
+      // Throwing CanonLintError lets the bakeOne catch site log the
+      // structured violations alongside the failure summary line.
+      throw new CanonLintError(violations)
+    }
+  }
 
   const json = JSON.stringify(response)
   const path = canonFilePath(outRoot, combo)
@@ -340,6 +387,7 @@ async function main(): Promise<void> {
     ')',
   )
   console.log('mode       :', args.force ? 'force regen' : 'incremental')
+  console.log('lint       :', args.lintWarn ? 'warn-only' : 'fail-fast')
   if (args.dryRun) console.log('(--dry-run — no Anthropic / Azure calls)')
   console.log('')
 
@@ -372,7 +420,13 @@ async function main(): Promise<void> {
 
     process.stdout.write(`bake   ${label} ... `)
     try {
-      const { bytes } = await bakeOne(combo, client!, args.child, args.out)
+      const { bytes } = await bakeOne(
+        combo,
+        client!,
+        args.child,
+        args.out,
+        args.lintWarn,
+      )
       totalBytes += bytes
       console.log(`ok (${(bytes / 1024).toFixed(0)}KB)`)
       written++
@@ -380,6 +434,15 @@ async function main(): Promise<void> {
       failed++
       const msg = err instanceof Error ? err.message : String(err)
       console.log(`FAILED — ${msg}`)
+      // Surface lint violations explicitly so the author can see exactly
+      // which utterance(s) tripped the rule without re-running.
+      if (err instanceof CanonLintError) {
+        for (const v of err.violations) {
+          console.log(
+            `         ↳ [${v.rule}] id=${v.utteranceId} text=${JSON.stringify(v.text)}`,
+          )
+        }
+      }
     }
 
     // Polite delay between combos. Wall time is dominated by Azure
