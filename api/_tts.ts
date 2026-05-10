@@ -166,14 +166,26 @@ export function escapeSsml(text: string): string {
  *    letter-name or unstressed schwa. Same scoping rationale as "ih"
  *    — only used in the short-i opener line; "ee" never appears as
  *    standalone-word content in any other planner template.
- *  - "pig" → /pɪɡ/ (anchor word — applies on every short-i utterance
- *    containing "pig", which is exactly correct behaviour: the
- *    `cvc-words-short-i` canon's `Read the pig.` / `Yes! Pig.` /
- *    `Let's look. Pig.` / `This one is pig.` / opener-line's
- *    `Like pig:` should ALL render with the explicit /ɪ/ vowel
- *    quality. The anchor word "pig" does not appear in any other
- *    track / focus node's planner copy, so the override is scoped
- *    by content rather than by context. Ticket 86c9qdp1q.
+ *  - "pig" — DROPPED 2026-05-10 (PR #192 follow-up). Originally added
+ *    as an anchor-word override (/pɪɡ/) on the assumption that forcing
+ *    the IPA on every short-i utterance containing "pig" would unify
+ *    the vowel quality across the read line + per-correct
+ *    micro-celebrations + the opener anchor. Thomas's iPad ear-test on
+ *    the PR #192 Vercel preview revealed the read line ("Read the pig.")
+ *    sounded fine but the celebration utterances ("Yes! Pig.",
+ *    "Let's look. Pig.", "This one is pig.") sounded gibberish/robotic
+ *    — Azure's faster cheerful prosody fights the IPA-forced phonemes
+ *    in a way the slower instructional read prosody does not. Azure's
+ *    default lexicon already pronounces "pig" correctly; the override
+ *    was buying nothing on the read line and breaking the celebration
+ *    lines. Removed. The opener still gets vowel-quality scaffolding
+ *    via the in-line `ih` and `ee` content-scoped wraps (neither
+ *    appears as a standalone word in any other planner copy). Devon
+ *    flagged this exact failure mode in his PR #192 review — see
+ *    "non-obvious findings #4" on PR #192. Long-term, a per-utterance-id
+ *    override map (only fire on `*.read`-shaped IDs, skip celebration
+ *    IDs) would let us re-introduce anchor-word IPA when an empirical
+ *    case demands it; that is backlog, not this PR.
  *
  * What about "two"?
  * -----------------
@@ -216,12 +228,16 @@ const PHONEME_OVERRIDES: Record<string, string> = {
   four: 'fɔːr',
   // Ticket 86c9qdp1q — short-i opener IPA scaffolding. See
   // `design/research/short-i-opener-phrasing.md` for the
-  // PAM/SLM-r-derived rationale. "ih" and "ee" are content-scoped
-  // (only appear in the cvc-words-short-i opener line); "pig" is
-  // anchor-word-scoped (only appears in cvc-words-short-i targets).
+  // PAM/SLM-r-derived rationale. Both "ih" and "ee" are
+  // content-scoped: they appear ONLY in the cvc-words-short-i
+  // first-encounter opener line and never as standalone tokens in
+  // any other planner copy, so the global word-boundary regex has
+  // zero false-fire surface elsewhere. "pig" was originally listed
+  // here too — see the long-form comment block above for why it
+  // was dropped 2026-05-10 (over-emphasis on per-correct
+  // celebration utterances surfaced in Thomas's PR #192 ear-test).
   ih: 'ɪ',
   ee: 'iː',
-  pig: 'pɪɡ',
 }
 
 /**

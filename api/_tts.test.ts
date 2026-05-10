@@ -329,11 +329,23 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
   })
 
   // ── Short-i opener IPA scaffolding (ticket 86c9qdp1q) ────────────
-  // Pin the three new overrides: `ih → /ɪ/`, `ee → /iː/`, `pig → /pɪɡ/`.
+  // Pin the two content-scoped overrides: `ih → /ɪ/`, `ee → /iː/`.
   // The rationale is in `design/research/short-i-opener-phrasing.md` —
-  // these are content-scoped (the tokens only appear in
-  // cvc-words-short-i copy) so the overrides have zero false-fire
-  // surface in any other planner output.
+  // both tokens appear ONLY in the cvc-words-short-i opener line so
+  // the overrides have zero false-fire surface in any other planner
+  // output.
+  //
+  // PR #192 follow-up (2026-05-10): the originally-shipped `pig` →
+  // /pɪɡ/ override was REMOVED after Thomas's iPad ear-test on the
+  // PR #192 Vercel preview. The IPA wrap rendered fine on the slow
+  // instructional read line ("Read the pig.") but caused robotic /
+  // gibberish prosody on the faster cheerful per-correct celebration
+  // utterances ("Yes! Pig.", "Let's look. Pig.", "This one is pig.").
+  // Azure's default lexicon already pronounces "pig" correctly, so
+  // the override was buying nothing on the read line and breaking
+  // celebrations. The contract guard below pins that "pig" passes
+  // through plain — do not re-add it without first listening-confirming
+  // a per-utterance-id scoping that limits the wrap to read-shaped IDs.
 
   it('wraps "ih" (short-i opener token) in <phoneme alphabet="ipa" ph="ɪ">', () => {
     expect(applyPhonemeOverrides('says ih.')).toBe(
@@ -347,34 +359,50 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     )
   })
 
-  it('wraps "pig" (anchor word) in <phoneme alphabet="ipa" ph="pɪɡ">', () => {
-    expect(applyPhonemeOverrides('Read the pig.')).toBe(
-      'Read the <phoneme alphabet="ipa" ph="pɪɡ">pig</phoneme>.',
+  it('passes "pig" through unchanged (override removed; PR #192 ear-test feedback)', () => {
+    // Contract guard against a regression that re-adds `pig` to
+    // PHONEME_OVERRIDES at module scope. Per PR #192 follow-up
+    // (2026-05-10) the global wrap caused robotic prosody on the
+    // per-correct celebration utterances. If a future PR wants
+    // anchor-word IPA back, scope it per-utterance-id (read-only),
+    // do not put it in the module-level map.
+    expect(applyPhonemeOverrides('Read the pig.')).toBe('Read the pig.')
+    expect(applyPhonemeOverrides('Yes! Pig.')).toBe('Yes! Pig.')
+    expect(applyPhonemeOverrides("Let's look. Pig.")).toBe(
+      'Let&apos;s look. Pig.',
     )
+    expect(applyPhonemeOverrides('This one is pig.')).toBe('This one is pig.')
+    // Zero phoneme wraps total across the four pig-bearing utterances.
+    const total = [
+      'Read the pig.',
+      'Yes! Pig.',
+      "Let's look. Pig.",
+      'This one is pig.',
+    ]
+      .map((s) => applyPhonemeOverrides(s).match(/<phoneme/g)?.length ?? 0)
+      .reduce((a, b) => a + b, 0)
+    expect(total).toBe(0)
   })
 
-  it('preserves casing on "Pig" capitalised target line', () => {
-    expect(applyPhonemeOverrides('Yes! Pig.')).toBe(
-      'Yes! <phoneme alphabet="ipa" ph="pɪɡ">Pig</phoneme>.',
-    )
-  })
-
-  it('emits all three overrides on the full short-i opener line', () => {
-    // The exact line the canon will bake. Pin all wraps in one pass.
+  it('emits exactly three overrides on the full short-i opener line (two ih + one ee; pig passes through plain)', () => {
+    // The exact line the canon bakes. Pin all wraps in one pass.
     const out = applyPhonemeOverrides(
       "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
     )
-    // Two `ih` wraps + one `ee` wrap + one `pig` wrap = 4 phoneme tags.
+    // Two `ih` wraps + one `ee` wrap + ZERO `pig` wraps = 3 phoneme tags.
     const phonemeCount = (out.match(/<phoneme alphabet="ipa"/g) ?? []).length
-    expect(phonemeCount).toBe(4)
+    expect(phonemeCount).toBe(3)
     const ihCount = (out.match(/<phoneme alphabet="ipa" ph="ɪ">/g) ?? []).length
     expect(ihCount).toBe(2)
     const eeCount = (out.match(/<phoneme alphabet="ipa" ph="iː">/g) ?? [])
       .length
     expect(eeCount).toBe(1)
-    const pigCount = (out.match(/<phoneme alphabet="ipa" ph="pɪɡ">/g) ?? [])
-      .length
-    expect(pigCount).toBe(1)
+    // `pig` MUST NOT be wrapped — see the contract guard above.
+    expect(out).not.toContain('<phoneme alphabet="ipa" ph="pɪɡ">')
+    // The bare token "pig" is preserved verbatim inside the opener
+    // (Azure's default lexicon voices it correctly on the slow read
+    // prosody used for the opener line).
+    expect(out).toContain('Like pig:')
   })
 
   it('does NOT match "ih" or "ee" inside larger words (boundary guard)', () => {
@@ -389,7 +417,11 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     expect(applyPhonemeOverrides('speedy')).not.toContain('<phoneme')
   })
 
-  it('does NOT match "pig" inside larger words (pigeon / pigsty boundary guard)', () => {
+  it('does NOT match "pig" inside larger words (pigeon / pigsty boundary guard, kept as forward-compat)', () => {
+    // Forward-compat guard: if a future PR re-introduces a `pig`
+    // override (per-utterance-id scoped per the PR #192 follow-up
+    // note), this test must continue to pass — the regex must still
+    // use \b on both edges.
     expect(applyPhonemeOverrides('pigeon')).toBe('pigeon')
     expect(applyPhonemeOverrides('pigeon')).not.toContain('<phoneme')
     expect(applyPhonemeOverrides('pigsty')).toBe('pigsty')
