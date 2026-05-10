@@ -5,6 +5,26 @@
 
 ---
 
+## Update 2026-05-10 (post-PR-#192 ear-test)
+
+**What shipped:** Option B's text — `"Listen — short i says ih, not ee. Like pig — listen: pig."` — but **WITHOUT** the `pig` IPA wrap that Option B's literal SSML specifies. Final canon uses Azure's default lexicon for "pig"; the contrast pedagogy rides the `ih` (→ /ɪ/) and `ee` (→ /iː/) module-level `PHONEME_OVERRIDES` wraps.
+
+**Why we deviated from the primary recommendation (two distinct findings from Thomas's iPad ear-tests on PR #192):**
+
+1. **Slash-segmented breakdown rendered as gibberish.** The primary text — `"... Like pig: /p/-/ɪ/-/g/."` — shipped as plain canon text. `applyPhonemeOverrides` only wraps whole-word boundary matches (`\b(four|ih|ee)\b`); it does not transform the literal forward slashes or the unicode `ɪ` IPA character inside the canon text itself. Azure read the slashes and the bare `ɪ` literally → "slash, p, slash, dash, slash, IH, slash, dash, slash, g, slash" gibberish at the end of the line. Marian heard garbage. The two near-term alternatives for keeping the breakdown were both rejected:
+   - Adding `p` and `g` to module-level `PHONEME_OVERRIDES`: `\bp\b` / `\bg\b` would fire on every standalone "p" and "g" anywhere in app copy.
+   - Per-utterance-id PHONEME_OVERRIDES map (Devon's primitive): too invasive for a same-day fix; backlog candidate.
+   - Raw-SSML-in-canon support: would require pipeline changes to bypass `escapeSsml`; trades safe-by-default posture.
+2. **`pig` whole-word IPA wrap caused celebration-prosody clash.** Separate finding from a prior ear-test on PR #192. The module-level `pig → /pɪɡ/` override was correct on the slow-paced "Read the pig." instructional line but caused robotic / over-emphasized prosody on the faster cheerful per-correct celebration utterances ("Yes! Pig.", "Let's look. Pig.", "This one is pig."). Fixed in commit `f473312` by removing `pig` from `PHONEME_OVERRIDES`. The ear-test confirmed Azure's default lexicon voices "pig" naturally on both the slow read line AND the celebrations.
+
+**Net effect on pedagogy:** The /ɪ/-vs-/iː/ contrast — the load-bearing PAM/SLM-r reasoning — is preserved in full via the `ih` and `ee` wraps. What's lost is the per-token segmental drill (`/p/-/ɪ/-/g/`). Per Dave's Option B trade-off note: the segmental drill is omitted, but Emma's natural recitation of "pig" twice (once after "Like" and once after "listen:") models the vowel without the segmental overhead.
+
+**Generalizable lesson:** literal IPA characters and `/segmented/` notation in canon text ship as TTS-bait. The original Option A specified IPA-bracketed text in markdown, intending a hand-authored SSML wrap; what actually shipped was the plain-text rendition through `applyPhonemeOverrides`'s word-boundary-only wrapping. Future opener authors writing in this doc should either (a) wrap any non-word-boundary IPA in `<phoneme>` SSML inline AND ensure the canon-bake pipeline preserves it, or (b) use only word-boundary tokens that the existing `PHONEME_OVERRIDES` table can wrap. A canon-bake-time lint that flags literal `/` or unicode IPA characters in `text` fields would have caught this before Thomas's ear-test (see Kevin's findings in the PR #192 follow-up #2 commit).
+
+The original recommendation below is preserved for historical accuracy.
+
+---
+
 ## Question
 
 What exact line should Emma speak on Marian's very first `cvc-words-short-i` session, and does the Azure `en-US-EmmaMultilingualNeural` voice need SSML phoneme overrides to render it correctly?

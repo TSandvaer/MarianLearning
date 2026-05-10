@@ -951,8 +951,8 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // Per `design/word-song/short-i-pool-expansion.md` §4 + Dave's research
 // at `design/research/short-i-opener-phrasing.md`, the first short-i
 // session opens with an explicit `/i/` vs. `/ɪ/` minimal-pair contrast
-// line ("Listen — short i says ih. Not 'ee' — just ih. Like pig:
-// /p/-/ɪ/-/g/."). This is load-bearing scaffolding for both L1 Tagalog
+// line ("Listen — short i says ih, not ee. Like pig — listen: pig.").
+// This is load-bearing scaffolding for both L1 Tagalog
 // interference (Marian's L1 has `/i/` but not `/ɪ/`, so per SLM-r her
 // predicted error is "pig → peeg") AND intra-English short-vowel
 // confusion (her diagnostic flagged `/ɪ/` as her weakest vowel).
@@ -1044,12 +1044,25 @@ long /iː/) but not /ɪ/, so per SLM-r her L1 default substitution
 for English short-i is /iː/ ("pig → peeg"); the contrast line
 resets that default at first encounter. Anchor word "pig" — both
 consonants exist in Tagalog so the vowel is the only new element:
-  "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/."
+  "Listen — short i says ih, not ee. Like pig — listen: pig."
 Use this exact text for "session.end.opener" when focus is
 cvc-words-short-i. The browser-side server gate
 (api/_firstEncounterGate.ts) substitutes the vanilla "You did it!"
 on second + subsequent sessions; the canon always ships the
 contrast variant.
+
+NOTE (PR #192 ear-test #2 follow-up, 2026-05-10): the originally
+recommended primary text from Dave's research note included a
+per-token segmental breakdown ("Like pig: /p/-/ih/-/g/."). That
+text shipped to canon and rendered as gibberish — Azure vocalized
+the literal forward slashes and the unicode IPA character ("slash,
+p, slash, dash, slash, IH, ..."). Switched to Dave's Option B
+text, which preserves the load-bearing short-i-vs-long-ee contrast
+pedagogy (via the "ih" and "ee" PHONEME_OVERRIDES wraps) but drops
+the slash-segmented breakdown. The "pig" IPA wrap from Option B's
+literal SSML is intentionally NOT introduced — it would re-trigger
+the celebration-prosody clash fixed in commit f473312. See
+design/research/short-i-opener-phrasing.md "Update 2026-05-10".
 
 Distractor guidance (Marian sees 3 picture chips per problem; one is the
 target, two are distractors — but YOU are not authoring the distractors

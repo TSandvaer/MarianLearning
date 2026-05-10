@@ -384,25 +384,36 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     expect(total).toBe(0)
   })
 
-  it('emits exactly three overrides on the full short-i opener line (two ih + one ee; pig passes through plain)', () => {
+  it('emits exactly two overrides on the full short-i opener line (one ih + one ee; pig passes through plain)', () => {
     // The exact line the canon bakes. Pin all wraps in one pass.
+    //
+    // PR #192 follow-up #2 (2026-05-10): the originally-shipped opener
+    // text included a per-token segmental breakdown ("Like pig:
+    // /p/-/ɪ/-/g/.") which Azure rendered as literal "slash, p, slash,
+    // dash, slash, ..." gibberish (forward-slashes and the unicode `ɪ`
+    // do not get wrapped by `applyPhonemeOverrides` — only word-boundary
+    // tokens like `ih`/`ee` do). Switched to Dave's Option B opener
+    // text which preserves the /ɪ/-vs-/iː/ contrast pedagogy via
+    // exactly two phoneme wraps. See
+    // `design/research/short-i-opener-phrasing.md` § "Update 2026-05-10".
     const out = applyPhonemeOverrides(
-      "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
+      'Listen — short i says ih, not ee. Like pig — listen: pig.',
     )
-    // Two `ih` wraps + one `ee` wrap + ZERO `pig` wraps = 3 phoneme tags.
+    // One `ih` wrap + one `ee` wrap + ZERO `pig` wraps = 2 phoneme tags.
     const phonemeCount = (out.match(/<phoneme alphabet="ipa"/g) ?? []).length
-    expect(phonemeCount).toBe(3)
+    expect(phonemeCount).toBe(2)
     const ihCount = (out.match(/<phoneme alphabet="ipa" ph="ɪ">/g) ?? []).length
-    expect(ihCount).toBe(2)
+    expect(ihCount).toBe(1)
     const eeCount = (out.match(/<phoneme alphabet="ipa" ph="iː">/g) ?? [])
       .length
     expect(eeCount).toBe(1)
     // `pig` MUST NOT be wrapped — see the contract guard above.
     expect(out).not.toContain('<phoneme alphabet="ipa" ph="pɪɡ">')
-    // The bare token "pig" is preserved verbatim inside the opener
-    // (Azure's default lexicon voices it correctly on the slow read
+    // Both bare "pig" tokens are preserved verbatim inside the opener
+    // (Azure's default lexicon voices "pig" correctly on the slow read
     // prosody used for the opener line).
-    expect(out).toContain('Like pig:')
+    expect(out).toContain('Like pig')
+    expect(out).toContain('listen: pig.')
   })
 
   it('does NOT match "ih" or "ee" inside larger words (boundary guard)', () => {

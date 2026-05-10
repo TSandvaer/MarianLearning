@@ -253,8 +253,7 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
     // lifetimeFirstEncounters, the gate substitutes the vanilla
     // "You did it!" opener.
     const response = buildResponse({
-      openerText:
-        "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
+      openerText: 'Listen — short i says ih, not ee. Like pig — listen: pig.',
       openerAudioBase64: 'BASE64_SHORT_I_CONTRAST_LINE_AUDIO',
     })
     const out = applyFirstEncounterGate(response, {
@@ -272,8 +271,7 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
     // Pin the greenfield path: an empty list (or any list lacking
     // short-i) leaves the canon's contrast variant intact.
     const response = buildResponse({
-      openerText:
-        "Listen — short i says ih. Not 'ee' — just ih. Like pig: /p/-/ɪ/-/g/.",
+      openerText: 'Listen — short i says ih, not ee. Like pig — listen: pig.',
     })
     const out = applyFirstEncounterGate(response, {
       focusNode: 'cvc-words-short-i',
