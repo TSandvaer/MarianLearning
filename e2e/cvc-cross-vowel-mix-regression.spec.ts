@@ -11,7 +11,7 @@
  * ---------------------
  * Per ticket AC7 + spec §7 AC13. Three regression scenarios:
  *
- *   1. **Predicate ON path (post-CVC-graduation)** — All three CVC
+ *   1. **Predicate ON path (post-CVC-graduation)** — All four CVC
  *      tiers `'mastered'` + `digraphs: 'practicing'` + the parent
  *      toggle defaulted to `true`. The picker walks past the mastered
  *      CVC tiers and lands on `digraphs` (the next non-mastered
@@ -26,12 +26,15 @@
  *      a `digraphs` session. It's the post-CVC-graduation reality
  *      check.
  *
- *   2. **Predicate OFF — incomplete mastery** — Two CVC tiers mastered
- *      + the third still `'practicing'`. Predicate returns `false`;
- *      session draws same-vowel-only distractors. Locks the
- *      no-regression on existing CVC sessions.
+ *   2. **Predicate OFF — incomplete mastery** — `cvc-words` and
+ *      `cvc-words-short-o` mastered + `cvc-words-short-u` still
+ *      `'practicing'` (so the picker stops there before reaching the
+ *      later `cvc-words-short-i` tier, which defaults to `'locked'`
+ *      in the seed). Predicate returns `false`; session draws
+ *      same-vowel-only short-u distractors. Locks the no-regression
+ *      on existing CVC sessions.
  *
- *   3. **Predicate OFF — toggle override** — All three CVC tiers
+ *   3. **Predicate OFF — toggle override** — All four CVC tiers
  *      mastered + `digraphs: 'practicing'` BUT
  *      `parentSettings.crossVowelMixingEnabled: false`. Predicate
  *      returns `false` (parent escape valve, per spec §10 Q1 + Dave's
@@ -42,7 +45,7 @@
  * The cross-vowel matrix (`TARGET_PAIRINGS_CROSSVOWEL`) is exercised
  * exclusively when `crossVowelMixingActive` is `true` AND the focus
  * is a CVC tier. With the v1 mastery rule, those two conditions are
- * naturally mutually exclusive: the predicate requires all three CVC
+ * naturally mutually exclusive: the predicate requires all four CVC
  * tiers `'mastered'`, but `pickFocusNode` walks past mastered nodes
  * and never returns one. In v1 this is forward-compat infrastructure
  * — the matrix surfaces chips only when a future ticket adds CVC
@@ -207,12 +210,12 @@ function skipOnWebkitHeadless(testInfo: {
 }
 
 test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
-  test('1. Predicate ON — post-CVC-graduation: all 3 CVC mastered, digraphs practicing, picker walks to digraphs (focus-tier gate stops cross-vowel routing)', async ({
+  test('1. Predicate ON — post-CVC-graduation: all 4 CVC mastered, digraphs practicing, picker walks to digraphs (focus-tier gate stops cross-vowel routing)', async ({
     page,
   }) => {
-    // Seed: cross-vowel-mixing debug-seed shape — three CVC tiers
+    // Seed: cross-vowel-mixing debug-seed shape — four CVC tiers
     // mastered, digraphs at practicing. Predicate `crossVowelMixingActive`
-    // returns `true` (all three mastered + default toggle on). But the
+    // returns `true` (all four mastered + default toggle on). But the
     // picker walks past CVC and lands on `digraphs`, so App.tsx's
     // `focusIsCvcTier` gate fires `false` and `wordSongCrossVowel` is
     // `false`. The session uses same-vowel `TARGET_PAIRINGS`.
@@ -234,6 +237,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
           'cvc-words': 'mastered',
           'cvc-words-short-o': 'mastered',
           'cvc-words-short-u': 'mastered',
+          'cvc-words-short-i': 'mastered',
           digraphs: 'practicing',
         },
         // Default `parentSettings` from the helper carries
@@ -298,6 +302,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(parsed.skillLevels['cvc-words']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-o']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-u']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-i']).toBe('mastered')
     expect(parsed.skillLevels['digraphs']).toBe('practicing')
     // Default toggle is `true` (defaulter fills missing key); seed
     // helper doesn't write it explicitly, so the field may be
@@ -379,7 +384,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(offPoolWords).toEqual([])
   })
 
-  test('3. Predicate OFF — toggle override: all 3 CVC mastered + crossVowelMixingEnabled=false → toggle persists, predicate cannot fire', async ({
+  test('3. Predicate OFF — toggle override: all 4 CVC mastered + crossVowelMixingEnabled=false → toggle persists, predicate cannot fire', async ({
     page,
   }) => {
     // Seed: the full post-graduation state, but with the parent
@@ -397,6 +402,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
           'cvc-words': 'mastered',
           'cvc-words-short-o': 'mastered',
           'cvc-words-short-u': 'mastered',
+          'cvc-words-short-i': 'mastered',
           digraphs: 'practicing',
         },
       }),
@@ -467,6 +473,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(parsed.skillLevels['cvc-words']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-o']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-u']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-i']).toBe('mastered')
     // The toggle override is the load-bearing assertion here.
     expect(parsed.parentSettings?.crossVowelMixingEnabled).toBe(false)
   })
