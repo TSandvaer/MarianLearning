@@ -57,6 +57,7 @@ export type WordSongNode =
   | 'cvc-words'
   | 'cvc-words-short-o'
   | 'cvc-words-short-u'
+  | 'cvc-words-short-i'
   | 'digraphs'
   | 'sight-words'
   | 'simple-sentences'
@@ -72,6 +73,7 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
+  'cvc-words-short-i',
   'digraphs',
   'sight-words',
   'simple-sentences',

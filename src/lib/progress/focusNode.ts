@@ -60,10 +60,13 @@ export const MATH_NODES_IN_ORDER: readonly NumberGardenNode[] = [
  * MATH_NODES_IN_ORDER.
  *
  * cvc-words = short-a CVC. Subsequent vowels get sibling nodes
- * (cvc-words-short-o, cvc-words-short-u, …). This was a deliberate
- * backward-compat choice — see design/word-song/short-o-pool-expansion.md §2
- * (and design/word-song/short-u-pool-expansion.md §2 for the short-u
- * tier added under ticket 86c9q9ben).
+ * (cvc-words-short-o, cvc-words-short-u, cvc-words-short-i, …). This
+ * was a deliberate backward-compat choice — see
+ * design/word-song/short-o-pool-expansion.md §2 (and
+ * design/word-song/short-u-pool-expansion.md §2 for the short-u tier
+ * added under ticket 86c9q9ben, plus
+ * design/word-song/short-i-pool-expansion.md §2 for the short-i tier
+ * added under ticket 86c9qdba4).
  */
 export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'letter-names',
@@ -72,6 +75,7 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
+  'cvc-words-short-i',
   'digraphs',
   'sight-words',
   'simple-sentences',

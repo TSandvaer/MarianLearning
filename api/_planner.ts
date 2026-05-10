@@ -59,6 +59,7 @@ import {
   WORD_SONG_TARGET_WORDS_FOR_PROMPT,
   WORD_SONG_TARGET_WORDS_SHORT_O,
   WORD_SONG_TARGET_WORDS_SHORT_U,
+  WORD_SONG_TARGET_WORDS_SHORT_I,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
 } from './_plannerWordList.js'
@@ -138,6 +139,7 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
+  'cvc-words-short-i',
   'digraphs',
   'sight-words',
   'simple-sentences',
@@ -603,6 +605,7 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
+  'cvc-words-short-i',
 ]
 
 /**
@@ -900,13 +903,14 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 
 // Word-song planner system prompt — ticket 86c9kxu07 (planner-parser
 // contract step 2) + ticket 86c9m3ae3 (short-o pool sibling tier) +
-// ticket 86c9q9ben (short-u pool sibling tier). Four first-class
-// content modes today:
+// ticket 86c9q9ben (short-u pool sibling tier) + ticket 86c9qdba4
+// (short-i pool sibling tier). Five first-class content modes today:
 //
 //   - blending-cv         → "Tap the <word>." (match-picture-to-spoken-word)
 //   - cvc-words           → "Read the <word>." (decode-printed-word, short-a)
 //   - cvc-words-short-o   → "Read the <word>." (decode-printed-word, short-o)
 //   - cvc-words-short-u   → "Read the <word>." (decode-printed-word, short-u)
+//   - cvc-words-short-i   → "Read the <word>." (decode-printed-word, short-i)
 //
 // All gated by the browser parser (PR #132 widened it to dispatch on
 // the read-line template). Other valid focus nodes (letter-sounds,
@@ -920,9 +924,9 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // content-type discriminant lives on the read-line template, NOT the id
 // namespace, by design (see design/word-song/parser-widening-plan.md
 // §"Why no new id namespace"). cvc-words / cvc-words-short-o /
-// cvc-words-short-u all share the "Read the <word>." template; the
-// focus-node name in the user message is what tells the planner which
-// word pool to draw from.
+// cvc-words-short-u / cvc-words-short-i all share the "Read the <word>."
+// template; the focus-node name in the user message is what tells the
+// planner which word pool to draw from.
 //
 // Short-u first-encounter scaffolding (ticket 86c9q9ben AC9b)
 // -----------------------------------------------------------
@@ -941,10 +945,36 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // Subsequent sessions hearing the same opener line is an acceptable
 // near-term posture — the alternative ("never emit the line") would
 // drop the load-bearing Tagalog scaffolding entirely.
+//
+// Short-i first-encounter scaffolding — DEFERRED (ticket 86c9qdba4)
+// -----------------------------------------------------------------
+// Per `design/word-song/short-i-pool-expansion.md` §4 + Dave's research
+// at `design/research/short-u-minimal-pair-and-future-vowel-openers.md`
+// §3.1, the first short-i session SHOULD open with an explicit `/i/`
+// vs. `/ɪ/` minimal-pair contrast line ("Listen carefully: 'sit' — not
+// 'seat.'"). This is documented in the spec as load-bearing
+// scaffolding for both L1 Tagalog interference AND intra-English
+// short-vowel confusion (Marian's diagnostic flagged `/ɪ/` as her
+// weakest vowel).
+//
+// The contrast opener is INTENTIONALLY OUT OF SCOPE for this PR per
+// the dispatch contract (ticket 86c9qdba4 brief). The contract scoped
+// the lifetime-first-encounter gate as "NOT needed for short-i (no
+// /ks/ opener-line equivalent; that was short-o box/fox-specific)" —
+// a scoping decision made by the orchestrator. The vanilla "You did
+// it!" opener ships with this PR's canon; the contrast-opener
+// scaffolding is filed as a follow-up ticket (TBD — Matt to file once
+// the short-i tier is shipping and Marian's first short-i session is
+// imminent). When that follow-up lands, it adds:
+//   - a SHORT-I FIRST-ENCOUNTER SCAFFOLDING block to this prompt,
+//     mirroring the short-u block below;
+//   - `cvc-words-short-i` to `FIRST_ENCOUNTER_GATED_NODES` in
+//     `api/_firstEncounterGate.ts`;
+//   - a canon re-bake to pick up the new opener.
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Four first-class content modes today:
+matching that node. Five first-class content modes today:
 
   - blending-cv: "Tap the <word>." problems. Marian hears the word
     spoken and taps the matching picture chip from a trio. This is the
@@ -963,6 +993,11 @@ matching that node. Four first-class content modes today:
     pool differs (short-u instead of short-a/short-o). The third
     vowel-tier sibling — Marian arrives here after she's mastered
     short-o.
+  - cvc-words-short-i: "Read the <word>." problems with SHORT-I target
+    words. Same wire shape and templates as cvc-words; only the word
+    pool differs (short-i instead of short-a/short-o/short-u). The
+    fourth vowel-tier sibling — Marian arrives here after she's
+    mastered short-u.
 
 Pick 8 distinct target words from the focus-node-specific pool below
 (do not invent new words, do not use a target more than once).
@@ -975,6 +1010,9 @@ ${WORD_SONG_TARGET_WORDS_SHORT_O}
 
 Pool for cvc-words-short-u (11-word short-u CVC):
 ${WORD_SONG_TARGET_WORDS_SHORT_U}
+
+Pool for cvc-words-short-i (8-word short-i CVC):
+${WORD_SONG_TARGET_WORDS_SHORT_I}
 
 GRADUATION-SESSION EXCEPTION: when the user message contains the
 "GRADUATION SESSION" directive, that directive supplies an additional
@@ -1001,10 +1039,11 @@ here, only the spoken lines):
 ${WORD_SONG_DISTRACTOR_HINTS}
 
 Order easier-recognise words (cat, bag, hat, dad for short-a; dog, mom,
-pot, log for short-o; sun, cup, bus for short-u) in problems 1-3 and
-richer-rhyme/trap words (van, can, fan, man, pan, mat, bat, tag, cap,
-jam for short-a; mop, box, fox, hot for short-o; bug, jug, rug, nut,
-hut, bun, gum, tub for short-u) in problems 4-8.
+pot, log for short-o; sun, cup, bus for short-u; pig, bin, lid for
+short-i) in problems 1-3 and richer-rhyme/trap words (van, can, fan,
+man, pan, mat, bat, tag, cap, jam for short-a; mop, box, fox, hot for
+short-o; bug, jug, rug, nut, hut, bun, gum, tub for short-u; pin, wig,
+bib, fig, sip for short-i) in problems 4-8.
 
 Per-problem utterance template — the read line varies by focus node;
 all other slots are content-mode-agnostic:
@@ -1014,10 +1053,11 @@ all other slots are content-mode-agnostic:
     - cvc-words:   "Read the <word>." e.g. "Read the cat."
     - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."
     - cvc-words-short-u: "Read the <word>." e.g. "Read the sun."
+    - cvc-words-short-i: "Read the <word>." e.g. "Read the pig."
   Use lowercase target word; one short sentence; ends with a period.
   Use the EXACT verb for the focus node — "Tap" for blending-cv,
-  "Read" for cvc-words / cvc-words-short-o / cvc-words-short-u. Do
-  not mix templates within a single plan.
+  "Read" for cvc-words / cvc-words-short-o / cvc-words-short-u /
+  cvc-words-short-i. Do not mix templates within a single plan.
 - correct: "Yes! <Word>." (capitalised target) e.g. "Yes! Cat."
 - reprompt: "Hmm... try again?"  (verbatim — do not vary)
 - hint: "Let's look. <Word>." e.g. "Let's look. Cat."
