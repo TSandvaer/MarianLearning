@@ -723,7 +723,20 @@ export async function synthesizeUtterance(
         method: 'POST',
         headers: {
           'Ocp-Apim-Subscription-Key': key,
-          'Content-Type': 'application/ssml+xml',
+          // `; charset=utf-8` is the root-cause fix for ticket 86c9qhr91.
+          // Without an explicit charset, Azure's SSML endpoint sometimes
+          // decodes the request bytes as Windows-1252, which then re-encodes
+          // through UTF-8 on the way to the synthesizer and produces classic
+          // mojibake — em-dash (U+2014, UTF-8 `E2 80 94`) ends up vocalized
+          // as the bytes `c3 a2 e2 82 ac e2 80 9d` ("â€"" rendered as
+          // letters → "asesinati"-shaped gibberish). Pinning charset=utf-8
+          // forces a single, correct UTF-8 decode on Azure's side regardless
+          // of host default. Defense-in-depth alongside the canon-lint rule
+          // that bans non-ASCII characters at bake-time (ticket 86c9qhr9k);
+          // the lint stays as the primary gate, this header makes the bake
+          // pipeline correct so unicode punctuation is safe to re-introduce
+          // in the future without producing TTS gibberish.
+          'Content-Type': 'application/ssml+xml; charset=utf-8',
           'X-Microsoft-OutputFormat': AZURE_OUTPUT_FORMAT,
           'User-Agent': USER_AGENT,
         },

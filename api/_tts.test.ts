@@ -548,7 +548,9 @@ describe('synthesizeUtterance', () => {
 
     const headers = init!.headers as Record<string, string>
     expect(headers['Ocp-Apim-Subscription-Key']).toBe('test-key-not-real')
-    expect(headers['Content-Type']).toBe('application/ssml+xml')
+    // charset=utf-8 is mandatory — without it Azure may decode the body
+    // as Windows-1252 and mojibake unicode punctuation (ticket 86c9qhr91).
+    expect(headers['Content-Type']).toBe('application/ssml+xml; charset=utf-8')
     expect(headers['X-Microsoft-OutputFormat']).toBe(
       'audio-24khz-48kbitrate-mono-mp3',
     )
@@ -1040,3 +1042,182 @@ describe('uint8ToBase64', () => {
     expect(uint8ToBase64(new Uint8Array(0))).toBe('')
   })
 })
+
+// --- Unicode-punctuation round-trip (ticket 86c9qhr91) ------------------
+//
+// The bug: PR #192 baked an em-dash (U+2014, UTF-8 bytes `E2 80 94`) in a
+// canon utterance. When the resulting SSML hit Azure's synthesizer it came
+// back as the mojibake byte sequence `c3 a2 e2 82 ac e2 80 9d` — the
+// classic UTF-8 → Windows-1252 → UTF-8 double-encoding signature. Azure
+// then dutifully vocalized the mojibake characters as letters, producing
+// "asesinati"-shaped gibberish in place of the em-dash pause.
+//
+// The root cause: Azure's SSML endpoint, given a body without an explicit
+// charset on the Content-Type header, can fall back to a non-UTF-8 default
+// (Windows-1252 in the observed case). Adding `; charset=utf-8` pins the
+// decode and eliminates the mojibake path.
+//
+// These tests pin the contract:
+//   1. The Content-Type header carries `; charset=utf-8`.
+//   2. The SSML body is sent as a JS string (which fetch encodes as UTF-8
+//      by default per the WHATWG Fetch spec) and contains the unicode
+//      codepoints unchanged.
+//   3. Re-encoding the body as UTF-8 bytes produces the original
+//      codepoint byte sequences, NOT the mojibake double-encoding.
+describe('synthesizeUtterance unicode-punctuation round-trip (86c9qhr91)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  // The four unicode-punctuation codepoints most likely to appear in
+  // human-authored canon prose: em-dash, en-dash, curly opening quote,
+  // curly closing quote, plus the horizontal ellipsis. Each is paired
+  // with its UTF-8 byte sequence so the test asserts on actual wire
+  // bytes, not just string-equality.
+  const UNICODE_CASES: Array<{
+    name: string
+    char: string
+    utf8Bytes: number[]
+  }> = [
+    { name: 'em-dash (U+2014)', char: '—', utf8Bytes: [0xe2, 0x80, 0x94] },
+    { name: 'en-dash (U+2013)', char: '–', utf8Bytes: [0xe2, 0x80, 0x93] },
+    {
+      name: 'curly open quote (U+201C)',
+      char: '“',
+      utf8Bytes: [0xe2, 0x80, 0x9c],
+    },
+    {
+      name: 'curly close quote (U+201D)',
+      char: '”',
+      utf8Bytes: [0xe2, 0x80, 0x9d],
+    },
+    {
+      name: 'horizontal ellipsis (U+2026)',
+      char: '…',
+      utf8Bytes: [0xe2, 0x80, 0xa6],
+    },
+  ]
+
+  // Typed fetch-mock factory — explicit signature so `mock.calls[0][1]`
+  // narrows to RequestInit instead of `never`. The synthesizeUtterance
+  // suite above uses the same shape inline; this is its hoisted form.
+  function makeFetchMock() {
+    const fn =
+      vi.fn<(input: string | URL, init?: RequestInit) => Promise<Response>>()
+    fn.mockImplementation(async () =>
+      fakeOkResponse(new Uint8Array([0xff, 0xfb])),
+    )
+    return fn
+  }
+
+  it('Content-Type header includes charset=utf-8', async () => {
+    const fetchFn = makeFetchMock()
+    await synthesizeUtterance(HAPPY_REQ, {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      env: TEST_ENV,
+    })
+    const headers = fetchFn.mock.calls[0]![1]!.headers as Record<string, string>
+    expect(headers['Content-Type']).toBe('application/ssml+xml; charset=utf-8')
+  })
+
+  for (const { name, char, utf8Bytes } of UNICODE_CASES) {
+    it(`preserves ${name} in the SSML body and as UTF-8 wire bytes`, async () => {
+      const fetchFn = makeFetchMock()
+      await synthesizeUtterance(
+        { ...HAPPY_REQ, text: `before${char}after` },
+        {
+          fetchFn: fetchFn as unknown as typeof fetch,
+          env: TEST_ENV,
+        },
+      )
+      const body = fetchFn.mock.calls[0]![1]!.body as string
+      // The raw codepoint round-trips through buildSsmlBody intact —
+      // escapeSsml only touches the five XML metacharacters (& < > " '),
+      // so unicode punctuation flows through untouched.
+      expect(body).toContain(`before${char}after`)
+      // Re-encode the body the way fetch will when it sends — UTF-8.
+      // The unicode codepoint must appear as its canonical UTF-8 byte
+      // sequence on the wire, NOT as the CP1252 mojibake double-
+      // encoding.
+      const wireBytes = new TextEncoder().encode(body)
+      const needle = new Uint8Array(utf8Bytes)
+      expect(indexOfBytes(wireBytes, needle)).toBeGreaterThanOrEqual(0)
+      // Canary: the mojibake double-encoding signature for em-dash
+      // starts with `c3 a2` (the UTF-8 of `Â`, which is what `E2` becomes
+      // when re-encoded after a CP1252 decode). It must NOT appear in
+      // the wire bytes for any of these inputs.
+      const mojibakeCanary = new Uint8Array([0xc3, 0xa2])
+      expect(indexOfBytes(wireBytes, mojibakeCanary)).toBe(-1)
+    })
+  }
+
+  it('em-dash specifically: the exact PR #192 corruption signature does NOT appear', async () => {
+    // The observed corruption from PR #192's bake of "..." → em-dash:
+    // canon JSON contained `c3 a2 e2 82 ac e2 80 9d` instead of the
+    // original `e2 80 94`. Pin that the corruption signature is absent
+    // from the body we send to Azure.
+    const fetchFn = makeFetchMock()
+    await synthesizeUtterance(
+      { ...HAPPY_REQ, text: 'wait—listen' },
+      {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        env: TEST_ENV,
+      },
+    )
+    const body = fetchFn.mock.calls[0]![1]!.body as string
+    const wireBytes = new TextEncoder().encode(body)
+    // Original em-dash bytes present.
+    expect(
+      indexOfBytes(wireBytes, new Uint8Array([0xe2, 0x80, 0x94])),
+    ).toBeGreaterThanOrEqual(0)
+    // Corruption signature absent.
+    const corruption = new Uint8Array([
+      0xc3, 0xa2, 0xe2, 0x82, 0xac, 0xe2, 0x80, 0x9d,
+    ])
+    expect(indexOfBytes(wireBytes, corruption)).toBe(-1)
+  })
+
+  it('combined unicode payload: em-dash + curly quotes + ellipsis all survive', async () => {
+    const fetchFn = makeFetchMock()
+    const text = '“wait—listen…”'
+    await synthesizeUtterance(
+      { ...HAPPY_REQ, text },
+      {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        env: TEST_ENV,
+      },
+    )
+    const body = fetchFn.mock.calls[0]![1]!.body as string
+    expect(body).toContain(text)
+    const wireBytes = new TextEncoder().encode(body)
+    // Each of the four codepoints present as canonical UTF-8.
+    const expected: Array<[string, number[]]> = [
+      ['curly open quote', [0xe2, 0x80, 0x9c]],
+      ['em-dash', [0xe2, 0x80, 0x94]],
+      ['ellipsis', [0xe2, 0x80, 0xa6]],
+      ['curly close quote', [0xe2, 0x80, 0x9d]],
+    ]
+    for (const [label, bytes] of expected) {
+      expect(
+        indexOfBytes(wireBytes, new Uint8Array(bytes)),
+        `${label} bytes missing from wire payload`,
+      ).toBeGreaterThanOrEqual(0)
+    }
+    // No CP1252-shaped mojibake on the wire.
+    expect(indexOfBytes(wireBytes, new Uint8Array([0xc3, 0xa2]))).toBe(-1)
+  })
+})
+
+/** Find the first index of `needle` in `haystack`. Returns -1 if not
+ * found. Naive O(n*m) scan — fine for the small fixtures these tests
+ * use (a few hundred bytes of SSML, 2-8 byte needles). */
+function indexOfBytes(haystack: Uint8Array, needle: Uint8Array): number {
+  if (needle.length === 0) return 0
+  outer: for (let i = 0; i <= haystack.length - needle.length; i++) {
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) continue outer
+    }
+    return i
+  }
+  return -1
+}

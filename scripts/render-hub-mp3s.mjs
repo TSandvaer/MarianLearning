@@ -178,7 +178,12 @@ async function synthesize(ssml) {
     method: 'POST',
     headers: {
       'Ocp-Apim-Subscription-Key': AZURE_KEY,
-      'Content-Type': 'application/ssml+xml',
+      // `; charset=utf-8` mirrors the canonical _tts.ts fix (ticket
+      // 86c9qhr91): without it Azure may decode the SSML body as
+      // Windows-1252 and produce mojibake on em-dash / curly-quote /
+      // en-dash codepoints. The Greet/Hub render scripts share the same
+      // POST shape and need the same defense-in-depth.
+      'Content-Type': 'application/ssml+xml; charset=utf-8',
       'X-Microsoft-OutputFormat': AZURE_OUTPUT_FORMAT,
       'User-Agent': 'marian-tutor-hub-render/1.0',
     },
