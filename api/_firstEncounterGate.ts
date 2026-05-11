@@ -34,12 +34,12 @@
 // `cvc-words-short-o.json` to carry a box/fox first-encounter
 // opener variant, this module's gate fires for it too — no new
 // code needed beyond extending the FIRST_ENCOUNTER_GATED_NODES
-// list below. Today only `cvc-words-short-u` ships a tier-
-// specific opener; `cvc-words-short-o` is on the gated-list as
-// infrastructure-ready (gate is a no-op for a canon that already
-// has vanilla "You did it!", since the rewrite would substitute
-// "You did it!" with itself — but the cost is one extra disk read,
-// which we still skip via the FIRST_ENCOUNTER_GATED_NODES check).
+// list below. Today NO tier ships a non-vanilla opener variant;
+// `cvc-words-short-o` is on the gated-list as infrastructure-
+// ready (gate is a no-op for a canon that already has vanilla
+// "You did it!"). `cvc-words-short-u` was previously gated but
+// was removed in ticket 86c9qkf3v (2026-05-11) after the
+// scaffolding pattern was declared dead.
 //
 // Defensive: the gate is also a no-op when:
 //  - the response doesn't carry a `session.end.opener` utterance
