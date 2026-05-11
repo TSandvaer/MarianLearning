@@ -34,12 +34,12 @@
 // `cvc-words-short-o.json` to carry a box/fox first-encounter
 // opener variant, this module's gate fires for it too — no new
 // code needed beyond extending the FIRST_ENCOUNTER_GATED_NODES
-// list below. Today only `cvc-words-short-u` ships a tier-
-// specific opener; `cvc-words-short-o` is on the gated-list as
-// infrastructure-ready (gate is a no-op for a canon that already
-// has vanilla "You did it!", since the rewrite would substitute
-// "You did it!" with itself — but the cost is one extra disk read,
-// which we still skip via the FIRST_ENCOUNTER_GATED_NODES check).
+// list below. Today NO tier ships a non-vanilla opener variant;
+// `cvc-words-short-o` is on the gated-list as infrastructure-
+// ready (gate is a no-op for a canon that already has vanilla
+// "You did it!"). `cvc-words-short-u` was previously gated but
+// was removed in ticket 86c9qkf3v (2026-05-11) after the
+// scaffolding pattern was declared dead.
 //
 // Defensive: the gate is also a no-op when:
 //  - the response doesn't carry a `session.end.opener` utterance
@@ -67,16 +67,19 @@ import type { SessionStartResponse, Utterance } from './_types.js'
  * canon to vanilla.
  */
 const FIRST_ENCOUNTER_GATED_NODES: ReadonlySet<string> = new Set([
-  // Ticket 86c9q9ben — short-u contrast opener. Canon currently has
-  // it; gate fires the rewrite when Marian has already encountered
-  // `cvc-words-short-u`.
-  'cvc-words-short-u',
   // Ticket 86c9q9ben (infrastructure-ready) — short-o box/fox /ks/
   // opener. Canon currently has VANILLA "You did it!"; the gate is
   // a no-op until a future canon re-bake adds the box/fox variant.
   // Listed here so the same mechanism handles it without code
   // changes when the canon ships.
   'cvc-words-short-o',
+  // NOTE: cvc-words-short-u was here (ticket 86c9q9ben) but its
+  // scaffolding opener produced Azure gibberish across three fix
+  // iterations (PR #174, #192, #194). The opener was stripped in
+  // ticket 86c9qkf3v (2026-05-11) — canon re-baked to plain
+  // "You did it!". The gate entry is intentionally removed so the
+  // code is self-documenting. Dave ticket 86c9qkbvk designs the
+  // replacement teaching mechanism.
 ])
 
 /**

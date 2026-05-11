@@ -928,29 +928,15 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // template; the focus-node name in the user message is what tells the
 // planner which word pool to draw from.
 //
-// Short-u first-encounter scaffolding (ticket 86c9q9ben AC9b;
-// re-baked under ticket 86c9qhxyd 2026-05-10 to drop em-dash +
-// slash-IPA notation Azure was vocalizing literally — see
-// `.claude/docs/planner-and-canon.md` §"Canon text must be
-// naturally pronounceable English" + §"Stick to ASCII-7
-// punctuation")
-// -----------------------------------------------------------
-// Per `design/word-song/short-u-pool-expansion.md` §4 + §10 Q1 lock,
-// the first short-u session opens with an explicit short-u vs.
-// long-oo minimal-pair contrast line — load-bearing for L1 Tagalog
-// interference (Tagalog has long-oo but not English short-u, so
-// Marian's L1 default is long-oo for English short-u). The line is
-// baked into the prompt below for the `cvc-words-short-u` branch
-// so Haiku emits it as part of the `session.end.opener`. The
-// "lifetime first-encounter only" gate (api/_firstEncounterGate.ts)
-// rewrites this opener back to the vanilla "You did it!" for
-// already-encountered users so subsequent sessions get a normal
-// closer. The per-segment phoneme scaffold uses natural-English
-// approximations (Sss, uh, nnn) instead of slash-IPA notation
-// (`/s/ /ʌ/ /n/`) because Azure vocalizes the latter character-
-// by-character ("slash s slash slash UH slash slash n slash"),
-// which is what Marian was hearing live in production from PR
-// #174 ship through the cleanup landing.
+// Short-u first-encounter scaffolding — STRIPPED (ticket 86c9qkf3v,
+// 2026-05-11). Three successive fix iterations (PR #174 slash-IPA,
+// PR #194 English-letter spellouts, PR #192 inline IPA) all produced
+// Azure gibberish. The pattern is dead per the orthography-independent
+// failure mode documented in `.claude/docs/planner-and-canon.md`
+// §"The failure mode is orthography-independent". Future phoneme
+// teaching must use a different surface (Dave ticket 86c9qkbvk).
+// The opener for cvc-words-short-u is now the same vanilla
+// "You did it!" that every other tier gets.
 //
 // Short-i first-encounter scaffolding — DEFERRED (ticket 86c9qdba4)
 // -----------------------------------------------------------------
@@ -1028,24 +1014,6 @@ novel words are also valid targets — pick the 2-3 specified novel
 problems from the directive's pool and the remaining 5-6 from the
 canonical pool above. The "do not invent new words" rule still
 forbids any word that is in NEITHER pool.
-
-SHORT-U FIRST-ENCOUNTER SCAFFOLDING (ticket 86c9q9ben AC9b,
-re-baked under ticket 86c9qhxyd to drop em-dash + slash-IPA
-notation that Azure was vocalizing literally): when focus is
-cvc-words-short-u, use the following minimal-pair contrast line
-for "session.end.opener" so Marian's first short-u session opens
-with an explicit short-u vs. long-oo contrast (Tagalog has long
-oo but not English short-u, so the contrast line resets her L1
-default substitution at first encounter). The per-segment
-breakdown uses natural-English phonetic approximations
-(Sss / uh / nnn) instead of slash-IPA notation, which Azure
-otherwise reads literally as "slash s slash slash UH slash":
-  "You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn."
-Use this exact text for "session.end.opener" when focus is
-cvc-words-short-u; for any other focus node use "You did it!" alone.
-Keep the text ASCII-7 only — no em-dashes, en-dashes, curly
-quotes, IPA characters, or forward-slash notation. The bake-time
-canon lint (scripts/canonLint.ts) enforces this rule.
 
 Distractor guidance (Marian sees 3 picture chips per problem; one is the
 target, two are distractors — but YOU are not authoring the distractors
