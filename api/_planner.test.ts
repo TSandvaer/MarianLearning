@@ -2525,17 +2525,19 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     expect(exceptionTemplateMatches).toEqual(1)
   })
 
-  it('system prompt names the per-word exception list (mom, dad, jam, hot)', async () => {
+  it('system prompt names the per-word exception list (mom, dad, jam, gum, hot)', async () => {
     // Pin the exception list contents. If a word is added to or
     // removed from the list in the planner directive without updating
     // this test, the test fails — ensuring the author audits the
     // canon re-bake implications before silently expanding scope.
     //
     // The exception list covers chip words that cannot take an
-    // indefinite article: mom/dad (relational), jam (mass noun),
+    // indefinite article: mom/dad (relational), jam/gum (mass nouns),
     // hot (adjective). The audit explicitly documented mom/dad/jam;
-    // hot was added at canon-bake time when the default template
-    // produced ungrammatical "That's a hot." in the short-o pool.
+    // hot was added at first canon-bake when the default template
+    // produced ungrammatical "That's a hot." in the short-o pool;
+    // gum was added on Devon's review of PR #198 (same grammatical
+    // issue as jam — mass noun in the short-u pool).
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -2555,7 +2557,9 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     // exact list-naming sentence. If the list grows or shrinks, the
     // count drops to 0 and the test fails.
     const exceptionListMatches = (
-      prompt.match(/exception list is exactly: mom, dad, jam, hot\./g) ?? []
+      prompt.match(
+        /exception list is exactly: mom, dad, jam, gum, hot\./g,
+      ) ?? []
     ).length
     expect(exceptionListMatches).toEqual(1)
   })

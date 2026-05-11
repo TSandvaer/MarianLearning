@@ -1043,12 +1043,12 @@ all other slots are content-mode-agnostic:
 - correct: default template is "Yes! That's a <word>." (lowercase target
   after the article) e.g. "Yes! That's a cat."
   EXCEPTION — chip words that cannot take an indefinite article
-  (relational nouns: mom, dad; mass nouns: jam; adjectives: hot)
+  (relational nouns: mom, dad; mass nouns: jam, gum; adjectives: hot)
   fall back to "Yes! <Word>!" (capitalised, trailing bang, no article)
-  e.g. "Yes! Mom!" / "Yes! Dad!" / "Yes! Jam!" / "Yes! Hot!"
-  The exception list is exactly: mom, dad, jam, hot. Apply the fallback
-  ONLY for these four words; every other chip word in every focus pool
-  uses the default "Yes! That's a <word>." template.
+  e.g. "Yes! Mom!" / "Yes! Dad!" / "Yes! Jam!" / "Yes! Gum!" / "Yes! Hot!"
+  The exception list is exactly: mom, dad, jam, gum, hot. Apply the
+  fallback ONLY for these five words; every other chip word in every
+  focus pool uses the default "Yes! That's a <word>." template.
   Rationale: the article-led declarative ramp lands the chip word in
   the same prosodic environment as "Read the <word>." which Azure
   renders naturally. The bare "Yes! <Word>." template triggered
