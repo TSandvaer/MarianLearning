@@ -58,3 +58,17 @@ dev-dist
 # `public/assets/pictures/` instead. The PNGs are large (~3.9 MB combined)
 # and have no runtime use; keep them out of the bundle.
 design/references/picture-pack/**/*.png
+
+# Security: env files with credentials must never be tracked.
+# Covers .env.local, .env.production.local, .env.dev.local, etc.
+.env*.local
+
+# Runtime / scratch dirs — stop these polluting `git status`
+# pair-review snap output (snap.mjs + PNGs + svg/transparent subdirs)
+.tmp-pair-review/
+# Vercel CLI scratch (project config, cache)
+.vercel/
+# generic scratch (e.g. tmp/short-u-validate/ from canon work)
+tmp/
+# orphaned harness convention; canonical .claude/ lives at parent MARIAN-TUTOR/ level per CLAUDE.md
+.claude/
