@@ -64,7 +64,11 @@ design/references/picture-pack/**/*.png
 .env*.local
 
 # Runtime / scratch dirs — stop these polluting `git status`
-.tmp-pair-review/   # pair-review snap output (snap.mjs + PNGs + svg/transparent subdirs)
-.vercel/            # Vercel CLI scratch (project config, cache)
-tmp/                # generic scratch (e.g. tmp/short-u-validate/ from canon work)
-.claude/            # orphaned harness convention; canonical .claude/ lives at parent MARIAN-TUTOR/ level per CLAUDE.md
+# pair-review snap output (snap.mjs + PNGs + svg/transparent subdirs)
+.tmp-pair-review/
+# Vercel CLI scratch (project config, cache)
+.vercel/
+# generic scratch (e.g. tmp/short-u-validate/ from canon work)
+tmp/
+# orphaned harness convention; canonical .claude/ lives at parent MARIAN-TUTOR/ level per CLAUDE.md
+.claude/
