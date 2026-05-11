@@ -1311,6 +1311,8 @@ describe('crossVowelMixingActive', () => {
 
 describe('applyMasteryRule — 86c9qu91g regression (80%/2, crossDay off, cvc-words)', () => {
   // Helper: build a Progress with the Thomas settings profile.
+  // masteryThreshold must include both tracks to satisfy PerTrackMasteryThreshold;
+  // keep math at the default 95/3 so only word-song is lowered.
   function thomasProgress(args: {
     history: SessionHistoryEntry[]
     pendingPromotion?: SkillNode
@@ -1319,7 +1321,10 @@ describe('applyMasteryRule — 86c9qu91g regression (80%/2, crossDay off, cvc-wo
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: args.history,
       parentSettings: {
-        masteryThreshold: { 'word-song': { percent: 0.8, sessions: 2 } },
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
         crossDayEnforcement: false,
       },
       ...(args.pendingPromotion !== undefined
