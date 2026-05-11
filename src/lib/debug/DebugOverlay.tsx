@@ -10,6 +10,19 @@ import {
 } from './debugBus'
 
 /**
+ * Storage keys for the "Copy state" export button.
+ *
+ * These mirror the canonical constants in `src/lib/progress/storage.ts` and
+ * `src/screens/SessionEnd/sessionHistory.ts`. They're redeclared here rather
+ * than imported to keep the debug module dependency-light (no circular
+ * dependency through the progress module). If these keys ever change, update
+ * here too — they're string constants in both places.
+ */
+const PROGRESS_KEY = 'marian-tutor:progress:v1'
+const SESSION_HISTORY_KEY = 'marian-tutor.session-history.v1'
+const DEVICE_ID_KEY = 'marian-tutor:device-id'
+
+/**
  * On-screen debug panel for iPad QA.
  *
  * Mounted by `App.tsx` only when `?debug=1` is in the URL. Without that flag
@@ -108,6 +121,113 @@ interface ExportPayload {
   log: unknown
   /** Count of rows in `log`, or 0 if the buffer was empty / malformed. */
   logEntryCount: number
+}
+
+/**
+ * Self-describing payload for the "Copy state" button.
+ *
+ * Bundles the three localStorage blobs Thomas needs to diagnose
+ * persistence bugs (mastery promotion, cloud sync races, etc.) with
+ * enough provenance context that the paste is self-explaining.
+ *
+ * `parentSettings` is embedded inside `progress` (it's a field on the
+ * Progress document, not a separate localStorage key) — callers that
+ * want to inspect settings read `progress.parentSettings`.
+ */
+export interface StateExportPayload {
+  /** ISO timestamp of the export call. */
+  exportedAt: string
+  /** `navigator.userAgent` — confirm iPhone model / iOS version. */
+  userAgent: string
+  /** `window.location.href` — tells PR-preview apart from production. */
+  pageUrl: string
+  /**
+   * Parsed contents of `marian-tutor:progress:v1`. Includes `skillLevels`,
+   * `history`, `pendingPromotion`, and `parentSettings` (the sub-field
+   * that carries mastery threshold + crossDayEnforcement + autoPromote).
+   * `null` if the key is missing, empty, or malformed JSON.
+   */
+  progress: unknown
+  /**
+   * Parsed contents of `marian-tutor.session-history.v1`. Hub session
+   * count, stardust totals, day streak, etc.
+   * `null` if the key is missing, empty, or malformed JSON.
+   */
+  sessionHistory: unknown
+  /**
+   * The device UUID used for cloud sync (`marian-tutor:device-id`).
+   * Lets us correlate this export with any server-side KV record.
+   * Raw string — not parsed.
+   */
+  deviceId: string | null
+}
+
+/**
+ * Safely read and JSON-parse a localStorage key. Returns `null` when
+ * the key is missing, the storage backend is unavailable, or parsing
+ * fails. Raw-string fields (like `deviceId`) use `safeGetRaw` below
+ * instead.
+ */
+function safeGetParsed(key: string): unknown {
+  if (typeof window === 'undefined' || !window.localStorage) return null
+  let raw: string | null
+  try {
+    raw = window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    // Return the raw string so the payload is still useful when JSON is
+    // corrupted — Thomas can at least see the malformed value.
+    return raw
+  }
+}
+
+/** Safely read a localStorage key as a raw string (no JSON parsing). */
+function safeGetRaw(key: string): string | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Build the state export payload. Wrapped in a function so tests can
+ * assert the shape without reaching into the component.
+ */
+export function buildStateExportPayload(
+  now: number = Date.now(),
+): StateExportPayload {
+  let pageUrl = '(unknown)'
+  try {
+    if (typeof window !== 'undefined' && window.location?.href) {
+      pageUrl = window.location.href
+    }
+  } catch {
+    // cross-origin / sandbox — keep default
+  }
+  let userAgent = '(unknown)'
+  try {
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+      userAgent = navigator.userAgent
+    }
+  } catch {
+    // ignore
+  }
+
+  return {
+    exportedAt: new Date(now).toISOString(),
+    userAgent,
+    pageUrl,
+    progress: safeGetParsed(PROGRESS_KEY),
+    sessionHistory: safeGetParsed(SESSION_HISTORY_KEY),
+    deviceId: safeGetRaw(DEVICE_ID_KEY),
+  }
 }
 
 /**
@@ -242,12 +362,19 @@ export interface DebugOverlayProps {
    * Test seam — overrides `Date.now()` used in the export payload.
    */
   nowFn?: () => number
+  /**
+   * Test seam — overrides the clipboard write for the "Copy state" button.
+   * Defaults to the same `writeClipboardFn` prop when omitted. Pass a
+   * separate stub when you need to test Copy state independently of Export log.
+   */
+  writeStateClipboardFn?: (text: string) => Promise<void>
 }
 
 export default function DebugOverlay({
   readAudioCtxLogFn = readAudioCtxLog,
   writeClipboardFn,
   nowFn,
+  writeStateClipboardFn,
 }: DebugOverlayProps) {
   const [bus, setBus] = useState<DebugSnapshot>({
     lastSpeak: null,
@@ -262,6 +389,10 @@ export default function DebugOverlay({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'fallback'>(
     'idle',
   )
+  const [stateCopyState, setStateCopyState] = useState<'idle' | 'copied'>(
+    'idle',
+  )
+  const stateCopyTimerRef = useRef<number | null>(null)
   const [logEntryCount, setLogEntryCount] = useState<number>(() => {
     const log = readAudioCtxLogFn()
     return Array.isArray(log) ? log.length : 0
@@ -273,7 +404,7 @@ export default function DebugOverlay({
     return subscribe(setBus)
   }, [])
 
-  // Clear any pending "Copied" timer on unmount so we never call setState
+  // Clear any pending "Copied" timers on unmount so we never call setState
   // after the component has been torn down (?debug=1 toggled off mid-flight,
   // hot reload, etc.).
   useEffect(() => {
@@ -281,6 +412,10 @@ export default function DebugOverlay({
       if (copyTimerRef.current !== null) {
         window.clearTimeout(copyTimerRef.current)
         copyTimerRef.current = null
+      }
+      if (stateCopyTimerRef.current !== null) {
+        window.clearTimeout(stateCopyTimerRef.current)
+        stateCopyTimerRef.current = null
       }
     }
   }, [])
@@ -333,6 +468,47 @@ export default function DebugOverlay({
     setCopyState('fallback')
     setExportText(json)
   }, [readAudioCtxLogFn, writeClipboardFn, nowFn])
+
+  /**
+   * "Copy state" button handler. Collects the three persistence blobs
+   * (progress, sessionHistory, deviceId) and copies them to the clipboard
+   * as a pretty-printed JSON payload.
+   *
+   * Unlike the audio-log export, there is no textarea fallback here — the
+   * progress blob can be large and a fallback textarea in the tiny overlay
+   * would be unusable. If the clipboard write fails (older WebKit, permission
+   * denied), the button label stays "Copy state" with no feedback rather than
+   * cluttering the panel.
+   */
+  const handleCopyState = useCallback(async () => {
+    const payload = buildStateExportPayload(nowFn ? nowFn() : Date.now())
+    const json = JSON.stringify(payload, null, 2)
+
+    const writer =
+      writeStateClipboardFn ??
+      writeClipboardFn ??
+      (typeof navigator !== 'undefined' && navigator.clipboard
+        ? (text: string) => navigator.clipboard.writeText(text)
+        : null)
+
+    if (!writer) return
+
+    try {
+      await writer(json)
+      setStateCopyState('copied')
+      if (stateCopyTimerRef.current !== null) {
+        window.clearTimeout(stateCopyTimerRef.current)
+      }
+      stateCopyTimerRef.current = window.setTimeout(() => {
+        setStateCopyState('idle')
+        stateCopyTimerRef.current = null
+      }, COPIED_CONFIRMATION_MS)
+    } catch {
+      // Clipboard write failed (permission denied, older WebKit). No
+      // fallback — the overlay is too cramped for a progress-blob textarea.
+      // The button returns to idle on the next interaction.
+    }
+  }, [writeStateClipboardFn, writeClipboardFn, nowFn])
 
   return (
     <div
@@ -478,6 +654,28 @@ export default function DebugOverlay({
             onFocus={(e) => e.currentTarget.select()}
           />
         )}
+        {/*
+          "Copy state" button. Exports progress + sessionHistory + deviceId
+          as a JSON payload so Thomas can diagnose mastery-promotion /
+          cloud-sync bugs from iPhone without needing Safari Web Inspector.
+          No textarea fallback — see handleCopyState comment above.
+        */}
+        <button
+          type="button"
+          data-testid="debug-overlay-copy-state-button"
+          onClick={() => {
+            void handleCopyState()
+          }}
+          className="
+            ml-2 px-2 py-0.5
+            rounded border border-white/40
+            bg-white/10 hover:bg-white/20
+            text-white text-[12px]
+            font-mono
+          "
+        >
+          {stateCopyState === 'copied' ? 'Copied!' : 'Copy state'}
+        </button>
       </div>
     </div>
   )
