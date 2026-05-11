@@ -1586,22 +1586,17 @@ describe('generateSessionPlan — cvc-words-short-u sibling tier (ticket 86c9q9b
     expect(prompt).toMatch(/cvc-words-short-u:/)
   })
 
-  it('system prompt carries the AC9b short-u vs long-oo minimal-pair contrast line for the short-u tier', async () => {
-    // Spec §4 + AC9b: the contrast opener "You did it! Listen.
-    // Sun, not soon. Sun! Sss, uh, nnn." is baked into the planner
-    // template so Haiku emits it on the first short-u session-end
-    // opener (the lifetime first-encounter gate downstream rewrites
-    // it to vanilla "You did it!" once Marian has heard it once).
-    //
-    // Re-baked 2026-05-10 under ticket 86c9qhxyd to drop the
-    // em-dash + slash-IPA notation (`'sun' — not 'soon.' Sun! /s/
-    // /ʌ/ /n/.`) that Azure was vocalizing literally as
-    // "slash s slash slash UH slash slash n slash" gibberish. The
-    // canonical phonetic-approximation form is documented in
-    // `.claude/docs/planner-and-canon.md` § "Canon text must be
-    // naturally pronounceable English" + § "Stick to ASCII-7
-    // punctuation". Pin the new ASCII-clean form here so future
-    // drift is caught at vitest time, not at ear-test time.
+  it('system prompt does NOT contain any short-u phonics scaffolding (stripped ticket 86c9qkf3v)', async () => {
+    // Ticket 86c9qkf3v (2026-05-11): the contrast opener pattern is
+    // dead — Azure renders phoneme-demonstration tokens as syllabic
+    // noise regardless of orthography (slash-IPA, English spellouts,
+    // inline IPA wraps all failed). The SHORT-U FIRST-ENCOUNTER
+    // SCAFFOLDING block has been stripped. The planner must NOT
+    // mandate any special opener text for cvc-words-short-u; it
+    // should receive the same vanilla "You did it!" that every other
+    // word-song focus node gets from the default Session-End contract.
+    // Per `feedback_count_assertions_on_regression_tests.md`: count-
+    // based (toHaveLength / not.toContain) not .toContain.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(makeShortUPlan(SHORT_U_WORDS), { capture })
 
@@ -1615,14 +1610,14 @@ describe('generateSessionPlan — cvc-words-short-u sibling tier (ticket 86c9q9b
 
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const prompt = args.system.map((b) => b.text).join('\n')
-    expect(prompt).toContain(
-      '"You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn."',
-    )
-    // Defensive: assert the corrupt notation does NOT reappear in
-    // the prompt (regression guard against re-introducing the
-    // slash-IPA / em-dash form in a future planner refactor).
+    // Scaffolding directive and ALL its historical forms must be absent.
+    expect(prompt).not.toContain('SHORT-U FIRST-ENCOUNTER SCAFFOLDING')
+    expect(prompt).not.toContain('Sss, uh, nnn')
+    expect(prompt).not.toContain('Sun, not soon')
     expect(prompt).not.toContain('/s/ /ʌ/ /n/')
-    expect(prompt).not.toContain("'sun' — not 'soon.'")
+    // Vanilla opener contract still applies: the system-preamble
+    // session.end.opener is "You did it!" for all focus nodes.
+    expect(prompt).toContain('"You did it!"')
   })
 
   it('round-trips a wire response with exactly 8 short-u problems', async () => {

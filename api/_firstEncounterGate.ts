@@ -67,16 +67,19 @@ import type { SessionStartResponse, Utterance } from './_types.js'
  * canon to vanilla.
  */
 const FIRST_ENCOUNTER_GATED_NODES: ReadonlySet<string> = new Set([
-  // Ticket 86c9q9ben — short-u contrast opener. Canon currently has
-  // it; gate fires the rewrite when Marian has already encountered
-  // `cvc-words-short-u`.
-  'cvc-words-short-u',
   // Ticket 86c9q9ben (infrastructure-ready) — short-o box/fox /ks/
   // opener. Canon currently has VANILLA "You did it!"; the gate is
   // a no-op until a future canon re-bake adds the box/fox variant.
   // Listed here so the same mechanism handles it without code
   // changes when the canon ships.
   'cvc-words-short-o',
+  // NOTE: cvc-words-short-u was here (ticket 86c9q9ben) but its
+  // scaffolding opener produced Azure gibberish across three fix
+  // iterations (PR #174, #192, #194). The opener was stripped in
+  // ticket 86c9qkf3v (2026-05-11) — canon re-baked to plain
+  // "You did it!". The gate entry is intentionally removed so the
+  // code is self-documenting. Dave ticket 86c9qkbvk designs the
+  // replacement teaching mechanism.
 ])
 
 /**

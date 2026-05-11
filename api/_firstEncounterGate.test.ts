@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Unit tests for the server-side first-encounter gate (ticket
- * 86c9q9ben — AC9f, AC9h).
+ * 86c9q9ben — AC9f, AC9h; updated ticket 86c9qkf3v 2026-05-11).
  *
  * Pin the contract:
  *   1. Non-gated focus nodes pass through unchanged.
@@ -14,9 +14,12 @@
  *      vanilla source.
  *   4. Defensive: missing vanilla source → pass through.
  *   5. Defensive: response without session.end.opener → pass through.
- *   6. The gate covers BOTH cvc-words-short-u (real) AND
- *      cvc-words-short-o (infrastructure-ready) — pinned via
- *      `getFirstEncounterGatedNodes`.
+ *   6. The gate covers cvc-words-short-o (infrastructure-ready).
+ *      cvc-words-short-u was previously gated but has been REMOVED
+ *      (ticket 86c9qkf3v, 2026-05-11) — the scaffolding opener
+ *      produced Azure gibberish across three fix iterations. The node
+ *      is now treated as non-gated; cvc-words-short-u passes through
+ *      to vanilla "You did it!" directly from the re-baked canon.
  */
 import { describe, expect, it, beforeEach } from 'vitest'
 
@@ -70,10 +73,18 @@ function buildResponse(opts: {
 }
 
 describe('getFirstEncounterGatedNodes', () => {
-  it('includes both cvc-words-short-u (active) and cvc-words-short-o (infra-ready)', () => {
+  it('includes cvc-words-short-o (infrastructure-ready)', () => {
     const gated = getFirstEncounterGatedNodes()
-    expect(gated).toContain('cvc-words-short-u')
     expect(gated).toContain('cvc-words-short-o')
+  })
+
+  it('does NOT include cvc-words-short-u (stripped ticket 86c9qkf3v — scaffolding pattern dead)', () => {
+    // cvc-words-short-u was removed from the gated set in ticket
+    // 86c9qkf3v (2026-05-11). The canon is now re-baked to carry the
+    // plain "You did it!" opener, same as every other tier. No gate
+    // needed — the canon itself is vanilla.
+    const gated = getFirstEncounterGatedNodes()
+    expect(gated).not.toContain('cvc-words-short-u')
   })
 
   it('does NOT include cvc-words (short-a — vanilla forever, no scaffolding)', () => {
@@ -100,7 +111,7 @@ describe('getFirstEncounterGatedNodes', () => {
 })
 
 describe('applyFirstEncounterGate — pass-through cases', () => {
-  it('non-gated focus node → input returned verbatim (same reference)', () => {
+  it('non-gated focus node (cvc-words) → input returned verbatim (same reference)', () => {
     const response = buildResponse({ openerText: 'You did it!' })
     const out = applyFirstEncounterGate(response, {
       focusNode: 'cvc-words',
@@ -109,37 +120,45 @@ describe('applyFirstEncounterGate — pass-through cases', () => {
     expect(out).toBe(response)
   })
 
-  it('gated focus + node NOT in lifetimeFirstEncounters → first encounter, pass through', () => {
-    const response = buildResponse({
-      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
-    })
+  it('cvc-words-short-u is now non-gated → input returned verbatim regardless of lifetimeFirstEncounters', () => {
+    // After ticket 86c9qkf3v: short-u no longer has a scaffolding
+    // opener in the gate or the planner. The canon carries vanilla
+    // "You did it!" directly. The gate is a no-op for this node.
+    const response = buildResponse({ openerText: 'You did it!' })
     const out = applyFirstEncounterGate(response, {
       focusNode: 'cvc-words-short-u',
-      lifetimeFirstEncounters: ['cvc-words'],
+      lifetimeFirstEncounters: ['cvc-words-short-u'],
     })
-    // First encounter: the canon's contrast variant is delivered as-is.
+    // Non-gated → same reference.
     expect(out).toBe(response)
   })
 
-  it('gated focus + empty lifetimeFirstEncounters → first encounter, pass through', () => {
-    const response = buildResponse({
-      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
-    })
+  it('gated focus (cvc-words-short-o) + node NOT in lifetimeFirstEncounters → first encounter, pass through', () => {
+    const response = buildResponse({ openerText: 'You did it!' })
     const out = applyFirstEncounterGate(response, {
-      focusNode: 'cvc-words-short-u',
+      focusNode: 'cvc-words-short-o',
+      lifetimeFirstEncounters: ['cvc-words'],
+    })
+    // First encounter: the canon's variant is delivered as-is.
+    expect(out).toBe(response)
+  })
+
+  it('gated focus (cvc-words-short-o) + empty lifetimeFirstEncounters → first encounter, pass through', () => {
+    const response = buildResponse({ openerText: 'You did it!' })
+    const out = applyFirstEncounterGate(response, {
+      focusNode: 'cvc-words-short-o',
       lifetimeFirstEncounters: [],
     })
     expect(out).toBe(response)
   })
 
-  it('gated focus + undefined lifetimeFirstEncounters → first-encounter posture (defensive)', () => {
-    // Legacy clients that don't ship the field get the contrast
-    // line — safest interpretation per the type doc-comment.
-    const response = buildResponse({
-      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
-    })
+  it('gated focus (cvc-words-short-o) + undefined lifetimeFirstEncounters → first-encounter posture (defensive)', () => {
+    // Legacy clients that don't ship the field get the canon variant
+    // (first-encounter posture) — safest interpretation per the
+    // type doc-comment.
+    const response = buildResponse({ openerText: 'You did it!' })
     const out = applyFirstEncounterGate(response, {
-      focusNode: 'cvc-words-short-u',
+      focusNode: 'cvc-words-short-o',
     })
     expect(out).toBe(response)
   })
@@ -162,8 +181,8 @@ describe('applyFirstEncounterGate — pass-through cases', () => {
       ],
     }
     const out = applyFirstEncounterGate(response, {
-      focusNode: 'cvc-words-short-u',
-      lifetimeFirstEncounters: ['cvc-words-short-u'],
+      focusNode: 'cvc-words-short-o',
+      lifetimeFirstEncounters: ['cvc-words-short-o'],
     })
     expect(out).toBe(response)
   })
@@ -176,8 +195,8 @@ describe('applyFirstEncounterGate — pass-through cases', () => {
     const out = applyFirstEncounterGate(
       response,
       {
-        focusNode: 'cvc-words-short-u',
-        lifetimeFirstEncounters: ['cvc-words-short-u'],
+        focusNode: 'cvc-words-short-o',
+        lifetimeFirstEncounters: ['cvc-words-short-o'],
       },
       '/nonexistent/canon/root',
     )
@@ -191,69 +210,13 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
   // The vanilla opener carries text "You did it!" with the audio
   // baked at canon-bake time.
 
-  it('gated focus + node IN lifetimeFirstEncounters → rewrites opener to vanilla', () => {
-    const response = buildResponse({
-      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
-      openerAudioBase64: 'BASE64_CONTRAST_LINE_AUDIO',
-    })
-    const out = applyFirstEncounterGate(response, {
-      focusNode: 'cvc-words-short-u',
-      lifetimeFirstEncounters: ['cvc-words-short-u'],
-    })
-
-    expect(out).not.toBe(response)
-    const opener = out.utterances.find((u) => u.id === 'session.end.opener')!
-    // Vanilla text from the cvc-words.json source canon.
-    expect(opener.text).toBe('You did it!')
-    // Audio swapped — base64 is no longer the contrast-line bytes.
-    // (We don't assert the exact base64 because the cvc-words.json
-    // canon's opener bytes are environment-dependent; we just
-    // verify the rewrite happened by confirming the text changed.)
-    expect(opener.audio.base64).not.toBe('BASE64_CONTRAST_LINE_AUDIO')
-  })
-
-  it('rewrite preserves other utterances unchanged', () => {
-    const response = buildResponse({
-      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
-    })
-    const out = applyFirstEncounterGate(response, {
-      focusNode: 'cvc-words-short-u',
-      lifetimeFirstEncounters: ['cvc-words-short-u'],
-    })
-
-    const problemRead = out.utterances.find((u) => u.id === 'word.p1.read')!
-    const originalProblemRead = response.utterances.find(
-      (u) => u.id === 'word.p1.read',
-    )!
-    // Same content (text + audio) — only the opener was rewritten.
-    expect(problemRead).toEqual(originalProblemRead)
-  })
-
-  it('rewrite is non-mutating — input response is unchanged', () => {
-    const response = buildResponse({
-      openerText: 'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
-      openerAudioBase64: 'BASE64_CONTRAST_LINE_AUDIO',
-    })
-    const beforeOpener = response.utterances[0]
-    applyFirstEncounterGate(response, {
-      focusNode: 'cvc-words-short-u',
-      lifetimeFirstEncounters: ['cvc-words-short-u'],
-    })
-    // Input opener unchanged.
-    expect(response.utterances[0]).toBe(beforeOpener)
-    expect(response.utterances[0]!.text).toBe(
-      'You did it! Listen. Sun, not soon. Sun! Sss, uh, nnn.',
-    )
-  })
-
-  it('short-o tier — gate is wired, but with vanilla canon today the rewrite is functionally a no-op (canon is already vanilla)', () => {
+  it('short-o tier — gate is wired, already-encountered → rewrites opener to vanilla', () => {
     // cvc-words-short-o is in the gated set as infrastructure-ready;
     // its canon today carries the vanilla "You did it!" opener.
-    // When already-encountered, the gate fires the rewrite, but the
-    // result is "You did it!" replaced with "You did it!" — same
-    // text, possibly slightly different audio bytes (different
-    // Azure render). The point is the mechanism fires; the
-    // content delta is zero today.
+    // When already-encountered, the gate fires the rewrite — result
+    // is "You did it!" replaced with the cvc-words.json vanilla
+    // "You did it!" (same text, possibly slightly different audio
+    // bytes). The point is the mechanism fires and does not crash.
     const response = buildResponse({
       openerText: 'You did it!',
       openerAudioBase64: 'BASE64_SHORT_O_VANILLA_OPENER',
@@ -267,6 +230,39 @@ describe('applyFirstEncounterGate — rewrite cases', () => {
     expect(out).not.toBe(response)
     const opener = out.utterances.find((u) => u.id === 'session.end.opener')!
     expect(opener.text).toBe('You did it!')
+  })
+
+  it('short-o rewrite preserves other utterances unchanged', () => {
+    const response = buildResponse({
+      openerText: 'You did it!',
+      openerAudioBase64: 'BASE64_SHORT_O_VANILLA_OPENER',
+    })
+    const out = applyFirstEncounterGate(response, {
+      focusNode: 'cvc-words-short-o',
+      lifetimeFirstEncounters: ['cvc-words-short-o'],
+    })
+
+    const problemRead = out.utterances.find((u) => u.id === 'word.p1.read')!
+    const originalProblemRead = response.utterances.find(
+      (u) => u.id === 'word.p1.read',
+    )!
+    // Same content (text + audio) — only the opener was rewritten.
+    expect(problemRead).toEqual(originalProblemRead)
+  })
+
+  it('short-o rewrite is non-mutating — input response is unchanged', () => {
+    const response = buildResponse({
+      openerText: 'You did it!',
+      openerAudioBase64: 'BASE64_SHORT_O_VANILLA_OPENER',
+    })
+    const beforeOpener = response.utterances[0]
+    applyFirstEncounterGate(response, {
+      focusNode: 'cvc-words-short-o',
+      lifetimeFirstEncounters: ['cvc-words-short-o'],
+    })
+    // Input opener unchanged (same reference).
+    expect(response.utterances[0]).toBe(beforeOpener)
+    expect(response.utterances[0]!.text).toBe('You did it!')
   })
 })
 
