@@ -2454,3 +2454,146 @@ describe('generateSessionPlan — slow-fact directive (M4.x)', () => {
     )
   })
 })
+
+/**
+ * Drift-guard tests for the celebration-prosody fix (ticket 86c9qkf2w,
+ * Option A1 from Devon's audit). The word-song correct-slot template
+ * changed from "Yes! <Word>." to "Yes! That's a <word>." with a
+ * per-word exception list for relational/mass nouns (mom, dad, jam)
+ * that cannot take an indefinite article.
+ *
+ * Rationale documented in:
+ *   - design/audio-celebration-prosody-audit-2026-05-10.md
+ *   - .claude/docs/planner-and-canon.md §"Template-structural prosody clip"
+ *
+ * Per `feedback_count_assertions_on_regression_tests.md`: the prompt
+ * assertions below use count-based or equality forms — never `.toContain`
+ * alone for the template literal itself (we check exact occurrence count
+ * of the default template and exact membership of the exception list).
+ */
+describe('celebration-prosody fix — word-song correct-slot template (ticket 86c9qkf2w)', () => {
+  /** Minimal valid word-song wire response. */
+  const VALID_WORD_RESPONSE = JSON.stringify({
+    id: 'prosody-test',
+    label: 'prosody test',
+    utterances: [
+      { id: 'word.p1.read', text: 'Read the cat.' },
+      { id: 'word.p1.correct', text: "Yes! That's a cat." },
+      { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'word.p1.hint', text: "Let's look. Cat." },
+      { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+    ],
+  })
+
+  it('system prompt carries the new article-led correct template', async () => {
+    // Pin the exact template string so future planner refactors that
+    // revert to "Yes! <Word>." are caught at vitest time, not at
+    // Thomas's ear-test time.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+
+    // Default template — pin the exact directive header line that
+    // defines the correct slot's default template. The string also
+    // appears once in the surrounding prose (where the directive
+    // refers back to itself); we anchor on the "default template is"
+    // phrasing so this test catches drift in the canonical
+    // definition without false-matching the prose callout.
+    const defaultTemplateMatches = (
+      prompt.match(
+        /default template is "Yes! That's a <word>\."/g,
+      ) ?? []
+    ).length
+    expect(defaultTemplateMatches).toEqual(1)
+
+    // Exception fallback template — anchor on the "fall back to"
+    // phrasing so the test pins the directive line, not a prose
+    // mention of the same string.
+    const exceptionTemplateMatches = (
+      prompt.match(/fall back to "Yes! <Word>!"/g) ?? []
+    ).length
+    expect(exceptionTemplateMatches).toEqual(1)
+  })
+
+  it('system prompt names the per-word exception list (mom, dad, jam, gum, hot)', async () => {
+    // Pin the exception list contents. If a word is added to or
+    // removed from the list in the planner directive without updating
+    // this test, the test fails — ensuring the author audits the
+    // canon re-bake implications before silently expanding scope.
+    //
+    // The exception list covers chip words that cannot take an
+    // indefinite article: mom/dad (relational), jam/gum (mass nouns),
+    // hot (adjective). The audit explicitly documented mom/dad/jam;
+    // hot was added at first canon-bake when the default template
+    // produced ungrammatical "That's a hot." in the short-o pool;
+    // gum was added on Devon's review of PR #198 (same grammatical
+    // issue as jam — mass noun in the short-u pool).
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+
+    // Pin the canonical exception list line — count-based assertion
+    // (per `feedback_count_assertions_on_regression_tests.md`) on the
+    // exact list-naming sentence. If the list grows or shrinks, the
+    // count drops to 0 and the test fails.
+    const exceptionListMatches = (
+      prompt.match(
+        /exception list is exactly: mom, dad, jam, gum, hot\./g,
+      ) ?? []
+    ).length
+    expect(exceptionListMatches).toEqual(1)
+  })
+
+  it('system prompt does NOT contain the old bare "Yes! <Word>." correct-slot directive', async () => {
+    // Regression guard: the old directive line was
+    //   `- correct: "Yes! <Word>." (capitalised target) e.g. ...`
+    // which triggered list-final / declarative-tag intonation on
+    // Azure. If someone reverts the planner directive, this test
+    // catches the headline-form drift. We anchor on the directive's
+    // "- correct:" prefix so this assertion ignores prose callouts
+    // (the new directive's prose intentionally cites the old form
+    // when explaining why it changed).
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+
+    // Count-based: the literal directive header for the OLD template
+    // must not appear at all. The new directive uses
+    // `- correct: default template is "Yes! That's a <word>."` so the
+    // OLD `- correct: "Yes! <Word>."` pattern would be a clear revert.
+    const oldDirectiveMatches = (
+      prompt.match(/- correct: "Yes! <Word>\."/g) ?? []
+    ).length
+    expect(oldDirectiveMatches).toEqual(0)
+  })
+})

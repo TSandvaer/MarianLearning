@@ -1040,7 +1040,20 @@ all other slots are content-mode-agnostic:
   Use the EXACT verb for the focus node — "Tap" for blending-cv,
   "Read" for cvc-words / cvc-words-short-o / cvc-words-short-u /
   cvc-words-short-i. Do not mix templates within a single plan.
-- correct: "Yes! <Word>." (capitalised target) e.g. "Yes! Cat."
+- correct: default template is "Yes! That's a <word>." (lowercase target
+  after the article) e.g. "Yes! That's a cat."
+  EXCEPTION — chip words that cannot take an indefinite article
+  (relational nouns: mom, dad; mass nouns: jam, gum; adjectives: hot)
+  fall back to "Yes! <Word>!" (capitalised, trailing bang, no article)
+  e.g. "Yes! Mom!" / "Yes! Dad!" / "Yes! Jam!" / "Yes! Gum!" / "Yes! Hot!"
+  The exception list is exactly: mom, dad, jam, gum, hot. Apply the
+  fallback ONLY for these five words; every other chip word in every
+  focus pool uses the default "Yes! That's a <word>." template.
+  Rationale: the article-led declarative ramp lands the chip word in
+  the same prosodic environment as "Read the <word>." which Azure
+  renders naturally. The bare "Yes! <Word>." template triggered
+  list-final / declarative-tag intonation (clipped sound) regardless
+  of final phoneme class.
 - reprompt: "Hmm... try again?"  (verbatim — do not vary)
 - hint: "Let's look. <Word>." e.g. "Let's look. Cat."
 - giveAnswer: "This one is <word>." e.g. "This one is cat."
