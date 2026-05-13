@@ -60,6 +60,7 @@ import {
   WORD_SONG_TARGET_WORDS_SHORT_O,
   WORD_SONG_TARGET_WORDS_SHORT_U,
   WORD_SONG_TARGET_WORDS_SHORT_I,
+  WORD_SONG_TARGET_WORDS_SHORT_E,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
 } from './_plannerWordList.js'
@@ -140,6 +141,7 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   'cvc-words-short-o',
   'cvc-words-short-u',
   'cvc-words-short-i',
+  'cvc-words-short-e',
   'digraphs',
   'sight-words',
   'simple-sentences',
@@ -606,6 +608,7 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'cvc-words-short-o',
   'cvc-words-short-u',
   'cvc-words-short-i',
+  'cvc-words-short-e',
 ]
 
 /**
@@ -904,13 +907,15 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // Word-song planner system prompt — ticket 86c9kxu07 (planner-parser
 // contract step 2) + ticket 86c9m3ae3 (short-o pool sibling tier) +
 // ticket 86c9q9ben (short-u pool sibling tier) + ticket 86c9qdba4
-// (short-i pool sibling tier). Five first-class content modes today:
+// (short-i pool sibling tier) + ticket 86c9teua2 (short-e pool sibling
+// tier — final single-vowel tier). Six first-class content modes today:
 //
 //   - blending-cv         → "Tap the <word>." (match-picture-to-spoken-word)
 //   - cvc-words           → "Read the <word>." (decode-printed-word, short-a)
 //   - cvc-words-short-o   → "Read the <word>." (decode-printed-word, short-o)
 //   - cvc-words-short-u   → "Read the <word>." (decode-printed-word, short-u)
 //   - cvc-words-short-i   → "Read the <word>." (decode-printed-word, short-i)
+//   - cvc-words-short-e   → "Read the <word>." (decode-printed-word, short-e)
 //
 // All gated by the browser parser (PR #132 widened it to dispatch on
 // the read-line template). Other valid focus nodes (letter-sounds,
@@ -924,9 +929,9 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // content-type discriminant lives on the read-line template, NOT the id
 // namespace, by design (see design/word-song/parser-widening-plan.md
 // §"Why no new id namespace"). cvc-words / cvc-words-short-o /
-// cvc-words-short-u / cvc-words-short-i all share the "Read the <word>."
-// template; the focus-node name in the user message is what tells the
-// planner which word pool to draw from.
+// cvc-words-short-u / cvc-words-short-i / cvc-words-short-e all share
+// the "Read the <word>." template; the focus-node name in the user
+// message is what tells the planner which word pool to draw from.
 //
 // Short-u first-encounter scaffolding — STRIPPED (ticket 86c9qkf3v,
 // 2026-05-11). Three successive fix iterations (PR #174 slash-IPA,
@@ -966,7 +971,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Five first-class content modes today:
+matching that node. Six first-class content modes today:
 
   - blending-cv: "Tap the <word>." problems. Marian hears the word
     spoken and taps the matching picture chip from a trio. This is the
@@ -990,6 +995,11 @@ matching that node. Five first-class content modes today:
     pool differs (short-i instead of short-a/short-o/short-u). The
     fourth vowel-tier sibling — Marian arrives here after she's
     mastered short-u.
+  - cvc-words-short-e: "Read the <word>." problems with SHORT-E target
+    words. Same wire shape and templates as cvc-words; only the word
+    pool differs (short-e instead of short-a/short-o/short-u/short-i).
+    The fifth and FINAL single-vowel tier in the o → u → i → e
+    canonical arc — Marian arrives here after she's mastered short-i.
 
 Pick 8 distinct target words from the focus-node-specific pool below
 (do not invent new words, do not use a target more than once).
@@ -1005,6 +1015,9 @@ ${WORD_SONG_TARGET_WORDS_SHORT_U}
 
 Pool for cvc-words-short-i (8-word short-i CVC):
 ${WORD_SONG_TARGET_WORDS_SHORT_I}
+
+Pool for cvc-words-short-e (9-word short-e CVC):
+${WORD_SONG_TARGET_WORDS_SHORT_E}
 
 GRADUATION-SESSION EXCEPTION: when the user message contains the
 "GRADUATION SESSION" directive, that directive supplies an additional
@@ -1022,10 +1035,11 @@ ${WORD_SONG_DISTRACTOR_HINTS}
 
 Order easier-recognise words (cat, bag, hat, dad for short-a; dog, mom,
 pot, log for short-o; sun, cup, bus for short-u; pig, bin, lid for
-short-i) in problems 1-3 and richer-rhyme/trap words (van, can, fan,
-man, pan, mat, bat, tag, cap, jam for short-a; mop, box, fox, hot, cot,
-top, pop for short-o; bug, jug, rug, nut, hut, bun, gum, tub for
-short-u; pin, wig, bib, fig, sip for short-i) in problems 4-8.
+short-i; bed, hen, leg for short-e) in problems 1-3 and richer-rhyme/
+trap words (van, can, fan, man, pan, mat, bat, tag, cap, jam for
+short-a; mop, box, fox, hot, cot, top, pop for short-o; bug, jug, rug,
+nut, hut, bun, gum, tub for short-u; pin, wig, bib, fig, sip for
+short-i; pen, web, net, jet, gem, egg for short-e) in problems 4-8.
 
 Per-problem utterance template — the read line varies by focus node;
 all other slots are content-mode-agnostic:
@@ -1036,19 +1050,27 @@ all other slots are content-mode-agnostic:
     - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."
     - cvc-words-short-u: "Read the <word>." e.g. "Read the sun."
     - cvc-words-short-i: "Read the <word>." e.g. "Read the pig."
+    - cvc-words-short-e: "Read the <word>." e.g. "Read the bed."
   Use lowercase target word; one short sentence; ends with a period.
   Use the EXACT verb for the focus node — "Tap" for blending-cv,
   "Read" for cvc-words / cvc-words-short-o / cvc-words-short-u /
-  cvc-words-short-i. Do not mix templates within a single plan.
+  cvc-words-short-i / cvc-words-short-e. Do not mix templates within
+  a single plan.
 - correct: default template is "Yes! That's a <word>." (lowercase target
   after the article) e.g. "Yes! That's a cat."
   EXCEPTION — chip words that cannot take an indefinite article
-  (relational nouns: mom, dad; mass nouns: jam, gum; adjectives: hot)
-  fall back to "Yes! <Word>!" (capitalised, trailing bang, no article)
-  e.g. "Yes! Mom!" / "Yes! Dad!" / "Yes! Jam!" / "Yes! Gum!" / "Yes! Hot!"
-  The exception list is exactly: mom, dad, jam, gum, hot. Apply the
-  fallback ONLY for these five words; every other chip word in every
+  (relational nouns: mom, dad; mass nouns: jam, gum; adjectives: hot;
+  vowel-initial nouns: egg) fall back to "Yes! <Word>!" (capitalised,
+  trailing bang, no article) e.g. "Yes! Mom!" / "Yes! Dad!" /
+  "Yes! Jam!" / "Yes! Gum!" / "Yes! Hot!" / "Yes! Egg!"
+  The exception list is exactly: mom, dad, jam, gum, hot, egg. Apply
+  the fallback ONLY for these six words; every other chip word in every
   focus pool uses the default "Yes! That's a <word>." template.
+  Rationale for the egg addition (ticket 86c9teua2): the article-led
+  template would produce "Yes! That's a egg." which is grammatically
+  wrong English; rather than introduce an a/an switch for one word,
+  the bang-fallback shape lands egg in the same prosodic environment
+  as the other 5 exceptions.
   Rationale: the article-led declarative ramp lands the chip word in
   the same prosodic environment as "Read the <word>." which Azure
   renders naturally. The bare "Yes! <Word>." template triggered
