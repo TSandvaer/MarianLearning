@@ -427,6 +427,13 @@ test.describe('Progression loop — sight-words (intro → mastered)', () => {
 
     // Seed: all word-song prerequisites mastered (including digraphs, the
     // node directly before sight-words in WORD_SONG_NODES_IN_ORDER).
+    //
+    // `cvc-words-short-e` mastered too (ticket 86c9teua2) — without this
+    // entry the picker would land on cvc-words-short-e (default 'locked')
+    // before reaching sight-words, and the simulated "perfect sight-words
+    // session" would run a short-e session instead, leaving sight-words
+    // at 'intro' forever. Mirrors the same Place-8 widening applied to
+    // `cvc-cross-vowel-mix-regression.spec.ts` in PR #208.
     const progress = buildSeedProgress({
       skillLevelOverrides: {
         'letter-names': 'mastered',
@@ -436,6 +443,7 @@ test.describe('Progression loop — sight-words (intro → mastered)', () => {
         'cvc-words-short-o': 'mastered',
         'cvc-words-short-u': 'mastered',
         'cvc-words-short-i': 'mastered',
+        'cvc-words-short-e': 'mastered',
         digraphs: 'mastered',
         'sight-words': 'intro',
         'simple-sentences': 'locked',
