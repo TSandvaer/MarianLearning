@@ -270,7 +270,8 @@ describe('FORBIDDEN_PAIRS', () => {
 
 describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
   // The 33 effective candidate pool (14 short-a target + 8 short-o + 11
-  // short-u — excluding the 4 short-a probes).
+  // short-u — excluding the 4 short-a probes AND excluding the 3
+  // short-o pool-extension words from ticket 86c9teu2e).
   //
   // Scope note (ticket 86c9qdba4): the cross-vowel matrix's coverage
   // tracks `mastery.ts CVC_CROSS_VOWEL_NODES` — only the CVC tiers the
@@ -284,23 +285,38 @@ describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
   // contract — adding a new tier to TARGET_WORDS doesn't false-fail
   // this test until the cross-vowel matrix expands to cover it.
   //
+  // Scope note (ticket 86c9teu2e — short-o pool extension): the v2
+  // pool-extension words (`cot, top, pop`) extend an EXISTING tier
+  // (short-o) — vowel-scoped filtering above wouldn't excise them.
+  // Per the extension spec §5, cross-vowel matrix rows for these 3
+  // entries are deferred to the cross-vowel-mode impl ticket
+  // (86c9m3aek). Scoping them out here by an explicit
+  // `POOL_EXTENSION_PENDING_CROSSVOWEL` set keeps the same
+  // exhaustiveness contract: adding pool-extension words to an
+  // existing tier doesn't false-fail this test until the cross-vowel
+  // matrix is widened to cover them. Same posture as PROBE_WORDS.
+  //
   // Single source of truth (ticket 86c9qdp2n): `CVC_CROSS_VOWEL_VOWELS`
   // is exported from `mastery.ts` paired with `CVC_CROSS_VOWEL_NODES`.
   // When the cross-vowel matrix widens, both constants update together.
   const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+  const POOL_EXTENSION_PENDING_CROSSVOWEL = new Set(['cot', 'top', 'pop'])
   const CROSS_VOWEL_VOWEL_SET: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
     new Set(CVC_CROSS_VOWEL_VOWELS)
   const CROSS_VOWEL_TARGETS = TARGET_WORDS.filter(
     (w) =>
       w.isTarget &&
       !PROBE_WORDS.has(w.word) &&
+      !POOL_EXTENSION_PENDING_CROSSVOWEL.has(w.word) &&
       CROSS_VOWEL_VOWEL_SET.has(w.vowel),
   )
 
-  it('has exactly 33 rows — 14 short-a canonical + 8 short-o + 11 short-u (probes + non-cross-vowel-tier targets excluded)', () => {
+  it('has exactly 33 rows — 14 short-a canonical + 8 short-o v1 + 11 short-u (probes + pool-extension pending + non-cross-vowel-tier targets excluded)', () => {
     // Spec §4 AC4 — 33 rows total. Probes (`nap, rat, map, tap`)
     // intentionally excluded so they remain graduation-session-only
-    // emit-paths.
+    // emit-paths. Pool-extension words (`cot, top, pop` from ticket
+    // 86c9teu2e) intentionally excluded — cross-vowel matrix
+    // widening for them is deferred to ticket 86c9m3aek per spec §5.
     const rowCount = Object.keys(TARGET_PAIRINGS_CROSSVOWEL).length
     expect(rowCount).toBe(33)
   })
@@ -511,13 +527,21 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
     //
     // Single source of truth (ticket 86c9qdp2n): pulls
     // `CVC_CROSS_VOWEL_VOWELS` from `mastery.ts`.
+    //
+    // Pool-extension scope (ticket 86c9teu2e): the short-o pool
+    // extension (`cot, top, pop`) intentionally has NO cross-vowel
+    // matrix rows yet — that's deferred to the cross-vowel-mode
+    // impl ticket 86c9m3aek. They are scoped out here by the same
+    // exclusion pattern used for probe words.
     const PROBE_WORDS = new Set(['nap', 'rat', 'map', 'tap'])
+    const POOL_EXTENSION_PENDING_CROSSVOWEL = new Set(['cot', 'top', 'pop'])
     const CROSS_VOWEL_VOWEL_SET: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
       new Set(CVC_CROSS_VOWEL_VOWELS)
     const targets = TARGET_WORDS.filter(
       (w) =>
         w.isTarget &&
         !PROBE_WORDS.has(w.word) &&
+        !POOL_EXTENSION_PENDING_CROSSVOWEL.has(w.word) &&
         CROSS_VOWEL_VOWEL_SET.has(w.vowel),
     )
     for (const target of targets) {

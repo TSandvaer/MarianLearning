@@ -60,12 +60,13 @@
  *
  * Note on canon authority
  * -----------------------
- * The canon's 8 short-o targets — dog, mom, pot, log, mop, box, fox,
- * hot — are the source of truth for `VALID_SHORT_O_WORDS`. They mirror
- * (and must stay in sync with) the `vowel: 'o'` entries in
+ * The canon's 11 short-o targets — dog, mom, pot, log, mop, box, fox,
+ * hot, cot, top, pop — are the source of truth for `VALID_SHORT_O_WORDS`.
+ * They mirror (and must stay in sync with) the `vowel: 'o'` entries in
  * `src/screens/WordSong/wordPack.ts` `TARGET_WORDS`. Hardcoding the
  * set here means a future canon-bake that omits or adds a target
- * fails this spec loudly — the right kind of failure.
+ * fails this spec loudly — the right kind of failure. Extended from
+ * the original 8 (PR #151) to 11 in the v2 pool extension (+cot/top/pop).
  *
  * Note on test 7 (focusNode persistence)
  * --------------------------------------
@@ -107,9 +108,12 @@ const CVC_WORDS_SHORT_O_CANON_PATH = resolve(
 )
 
 /**
- * The eight short-o targets shipped in the canon. Source of truth for
+ * The eleven short-o targets shipped in the canon. Source of truth for
  * read-line / chip-target membership checks. Must stay aligned with
- * `vowel: 'o'` entries in `wordPack.ts` `TARGET_WORDS`.
+ * `vowel: 'o'` entries in `wordPack.ts` `TARGET_WORDS`. Extended from
+ * 8 → 11 in the v2 pool extension (+cot/top/pop) shipped on this PR;
+ * the upstream PR #151 lineage that this spec name still references
+ * locked the original 8-word pool.
  */
 const VALID_SHORT_O_WORDS: ReadonlySet<string> = new Set([
   'dog',
@@ -120,6 +124,9 @@ const VALID_SHORT_O_WORDS: ReadonlySet<string> = new Set([
   'box',
   'fox',
   'hot',
+  'cot',
+  'top',
+  'pop',
 ])
 
 /**

@@ -23,27 +23,40 @@ export const WORD_SONG_TARGET_WORDS_FOR_PROMPT = [
 ].join('\n')
 
 /**
- * The 8 target words for the short-o sibling tier (`cvc-words-short-o`).
- * Locked by Thomas 2026-05-04 per
- * `design/word-song/short-o-pool-expansion.md` §1 with the §10 Q1/Q2
- * decisions applied (keep box+fox with first-encounter scaffolding,
- * `hot` over `dot` for the 8th slot — steaming-bowl picture is a
- * stronger anchor for an L2 8-year-old than an abstract circle).
+ * The 11 target words for the short-o sibling tier (`cvc-words-short-o`).
+ *
+ * v1 (PR #150, locked 2026-05-04 per
+ * `design/word-song/short-o-pool-expansion.md`): 8 words —
+ * `dog, mop, log, pot, box, fox, mom, hot`. §10 Q1/Q2 decisions applied
+ * (keep box+fox with first-encounter scaffolding, `hot` over `dot` for
+ * the 8th slot — steaming-bowl picture is a stronger anchor for an L2
+ * 8-year-old than an abstract circle).
+ *
+ * v2 (ticket 86c9teu2e, this PR — `short-o-pool-extension.md`): pool
+ * extended 8 → 11 to match short-u parity and unblock the cross-vowel
+ * mode pool-size floor (≥ 11 per `cross-vowel-mix-spec.md` §6 +
+ * `cross-vowel-discrimination-threshold.md` §"Recommendations"). The
+ * 3 new entries are `cot, top, pop` — all wholly-new, all CVC short-o,
+ * adding two new rhyme triplets to the pool: `/ɒt/` (`pot, hot, cot`)
+ * and `/ɒp/` (`mop, top, pop`). See spec §3 audit for the per-word
+ * rationale.
  *
  * Pool composition:
  *  - 4 promoted from the v1 distractor-only pool: `dog, log, pot, fox`
  *    (their `WordEntry.isTarget` flips to true in `wordPack.ts` while
  *    they remain valid distractors for short-a sessions — the two
  *    flags are independent).
- *  - 4 wholly new entries: `mop, box, mom, hot`.
+ *  - 4 wholly new in v1: `mop, box, mom, hot`.
+ *  - 3 wholly new in v2 (this PR): `cot, top, pop`.
  *
  * Same alignment contract as `WORD_SONG_TARGET_WORDS_FOR_PROMPT`: the
  * client-side `wordPack.ts` MUST carry every word here as
- * `isTarget: true` plus a `TARGET_PAIRINGS` row. The smoke test in
- * `claude.test.ts` round-trips this list to enforce that.
+ * `isTarget: true` plus a `TARGET_PAIRINGS` row. The round-trip suite
+ * in `src/screens/WordSong/plannerRoundTrip.test.ts` + the planner
+ * unit tests in `api/_planner.test.ts` enforce that.
  */
 export const WORD_SONG_TARGET_WORDS_SHORT_O =
-  'dog, mop, log, pot, box, fox, mom, hot'
+  'dog, mop, log, pot, box, fox, mom, hot, cot, top, pop'
 
 /**
  * The 11 target words for the short-u sibling tier (`cvc-words-short-u`).
@@ -108,7 +121,16 @@ export const WORD_SONG_TARGET_WORDS_SHORT_I =
  *  rhyme family in the v3 short-u pool — same shape and motivation as
  *  short-a's `/æt/` cluster. The short-i block (ticket 86c9qdba4) is
  *  included for the same reason: the `/ɪg/` triplet (`pig, wig, fig`)
- *  is the densest rhyme family in the v4 short-i pool. */
+ *  is the densest rhyme family in the v4 short-i pool.
+ *
+ *  Short-o rhyme block added with the v2 pool extension (ticket
+ *  86c9teu2e, `design/word-song/short-o-pool-extension.md` AC5). The
+ *  pool extension to 11 entries (`+ cot, top, pop`) emerges two new
+ *  rhyme triplets — `/ɒt/` (`pot, hot, cot`) and `/ɒp/` (`mop, top,
+ *  pop`) — which parallel short-u's `/ʌg/` triplet and short-i's
+ *  `/ɪg/` triplet as the densest clusters in their pools. Surfacing
+ *  the rhyme families lets Haiku exploit them as trap-window levers,
+ *  mirroring the short-u/short-i precedents. */
 export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /æt/ rhyme family: cat, hat, bat, mat — pack these in the trap window when one is the target.',
   '- /æn/ rhyme family: fan, man, pan, can, van — same.',
@@ -116,6 +138,11 @@ export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /æp/ rhyme family: cap.',
   '- /æd/ rhyme family: dad.',
   '- /æm/ rhyme family: jam.',
+  '- /ɒg/ rhyme family: dog, log — pack these in the trap window when one is the target.',
+  '- /ɒp/ rhyme family: mop, top, pop — pack these in the trap window when one is the target.',
+  '- /ɒt/ rhyme family: pot, hot, cot — pack these in the trap window when one is the target.',
+  '- /ɒks/ rhyme family: box, fox — same.',
+  '- /ɒm/ rhyme family: mom.',
   '- /ʌn/ rhyme family: sun, bun — pack these in the trap window when one is the target.',
   '- /ʌp/ rhyme family: cup.',
   '- /ʌs/ rhyme family: bus.',

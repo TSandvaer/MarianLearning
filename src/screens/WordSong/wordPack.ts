@@ -290,6 +290,50 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'object',
     isTarget: true,
   },
+  // ── Short-o pool extension (ticket 86c9teu2e, v2 pool extension) ────
+  // Per `design/word-song/short-o-pool-extension.md` §3 with Thomas's
+  // 2026-05-09 lock (Q1=A, Q2=A): 3 wholly-new short-o words extending
+  // the v1 8-word pool to 11 entries, matching short-u parity and
+  // unblocking the cross-vowel mode pool-size floor (≥ 11 per
+  // `cross-vowel-mix-spec.md` §6). All three add new rhyme partners:
+  //   - cot — /ɒt/ rhyme triplet completion (pot, hot, cot)
+  //   - top — /ɒp/ rhyme expansion (mop, top)
+  //   - pop — /ɒp/ rhyme triplet completion (mop, top, pop)
+  //
+  // Picture pack ships in Devon's parallel ticket 86c9teu03 (Phase 3
+  // PNG-in-SVG embed via `yarn embed-pictures`). Until that lands the
+  // chips fall back to the unknown-key silhouette in `wordPictures.tsx`
+  // (rounded rectangle + word text) — graceful, not crashing.
+  //
+  // Same-vowel-only distractor rule (spec §8) preserved: every
+  // distractor for a short-o target is drawn from the now-11-word
+  // short-o pool itself. Cross-vowel matrix is intentionally NOT
+  // widened here — that's a separate downstream ticket (86c9m3aek);
+  // the cross-vowel exhaustiveness test in `wordDistractors.test.ts`
+  // is scoped to exclude these 3 extension words via the same
+  // `POOL_EXTENSION_PENDING_CROSSVOWEL` exclusion pattern used for
+  // probes.
+  {
+    word: 'cot',
+    pictureKey: 'cot',
+    vowel: 'o',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'top',
+    pictureKey: 'top',
+    vowel: 'o',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'pop',
+    pictureKey: 'pop',
+    vowel: 'o',
+    category: 'food',
+    isTarget: true,
+  },
   // ── Short-u pool (ticket 86c9q5q2d / 86c9q9ben, v3 vowel tier) ──────
   // Per `design/word-song/short-u-pool-expansion.md` §1 with Thomas's
   // 2026-05-09 lock (Q1=A): 11 short-u target words spanning seven
@@ -653,6 +697,24 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   fox: { gentle: ['pot', 'mom'], trap: ['box', 'dog'] }, // /ɒks/ rhyme + animal trap
   mom: { gentle: ['box', 'hot'], trap: ['mop', 'log'] }, // m-alliteration + /ɒ/ vowel trap
   hot: { gentle: ['dog', 'fox'], trap: ['pot', 'mop'] }, // /ɒt/ rhyme + p-/m- alliteration trap
+  // ── Short-o pool extension (ticket 86c9teu2e) ─────────────────────
+  // Per `design/word-song/short-o-pool-extension.md` §5: same-vowel
+  // only — every distractor for the 3 new short-o targets is drawn
+  // from the 11-word short-o pool. Trap-tier pairs lean on the new
+  // rhyme triplets emerging from the extension:
+  //   - /ɒt/ triplet (pot, hot, cot) → cot's trap is its rhyme cluster
+  //   - /ɒp/ triplet (mop, top, pop) → top's and pop's trap is theirs
+  // Gentle-tier pairs cross category (object ↔ animal ↔ person ↔
+  // household) to keep the gentle-tier "clearly different" gate honest.
+  //
+  // FORBIDDEN_PAIRS audit — none of the rows below trigger. The new
+  // entries are not involved in any existing forbidden pair (cat-dog,
+  // bus-van, pan-pot, cap-hat, man-dad, mom-dad, rug-mat, tub-cup,
+  // fig-bun, pig-dog, pig-cat); none of those pairs surfaces in a
+  // short-o trio under the same-vowel-only rule either.
+  cot: { gentle: ['box', 'fox'], trap: ['pot', 'hot'] }, // /ɒt/ rhyme triplet trap (cot/pot/hot)
+  top: { gentle: ['dog', 'mom'], trap: ['mop', 'pop'] }, // /ɒp/ rhyme triplet trap (top/mop/pop)
+  pop: { gentle: ['fox', 'log'], trap: ['mop', 'top'] }, // /ɒp/ rhyme triplet trap (pop/mop/top)
   // ── Short-u pool (ticket 86c9q5q2d / 86c9q9ben) ────────────────────
   // Per `design/word-song/short-u-pool-expansion.md` §2.4 matrix
   // preview + §8 same-vowel-only rule: every distractor for a short-u
