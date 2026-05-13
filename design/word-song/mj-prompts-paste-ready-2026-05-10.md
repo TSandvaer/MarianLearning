@@ -303,22 +303,26 @@ A flat illustrated cartoon DRAWING of a single corn-on-the-cob in three-quarter 
 
 ## Phase 3 handoff (Devon)
 
-After Thomas's MJ + remove.bg, source PNGs land at:
+After Thomas's MJ + remove.bg, source PNGs land at (per-tier subdir convention adopted 2026-05-13):
 
-```
-MarianLearning/design/references/picture-pack/transparent/{bed,leg,hen,pen,web,net,jet,gem,egg,cot,top,pop,cob}.png
-```
+- Short-e words (`bed, leg, hen, pen, web, net, jet, gem, egg`):
+  `MarianLearning/design/references/picture-pack/transparent-short-e/picture-{word}.png`
+- Short-o-ext words (`cot, top, pop` — or `cob` if Phase 2 substitution fires):
+  `MarianLearning/design/references/picture-pack/transparent-short-o-ext/picture-{word}.png`
 
 Devon's Phase 3 step (per `.claude/docs/skill-trees-and-content.md` § Two embed-pipeline gotchas):
 
 ```pwsh
 cd MarianLearning
-yarn embed-pictures design/references/picture-pack/transparent public/assets/pictures
+# Short-e
+yarn embed-pictures design/references/picture-pack/transparent-short-e public/assets/pictures
+# Short-o-ext
+yarn embed-pictures design/references/picture-pack/transparent-short-o-ext public/assets/pictures
 ```
 
 **Worktree-drift gotcha:** md5-check source PNGs against canonical main-repo path before running, OR `cp` canonical PNGs into worktree path as first step.
 
-**Empty-input-dir gotcha:** ensure `transparent/` contains ONLY the target PNGs at run-time; out-of-scope source PNGs WILL produce unintended SVG output.
+**Per-tier isolation:** each tier's subdir contains ONLY that tier's PNGs. Adding a new PNG to `transparent-short-e/` does NOT affect any other tier's embed run.
 
 If Phase 2 `pop → cob` substitution fires, follow pool spec §AC7 + §10 Q3 (`wordPack.ts TARGET_WORDS` + `TARGET_PAIRINGS` + `api/_plannerWordList.ts` + canon re-bake + spec amendment PR).
 
