@@ -1442,3 +1442,231 @@ describe('applyMasteryRule — 86c9qu91g regression (80%/2, crossDay off, cvc-wo
     expect(result.pendingPromotion).toBe('cvc-words')
   })
 })
+
+// --------------------------------------------------------------------------
+// intro → practicing transition (ticket 86c9qu91g root-cause fix)
+//
+// Root cause confirmed by Thomas's iPhone state export:
+//   skillLevels['cvc-words'] === 'intro' after 4 consecutive 100% sessions.
+//
+// `applyMasteryRule` previously only walked nodes at 'practicing'. Nodes
+// stuck at 'intro' were invisible to the mastery engine regardless of
+// session history. The fix adds a pass BEFORE the practicing → mastered
+// scan: for every node at 'intro' that has at least one session with
+// successRate > 0, promote it to 'practicing'. This lets the normal M3
+// rule handle practicing → mastered on the SAME call.
+//
+// Four nodes start at 'intro' in defaultProgress():
+//   cvc-words, sub-to-20, mult-2-5-10, sight-words
+//
+// All four are dead-end skills until this fix ships.
+// --------------------------------------------------------------------------
+
+describe('applyMasteryRule — intro → practicing transition (86c9qu91g)', () => {
+  // ── Core case: Thomas's exact iPhone scenario ──────────────────────────
+  //
+  // Settings match what Thomas has configured: 80%/2, crossDayEnforcement=false.
+  // Starting state: cvc-words === 'intro' (default).
+  // History: 4 × 100% same-day sessions on cvc-words (crossDay off → all count).
+  //
+  // Expected full ladder traversal:
+  //   intro → practicing (new intro→practicing pass)
+  //   practicing → (graduation gate fires, but no novelPoolSuccessRate yet → stays)
+  //
+  // Note: cvc-words is graduation-gated. After intro→practicing, the 80%/2
+  // canonical window is satisfied but the graduation gate needs a
+  // novelPoolSuccessRate entry. So the expected outcome after 4 plain sessions
+  // is: cvc-words === 'practicing' (not mastered yet — graduation needed).
+  // isGraduationSessionPending must also return true.
+  it('promotes cvc-words from intro to practicing when successRate > 0, then graduation gate holds', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'intro' }),
+      history: [
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T11:00:00.000Z', 'cvc-words', 1.0),
+      ],
+      parentSettings: {
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
+        crossDayEnforcement: false,
+      },
+    })
+    const result = applyMasteryRule(progress)
+    // intro → practicing fired; graduation gate blocks mastery (no novel entry).
+    expect(result.skillLevels['cvc-words']).toBe('practicing')
+    // Downstream stays locked — no mastery promotion yet.
+    expect(result.skillLevels['cvc-words-short-o']).toBe('locked')
+    // isGraduationSessionPending must be true (80%/2 canonical met, no novel yet).
+    expect(
+      isGraduationSessionPending(result, 'cvc-words', 'word-song'),
+    ).toBe(true)
+  })
+
+  // ── Thomas's full self-healing scenario (AC#6 verification) ────────────
+  //
+  // Thomas's iPhone has cvc-words stuck at 'intro' but has 5+ sessions
+  // of 100% cvc-words history. After ONE applyMasteryRule call with a
+  // graduation entry as the most recent, the node must reach 'mastered'
+  // in a single pass:
+  //   intro → practicing (new pass)
+  //   practicing → mastered (graduation gate clears)
+  //
+  // This is the self-healing test from AC#6 — no manual data fix needed.
+  it('full ladder traversal (intro → practicing → mastered) in one call when graduation entry is present', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'intro' }),
+      history: [
+        // 3 canonical sessions (crossDay off) + graduation entry — all at 100%.
+        // The 80%/2 canonical window is satisfied by the tail 2 of these entries;
+        // the graduation entry is the last one and carries novelPoolSuccessRate=1.0.
+        entry('2026-05-11T07:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-11T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+      parentSettings: {
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
+        crossDayEnforcement: false,
+      },
+    })
+    const result = applyMasteryRule(progress)
+    // Full ladder: intro → practicing → mastered in a single call.
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    // Downstream unlocked.
+    expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
+    expect(result.pendingPromotion).toBe('cvc-words')
+  })
+
+  // ── AC#4: full ladder with default 90%/3 settings (non-Thomas shape) ──
+  //
+  // Tests that the intro → practicing → mastered ladder works under the
+  // default word-song 90%/3 threshold too (not just Thomas's 80%/2).
+  // Uses 4 sessions: 3 canonical qualifying + 1 graduation entry.
+  it('full ladder under default 90%/3 word-song threshold with cross-day sessions', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'intro' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+        // Graduation entry — completes the 90%/3 canonical window and passes the novel gate.
+        // With crossDayEnforcement=true (default), dedupe to one-per-day;
+        // the tail 3 after dedupe are the three entries above + this one.
+        // Slice(-3): entries [04-30, 05-01, graduation]; the last is the graduation entry.
+        graduationEntry('2026-05-02T10:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+      // No parentSettings override — uses defaultProgress()'s 90%/3 word-song default.
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
+    expect(result.pendingPromotion).toBe('cvc-words')
+  })
+
+  // ── intro → practicing on a non-graduation-gated node ─────────────────
+  //
+  // sub-to-20 starts at 'intro' in defaultProgress(). It is NOT
+  // graduation-gated. A single session with successRate > 0 should
+  // promote it to 'practicing'. Three sessions above the threshold
+  // should then promote it to 'mastered' in the same call.
+  it('promotes sub-to-20 from intro to practicing when successRate > 0', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-20': 'intro' }),
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'sub-to-20', 0.625), // 5/8 — above zero
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sub-to-20']).toBe('practicing')
+  })
+
+  it('intro node with zero successRate does NOT advance to practicing', () => {
+    // A session where Marian got 0/8 does not count as "she can do something
+    // with this skill." intro → practicing requires successRate > 0.
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-20': 'intro' }),
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'sub-to-20', 0.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sub-to-20']).toBe('intro')
+  })
+
+  it('intro node with no matching history stays at intro', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-20': 'intro' }),
+      history: [
+        // History only has add-to-10 entries — sub-to-20 not touched.
+        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sub-to-20']).toBe('intro')
+  })
+
+  it('intro → practicing does NOT unlock the downstream node (locked → intro only on mastered)', () => {
+    // When blending-cv (at 'locked') should NOT get promoted to 'intro'
+    // just because cvc-words advances from intro → practicing.
+    // The 'locked → intro' downstream unlock only fires on mastered, not on
+    // practicing.
+    const progress = buildProgress({
+      skillLevels: levels({
+        'cvc-words': 'intro',
+        'cvc-words-short-o': 'locked',
+      }),
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('practicing')
+    // Downstream stays locked — intro→practicing does not cascade.
+    expect(result.skillLevels['cvc-words-short-o']).toBe('locked')
+  })
+
+  it('does not mutate input progress', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'intro' }),
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    applyMasteryRule(progress)
+    expect(progress.skillLevels['cvc-words']).toBe('intro')
+  })
+
+  // ── mult-2-5-10 (math intro node) ─────────────────────────────────────
+  //
+  // mult-2-5-10 starts at 'intro' in defaultProgress(). Verify the fix
+  // works on the math track too.
+  it('promotes mult-2-5-10 from intro to practicing with one any-success session', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'mult-2-5-10': 'intro' }),
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'mult-2-5-10', 0.125), // 1/8
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['mult-2-5-10']).toBe('practicing')
+  })
+
+  // ── sight-words (word-song intro node) ────────────────────────────────
+  it('promotes sight-words from intro to practicing with one any-success session', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sight-words': 'intro' }),
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'sight-words', 0.5),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sight-words']).toBe('practicing')
+  })
+})
