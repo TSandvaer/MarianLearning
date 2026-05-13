@@ -257,16 +257,57 @@ export function applyMasteryRule(progress: Progress): Progress {
     delete out.pendingPromotion
   }
 
-  // ── Walk both trees, evaluate promotion candidates ──
-  // We collect candidates first so the autoPromote=false branch can
-  // pick the earliest in tree order without scanning twice.
-  const candidates: { track: MasteryTrack; node: SkillNode }[] = []
-
+  // Shared tree list used by both the intro→practicing pass and the
+  // practicing→mastered candidate scan below.
   const trees: readonly { track: MasteryTrack; nodes: readonly SkillNode[] }[] =
     [
       { track: 'math', nodes: MATH_TREE },
       { track: 'word-song', nodes: LITERACY_TREE },
     ]
+
+  // ── intro → practicing pass (ticket 86c9qu91g) ──────────────────────────
+  // Root cause: the rule below only walked nodes at 'practicing'. Any node
+  // that started at 'intro' (cvc-words, sub-to-20, mult-2-5-10, sight-words
+  // in the default baseline) was permanently invisible to the engine
+  // regardless of how many sessions Marian completed on it. Thomas's iPhone
+  // state showed skillLevels['cvc-words'] === 'intro' after 4 consecutive
+  // 100% sessions — confirming the dead-end.
+  //
+  // Transition rule: if a node is at 'intro' AND the history contains at
+  // least one entry where `skillFocus` includes that node AND
+  // `successRate > 0`, advance the node to 'practicing'. One any-success
+  // session is sufficient — the semantic of 'intro' is "hasn't been tried
+  // yet" and the semantic of 'practicing' is "has demonstrated SOME ability
+  // with this skill, now being refined." A session with successRate = 0
+  // (0/8) does not clear the intro gate.
+  //
+  // No downstream cascade here: the locked → intro unlock only fires when
+  // a node reaches 'mastered', not 'practicing'. The practicing → mastered
+  // scan below runs against the updated `out.skillLevels` in the same call,
+  // so a node can traverse intro → practicing → mastered in a single
+  // applyMasteryRule call when history is sufficient.
+  //
+  // Retroactive self-healing: existing users with nodes stuck at 'intro'
+  // (Thomas's iPhone) will self-heal on the next session-end call because
+  // the prior session history satisfies the "at least one successRate > 0"
+  // check.
+  for (const { nodes } of trees) {
+    for (const node of nodes) {
+      if (out.skillLevels[node] !== 'intro') continue
+      const hasAnySuccess = progress.history.some(
+        (entry) =>
+          entry.skillFocus.includes(node) && entry.successRate > 0,
+      )
+      if (hasAnySuccess) {
+        out.skillLevels[node] = 'practicing'
+      }
+    }
+  }
+
+  // ── Walk both trees, evaluate promotion candidates ──
+  // We collect candidates first so the autoPromote=false branch can
+  // pick the earliest in tree order without scanning twice.
+  const candidates: { track: MasteryTrack; node: SkillNode }[] = []
 
   for (const { track, nodes } of trees) {
     // Per-track threshold (ticket 86c9kwvy0) — math and word-song

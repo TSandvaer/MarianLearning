@@ -331,8 +331,11 @@ describe('promotion round-trip (writer → reader)', () => {
 
     // Session-end 2: a regular subsequent session on the new focus node.
     // The mastery rule re-runs, sees the queued node is 'mastered', and
-    // the stale-clear branch deletes pendingPromotion. skillLevels
-    // shape is unchanged.
+    // the stale-clear branch deletes pendingPromotion.
+    // add-to-20 is now at 'intro' (unlocked by the session-end 1 promotion)
+    // and session-end 2 records a 100% session on it — the intro→practicing
+    // pass (ticket 86c9qu91g) fires, so add-to-20 advances to 'practicing'.
+    // Core assertion: pendingPromotion is gone (the stale-clear lifecycle).
     recordProgressOnSessionEnd({
       surface: 'math',
       totalCorrect: 8,
@@ -342,6 +345,8 @@ describe('promotion round-trip (writer → reader)', () => {
     const afterSecond = loadProgress()
     expect(afterSecond?.pendingPromotion).toBeUndefined()
     expect(afterSecond?.skillLevels['add-to-10']).toBe('mastered')
-    expect(afterSecond?.skillLevels['add-to-20']).toBe('intro')
+    // add-to-20 advances intro → practicing because session-end 2 recorded
+    // a 100% session on it (intro→practicing fires on any successRate > 0).
+    expect(afterSecond?.skillLevels['add-to-20']).toBe('practicing')
   })
 })
