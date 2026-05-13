@@ -214,13 +214,16 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // vowel-tier sibling — see `design/word-song/short-u-pool-expansion.md`
 // §6. Ticket 86c9qdba4 added `cvc-words-short-i` as the fourth
 // vowel-tier sibling — see `design/word-song/short-i-pool-expansion.md`
-// §6.
+// §6. Ticket 86c9teua2 added `cvc-words-short-e` as the fifth and
+// FINAL single-vowel tier in the o → u → i → e canonical arc — see
+// `design/word-song/short-e-pool-expansion.md` §7.
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
   'cvc-words-short-u',
   'cvc-words-short-i',
+  'cvc-words-short-e',
 ]
 
 export function activeCombos(): readonly Combo[] {

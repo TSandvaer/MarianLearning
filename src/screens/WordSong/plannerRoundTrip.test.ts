@@ -704,6 +704,183 @@ describe('planner → parser round-trip — cvc-words-short-i (ticket 86c9qdba4)
   })
 })
 
+/**
+ * Short-e sibling tier round-trip (ticket 86c9teua2). Mirrors the
+ * short-o / short-u / short-i blocks above, one tier further down the
+ * literacy ladder — and the FINAL single-vowel tier in the
+ * o → u → i → e canonical arc. The planner widens to emit
+ * `cvc-words-short-e` content with a 9-word short-e pool (`bed, leg,
+ * hen, pen, web, net, jet, gem, egg`); the parser already accepts
+ * `"Read the <word>."` per PR #132. This suite pins the round-trip
+ * end-to-end:
+ *
+ *   1. A wire-shape response with 8 short-e "Read the <word>."
+ *      problems parses without throwing (pool is 9; planner picks 8
+ *      distinct per the standard rule).
+ *   2. Every problem carries `contentType: 'cvc-word'` (same as the
+ *      short-a / short-o / short-u / short-i siblings — the discriminant
+ *      is the read-line template, not the focus-node name).
+ *   3. The 8 sampled targets resolve via `getWordEntry` (the wordPack
+ *      carries all 9 entries with `isTarget: true`), and
+ *      `pickDistractors` resolves trios for both gentle and trap tiers.
+ *   4. Distractor pool isolation: same-vowel-only rule (spec §8) —
+ *      every distractor for a short-e target is drawn from the
+ *      short-e pool itself.
+ */
+describe('planner → parser round-trip — cvc-words-short-e (ticket 86c9teua2)', () => {
+  const SHORT_E_WORDS = [
+    'bed',
+    'leg',
+    'hen',
+    'pen',
+    'web',
+    'net',
+    'jet',
+    'gem',
+  ] as const
+
+  const FULL_SHORT_E_POOL: ReadonlySet<string> = new Set([
+    ...SHORT_E_WORDS,
+    'egg',
+  ])
+
+  /** Build a wire-shape response that mirrors what the live planner
+   *  would emit for `focusNode: 'cvc-words-short-e'`. Uses 8 of the 9
+   *  short-e pool entries — the planner picks 8 distinct per session. */
+  function makeShortEWirePlan(words: readonly string[]): string {
+    if (words.length !== 8) {
+      throw new Error(
+        `[plannerRoundTrip test] short-e plan needs 8 words; got ${words.length}`,
+      )
+    }
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      // egg uses the bang-fallback celebration template per the
+      // planner directive's vowel-initial exception (ticket 86c9teua2);
+      // other short-e words use the default "That's a <word>." form.
+      const correctText =
+        word === 'egg' ? `Yes! ${cap}!` : `Yes! That's a ${word}.`
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: correctText },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-short-e-001',
+      label: 'CVC short-e roundtrip fixture',
+      utterances,
+    })
+  }
+
+  it('parses cleanly with contentType=cvc-word on every short-e problem', async () => {
+    const client = makeMockClient(makeShortEWirePlan(SHORT_E_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-e',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    expect(rebuilt.problems).toHaveLength(8)
+    for (const problem of rebuilt.problems) {
+      expect(problem.contentType).toEqual('cvc-word')
+      expect(problem.utterances.read).toMatch(/^Read the [a-z]+\.$/)
+      // Every target is from the short-e pool (no other-vowel leakage
+      // at the planner-output level).
+      expect(FULL_SHORT_E_POOL.has(problem.target.word)).toBe(true)
+      // Vowel field carries 'e' on every short-e target.
+      expect(problem.target.vowel).toEqual('e')
+      // isTarget=true on every target.
+      expect(problem.target.isTarget).toBe(true)
+    }
+    // 8 distinct targets — no repeats within a session. Equality
+    // check (count-based assertion per
+    // feedback_count_assertions_on_regression_tests.md).
+    const targets = rebuilt.problems.map((p) => p.target.word)
+    expect(new Set(targets).size).toEqual(8)
+    // Sorted-equality on the 8 we fed in — exact membership, not "contains".
+    expect(targets.slice().sort()).toEqual([...SHORT_E_WORDS].sort())
+  })
+
+  it('every short-e target resolves a gentle + trap distractor pair without throwing', async () => {
+    // Pin that `TARGET_PAIRINGS` carries a row for every word in the
+    // 9-word short-e pool. Missing rows surface here as a
+    // `pickDistractors` throw; matrix drift surfaces immediately.
+    const client = makeMockClient(makeShortEWirePlan(SHORT_E_WORDS))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-e',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    for (const problem of rebuilt.problems) {
+      expect(() => pickDistractors(problem.target, 1)).not.toThrow()
+      expect(() => pickDistractors(problem.target, 5)).not.toThrow()
+    }
+  })
+
+  it('short-e trios draw distractors only from the short-e pool (same-vowel rule, spec §8)', () => {
+    // For each of the 9 short-e targets, both tiers' distractor pairs
+    // must come from the short-e pool. Pure read of the matrix —
+    // exercises every TARGET_PAIRINGS row.
+    for (const target of FULL_SHORT_E_POOL) {
+      const [g1, g2] = pickDistractors(
+        {
+          word: target,
+          pictureKey: target,
+          vowel: 'e',
+          category: 'object',
+          isTarget: true,
+        },
+        1,
+      )
+      expect(FULL_SHORT_E_POOL.has(g1.word)).toBe(true)
+      expect(FULL_SHORT_E_POOL.has(g2.word)).toBe(true)
+      const [t1, t2] = pickDistractors(
+        {
+          word: target,
+          pictureKey: target,
+          vowel: 'e',
+          category: 'object',
+          isTarget: true,
+        },
+        5,
+      )
+      expect(FULL_SHORT_E_POOL.has(t1.word)).toBe(true)
+      expect(FULL_SHORT_E_POOL.has(t2.word)).toBe(true)
+    }
+  })
+
+  it('every short-e target resolves via getWordEntry with isTarget=true AND vowel="e" (alignment contract)', () => {
+    // Defensive contract pin: the wordPack must carry every entry in
+    // `WORD_SONG_TARGET_WORDS_SHORT_E` as `isTarget: true` with
+    // `vowel: 'e'`. Drift between _plannerWordList.ts and wordPack.ts
+    // would surface as either a missing entry (getWordEntry throws)
+    // or a false isTarget flag (the parser would reject it as a
+    // "non-target word"). Direct read of the wordPack — no planner
+    // mock needed.
+    for (const word of FULL_SHORT_E_POOL) {
+      const entry = getWordEntry(word)
+      expect(entry.isTarget).toBe(true)
+      expect(entry.vowel).toBe('e')
+    }
+    // Sanity: exactly 9 short-e entries (audit-derived ship pool per
+    // spec §1 / §10 Q1 = A).
+    expect(FULL_SHORT_E_POOL.size).toEqual(9)
+  })
+})
+
 describe('planner → parser round-trip — untuned tier stub fallback (step 2 ticket 86c9kxu07)', () => {
   it('a digraphs-requested call falls back to blending-cv content (the stub-fallback contract)', async () => {
     // Per `effectiveFocusNode` in api/_planner.ts: untuned tiers
