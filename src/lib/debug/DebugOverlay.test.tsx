@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DebugOverlay from './DebugOverlay'
+import DebugOverlay, { buildStateExportPayload } from './DebugOverlay'
 import { isDebugEnabled } from './isDebugEnabled'
 import {
   _resetForTests,
@@ -413,6 +413,167 @@ describe('DebugOverlay', () => {
           })
         }
       }
+    })
+  })
+
+  describe('copy state button', () => {
+    beforeEach(() => {
+      localStorage.clear()
+    })
+
+    it('renders the "Copy state" button in the overlay', () => {
+      render(<DebugOverlay />)
+      expect(
+        screen.getByTestId('debug-overlay-copy-state-button'),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByTestId('debug-overlay-copy-state-button'),
+      ).toHaveTextContent('Copy state')
+    })
+
+    it('copies a JSON payload with progress + sessionHistory + deviceId on click', async () => {
+      vi.useRealTimers()
+      const user = userEvent.setup()
+
+      // Seed localStorage with known values.
+      const progressBlob = {
+        schemaVersion: 1,
+        skillLevels: { 'cvc-words': 'practicing' },
+        parentSettings: { crossDayEnforcement: false },
+      }
+      const sessionHistoryBlob = { schemaVersion: 2, sessionCount: 4 }
+      localStorage.setItem(
+        'marian-tutor:progress:v1',
+        JSON.stringify(progressBlob),
+      )
+      localStorage.setItem(
+        'marian-tutor.session-history.v1',
+        JSON.stringify(sessionHistoryBlob),
+      )
+      localStorage.setItem('marian-tutor:device-id', 'test-device-uuid')
+
+      const writeStateClipboardFn = vi.fn().mockResolvedValue(undefined)
+
+      render(
+        <DebugOverlay
+          writeStateClipboardFn={writeStateClipboardFn}
+          nowFn={() => 1_700_000_000_000}
+        />,
+      )
+
+      await user.click(
+        screen.getByTestId('debug-overlay-copy-state-button'),
+      )
+
+      expect(writeStateClipboardFn).toHaveBeenCalledTimes(1)
+      const payloadText = writeStateClipboardFn.mock.calls[0][0] as string
+      const parsed = JSON.parse(payloadText)
+
+      // Shape assertions — every field must be present and typed correctly.
+      expect(typeof parsed.exportedAt).toBe('string')
+      expect(typeof parsed.userAgent).toBe('string')
+      expect(typeof parsed.pageUrl).toBe('string')
+      expect(parsed.progress).toEqual(progressBlob)
+      expect(parsed.sessionHistory).toEqual(sessionHistoryBlob)
+      expect(parsed.deviceId).toBe('test-device-uuid')
+    })
+
+    it('flips button label to "Copied!" on success and resets after timeout', async () => {
+      // Outer beforeEach already called vi.useFakeTimers(). Use real timers
+      // here so the clipboard promise + React state updates flush naturally
+      // via microtasks. Verify label change; then fake-advance to fire revert.
+      // Because we restore with vi.useRealTimers() at the end of the outer
+      // afterEach, we just need to use real timers for the async portion and
+      // spy on the revert with a real waitFor.
+      vi.useRealTimers()
+      const user = userEvent.setup()
+      const writeStateClipboardFn = vi.fn().mockResolvedValue(undefined)
+
+      render(
+        <DebugOverlay
+          writeStateClipboardFn={writeStateClipboardFn}
+          nowFn={() => 0}
+        />,
+      )
+
+      await user.click(
+        screen.getByTestId('debug-overlay-copy-state-button'),
+      )
+
+      // Clipboard resolved — button should flip to "Copied!".
+      await waitFor(() =>
+        expect(
+          screen.getByTestId('debug-overlay-copy-state-button'),
+        ).toHaveTextContent('Copied!'),
+      )
+
+      // Wait for the 2000 ms revert. Real timers are in effect so this will
+      // actually wait — capped with a generous timeout so CI is stable.
+      await waitFor(
+        () =>
+          expect(
+            screen.getByTestId('debug-overlay-copy-state-button'),
+          ).toHaveTextContent('Copy state'),
+        { timeout: 3000 },
+      )
+    })
+
+    it('exports null for missing progress / sessionHistory keys', async () => {
+      vi.useRealTimers()
+      const user = userEvent.setup()
+      // localStorage is empty (beforeEach cleared it).
+      const writeStateClipboardFn = vi.fn().mockResolvedValue(undefined)
+
+      render(
+        <DebugOverlay
+          writeStateClipboardFn={writeStateClipboardFn}
+          nowFn={() => 0}
+        />,
+      )
+
+      await user.click(
+        screen.getByTestId('debug-overlay-copy-state-button'),
+      )
+
+      expect(writeStateClipboardFn).toHaveBeenCalledTimes(1)
+      const parsed = JSON.parse(
+        writeStateClipboardFn.mock.calls[0][0] as string,
+      )
+      expect(parsed.progress).toBeNull()
+      expect(parsed.sessionHistory).toBeNull()
+      expect(parsed.deviceId).toBeNull()
+    })
+  })
+
+  describe('buildStateExportPayload', () => {
+    beforeEach(() => {
+      localStorage.clear()
+    })
+
+    it('returns the correct shape with all three keys populated', () => {
+      const progressBlob = { schemaVersion: 1 }
+      localStorage.setItem(
+        'marian-tutor:progress:v1',
+        JSON.stringify(progressBlob),
+      )
+      localStorage.setItem('marian-tutor.session-history.v1', '{"count":1}')
+      localStorage.setItem('marian-tutor:device-id', 'abc-123')
+
+      const payload = buildStateExportPayload(1_700_000_000_000)
+
+      expect(payload.exportedAt).toBe(
+        new Date(1_700_000_000_000).toISOString(),
+      )
+      expect(payload.progress).toEqual(progressBlob)
+      expect(payload.sessionHistory).toEqual({ count: 1 })
+      expect(payload.deviceId).toBe('abc-123')
+    })
+
+    it('returns null for progress and sessionHistory when keys are absent', () => {
+      const payload = buildStateExportPayload(0)
+      expect(payload.progress).toBeNull()
+      expect(payload.sessionHistory).toBeNull()
+      expect(payload.deviceId).toBeNull()
     })
   })
 })

@@ -1291,3 +1291,154 @@ describe('crossVowelMixingActive', () => {
     expect(crossVowelMixingActive(progress)).toBe(true)
   })
 })
+
+// --------------------------------------------------------------------------
+// Regression — ticket 86c9qu91g (mastery-promotion bug)
+//
+// Thomas reported: after 4-5 perfect cvc-words sessions on iPhone Safari
+// with ParentSettings set to 80% / 2 sessions + crossDayEnforcement=false,
+// the PromotionCelebration overlay fired but the next session still picked
+// cvc-words as focus and served the same short-a words.
+//
+// These tests pin each layer of the promotion + focus-selection pipeline
+// under the lowered threshold so a regression is immediately visible.
+//
+// Settings profile used throughout:
+//   masteryThreshold['word-song']: { percent: 0.8, sessions: 2 }
+//   crossDayEnforcement: false
+//   autoPromote: true (default)
+// --------------------------------------------------------------------------
+
+describe('applyMasteryRule — 86c9qu91g regression (80%/2, crossDay off, cvc-words)', () => {
+  // Helper: build a Progress with the Thomas settings profile.
+  // masteryThreshold must include both tracks to satisfy PerTrackMasteryThreshold;
+  // keep math at the default 95/3 so only word-song is lowered.
+  function thomasProgress(args: {
+    history: SessionHistoryEntry[]
+    pendingPromotion?: SkillNode
+  }): Progress {
+    return buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: args.history,
+      parentSettings: {
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
+        crossDayEnforcement: false,
+      },
+      ...(args.pendingPromotion !== undefined
+        ? { pendingPromotion: args.pendingPromotion }
+        : {}),
+    })
+  }
+
+  it('graduation gate blocks promotion after 2 same-day canonical sessions at 100% (no novel entry yet)', () => {
+    // Sessions 1+2 on the same day, both perfect. With crossDay off,
+    // both count. The 80%/2 canonical window is full — but cvc-words
+    // is graduation-gated, so promotion MUST NOT fire until the novel
+    // probe result lands. Focus must stay on cvc-words.
+    const progress = thomasProgress({
+      history: [
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('practicing')
+    expect(result.skillLevels['cvc-words-short-o']).toBe('locked')
+    expect(result.pendingPromotion).toBeUndefined()
+  })
+
+  it('isGraduationSessionPending returns true after 2 same-day qualifying sessions with 80%/2 + crossDay off', () => {
+    // The graduation detector must flag the next session for novel-word
+    // probing so the planner can emit the graduation-run problem set.
+    const progress = thomasProgress({
+      history: [
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      true,
+    )
+  })
+
+  it('promotes cvc-words and sets pendingPromotion when the graduation session lands novel ≥ 0.80 (same day, crossDay off)', () => {
+    // Graduation session on the same day as the two canonical sessions.
+    // crossDayEnforcement=false → all three entries count. The tail
+    // (graduation entry) carries novelPoolSuccessRate=0.9 ≥ 0.80.
+    // Both qualifies() and graduationGateClears() pass → promote.
+    const progress = thomasProgress({
+      history: [
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-11T10:00:00.000Z', 'cvc-words', 1.0, 0.9),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
+    expect(result.pendingPromotion).toBe('cvc-words')
+  })
+
+  it('second applyMasteryRule call (next session-end) does NOT reset cvc-words back to practicing — stale-clear only clears pendingPromotion', () => {
+    // Core regression case: if something (cloud sync, double-call,
+    // state restore) triggers applyMasteryRule a second time after the
+    // graduation promotion, cvc-words must stay at 'mastered'. The
+    // stale-clear branch deletes pendingPromotion (cvc-words is no
+    // longer 'practicing') but must NOT touch skillLevels.
+    const progress = thomasProgress({
+      history: [
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-11T10:00:00.000Z', 'cvc-words', 1.0, 0.9),
+      ],
+    })
+    const afterFirstCall = applyMasteryRule(progress)
+    expect(afterFirstCall.skillLevels['cvc-words']).toBe('mastered')
+    expect(afterFirstCall.pendingPromotion).toBe('cvc-words')
+
+    // Simulate next session-end calling applyMasteryRule on the saved doc.
+    const afterSecondCall = applyMasteryRule(afterFirstCall)
+    expect(afterSecondCall.skillLevels['cvc-words']).toBe('mastered')
+    expect(afterSecondCall.skillLevels['cvc-words-short-o']).toBe('intro')
+    // pendingPromotion cleared by stale-clear branch (node is now 'mastered').
+    expect(afterSecondCall.pendingPromotion).toBeUndefined()
+  })
+
+  it('graduation gate blocks promotion even with 5 same-day sessions at 100% if none has novelPoolSuccessRate', () => {
+    // Thomas reports 4-5 perfect sessions without the app emitting the
+    // graduation probe. The gate must hold for all N additional canonical
+    // sessions until a graduation entry lands.
+    const progress = thomasProgress({
+      history: [
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T08:30:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T09:30:00.000Z', 'cvc-words', 1.0),
+        entry('2026-05-11T10:00:00.000Z', 'cvc-words', 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('practicing')
+    expect(result.pendingPromotion).toBeUndefined()
+  })
+
+  it('80%/2 + crossDay off — threshold applies to the tail 2 entries; earlier dips do not prevent promotion', () => {
+    // Only the LAST 2 (= threshold.sessions) entries need to clear the
+    // percent threshold. A dip in an earlier session is outside the
+    // window and should not block the graduation gate from triggering.
+    // (Note: graduation gate also checks the last entry for novelPoolSuccessRate.)
+    const progress = thomasProgress({
+      history: [
+        entry('2026-05-11T07:00:00.000Z', 'cvc-words', 0.5), // dip — outside tail
+        entry('2026-05-11T08:00:00.000Z', 'cvc-words', 1.0),
+        graduationEntry('2026-05-11T09:00:00.000Z', 'cvc-words', 1.0, 1.0),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.pendingPromotion).toBe('cvc-words')
+  })
+})
