@@ -997,7 +997,7 @@ Pick 8 distinct target words from the focus-node-specific pool below
 Pool for blending-cv and cvc-words (14-word short-a CVC):
 ${WORD_SONG_TARGET_WORDS_FOR_PROMPT}
 
-Pool for cvc-words-short-o (8-word short-o CVC):
+Pool for cvc-words-short-o (11-word short-o CVC):
 ${WORD_SONG_TARGET_WORDS_SHORT_O}
 
 Pool for cvc-words-short-u (11-word short-u CVC):
@@ -1023,9 +1023,9 @@ ${WORD_SONG_DISTRACTOR_HINTS}
 Order easier-recognise words (cat, bag, hat, dad for short-a; dog, mom,
 pot, log for short-o; sun, cup, bus for short-u; pig, bin, lid for
 short-i) in problems 1-3 and richer-rhyme/trap words (van, can, fan,
-man, pan, mat, bat, tag, cap, jam for short-a; mop, box, fox, hot for
-short-o; bug, jug, rug, nut, hut, bun, gum, tub for short-u; pin, wig,
-bib, fig, sip for short-i) in problems 4-8.
+man, pan, mat, bat, tag, cap, jam for short-a; mop, box, fox, hot, cot,
+top, pop for short-o; bug, jug, rug, nut, hut, bun, gum, tub for
+short-u; pin, wig, bib, fig, sip for short-i) in problems 4-8.
 
 Per-problem utterance template — the read line varies by focus node;
 all other slots are content-mode-agnostic:
