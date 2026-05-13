@@ -30,6 +30,7 @@ export type WordSongStageId =
   | 'cvc-words-short-o'
   | 'cvc-words-short-u'
   | 'cvc-words-short-i'
+  | 'cvc-words-short-e'
   | 'digraphs'
   | 'sight-words'
   | 'simple-sentences'
@@ -58,6 +59,7 @@ export const WORD_SONG_STAGES: WordSongStageId[] = [
   'cvc-words-short-o',
   'cvc-words-short-u',
   'cvc-words-short-i',
+  'cvc-words-short-e',
   'digraphs',
   'sight-words',
   'simple-sentences',
