@@ -164,6 +164,14 @@ function renderPictureBody(key: string): ReactNode {
     case 'fig':
     case 'lid':
     case 'sip':
+    case 'bed':
+    case 'leg':
+    case 'hen':
+    case 'web':
+    case 'net':
+    case 'jet':
+    case 'gem':
+    case 'egg':
       // Short-u pack additions (ticket 86c9q5q2d / 86c9q9ben). 8
       // wholly-new (`bug, nut, tub, bun, jug, rug, hut, gum`) plus
       // 3 retraces of existing distractor pictures (`sun, cup, bus`
@@ -180,6 +188,15 @@ function renderPictureBody(key: string): ReactNode {
       // the case-list expanded. Canon wiring (planner branches,
       // WordSongNode union, debug seed) is gated on this PR shipping
       // and lands in Kevin's follow-up ticket 86c9qdba4.
+      //
+      // Short-e pack additions (ticket 86c9teu5v). 8 wholly-new
+      // entries (`bed, leg, hen, web, net, jet, gem, egg`) plus a
+      // retrace of `pen` for tier cohesion — the existing
+      // `picture-pen.svg` (PR #158 vintage, commit `c8154b1`) is
+      // overwritten in this PR per Q2 Option A of
+      // `design/word-song/short-e-pool-expansion.md` §10. Same Path 2
+      // wrapper convention; case-list expanded. Canon wiring is
+      // Kevin's follow-up ticket 86c9teua2.
       // External SVG — rendered as <image> inside the wrapper <svg>
       // so the WordPicture outer envelope (data-testid, role,
       // aria-label, data-large, data-picture-key) stays identical to
