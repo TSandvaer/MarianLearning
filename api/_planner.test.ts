@@ -1390,7 +1390,9 @@ describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3a
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const prompt = args.system.map((b) => b.text).join('\n')
     // Pool literal — the comma-joined list as embedded in the prompt.
-    expect(prompt).toContain('dog, mop, log, pot, box, fox, mom, hot, cot, top, pop')
+    expect(prompt).toContain(
+      'dog, mop, log, pot, box, fox, mom, hot, cot, top, pop',
+    )
     // The third content-mode header.
     expect(prompt).toMatch(/cvc-words-short-o:/)
     // The label is updated to reflect the expanded pool size.
@@ -1450,9 +1452,7 @@ describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3a
     // sorted equality on the input planWords set — exact match, no
     // "contains" looseness.
     expect(readWords.slice().sort()).toEqual(
-      ['cot', 'top', 'pop', 'dog', 'mom', 'pot', 'log', 'fox']
-        .slice()
-        .sort(),
+      ['cot', 'top', 'pop', 'dog', 'mom', 'pot', 'log', 'fox'].slice().sort(),
     )
     // And the pool-isolation invariant still holds.
     for (const word of readWords) {
@@ -2573,9 +2573,7 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     // phrasing so this test catches drift in the canonical
     // definition without false-matching the prose callout.
     const defaultTemplateMatches = (
-      prompt.match(
-        /default template is "Yes! That's a <word>\."/g,
-      ) ?? []
+      prompt.match(/default template is "Yes! That's a <word>\."/g) ?? []
     ).length
     expect(defaultTemplateMatches).toEqual(1)
 
@@ -2620,9 +2618,8 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     // exact list-naming sentence. If the list grows or shrinks, the
     // count drops to 0 and the test fails.
     const exceptionListMatches = (
-      prompt.match(
-        /exception list is exactly: mom, dad, jam, gum, hot\./g,
-      ) ?? []
+      prompt.match(/exception list is exactly: mom, dad, jam, gum, hot\./g) ??
+      []
     ).length
     expect(exceptionListMatches).toEqual(1)
   })
