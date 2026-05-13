@@ -238,6 +238,15 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
           'cvc-words-short-o': 'mastered',
           'cvc-words-short-u': 'mastered',
           'cvc-words-short-i': 'mastered',
+          // cvc-words-short-e mastered too (ticket 86c9teua2) — without
+          // this entry the picker would land on cvc-words-short-e
+          // (locked-to-intro-when-short-i-promotes pattern) instead of
+          // digraphs, and the focusNode assertion below would fail.
+          // Same widening pattern the short-i tier required for this
+          // spec (sibling-spec audit per
+          // .claude/docs/progress-and-persistence.md § "Five sync points
+          // when widening SkillNode" → Place 8).
+          'cvc-words-short-e': 'mastered',
           digraphs: 'practicing',
         },
         // Default `parentSettings` from the helper carries
@@ -303,6 +312,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(parsed.skillLevels['cvc-words-short-o']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-u']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-i']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-e']).toBe('mastered')
     expect(parsed.skillLevels['digraphs']).toBe('practicing')
     // Default toggle is `true` (defaulter fills missing key); seed
     // helper doesn't write it explicitly, so the field may be
@@ -403,6 +413,9 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
           'cvc-words-short-o': 'mastered',
           'cvc-words-short-u': 'mastered',
           'cvc-words-short-i': 'mastered',
+          // cvc-words-short-e mastered too (ticket 86c9teua2) — see Test
+          // 1's matching comment for the rationale.
+          'cvc-words-short-e': 'mastered',
           digraphs: 'practicing',
         },
       }),
@@ -474,6 +487,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(parsed.skillLevels['cvc-words-short-o']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-u']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-i']).toBe('mastered')
+    expect(parsed.skillLevels['cvc-words-short-e']).toBe('mastered')
     // The toggle override is the load-bearing assertion here.
     expect(parsed.parentSettings?.crossVowelMixingEnabled).toBe(false)
   })

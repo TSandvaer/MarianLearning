@@ -29,7 +29,7 @@ import {
 } from '../api/_planner.js'
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 15 combos: 10 math nodes × level 1 + 5 word-song nodes × level 1 (short-i sibling tier added, ticket 86c9qdba4)', () => {
+  it('produces 16 combos: 10 math nodes × level 1 + 6 word-song nodes × level 1 (short-e sibling tier added, ticket 86c9teua2)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -37,16 +37,19 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // vowel-tier sibling (see `design/word-song/short-u-pool-expansion.md`).
     // Ticket 86c9qdba4 added `cvc-words-short-i` as the fourth
     // vowel-tier sibling (see `design/word-song/short-i-pool-expansion.md`).
+    // Ticket 86c9teua2 added `cvc-words-short-e` as the fifth and FINAL
+    // single-vowel sibling tier in the o → u → i → e canonical arc (see
+    // `design/word-song/short-e-pool-expansion.md`).
     // Untuned tiers (letter-sounds / digraphs / sight-words /
     // simple-sentences) are deliberately NOT in canon — they fall back
     // to blending-cv content via the planner's `effectiveFocusNode`,
     // so baking a duplicate blob would be wasted bytes.
     const combos = activeCombos()
-    expect(combos).toHaveLength(15)
+    expect(combos).toHaveLength(16)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
     expect(mathCount).toBe(10)
-    expect(wordSongCount).toBe(5)
+    expect(wordSongCount).toBe(6)
   })
 
   it('every math combo names a node from VALID_MATH_FOCUS_NODES', () => {
@@ -57,13 +60,14 @@ describe('activeCombos — coverage matches the curriculum', () => {
     }
   })
 
-  it('word-song combos are blending-cv + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i (planner first-class scope)', () => {
+  it('word-song combos are blending-cv + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i + cvc-words-short-e (planner first-class scope)', () => {
     const combos = activeCombos().filter((c) => c.track === 'word-song')
-    expect(combos).toHaveLength(5)
+    expect(combos).toHaveLength(6)
     const focusNodes = combos.map((c) => c.focusNode).sort()
     expect(focusNodes).toEqual([
       'blending-cv',
       'cvc-words',
+      'cvc-words-short-e',
       'cvc-words-short-i',
       'cvc-words-short-o',
       'cvc-words-short-u',

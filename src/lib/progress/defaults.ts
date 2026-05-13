@@ -47,6 +47,7 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'cvc-words-short-o',
   'cvc-words-short-u',
   'cvc-words-short-i',
+  'cvc-words-short-e',
   'digraphs',
   'sight-words',
   'simple-sentences',
@@ -112,6 +113,18 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // Locked at v1 default — unlocks to 'intro' when cvc-words-short-u is
   // mastered. See design/word-song/short-i-pool-expansion.md §2 + §4.
   'cvc-words-short-i': 'locked',
+  // cvc-words-short-e is the fifth (and final single-vowel) tier sibling
+  // (ticket 86c9teua2). Locked at v1 default — unlocks to 'intro' when
+  // cvc-words-short-i is mastered. After short-e masters, downstream is
+  // `digraphs`. See design/word-song/short-e-pool-expansion.md §1 + §4.
+  // Note: the spec § 5 flagged a "2-session-gap rule between short-i
+  // mastery and short-e introduction" for /ɛ/-vs-/ɪ/ discrimination
+  // hygiene; that scaffolding mechanism (AC10b) is INTENTIONALLY OUT OF
+  // SCOPE for this canon-wire ticket per Matt's brief — the v1 unlock
+  // path uses the standard `locked → intro` cascade with no extra gate.
+  // A follow-up ticket (TBD — Matt to file) lands the `canIntroduceShortE`
+  // helper if real-iPad observation surfaces /ɛ/–/ɪ/ confusion.
+  'cvc-words-short-e': 'locked',
   digraphs: 'locked',
   'sight-words': 'intro', // introduce gradually
   'simple-sentences': 'locked',

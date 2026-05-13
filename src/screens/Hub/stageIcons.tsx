@@ -167,6 +167,7 @@ const STAGE_LABEL: Record<StageId, string> = {
   'cvc-words-short-o': 'dog',
   'cvc-words-short-u': 'sun',
   'cvc-words-short-i': 'pig',
+  'cvc-words-short-e': 'bed',
   digraphs: 'sh',
   'sight-words': 'the',
   'simple-sentences': 'I',

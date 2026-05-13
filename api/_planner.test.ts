@@ -2586,7 +2586,7 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     expect(exceptionTemplateMatches).toEqual(1)
   })
 
-  it('system prompt names the per-word exception list (mom, dad, jam, gum, hot)', async () => {
+  it('system prompt names the per-word exception list (mom, dad, jam, gum, hot, egg)', async () => {
     // Pin the exception list contents. If a word is added to or
     // removed from the list in the planner directive without updating
     // this test, the test fails — ensuring the author audits the
@@ -2594,11 +2594,13 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     //
     // The exception list covers chip words that cannot take an
     // indefinite article: mom/dad (relational), jam/gum (mass nouns),
-    // hot (adjective). The audit explicitly documented mom/dad/jam;
+    // hot (adjective), egg (vowel-initial — "a egg" is ungrammatical;
+    // ticket 86c9teua2). The audit explicitly documented mom/dad/jam;
     // hot was added at first canon-bake when the default template
     // produced ungrammatical "That's a hot." in the short-o pool;
     // gum was added on Devon's review of PR #198 (same grammatical
-    // issue as jam — mass noun in the short-u pool).
+    // issue as jam — mass noun in the short-u pool); egg was added
+    // alongside the short-e tier (vowel-initial noun, ticket 86c9teua2).
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -2618,8 +2620,9 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     // exact list-naming sentence. If the list grows or shrinks, the
     // count drops to 0 and the test fails.
     const exceptionListMatches = (
-      prompt.match(/exception list is exactly: mom, dad, jam, gum, hot\./g) ??
-      []
+      prompt.match(
+        /exception list is exactly: mom, dad, jam, gum, hot, egg\./g,
+      ) ?? []
     ).length
     expect(exceptionListMatches).toEqual(1)
   })

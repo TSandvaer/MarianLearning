@@ -109,6 +109,48 @@ export const WORD_SONG_TARGET_WORDS_SHORT_U =
 export const WORD_SONG_TARGET_WORDS_SHORT_I =
   'pig, pin, bin, wig, bib, fig, lid, sip'
 
+/**
+ * The 9 target words for the short-e sibling tier (`cvc-words-short-e`).
+ * Locked by Thomas 2026-05-09 per
+ * `design/word-song/short-e-pool-expansion.md` §1 / §10 Q1 = A
+ * (audit-derived 9-word ship pool). The final single-vowel tier in
+ * the o → u → i → e canonical arc — after short-e masters, the
+ * literacy track moves to digraphs.
+ *
+ * Pool composition:
+ *  - 1 promoted from the v1 distractor-only pool: `pen`
+ *    (its `WordEntry.isTarget` flips to true in `wordPack.ts` while
+ *    it remains valid as a distractor for short-a / short-o /
+ *    short-u / short-i sessions — the two flags are independent).
+ *  - 8 wholly new entries: `bed, leg, hen, web, net, jet, gem, egg`.
+ *
+ * Phonetic spread (6 distinct codas across 9 words):
+ *  - /ɛd/: bed
+ *  - /ɛg/: leg, egg  (densest cluster after /ɛn/ + /ɛt/)
+ *  - /ɛn/: hen, pen
+ *  - /ɛb/: web
+ *  - /ɛt/: net, jet
+ *  - /ɛm/: gem
+ *
+ * Note: `egg` is 3-letter spelling-CVC with geminate `gg` decoding
+ * as a single /g/ phoneme — applies the short-o `box`/`fox` precedent
+ * (practitioner curricula universally list as short-e CVC). No
+ * first-encounter scaffolding line is needed for `egg` specifically
+ * (its decoding load is fractional, not load-bearing); the spec's
+ * §4 `bed/bid` minimal-pair opener is the load-bearing scaffolding,
+ * but that opener is INTENTIONALLY OUT OF SCOPE for this canon-wire
+ * ticket per Matt's brief — a follow-up ticket lands the
+ * lifetime-first-encounter wiring if real-iPad observation surfaces
+ * /ɛ/–/ɪ/ confusion.
+ *
+ * Same alignment contract as the prior tiers: the client-side
+ * `wordPack.ts` MUST carry every word here as `isTarget: true` plus a
+ * `TARGET_PAIRINGS` row. The round-trip suite in
+ * `src/screens/WordSong/plannerRoundTrip.test.ts` enforces it.
+ */
+export const WORD_SONG_TARGET_WORDS_SHORT_E =
+  'bed, leg, hen, pen, web, net, jet, gem, egg'
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).
@@ -130,7 +172,12 @@ export const WORD_SONG_TARGET_WORDS_SHORT_I =
  *  pop`) — which parallel short-u's `/ʌg/` triplet and short-i's
  *  `/ɪg/` triplet as the densest clusters in their pools. Surfacing
  *  the rhyme families lets Haiku exploit them as trap-window levers,
- *  mirroring the short-u/short-i precedents. */
+ *  mirroring the short-u/short-i precedents.
+ *
+ *  The short-e block (ticket 86c9teua2 / AC3b) carries 6 rhyme-family
+ *  lines for the 9-word short-e pool — three doublets (`/ɛg/` leg+egg,
+ *  `/ɛn/` hen+pen, `/ɛt/` net+jet) give Haiku explicit trap-window
+ *  guidance in the same shape as the prior tiers' densest clusters. */
 export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /æt/ rhyme family: cat, hat, bat, mat — pack these in the trap window when one is the target.',
   '- /æn/ rhyme family: fan, man, pan, can, van — same.',
@@ -155,6 +202,12 @@ export const WORD_SONG_DISTRACTOR_HINTS = [
   '- /ɪb/ rhyme family: bib.',
   '- /ɪd/ rhyme family: lid.',
   '- /ɪp/ rhyme family: sip.',
+  '- /ɛd/ rhyme family: bed.',
+  '- /ɛg/ rhyme family: leg, egg — pack these in the trap window when one is the target.',
+  '- /ɛn/ rhyme family: hen, pen — pack these in the trap window when one is the target.',
+  '- /ɛb/ rhyme family: web.',
+  '- /ɛt/ rhyme family: net, jet — pack these in the trap window when one is the target.',
+  '- /ɛm/ rhyme family: gem.',
 ].join('\n')
 
 /**

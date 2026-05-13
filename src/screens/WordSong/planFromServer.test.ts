@@ -45,10 +45,14 @@ describe('parseReadTarget', () => {
   })
 
   it('throws on words outside the target list', () => {
-    // After the short-u promotion (ticket 86c9q9ben), `pen` is the only
-    // remaining distractor-only entry. Use it to exercise the
-    // non-target rejection path.
-    expect(() => parseReadTarget('Tap the pen.')).toThrow(/non-target word/)
+    // After the short-e promotion (ticket 86c9teua2), `pen` flipped to
+    // `isTarget: true` and `DISTRACTOR_ONLY_WORDS` is now empty — there
+    // are no in-pack distractor-only entries to exercise the non-target
+    // rejection path. We use a plausibly-CVC English word that is NOT
+    // in any of the target pools: `'ten'` — explicitly rejected from
+    // short-e per spec §1 audit (abstract number, no stable noun-form
+    // picture) and not in any other vowel pool.
+    expect(() => parseReadTarget('Tap the ten.')).toThrow(/non-target word/)
   })
 })
 
@@ -147,11 +151,11 @@ describe('wordSongSessionPlanFromServer — failure paths', () => {
     const broken = {
       ...wire,
       utterances: wire.utterances.map((u) =>
-        // `pen` is the only remaining distractor-only entry post the
-        // short-u promotion (ticket 86c9q9ben moved `bus, sun, cup`
-        // out of DISTRACTOR_ONLY_WORDS). Use `pen` here so the test
-        // continues to exercise the non-target rejection path.
-        u.id === 'word.p1.read' ? { ...u, text: 'Tap the pen.' } : u,
+        // Post the short-e promotion (ticket 86c9teua2), `pen` flipped
+        // to `isTarget: true` and `DISTRACTOR_ONLY_WORDS` is empty.
+        // Use `'ten'` (rejected from short-e audit §1; not in any pool)
+        // so the negative path still surfaces.
+        u.id === 'word.p1.read' ? { ...u, text: 'Tap the ten.' } : u,
       ),
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
@@ -348,11 +352,12 @@ describe('parseReadLine — content-type discriminant routing (86c9kxp08)', () =
   })
 
   it('rejects words outside the target list on both templates', () => {
-    // After the short-u promotion (ticket 86c9q9ben) flipped `bus, sun,
-    // cup` to `isTarget: true`, `pen` is the only remaining
-    // distractor-only entry — that's the negative case here.
-    expect(() => parseReadLine('Tap the pen.')).toThrow(/non-target word/)
-    expect(() => parseReadLine('Read the pen.')).toThrow(/non-target word/)
+    // After the short-e promotion (ticket 86c9teua2) flipped `pen` to
+    // `isTarget: true`, `DISTRACTOR_ONLY_WORDS` is empty. Use `'ten'`
+    // (rejected from the short-e audit §1; not in any vowel pool) as
+    // the in-shape non-target.
+    expect(() => parseReadLine('Tap the ten.')).toThrow(/non-target word/)
+    expect(() => parseReadLine('Read the ten.')).toThrow(/non-target word/)
   })
 
   it('rejects unrecognised templates with a helpful message', () => {
@@ -462,18 +467,19 @@ describe('wordSongSessionPlanFromServer — cvc-word fixture (new acceptance)', 
   })
 
   it('rejects a cvc-word entry whose word is not in the target pool', () => {
-    // "pen" is the only remaining distractor-only word post the
-    // short-u promotion (ticket 86c9q9ben moved `bus, sun, cup` to
-    // `isTarget: true`). Same rejection as the cv-blend path — the
-    // membership check is shared across templates by design.
+    // Post the short-e promotion (ticket 86c9teua2), `pen` is now
+    // `isTarget: true` and `DISTRACTOR_ONLY_WORDS` is empty. Substitute
+    // `'ten'` — explicitly rejected from short-e §1 audit (abstract
+    // number, no stable noun-form picture) and not in any vowel pool.
+    // The membership check is shared across templates by design.
     const broken = {
       ...SAMPLE_CVC_WORD_PLAN,
       utterances: SAMPLE_CVC_WORD_PLAN.utterances.map((u) =>
-        u.id === 'word.p1.read' ? { ...u, text: 'Read the pen.' } : u,
+        u.id === 'word.p1.read' ? { ...u, text: 'Read the ten.' } : u,
       ),
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
-      /non-target word "pen"/,
+      /non-target word "ten"/,
     )
   })
 })

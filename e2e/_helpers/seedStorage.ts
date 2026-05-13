@@ -65,6 +65,7 @@ const DEFAULT_SKILL_LEVELS = {
   'cvc-words-short-o': 'locked',
   'cvc-words-short-u': 'locked',
   'cvc-words-short-i': 'locked',
+  'cvc-words-short-e': 'locked',
   digraphs: 'locked',
   'sight-words': 'intro',
   'simple-sentences': 'locked',

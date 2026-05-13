@@ -93,6 +93,13 @@
  *   CVC tier and lands on `cvc-words-short-i` (practicing) per
  *   WORD_SONG_NODES_IN_ORDER. Mirrors the `cvc-words-short-u` recipe
  *   one step further down the tree.
+ * - `cvc-words-short-e`: Marian as if short-a, short-o, short-u, AND
+ *   short-i CVC pools are fully mastered and she's now practicing the
+ *   short-e sibling node — the FINAL single-vowel tier in the
+ *   o → u → i → e canonical arc (ticket 86c9teua2). The picker walks
+ *   past every prior CVC tier and lands on `cvc-words-short-e`
+ *   (practicing) per WORD_SONG_NODES_IN_ORDER. Mirrors the
+ *   `cvc-words-short-i` recipe one step further down the tree.
  * - `cross-vowel-mixing`: Marian as if all three CVC tiers
  *   (`cvc-words`, `cvc-words-short-o`, `cvc-words-short-u`) are fully
  *   mastered and she's now practicing `digraphs` — the next node in
@@ -271,6 +278,30 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
   },
+  // Short-e sibling node smoke-test entry (ticket 86c9teua2 — fifth
+  // vowel-tier sibling, the FINAL single-vowel tier in the
+  // o → u → i → e canonical arc). Marian has fully mastered short-a,
+  // short-o, short-u, AND short-i CVC pools and is now practicing the
+  // short-e tier. The picker walks WORD_SONG_NODES_IN_ORDER, sees every
+  // earlier word-song node mastered (including cvc-words,
+  // cvc-words-short-o, cvc-words-short-u, and cvc-words-short-i), and
+  // lands on `cvc-words-short-e`. Used by Thomas's iPad smoke-test for
+  // the short-e focus session AND by QA for the deep-launch path
+  // verifying the new tier renders end-to-end. Mirrors the
+  // `cvc-words-short-i` recipe with one additional mastered prerequisite.
+  'cvc-words-short-e': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'practicing',
+    },
+    skipGreet: true,
+  },
   // Cross-vowel mixing smoke-test entry (ticket 86c9qa0kf). Marian as
   // if all three CVC vowel tiers are mastered. The predicate
   // `crossVowelMixingActive(progress, parentSettings)` returns `true`
@@ -312,6 +343,12 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       // predicate today; it only matters for the picker walk to land on
       // digraphs.
       'cvc-words-short-i': 'mastered',
+      // cvc-words-short-e mastered too (ticket 86c9teua2) — without this
+      // entry the picker would land on cvc-words-short-e instead of
+      // digraphs, and the seed's intent ("focus is digraphs, not a CVC
+      // tier") would break. Same widening pattern as the short-i tier
+      // required for this seed.
+      'cvc-words-short-e': 'mastered',
       digraphs: 'practicing',
     },
     skipGreet: true,

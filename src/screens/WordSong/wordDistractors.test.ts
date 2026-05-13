@@ -141,12 +141,23 @@ describe('pickDistractors', () => {
   })
 
   it('throws for a target word that is not in the pairings matrix', () => {
-    // Distractor-only word as target — should fail because TARGET_PAIRINGS
-    // only has entries for the target-flagged words. After the short-u
-    // pool promotion (ticket 86c9q9ben) flipped `sun, cup, bus` to
-    // `isTarget: true`, the only remaining distractor-only entry is
-    // `pen` — that's our negative case here.
-    const fakeTarget = getWordEntry('pen') // distractor-only
+    // After the short-e pool promotion (ticket 86c9teua2) flipped `pen`
+    // to `isTarget: true`, `DISTRACTOR_ONLY_WORDS` is empty — every
+    // pack-resident word has a matrix row. To exercise the
+    // "no pairing matrix entry" path defensively we synthesise a
+    // pack-shaped WordEntry whose `word` is an out-of-matrix string.
+    // Pre-condition: the word is NOT a key in TARGET_PAIRINGS — we
+    // confirm at runtime via `TARGET_PAIRINGS[word]` so a future
+    // matrix expansion that adds it won't silently flip this assertion.
+    const outOfMatrixWord = 'zzz-out-of-matrix' as const
+    expect(TARGET_PAIRINGS[outOfMatrixWord]).toBeUndefined()
+    const fakeTarget = {
+      word: outOfMatrixWord,
+      pictureKey: outOfMatrixWord,
+      vowel: 'a' as const,
+      category: 'object' as const,
+      isTarget: true,
+    }
     expect(() => pickDistractors(fakeTarget, 1)).toThrow(
       /no pairing matrix entry/,
     )
@@ -223,7 +234,7 @@ describe('pickDistractors — defensive assertions (matrix-drift guards)', () =>
 })
 
 describe('FORBIDDEN_PAIRS', () => {
-  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4)", () => {
+  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
     // implementation hand-off note + design/word-song/short-o-pool-
     // expansion.md §3 (mom↔dad composition collision) +
@@ -231,8 +242,10 @@ describe('FORBIDDEN_PAIRS', () => {
     // 2026-05-08 (rug↔mat flat-rectangle floor coverings; tub↔cup
     // side-profile vessels) + design/word-song/short-i-pool-expansion.md
     // §3 / §10 Q2 LOCKED 2026-05-09 (fig↔bun round-food; pig↔dog and
-    // pig↔cat four-legged-animal cross-pack hygiene). Exact list, in
-    // any order.
+    // pig↔cat four-legged-animal cross-pack hygiene) +
+    // design/word-song/short-e-pool-expansion.md §3 / §5 LOCKED
+    // 2026-05-09 (net↔bag fabric-with-handle; egg↔nut ovals;
+    // egg↔bun round-food). Exact list, in any order.
     const pairs = FORBIDDEN_PAIRS.map((p) => [...p].sort().join(','))
     const expectedPairs = [
       ['cat', 'dog'],
@@ -246,6 +259,9 @@ describe('FORBIDDEN_PAIRS', () => {
       ['fig', 'bun'], // ticket 86c9qdba4 — round food with top-feature (mandatory per spec §3)
       ['pig', 'dog'], // ticket 86c9qdba4 — four-legged mammal cross-pack hygiene
       ['pig', 'cat'], // ticket 86c9qdba4 — four-legged animal cross-pack hygiene
+      ['net', 'bag'], // ticket 86c9teua2 — fabric-with-handle (mesh-vs-solid)
+      ['egg', 'nut'], // ticket 86c9teua2 — ovals (smooth-vs-seam)
+      ['egg', 'bun'], // ticket 86c9teua2 — round food (smooth-vs-score)
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {
