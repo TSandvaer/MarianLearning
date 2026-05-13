@@ -355,10 +355,12 @@ describe('prepareWordSongPathA — error paths', () => {
         id: plan.id,
         label: plan.label,
         utterances: wordSongSessionPlanToUtteranceSources(plan).map((u) =>
-          // After the short-u promotion (ticket 86c9q9ben), `pen` is
-          // the only remaining distractor-only entry — non-target rejection
-          // path now exercised against `pen` rather than `bus`.
-          u.id === 'word.p1.read' ? { ...u, text: 'Tap the pen.' } : u,
+          // Post the short-e promotion (ticket 86c9teua2), `pen` flipped
+          // to `isTarget: true` and `DISTRACTOR_ONLY_WORDS` is empty.
+          // Use `'ten'` — explicitly rejected from short-e §1 audit
+          // (abstract number, no stable noun-form picture) — to exercise
+          // the non-target rejection path.
+          u.id === 'word.p1.read' ? { ...u, text: 'Tap the ten.' } : u,
         ),
       },
     }

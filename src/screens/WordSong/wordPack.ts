@@ -519,6 +519,98 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'object',
     isTarget: true,
   },
+  // ── Short-e pool (ticket 86c9teua2, v5 vowel tier — FINAL single-vowel) ──
+  // Per `design/word-song/short-e-pool-expansion.md` §1 with Thomas's
+  // 2026-05-09 lock (Q1=A — audit-derived 9-word ship pool). Pool reaches
+  // Marian only when the planner emits content for `cvc-words-short-e`
+  // (the fifth-vowel sibling node added between `cvc-words-short-i` and
+  // `digraphs` in WordSongNode / LITERACY_TREE). Short-a / short-o /
+  // short-u / short-i sessions continue to draw from their own pools
+  // and short-e words don't leak into them (planner-side guarantee —
+  // see `WORD_SONG_TRACK_GUIDE` in `api/_planner.ts`).
+  //
+  // One of the entries (`pen`) USED to live in `DISTRACTOR_ONLY_WORDS`
+  // (see git blame); per Q2=A (2026-05-09) it is promoted distractor →
+  // target with `isTarget: true` flipped on. It retains its distractor
+  // picture (re-trace pending Phase 3 of the short-e pack — see
+  // `design/word-song/short-e-pool-expansion.md` §10 Q2). It remains
+  // pickable as a distractor in short-a / short-o / short-u / short-i
+  // sessions (the two flags are independent) — same precedent as the
+  // short-o promotion of `dog/log/pot/fox` and the short-u promotion
+  // of `sun/cup/bus`.
+  //
+  // Same-vowel-only rule (spec §8): every distractor for a short-e
+  // target is drawn from the short-e pool itself. No cross-vowel mixing
+  // in v1 — that's a separate downstream ticket (`86c9m3aek`). The
+  // `crossVowelMixingActive` predicate gate at `mastery.ts
+  // CVC_CROSS_VOWEL_NODES` is intentionally NOT widened to include
+  // `cvc-words-short-e` in this PR — adding short-e to that set would
+  // require corresponding `TARGET_PAIRINGS_CROSSVOWEL` rows for every
+  // short-e target, which is out of scope per the dispatch contract
+  // (cross-vowel matrix updates separately ticketed).
+  {
+    word: 'bed',
+    pictureKey: 'bed',
+    vowel: 'e',
+    category: 'household',
+    isTarget: true,
+  },
+  {
+    word: 'leg',
+    pictureKey: 'leg',
+    vowel: 'e',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'hen',
+    pictureKey: 'hen',
+    vowel: 'e',
+    category: 'animal',
+    isTarget: true,
+  },
+  {
+    word: 'pen',
+    pictureKey: 'pen',
+    vowel: 'e',
+    category: 'stationery',
+    isTarget: true,
+  },
+  {
+    word: 'web',
+    pictureKey: 'web',
+    vowel: 'e',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'net',
+    pictureKey: 'net',
+    vowel: 'e',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'jet',
+    pictureKey: 'jet',
+    vowel: 'e',
+    category: 'vehicle',
+    isTarget: true,
+  },
+  {
+    word: 'gem',
+    pictureKey: 'gem',
+    vowel: 'e',
+    category: 'object',
+    isTarget: true,
+  },
+  {
+    word: 'egg',
+    pictureKey: 'egg',
+    vowel: 'e',
+    category: 'food',
+    isTarget: true,
+  },
 ] as const
 
 /**
@@ -553,17 +645,23 @@ export const TARGET_WORDS: readonly WordEntry[] = [
  * wig, bib, fig, lid, sip`) are wholly-new in `TARGET_WORDS` — short-i
  * had no existing distractor-only candidates per spec §1 audit
  * (verbs/digraphs/picture-instability dominated the rejected pool).
- * `pen` (short-e) remains the only distractor-only entry today.
+ * `pen` (short-e) remained as the lone distractor-only entry until
+ * the short-e tier shipped.
+ *
+ * v5 note (ticket 86c9teua2, short-e pool expansion): the lone `pen`
+ * entry is promoted distractor → target by Thomas's 2026-05-09 Q2=A
+ * lock and now lives in `TARGET_WORDS` with `isTarget: true` and
+ * `vowel: 'e'`. It remains pickable as a distractor in short-a /
+ * short-o / short-u / short-i sessions because `getWordEntry()`
+ * resolves it from `TARGET_WORDS` and the existing `TARGET_PAIRINGS`
+ * rows for short-a (e.g. `mat: { gentle: ['pen', 'dog'], … }`) point
+ * at it by string — same shape as the short-u / short-o promotion
+ * patterns. With the `pen` promotion, `DISTRACTOR_ONLY_WORDS` is now
+ * an empty array; it is kept as an exported constant for forward
+ * compat (future tier work may re-introduce distractor-only entries
+ * for cross-pool variety).
  */
-export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
-  {
-    word: 'pen',
-    pictureKey: 'pen',
-    vowel: 'e',
-    category: 'stationery',
-    isTarget: false,
-  },
-] as const
+export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [] as const
 
 /** All entries (targets + distractor-only), the full pool for distractor picking. */
 export const ALL_WORDS: readonly WordEntry[] = [
@@ -612,6 +710,23 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['fig', 'bun'], // both round food with top-feature (stem-cap vs score-mark)
   ['pig', 'dog'], // both four-legged mammals; snout/curly-tail vs ears/non-curly-tail
   ['pig', 'cat'], // both four-legged animals; snout/curly-tail vs whiskers/pointed-ears
+  // Short-e pool additions (ticket 86c9teua2, §3 / §5 LOCKED 2026-05-09).
+  // Same posture as the short-u + short-i additions: same-vowel-only rule
+  // (spec §8) keeps these pairs from co-occurring in v1 trios anyway, but
+  // the entries are cheap insurance against future cross-vowel mixing
+  // (ticket 86c9m3aek) — when cross-vowel fires, a short-e target
+  // landing alongside a short-a/short-u distractor must not collide on
+  // silhouette. Per Kyle's spec §3 + §6, all three are cross-vowel pairs:
+  //   - [net, bag]: both fabric-with-handle objects. Discriminator is
+  //     mesh-vs-solid; load-bearing for net's chip-readability at 96pt.
+  //   - [egg, nut]: both ovals. Discriminator is smooth-ovoid (egg)
+  //     vs vertical-seam (nut). At 96pt with PNG-embed compression the
+  //     seam can collapse — cheap insurance.
+  //   - [egg, bun]: both round food. Discriminator is smooth-ovoid (egg)
+  //     vs horizontal-score-mark (bun). Cheap insurance.
+  ['net', 'bag'],
+  ['egg', 'nut'],
+  ['egg', 'bun'],
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -795,6 +910,44 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   fig: { gentle: ['lid', 'bin'], trap: ['pig', 'wig'] }, // /ɪg/ rhyme triplet trap
   lid: { gentle: ['wig', 'pig'], trap: ['bin', 'sip'] }, // /ɪd/ has no in-pool rhyme; container/coda trap
   sip: { gentle: ['fig', 'wig'], trap: ['pin', 'lid'] }, // /ɪp/ singleton (hip dropped); coda-contrast trap
+  // ── Short-e pool (ticket 86c9teua2) ─────────────────────────────────
+  // Per `design/word-song/short-e-pool-expansion.md` §2.4 matrix preview
+  // + §8 same-vowel-only rule: every distractor for a short-e target is
+  // drawn from the short-e pool itself (`bed, leg, hen, pen, web, net,
+  // jet, gem, egg`). No cross-vowel mixing in v1; that's a separate
+  // ticket (`86c9m3aek`).
+  //
+  // Trap-tier pairs lean on the rhyme families enumerated in spec §1
+  // (`/ɛg/`, `/ɛn/`, `/ɛt/` are the three doublets, plus `/ɛd/`,
+  // `/ɛb/`, `/ɛm/` singletons). The three doublets carry the trap-tier
+  // pressure: leg+egg, hen+pen, net+jet — same trap-cluster pattern as
+  // the prior tiers' densest rhyme groups (short-a /æt/, short-u /ʌg/,
+  // short-i /ɪg/). Gentle-tier pairs are visually / categorically
+  // distinct from the target (animal vs household vs object vs
+  // stationery vs vehicle vs food).
+  //
+  // Author-latitude note (Kevin, 2026-05-13): the spec preview at §2.4
+  // flagged `pen`'s row as illustrative with a `hen`-duplicate; the
+  // final row below uses distinct distractors per row. The constraint
+  // (gentle = clearly different category; trap = same rhyme or same
+  // near-coda) is the design lock, not the exact pair assignments.
+  //
+  // FORBIDDEN_PAIRS audit — none of the rows below trigger:
+  //  - new short-e additions `[net, bag]`, `[egg, nut]`, `[egg, bun]`
+  //    are all cross-vowel — same-vowel-only rule keeps them apart.
+  //  - all existing forbidden pairs (cat-dog, bus-van, pan-pot, cap-hat,
+  //    man-dad, mom-dad, rug-mat, tub-cup, fig-bun, pig-dog, pig-cat)
+  //    involve at least one non-short-e word and so are unreachable
+  //    here under the same-vowel rule.
+  bed: { gentle: ['hen', 'gem'], trap: ['leg', 'egg'] }, // /ɛd/ singleton; /ɛg/ doublet trap (cross-coda)
+  leg: { gentle: ['hen', 'net'], trap: ['egg', 'gem'] }, // /ɛg/ rhyme partner (leg+egg) + /ɛm/ near-rhyme
+  hen: { gentle: ['web', 'gem'], trap: ['pen', 'jet'] }, // /ɛn/ rhyme partner (hen+pen) + /ɛt/ near-rhyme
+  pen: { gentle: ['gem', 'bed'], trap: ['hen', 'net'] }, // /ɛn/ rhyme partner (pen+hen) + /ɛt/ near-rhyme (-n vs -t coda contrast)
+  web: { gentle: ['hen', 'jet'], trap: ['bed', 'gem'] }, // /ɛb/ singleton; near-codas (-d, -m) for trap-density
+  net: { gentle: ['bed', 'gem'], trap: ['jet', 'pen'] }, // /ɛt/ rhyme partner (net+jet) + /ɛn/ near-rhyme
+  jet: { gentle: ['hen', 'gem'], trap: ['net', 'pen'] }, // /ɛt/ rhyme partner (jet+net) + /ɛn/ near-rhyme
+  gem: { gentle: ['hen', 'net'], trap: ['jet', 'web'] }, // /ɛm/ singleton; -t + -b near-coda trap
+  egg: { gentle: ['hen', 'web'], trap: ['leg', 'gem'] }, // /ɛg/ rhyme partner (egg+leg) + /ɛm/ near-rhyme
 } as const
 
 /**
