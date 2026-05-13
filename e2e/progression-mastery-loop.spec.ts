@@ -1,8 +1,15 @@
 /**
  * E2E spec — Progression mastery loop: intro → practicing → mastered.
  *
- * Ticket 86c9qu91g — covers the gap that allowed the intro→practicing
- * missing-transition bug to ship to production undetected.
+ * Tickets:
+ *   - 86c9qu91g — original four nodes (PR #202): covers the gap that
+ *     allowed the intro→practicing missing-transition bug to ship to
+ *     production undetected.
+ *   - 86c9teuf0 — Part 3 cvc-words-short-e (this PR): empirical
+ *     lock-in for Kevin's parallel canon-wire ticket 86c9teua2. The
+ *     Part 3 suite was authored failing-first against pre-canon-wire
+ *     main; it flips RED→GREEN when Kevin's PR merges. See the
+ *     Part 3 header block below for the contract.
  *
  * THE BUG (pre-fix on main)
  * -------------------------
@@ -416,6 +423,251 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
     expect(lastTwo[1]!.successRate).toBe(1)
     expect(lastTwo[0]!.skillFocus).toEqual(['mult-2-5-10'])
     expect(lastTwo[1]!.skillFocus).toEqual(['mult-2-5-10'])
+  })
+})
+
+// ── Part 3 — cvc-words-short-e (intro → practicing → mastered) ────────────
+//
+// Ticket 86c9teuf0 — paired with Kevin's canon-wire ticket 86c9teua2.
+//
+// THE FAILING-FIRST CONTRACT
+// --------------------------
+// This describe block was authored BEFORE Kevin's PR landed
+// `cvc-words-short-e` in the codebase. On main at authoring time
+// (commit d56103a), the node literal `'cvc-words-short-e'` exists
+// nowhere in source:
+//   - NOT in `WordSongNode` union (`src/lib/progress/types.ts`)
+//   - NOT in `SKILL_NODES` (`src/lib/progress/guards.ts`)
+//   - NOT in `LITERACY_TREE` (`src/lib/progress/mastery.ts`)
+//   - NOT in `WORD_SONG_NODES_IN_ORDER` (`src/lib/progress/focusNode.ts`)
+//   - NOT in `DEFAULT_SKILL_LEVELS` (this file's seed defaults)
+//
+// On pre-Kevin main, the test runs but fails for the right reason:
+//   1. Seeding `'cvc-words-short-e': 'intro'` as an extra
+//      skillLevels key passes the strict guard (the guard iterates
+//      the known SKILL_NODES set and reads each — extra keys are
+//      tolerated, see isSkillLevels in guards.ts:55-64).
+//   2. `pickFocusNode` walks `WORD_SONG_NODES_IN_ORDER` left-to-right
+//      and stops at the first non-mastered node. With every node
+//      through `cvc-words-short-i` seeded `'mastered'`, the picker
+//      lands on `digraphs` (currently `'locked'`) — NOT on the new
+//      `cvc-words-short-e` which is invisible to the picker.
+//   3. Sessions therefore log `skillFocus: ['digraphs']`, NOT
+//      `['cvc-words-short-e']`. `applyMasteryRule` iterates
+//      `LITERACY_TREE` (which doesn't contain the new node either),
+//      so the intro→practicing pass never fires on the new node
+//      and the practicing→mastered scan never sees it. The extra
+//      key stays at `'intro'` forever in the persisted blob.
+//   4. The final assertion `.toBe('mastered')` fails on pre-Kevin
+//      main: actual is `'intro'`. This is the RED state — the
+//      empirical proof that without Kevin's wire-up, the node is
+//      unreachable by the state machine.
+//
+// POST-KEVIN GREEN STATE
+// ----------------------
+// Kevin's PR (ticket 86c9teua2) adds `cvc-words-short-e` to all
+// five lists above, slotting it BETWEEN `cvc-words-short-i` and
+// `digraphs` in both the tree and the picker order. After the rebase
+// onto post-merge main:
+//   1. The picker chooses `cvc-words-short-e` (since it's now in
+//      the order and seeded `'intro'` < `'mastered'`).
+//   2. Session 1 records `skillFocus: ['cvc-words-short-e']`,
+//      `successRate: 1.0`. `applyMasteryRule` runs after save: the
+//      intro→practicing pass sees `successRate > 0` and advances
+//      the node to `'practicing'`.
+//   3. Sessions 2-4 record three more perfect entries. The
+//      practicing→mastered scan in session 4's `applyMasteryRule`
+//      call walks the 90/3 window, sees the last 3 entries all
+//      hit 1.0 >= 0.9, and promotes to `'mastered'`. Downstream
+//      `digraphs` flips `'locked' → 'intro'`.
+//   4. The final assertions all pass: short-e is `'mastered'`,
+//      `digraphs` is `'intro'`, history has 4 entries.
+//
+// FOUR TRANSITIONS LOCKED
+// -----------------------
+//   - `locked → intro` (covered by the schema-floor seed default
+//     pattern; this suite seeds short-e directly at `'intro'` so
+//     the test focuses on the downstream three edges)
+//   - `intro → practicing` (session 1's intro-pass; PR #201 invariant)
+//   - `practicing → mastered` (session 4's 90/3 scan; standard rule)
+//   - `digraphs: locked → intro` (downstream unlock cascade)
+//
+// THRESHOLD CHOICE
+// ----------------
+// Per-track 90/3 with `crossDayEnforcement: false`. Matches the
+// project default (`word-song: 0.9 percent / 3 sessions`) — verifies
+// AC10 (the 90/3 rule applies without special-casing for short-e).
+// Earlier suites in this file used 80/2 to minimise session count
+// for the intro-pass-specific regressions; this suite uses 90/3 to
+// pin the full production threshold path end-to-end.
+//
+// Why 4 sessions, not 3
+// ---------------------
+// The intro→practicing pass fires INSIDE the same `applyMasteryRule`
+// call that records session 1's entry. After session 1: node is
+// `'practicing'`, history has 1 entry — not enough for promotion
+// (1 < 3). After session 3: 3 entries, all at 1.0 — the
+// practicing→mastered scan promotes in session 3's call. 3 perfect
+// sessions are mathematically sufficient.
+//
+// The brief specified "1 perfect session" then "3 more" (= 4 total)
+// to make the intermediate `'practicing'` state observable as its
+// own assertion checkpoint. We run all 4 and assert at two
+// checkpoints (after session 1: `'practicing'`; after session 4:
+// `'mastered'` plus digraphs unlock). The session 4 read is a
+// belt-and-braces on idempotence — `applyMasteryRule` after
+// promotion leaves `'mastered'` undisturbed.
+
+test.describe('Progression loop — cvc-words-short-e (intro → practicing → mastered)', () => {
+  test.beforeEach(async ({ page }) => {
+    await installClaudeMock(page, { failNetwork: true })
+
+    // Seed: every word-song node UP TO AND INCLUDING `cvc-words-short-i`
+    // is `'mastered'`. The new sibling `cvc-words-short-e` lives at
+    // `'intro'`. `digraphs` is `'locked'` so we can observe the
+    // downstream cascade on promotion.
+    //
+    // Note: seed via `skillLevelOverrides` even for `cvc-words-short-e`
+    // — the helper's type signature is `Record<string, string>`, so
+    // the new node literal (not yet in `WordSongNode` union on
+    // pre-Kevin main) is accepted as a string key. The runtime guard
+    // tolerates the extra key (`isSkillLevels` only requires the
+    // known set to be present, not exclusive). Post-Kevin-merge, the
+    // type widens and the literal becomes well-typed without any
+    // change to this seed shape.
+    const progress = buildSeedProgress({
+      skillLevelOverrides: {
+        'letter-names': 'mastered',
+        'letter-sounds': 'mastered',
+        'blending-cv': 'mastered',
+        'cvc-words': 'mastered',
+        'cvc-words-short-o': 'mastered',
+        'cvc-words-short-u': 'mastered',
+        'cvc-words-short-i': 'mastered',
+        'cvc-words-short-e': 'intro',
+        digraphs: 'locked',
+        'sight-words': 'locked',
+        'simple-sentences': 'locked',
+      },
+      // 90/3 — full production word-song threshold. AC10 in the
+      // dispatch brief calls this out explicitly: short-e must
+      // graduate under the standard rule without special-casing.
+      masteryThreshold: { percent: 0.9, sessions: 3 },
+    })
+
+    // Both tracks required by the strict per-track guard (see the
+    // cvc-words describe block above for the long-form gotcha). We
+    // intentionally set math to a value that can never qualify
+    // accidentally (95/3) so the four word-song sessions in this
+    // suite don't get caught by some unrelated math node we missed.
+    const progressWithNoCrossDay = {
+      ...(progress as Record<string, unknown>),
+      parentSettings: {
+        autoPromote: true,
+        sessionModePicker: 'off',
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.9, sessions: 3 },
+        },
+        crossDayEnforcement: false,
+        showLevelToMarian: false,
+      },
+    }
+
+    await seedLocalStorage(page, {
+      progress: progressWithNoCrossDay,
+      sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
+    })
+  })
+
+  /**
+   * Pre-Kevin (RED): `pickFocusNode` chooses `digraphs` because
+   * `cvc-words-short-e` is invisible to the picker. Sessions log
+   * `skillFocus: ['digraphs']`. The extra `'cvc-words-short-e': 'intro'`
+   * key sits inert in `skillLevels`. After 4 sessions, the assertion
+   * `.toBe('practicing')` after session 1 fails on actual `'intro'`.
+   *
+   * Post-Kevin (GREEN): all four transitions fire, sessions log
+   * `['cvc-words-short-e']` focus, history accumulates to 4 entries,
+   * mastery rule promotes to `'mastered'` and unlocks `digraphs`.
+   */
+  test('four perfect cvc-words-short-e sessions: intro → practicing (session 1) → mastered (session 4); digraphs unlocks', async ({
+    page,
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
+
+    // 4 sessions × ~25s each (1500ms × 8 chips + nav overhead) overruns
+    // the 90s default Playwright test timeout. The other suites in this
+    // file are 2-session and fit comfortably. Bump per-test to give the
+    // 4-session ladder ~30s of headroom on slow CI runners.
+    test.setTimeout(240_000)
+
+    await page.goto('/')
+    await forceHowlerUnlock(page)
+
+    // ── Session 1: intro → practicing ─────────────────────────────────
+    await runOneWordSongSession(page)
+
+    const afterSession1 = (await readProgressFromPage(
+      page,
+    )) as PersistedProgress
+    expect(afterSession1).not.toBeNull()
+
+    // SMOKING GUN A — intro→practicing fires on first perfect session.
+    expect(afterSession1.skillLevels['cvc-words-short-e']).toBe('practicing')
+
+    // Downstream stays locked (cascade only fires on 'mastered').
+    expect(afterSession1.skillLevels['digraphs']).toBe('locked')
+
+    // Exactly one history entry recorded against the new node.
+    expect(afterSession1.history.length).toBe(1)
+    expect(afterSession1.history[0]!.skillFocus).toEqual(['cvc-words-short-e'])
+    expect(afterSession1.history[0]!.successRate).toBe(1)
+
+    // ── Sessions 2-4: practicing → mastered + digraphs unlock ─────────
+    await runOneWordSongSession(page)
+    await runOneWordSongSession(page)
+    await runOneWordSongSession(page)
+
+    const afterSession4 = (await readProgressFromPage(
+      page,
+    )) as PersistedProgress
+    expect(afterSession4).not.toBeNull()
+
+    // SMOKING GUN B — practicing→mastered fires under the 90/3 window
+    // (AC10: standard rule applies, no special-casing for short-e).
+    expect(afterSession4.skillLevels['cvc-words-short-e']).toBe('mastered')
+
+    // SMOKING GUN C — downstream `digraphs` unlocks on mastery and
+    // immediately advances to 'practicing' on session 4.
+    //
+    // Cascade chain: session 3's `applyMasteryRule` call promotes
+    // short-e to 'mastered' and flips `digraphs: 'locked' → 'intro'`
+    // in the same pass. The picker then targets `digraphs` for
+    // session 4 (next non-mastered word-song node). Session 4's
+    // `applyMasteryRule` call observes a `digraphs` history entry
+    // with successRate=1.0 and fires the PR #201 intro→practicing
+    // rule. Net post-session-4 state: digraphs at 'practicing'.
+    //
+    // This is the empirically-correct compounded state — confirms
+    // BOTH the unlock cascade and the intro→practicing rule are
+    // wired correctly through the cvc-words-short-e milestone.
+    expect(afterSession4.skillLevels['digraphs']).toBe('practicing')
+
+    // History has all 4 entries. The first 3 are short-e (sessions
+    // 1-3 ran short-e per pickFocusNode); session 4 ran digraphs
+    // because short-e mastered at end-of-session-3 advanced the
+    // picker.
+    expect(afterSession4.history.length).toBe(4)
+    const lastFour = afterSession4.history.slice(-4)
+    expect(lastFour[0]!.successRate).toBe(1)
+    expect(lastFour[1]!.successRate).toBe(1)
+    expect(lastFour[2]!.successRate).toBe(1)
+    expect(lastFour[3]!.successRate).toBe(1)
+    expect(lastFour[0]!.skillFocus).toEqual(['cvc-words-short-e'])
+    expect(lastFour[1]!.skillFocus).toEqual(['cvc-words-short-e'])
+    expect(lastFour[2]!.skillFocus).toEqual(['cvc-words-short-e'])
+    expect(lastFour[3]!.skillFocus).toEqual(['digraphs'])
   })
 })
 
