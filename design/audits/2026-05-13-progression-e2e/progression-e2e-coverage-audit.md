@@ -57,12 +57,25 @@ node. Each suite:
 
 1. Seeds the node at `'intro'` with all prerequisites mastered.
 2. Runs 2 perfect sessions (threshold 80%/2, crossDay off).
-3. Asserts `skillLevels[node] === 'mastered'` and the downstream neighbour
-   flipped to `'intro'`.
+3. Asserts `skillLevels[node]` reflects the post-fix state and the
+   downstream neighbour reflects the expected unlock.
 4. Uses count-based assertions throughout (`.toBe()` + `.toEqual([...])`).
 
-All four tests FAIL on current main with "Expected: mastered / Received: intro".
-All four turn GREEN once Kevin's fix (`fix/86c9qu91g-intro-to-practicing`) lands.
+**Graduation-gate split:**
+
+- `cvc-words` is graduation-gated (`WORD_SONG_GRADUATION_GATED_NODES`).
+  Two plain sessions advance it to `'practicing'` only — `'mastered'`
+  requires a graduation session with a passing `novelPoolSuccessRate`.
+  The spec asserts `practicing` for cvc-words and `'locked'` for the
+  downstream `cvc-words-short-o` (cascade fires on `'mastered'` only).
+- The other three (`sub-to-20`, `mult-2-5-10`, `sight-words`) are
+  NOT graduation-gated, so two perfect sessions advance all the way to
+  `'mastered'` and the downstream unlocks to `'intro'`.
+
+All four tests FAIL on pre-fix main. All four pass on post-fix main —
+empirically verified locally 2026-05-13 (full chromium suite passes in
+6.5 min; webkit project skips via `skipOnWebkitHeadless` since the
+read-aloud gate cannot flip without AudioContext).
 
 ---
 
@@ -142,12 +155,65 @@ jessica-qa-edge-cases.md` is NOT regression-locked in E2E with a timezone-
 pinned test. The fix landed but there's no safety net if it regresses. Flag
 for a follow-up timezone-pinned E2E spec.
 
+### Gap F — `isParentSettings` per-track strictness silently rejects single-track seeds
+
+While authoring this spec, both initial CI runs silently failed because
+the seed `parentSettings.masteryThreshold` shipped only one track
+(e.g. `{ 'word-song': {...} }` for word-song tests). `isParentSettings`
+in `src/lib/progress/guards.ts:191-197` requires BOTH `mt.math` AND
+`mt['word-song']` to be valid threshold shapes when ANY per-track key is
+present:
+
+```ts
+const hasPerTrack = 'math' in mt || 'word-song' in mt
+if (hasPerTrack) {
+  if (!isMasteryThresholdShape(mt.math)) return false
+  if (!isMasteryThresholdShape(mt['word-song'])) return false // ← strict
+  return true
+}
+```
+
+A single-track seed makes the guard reject the whole `parentSettings` →
+`isProgressV1` rejects the blob → `loadProgress()` returns `null` →
+the app falls back to `defaultProgress()`. The test then asserts against
+the diagnostic baseline rather than the seeded state, **with no error
+surfaced** — `seedLocalStorage` writes the blob successfully, the read
+path silently discards it.
+
+This is the same failure mode documented in `progress-and-persistence.md`
+§ "Critical gotcha — when `SKILL_NODES` widens, every persisted blob
+without the new key fails the guard." That gotcha covers the
+`skillLevels` widening hazard; this is the per-track-threshold sibling.
+
+**Recommended helper improvement** (filed as separate ticket
+recommendation): teach `buildSeedProgress` in `e2e/_helpers/seedStorage.ts`
+to accept a per-track `masteryThreshold` option and ALWAYS emit a
+fully-shaped per-track value, so callers can't trip this guard. Today the
+helper only accepts a single `{ percent, sessions }` shape and applies it
+to both tracks via the read-path defaulter — fine for the common case but
+the doc-and-helper coverage of per-track seeding is the gap that bit
+twice during this ticket.
+
+**Defensive pattern for spec authors** (applied in this spec): when
+overriding `parentSettings` via raw spread, always emit:
+
+```ts
+masteryThreshold: {
+  math: { percent: P, sessions: N },
+  'word-song': { percent: P, sessions: N },
+}
+```
+
+NEVER a single-track object. The guard's strictness is invisible at write
+time; only the test's behavioural assertion catches the mismatch.
+
 ---
 
 ## 5. Cross-references
 
-- Failing spec: `e2e/progression-mastery-loop.spec.ts` (ticket 86c9qu91g).
-- Fix PR: `fix/86c9qu91g-intro-to-practicing` (Kevin, in flight).
+- Spec: `e2e/progression-mastery-loop.spec.ts` (ticket 86c9qu91g) —
+  failed on pre-fix main; passes on post-fix main (commit `ce9c557`).
+- Fix PR: `#201` (Kevin), merged 2026-05-13 at commit `ce9c557`.
 - Existing promotion spec: `e2e/mastery-promotion.spec.ts` (ticket 86c9kwnmx).
 - Source of truth: `src/lib/progress/mastery.ts` `applyMasteryRule()`.
 - Sibling doc: `.claude/docs/progress-and-persistence.md` § "M3 mastery rule".

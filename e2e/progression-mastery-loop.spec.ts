@@ -4,16 +4,13 @@
  * Ticket 86c9qu91g — covers the gap that allowed the intro→practicing
  * missing-transition bug to ship to production undetected.
  *
- * THE BUG (current main, before Kevin's fix)
- * ------------------------------------------
- * `applyMasteryRule()` in `src/lib/progress/mastery.ts` line ~277:
- *
- *   if (out.skillLevels[node] !== 'practicing') continue
- *
- * This check explicitly SKIPS nodes at `'intro'`. The mastery rule
- * handles `practicing → mastered` (and `locked → intro` for downstream
- * unlocks) but has NO path for `intro → practicing`. As a result, four
- * default-`'intro'` nodes in the diagnostic baseline are permanently
+ * THE BUG (pre-fix on main)
+ * -------------------------
+ * `applyMasteryRule()` in `src/lib/progress/mastery.ts` only walked nodes
+ * at `'practicing'` and explicitly skipped `'intro'`. The mastery rule
+ * handled `practicing → mastered` (and `locked → intro` for downstream
+ * unlocks) but had NO path for `intro → practicing`. As a result, four
+ * default-`'intro'` nodes in the diagnostic baseline were permanently
  * stuck:
  *
  *   - `cvc-words`    (word-song track, diagnostic default)
@@ -21,52 +18,61 @@
  *   - `mult-2-5-10`  (math track, diagnostic default)
  *   - `sight-words`  (word-song track, diagnostic default)
  *
- * Each of the four test suites below:
- *   1. Seeds a state where the target node is at `'intro'`.
- *   2. Runs 2 perfect sessions (threshold: 80% / 2 sessions, crossDay off).
- *   3. Asserts the node advanced to `'mastered'` and its downstream
- *      neighbour unlocked to `'intro'`.
+ * Kevin's fix in PR #201 (commit `ce9c557`) added the intro→practicing
+ * pass before the practicing→mastered scan. Rule: if history contains any
+ * entry for the node with `successRate > 0`, advance to `'practicing'`.
  *
- * EXPECTED BEHAVIOUR ON CURRENT MAIN (before the fix)
- * ----------------------------------------------------
- * All four "session 2 promotions" assertions FAIL with something like:
- *   expect(received).toBe(expected)
- *   Expected: "mastered"
- *   Received: "intro"
+ * What these four suites lock in
+ * ------------------------------
+ * Each suite seeds the target node at `'intro'` with prerequisites
+ * mastered, runs 2 perfect sessions (80%/2 threshold, crossDay off), and
+ * asserts the post-fix terminal state.
  *
- * This spec turns GREEN once Kevin's PR (#fix/86c9qu91g-intro-to-practicing)
- * merges. Do not rebase this branch onto his fix branch — the failing-test-
- * first discipline is the point.
+ * Graduation-gate caveat for cvc-words
+ * ------------------------------------
+ * `cvc-words` is graduation-gated (`WORD_SONG_GRADUATION_GATED_NODES`):
+ * mastery requires a graduation session with a passing
+ * `novelPoolSuccessRate`. Two plain perfect sessions advance it to
+ * `'practicing'` but NOT to `'mastered'` — that's the documented
+ * behaviour Kevin's own mastery.test.ts case validates. The downstream
+ * `cvc-words-short-o` therefore stays `'locked'` (the unlock cascade
+ * only fires on `'mastered'`). The cvc-words assertion below is the
+ * `intro → practicing` half of the ladder; the graduation-session test
+ * is a separate concern (covered by `plannerRoundTrip` + the existing
+ * cvc-words regression specs).
  *
- * Threshold choice
- * ----------------
- * The spec uses `percent: 0.8, sessions: 2` with `crossDayEnforcement: false`
- * so two back-to-back sessions suffice. This is the most lenient preset
- * (80/2) and sidesteps cross-day de-dupe complexity entirely. Both the
- * bug class (intro node never promotes regardless of session count) and
- * the fix (intro → practicing on first encounter, then standard rule
- * fires) are observable at any threshold.
+ * The OTHER three nodes (`sub-to-20`, `mult-2-5-10`, `sight-words`) are
+ * NOT graduation-gated, so two perfect sessions DO advance them all the
+ * way to `'mastered'` with the downstream node flipped to `'intro'`.
+ *
+ * Threshold + cross-day setup
+ * ---------------------------
+ * 80%/2 with `crossDayEnforcement: false` so two back-to-back sessions
+ * qualify. This is the most lenient preset and sidesteps day-key
+ * complexity. The bug (intro stuck forever) and the fix (intro→practicing
+ * pass) are observable at any threshold; we pick the cheapest one.
  *
  * Session-driving strategy
  * ------------------------
- * Math sessions use `failNetwork: true` (silent caption-walk fallback).
- * Word-song sessions also use `failNetwork: true` — the static plan
- * (`pickStaticWordSongPlan`) drives chip render, and the caption-walk
- * fallback fires `audioReady` so chips enable. Both approaches let the
- * spec run without paying audio-decode costs in CI.
+ * Both math and word-song sessions use `failNetwork: true` (silent
+ * caption-walk fallback driven by the static plan). Chips become
+ * enabled once the read-aloud effect's `audioReady` flips true. No
+ * audio-decode costs in CI.
  *
- * Chromium-only
- * -------------
- * Like `mastery-promotion.spec.ts`, these tests depend on chips enabling
- * (which requires the read-aloud gate to flip). WebKit headless has no
- * AudioContext; the read-aloud effect short-circuits on WebKit and chips
- * never enable. All four suites are chromium-only.
+ * Chromium-only (webkit skip)
+ * ---------------------------
+ * WebKit headless has no AudioContext; the read-aloud effect's
+ * `getHowlerRunningFn()` predicate stays false forever and chips never
+ * enable. This is a Playwright harness limitation — real iPad Safari has
+ * a working AudioContext post-gesture. Mirroring the pattern in
+ * `cvc-words-regression.spec.ts`, each test calls `skipOnWebkitHeadless`
+ * to skip on the webkit project. The progression-state-machine surface
+ * is engine-agnostic; chromium coverage is sufficient.
  *
  * Count-based assertions
  * ----------------------
- * Per `feedback_count_assertions_on_regression_tests`: every assertion on
- * the promoted state uses `.toBe()` with an exact expected value, not
- * `.toContain`. The `history.length` assertions also use exact counts.
+ * Per `feedback_count_assertions_on_regression_tests`: `.toBe()` with
+ * exact expected values, `.toEqual([...])` for arrays. Never `.toContain`.
  */
 
 import { test, expect } from '@playwright/test'
@@ -84,15 +90,29 @@ interface PersistedProgress {
   history: Array<{ dateISO: string; skillFocus: string[]; successRate: number }>
 }
 
+/**
+ * WebKit headless has no AudioContext. Read-aloud effect's
+ * `getHowlerRunningFn()` predicate stays false forever; chips never
+ * become enabled and any chip-tap test times out. Real iPad Safari
+ * works fine — this is a Playwright harness limitation only.
+ *
+ * Pattern mirrored from `cvc-words-regression.spec.ts:282-290`.
+ */
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → read-aloud cannot fire. Chromium coverage is sufficient for progression state-machine surface.',
+  )
+}
+
 // ── shared helpers ─────────────────────────────────────────────────────────
 
 /**
  * Drive one complete math session: Hub → Number Garden → 8 correct chip
  * taps → SessionEnd → "All done!" → Hub.
- *
- * The session records a 1.0 successRate entry for whatever node is the
- * current focus (the focus picker picks it from `skillLevels` at
- * session-end). Returns when Hub re-mounts.
  */
 async function runOneMathSession(
   page: import('@playwright/test').Page,
@@ -124,10 +144,6 @@ async function runOneMathSession(
 /**
  * Drive one complete word-song session: Hub → Word Song → 8 correct chip
  * taps → SessionEnd → "All done!" → Hub.
- *
- * Uses the static word-song plan (failNetwork path) — chips become enabled
- * after the caption-walk fallback fires `audioReady`. Returns when Hub
- * re-mounts.
  */
 async function runOneWordSongSession(
   page: import('@playwright/test').Page,
@@ -156,16 +172,14 @@ async function runOneWordSongSession(
   await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
 }
 
-// ── Part 1 — cvc-words (word-song track) ──────────────────────────────────
+// ── Part 1 — cvc-words (graduation-gated; verifies intro → practicing) ─────
 
-test.describe('Progression loop — cvc-words (intro → mastered)', () => {
+test.describe('Progression loop — cvc-words (intro → practicing, graduation-gated)', () => {
   test.beforeEach(async ({ page }) => {
     await installClaudeMock(page, { failNetwork: true })
 
     // Seed: all word-song prerequisites mastered so pickFocusNode lands on
-    // cvc-words. cvc-words itself is at 'intro'. cvc-words-short-o is
-    // 'locked' (the downstream node we expect to flip to 'intro').
-    // Threshold: 80%/2 sessions, crossDay off so two same-session runs qualify.
+    // cvc-words. cvc-words at 'intro'. cvc-words-short-o 'locked'.
     const progress = buildSeedProgress({
       skillLevelOverrides: {
         'letter-names': 'mastered',
@@ -173,7 +187,6 @@ test.describe('Progression loop — cvc-words (intro → mastered)', () => {
         'blending-cv': 'mastered',
         'cvc-words': 'intro',
         'cvc-words-short-o': 'locked',
-        // Keep subsequent nodes locked so focus stays on cvc-words.
         'cvc-words-short-u': 'locked',
         'cvc-words-short-i': 'locked',
         digraphs: 'locked',
@@ -183,16 +196,27 @@ test.describe('Progression loop — cvc-words (intro → mastered)', () => {
       masteryThreshold: { percent: 0.8, sessions: 2 },
     })
 
-    // parentSettings.crossDayEnforcement must be false for two back-to-back
-    // sessions to qualify. buildSeedProgress uses crossDayEnforcement: true
-    // by default; override via a full parentSettings merge inside the raw
-    // seed object.
+    // crossDayEnforcement: false so two back-to-back sessions both count.
+    // buildSeedProgress hardcodes crossDayEnforcement: true; replace the
+    // whole parentSettings via raw spread to override.
+    //
+    // GOTCHA — `isParentSettings` is STRICT on the per-track shape: when
+    // `'math' in mt || 'word-song' in mt`, BOTH `mt.math` AND
+    // `mt['word-song']` must be valid thresholds (guards.ts:193-197). A
+    // single-track seed (`{ 'word-song': {...} }` alone) makes the guard
+    // reject the whole `parentSettings` → `isProgressV1` rejects the
+    // blob → `loadProgress()` returns null → app falls back to
+    // defaultProgress(). Silent seed-rejection failure mode. Include
+    // both tracks here.
     const progressWithNoCrossDay = {
       ...(progress as Record<string, unknown>),
       parentSettings: {
         autoPromote: true,
         sessionModePicker: 'off',
-        masteryThreshold: { 'word-song': { percent: 0.8, sessions: 2 } },
+        masteryThreshold: {
+          math: { percent: 0.8, sessions: 2 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
         crossDayEnforcement: false,
         showLevelToMarian: false,
       },
@@ -205,56 +229,52 @@ test.describe('Progression loop — cvc-words (intro → mastered)', () => {
   })
 
   /**
-   * FAILS on current main: applyMasteryRule skips 'intro' nodes so
-   * cvc-words never advances past 'intro' regardless of session count.
+   * Pre-fix: cvc-words stays at 'intro' forever.
+   * Post-fix: 2 perfect sessions advance cvc-words to 'practicing'.
    *
-   * PASSES once Kevin's fix lands: intro → practicing on first session,
-   * practicing → mastered after 2 qualifying sessions, cvc-words-short-o
-   * unlocks to 'intro'.
+   * Graduation-gate caveat: cvc-words is in
+   * `WORD_SONG_GRADUATION_GATED_NODES`. Two plain perfect sessions are
+   * NOT sufficient for 'mastered' — the graduation gate requires a
+   * novelPoolSuccessRate entry. So we assert the half of the ladder
+   * Kevin's fix actually closes: intro → practicing. cvc-words-short-o
+   * stays 'locked' (downstream unlock cascades on 'mastered' only).
    */
-  test(
-    '[chromium] two perfect cvc-words sessions promote intro → mastered and unlock cvc-words-short-o',
-    { tag: '@chromium' },
-    async ({ page }) => {
-      await page.goto('/')
-      await forceHowlerUnlock(page)
+  test('two perfect cvc-words sessions advance intro → practicing (graduation gate holds short-o locked)', async ({
+    page,
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
 
-      // Session 1: intro → practicing (after fix)
-      await runOneWordSongSession(page)
+    await page.goto('/')
+    await forceHowlerUnlock(page)
 
-      // Session 2: practicing → mastered if qualifies (after fix)
-      await runOneWordSongSession(page)
+    await runOneWordSongSession(page)
+    await runOneWordSongSession(page)
 
-      const persisted = (await readProgressFromPage(page)) as PersistedProgress
-      expect(persisted).not.toBeNull()
+    const persisted = (await readProgressFromPage(page)) as PersistedProgress
+    expect(persisted).not.toBeNull()
 
-      // THE SMOKING GUN — fails on main, passes after Kevin's fix.
-      expect(persisted.skillLevels['cvc-words']).toBe('mastered')
+    // THE SMOKING GUN — pre-fix: 'intro'. Post-fix: 'practicing'.
+    expect(persisted.skillLevels['cvc-words']).toBe('practicing')
 
-      // Downstream unlock: cvc-words-short-o should flip locked → intro.
-      expect(persisted.skillLevels['cvc-words-short-o']).toBe('intro')
+    // Downstream stays locked — unlock only fires on 'mastered' promotion.
+    expect(persisted.skillLevels['cvc-words-short-o']).toBe('locked')
 
-      // History grew by exactly 2 entries (we seeded 0 and ran 2 sessions).
-      expect(persisted.history.length).toBe(2)
-
-      // Both entries targeted cvc-words and were perfect.
-      const lastTwo = persisted.history.slice(-2)
-      expect(lastTwo[0]!.successRate).toBe(1)
-      expect(lastTwo[1]!.successRate).toBe(1)
-      expect(lastTwo[0]!.skillFocus).toEqual(['cvc-words'])
-      expect(lastTwo[1]!.skillFocus).toEqual(['cvc-words'])
-    },
-  )
+    // History grew by exactly 2 entries.
+    expect(persisted.history.length).toBe(2)
+    const lastTwo = persisted.history.slice(-2)
+    expect(lastTwo[0]!.successRate).toBe(1)
+    expect(lastTwo[1]!.successRate).toBe(1)
+    expect(lastTwo[0]!.skillFocus).toEqual(['cvc-words'])
+    expect(lastTwo[1]!.skillFocus).toEqual(['cvc-words'])
+  })
 })
 
-// ── Part 2a — sub-to-20 (math track) ──────────────────────────────────────
+// ── Part 2a — sub-to-20 (math, not graduation-gated) ──────────────────────
 
 test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
   test.beforeEach(async ({ page }) => {
     await installClaudeMock(page, { failNetwork: true })
 
-    // Seed: all math prerequisites mastered so pickFocusNode lands on
-    // sub-to-20. sub-to-20 at 'intro'. two-digit-addsub 'locked'.
     const progress = buildSeedProgress({
       skillLevelOverrides: {
         'number-recog': 'mastered',
@@ -271,12 +291,17 @@ test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
       masteryThreshold: { percent: 0.8, sessions: 2 },
     })
 
+    // Both tracks required by isParentSettings strict per-track guard
+    // (see cvc-words describe block above for full gotcha note).
     const progressWithNoCrossDay = {
       ...(progress as Record<string, unknown>),
       parentSettings: {
         autoPromote: true,
         sessionModePicker: 'off',
-        masteryThreshold: { math: { percent: 0.8, sessions: 2 } },
+        masteryThreshold: {
+          math: { percent: 0.8, sessions: 2 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
         crossDayEnforcement: false,
         showLevelToMarian: false,
       },
@@ -289,43 +314,44 @@ test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
   })
 
   /**
-   * FAILS on current main: sub-to-20 stays at 'intro' forever.
-   * PASSES after Kevin's fix: intro → practicing → mastered in 2 sessions.
+   * Pre-fix: sub-to-20 stays at 'intro' forever.
+   * Post-fix: 2 perfect sessions → intro → practicing → mastered in one
+   * ladder traversal (intro→practicing pass fires session 1; practicing→
+   * mastered fires session 2 with both qualifying entries). two-digit-addsub
+   * unlocks from 'locked' → 'intro'.
    */
-  test(
-    '[chromium] two perfect sub-to-20 sessions promote intro → mastered and unlock two-digit-addsub',
-    { tag: '@chromium' },
-    async ({ page }) => {
-      await page.goto('/')
-      await forceHowlerUnlock(page)
+  test('two perfect sub-to-20 sessions promote intro → mastered and unlock two-digit-addsub', async ({
+    page,
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
 
-      await runOneMathSession(page)
-      await runOneMathSession(page)
+    await page.goto('/')
+    await forceHowlerUnlock(page)
 
-      const persisted = (await readProgressFromPage(page)) as PersistedProgress
-      expect(persisted).not.toBeNull()
+    await runOneMathSession(page)
+    await runOneMathSession(page)
 
-      expect(persisted.skillLevels['sub-to-20']).toBe('mastered')
-      expect(persisted.skillLevels['two-digit-addsub']).toBe('intro')
+    const persisted = (await readProgressFromPage(page)) as PersistedProgress
+    expect(persisted).not.toBeNull()
 
-      expect(persisted.history.length).toBe(2)
-      const lastTwo = persisted.history.slice(-2)
-      expect(lastTwo[0]!.successRate).toBe(1)
-      expect(lastTwo[1]!.successRate).toBe(1)
-      expect(lastTwo[0]!.skillFocus).toEqual(['sub-to-20'])
-      expect(lastTwo[1]!.skillFocus).toEqual(['sub-to-20'])
-    },
-  )
+    expect(persisted.skillLevels['sub-to-20']).toBe('mastered')
+    expect(persisted.skillLevels['two-digit-addsub']).toBe('intro')
+
+    expect(persisted.history.length).toBe(2)
+    const lastTwo = persisted.history.slice(-2)
+    expect(lastTwo[0]!.successRate).toBe(1)
+    expect(lastTwo[1]!.successRate).toBe(1)
+    expect(lastTwo[0]!.skillFocus).toEqual(['sub-to-20'])
+    expect(lastTwo[1]!.skillFocus).toEqual(['sub-to-20'])
+  })
 })
 
-// ── Part 2b — mult-2-5-10 (math track) ────────────────────────────────────
+// ── Part 2b — mult-2-5-10 (math, not graduation-gated) ─────────────────────
 
 test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
   test.beforeEach(async ({ page }) => {
     await installClaudeMock(page, { failNetwork: true })
 
-    // Seed: all math prerequisites mastered so pickFocusNode lands on
-    // mult-2-5-10. mult-2-5-10 at 'intro'. mult-3-4 'locked'.
     const progress = buildSeedProgress({
       skillLevelOverrides: {
         'number-recog': 'mastered',
@@ -342,12 +368,16 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
       masteryThreshold: { percent: 0.8, sessions: 2 },
     })
 
+    // Both tracks required (see cvc-words describe block for the gotcha).
     const progressWithNoCrossDay = {
       ...(progress as Record<string, unknown>),
       parentSettings: {
         autoPromote: true,
         sessionModePicker: 'off',
-        masteryThreshold: { math: { percent: 0.8, sessions: 2 } },
+        masteryThreshold: {
+          math: { percent: 0.8, sessions: 2 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
         crossDayEnforcement: false,
         showLevelToMarian: false,
       },
@@ -360,43 +390,43 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
   })
 
   /**
-   * FAILS on current main: mult-2-5-10 stays at 'intro' forever.
-   * PASSES after Kevin's fix.
+   * Pre-fix: mult-2-5-10 stays at 'intro' forever.
+   * Post-fix: full intro → practicing → mastered ladder, mult-3-4 unlocks.
    */
-  test(
-    '[chromium] two perfect mult-2-5-10 sessions promote intro → mastered and unlock mult-3-4',
-    { tag: '@chromium' },
-    async ({ page }) => {
-      await page.goto('/')
-      await forceHowlerUnlock(page)
+  test('two perfect mult-2-5-10 sessions promote intro → mastered and unlock mult-3-4', async ({
+    page,
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
 
-      await runOneMathSession(page)
-      await runOneMathSession(page)
+    await page.goto('/')
+    await forceHowlerUnlock(page)
 
-      const persisted = (await readProgressFromPage(page)) as PersistedProgress
-      expect(persisted).not.toBeNull()
+    await runOneMathSession(page)
+    await runOneMathSession(page)
 
-      expect(persisted.skillLevels['mult-2-5-10']).toBe('mastered')
-      expect(persisted.skillLevels['mult-3-4']).toBe('intro')
+    const persisted = (await readProgressFromPage(page)) as PersistedProgress
+    expect(persisted).not.toBeNull()
 
-      expect(persisted.history.length).toBe(2)
-      const lastTwo = persisted.history.slice(-2)
-      expect(lastTwo[0]!.successRate).toBe(1)
-      expect(lastTwo[1]!.successRate).toBe(1)
-      expect(lastTwo[0]!.skillFocus).toEqual(['mult-2-5-10'])
-      expect(lastTwo[1]!.skillFocus).toEqual(['mult-2-5-10'])
-    },
-  )
+    expect(persisted.skillLevels['mult-2-5-10']).toBe('mastered')
+    expect(persisted.skillLevels['mult-3-4']).toBe('intro')
+
+    expect(persisted.history.length).toBe(2)
+    const lastTwo = persisted.history.slice(-2)
+    expect(lastTwo[0]!.successRate).toBe(1)
+    expect(lastTwo[1]!.successRate).toBe(1)
+    expect(lastTwo[0]!.skillFocus).toEqual(['mult-2-5-10'])
+    expect(lastTwo[1]!.skillFocus).toEqual(['mult-2-5-10'])
+  })
 })
 
-// ── Part 2c — sight-words (word-song track) ────────────────────────────────
+// ── Part 2c — sight-words (word-song, not graduation-gated) ────────────────
 
 test.describe('Progression loop — sight-words (intro → mastered)', () => {
   test.beforeEach(async ({ page }) => {
     await installClaudeMock(page, { failNetwork: true })
 
-    // Seed: all word-song prerequisites mastered so pickFocusNode lands on
-    // sight-words. sight-words at 'intro'. simple-sentences 'locked'.
+    // Seed: all word-song prerequisites mastered (including digraphs, the
+    // node directly before sight-words in WORD_SONG_NODES_IN_ORDER).
     const progress = buildSeedProgress({
       skillLevelOverrides: {
         'letter-names': 'mastered',
@@ -413,12 +443,16 @@ test.describe('Progression loop — sight-words (intro → mastered)', () => {
       masteryThreshold: { percent: 0.8, sessions: 2 },
     })
 
+    // Both tracks required (see cvc-words describe block for the gotcha).
     const progressWithNoCrossDay = {
       ...(progress as Record<string, unknown>),
       parentSettings: {
         autoPromote: true,
         sessionModePicker: 'off',
-        masteryThreshold: { 'word-song': { percent: 0.8, sessions: 2 } },
+        masteryThreshold: {
+          math: { percent: 0.8, sessions: 2 },
+          'word-song': { percent: 0.8, sessions: 2 },
+        },
         crossDayEnforcement: false,
         showLevelToMarian: false,
       },
@@ -431,32 +465,31 @@ test.describe('Progression loop — sight-words (intro → mastered)', () => {
   })
 
   /**
-   * FAILS on current main: sight-words stays at 'intro' forever.
-   * PASSES after Kevin's fix: intro → practicing → mastered, simple-sentences
-   * unlocks to 'intro'.
+   * Pre-fix: sight-words stays at 'intro' forever.
+   * Post-fix: full intro → practicing → mastered, simple-sentences unlocks.
    */
-  test(
-    '[chromium] two perfect sight-words sessions promote intro → mastered and unlock simple-sentences',
-    { tag: '@chromium' },
-    async ({ page }) => {
-      await page.goto('/')
-      await forceHowlerUnlock(page)
+  test('two perfect sight-words sessions promote intro → mastered and unlock simple-sentences', async ({
+    page,
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
 
-      await runOneWordSongSession(page)
-      await runOneWordSongSession(page)
+    await page.goto('/')
+    await forceHowlerUnlock(page)
 
-      const persisted = (await readProgressFromPage(page)) as PersistedProgress
-      expect(persisted).not.toBeNull()
+    await runOneWordSongSession(page)
+    await runOneWordSongSession(page)
 
-      expect(persisted.skillLevels['sight-words']).toBe('mastered')
-      expect(persisted.skillLevels['simple-sentences']).toBe('intro')
+    const persisted = (await readProgressFromPage(page)) as PersistedProgress
+    expect(persisted).not.toBeNull()
 
-      expect(persisted.history.length).toBe(2)
-      const lastTwo = persisted.history.slice(-2)
-      expect(lastTwo[0]!.successRate).toBe(1)
-      expect(lastTwo[1]!.successRate).toBe(1)
-      expect(lastTwo[0]!.skillFocus).toEqual(['sight-words'])
-      expect(lastTwo[1]!.skillFocus).toEqual(['sight-words'])
-    },
-  )
+    expect(persisted.skillLevels['sight-words']).toBe('mastered')
+    expect(persisted.skillLevels['simple-sentences']).toBe('intro')
+
+    expect(persisted.history.length).toBe(2)
+    const lastTwo = persisted.history.slice(-2)
+    expect(lastTwo[0]!.successRate).toBe(1)
+    expect(lastTwo[1]!.successRate).toBe(1)
+    expect(lastTwo[0]!.skillFocus).toEqual(['sight-words'])
+    expect(lastTwo[1]!.skillFocus).toEqual(['sight-words'])
+  })
 })
