@@ -1264,24 +1264,29 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
 })
 
 /**
- * Short-o sibling tier (ticket 86c9m3ae3). The planner gains
- * `cvc-words-short-o` as a third first-class word-song content mode —
- * same "Read the <word>." template as `cvc-words`, but the word pool
- * shifts from short-a to the 8-word short-o pool
- * (`dog, mop, log, pot, box, fox, mom, hot`).
+ * Short-o sibling tier (ticket 86c9m3ae3, extended by 86c9teu2e). The
+ * planner emits `cvc-words-short-o` content using the same "Read the
+ * <word>." template as `cvc-words`, but the word pool is short-o.
+ *
+ * Pool history:
+ *  - v1 (PR #150, ticket 86c9m3ae3): 8 words —
+ *    `dog, mop, log, pot, box, fox, mom, hot`.
+ *  - v2 (this PR's predecessor 86c9teu2e): 11 words — added
+ *    `cot, top, pop` to match short-u parity and unblock the
+ *    cross-vowel mode pool-size floor (≥ 11 per
+ *    `cross-vowel-mix-spec.md` §6).
  *
  * Coverage strategy:
- *  - (a) System prompt acknowledges the new node + names its 8 words.
+ *  - (a) System prompt acknowledges the new node + names all 11
+ *    pool words.
  *  - (b) User message routes `cvc-words-short-o` through verbatim
  *    (first-class, no stub-fallback).
  *  - (c) Round-trip: a wire-shape response with 8 short-o "Read the
- *    <word>." problems parses cleanly via toEqual on the count.
- *  - (d) No short-a leakage: a planned response that emits a short-a
- *    word as a target round-trips successfully through the planner
- *    (the planner is content-agnostic — pool isolation is enforced
- *    upstream by the prompt + downstream by the wordPack), but the
- *    short-o pool list itself in the system prompt contains no
- *    short-a words.
+ *    <word>." problems parses cleanly via toEqual on the count;
+ *    every target is in the 11-word pool.
+ *  - (d) No short-a leakage: pool isolation is enforced upstream by
+ *    the prompt + downstream by the wordPack; the short-o pool list
+ *    itself in the system prompt contains no short-a words.
  *  - (e) Cache invariant: two calls differing only in focusNode
  *    (cvc-words vs cvc-words-short-o) share byte-identical system
  *    text. Per shared/prompt-caching.md, focusNode lives in the user
@@ -1291,7 +1296,12 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
  * assertions (`.toEqual([…])`, `.toHaveLength(N)`, `.toEqual(N)`) —
  * never `.toContain` for the round-trip pool checks.
  */
-describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3ae3)', () => {
+describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3ae3 / 86c9teu2e)', () => {
+  /** The 8 words baked into the test plan factory below — a stable
+   *  sample of the 11-word pool used to drive the round-trip path.
+   *  The planner only emits 8 problems per session, so the wire-shape
+   *  factory always produces 8; the 11-word pool below is the full
+   *  set the planner may draw from. */
   const SHORT_O_WORDS = [
     'dog',
     'mop',
@@ -1302,6 +1312,23 @@ describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3a
     'mom',
     'hot',
   ] as const
+
+  /** The full 11-word short-o pool (v2, ticket 86c9teu2e). Membership
+   *  checks pin that the planner's emitted targets fall inside this
+   *  pool — they may be ANY 8 of these 11. */
+  const FULL_SHORT_O_POOL: ReadonlySet<string> = new Set([
+    'dog',
+    'mop',
+    'log',
+    'pot',
+    'box',
+    'fox',
+    'mom',
+    'hot',
+    'cot',
+    'top',
+    'pop',
+  ])
 
   /** Build an 8-problem cvc-words-short-o wire response in template form. */
   function makeShortOPlan(words: readonly string[]): string {
@@ -1345,10 +1372,10 @@ describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3a
     expect(user).toMatch(/Focus skill node: cvc-words-short-o\./)
   })
 
-  it('system prompt names the 8-word short-o pool', async () => {
+  it('system prompt names the 11-word short-o pool', async () => {
     // Pin the pool enumeration so a future copy edit can't silently
     // drop a word and cause Haiku to emit something the wordPack
-    // doesn't carry.
+    // doesn't carry. v2 pool (ticket 86c9teu2e) is 11 entries.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(makeShortOPlan(SHORT_O_WORDS), { capture })
 
@@ -1363,15 +1390,19 @@ describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3a
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const prompt = args.system.map((b) => b.text).join('\n')
     // Pool literal — the comma-joined list as embedded in the prompt.
-    expect(prompt).toContain('dog, mop, log, pot, box, fox, mom, hot')
+    expect(prompt).toContain('dog, mop, log, pot, box, fox, mom, hot, cot, top, pop')
     // The third content-mode header.
     expect(prompt).toMatch(/cvc-words-short-o:/)
+    // The label is updated to reflect the expanded pool size.
+    expect(prompt).toContain('11-word short-o CVC')
   })
 
-  it('round-trips a wire response with exactly 8 short-o problems', async () => {
+  it('round-trips a wire response with exactly 8 short-o problems drawn from the 11-word pool', async () => {
     // Count-based assertion per
     // `feedback_count_assertions_on_regression_tests.md` — `.toEqual`
     // / `.toHaveLength`, never `.toContain` for the pool check.
+    // The wire response only contains 8 problems (planner contract);
+    // pool membership is checked against the full 11-word v2 pool.
     const client = makeMockClient(makeShortOPlan(SHORT_O_WORDS))
 
     const plan = await generateSessionPlan({
@@ -1384,17 +1415,49 @@ describe('generateSessionPlan — cvc-words-short-o sibling tier (ticket 86c9m3a
 
     const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
     expect(reads).toHaveLength(8)
-    // Every read-line word must be in the short-o pool — exact
-    // membership, not "contains".
+    // Every read-line word must be in the 11-word short-o pool —
+    // exact membership, not "contains".
     const reReadLine = /^Read the ([a-z]+)\.$/
     const readWords = reads.map((u) => u.text.match(reReadLine)![1]!)
     expect(readWords).toHaveLength(8)
-    const poolSet = new Set<string>(SHORT_O_WORDS)
     for (const word of readWords) {
-      expect(poolSet.has(word)).toBe(true)
+      expect(FULL_SHORT_O_POOL.has(word)).toBe(true)
     }
     // Distinct targets (no repeats within a session).
     expect(new Set(readWords).size).toEqual(8)
+  })
+
+  it('round-trips a wire response that uses the 3 v2 extension words (cot/top/pop)', async () => {
+    // Pool-extension coverage: a wire response built with the new
+    // v2 extension words (cot, top, pop) round-trips cleanly. This
+    // exercises the AC4 contract that the 3 new words can each
+    // appear as the planner's emitted target.
+    const planWords = ['cot', 'top', 'pop', 'dog', 'mom', 'pot', 'log', 'fox']
+    const client = makeMockClient(makeShortOPlan(planWords))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    const reReadLine = /^Read the ([a-z]+)\.$/
+    const readWords = reads.map((u) => u.text.match(reReadLine)![1]!)
+    // Pin that the 3 extension words round-trip. Count-assertion via
+    // sorted equality on the input planWords set — exact match, no
+    // "contains" looseness.
+    expect(readWords.slice().sort()).toEqual(
+      ['cot', 'top', 'pop', 'dog', 'mom', 'pot', 'log', 'fox']
+        .slice()
+        .sort(),
+    )
+    // And the pool-isolation invariant still holds.
+    for (const word of readWords) {
+      expect(FULL_SHORT_O_POOL.has(word)).toBe(true)
+    }
   })
 
   it('every read line uses the "Read the <word>." template (no "Tap the" leakage from blending-cv)', async () => {

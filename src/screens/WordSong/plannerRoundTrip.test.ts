@@ -151,26 +151,34 @@ describe('planner → parser round-trip — cvc-words (the August unblock — st
 })
 
 /**
- * Short-o sibling tier round-trip (ticket 86c9m3ae3). The planner
- * widens to emit `cvc-words-short-o` content with a short-o pool
- * (`dog, mop, log, pot, box, fox, mom, hot`); the parser already
- * accepts `"Read the <word>."` per PR #132. This suite pins the
- * round-trip end-to-end:
+ * Short-o sibling tier round-trip (ticket 86c9m3ae3, extended by
+ * 86c9teu2e). The planner emits `cvc-words-short-o` content with a
+ * short-o pool; the parser already accepts `"Read the <word>."` per
+ * PR #132. This suite pins the round-trip end-to-end:
+ *
+ * Pool history:
+ *  - v1 (ticket 86c9m3ae3, PR #150): 8 words —
+ *    `dog, mop, log, pot, box, fox, mom, hot`.
+ *  - v2 (ticket 86c9teu2e): 11 words — added `cot, top, pop` to
+ *    match short-u parity and unblock the cross-vowel mode pool-size
+ *    floor.
  *
  *   1. A wire-shape response with 8 short-o "Read the <word>."
  *      problems parses without throwing.
  *   2. Every problem carries `contentType: 'cvc-word'` (same as the
  *      short-a sibling — the discriminant is the read-line template,
  *      not the focus-node name).
- *   3. The 8 targets resolve via `getWordEntry` (the wordPack carries
- *      the new entries with `isTarget: true`), and `pickDistractors`
- *      resolves trios for both gentle and trap tiers.
- *   4. Bit-for-bit isolation: short-a sessions never see short-o
- *      words leak into them (planner-side guarantee, exercised here
- *      by feeding a short-a request through and checking targets are
- *      all in the short-a pool).
+ *   3. The 11 target words resolve via `getWordEntry` (the wordPack
+ *      carries every short-o entry with `isTarget: true`), and
+ *      `pickDistractors` resolves trios for both gentle and trap
+ *      tiers including the 3 v2 extension rows.
+ *   4. Same-vowel-only rule (spec §8): every distractor for a
+ *      short-o target is drawn from the short-o pool itself —
+ *      pinned across all 11 targets including cot/top/pop.
+ *   5. Bit-for-bit isolation: short-a sessions never see short-o
+ *      words leak into them (planner-side guarantee).
  */
-describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)', () => {
+describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3 / 86c9teu2e)', () => {
   const SHORT_O_WORDS = [
     'dog',
     'mop',
@@ -181,6 +189,23 @@ describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)
     'mom',
     'hot',
   ] as const
+
+  /** The full 11-word short-o pool (v2, ticket 86c9teu2e). Used for
+   *  the same-vowel-rule matrix scan + the extension-word round-trip
+   *  pin below. */
+  const FULL_SHORT_O_POOL: ReadonlySet<string> = new Set([
+    'dog',
+    'mop',
+    'log',
+    'pot',
+    'box',
+    'fox',
+    'mom',
+    'hot',
+    'cot',
+    'top',
+    'pop',
+  ])
 
   /** Build a wire-shape response that mirrors what the live planner
    *  would emit for `focusNode: 'cvc-words-short-o'`. */
@@ -226,12 +251,10 @@ describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)
       // is the read-line template, not the focus-node name.
       expect(problem.contentType).toEqual('cvc-word')
       expect(problem.utterances.read).toMatch(/^Read the [a-z]+\.$/)
-      // Every target is from the short-o pool (no short-a leakage).
-      expect(
-        SHORT_O_WORDS.includes(
-          problem.target.word as (typeof SHORT_O_WORDS)[number],
-        ),
-      ).toBe(true)
+      // Every target is from the 11-word short-o pool (no short-a /
+      // short-u / short-i leakage). Per spec §AC9: round-trip widened
+      // from the v1 8-word pool to the v2 11-word pool.
+      expect(FULL_SHORT_O_POOL.has(problem.target.word)).toBe(true)
       // Vowel field carries 'o' on every short-o target.
       expect(problem.target.vowel).toEqual('o')
       // isTarget=true on every target (the parser already enforces
@@ -241,9 +264,39 @@ describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)
     // 8 distinct targets — no repeats within a session.
     const targets = rebuilt.problems.map((p) => p.target.word)
     expect(new Set(targets).size).toEqual(8)
-    // Equality check of the sorted targets vs the sorted pool — exact
-    // membership, not "contains".
+    // Equality check of the sorted targets vs the sorted sample —
+    // the fixture fed in 8 v1 words, so we expect those 8 back.
     expect(targets.slice().sort()).toEqual(SHORT_O_WORDS.slice().sort())
+  })
+
+  it('parses cleanly when the plan uses the 3 v2 extension words (cot/top/pop)', async () => {
+    // Pool-extension coverage: a wire response that includes the 3
+    // new v2 extension words alongside 5 v1 words round-trips
+    // cleanly. Exercises AC4 — Haiku may emit the new words as the
+    // planner's emitted target.
+    const planWords = ['cot', 'top', 'pop', 'dog', 'mom', 'pot', 'log', 'fox']
+    const client = makeMockClient(makeShortOWirePlan(planWords))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    expect(rebuilt.problems).toHaveLength(8)
+    const targets = rebuilt.problems.map((p) => p.target.word)
+    // Exact membership — sorted equality so the 3 extension words
+    // round-trip alongside the 5 v1 words.
+    expect(targets.slice().sort()).toEqual(planWords.slice().sort())
+    // Every target carries vowel: 'o' (no cross-vowel leakage during
+    // parsing — the wordPack rows for cot/top/pop are correctly
+    // typed).
+    for (const problem of rebuilt.problems) {
+      expect(problem.target.vowel).toEqual('o')
+    }
   })
 
   it('every short-o target resolves a gentle + trap distractor pair without throwing', async () => {
@@ -269,14 +322,14 @@ describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)
     }
   })
 
-  it('short-o trios draw distractors only from the short-o pool (same-vowel rule, spec §8)', () => {
-    // For each of the 8 short-o targets, both tiers' distractor pairs
-    // must come from the short-o pool. This is a pure read of the
-    // matrix — no planner involved.
-    const poolSet = new Set<string>(SHORT_O_WORDS)
-    for (const target of SHORT_O_WORDS) {
-      // pickDistractors throws on missing pairings; calling it
-      // exercises the matrix entry.
+  it('short-o trios draw distractors only from the 11-word short-o pool (same-vowel rule, spec §8)', () => {
+    // For each of the 11 short-o targets (v2 pool, ticket 86c9teu2e),
+    // both tiers' distractor pairs must come from the short-o pool.
+    // This is a pure read of the matrix — no planner involved.
+    // Iterating over FULL_SHORT_O_POOL ensures the 3 new TARGET_PAIRINGS
+    // rows (cot, top, pop) are exercised — missing rows would surface
+    // here as a `pickDistractors` throw.
+    for (const target of FULL_SHORT_O_POOL) {
       // gentle (problem index 1)
       const [g1, g2] = pickDistractors(
         {
@@ -288,8 +341,8 @@ describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)
         },
         1,
       )
-      expect(poolSet.has(g1.word)).toBe(true)
-      expect(poolSet.has(g2.word)).toBe(true)
+      expect(FULL_SHORT_O_POOL.has(g1.word)).toBe(true)
+      expect(FULL_SHORT_O_POOL.has(g2.word)).toBe(true)
       // trap (problem index 5)
       const [t1, t2] = pickDistractors(
         {
@@ -301,8 +354,8 @@ describe('planner → parser round-trip — cvc-words-short-o (ticket 86c9m3ae3)
         },
         5,
       )
-      expect(poolSet.has(t1.word)).toBe(true)
-      expect(poolSet.has(t2.word)).toBe(true)
+      expect(FULL_SHORT_O_POOL.has(t1.word)).toBe(true)
+      expect(FULL_SHORT_O_POOL.has(t2.word)).toBe(true)
     }
   })
 })

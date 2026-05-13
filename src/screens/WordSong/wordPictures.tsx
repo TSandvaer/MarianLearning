@@ -156,6 +156,9 @@ function renderPictureBody(key: string): ReactNode {
     case 'rug':
     case 'hut':
     case 'gum':
+    case 'cot':
+    case 'top':
+    case 'pop':
     case 'pig':
     case 'pin':
     case 'bin':
@@ -172,6 +175,16 @@ function renderPictureBody(key: string): ReactNode {
     case 'jet':
     case 'gem':
     case 'egg':
+      // Short-o pool extension (ticket 86c9teu2e). 3 wholly-new
+      // short-o entries (`cot, top, pop`) — case-list extension so
+      // the `WordPicture` renderer routes these keys through the
+      // `<image href>` external-SVG path. The SVG asset files ship
+      // in Devon's parallel ticket (86c9teu03 — Phase 3 PNG-in-SVG
+      // embed). Until those land, the chip renders a 404'd image
+      // box; once they land, the chip renders the real picture with
+      // no further code change. The forward-compatible posture
+      // keeps the canon-wire and picture-pack PRs cleanly separable.
+      //
       // Short-u pack additions (ticket 86c9q5q2d / 86c9q9ben). 8
       // wholly-new (`bug, nut, tub, bun, jug, rug, hut, gum`) plus
       // 3 retraces of existing distractor pictures (`sun, cup, bus`
