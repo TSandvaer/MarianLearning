@@ -48,6 +48,22 @@ export interface WordEntry {
   /** Whether this entry can appear as a target word. Distractor-only
    *  entries (like `bus`, `sun`) have `isTarget: false`. */
   isTarget: boolean
+  /**
+   * Optional phoneme tag (IPA, content phoneme only). Used for
+   * distractor-selection scoping when a grapheme covers multiple
+   * phonemes (e.g. `th` → /θ/ vs /ð/, `g` → /g/ vs /dʒ/). For words
+   * where the grapheme→phoneme mapping is unambiguous (most of the
+   * pack), this is `undefined` — `vowel` already carries the
+   * discriminating phonological dimension and the word's identity
+   * fully determines the consonant phonemes.
+   *
+   * Annotate when a word's onset/digraph grapheme is shared with a
+   * pack-resident word that carries a DIFFERENT phoneme — the
+   * phoneme-scoping branch in `pickDistractors` then prevents
+   * cross-phoneme co-occurrence in a chip trio. See
+   * `design/architecture/digraph-architecture-proposal.md` §3.
+   */
+  phoneme?: string
 }
 
 export type WordCategory =
@@ -433,6 +449,13 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     vowel: 'u',
     category: 'food',
     isTarget: true,
+    // /g/ — hard-g onset. Paired against `gem` (/dʒ/) below in the
+    // short-e pool: the `g` grapheme covers two phonemes in this pack.
+    // Same-vowel-only rule keeps them apart in v1 sessions, but the
+    // phoneme tag is the architectural floor that prevents a future
+    // cross-vowel matrix author from accidentally pairing them. See
+    // `design/architecture/digraph-architecture-proposal.md` §3.5.
+    phoneme: '/g/',
   },
   // ── Short-i pool (ticket 86c9qdba4, v4 vowel tier) ─────────────────
   // Per `design/word-song/short-i-pool-expansion.md` §1 with Thomas's
@@ -603,6 +626,13 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     vowel: 'e',
     category: 'object',
     isTarget: true,
+    // /dʒ/ — soft-g onset. Paired against `gum` (/g/) above in the
+    // short-u pool: the `g` grapheme covers two phonemes in this pack.
+    // Same-vowel-only rule keeps them apart in v1 sessions, but the
+    // phoneme tag is the architectural floor that prevents a future
+    // cross-vowel matrix author from accidentally pairing them. See
+    // `design/architecture/digraph-architecture-proposal.md` §3.5.
+    phoneme: '/dʒ/',
   },
   {
     word: 'egg',

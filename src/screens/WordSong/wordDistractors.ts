@@ -156,6 +156,33 @@ export function pickDistractors(
     )
   }
 
+  // Phoneme-scoping — when the target carries a phoneme tag, any
+  // distractor that ALSO carries one must match. Distractors without a
+  // phoneme tag pass through (the phoneme tag is opt-in; absence means
+  // "don't filter on this dimension"). Defensive throw, NOT silent
+  // filter — silent filtering hides matrix authoring bugs (e.g. a
+  // future voiceless-/θ/ row that lists a voiced-/ð/ distractor by
+  // mistake). See `design/architecture/digraph-architecture-proposal.md`
+  // §3.3 for the full rationale.
+  if (target.phoneme !== undefined) {
+    if (d1.phoneme !== undefined && d1.phoneme !== target.phoneme) {
+      throw new Error(
+        `[wordDistractors] phoneme mismatch: target ${target.word} (${target.phoneme}) ` +
+          `vs distractor ${d1.word} (${d1.phoneme}). Matrix authoring bug — ` +
+          `cross-phoneme co-occurrence must not surface in a chip trio ` +
+          `(see digraph-architecture-proposal.md §3).`,
+      )
+    }
+    if (d2.phoneme !== undefined && d2.phoneme !== target.phoneme) {
+      throw new Error(
+        `[wordDistractors] phoneme mismatch: target ${target.word} (${target.phoneme}) ` +
+          `vs distractor ${d2.word} (${d2.phoneme}). Matrix authoring bug — ` +
+          `cross-phoneme co-occurrence must not surface in a chip trio ` +
+          `(see digraph-architecture-proposal.md §3).`,
+      )
+    }
+  }
+
   return [d1, d2]
 }
 

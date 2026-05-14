@@ -612,3 +612,242 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
     expect([d1.word, d2.word]).toEqual(['bus', 'sun'])
   })
 })
+
+// --------------------------------------------------------------------------
+// Phoneme-scoping (Kevin's digraph-architecture-proposal §3 — phoneme-tag
+// infrastructure PR, gum/gem latent-vulnerability closeout).
+//
+// The phoneme tag is an opt-in field on WordEntry. When a target carries a
+// phoneme tag, any distractor that ALSO carries one must match — defensive
+// throw, not silent filter. These tests drive the new branch through every
+// shape combination of (target tagged?, distractor tagged?).
+// --------------------------------------------------------------------------
+
+describe('pickDistractors — phoneme-scoping (digraph-architecture-proposal §3)', () => {
+  // Synthesise word entries to exercise the phoneme branch without
+  // depending on the live matrix's contents — mirrors the
+  // "out-of-matrix" test pattern but uses a real matrix row + mocked
+  // wordPack to surface a controlled (target, d1, d2) phoneme triple.
+  //
+  // Each test resets module state, mocks `./wordPack` with a single
+  // patched TARGET_PAIRINGS row + patched entries with phoneme tags,
+  // then imports `pickDistractors` fresh. The mock is scoped to a
+  // single test (`vi.resetModules()` + `vi.doUnmock()`).
+
+  async function withPatchedPack<T>(
+    targetWord: string,
+    targetPhoneme: string | undefined,
+    d1Word: string,
+    d1Phoneme: string | undefined,
+    d2Word: string,
+    d2Phoneme: string | undefined,
+    run: (
+      pickDistractors: typeof import('./wordDistractors').pickDistractors,
+      getWordEntry: typeof import('./wordPack').getWordEntry,
+    ) => T,
+  ): Promise<T> {
+    vi.resetModules()
+    vi.doMock('./wordPack', async () => {
+      const real =
+        await vi.importActual<typeof import('./wordPack')>('./wordPack')
+      // Build a synthetic TARGET_WORDS list whose target + d1 + d2
+      // entries carry the requested phoneme tags. Build a synthetic
+      // TARGET_PAIRINGS row mapping target → both gentle and trap to
+      // [d1, d2] so problemIndex doesn't matter.
+      const realEntries: ReadonlyArray<import('./wordPack').WordEntry> =
+        real.ALL_WORDS
+      const findEntry = (word: string) => {
+        const found = realEntries.find((e) => e.word === word)
+        if (!found)
+          throw new Error(`test setup: no ALL_WORDS entry for ${word}`)
+        return found
+      }
+      const patchedEntries = [
+        { ...findEntry(targetWord), phoneme: targetPhoneme },
+        { ...findEntry(d1Word), phoneme: d1Phoneme },
+        { ...findEntry(d2Word), phoneme: d2Phoneme },
+      ]
+      // Replace the entries that match by word; carry over everything
+      // else so unrelated lookups still work.
+      const patchedAll = realEntries.map((e) => {
+        const replacement = patchedEntries.find((p) => p.word === e.word)
+        return replacement ?? e
+      })
+      const patchedTargets = real.TARGET_WORDS.map((e) => {
+        const replacement = patchedEntries.find((p) => p.word === e.word)
+        return replacement ?? e
+      })
+      const patchedPairings = {
+        ...real.TARGET_PAIRINGS,
+        [targetWord]: {
+          gentle: [d1Word, d2Word] as const,
+          trap: [d1Word, d2Word] as const,
+        },
+      } as typeof real.TARGET_PAIRINGS
+      const patchedGetWordEntry = (word: string) => {
+        const hit = patchedAll.find((e) => e.word === word)
+        if (!hit) {
+          throw new Error(
+            `[wordPack] No entry for word "${word}" — must be in TARGET_WORDS or DISTRACTOR_ONLY_WORDS`,
+          )
+        }
+        return hit
+      }
+      return {
+        ...real,
+        ALL_WORDS: patchedAll,
+        TARGET_WORDS: patchedTargets,
+        TARGET_PAIRINGS: patchedPairings,
+        getWordEntry: patchedGetWordEntry,
+      }
+    })
+    const { pickDistractors: localPick } = await import('./wordDistractors')
+    const { getWordEntry: localGet } = await import('./wordPack')
+    try {
+      return run(localPick, localGet)
+    } finally {
+      vi.doUnmock('./wordPack')
+      vi.resetModules()
+    }
+  }
+
+  it('throws when target is tagged + d1 is tagged with a mismatching phoneme', async () => {
+    // Target /g/, distractor1 /dʒ/ — the canonical gum-vs-gem case.
+    await withPatchedPack(
+      'cat',
+      '/g/',
+      'bus',
+      '/dʒ/',
+      'sun',
+      undefined,
+      (pick, get) => {
+        expect(() => pick(get('cat'), 1)).toThrow(/phoneme mismatch/)
+        expect(() => pick(get('cat'), 1)).toThrow(/cat \(\/g\/\)/)
+        expect(() => pick(get('cat'), 1)).toThrow(/bus \(\/dʒ\/\)/)
+      },
+    )
+  })
+
+  it('throws when target is tagged + d2 is tagged with a mismatching phoneme', async () => {
+    // Mismatch on the second distractor specifically — exercises the
+    // separate d2 branch (parallel to d1, distinct error site).
+    await withPatchedPack(
+      'cat',
+      '/θ/',
+      'bus',
+      undefined,
+      'sun',
+      '/ð/',
+      (pick, get) => {
+        expect(() => pick(get('cat'), 1)).toThrow(/phoneme mismatch/)
+        expect(() => pick(get('cat'), 1)).toThrow(/cat \(\/θ\/\)/)
+        expect(() => pick(get('cat'), 1)).toThrow(/sun \(\/ð\/\)/)
+      },
+    )
+  })
+
+  it('passes when target is tagged + a distractor is untagged (one-side-tagged is opt-in)', async () => {
+    // Target /g/, d1 untagged, d2 untagged. The phoneme tag is opt-in;
+    // an untagged distractor is filler from another tier where the
+    // vowel axis already constrains things.
+    await withPatchedPack(
+      'cat',
+      '/g/',
+      'bus',
+      undefined,
+      'sun',
+      undefined,
+      (pick, get) => {
+        expect(() => pick(get('cat'), 1)).not.toThrow()
+        const [d1, d2] = pick(get('cat'), 1)
+        expect([d1.word, d2.word]).toEqual(['bus', 'sun'])
+      },
+    )
+  })
+
+  it('passes when target is untagged + distractors are tagged (target-side gate)', async () => {
+    // Untagged target — the phoneme branch is gated on
+    // `target.phoneme !== undefined` and short-circuits cleanly.
+    await withPatchedPack(
+      'cat',
+      undefined,
+      'bus',
+      '/g/',
+      'sun',
+      '/dʒ/',
+      (pick, get) => {
+        expect(() => pick(get('cat'), 1)).not.toThrow()
+        const [d1, d2] = pick(get('cat'), 1)
+        expect([d1.word, d2.word]).toEqual(['bus', 'sun'])
+      },
+    )
+  })
+
+  it('passes when target and both distractors are untagged (no-op case)', async () => {
+    // No tags anywhere — the entire branch is a no-op. Confirms the
+    // back-compat posture for the bulk of the pack.
+    await withPatchedPack(
+      'cat',
+      undefined,
+      'bus',
+      undefined,
+      'sun',
+      undefined,
+      (pick, get) => {
+        expect(() => pick(get('cat'), 1)).not.toThrow()
+        const [d1, d2] = pick(get('cat'), 1)
+        expect([d1.word, d2.word]).toEqual(['bus', 'sun'])
+      },
+    )
+  })
+
+  it('passes when target and both distractors are tagged with matching phonemes', async () => {
+    // All three sides tagged with the same phoneme — the match path.
+    // This is the "voiceless-th tier authored correctly" shape.
+    await withPatchedPack(
+      'cat',
+      '/θ/',
+      'bus',
+      '/θ/',
+      'sun',
+      '/θ/',
+      (pick, get) => {
+        expect(() => pick(get('cat'), 1)).not.toThrow()
+        const [d1, d2] = pick(get('cat'), 1)
+        expect([d1.word, d2.word]).toEqual(['bus', 'sun'])
+      },
+    )
+  })
+})
+
+describe('WordEntry.phoneme — live-pack annotations (gum/gem latent-vulnerability)', () => {
+  it('gum carries phoneme: "/g/"', () => {
+    const gum = getWordEntry('gum')
+    expect(gum.phoneme).toBe('/g/')
+  })
+
+  it('gem carries phoneme: "/dʒ/"', () => {
+    const gem = getWordEntry('gem')
+    expect(gem.phoneme).toBe('/dʒ/')
+  })
+
+  it('most pack entries are untagged (phoneme is undefined)', () => {
+    // Spot-check a handful of unambiguous-grapheme entries. The
+    // phoneme tag is opt-in for grapheme-ambiguity cases only; the
+    // bulk of the pack stays undefined.
+    expect(getWordEntry('cat').phoneme).toBeUndefined()
+    expect(getWordEntry('dog').phoneme).toBeUndefined()
+    expect(getWordEntry('sun').phoneme).toBeUndefined()
+    expect(getWordEntry('pig').phoneme).toBeUndefined()
+    expect(getWordEntry('bed').phoneme).toBeUndefined()
+  })
+
+  it('gum and gem live in different vowel tiers so same-vowel rule masks the latent collision in v1', () => {
+    // Sanity check that the v1 same-vowel-only rule is doing what the
+    // architecture proposal §3.5 claims it does — gum is short-u, gem
+    // is short-e. Adding phoneme tags is belt-and-braces; the v1
+    // safety comes from the vowel axis still.
+    expect(getWordEntry('gum').vowel).toBe('u')
+    expect(getWordEntry('gem').vowel).toBe('e')
+  })
+})
