@@ -151,6 +151,66 @@ export const WORD_SONG_TARGET_WORDS_SHORT_I =
 export const WORD_SONG_TARGET_WORDS_SHORT_E =
   'bed, leg, hen, pen, web, net, jet, gem, egg'
 
+/**
+ * The 7 target words for the digraphs-sh tier (`digraphs-sh`) — the
+ * FIRST digraph tier, sitting between `cvc-words-short-e` and
+ * `sight-words` in `WordSongNode` / `LITERACY_TREE` (PR #217's
+ * 3-sibling digraph split — `digraphs-sh` / `digraphs-ch` /
+ * `digraphs-th-voiceless`).
+ *
+ * Locked 2026-05-14 per `design/word-song/digraphs-sh-word-list.md` §1
+ * (Option C-minus, via Dave's long-vowel addendum). Seven sh-initial
+ * words:
+ *  - 4 conventional sh-CVC: `ship, shell, shed, shop` — the `/ʃ/`
+ *    digraph onset + a single short vowel inside.
+ *  - 3 long-vowel sight-word-hybrids: `shoe` (/uː/), `sheep` (/iː/),
+ *    `shark` (/ɑːr/) — their rest-of-word vowel is OUTSIDE Marian's
+ *    formal short-vowel phonics tiers. These carry `hybridMode: true`
+ *    in `wordPack.ts`; the planner reads that flag (via
+ *    `DIGRAPHS_SH_HYBRID_MODE_WORDS` below) to SUPPRESS
+ *    segmentation / spelling / decode-from-phoneme problem types for
+ *    them — they are chip-tap-only, picture+audio scaffold, never
+ *    decoded or segmented (Kyle's spec §6.1 + Dave addendum §Q7d).
+ *
+ * Order MUST match the `isTarget: true` sh-tier rows in `wordPack.ts`
+ * (Devon's parallel PR #220): `ship, shell, shoe, sheep, shark, shed,
+ * shop`. `shore` was deliberately dropped from the pool.
+ *
+ * Unlike the short-vowel tiers, the sh-tier is classified by the
+ * digraph phoneme `/ʃ/`, not by a short-vowel code — so there is no
+ * `vowel` field on these `wordPack.ts` entries and no rhyme-family
+ * block in `WORD_SONG_DISTRACTOR_HINTS` below.
+ *
+ * Same alignment contract as the prior tiers: the client-side
+ * `wordPack.ts` MUST carry every word here as `isTarget: true` plus a
+ * `TARGET_PAIRINGS` row. The round-trip suite in
+ * `src/screens/WordSong/plannerRoundTrip.test.ts` + the planner unit
+ * tests in `api/_planner.test.ts` enforce that.
+ */
+export const WORD_SONG_TARGET_WORDS_DIGRAPHS_SH =
+  'ship, shell, shoe, sheep, shark, shed, shop'
+
+/**
+ * The subset of the digraphs-sh pool whose `wordPack.ts` entries carry
+ * `hybridMode: true` — long / r-controlled vowels outside Marian's
+ * formal phonics tiers (`shoe` /uː/, `sheep` /iː/, `shark` /ɑːr/).
+ *
+ * The planner consumes this list as the hybridMode GATE: when the
+ * focus node is `digraphs-sh`, the system prompt instructs Haiku that
+ * these three words are chip-tap recognition ONLY — no segmentation,
+ * no spelling, no decode-from-phoneme prompt shapes. The 4
+ * conventional sh-CVC words (`ship, shell, shed, shop`) take the full
+ * decode treatment.
+ *
+ * MUST stay aligned with the `hybridMode: true` rows in `wordPack.ts`.
+ * Enforced by code review + `api/_planner.test.ts`.
+ */
+export const WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID: readonly string[] = [
+  'shoe',
+  'sheep',
+  'shark',
+] as const
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).
