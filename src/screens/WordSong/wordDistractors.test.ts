@@ -15,6 +15,51 @@ import {
   isForbiddenPair,
 } from './wordPack'
 
+// All digraph-tier target words (sh + ch + th). Digraph tiers are NOT
+// classified by the same-vowel CVC heuristic — their distractor rules are
+// "pool-neighbour + cross-orthography contrast" (asserted in the dedicated
+// per-tier describe blocks below), so the generic CVC-tier gentle/trap
+// AXIS tests and the cross-vowel exhaustiveness scans must exclude them.
+//
+// The sh tier OMITS `vowel`, so a `w.vowel !== undefined` filter alone
+// catches it; the ch + th tiers SET `vowel` (every ch/th word uses a
+// short vowel Marian has covered), so the undefined-guard does NOT catch
+// them — they need this explicit Set. The ch tier additionally happened to
+// pass the generic gentle/trap axis tests by coincidence (every ch word
+// starts `c`); the th tier does NOT (th-pool neighbours used as traps —
+// e.g. `bath`'s trap `thin`, `moth`'s trap `thin`/`math` — share the `th`
+// grapheme / `/θ/` phoneme but no starting char, ending char, vowel, or
+// category). Scoping the generic axis tests by this Set is the th-tier
+// analogue of the sh-tier exclusion already documented in those tests'
+// comments — coverage for ch + th lives in their dedicated describe
+// blocks instead.
+const ALL_DIGRAPH_TIER_WORDS: ReadonlySet<string> = new Set([
+  // digraphs-sh
+  'ship',
+  'shell',
+  'shoe',
+  'sheep',
+  'shark',
+  'shed',
+  'shop',
+  // digraphs-ch
+  'chin',
+  'chip',
+  'chop',
+  'chat',
+  'chest',
+  'chug',
+  'chick',
+  // digraphs-th-voiceless
+  'thin',
+  'bath',
+  'math',
+  'path',
+  'moth',
+  'thick',
+  'cloth',
+])
+
 describe('pickTier', () => {
   it('returns "gentle" for problems 1 through GENTLE_RAMP_THROUGH', () => {
     for (let i = 1; i <= GENTLE_RAMP_THROUGH; i++) {
@@ -99,14 +144,18 @@ describe('pickDistractors', () => {
     // "objects from clearly different categories and clearly different
     // sounds." The matrix should reflect that.
     //
-    // SCOPED to vowel-bearing (CVC-tier) entries. The digraphs-sh tier
-    // (`vowel` omitted) is INTENTIONALLY excluded — its gentle rule is
-    // "both entries are sh-pool neighbours, distinguished by PICTURE"
-    // (Kyle's spec §2), so every sh-tier gentle pair shares the `sh`
-    // onset and has no `vowel` axis. The category/consonant/vowel
-    // heuristic genuinely does not apply; the dedicated
-    // 'digraphs-sh tier' describe block below asserts the sh-tier rule.
-    for (const target of TARGET_WORDS.filter((w) => w.vowel !== undefined)) {
+    // SCOPED to vowel-bearing (CVC-tier) entries, EXCLUDING all
+    // digraph-tier words (sh + ch + th — `ALL_DIGRAPH_TIER_WORDS`). The
+    // digraphs-sh tier (`vowel` omitted) was already excluded by the
+    // `vowel !== undefined` guard; the ch + th tiers SET `vowel` so they
+    // need the explicit Set. Each digraph tier's gentle rule is "both
+    // entries are pool neighbours, distinguished by PICTURE" (Kyle's
+    // specs §2) — the category/consonant/vowel heuristic genuinely does
+    // not apply; the dedicated per-tier describe blocks below assert the
+    // pool-neighbour rule instead.
+    for (const target of TARGET_WORDS.filter(
+      (w) => w.vowel !== undefined && !ALL_DIGRAPH_TIER_WORDS.has(w.word),
+    )) {
       const [d1, d2] = pickDistractors(target, 1)
       // At least one of (different category, different starting consonant,
       // different vowel) must be true for each distractor — and ideally all.
@@ -131,10 +180,20 @@ describe('pickDistractors', () => {
     // same category, OR same starting consonant, OR same vowel sound,
     // OR same ending consonant."
     //
-    // SCOPED to vowel-bearing (CVC-tier) entries — same rationale as the
-    // gentle test above. The sh-tier trap rule (sh/s contrast OR sh-pool
-    // neighbour) is asserted in the dedicated 'digraphs-sh tier' block.
-    for (const target of TARGET_WORDS.filter((w) => w.vowel !== undefined)) {
+    // SCOPED to vowel-bearing (CVC-tier) entries, EXCLUDING all
+    // digraph-tier words (`ALL_DIGRAPH_TIER_WORDS`) — same rationale as
+    // the gentle test above. Each digraph tier's trap rule
+    // (cross-orthography contrast OR pool neighbour) is asserted in its
+    // dedicated per-tier describe block. Note the th tier specifically
+    // would FAIL this generic axis test if not excluded: th-pool
+    // neighbours used as traps (e.g. `bath`'s trap `thin`, `moth`'s trap
+    // `thin`/`math`) share the `th` grapheme / `/θ/` phoneme but not a
+    // starting char, ending char, vowel, or category — the axis the th
+    // tier tests is the chip-SELECTION /θ/-vs-/t/ contrast, not the CVC
+    // character-overlap heuristic.
+    for (const target of TARGET_WORDS.filter(
+      (w) => w.vowel !== undefined && !ALL_DIGRAPH_TIER_WORDS.has(w.word),
+    )) {
       const [d1, d2] = pickDistractors(target, 5)
       for (const d of [d1, d2]) {
         const targetStart = target.word[0]
@@ -308,9 +367,19 @@ describe('digraphs-sh tier — wordPack rows', () => {
     }
     // They live in DISTRACTOR_ONLY_WORDS, not TARGET_WORDS. The digraphs-ch
     // tier appended `sat` + `sick` (ch/s-contrast traps for `chat`/`chick`)
-    // — asserted in the dedicated 'digraphs-ch tier' describe block below.
+    // and the digraphs-th tier appended `tin` + `tick` + `pat` (th/t-contrast
+    // traps for `thin`/`thick`/`path`) — each asserted in its dedicated
+    // describe block below.
     const distractorOnlyWords = DISTRACTOR_ONLY_WORDS.map((e) => e.word)
-    expect(distractorOnlyWords).toEqual(['sell', 'sop', 'sat', 'sick'])
+    expect(distractorOnlyWords).toEqual([
+      'sell',
+      'sop',
+      'sat',
+      'sick',
+      'tin',
+      'tick',
+      'pat',
+    ])
   })
 
   it('sip remains a short-i TARGET_WORDS entry (dual-role, not duplicated)', () => {
@@ -546,10 +615,19 @@ describe('digraphs-ch tier — wordPack rows', () => {
     // just not ch-tier targets.
     expect(getWordEntry('sat').vowel).toBe('a')
     expect(getWordEntry('sick').vowel).toBe('i')
-    // The full distractor-only set after the ch tier: sh's sell/sop +
-    // ch's sat/sick.
+    // The full distractor-only set after the digraph tiers: sh's sell/sop
+    // + ch's sat/sick + th's tin/tick/pat (the th-tier appended its
+    // t-contrast traps — asserted in the 'digraphs-th tier' block below).
     const distractorOnlyWords = DISTRACTOR_ONLY_WORDS.map((e) => e.word)
-    expect(distractorOnlyWords).toEqual(['sell', 'sop', 'sat', 'sick'])
+    expect(distractorOnlyWords).toEqual([
+      'sell',
+      'sop',
+      'sat',
+      'sick',
+      'tin',
+      'tick',
+      'pat',
+    ])
   })
 
   it('sip remains a single short-i TARGET_WORDS entry (now dual-role across short-i / sh / ch — not duplicated)', () => {
@@ -692,6 +770,316 @@ describe('digraphs-ch tier — wordPack rows', () => {
   })
 })
 
+// --------------------------------------------------------------------------
+// Digraphs-th tier (ticket digraphs-th wordPack)
+//
+// The th-tier reuses the sh + ch cross-orthography distractor machinery
+// (Kyle's spec `design/word-song/digraphs-th-word-list.md`, RECONCILED
+// against Dave's `design/research/digraph-th-addendum.md`). It is a HYBRID
+// of the sh and ch postures (spec §0):
+//   - 7 voiceless-/θ/ targets — `thin/bath/math/path/moth/thick/cloth`.
+//   - `vowel` IS set on all 7 (like ch, unlike sh) — every th-word uses a
+//     short vowel Marian has formally covered (short-i ×2, short-a ×3,
+//     short-o ×2).
+//   - `phoneme: '/θ/'` IS set on all 7 (like sh's `/ʃ/`, UNLIKE ch which
+//     omitted `phoneme`) — `th` is THE canonical multi-phoneme grapheme
+//     (/θ/ vs /ð/); the tag is the architectural floor for a future
+//     voiced-/ð/ tier (spec §6.1).
+//   - TWO `hybridMode: true` entries — `thick` (th + ck double-digraph)
+//     and `cloth` (/kl/ onset blend); the other 5 are fully decodable
+//     (spec §6.2). th resembles the sh tier's structure, NOT ch's clean
+//     zero-`hybridMode` pool.
+//   - gentle pair = 2 th-pool neighbours (distinguished by picture).
+//   - trap pair = th/t-contrast trap + th-pool neighbour for the
+//     strong-trap subset (`thin/thick/path/bath/math` — 5 of 7, the
+//     richest of any digraph tier), else 2 th-pool neighbours for the
+//     weak-trap subset (`moth/cloth` — no clean real-word t-contrast).
+//   - 3 new distractor-only t-contrast entries (`tin/tick/pat`); `bat` +
+//     `mat` are dual-role (reuse their short-a CVC `TARGET_WORDS` entries
+//     as `bath`'s / `math`'s t-contrast traps).
+// --------------------------------------------------------------------------
+
+describe('digraphs-th tier — wordPack rows', () => {
+  const TH_TARGET_WORDS = [
+    'thin',
+    'bath',
+    'math',
+    'path',
+    'moth',
+    'thick',
+    'cloth',
+  ] as const
+  // The 5 strong-trap t-contrast distractors: 3 new distractor-only
+  // (`tin/tick/pat`) + 2 dual-role existing short-a CVC targets
+  // (`bat/mat`).
+  const TH_T_CONTRAST_DISTRACTORS = [
+    'tin',
+    'tick',
+    'pat',
+    'bat',
+    'mat',
+  ] as const
+  const TH_VOWELS: Record<string, 'a' | 'o' | 'u' | 'i' | 'e'> = {
+    thin: 'i',
+    bath: 'a',
+    math: 'a',
+    path: 'a',
+    moth: 'o',
+    thick: 'i',
+    cloth: 'o',
+  }
+  const TH_HYBRID_MODE_WORDS = ['thick', 'cloth'] as const
+
+  it('all 7 th-target WordEntry rows exist with isTarget: true, vowel set, and phoneme: "/θ/"', () => {
+    let foundCount = 0
+    for (const word of TH_TARGET_WORDS) {
+      const entry = getWordEntry(word)
+      foundCount += 1
+      expect(entry.isTarget, `${word} isTarget`).toBe(true)
+      // `vowel` IS set on every th entry (like ch, unlike sh) — every
+      // th-word uses a short vowel Marian has covered.
+      expect(entry.vowel, `${word} vowel`).toBe(TH_VOWELS[word])
+      // `phoneme: '/θ/'` IS set on all 7 — the load-bearing schema
+      // divergence from ch (which omitted `phoneme`). `th` is THE
+      // canonical multi-phoneme grapheme; the tag scopes distractor
+      // selection so a future voiced-/ð/ word can never co-occur in a
+      // th-trio (spec §6.1 / AC12).
+      expect(entry.phoneme, `${word} phoneme`).toBe('/θ/')
+    }
+    // Count-based: all 7 resolved (none threw, none missing).
+    expect(foundCount).toBe(7)
+  })
+
+  it('thick + cloth carry hybridMode: true; the other 5 th targets do not (spec §6.2 / AC13)', () => {
+    // RECONCILED — Dave §3e: `thick` (th-onset + ck-coda double-digraph)
+    // and `cloth` (/kl/ onset blend) ship recognition-only. The other 5
+    // (`thin/bath/math/path/moth`) are fully decodable. th is NOT a clean
+    // zero-`hybridMode` tier the way ch was — it resembles the sh tier's
+    // structure. Count-based: the set of hybridMode th words is exactly
+    // [thick, cloth].
+    const hybridThWords = TH_TARGET_WORDS.filter(
+      (w) => getWordEntry(w).hybridMode === true,
+    )
+    expect([...hybridThWords].sort()).toEqual([...TH_HYBRID_MODE_WORDS].sort())
+    // The other 5 carry no hybridMode flag (absent === false default).
+    for (const word of TH_TARGET_WORDS) {
+      if ((TH_HYBRID_MODE_WORDS as readonly string[]).includes(word)) continue
+      expect(
+        getWordEntry(word).hybridMode,
+        `${word} hybridMode`,
+      ).toBeUndefined()
+    }
+  })
+
+  it('tin + tick + pat are distractor-only entries (isTarget: false), NOT phoneme-tagged', () => {
+    for (const word of ['tin', 'tick', 'pat'] as const) {
+      const entry = getWordEntry(word)
+      expect(entry.isTarget, `${word} isTarget`).toBe(false)
+      // NOT phoneme-tagged — the th-target rows reference them as untagged
+      // t-contrast distractors. Tagging them `/t/` would trip the
+      // phoneme-mismatch defensive check against the `/θ/`-tagged th
+      // targets (spec §6.1).
+      expect(entry.phoneme, `${word} phoneme`).toBeUndefined()
+    }
+    // They keep their real short vowel — they ARE short-vowel CVC words,
+    // just not th-tier targets.
+    expect(getWordEntry('tin').vowel).toBe('i')
+    expect(getWordEntry('tick').vowel).toBe('i')
+    expect(getWordEntry('pat').vowel).toBe('a')
+    // The full distractor-only set after the th tier: sh's sell/sop +
+    // ch's sat/sick + th's tin/tick/pat.
+    const distractorOnlyWords = DISTRACTOR_ONLY_WORDS.map((e) => e.word)
+    expect(distractorOnlyWords).toEqual([
+      'sell',
+      'sop',
+      'sat',
+      'sick',
+      'tin',
+      'tick',
+      'pat',
+    ])
+  })
+
+  it('bat + mat remain single short-a TARGET_WORDS entries (dual-role across short-a / th — not duplicated)', () => {
+    // `bat` / `mat` are the th/t-contrast traps for `bath` / `math` AND
+    // their own short-a CVC targets — referenced by string from the
+    // th-tier matrix, NOT added as second entries.
+    for (const word of ['bat', 'mat'] as const) {
+      const entries = TARGET_WORDS.filter((e) => e.word === word)
+      expect(entries, `${word} entry count`).toHaveLength(1)
+      expect(entries[0].vowel, `${word} vowel`).toBe('a')
+      expect(entries[0].isTarget, `${word} isTarget`).toBe(true)
+      // Plain short-a CVC words — NOT phoneme-tagged (an untagged
+      // distractor passes the `pickDistractors` phoneme-scoping check
+      // against a `/θ/`-tagged th target by design).
+      expect(entries[0].phoneme, `${word} phoneme`).toBeUndefined()
+    }
+  })
+
+  it('each th-target produces exactly 2 distractors per pickDistractors (gentle + trap)', () => {
+    let resolvedCount = 0
+    for (const word of TH_TARGET_WORDS) {
+      const target = getWordEntry(word)
+      const gentle = pickDistractors(target, 1)
+      const trap = pickDistractors(target, 5)
+      expect(gentle, `${word} gentle`).toHaveLength(2)
+      expect(trap, `${word} trap`).toHaveLength(2)
+      // Distinctness — d1 ≠ d2 ≠ target, both tiers.
+      expect(gentle[0].word).not.toBe(target.word)
+      expect(gentle[1].word).not.toBe(target.word)
+      expect(gentle[0].word).not.toBe(gentle[1].word)
+      expect(trap[0].word).not.toBe(target.word)
+      expect(trap[1].word).not.toBe(target.word)
+      expect(trap[0].word).not.toBe(trap[1].word)
+      resolvedCount += 1
+    }
+    expect(resolvedCount).toBe(7)
+  })
+
+  it('every th-target gentle pair is two th-pool neighbours (spec §2 gentle rule)', () => {
+    // Gentle rule: BOTH entries are th-pool words — Marian distinguishes
+    // by picture, not by th-vs-t. Count-based: tally non-th-pool gentle
+    // distractors, assert zero.
+    const thPool = new Set<string>(TH_TARGET_WORDS)
+    const nonThPoolGentle: string[] = []
+    for (const word of TH_TARGET_WORDS) {
+      const [d1, d2] = pickDistractors(getWordEntry(word), 1)
+      for (const d of [d1, d2]) {
+        if (!thPool.has(d.word)) nonThPoolGentle.push(`${word}->${d.word}`)
+      }
+    }
+    expect(nonThPoolGentle).toEqual([])
+  })
+
+  it('strong-trap subset (thin/thick/path/bath/math) trap pair includes its th/t-contrast distractor', () => {
+    // Spec §2 strong-trap subset — these 5 targets have a real-word,
+    // 8yo-appropriate t-contrast minimal pair (tin/tick/pat/bat/mat). The
+    // trap pair must include it. This is the richest strong-trap subset
+    // of any digraph tier (sh: 3, ch: 3, th: 5).
+    const strongTrap: Record<string, string> = {
+      thin: 'tin',
+      thick: 'tick',
+      path: 'pat',
+      bath: 'bat',
+      math: 'mat',
+    }
+    for (const [target, expectedTContrast] of Object.entries(strongTrap)) {
+      const [d1, d2] = pickDistractors(getWordEntry(target), 5)
+      const trapWords = [d1.word, d2.word]
+      expect(
+        trapWords,
+        `${target} trap pair should include t-contrast "${expectedTContrast}"`,
+      ).toContain(expectedTContrast)
+    }
+  })
+
+  it('weak-trap subset (moth/cloth) trap pair is two th-pool neighbours (no t-contrast)', () => {
+    // Spec §2 weak-trap subset — no clean real-word t-contrast
+    // (`moth`→"mot" non-word; `cloth`'s /kl/ onset has no single
+    // t-substitutable consonant), so both trap entries are th-pool
+    // neighbours. Count-based: tally any non-th-pool distractor in these
+    // rows, assert zero.
+    const thPool = new Set<string>(TH_TARGET_WORDS)
+    const tContrastInWeakTrap: string[] = []
+    for (const word of ['moth', 'cloth'] as const) {
+      const [d1, d2] = pickDistractors(getWordEntry(word), 5)
+      for (const d of [d1, d2]) {
+        if (!thPool.has(d.word)) tContrastInWeakTrap.push(`${word}->${d.word}`)
+      }
+    }
+    expect(tContrastInWeakTrap).toEqual([])
+  })
+
+  it('no th-tier trio surfaces a forbidden silhouette pair', () => {
+    // Defensive — the new FORBIDDEN_PAIRS entries [thin,thick],
+    // [path,moth], [bath,box] plus all prior pairs. pickDistractors
+    // throws on a forbidden pair, so a clean run across all problem
+    // indices proves the matrix is clean. (This is the regression guard
+    // for the spec-§2-preview defect: the spec's illustrative
+    // `moth: trap: ['thin','thick']` would have tripped this — the
+    // shipped matrix uses `['thin','math']` instead. See wordPack.ts
+    // moth-row deviation note.)
+    for (const word of TH_TARGET_WORDS) {
+      const target = getWordEntry(word)
+      for (const problem of [1, 2, 3, 4, 5, 6, 7, 8]) {
+        const [d1, d2] = pickDistractors(target, problem)
+        expect(
+          isForbiddenPair(target.word, d1.word),
+          `${target.word}/${d1.word} (problem ${problem})`,
+        ).toBe(false)
+        expect(
+          isForbiddenPair(target.word, d2.word),
+          `${target.word}/${d2.word} (problem ${problem})`,
+        ).toBe(false)
+        expect(
+          isForbiddenPair(d1.word, d2.word),
+          `${d1.word}/${d2.word} (problem ${problem})`,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('no th-target trio leaks a generic CVC word, an sh/ch-tier word, or a voiced-/ð/ word (cross-tier hygiene, spec §6)', () => {
+    // th-trios contain ONLY th-pool words + the 5 t-contrast distractors
+    // (tin/tick/pat/bat/mat). No generic `cat`/`dog`/`pen`, no
+    // `ship`/`chip`, no `the`/`this`. `bat`/`mat` ARE permitted — they
+    // are the diagnostic t-contrast traps, not generic filler.
+    // Count-based: tally any distractor outside that allowed set across
+    // all problem indices.
+    const allowed = new Set<string>([
+      ...TH_TARGET_WORDS,
+      ...TH_T_CONTRAST_DISTRACTORS,
+    ])
+    const leaks: string[] = []
+    for (const word of TH_TARGET_WORDS) {
+      const target = getWordEntry(word)
+      for (const problem of [1, 5]) {
+        const [d1, d2] = pickDistractors(target, problem)
+        for (const d of [d1, d2]) {
+          if (!allowed.has(d.word)) leaks.push(`${word}@${problem}->${d.word}`)
+        }
+      }
+    }
+    expect(leaks).toEqual([])
+  })
+
+  it('every th-tier distractor carries phoneme "/θ/" OR is untagged (phoneme-scoping never rejects a v1 th pairing)', () => {
+    // Spec §6.1: the phoneme-scoping branch in pickDistractors is
+    // REACTIVATED for th-tier targets (they carry `phoneme: '/θ/'`) — but
+    // every th-tier distractor is either a `/θ/`-tagged th-pool neighbour
+    // (matches) or an UNTAGGED t-contrast trap (the branch does not
+    // fire). So it never rejects a v1 th pairing. A clean pickDistractors
+    // run across all problem indices already proves this (the branch
+    // throws on mismatch), but assert the distractor phoneme tags
+    // directly too for legibility. Count-based: tally any th-tier
+    // distractor whose phoneme is tagged AND ≠ '/θ/', assert zero.
+    const mismatches: string[] = []
+    for (const word of TH_TARGET_WORDS) {
+      const target = getWordEntry(word)
+      for (const problem of [1, 5]) {
+        const [d1, d2] = pickDistractors(target, problem)
+        for (const d of [d1, d2]) {
+          if (d.phoneme !== undefined && d.phoneme !== '/θ/') {
+            mismatches.push(`${word}@${problem}->${d.word}(${d.phoneme})`)
+          }
+        }
+      }
+    }
+    expect(mismatches).toEqual([])
+  })
+
+  it('FORBIDDEN_PAIRS includes the 3 digraphs-th additions', () => {
+    const pairs = FORBIDDEN_PAIRS.map((p) => [...p].sort().join(','))
+    for (const expected of [
+      ['thin', 'thick'],
+      ['path', 'moth'],
+      ['bath', 'box'],
+    ].map((p) => [...p].sort().join(','))) {
+      expect(pairs).toContain(expected)
+    }
+  })
+})
+
 describe('pickDistractors — defensive assertions (matrix-drift guards)', () => {
   // Drive the defensive throws by importing a fresh module instance with
   // a stubbed wordPack. Tests use vi.doMock to make this hermetic — the
@@ -748,7 +1136,7 @@ describe('pickDistractors — defensive assertions (matrix-drift guards)', () =>
 })
 
 describe('FORBIDDEN_PAIRS', () => {
-  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e + digraphs-sh + digraphs-ch additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2 / digraphs-sh / digraphs-ch)", () => {
+  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e + digraphs-sh + digraphs-ch + digraphs-th additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2 / digraphs-sh / digraphs-ch / digraphs-th)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
     // implementation hand-off note + design/word-song/short-o-pool-
     // expansion.md §3 (mom↔dad composition collision) +
@@ -782,6 +1170,9 @@ describe('FORBIDDEN_PAIRS', () => {
       ['chest', 'chip'], // digraphs-ch — small flat chip vs small chest mass-contrast (in-pool hygiene)
       ['chick', 'chin'], // digraphs-ch — both small rounded-form silhouettes (in-pool hygiene)
       ['chest', 'box'], // digraphs-ch — treasure-trunk vs plain cuboid (cross-pool hygiene)
+      ['thin', 'thick'], // digraphs-th — antonym-pair silhouettes (same object class, opposite property extreme) — in-pool hygiene
+      ['path', 'moth'], // digraphs-th — both low-mass irregular-outline silhouettes — in-pool hygiene
+      ['bath', 'box'], // digraphs-th — open-top rounded tub vs plain cuboid — cross-pool hygiene
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {
@@ -852,24 +1243,13 @@ describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
   // false-fail this test. When/if a future ticket promotes a digraph tier
   // into cross-vowel mixing, remove it here AND extend
   // `CVC_CROSS_VOWEL_NODES` + `CVC_CROSS_VOWEL_VOWELS` together.
-  const DIGRAPH_TIER_WORDS = new Set([
-    // digraphs-sh (vowel omitted — also caught by the undefined guard)
-    'ship',
-    'shell',
-    'shoe',
-    'sheep',
-    'shark',
-    'shed',
-    'shop',
-    // digraphs-ch (vowel SET — the undefined guard does NOT catch these)
-    'chin',
-    'chip',
-    'chop',
-    'chat',
-    'chest',
-    'chug',
-    'chick',
-  ])
+  //
+  // The digraphs-th tier is the same shape as ch — it SETS `vowel` (all 7
+  // th-words use a short vowel Marian has covered: short-i ×2, short-a ×3,
+  // short-o ×2), so the `w.vowel !== undefined` guard does NOT exclude
+  // them; they need the explicit Set. Reuses the module-level
+  // `ALL_DIGRAPH_TIER_WORDS` so the sh + ch + th lists never drift apart.
+  const DIGRAPH_TIER_WORDS = ALL_DIGRAPH_TIER_WORDS
   const CROSS_VOWEL_VOWEL_SET: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
     new Set(CVC_CROSS_VOWEL_VOWELS)
   const CROSS_VOWEL_TARGETS = TARGET_WORDS.filter(
@@ -1113,25 +1493,12 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
     const POOL_EXTENSION_PENDING_CROSSVOWEL = new Set(['cot', 'top', 'pop'])
     // Digraph-tier words are not CVC cross-vowel nodes — see the
     // `DIGRAPH_TIER_WORDS` rationale in the `TARGET_PAIRINGS_CROSSVOWEL`
-    // describe block above. The digraphs-ch tier SETS `vowel` (3 of the 7
-    // carry a/o/u), so the `w.vowel !== undefined` guard alone does NOT
-    // exclude them — they need the explicit Set.
-    const DIGRAPH_TIER_WORDS = new Set([
-      'ship',
-      'shell',
-      'shoe',
-      'sheep',
-      'shark',
-      'shed',
-      'shop',
-      'chin',
-      'chip',
-      'chop',
-      'chat',
-      'chest',
-      'chug',
-      'chick',
-    ])
+    // describe block above. The digraphs-ch + digraphs-th tiers SET
+    // `vowel` (3 of the 7 ch words carry a/o/u; all 7 th words carry a
+    // short vowel), so the `w.vowel !== undefined` guard alone does NOT
+    // exclude them — they need the explicit Set. Reuses the module-level
+    // `ALL_DIGRAPH_TIER_WORDS` so the sh + ch + th lists never drift.
+    const DIGRAPH_TIER_WORDS = ALL_DIGRAPH_TIER_WORDS
     const CROSS_VOWEL_VOWEL_SET: ReadonlySet<'a' | 'o' | 'u' | 'i' | 'e'> =
       new Set(CVC_CROSS_VOWEL_VOWELS)
     const targets = TARGET_WORDS.filter(

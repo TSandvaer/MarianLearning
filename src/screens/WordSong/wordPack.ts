@@ -942,6 +942,162 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     // brief: baby-bird roundness + no comb, to stay distinct from `hen`
     // (short-e target).
   },
+  // ── Digraphs-th pool (ticket digraphs-th wordPack — THIRD digraph tier) ──
+  // Per `design/word-song/digraphs-th-word-list.md` §1 (RECONCILED against
+  // `design/research/digraph-th-addendum.md`, commit `8c43395`): 7
+  // voiceless-/θ/ words — `thin, bath, math, path, moth, thick, cloth`.
+  // Pool reaches Marian only when the planner emits content for the
+  // `digraphs-th-voiceless` SkillNode (added in PR #211's 3-sibling split
+  // — `digraphs-sh` / `digraphs-ch` / `digraphs-th-voiceless`). Kevin's
+  // parallel planner PR wires the planner side (first-class focus node,
+  // canon bake, 3-place sync contract).
+  //
+  // STRUCTURALLY: th is a HYBRID of the sh and ch postures (spec §0):
+  //   1. `vowel` is SET on all 7 (like ch, unlike sh). Every th-word uses
+  //      a short vowel Marian has formally covered (short-i ×2, short-a
+  //      ×3, short-o ×2) — the th grapheme is the digraph lesson, the
+  //      rest-of-word vowel is in-tier, so `vowel` carries the real
+  //      phonological dimension. Because th SETS `vowel`, the th-tier
+  //      words must be added to the `DIGRAPH_TIER_WORDS` exclusion Set in
+  //      `wordDistractors.test.ts` (same gap the ch tier hit) so they do
+  //      not false-fail the cross-vowel exhaustiveness scan.
+  //   2. `phoneme: '/θ/'` IS set on all 7 (like sh's `/ʃ/`, UNLIKE ch
+  //      which omitted `phoneme`). `th` is THE canonical multi-phoneme
+  //      grapheme — voiceless /θ/ (`thin`, `bath`) vs voiced /ð/ (`the`,
+  //      `this`). Setting `phoneme: '/θ/'` is the architectural floor
+  //      that lets a future voiced-/ð/ sight-word tier coexist without
+  //      cross-phoneme chip-trio co-occurrence bugs (spec §6.1). The
+  //      opt-in phoneme-scoping branch in `pickDistractors` is
+  //      reactivated for th-tier targets — but every th-tier distractor
+  //      is either a `/θ/`-tagged th-pool neighbour (matches) or an
+  //      UNTAGGED t-contrast trap (`tin`/`tick`/`pat`/`bat`/`mat` — the
+  //      branch does not fire), so it never rejects a v1 th-tier pairing.
+  //   3. TWO `hybridMode: true` entries — `thick` (th-onset + `ck`-coda
+  //      double-digraph) and `cloth` (`/kl/` onset blend). Both exceed
+  //      CVC scope, so they ship recognition-only: Kevin's planner reads
+  //      the flag to suppress segmentation / spelling / decode-from-
+  //      phoneme prompts (the sh-tier `hybridMode` guard from PR #220 is
+  //      consumed, not rebuilt). The other 5 (`thin, bath, math, path,
+  //      moth`) are fully decodable (`hybridMode` absent === `false`).
+  //      th resembles the SH tier's structure (decodable + hybrid mix),
+  //      NOT ch's clean zero-`hybridMode` pool (spec §6.2 / AC13).
+  //
+  // Cross-tier hygiene (spec §6): th-trios contain ONLY th-pool words +
+  // th/t-contrast traps. No generic CVC short-vowel words, no sh-tier or
+  // ch-tier words, and no voiced-/ð/ words leak in — EXCEPT the t-contrast
+  // minimal-pair partner of a th-target (`bat` for `bath`, `mat` for
+  // `math`), which IS the diagnostic distractor, not generic filler. The
+  // th-tier `TARGET_PAIRINGS` rows below reference only th-pool neighbours
+  // and the 5 t-contrast distractors (`bat`/`mat` dual-role existing +
+  // `tin`/`tick`/`pat` new distractor-only entries). Picture pack ships
+  // via `yarn embed-pictures` from the companion prompt sheet
+  // (`digraphs-th-picture-pack-prompts.md` — 7 wholly-new pictures);
+  // until then chips fall back to the unknown-key silhouette in
+  // `wordPictures.tsx`.
+  {
+    word: 'thin',
+    pictureKey: 'thin',
+    vowel: 'i',
+    category: 'object',
+    isTarget: true,
+    // /θ/ — voiceless-th digraph ONSET. Short-i, mastered. Canonical
+    // word-initial /θ/ anchor (Dave §3f); lead word, introduced session
+    // 1. Forms the `thin`/`tin` th/t-contrast minimal pair the §2
+    // distractor matrix is built around. Picture brief is load-bearing:
+    // an adjective — the "thinness" PROPERTY must be the salient picture
+    // feature (Dave Recommendation 3 — contrast-pair composition).
+    phoneme: '/θ/',
+  },
+  {
+    word: 'bath',
+    pictureKey: 'bath',
+    vowel: 'a',
+    category: 'household',
+    isTarget: true,
+    // /θ/ — voiceless-th digraph CODA (word-final). Short-a, mastered.
+    // Fully decodable; highest-familiarity th word in the pool (Dave
+    // §3f). Forms the `bath`/`bat` th/t-contrast minimal pair — `bat` is
+    // a shipped short-a CVC target, the strongest possible real-word
+    // trap. Picture: a bathtub, no child in the tub (Dave Recommendation
+    // 3).
+    phoneme: '/θ/',
+  },
+  {
+    word: 'math',
+    pictureKey: 'math',
+    vowel: 'a',
+    category: 'object',
+    isTarget: true,
+    // /θ/ — voiceless-th digraph CODA (word-final). Short-a, mastered.
+    // Fully decodable; strong cross-language anchor (matematika). Forms
+    // the `math`/`mat` th/t-contrast minimal pair — `mat` is a shipped
+    // short-a CVC target. Picture brief is load-bearing: a chalkboard /
+    // notebook with numerals (a `2 + 2`-type sum), NOT "school" (Dave
+    // Recommendation 3).
+    phoneme: '/θ/',
+  },
+  {
+    word: 'path',
+    pictureKey: 'path',
+    vowel: 'a',
+    category: 'object',
+    isTarget: true,
+    // /θ/ — voiceless-th digraph CODA (word-final). Short-a, mastered.
+    // Fully decodable. Forms the `path`/`pat` th/t-contrast minimal pair.
+    // Picture: a simple winding trail — must read as "path" not "road"
+    // (Dave Recommendation 3).
+    phoneme: '/θ/',
+  },
+  {
+    word: 'moth',
+    pictureKey: 'moth',
+    vowel: 'o',
+    category: 'animal',
+    isTarget: true,
+    // /θ/ — voiceless-th digraph CODA (word-final). Short-o, mastered.
+    // Fully decodable. No clean real-word t-contrast (`/θ/`→`/t/` gives
+    // the non-word "mot") — weak-trap subset, paired with th-pool
+    // neighbours. Picture brief is load-bearing: fuzzy body + drab/muted
+    // colour + flat/folded wings + feathery antennae, to stay distinct
+    // from a butterfly (Dave Recommendation 3).
+    phoneme: '/θ/',
+  },
+  {
+    word: 'thick',
+    pictureKey: 'thick',
+    vowel: 'i',
+    category: 'object',
+    isTarget: true,
+    // /θ/ — voiceless-th digraph ONSET. Short-i, mastered. `hybridMode:
+    // true` (RECONCILED — Dave §3d/§3e): `thick` is a DOUBLE-DIGRAPH word
+    // — `th` (this tier's target) AND `ck` (a separate digraph not yet
+    // formally taught). In the chip-tap recognition format the `ck` is
+    // not a decoding burden, but `hybridMode: true` is the correct flag:
+    // the planner must never ask Marian to decode or spell `thick`. Forms
+    // the `thick`/`tick` th/t-contrast minimal pair. Picture brief:
+    // contrast-pair composition, "thickness" the salient property (Dave
+    // Recommendation 3).
+    phoneme: '/θ/',
+    hybridMode: true,
+  },
+  {
+    word: 'cloth',
+    pictureKey: 'cloth',
+    vowel: 'o',
+    category: 'object',
+    isTarget: true,
+    // /θ/ — voiceless-th digraph CODA (word-final). Short-o, mastered.
+    // `hybridMode: true` (RECONCILED — Dave §3d/§3e): `cloth` carries a
+    // `/kl/` ONSET BLEND that exceeds CVC scope — recognition-only, the
+    // planner emits no decode/spell prompts. No clean real-word
+    // t-contrast (`/kl/` onset has no single t-substitutable consonant) —
+    // weak-trap subset, paired with th-pool neighbours. Gives the pool a
+    // 2nd short-o word-final entry alongside `moth`. Picture brief: a
+    // clean single fabric square — must read as "cloth" not
+    // "blanket"/"fabric" (Dave §3d / Recommendation 3).
+    phoneme: '/θ/',
+    hybridMode: true,
+  },
 ] as const
 
 /**
@@ -1024,6 +1180,28 @@ export const TARGET_WORDS: readonly WordEntry[] = [
  * adult-register, `sop` already exists for sh but is obscure for an 8yo
  * ch trap, `sest`/`sug` are non-words. Per `digraphs-ch-word-list.md`
  * §2 + AC2.
+ *
+ * v8 note (digraphs-th tier): three NEW t-contrast trap distractors are
+ * added — `tin` (/tɪn/), `tick` (/tɪk/), `pat` (/pæt/) — the t-onset
+ * (word-initial) and t-coda (word-final) minimal-pair partners of `thin`,
+ * `thick`, and `path` respectively. They are genuine short-vowel CVC
+ * words (so they keep their real `vowel` — `tin`/`tick` /ɪ/, `pat` /æ/)
+ * but they are NOT th-tier targets and appear ONLY as th-trio distractors
+ * — cross-tier hygiene (`digraphs-th-word-list.md` §6 constraint #2)
+ * keeps them out of any CVC / sh / ch trio. They are NOT phoneme-tagged:
+ * the /θ/-vs-/t/ contrast is the diagnostic the th-tier tests by chip
+ * SELECTION, not by phoneme-scoping — tagging them `/t/` would make every
+ * th-tier `TARGET_PAIRINGS` row trip the phoneme-mismatch defensive check
+ * in `pickDistractors` (target `/θ/` vs distractor `/t/`). An untagged
+ * distractor passes the phoneme-scoping check by design — the same
+ * posture sh used for `sip` and ch used for `sat`/`sick`. The other two
+ * th-tier strong-trap distractors — `bath`'s `bat` and `math`'s `mat` —
+ * are NOT here: they are dual-role existing short-a CVC `TARGET_WORDS`
+ * entries referenced by string (now load-bearing across short-a own +
+ * th). `moth` and `cloth` have NO clean real-word t-contrast (`moth`→"mot"
+ * non-word; `cloth`'s `/kl/` onset has no single t-substitutable
+ * consonant) — their th-tier rows use th-pool neighbours as traps. Per
+ * `digraphs-th-word-list.md` §2 + AC2.
  */
 export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
   {
@@ -1070,6 +1248,44 @@ export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
     // (digraphs-ch tier, `digraphs-ch-word-list.md` §2). NOT
     // phoneme-tagged. Picture: silhouette placeholder acceptable for
     // distractor-only entries (spec §3 — `picture-sick.svg` is a new
+    // distractor-only asset).
+  },
+  {
+    word: 'tin',
+    pictureKey: 'tin',
+    vowel: 'i',
+    category: 'object',
+    isTarget: false,
+    // t-onset minimal pair for `thin` — the th/t contrast trap
+    // (digraphs-th tier, `digraphs-th-word-list.md` §2). NOT
+    // phoneme-tagged (see the array doc above — tagging it `/t/` would
+    // trip the phoneme-mismatch check against the `/θ/`-tagged `thin`
+    // target). Picture: silhouette placeholder acceptable for
+    // distractor-only entries (spec §3 — `picture-tin.svg` is a new
+    // distractor-only asset; vector trace deferred to polish backlog).
+  },
+  {
+    word: 'tick',
+    pictureKey: 'tick',
+    vowel: 'i',
+    category: 'object',
+    isTarget: false,
+    // t-onset minimal pair for `thick` — the th/t contrast trap
+    // (digraphs-th tier, `digraphs-th-word-list.md` §2). NOT
+    // phoneme-tagged. Picture: silhouette placeholder acceptable for
+    // distractor-only entries (spec §3 — `picture-tick.svg` is a new
+    // distractor-only asset).
+  },
+  {
+    word: 'pat',
+    pictureKey: 'pat',
+    vowel: 'a',
+    category: 'object',
+    isTarget: false,
+    // t-coda minimal pair for `path` — the th/t contrast trap
+    // (digraphs-th tier, `digraphs-th-word-list.md` §2). NOT
+    // phoneme-tagged. Picture: silhouette placeholder acceptable for
+    // distractor-only entries (spec §3 — `picture-pat.svg` is a new
     // distractor-only asset).
   },
 ] as const
@@ -1179,6 +1395,32 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['chest', 'chip'],
   ['chick', 'chin'],
   ['chest', 'box'],
+  // Digraphs-th pool additions (`digraphs-th-word-list.md` §"FORBIDDEN_PAIRS
+  // additions" + §6, RECONCILED against Dave's th-addendum 2026-05-14). All
+  // three are silhouette-collision hygiene; the th-tier th-pool-only rule
+  // already keeps the first two from co-occurring (both members are
+  // th-pool), but the entries are the architectural floor that keeps the §2
+  // distractor matrix honest and protect future cross-pool digraph work:
+  //   - [thin, thick]: an antonym pair whose pictures are deliberately the
+  //     SAME object class at opposite extremes of one property
+  //     (slenderness). At 96pt a "thin X" and a "thick X" could read as
+  //     near-identical silhouettes differing only in width — stacking them
+  //     in one trio over-loads the property-contrast. In-pool hygiene; the
+  //     §2 matrix routes `thin`/`thick` th-neighbour pairs around each
+  //     other (`thin.gentle = ['bath','math']`, NOT `thick`).
+  //   - [path, moth]: both low-mass, irregular-outline silhouettes (`path`
+  //     a thin winding trail, `moth` a small drab insect) — neither has a
+  //     bold blocky silhouette, so the contrast is insufficient at 96pt.
+  //     In-pool hygiene keeps them out of the same trio.
+  //   - [bath, box]: cross-pool silhouette hygiene — `bath` (a tub —
+  //     open-topped rounded vessel) vs `box` (short-o target, plain closed
+  //     cuboid). The open-top/rounded vs closed/cuboid detail distinguishes
+  //     them; the th-tier th-pool-only rule already prevents `box`
+  //     appearing in a th-trio, so this entry documents the risk for future
+  //     interleaving work. The th-tier analogue of `[chest, box]`.
+  ['thin', 'thick'],
+  ['path', 'moth'],
+  ['bath', 'box'],
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -1472,6 +1714,74 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   chop: { gentle: ['chug', 'chest'], trap: ['chin', 'chat'] }, // ch-pool only
   chest: { gentle: ['chop', 'chug'], trap: ['chat', 'chick'] }, // ch-pool only; chip avoided (FORBIDDEN_PAIR)
   chug: { gentle: ['chop', 'chest'], trap: ['chin', 'chat'] }, // ch-pool only
+  // ── Digraphs-th pool (ticket digraphs-th wordPack) ──────────────────
+  // Per `design/word-song/digraphs-th-word-list.md` §2 (RECONCILED against
+  // Dave's th-addendum): structurally REUSES the sh + ch cross-orthography
+  // distractor machinery — no new architecture. The th-tier distractor
+  // rule is th-pool-only + th/t-contrast:
+  //   - gentle (problems 1-3): BOTH entries are th-pool neighbours —
+  //     Marian distinguishes by picture, builds th-pool cohesion.
+  //   - trap (problems 4-8): for the strong-trap subset (`thin`, `thick`,
+  //     `path`, `bath`, `math` — the 5 targets with a real-English-word,
+  //     8yo-appropriate t-contrast partner) one trap entry is the
+  //     th/t-contrast distractor (`tin`/`tick`/`pat`/`bat`/`mat`) + one
+  //     th-pool neighbour; for the weak-trap subset (`moth`, `cloth` — no
+  //     clean real-word t-contrast: `moth`→"mot" non-word, `cloth` has a
+  //     `/kl/` onset) BOTH trap entries are th-pool neighbours.
+  // No generic CVC short-vowel words, NO sh-tier or ch-tier words, and NO
+  // voiced-/ð/ words appear in any th-trio (cross-tier hygiene, spec §6) —
+  // EXCEPT `bat`/`mat`, which are dual-role: they are shipped short-a CVC
+  // `TARGET_WORDS` entries referenced here by string as `bath`'s/`math`'s
+  // diagnostic t-contrast trap (the minimal-pair partner IS the trap, not
+  // generic filler — same posture as sh's `sip`).
+  // FORBIDDEN_PAIRS pre-checked: `[thin,thick]`, `[path,moth]`,
+  // `[bath,box]` — no row below pairs a target with a forbidden silhouette
+  // neighbour.
+  //
+  // Phoneme-scoping: every th-word distractor carries `phoneme: '/θ/'`
+  // (matches the th target); `tin`/`tick`/`pat` (new distractor-only) and
+  // `bat`/`mat` (dual-role) are UNTAGGED and pass the opt-in phoneme check
+  // by design — the same posture sh used for `sip`. The phoneme-scoping
+  // branch in `pickDistractors` is reactivated for th-tier targets (it was
+  // inert for ch) but never rejects a v1 th-tier pairing.
+  //
+  // NOTE — unlike the sh + ch tiers, the th-tier rows are NOT guaranteed
+  // to satisfy the generic CVC-tier gentle/trap axis tests in
+  // `wordDistractors.test.ts`: th-pool neighbours used as traps (e.g.
+  // `bath`'s trap `thin`, `moth`'s trap `thin`/`thick`) share the `th`
+  // grapheme / `/θ/` phoneme but NOT a starting char, ending char, vowel,
+  // or category. ch passed those generic tests only coincidentally (every
+  // ch word starts `c`). The generic axis tests are therefore scoped to
+  // exclude all digraph-tier words via `DIGRAPH_TIER_WORDS`; the th-tier
+  // distractor rule (th/t contrast OR th-pool neighbour) is asserted in
+  // the dedicated 'digraphs-th tier' describe block instead — the same
+  // posture the sh-tier comment block already documents.
+  //
+  // Strong-trap subset — th/t contrast trap + th-pool neighbour:
+  thin: { gentle: ['bath', 'math'], trap: ['tin', 'path'] }, // th/t minimal pair (tin) + th-neighbour; thick avoided (FORBIDDEN_PAIR)
+  thick: { gentle: ['bath', 'math'], trap: ['tick', 'path'] }, // th/t minimal pair (tick) + th-neighbour; thin avoided (FORBIDDEN_PAIR)
+  path: { gentle: ['bath', 'cloth'], trap: ['pat', 'thick'] }, // th/t minimal pair (pat) + th-neighbour; moth avoided (FORBIDDEN_PAIR)
+  bath: { gentle: ['path', 'math'], trap: ['bat', 'thin'] }, // th/t minimal pair (bat — dual-role) + th-neighbour
+  math: { gentle: ['path', 'bath'], trap: ['mat', 'thick'] }, // th/t minimal pair (mat — dual-role) + th-neighbour
+  // Weak-trap subset — th-pool neighbours both tiers (no clean real-word
+  // t-contrast: `moth`→"mot" non-word; `cloth`'s `/kl/` onset has no
+  // single t-substitutable consonant):
+  //
+  // SPEC-DEVIATION (flagged to Matt): the spec §2 illustrative matrix
+  // gives `moth: trap: ['thin', 'thick']`, but `[thin, thick]` is itself
+  // a FORBIDDEN_PAIR (spec §"FORBIDDEN_PAIRS additions" + §6) — so that
+  // pair would trip `pickDistractors`' `assertNotForbidden(d1, d2)` check
+  // and throw at runtime. The spec explicitly labels its §2 matrix as
+  // "illustrative; Kevin owns the final TARGET_PAIRINGS rows" and names
+  // "No FORBIDDEN_PAIR adjacency" as a load-bearing constraint, so the
+  // FORBIDDEN_PAIRS rule wins: `moth`'s trap uses two th-pool neighbours
+  // that are NOT a forbidden pair with `moth` (`[path, moth]` is
+  // forbidden, so `path` is excluded) nor with each other. `['thin',
+  // 'math']` — both th-pool, both `/θ/`-tagged, no forbidden adjacency,
+  // distinct from `moth`'s gentle pair. See PR description + ClickUp
+  // comment.
+  moth: { gentle: ['bath', 'cloth'], trap: ['thin', 'math'] }, // th-pool only; path avoided (FORBIDDEN_PAIR); spec's [thin,thick] is itself a FORBIDDEN_PAIR — see deviation note above
+  cloth: { gentle: ['bath', 'math'], trap: ['thin', 'moth'] }, // th-pool only
 } as const
 
 /**
