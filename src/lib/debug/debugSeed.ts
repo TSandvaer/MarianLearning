@@ -110,6 +110,16 @@
  *   QA for the deep-launch path verifying the new tier renders
  *   end-to-end. Mirrors the `cvc-words-short-e` recipe one step further
  *   down the tree.
+ * - `digraphs-ch`: Marian as if every single-vowel CVC tier AND the
+ *   first digraph tier (`digraphs-sh`) are fully mastered and she's now
+ *   practicing `digraphs-ch` — the SECOND digraph tier, sitting between
+ *   `digraphs-sh` and `digraphs-th-voiceless` in WORD_SONG_NODES_IN_ORDER
+ *   per PR #211's 3-sibling digraph split. The picker walks past every
+ *   prior word-song node and lands on `digraphs-ch` (practicing). Used
+ *   by Thomas's iPad smoke-test for the ch-digraph focus session AND by
+ *   QA for the deep-launch path verifying the new tier renders
+ *   end-to-end. Mirrors the `digraphs-sh` recipe one step further down
+ *   the tree.
  * - `cross-vowel-mixing`: Marian as if all three CVC tiers
  *   (`cvc-words`, `cvc-words-short-o`, `cvc-words-short-u`) are fully
  *   mastered and she's now practicing `digraphs-sh` — the next node
@@ -340,6 +350,36 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'cvc-words-short-i': 'mastered',
       'cvc-words-short-e': 'mastered',
       'digraphs-sh': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Digraphs-ch content tier smoke-test entry (SECOND digraph tier).
+  // Marian has fully mastered every single-vowel CVC tier (short-a,
+  // short-o, short-u, short-i, short-e) AND the first digraph tier
+  // (digraphs-sh), and is now practicing the ch-digraph tier. The
+  // picker walks WORD_SONG_NODES_IN_ORDER, sees every earlier word-song
+  // node mastered (all five CVC sibling tiers + digraphs-sh), and lands
+  // on `digraphs-ch` — the first non-mastered node, sitting between
+  // `digraphs-sh` and `digraphs-th-voiceless` per PR #211's 3-sibling
+  // digraph split. The one downstream digraph node
+  // (`digraphs-th-voiceless`) stays at its default 'locked' — it
+  // unlocks on cascade via the standard sibling-tier promotion path.
+  // Used by Thomas's iPad smoke-test for the ch-digraph focus session
+  // AND by QA for the deep-launch path verifying the new tier renders
+  // end-to-end (canon + planner + picker). Mirrors the `digraphs-sh`
+  // recipe with one additional mastered prerequisite (digraphs-sh).
+  'digraphs-ch': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      'digraphs-sh': 'mastered',
+      'digraphs-ch': 'practicing',
     },
     skipGreet: true,
   },

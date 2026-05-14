@@ -211,6 +211,50 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID: readonly string[] = [
   'shark',
 ] as const
 
+/**
+ * The 7 target words for the digraphs-ch tier (`digraphs-ch`) — the
+ * SECOND digraph tier, sitting between `digraphs-sh` and
+ * `digraphs-th-voiceless` in `WordSongNode` / `LITERACY_TREE` (PR #211's
+ * 3-sibling digraph split — `digraphs-sh` / `digraphs-ch` /
+ * `digraphs-th-voiceless`).
+ *
+ * Locked 2026-05-14 per `design/word-song/digraphs-ch-word-list.md` §1,
+ * which adopts Dave's `design/research/digraph-ch-addendum.md` §3c
+ * recommended pool verbatim. Seven ch-INITIAL words:
+ *  - `chin, chip, chop, chat, chest, chug, chick` — every word uses a
+ *    short vowel Marian has formally covered (short-i / -o / -a / -e
+ *    / -u). All are word-initial ch (`/tʃ/` digraph onset); no ch-final
+ *    (CVCC) words in v1.
+ *
+ * STRUCTURAL DIVERGENCE FROM THE SH TIER — ZERO hybridMode words.
+ * Unlike `digraphs-sh` (whose `shoe` / `sheep` / `shark` carry a long /
+ * r-controlled vowel OUTSIDE Marian's formal phonics tiers and so are
+ * flagged `hybridMode: true`), every ch-tier word is fully decodable.
+ * There is intentionally NO `WORD_SONG_TARGET_WORDS_DIGRAPHS_CH_HYBRID`
+ * analogue, and the planner does NOT inherit the sh-tier hybridMode
+ * problem-type gate for ch content. This is a deliberate outcome stated
+ * explicitly per Dave addendum §3d / non-obvious finding #1 and Kyle's
+ * spec §6.1 / AC12 — the short-vowel ch word stock is rich enough that
+ * long-vowel inclusions are never necessary, so the hybridMode pattern
+ * must NOT be misapplied to ch.
+ *
+ * Order MUST match the `isTarget: true` ch-tier rows in `wordPack.ts`
+ * (Devon's parallel PR `feat/digraphs-ch-wordpack`): `chin, chip, chop,
+ * chat, chest, chug, chick`.
+ *
+ * Like the sh-tier, the ch-tier is classified by the digraph phoneme
+ * `/tʃ/`, not by a short-vowel code — there is no `vowel`-keyed
+ * rhyme-family block in `WORD_SONG_DISTRACTOR_HINTS` for it.
+ *
+ * Same alignment contract as the prior tiers: the client-side
+ * `wordPack.ts` MUST carry every word here as `isTarget: true` plus a
+ * `TARGET_PAIRINGS` row. The round-trip suite in
+ * `src/screens/WordSong/plannerRoundTrip.test.ts` + the planner unit
+ * tests in `api/_planner.test.ts` enforce that.
+ */
+export const WORD_SONG_TARGET_WORDS_DIGRAPHS_CH =
+  'chin, chip, chop, chat, chest, chug, chick'
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).
