@@ -121,6 +121,14 @@ export type WordCategory =
   // Per Kyle's spec §1 final-pool table (`design/word-song/
   // digraphs-sh-word-list.md`).
   | 'structure'
+  // 'body-part' + 'action' added with the digraphs-ch tier — `chin` is a
+  // body part, `chat` + `chug` are familiar actions (social /
+  // onomatopoeic). Neither category existed in the CVC or sh packs. Per
+  // the digraphs-ch picture-pack prompt sheet §2.1 / §2.4 / §2.6 headers
+  // (`design/word-song/digraphs-ch-picture-pack-prompts.md`) and the
+  // word-list §1 final-pool table category column.
+  | 'body-part'
+  | 'action'
 
 /**
  * The 14 target words — all CVC short-a, in Marian's likely vocabulary.
@@ -809,6 +817,131 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     // August 2026 Danish-school transition (spec §7 Q3).
     phoneme: '/ʃ/',
   },
+  // ── Digraphs-ch pool (ticket digraphs-ch wordPack — SECOND digraph tier) ──
+  // Per `design/word-song/digraphs-ch-word-list.md` §1 (Dave's §3c locked
+  // inventory, reconciled against `design/research/digraph-ch-addendum.md`):
+  // 7 ch-initial words — `chin, chip, chop, chat, chest, chug, chick`. Pool
+  // reaches Marian only when the planner emits content for the
+  // `digraphs-ch` SkillNode (added in PR #211's 3-sibling split —
+  // `digraphs-sh` / `digraphs-ch` / `digraphs-th-voiceless`). Kevin's
+  // parallel planner PR wires the planner side (first-class focus node,
+  // canon bake, 3-place sync contract).
+  //
+  // STRUCTURALLY UNLIKE THE SH TIER on three points (spec §0):
+  //   1. `vowel` is SET on all 7 (not omitted as on sh-tier entries).
+  //      Every ch-word uses a short vowel Marian has formally covered
+  //      (short-i, -o, -a, -e, -u) — the ch grapheme is the digraph
+  //      lesson, but the rest-of-word vowel is in-tier, so `vowel`
+  //      carries the real phonological dimension. The CVC-tier
+  //      gentle/trap axis tests in `wordDistractors.test.ts` DO apply to
+  //      these entries (unlike sh, which the tests skip via the
+  //      `vowel !== undefined` filter) — the §2 matrix pairings are
+  //      authored to satisfy them.
+  //   2. NO `phoneme` field. The sh tier carried `phoneme: '/ʃ/'` to
+  //      drive cross-phoneme distractor scoping; the ch pool needs no
+  //      such scoping (no pack-resident word shares the `ch` grapheme
+  //      with a different phoneme), so the field is omitted and the
+  //      opt-in phoneme-scoping branch in `pickDistractors` stays inert.
+  //   3. ZERO `hybridMode: true` entries — see spec §6.1 + AC12 + Dave
+  //      non-obvious finding #1. The sh tier set `hybridMode: true` on 3
+  //      long-vowel hybrids (`shoe/sheep/shark`) whose vowel pattern was
+  //      outside Marian's formal phonics; the ch short-vowel word stock
+  //      is rich enough that no long-vowel inclusions are needed, so
+  //      every ch-word is fully decodable and `hybridMode` is absent
+  //      (=== `false` default) on all 7. Stating this explicitly
+  //      prevents future misapplication of the `hybridMode` pattern to
+  //      ch. `chest`'s short-e is "emerging" not "unlearned" — it needs
+  //      a conservative planner weighting (Kevin's ticket, spec §6
+  //      constraint #5 / AC13), NOT a `hybridMode` flag.
+  //
+  // Cross-tier hygiene (spec §6): ch-trios contain ONLY ch-pool words +
+  // ch/s-contrast traps — no CVC short-vowel words, no sh-tier words, and
+  // no c-initial /k/-words leak in. The ch-tier `TARGET_PAIRINGS` rows
+  // below reference only ch-pool neighbours and the 3 s-contrast
+  // distractors (`sip` dual-role + `sat`/`sick` new distractor-only
+  // entries). Picture pack ships via `yarn embed-pictures` from the
+  // companion prompt sheet (`digraphs-ch-picture-pack-prompts.md` — 7
+  // wholly-new pictures); until then chips fall back to the unknown-key
+  // silhouette in `wordPictures.tsx`.
+  {
+    word: 'chin',
+    pictureKey: 'chin',
+    vowel: 'i',
+    category: 'body-part',
+    isTarget: true,
+    // /tʃ/ — digraph onset. Short-i, mastered. Dave's "ideal anchor" —
+    // body parts are the highest-familiarity vocabulary class. Lead word.
+  },
+  {
+    word: 'chip',
+    pictureKey: 'chip',
+    vowel: 'i',
+    category: 'food',
+    isTarget: true,
+    // /tʃ/ — digraph onset. Short-i, mastered. Universal Filipino-English
+    // loanword. `chip`/`ship` minimal-pair anchor with the sh tier (spec
+    // §6 constraint #6 — annotation only in the introduction tier; the
+    // pair is NOT yet used as a cross-pool distractor).
+  },
+  {
+    word: 'chop',
+    pictureKey: 'chop',
+    vowel: 'o',
+    category: 'object',
+    isTarget: true,
+    // /tʃ/ — digraph onset. Short-o, mastered. `chop`/`shop` minimal-pair
+    // anchor with the sh tier (spec §6 constraint #6). Picture brief is
+    // load-bearing: a chopped/split log + small axe — the concrete-result
+    // depiction, not the bare verb (spec §3 / AC7).
+  },
+  {
+    word: 'chat',
+    pictureKey: 'chat',
+    vowel: 'a',
+    category: 'action',
+    isTarget: true,
+    // /tʃ/ — digraph onset. Short-a, mastered. "The best short-a ch word
+    // that is picturable" (Dave §3a). Picture brief is load-bearing: two
+    // simple figures + a speech bubble between them; must read as
+    // "talking" (spec §3 / AC7).
+  },
+  {
+    word: 'chest',
+    pictureKey: 'chest',
+    vowel: 'e',
+    category: 'object',
+    isTarget: true,
+    // /tʃ/ — digraph onset. Short-e, emerging (the short-e tier shipped
+    // 2026-05-14). `st` coda is acoustically inert for chip-tap
+    // recognition. The short-e emerging-vowel entry — planner weights it
+    // conservatively in introduction sessions (like `gem`/`web` in the
+    // short-e tier; spec §6 constraint #5 / AC13). Fully decodable —
+    // emerging is not unlearned, so NO `hybridMode` flag.
+  },
+  {
+    word: 'chug',
+    pictureKey: 'chug',
+    vowel: 'u',
+    category: 'action',
+    isTarget: true,
+    // /tʃ/ — digraph onset. Short-u, mastered. Dave's replacement for the
+    // dropped `much` (`much` is an unpicturable function word). Picture
+    // brief is load-bearing: a train or a bottle being gulped, mid-motion
+    // (spec §3 / AC7) — the picture+audio scaffold carries the moderate
+    // label-familiarity.
+  },
+  {
+    word: 'chick',
+    pictureKey: 'chick',
+    vowel: 'i',
+    category: 'animal',
+    isTarget: true,
+    // /tʃ/ — digraph onset. Short-i, mastered. `ck` coda spells /k/ she
+    // already decodes — acoustically inert for chip-tap recognition.
+    // Storybook-universal; Tagalog "sisiw" is everyday vocab. Picture
+    // brief: baby-bird roundness + no comb, to stay distinct from `hen`
+    // (short-e target).
+  },
 ] as const
 
 /**
@@ -871,6 +1004,26 @@ export const TARGET_WORDS: readonly WordEntry[] = [
  * `sip` row comment). `sue/seep/sark/sed` were rejected as too weak and
  * `sore` is not needed (its target `shore` was dropped from the pool
  * per Dave's Option C-minus addendum). Per Kyle's spec §6.1 + AC2.
+ *
+ * v7 note (digraphs-ch tier): two more sh-style s-contrast trap
+ * distractors are added — `sat` (/sæt/) and `sick` (/sɪk/) — the s-onset
+ * minimal-pair partners of `chat` and `chick`. Same posture as `sell` /
+ * `sop`: genuine short-vowel CVC words (so they keep their real `vowel`)
+ * but NOT ch-tier targets, appearing ONLY as ch-trio distractors —
+ * cross-tier hygiene rule (`digraphs-ch-word-list.md` §6 constraint #2)
+ * keeps them out of any CVC / sh trio. They are NOT phoneme-tagged: the
+ * /tʃ/-vs-/s/ contrast is the diagnostic the ch-tier tests, so the
+ * ch-target rows reference them as untagged distractors (an untagged
+ * distractor passes the `pickDistractors` phoneme-scoping check — and ch
+ * targets carry no `phoneme` either, so the branch never runs). `chip`'s
+ * s-contrast trap `sip` is NOT here — it is a dual-role short-i
+ * `TARGET_WORDS` entry referenced by string (now load-bearing across
+ * THREE tiers: short-i own, sh `ship`'s trap, ch `chip`'s trap — see the
+ * `sip` row comment). Weak-trap s-contrast words (`sin`, `sop` reused as
+ * `chop`'s? no — `sin`/`sop`/`sest`/`sug`) are NOT shipped: `sin` is
+ * adult-register, `sop` already exists for sh but is obscure for an 8yo
+ * ch trap, `sest`/`sug` are non-words. Per `digraphs-ch-word-list.md`
+ * §2 + AC2.
  */
 export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
   {
@@ -893,6 +1046,31 @@ export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
     // s-onset minimal pair for `shop` — the sh/s contrast trap. NOT
     // phoneme-tagged. Picture: silhouette placeholder acceptable for
     // distractor-only entries (spec §10 finding #13).
+  },
+  {
+    word: 'sat',
+    pictureKey: 'sat',
+    vowel: 'a',
+    category: 'object',
+    isTarget: false,
+    // s-onset minimal pair for `chat` — the ch/s contrast trap
+    // (digraphs-ch tier, `digraphs-ch-word-list.md` §2). NOT
+    // phoneme-tagged. Picture: silhouette placeholder acceptable for
+    // distractor-only entries until a vector trace lands in the polish
+    // backlog (spec §3 — `picture-sat.svg` is a new distractor-only
+    // asset).
+  },
+  {
+    word: 'sick',
+    pictureKey: 'sick',
+    vowel: 'i',
+    category: 'object',
+    isTarget: false,
+    // s-onset minimal pair for `chick` — the ch/s contrast trap
+    // (digraphs-ch tier, `digraphs-ch-word-list.md` §2). NOT
+    // phoneme-tagged. Picture: silhouette placeholder acceptable for
+    // distractor-only entries (spec §3 — `picture-sick.svg` is a new
+    // distractor-only asset).
   },
 ] as const
 
@@ -979,6 +1157,28 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['shed', 'shop'],
   ['shoe', 'shop'],
   ['ship', 'tub'],
+  // Digraphs-ch pool additions (`digraphs-ch-word-list.md` §"FORBIDDEN_PAIRS
+  // additions" + §6, LOCKED 2026-05-14). All three are silhouette-collision
+  // hygiene; the ch-tier ch-pool-only rule already keeps the first two from
+  // co-occurring (both members are ch-pool), but the entries are the
+  // architectural floor that keeps the §2 distractor matrix honest and
+  // protect future cross-pool digraph work:
+  //   - [chest, chip]: at 96pt a small flat `chip` could read against a
+  //     small `chest` with insufficient mass contrast if the chest is
+  //     drawn small. In-pool hygiene; the §2 matrix routes `chip`/`chest`
+  //     around each other (`chip.gentle = ['chop','chug']`, NOT `chest`).
+  //   - [chick, chin]: `chick` (small round bird) and `chin`
+  //     (face-with-prominent-chin) are both small rounded-form
+  //     silhouettes at 96pt — the discriminator is real but in-pool
+  //     hygiene keeps them out of the same trio so the load doesn't stack.
+  //   - [chest, box]: cross-pool silhouette hygiene — `chest` (treasure
+  //     trunk) vs `box` (short-o target, plain cuboid). The
+  //     hinged-lid/bands detail distinguishes them; the ch-tier
+  //     ch-pool-only rule already prevents `box` appearing in a ch-trio,
+  //     so this entry documents the risk for future interleaving work.
+  ['chest', 'chip'],
+  ['chick', 'chin'],
+  ['chest', 'box'],
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -1230,6 +1430,48 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   sheep: { gentle: ['shark', 'shoe'], trap: ['ship', 'shell'] }, // sh-pool only
   shark: { gentle: ['ship', 'sheep'], trap: ['shoe', 'shell'] }, // sh-pool only
   shed: { gentle: ['shark', 'sheep'], trap: ['ship', 'shell'] }, // sh-pool only; shed+shop avoided (FORBIDDEN_PAIR)
+  // ── Digraphs-ch pool (ticket digraphs-ch wordPack) ──────────────────
+  // Per `design/word-song/digraphs-ch-word-list.md` §2: structurally the
+  // SAME as the sh tier's cross-orthography distractor pattern (ch reuses
+  // that machinery — no new architecture). The ch-tier distractor rule is
+  // ch-pool-only + ch/s-contrast:
+  //   - gentle (problems 1-3): BOTH entries are ch-pool neighbours —
+  //     Marian distinguishes by picture, builds ch-pool cohesion.
+  //   - trap (problems 4-8): for the strong-trap subset (`chip`, `chat`,
+  //     `chick` — the 3 targets with a real-English-word, 8yo-appropriate
+  //     s-contrast partner) one trap entry is the ch/s-contrast distractor
+  //     (`sip`/`sat`/`sick`) + one ch-pool neighbour; for the weak-trap
+  //     subset (`chin`, `chop`, `chest`, `chug` — `sin` adult-register,
+  //     `sop` obscure, `sest`/`sug` non-words; spec §2) BOTH trap entries
+  //     are ch-pool neighbours.
+  // No CVC short-vowel words, NO sh-tier words, and NO c-initial /k/-words
+  // appear in any ch-trio (cross-tier hygiene, spec §6 — the c-says-/k/
+  // trap is handled by Emma's intro script, NOT a /k/-onset distractor).
+  // FORBIDDEN_PAIRS pre-checked: `[chest,chip]`, `[chick,chin]`,
+  // `[chest,box]` — no row below pairs a target with a forbidden
+  // silhouette neighbour. Unlike the sh tier, ch entries carry NO
+  // `phoneme` tag (the /tʃ/-vs-/s/ contrast is tested by chip selection,
+  // not phoneme-scoping) — `sip`/`sat`/`sick` stay untagged and the
+  // opt-in phoneme-scoping branch in `pickDistractors` never runs for
+  // ch-tier rows.
+  //
+  // The §2 matrix pairings also satisfy the CVC-tier gentle/trap axis
+  // tests in `wordDistractors.test.ts` (which DO apply to ch entries
+  // because they set `vowel`, unlike sh): every gentle distractor differs
+  // from its target on vowel; every trap distractor shares an axis
+  // (ch-pool neighbours share the `c` onset, s-contrast traps share the
+  // vowel + ending consonant).
+  //
+  // Strong-trap subset — ch/s contrast trap + ch-pool neighbour:
+  chip: { gentle: ['chop', 'chug'], trap: ['sip', 'chick'] }, // ch/s minimal pair (sip) + ch-neighbour; chest avoided (FORBIDDEN_PAIR)
+  chat: { gentle: ['chop', 'chug'], trap: ['sat', 'chest'] }, // ch/s minimal pair (sat) + ch-neighbour
+  chick: { gentle: ['chop', 'chug'], trap: ['sick', 'chest'] }, // ch/s minimal pair (sick) + ch-neighbour; chin avoided (FORBIDDEN_PAIR)
+  // Weak-trap subset — ch-pool neighbours both tiers (no shippable
+  // s-contrast word: sin adult-register, sop obscure, sest/sug non-words):
+  chin: { gentle: ['chop', 'chug'], trap: ['chest', 'chat'] }, // ch-pool only; chick avoided (FORBIDDEN_PAIR)
+  chop: { gentle: ['chug', 'chest'], trap: ['chin', 'chat'] }, // ch-pool only
+  chest: { gentle: ['chop', 'chug'], trap: ['chat', 'chick'] }, // ch-pool only; chip avoided (FORBIDDEN_PAIR)
+  chug: { gentle: ['chop', 'chest'], trap: ['chin', 'chat'] }, // ch-pool only
 } as const
 
 /**
