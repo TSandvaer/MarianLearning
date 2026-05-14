@@ -76,9 +76,9 @@
        Three overlay elements:
        1. Upper teeth bottom-edge curve: reinforces the "above" boundary.
        2. Lower teeth top-edge curve: reinforces the "below" boundary.
-       3. Tongue tip shape: the load-bearing element. Rounded teardrop sitting
-          clearly in the interdental gap (apex y=85, between upper-teeth-bottom
-          y=90 and lower-teeth-top y=99). Pink fill, rose outline, manhwa weight.
+       3. Tongue tip shape: the load-bearing element. Rounded teardrop shape;
+          apex y=85 is above the upper-teeth-bottom curve (y≈88-90 in SVG space — y
+          increases downward, so y=85 sits above y=90). Protrudes toward viewer: correct interdental /θ/.
   -->
   <g clip-path="url(#frame-clip)" aria-hidden="true">
 
@@ -105,12 +105,12 @@
     />
 
     <!-- Tongue tip: the load-bearing element.
-         Rounded teardrop shape clearly sitting in the interdental gap.
-         Apex at (100, 85): visually between upper (y90) and lower (y99) teeth.
+         Rounded teardrop shape. Apex protrudes above the upper-teeth edge — the tongue
+         tip protrudes toward the viewer — correct interdental /θ/ position.
          Body widens downward, blending with the existing tongue in the base PNG.
 
          Path breakdown:
-           M 100 85       = tip apex (the "between" point)
+           M 100 85       = tip apex (y=85, above upper-teeth curve y≈88-90; protrudes toward viewer)
            Q 122 88       = right bezier control (curves outward)
            118 103        = right side anchor (tongue body widening)
            Q 110 109      = bottom-right round control
