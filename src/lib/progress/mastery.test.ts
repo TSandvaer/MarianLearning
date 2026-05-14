@@ -668,10 +668,12 @@ describe('applyMasteryRule — autoPromote=true sets pendingPromotion (ticket 86
     // cleanly with the graduation gate.
     //
     // Ticket 86c9m3ae3 inserted `cvc-words-short-o` between `cvc-words`
-    // and `digraphs` in LITERACY_TREE — so the downstream node that
+    // and `digraphs-sh` in LITERACY_TREE — so the downstream node that
     // unlocks on cvc-words promotion is now `cvc-words-short-o` (not
-    // `digraphs` directly). `digraphs` only unlocks once short-o
-    // graduates; that's a separate session.
+    // a digraph node directly). The first digraph sibling node only
+    // unlocks once short-e graduates; that's a much later session.
+    // (PR #211 split the single `digraphs` literal into 3 sequential
+    // sibling nodes; this assertion pins the leading digraph sibling.)
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
@@ -683,7 +685,7 @@ describe('applyMasteryRule — autoPromote=true sets pendingPromotion (ticket 86
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['cvc-words']).toBe('mastered')
     expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
-    expect(result.skillLevels['digraphs']).toBe('locked')
+    expect(result.skillLevels['digraphs-sh']).toBe('locked')
     expect(result.pendingPromotion).toBe('cvc-words')
   })
 
@@ -1040,7 +1042,7 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['cvc-words']).toBe('practicing')
     // Downstream stays locked — no cascade.
-    expect(result.skillLevels['digraphs']).toBe('locked')
+    expect(result.skillLevels['digraphs-sh']).toBe('locked')
     // No queued pendingPromotion either — the gate is unmet, not a
     // parent-confirmation hold.
     expect(result.pendingPromotion).toBeUndefined()
@@ -1054,8 +1056,10 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     // pure read of the resulting skillLevels.
     //
     // Ticket 86c9m3ae3 inserted `cvc-words-short-o` between `cvc-words`
-    // and `digraphs` — the downstream that unlocks on cvc-words
-    // promotion is now `cvc-words-short-o`.
+    // and the first digraph sibling — the downstream that unlocks on
+    // cvc-words promotion is now `cvc-words-short-o`. (PR #211 split
+    // the dead `digraphs` literal into 3 sequential sibling nodes;
+    // `digraphs-sh` is the new leading digraph, still far downstream.)
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'practicing' }),
       history: [
@@ -1067,9 +1071,9 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['cvc-words']).toBe('mastered')
     // Downstream `cvc-words-short-o` was 'locked' — should now be
-    // 'intro'. `digraphs` stays 'locked' until short-o promotes.
+    // 'intro'. `digraphs-sh` stays 'locked' until short-e promotes.
     expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
-    expect(result.skillLevels['digraphs']).toBe('locked')
+    expect(result.skillLevels['digraphs-sh']).toBe('locked')
   })
 
   it('does NOT promote when the graduation session lands novel-pool below 0.80', () => {
@@ -1087,7 +1091,7 @@ describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)',
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['cvc-words']).toBe('practicing')
-    expect(result.skillLevels['digraphs']).toBe('locked')
+    expect(result.skillLevels['digraphs-sh']).toBe('locked')
   })
 
   it('promotes at exactly 0.80 novel-pool (boundary inclusive)', () => {
@@ -1501,9 +1505,9 @@ describe('applyMasteryRule — intro → practicing transition (86c9qu91g)', () 
     // Downstream stays locked — no mastery promotion yet.
     expect(result.skillLevels['cvc-words-short-o']).toBe('locked')
     // isGraduationSessionPending must be true (80%/2 canonical met, no novel yet).
-    expect(
-      isGraduationSessionPending(result, 'cvc-words', 'word-song'),
-    ).toBe(true)
+    expect(isGraduationSessionPending(result, 'cvc-words', 'word-song')).toBe(
+      true,
+    )
   })
 
   // ── Thomas's full self-healing scenario (AC#6 verification) ────────────
@@ -1592,9 +1596,7 @@ describe('applyMasteryRule — intro → practicing transition (86c9qu91g)', () 
     // with this skill." intro → practicing requires successRate > 0.
     const progress = buildProgress({
       skillLevels: levels({ 'sub-to-20': 'intro' }),
-      history: [
-        entry('2026-05-01T10:00:00.000Z', 'sub-to-20', 0.0),
-      ],
+      history: [entry('2026-05-01T10:00:00.000Z', 'sub-to-20', 0.0)],
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['sub-to-20']).toBe('intro')
@@ -1622,9 +1624,7 @@ describe('applyMasteryRule — intro → practicing transition (86c9qu91g)', () 
         'cvc-words': 'intro',
         'cvc-words-short-o': 'locked',
       }),
-      history: [
-        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
-      ],
+      history: [entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0)],
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['cvc-words']).toBe('practicing')
@@ -1635,9 +1635,7 @@ describe('applyMasteryRule — intro → practicing transition (86c9qu91g)', () 
   it('does not mutate input progress', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'cvc-words': 'intro' }),
-      history: [
-        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0),
-      ],
+      history: [entry('2026-05-01T10:00:00.000Z', 'cvc-words', 1.0)],
     })
     applyMasteryRule(progress)
     expect(progress.skillLevels['cvc-words']).toBe('intro')
@@ -1662,9 +1660,7 @@ describe('applyMasteryRule — intro → practicing transition (86c9qu91g)', () 
   it('promotes sight-words from intro to practicing with one any-success session', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'sight-words': 'intro' }),
-      history: [
-        entry('2026-05-01T10:00:00.000Z', 'sight-words', 0.5),
-      ],
+      history: [entry('2026-05-01T10:00:00.000Z', 'sight-words', 0.5)],
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['sight-words']).toBe('practicing')

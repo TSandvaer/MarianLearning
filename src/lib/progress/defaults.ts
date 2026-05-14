@@ -48,7 +48,10 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'cvc-words-short-u',
   'cvc-words-short-i',
   'cvc-words-short-e',
-  'digraphs',
+  // Digraphs split into 3 sequential sibling nodes per PR #211.
+  'digraphs-sh',
+  'digraphs-ch',
+  'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
 ] as const
@@ -116,7 +119,7 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // cvc-words-short-e is the fifth (and final single-vowel) tier sibling
   // (ticket 86c9teua2). Locked at v1 default — unlocks to 'intro' when
   // cvc-words-short-i is mastered. After short-e masters, downstream is
-  // `digraphs`. See design/word-song/short-e-pool-expansion.md §1 + §4.
+  // `digraphs-sh`. See design/word-song/short-e-pool-expansion.md §1 + §4.
   // Note: the spec § 5 flagged a "2-session-gap rule between short-i
   // mastery and short-e introduction" for /ɛ/-vs-/ɪ/ discrimination
   // hygiene; that scaffolding mechanism (AC10b) is INTENTIONALLY OUT OF
@@ -125,7 +128,15 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // A follow-up ticket (TBD — Matt to file) lands the `canIntroduceShortE`
   // helper if real-iPad observation surfaces /ɛ/–/ɪ/ confusion.
   'cvc-words-short-e': 'locked',
-  digraphs: 'locked',
+  // Digraphs split into 3 sequential sibling nodes per PR #211. Each
+  // tier unlocks 'intro' only when its predecessor masters. The dead
+  // single `digraphs` literal that previously sat here was never seen
+  // above 'locked' by any real user (verified in proposal §2.6). The
+  // read-path defaulter at storage.ts:withDefaultedSkillLevels carries
+  // a one-time `digraphs → digraphs-sh` remap for the QA hand-edit case.
+  'digraphs-sh': 'locked',
+  'digraphs-ch': 'locked',
+  'digraphs-th-voiceless': 'locked',
   'sight-words': 'intro', // introduce gradually
   'simple-sentences': 'locked',
 }

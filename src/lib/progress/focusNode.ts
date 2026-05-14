@@ -69,6 +69,14 @@ export const MATH_NODES_IN_ORDER: readonly NumberGardenNode[] = [
  * added under ticket 86c9qdba4, and
  * design/word-song/short-e-pool-expansion.md §1 for the short-e tier
  * — the final single-vowel tier — added under ticket 86c9teua2).
+ *
+ * Digraphs are split into three sequential sibling nodes (sh → ch →
+ * th-voiceless) per the architecture proposal PR #211. The dead single
+ * `digraphs` literal that previously sat between `cvc-words-short-e`
+ * and `sight-words` is dropped in this PR; the mastery + focus-picker
+ * machinery now enforces sequential digraph isolation identically to
+ * the CVC sibling tier cascade. Each digraph requires 3 cross-day
+ * ≥90% sessions before the next unlocks.
  */
 export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'letter-names',
@@ -79,7 +87,9 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
   'cvc-words-short-u',
   'cvc-words-short-i',
   'cvc-words-short-e',
-  'digraphs',
+  'digraphs-sh',
+  'digraphs-ch',
+  'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
 ]
@@ -106,7 +116,8 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
  * Tier coverage today:
  *   - blending-cv → first-class (planner emits "Tap the <word>.")
  *   - cvc-words   → first-class (planner emits "Read the <word>.")
- *   - letter-sounds / digraphs / sight-words / simple-sentences →
+ *   - letter-sounds / digraphs-sh / digraphs-ch /
+ *     digraphs-th-voiceless / sight-words / simple-sentences →
  *     stub plans (planner falls back to blending-cv content with a
  *     non-error log; future tier-content tickets refine these).
  *

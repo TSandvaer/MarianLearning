@@ -142,7 +142,14 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   'cvc-words-short-u',
   'cvc-words-short-i',
   'cvc-words-short-e',
-  'digraphs',
+  // Digraphs split into 3 sequential sibling nodes per PR #211. The
+  // dead single `digraphs` literal is dropped — no canon shipped and
+  // no real user ever sent it on a request. The three new nodes fall
+  // through to the `blending-cv` stub via `effectiveFocusNode` until
+  // their content tier ships (planner step in the §5 11-PR plan).
+  'digraphs-sh',
+  'digraphs-ch',
+  'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
 ]
@@ -598,9 +605,14 @@ function defaultFocusNodeForTrack(track: PlannerTrack): string {
  * (stub-fallback — see header comment on `WORD_SONG_TRACK_GUIDE`).
  *
  * Step 2 of the planner-parser contract (ticket 86c9kxu07) added
- * `cvc-words` here. Future tier widenings (letter-sounds, digraphs,
- * sight-words, simple-sentences) come in their own paired
- * parser-first-then-planner widenings.
+ * `cvc-words` here. Future tier widenings (letter-sounds, digraphs-sh,
+ * digraphs-ch, digraphs-th-voiceless, sight-words, simple-sentences)
+ * come in their own paired parser-first-then-planner widenings. The
+ * digraph split (PR #211) drops the dead `digraphs` literal from
+ * `VALID_WORD_SONG_FOCUS_NODES`; the three new sibling nodes remain
+ * intentionally EXCLUDED from the first-class set here and route to
+ * the `blending-cv` stub via `effectiveFocusNode` until their content
+ * tickets ship (step in the §5 11-PR plan).
  */
 const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'blending-cv',
@@ -615,10 +627,10 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
  * Resolve the focus node the planner actually generates for. Math honours
  * caller-supplied focusNode verbatim. Word-song honours first-class nodes
  * (`blending-cv`, `cvc-words`); valid-but-unsupported nodes
- * (`letter-sounds`, `digraphs`, `sight-words`, `simple-sentences`) fall
- * back to `blending-cv` content as a stub — the screen always renders,
- * even on tiers we haven't tuned yet. See `WORD_SONG_TRACK_GUIDE` for
- * the prompt-side handling.
+ * (`letter-sounds`, `digraphs-sh`, `digraphs-ch`, `digraphs-th-voiceless`,
+ * `sight-words`, `simple-sentences`) fall back to `blending-cv` content
+ * as a stub — the screen always renders, even on tiers we haven't tuned
+ * yet. See `WORD_SONG_TRACK_GUIDE` for the prompt-side handling.
  *
  * Validation (`generateSessionPlan` above) still rejects an invalid
  * cross-track or unknown focusNode for word-song before reaching here —
@@ -919,10 +931,11 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 //
 // All gated by the browser parser (PR #132 widened it to dispatch on
 // the read-line template). Other valid focus nodes (letter-sounds,
-// digraphs, sight-words, simple-sentences) reach this prompt as
-// `blending-cv` after `effectiveFocusNode`'s stub-fallback — the user
-// message will name `blending-cv` for those. This is the "always
-// render something" posture from the contract doc.
+// digraphs-sh, digraphs-ch, digraphs-th-voiceless, sight-words,
+// simple-sentences) reach this prompt as `blending-cv` after
+// `effectiveFocusNode`'s stub-fallback — the user message will name
+// `blending-cv` for those. This is the "always render something"
+// posture from the contract doc.
 //
 // Utterance ids ALWAYS use the "word." prefix regardless of content mode.
 // The P0 incident (PR #117 → #118) was caused by `cvc.*` prefixes — the

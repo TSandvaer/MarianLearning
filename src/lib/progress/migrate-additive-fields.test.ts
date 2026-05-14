@@ -137,7 +137,11 @@ describe('Progress — additive-no-bump field migrations', () => {
     //   cvc-words: intro            → encountered
     //   cvc-words-short-o: locked   → NOT encountered
     //   cvc-words-short-u: locked   → NOT encountered
-    //   digraphs: locked            → NOT encountered
+    //   cvc-words-short-i: locked   → NOT encountered
+    //   cvc-words-short-e: locked   → NOT encountered
+    //   digraphs-sh: locked         → NOT encountered (PR #211 split)
+    //   digraphs-ch: locked         → NOT encountered (PR #211 split)
+    //   digraphs-th-voiceless: locked → NOT encountered (PR #211 split)
     //   sight-words: intro          → encountered
     //   simple-sentences: locked    → NOT encountered
     expect(loaded?.lifetimeFirstEncounters).toEqual([

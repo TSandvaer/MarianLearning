@@ -882,15 +882,18 @@ describe('planner → parser round-trip — cvc-words-short-e (ticket 86c9teua2)
 })
 
 describe('planner → parser round-trip — untuned tier stub fallback (step 2 ticket 86c9kxu07)', () => {
-  it('a digraphs-requested call falls back to blending-cv content (the stub-fallback contract)', async () => {
+  it('a digraphs-sh-requested call falls back to blending-cv content (the stub-fallback contract)', async () => {
     // Per `effectiveFocusNode` in api/_planner.ts: untuned tiers
-    // (letter-sounds / digraphs / sight-words / simple-sentences) fall
-    // back to blending-cv content so the screen always renders. The
-    // mocked Haiku response below is what the planner WOULD ask Haiku
-    // for in that case (a blending-cv plan); we just need to confirm
-    // the planner accepts the request and the parser stamps it as
-    // blending-cv. Future tier tickets refine these to first-class
-    // content.
+    // (letter-sounds / digraphs-sh / digraphs-ch / digraphs-th-voiceless
+    // / sight-words / simple-sentences) fall back to blending-cv
+    // content so the screen always renders. The mocked Haiku response
+    // below is what the planner WOULD ask Haiku for in that case (a
+    // blending-cv plan); we just need to confirm the planner accepts
+    // the request and the parser stamps it as blending-cv. Future tier
+    // tickets refine these to first-class content. The digraph
+    // SkillNode split (PR #211) replaces the single `digraphs` literal
+    // with three sequential sibling nodes; this test pins the
+    // stub-fallback for the leading sibling.
     const client = makeMockClient(JSON.stringify(SAMPLE_CV_BLEND_PLAN))
 
     const plan = await generateSessionPlan({
@@ -898,7 +901,7 @@ describe('planner → parser round-trip — untuned tier stub fallback (step 2 t
       track: 'word-song',
       level: 1,
       childName: 'Marian',
-      focusNode: 'digraphs',
+      focusNode: 'digraphs-sh',
     })
 
     const rebuilt = wordSongSessionPlanFromServer(plan)
@@ -1036,13 +1039,16 @@ describe('graduation-session round-trip — cvc-words generalization check (tick
 
     // Promotion fires: cvc-words → mastered, downstream
     // cvc-words-short-o moves locked → intro (ticket 86c9m3ae3
-    // inserted the sibling between cvc-words and digraphs; digraphs
-    // stays locked until short-o promotes). pickFocusNode walks past
-    // cvc-words and lands on cvc-words-short-o.
+    // inserted the sibling between cvc-words and digraphs-sh; the
+    // first digraph sibling stays locked until short-e promotes).
+    // pickFocusNode walks past cvc-words and lands on
+    // cvc-words-short-o. (PR #211 split the dead `digraphs` literal
+    // into 3 sequential sibling nodes; `digraphs-sh` is the leading
+    // digraph node, still far downstream of the short-o cascade.)
     const after = loadProgress()!
     expect(after.skillLevels['cvc-words']).toBe('mastered')
     expect(after.skillLevels['cvc-words-short-o']).toBe('intro')
-    expect(after.skillLevels['digraphs']).toBe('locked')
+    expect(after.skillLevels['digraphs-sh']).toBe('locked')
     expect(pickFocusNode(after, 'word-song')).not.toBe('cvc-words')
     // Picker walks past cvc-words and lands on cvc-words-short-o (the
     // next word-song node, now at 'intro' so non-mastered).
@@ -1072,7 +1078,7 @@ describe('graduation-session round-trip — cvc-words generalization check (tick
     // Promotion blocked at the novel-pool gate.
     expect(after.skillLevels['cvc-words']).toBe('practicing')
     // Downstream stays locked.
-    expect(after.skillLevels['digraphs']).toBe('locked')
+    expect(after.skillLevels['digraphs-sh']).toBe('locked')
     // Picker stays on cvc-words.
     expect(pickFocusNode(after, 'word-song')).toBe('cvc-words')
     // ALSO: per the AC contract, the next session is a regular

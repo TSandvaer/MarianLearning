@@ -953,16 +953,21 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
   it('routes first-class focus nodes (blending-cv, cvc-words) verbatim; falls back untuned tiers to blending-cv (sweep)', async () => {
     // Step 2 (ticket 86c9kxu07) widened the planner to first-class
     // emit `cvc-words` content alongside `blending-cv`. Untuned tiers
-    // (letter-names / letter-sounds / digraphs / sight-words /
-    // simple-sentences) fall back to blending-cv per the contract doc's
-    // §"Tier coverage today" section. This sweep pins the routing
-    // table so a future regression on either side surfaces here.
+    // (letter-names / letter-sounds / digraphs-sh / digraphs-ch /
+    // digraphs-th-voiceless / sight-words / simple-sentences) fall back
+    // to blending-cv per the contract doc's §"Tier coverage today"
+    // section. This sweep pins the routing table so a future regression
+    // on either side surfaces here. (PR #211: dead `digraphs` literal
+    // dropped; replaced by 3 sequential sibling nodes that all sit at
+    // the stub-fallback until their content tier ships.)
     const expectations: ReadonlyArray<[string, string]> = [
       ['letter-names', 'blending-cv'],
       ['letter-sounds', 'blending-cv'],
       ['blending-cv', 'blending-cv'], // first-class
       ['cvc-words', 'cvc-words'], // first-class (the unblock)
-      ['digraphs', 'blending-cv'],
+      ['digraphs-sh', 'blending-cv'],
+      ['digraphs-ch', 'blending-cv'],
+      ['digraphs-th-voiceless', 'blending-cv'],
       ['sight-words', 'blending-cv'],
       ['simple-sentences', 'blending-cv'],
     ]
@@ -1187,12 +1192,14 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
   })
 
   it('ignores isGraduationSession=true on word-song untuned tiers (stub-fallback to blending-cv)', async () => {
-    // Untuned tiers (e.g. digraphs) fall back to blending-cv content
+    // Untuned tiers (e.g. digraphs-sh) fall back to blending-cv content
     // per `effectiveFocusNode`. The graduation directive is gated on
     // the EFFECTIVE focus node being cvc-words, so an untuned-tier
     // request with the flag set must not carry the directive — the
     // session would otherwise emit graduation content under a
-    // non-graduation focus.
+    // non-graduation focus. (PR #211: dead `digraphs` literal dropped;
+    // the leading digraph sibling `digraphs-sh` sits at the same
+    // stub-fallback path.)
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -1201,7 +1208,7 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
       track: 'word-song',
       level: 1,
       childName: 'Marian',
-      focusNode: 'digraphs',
+      focusNode: 'digraphs-sh',
       isGraduationSession: true,
     })
 

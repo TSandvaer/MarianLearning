@@ -201,12 +201,16 @@ const MATH_FOCUS_NODES: readonly string[] = [
 
 // Word-song first-class content modes — must match the
 // WORD_SONG_FIRST_CLASS_FOCUS_NODES list in api/_planner.ts. Untuned
-// tiers (letter-sounds / digraphs / sight-words / simple-sentences)
-// fall back to blending-cv content via `effectiveFocusNode`, so baking
-// canon entries for them would just be a wasteful copy of the
-// blending-cv blob — they're omitted here on purpose. Future tier
-// widenings (paired parser-then-planner steps per the contract doc)
-// add their entries here when they go first-class.
+// tiers (letter-sounds / digraphs-sh / digraphs-ch /
+// digraphs-th-voiceless / sight-words / simple-sentences) fall back
+// to blending-cv content via `effectiveFocusNode`, so baking canon
+// entries for them would just be a wasteful copy of the blending-cv
+// blob — they're omitted here on purpose. Future tier widenings
+// (paired parser-then-planner steps per the contract doc) add their
+// entries here when they go first-class. The digraph SkillNode split
+// (PR #211) replaces the single `digraphs` literal with three
+// sequential sibling nodes; canon for them lands in their own
+// content-tier PRs (step in the §5 11-PR plan).
 //
 // Ticket 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
 // tier — see `design/word-song/short-o-pool-expansion.md` §6 (canon-

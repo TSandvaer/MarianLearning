@@ -102,7 +102,10 @@ describe('loadProgress — skill-level defaulter (ticket 86c9pkfth)', () => {
     expect(loaded?.skillLevels['blending-cv']).toBe('locked')
     expect(loaded?.skillLevels['cvc-words']).toBe('locked')
     expect(loaded?.skillLevels['cvc-words-short-o']).toBe('locked')
-    expect(loaded?.skillLevels['digraphs']).toBe('locked')
+    // Digraphs split into 3 sequential sibling nodes per PR #211.
+    expect(loaded?.skillLevels['digraphs-sh']).toBe('locked')
+    expect(loaded?.skillLevels['digraphs-ch']).toBe('locked')
+    expect(loaded?.skillLevels['digraphs-th-voiceless']).toBe('locked')
     expect(loaded?.skillLevels['sight-words']).toBe('locked')
     expect(loaded?.skillLevels['simple-sentences']).toBe('locked')
     // Math nodes are preserved.
@@ -189,5 +192,89 @@ describe('loadProgress — skill-level defaulter (ticket 86c9pkfth)', () => {
     for (const node of expectedNodes) {
       expect(loaded?.skillLevels[node]).toBe('locked')
     }
+  })
+})
+
+describe('loadProgress — dead-letter remap: digraphs → digraphs-sh (PR #211)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('remaps a legacy `digraphs: <level>` key to `digraphs-sh: <level>` on load', () => {
+    // Hand-edited QA case from the proposal §2.6 — a blob with
+    // `digraphs: 'practicing'` that predates the SkillNode split. The
+    // strict guard would otherwise reject the post-split blob because
+    // `digraphs-sh` is missing from the skillLevels map. The read-path
+    // remap moves the value to its new home; the schema-floor defaulter
+    // then fills `digraphs-ch` and `digraphs-th-voiceless` with
+    // 'locked'. Net: progress is preserved and the blob validates.
+    const seed = defaultProgress('Marian')
+    const skillLevelsWithLegacy: Record<string, string> = {
+      ...seed.skillLevels,
+    }
+    // Strip the new keys to simulate a pre-PR-#211 blob.
+    delete skillLevelsWithLegacy['digraphs-sh']
+    delete skillLevelsWithLegacy['digraphs-ch']
+    delete skillLevelsWithLegacy['digraphs-th-voiceless']
+    // Add the legacy key with a non-default value (hand-edited case).
+    skillLevelsWithLegacy['digraphs'] = 'practicing'
+
+    const blob = { ...seed, skillLevels: skillLevelsWithLegacy }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    // Legacy value lands on the leading digraph sibling.
+    expect(loaded?.skillLevels['digraphs-sh']).toBe('practicing')
+    // Downstream digraph siblings stay at the schema floor.
+    expect(loaded?.skillLevels['digraphs-ch']).toBe('locked')
+    expect(loaded?.skillLevels['digraphs-th-voiceless']).toBe('locked')
+    // The legacy `digraphs` key is stripped from the validated shape
+    // (the guard rejects unrecognised keys; the remap moves the value
+    // BEFORE the guard runs).
+    expect('digraphs' in (loaded?.skillLevels ?? {})).toBe(false)
+    // Round-trip validates.
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('treats the new `digraphs-sh` key as canonical when both legacy and new keys are present', () => {
+    // Edge case: a blob carries BOTH `digraphs: 'mastered'` (legacy)
+    // AND `digraphs-sh: 'practicing'` (post-split). The new key wins
+    // — the legacy key is stripped and the new key's value is
+    // preserved. This is the "we trust the explicit new-shape value
+    // over the implicit legacy carry-over" posture.
+    const seed = defaultProgress('Marian')
+    const skillLevelsWithBoth: Record<string, string> = {
+      ...seed.skillLevels,
+      'digraphs-sh': 'practicing',
+    }
+    skillLevelsWithBoth['digraphs'] = 'mastered'
+
+    const blob = { ...seed, skillLevels: skillLevelsWithBoth }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.skillLevels['digraphs-sh']).toBe('practicing')
+    expect('digraphs' in (loaded?.skillLevels ?? {})).toBe(false)
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('leaves a blob untouched when only the new `digraphs-sh` key is present (post-PR-#211 happy path)', () => {
+    // A fresh-storage Marian saved on post-PR-#211 code: no legacy
+    // `digraphs` key, only the three new sibling nodes. Load must
+    // round-trip cleanly with no remap firing.
+    const seed = defaultProgress('Marian')
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
+
+    const loaded = loadProgress()
+    expect(loaded).toEqual(seed)
+    expect(loaded?.skillLevels['digraphs-sh']).toBe('locked')
+    expect(loaded?.skillLevels['digraphs-ch']).toBe('locked')
+    expect(loaded?.skillLevels['digraphs-th-voiceless']).toBe('locked')
   })
 })

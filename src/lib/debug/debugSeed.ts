@@ -102,18 +102,21 @@
  *   `cvc-words-short-i` recipe one step further down the tree.
  * - `cross-vowel-mixing`: Marian as if all three CVC tiers
  *   (`cvc-words`, `cvc-words-short-o`, `cvc-words-short-u`) are fully
- *   mastered and she's now practicing `digraphs` — the next node in
- *   word-song promotion order (ticket 86c9qa0kf). With every CVC tier
- *   mastered, `crossVowelMixingActive(progress, parentSettings)`
+ *   mastered and she's now practicing `digraphs-sh` — the next node
+ *   in word-song promotion order (ticket 86c9qa0kf). With every CVC
+ *   tier mastered, `crossVowelMixingActive(progress, parentSettings)`
  *   returns `true`; the next session on any of the three CVC tiers
- *   would draw from `TARGET_PAIRINGS_CROSSVOWEL`. Note: with all three
- *   CVC tiers mastered the picker actually walks past them and lands
- *   on `digraphs` — to exercise cross-vowel chip rendering, test
- *   harnesses bump one CVC tier back to `'practicing'` (the e2e
- *   regression spec does this directly via `seedLocalStorage` with
- *   tier-specific overrides; the seed here is the ear-test recipe for
- *   "all three mastered, predicate active"). `parentSettings.crossVowelMixingEnabled`
- *   is left at the default `true` — no override needed.
+ *   would draw from `TARGET_PAIRINGS_CROSSVOWEL`. Note: with all
+ *   three CVC tiers mastered (plus short-i, short-e) the picker
+ *   actually walks past them and lands on `digraphs-sh` — to exercise
+ *   cross-vowel chip rendering, test harnesses bump one CVC tier back
+ *   to `'practicing'` (the e2e regression spec does this directly via
+ *   `seedLocalStorage` with tier-specific overrides; the seed here is
+ *   the ear-test recipe for "all three mastered, predicate active").
+ *   `parentSettings.crossVowelMixingEnabled` is left at the default
+ *   `true` — no override needed. (Digraph split PR #211: the picker
+ *   landing point shifted from the single `digraphs` literal to its
+ *   first sibling node `digraphs-sh`.)
  * - `add-to-20`: Marian as if she's mastered `number-recog` and
  *   `add-to-10` and is now practicing the next math tier. The picker
  *   walks past those two and lands on `add-to-20` (practicing) per
@@ -308,11 +311,11 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
   // for this state (assuming default `parentSettings.crossVowelMixingEnabled
   // = true`). For practical chip rendering: with all three CVC tiers
   // mastered, `pickFocusNode` walks past them and lands on the next
-  // non-mastered node — the seed sets `digraphs: 'practicing'` so the
-  // picker has somewhere to land. Cross-vowel chips don't render in the
-  // natural session flow (focus is `digraphs`, NOT a CVC tier; the
-  // caller-side `focusIsCvcTier` gate in App.tsx returns `false` and
-  // `wordSongCrossVowel` stays `false`).
+  // non-mastered node — the seed sets `digraphs-sh: 'practicing'` so
+  // the picker has somewhere to land. Cross-vowel chips don't render
+  // in the natural session flow (focus is `digraphs-sh`, NOT a CVC
+  // tier; the caller-side `focusIsCvcTier` gate in App.tsx returns
+  // `false` and `wordSongCrossVowel` stays `false`).
   //
   // Why ship the seed at all in v1 if cross-vowel never fires? Two
   // reasons: (a) the seed exercises the predicate-true branch end-to-end
@@ -334,22 +337,26 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'cvc-words-short-u': 'mastered',
       // cvc-words-short-i mastered too (ticket 86c9qdba4) — without this
       // entry the picker would land on cvc-words-short-i (locked-to-
-      // intro-when-short-u-promotes pattern) instead of digraphs, and
-      // the seed's intent ("focus is digraphs, not a CVC tier; cross-
+      // intro-when-short-u-promotes pattern) instead of digraphs-sh, and
+      // the seed's intent ("focus is digraphs-sh, not a CVC tier; cross-
       // vowel chips don't render in the natural session flow") would
       // break. The `crossVowelMixingActive` predicate still gates only
       // on the 3-node CVC_CROSS_VOWEL_NODES set (cvc-words / short-o /
       // short-u) per mastery.ts — short-i mastery is irrelevant to the
       // predicate today; it only matters for the picker walk to land on
-      // digraphs.
+      // digraphs-sh.
       'cvc-words-short-i': 'mastered',
       // cvc-words-short-e mastered too (ticket 86c9teua2) — without this
       // entry the picker would land on cvc-words-short-e instead of
-      // digraphs, and the seed's intent ("focus is digraphs, not a CVC
-      // tier") would break. Same widening pattern as the short-i tier
-      // required for this seed.
+      // digraphs-sh, and the seed's intent ("focus is digraphs-sh, not
+      // a CVC tier") would break. Same widening pattern as the short-i
+      // tier required for this seed.
       'cvc-words-short-e': 'mastered',
-      digraphs: 'practicing',
+      // Digraphs split into 3 sequential sibling nodes per PR #211. The
+      // picker lands on the first non-mastered: `digraphs-sh`. The two
+      // downstream digraph nodes stay at their default 'locked' — they
+      // unlock on cascade via the standard sibling-tier promotion path.
+      'digraphs-sh': 'practicing',
     },
     skipGreet: true,
   },

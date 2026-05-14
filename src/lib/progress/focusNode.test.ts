@@ -56,7 +56,10 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       'cvc-words-short-u',
       'cvc-words-short-i',
       'cvc-words-short-e',
-      'digraphs',
+      // Digraphs split into 3 sequential sibling nodes per PR #211.
+      'digraphs-sh',
+      'digraphs-ch',
+      'digraphs-th-voiceless',
       'sight-words',
       'simple-sentences',
     ])
@@ -181,7 +184,10 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'blending-cv': 'locked',
       'cvc-words': 'locked',
       'cvc-words-short-o': 'locked',
-      digraphs: 'locked',
+      // Digraphs split into 3 sequential sibling nodes per PR #211.
+      'digraphs-sh': 'locked',
+      'digraphs-ch': 'locked',
+      'digraphs-th-voiceless': 'locked',
       'sight-words': 'locked',
       'simple-sentences': 'locked',
     })
@@ -195,9 +201,13 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'blending-cv': 'mastered',
       'cvc-words': 'mastered',
       'cvc-words-short-o': 'mastered',
-      digraphs: 'intro',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      // First digraph sibling at 'intro' — picker lands there.
+      'digraphs-sh': 'intro',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('digraphs')
+    expect(pickFocusNode(progress, 'word-song')).toBe('digraphs-sh')
   })
 
   it('skips mastered nodes and lands on the first non-mastered', () => {
@@ -207,7 +217,16 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'blending-cv': 'mastered',
       'cvc-words': 'mastered',
       'cvc-words-short-o': 'mastered',
-      digraphs: 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      // All three digraph siblings mastered too; picker lands on
+      // sight-words. (Sequential isolation per PR #211: each digraph
+      // tier must master before the next unlocks; this test seeds
+      // the post-graduation state directly.)
+      'digraphs-sh': 'mastered',
+      'digraphs-ch': 'mastered',
+      'digraphs-th-voiceless': 'mastered',
       'sight-words': 'practicing',
     })
     expect(pickFocusNode(progress, 'word-song')).toBe('sight-words')
@@ -254,7 +273,9 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
         },
         'cvc-words-short-o',
       ],
-      // Every higher tier locked; walker falls onto digraphs.
+      // Every higher tier locked; walker falls onto the first
+      // non-mastered node — `cvc-words-short-u` (the next sibling
+      // after the only two CVC tiers we explicitly mastered).
       [
         {
           'letter-names': 'mastered',
@@ -262,9 +283,30 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
           'blending-cv': 'mastered',
           'cvc-words': 'mastered',
           'cvc-words-short-o': 'mastered',
-          digraphs: 'locked',
+          // Note: leaving short-u/i/e and the digraph siblings at the
+          // helper's all-mastered default would skip past everything
+          // to simple-sentences — that's a different sweep case below.
+          // Here we override short-u back to 'locked' to stop the walk.
+          'cvc-words-short-u': 'locked',
         },
-        'digraphs',
+        'cvc-words-short-u',
+      ],
+      // Every CVC + digraph mastered; walker lands on the leading
+      // digraph sibling when it's 'locked' downstream of short-e.
+      [
+        {
+          'letter-names': 'mastered',
+          'letter-sounds': 'mastered',
+          'blending-cv': 'mastered',
+          'cvc-words': 'mastered',
+          'cvc-words-short-o': 'mastered',
+          'cvc-words-short-u': 'mastered',
+          'cvc-words-short-i': 'mastered',
+          'cvc-words-short-e': 'mastered',
+          // Three digraph siblings per PR #211 — sh comes first.
+          'digraphs-sh': 'locked',
+        },
+        'digraphs-sh',
       ],
     ]
     for (const [overrides, expected] of shapes) {
