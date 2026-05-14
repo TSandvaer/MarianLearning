@@ -41,13 +41,51 @@ export interface WordEntry {
    *  sibling tier — see `design/word-song/short-o-pool-expansion.md`).
    *  Distractor-only words carry their actual short-vowel for the
    *  trap-tier same-vowel/different-vowel discrimination check (spec
-   *  §Distractor policy → Trap tier). */
-  vowel: 'a' | 'o' | 'u' | 'i' | 'e'
+   *  §Distractor policy → Trap tier).
+   *
+   *  OPTIONAL since the digraphs-sh tier. The 7 sh-tier `isTarget` entries
+   *  OMIT `vowel` entirely: they are NOT classified by short-vowel tier —
+   *  they are classified by the digraph phoneme `/ʃ/` (carried in
+   *  `phoneme` below). The same-vowel-only distractor rule does not apply
+   *  to the sh-tier (it is sh-pool-only — see
+   *  `design/word-song/digraphs-sh-word-list.md` §6); the `vowel` field is
+   *  never consulted for sh-tier distractor logic, and 3 of the 7 sh words
+   *  (`shoe`/`sheep`/`shark`) carry long / r-controlled vowels the
+   *  short-vowel union cannot express anyway (spec §10 finding #11).
+   *  Omitting it on all 7 — rather than widening the union with long-vowel
+   *  codes — keeps the union honest (it means "short-vowel CVC tier") and
+   *  avoids the digraph-tier sh words tripping the cross-vowel
+   *  exhaustiveness scan in `wordDistractors.test.ts` (whose `vowel`-based
+   *  filter would otherwise pick up `shop`'s `'o'`). Resolution path (c)
+   *  per the dispatch brief; verified against Kyle's spec §6.1 + §10
+   *  finding #11 + Dave's §Q8c ("developmentally invisible").
+   *  Distractor-only CVC entries (`sell` /ɛ/, `sop` /ɒ/) keep their real
+   *  short-vowel — they ARE short-vowel CVC words, just not sh-tier
+   *  targets. */
+  vowel?: 'a' | 'o' | 'u' | 'i' | 'e'
   /** Coarse category — used by the gentle-tier filter. */
   category: WordCategory
   /** Whether this entry can appear as a target word. Distractor-only
-   *  entries (like `bus`, `sun`) have `isTarget: false`. */
+   *  entries (like `sell`, `sop`) have `isTarget: false`. */
   isTarget: boolean
+  /**
+   * Sight-word-hybrid flag (digraphs-sh tier — Kyle's spec §6.1, Dave
+   * addendum 2026-05-14 §Q7d). `true` for the 3 long-vowel hybrid sh-tier
+   * words (`shoe` /uː/, `sheep` /iː/, `shark` /ɑːr/) whose rest-of-word
+   * vowel pattern is outside Marian's formal phonics tiers. The planner
+   * (Kevin's parallel `feat/digraphs-sh-content-planner` PR) reads this
+   * flag to suppress segmentation / spelling / decode-from-phoneme prompts
+   * for these words — only chip-tap recognition and picture-retrieval are
+   * valid problem types for `hybridMode` entries.
+   *
+   * Default-absent === `false` (the conventional decodable case — every
+   * pre-sh-tier entry and the 4 conventional sh-CVC words `ship`/`shell`/
+   * `shed`/`shop`). Read-only at the data layer; orthogonal to the
+   * SkillNode-split (#217) and phoneme-tag (#215) — independent of
+   * either's landing order. See
+   * `design/word-song/digraphs-sh-word-list.md` §6.1 + AC12.
+   */
+  hybridMode?: boolean
   /**
    * Optional phoneme tag (IPA, content phoneme only). Used for
    * distractor-selection scoping when a grapheme covers multiple
@@ -78,6 +116,11 @@ export type WordCategory =
   | 'person'
   | 'object'
   | 'vessel'
+  // 'structure' added with the digraphs-sh tier — `shed` + `shop` are
+  // small outbuildings/storefronts, a category absent from the CVC pack.
+  // Per Kyle's spec §1 final-pool table (`design/word-song/
+  // digraphs-sh-word-list.md`).
+  | 'structure'
 
 /**
  * The 14 target words — all CVC short-a, in Marian's likely vocabulary.
@@ -536,6 +579,26 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     isTarget: true,
   },
   {
+    // DUAL-ROLE — cross-vowel-tier load-bearing distractor.
+    // `sip` is a short-i target (its own tier) AND the sh/s-contrast trap
+    // distractor for `ship` in the digraphs-sh `TARGET_PAIRINGS` row
+    // below. `getWordEntry('sip')` must keep resolving for BOTH the
+    // short-i target lookup AND the sh-tier distractor lookup. The two
+    // flags (`isTarget`, distractor-eligibility) are independent — same
+    // precedent as `pen` (short-e target, short-a distractor) and the
+    // short-o/short-u promotions (`dog`/`log`/`cup`/`sun`). Per
+    // `.claude/docs/skill-trees-and-content.md` §"Cross-vowel-tier
+    // load-bearing — generalization": before any future removal of `sip`
+    // from `TARGET_WORDS`, grep `TARGET_PAIRINGS` for the `sip` string
+    // token and either retain this entry or substitute every reference.
+    // The `ship/sip` minimal pair is the single strongest sh-vs-s
+    // diagnostic in the sh-tier (Kyle's spec §2 + Dave §Recommendations-
+    // to-Kyle #4) — substituting another short-i word would lose the
+    // `/ʃ/`-vs-`/s/` test, so the dual-role pattern is the correct
+    // resolution. `sip` is NOT phoneme-tagged: tagging it `/s/` would make
+    // the sh-tier `ship` row throw the phoneme-mismatch defensive check in
+    // `pickDistractors` (target `/ʃ/` vs distractor `/s/`). The phoneme
+    // tag is opt-in; an untagged distractor passes through.
     word: 'sip',
     pictureKey: 'sip',
     vowel: 'i',
@@ -641,6 +704,111 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     category: 'food',
     isTarget: true,
   },
+  // ── Digraphs-sh pool (ticket digraphs-sh wordPack — FIRST digraph tier) ──
+  // Per `design/word-song/digraphs-sh-word-list.md` §1 (Option C-minus,
+  // LOCKED 2026-05-14 via Dave's long-vowel addendum): 7 sh-initial words
+  // — 4 conventional sh-CVC (`ship, shell, shed, shop`) + 3 long-vowel
+  // sight-word-hybrids (`shoe, sheep, shark`). Pool reaches Marian only
+  // when the planner emits content for the `digraphs-sh` SkillNode (added
+  // in PR #217's 3-sibling split — `digraphs-sh` / `digraphs-ch` /
+  // `digraphs-th-voiceless`, between `cvc-words-short-e` and
+  // `sight-words`). Kevin's parallel `feat/digraphs-sh-content-planner` PR
+  // wires the planner side (`WORD_SONG_TARGET_WORDS_DIGRAPHS_SH`,
+  // first-class focus node, canon bake).
+  //
+  // `vowel` is OMITTED on all 7 (see the `WordEntry.vowel` doc above): the
+  // sh-tier is classified by the digraph phoneme `/ʃ/`, not by short-vowel
+  // tier. All 7 carry `phoneme: '/ʃ/'` — the canonical disambiguator per
+  // spec §10 finding #11 resolution path (iii), consuming the
+  // phoneme-tag infrastructure shipped in #215.
+  //
+  // `hybridMode: true` on `shoe`/`sheep`/`shark` ONLY (Kyle's spec §6.1 +
+  // Dave addendum §Q7d) — long / r-controlled vowels outside Marian's
+  // formal phonics tiers; Kevin's planner reads the flag to suppress
+  // segmentation / spelling / decode-from-phoneme prompts. The 4
+  // conventional sh-CVC words default-absent (=== `false`).
+  //
+  // Cross-tier hygiene (spec §6): sh-trios contain ONLY sh-pool words +
+  // s-contrast traps — no CVC short-vowel words leak in. The sh-tier
+  // `TARGET_PAIRINGS` rows below reference only sh-pool neighbours and the
+  // 3 s-contrast distractors (`sip` dual-role + `sell`/`sop` new
+  // distractor-only entries). Picture pack ships in a separate ticket
+  // (`digraphs-sh-picture-pack-prompts.md` — 7 wholly-new pictures); until
+  // then chips fall back to the unknown-key silhouette in
+  // `wordPictures.tsx`.
+  {
+    word: 'ship',
+    pictureKey: 'ship',
+    category: 'vehicle',
+    isTarget: true,
+    // /ʃ/ — digraph onset. The cleanest sh-CVC anchor (3-letter pattern,
+    // short-i inside). `vowel` omitted — sh-tier is phoneme-classified.
+    phoneme: '/ʃ/',
+  },
+  {
+    word: 'shell',
+    pictureKey: 'shell',
+    category: 'object',
+    isTarget: true,
+    // /ʃ/ — digraph onset. 3-phoneme geminate-CVC under the `egg`/`box`
+    // precedent (the `ll` decodes as a single /l/).
+    phoneme: '/ʃ/',
+  },
+  {
+    word: 'shoe',
+    pictureKey: 'shoe',
+    category: 'object',
+    isTarget: true,
+    // /ʃ/ — digraph onset. Long-vowel /uː/ inside — outside Marian's
+    // formal phonics tiers, so `hybridMode: true` (Kyle's spec §6.1):
+    // picture+audio scaffold carries the long-vowel decode; the planner
+    // emits only chip-tap recognition / picture-retrieval prompts.
+    phoneme: '/ʃ/',
+    hybridMode: true,
+  },
+  {
+    word: 'sheep',
+    pictureKey: 'sheep',
+    category: 'animal',
+    isTarget: true,
+    // /ʃ/ — digraph onset. Long-vowel /iː/ + vowel digraph `ee` —
+    // outside Marian's formal phonics tiers, so `hybridMode: true`.
+    phoneme: '/ʃ/',
+    hybridMode: true,
+  },
+  {
+    word: 'shark',
+    pictureKey: 'shark',
+    category: 'animal',
+    isTarget: true,
+    // /ʃ/ — digraph onset. R-controlled /ɑːr/ — outside Marian's formal
+    // phonics tiers, so `hybridMode: true`. Strongest pick in the
+    // long-vowel-allowance set (universal vocabulary + PH-cultural
+    // context per spec §10 finding #5).
+    phoneme: '/ʃ/',
+    hybridMode: true,
+  },
+  {
+    word: 'shed',
+    pictureKey: 'shed',
+    category: 'structure',
+    isTarget: true,
+    // /ʃ/ — digraph onset. Short-e sh-CVC. Vocab register marginally
+    // Filipino-English but learnable via the picture+audio scaffold (spec
+    // §1 + §10 finding #4).
+    phoneme: '/ʃ/',
+  },
+  {
+    word: 'shop',
+    pictureKey: 'shop',
+    category: 'structure',
+    isTarget: true,
+    // /ʃ/ — digraph onset. Short-o sh-CVC. Vocab register marginally
+    // Filipino-English but learnable via scaffold; British-English
+    // high-frequency word — useful advance-vocabulary anchor for Marian's
+    // August 2026 Danish-school transition (spec §7 Q3).
+    phoneme: '/ʃ/',
+  },
 ] as const
 
 /**
@@ -686,12 +854,47 @@ export const TARGET_WORDS: readonly WordEntry[] = [
  * resolves it from `TARGET_WORDS` and the existing `TARGET_PAIRINGS`
  * rows for short-a (e.g. `mat: { gentle: ['pen', 'dog'], … }`) point
  * at it by string — same shape as the short-u / short-o promotion
- * patterns. With the `pen` promotion, `DISTRACTOR_ONLY_WORDS` is now
- * an empty array; it is kept as an exported constant for forward
- * compat (future tier work may re-introduce distractor-only entries
- * for cross-pool variety).
+ * patterns. With the `pen` promotion this array was briefly empty.
+ *
+ * v6 note (digraphs-sh tier): the array is re-populated with the 2
+ * sh/s-contrast trap distractors `sell` (/sɛl/) and `sop` (/sɒp/) —
+ * the s-onset minimal-pair partners of `shell` and `shop`. These are
+ * genuine short-vowel CVC words (so they keep their real `vowel`) but
+ * they are NOT sh-tier targets and they appear ONLY as sh-trio
+ * distractors — cross-tier hygiene rule (Kyle's spec §6) keeps them out
+ * of any short-i/short-e/short-o CVC trio. They are NOT phoneme-tagged:
+ * the `/ʃ/`-vs-`/s/` contrast is the diagnostic the sh-tier is testing,
+ * so the sh-target rows reference them as untagged distractors (an
+ * untagged distractor passes the `pickDistractors` phoneme-scoping check
+ * by design). `ship`'s s-contrast trap `sip` is NOT here — it is a
+ * dual-role short-i `TARGET_WORDS` entry referenced by string (see the
+ * `sip` row comment). `sue/seep/sark/sed` were rejected as too weak and
+ * `sore` is not needed (its target `shore` was dropped from the pool
+ * per Dave's Option C-minus addendum). Per Kyle's spec §6.1 + AC2.
  */
-export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [] as const
+export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
+  {
+    word: 'sell',
+    pictureKey: 'sell',
+    vowel: 'e',
+    category: 'object',
+    isTarget: false,
+    // s-onset minimal pair for `shell` — the sh/s contrast trap. NOT
+    // phoneme-tagged (see the array doc above). Picture: silhouette
+    // placeholder acceptable for distractor-only entries until a vector
+    // trace lands in the polish backlog (spec §10 finding #13).
+  },
+  {
+    word: 'sop',
+    pictureKey: 'sop',
+    vowel: 'o',
+    category: 'object',
+    isTarget: false,
+    // s-onset minimal pair for `shop` — the sh/s contrast trap. NOT
+    // phoneme-tagged. Picture: silhouette placeholder acceptable for
+    // distractor-only entries (spec §10 finding #13).
+  },
+] as const
 
 /** All entries (targets + distractor-only), the full pool for distractor picking. */
 export const ALL_WORDS: readonly WordEntry[] = [
@@ -757,6 +960,25 @@ export const FORBIDDEN_PAIRS: ReadonlyArray<readonly [string, string]> = [
   ['net', 'bag'],
   ['egg', 'nut'],
   ['egg', 'bun'],
+  // Digraphs-sh pool additions (Kyle's spec §6 + §2 FORBIDDEN_PAIRS
+  // pre-check, LOCKED 2026-05-14). All three are silhouette-collision
+  // hygiene; the sh-tier sh-pool-only rule already keeps the first two
+  // from co-occurring (both members are sh-pool), but the entries are the
+  // architectural floor that keeps the §2 distractor matrix honest and
+  // protects future cross-pool digraph work:
+  //   - [shed, shop]: both small-structure silhouettes — the only 96pt
+  //     discriminator is awning-vs-roof, too fine. In-pool hygiene; the
+  //     §2 matrix routes `shed`/`shop` sh-neighbour pairs around each
+  //     other (e.g. `shop.gentle = ['shark','shell']`, NOT `shed`).
+  //   - [shoe, shop]: if the `shop` picture leans toward "shoe store" the
+  //     silhouette could collide. In-pool hygiene.
+  //   - [ship, tub]: both vessel-like silhouettes at 96pt. `tub` is a
+  //     short-u target — cross-pool only; the sh-tier rule already
+  //     prevents this pair in a v1 trio, but the entry documents the
+  //     silhouette risk for future cross-pool work.
+  ['shed', 'shop'],
+  ['shoe', 'shop'],
+  ['ship', 'tub'],
 ] as const
 
 /** True if `a` and `b` are a forbidden silhouette-similar pair. */
@@ -978,6 +1200,36 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   jet: { gentle: ['hen', 'gem'], trap: ['net', 'pen'] }, // /ɛt/ rhyme partner (jet+net) + /ɛn/ near-rhyme
   gem: { gentle: ['hen', 'net'], trap: ['jet', 'web'] }, // /ɛm/ singleton; -t + -b near-coda trap
   egg: { gentle: ['hen', 'web'], trap: ['leg', 'gem'] }, // /ɛg/ rhyme partner (egg+leg) + /ɛm/ near-rhyme
+  // ── Digraphs-sh pool (ticket digraphs-sh wordPack) ──────────────────
+  // Per `design/word-song/digraphs-sh-word-list.md` §2: structurally
+  // DIFFERENT from the same-vowel-only CVC tiers. The sh-tier distractor
+  // rule is sh-pool-only + sh/s-contrast:
+  //   - gentle (problems 1-3): BOTH entries are sh-pool neighbours —
+  //     Marian distinguishes by picture, builds sh-pool cohesion.
+  //   - trap (problems 4-8): for the strong-trap subset (`ship`, `shell`,
+  //     `shop` — the 3 targets with a real-English-word s-contrast
+  //     partner) one trap entry is the sh/s-contrast distractor
+  //     (`sip`/`sell`/`sop`) + one sh-pool neighbour; for the weak-trap
+  //     subset (`shoe`, `sheep`, `shark`, `shed` — no good s-contrast
+  //     word, see spec §2 / §10 finding #3) BOTH trap entries are
+  //     sh-pool neighbours.
+  // No CVC short-vowel words appear in any sh-trio (cross-tier hygiene,
+  // spec §6). FORBIDDEN_PAIRS pre-checked: `[shed,shop]`, `[shoe,shop]`,
+  // `[ship,tub]` — no row below pairs a target with a forbidden
+  // silhouette neighbour. Phoneme-scoping: every sh-word distractor
+  // carries `phoneme: '/ʃ/'` (matches the sh target); `sip`/`sell`/`sop`
+  // are untagged and pass the opt-in phoneme check by design.
+  //
+  // Strong-trap subset — sh/s contrast trap + sh-pool neighbour:
+  ship: { gentle: ['shell', 'shark'], trap: ['sip', 'sheep'] }, // sh/s minimal pair (sip) + sh-neighbour
+  shell: { gentle: ['ship', 'shoe'], trap: ['sell', 'sheep'] }, // sh/s minimal pair (sell) + sh-neighbour
+  shop: { gentle: ['shark', 'shell'], trap: ['sop', 'sheep'] }, // sh/s minimal pair (sop) + sh-neighbour; gentle avoids shed/shoe (FORBIDDEN_PAIRS)
+  // Weak-trap subset — sh-pool neighbours both tiers (no strong s-contrast
+  // word: sue too adult-vocab, seep too obscure, sark/sed non-words):
+  shoe: { gentle: ['ship', 'shark'], trap: ['shell', 'sheep'] }, // sh-pool only; shoe+shop avoided (FORBIDDEN_PAIR)
+  sheep: { gentle: ['shark', 'shoe'], trap: ['ship', 'shell'] }, // sh-pool only
+  shark: { gentle: ['ship', 'sheep'], trap: ['shoe', 'shell'] }, // sh-pool only
+  shed: { gentle: ['shark', 'sheep'], trap: ['ship', 'shell'] }, // sh-pool only; shed+shop avoided (FORBIDDEN_PAIR)
 } as const
 
 /**
