@@ -58,24 +58,24 @@
  * so the RED state is unambiguous in CI logs.
  *
  * Test 4 (the `intro → practicing` progression assertion) uses the
- * SHARED `installClaudeMock` with `failNetwork: true` — it does NOT
- * depend on the ch canon file. On pre-merge main it still fails for the
- * right reason: the picker walks `WORD_SONG_NODES_IN_ORDER`, lands on
- * the seeded `digraphs-ch: 'intro'` node, but `applyMasteryRule`'s
- * intro-pass never advances it because the planner stub-served
- * `blending-cv` content and the session's `skillFocus` therefore does
- * not name `digraphs-ch`... actually no — see the test 4 docstring for
- * the precise RED mechanism. The short version: on pre-merge main the
- * `digraphs-ch` node is reachable by the picker (it IS in
- * `WORD_SONG_NODES_IN_ORDER`), so the session DOES log
- * `skillFocus: ['digraphs-ch']` and the intro-pass DOES fire. Test 4's
- * RED state is therefore NOT about progression plumbing (PR #211 +
- * #201 already wired that) — it is about CONTENT: on pre-merge main the
- * session renders `blending-cv` stub content, so the chip-tap walk
- * taps `blending-cv` words, not ch words. Test 4 asserts BOTH the
- * transition AND that the session that drove it ran real ch content
- * (the read-line caption shows a ch-pool word). The content half is
- * what is RED pre-merge.
+ * SAME per-spec `installDigraphsChClaudeMock` as tests 1 and 3 — it
+ * serves the ch-tier canon bytes on word-song requests, so a REAL ch
+ * session drives the transition. On pre-merge main it still fails for
+ * the right reason: `readDigraphsChCanon()` throws `ENOENT` at setup
+ * because the canon file does not exist yet. (An earlier draft used the
+ * shared `installClaudeMock` with `failNetwork: true`; that was wrong —
+ * with the network aborted, WordSong falls through to
+ * `pickStaticWordSongPlan()`, whose targets are hardcoded short-a CVC
+ * words, never ch-pool words, so the content-half assertion could never
+ * pass even post-merge. Using the ch-canon mock makes the content half
+ * satisfiable on a green tree.) Test 4's RED state is therefore NOT
+ * about progression plumbing (PR #211 + #201 already wired that) — it
+ * is about CONTENT: pre-merge the canon file does not exist, so the
+ * mock setup throws; post-merge the canon serves real ch content and
+ * both the transition AND the content-half assertion pass. Test 4
+ * asserts BOTH the transition AND that the session that drove it ran
+ * real ch content (the first correct chip carries a ch-pool
+ * `data-word`).
  *
  * POST-MERGE GREEN STATE
  * ----------------------
@@ -136,21 +136,21 @@
  * there is NO shared `installCvcWordsClaudeMock`-with-capture helper;
  * word-song Claude mocks in e2e are per-spec local functions.
  *
- * Test 4 deliberately uses the SHARED `installClaudeMock` with
- * `failNetwork: true` instead of the ch-canon mock — it walks a full
- * session through the silent-caption-walk fallback to drive the state
- * machine, and the silent fallback is the CI-mute path the progression
- * siblings (`progression-mastery-loop.spec.ts`,
- * `digraphs-sh-progression.spec.ts`) all use. The read-line caption
- * still shows the planner's word text even on the silent path, so the
- * "real ch content drove the transition" half of test 4 still has a
- * signal. See test 4's docstring.
+ * Test 4 uses the SAME `installDigraphsChClaudeMock` as tests 1 and 3,
+ * not the shared `installClaudeMock` — it walks a full session that
+ * must run REAL ch content to satisfy its content-half assertion. The
+ * `failNetwork: true` fallback path would route WordSong through
+ * `pickStaticWordSongPlan()`, whose hardcoded targets are short-a CVC
+ * words (never ch-pool words), so the content-half assertion could
+ * never pass on that path. Driving the session with the ch-canon mock
+ * means the first correct chip carries a real ch-pool `data-word`. See
+ * test 4's docstring for the precise RED/GREEN mechanism.
  *
  * Timeout sizing — per `testing-and-ci.md` §4.1.1b
  * ------------------------------------------------
  * Tests 1-2 are payload assertions that don't walk a session — default
  * 90s budget is ample. Test 3 walks one 8-problem session (~30-50s wall
- * on the silent caption-walk fallback) — default 90s is adequate.
+ * driven by the ch-canon mock) — default 90s is adequate.
  * Test 4 walks ONE full session AND reads progress back — single
  * session, ~50s wall + nav + progress-read overhead; the default 90s
  * budget covers it, but it is sized explicitly at 120s for headroom
@@ -173,11 +173,9 @@ import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   readProgressFromPage,
   seedLocalStorage,
 } from './_helpers/seedStorage'
@@ -766,38 +764,41 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
    * alone (tests 1-2) would NOT catch a state machine that never moves
    * `digraphs-ch` out of `intro`.
    *
-   * Mock choice — SHARED `installClaudeMock` with `failNetwork: true`,
-   * NOT the ch-canon mock. Rationale: this test walks a full session
-   * through the silent-caption-walk fallback to drive the state
-   * machine; the silent fallback is the CI-mute path the progression
-   * siblings (`progression-mastery-loop.spec.ts`,
-   * `digraphs-sh-progression.spec.ts`) all use, and it does not depend
-   * on the ch canon file existing. The read-line caption still shows
-   * the planner's word text on the silent path — see the content-half
-   * assertion below.
+   * Mock choice — the PER-SPEC `installDigraphsChClaudeMock` (the same
+   * mock tests 1 and 3 use), NOT the shared `installClaudeMock` with
+   * `failNetwork: true`. Rationale: this test asserts BOTH the
+   * transition AND that REAL ch content drove it. The `failNetwork`
+   * fallback routes WordSong through `pickStaticWordSongPlan()`, whose
+   * hardcoded targets are short-a CVC words (`cat`, `mat`, `cap`, ...) —
+   * never ch-pool words — so the content-half assertion could never
+   * pass on that path, even on a green tree. Driving the session with
+   * the ch-canon mock means the first correct chip carries a real
+   * ch-pool `data-word`, so the content half is satisfiable post-merge.
    *
    * Pre-merge RED mechanism (precise):
-   *   On pre-merge main `digraphs-ch` IS in `WORD_SONG_NODES_IN_ORDER`
-   *   (PR #211 SkillNode split) so the picker DOES land on the seeded
-   *   `digraphs-ch: 'intro'` node, the session DOES log
-   *   `skillFocus: ['digraphs-ch']`, and `applyMasteryRule`'s intro-pass
-   *   (PR #201) DOES advance it to `'practicing'`. So the PROGRESSION
-   *   half of this test would pass pre-merge — PR #211 + #201 already
-   *   wired that plumbing.
-   *   What FAILS pre-merge is the CONTENT half: `digraphs-ch` is NOT in
-   *   `WORD_SONG_FIRST_CLASS_FOCUS_NODES`, so the planner stub-falls-
-   *   through to `blending-cv` content. The session renders
-   *   `blending-cv` stub words; the read-line caption shows a
-   *   `blending-cv` word (e.g. "ma", "si"), NOT a ch-pool word. The
-   *   content-half assertion `expect(CH_TIER_WORDS.has(readWord))` fails
-   *   on pre-merge main.
-   *   This is the RIGHT failing reason: the ch content does not exist
-   *   yet, so the transition — even though it fires — was NOT driven by
-   *   a real ch session.
+   *   The progression plumbing already works on pre-merge main:
+   *   `digraphs-ch` IS in `WORD_SONG_NODES_IN_ORDER` (PR #211 SkillNode
+   *   split), so the picker lands on the seeded `digraphs-ch: 'intro'`
+   *   node, the session logs `skillFocus: ['digraphs-ch']`, and
+   *   `applyMasteryRule`'s intro-pass (PR #201) advances it to
+   *   `'practicing'`. So a progression-ONLY assertion would pass
+   *   pre-merge — false confidence.
+   *   What FAILS pre-merge is setup: `public/canon/word-song/level-1/
+   *   digraphs-ch.json` does not exist, so `installDigraphsChClaudeMock`
+   *   → `readDigraphsChCanon()` throws `ENOENT` before the session walk
+   *   even begins. The content-half assertion
+   *   `expect(CH_TIER_WORDS.has(firstTargetWord))` is therefore never
+   *   reached on pre-merge main — the test is RED at the mock-install
+   *   step, the same RED reason as tests 1 and 3.
+   *   This is the RIGHT failing reason: the ch content (canon file +
+   *   first-class planner support) does not exist yet, so a real ch
+   *   session — the only thing that can satisfy the content half —
+   *   cannot be constructed.
    *
-   * Post-merge GREEN: `digraphs-ch` is first-class, the planner emits
-   * ch content, the read-line caption names a ch-pool word, the
-   * intro-pass advances the node to `'practicing'`. Both halves pass.
+   * Post-merge GREEN: the canon file exists, `digraphs-ch` is
+   * first-class, the mock serves real ch content, the first correct
+   * chip carries a ch-pool word, and the intro-pass advances the node
+   * to `'practicing'`. Both halves pass.
    *
    * Chromium-only (the session walk depends on the read-aloud effect /
    * chip enablement). Timeout sized explicitly per `testing-and-ci.md`
@@ -807,15 +808,26 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
-    // Single session walk (~50s wall on silent-caption-walk fallback) +
-    // nav + a progress round-trip read. Default 90s is borderline; 120s
-    // gives headroom. Contrast digraphs-sh-progression.spec.ts which
-    // runs 4 sessions and needs 240s.
+    // Single session walk (~50s wall, ch-canon mock) + nav + a progress
+    // round-trip read. Default 90s is borderline; 120s gives headroom.
+    // Contrast digraphs-sh-progression.spec.ts which runs 4 sessions and
+    // needs 240s.
     test.setTimeout(120_000)
 
-    await installClaudeMock(page, { failNetwork: true })
+    await installDigraphsChClaudeMock(page)
     await page.goto('/')
-    await forceHowlerUnlock(page)
+    // NOTE: do NOT call `forceHowlerUnlock` here. That test seam stubs
+    // `Howler.ctx` in a way that makes the real ch-canon MP3 nodes throw
+    // `Failed to execute 'connect' on 'AudioNode'` when Howler decodes
+    // them — `prepareWordSongPathA` then rejects and WordSong silently
+    // falls back to the short-a static plan, so `firstTargetWord` would
+    // be `cat`, never a ch-pool word, and the content-half assertion
+    // could never pass. This test drives a real ch-canon session, so it
+    // relies on the genuine gesture-unlock chain — the same path test 3
+    // (the UI walk) uses, which is why test 3 passes without forcing.
+    // `forceHowlerUnlock` is only safe on the `failNetwork: true`
+    // silent-caption-walk path (e.g. `digraphs-sh-progression.spec.ts`),
+    // which never decodes real canon audio.
 
     // ── Pre-flight: confirm the seed landed and digraphs-ch starts at
     //    'intro'. If the seed were silently rejected (the
@@ -830,13 +842,12 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
     expect(beforeSession).not.toBeNull()
     expect(beforeSession.skillLevels['digraphs-ch']).toBe('intro')
 
-    // ── Capture the read-line word the session actually presents.
-    //    On the silent-caption-walk fallback the read-line still
-    //    renders the planner's word text word-by-word; the
-    //    `data-testid="word-song-read-word"` nodes carry it. We grab
-    //    problem 1's read word as the content-half signal: post-merge
-    //    it is a ch-pool word; pre-merge (planner stub) it is a
-    //    blending-cv word.
+    // ── Capture the target word the session actually presents.
+    //    The ch-canon mock serves real ch-tier content, so problem 1's
+    //    correct chip carries a ch-pool `data-word`. We grab it as the
+    //    content-half signal: post-merge it is one of the 7 ch-pool
+    //    words. (Pre-merge this line is never reached — the mock-install
+    //    step throws `ENOENT` because the ch canon file does not exist.)
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
@@ -847,10 +858,21 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
     await expect(wordSong).toHaveAttribute('data-problem-index', '0', {
       timeout: 20_000,
     })
+    // Wait for the REAL ch-canon plan to drive the read-aloud before
+    // reading the target word. On cold mount WordSong renders the
+    // `pickStaticWordSongPlan()` fallback (short-a CVC) until
+    // `prepareWordSongPathA` resolves and swaps in the server plan;
+    // `data-read-aloud-played === 'true'` only flips once the real
+    // (ch-canon) audio has played. Reading `data-word` before this gate
+    // would catch the static-fallback CVC word, not the ch-pool word —
+    // the same gate test 3 uses for its per-problem chip assertions.
+    await expect(wordSong).toHaveAttribute('data-read-aloud-played', 'true', {
+      timeout: 20_000,
+    })
     // The correct chip carries `data-word` — the canonical per-problem
-    // target word. Read it before the first tap. On pre-merge main the
-    // planner stub serves blending-cv content, so this is a
-    // blending-cv word; post-merge it is a ch-pool word.
+    // target word. Read it before the first tap. Driven by the ch-canon
+    // mock, this is a ch-pool word post-merge; the content-half
+    // assertion at the end of the test pins that.
     const firstCorrectChip = page.locator(
       '[data-testid="word-song-chip"][data-correct="true"]',
     )
@@ -883,10 +905,11 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
     expect(afterSession).not.toBeNull()
 
     // SMOKING GUN — the intro→practicing transition fired for
-    // `digraphs-ch` on the first perfect session. Pre-merge: PR #211 +
-    // #201 plumbing makes this pass. Post-merge: still passes — the
-    // transition is real either way; what changes is whether REAL ch
-    // content drove it (the content-half assertion below).
+    // `digraphs-ch` on the first perfect session. The PR #211 + #201
+    // plumbing makes this pass; this assertion guards that the
+    // plumbing stays wired. The content-half assertion below is what
+    // guards that a REAL ch session drove it. (Pre-merge this line is
+    // never reached — the mock-install step throws `ENOENT`.)
     expect(afterSession.skillLevels['digraphs-ch']).toBe('practicing')
 
     // Exactly one history entry, focused on `digraphs-ch`, perfect
@@ -901,13 +924,15 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
     expect(afterSession.skillLevels['digraphs-th-voiceless']).toBe('locked')
 
     // CONTENT HALF — the session that drove the transition ran REAL ch
-    // content. On pre-merge main the planner stub-falls-through to
-    // `blending-cv`, so `firstTargetWord` is a blending-cv word and
-    // this fails — the RIGHT failing reason: the ch content does not
-    // exist yet, so the (real, plumbing-wired) transition was NOT
-    // driven by a ch session. Post-merge the planner is first-class for
-    // `digraphs-ch` and `firstTargetWord` is one of the 7 ch-pool
-    // words.
+    // content. The ch-canon mock serves first-class `digraphs-ch`
+    // content, so `firstTargetWord` is one of the 7 ch-pool words. This
+    // is what makes test 4 a genuine wire-level check rather than a
+    // false-green progression-only assertion: the transition firing
+    // (above) plus a ch-pool word driving it (here) together prove a
+    // real ch session moved the node. Pre-merge this line is never
+    // reached — the mock-install step throws `ENOENT` because the ch
+    // canon file does not exist yet, the same RED reason as tests 1
+    // and 3.
     expect(CH_TIER_WORDS.has(firstTargetWord!)).toBe(true)
   })
 })
