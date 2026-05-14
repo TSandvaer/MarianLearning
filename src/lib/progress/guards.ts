@@ -37,7 +37,13 @@ const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
   'cvc-words-short-u',
   'cvc-words-short-i',
   'cvc-words-short-e',
-  'digraphs',
+  // Digraphs split into 3 sequential sibling nodes per PR #211.
+  // Sequential isolation: sh masters → ch unlocks 'intro'; ch masters
+  // → th-voiceless unlocks 'intro'. Voiced /ð/ is NOT here — it
+  // routes to the `sight-words` tier (Dave's research §Q2/§Q3).
+  'digraphs-sh',
+  'digraphs-ch',
+  'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
 ])

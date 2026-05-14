@@ -168,7 +168,13 @@ const STAGE_LABEL: Record<StageId, string> = {
   'cvc-words-short-u': 'sun',
   'cvc-words-short-i': 'pig',
   'cvc-words-short-e': 'bed',
-  digraphs: 'sh',
+  // Digraphs split into 3 sequential sibling nodes per PR #211. Plain
+  // grapheme labels (not IPA) per Thomas's K4 lock — IPA glyphs are
+  // too obscure for an 8-year-old. The single `digraphs: 'sh'` legacy
+  // label is dropped.
+  'digraphs-sh': 'sh',
+  'digraphs-ch': 'ch',
+  'digraphs-th-voiceless': 'th',
   'sight-words': 'the',
   'simple-sentences': 'I',
 }

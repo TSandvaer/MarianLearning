@@ -108,7 +108,10 @@ const WORD_SONG_LABELS: Record<WordSongNode, string> = {
   'cvc-words-short-u': 'CVC words (short u)',
   'cvc-words-short-i': 'CVC words (short i)',
   'cvc-words-short-e': 'CVC words (short e)',
-  digraphs: 'digraphs',
+  // Digraphs split into 3 sequential sibling nodes per PR #211.
+  'digraphs-sh': 'digraphs (sh)',
+  'digraphs-ch': 'digraphs (ch)',
+  'digraphs-th-voiceless': 'digraphs (th)',
   'sight-words': 'sight words',
   'simple-sentences': 'simple sentences',
 }

@@ -36,6 +36,19 @@ export type NumberGardenNode =
 // the short-e spec at design/word-song/short-e-pool-expansion.md
 // §1 / §10 Q1 lock for the 9-word ship pool, ticket 86c9teua2 — the
 // final single-vowel tier in the o → u → i → e canonical arc).
+//
+// Digraphs are split into three sequential sibling nodes
+// (digraphs-sh → digraphs-ch → digraphs-th-voiceless) per the
+// architecture proposal PR #211 (Thomas-locked K1–K6, 2026-05-14). The
+// single dead `digraphs` literal that previously sat between the CVC
+// tiers and `sight-words` is dropped — no real user ever had it above
+// `'locked'` (verified in proposal §2.6). A read-path remap in
+// defaults.ts covers the QA hand-edit case. Sequential isolation
+// (3 cross-day ≥90% sessions per digraph before the next unlocks) is
+// enforced by the existing mastery rule walking the new sibling tier,
+// identical in shape to the CVC sibling-tier cascade. Voiced /ð/ is
+// NOT a digraph node — it routes to the `sight-words` tier per Dave's
+// research (`design/research/digraph-acquisition-marian.md` §Q2/§Q3).
 export type WordSongNode =
   | 'letter-names'
   | 'letter-sounds'
@@ -45,7 +58,9 @@ export type WordSongNode =
   | 'cvc-words-short-u'
   | 'cvc-words-short-i'
   | 'cvc-words-short-e'
-  | 'digraphs'
+  | 'digraphs-sh'
+  | 'digraphs-ch'
+  | 'digraphs-th-voiceless'
   | 'sight-words'
   | 'simple-sentences'
 

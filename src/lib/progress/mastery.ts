@@ -125,6 +125,15 @@ export const MATH_TREE: readonly NumberGardenNode[] = [
  * design/word-song/short-e-pool-expansion.md §1 for the short-e tier
  * — the final single-vowel tier in the o → u → i → e canonical arc —
  * added under ticket 86c9teua2).
+ *
+ * Digraphs are split into three sequential sibling nodes
+ * (digraphs-sh → digraphs-ch → digraphs-th-voiceless) per the
+ * architecture proposal PR #211. Mastery walks the new sibling tier
+ * identically to the CVC sibling cascade: each digraph must hit
+ * 3 cross-day ≥90% sessions before the next unlocks. The dead single
+ * `digraphs` literal previously between `cvc-words-short-e` and
+ * `sight-words` is dropped; the read-path defaulter in defaults.ts
+ * covers the QA hand-edit case via a `digraphs → digraphs-sh` remap.
  */
 export const LITERACY_TREE: readonly WordSongNode[] = [
   'letter-names',
@@ -135,7 +144,9 @@ export const LITERACY_TREE: readonly WordSongNode[] = [
   'cvc-words-short-u',
   'cvc-words-short-i',
   'cvc-words-short-e',
-  'digraphs',
+  'digraphs-sh',
+  'digraphs-ch',
+  'digraphs-th-voiceless',
   'sight-words',
   'simple-sentences',
 ]
@@ -299,8 +310,7 @@ export function applyMasteryRule(progress: Progress): Progress {
     for (const node of nodes) {
       if (out.skillLevels[node] !== 'intro') continue
       const hasAnySuccess = progress.history.some(
-        (entry) =>
-          entry.skillFocus.includes(node) && entry.successRate > 0,
+        (entry) => entry.skillFocus.includes(node) && entry.successRate > 0,
       )
       if (hasAnySuccess) {
         out.skillLevels[node] = 'practicing'

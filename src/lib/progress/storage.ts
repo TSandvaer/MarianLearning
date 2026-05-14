@@ -124,14 +124,41 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
     return parsed
   }
   const present = skillLevels as Record<string, unknown>
+
+  // Dead-letter remap: `digraphs` → `digraphs-sh` (PR #211).
+  //
+  // The single `digraphs` SkillNode was dropped when the digraph tier
+  // was split into three sequential sibling nodes
+  // (`digraphs-sh` / `digraphs-ch` / `digraphs-th-voiceless`). No real
+  // user ever had `digraphs` above `'locked'` (verified in the
+  // proposal §2.6 — Marian's defaultProgress had it at 'locked' and
+  // no canon shipped for the node), so for production users the
+  // remap is a no-op. The branch exists to cover the QA hand-edit
+  // case (e.g. someone setting `digraphs: 'practicing'` via DevTools)
+  // so that progress isn't silently dropped. When both the legacy
+  // and the new key are present in the same blob, the new key wins
+  // — the new key is the source of truth post-PR.
+  let withRemap = present
+  if ('digraphs' in present && !('digraphs-sh' in present)) {
+    const { digraphs: legacyDigraphsLevel, ...rest } = present
+    withRemap = { ...rest, 'digraphs-sh': legacyDigraphsLevel }
+  } else if ('digraphs' in present) {
+    // Both keys present — strip the legacy literal so the strict
+    // guard's downstream check doesn't see an unrecognised key on a
+    // best-effort load path. The new key's value is preserved as-is.
+    const rest = { ...present }
+    delete rest['digraphs']
+    withRemap = rest
+  }
+
   const floor = defaultLockedSkillLevels()
-  let mutated = false
+  let mutated = withRemap !== present
   const filled: SkillLevels = { ...floor }
   for (const key of Object.keys(floor) as Array<keyof SkillLevels>) {
-    if (key in present && present[key] !== undefined) {
+    if (key in withRemap && withRemap[key] !== undefined) {
       // Preserve the existing value verbatim — even if invalid; the
       // guard catches that downstream.
-      filled[key] = present[key] as SkillLevels[typeof key]
+      filled[key] = withRemap[key] as SkillLevels[typeof key]
     } else {
       mutated = true
     }
@@ -141,9 +168,9 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
   // leaving them in lets the guard surface them as a real error
   // rather than silently dropping them). This is parallel to how
   // `withDefaultedSettings` is non-destructive.
-  for (const key of Object.keys(present)) {
+  for (const key of Object.keys(withRemap)) {
     if (!(key in floor)) {
-      ;(filled as Record<string, unknown>)[key] = present[key]
+      ;(filled as Record<string, unknown>)[key] = withRemap[key]
     }
   }
   if (!mutated) return parsed

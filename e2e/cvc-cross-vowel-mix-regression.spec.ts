@@ -12,18 +12,21 @@
  * Per ticket AC7 + spec §7 AC13. Three regression scenarios:
  *
  *   1. **Predicate ON path (post-CVC-graduation)** — All four CVC
- *      tiers `'mastered'` + `digraphs: 'practicing'` + the parent
+ *      tiers `'mastered'` + `digraphs-sh: 'practicing'` + the parent
  *      toggle defaulted to `true`. The picker walks past the mastered
- *      CVC tiers and lands on `digraphs` (the next non-mastered
+ *      CVC tiers and lands on `digraphs-sh` (the next non-mastered
  *      node). Cross-vowel chips do NOT render in the natural session
- *      flow because the focus is `digraphs`, NOT a CVC tier — App.tsx's
- *      `focusIsCvcTier` gate returns `false` and `wordSongCrossVowel`
- *      is `false`. The session walks the stub-blending-cv fallback.
+ *      flow because the focus is `digraphs-sh`, NOT a CVC tier —
+ *      App.tsx's `focusIsCvcTier` gate returns `false` and
+ *      `wordSongCrossVowel` is `false`. The session walks the
+ *      stub-blending-cv fallback. (PR #211 split the dead `digraphs`
+ *      literal into 3 sequential sibling nodes; `digraphs-sh` is the
+ *      leading sibling, the new picker landing point post-graduation.)
  *
  *      This case validates the end-to-end wire: the predicate fires
  *      `true` for a post-graduation Marian, but the session-level
  *      gate (focus must be CVC) keeps the matrix from leaking into
- *      a `digraphs` session. It's the post-CVC-graduation reality
+ *      a `digraphs-sh` session. It's the post-CVC-graduation reality
  *      check.
  *
  *   2. **Predicate OFF — incomplete mastery** — `cvc-words` and
@@ -35,7 +38,7 @@
  *      on existing CVC sessions.
  *
  *   3. **Predicate OFF — toggle override** — All four CVC tiers
- *      mastered + `digraphs: 'practicing'` BUT
+ *      mastered + `digraphs-sh: 'practicing'` BUT
  *      `parentSettings.crossVowelMixingEnabled: false`. Predicate
  *      returns `false` (parent escape valve, per spec §10 Q1 + Dave's
  *      research §4.4). Locks the toggle's hard-off semantics.
@@ -61,7 +64,7 @@
  * All three tests use a single inline `installCanonBytesClaudeMock`
  * that returns the bytes of `cvc-words-short-u.json` (real
  * Azure-rendered MP3s) for any word-song request. Tests 1 + 3 land
- * on `digraphs`-focus (post-CVC-graduation seed) — the planner
+ * on `digraphs-sh`-focus (post-CVC-graduation seed) — the planner
  * stub-falls-back to blending-cv content there, but Playwright's
  * route handler doesn't care about focus; it just returns the canon
  * bytes. The App's parser is content-shape-driven and the short-u
@@ -127,7 +130,7 @@ const VALID_SHORT_U_WORDS: ReadonlySet<string> = new Set([
  *  cvc-words-short-u-regression.spec.ts's mock helper.
  *
  *  We re-use the short-u canon for Tests 1 + 3 too (which seed
- *  digraphs-focus). The mock doesn't gate on focus — the App's
+ *  digraphs-sh-focus). The mock doesn't gate on focus — the App's
  *  parser is content-shape-driven and the short-u canon bytes
  *  parse cleanly into a plan regardless of the requested focus.
  *  Real Azure-rendered MP3s decode reliably in headless Chromium;
@@ -210,15 +213,18 @@ function skipOnWebkitHeadless(testInfo: {
 }
 
 test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
-  test('1. Predicate ON — post-CVC-graduation: all 4 CVC mastered, digraphs practicing, picker walks to digraphs (focus-tier gate stops cross-vowel routing)', async ({
+  test('1. Predicate ON — post-CVC-graduation: all 4 CVC mastered, digraphs-sh practicing, picker walks to digraphs-sh (focus-tier gate stops cross-vowel routing)', async ({
     page,
   }) => {
     // Seed: cross-vowel-mixing debug-seed shape — four CVC tiers
-    // mastered, digraphs at practicing. Predicate `crossVowelMixingActive`
-    // returns `true` (all four mastered + default toggle on). But the
-    // picker walks past CVC and lands on `digraphs`, so App.tsx's
-    // `focusIsCvcTier` gate fires `false` and `wordSongCrossVowel` is
-    // `false`. The session uses same-vowel `TARGET_PAIRINGS`.
+    // mastered, digraphs-sh at practicing. Predicate
+    // `crossVowelMixingActive` returns `true` (all four mastered +
+    // default toggle on). But the picker walks past CVC and lands on
+    // `digraphs-sh`, so App.tsx's `focusIsCvcTier` gate fires `false`
+    // and `wordSongCrossVowel` is `false`. The session uses same-vowel
+    // `TARGET_PAIRINGS`. (PR #211 split the dead `digraphs` literal
+    // into 3 sequential sibling nodes; the leading sibling
+    // `digraphs-sh` is the new picker target post-CVC-graduation.)
     //
     // We assert at the wire level (focusNode in the request payload) +
     // the persisted localStorage state, NOT at the chip-render level.
@@ -241,13 +247,17 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
           // cvc-words-short-e mastered too (ticket 86c9teua2) — without
           // this entry the picker would land on cvc-words-short-e
           // (locked-to-intro-when-short-i-promotes pattern) instead of
-          // digraphs, and the focusNode assertion below would fail.
+          // digraphs-sh, and the focusNode assertion below would fail.
           // Same widening pattern the short-i tier required for this
           // spec (sibling-spec audit per
           // .claude/docs/progress-and-persistence.md § "Five sync points
           // when widening SkillNode" → Place 8).
           'cvc-words-short-e': 'mastered',
-          digraphs: 'practicing',
+          // Digraphs split into 3 sequential sibling nodes per PR #211.
+          // The leading sibling `digraphs-sh` is the new picker target
+          // post-CVC-graduation; the two downstream digraph nodes stay
+          // at the helper's default 'locked'.
+          'digraphs-sh': 'practicing',
         },
         // Default `parentSettings` from the helper carries
         // crossVowelMixingEnabled: undefined → defaulter fills `true`.
@@ -256,7 +266,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     })
 
     // Real canon bytes (cvc-words-short-u.json) — they parse cleanly
-    // even on a digraphs-focus request (planner-content shape, not
+    // even on a digraphs-sh-focus request (planner-content shape, not
     // focus-coupled at the parser). The mock just returns whatever
     // bytes the server would have for the request shape.
     const { requests } = await installCvcWordsShortUClaudeMock(page)
@@ -274,12 +284,13 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     await expect(page.getByTestId('word-song')).toBeVisible({ timeout: 15_000 })
 
     // Wire-level assertion: the planner request shipped focusNode =
-    // 'digraphs'. This is the observable proof that the picker
-    // walked past every mastered CVC tier and stopped at digraphs;
+    // 'digraphs-sh'. This is the observable proof that the picker
+    // walked past every mastered CVC tier and stopped at digraphs-sh;
     // App.tsx's `focusIsCvcTier` gate then refused to thread
     // crossVowelMixing into the WordSong prop, so cross-vowel
     // routing did NOT fire even though `crossVowelMixingActive`
-    // would have returned `true` on this profile.
+    // would have returned `true` on this profile. (PR #211: leading
+    // digraph sibling post-split.)
     expect(requests).toHaveLength(1)
     const body = JSON.parse(requests[0]!.postData() ?? '{}') as Record<
       string,
@@ -290,7 +301,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(payload.track).toBe('word-song')
     const progressBlock = payload.progress as Record<string, unknown>
     expect(progressBlock).toBeDefined()
-    expect(progressBlock.focusNode).toBe('digraphs')
+    expect(progressBlock.focusNode).toBe('digraphs-sh')
 
     // localStorage proof: predicate's mastery-state inputs are the
     // seeded shape. Verifies the seed actually landed without
@@ -298,7 +309,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     // new optional `crossVowelMixingEnabled` field — if the guard
     // refused the seeded blob, `loadProgress` would return null and
     // App would fall back to defaults with `add-to-10` focus, not
-    // `digraphs`).
+    // `digraphs-sh`).
     const persisted = (await page.evaluate(
       (key) => window.localStorage.getItem(key),
       PROGRESS_STORAGE_KEY,
@@ -313,7 +324,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     expect(parsed.skillLevels['cvc-words-short-u']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-i']).toBe('mastered')
     expect(parsed.skillLevels['cvc-words-short-e']).toBe('mastered')
-    expect(parsed.skillLevels['digraphs']).toBe('practicing')
+    expect(parsed.skillLevels['digraphs-sh']).toBe('practicing')
     // Default toggle is `true` (defaulter fills missing key); seed
     // helper doesn't write it explicitly, so the field may be
     // absent on the persisted blob — that's the read-path-defaulter
@@ -416,7 +427,9 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
           // cvc-words-short-e mastered too (ticket 86c9teua2) — see Test
           // 1's matching comment for the rationale.
           'cvc-words-short-e': 'mastered',
-          digraphs: 'practicing',
+          // Digraphs split into 3 sequential sibling nodes per PR #211;
+          // leading sibling is the new picker landing point.
+          'digraphs-sh': 'practicing',
         },
       }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
@@ -457,9 +470,10 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
 
     await expect(page.getByTestId('word-song')).toBeVisible({ timeout: 15_000 })
 
-    // Wire-level assertion: focusNode is digraphs (picker walks past
+    // Wire-level assertion: focusNode is digraphs-sh (picker walks past
     // every mastered CVC tier; the toggle being off doesn't change
-    // the picker, just the predicate's verdict).
+    // the picker, just the predicate's verdict). PR #211: leading
+    // digraph sibling post-split.
     expect(requests).toHaveLength(1)
     const body = JSON.parse(requests[0]!.postData() ?? '{}') as Record<
       string,
@@ -467,7 +481,7 @@ test.describe('cvc cross-vowel mix v1 regression (ticket 86c9qa0kf)', () => {
     >
     const payload = body.payload as Record<string, unknown>
     const progressBlock = payload.progress as Record<string, unknown>
-    expect(progressBlock.focusNode).toBe('digraphs')
+    expect(progressBlock.focusNode).toBe('digraphs-sh')
 
     // localStorage proof: the toggle override persisted.
     // `crossVowelMixingActive(progress)` would return `false` for

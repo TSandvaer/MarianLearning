@@ -196,7 +196,11 @@ test.describe('Progression loop — cvc-words (intro → practicing, graduation-
         'cvc-words-short-o': 'locked',
         'cvc-words-short-u': 'locked',
         'cvc-words-short-i': 'locked',
-        digraphs: 'locked',
+        'cvc-words-short-e': 'locked',
+        // Digraphs split into 3 sequential sibling nodes per PR #211.
+        'digraphs-sh': 'locked',
+        'digraphs-ch': 'locked',
+        'digraphs-th-voiceless': 'locked',
         'sight-words': 'locked',
         'simple-sentences': 'locked',
       },
@@ -450,9 +454,9 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
 //   2. `pickFocusNode` walks `WORD_SONG_NODES_IN_ORDER` left-to-right
 //      and stops at the first non-mastered node. With every node
 //      through `cvc-words-short-i` seeded `'mastered'`, the picker
-//      lands on `digraphs` (currently `'locked'`) — NOT on the new
+//      lands on `digraphs-sh` (currently `'locked'`) — NOT on the new
 //      `cvc-words-short-e` which is invisible to the picker.
-//   3. Sessions therefore log `skillFocus: ['digraphs']`, NOT
+//   3. Sessions therefore log `skillFocus: ['digraphs-sh']`, NOT
 //      `['cvc-words-short-e']`. `applyMasteryRule` iterates
 //      `LITERACY_TREE` (which doesn't contain the new node either),
 //      so the intro→practicing pass never fires on the new node
@@ -462,6 +466,9 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
 //      main: actual is `'intro'`. This is the RED state — the
 //      empirical proof that without Kevin's wire-up, the node is
 //      unreachable by the state machine.
+//      (PR #211 note: post-split, the leading digraph node is
+//      `digraphs-sh` rather than the legacy `digraphs` literal —
+//      same shape, just renamed.)
 //
 // POST-KEVIN GREEN STATE
 // ----------------------
@@ -479,9 +486,10 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
 //      practicing→mastered scan in session 4's `applyMasteryRule`
 //      call walks the 90/3 window, sees the last 3 entries all
 //      hit 1.0 >= 0.9, and promotes to `'mastered'`. Downstream
-//      `digraphs` flips `'locked' → 'intro'`.
+//      `digraphs-sh` flips `'locked' → 'intro'`.
 //   4. The final assertions all pass: short-e is `'mastered'`,
-//      `digraphs` is `'intro'`, history has 4 entries.
+//      `digraphs-sh` is `'practicing'` (after session 4 ran on it),
+//      history has 4 entries.
 //
 // FOUR TRANSITIONS LOCKED
 // -----------------------
@@ -490,7 +498,7 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
 //     the test focuses on the downstream three edges)
 //   - `intro → practicing` (session 1's intro-pass; PR #201 invariant)
 //   - `practicing → mastered` (session 4's 90/3 scan; standard rule)
-//   - `digraphs: locked → intro` (downstream unlock cascade)
+//   - `digraphs-sh: locked → intro` (downstream unlock cascade)
 //
 // THRESHOLD CHOICE
 // ----------------
@@ -545,7 +553,12 @@ test.describe('Progression loop — cvc-words-short-e (intro → practicing → 
         'cvc-words-short-u': 'mastered',
         'cvc-words-short-i': 'mastered',
         'cvc-words-short-e': 'intro',
-        digraphs: 'locked',
+        // Digraphs split into 3 sequential sibling nodes per PR #211.
+        // The leading sibling `digraphs-sh` is the downstream node
+        // that unlocks on cvc-words-short-e mastery.
+        'digraphs-sh': 'locked',
+        'digraphs-ch': 'locked',
+        'digraphs-th-voiceless': 'locked',
         'sight-words': 'locked',
         'simple-sentences': 'locked',
       },
@@ -581,17 +594,21 @@ test.describe('Progression loop — cvc-words-short-e (intro → practicing → 
   })
 
   /**
-   * Pre-Kevin (RED): `pickFocusNode` chooses `digraphs` because
+   * Pre-Kevin (RED): `pickFocusNode` chooses `digraphs-sh` because
    * `cvc-words-short-e` is invisible to the picker. Sessions log
-   * `skillFocus: ['digraphs']`. The extra `'cvc-words-short-e': 'intro'`
+   * `skillFocus: ['digraphs-sh']`. The extra `'cvc-words-short-e': 'intro'`
    * key sits inert in `skillLevels`. After 4 sessions, the assertion
    * `.toBe('practicing')` after session 1 fails on actual `'intro'`.
    *
    * Post-Kevin (GREEN): all four transitions fire, sessions log
    * `['cvc-words-short-e']` focus, history accumulates to 4 entries,
-   * mastery rule promotes to `'mastered'` and unlocks `digraphs`.
+   * mastery rule promotes to `'mastered'` and unlocks `digraphs-sh`.
+   * (PR #211 split the dead `digraphs` literal into 3 sequential
+   * sibling nodes; the leading sibling `digraphs-sh` is the downstream
+   * node that unlocks on cvc-words-short-e mastery — same shape as
+   * the pre-split contract, just renamed.)
    */
-  test('four perfect cvc-words-short-e sessions: intro → practicing (session 1) → mastered (session 4); digraphs unlocks', async ({
+  test('four perfect cvc-words-short-e sessions: intro → practicing (session 1) → mastered (session 4); digraphs-sh unlocks', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -617,7 +634,7 @@ test.describe('Progression loop — cvc-words-short-e (intro → practicing → 
     expect(afterSession1.skillLevels['cvc-words-short-e']).toBe('practicing')
 
     // Downstream stays locked (cascade only fires on 'mastered').
-    expect(afterSession1.skillLevels['digraphs']).toBe('locked')
+    expect(afterSession1.skillLevels['digraphs-sh']).toBe('locked')
 
     // Exactly one history entry recorded against the new node.
     expect(afterSession1.history.length).toBe(1)
@@ -638,24 +655,27 @@ test.describe('Progression loop — cvc-words-short-e (intro → practicing → 
     // (AC10: standard rule applies, no special-casing for short-e).
     expect(afterSession4.skillLevels['cvc-words-short-e']).toBe('mastered')
 
-    // SMOKING GUN C — downstream `digraphs` unlocks on mastery and
-    // immediately advances to 'practicing' on session 4.
+    // SMOKING GUN C — downstream `digraphs-sh` unlocks on mastery
+    // and immediately advances to 'practicing' on session 4.
     //
     // Cascade chain: session 3's `applyMasteryRule` call promotes
-    // short-e to 'mastered' and flips `digraphs: 'locked' → 'intro'`
-    // in the same pass. The picker then targets `digraphs` for
+    // short-e to 'mastered' and flips `digraphs-sh: 'locked' → 'intro'`
+    // in the same pass. The picker then targets `digraphs-sh` for
     // session 4 (next non-mastered word-song node). Session 4's
-    // `applyMasteryRule` call observes a `digraphs` history entry
+    // `applyMasteryRule` call observes a `digraphs-sh` history entry
     // with successRate=1.0 and fires the PR #201 intro→practicing
-    // rule. Net post-session-4 state: digraphs at 'practicing'.
+    // rule. Net post-session-4 state: digraphs-sh at 'practicing'.
     //
     // This is the empirically-correct compounded state — confirms
     // BOTH the unlock cascade and the intro→practicing rule are
     // wired correctly through the cvc-words-short-e milestone.
-    expect(afterSession4.skillLevels['digraphs']).toBe('practicing')
+    // (PR #211 split the dead `digraphs` literal into 3 sequential
+    // sibling nodes; this assertion pins the leading sibling as the
+    // freshly-unlocked downstream.)
+    expect(afterSession4.skillLevels['digraphs-sh']).toBe('practicing')
 
     // History has all 4 entries. The first 3 are short-e (sessions
-    // 1-3 ran short-e per pickFocusNode); session 4 ran digraphs
+    // 1-3 ran short-e per pickFocusNode); session 4 ran digraphs-sh
     // because short-e mastered at end-of-session-3 advanced the
     // picker.
     expect(afterSession4.history.length).toBe(4)
@@ -667,7 +687,7 @@ test.describe('Progression loop — cvc-words-short-e (intro → practicing → 
     expect(lastFour[0]!.skillFocus).toEqual(['cvc-words-short-e'])
     expect(lastFour[1]!.skillFocus).toEqual(['cvc-words-short-e'])
     expect(lastFour[2]!.skillFocus).toEqual(['cvc-words-short-e'])
-    expect(lastFour[3]!.skillFocus).toEqual(['digraphs'])
+    expect(lastFour[3]!.skillFocus).toEqual(['digraphs-sh'])
   })
 })
 
@@ -677,15 +697,20 @@ test.describe('Progression loop — sight-words (intro → mastered)', () => {
   test.beforeEach(async ({ page }) => {
     await installClaudeMock(page, { failNetwork: true })
 
-    // Seed: all word-song prerequisites mastered (including digraphs, the
-    // node directly before sight-words in WORD_SONG_NODES_IN_ORDER).
+    // Seed: all word-song prerequisites mastered (including the three
+    // digraph siblings, the nodes directly before sight-words in
+    // WORD_SONG_NODES_IN_ORDER post-PR-#211 split).
     //
-    // `cvc-words-short-e` mastered too (ticket 86c9teua2) — without this
-    // entry the picker would land on cvc-words-short-e (default 'locked')
-    // before reaching sight-words, and the simulated "perfect sight-words
-    // session" would run a short-e session instead, leaving sight-words
-    // at 'intro' forever. Mirrors the same Place-8 widening applied to
-    // `cvc-cross-vowel-mix-regression.spec.ts` in PR #208.
+    // `cvc-words-short-e` mastered too (ticket 86c9teua2) — without
+    // this entry the picker would land on cvc-words-short-e (default
+    // 'locked') before reaching sight-words, and the simulated "perfect
+    // sight-words session" would run a short-e session instead, leaving
+    // sight-words at 'intro' forever. Mirrors the same Place-8 widening
+    // applied to `cvc-cross-vowel-mix-regression.spec.ts` in PR #208.
+    //
+    // PR #211 split the dead `digraphs` literal into 3 sequential
+    // sibling nodes; all three must be at 'mastered' here for the
+    // picker to reach `sight-words`. Same Place-8 pattern.
     const progress = buildSeedProgress({
       skillLevelOverrides: {
         'letter-names': 'mastered',
@@ -696,7 +721,9 @@ test.describe('Progression loop — sight-words (intro → mastered)', () => {
         'cvc-words-short-u': 'mastered',
         'cvc-words-short-i': 'mastered',
         'cvc-words-short-e': 'mastered',
-        digraphs: 'mastered',
+        'digraphs-sh': 'mastered',
+        'digraphs-ch': 'mastered',
+        'digraphs-th-voiceless': 'mastered',
         'sight-words': 'intro',
         'simple-sentences': 'locked',
       },
