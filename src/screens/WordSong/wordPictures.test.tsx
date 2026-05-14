@@ -43,9 +43,20 @@ describe('WordPicture', () => {
   // the wordPack-side ticket (this one) ships the WordEntry rows so the
   // planner + distractor matrix can resolve them; the chips fall back to
   // the silhouette until `digraphs-sh-picture-pack-prompts.md` ships.
+  //
+  // The digraphs-ch tier adds the same posture: 7 ch-target pictures
+  // (`chin/chip/chop/chat/chest/chug/chick`) + 2 s-contrast distractor
+  // pictures (`sat`, `sick`) ship from `digraphs-ch-picture-pack-prompts.md`
+  // in a SEPARATE picture-pack ticket per `design/word-song/
+  // digraphs-ch-word-list.md` §3 + AC7. The wordPack-side ticket (this
+  // one) ships the WordEntry rows; chips fall back to the silhouette
+  // until the picture bodies land. `sip` is NOT here — its short-i
+  // picture body already shipped.
+  //
   // Same posture as the short-o-extension / short-i pre-embed windows.
   // REMOVE entries from this set as each picture body lands.
   const PENDING_PICTURE_PACK = new Set<string>([
+    // digraphs-sh tier
     'ship',
     'shell',
     'shoe',
@@ -55,6 +66,16 @@ describe('WordPicture', () => {
     'shop',
     'sell',
     'sop',
+    // digraphs-ch tier
+    'chin',
+    'chip',
+    'chop',
+    'chat',
+    'chest',
+    'chug',
+    'chick',
+    'sat',
+    'sick',
   ])
 
   it('renders a non-empty body for every picture in the curated pack', () => {
@@ -80,12 +101,13 @@ describe('WordPicture', () => {
     }
   })
 
-  it('digraphs-sh tier keys render the silhouette fallback until the picture-pack ticket lands', () => {
+  it('digraph-tier keys render the silhouette fallback until the picture-pack ticket lands', () => {
     // Positive assertion of the PENDING_PICTURE_PACK posture: each
-    // not-yet-pictured digraphs-sh key renders the graceful silhouette
-    // fallback (a <text> child with the key) — NOT a crash, NOT a blank
-    // SVG. When the picture-pack ticket adds a renderPictureBody case for
-    // a key, remove it from PENDING_PICTURE_PACK and this loop shrinks.
+    // not-yet-pictured digraph-tier key (sh + ch) renders the graceful
+    // silhouette fallback (a <text> child with the key) — NOT a crash,
+    // NOT a blank SVG. When the picture-pack ticket adds a
+    // renderPictureBody case for a key, remove it from
+    // PENDING_PICTURE_PACK and this loop shrinks.
     let fallbackCount = 0
     for (const key of PENDING_PICTURE_PACK) {
       const { container, unmount } = render(<WordPicture pictureKey={key} />)
@@ -96,7 +118,8 @@ describe('WordPicture', () => {
       fallbackCount += 1
       unmount()
     }
-    expect(fallbackCount).toBe(9)
+    // 9 digraphs-sh keys + 9 digraphs-ch keys.
+    expect(fallbackCount).toBe(18)
   })
 
   it('falls back to the unknown-picture text shape for an unknown key', () => {
