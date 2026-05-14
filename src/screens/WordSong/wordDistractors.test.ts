@@ -169,12 +169,44 @@ describe('pickDistractors', () => {
     }
   })
 
-  it('every distractor referenced in the matrix is a known word entry', () => {
+  it('every distractor referenced in the matrix resolves to a known word entry (cross-vowel-tier load-bearing regression guard)', () => {
+    // Cross-vowel-tier load-bearing: words like `pen` (own vowel 'e', post-#208
+    // target) appear as string distractors in short-a TARGET_PAIRINGS rows
+    // (`mat`, `bag`, `pan`, `tag`, `van`). Same shape applies to `dog`, `log`
+    // (short-o targets in short-a rows), `bus`, `cup`, `sun` (short-u targets
+    // in short-a rows). If a future PR removes any of these from TARGET_WORDS
+    // without retiring the string references that point at it,
+    // `getWordEntry(distractor)` throws at runtime — short-a session trios at
+    // problems 1-3 (gentle tier) brick. This iteration is the regression
+    // guard.
+    //
+    // Count-based per feedback_count_assertions_on_regression_tests: we
+    // accumulate the count of distractor lookups attempted AND the count of
+    // failed lookups, then assert both numbers explicitly. A `.not.toThrow()`
+    // per-iteration assertion is implicitly count-based on throws, but the
+    // explicit counters make the intent legible at the assertion site and
+    // guard against an iteration body silently short-circuiting (e.g. via a
+    // future early-return refactor) without the test noticing.
+    let lookupCount = 0
+    const failedLookups: string[] = []
     for (const [, pairings] of Object.entries(TARGET_PAIRINGS)) {
       for (const word of [...pairings.gentle, ...pairings.trap]) {
-        expect(() => getWordEntry(word)).not.toThrow()
+        lookupCount += 1
+        try {
+          getWordEntry(word)
+        } catch {
+          failedLookups.push(word)
+        }
       }
     }
+    // Every TARGET_PAIRINGS row has exactly 2 gentle + 2 trap = 4 distractor
+    // references. With 26 target rows shipped (14 short-a + 4 short-a probes
+    // + 8 short-o), lookupCount = 26 × 4 = 104 at the time of authoring. Pin
+    // the lower bound rather than the exact number so future tier additions
+    // don't break this assertion — the load-bearing claim is "every
+    // distractor resolves," not "exactly N distractors."
+    expect(lookupCount).toBeGreaterThanOrEqual(26 * 4)
+    expect(failedLookups).toEqual([])
   })
 })
 
