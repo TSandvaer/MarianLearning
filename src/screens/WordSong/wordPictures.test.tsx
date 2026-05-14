@@ -53,6 +53,16 @@ describe('WordPicture', () => {
   // until the picture bodies land. `sip` is NOT here — its short-i
   // picture body already shipped.
   //
+  // The digraphs-th tier adds the same posture again: 7 th-target pictures
+  // (`thin/bath/math/path/moth/thick/cloth`) + 3 t-contrast distractor
+  // pictures (`tin`, `tick`, `pat`) ship from
+  // `digraphs-th-picture-pack-prompts.md` in a SEPARATE picture-pack
+  // ticket per `design/word-song/digraphs-th-word-list.md` §3 + AC7. The
+  // wordPack-side ticket (this one) ships the WordEntry rows; chips fall
+  // back to the silhouette until the picture bodies land. `bat`/`mat` are
+  // NOT here — their short-a CVC picture bodies already shipped (they are
+  // `bath`'s / `math`'s dual-role t-contrast traps).
+  //
   // Same posture as the short-o-extension / short-i pre-embed windows.
   // REMOVE entries from this set as each picture body lands.
   const PENDING_PICTURE_PACK = new Set<string>([
@@ -76,6 +86,17 @@ describe('WordPicture', () => {
     'chick',
     'sat',
     'sick',
+    // digraphs-th tier
+    'thin',
+    'bath',
+    'math',
+    'path',
+    'moth',
+    'thick',
+    'cloth',
+    'tin',
+    'tick',
+    'pat',
   ])
 
   it('renders a non-empty body for every picture in the curated pack', () => {
@@ -103,9 +124,9 @@ describe('WordPicture', () => {
 
   it('digraph-tier keys render the silhouette fallback until the picture-pack ticket lands', () => {
     // Positive assertion of the PENDING_PICTURE_PACK posture: each
-    // not-yet-pictured digraph-tier key (sh + ch) renders the graceful
-    // silhouette fallback (a <text> child with the key) — NOT a crash,
-    // NOT a blank SVG. When the picture-pack ticket adds a
+    // not-yet-pictured digraph-tier key (sh + ch + th) renders the
+    // graceful silhouette fallback (a <text> child with the key) — NOT a
+    // crash, NOT a blank SVG. When the picture-pack ticket adds a
     // renderPictureBody case for a key, remove it from
     // PENDING_PICTURE_PACK and this loop shrinks.
     let fallbackCount = 0
@@ -118,8 +139,9 @@ describe('WordPicture', () => {
       fallbackCount += 1
       unmount()
     }
-    // 9 digraphs-sh keys + 9 digraphs-ch keys.
-    expect(fallbackCount).toBe(18)
+    // 9 digraphs-sh keys + 9 digraphs-ch keys + 10 digraphs-th keys
+    // (7 th targets + 3 t-contrast distractor-only entries).
+    expect(fallbackCount).toBe(28)
   })
 
   it('falls back to the unknown-picture text shape for an unknown key', () => {
