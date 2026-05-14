@@ -3,7 +3,7 @@
 **Audience:** Thomas (Midjourney Web operator, Phase 2 — uses MJ Web workflow per `user_midjourney_web` memory, step-by-step with 4-grid feedback per word per `feedback_mj_walkthrough_step_by_step` memory). Devon (PNG-embed integration, Phase 3 via `yarn embed-pictures`).
 **Author:** Marian Tutor design persona.
 **Status:** Phase 1 prompt sheet — paste-ready, one prompt per word.
-**Predecessor specs:** `design/word-song/digraphs-sh-word-list.md` (sibling — defines the 8-word pool and the picture-pack scope), `design/word-song/picture-pack-style-anchor.md` (style frame — inherited verbatim), `design/word-song/short-e-picture-pack-prompts.md` (most recent CVC prompt sheet — structural template, with MJ-parameter updates below).
+**Predecessor specs:** `design/word-song/digraphs-sh-word-list.md` (sibling — defines the 7-word pool and the picture-pack scope, post-Dave-addendum Option C-minus drop of `shore`), `design/word-song/picture-pack-style-anchor.md` (style frame — inherited verbatim), `design/word-song/short-e-picture-pack-prompts.md` (most recent CVC prompt sheet — structural template, with MJ-parameter updates below).
 **Predecessor research:** `design/research/digraph-acquisition-marian.md` (Dave, 2026-05-14).
 
 ---
@@ -49,7 +49,7 @@ Per `feedback_mj_moderator_negatives_per_word` memory: "drop `--v 6 --style raw 
 
 Per `feedback_mj_pack_cohesion_lever_unused` memory: "strip `--cref/--sref/--cw 80` from paste-ready prompts; Thomas never captured pose-zero, style preamble alone has carried 38 assets; opt-in only".
 
-**This sheet has NO `--cref / --sref / --cw 80` flags.** The §1.4 style preamble (re-used byte-for-byte) is the cohesion mechanism. If Thomas finds drift across the 8 generations, the opt-in fallback is to capture a `shell` pose-zero from the first successful generation and apply `--cref/--sref/--cw 80` to the remaining 7 — but that is a Phase-2 escalation, not the default.
+**This sheet has NO `--cref / --sref / --cw 80` flags.** The §1.4 style preamble (re-used byte-for-byte) is the cohesion mechanism. If Thomas finds drift across the 7 generations, the opt-in fallback is to capture a `shell` pose-zero from the first successful generation and apply `--cref/--sref/--cw 80` to the remaining 6 — but that is a Phase-2 escalation, not the default.
 
 ### 1.3 Per-word `--no` only — NEVER paste pack-wide negatives in one prompt
 
@@ -73,13 +73,13 @@ Per `feedback_mj_moderator_negatives_per_word` memory: "≤40-word ceiling, IP-n
 
 | Slot                             | Target                                                  | Why                                                                         |
 | -------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Style preamble (§1.4 below)      | ≤14 words, byte-for-byte identical across all 8 prompts | Pack cohesion lever (per §1.2 — no `--cref/--sref` fallback used)           |
+| Style preamble (§1.4 below)      | ≤14 words, byte-for-byte identical across all 7 prompts | Pack cohesion lever (per §1.2 — no `--cref/--sref` fallback used)           |
 | Subject phrase + subject details | ≤22 words per prompt                                    | Subject identity load-bearing for the chip read; the preamble handles style |
 | `--no` list                      | ≤12 logical-concept entries per prompt                  | Empirically the moderator-safe ceiling per memory rule                      |
 
 Total body: ≤14 + ≤22 = ≤36 words — leaves 4 words headroom under the 40-word ceiling for word-specific safety phrases (e.g., "(closed mouth)" on `shark`).
 
-**Cohesion-vs-moderation tension flagged by Devon's PR #212 review.** Shortening the preamble weakens cohesion (no pose-zero, no `--cref/--sref`, no `--sref` style anchor — the byte-for-byte preamble IS the only cohesion lever). The ≤14-word preamble below preserves: (a) the style descriptor cluster (children's-book illustration, soft pastel, clean line art) — the load-bearing visual-style cohesion seed; (b) the cream-background rule — the only colour anchor; (c) the single-subject rule — the only compositional anchor; (d) the no-text rule — moderation safety. Anything shorter loses one of those four. If pack-wide drift emerges in 4-grid review across the 8 generations, the documented opt-in fallback (capture a `shell` pose-zero from the first successful generation and apply `--cref/--sref/--cw 80` to the remaining 7 — see §1.2) remains available.
+**Cohesion-vs-moderation tension flagged by Devon's PR #212 review.** Shortening the preamble weakens cohesion (no pose-zero, no `--cref/--sref`, no `--sref` style anchor — the byte-for-byte preamble IS the only cohesion lever). The ≤14-word preamble below preserves: (a) the style descriptor cluster (children's-book illustration, soft pastel, clean line art) — the load-bearing visual-style cohesion seed; (b) the cream-background rule — the only colour anchor; (c) the single-subject rule — the only compositional anchor; (d) the no-text rule — moderation safety. Anything shorter loses one of those four. If pack-wide drift emerges in 4-grid review across the 7 generations, the documented opt-in fallback (capture a `shell` pose-zero from the first successful generation and apply `--cref/--sref/--cw 80` to the remaining 6 — see §1.2) remains available.
 
 ### 1.5 IP-name strip
 
@@ -97,13 +97,13 @@ Per `feedback_mj_workflow_explicit_removebg` memory: "never imply MJ outputs are
 
 Per `feedback_mj_walkthrough_step_by_step` memory: "for MJ generation work, hand Thomas ONE prompt at a time in a copy-able fenced block, wait for his 4-grid feedback, fully sequence prompt→pick→upscale→remove.bg→save before moving to next word".
 
-**Each prompt below is in its own fenced code block, paste-ready, independently.** When walkthrough time arrives (separate session), hand Thomas one at a time, wait for the 4-grid screenshot, iterate if needed, then move on. Do NOT hand him all 8 in one batch.
+**Each prompt below is in its own fenced code block, paste-ready, independently.** When walkthrough time arrives (separate session), hand Thomas one at a time, wait for the 4-grid screenshot, iterate if needed, then move on. Do NOT hand him all 7 in one batch.
 
 ---
 
 ## 1.4 Style preamble — short form (14 words; canonical full preamble in style-anchor §2)
 
-Re-use this short-form preamble byte-for-byte across all 8 prompts in this pack:
+Re-use this short-form preamble byte-for-byte across all 7 prompts in this pack:
 
 > **Children's-book illustration, soft pastel, clean line art, cream background, single subject, no text.**
 

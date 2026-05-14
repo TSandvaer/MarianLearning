@@ -1,4 +1,4 @@
-# Word Song — digraphs `sh` word list (8 words, sh-initial only)
+# Word Song — digraphs `sh` word list (7 words, sh-initial only; Option C-minus)
 
 **Ticket:** TBD — Matt to file. This spec lands the design-side word selection. Implementation downstream (Kevin's planner-widen + `SkillNode` decision + canon-bake; Devon's `wordPack.ts` + picture-pack embed wiring; sequencing of `digraphs-ch` and `digraphs-th` are separate specs).
 **Status:** Draft for Thomas review.
@@ -20,11 +20,11 @@ Per Dave's research (`digraph-acquisition-marian.md` §Q1, §Q6):
 - **Vocabulary-familiarity is the binding constraint** — stricter than CVC tiers (Dave finding #4). Marian must recognize the picture without verbal scaffolding, because each digraph word now carries TWO new things (new orthographic pattern AND, for many words, new vocabulary). The CVC tiers got vocabulary mostly for free (cat, dog, sun); digraphs do not.
 - L2 risk: `/ʃ/` → `/s/` substitution (Tagalog lacks `/ʃ/`). Picture-grounding the chip is the design response — the audio `/ʃ/` needs a referent Marian can hold.
 
-**Scope of this spec:** word selection (audit + final pool of 8), focus-node naming guidance (not architecture — Kevin is auditing the `SkillNode` shape in parallel per Dave finding #1+#2), picture-pack requirements summary, and the open questions Thomas needs to lock. The companion MJ prompt sheet [`digraphs-sh-picture-pack-prompts.md`](./digraphs-sh-picture-pack-prompts.md) carries the per-word generation prompts (Phase 1 deliverable for Thomas).
+**Scope of this spec:** word selection (audit + final pool of 7 post-Dave-addendum Option C-minus; original draft was 8 including `shore`), focus-node naming guidance (not architecture — Kevin's PR #211 owns the `SkillNode` shape decision: 3 sibling nodes locked), picture-pack requirements summary, the `hybridMode: true` annotation requirement for the 3 long-vowel hybrids (§6.1), and the open questions Thomas has now resolved (§7). The companion MJ prompt sheet [`digraphs-sh-picture-pack-prompts.md`](./digraphs-sh-picture-pack-prompts.md) carries the per-word generation prompts (Phase 1 deliverable for Thomas).
 
 **Out-of-scope (deferred):**
 
-- `SkillNode` shape decision (one `digraphs` node vs. three sibling nodes vs. one node with internal sub-tier progression) — Kevin's audit owns this.
+- `SkillNode` shape decision (one `digraphs` node vs. three sibling nodes vs. one node with internal sub-tier progression) — Kevin's audit owns this. **Resolved in PR #211: 3 sibling nodes (`digraphs-sh`, `digraphs-ch`, `digraphs-th-voiceless`).**
 - `digraphs-ch` and `digraphs-th` word lists — separate specs, downstream after sh ships.
 - Sh-final words (fish, dish, rush, wish, crash) — separate follow-up arc.
 - Voiced `/ð/` content — deferred indefinitely from chip-tap; treated as sight-word domain per Dave §Q2.
@@ -33,7 +33,7 @@ Per Dave's research (`digraph-acquisition-marian.md` §Q1, §Q6):
 
 ---
 
-## 1. Word selection — the 8 sh-initial words
+## 1. Word selection — the 7 sh-initial words (Option C-minus)
 
 ### Brief / source pool
 
@@ -228,68 +228,72 @@ Looking at sh-final words just for completeness (we are NOT using them in v1 per
 - `shop` — picturable (storefront awning + signage placeholder), vocab register-mismatched, but high-frequency English word she'll encounter. **Stronger than `shore`.**
 - `shore` — composition-complex (beach + water + sand), vocab marginal, multi-element. **Weakest of the borderlines.**
 
-**Final 8 = `ship, shell, shoe, sheep, shark, shed, shop, shore`?** The `shore` inclusion is the weakest link.
+**Initial draft landing (superseded):** First draft of this spec recommended pool of 8 with `shore` flagged for Phase-2 contingency drop.
 
-**Alternative:** drop `shore` to 7 and accept Option A's risk of slightly thin pool. Or include `shore` as the 8th and document its weakness so Thomas can lock it.
+**Final landing (Dave addendum 2026-05-14, Option C-minus — LOCKED):** Pool of 7. `shore` dropped pre-Phase-2 per `design/research/digraph-sh-long-vowel-addendum.md` §Q7c. Two independent compounding concerns identified by Dave's research:
 
-**The audit-honest landing: 8 with `shore` as a known-weak entry, OR 7 strong without `shore`.** Recommend 8 with `shore` flagged for Phase-2 review — if MJ can't deliver a single-subject picturable `shore` chip in 4 grids, drop to 7 in Phase 2.
+1. **Phonemic novelty.** `/ɔːr/` r-controlled vowel is more marked than `/ɑːr/` (shark). Tagalog has no clean equivalent of English `/ɔː/`; the r-controlled `/ɔːr/` combination is perceptually unfamiliar to Tagalog-L1 speakers. For a chip-tap recognition task, Marian may not confidently map Emma's `/ʃɔːr/` audio to the "shore" chip when the vowel itself is unfamiliar.
+2. **Picture composition.** Multi-subject scene (sand + water + boundary) — violates single-subject style anchor + reads ambiguously as "beach"/"ocean" rather than "shore" at 96pt.
 
-### Pool-size recommendation — 8 words (Option C, long-vowel allowance)
+**No compensating vocabulary strength.** Filipino-English 8yo register reaches for "beach", not "shore". Dave's recommendation: defer `shore` to a future r-controlled-vowel tier where the phoneme has been formally introduced and the picture can be cleaner.
 
-The recommended final pool:
+### Pool-size recommendation — 7 words (Option C-minus: long-vowel allowance minus `shore`)
 
-> **`ship, shell, shoe, sheep, shark, shed, shop, shore`** — 8 words.
+The locked final pool:
 
-This hits Dave's lower bound (8–10) and respects the audit's honest yield. Phase 2 fallback to 7 (drop `shore`) is documented as the contingency.
+> **`ship, shell, shoe, sheep, shark, shed, shop`** — 7 words.
 
-**Open question for Thomas (Q1 in §7):** confirm Option C (long-vowel allowance, pool size 8 including `shore`). Or Option A-extended (4-6 short-vowel-only with planner accommodating thin pool). Or escalate via Dave for a clarification on whether long-vowel sh-onsets are pedagogically acceptable in the first sh-introduction tier.
+At the lower edge of Dave's 8–10 range. Pool of 7 lets the planner construct 3–5 introduction sessions with controlled repetition (~4–5 sh-target words per session, rotating through the 7) — adequate for digraph introduction, slightly thinner than CVC tiers by design (digraph words carry higher vocabulary risk per word, so a tighter pool with stronger entries is preferable to a padded pool with weaker ones, per Dave §Q7d).
 
-### Final v1 sh-initial pool (8 words, recommendation pending Thomas Q1 lock)
+### Final v1 sh-initial pool (7 words, Option C-minus locked)
 
-| #   | Word  | Vowel inside                        | Picture status | Sh-position | Category  | Notes                                                                                                                                                        |
-| --- | ----- | ----------------------------------- | -------------- | ----------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | ship  | short-i (`/ɪ/`)                     | NEW            | initial     | vehicle   | Vessel — hull + mast/smokestack + portholes. **The cleanest sh-CVC anchor**: 3-letter pattern (sh+i+p), short-vowel inside, universal picturable. Lead word. |
-| 2   | shell | short-e (`/ɛ/`)                     | NEW            | initial     | object    | Spiral or scallop seashell. **3-phoneme geminate-CVC** under the `egg`/`box` precedent. Strong picturable.                                                   |
-| 3   | shoe  | long-oo (`/uː/`)                    | NEW            | initial     | object    | Footwear — universal silhouette. **Long-vowel sh-onset** per Option C allowance; picture+audio scaffold carries the long-vowel decoding.                     |
-| 4   | sheep | long-e (`/iː/`, vowel digraph `ee`) | NEW            | initial     | animal    | Woolly farm animal — distinct silhouette. **Long-vowel sh-onset** per Option C.                                                                              |
-| 5   | shark | r-controlled `a` (`/ɑːr/`)          | NEW            | initial     | animal    | Sea creature — triangular fin + sleek body. **Long-vowel + r-controlled** per Option C. Universally vocabulary-familiar (PH archipelago context).            |
-| 6   | shed  | short-e (`/ɛ/`)                     | NEW            | initial     | structure | Small wooden outbuilding — sloped roof + door + window. **Short-vowel sh-CVC.** Vocab register marginally Filipino-English but learnable via scaffold.       |
-| 7   | shop  | short-o (`/ɒ/`)                     | NEW            | initial     | structure | Small storefront — awning + signboard + window. **Short-vowel sh-CVC.** Vocab register marginally Filipino-English but learnable via scaffold.               |
-| 8   | shore | long-o + r-controlled (`/ɔːr/`)     | NEW            | initial     | place     | Sandy beach with simple soft wave at bottom. **Long-vowel + r-controlled** per Option C. **Weakest of the 8** — Phase-2 contingency to drop.                 |
+| #   | Word  | Vowel inside                        | Picture status | Sh-position | Category  | hybridMode | Notes                                                                                                                                                                                                 |
+| --- | ----- | ----------------------------------- | -------------- | ----------- | --------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | ship  | short-i (`/ɪ/`)                     | NEW            | initial     | vehicle   | false      | Vessel — hull + mast/smokestack + portholes. The cleanest sh-CVC anchor: 3-letter pattern (sh+i+p), short-vowel inside, universal picturable. Lead word.                                              |
+| 2   | shell | short-e (`/ɛ/`)                     | NEW            | initial     | object    | false      | Spiral or scallop seashell. 3-phoneme geminate-CVC under the `egg`/`box` precedent. Strong picturable.                                                                                                |
+| 3   | shoe  | long-oo (`/uː/`)                    | NEW            | initial     | object    | **true**   | Footwear — universal silhouette. Long-vowel sh-onset per Option C-minus allowance; picture+audio scaffold carries the long-vowel decoding. **Sight-word-hybrid** — see §6.1 `hybridMode` requirement. |
+| 4   | sheep | long-e (`/iː/`, vowel digraph `ee`) | NEW            | initial     | animal    | **true**   | Woolly farm animal — distinct silhouette. Long-vowel sh-onset per Option C-minus. **Sight-word-hybrid.**                                                                                              |
+| 5   | shark | r-controlled `a` (`/ɑːr/`)          | NEW            | initial     | animal    | **true**   | Sea creature — triangular fin + sleek body. Long-vowel + r-controlled per Option C-minus. Universally vocabulary-familiar (PH archipelago context). **Sight-word-hybrid.**                            |
+| 6   | shed  | short-e (`/ɛ/`)                     | NEW            | initial     | structure | false      | Small wooden outbuilding — sloped roof + door + window. Short-vowel sh-CVC. Vocab register marginally Filipino-English but learnable via scaffold.                                                    |
+| 7   | shop  | short-o (`/ɒ/`)                     | NEW            | initial     | structure | false      | Small storefront — awning + signboard + window. Short-vowel sh-CVC. Vocab register marginally Filipino-English but learnable via scaffold.                                                            |
 
-### Pool composition cross-check
+**`shore` row removed** per Dave addendum 2026-05-14, Option C-minus. Deferred to future r-controlled-vowel tier.
 
-- **All 8 are concrete nouns** (objects, animals, structures, places). Each has a stable chip read.
-- **5 of 8 are picture-distinct from existing CVC pack pictures** (`ship` vs `tub`/`box`; `shell` vs everything; `shoe` is unique; `sheep` is unique; `shark` is unique).
-- **3 of 8 have known picture-instability or composition risk** (`shed` — could read as "small house"; `shop` — could read as "store"; `shore` — composition-complex). Mitigation in the prompt sheet (`digraphs-sh-picture-pack-prompts.md`) covers these.
-- **Vowel spread:** short-i (1), short-e (1), short-o (1), long-oo (1), long-e (1), r-controlled-a (1), long-o+r (1) — 7 vowel positions. Phonetic variety is high.
-- **Category spread:** vehicle (1), object (2 — shell, shoe), animal (2 — sheep, shark), structure (2 — shed, shop), place (1 — shore). 5 categories across 8 words. Good diversity.
+### Pool composition cross-check (post-`shore` drop)
+
+- **All 7 are concrete nouns** (objects, animals, structures). Each has a stable chip read.
+- **All 7 are picture-distinct from existing CVC pack pictures** (`ship` vs `tub`/`box`; `shell` vs everything; `shoe` is unique; `sheep` is unique; `shark` is unique; `shed`/`shop` are structures absent elsewhere in the pack).
+- **2 of 7 have known picture-instability or composition risk** (`shed` — could read as "small house"; `shop` — could read as "store"). Mitigation in the prompt sheet (`digraphs-sh-picture-pack-prompts.md`) covers these.
+- **Vowel spread:** short-i (1: ship), short-e (2: shell, shed), short-o (1: shop), long-oo (1: shoe), long-e (1: sheep), r-controlled-a (1: shark) — 6 vowel positions. Phonetic variety adequate.
+- **Category spread:** vehicle (1), object (2 — shell, shoe), animal (2 — sheep, shark), structure (2 — shed, shop). 4 categories across 7 words. The "place" category lost with `shore`'s drop is the only category-spread loss.
+- **`hybridMode: true` split:** 3 of 7 (`shoe, sheep, shark`); 4 of 7 fully decodable (`ship, shell, shed, shop`). Per Dave §Q7d this is the right split for a digraph tier introducing one new phonics concept.
 
 ### Phonetic spread within the pool (digraph isolation check)
 
-The whole point of this tier is for Marian to internalize **`sh = /ʃ/`** as a single decoded unit. Every word in the pool starts with `sh` followed by a vowel — the sh-decoding lesson is identical across all 8. The vowel-following diversity is incidental.
+The whole point of this tier is for Marian to internalize **`sh = /ʃ/`** as a single decoded unit. Every word in the pool starts with `sh` followed by a vowel — the sh-decoding lesson is identical across all 7. The vowel-following diversity is incidental.
 
-- **sh-initial position:** ✓ ALL 8.
+- **sh-initial position:** ✓ ALL 7.
 - **sh-final position:** ✗ NONE (deferred per Dave finding #3).
 - **sh + consonant blend at onset (e.g., `shr-`):** ✗ NONE (`shrub`, `shrimp` deferred).
-- **Single-syllable:** ✓ ALL 8.
+- **Single-syllable:** ✓ ALL 7.
 
 ### Vocabulary-familiarity audit (the binding constraint per Dave §Q4)
 
 For each of the 8, the picture-grounding-without-explanation check:
 
-| Word  | Marian's L1 (Tagalog) referent                                                 | Picture-grounds-without-explanation?                                              | Audio-anchor risk                                                    |
-| ----- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| ship  | barko (high-frequency word in PH)                                              | ✓ — ship/barko are universal                                                      | Low — clear picture                                                  |
-| shell | kabibi / shell (English loanword common in PH beach context)                   | ✓ — beach shells universal                                                        | Low                                                                  |
-| shoe  | sapatos / shoe (loanword)                                                      | ✓ — universal                                                                     | Low                                                                  |
-| sheep | tupa (less common in PH but storybook-familiar)                                | ✓ — picture-grounded                                                              | Low — storybook recognition is solid                                 |
-| shark | pating / shark (loanword in marine vocab)                                      | ✓ — universal in PH                                                               | Low — shark and pating are interchangeable in Filipino-English       |
-| shed  | kuwadra / kubo (loose mapping)                                                 | Marginal — depends on chip's roofline + door + window discriminating from "house" | Moderate — picture must read as "small building, not a house"        |
-| shop  | tindahan / tindera (loose mapping)                                             | Marginal — depends on chip's awning + signboard discriminating from "house"       | Moderate — picture must read as "small store with sign, not a house" |
-| shore | dalampasigan / aplaya (beach is universal but "shore" specifically is English) | Marginal — depends on chip's sand+wave composition reading as "beach"             | Moderate — picture must avoid "ocean view" reading                   |
+| Word  | Marian's L1 (Tagalog) referent                               | Picture-grounds-without-explanation?                                              | Audio-anchor risk                                                    |
+| ----- | ------------------------------------------------------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| ship  | barko (high-frequency word in PH)                            | ✓ — ship/barko are universal                                                      | Low — clear picture                                                  |
+| shell | kabibi / shell (English loanword common in PH beach context) | ✓ — beach shells universal                                                        | Low                                                                  |
+| shoe  | sapatos / shoe (loanword)                                    | ✓ — universal                                                                     | Low                                                                  |
+| sheep | tupa (less common in PH but storybook-familiar)              | ✓ — picture-grounded                                                              | Low — storybook recognition is solid                                 |
+| shark | pating / shark (loanword in marine vocab)                    | ✓ — universal in PH                                                               | Low — shark and pating are interchangeable in Filipino-English       |
+| shed  | kuwadra / kubo (loose mapping)                               | Marginal — depends on chip's roofline + door + window discriminating from "house" | Moderate — picture must read as "small building, not a house"        |
+| shop  | tindahan / tindera (loose mapping)                           | Marginal — depends on chip's awning + signboard discriminating from "house"       | Moderate — picture must read as "small store with sign, not a house" |
 
-**6 of 8 are vocabulary-familiar without scaffolding** (ship, shell, shoe, sheep, shark; plus arguably shop via the universal "store" concept once the picture is grounded). 3 of 8 have moderate picture-grounding risk that the prompt sheet must address (shed, shop, shore).
+**`shore` row removed** post-Dave-addendum Option C-minus.
+
+**5 of 7 are vocabulary-familiar without scaffolding** (ship, shell, shoe, sheep, shark; plus arguably shop via the universal "store" concept once the picture is grounded). 2 of 7 have moderate picture-grounding risk that the prompt sheet must address (shed, shop).
 
 ### Tagalog phonology check per word — `/ʃ/` → `/s/` risk per Dave §Q3
 
@@ -308,20 +312,21 @@ Per-word substitution prediction:
 | shark | "sark" (non-word; minimal substitution risk in production)       | sh- vs. s-                             |
 | shed  | "sed" (non-word)                                                 | sh- vs. s-                             |
 | shop  | "sop" (mostly non-word, though "sop" is a real but obscure word) | sh- vs. s-                             |
-| shore | "sore"                                                           | sh- vs. s-                             |
 
-Two of these substitutions produce real English words: `shell → sell` and `shore → sore`. The distractor architecture (§5) must include the `sh`-vs-`s` contrast pair as a trap distractor for these two. Emma's audio (Azure neural voice) produces `/ʃ/` correctly; the chip-tap recognition test is whether Marian matches the heard `/ʃ/` audio to the chip starting with `sh`, NOT to the chip starting with `s`. This is a meaningful learning target per Dave's recommendations to Kyle #4 (distractor design for digraphs differs from CVC).
+One of these substitutions produces a real English word: `shell → sell`. (Pre-`shore`-drop the list also included `shore → sore`; with `shore` deferred per Dave addendum Option C-minus, only `shell/sell` remains as a real-English-word minimal-pair substitution risk in the v1 pool.) The distractor architecture (§5) must include the `sh`-vs-`s` contrast pair as a trap distractor. Emma's audio (Azure neural voice) produces `/ʃ/` correctly; the chip-tap recognition test is whether Marian matches the heard `/ʃ/` audio to the chip starting with `sh`, NOT to the chip starting with `s`. This is a meaningful learning target per Dave's recommendations to Kyle #4 (distractor design for digraphs differs from CVC).
 
 ---
 
 ## 1.3 The long-vowel allowance — design call and justification
 
-This is the load-bearing design call in this spec. Dave's research is **silent** on whether long-vowel sh-onsets (`shoe`, `sheep`, `shark`, `shore`) belong in the first sh-introduction pool. The audit forced this question because short-vowel-only sh-CVC nouns are scarce in English.
+This is the load-bearing design call in this spec. The audit forced this question because short-vowel-only sh-CVC nouns are scarce in English.
+
+**Dave's addendum (2026-05-14) LOCKED Option C-minus:** long-vowel allowance for `shoe`, `sheep`, `shark` (with `hybridMode: true` annotation — see §6.1); `shore` dropped due to compounding phonemic novelty + composition complexity. The rest of this section preserves the original justification reasoning, with `shore` references stripped to the locked v1 pool of 3 long-vowel hybrids (down from the original 4 candidates).
 
 ### The case for short-vowel-only (Option A — what structured-literacy purists would say)
 
 - Marian has just shipped short-e (the final single-vowel tier). She has NOT been taught long vowels, vowel digraphs (`ee`, `oe`), magic-e (`ape`, `ide`), or r-controlled vowels (`ar`, `or`).
-- Introducing `shoe`, `sheep`, `shark`, `shore` in the sh-tier means the chip presents TWO phonics challenges simultaneously: the sh-digraph AND a vowel pattern she hasn't formally learned.
+- Introducing `shoe`, `sheep`, `shark` (originally also `shore`, now dropped) in the sh-tier means the chip presents TWO phonics challenges simultaneously: the sh-digraph AND a vowel pattern she hasn't formally learned.
 - This violates the one-new-concept-per-session principle (`phonics-sequence-marian.md` §Q5, Dave §Q4).
 - The structured-literacy correct path: ship sh-tier with short-vowel-only words even if the pool is small (4 strong picks).
 
@@ -336,11 +341,13 @@ This is the load-bearing design call in this spec. Dave's research is **silent**
 
 ### The hybrid resolution
 
-Mark `shoe`, `sheep`, `shark`, `shore` in the pool as **"sight-word-hybrid"** — Marian is expected to pattern-match against Emma's audio rather than fully decode the long-vowel rest-of-word. The planner / canon-bake should produce session content that pairs these chips with Emma's audio + the picture, never with a "decode this aloud" prompt.
+Mark `shoe`, `sheep`, `shark` in the pool as **"sight-word-hybrid"** (`hybridMode: true` — see §6.1 for the schema requirement). Marian is expected to pattern-match against Emma's audio rather than fully decode the long-vowel rest-of-word. The planner / canon-bake produces session content that pairs these chips with Emma's audio + the picture, never with a "decode this aloud", "segment this word", or "spell from phoneme" prompt.
 
 This is documented in the picture-pack prompt sheet's per-word notes for each of these 4 words.
 
-**Recommended call: Option C with the hybrid annotation.** If Thomas locks Option A (short-vowel-only purist), pool drops to ~4 words and the planner accommodates the thin pool by accepting in-session repetition. Either is defensible; Option C is the audit-honest call given the English sh-CVC noun stock is small.
+**Recommended call (initial draft):** Option C with the hybrid annotation.
+
+**Locked call (Dave addendum 2026-05-14):** **Option C-minus** — long-vowel allowance for `shoe`, `sheep`, `shark` only; `shore` dropped. Pool of 7 (`ship, shell, shoe, sheep, shark, shed, shop`). The 3 long-vowel hybrids carry `hybridMode: true` per §6.1.
 
 ---
 
@@ -367,11 +374,10 @@ For the sh-tier, the diagnostically useful distractor for `ship` is `sip` — sa
 | shark     | sark            | NO — non-word                                     | Sark is not a word; the visual sh/s contrast still works but it's a non-real pair |
 | shed      | sed             | NO — non-word                                     | "Sed" is a Unix command, not an English word                                      |
 | shop      | sop             | YES — but obscure noun                            | "Sop" = bread soaked in liquid (archaic)                                          |
-| shore     | sore            | YES — both real                                   | Direct minimal pair                                                               |
 
-**4 of 8 sh-targets have a real-word s-contrast trap (ship/sip, shell/sell, shore/sore, plus shop/sop borderline). The remaining 4 (shoe/sue, sheep/seep, shark/sark, shed/sed) have weaker traps — either uncommon, non-word, or vocabulary-adult.**
+**`shore/sore` row removed** post-Dave-addendum Option C-minus. With `shore` deferred, the strong-trap subset shrinks to 2 of 7 (ship/sip, shell/sell) plus shop/sop borderline. The remaining 4 (shoe/sue, sheep/seep, shark/sark, shed/sed) have weaker traps — either uncommon, non-word, or vocabulary-adult.
 
-The strong-trap subset (`ship/sip, shell/sell, shore/sore, shop/sop`) is where the sh-vs-s discrimination test has real teeth. For the weak-trap subset, use a same-pool sh-neighbor as the trap instead — keeping the sh-decoding success-pattern intact while still giving Marian a phonics-meaningful choice.
+The strong-trap subset (`ship/sip, shell/sell, shop/sop`) is where the sh-vs-s discrimination test has real teeth. For the weak-trap subset, use a same-pool sh-neighbor as the trap instead — keeping the sh-decoding success-pattern intact while still giving Marian a phonics-meaningful choice.
 
 **Class 2 — same-pool sh-neighbor (gentle distractor, mirrors short-vowel tier pattern):**
 
@@ -387,30 +393,28 @@ Full `TARGET_PAIRINGS` rows are Kevin's to author; design preview here so the st
 
 ```ts
 // Strong-trap subset — Class 1 (sh/s contrast) + Class 2 (sh-pool neighbor):
-ship:  { gentle: ['shell', 'shark'], trap: ['sip',  'shoe']  },  // gentle: 2 sh-neighbors; trap: sh/s contrast + sh-neighbor
+ship:  { gentle: ['shell', 'shark'], trap: ['sip',  'sheep'] },  // gentle: 2 sh-neighbors; trap: sh/s contrast + sh-neighbor
 shell: { gentle: ['ship',  'shoe'],  trap: ['sell', 'sheep'] },  // gentle: 2 sh-neighbors; trap: sh/s contrast + sh-neighbor
-shore: { gentle: ['sheep', 'shark'], trap: ['sore', 'shed']  },  // gentle: 2 sh-neighbors; trap: sh/s contrast + sh-neighbor
-shop:  { gentle: ['shark', 'shoe'],  trap: ['sop',  'sheep'] },  // gentle: 2 sh-neighbors (NOT shed — FORBIDDEN_PAIR); trap: sh/s contrast + sh-neighbor
+shop:  { gentle: ['shark', 'shell'], trap: ['sop',  'sheep'] },  // gentle: 2 sh-neighbors (NOT shed or shoe — FORBIDDEN_PAIRS); trap: sh/s contrast + sh-neighbor
 
 // Weak-trap subset — Class 2 (sh-pool neighbor only; weak s-contrast trap omitted):
 shoe:  { gentle: ['ship',  'shark'], trap: ['shell', 'sheep'] }, // gentle + trap both sh-pool; sue too adult-vocab
-sheep: { gentle: ['shark', 'shoe'],  trap: ['shore', 'ship']  }, // gentle + trap both sh-pool; seep too obscure
-shark: { gentle: ['ship',  'sheep'], trap: ['shoe',  'shore'] }, // gentle + trap both sh-pool; sark non-word
-shed:  { gentle: ['shark', 'shore'], trap: ['shore', 'sheep'] }, // gentle + trap both sh-pool (NOT shop or shoe — FORBIDDEN_PAIRS); sed non-word
+sheep: { gentle: ['shark', 'shoe'],  trap: ['ship',  'shell'] }, // gentle + trap both sh-pool; seep too obscure
+shark: { gentle: ['ship',  'sheep'], trap: ['shoe',  'shell'] }, // gentle + trap both sh-pool; sark non-word
+shed:  { gentle: ['shark', 'sheep'], trap: ['ship',  'shell'] }, // gentle + trap both sh-pool (NOT shop — FORBIDDEN_PAIR); sed non-word
 ```
 
 **Distractor-class summary per row:**
 
 | Target | Gentle tier (problems 1-3) | Trap tier (problems 4-8) | Trap class         |
 | ------ | -------------------------- | ------------------------ | ------------------ |
-| ship   | shell, shark               | sip, shoe                | sh/s + sh-neighbor |
+| ship   | shell, shark               | sip, sheep               | sh/s + sh-neighbor |
 | shell  | ship, shoe                 | sell, sheep              | sh/s + sh-neighbor |
-| shore  | sheep, shark               | sore, shed               | sh/s + sh-neighbor |
-| shop   | shark, shoe                | sop, sheep               | sh/s + sh-neighbor |
+| shop   | shark, shell               | sop, sheep               | sh/s + sh-neighbor |
 | shoe   | ship, shark                | shell, sheep             | sh-neighbor only   |
-| sheep  | shark, shoe                | shore, ship              | sh-neighbor only   |
-| shark  | ship, sheep                | shoe, shore              | sh-neighbor only   |
-| shed   | shark, shore               | shore, sheep             | sh-neighbor only   |
+| sheep  | shark, shoe                | ship, shell              | sh-neighbor only   |
+| shark  | ship, sheep                | shoe, shell              | sh-neighbor only   |
+| shed   | shark, sheep               | ship, shell              | sh-neighbor only   |
 
 **`sip` as cross-tier-load-bearing dual-role distractor (resolution per Devon's review of PR #212):**
 
@@ -431,7 +435,7 @@ The pattern is well-established:
 - Tuple shape `[string, string]` (2 entries each).
 - No FORBIDDEN_PAIR adjacency.
 - `gentle` always sh-pool; `trap` is sh/s contrast where strong-trap available, else another sh-pool neighbor.
-- `sip` documented as dual-role; all other s-contrast distractors (`sell`, `sop`, `sore`) are new distractor-only entries (NOT existing in `TARGET_WORDS`).
+- `sip` documented as dual-role; the other s-contrast distractors actually referenced by the matrix (`sell`, `sop`) are new distractor-only entries (NOT existing in `TARGET_WORDS`). (`sore` was originally planned as `shore`'s s-contrast trap; with `shore` dropped per Dave addendum, `sore` is NOT needed and should NOT ship.)
 
 ### Cross-tier hygiene — NO short-vowel CVC distractors in sh-trios
 
@@ -453,11 +457,12 @@ See `digraphs-sh-picture-pack-prompts.md` for the per-word MJ prompts.
 
 Summary requirements:
 
-- **8 wholly-new pictures** (no re-traces — none of the 8 sh-words have existing distractor SVGs from prior tiers).
+- **7 wholly-new pictures** (no re-traces — none of the 7 sh-words have existing distractor SVGs from prior tiers).
 - Pictures embedded via `yarn embed-pictures` per the established Phase-3 pipeline.
-- Filenames: `picture-ship.svg`, `picture-shell.svg`, `picture-shoe.svg`, `picture-sheep.svg`, `picture-shark.svg`, `picture-shed.svg`, `picture-shop.svg`, `picture-shore.svg` at `public/assets/pictures/`.
+- Filenames: `picture-ship.svg`, `picture-shell.svg`, `picture-shoe.svg`, `picture-sheep.svg`, `picture-shark.svg`, `picture-shed.svg`, `picture-shop.svg` at `public/assets/pictures/`.
 - Style anchor: `picture-pack-style-anchor.md` §2 + §3 (locked, byte-for-byte preamble).
-- Phase-2 fallback: drop `shore` to 7 pictures if Phase-2 MJ pass can't produce a 96pt-readable shore chip in 4 grids.
+- Pool went 8 → 7 per Dave addendum 2026-05-14 Option C-minus: `shore` deferred to future r-controlled-vowel tier (§1.3).
+- Additional 2 distractor-only pictures needed for the s-contrast traps (`sell`, `sop`) — Devon's picture-pack §6 finding #4 path applies (silhouette placeholders acceptable for distractor-only, vector trace deferred to polish backlog).
 
 ---
 
@@ -477,7 +482,7 @@ This is informational; the Word Song spec for Kevin's planner will lift the exac
 
 > "[word]! Listen: [word]. Can you find [word]?"
 
-For the long-vowel hybrid items (`shoe`, `sheep`, `shark`, `shore`):
+For the long-vowel hybrid items (`shoe`, `sheep`, `shark` — `hybridMode: true`, see §6.1):
 
 > "[word]! [picture appears alongside audio] [word]."
 
@@ -516,66 +521,96 @@ Short-e and sh-tier are NOT in a known minimal-pair confusion class (per Dave §
 
 The v1 `TARGET_PAIRINGS` shape (in [`wordPack.ts`](../../src/screens/WordSong/wordPack.ts)) was designed for same-vowel-only CVC distractors. The sh-tier introduces cross-orthography distractors. The runtime impact is small but the data model needs care:
 
-- **`wordPack.ts TARGET_WORDS` additions:** distractor-only entries (`isTarget: false`) for the s-contrast traps actually referenced by the §2 matrix — `sell`, `sop`, `sore`. These are NOT sh-words but need to exist as `WordEntry` rows with picture assets so the chip render resolves them via `getWordEntry()`. `sue, seep, sark, sed` were rejected in §2 as too weak and do NOT need to ship.
+- **`wordPack.ts TARGET_WORDS` additions:** distractor-only entries (`isTarget: false`) for the s-contrast traps actually referenced by the §2 matrix — `sell`, `sop`. These are NOT sh-words but need to exist as `WordEntry` rows with picture assets so the chip render resolves them via `getWordEntry()`. `sue, seep, sark, sed, sore` were rejected — `sue/seep/sark/sed` as too weak (§2), `sore` because its target `shore` was dropped post-Dave-addendum (§1).
 - **`sip` is dual-role (NOT a new entry).** It already exists in `TARGET_WORDS` with `vowel: 'i'`, `isTarget: true`. The sh-tier row for `ship` references it by string. See §2 "`sip` as cross-tier-load-bearing dual-role distractor" and §10 finding #9. Operational rule from `.claude/docs/skill-trees-and-content.md` §"Cross-vowel-tier load-bearing" applies.
 - **`pickDistractors` runtime is unchanged.** No functional refactor; matrix-lookup-only. Adding sh-tier `TARGET_PAIRINGS` rows is sufficient.
 - **`buildChipOrder` runtime is unchanged.** Render-time positioning is target-agnostic.
 - **`FORBIDDEN_PAIRS` extension** for in-pool sh-hygiene rules (table in §6 above).
 - **`WordEntry.vowel` type union** may need to extend or be supplanted by Kevin's `phoneme:` field per PR #211 — see §10 finding #10.
-- **Picture assets for distractor-only s-contrast entries.** `sell`, `sop`, `sore` each need a picture (silhouette placeholder is acceptable per the existing pattern for distractor-only entries; vector trace can land in polish backlog). `sip` reuses its existing short-i picture asset.
+- **Picture assets for distractor-only s-contrast entries.** `sell`, `sop` each need a picture (silhouette placeholder is acceptable per the existing pattern for distractor-only entries; vector trace can land in polish backlog). `sip` reuses its existing short-i picture asset.
 
 **This is downstream for Kevin's impl ticket.** Flagging here so the spec downstream is clear.
+
+### 6.1 `hybridMode: true` annotation requirement (NEW canon-schema field per Dave addendum)
+
+**This is a NEW canon-schema field that does not exist in `wordPack.ts` today.** Spec'd here for the impl ticket; ownership is Kevin's planner-widen + canon-bake task.
+
+#### What
+
+Add a per-`WordEntry` boolean flag — proposed name `hybridMode: boolean` (default `false`). Set `true` for the 3 long-vowel hybrid sh-tier words:
+
+| Word  | `vowel` (current union)   | `hybridMode` | Reason                                                     |
+| ----- | ------------------------- | ------------ | ---------------------------------------------------------- |
+| shoe  | TBD (see §10 finding #10) | `true`       | Long-vowel `/uː/` outside Marian's formal phonics tiers    |
+| sheep | TBD                       | `true`       | Long-vowel `/iː/` + vowel digraph `ee` outside tiers       |
+| shark | TBD                       | `true`       | R-controlled `/ɑːr/` outside Marian's formal phonics tiers |
+
+The other 4 sh-tier words (`ship`, `shell`, `shed`, `shop`) are conventional short-vowel sh-CVC entries — `hybridMode: false` (the default).
+
+#### Why
+
+Per Dave addendum §Q7d:
+
+> `shark` (and `shoe`, `sheep`) must be permanently annotated as a hybrid/sight-word entry in the canon, never as a decode target. [...] Ensure the planner never generates a segmentation, spelling, or decode-from-phoneme prompt for these three words. The only valid planner prompts for hybrid words: "Listen to Emma, tap the word you hear" (recognition) and "What word does this picture show?" (retrieval).
+
+The annotation is the machine-readable bridge between the spec-side pedagogical posture ("these words are picture+audio sight-word-hybrids") and the planner-side prompt generation ("emit only chip-tap recognition prompts for these words"). Without the annotation, the planner could over time start emitting decode prompts for hybrid words — which would violate the developmental rationale that admitted them into the pool.
+
+#### Planner-side requirement (canon-schema + Haiku prompt)
+
+Two pieces:
+
+1. **`WordEntry.hybridMode: boolean`** — new field on the `WordEntry` shape in `wordPack.ts`. Default `false`. Read-only at the data layer.
+2. **Planner prompt gating** — the Haiku-prompted session canon generation must consult `hybridMode`. For words with `hybridMode: true`:
+   - **Allowed problem types:** chip-tap recognition (Emma says the word, Marian taps the chip — current default for the digraphs-sh tier) and picture-retrieval ("What word does this picture show?").
+   - **Disallowed problem types:** segmentation ("Tell me the sounds in s-h-e-e-p"), spelling-from-phoneme ("Emma says `/ʃiːp/`, type the word"), decode-from-letters ("Read these letters aloud: s-h-e-e-p"), any task that requires the child to produce or decode the rest-of-word vowel pattern.
+   - The planner's Haiku prompt should include the rule explicitly: "For words flagged `hybridMode: true`, generate ONLY chip-tap recognition or picture-retrieval problems. Do NOT emit segmentation, spelling, or decode prompts for these words."
+
+#### Out-of-scope for THIS spec (downstream for Kevin's impl ticket)
+
+- Whether `hybridMode` lives in `WordEntry` (per-word) or in a separate node-level config (per-skill-node). Per-word is the recommended shape — fits the existing `WordEntry` extension pattern (`isTarget`, `vowel`, `category` are all per-word) and lets future digraph tiers (`digraphs-ch`, `digraphs-th-voiceless`) independently flag their own long-vowel hybrids if needed.
+- The exact set of problem types the planner can emit for `digraphs-sh`. The locked v1 problem type is chip-tap recognition (mirrors CVC tiers). Picture-retrieval is a future-tier consideration. For v1, the practical gating is "the planner cannot emit any problem type other than chip-tap recognition for sh-tier targets" — and `hybridMode` is the future-proofing for when picture-retrieval / segmentation / spelling problem types are introduced for other tiers.
+- The migration path for existing tiers (`cvc-words-short-*` nodes) that don't have `hybridMode` set on their entries. Default `false` is safe — existing nodes preserve current behaviour.
+
+#### Coordination with Kevin's PR #211
+
+`hybridMode` is orthogonal to the SkillNode-shape decision (PR #211) and to the phoneme-tag proposal (PR #211 §3.3). Per Dave's §Q8c addendum, the developmental impact of phoneme-tag and SkillNode-split ordering is negligible. `hybridMode` does NOT depend on phoneme-tag landing first — they are independent annotations. The impl ticket for sh-tier content can add `hybridMode` alongside the new sh-tier `WordEntry` rows in the same diff.
+
+#### Implementation footprint estimate
+
+- `wordPack.ts` — add `hybridMode: boolean` to the `WordEntry` type and 3 `hybridMode: true` entries (`shoe, sheep, shark`); rest default `false`. ~10 lines.
+- `api/_planner*.ts` — extend the Haiku system prompt to include the hybridMode rule. ~3-5 prompt-string lines.
+- Canon-bake script — no change (it consumes whatever the Haiku planner emits).
+- E2E test (per AC12) — new spec verifying no segmentation/spelling/decode problem for hybridMode words in sh-tier sessions. ~30 lines of test.
 
 ---
 
 ## 7. Open questions for Thomas
 
-### Q1 — Long-vowel allowance (LOAD-BEARING)
+All 6 original open questions are now resolved (Thomas locked Q1/Q2/Q3/Q5/Q6 directly via orchestrator brief 2026-05-14; Q4 was decided in PR #211; Dave's research addendum 2026-05-14 confirmed Q1/Q2 at the developmental level). Section retained for spec history and so future digraph specs can pattern-match the resolutions.
 
-**Recommended:** Option C — pool of 8 including `shoe, sheep, shark, shore` (long-vowel sh-onsets) with hybrid sight-word-like scaffolding via picture+audio.
+### Q1 — Long-vowel allowance (LOAD-BEARING) — RESOLVED: Option C-minus
 
-**Alternative:** Option A — pool of 4 short-vowel-only (`ship, shell, shed, shop`); planner accommodates thin pool with high in-session repetition (every session uses all 4 words).
+**Resolution:** Pool of 7 (`ship, shell, shoe, sheep, shark, shed, shop`). Long-vowel allowance for `shoe/sheep/shark` via picture+audio hybrid scaffold; `shore` dropped. Locked by Thomas pending Dave confirmation; Dave addendum 2026-05-14 (`design/research/digraph-sh-long-vowel-addendum.md` §Q7d) independently arrived at the same recommendation. 3 of 7 carry `hybridMode: true` per §6.1.
 
-**Why this matters:** Dave's research is silent. The audit honestly does not produce 8 short-vowel-only sh-CVC strong picks because the English sh-initial short-vowel-CVC noun stock is small. Either we expand the criteria (Option C — recommended) or we ship a thin pool (Option A — Dave §Q4 doesn't reject this but it's harder to compose sessions from).
+### Q2 — `shore` retention — RESOLVED: drop pre-Phase-2
 
-**Question:** Lock Option C? Or escalate to Dave for clarification on long-vowel sh-onset acceptability?
+**Resolution:** Drop `shore` proactively, ship at 7. Originally drafted as Phase-2 contingency; Dave's addendum §Q7c converted the contingency into a recommendation (`/ɔːr/` r-controlled vowel is phonemically novel for Tagalog-L1 + composition-complex picture, no vocab compensator). `shore` is deferred to a future r-controlled-vowel tier where the phoneme is formally introduced and the picture composition can be cleaner.
 
-### Q2 — `shore` retention (Phase-2 contingency)
+### Q3 — `shop` vs `store` register — RESOLVED: keep `shop`
 
-**Recommended:** include `shore` in the v1 pool of 8 with a Phase-2 contingency to drop to 7 if MJ can't produce a clean single-subject shore picture in 4 grids.
+**Resolution:** Keep `shop` in the pool. Picture+audio scaffold sufficient. Register-mismatch concern similar to `gem` (short-e), which shipped. Dave's addendum non-obvious finding #2 adds a supporting reason: `shed` and `shop` are British-English high-frequency words, useful advance-vocabulary anchors for Marian's August 2026 Danish school transition (Danish school English instruction uses British register). Real-iPad smoke contingency to drop `shop` empirically if real-Marian observation shows register mismatch eating chip-tap accuracy remains in §10 finding #4.
 
-**Alternative:** drop `shore` proactively, ship 7 from start.
+### Q4 — Sh-tier `SkillNode` shape — RESOLVED in PR #211
 
-**Why this matters:** `shore` is the weakest of the 8 — composition complexity (sand + wave + sky) and vocab register marginality. The other 7 are stronger.
+**Resolution:** 3 sibling nodes (`digraphs-sh`, `digraphs-ch`, `digraphs-th-voiceless`) per Kevin's PR #211 architecture audit. Out-of-scope for this spec; included here only as a pointer. See PR #211 for the locked shape.
 
-**Question:** Ship 8 with contingency, or 7 from start?
+### Q5 — Sh-tier mastery rule alignment with CVC tiers — RESOLVED: same 90/3
 
-### Q3 — `shop` vs `store` register
+**Resolution:** Same 90/3 mastery rule as CVC tiers. After 90% accuracy across 3 consecutive sessions, `digraphs-sh` graduates; `digraphs-ch` unlocks. Dave's research does not recommend differentiating digraph mastery thresholds from CVC; parent-settings infrastructure already supports per-track threshold overrides if needed later.
 
-The `shop` picture (storefront with awning) is in Anglo-British register; the Filipino-English equivalent is `store` or `tindahan`. The picture+audio scaffold should build the binding "shop = storefront silhouette" even if Marian's L1 vocabulary maps to `tindahan`.
+### Q6 — Sh/ch interleaving trigger — DOWNSTREAM (not a live question)
 
-**Question:** Confirm `shop` stays in the pool? Or replace with another option?
-
-**Recommended:** keep `shop`. The picture+audio scaffold is sufficient. The register-mismatch concern is similar to `gem` (short-e), which shipped.
-
-### Q4 — Sh-tier `SkillNode` shape
-
-**Out-of-scope for this spec** per the brief — Kevin's audit owns this. But flagging the design implication:
-
-- If `SkillNode` = single `digraphs` node with `wordPack[digraphs]` containing only sh-words in v1, then later spec adds ch + th words to the same pack → planner must enforce per-session digraph isolation.
-- If `SkillNode` = 3 sibling nodes (`digraphs-sh`, `digraphs-ch`, `digraphs-th`), then each has its own pack and planner naturally isolates by node.
-
-**Recommended:** 3 sibling nodes (mirrors the short-vowel CVC structure: `cvc-words-short-a`, `cvc-words-short-o`, etc.). But this is Kevin's call.
-
-### Q5 — Sh-tier mastery rule alignment with CVC tiers
-
-**Recommended:** same 90/3 mastery rule as CVC tiers. After 90% accuracy across 3 consecutive sessions, sh-tier graduates; ch-tier unlocks.
-
-**Question:** Confirm? Or use a different threshold for digraph mastery (Dave's research is silent on whether digraph mastery thresholds differ from CVC thresholds)?
-
-### Q6 — Sh/ch interleaving trigger
-
-**Out-of-scope for this spec** per Dave §Q5. Flagged here so it's not forgotten: once ch-tier ships and both sh + ch are at ~70%+ accuracy, a mixed sh/ch session is appropriate (Dave's recommendation). Operationalization (e.g. "3 sessions above 70%") is a planner decision at the time ch-tier ships.
+Demoted to "downstream considerations" per Devon's PR #212 review — there is nothing for Thomas to lock here. Operationalization (e.g. "3 sessions above 70%") is a planner decision at the time `digraphs-ch` ships. Retained for future-spec pattern-matching but not a gating question for this spec.
 
 ---
 
@@ -583,17 +618,18 @@ The `shop` picture (storefront with awning) is in Anglo-British register; the Fi
 
 For this spec's downstream impl tickets (Kevin's planner + Devon's wordPack + canon-bake):
 
-- [ ] **AC1 — pool size:** `wordPack[digraphs-sh]` (or `wordPack.digraphs` filtered by sh) contains the 8 words: `ship, shell, shoe, sheep, shark, shed, shop, shore` (subject to Q1 + Q2 locks).
-- [ ] **AC2 — distractor-only pool:** sh-tier-specific s-contrast distractor entries exist as text+audio chips: `sip, sell, sop, sore` (strong-trap) + sh-pool-neighbors for weak-trap pairings. `sue, seep, sark, sed` are NOT shipped — too weak.
-- [ ] **AC3 — Trio composition for sh-tier (`pickDistractors` + `buildChipOrder`):** for every sh-target row in `TARGET_PAIRINGS`, both gentle entries are sh-pool neighbors; the trap entries are either (a) an s-contrast distractor-only word + a sh-pool neighbor (strong-trap subset: `ship`, `shell`, `shore`, `shop`) or (b) two sh-pool neighbors (weak-trap subset: `shoe`, `sheep`, `shark`, `shed`) per the matrix in §2. No CVC short-vowel words appear as distractors in sh-trios. Tuple shape is `readonly [string, string]` for both `gentle` and `trap`. Render-time positioning of the 3 chips remains in `buildChipOrder()`; no new function needed.
+- [ ] **AC1 — pool size:** `wordPack` for the `digraphs-sh` sibling node (per PR #211) contains the 7 words: `ship, shell, shoe, sheep, shark, shed, shop`. (Originally 8 in this spec's first draft; `shore` dropped per Dave addendum 2026-05-14 Option C-minus.)
+- [ ] **AC2 — distractor-only pool:** sh-tier-specific s-contrast distractor entries exist as text+audio chips: `sell, sop` as new distractor-only entries; `sip` is dual-role (reuses existing short-i `TARGET_WORDS` entry, see §2 sip-dual-role subsection). `sue, seep, sark, sed, sore` are NOT shipped — `sue/seep/sark/sed` too weak (§2), `sore` no longer needed (its target `shore` dropped).
+- [ ] **AC3 — Trio composition for sh-tier (`pickDistractors` + `buildChipOrder`):** for every sh-target row in `TARGET_PAIRINGS`, both gentle entries are sh-pool neighbors; the trap entries are either (a) an s-contrast distractor-only word + a sh-pool neighbor (strong-trap subset: `ship`, `shell`, `shop`) or (b) two sh-pool neighbors (weak-trap subset: `shoe`, `sheep`, `shark`, `shed`) per the matrix in §2. No CVC short-vowel words appear as distractors in sh-trios. Tuple shape is `readonly [string, string]` for both `gentle` and `trap`. Render-time positioning of the 3 chips remains in `buildChipOrder()`; no new function needed.
 - [ ] **AC4 — FORBIDDEN_PAIRS:** `[shed, shop]`, `[shoe, shop]`, `[ship, tub]` added to the FORBIDDEN_PAIRS list.
 - [ ] **AC5 — Emma's two-letters-one-sound opener:** fires the first time sh-tier is encountered (lifetime-once); persists in localStorage. Mirrors short-u's `sun/soon` AC9b mechanism.
 - [ ] **AC6 — Per-session sh-vowel-cue:** small visual cue (e.g., "sh - ship" with picture) persists in screen corner during sh-tier sessions WHILE `digraphs-sh.state === 'practicing'` (per `applyMasteryRule()` in `src/lib/progress/mastery.ts`). The cue is hidden once the node flips to `'mastered'`. Concretely: `intro` state shows the cue; `practicing` state shows the cue; `mastered` hides it. This maps cleanly to the existing `Progress.skillLevels[node]` field — no new accuracy-percentage infrastructure required. (Originally drafted as "until ~70% accuracy" which has no corresponding state in the progress model; corrected per Devon's PR #212 review.)
-- [ ] **AC7 — 8 picture assets shipped:** `picture-{ship,shell,shoe,sheep,shark,shed,shop,shore}.svg` at `public/assets/pictures/`, embedded via `yarn embed-pictures`. (Or 7 per Q2 fallback.)
+- [ ] **AC7 — 7 picture assets shipped:** `picture-{ship,shell,shoe,sheep,shark,shed,shop}.svg` at `public/assets/pictures/`, embedded via `yarn embed-pictures`. Plus 2 distractor-only picture assets for s-contrast traps: `picture-sell.svg` and `picture-sop.svg` (silhouette placeholders acceptable per Devon's picture-pack §6 finding #4 path; vector trace deferred to polish backlog). `picture-sip.svg` already exists from short-i tier (reused).
 - [ ] **AC8 — mastery rule:** sh-tier graduates at 90% accuracy across 3 consecutive sessions (per Q5 lock).
 - [ ] **AC9 — same-vowel-only-extended-to-sh-only rule:** sh-trios contain only sh-pool words + s-contrast distractors, never CVC short-vowel words. (Cross-tier review of mastered CVC content is handled outside of sh-trios, via the planner's existing cross-tier review mechanism.)
 - [ ] **AC10 — canon bake:** sh-tier session canon is baked via `npm run canon:regen` post-spec-merge; canon JSON committed in the impl PR.
 - [ ] **AC11 — Jessica E2E spec (per `feedback_progression_e2e_mandatory.md`):** sh-tier progression includes a failing-first E2E spec — covers (a) first-encounter scaffold fires once, (b) ~90% accuracy across 3 sessions transitions sh-tier from `intro → practicing → mastered`, (c) trap distractor (sh/s contrast) correctly counts as wrong when selected.
+- [ ] **AC12 — `hybridMode: true` planner gating (NEW per Dave addendum 2026-05-14 §Q7d):** the 3 long-vowel hybrid words (`shoe`, `sheep`, `shark`) are flagged `hybridMode: true` in the `WordEntry` schema. The planner (Haiku prompt) must NEVER generate segmentation, spelling, or decode-from-phoneme prompts for these 3 words — only chip-tap recognition (Listen + tap) and picture-retrieval ("What word does this picture show?") problem types. Concrete tests: (i) `wordPack.ts` exports 3 entries with `hybridMode: true`; (ii) planner prompt explicitly excludes hybridMode-flagged words from any segmentation/spelling/decode task class; (iii) Jessica E2E spec verifies that for sh-tier sessions, no problem against `shoe`/`sheep`/`shark` is of segmentation/spelling/decode type. See §6.1 for the full schema requirement.
 
 ---
 
@@ -602,6 +638,7 @@ For this spec's downstream impl tickets (Kevin's planner + Devon's wordPack + ca
 This spec is derived from:
 
 - `design/research/digraph-acquisition-marian.md` (Dave, 2026-05-14) — research gate; cited in §1 Why-now, §1 Audit, §2 Distractors, §4 Emma lines, §5 Scaffold, §6 Planner, §7 Open questions.
+- `design/research/digraph-sh-long-vowel-addendum.md` (Dave, 2026-05-14) — extends the digraph research; locked Option C-minus (pool of 7, drop `shore`); cited in §1.3, §1 final pool, §6.1 `hybridMode` requirement, §7 Q1/Q2 resolutions, §8 AC12, §10 findings #1/#5/#6/#11/#12.
 - `design/research/phonics-sequence-marian.md` (2026-04-26) — vowel-tier precedent + session pacing constraints (§Q5).
 - `design/word-song/short-e-pool-expansion.md` — format precedent + audit pattern.
 - `design/word-song/short-u-pool-expansion.md` — format precedent + first-encounter scaffold pattern.
@@ -616,22 +653,28 @@ This spec is derived from:
 
 These are surfaced for Thomas / Matt / Kevin via the PR / handoff:
 
-1. **The English sh-initial short-vowel-CVC noun stock is small** — about 4 strong picks (`ship`, `shell` + 2 borderline). This forces a pool-shape decision that Dave's research is silent on. The recommended Option C (long-vowel allowance via picture+audio scaffold) is defensible but is a meaningful pedagogical exception worth flagging to Dave for retroactive validation if Thomas locks it.
+1. **The English sh-initial short-vowel-CVC noun stock is small** — about 4 strong picks (`ship`, `shell` + 2 borderline). The initial draft of this spec posed long-vowel allowance as the load-bearing question for Thomas; Dave's research addendum 2026-05-14 (`design/research/digraph-sh-long-vowel-addendum.md` §Q7a-d) independently confirmed Option C-minus (long-vowel allowance for `shoe/sheep/shark`; `shore` dropped due to compounding novelty + composition concerns). The locked pool is 7 — 4 short-vowel + 3 long-vowel hybrids.
 
-2. **The sh-tier introduces a new distractor pattern (sh/s contrast) that did NOT exist in CVC tiers.** Mechanically the change is small — `pickDistractors` in `wordDistractors.ts` is a matrix-lookup-and-resolve function with no per-tier logic, so adding sh-tier rows to `TARGET_PAIRINGS` with the appropriate distractor strings is sufficient at the runtime layer. The architecturally-meaningful work is in `wordPack.ts`: distractor-only `WordEntry` rows for `sell`, `sop`, `sore` (NOT same-vowel-pool neighbors — these are short-e, short-o, long-o-r words functioning as sh-trio distractors only), each with `isTarget: false` and a picture asset. `sip` is a dual-role exception (see finding #9 below). This is downstream for Kevin's impl ticket but is flagged here so the spec downstream is clear it's not just "add more words to TARGET_WORDS".
+2. **The sh-tier introduces a new distractor pattern (sh/s contrast) that did NOT exist in CVC tiers.** Mechanically the change is small — `pickDistractors` in `wordDistractors.ts` is a matrix-lookup-and-resolve function with no per-tier logic, so adding sh-tier rows to `TARGET_PAIRINGS` with the appropriate distractor strings is sufficient at the runtime layer. The architecturally-meaningful work is in `wordPack.ts`: distractor-only `WordEntry` rows for `sell`, `sop` (NOT same-vowel-pool neighbors — these are short-e and short-o words functioning as sh-trio distractors only), each with `isTarget: false` and a picture asset. `sip` is a dual-role exception (see finding #9 below). This is downstream for Kevin's impl ticket but is flagged here so the spec downstream is clear it's not just "add more words to TARGET_WORDS".
 
-3. **4 of 8 sh-targets have NO good s-contrast trap word** (`shoe/sue` adult-vocab, `sheep/seep` uncommon, `shark/sark` non-word, `shed/sed` non-word). The matrix uses sh-pool-neighbors for these weak-trap pairings. This is fine pedagogically (the sh-vs-sh trio still teaches digraph recognition by picture) but it means only half the pool gets the sh-vs-s discrimination contrast that's the diagnostically most useful test per Dave §Recommendations-to-Kyle #4.
+3. **4 of 7 sh-targets have NO good s-contrast trap word** (`shoe/sue` adult-vocab, `sheep/seep` uncommon, `shark/sark` non-word, `shed/sed` non-word). The matrix uses sh-pool-neighbors for these weak-trap pairings. This is fine pedagogically (the sh-vs-sh trio still teaches digraph recognition by picture) but it means only 3 of 7 (ship, shell, shop) get the sh-vs-s discrimination contrast that's the diagnostically most useful test per Dave §Recommendations-to-Kyle #4. (Pre-`shore`-drop the strong-trap count was 4 of 8; the ratio improved very slightly post-drop — 3 of 7 is 43% vs 4 of 8 = 50% — but the absolute number of strong-trap pairs is down from 4 to 3.)
 
-4. **`shop` and `shed` have vocabulary register mismatch with Filipino-English** — Marian's L1 dialect uses `store` and `kubo/small building` respectively. The picture+audio scaffold builds the English-register association, but Thomas should be alert during real-iPad smoke that these two chips don't produce confusion. If real-Marian observation shows `shop` consistently failing because the picture reads as "store" not "shop", the contingency is to drop `shop` and ship at 7 (alongside or instead of the `shore` Phase-2 drop).
+4. **`shop` and `shed` have vocabulary register mismatch with Filipino-English** — Marian's L1 dialect uses `store` and `kubo/small building` respectively. The picture+audio scaffold builds the English-register association, but Thomas should be alert during real-iPad smoke that these two chips don't produce confusion. Dave's addendum non-obvious finding #2 adds a strengthening factor: `shed` and `shop` are British-English high-frequency words and useful advance-vocabulary anchors for Marian's August 2026 Danish school transition (Danish school English instruction uses British register). If real-Marian observation shows `shop` consistently failing because the picture reads as "store" not "shop", the contingency is to drop `shop` and ship at 6 (`ship, shell, shoe, sheep, shark, shed`).
 
-5. **`shark` is the strongest pick in the long-vowel-allowance set** despite having `ar` r-controlled vowel — universal vocabulary, universal picture, PH-cultural-context strong. If Thomas rejects Option C, `shark` is the highest-leverage exception to consider individually (rather than rejecting all 4 long-vowel candidates together).
+5. **`shark` is the strongest pick in the long-vowel-allowance set** despite having `ar` r-controlled vowel — universal vocabulary, universal picture, PH-cultural-context strong. Dave's addendum §Q7c confirms shark passes the developmental bar conditionally on the `hybridMode: true` annotation (see §6.1) — the planner must never emit segmentation/spelling/decode prompts for it, only chip-tap recognition.
 
-6. **Sh-final position is intentionally deferred** (Dave finding #3). Sh-final words (`fish, dish, wish, rush, crash, bush, cash, dash, gush, mush`) are a meaningful follow-up arc once sh-initial consolidates. About half of those are highly picturable (fish, dish, bush, brush-not-actually-CVCC, crash); the others are verbs/abstract. Flagging here so the sh-final follow-up spec has a starting candidate list.
+6. **`shore` was dropped from the v1 pool** per Dave's addendum §Q7c (Option C-minus). Two independent compounding concerns: (a) `/ɔːr/` r-controlled vowel is phonemically novel for Tagalog-L1, more marked than `/ɑːr/` (shark) which is conditionally workable; (b) picture composition requires multi-subject scene (sand + water + boundary) — violates single-subject style anchor + reads ambiguously as "beach"/"ocean" at 96pt; (c) no compensating vocabulary strength (Filipino-English 8yo register reaches for "beach"). Deferred to a future r-controlled-vowel tier where the phoneme is formally introduced and the picture composition can be cleaner. Dave's recommendation #4: "Do not add `shore` to a later tier until r-controlled vowels (`or` pattern) are formally introduced."
 
-7. **The two-letters-one-sound concept is new for Marian.** Tagalog does not have true consonant digraphs in the same way; per Dave §Application this is "the primary conceptual barrier, not the blending mechanic." Emma's first-encounter line must explicitly name the concept ("Two letters, one sound. Shhh.") — this is a script-side requirement that the spec downstream for Kevin must implement. It is NOT a passive design hint; it's load-bearing for Marian's success on the tier.
+7. **Sh-final position is intentionally deferred** (Dave finding #3). Sh-final words (`fish, dish, wish, rush, crash, bush, cash, dash, gush, mush`) are a meaningful follow-up arc once sh-initial consolidates. About half of those are highly picturable (fish, dish, bush, brush-not-actually-CVCC, crash); the others are verbs/abstract. Flagging here so the sh-final follow-up spec has a starting candidate list.
 
-8. **`/ʃ/` → `/s/` is the structural L2 substitution risk (not per-word).** This is testable in the chip-tap format via the sh/s contrast distractor. But the production-side substitution (Marian saying `/s/` when she means `/ʃ/`) is NOT testable in chip-tap and is acceptable per Dave §Q3 — the app tests recognition, not production. Thomas should be alert that real-Marian iPad smoke may show her getting all chip-taps right while still pronouncing `/s/` aloud; that is expected and not a failure mode.
+8. **The two-letters-one-sound concept is new for Marian.** Tagalog does not have true consonant digraphs in the same way; per Dave §Application this is "the primary conceptual barrier, not the blending mechanic." Emma's first-encounter line must explicitly name the concept ("Two letters, one sound. Shhh.") — this is a script-side requirement that the spec downstream for Kevin must implement. It is NOT a passive design hint; it's load-bearing for Marian's success on the tier.
 
-9. **`sip` is the second discovered cross-vowel-tier load-bearing distractor in `wordPack.ts`** (after `pen`, post-#208). Surfaced by Devon's review of PR #212. The cluster pattern (`.claude/docs/skill-trees-and-content.md` §"pen is cross-vowel-tier load-bearing") generalises cleanly: a word with `vowel: 'i'` and `isTarget: true` referenced as a string distractor from a DIFFERENT vowel tier's `TARGET_PAIRINGS` row (here: sh-tier referencing `sip` as `ship`'s trap distractor). The dual-role resolution (keep the entry as-is in `TARGET_WORDS`, reference by string from the new matrix row) is the established cheap path. The cluster now contains: `pen` (`'e'`), `dog` (`'o'`), `log` (`'o'`), `cup` (`'u'`), `sun` (`'u'`), `sip` (`'i'`). Worth updating `.claude/docs/skill-trees-and-content.md`'s table to add the sh-tier-as-referencing-tier row once this spec ships its impl.
+9. **`/ʃ/` → `/s/` is the structural L2 substitution risk (not per-word).** This is testable in the chip-tap format via the sh/s contrast distractor. But the production-side substitution (Marian saying `/s/` when she means `/ʃ/`) is NOT testable in chip-tap and is acceptable per Dave §Q3 — the app tests recognition, not production. Thomas should be alert that real-Marian iPad smoke may show her getting all chip-taps right while still pronouncing `/s/` aloud; that is expected and not a failure mode.
 
-10. **The `vowel:` literal type may need to extend for sh-tier `WordEntry` rows.** Per Devon's review, the current `WordEntry.vowel` is `'a' | 'o' | 'u' | 'i' | 'e'` (short vowels only). The 4 long-vowel-allowance sh-words (`shoe`, `sheep`, `shark`, `shore`) do not fit this union. Three resolution paths: (i) extend the union to include digraph-tier values like `'sh-long'` or per-word phoneme tags; (ii) annotate a fake-but-closest short vowel as a soft placeholder with comment documentation; (iii) ship Kevin's PR #211 phoneme-tag proposal first and use `phoneme: '/ʃ/'` uniformly on all 8 sh-rows as the canonical disambiguator. This is load-bearing for the impl ticket — flagged here so Kevin's coordination with PR #211 sequencing is clear.
+10. **`sip` is the second discovered cross-vowel-tier load-bearing distractor in `wordPack.ts`** (after `pen`, post-#208). Surfaced by Devon's review of PR #212. The cluster pattern (`.claude/docs/skill-trees-and-content.md` §"pen is cross-vowel-tier load-bearing") generalises cleanly: a word with `vowel: 'i'` and `isTarget: true` referenced as a string distractor from a DIFFERENT vowel tier's `TARGET_PAIRINGS` row (here: sh-tier referencing `sip` as `ship`'s trap distractor). The dual-role resolution (keep the entry as-is in `TARGET_WORDS`, reference by string from the new matrix row) is the established cheap path. The cluster now contains: `pen` (`'e'`), `dog` (`'o'`), `log` (`'o'`), `cup` (`'u'`), `sun` (`'u'`), `sip` (`'i'`). Worth updating `.claude/docs/skill-trees-and-content.md`'s table to add the sh-tier-as-referencing-tier row once this spec ships its impl.
+
+11. **The `vowel:` literal type may need to extend for sh-tier `WordEntry` rows.** Per Devon's review, the current `WordEntry.vowel` is `'a' | 'o' | 'u' | 'i' | 'e'` (short vowels only). The 3 long-vowel-allowance sh-words (`shoe`, `sheep`, `shark`) do not fit this union. Three resolution paths: (i) extend the union to include digraph-tier values like `'sh-long'` or per-word phoneme tags; (ii) annotate a fake-but-closest short vowel as a soft placeholder with comment documentation; (iii) ship Kevin's PR #211 phoneme-tag proposal first and use `phoneme: '/ʃ/'` uniformly on all 7 sh-rows as the canonical disambiguator. This is load-bearing for the impl ticket — flagged here so Kevin's coordination with PR #211 sequencing is clear. Per Dave addendum §Q8c, this ordering is developmentally invisible to Marian as long as canon-bake doesn't deploy until both the SkillNode-split and the phoneme-tag (or alternative resolution) are in place — code-shape decision only.
+
+12. **`hybridMode: true` is a NEW canon-schema field** introduced by Dave's addendum 2026-05-14 §Q7d (see §6.1). Three words flagged (`shoe, sheep, shark`); the other 4 are conventional decodable. The planner's Haiku prompt must consult this flag and gate problem-type generation accordingly. AC12 lays out the testable requirements. The field is orthogonal to SkillNode-split and phoneme-tag (PR #211) — independent of either's landing order.
+
+13. **The picture-pack also needs `sell` and `sop` distractor-only pictures.** These are short-e and short-o words being used as sh-trio s-contrast distractors. Per the existing distractor-only-entry pattern in `wordPack.ts`, silhouette placeholders are acceptable for v1; vector trace can land in polish backlog. Devon's picture-pack §6 finding #4 path applies. The picture-pack prompt sheet (`digraphs-sh-picture-pack-prompts.md`) does not include prompts for these two — they fall under the distractor-only-entries pipeline, not the per-target-word MJ generation pipeline.
