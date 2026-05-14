@@ -64,6 +64,8 @@ import {
   WORD_SONG_TARGET_WORDS_DIGRAPHS_SH,
   WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID,
   WORD_SONG_TARGET_WORDS_DIGRAPHS_CH,
+  WORD_SONG_TARGET_WORDS_DIGRAPHS_TH,
+  WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
 } from './_plannerWordList.js'
@@ -614,14 +616,17 @@ function defaultFocusNodeForTrack(track: PlannerTrack): string {
  * (PR #211) drops the dead `digraphs` literal from
  * `VALID_WORD_SONG_FOCUS_NODES`; `digraphs-sh` went FIRST-CLASS first
  * (its content tier wired the `/ʃ/` digraph pool + the hybridMode
- * problem-type gate). `digraphs-ch` is now ALSO FIRST-CLASS — its
- * content tier (this PR) wires the `/tʃ/` digraph pool. Unlike
+ * problem-type gate). `digraphs-ch` went FIRST-CLASS second — its
+ * content tier wired the `/tʃ/` digraph pool. Unlike
  * `digraphs-sh`, the ch-tier ships ZERO hybridMode words — every
  * ch-word is fully decodable (Dave addendum §3d / Kyle spec §6.1 /
  * AC12), so there is no ch-tier hybridMode problem-type gate.
- * `digraphs-th-voiceless` remains intentionally EXCLUDED and routes to
- * the `blending-cv` stub via `effectiveFocusNode` until its content
- * ticket ships.
+ * `digraphs-th-voiceless` is now ALSO FIRST-CLASS — its content tier
+ * (this PR) wires the voiceless-/θ/ digraph pool. Like `digraphs-sh`
+ * (and unlike `digraphs-ch`), the th-tier ships TWO hybridMode words
+ * — `thick` (double-digraph `th` + `ck`) and `cloth` (`/kl/` onset
+ * blend) — so it REUSES the sh-tier hybridMode problem-type gate
+ * (Dave th-addendum §3e / §3f, Kyle spec §6.2).
  */
 const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'blending-cv',
@@ -632,14 +637,15 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'cvc-words-short-e',
   'digraphs-sh',
   'digraphs-ch',
+  'digraphs-th-voiceless',
 ]
 
 /**
  * Resolve the focus node the planner actually generates for. Math honours
  * caller-supplied focusNode verbatim. Word-song honours first-class nodes
  * (`blending-cv`, `cvc-words`, the four short-vowel sibling tiers,
- * `digraphs-sh`, and `digraphs-ch`); valid-but-unsupported nodes
- * (`letter-sounds`, `digraphs-th-voiceless`, `sight-words`,
+ * `digraphs-sh`, `digraphs-ch`, and `digraphs-th-voiceless`);
+ * valid-but-unsupported nodes (`letter-sounds`, `sight-words`,
  * `simple-sentences`) fall back to `blending-cv` content as a stub — the
  * screen always renders, even on tiers we haven't tuned yet. See
  * `WORD_SONG_TRACK_GUIDE` for the prompt-side handling.
@@ -933,24 +939,26 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // ticket 86c9q9ben (short-u pool sibling tier) + ticket 86c9qdba4
 // (short-i pool sibling tier) + ticket 86c9teua2 (short-e pool sibling
 // tier — final single-vowel tier) + the digraphs-sh content tier (FIRST
-// digraph tier) + the digraphs-ch content tier (SECOND digraph tier).
-// Eight first-class content modes today:
+// digraph tier) + the digraphs-ch content tier (SECOND digraph tier) +
+// the digraphs-th content tier (THIRD and final digraph tier).
+// Nine first-class content modes today:
 //
-//   - blending-cv         → "Tap the <word>." (match-picture-to-spoken-word)
-//   - cvc-words           → "Read the <word>." (decode-printed-word, short-a)
-//   - cvc-words-short-o   → "Read the <word>." (decode-printed-word, short-o)
-//   - cvc-words-short-u   → "Read the <word>." (decode-printed-word, short-u)
-//   - cvc-words-short-i   → "Read the <word>." (decode-printed-word, short-i)
-//   - cvc-words-short-e   → "Read the <word>." (decode-printed-word, short-e)
-//   - digraphs-sh         → "Read the <word>." (decode /ʃ/-digraph words)
-//   - digraphs-ch         → "Read the <word>." (decode /tʃ/-digraph words)
+//   - blending-cv          → "Tap the <word>." (match-picture-to-spoken-word)
+//   - cvc-words            → "Read the <word>." (decode-printed-word, short-a)
+//   - cvc-words-short-o    → "Read the <word>." (decode-printed-word, short-o)
+//   - cvc-words-short-u    → "Read the <word>." (decode-printed-word, short-u)
+//   - cvc-words-short-i    → "Read the <word>." (decode-printed-word, short-i)
+//   - cvc-words-short-e    → "Read the <word>." (decode-printed-word, short-e)
+//   - digraphs-sh          → "Read the <word>." (decode /ʃ/-digraph words)
+//   - digraphs-ch          → "Read the <word>." (decode /tʃ/-digraph words)
+//   - digraphs-th-voiceless → "Read the <word>." (decode voiceless /θ/-digraph words)
 //
 // All gated by the browser parser (PR #132 widened it to dispatch on
 // the read-line template). Other valid focus nodes (letter-sounds,
-// digraphs-th-voiceless, sight-words, simple-sentences) reach this
-// prompt as `blending-cv` after `effectiveFocusNode`'s stub-fallback —
-// the user message will name `blending-cv` for those. This is the
-// "always render something" posture from the contract doc.
+// sight-words, simple-sentences) reach this prompt as `blending-cv`
+// after `effectiveFocusNode`'s stub-fallback — the user message will
+// name `blending-cv` for those. This is the "always render something"
+// posture from the contract doc.
 //
 // Utterance ids ALWAYS use the "word." prefix regardless of content mode.
 // The P0 incident (PR #117 → #118) was caused by `cvc.*` prefixes — the
@@ -958,22 +966,30 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // namespace, by design (see design/word-song/parser-widening-plan.md
 // §"Why no new id namespace"). cvc-words / cvc-words-short-o /
 // cvc-words-short-u / cvc-words-short-i / cvc-words-short-e /
-// digraphs-sh / digraphs-ch all share the "Read the <word>." template;
-// the focus-node name in the user message is what tells the planner
-// which word pool to draw from.
+// digraphs-sh / digraphs-ch / digraphs-th-voiceless all share the
+// "Read the <word>." template; the focus-node name in the user message
+// is what tells the planner which word pool to draw from.
 //
-// hybridMode problem-type gate (digraphs-sh tier ONLY) — Kyle's sh spec
-// §6.1 + Dave addendum §Q7d. Three of the seven sh-tier words (`shoe`,
+// hybridMode problem-type gate (digraphs-sh AND digraphs-th tiers) —
+// Kyle's sh spec §6.1 + Dave addendum §Q7d, and Kyle's th spec §6.2 +
+// Dave th-addendum §3e/§3f. Three of the seven sh-tier words (`shoe`,
 // `sheep`, `shark`) carry a long / r-controlled vowel OUTSIDE Marian's
-// formal short-vowel phonics tiers. Their `wordPack.ts` entries are
-// flagged `hybridMode: true`. The planner directive below names those
-// three explicitly and instructs Haiku to keep them chip-tap
-// recognition ONLY — no segmentation, no spelling, no
-// decode-from-phoneme prompt shapes. The 4 conventional sh-CVC words
-// (`ship, shell, shed, shop`) take the full decode treatment. The list
-// is sourced from `WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID` in
-// `_plannerWordList.ts`, which mirrors the `hybridMode: true` rows in
-// `wordPack.ts`.
+// formal short-vowel phonics tiers. Two of the seven th-tier words
+// (`thick`, `cloth`) carry a different structural complication —
+// `thick` is a double-digraph (`th` target onset + `ck` not-yet-taught
+// coda); `cloth` carries a `/kl/` onset blend beyond CVC scope. Their
+// `wordPack.ts` entries are flagged `hybridMode: true`. The planner
+// directive below names those words explicitly and instructs Haiku to
+// keep them chip-tap recognition ONLY — no segmentation, no spelling,
+// no decode-from-phoneme prompt shapes. The conventional sh-CVC words
+// (`ship, shell, shed, shop`) and the 5 fully-decodable th-words
+// (`thin, path, bath, math, moth`) take the full decode treatment. The
+// lists are sourced from `WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID`
+// and `WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID` in
+// `_plannerWordList.ts`, which mirror the `hybridMode: true` rows in
+// `wordPack.ts`. The th tier REUSES the exact sh-tier gate pattern —
+// same suppression behaviour, no new infrastructure; only the REASON
+// for the flag differs (Dave th-addendum Non-obvious finding 5).
 //
 // digraphs-ch tier — ZERO hybridMode words. The ch-tier directive
 // (digraphs-ch block in WORD_SONG_TRACK_GUIDE below) does NOT inherit
@@ -981,7 +997,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // chat, chest, chug, chick`) are fully decodable short-vowel words, so
 // there is no `WORD_SONG_TARGET_WORDS_DIGRAPHS_CH_HYBRID` list and no
 // per-word problem-type suppression. This is a deliberate structural
-// divergence from the sh tier, stated explicitly per Dave's
+// divergence from the sh AND th tiers, stated explicitly per Dave's
 // `digraph-ch-addendum.md` §3d / non-obvious finding #1 + Kyle's
 // `digraphs-ch-word-list.md` §6.1 / AC12 — the short-vowel ch word
 // stock is rich enough that long-vowel inclusions are never necessary,
@@ -989,6 +1005,21 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // directive instead carries the c-says-/k/ orthographic-trap framing
 // (Dave §1c, non-obvious finding #2): Marian already knows `c` says
 // /k/, so `ch` saying /tʃ/ requires explicit naming.
+//
+// digraphs-th tier — voiceless /θ/ ONLY, plus a mandatory articulation
+// scaffold. The th-tier directive (digraphs-th-voiceless block in
+// WORD_SONG_TRACK_GUIDE below) carries TWO teaching points neither sh
+// nor ch needed: (1) the tongue-between-teeth articulation cue — /θ/
+// has NO L1 anchor for a Tagalog-L1 learner and the /θ/→/t/
+// substitution is the most systematic of the three digraphs, so Emma
+// must explicitly name "put your tongue between your teeth and blow"
+// (Dave th-addendum §1a/§1b/§5b, Recommendation 4); (2) the voiced/θ/
+// vs voiceless /ð/ disambiguation — `th` spells BOTH sounds, and the
+// voiced /ð/ words (`the, this, that, they, them, then, than, there`)
+// are EXCLUDED from this tier entirely (Dave th-addendum §2a/§2b/§4a;
+// Kyle th spec §1.4). The mouth-at-teeth VISUAL is a design
+// requirement owned by the WordSong screen — the planner cannot render
+// a visual, but its opener copy must pair with it.
 //
 // Short-u first-encounter scaffolding — STRIPPED (ticket 86c9qkf3v,
 // 2026-05-11). Three successive fix iterations (PR #174 slash-IPA,
@@ -1073,23 +1104,38 @@ matching that node. Eight first-class content modes today:
     c-says-/k/ orthographic trap (Marian already knows "c" says /k/ from
     cat / cup / cap, so "ch" saying /tʃ/ must be named explicitly). See
     the CH-DIGRAPH C-SAYS-/k/ FRAMING block below.
+  - digraphs-th-voiceless: "Read the <word>." problems with voiceless
+    th-DIGRAPH target words — the consonant digraph "th" making the
+    voiceless /θ/ sound (the breath sound in "thin" and "bath", NOT the
+    voiced sound in "the"). Two letters making one sound. Same wire
+    shape and templates as cvc-words. This is the THIRD and final
+    digraph tier — Marian arrives here after she's mastered digraphs-ch.
+    Two of the seven th-words (thick, cloth) are hybridMode — see the
+    HYBRIDMODE PROBLEM-TYPE GATE block below. The th tier carries TWO
+    teaching points sh and ch did not: the tongue-between-teeth
+    articulation cue, and the voiceless-vs-voiced disambiguation. See
+    the TH-DIGRAPH VOICELESS-/θ/ FRAMING block below.
 
 Pick 8 distinct target words from the focus-node-specific pool below
 (do not invent new words, do not use a target more than once).
 
-EXCEPTION for digraphs-sh AND digraphs-ch: each digraph-tier pool has
-only 7 words, so 8 distinct words is impossible. For a digraphs-sh OR
-digraphs-ch session, use each of the 7 pool words at least once and
-repeat exactly ONE word for the 8th problem. For digraphs-sh, prefer
-repeating a conventional sh-CVC word (ship, shell, shed, or shop) for
-the 8th slot — NOT a hybridMode word (shoe / sheep / shark), so the
-repeated decode practice lands on a fully-decodable word. For
-digraphs-ch, all 7 words are fully decodable, so any ch-word may be
-repeated for the 8th slot — but prefer a short-i, short-o, short-a, or
-short-u word (chin, chip, chop, chat, chug, chick) over the short-e
-word (chest), since short-e is Marian's emerging vowel. digraphs-sh and
-digraphs-ch are the only focus nodes where a target may legitimately
-appear twice in a session.
+EXCEPTION for digraphs-sh, digraphs-ch AND digraphs-th-voiceless: each
+digraph-tier pool has only 7 words, so 8 distinct words is impossible.
+For a digraphs-sh, digraphs-ch, OR digraphs-th-voiceless session, use
+each of the 7 pool words at least once and repeat exactly ONE word for
+the 8th problem. For digraphs-sh, prefer repeating a conventional
+sh-CVC word (ship, shell, shed, or shop) for the 8th slot — NOT a
+hybridMode word (shoe / sheep / shark), so the repeated decode practice
+lands on a fully-decodable word. For digraphs-ch, all 7 words are fully
+decodable, so any ch-word may be repeated for the 8th slot — but prefer
+a short-i, short-o, short-a, or short-u word (chin, chip, chop, chat,
+chug, chick) over the short-e word (chest), since short-e is Marian's
+emerging vowel. For digraphs-th-voiceless, prefer repeating one of the
+5 fully-decodable th-words (thin, path, bath, math, moth) for the 8th
+slot — NOT a hybridMode word (thick / cloth), so the repeated decode
+practice lands on a fully-decodable word. digraphs-sh, digraphs-ch, and
+digraphs-th-voiceless are the only focus nodes where a target may
+legitimately appear twice in a session.
 
 Pool for blending-cv and cvc-words (14-word short-a CVC):
 ${WORD_SONG_TARGET_WORDS_FOR_PROMPT}
@@ -1112,19 +1158,30 @@ ${WORD_SONG_TARGET_WORDS_DIGRAPHS_SH}
 Pool for digraphs-ch (7-word ch-digraph):
 ${WORD_SONG_TARGET_WORDS_DIGRAPHS_CH}
 
-HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh tier only): three of the
-seven sh-words — ${WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID.join(', ')} — are
+Pool for digraphs-th-voiceless (7-word voiceless-th-digraph):
+${WORD_SONG_TARGET_WORDS_DIGRAPHS_TH}
+
+HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh AND digraphs-th-voiceless
+tiers): three of the seven sh-words —
+${WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID.join(', ')} — are
 sight-word-hybrids. Their inside vowel is a long or r-controlled vowel
-OUTSIDE the short-vowel phonics tiers Marian has been taught. For these
-three words, generate ONLY chip-tap recognition problems (Emma says the
-word, Marian taps the matching picture chip) — the same "Read the
-<word>." template every sh-word uses. You MUST NOT generate any
-segmentation prompt ("tell me the sounds in s-h-e-e-p"), spelling-from-
-phoneme prompt, or decode-from-letters prompt for shoe, sheep, or shark.
-The picture and Emma's audio carry the rest-of-word vowel; the child is
-never asked to produce or decode it. The 4 conventional sh-CVC words
-(ship, shell, shed, shop) take the normal decode treatment. (In v1 the
-only problem type for the whole digraphs-sh tier is chip-tap "Read the
+OUTSIDE the short-vowel phonics tiers Marian has been taught. Two of
+the seven th-words — ${WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID.join(', ')} —
+are also hybridMode, for a different structural reason: thick is a
+double-digraph (the "th" target plus a "ck" ending Marian has not been
+formally taught), and cloth carries a consonant blend at its start
+("cl") that is beyond the simple-word scope. For ALL of these words
+(sh: shoe, sheep, shark; th: thick, cloth), generate ONLY chip-tap
+recognition problems (Emma says the word, Marian taps the matching
+picture chip) — the same "Read the <word>." template every digraph word
+uses. You MUST NOT generate any segmentation prompt ("tell me the
+sounds in s-h-e-e-p"), spelling-from-phoneme prompt, or
+decode-from-letters prompt for shoe, sheep, shark, thick, or cloth. The
+picture and Emma's audio carry the complicated part; the child is never
+asked to produce or decode it. The conventional sh-CVC words (ship,
+shell, shed, shop) and the 5 fully-decodable th-words (thin, path,
+bath, math, moth) take the normal decode treatment. (In v1 the only
+problem type for the whole digraph tier set is chip-tap "Read the
 <word>." recognition, so the practical effect is uniform; the gate is
 forward-compatible guidance for when segmentation / spelling problem
 types are introduced for other tiers.)
@@ -1132,8 +1189,9 @@ types are introduced for other tiers.)
 NO HYBRIDMODE GATE for digraphs-ch: all 7 ch-words (chin, chip, chop,
 chat, chest, chug, chick) use short vowels Marian has formally covered
 (short-i, -o, -a, -e, -u). They are all fully decodable — there is no
-ch-tier equivalent of the sh-tier's shoe / sheep / shark hybrids and no
-per-word problem-type suppression for the ch tier.
+ch-tier equivalent of the sh-tier's shoe / sheep / shark hybrids (or
+the th-tier's thick / cloth hybrids) and no per-word problem-type
+suppression for the ch tier.
 
 CH-DIGRAPH C-SAYS-/k/ FRAMING (digraphs-ch tier only): the ch tier has
 one teaching point the sh tier did not. Marian already knows the
@@ -1154,6 +1212,41 @@ This framing is informational scaffolding inside the standard "Read the
 <word>." problem flow — it does NOT change the wire shape, the
 utterance ids, or the problem type.
 
+TH-DIGRAPH VOICELESS-/θ/ FRAMING (digraphs-th-voiceless tier only): the
+th tier carries TWO teaching points neither sh nor ch needed.
+
+(1) The tongue-between-teeth articulation cue. The voiceless "th" sound
+is the hardest of the three digraphs for Marian: her first language
+(Tagalog) has no equivalent sound at all, and the natural error is to
+say "t" instead (thin becomes "tin", thick becomes "tick"). So Emma
+must name HOW the sound is made, not just THAT it is one sound. Open
+the digraphs-th-voiceless session's FIRST problem read-flow with this
+articulation cue baked into the hint/scaffold copy: "th" is a special
+new sound — put your tongue between your teeth and blow softly. It is
+NOT the "t" sound like in "top". A static mouth-with-tongue-at-teeth
+picture is shown alongside Emma's audio by the screen — your opener
+copy must pair with that visual ("look at my mouth — my tongue is
+between my teeth").
+
+(2) The voiceless-vs-voiced disambiguation, one line only. The letters
+"th" can spell two different sounds: the breath sound in "thin" and
+"bath" (this tier), and a different sound in words like "the" and
+"this" (NOT this tier). Emma names this once: the "th" in our words is
+a quiet breath sound; some other "th" words sound different and we will
+learn those later. Do NOT teach the voiced sound here — just flag that
+it exists so Marian is not confused later.
+
+Keep ALL of this in natural spoken English. This text is read aloud by
+Azure TTS — do NOT write phonetic notation, slashes, IPA characters, or
+letter-sound spellouts into utterance text. Write "the th sound" and
+"the t sound like in top", never "/θ/" or "/t/" or "th-th-th". For the
+per-item lines on thin and thick specifically, you MAY name the t-word
+that Marian might confuse it with ("thin — not tin"; "thick — not
+tick") since the t-contrast is the core discrimination this tier
+teaches. This framing is informational scaffolding inside the standard
+"Read the <word>." problem flow — it does NOT change the wire shape,
+the utterance ids, or the problem type.
+
 GRADUATION-SESSION EXCEPTION: when the user message contains the
 "GRADUATION SESSION" directive, that directive supplies an additional
 NOVEL pool of words (e.g. nap, rat, map, tap) to be mixed with the
@@ -1171,15 +1264,23 @@ ${WORD_SONG_DISTRACTOR_HINTS}
 Order easier-recognise words (cat, bag, hat, dad for short-a; dog, mom,
 pot, log for short-o; sun, cup, bus for short-u; pig, bin, lid for
 short-i; bed, hen, leg for short-e; ship, shell, shoe for digraphs-sh;
-chin, chip, chick for digraphs-ch) in problems 1-3 and
-richer-rhyme/trap words (van, can, fan, man, pan, mat, bat, tag, cap,
-jam for short-a; mop, box, fox, hot, cot, top, pop for short-o; bug,
-jug, rug, nut, hut, bun, gum, tub for short-u; pin, wig, bib, fig, sip
-for short-i; pen, web, net, jet, gem, egg for short-e; sheep, shark,
-shed, shop for digraphs-sh; chop, chat, chug, chest for digraphs-ch) in
-problems 4-8. For digraphs-ch, place chest (Marian's emerging short-e
-vowel) toward the later problems — it is the conservatively-weighted
-entry in the ch pool.
+chin, chip, chick for digraphs-ch; thin, bath, math for
+digraphs-th-voiceless) in problems 1-3 and richer-rhyme/trap words
+(van, can, fan, man, pan, mat, bat, tag, cap, jam for short-a; mop,
+box, fox, hot, cot, top, pop for short-o; bug, jug, rug, nut, hut, bun,
+gum, tub for short-u; pin, wig, bib, fig, sip for short-i; pen, web,
+net, jet, gem, egg for short-e; sheep, shark, shed, shop for
+digraphs-sh; chop, chat, chug, chest for digraphs-ch; path, moth,
+thick, cloth for digraphs-th-voiceless) in problems 4-8. For
+digraphs-ch, place chest (Marian's emerging short-e vowel) toward the
+later problems — it is the conservatively-weighted entry in the ch
+pool. For digraphs-th-voiceless, introduce the two word-initial th
+words (thin, thick) before the word-final th words — Marian meets "th"
+at the START of a word first, then sees it at the END. thin is the
+clean word-initial decode anchor (place it early); thick is hybridMode
+(place it in the trap window, problems 4-8). Spread the 3 word-final
+short-a words (path, bath, math) across the session — do NOT cluster
+all three back-to-back.
 
 Per-problem utterance template — the read line varies by focus node;
 all other slots are content-mode-agnostic:
@@ -1193,26 +1294,37 @@ all other slots are content-mode-agnostic:
     - cvc-words-short-e: "Read the <word>." e.g. "Read the bed."
     - digraphs-sh: "Read the <word>." e.g. "Read the ship."
     - digraphs-ch: "Read the <word>." e.g. "Read the chin."
+    - digraphs-th-voiceless: "Read the <word>." e.g. "Read the thin."
   Use lowercase target word; one short sentence; ends with a period.
   Use the EXACT verb for the focus node — "Tap" for blending-cv,
   "Read" for cvc-words / cvc-words-short-o / cvc-words-short-u /
-  cvc-words-short-i / cvc-words-short-e / digraphs-sh / digraphs-ch.
+  cvc-words-short-i / cvc-words-short-e / digraphs-sh / digraphs-ch /
+  digraphs-th-voiceless.
   Do not mix templates within a single plan.
 - correct: default template is "Yes! That's a <word>." (lowercase target
   after the article) e.g. "Yes! That's a cat."
   EXCEPTION — chip words that cannot take an indefinite article
-  (relational nouns: mom, dad; mass nouns: jam, gum; adjectives: hot;
-  vowel-initial nouns: egg) fall back to "Yes! <Word>!" (capitalised,
-  trailing bang, no article) e.g. "Yes! Mom!" / "Yes! Dad!" /
-  "Yes! Jam!" / "Yes! Gum!" / "Yes! Hot!" / "Yes! Egg!"
-  The exception list is exactly: mom, dad, jam, gum, hot, egg. Apply
-  the fallback ONLY for these six words; every other chip word in every
-  focus pool uses the default "Yes! That's a <word>." template.
+  (relational nouns: mom, dad; mass nouns: jam, gum; adjectives: hot,
+  thin, thick; non-count domain noun: math; vowel-initial nouns: egg)
+  fall back to "Yes! <Word>!" (capitalised, trailing bang, no article)
+  e.g. "Yes! Mom!" / "Yes! Dad!" / "Yes! Jam!" / "Yes! Gum!" /
+  "Yes! Hot!" / "Yes! Egg!" / "Yes! Thin!" / "Yes! Thick!" /
+  "Yes! Math!"
+  The exception list is exactly: mom, dad, jam, gum, hot, egg, thin,
+  thick, math. Apply the fallback ONLY for these nine words; every
+  other chip word in every focus pool uses the default
+  "Yes! That's a <word>." template.
   Rationale for the egg addition (ticket 86c9teua2): the article-led
   template would produce "Yes! That's a egg." which is grammatically
   wrong English; rather than introduce an a/an switch for one word,
   the bang-fallback shape lands egg in the same prosodic environment
-  as the other 5 exceptions.
+  as the other exceptions.
+  Rationale for the thin / thick / math additions (digraphs-th tier):
+  thin and thick are adjectives and math is a non-count domain noun —
+  "That's a thin." / "That's a thick." / "That's a math." are all
+  ungrammatical English. The other 4 th-words (path, bath, moth,
+  cloth) are ordinary count nouns and use the default article-led
+  template.
   Rationale: the article-led declarative ramp lands the chip word in
   the same prosodic environment as "Read the <word>." which Azure
   renders naturally. The bare "Yes! <Word>." template triggered

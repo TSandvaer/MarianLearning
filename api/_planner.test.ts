@@ -960,17 +960,19 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
     // here. (PR #211: dead `digraphs` literal dropped; replaced by 3
     // sequential sibling nodes. `digraphs-sh` went FIRST-CLASS first —
     // its content tier wired the /ʃ/ digraph pool + hybridMode gate.
-    // `digraphs-ch` is now ALSO FIRST-CLASS — its content tier wires the
+    // `digraphs-ch` went FIRST-CLASS second — its content tier wired the
     // /tʃ/ digraph pool (ZERO hybridMode words). `digraphs-th-voiceless`
-    // remains at the stub-fallback until its content tier ships.)
+    // is now ALSO FIRST-CLASS — its content tier (this PR) wires the
+    // voiceless-/θ/ digraph pool + REUSES the sh-tier hybridMode gate
+    // for thick/cloth.)
     const expectations: ReadonlyArray<[string, string]> = [
       ['letter-names', 'blending-cv'],
       ['letter-sounds', 'blending-cv'],
       ['blending-cv', 'blending-cv'], // first-class
       ['cvc-words', 'cvc-words'], // first-class (the unblock)
       ['digraphs-sh', 'digraphs-sh'], // first-class (sh content tier)
-      ['digraphs-ch', 'digraphs-ch'], // first-class (this PR's content tier)
-      ['digraphs-th-voiceless', 'blending-cv'],
+      ['digraphs-ch', 'digraphs-ch'], // first-class (ch content tier)
+      ['digraphs-th-voiceless', 'digraphs-th-voiceless'], // first-class (this PR's content tier)
       ['sight-words', 'blending-cv'],
       ['simple-sentences', 'blending-cv'],
     ]
@@ -1195,17 +1197,17 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
   })
 
   it('ignores isGraduationSession=true on word-song untuned tiers (stub-fallback to blending-cv)', async () => {
-    // Untuned tiers (e.g. digraphs-th-voiceless) fall back to
-    // blending-cv content per `effectiveFocusNode`. The graduation
-    // directive is gated on the EFFECTIVE focus node being cvc-words,
-    // so an untuned-tier request with the flag set must not carry the
-    // directive — the session would otherwise emit graduation content
-    // under a non-graduation focus. (PR #211: dead `digraphs` literal
-    // dropped for 3 sibling nodes; `digraphs-sh` and `digraphs-ch` are
-    // now both first-class with their own content tiers, so
-    // `digraphs-th-voiceless` is the remaining stub-fallback example
-    // here. The first-class digraph graduation-no-leak cases have their
-    // own assertions in the digraphs-sh / digraphs-ch sibling-tier
+    // Untuned tiers (e.g. sight-words) fall back to blending-cv content
+    // per `effectiveFocusNode`. The graduation directive is gated on the
+    // EFFECTIVE focus node being cvc-words, so an untuned-tier request
+    // with the flag set must not carry the directive — the session would
+    // otherwise emit graduation content under a non-graduation focus.
+    // (PR #211: dead `digraphs` literal dropped for 3 sibling nodes;
+    // `digraphs-sh`, `digraphs-ch`, and `digraphs-th-voiceless` are now
+    // ALL first-class with their own content tiers, so `sight-words` is
+    // the remaining stub-fallback example here. The first-class digraph
+    // graduation-no-leak cases have their own assertions in the
+    // digraphs-sh / digraphs-ch / digraphs-th-voiceless sibling-tier
     // describe blocks.)
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
@@ -1215,7 +1217,7 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
       track: 'word-song',
       level: 1,
       childName: 'Marian',
-      focusNode: 'digraphs-th-voiceless',
+      focusNode: 'sight-words',
       isGraduationSession: true,
     })
 
@@ -2207,29 +2209,30 @@ describe('generateSessionPlan — digraphs-ch content tier (SECOND digraph tier)
     expect(prompt).toMatch(/cat/)
     // The prompt explicitly states the ch tier has NO hybridMode gate.
     expect(prompt).toContain('NO HYBRIDMODE GATE for digraphs-ch')
-    // And it must NOT carry a ch-tier hybridMode word list — the sh
-    // tier's HYBRIDMODE PROBLEM-TYPE GATE is sh-only. (The string
-    // "HYBRIDMODE PROBLEM-TYPE GATE" still appears in the prompt for
-    // the sh tier; what must be absent is the ch pool being subjected
-    // to it.) The sh hybridMode gate block (from its header to the
+    // And it must NOT carry a ch-tier hybridMode word list — the
+    // HYBRIDMODE PROBLEM-TYPE GATE covers the sh AND th tiers, never
+    // ch. (The string "HYBRIDMODE PROBLEM-TYPE GATE" still appears in
+    // the prompt; what must be absent is the ch pool being subjected
+    // to it.) The hybridMode gate block (from its header to the
     // "NO HYBRIDMODE GATE for digraphs-ch" disclaimer) must not name
     // `digraphs-ch` nor carry the ch pool literal.
     // Anchor on the fuller gate-block header — the bare string
     // "HYBRIDMODE PROBLEM-TYPE GATE" also appears in the digraphs-sh
     // mode-list description ("See the HYBRIDMODE PROBLEM-TYPE GATE
     // block below"), which would over-widen the slice.
-    const shGateBlock = prompt.slice(
-      prompt.indexOf('HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh tier only)'),
+    const gateBlock = prompt.slice(
+      prompt.indexOf('HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh AND'),
       prompt.indexOf('NO HYBRIDMODE GATE for digraphs-ch'),
     )
-    expect(shGateBlock.includes('digraphs-ch')).toBe(false)
+    expect(gateBlock.includes('digraphs-ch')).toBe(false)
     expect(
-      shGateBlock.includes('chin, chip, chop, chat, chest, chug, chick'),
+      gateBlock.includes('chin, chip, chop, chat, chest, chug, chick'),
     ).toBe(false)
-    // The sh gate names only the 3 sh-hybrid words — none of the ch
-    // pool. (sh-hybrid list is the authoritative gated set.)
-    for (const shWord of ['shoe', 'sheep', 'shark']) {
-      expect(shGateBlock).toContain(shWord)
+    // The gate names the 3 sh-hybrid words + the 2 th-hybrid words —
+    // none of the ch pool. (sh+th hybrid list is the authoritative
+    // gated set.)
+    for (const gatedWord of ['shoe', 'sheep', 'shark', 'thick', 'cloth']) {
+      expect(gateBlock).toContain(gatedWord)
     }
   })
 
@@ -2337,6 +2340,297 @@ describe('generateSessionPlan — digraphs-ch content tier (SECOND digraph tier)
 
   it('digraphs-ch is in VALID_WORD_SONG_FOCUS_NODES (drift tripwire)', () => {
     expect(VALID_WORD_SONG_FOCUS_NODES.includes('digraphs-ch')).toBe(true)
+  })
+})
+
+/*
+ * digraphs-th content tier (the THIRD and final digraph tier — sits
+ * after `digraphs-ch` in `WordSongNode` / `LITERACY_TREE` per PR #211's
+ * 3-sibling digraph split). The planner emits `digraphs-th-voiceless`
+ * content using the same "Read the <word>." template as `cvc-words` /
+ * `digraphs-sh` / `digraphs-ch`, but the word pool is the 7 voiceless-th
+ * words (`thin, thick, path, bath, math, moth, cloth`).
+ *
+ * Spec: `design/word-song/digraphs-th-word-list.md` §1 (RECONCILED
+ * against Dave's `design/research/digraph-th-addendum.md` §3f,
+ * 2026-05-14). Pairs with Devon's `feat/digraphs-th-wordpack` PR
+ * (client-side wordPack rows). Unblocks the th-tier E2E spec.
+ *
+ * STRUCTURAL SHAPE — covered explicitly below:
+ *  - TWO hybridMode words (`thick`, `cloth`) — REUSES the sh-tier
+ *    hybridMode problem-type gate, NOT a new one. `thick` is a
+ *    double-digraph (`th` + `ck`); `cloth` carries a `/kl/` onset
+ *    blend. Dave th-addendum §3e/§3f + Kyle spec §6.2. This is the
+ *    OPPOSITE of the ch tier (ZERO hybridMode).
+ *  - The th tier carries TWO teaching points neither sh nor ch needed:
+ *    the tongue-between-teeth articulation cue (the /θ/→/t/
+ *    substitution has no L1 anchor for a Tagalog-L1 learner — Dave
+ *    §1a/§1b/§5b), and the voiceless-vs-voiced disambiguation (`th`
+ *    spells both /θ/ and /ð/; voiced /ð/ function words are EXCLUDED —
+ *    Dave §2a/§2b/§4a, Kyle §1.4).
+ *
+ * Coverage strategy (mirrors the digraphs-sh / digraphs-ch blocks):
+ *  - (a) User message routes `digraphs-th-voiceless` through verbatim
+ *    (first-class, no stub-fallback to blending-cv).
+ *  - (b) System prompt names the new node + the 7-word pool.
+ *  - (c) System prompt carries the voiceless-/θ/ framing AND extends
+ *    the hybridMode gate to the th pool (thick, cloth).
+ *  - (d) Round-trip: a wire-shape response with 8 "Read the <word>."
+ *    problems parses cleanly; every target is in the 7-word pool.
+ *  - (e) Cache invariant: a `digraphs-th-voiceless` call shares
+ *    byte-identical system text with a `cvc-words` call.
+ *  - (f) Graduation directive does NOT leak into a th session.
+ *
+ * Per `feedback_count_assertions_on_regression_tests.md`: count-based
+ * assertions (`.toHaveLength(N)`, `.toEqual(N)`) — never `.toContain`
+ * for the round-trip pool checks.
+ */
+describe('generateSessionPlan — digraphs-th content tier (THIRD digraph tier)', () => {
+  /** The full 7-word voiceless-th pool, in wordPack.ts row order. */
+  const TH_POOL = [
+    'thin',
+    'thick',
+    'path',
+    'bath',
+    'math',
+    'moth',
+    'cloth',
+  ] as const
+
+  /** Words whose correct-slot line uses the "Yes! <Word>!" bang
+   *  fallback rather than the article-led "Yes! That's a <word>."
+   *  template — adjectives (thin, thick) and the non-count domain noun
+   *  (math) cannot take an indefinite article. */
+  const TH_BANG_WORDS = new Set<string>(['thin', 'thick', 'math'])
+
+  /** Build an 8-problem digraphs-th wire response in template form.
+   *  The th pool has only 7 words, so the 8th problem repeats one
+   *  fully-decodable th-word (`thin`) — matching the planner's
+   *  digraphs-th-voiceless EXCEPTION ("each of the 7 at least once,
+   *  repeat ONE fully-decodable word for the 8th"). */
+  function makeThPlan(): string {
+    const words = [...TH_POOL, 'thin'] // 8 entries, 7 distinct
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      const correct = TH_BANG_WORDS.has(word)
+        ? `Yes! ${cap}!`
+        : `Yes! That's a ${word}.`
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: correct },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-digraphs-th-001',
+      label: 'Digraphs th',
+      utterances,
+    })
+  }
+
+  it('routes digraphs-th-voiceless focus verbatim into the user message (first-class, no stub-fallback)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeThPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-th-voiceless',
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/Focus skill node: digraphs-th-voiceless\./)
+    // It must NOT have been remapped to the blending-cv stub.
+    expect(user).not.toMatch(/Focus skill node: blending-cv\./)
+  })
+
+  it('system prompt names the digraphs-th-voiceless content mode + the 7-word pool', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeThPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-th-voiceless',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // The content-mode header.
+    expect(prompt).toMatch(/digraphs-th-voiceless:/)
+    // Pool literal — the comma-joined list as embedded in the prompt.
+    expect(prompt).toContain('thin, thick, path, bath, math, moth, cloth')
+  })
+
+  it('system prompt carries the voiceless-/θ/ framing and extends the hybridMode gate to thick + cloth (spec §6.2)', async () => {
+    // The th tier's load-bearing planner directives: (1) the
+    // voiceless-/θ/ articulation framing (tongue-between-teeth cue +
+    // voiced-vs-voiceless disambiguation — Dave th-addendum §1/§2/§5b),
+    // and (2) the hybridMode gate REUSED from the sh tier, extended to
+    // cover thick + cloth.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeThPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-th-voiceless',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // The voiceless-/θ/ framing block — th's distinctive teaching point.
+    expect(prompt).toContain('TH-DIGRAPH VOICELESS-/θ/ FRAMING')
+    // It must name the tongue-between-teeth articulation cue.
+    expect(prompt).toMatch(/tongue between your teeth/)
+    // It must flag the voiced-vs-voiceless split (without teaching it).
+    expect(prompt).toMatch(/some other "th" words sound different/)
+    // The hybridMode gate must now name BOTH sh-tier and th-tier in its
+    // header, and the th-tier hybrid words thick + cloth.
+    expect(prompt).toContain(
+      'HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh AND digraphs-th-voiceless',
+    )
+    // The hybridMode gate block must name thick and cloth as the gated
+    // th-tier words. Slice from the gate header to the
+    // "NO HYBRIDMODE GATE for digraphs-ch" disclaimer.
+    const gateBlock = prompt.slice(
+      prompt.indexOf('HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh AND'),
+      prompt.indexOf('NO HYBRIDMODE GATE for digraphs-ch'),
+    )
+    expect(gateBlock).toContain('thick')
+    expect(gateBlock).toContain('cloth')
+    // The sh-hybrid words are still gated too.
+    for (const shWord of ['shoe', 'sheep', 'shark']) {
+      expect(gateBlock).toContain(shWord)
+    }
+    // The fully-decodable th-words must NOT be in the gated set.
+    for (const decodable of ['thin', 'path', 'bath', 'math', 'moth']) {
+      // they appear in the pool list elsewhere, but the gate block's
+      // explicit gated-word enumeration names only thick + cloth.
+      // Assert the gate block's gated-list sentence (the
+      // `_HYBRID.join(', ')` interpolation) is exactly "thick, cloth".
+      expect(gateBlock).not.toMatch(
+        new RegExp(`seven th-words — [^\\n]*\\b${decodable}\\b`),
+      )
+    }
+  })
+
+  it('round-trips a wire response with 8 problems drawn from the 7-word th pool', async () => {
+    // Count-based assertions per
+    // `feedback_count_assertions_on_regression_tests.md`.
+    // digraphs-th-voiceless (like digraphs-sh / digraphs-ch) is a focus
+    // node where a target may legitimately appear twice (7-word pool,
+    // 8-problem session) — so the assertion is "8 reads, all from the
+    // pool, exactly 7 distinct", NOT "8 distinct".
+    const client = makeMockClient(makeThPlan())
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-th-voiceless',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    const reReadLine = /^Read the ([a-z]+)\.$/
+    const readWords = reads.map((u) => u.text.match(reReadLine)![1]!)
+    expect(readWords).toHaveLength(8)
+    const poolSet = new Set<string>(TH_POOL)
+    for (const word of readWords) {
+      expect(poolSet.has(word)).toBe(true)
+    }
+    // Every one of the 7 th-words appears at least once.
+    expect(new Set(readWords).size).toEqual(7)
+  })
+
+  it('every read line uses the "Read the <word>." template (no "Tap the" leakage from blending-cv)', async () => {
+    const client = makeMockClient(makeThPlan())
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-th-voiceless',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    for (const r of reads) {
+      expect(r.text).toMatch(/^Read the [a-z]+\.$/)
+      expect(r.text).not.toMatch(/^Tap the/)
+    }
+  })
+
+  it('two calls differing only in focusNode (cvc-words vs digraphs-th-voiceless) share byte-identical system text (cache invariant)', async () => {
+    // Per shared/prompt-caching.md: focusNode lives in the user
+    // message, not the system block. The new digraph tier must not
+    // cause a cache-prefix delta vs cvc-words.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(makeThPlan(), { capture: cap1 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(makeThPlan(), { capture: cap2 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-th-voiceless',
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toEqual(sys2)
+  })
+
+  it('graduation directive does NOT leak into a digraphs-th-voiceless session even with isGraduationSession=true', async () => {
+    // The graduation gate is `cvc-words`-only (short-a) per
+    // `WORD_SONG_GRADUATION_GATED_NODES` in mastery.ts. A misrouted
+    // flag on a th request must not carry the directive — the session
+    // would otherwise receive novel short-a words alongside its
+    // th-digraph pool, which is nonsense for the digraph tier.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeThPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-th-voiceless',
+      isGraduationSession: true,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
+  })
+
+  it('digraphs-th-voiceless is in VALID_WORD_SONG_FOCUS_NODES (drift tripwire)', () => {
+    expect(VALID_WORD_SONG_FOCUS_NODES.includes('digraphs-th-voiceless')).toBe(
+      true,
+    )
   })
 })
 
@@ -3128,7 +3422,7 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     expect(exceptionTemplateMatches).toEqual(1)
   })
 
-  it('system prompt names the per-word exception list (mom, dad, jam, gum, hot, egg)', async () => {
+  it('system prompt names the per-word exception list (mom, dad, jam, gum, hot, egg, thin, thick, math)', async () => {
     // Pin the exception list contents. If a word is added to or
     // removed from the list in the planner directive without updating
     // this test, the test fails — ensuring the author audits the
@@ -3136,13 +3430,17 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     //
     // The exception list covers chip words that cannot take an
     // indefinite article: mom/dad (relational), jam/gum (mass nouns),
-    // hot (adjective), egg (vowel-initial — "a egg" is ungrammatical;
-    // ticket 86c9teua2). The audit explicitly documented mom/dad/jam;
-    // hot was added at first canon-bake when the default template
-    // produced ungrammatical "That's a hot." in the short-o pool;
-    // gum was added on Devon's review of PR #198 (same grammatical
-    // issue as jam — mass noun in the short-u pool); egg was added
-    // alongside the short-e tier (vowel-initial noun, ticket 86c9teua2).
+    // hot/thin/thick (adjectives), egg (vowel-initial — "a egg" is
+    // ungrammatical; ticket 86c9teua2), math (non-count domain noun).
+    // The audit explicitly documented mom/dad/jam; hot was added at
+    // first canon-bake when the default template produced
+    // ungrammatical "That's a hot." in the short-o pool; gum was added
+    // on Devon's review of PR #198 (same grammatical issue as jam —
+    // mass noun in the short-u pool); egg was added alongside the
+    // short-e tier (vowel-initial noun, ticket 86c9teua2); thin/thick/
+    // math were added alongside the digraphs-th tier — "That's a thin."
+    // / "That's a thick." / "That's a math." are all ungrammatical
+    // English.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -3161,10 +3459,14 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
     // (per `feedback_count_assertions_on_regression_tests.md`) on the
     // exact list-naming sentence. If the list grows or shrinks, the
     // count drops to 0 and the test fails.
+    // Tolerate the directive's hard line-wrap between list members
+    // (`thin,\n  thick, math.`) — collapse runs of whitespace first.
     const exceptionListMatches = (
-      prompt.match(
-        /exception list is exactly: mom, dad, jam, gum, hot, egg\./g,
-      ) ?? []
+      prompt
+        .replace(/\s+/g, ' ')
+        .match(
+          /exception list is exactly: mom, dad, jam, gum, hot, egg, thin, thick, math\./g,
+        ) ?? []
     ).length
     expect(exceptionListMatches).toEqual(1)
   })

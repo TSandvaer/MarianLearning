@@ -255,6 +255,82 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID: readonly string[] = [
 export const WORD_SONG_TARGET_WORDS_DIGRAPHS_CH =
   'chin, chip, chop, chat, chest, chug, chick'
 
+/**
+ * The 7 target words for the digraphs-th tier (`digraphs-th-voiceless`)
+ * — the THIRD and final digraph tier, sitting after `digraphs-ch` in
+ * `WordSongNode` / `LITERACY_TREE` (PR #211's 3-sibling digraph split —
+ * `digraphs-sh` / `digraphs-ch` / `digraphs-th-voiceless`).
+ *
+ * Locked 2026-05-14 per `design/word-song/digraphs-th-word-list.md` §1
+ * (RECONCILED against Dave's `design/research/digraph-th-addendum.md`
+ * §3f). Seven voiceless-/θ/ words covering BOTH th-positions:
+ *  - 2 word-initial th: `thin` (short-i), `thick` (short-i).
+ *  - 5 word-final th: `path, bath, math` (short-a), `moth, cloth`
+ *    (short-o). The 5-final/2-initial asymmetry is deliberate — the
+ *    word-final /θ/ stock is the stronger one for Marian (picturable
+ *    nouns), while the word-initial short-vowel th stock is mostly
+ *    property/event words (Dave §3c / §3f / Non-obvious finding 1).
+ *  - 2 hybridMode words: `thick` (double-digraph — `th` target +
+ *    `ck` not-yet-taught coda) and `cloth` (`/kl/` onset blend beyond
+ *    CVC scope). These carry `hybridMode: true` in `wordPack.ts`; the
+ *    planner reads that flag (via `WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID`
+ *    below) to SUPPRESS segmentation / spelling / decode-from-phoneme
+ *    problem types for them — chip-tap recognition only (Dave §3d /
+ *    §3e / §3f; Kyle's spec §6.2). The other 5 are fully decodable.
+ *
+ * Order MUST match the `isTarget: true` th-tier rows in `wordPack.ts`
+ * (Devon's parallel PR `feat/digraphs-th-wordpack`): `thin, thick,
+ * path, bath, math, moth, cloth` — the §1 numbered-table order in the
+ * word-list spec.
+ *
+ * STRUCTURAL DIVERGENCE FROM THE CH TIER: th SETS `phoneme: '/θ/'` on
+ * all 7 `wordPack.ts` rows (the ch tier OMITTED `phoneme`). `th` is the
+ * canonical multi-phoneme grapheme — it spells BOTH voiceless /θ/ and
+ * voiced /ð/ — so the `phoneme` field is the structural floor that
+ * scopes distractor selection and keeps a future `/ð/`-tagged word from
+ * ever co-occurring with a voiceless-/θ/ target. This mirrors the sh
+ * tier (`phoneme: '/ʃ/'`), not the ch tier. The 3-sibling node name
+ * `digraphs-th-voiceless` itself encodes the multi-phoneme reality.
+ *
+ * Same alignment contract as the prior tiers: the client-side
+ * `wordPack.ts` MUST carry every word here as `isTarget: true` plus a
+ * `TARGET_PAIRINGS` row. The round-trip suite in
+ * `src/screens/WordSong/plannerRoundTrip.test.ts` + the planner unit
+ * tests in `api/_planner.test.ts` enforce that.
+ */
+export const WORD_SONG_TARGET_WORDS_DIGRAPHS_TH =
+  'thin, thick, path, bath, math, moth, cloth'
+
+/**
+ * The subset of the digraphs-th pool whose `wordPack.ts` entries carry
+ * `hybridMode: true` — `thick` (a double-digraph: `th` target onset +
+ * `ck` not-yet-formally-taught coda) and `cloth` (a `/kl/` onset blend
+ * that exceeds CVC scope).
+ *
+ * The planner consumes this list as the hybridMode GATE: when the focus
+ * node is `digraphs-th-voiceless`, the system prompt instructs Haiku
+ * that these two words are chip-tap recognition ONLY — no segmentation,
+ * no spelling, no decode-from-phoneme prompt shapes. The 5 fully
+ * decodable th-words (`thin, path, bath, math, moth`) take the full
+ * decode treatment.
+ *
+ * This reuses the EXACT gate pattern the sh tier established
+ * (`WORD_SONG_TARGET_WORDS_DIGRAPHS_SH_HYBRID`) — same planner guard
+ * logic, no new infrastructure. The REASON differs from sh's (sh's
+ * hybrids were long-/r-controlled-vowel-after-digraph; th's are
+ * onset-blend + double-digraph — Dave Non-obvious finding 5), but the
+ * suppression behaviour is identical. The ch tier had ZERO hybridMode
+ * words and no `_CH_HYBRID` analogue; th is NOT a clean zero-hybrid
+ * tier the way ch was.
+ *
+ * MUST stay aligned with the `hybridMode: true` rows in `wordPack.ts`.
+ * Enforced by code review + `api/_planner.test.ts`.
+ */
+export const WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID: readonly string[] = [
+  'thick',
+  'cloth',
+] as const
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).
