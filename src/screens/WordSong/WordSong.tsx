@@ -610,7 +610,12 @@ function WordSongScreen({
       sparkleInstance.unload()
       poofInstance.unload()
       plinkInstance.unload()
-      // Persist on unmount (same defensive write as Math).
+      // Persist on unmount (same defensive write as Math). Reading the ref
+      // at cleanup-time is intentional — we want the LATEST stardust total,
+      // including grants made between mount and unmount that React may not
+      // have committed to state yet. Snapshotting at mount would write the
+      // initial total and lose the session's earnings.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       writeStardust(stardustTotalRef.current, storage, now)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

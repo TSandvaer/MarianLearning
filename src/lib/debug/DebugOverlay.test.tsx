@@ -1,7 +1,8 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import DebugOverlay, { buildStateExportPayload } from './DebugOverlay'
+import DebugOverlay from './DebugOverlay'
+import { buildStateExportPayload } from './stateExport'
 import { isDebugEnabled } from './isDebugEnabled'
 import {
   _resetForTests,
@@ -461,9 +462,7 @@ describe('DebugOverlay', () => {
         />,
       )
 
-      await user.click(
-        screen.getByTestId('debug-overlay-copy-state-button'),
-      )
+      await user.click(screen.getByTestId('debug-overlay-copy-state-button'))
 
       expect(writeStateClipboardFn).toHaveBeenCalledTimes(1)
       const payloadText = writeStateClipboardFn.mock.calls[0][0] as string
@@ -496,9 +495,7 @@ describe('DebugOverlay', () => {
         />,
       )
 
-      await user.click(
-        screen.getByTestId('debug-overlay-copy-state-button'),
-      )
+      await user.click(screen.getByTestId('debug-overlay-copy-state-button'))
 
       // Clipboard resolved — button should flip to "Copied!".
       await waitFor(() =>
@@ -531,9 +528,7 @@ describe('DebugOverlay', () => {
         />,
       )
 
-      await user.click(
-        screen.getByTestId('debug-overlay-copy-state-button'),
-      )
+      await user.click(screen.getByTestId('debug-overlay-copy-state-button'))
 
       expect(writeStateClipboardFn).toHaveBeenCalledTimes(1)
       const parsed = JSON.parse(
@@ -561,9 +556,7 @@ describe('DebugOverlay', () => {
 
       const payload = buildStateExportPayload(1_700_000_000_000)
 
-      expect(payload.exportedAt).toBe(
-        new Date(1_700_000_000_000).toISOString(),
-      )
+      expect(payload.exportedAt).toBe(new Date(1_700_000_000_000).toISOString())
       expect(payload.progress).toEqual(progressBlob)
       expect(payload.sessionHistory).toEqual({ count: 1 })
       expect(payload.deviceId).toBe('abc-123')
