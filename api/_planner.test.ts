@@ -953,23 +953,23 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
   it('routes first-class focus nodes (blending-cv, cvc-words) verbatim; falls back untuned tiers to blending-cv (sweep)', async () => {
     // Step 2 (ticket 86c9kxu07) widened the planner to first-class
     // emit `cvc-words` content alongside `blending-cv`. Untuned tiers
-    // (letter-names / letter-sounds / digraphs-ch /
-    // digraphs-th-voiceless / sight-words / simple-sentences) fall back
-    // to blending-cv per the contract doc's §"Tier coverage today"
-    // section. This sweep pins the routing table so a future regression
-    // on either side surfaces here. (PR #211: dead `digraphs` literal
-    // dropped; replaced by 3 sequential sibling nodes. `digraphs-sh` is
-    // now FIRST-CLASS — its content tier wires the /ʃ/ digraph pool +
-    // hybridMode gate — so it routes verbatim; `digraphs-ch` and
-    // `digraphs-th-voiceless` remain at the stub-fallback until their
-    // content tiers ship.)
+    // (letter-names / letter-sounds / digraphs-th-voiceless /
+    // sight-words / simple-sentences) fall back to blending-cv per the
+    // contract doc's §"Tier coverage today" section. This sweep pins
+    // the routing table so a future regression on either side surfaces
+    // here. (PR #211: dead `digraphs` literal dropped; replaced by 3
+    // sequential sibling nodes. `digraphs-sh` went FIRST-CLASS first —
+    // its content tier wired the /ʃ/ digraph pool + hybridMode gate.
+    // `digraphs-ch` is now ALSO FIRST-CLASS — its content tier wires the
+    // /tʃ/ digraph pool (ZERO hybridMode words). `digraphs-th-voiceless`
+    // remains at the stub-fallback until its content tier ships.)
     const expectations: ReadonlyArray<[string, string]> = [
       ['letter-names', 'blending-cv'],
       ['letter-sounds', 'blending-cv'],
       ['blending-cv', 'blending-cv'], // first-class
       ['cvc-words', 'cvc-words'], // first-class (the unblock)
-      ['digraphs-sh', 'digraphs-sh'], // first-class (this PR's content tier)
-      ['digraphs-ch', 'blending-cv'],
+      ['digraphs-sh', 'digraphs-sh'], // first-class (sh content tier)
+      ['digraphs-ch', 'digraphs-ch'], // first-class (this PR's content tier)
       ['digraphs-th-voiceless', 'blending-cv'],
       ['sight-words', 'blending-cv'],
       ['simple-sentences', 'blending-cv'],
@@ -1195,16 +1195,18 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
   })
 
   it('ignores isGraduationSession=true on word-song untuned tiers (stub-fallback to blending-cv)', async () => {
-    // Untuned tiers (e.g. digraphs-ch) fall back to blending-cv content
-    // per `effectiveFocusNode`. The graduation directive is gated on
-    // the EFFECTIVE focus node being cvc-words, so an untuned-tier
-    // request with the flag set must not carry the directive — the
-    // session would otherwise emit graduation content under a
-    // non-graduation focus. (PR #211: dead `digraphs` literal dropped
-    // for 3 sibling nodes; `digraphs-sh` is now first-class with its
-    // own content tier, so `digraphs-ch` is the stub-fallback example
-    // here. The first-class `digraphs-sh` graduation-no-leak case has
-    // its own assertion in the digraphs-sh sibling-tier describe block.)
+    // Untuned tiers (e.g. digraphs-th-voiceless) fall back to
+    // blending-cv content per `effectiveFocusNode`. The graduation
+    // directive is gated on the EFFECTIVE focus node being cvc-words,
+    // so an untuned-tier request with the flag set must not carry the
+    // directive — the session would otherwise emit graduation content
+    // under a non-graduation focus. (PR #211: dead `digraphs` literal
+    // dropped for 3 sibling nodes; `digraphs-sh` and `digraphs-ch` are
+    // now both first-class with their own content tiers, so
+    // `digraphs-th-voiceless` is the remaining stub-fallback example
+    // here. The first-class digraph graduation-no-leak cases have their
+    // own assertions in the digraphs-sh / digraphs-ch sibling-tier
+    // describe blocks.)
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -1213,7 +1215,7 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
       track: 'word-song',
       level: 1,
       childName: 'Marian',
-      focusNode: 'digraphs-ch',
+      focusNode: 'digraphs-th-voiceless',
       isGraduationSession: true,
     })
 
@@ -2060,6 +2062,281 @@ describe('generateSessionPlan — digraphs-sh content tier (FIRST digraph tier)'
 
   it('digraphs-sh is in VALID_WORD_SONG_FOCUS_NODES (drift tripwire)', () => {
     expect(VALID_WORD_SONG_FOCUS_NODES.includes('digraphs-sh')).toBe(true)
+  })
+})
+
+/**
+ * digraphs-ch content tier (the SECOND digraph tier — sits between
+ * `digraphs-sh` and `digraphs-th-voiceless` in `WordSongNode` /
+ * `LITERACY_TREE` per PR #211's 3-sibling digraph split). The planner
+ * emits `digraphs-ch` content using the same "Read the <word>."
+ * template as `cvc-words` / `digraphs-sh`, but the word pool is the 7
+ * ch-digraph words (`chin, chip, chop, chat, chest, chug, chick`).
+ *
+ * Spec: `design/word-song/digraphs-ch-word-list.md` (Dave's §3c locked
+ * inventory, 2026-05-14). Pairs with Devon's `feat/digraphs-ch-wordpack`
+ * PR (client-side wordPack rows). Unblocks the ch-tier E2E spec.
+ *
+ * STRUCTURAL DIVERGENCE FROM digraphs-sh — covered explicitly below:
+ *  - ZERO hybridMode words. Unlike the sh tier (`shoe/sheep/shark`
+ *    flagged `hybridMode: true`), all 7 ch-words are fully decodable
+ *    short-vowel words. The system prompt must NOT carry a ch-tier
+ *    hybridMode problem-type gate. Dave addendum §3d / non-obvious
+ *    finding #1 + Kyle spec §6.1 / AC12.
+ *  - The ch tier instead carries the c-says-/k/ orthographic-trap
+ *    framing — Marian already knows `c` says /k/, so `ch` saying /tʃ/
+ *    must be named explicitly. Dave §1c / non-obvious finding #2.
+ *
+ * Coverage strategy (mirrors the digraphs-sh sibling-tier block):
+ *  - (a) User message routes `digraphs-ch` through verbatim
+ *    (first-class, no stub-fallback to blending-cv).
+ *  - (b) System prompt names the new node + the 7-word pool.
+ *  - (c) System prompt carries the c-says-/k/ framing AND does NOT
+ *    carry a ch-tier hybridMode gate.
+ *  - (d) Round-trip: a wire-shape response with 8 "Read the <word>."
+ *    problems parses cleanly; every target is in the 7-word pool.
+ *  - (e) Cache invariant: a `digraphs-ch` call shares byte-identical
+ *    system text with a `cvc-words` call (focusNode lives in the user
+ *    message, not the cache prefix).
+ *  - (f) Graduation directive does NOT leak into a `digraphs-ch`
+ *    session — the graduation gate is `cvc-words`-only.
+ *
+ * Per `feedback_count_assertions_on_regression_tests.md`: count-based
+ * assertions (`.toHaveLength(N)`, `.toEqual(N)`) — never `.toContain`
+ * for the round-trip pool checks.
+ */
+describe('generateSessionPlan — digraphs-ch content tier (SECOND digraph tier)', () => {
+  /** The full 7-word ch-digraph pool, in wordPack.ts row order. */
+  const CH_POOL = [
+    'chin',
+    'chip',
+    'chop',
+    'chat',
+    'chest',
+    'chug',
+    'chick',
+  ] as const
+
+  /** Build an 8-problem digraphs-ch wire response in template form.
+   *  The ch pool has only 7 words, so the 8th problem repeats one
+   *  ch-word (`chin`) — matching the planner's digraphs-ch EXCEPTION
+   *  ("each of the 7 at least once, repeat ONE for the 8th"). */
+  function makeChPlan(): string {
+    const words = [...CH_POOL, 'chin'] // 8 entries, 7 distinct
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: `Yes! That's a ${word}.` },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-digraphs-ch-001',
+      label: 'Digraphs ch',
+      utterances,
+    })
+  }
+
+  it('routes digraphs-ch focus verbatim into the user message (first-class, no stub-fallback)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeChPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-ch',
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/Focus skill node: digraphs-ch\./)
+    // It must NOT have been remapped to the blending-cv stub.
+    expect(user).not.toMatch(/Focus skill node: blending-cv\./)
+  })
+
+  it('system prompt names the digraphs-ch content mode + the 7-word pool', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeChPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-ch',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // The content-mode header.
+    expect(prompt).toMatch(/digraphs-ch:/)
+    // Pool literal — the comma-joined list as embedded in the prompt.
+    expect(prompt).toContain('chin, chip, chop, chat, chest, chug, chick')
+  })
+
+  it('system prompt carries the c-says-/k/ framing and NO ch-tier hybridMode gate (spec §6.1 / AC12)', async () => {
+    // The ch tier's load-bearing planner directive is the OPPOSITE of
+    // the sh tier's: it carries the c-says-/k/ orthographic-trap
+    // framing (Dave §1c) and deliberately has ZERO hybridMode words —
+    // the system prompt must NOT introduce a ch-tier hybridMode gate.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeChPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-ch',
+    })
+
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const prompt = args.system.map((b) => b.text).join('\n')
+    // The c-says-/k/ framing block — ch's distinctive teaching point.
+    expect(prompt).toContain('CH-DIGRAPH C-SAYS-/k/ FRAMING')
+    // It must name the trap explicitly: ch is NOT the /k/ sound.
+    expect(prompt).toMatch(/NOT the \/k\/ sound/)
+    // The framing must reference "cat" — the word Marian already
+    // decodes where `c` says /k/ (Dave §Recommendations-to-Kyle #1).
+    expect(prompt).toMatch(/cat/)
+    // The prompt explicitly states the ch tier has NO hybridMode gate.
+    expect(prompt).toContain('NO HYBRIDMODE GATE for digraphs-ch')
+    // And it must NOT carry a ch-tier hybridMode word list — the sh
+    // tier's HYBRIDMODE PROBLEM-TYPE GATE is sh-only. (The string
+    // "HYBRIDMODE PROBLEM-TYPE GATE" still appears in the prompt for
+    // the sh tier; what must be absent is the ch pool being subjected
+    // to it.) The sh hybridMode gate block (from its header to the
+    // "NO HYBRIDMODE GATE for digraphs-ch" disclaimer) must not name
+    // `digraphs-ch` nor carry the ch pool literal.
+    // Anchor on the fuller gate-block header — the bare string
+    // "HYBRIDMODE PROBLEM-TYPE GATE" also appears in the digraphs-sh
+    // mode-list description ("See the HYBRIDMODE PROBLEM-TYPE GATE
+    // block below"), which would over-widen the slice.
+    const shGateBlock = prompt.slice(
+      prompt.indexOf('HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh tier only)'),
+      prompt.indexOf('NO HYBRIDMODE GATE for digraphs-ch'),
+    )
+    expect(shGateBlock.includes('digraphs-ch')).toBe(false)
+    expect(
+      shGateBlock.includes('chin, chip, chop, chat, chest, chug, chick'),
+    ).toBe(false)
+    // The sh gate names only the 3 sh-hybrid words — none of the ch
+    // pool. (sh-hybrid list is the authoritative gated set.)
+    for (const shWord of ['shoe', 'sheep', 'shark']) {
+      expect(shGateBlock).toContain(shWord)
+    }
+  })
+
+  it('round-trips a wire response with 8 problems drawn from the 7-word ch pool', async () => {
+    // Count-based assertions per
+    // `feedback_count_assertions_on_regression_tests.md`. digraphs-ch
+    // (like digraphs-sh) is a focus node where a target may legitimately
+    // appear twice (7-word pool, 8-problem session) — so the assertion
+    // is "8 reads, all from the pool, exactly 7 distinct", NOT "8
+    // distinct".
+    const client = makeMockClient(makeChPlan())
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-ch',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    const reReadLine = /^Read the ([a-z]+)\.$/
+    const readWords = reads.map((u) => u.text.match(reReadLine)![1]!)
+    expect(readWords).toHaveLength(8)
+    const poolSet = new Set<string>(CH_POOL)
+    for (const word of readWords) {
+      expect(poolSet.has(word)).toBe(true)
+    }
+    // Every one of the 7 ch-words appears at least once.
+    expect(new Set(readWords).size).toEqual(7)
+  })
+
+  it('every read line uses the "Read the <word>." template (no "Tap the" leakage from blending-cv)', async () => {
+    const client = makeMockClient(makeChPlan())
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-ch',
+    })
+
+    const reads = plan.utterances.filter((u) => u.id.endsWith('.read'))
+    expect(reads).toHaveLength(8)
+    for (const r of reads) {
+      expect(r.text).toMatch(/^Read the [a-z]+\.$/)
+      expect(r.text).not.toMatch(/^Tap the/)
+    }
+  })
+
+  it('two calls differing only in focusNode (cvc-words vs digraphs-ch) share byte-identical system text (cache invariant)', async () => {
+    // Per shared/prompt-caching.md: focusNode lives in the user
+    // message, not the system block. The new digraph tier must not
+    // cause a cache-prefix delta vs cvc-words.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+
+    await generateSessionPlan({
+      client: makeMockClient(makeChPlan(), { capture: cap1 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(makeChPlan(), { capture: cap2 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-ch',
+    })
+
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toEqual(sys2)
+  })
+
+  it('graduation directive does NOT leak into a digraphs-ch session even with isGraduationSession=true', async () => {
+    // The graduation gate is `cvc-words`-only (short-a) per
+    // `WORD_SONG_GRADUATION_GATED_NODES` in mastery.ts. A misrouted
+    // flag on a digraphs-ch request must not carry the directive — the
+    // session would otherwise receive novel short-a words alongside
+    // its ch-digraph pool, which is nonsense for the digraph tier.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeChPlan(), { capture })
+
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'digraphs-ch',
+      isGraduationSession: true,
+    })
+
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
+  })
+
+  it('digraphs-ch is in VALID_WORD_SONG_FOCUS_NODES (drift tripwire)', () => {
+    expect(VALID_WORD_SONG_FOCUS_NODES.includes('digraphs-ch')).toBe(true)
   })
 })
 
