@@ -29,7 +29,7 @@ import {
 } from '../api/_planner.js'
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 16 combos: 10 math nodes × level 1 + 6 word-song nodes × level 1 (short-e sibling tier added, ticket 86c9teua2)', () => {
+  it('produces 17 combos: 10 math nodes × level 1 + 7 word-song nodes × level 1 (digraphs-sh content tier added)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -40,16 +40,20 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // Ticket 86c9teua2 added `cvc-words-short-e` as the fifth and FINAL
     // single-vowel sibling tier in the o → u → i → e canonical arc (see
     // `design/word-song/short-e-pool-expansion.md`).
-    // Untuned tiers (letter-sounds / digraphs / sight-words /
-    // simple-sentences) are deliberately NOT in canon — they fall back
-    // to blending-cv content via the planner's `effectiveFocusNode`,
-    // so baking a duplicate blob would be wasted bytes.
+    // The digraphs-sh content tier added `digraphs-sh` as the FIRST
+    // digraph tier — first-class, baked (see
+    // `design/word-song/digraphs-sh-word-list.md` §6/§8 AC10).
+    // Remaining untuned tiers (letter-sounds / digraphs-ch /
+    // digraphs-th-voiceless / sight-words / simple-sentences) are
+    // deliberately NOT in canon — they fall back to blending-cv content
+    // via the planner's `effectiveFocusNode`, so baking a duplicate
+    // blob would be wasted bytes.
     const combos = activeCombos()
-    expect(combos).toHaveLength(16)
+    expect(combos).toHaveLength(17)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
     expect(mathCount).toBe(10)
-    expect(wordSongCount).toBe(6)
+    expect(wordSongCount).toBe(7)
   })
 
   it('every math combo names a node from VALID_MATH_FOCUS_NODES', () => {
@@ -60,9 +64,9 @@ describe('activeCombos — coverage matches the curriculum', () => {
     }
   })
 
-  it('word-song combos are blending-cv + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i + cvc-words-short-e (planner first-class scope)', () => {
+  it('word-song combos are blending-cv + cvc-words + cvc-words-short-o + cvc-words-short-u + cvc-words-short-i + cvc-words-short-e + digraphs-sh (planner first-class scope)', () => {
     const combos = activeCombos().filter((c) => c.track === 'word-song')
-    expect(combos).toHaveLength(6)
+    expect(combos).toHaveLength(7)
     const focusNodes = combos.map((c) => c.focusNode).sort()
     expect(focusNodes).toEqual([
       'blending-cv',
@@ -71,6 +75,7 @@ describe('activeCombos — coverage matches the curriculum', () => {
       'cvc-words-short-i',
       'cvc-words-short-o',
       'cvc-words-short-u',
+      'digraphs-sh',
     ])
     // All must be valid focus-node names per the planner's allow-list
     // — drift tripwire if the planner's accept set contracts.

@@ -201,16 +201,17 @@ const MATH_FOCUS_NODES: readonly string[] = [
 
 // Word-song first-class content modes — must match the
 // WORD_SONG_FIRST_CLASS_FOCUS_NODES list in api/_planner.ts. Untuned
-// tiers (letter-sounds / digraphs-sh / digraphs-ch /
-// digraphs-th-voiceless / sight-words / simple-sentences) fall back
-// to blending-cv content via `effectiveFocusNode`, so baking canon
-// entries for them would just be a wasteful copy of the blending-cv
-// blob — they're omitted here on purpose. Future tier widenings
-// (paired parser-then-planner steps per the contract doc) add their
-// entries here when they go first-class. The digraph SkillNode split
-// (PR #211) replaces the single `digraphs` literal with three
-// sequential sibling nodes; canon for them lands in their own
-// content-tier PRs (step in the §5 11-PR plan).
+// tiers (letter-sounds / digraphs-ch / digraphs-th-voiceless /
+// sight-words / simple-sentences) fall back to blending-cv content via
+// `effectiveFocusNode`, so baking canon entries for them would just be
+// a wasteful copy of the blending-cv blob — they're omitted here on
+// purpose. Future tier widenings (paired parser-then-planner steps per
+// the contract doc) add their entries here when they go first-class.
+// The digraph SkillNode split (PR #211) replaces the single `digraphs`
+// literal with three sequential sibling nodes; `digraphs-sh` is now
+// first-class (its content tier — this PR) and IS baked; `digraphs-ch`
+// and `digraphs-th-voiceless` land in their own content-tier PRs (steps
+// in the §5 11-PR plan).
 //
 // Ticket 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
 // tier — see `design/word-song/short-o-pool-expansion.md` §6 (canon-
@@ -220,7 +221,9 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // vowel-tier sibling — see `design/word-song/short-i-pool-expansion.md`
 // §6. Ticket 86c9teua2 added `cvc-words-short-e` as the fifth and
 // FINAL single-vowel tier in the o → u → i → e canonical arc — see
-// `design/word-song/short-e-pool-expansion.md` §7.
+// `design/word-song/short-e-pool-expansion.md` §7. The digraphs-sh
+// content tier added `digraphs-sh` as the FIRST digraph tier — see
+// `design/word-song/digraphs-sh-word-list.md` §6/§8 (AC10 canon bake).
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'blending-cv',
   'cvc-words',
@@ -228,6 +231,7 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'cvc-words-short-u',
   'cvc-words-short-i',
   'cvc-words-short-e',
+  'digraphs-sh',
 ]
 
 export function activeCombos(): readonly Combo[] {
