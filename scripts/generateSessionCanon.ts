@@ -201,17 +201,17 @@ const MATH_FOCUS_NODES: readonly string[] = [
 
 // Word-song first-class content modes — must match the
 // WORD_SONG_FIRST_CLASS_FOCUS_NODES list in api/_planner.ts. Untuned
-// tiers (letter-sounds / digraphs-ch / digraphs-th-voiceless /
-// sight-words / simple-sentences) fall back to blending-cv content via
+// tiers (letter-sounds / digraphs-th-voiceless / sight-words /
+// simple-sentences) fall back to blending-cv content via
 // `effectiveFocusNode`, so baking canon entries for them would just be
 // a wasteful copy of the blending-cv blob — they're omitted here on
 // purpose. Future tier widenings (paired parser-then-planner steps per
 // the contract doc) add their entries here when they go first-class.
 // The digraph SkillNode split (PR #211) replaces the single `digraphs`
-// literal with three sequential sibling nodes; `digraphs-sh` is now
-// first-class (its content tier — this PR) and IS baked; `digraphs-ch`
-// and `digraphs-th-voiceless` land in their own content-tier PRs (steps
-// in the §5 11-PR plan).
+// literal with three sequential sibling nodes; `digraphs-sh` went
+// first-class first (its content tier) and IS baked; `digraphs-ch` is
+// now ALSO first-class (its content tier — this PR) and IS baked;
+// `digraphs-th-voiceless` lands in its own content-tier PR.
 //
 // Ticket 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
 // tier — see `design/word-song/short-o-pool-expansion.md` §6 (canon-
@@ -224,6 +224,10 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // `design/word-song/short-e-pool-expansion.md` §7. The digraphs-sh
 // content tier added `digraphs-sh` as the FIRST digraph tier — see
 // `design/word-song/digraphs-sh-word-list.md` §6/§8 (AC10 canon bake).
+// The digraphs-ch content tier added `digraphs-ch` as the SECOND
+// digraph tier — see `design/word-song/digraphs-ch-word-list.md`
+// §6/§8 (AC10 canon bake). Unlike digraphs-sh, the ch tier has ZERO
+// hybridMode words.
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'blending-cv',
   'cvc-words',
@@ -232,6 +236,7 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'cvc-words-short-i',
   'cvc-words-short-e',
   'digraphs-sh',
+  'digraphs-ch',
 ]
 
 export function activeCombos(): readonly Combo[] {
