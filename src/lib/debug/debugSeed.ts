@@ -120,6 +120,17 @@
  *   QA for the deep-launch path verifying the new tier renders
  *   end-to-end. Mirrors the `digraphs-sh` recipe one step further down
  *   the tree.
+ * - `digraphs-th-voiceless`: Marian as if every single-vowel CVC tier
+ *   AND the first two digraph tiers (`digraphs-sh`, `digraphs-ch`) are
+ *   fully mastered and she's now practicing `digraphs-th-voiceless` —
+ *   the THIRD and final digraph tier per PR #211's 3-sibling digraph
+ *   split. The picker walks past every prior word-song node and lands
+ *   on `digraphs-th-voiceless` (practicing). Used by Thomas's iPad
+ *   smoke-test for the voiceless-th-digraph focus session AND by QA
+ *   for the deep-launch path verifying the new tier renders end-to-end
+ *   (canon + planner + picker). Mirrors the `digraphs-ch` recipe one
+ *   step further down the tree. (Seed key is the full SkillNode
+ *   literal — `digraphs-th-voiceless`, not `digraphs-th`.)
  * - `cross-vowel-mixing`: Marian as if all three CVC tiers
  *   (`cvc-words`, `cvc-words-short-o`, `cvc-words-short-u`) are fully
  *   mastered and she's now practicing `digraphs-sh` — the next node
@@ -380,6 +391,39 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'cvc-words-short-e': 'mastered',
       'digraphs-sh': 'mastered',
       'digraphs-ch': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Digraphs-th content tier smoke-test entry (THIRD and final digraph
+  // tier). Marian has fully mastered every single-vowel CVC tier
+  // (short-a, short-o, short-u, short-i, short-e) AND the first two
+  // digraph tiers (digraphs-sh, digraphs-ch), and is now practicing the
+  // voiceless-th digraph tier. The picker walks WORD_SONG_NODES_IN_ORDER,
+  // sees every earlier word-song node mastered (all five CVC sibling
+  // tiers + digraphs-sh + digraphs-ch), and lands on
+  // `digraphs-th-voiceless` — the first non-mastered node, the last
+  // digraph tier in PR #211's 3-sibling digraph split. Used by Thomas's
+  // iPad smoke-test for the th-digraph focus session AND by QA for the
+  // deep-launch path verifying the new tier renders end-to-end (canon +
+  // planner + picker). Mirrors the `digraphs-ch` recipe with one
+  // additional mastered prerequisite (digraphs-ch). The seed key is the
+  // full SkillNode literal `digraphs-th-voiceless` (the `-voiceless`
+  // suffix is part of the node name — there is no bare `digraphs-th`
+  // node); deep-launch URL is
+  // `?debug=1&seed=digraphs-th-voiceless`.
+  'digraphs-th-voiceless': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      'digraphs-sh': 'mastered',
+      'digraphs-ch': 'mastered',
+      'digraphs-th-voiceless': 'practicing',
     },
     skipGreet: true,
   },
