@@ -8,4 +8,4 @@ Both the originals and the transparent versions are committed to git.
 
 **Canonical BG-removal tool: bgclear.ai** — full source resolution, best edge fidelity (preserves fingers/hair-wisps where light skin meets the cream MJ background). Fallback order: bgclear.ai → remove-bg.io → remove.bg. See the `feedback_mj_workflow_explicit_removebg` memory + `removebg-tool-evaluation-2026-05-14.md`.
 
-_Folder is currently empty pending the deliberate Emma-family re-cut — tracked as a polish-backlog item. The emma-splash-base asset (PR #218) is the first transparent Emma asset; the 8 existing poses still need re-cutting._
+_Contents (as of the 2026-05-14 Emma asset refresh): the 8 family poses (`emma-{idle,celebration,cheering,listening,puzzled-tilt,sleepy,attentive-pointing,waving}.png`, 1024x1024 RGBA, bgclear.ai re-cuts) plus `emma-splash-base.png` (500x500 RGBA, the "Emma Tutor" medallion logo, remove.bg — bgclear.ai mattes away the thin medallion ring). All of these are embedded as base64 into the matching `public/assets/emma-*.svg` wrappers — see `scripts/embed-emma-assets.mjs`._
