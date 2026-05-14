@@ -379,25 +379,63 @@ For every sh-target, pair it with another sh-target as the gentle distractor —
 
 ### Recommended distractor matrix (concrete example for Kevin's impl ticket)
 
-Full `TARGET_PAIRINGS` rows are Kevin's to author; design preview here so the structure is clear (mirrors `short-e §2`):
+Full `TARGET_PAIRINGS` rows are Kevin's to author; design preview here so the structure is clear (mirrors `short-e §2`).
+
+**Shape contract.** Every row's `gentle` and `trap` are `readonly [string, string]` tuples — exactly 2 entries each. This matches the existing `WordPairing` type in [`wordPack.ts`](../../src/screens/WordSong/wordPack.ts) and the v1 shape across all short-vowel tiers. Single-entry tuples are a type error.
+
+**FORBIDDEN_PAIRS pre-check.** Every distractor below has been cross-checked against §6's FORBIDDEN_PAIRS additions: `[shed, shop]`, `[shoe, shop]`, `[ship, tub]`. No row pairs a target with a forbidden silhouette neighbor.
 
 ```ts
-ship: { gentle: ['shell'], trap: ['sip'] },   // sh-neighbor + sh/s contrast
-shell: { gentle: ['ship'], trap: ['sell'] },  // sh-neighbor + sh/s contrast
-shore: { gentle: ['sheep'], trap: ['sore'] }, // sh-neighbor + sh/s contrast
-shop: { gentle: ['shed'], trap: ['sop'] },    // sh-neighbor + sh/s contrast (sop is borderline; consider 'top' instead)
-// weak-trap subset — use sh-neighbor only:
-shoe: { gentle: ['ship', 'shark'], trap: ['shell'] },
-sheep: { gentle: ['shark', 'shoe'], trap: ['shore'] },
-shark: { gentle: ['ship', 'sheep'], trap: ['shoe'] },
-shed: { gentle: ['shop', 'shore'], trap: ['shop'] },
+// Strong-trap subset — Class 1 (sh/s contrast) + Class 2 (sh-pool neighbor):
+ship:  { gentle: ['shell', 'shark'], trap: ['sip',  'shoe']  },  // gentle: 2 sh-neighbors; trap: sh/s contrast + sh-neighbor
+shell: { gentle: ['ship',  'shoe'],  trap: ['sell', 'sheep'] },  // gentle: 2 sh-neighbors; trap: sh/s contrast + sh-neighbor
+shore: { gentle: ['sheep', 'shark'], trap: ['sore', 'shed']  },  // gentle: 2 sh-neighbors; trap: sh/s contrast + sh-neighbor
+shop:  { gentle: ['shark', 'shoe'],  trap: ['sop',  'sheep'] },  // gentle: 2 sh-neighbors (NOT shed — FORBIDDEN_PAIR); trap: sh/s contrast + sh-neighbor
+
+// Weak-trap subset — Class 2 (sh-pool neighbor only; weak s-contrast trap omitted):
+shoe:  { gentle: ['ship',  'shark'], trap: ['shell', 'sheep'] }, // gentle + trap both sh-pool; sue too adult-vocab
+sheep: { gentle: ['shark', 'shoe'],  trap: ['shore', 'ship']  }, // gentle + trap both sh-pool; seep too obscure
+shark: { gentle: ['ship',  'sheep'], trap: ['shoe',  'shore'] }, // gentle + trap both sh-pool; sark non-word
+shed:  { gentle: ['shark', 'shore'], trap: ['shore', 'sheep'] }, // gentle + trap both sh-pool (NOT shop or shoe — FORBIDDEN_PAIRS); sed non-word
 ```
 
-**Note:** the matrix above is illustrative. Kevin owns the final pairings per `screens-and-flows.md` convention. The constraint is the **distractor class**: Class 1 (sh/s contrast) for strong-trap pairs, Class 2 (same-pool sh-neighbor) for weak-trap pairs. Mixing across sh-targets within the same trio is allowed (gentle is always another sh-word; trap is sh/s contrast OR another sh-word per the strength of the contrast available).
+**Distractor-class summary per row:**
+
+| Target | Gentle tier (problems 1-3) | Trap tier (problems 4-8) | Trap class         |
+| ------ | -------------------------- | ------------------------ | ------------------ |
+| ship   | shell, shark               | sip, shoe                | sh/s + sh-neighbor |
+| shell  | ship, shoe                 | sell, sheep              | sh/s + sh-neighbor |
+| shore  | sheep, shark               | sore, shed               | sh/s + sh-neighbor |
+| shop   | shark, shoe                | sop, sheep               | sh/s + sh-neighbor |
+| shoe   | ship, shark                | shell, sheep             | sh-neighbor only   |
+| sheep  | shark, shoe                | shore, ship              | sh-neighbor only   |
+| shark  | ship, sheep                | shoe, shore              | sh-neighbor only   |
+| shed   | shark, shore               | shore, sheep             | sh-neighbor only   |
+
+**`sip` as cross-tier-load-bearing dual-role distractor (resolution per Devon's review of PR #212):**
+
+`sip` is already a `TARGET_WORDS` entry with `vowel: 'i'`, `isTarget: true` (`wordPack.ts:516` — shipped in short-i tier). Using `sip` as `ship`'s trap distractor in the sh-tier matrix means `sip` becomes the **second** cross-vowel-tier-load-bearing distractor in `wordPack.ts`, after `pen` (see `.claude/docs/skill-trees-and-content.md` §"pen is cross-vowel-tier load-bearing", added post-#208).
+
+The pattern is well-established:
+
+1. **Retain `sip`'s existing entry** in `TARGET_WORDS` with `vowel: 'i'`, `isTarget: true`. No flip to `isTarget: false`.
+2. **Reference `sip` by string** from the sh-tier `TARGET_PAIRINGS` row for `ship` (above). `getWordEntry('sip')` resolves to the existing short-i entry; the picture, audio, and chip-render machinery already work.
+3. **Operational rule applies** (per `.claude/docs/skill-trees-and-content.md` §"Cross-vowel-tier load-bearing — generalization"): before any future removal of `sip` from `TARGET_WORDS`, the impl ticket must grep for `sip` as a string token in `TARGET_PAIRINGS` and either retain the entry or substitute every reference. Same as `pen`, `dog`, `cup`, `sun` already in that cluster.
+
+**Why dual-role over a non-`sip` substitute:** the `sh/s` contrast for `ship` is the SINGLE strongest diagnostic test in the entire sh-tier (per §2 above and Dave §Recommendations-to-Kyle #4). `sip`/`ship` is the cleanest minimal-pair in English. Substituting another short-i word would lose the `/ʃ/`-vs-`/s/` test. The dual-role pattern is the cheaper resolution, and it establishes the cross-tier-distractor precedent that downstream digraph tiers (`ch`, `th`) will likely also need.
+
+**Devon's second cross-tier-load-bearing distractor finding:** post-#208, `pen` was the sole entry in this cluster. With `sip` added, the cluster grows to 6 (per the table in `.claude/docs/skill-trees-and-content.md`: `pen`, `dog`, `log`, `cup`, `sun`, and now `sip`). Worth confirming the operational rule generalises cleanly to digraph-tier distractors — surfaced as a non-obvious finding in §10 below.
+
+**Note on the matrix preview:** illustrative; Kevin owns the final `TARGET_PAIRINGS` rows in the impl ticket per `screens-and-flows.md` convention. The constraints above are load-bearing:
+
+- Tuple shape `[string, string]` (2 entries each).
+- No FORBIDDEN_PAIR adjacency.
+- `gentle` always sh-pool; `trap` is sh/s contrast where strong-trap available, else another sh-pool neighbor.
+- `sip` documented as dual-role; all other s-contrast distractors (`sell`, `sop`, `sore`) are new distractor-only entries (NOT existing in `TARGET_WORDS`).
 
 ### Cross-tier hygiene — NO short-vowel CVC distractors in sh-trios
 
-Per Dave §Q5: "Do not interleave digraphs with CVC content until the digraph is consolidated (~90% accuracy)." The same-vowel-only rule that v1 applies inside CVC tiers extends to: **sh-tier trios contain ONLY sh-words + s-contrast traps. No `cat`, `dog`, `pen` etc. in sh-trios in v1.** This is a planner constraint (`composeTrio` analogous to short-e's same-vowel-only rule).
+Per Dave §Q5: "Do not interleave digraphs with CVC content until the digraph is consolidated (~90% accuracy)." The same-vowel-only rule that v1 applies inside CVC tiers extends to: **sh-tier trios contain ONLY sh-words + s-contrast traps. No `cat`, `dog`, `pen` etc. in sh-trios in v1.** This is realised in code through (a) `pickDistractors(target, problemIndex, options)` in [`src/screens/WordSong/wordDistractors.ts`](../../src/screens/WordSong/wordDistractors.ts) which resolves the trio's two distractors from the `TARGET_PAIRINGS` matrix (matrix-curated, runtime-dumb — adding sh-tier rows whose distractor strings are sh-pool or s-contrast is sufficient), and (b) render-time chip ordering via `buildChipOrder()` in [`src/screens/WordSong/WordSong.tsx`](../../src/screens/WordSong/WordSong.tsx) which shuffles the `[target, d1, d2]` triple deterministically per problem. There is no separate `composeTrio` function; "trio" is the rendered output of `pickDistractors` + `buildChipOrder`. The planner constraint above is analogous to short-e's same-vowel-only matrix.
 
 ### FORBIDDEN_PAIRS additions
 
@@ -454,7 +492,7 @@ Short-e and sh-tier are NOT in a known minimal-pair confusion class (per Dave §
 - The sh-tier introduces a fundamentally new concept ("two letters make one sound") that did not exist in any prior CVC tier.
 - Per Dave §Application: "The 'two letters, one sound' concept will be the primary conceptual barrier, not the blending mechanic."
 
-**Recommended scaffold gate:** before the first sh-introduction session, Emma's session-open includes a brief metalinguistic intro (the vowel-introduction line above) explicitly naming the two-letters-one-sound concept. This is NOT a separate lifetime-once item like short-u's `sun/soon` opener — it's a per-session reminder at the start of each sh-introduction session until the tier reaches ~70% accuracy.
+**Recommended scaffold gate:** before the first sh-introduction session, Emma's session-open includes a brief metalinguistic intro (the vowel-introduction line above) explicitly naming the two-letters-one-sound concept. This is NOT a separate lifetime-once item like short-u's `sun/soon` opener — it's a per-session reminder at the start of each sh-introduction session while `digraphs-sh.state === 'practicing'` (i.e., still surfaced through the `practicing` state; suppressed once the node flips to `'mastered'`). State mapping mirrors AC6's correction.
 
 **Implementation note:** parallels the `vowel-of-the-session` cue from `phonics-sequence-marian.md` §Application — small visual cue showing "sh" + a keyword picture (e.g., `sh - ship`) persistent during sh-tier sessions. Reduces working-memory load. Spec-side note for Kevin's planner.
 
@@ -467,7 +505,7 @@ Short-e and sh-tier are NOT in a known minimal-pair confusion class (per Dave §
 1. **sh-tier sessions contain only sh-words + s-contrast traps.** No CVC words from prior tiers in sh-trios in v1. Mirrors same-vowel-only rule.
 2. **Maximum 2-3 new sh-items per 8-item session** (per `phonics-sequence §Q5` and Dave §Q4). The remaining 5-6 items are review (mastered short-vowel CVC words from prior tiers — handled via the planner's existing cross-tier-review mechanism, NOT via in-trio cross-tier inclusion).
 3. **First sh-session is lifetime-once-scaffolded** — Emma's two-letters-one-sound intro fires the first time sh-tier is encountered. Mirrors short-u's `sun/soon` AC9b.
-4. **Per-session sh-vowel-cue persists during sh-tier sessions until ~70% accuracy.** Small visual cue in screen corner showing "sh - [keyword picture, e.g. ship]" so the digraph stays anchored visually.
+4. **Per-session sh-vowel-cue persists during sh-tier sessions while `digraphs-sh.state === 'practicing'`** (per `applyMasteryRule()` in `src/lib/progress/mastery.ts`; intro + practicing both show the cue, mastered hides it). Small visual cue in screen corner showing "sh - [keyword picture, e.g. ship]" so the digraph stays anchored visually. See AC6 — concrete state mapping replaces the earlier "~70% accuracy" formulation which has no corresponding state in the progress model.
 
 ### Cross-tier hygiene
 
@@ -476,11 +514,15 @@ Short-e and sh-tier are NOT in a known minimal-pair confusion class (per Dave §
 
 ### Distractor architecture refactor (flagged for Kevin's impl ticket)
 
-The v1 `TARGET_PAIRINGS` shape (per `picture-pack-style-anchor §1` — illustrative; actual code in `wordPack.ts`) was designed for same-vowel-only CVC distractors. The sh-tier introduces cross-orthography distractors (`sip` is short-i CVC; `sell` is short-e CVC). This is a meaningful refactor:
+The v1 `TARGET_PAIRINGS` shape (in [`wordPack.ts`](../../src/screens/WordSong/wordPack.ts)) was designed for same-vowel-only CVC distractors. The sh-tier introduces cross-orthography distractors. The runtime impact is small but the data model needs care:
 
-- `wordPack.ts` for `digraphs-sh` needs entries for the s-contrast traps (`sip`, `sell`, `sue`, `seep`, `sark` n/a, `sed` n/a, `sop`, `sore`) as distractor-only entries — these are NOT sh-words but are needed as text+audio chips for sh-trios.
-- `composeTrio` for sh-tier needs the rule "gentle = sh-pool neighbor; trap = s-contrast word from the s-trap pool".
-- `FORBIDDEN_PAIRS` extension for in-pool sh-hygiene rules.
+- **`wordPack.ts TARGET_WORDS` additions:** distractor-only entries (`isTarget: false`) for the s-contrast traps actually referenced by the §2 matrix — `sell`, `sop`, `sore`. These are NOT sh-words but need to exist as `WordEntry` rows with picture assets so the chip render resolves them via `getWordEntry()`. `sue, seep, sark, sed` were rejected in §2 as too weak and do NOT need to ship.
+- **`sip` is dual-role (NOT a new entry).** It already exists in `TARGET_WORDS` with `vowel: 'i'`, `isTarget: true`. The sh-tier row for `ship` references it by string. See §2 "`sip` as cross-tier-load-bearing dual-role distractor" and §10 finding #9. Operational rule from `.claude/docs/skill-trees-and-content.md` §"Cross-vowel-tier load-bearing" applies.
+- **`pickDistractors` runtime is unchanged.** No functional refactor; matrix-lookup-only. Adding sh-tier `TARGET_PAIRINGS` rows is sufficient.
+- **`buildChipOrder` runtime is unchanged.** Render-time positioning is target-agnostic.
+- **`FORBIDDEN_PAIRS` extension** for in-pool sh-hygiene rules (table in §6 above).
+- **`WordEntry.vowel` type union** may need to extend or be supplanted by Kevin's `phoneme:` field per PR #211 — see §10 finding #10.
+- **Picture assets for distractor-only s-contrast entries.** `sell`, `sop`, `sore` each need a picture (silhouette placeholder is acceptable per the existing pattern for distractor-only entries; vector trace can land in polish backlog). `sip` reuses its existing short-i picture asset.
 
 **This is downstream for Kevin's impl ticket.** Flagging here so the spec downstream is clear.
 
@@ -543,10 +585,10 @@ For this spec's downstream impl tickets (Kevin's planner + Devon's wordPack + ca
 
 - [ ] **AC1 — pool size:** `wordPack[digraphs-sh]` (or `wordPack.digraphs` filtered by sh) contains the 8 words: `ship, shell, shoe, sheep, shark, shed, shop, shore` (subject to Q1 + Q2 locks).
 - [ ] **AC2 — distractor-only pool:** sh-tier-specific s-contrast distractor entries exist as text+audio chips: `sip, sell, sop, sore` (strong-trap) + sh-pool-neighbors for weak-trap pairings. `sue, seep, sark, sed` are NOT shipped — too weak.
-- [ ] **AC3 — `composeTrio` for sh-tier:** gentle distractor is a sh-pool neighbor; trap distractor is either an s-contrast word or another sh-pool neighbor (per the matrix in §2). No CVC short-vowel words in sh-trios.
+- [ ] **AC3 — Trio composition for sh-tier (`pickDistractors` + `buildChipOrder`):** for every sh-target row in `TARGET_PAIRINGS`, both gentle entries are sh-pool neighbors; the trap entries are either (a) an s-contrast distractor-only word + a sh-pool neighbor (strong-trap subset: `ship`, `shell`, `shore`, `shop`) or (b) two sh-pool neighbors (weak-trap subset: `shoe`, `sheep`, `shark`, `shed`) per the matrix in §2. No CVC short-vowel words appear as distractors in sh-trios. Tuple shape is `readonly [string, string]` for both `gentle` and `trap`. Render-time positioning of the 3 chips remains in `buildChipOrder()`; no new function needed.
 - [ ] **AC4 — FORBIDDEN_PAIRS:** `[shed, shop]`, `[shoe, shop]`, `[ship, tub]` added to the FORBIDDEN_PAIRS list.
 - [ ] **AC5 — Emma's two-letters-one-sound opener:** fires the first time sh-tier is encountered (lifetime-once); persists in localStorage. Mirrors short-u's `sun/soon` AC9b mechanism.
-- [ ] **AC6 — Per-session sh-vowel-cue:** small visual cue (e.g., "sh - ship" with picture) persists in screen corner during sh-tier sessions until ~70% accuracy.
+- [ ] **AC6 — Per-session sh-vowel-cue:** small visual cue (e.g., "sh - ship" with picture) persists in screen corner during sh-tier sessions WHILE `digraphs-sh.state === 'practicing'` (per `applyMasteryRule()` in `src/lib/progress/mastery.ts`). The cue is hidden once the node flips to `'mastered'`. Concretely: `intro` state shows the cue; `practicing` state shows the cue; `mastered` hides it. This maps cleanly to the existing `Progress.skillLevels[node]` field — no new accuracy-percentage infrastructure required. (Originally drafted as "until ~70% accuracy" which has no corresponding state in the progress model; corrected per Devon's PR #212 review.)
 - [ ] **AC7 — 8 picture assets shipped:** `picture-{ship,shell,shoe,sheep,shark,shed,shop,shore}.svg` at `public/assets/pictures/`, embedded via `yarn embed-pictures`. (Or 7 per Q2 fallback.)
 - [ ] **AC8 — mastery rule:** sh-tier graduates at 90% accuracy across 3 consecutive sessions (per Q5 lock).
 - [ ] **AC9 — same-vowel-only-extended-to-sh-only rule:** sh-trios contain only sh-pool words + s-contrast distractors, never CVC short-vowel words. (Cross-tier review of mastered CVC content is handled outside of sh-trios, via the planner's existing cross-tier review mechanism.)
@@ -576,7 +618,7 @@ These are surfaced for Thomas / Matt / Kevin via the PR / handoff:
 
 1. **The English sh-initial short-vowel-CVC noun stock is small** — about 4 strong picks (`ship`, `shell` + 2 borderline). This forces a pool-shape decision that Dave's research is silent on. The recommended Option C (long-vowel allowance via picture+audio scaffold) is defensible but is a meaningful pedagogical exception worth flagging to Dave for retroactive validation if Thomas locks it.
 
-2. **The sh-tier introduces a new distractor pattern (sh/s contrast) that did NOT exist in CVC tiers.** This is a meaningful refactor for `wordPack.ts` and `composeTrio`: distractor-only entries that are NOT same-vowel-pool neighbors. The architecture work is downstream for Kevin's impl ticket but is flagged here so the spec downstream is clear it's not just "add more words to wordPack".
+2. **The sh-tier introduces a new distractor pattern (sh/s contrast) that did NOT exist in CVC tiers.** Mechanically the change is small — `pickDistractors` in `wordDistractors.ts` is a matrix-lookup-and-resolve function with no per-tier logic, so adding sh-tier rows to `TARGET_PAIRINGS` with the appropriate distractor strings is sufficient at the runtime layer. The architecturally-meaningful work is in `wordPack.ts`: distractor-only `WordEntry` rows for `sell`, `sop`, `sore` (NOT same-vowel-pool neighbors — these are short-e, short-o, long-o-r words functioning as sh-trio distractors only), each with `isTarget: false` and a picture asset. `sip` is a dual-role exception (see finding #9 below). This is downstream for Kevin's impl ticket but is flagged here so the spec downstream is clear it's not just "add more words to TARGET_WORDS".
 
 3. **4 of 8 sh-targets have NO good s-contrast trap word** (`shoe/sue` adult-vocab, `sheep/seep` uncommon, `shark/sark` non-word, `shed/sed` non-word). The matrix uses sh-pool-neighbors for these weak-trap pairings. This is fine pedagogically (the sh-vs-sh trio still teaches digraph recognition by picture) but it means only half the pool gets the sh-vs-s discrimination contrast that's the diagnostically most useful test per Dave §Recommendations-to-Kyle #4.
 
@@ -589,3 +631,7 @@ These are surfaced for Thomas / Matt / Kevin via the PR / handoff:
 7. **The two-letters-one-sound concept is new for Marian.** Tagalog does not have true consonant digraphs in the same way; per Dave §Application this is "the primary conceptual barrier, not the blending mechanic." Emma's first-encounter line must explicitly name the concept ("Two letters, one sound. Shhh.") — this is a script-side requirement that the spec downstream for Kevin must implement. It is NOT a passive design hint; it's load-bearing for Marian's success on the tier.
 
 8. **`/ʃ/` → `/s/` is the structural L2 substitution risk (not per-word).** This is testable in the chip-tap format via the sh/s contrast distractor. But the production-side substitution (Marian saying `/s/` when she means `/ʃ/`) is NOT testable in chip-tap and is acceptable per Dave §Q3 — the app tests recognition, not production. Thomas should be alert that real-Marian iPad smoke may show her getting all chip-taps right while still pronouncing `/s/` aloud; that is expected and not a failure mode.
+
+9. **`sip` is the second discovered cross-vowel-tier load-bearing distractor in `wordPack.ts`** (after `pen`, post-#208). Surfaced by Devon's review of PR #212. The cluster pattern (`.claude/docs/skill-trees-and-content.md` §"pen is cross-vowel-tier load-bearing") generalises cleanly: a word with `vowel: 'i'` and `isTarget: true` referenced as a string distractor from a DIFFERENT vowel tier's `TARGET_PAIRINGS` row (here: sh-tier referencing `sip` as `ship`'s trap distractor). The dual-role resolution (keep the entry as-is in `TARGET_WORDS`, reference by string from the new matrix row) is the established cheap path. The cluster now contains: `pen` (`'e'`), `dog` (`'o'`), `log` (`'o'`), `cup` (`'u'`), `sun` (`'u'`), `sip` (`'i'`). Worth updating `.claude/docs/skill-trees-and-content.md`'s table to add the sh-tier-as-referencing-tier row once this spec ships its impl.
+
+10. **The `vowel:` literal type may need to extend for sh-tier `WordEntry` rows.** Per Devon's review, the current `WordEntry.vowel` is `'a' | 'o' | 'u' | 'i' | 'e'` (short vowels only). The 4 long-vowel-allowance sh-words (`shoe`, `sheep`, `shark`, `shore`) do not fit this union. Three resolution paths: (i) extend the union to include digraph-tier values like `'sh-long'` or per-word phoneme tags; (ii) annotate a fake-but-closest short vowel as a soft placeholder with comment documentation; (iii) ship Kevin's PR #211 phoneme-tag proposal first and use `phoneme: '/ʃ/'` uniformly on all 8 sh-rows as the canonical disambiguator. This is load-bearing for the impl ticket — flagged here so Kevin's coordination with PR #211 sequencing is clear.
