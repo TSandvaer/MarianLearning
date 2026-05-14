@@ -6,6 +6,7 @@ import {
   pickTier,
 } from './wordDistractors'
 import {
+  DISTRACTOR_ONLY_WORDS,
   FORBIDDEN_PAIRS,
   TARGET_PAIRINGS,
   TARGET_PAIRINGS_CROSSVOWEL,
@@ -97,7 +98,15 @@ describe('pickDistractors', () => {
     // Gentle-tier rule from spec §"Distractor policy" → "Gentle tier":
     // "objects from clearly different categories and clearly different
     // sounds." The matrix should reflect that.
-    for (const target of TARGET_WORDS) {
+    //
+    // SCOPED to vowel-bearing (CVC-tier) entries. The digraphs-sh tier
+    // (`vowel` omitted) is INTENTIONALLY excluded — its gentle rule is
+    // "both entries are sh-pool neighbours, distinguished by PICTURE"
+    // (Kyle's spec §2), so every sh-tier gentle pair shares the `sh`
+    // onset and has no `vowel` axis. The category/consonant/vowel
+    // heuristic genuinely does not apply; the dedicated
+    // 'digraphs-sh tier' describe block below asserts the sh-tier rule.
+    for (const target of TARGET_WORDS.filter((w) => w.vowel !== undefined)) {
       const [d1, d2] = pickDistractors(target, 1)
       // At least one of (different category, different starting consonant,
       // different vowel) must be true for each distractor — and ideally all.
@@ -121,7 +130,11 @@ describe('pickDistractors', () => {
     // "Distractors share *one* meaningful axis with the correct word:
     // same category, OR same starting consonant, OR same vowel sound,
     // OR same ending consonant."
-    for (const target of TARGET_WORDS) {
+    //
+    // SCOPED to vowel-bearing (CVC-tier) entries — same rationale as the
+    // gentle test above. The sh-tier trap rule (sh/s contrast OR sh-pool
+    // neighbour) is asserted in the dedicated 'digraphs-sh tier' block.
+    for (const target of TARGET_WORDS.filter((w) => w.vowel !== undefined)) {
       const [d1, d2] = pickDistractors(target, 5)
       for (const d of [d1, d2]) {
         const targetStart = target.word[0]
@@ -210,6 +223,234 @@ describe('pickDistractors', () => {
   })
 })
 
+// --------------------------------------------------------------------------
+// Digraphs-sh tier (ticket digraphs-sh wordPack)
+//
+// The sh-tier is structurally different from the same-vowel-only CVC tiers
+// (Kyle's spec `design/word-song/digraphs-sh-word-list.md` §2):
+//   - 7 sh-initial targets — 4 conventional sh-CVC (`ship/shell/shed/shop`)
+//     + 3 long-vowel sight-word hybrids (`shoe/sheep/shark`).
+//   - `vowel` is omitted on all 7; all 7 carry `phoneme: '/ʃ/'`.
+//   - gentle pair = 2 sh-pool neighbours (distinguished by picture).
+//   - trap pair = sh/s-contrast trap + sh-pool neighbour for the
+//     strong-trap subset (`ship/shell/shop`), else 2 sh-pool neighbours
+//     for the weak-trap subset (`shoe/sheep/shark/shed`).
+//   - 2 new distractor-only s-contrast entries (`sell/sop`); `sip` is
+//     dual-role (reuses its short-i `TARGET_WORDS` entry).
+// --------------------------------------------------------------------------
+
+describe('digraphs-sh tier — wordPack rows', () => {
+  const SH_TARGET_WORDS = [
+    'ship',
+    'shell',
+    'shoe',
+    'sheep',
+    'shark',
+    'shed',
+    'shop',
+  ] as const
+  const SH_HYBRID_WORDS = ['shoe', 'sheep', 'shark'] as const
+  const SH_S_CONTRAST_DISTRACTORS = ['sip', 'sell', 'sop'] as const
+
+  it('all 7 sh-target WordEntry rows exist with isTarget: true, phoneme "/ʃ/", and vowel omitted', () => {
+    let foundCount = 0
+    for (const word of SH_TARGET_WORDS) {
+      const entry = getWordEntry(word)
+      foundCount += 1
+      expect(entry.isTarget, `${word} isTarget`).toBe(true)
+      expect(entry.phoneme, `${word} phoneme`).toBe('/ʃ/')
+      // `vowel` omitted on all 7 sh-tier entries — they are
+      // phoneme-classified, not vowel-classified.
+      expect(entry.vowel, `${word} vowel`).toBeUndefined()
+    }
+    // Count-based: all 7 resolved (none threw, none missing).
+    expect(foundCount).toBe(7)
+  })
+
+  it('hybridMode: true is set on exactly the 3 long-vowel hybrids (shoe/sheep/shark)', () => {
+    // Kyle's spec §6.1 + AC12 — hybridMode gates the planner's prompt
+    // generation. The 4 conventional sh-CVC words must NOT carry it.
+    const hybridWords = SH_TARGET_WORDS.filter(
+      (w) => getWordEntry(w).hybridMode === true,
+    )
+    expect([...hybridWords].sort()).toEqual([...SH_HYBRID_WORDS].sort())
+  })
+
+  it('the 4 conventional sh-CVC words have hybridMode absent (=== false default)', () => {
+    for (const word of ['ship', 'shell', 'shed', 'shop'] as const) {
+      // Default-absent === false — no explicit `hybridMode: false` needed.
+      expect(getWordEntry(word).hybridMode).toBeUndefined()
+    }
+  })
+
+  it('every hybridMode: true word carries phoneme "/ʃ/" (AC12 cross-check)', () => {
+    // Belt-and-braces: a hybridMode word is by construction a sh-tier
+    // word, so it must also carry the sh digraph phoneme tag.
+    let checked = 0
+    for (const word of SH_HYBRID_WORDS) {
+      const entry = getWordEntry(word)
+      checked += 1
+      expect(entry.hybridMode, `${word} hybridMode`).toBe(true)
+      expect(entry.phoneme, `${word} phoneme`).toBe('/ʃ/')
+    }
+    expect(checked).toBe(3)
+  })
+
+  it('sell + sop are distractor-only entries (isTarget: false), NOT phoneme-tagged', () => {
+    for (const word of ['sell', 'sop'] as const) {
+      const entry = getWordEntry(word)
+      expect(entry.isTarget, `${word} isTarget`).toBe(false)
+      // NOT phoneme-tagged — the sh-target rows reference them as
+      // untagged s-contrast distractors so the opt-in phoneme-scoping
+      // check in pickDistractors passes (tagging them `/s/` would make
+      // the sh-target rows throw on phoneme mismatch).
+      expect(entry.phoneme, `${word} phoneme`).toBeUndefined()
+    }
+    // They live in DISTRACTOR_ONLY_WORDS, not TARGET_WORDS.
+    const distractorOnlyWords = DISTRACTOR_ONLY_WORDS.map((e) => e.word)
+    expect(distractorOnlyWords).toEqual(['sell', 'sop'])
+  })
+
+  it('sip remains a short-i TARGET_WORDS entry (dual-role, not duplicated)', () => {
+    // `sip` is the sh/s-contrast trap for `ship` AND its own short-i
+    // target — referenced by string from the sh-tier matrix, NOT added
+    // as a second entry. It keeps `vowel: 'i'`, `isTarget: true`, and
+    // stays untagged (no `/s/` phoneme).
+    const sipEntries = TARGET_WORDS.filter((e) => e.word === 'sip')
+    expect(sipEntries).toHaveLength(1)
+    expect(sipEntries[0].vowel).toBe('i')
+    expect(sipEntries[0].isTarget).toBe(true)
+    expect(sipEntries[0].phoneme).toBeUndefined()
+  })
+
+  it('each sh-target produces exactly 2 distractors per pickDistractors (gentle + trap)', () => {
+    // Mirrors the CVC-tier "every target word has a deterministic
+    // gentle + trap pair" coverage, scoped to the sh-tier.
+    let resolvedCount = 0
+    for (const word of SH_TARGET_WORDS) {
+      const target = getWordEntry(word)
+      const gentle = pickDistractors(target, 1)
+      const trap = pickDistractors(target, 5)
+      expect(gentle, `${word} gentle`).toHaveLength(2)
+      expect(trap, `${word} trap`).toHaveLength(2)
+      // Distinctness — d1 ≠ d2 ≠ target, both tiers.
+      expect(gentle[0].word).not.toBe(target.word)
+      expect(gentle[1].word).not.toBe(target.word)
+      expect(gentle[0].word).not.toBe(gentle[1].word)
+      expect(trap[0].word).not.toBe(target.word)
+      expect(trap[1].word).not.toBe(target.word)
+      expect(trap[0].word).not.toBe(trap[1].word)
+      resolvedCount += 1
+    }
+    expect(resolvedCount).toBe(7)
+  })
+
+  it('every sh-target gentle pair is two sh-pool neighbours (spec §2 gentle rule)', () => {
+    // Gentle rule: BOTH entries are sh-pool words — Marian distinguishes
+    // by picture, not by sh-vs-s. Count-based: tally non-sh-pool gentle
+    // distractors, assert zero.
+    const shPool = new Set<string>(SH_TARGET_WORDS)
+    const nonShPoolGentle: string[] = []
+    for (const word of SH_TARGET_WORDS) {
+      const [d1, d2] = pickDistractors(getWordEntry(word), 1)
+      for (const d of [d1, d2]) {
+        if (!shPool.has(d.word)) nonShPoolGentle.push(`${word}->${d.word}`)
+      }
+    }
+    expect(nonShPoolGentle).toEqual([])
+  })
+
+  it('strong-trap subset (ship/shell/shop) trap pair includes its sh/s-contrast distractor', () => {
+    // Spec §2 strong-trap subset — these 3 targets have a real-word
+    // s-onset minimal pair (sip/sell/sop). The trap pair must include it.
+    const strongTrap: Record<string, string> = {
+      ship: 'sip',
+      shell: 'sell',
+      shop: 'sop',
+    }
+    for (const [target, expectedSContrast] of Object.entries(strongTrap)) {
+      const [d1, d2] = pickDistractors(getWordEntry(target), 5)
+      const trapWords = [d1.word, d2.word]
+      expect(
+        trapWords,
+        `${target} trap pair should include s-contrast "${expectedSContrast}"`,
+      ).toContain(expectedSContrast)
+    }
+  })
+
+  it('weak-trap subset (shoe/sheep/shark/shed) trap pair is two sh-pool neighbours (no s-contrast)', () => {
+    // Spec §2 weak-trap subset — no good s-contrast word, so both trap
+    // entries are sh-pool neighbours. Count-based: tally any
+    // s-contrast distractor in these rows, assert zero.
+    const shPool = new Set<string>(SH_TARGET_WORDS)
+    const sContrastInWeakTrap: string[] = []
+    for (const word of ['shoe', 'sheep', 'shark', 'shed'] as const) {
+      const [d1, d2] = pickDistractors(getWordEntry(word), 5)
+      for (const d of [d1, d2]) {
+        if (!shPool.has(d.word)) sContrastInWeakTrap.push(`${word}->${d.word}`)
+      }
+    }
+    expect(sContrastInWeakTrap).toEqual([])
+  })
+
+  it('no sh-tier trio surfaces a forbidden silhouette pair', () => {
+    // Defensive — the new FORBIDDEN_PAIRS entries [shed,shop],
+    // [shoe,shop], [ship,tub] plus all prior pairs. pickDistractors
+    // throws on a forbidden pair, so a clean run across all problem
+    // indices proves the matrix is clean.
+    for (const word of SH_TARGET_WORDS) {
+      const target = getWordEntry(word)
+      for (const problem of [1, 2, 3, 4, 5, 6, 7, 8]) {
+        const [d1, d2] = pickDistractors(target, problem)
+        expect(
+          isForbiddenPair(target.word, d1.word),
+          `${target.word}/${d1.word} (problem ${problem})`,
+        ).toBe(false)
+        expect(
+          isForbiddenPair(target.word, d2.word),
+          `${target.word}/${d2.word} (problem ${problem})`,
+        ).toBe(false)
+        expect(
+          isForbiddenPair(d1.word, d2.word),
+          `${d1.word}/${d2.word} (problem ${problem})`,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('no sh-target trio leaks a CVC short-vowel word (cross-tier hygiene, spec §6)', () => {
+    // sh-trios contain ONLY sh-pool words + the 3 s-contrast distractors
+    // (sip/sell/sop). No `cat`/`dog`/`pen` etc. Count-based: tally any
+    // distractor outside that allowed set across all problem indices.
+    const allowed = new Set<string>([
+      ...SH_TARGET_WORDS,
+      ...SH_S_CONTRAST_DISTRACTORS,
+    ])
+    const leaks: string[] = []
+    for (const word of SH_TARGET_WORDS) {
+      const target = getWordEntry(word)
+      for (const problem of [1, 5]) {
+        const [d1, d2] = pickDistractors(target, problem)
+        for (const d of [d1, d2]) {
+          if (!allowed.has(d.word)) leaks.push(`${word}@${problem}->${d.word}`)
+        }
+      }
+    }
+    expect(leaks).toEqual([])
+  })
+
+  it('FORBIDDEN_PAIRS includes the 3 digraphs-sh additions', () => {
+    const pairs = FORBIDDEN_PAIRS.map((p) => [...p].sort().join(','))
+    for (const expected of [
+      ['shed', 'shop'],
+      ['shoe', 'shop'],
+      ['ship', 'tub'],
+    ].map((p) => [...p].sort().join(','))) {
+      expect(pairs).toContain(expected)
+    }
+  })
+})
+
 describe('pickDistractors — defensive assertions (matrix-drift guards)', () => {
   // Drive the defensive throws by importing a fresh module instance with
   // a stubbed wordPack. Tests use vi.doMock to make this hermetic — the
@@ -266,7 +507,7 @@ describe('pickDistractors — defensive assertions (matrix-drift guards)', () =>
 })
 
 describe('FORBIDDEN_PAIRS', () => {
-  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2)", () => {
+  it("contains the silhouette-similarity pairs from Kyle's pack-doc + the v2 short-o + v3 short-u + v4 short-i + v5 short-e + digraphs-sh additions (tickets 86c9m3ae3 / 86c9q9ben / 86c9qdba4 / 86c9teua2 / digraphs-sh)", () => {
     // Per design/word-song-picture-pack.md §"Distractor pairing matrix"
     // implementation hand-off note + design/word-song/short-o-pool-
     // expansion.md §3 (mom↔dad composition collision) +
@@ -294,6 +535,9 @@ describe('FORBIDDEN_PAIRS', () => {
       ['net', 'bag'], // ticket 86c9teua2 — fabric-with-handle (mesh-vs-solid)
       ['egg', 'nut'], // ticket 86c9teua2 — ovals (smooth-vs-seam)
       ['egg', 'bun'], // ticket 86c9teua2 — round food (smooth-vs-score)
+      ['shed', 'shop'], // digraphs-sh — both small-structure silhouettes (in-pool hygiene)
+      ['shoe', 'shop'], // digraphs-sh — shop-as-shoe-store silhouette collision risk
+      ['ship', 'tub'], // digraphs-sh — both vessel-like silhouettes (cross-pool hygiene)
     ].map((p) => [...p].sort().join(','))
 
     for (const expected of expectedPairs) {
@@ -356,6 +600,13 @@ describe('TARGET_PAIRINGS_CROSSVOWEL', () => {
       w.isTarget &&
       !PROBE_WORDS.has(w.word) &&
       !POOL_EXTENSION_PENDING_CROSSVOWEL.has(w.word) &&
+      // `w.vowel` is now optional (digraphs-sh tier omits it — sh-tier
+      // words are phoneme-classified, not vowel-classified). The
+      // `undefined` guard keeps the digraph-tier sh words out of the
+      // cross-vowel exhaustiveness scan without an explicit exclusion
+      // Set — they have no `vowel`, so they cannot be a cross-vowel CVC
+      // target by construction.
+      w.vowel !== undefined &&
       CROSS_VOWEL_VOWEL_SET.has(w.vowel),
   )
 
@@ -590,6 +841,10 @@ describe('pickDistractors — cross-vowel mode (ticket 86c9qa0kf)', () => {
         w.isTarget &&
         !PROBE_WORDS.has(w.word) &&
         !POOL_EXTENSION_PENDING_CROSSVOWEL.has(w.word) &&
+        // `w.vowel` is optional post-digraphs-sh tier — sh-tier words
+        // omit it. Guard excludes them from the cross-vowel scan by
+        // construction (no `vowel` => not a cross-vowel CVC target).
+        w.vowel !== undefined &&
         CROSS_VOWEL_VOWEL_SET.has(w.vowel),
     )
     for (const target of targets) {
