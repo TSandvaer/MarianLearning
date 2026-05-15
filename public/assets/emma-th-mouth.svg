@@ -15,7 +15,7 @@
     Anatomy: lower face from just above upper lip to chin.
 
   Fix 2 (source downscale): previous embed was 2048x2048 full-portrait
-    (~3.1 MB SVG). This SVG is ~492 KB -- 6x reduction. Target <300 KB;
+    (~3.1 MB SVG). This SVG is ~492 KB — 6x reduction. Target <300 KB;
     512x512 chosen to preserve tongue-detail at 56pt corner-cue size.
     bgclear.ai pass is polish-backlog (brownish MJ background may show
     at crop edges; SVG clipPath clips to the 200x200 frame per §3b).
@@ -25,7 +25,7 @@
     Lower tooth line: viewBox y=155 (source y=415; 415-260=155).
     Tongue ellipse: cx=100, cy=130, rx=35, ry=26.
 
-  ViewBox 0 0 200 200 -- non-pose Emma asset convention (§3b).
+  ViewBox 0 0 200 200 — non-pose Emma asset convention (§3b).
   Not in EmmaPose union; referenced by direct path from WordSong.
 -->
 <svg
