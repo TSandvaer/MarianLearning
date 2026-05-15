@@ -96,17 +96,35 @@ describe('getFirstEncounterGatedNodes', () => {
     expect(getFirstEncounterGatedNodes()).not.toContain('blending-cv')
   })
 
-  it('does NOT include any math focus nodes', () => {
+  // Per-math-node assertions (replaced the previous blanket
+  // `not.toContain` over all math nodes, 2026-05-15 with the sub-to-10
+  // content tier — Kyle's spec §9.4 + the implementation PR brief).
+  // `sub-to-10` is now in the gated set as infrastructure-ready; the
+  // other math nodes are NOT.
+  it('includes sub-to-10 (sub-to-10 content tier — infrastructure-ready)', () => {
+    // Per Kyle's sub-to-10 content tier spec §4.3: the read-line
+    // variant gate is wired here. Per the schema constraint
+    // (`lifetimeFirstEncounters: WordSongNode[]`), the actual rewrite
+    // is a no-op for math nodes at runtime — the entry is here so
+    // the gate set test confirms wire-up.
     const gated = getFirstEncounterGatedNodes()
-    for (const mathNode of [
-      'add-to-10',
-      'add-to-20',
-      'sub-to-10',
-      'sub-to-20',
-      'two-digit-addsub',
-    ]) {
-      expect(gated).not.toContain(mathNode)
-    }
+    expect(gated).toContain('sub-to-10')
+  })
+
+  it('does NOT include add-to-10 (no first-encounter scaffolding)', () => {
+    expect(getFirstEncounterGatedNodes()).not.toContain('add-to-10')
+  })
+
+  it('does NOT include add-to-20 (no first-encounter scaffolding)', () => {
+    expect(getFirstEncounterGatedNodes()).not.toContain('add-to-20')
+  })
+
+  it('does NOT include sub-to-20 (no first-encounter scaffolding)', () => {
+    expect(getFirstEncounterGatedNodes()).not.toContain('sub-to-20')
+  })
+
+  it('does NOT include two-digit-addsub (no first-encounter scaffolding)', () => {
+    expect(getFirstEncounterGatedNodes()).not.toContain('two-digit-addsub')
   })
 })
 

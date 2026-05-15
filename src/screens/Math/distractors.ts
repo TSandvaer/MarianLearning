@@ -49,8 +49,20 @@
  * at least one positive integer as a valid chip value.
  */
 
-/** The two distractor flavours. */
-export type DistractorTier = 'gentle' | 'offByOne'
+/** The three distractor flavours.
+ *
+ *  - `gentle`: warm-up tier (problems 1-3). Distractors ≥2 away from
+ *    correct, biased toward range extremes. Op-agnostic — fires the
+ *    same on `+` and `-` (Kyle's sub-to-10 spec §3.1: "no code change
+ *    for sub-to-10 — same algorithm fires").
+ *  - `offByOne`: discriminate tier default (problems 4-8). Distractors
+ *    are `correct ± 1` clamped into range.
+ *  - `wrongOp`: discriminate tier alternative for `op === '-'` problems
+ *    only (Kyle's spec §3.2). Trap = `minuend + subtrahend` (the
+ *    addition answer using the same operand pair); secondary = an
+ *    off-by-one. Range-fitness checked at render time — when trap is
+ *    OOR or aliases correct, silently downgrades to `offByOne`. */
+export type DistractorTier = 'gentle' | 'offByOne' | 'wrongOp'
 
 /** Default inclusive lower / upper bound on chip values for the sums-to-10
  *  tier. Other tiers (sums-to-20) override `ANSWER_RANGE_MAX` via the
@@ -120,20 +132,50 @@ export function pickTier(problemIndex: number): DistractorTier {
 }
 
 /**
+ * Optional render-time hints fed to {@link pickDistractors}. All are
+ * additive — addition callers (add-to-10 / add-to-20) pass nothing and
+ * the function behaves exactly as before the sub-to-10 extension.
+ *
+ * @property op             Operator on the problem (`'+'` or `'-'`). Defaults
+ *                          to `'+'`. Drives the Class-2 dispatch and the
+ *                          `minAnswer` widening default.
+ * @property operands       `[addendA, addendB]` (minuend + subtrahend for
+ *                          `op === '-'`). Required when `distractorClass`
+ *                          is `'wrong-op'`; the wrong-op trap = `a + b`.
+ * @property minAnswer      Inclusive lower bound. Defaults to
+ *                          `ANSWER_RANGE_MIN` (1) for `op === '+'`, and
+ *                          `0` for `op === '-'` (sub-to-10's subtract-self
+ *                          facts produce `correct = 0` — Kyle's spec §3.3).
+ *                          Callers can override either default.
+ * @property distractorClass Planner's soft hint on which Class-2-eligible
+ *                          path to take for `op === '-'` problems P4–P8.
+ *                          Defaults to `'off-by-one'` when absent. Range-
+ *                          fitness re-checked at render time.
+ */
+export interface PickDistractorsOpts {
+  op?: '+' | '-'
+  operands?: readonly [number, number]
+  minAnswer?: number
+  distractorClass?: 'off-by-one' | 'wrong-op'
+}
+
+/**
  * Pick two distinct in-range distractors for a given correct answer.
  *
- * Deterministic per (correct, problemIndex, maxAnswer) tuple. The position
- * of the correct chip among the three rendered chips is randomised
- * separately at render time (`AnswerChips`), so two sessions running
- * back-to-back with the same plan won't put the right chip in the same
- * slot — but the chip *values* themselves are stable, which is what tests
- * want to assert against.
+ * Deterministic per (correct, problemIndex, maxAnswer, opts) tuple. The
+ * position of the correct chip among the three rendered chips is
+ * randomised separately at render time (`AnswerChips`), so two sessions
+ * running back-to-back with the same plan won't put the right chip in
+ * the same slot — but the chip *values* themselves are stable, which is
+ * what tests want to assert against.
  *
- * @param correct The right answer. Must be in [ANSWER_RANGE_MIN, maxAnswer].
+ * @param correct      The right answer. Must be in [minAnswer, maxAnswer].
  * @param problemIndex 1-based session position. Drives the tier choice.
- * @param maxAnswer Upper bound of the answer range (inclusive). Defaults
- *                  to ANSWER_RANGE_MAX (10). Pass ANSWER_RANGE_MAX_TO_20
- *                  for the add-to-20 tier.
+ * @param maxAnswer    Upper bound of the answer range (inclusive).
+ *                     Defaults to ANSWER_RANGE_MAX (10). Pass
+ *                     ANSWER_RANGE_MAX_TO_20 for the add-to-20 tier.
+ * @param opts         Optional render-time hints. See
+ *                     {@link PickDistractorsOpts}.
  * @returns A tuple [d1, d2] of distractor values, both in range, both
  *          distinct, and both different from `correct`.
  *
@@ -145,29 +187,125 @@ export function pickDistractors(
   correct: number,
   problemIndex: number,
   maxAnswer: number = ANSWER_RANGE_MAX,
+  opts?: PickDistractorsOpts,
 ): [number, number] {
-  if (!Number.isInteger(maxAnswer) || maxAnswer < ANSWER_RANGE_MIN + 2) {
+  const op = opts?.op ?? '+'
+  const minAnswer = opts?.minAnswer ?? (op === '-' ? 0 : ANSWER_RANGE_MIN)
+
+  if (!Number.isInteger(maxAnswer) || maxAnswer < minAnswer + 2) {
     // Need at least 2 valid distractors to satisfy the distinctness +
     // ≥2-gap constraints; a too-narrow range is a configuration bug
     // upstream, not a user-facing failure mode.
     throw new Error(
-      `[distractors] maxAnswer=${maxAnswer} must be an integer >= ${ANSWER_RANGE_MIN + 2}`,
+      `[distractors] maxAnswer=${maxAnswer} must be an integer >= ${minAnswer + 2}`,
     )
   }
   if (
     !Number.isInteger(correct) ||
-    correct < ANSWER_RANGE_MIN ||
+    correct < minAnswer ||
     correct > maxAnswer
   ) {
     throw new Error(
-      `[distractors] correct=${correct} is outside [${ANSWER_RANGE_MIN}, ${maxAnswer}]`,
+      `[distractors] correct=${correct} is outside [${minAnswer}, ${maxAnswer}]`,
     )
   }
 
   const tier = pickTier(problemIndex)
-  return tier === 'gentle'
-    ? gentleDistractors(correct, maxAnswer)
-    : offByOneDistractors(correct, maxAnswer)
+  if (tier === 'gentle') {
+    return gentleDistractors(correct, maxAnswer, minAnswer)
+  }
+  // Discriminate tier (problems 4-8). Dispatch on op + distractorClass:
+  //   - op === '+'                                  → off-by-one (Class 1)
+  //   - op === '-', class !== 'wrong-op'             → off-by-one (Class 1)
+  //   - op === '-', class === 'wrong-op', no operands → off-by-one (defensive)
+  //   - op === '-', class === 'wrong-op', operands     → try Class 2; fall
+  //                                                       back to Class 1
+  //                                                       on OOR / alias.
+  const wantsWrongOp =
+    op === '-' &&
+    opts?.distractorClass === 'wrong-op' &&
+    opts.operands !== undefined
+  if (wantsWrongOp) {
+    const [a, b] = opts.operands as [number, number]
+    const wrongOp = wrongOpDistractors(correct, a, b, maxAnswer, minAnswer)
+    if (wrongOp !== null) {
+      return wrongOp
+    }
+    // Range-fitness or alias collision — fall through to off-by-one.
+    // Per Kyle's spec §3.2 "Out-of-range wrong-op fallback": the
+    // problem renders identically to a Class-1 off-by-one. The planner
+    // hint was misleading; this is the documented downgrade.
+  }
+  return offByOneDistractors(correct, maxAnswer, minAnswer)
+}
+
+/**
+ * Class-2 wrong-operation distractor pair for a subtraction problem
+ * `a − b = c` (Kyle's spec §3.2). Returns `null` when the trap value
+ * can't be used cleanly — the caller's expected behaviour is to fall
+ * through to Class 1 (off-by-one).
+ *
+ * Trap = `a + b` (the addition answer using the same operand pair).
+ * Two failure modes downgrade to null:
+ *
+ *   1. **Out-of-range:** `a + b > maxAnswer`. E.g. `10 − 2 = 8` →
+ *      wrong-op `12` > 10. The Class-2 lure simply doesn't fit. The
+ *      problem renders identically to a Class-1 off-by-one.
+ *   2. **Same-value collision (subtract-zero):** `a + 0 = a = c`.
+ *      Wrong-op aliases the correct answer. Per spec §3.2, Class 2 is
+ *      FORBIDDEN for subtract-zero facts.
+ *
+ * Secondary distractor is the standard off-by-one (`c - 1` or `c + 1`
+ * clamped). Alias collision between trap and off-by-one is resolved by
+ * substituting the next-nearest in-range value (`c - 2`).
+ *
+ * Returned tuple is sorted ascending for test stability — chip
+ * randomization happens at render time.
+ */
+export function wrongOpDistractors(
+  correct: number,
+  a: number,
+  b: number,
+  maxAnswer: number,
+  minAnswer: number = 0,
+): [number, number] | null {
+  const trap = a + b
+  // Failure mode 1: trap out of range.
+  if (trap > maxAnswer || trap < minAnswer) return null
+  // Failure mode 2: trap aliases the correct answer (subtract-zero).
+  if (trap === correct) return null
+
+  // Secondary: off-by-one. Prefer `correct - 1` when in range AND not
+  // equal to the trap; else `correct + 1`; else fall back further.
+  const secondary = pickSecondaryOffByOne(correct, trap, minAnswer, maxAnswer)
+  if (secondary === null) {
+    // Pathological — couldn't satisfy distinctness even with the
+    // off-by-one. Caller falls through to plain off-by-one tier.
+    return null
+  }
+  return sortPair(trap, secondary)
+}
+
+/** Pick a single off-by-one secondary distractor that is in range,
+ *  distinct from `correct`, and distinct from `avoid` (the wrong-op
+ *  trap). Walk `correct ± 1` first, then `± 2` if a collision forces
+ *  us further. Returns `null` if no choice satisfies the constraints
+ *  (would only happen on absurdly narrow ranges). */
+function pickSecondaryOffByOne(
+  correct: number,
+  avoid: number,
+  minAnswer: number,
+  maxAnswer: number,
+): number | null {
+  // Try ±1 first (the textbook off-by-one), then ±2 if collision.
+  for (const delta of [-1, 1, -2, 2]) {
+    const candidate = correct + delta
+    if (candidate < minAnswer || candidate > maxAnswer) continue
+    if (candidate === correct) continue
+    if (candidate === avoid) continue
+    return candidate
+  }
+  return null
 }
 
 /**
@@ -210,8 +348,9 @@ export function pickDistractors(
 function gentleDistractors(
   correct: number,
   maxAnswer: number,
+  minAnswer: number = ANSWER_RANGE_MIN,
 ): [number, number] {
-  const minOk = correct - ANSWER_RANGE_MIN >= 2 ? ANSWER_RANGE_MIN : null
+  const minOk = correct - minAnswer >= 2 ? minAnswer : null
   const maxOk = maxAnswer - correct >= 2 ? maxAnswer : null
 
   if (minOk !== null && maxOk !== null) {
@@ -224,13 +363,13 @@ function gentleDistractors(
   // ≥2 gap, distinct, in-range, ≠ the first pick.
   const anchor = (minOk ?? maxOk) as number
 
-  // Walk inward from the opposite end. When anchor=MIN (correct sits high),
-  // search from maxAnswer downward; when anchor=maxAnswer (correct sits
-  // low), search from MIN upward.
+  // Walk inward from the opposite end. When anchor=minAnswer (correct
+  // sits high), search from maxAnswer downward; when anchor=maxAnswer
+  // (correct sits low), search from minAnswer upward.
   const searchOrder =
-    anchor === ANSWER_RANGE_MIN
-      ? rangeDescending(maxAnswer, ANSWER_RANGE_MIN)
-      : rangeAscending(ANSWER_RANGE_MIN, maxAnswer)
+    anchor === minAnswer
+      ? rangeDescending(maxAnswer, minAnswer)
+      : rangeAscending(minAnswer, maxAnswer)
 
   for (const candidate of searchOrder) {
     if (candidate === anchor) continue
@@ -240,11 +379,11 @@ function gentleDistractors(
   }
 
   // Pathological fallback — by construction this is unreachable for any
-  // correct in [ANSWER_RANGE_MIN, maxAnswer] because the gentle-distance
-  // constraint is satisfiable on any range with maxAnswer >= 3. Throw
-  // rather than silently returning bad data.
+  // correct in [minAnswer, maxAnswer] because the gentle-distance
+  // constraint is satisfiable on any range with maxAnswer - minAnswer >= 3.
+  // Throw rather than silently returning bad data.
   throw new Error(
-    `[distractors] gentle ramp could not satisfy ≥2 gap for correct=${correct} (maxAnswer=${maxAnswer})`,
+    `[distractors] gentle ramp could not satisfy ≥2 gap for correct=${correct} (range [${minAnswer}, ${maxAnswer}])`,
   )
 }
 
@@ -269,18 +408,19 @@ function gentleDistractors(
 function offByOneDistractors(
   correct: number,
   maxAnswer: number,
+  minAnswer: number = ANSWER_RANGE_MIN,
 ): [number, number] {
   const low = correct - 1
   const high = correct + 1
 
-  const lowOk = low >= ANSWER_RANGE_MIN
+  const lowOk = low >= minAnswer
   const highOk = high <= maxAnswer
 
   if (lowOk && highOk) return [low, high]
 
   if (!lowOk) {
-    // correct === ANSWER_RANGE_MIN: low=0 invalid. Take high, then the
-    // next in-range adjacent on the high side.
+    // correct === minAnswer: low is below the floor. Take high, then
+    // the next in-range adjacent on the high side.
     return [high, high + 1]
   }
 

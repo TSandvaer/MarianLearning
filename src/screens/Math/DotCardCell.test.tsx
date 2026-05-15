@@ -16,6 +16,7 @@ function problem(addendA: number, addendB: number): MathProblem {
     addendA,
     addendB,
     correct: addendA + addendB,
+    op: '+',
     utterances: {
       read: 'placeholder',
       correct: 'placeholder',

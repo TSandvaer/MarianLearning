@@ -718,14 +718,17 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
     ? buildLeitnerDirective(args.leitner!)
     : null
 
-  // Slow-fact directive (M4.x — follow-up to 86c9pwgc8). Same gating
-  // posture as Leitner: math + add-to-10 + non-empty array. Surfaces
-  // accurate-but-slow facts so Haiku can dose them in for
-  // automaticity practice. Lives in the user message; cache prefix
-  // unchanged.
+  // Slow-fact directive (M4.x — follow-up to 86c9pwgc8). Math retrieval
+  // tiers (`add-to-10` and `sub-to-10` — Kyle's sub-to-10 content tier
+  // spec §8) + non-empty array. Surfaces accurate-but-slow facts so
+  // Haiku can dose them in for automaticity practice. The sub-to-10
+  // gate fires post-warmup only — `buildSlowFactSessionHint` returns
+  // [] for the first 5 sub-to-10 sessions so the wire field is
+  // omitted entirely on the cold-start path. Lives in the user
+  // message; cache prefix unchanged.
   const isSlowFactsActive =
     args.track === 'math' &&
-    focusNode === 'add-to-10' &&
+    (focusNode === 'add-to-10' || focusNode === 'sub-to-10') &&
     args.slowFacts !== undefined &&
     args.slowFacts.length > 0
   const slowFactsLine = isSlowFactsActive
@@ -917,7 +920,42 @@ The user message names a focus skill node. Generate problems specifically for th
 - number-recog: number recognition. Say a numeral, child taps it. Numerals 1-10. read: "Tap the <number>." e.g. "Tap the five."
 - add-to-10: addition with sums 3-10. Both addends 1-9. read: "<addend-A> plus <addend-B>. How many?" e.g. "Three plus two. How many?" Prefer bridge-through-5 (3+2, 4+3), easy doubles (2+2, 4+4), and small near-doubles. Sums must be <= 10.
 - add-to-20: addition with sums STRICTLY in 11-20 (inclusive). Every problem's sum MUST be at least 11 and at most 20 — a sum of 10 or below is FORBIDDEN here (that's add-to-10's territory). FORBIDDEN sum examples (do NOT emit): 5+5=10, 4+4=8, 3+7=10, 6+4=10, 2+8=10. Before emitting any add-to-20 problem, COMPUTE the sum mentally and CONFIRM it is between 11 and 20 inclusive; reject any candidate whose sum falls outside that range. BOTH addends MUST be in 1-9 (cross-10-bridge facts like 8+5=13, 7+6=13, 9+4=13). Ten-plus-single forms are FORBIDDEN — neither addend may equal 10. FORBIDDEN addend examples (do NOT emit, regardless of sum): 10+1=11, 10+5=15, 10+8=18, 1+10=11, 5+10=15, 8+10=18. Before emitting any add-to-20 problem, also CONFIRM that addendA in 1-9 AND addendB in 1-9; reject any candidate where either addend equals 10 or exceeds 10. Rationale: ten-plus-single is pedagogically easier than cross-10-bridge (the actual learning target at this tier), and the visual flower-row at addend=10 overflows the iPad portrait safe area. read: same template — e.g. "Seven plus six. How many?" Lean on doubles and near-doubles within range: 6+6=12, 7+7=14, 8+8=16, 9+9=18, 6+7=13, 7+8=15, 8+9=17.
-- sub-to-10: subtraction with both operands and answer in 1-10. read: "<A> minus <B>. How many?" e.g. "Seven minus three. How many?"
+- sub-to-10: subtraction with both operands in 0-10 and answer in 0-10. read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seven minus three. How many are left?"
+
+  FIRST-SESSION READ-LINE — on the very first session on this node (lifetimeFirstEncounters['sub-to-10'] not yet set), use the warmer phrasing: "<minuend> take away <subtrahend>. How many are left?" e.g. "Eight take away three. How many are left?" This frames subtraction as physical removal, which matches Marian's mental model from counting back. Subsequent sessions revert to the "minus" template. Emma's voice config is unchanged — the SSML and prosody pipeline does not change for this tier.
+
+  FACT POOL (16 facts; pick exactly 8 distinct facts from this pool per session, no duplicates):
+  - Easy band — rule-application / single-step:
+    · 5-5=0, 8-8=0           (subtract-self — at most one per session)
+    · 7-0=7, 9-0=9           (subtract-zero — at most one per session)
+    · 10-5=5, 8-4=4, 6-3=3   (doubles — at most one per session)
+    · 9-1=8                  (subtract-one)
+  - Medium band — counting back / bridges:
+    · 10-1=9                 (subtract-one)
+    · 10-2=8                 (subtract-two)
+    · 10-3=7, 10-7=3         (take-from-10 — at most TWO per session, this category is high-value)
+  - Hard band — general:
+    · 9-4=5, 8-3=5, 7-4=3, 9-6=3  (general — at most two per session)
+
+  SESSION COMPOSITION RULES (apply IN ORDER):
+  1. Problems 1-3 (gentle ramp): draw EXCLUSIVELY from the easy band. Calibration window; no traps yet.
+  2. Problems 4-8 (discriminate): draw from medium + hard bands. Recent-score modulation: low score (< 0.5) → bias toward medium; high score (>= 0.85) → bias toward hard; mid score → balanced.
+  3. At least one take-from-10 fact (10-3 or 10-7) MUST appear somewhere in problems 4-8.
+  4. DUAL-EXPOSURE RULE: never pair a subtraction fact and its addition inverse in the same session. E.g. if 10-7=3 is included, 7+3=10 (or 3+7=10) is FORBIDDEN. This rule is forward-compatible — when Marian later moves to mixed add+sub sessions, this rule remains in force per Dave's research on inverse-principle interference.
+  5. NO duplicate facts within the 8-problem set.
+  6. Category cap: at most one each of subtract-self, subtract-zero, doubles, subtract-one, subtract-two; at most two of take-from-10; at most two of general.
+
+  DISTRACTOR-CLASS HINT (for problems 4-8 only):
+  Tag each P4-P8 problem with distractorClass: "off-by-one" | "wrong-op". At least 2 of the 5 problems P4-P8 MUST be tagged "wrong-op" (the trap is minuend + subtrahend — the addition answer using the same pair). DO NOT use "wrong-op" for subtract-zero facts (the wrong-op would alias the correct answer). For subtract-self facts placed in P4-P8 (unusual since they live in the easy band, but technically possible if recent-score is very high), prefer "wrong-op" — the lure is 2n, a strong distractor. Problems 1-3 are NEVER tagged (they use the gentle ramp).
+
+  PER-PROBLEM SHAPE for sub-to-10: every problem MUST emit op: "-" on the wire (the screen renders the operator glyph from op). For P4-P8 only, OPTIONALLY emit distractorClass per the rule above. Per-slot utterance templates:
+  - read: see above ("<minuend> minus <subtrahend>. How many are left?" or first-session "take away" variant)
+  - correct: "Yes! <answer>!" e.g. "Yes! Eight!" (for correct=0 → "Yes! Zero!")
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint: "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Ten. Take away two. How many now?" (use "take away" framing in the hint regardless of read-line variant — the hint is a scaffold, not a primary read)
+  - giveAnswer: "This one is <answer>." e.g. "This one is eight." (for correct=0 → "This one is zero.")
+
+  PROSODY: numbers are spelled out as words ("zero", "one", "two", ... "ten"). Capitalize the first word of each sentence. The "minus" / "take away" template renders cleanly on en-US-EmmaMultilingualNeural rate -10%; no SSML overrides required for any value in [0, 10].
 - sub-to-20: subtraction within 20. read: same template; the answer may be 1-19.
 - two-digit-addsub: addition or subtraction with at least one two-digit addend. read: "Twenty-three plus four. How many?" Answer < 100, no carrying/borrowing in this slice.
 - skip-counting: count by 2s, 5s, or 10s. read: "Two, four, six, ... what's next?" Answer is the next term.

@@ -573,7 +573,14 @@ export default function App() {
       ? activePlan.problems.map((p) => ({
           a: p.addendA,
           b: p.addendB,
-          op: '+' as const,
+          // Read op from the per-problem MathProblem (Kyle's sub-to-10
+          // content tier spec §5 + audit §1). Pre-sub-to-10 the field
+          // was hardcoded `'+'` because add-to-10 was the only first-
+          // class math tier; with sub-to-10 emitting `op: '-'`, the
+          // per-problem field is the source of truth — synthesizing
+          // `'+'` here would pollute Leitner + slowFacts aggregates
+          // with op-mismatched facts (10−2=8 keyed as 10+2=12 etc.).
+          op: p.op,
         }))
       : undefined
     setSessionEndPayload({

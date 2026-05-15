@@ -67,8 +67,8 @@ const ALL_SLOTS: readonly MathUtteranceSlot[] = [
   'giveAnswer',
 ]
 
-/** Words that can appear as an addend in the `read` template. Covers
- *  1..20 because:
+/** Words that can appear as an addend / operand in the `read` template.
+ *  Covers 0..20 because:
  *
  *   - add-to-10 (sums 3..10) restricts addends to 1..9 — the 10 entry is
  *     defense in depth in case the prompt drifts.
@@ -76,12 +76,20 @@ const ALL_SLOTS: readonly MathUtteranceSlot[] = [
  *     OR a teen + 1, so 11..20 entries cover the teen-plus-single pattern
  *     (e.g. "Twelve plus five. How many?" parses as addendA=12, addendB=5,
  *     correct=17).
+ *   - sub-to-10 (Kyle's spec §1.1) introduces subtraction problems with
+ *     operands and answer in [0, 10]. Two pool facts have operand `0`
+ *     (`7 − 0 = 7`, `9 − 0 = 9`) and two have correct `0` (`5 − 5 = 0`,
+ *     `8 − 8 = 0`). The "zero" entry is REQUIRED for the parser to
+ *     accept those read-lines; without it the parser would throw on
+ *     "Seven minus zero. How many are left?" and the screen would fall
+ *     back to the silent static plan.
  *
  *  Anything beyond 20 stays out of this table — that signals a prompt
  *  drift the parser shouldn't silently absorb (`two-digit-addsub` has its
  *  own template / focus node and would route through a different parser
  *  if we ever ship one). */
 const NUMBER_WORDS: Record<string, number> = {
+  zero: 0,
   one: 1,
   two: 2,
   three: 3,
@@ -169,12 +177,14 @@ export function mathSessionPlanFromServer(
       }
     }
     const utterances = bucket as MathProblemUtterances
-    const { addendA, addendB } = parseReadAddends(utterances.read)
+    const { addendA, addendB, op } = parseReadOperands(utterances.read)
+    const correct = op === '-' ? addendA - addendB : addendA + addendB
     problems.push({
       index,
       addendA,
       addendB,
-      correct: addendA + addendB,
+      correct,
+      op,
       utterances,
     })
   }
@@ -186,32 +196,94 @@ export function mathSessionPlanFromServer(
   }
 }
 
-/** Extract `{addendA, addendB}` from a `read` line shaped like
- *  "Three plus two. How many?" — case-insensitive on the leading word.
- *  Throws on any drift. */
+/** Extract `{addendA, addendB, op}` from a `read` line.
+ *
+ *  Three templates accepted, dispatched by substring on the operator
+ *  word (`plus` / `minus` / `take away`):
+ *
+ *   - `"<A> plus <B>. How many?"`             → op `'+'`
+ *   - `"<A> minus <B>. How many are left?"`   → op `'-'`
+ *   - `"<A> take away <B>. How many are left?"` → op `'-'`
+ *
+ *  All case-insensitive. Throws on any drift outside these three
+ *  templates so the App's silent-fallback path can fire cleanly rather
+ *  than silently producing a wrong-operator session.
+ *
+ *  The first-session `"take away"` variant is Kyle's spec §4.3 — fired
+ *  by the planner via `lifetimeFirstEncounters['sub-to-10']` gating. The
+ *  parser accepts both variants so the gate's flip from session 1 →
+ *  session 2+ doesn't require a parser change.
+ */
+export function parseReadOperands(read: string): {
+  addendA: number
+  addendB: number
+  op: '+' | '-'
+} {
+  // Addition template — anchored to "plus" between two number words.
+  // "Three plus two. How many?" — case-insensitive.
+  const additionMatch = read.match(
+    /^\s*([a-z]+)\s+plus\s+([a-z]+)\s*\.\s*how\s+many\s*\?\s*$/i,
+  )
+  if (additionMatch) {
+    return decodeOperands(additionMatch[1]!, additionMatch[2]!, '+', read)
+  }
+  // Subtraction template — "minus" between two number words, "how many
+  // are left?" trailing. e.g. "Seven minus three. How many are left?"
+  const subMinusMatch = read.match(
+    /^\s*([a-z]+)\s+minus\s+([a-z]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i,
+  )
+  if (subMinusMatch) {
+    return decodeOperands(subMinusMatch[1]!, subMinusMatch[2]!, '-', read)
+  }
+  // First-session subtraction template — "take away" between operands.
+  // e.g. "Eight take away three. How many are left?"
+  const subTakeAwayMatch = read.match(
+    /^\s*([a-z]+)\s+take\s+away\s+([a-z]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i,
+  )
+  if (subTakeAwayMatch) {
+    return decodeOperands(subTakeAwayMatch[1]!, subTakeAwayMatch[2]!, '-', read)
+  }
+  throw new PlanFromServerError(
+    `math read line "${read}" did not match any known math read template ` +
+      `(addition "<W> plus <W>. How many?"; subtraction "<W> minus <W>. ` +
+      `How many are left?"; subtraction first-session "<W> take away <W>. ` +
+      `How many are left?")`,
+  )
+}
+
+/** Backwards-compat shim — exported so existing callers / tests that
+ *  read only `{addendA, addendB}` (and assume addition) still compile.
+ *  Throws on subtraction templates: addition-only consumers should NOT
+ *  be passed subtraction read-lines; if they are, the failure is loud.
+ *  New callers should use `parseReadOperands` directly. */
 export function parseReadAddends(read: string): {
   addendA: number
   addendB: number
 } {
-  // Anchor: optional leading whitespace, capture word A, " plus ", capture
-  // word B, ". How many?" (with optional trailing whitespace / punctuation).
-  // Case-insensitive so "three" / "Three" both work.
-  const match = read.match(
-    /^\s*([a-z]+)\s+plus\s+([a-z]+)\s*\.\s*how\s+many\s*\?\s*$/i,
-  )
-  if (!match) {
+  const result = parseReadOperands(read)
+  if (result.op !== '+') {
     throw new PlanFromServerError(
-      `math read line "${read}" did not match "<word> plus <word>. How many?" template`,
+      `parseReadAddends called on a non-addition read line "${read}"; ` +
+        `use parseReadOperands for subtraction support`,
     )
   }
-  const a = NUMBER_WORDS[match[1]!.toLowerCase()]
-  const b = NUMBER_WORDS[match[2]!.toLowerCase()]
+  return { addendA: result.addendA, addendB: result.addendB }
+}
+
+function decodeOperands(
+  wordA: string,
+  wordB: string,
+  op: '+' | '-',
+  rawRead: string,
+): { addendA: number; addendB: number; op: '+' | '-' } {
+  const a = NUMBER_WORDS[wordA.toLowerCase()]
+  const b = NUMBER_WORDS[wordB.toLowerCase()]
   if (a === undefined || b === undefined) {
     throw new PlanFromServerError(
-      `math read line "${read}" had unrecognised number word(s)`,
+      `math read line "${rawRead}" had unrecognised number word(s)`,
     )
   }
-  return { addendA: a, addendB: b }
+  return { addendA: a, addendB: b, op }
 }
 
 /** Parse a `math.p<N>.<slot>` utterance id. Returns null on miss. */

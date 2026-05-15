@@ -144,13 +144,35 @@ export interface MathProblemUtterances {
 export interface MathProblem {
   /** 1-based position in the session (1..8). */
   index: number
-  /** Left addend (e.g. 3 in "3 + 2"). */
+  /** Left operand. For `op === '+'` this is the left addend; for
+   *  `op === '-'` this is the minuend (e.g. 7 in "7 − 3"). The field
+   *  name stays `addendA` for backwards-compat with the existing add-to-10
+   *  shape — semantic drift is acceptable because the field is named at
+   *  the data layer and the visual / read-aloud layers consume `op`
+   *  directly to render the right operator. See sessionPlans test
+   *  fixtures + Kyle's sub-to-10 content spec §5. */
   addendA: number
-  /** Right addend (e.g. 2 in "3 + 2"). */
+  /** Right operand. Addend for `op === '+'`, subtrahend for `op === '-'`. */
   addendB: number
-  /** The right answer. Always `addendA + addendB`; computed once at plan
-   *  authoring time so `Math.tsx` doesn't have to re-derive on every render. */
+  /** The right answer. `addendA + addendB` for `op === '+'`,
+   *  `addendA - addendB` for `op === '-'`. Computed once at plan-author
+   *  time so `Math.tsx` doesn't have to re-derive on every render. */
   correct: number
+  /** Operation discriminant. Required on every MathProblem so the
+   *  consumer (`App.tsx#handleMathComplete` for the per-problem
+   *  `MathFact[]` synthesis; future Math.tsx render branch for the
+   *  symbolic operator glyph; future dotCard gate) can branch without
+   *  inspecting the read-aloud text. Defaults to `'+'` at every
+   *  authored site for the add-to-10 / add-to-20 tiers; emitted as
+   *  `'-'` by the sub-to-10 planner directive + canon adapter. */
+  op: '+' | '-'
+  /** Soft hint from the planner for the distractor algorithm. Only
+   *  emitted on `op === '-'` problems P4–P8 (the discriminate tier).
+   *  Range / collision-fitness is re-checked at render time; the
+   *  algorithm may silently downgrade `'wrong-op'` to off-by-one when
+   *  the trap value falls outside `[minAnswer, maxAnswer]` or aliases
+   *  the correct answer (subtract-zero facts). See Kyle's spec §3.4. */
+  distractorClass?: 'off-by-one' | 'wrong-op'
   /** Pre-canned utterance lines for this problem. */
   utterances: MathProblemUtterances
 }
@@ -165,7 +187,12 @@ export interface MathSessionPlan {
   problems: readonly MathProblem[]
 }
 
-/** Build a problem with all the canned utterances derived from its addends. */
+/** Build a problem with all the canned utterances derived from its addends.
+ *  Every static-fallback plan here is addition; sub-to-10 content lands
+ *  exclusively via the planner / canon pipeline (no static-`-` fallback
+ *  rotation in v1 per Kyle's spec — fallback path emits add-to-10 plans
+ *  if sub-to-10 canon is unreachable, which is consistent with current
+ *  pickStaticSessionPlan behaviour for unknown focus nodes). */
 function makeProblem(
   index: number,
   addendA: number,
@@ -177,6 +204,7 @@ function makeProblem(
     addendA,
     addendB,
     correct,
+    op: '+',
     utterances: {
       read: `${numberWord(addendA)} plus ${numberWord(addendB)}. How many?`,
       correct: `Yes! ${numberWord(correct)}!`,
@@ -202,6 +230,13 @@ function makeProblem(
  */
 function numberWord(n: number): string {
   const words: Record<number, string> = {
+    // 0 — for sub-to-10's subtract-self facts (`5−5=0`, `8−8=0`). The
+    // static fallback plans never produce 0 (they're all addition with
+    // both addends ≥ 1), but the sub-to-10 canon adapter's hint /
+    // giveAnswer / correct utterances may need to spell "zero" — wire
+    // the word in here so both the canon adapter and any future
+    // sub-to-10 static plan share the same table.
+    0: 'zero',
     1: 'one',
     2: 'two',
     3: 'three',

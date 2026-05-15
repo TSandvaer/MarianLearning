@@ -28,4 +28,5 @@ export {
   PlanFromServerError as MathPlanFromServerError,
   mathSessionPlanFromServer,
   parseReadAddends,
+  parseReadOperands,
 } from './planFromServer'

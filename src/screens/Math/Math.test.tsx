@@ -82,6 +82,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 3,
         addendB: 2,
         correct: 5,
+        op: '+',
         utterances: {
           read: 'Three plus two. How many?',
           correct: 'Yes! Five!',
@@ -95,6 +96,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 1,
         addendB: 4,
         correct: 5,
+        op: '+',
         utterances: {
           read: 'One plus four. How many?',
           correct: 'Yes! Five!',
@@ -108,6 +110,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 4,
         addendB: 2,
         correct: 6,
+        op: '+',
         utterances: {
           read: 'Four plus two. How many?',
           correct: 'Yes! Six!',
@@ -121,6 +124,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 5,
         addendB: 3,
         correct: 8,
+        op: '+',
         utterances: {
           read: 'Five plus three. How many?',
           correct: 'Yes! Eight!',
@@ -134,6 +138,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 2,
         addendB: 5,
         correct: 7,
+        op: '+',
         utterances: {
           read: 'Two plus five. How many?',
           correct: 'Yes! Seven!',
@@ -147,6 +152,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 6,
         addendB: 3,
         correct: 9,
+        op: '+',
         utterances: {
           read: 'Six plus three. How many?',
           correct: 'Yes! Nine!',
@@ -160,6 +166,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 4,
         addendB: 4,
         correct: 8,
+        op: '+',
         utterances: {
           read: 'Four plus four. How many?',
           correct: 'Yes! Eight!',
@@ -173,6 +180,7 @@ function fixedPlan(): MathSessionPlan {
         addendA: 5,
         addendB: 5,
         correct: 10,
+        op: '+',
         utterances: {
           read: 'Five plus five. How many?',
           correct: 'Yes! Ten!',
@@ -2304,6 +2312,7 @@ describe('Math (Number Garden) screen', () => {
             addendA: 7,
             addendB: 2,
             correct: 9,
+            op: '+',
             utterances: {
               read: 'Seven plus two. How many?',
               correct: 'Yes! Nine!',
@@ -2634,6 +2643,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 6,
           addendB: 6,
           correct: 12,
+          op: '+',
           utterances: {
             read: 'Six plus six. How many?',
             correct: 'Yes! Twelve!',
@@ -2647,6 +2657,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 7,
           addendB: 7,
           correct: 14,
+          op: '+',
           utterances: {
             read: 'Seven plus seven. How many?',
             correct: 'Yes! Fourteen!',
@@ -2660,6 +2671,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 5,
           addendB: 7,
           correct: 12,
+          op: '+',
           utterances: {
             read: 'Five plus seven. How many?',
             correct: 'Yes! Twelve!',
@@ -2673,6 +2685,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 8,
           addendB: 5,
           correct: 13,
+          op: '+',
           utterances: {
             read: 'Eight plus five. How many?',
             correct: 'Yes! Thirteen!',
@@ -2686,6 +2699,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 9,
           addendB: 9,
           correct: 18,
+          op: '+',
           utterances: {
             read: 'Nine plus nine. How many?',
             correct: 'Yes! Eighteen!',
@@ -2699,6 +2713,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 7,
           addendB: 6,
           correct: 13,
+          op: '+',
           utterances: {
             read: 'Seven plus six. How many?',
             correct: 'Yes! Thirteen!',
@@ -2712,6 +2727,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 9,
           addendB: 4,
           correct: 13,
+          op: '+',
           utterances: {
             read: 'Nine plus four. How many?',
             correct: 'Yes! Thirteen!',
@@ -2725,6 +2741,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 8,
           addendB: 8,
           correct: 16,
+          op: '+',
           utterances: {
             read: 'Eight plus eight. How many?',
             correct: 'Yes! Sixteen!',
@@ -2789,6 +2806,7 @@ describe('Math (Number Garden) screen', () => {
         addendA: 9,
         addendB: 9,
         correct: 18,
+        op: '+',
         utterances: {
           read: 'Nine plus nine. How many?',
           correct: 'Yes! Eighteen!',
@@ -2861,6 +2879,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 9,
           addendB: 9,
           correct: 18,
+          op: '+',
           utterances: {
             read: 'Nine plus nine. How many?',
             correct: 'Yes! Eighteen!',
@@ -2898,6 +2917,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 5,
           addendB: 5,
           correct: 10,
+          op: '+',
           utterances: {
             read: 'Five plus five. How many?',
             correct: 'Yes! Ten!',
@@ -3558,6 +3578,7 @@ describe('Math (Number Garden) screen', () => {
             addendA: 6,
             addendB: 4,
             correct: 10,
+            op: '+',
             utterances: {
               read: 'Six plus four. How many?',
               correct: 'Yes! Ten!',
@@ -3629,6 +3650,7 @@ describe('Math (Number Garden) screen', () => {
           addendA: 6,
           addendB: i % 4 === 0 ? 4 : 1,
           correct: 6 + (i % 4 === 0 ? 4 : 1),
+          op: '+' as const,
           utterances: {
             read: 'Six plus four. How many?',
             correct: 'Yes!',
