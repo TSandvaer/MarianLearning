@@ -164,11 +164,11 @@ export interface PrepareMathPathAArgs {
    * consults this via `applyFirstEncounterGate` to decide whether to
    * fire tier-specific scaffolding on `session.end.opener` for gated
    * math nodes (`'sub-to-10'` is on the gated list as infrastructure-
-   * ready; the rewrite is a runtime no-op until Wave 3.4 widens
-   * `lifetimeFirstEncounters` to `SkillNode[]` and adds session-end
-   * append-on-math). Always shipped (even when empty) for the math
-   * track when progress exists; `[]` is meaningful (greenfield
-   * Marian).
+   * ready; the rewrite is a runtime no-op until session-end
+   * append-on-math is wired — Wave 3.4 widened the schema to
+   * `SkillNode[]`, the producer change is the remaining follow-up).
+   * Always shipped (even when empty) for the math track when progress
+   * exists; `[]` is meaningful (greenfield Marian).
    */
   lifetimeFirstEncounters?: readonly string[]
 }

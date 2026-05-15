@@ -245,11 +245,8 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   // Always include the field when progress exists — empty array is
   // meaningful (greenfield Marian, fire scaffolding on every tier's first
   // session). The read-path defaulter ensures the field is never undefined
-  // here. NOTE: `Progress.lifetimeFirstEncounters` is typed
-  // `WordSongNode[]` today; the runtime guard widens to all `SkillNode`s,
-  // so a math node ID (`'sub-to-10'`) will round-trip cleanly even though
-  // the static type can't express it. Widening the static type to
-  // `SkillNode[]` plus session-end append-on-math is Wave 3.4 work.
+  // here. Static type spans both tracks (`SkillNode[]`) post Wave 3.4 —
+  // session-end append-on-math is a follow-up.
   const lifetimeFirstEncounters: readonly string[] =
     progress.lifetimeFirstEncounters ?? []
   return {
@@ -857,8 +854,9 @@ export default function App() {
         // sub-to-10 content tier (Kyle §4.3, 2026-05-15): forward the
         // lifetime-first-encounter list. Server's
         // `applyFirstEncounterGate` consults it for gated math nodes
-        // (`'sub-to-10'`); rewrite is a no-op until Wave 3.4 widens
-        // schema + adds session-end append-on-math. Jessica's
+        // (`'sub-to-10'`); the schema now legally carries math node ids
+        // (Wave 3.4), but the rewrite remains a no-op until session-end
+        // append-on-math lands in a follow-up. Jessica's
         // sub-to-10-first-encounter-gate.spec.ts asserts the field
         // is present on math requests.
         lifetimeFirstEncounters: mathHints.lifetimeFirstEncounters,

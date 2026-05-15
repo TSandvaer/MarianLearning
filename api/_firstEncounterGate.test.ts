@@ -103,10 +103,11 @@ describe('getFirstEncounterGatedNodes', () => {
   // other math nodes are NOT.
   it('includes sub-to-10 (sub-to-10 content tier — infrastructure-ready)', () => {
     // Per Kyle's sub-to-10 content tier spec §4.3: the read-line
-    // variant gate is wired here. Per the schema constraint
-    // (`lifetimeFirstEncounters: WordSongNode[]`), the actual rewrite
-    // is a no-op for math nodes at runtime — the entry is here so
-    // the gate set test confirms wire-up.
+    // variant gate is wired here. The schema now legally carries
+    // math node ids (Wave 3.4 widened `lifetimeFirstEncounters` from
+    // `WordSongNode[]` to `SkillNode[]`); the rewrite remains a no-op
+    // for math nodes until the session-end append-on-math producer
+    // lights up in a follow-up.
     const gated = getFirstEncounterGatedNodes()
     expect(gated).toContain('sub-to-10')
   })
