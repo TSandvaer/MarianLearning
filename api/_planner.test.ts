@@ -3167,6 +3167,30 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     expect(systemText).toContain("lifetimeFirstEncounters['sub-to-10']")
   })
 
+  it('the sub-to-10 menu line scopes the read-line template choice to the WHOLE session (not per-problem)', async () => {
+    // Sharpening post-PR-240 — Haiku-3 violation was per-problem template
+    // drift. The directive now frames the choice as session-level + bans
+    // mixing templates within a session.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('SESSION-LEVEL TEMPLATE CHOICE')
+    expect(systemText).toContain(
+      'USE THE CHOSEN TEMPLATE ACROSS ALL 8 PROBLEMS',
+    )
+    expect(systemText).toContain(
+      'DO NOT mix "take away" and "minus" within a single session',
+    )
+  })
+
   it('the sub-to-10 menu line names the 16-fact canonical pool (Dave §"Concrete fact ordering")', async () => {
     // Pin every pool fact's a-b=c notation appears literally in the
     // prompt. This drift-guards the pool — a "let me trim this list"
@@ -3217,9 +3241,12 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
     // The three bands are the spine of the sequencing.
-    expect(systemText).toContain('Easy band')
-    expect(systemText).toContain('Medium band')
-    expect(systemText).toContain('Hard band')
+    // Each fact carries an inline [BAND/category] tag in the FACT POOL so
+    // Haiku doesn't lose the band binding when composing the 8-problem
+    // sequence (sharpening per PR #240 follow-up — Haiku-3 violations).
+    expect(systemText).toContain('[EASY/')
+    expect(systemText).toContain('[MEDIUM/')
+    expect(systemText).toContain('[HARD/')
     // Subcategory names (Dave's research §"Concrete fact ordering").
     expect(systemText).toContain('subtract-self')
     expect(systemText).toContain('subtract-zero')
@@ -3300,7 +3327,15 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
     expect(systemText).toMatch(/Problems 1-3 \(gentle ramp\)/)
-    expect(systemText).toContain('EXCLUSIVELY from the easy band')
+    // Wording sharpened post-PR-240 (band-binding inlined per fact) — the
+    // semantic invariant is "P1-P3 are EASY-band only".
+    expect(systemText).toContain('EXCLUSIVELY EASY-band facts')
+    // Negative-anchor block paired with the positive directive — explicit
+    // placement bans for HARD-band facts at P1-P3 (sharpening rationale).
+    expect(systemText).toContain('NEGATIVE ANCHOR')
+    expect(systemText).toContain(
+      'DO NOT place 8-3, 9-4, 7-4, or 9-6 at P1, P2, or P3',
+    )
   })
 
   it('the sub-to-10 menu line emits op:"-" on every problem (wire-shape contract per Kyle spec §5)', async () => {
