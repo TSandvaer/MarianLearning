@@ -25,6 +25,21 @@
  * constant below pins the dice-pip vocabulary ceiling — the rule must
  * stay aligned with the rendering primitive.
  *
+ * `sub-to-10` (Kyle's spec §3, Dave's research §Q2 "skip CRA detour")
+ * --------------------------------------------------------------------
+ * The dot-card is a CRA representational layer scoped to addition only.
+ * Per Dave's research, subtraction does NOT get the CRA visual scaffold —
+ * the read-aloud carries the representational layer for sub-to-10. Pool
+ * facts like `5 − 5 = 0` and `3 − 2 = 1` have BOTH operands ≤ 5, so
+ * without an explicit op-gate the structural predicate would fire on them
+ * and Marian would see a dot-card showing pips `5` and `5` (total 10)
+ * for a problem whose correct answer is `0` — visually nonsensical for a
+ * subtraction. The `op === '+'` gate at the top of `shouldShowDotCard`
+ * is the belt-and-braces enforcement that prevents this. Belt = the
+ * structural addends-≤-5 rule (still applies); braces = the op check
+ * (catches subtraction explicitly so future tiers with addends-≤-5 also
+ * stay out). See Kevin's audit §4 for the same recommendation.
+ *
  * Spec invariant: `shouldShowDotCard` must be deterministic and side-
  * effect-free so the screen can call it in render without state sync.
  */
@@ -62,9 +77,14 @@ export const MIN_PIPS_PER_CELL = 1 as const
 
 /**
  * Returns `true` when the problem qualifies for a dot-card overlay
- * flash. Both addends must be in `[1, 5]`.
+ * flash. Both addends must be in `[1, 5]` AND `op === '+'` (the dot-card
+ * is an addition-only CRA scaffold; sub-to-10 explicitly skips it per
+ * Dave's research §Q2 / Kyle's spec §3).
  */
 export function shouldShowDotCard(problem: MathProblem): boolean {
+  // Op-gate FIRST — subtraction never shows the dot-card regardless of
+  // operand sizes. See module header "sub-to-10" block for rationale.
+  if (problem.op !== '+') return false
   const { addendA, addendB } = problem
   if (!Number.isInteger(addendA) || !Number.isInteger(addendB)) return false
   if (addendA < MIN_PIPS_PER_CELL || addendA > MAX_PIPS_PER_CELL) return false

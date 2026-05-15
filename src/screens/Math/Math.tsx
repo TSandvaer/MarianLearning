@@ -2156,14 +2156,28 @@ function MathScreen({
        */}
       {audioReady !== false && (
         <>
-          {/* Problem display — symbolic + visual flowers */}
+          {/* Problem display — symbolic + (op==='+' only) visual flowers */}
           <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6 px-4">
             <div
               data-testid="math-symbolic"
+              data-op={currentProblem.op}
               className="flex items-center gap-4 font-display text-[6rem] leading-none"
             >
               <span data-testid="math-addend-a">{currentProblem.addendA}</span>
-              <span aria-hidden>+</span>
+              {/*
+                Operator glyph driven by `currentProblem.op`. Sub-to-10
+                uses U+2212 MINUS SIGN — the typographically correct
+                glyph at display sizes — NOT the ASCII hyphen-minus
+                `-` (U+002D). Per Kyle's sub-to-10 spec §13 and Kevin's
+                audit §1 blocker 1: the previous hardcoded `+` baked
+                addition into the JSX; sub-to-10 problems were rendering
+                with the wrong operator. The `aria-hidden` stays because
+                Emma's read-aloud carries the operator name verbatim
+                ("Seven minus three. How many are left?").
+              */}
+              <span aria-hidden data-testid="math-operator">
+                {currentProblem.op === '-' ? '−' : '+'}
+              </span>
               <span data-testid="math-addend-b">{currentProblem.addendB}</span>
               <span aria-hidden>=</span>
               <span data-testid="math-result-placeholder" aria-hidden>
@@ -2191,66 +2205,77 @@ function MathScreen({
 
             `data-flowers-visible` mirrors the dot-card lifecycle for
             QA — `false` while the overlay is on screen, `true`
-            otherwise. */}
-            <div className="relative flex items-center justify-center">
-              <m.div
-                data-testid="math-visual-groups"
-                data-flower-rem={flowerRowFontSizeRem(
-                  currentProblem.addendA,
-                  currentProblem.addendB,
-                ).toFixed(2)}
-                data-flowers-visible={flowersVisible ? 'true' : 'false'}
-                aria-hidden
-                className="flex items-center gap-6"
-                style={{
-                  fontSize: `${flowerRowFontSizeRem(
+            otherwise.
+
+            `op === '-'` (sub-to-10) skips the entire visual-groups
+            row — per Kyle's spec §3 and Dave's research §Q2 ("skip the
+            CRA visual detour"), subtraction's representational layer
+            is Emma's read-aloud, not flower bouquets. Two flower
+            groups with a `−` between them would be visually nonsense
+            (you can't subtract one bouquet from another in a static
+            picture). The chip row below carries the full interaction
+            for sub-to-10. */}
+            {currentProblem.op === '+' && (
+              <div className="relative flex items-center justify-center">
+                <m.div
+                  data-testid="math-visual-groups"
+                  data-flower-rem={flowerRowFontSizeRem(
                     currentProblem.addendA,
                     currentProblem.addendB,
-                  )}rem`,
-                }}
-                /*
-                 * Flower opacity is the single visual we cross-fade
-                 * across the dot-card lifecycle. Initial mount on an
-                 * in-scope problem starts at 0 (overlay covers it);
-                 * out-of-scope problems initialise `dotCardDismissed
-                 * = true` in the effect above so flowers paint at
-                 * opacity 1 from t=0 — matching today's behaviour for
-                 * any problem with addend > 5.
-                 *
-                 * The 250ms tween cross-fades into the dot-card's
-                 * 200ms fade-out (overlap of 200ms, dot-card unmounts
-                 * 50ms before flowers fully settle). Spec § "Flower
-                 * coordination".
-                 */
-                initial={false}
-                animate={{ opacity: flowersVisible ? 1 : 0 }}
-                transition={{
-                  duration: reducedMotion ? 0.2 : 0.25,
-                  ease: 'easeOut',
-                }}
-              >
-                <FlowerGroup count={currentProblem.addendA} />
-                <span>+</span>
-                <FlowerGroup count={currentProblem.addendB} />
-              </m.div>
-              {showDotCardOverlay && dotCardPips !== null && (
-                <DotCardOverlay
-                  // `key` per problemIndex guarantees the overlay
-                  // unmounts/remounts cleanly when Marian advances —
-                  // its internal phase machine resets on each new
-                  // problem. Without this, a tight advance during the
-                  // overlay's `holding` phase could land the next
-                  // problem's overlay mid-cycle.
-                  key={problemIndex}
-                  pipsA={dotCardPips[0]}
-                  pipsB={dotCardPips[1]}
-                  pageHidden={pageHidden}
-                  reducedMotion={reducedMotion}
-                  onComplete={() => setActiveDismissForIndex(problemIndex)}
-                  __testSkipLifecycle={__testDisableDotCard}
-                />
-              )}
-            </div>
+                  ).toFixed(2)}
+                  data-flowers-visible={flowersVisible ? 'true' : 'false'}
+                  aria-hidden
+                  className="flex items-center gap-6"
+                  style={{
+                    fontSize: `${flowerRowFontSizeRem(
+                      currentProblem.addendA,
+                      currentProblem.addendB,
+                    )}rem`,
+                  }}
+                  /*
+                   * Flower opacity is the single visual we cross-fade
+                   * across the dot-card lifecycle. Initial mount on an
+                   * in-scope problem starts at 0 (overlay covers it);
+                   * out-of-scope problems initialise `dotCardDismissed
+                   * = true` in the effect above so flowers paint at
+                   * opacity 1 from t=0 — matching today's behaviour for
+                   * any problem with addend > 5.
+                   *
+                   * The 250ms tween cross-fades into the dot-card's
+                   * 200ms fade-out (overlap of 200ms, dot-card unmounts
+                   * 50ms before flowers fully settle). Spec § "Flower
+                   * coordination".
+                   */
+                  initial={false}
+                  animate={{ opacity: flowersVisible ? 1 : 0 }}
+                  transition={{
+                    duration: reducedMotion ? 0.2 : 0.25,
+                    ease: 'easeOut',
+                  }}
+                >
+                  <FlowerGroup count={currentProblem.addendA} />
+                  <span>+</span>
+                  <FlowerGroup count={currentProblem.addendB} />
+                </m.div>
+                {showDotCardOverlay && dotCardPips !== null && (
+                  <DotCardOverlay
+                    // `key` per problemIndex guarantees the overlay
+                    // unmounts/remounts cleanly when Marian advances —
+                    // its internal phase machine resets on each new
+                    // problem. Without this, a tight advance during the
+                    // overlay's `holding` phase could land the next
+                    // problem's overlay mid-cycle.
+                    key={problemIndex}
+                    pipsA={dotCardPips[0]}
+                    pipsB={dotCardPips[1]}
+                    pageHidden={pageHidden}
+                    reducedMotion={reducedMotion}
+                    onComplete={() => setActiveDismissForIndex(problemIndex)}
+                    __testSkipLifecycle={__testDisableDotCard}
+                  />
+                )}
+              </div>
+            )}
           </div>
 
           {/* Answer chips */}
@@ -2509,7 +2534,35 @@ function buildChipOrder(
   problem: MathProblem,
   maxAnswer: number,
 ): readonly number[] {
-  const [d1, d2] = pickDistractors(problem.correct, problem.index, maxAnswer)
+  // Thread `op`, `operands`, and the planner's `distractorClass` hint
+  // into `pickDistractors` (Kyle's sub-to-10 spec §3.4 + §13 PR 2).
+  // For sub-to-10 problems P4–P8, default the hint to `'wrong-op'` so
+  // the Class-2 trap (a + b) is attempted; `pickDistractors` silently
+  // downgrades to off-by-one when the trap is OOR (e.g. `10 − 2 = 8`,
+  // trap `12` > maxAnswer=10) or aliases the correct answer
+  // (subtract-zero, where a + 0 = a = correct). For P1–P3, the gentle
+  // tier wins regardless of the hint.
+  //
+  // The wire shape today (per `planFromServer.ts`) does not carry a
+  // per-problem `distractorClass` field — the planner directive
+  // describes it as a planner-emitted tag, but the canon JSON wire is
+  // utterance-only `{id, text}`. Until the wire shape widens to a
+  // per-problem object (a future schema bump), the deterministic
+  // client-side default is: attempt `'wrong-op'` for every sub-to-10
+  // P4–P8 problem; let the OOR/alias fallback in `pickDistractors`
+  // handle the cases where the trap is invalid. This satisfies Kyle's
+  // spec §2.2 ("≥ 2 of P4–P8 must carry the wrong-op trap") because in
+  // practice ≥ 2 of any sub-to-10 P4–P8 sequence has an in-range
+  // trap — and over-attempting wrong-op is benign (silent downgrade).
+  // If `MathProblem.distractorClass` is explicitly set on the problem
+  // (e.g. by a future server-emitted hint), that wins over the default.
+  const distractorClass: 'off-by-one' | 'wrong-op' | undefined =
+    problem.distractorClass ?? (problem.op === '-' ? 'wrong-op' : undefined)
+  const [d1, d2] = pickDistractors(problem.correct, problem.index, maxAnswer, {
+    op: problem.op,
+    operands: [problem.addendA, problem.addendB] as const,
+    distractorClass,
+  })
   const values = [problem.correct, d1, d2]
   // Deterministic Fisher-Yates with a per-problem seed.
   const seed = (problem.index * 31 + problem.correct * 17 + 1) >>> 0

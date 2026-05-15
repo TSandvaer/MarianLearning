@@ -45,6 +45,26 @@ function problem(addendA: number, addendB: number): MathProblem {
   }
 }
 
+/** Like `problem(...)` but produces a subtraction problem. Used to pin
+ *  Kyle's spec §3 / Dave's research §Q2: sub-to-10 NEVER shows the
+ *  dot-card, regardless of operand sizes. */
+function subProblem(minuend: number, subtrahend: number): MathProblem {
+  return {
+    index: 1,
+    addendA: minuend,
+    addendB: subtrahend,
+    correct: minuend - subtrahend,
+    op: '-',
+    utterances: {
+      read: 'placeholder',
+      correct: 'placeholder',
+      reprompt: 'placeholder',
+      hint: 'placeholder',
+      giveAnswer: 'placeholder',
+    },
+  }
+}
+
 describe('shouldShowDotCard', () => {
   it('returns true when both addends are at the lower bound (1+1)', () => {
     expect(shouldShowDotCard(problem(1, 1))).toBe(true)
@@ -108,6 +128,56 @@ describe('shouldShowDotCard', () => {
 
   it('returns false on a spec out-of-scope sample from PR #163 trigger table (6+3)', () => {
     expect(shouldShowDotCard(problem(6, 3))).toBe(false)
+  })
+
+  // ── sub-to-10 op-gate (Kyle's spec §3, Dave's research §Q2) ────────────
+  //
+  // The dot-card is an addition-only CRA scaffold. Subtraction skips it
+  // entirely — Marian's representational layer for sub-to-10 is Emma's
+  // read-aloud, not a pip visualization. Without the op-gate, pool facts
+  // like `5 − 5 = 0` (both operands ≤ 5) would fire the structural rule
+  // and show a misleading 5+5 = 10 pip count for a problem whose
+  // correct answer is `0`.
+  //
+  // Belt-and-braces: even pool facts whose operands ALSO clear the ≤ 5
+  // ceiling (e.g. `5 − 5`, `3 − 2`, `1 − 1`) must return false on
+  // `op === '-'`. The structural addends-≤-5 rule still runs for `op
+  // === '+'` callers — these counter-tests defend against silent gate
+  // regression.
+
+  it('returns false on sub-to-10 subtract-self with both operands ≤ 5 (5-5)', () => {
+    expect(shouldShowDotCard(subProblem(5, 5))).toBe(false)
+  })
+
+  it('returns false on sub-to-10 with both operands ≤ 5 (3-2)', () => {
+    expect(shouldShowDotCard(subProblem(3, 2))).toBe(false)
+  })
+
+  it('returns false on sub-to-10 with both operands at the lower bound (1-1)', () => {
+    expect(shouldShowDotCard(subProblem(1, 1))).toBe(false)
+  })
+
+  it('returns false on every sub-to-10 pair on the 1..5 × 1..5 truth table', () => {
+    for (let m = 1; m <= 5; m++) {
+      for (let s = 1; s <= 5; s++) {
+        expect(
+          shouldShowDotCard(subProblem(m, s)),
+          `sub-to-10 ${m}-${s} must NOT fire dot-card (op-gate)`,
+        ).toBe(false)
+      }
+    }
+  })
+
+  it('returns false on sub-to-10 even when operands would be in-range additively (4-1)', () => {
+    // 4 + 1 = 5 would pass the structural rule for op:'+', but the op-gate
+    // rejects op:'-' upfront — no need to evaluate the operand check.
+    expect(shouldShowDotCard(subProblem(4, 1))).toBe(false)
+  })
+
+  it('returns false on sub-to-10 subtract-zero (5-0) — operand 0 is below MIN, AND op gate rejects', () => {
+    // Double-protected — subtract-zero produces operand b=0 which would fail
+    // the MIN_PIPS_PER_CELL check anyway, but the op-gate fires first.
+    expect(shouldShowDotCard(subProblem(5, 0))).toBe(false)
   })
 })
 
