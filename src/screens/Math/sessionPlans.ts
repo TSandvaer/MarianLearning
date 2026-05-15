@@ -166,12 +166,18 @@ export interface MathProblem {
    *  authored site for the add-to-10 / add-to-20 tiers; emitted as
    *  `'-'` by the sub-to-10 planner directive + canon adapter. */
   op: '+' | '-'
-  /** Soft hint from the planner for the distractor algorithm. Only
-   *  emitted on `op === '-'` problems P4–P8 (the discriminate tier).
-   *  Range / collision-fitness is re-checked at render time; the
-   *  algorithm may silently downgrade `'wrong-op'` to off-by-one when
-   *  the trap value falls outside `[minAnswer, maxAnswer]` or aliases
-   *  the correct answer (subtract-zero facts). See Kyle's spec §3.4. */
+  /** Render-time hint for the distractor algorithm. Forward-compat
+   *  seam: the planner wire shape is utterance-only and does NOT
+   *  carry this field. The only writer today is `Math.tsx`'s
+   *  deterministic default at the chip-build site, which sets
+   *  `'wrong-op'` for every `op === '-'` P4–P8 problem; `pickDistractors`
+   *  silently downgrades to off-by-one when the trap value falls
+   *  outside `[minAnswer, maxAnswer]` or aliases the correct answer
+   *  (subtract-zero facts). Kept as an optional field so a future
+   *  planner-side widening (per-problem structured tags via a wire
+   *  envelope extension) can populate it without a type change. See
+   *  Kyle's spec §3.4 and the planner-and-canon doc's "wire shape is
+   *  utterance-only" rule. */
   distractorClass?: 'off-by-one' | 'wrong-op'
   /** Pre-canned utterance lines for this problem. */
   utterances: MathProblemUtterances

@@ -3274,10 +3274,16 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     )
   })
 
-  it('the sub-to-10 menu line lists Class 2 wrong-operation distractor rules (Dave §Q4)', async () => {
-    // The wrong-operation lure: minuend + subtrahend. At least 2 of
-    // P4-P8 must be tagged 'wrong-op'. Subtract-zero is forbidden
-    // (alias collision).
+  it('the sub-to-10 directive does NOT mention distractorClass — distractor selection is render-time derived (planner wire is utterance-only)', async () => {
+    // Drift-guard: the wire shape is utterance-only and cannot carry
+    // a per-problem `distractorClass` tag. Distractor selection lives
+    // entirely in `src/screens/Math/Math.tsx`'s deterministic default
+    // (every P4-P8 op:"-" problem attempts 'wrong-op'; pickDistractors
+    // silently downgrades to off-by-one when the trap is OOR or aliases
+    // the correct answer). A future Haiku-tuning pass that re-adds a
+    // "tag each problem with distractorClass" line would re-introduce
+    // ignored wire emissions (Haiku-3 NOFs from PR #240 + PR #241) —
+    // this test locks the reword.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(STUB_RESPONSE, { capture })
     await generateSessionPlan({
@@ -3289,11 +3295,8 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     })
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
-    expect(systemText).toContain('DISTRACTOR-CLASS HINT')
-    expect(systemText).toContain('wrong-op')
-    expect(systemText).toContain('minuend + subtrahend')
-    expect(systemText).toMatch(/at least 2 of/i)
-    expect(systemText).toContain('DO NOT use "wrong-op" for subtract-zero')
+    expect(systemText).not.toContain('distractorClass')
+    expect(systemText).not.toContain('DISTRACTOR-CLASS HINT')
   })
 
   it('the sub-to-10 menu line requires at least one take-from-10 fact in P4-P8 (Dave §"session design rules" #2)', async () => {
