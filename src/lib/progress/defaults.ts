@@ -90,7 +90,16 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   'number-recog': 'mastered',
   'add-to-10': 'practicing', // sums to 10, drive automaticity
   'add-to-20': 'locked',
-  'sub-to-10': 'mastered', // within 15 confident => sub-to-10 is solid
+  // sub-to-10: re-baselined to 'practicing' (was 'mastered' from the
+  // April 2026 diagnostic — "subtraction within 15 confident"). Per
+  // Dave's research (design/research/sub-to-10-fact-sequencing-marian.md)
+  // and the sub-to-10 content tier spec (design/math/sub-to-10-content.md,
+  // §6 advancement gate), the conceptual confidence she showed in the
+  // diagnostic does NOT translate to retrieval automaticity on the
+  // 4-chip abstract format. The new tier exists to drill the retrieval
+  // pathway; baseline starts at 'practicing' so the picker lands here
+  // after add-to-20 (existing tree order, no curriculum reorder).
+  'sub-to-10': 'practicing', // retrieval-automaticity drill, not concept
   'sub-to-20': 'intro', // diagnostic says extend to 20 no-borrow next — introduced
   'two-digit-addsub': 'locked',
   'skip-counting': 'locked',

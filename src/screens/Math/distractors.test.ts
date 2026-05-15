@@ -359,3 +359,251 @@ describe('chipMaxAnswerForCorrects', () => {
     expect(() => chipMaxAnswerForCorrects([5, 99])).toThrow(/no tier ceiling/)
   })
 })
+
+// ── sub-to-10 Class 2 wrong-operation distractor (Kyle's spec §3.2) ──────
+
+describe('pickDistractors — sub-to-10 Class 2 (wrong-operation) trap', () => {
+  // For a subtraction problem `a − b = c`, the wrong-op trap is `a + b`
+  // (the addition answer using the same operand pair). Fires only on
+  // P4-P8 when `op === '-'` AND the planner emits
+  // `distractorClass: 'wrong-op'`. P1-P3 always use the gentle ramp;
+  // `op === '+'` problems NEVER use Class 2.
+
+  it('emits the wrong-op trap (a + b) when in range — e.g. 9 − 1 = 8 → traps with 10', () => {
+    // a=9, b=1 → wrong-op = 10 (in range [0,10]). Off-by-one secondary
+    // picks c−1 = 7 (in range, distinct from trap 10). Pair sorted
+    // ascending: [7, 10].
+    expect(
+      pickDistractors(8, 4, 10, {
+        op: '-',
+        operands: [9, 1],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([7, 10])
+  })
+
+  it('emits the wrong-op trap for 6 − 3 = 3 → traps with 9', () => {
+    // a=6, b=3 → wrong-op = 9 (in range). Secondary: c−1 = 2 (in range,
+    // distinct from 9). Pair: [2, 9].
+    expect(
+      pickDistractors(3, 5, 10, {
+        op: '-',
+        operands: [6, 3],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([2, 9])
+  })
+
+  it('emits the wrong-op trap for 10 − 7 = 3 (take-from-10 fact) → falls back when trap is OOR', () => {
+    // a=10, b=7 → wrong-op = 17 > 10 (OOR). Falls back to Class 1
+    // off-by-one: [c−1, c+1] = [2, 4].
+    expect(
+      pickDistractors(3, 5, 10, {
+        op: '-',
+        operands: [10, 7],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([2, 4])
+  })
+
+  it('falls back to Class 1 when the wrong-op trap is OOR — 10 − 2 = 8, trap=12 → [7, 9]', () => {
+    // a=10, b=2 → wrong-op = 12 > maxAnswer=10. Falls back to plain
+    // off-by-one Class 1: [c−1, c+1] = [7, 9].
+    expect(
+      pickDistractors(8, 4, 10, {
+        op: '-',
+        operands: [10, 2],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([7, 9])
+  })
+
+  it('falls back to Class 1 when the wrong-op trap aliases the correct answer (subtract-zero) — 7 − 0 = 7, trap=7 → [6, 8]', () => {
+    // a=7, b=0 → wrong-op = 7 = correct (alias collision per spec
+    // §3.2 "Same-value collision"). Falls back to Class 1.
+    expect(
+      pickDistractors(7, 5, 10, {
+        op: '-',
+        operands: [7, 0],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([6, 8])
+  })
+
+  it('falls back to Class 1 for 9 − 0 = 9 (subtract-zero) — trap=9 collides → [8, 10]', () => {
+    // a=9, b=0 → wrong-op = 9 = correct. Fall back to off-by-one;
+    // c+1 = 10 in range; c−1 = 8 in range; pair [8, 10].
+    expect(
+      pickDistractors(9, 6, 10, {
+        op: '-',
+        operands: [9, 0],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([8, 10])
+  })
+
+  it('subtract-self facts (correct = 0) use Class 2 trap + nearest off-by-one — 5 − 5 = 0, trap=10 → [1, 10]', () => {
+    // a=5, b=5 → wrong-op = 10 (in range, distinct from correct 0).
+    // Secondary off-by-one walks deltas [-1, +1, -2, +2]:
+    //   delta -1: candidate = -1, below minAnswer 0 → skip
+    //   delta +1: candidate = 1 ∈ [0,10], distinct from correct (0) and
+    //             trap (10) → take. Pair sorted: [1, 10].
+    expect(
+      pickDistractors(0, 4, 10, {
+        op: '-',
+        operands: [5, 5],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([1, 10])
+  })
+
+  it('subtract-self facts (correct = 0) require minAnswer=0 — gentle tier (P1) lands cleanly', () => {
+    // Without `minAnswer=0` (the default for `op: '-'`), correct=0
+    // would fail the input-range check (correct < ANSWER_RANGE_MIN=1).
+    // The default minAnswer for `op:'-'` is 0 — test that pickDistractors
+    // accepts correct=0 and produces in-range distractors.
+    // For correct=0 with maxAnswer=10, gentle picks: max anchor=10,
+    // then walk up from minAnswer=0; skip 0 (==correct), skip 1 (too
+    // close, <2 gap), pick 2. Pair: [2, 10].
+    expect(
+      pickDistractors(0, 1, 10, {
+        op: '-',
+        operands: [5, 5],
+      }),
+    ).toEqual([2, 10])
+  })
+
+  it('Class 2 NEVER fires for op === "+" — addition problems use Class 1 unchanged', () => {
+    // Even if a caller passes distractorClass:'wrong-op' on an
+    // addition problem, the Class 2 dispatch is gated on op:'-'.
+    // Addition falls through to off-by-one (Class 1) regardless.
+    expect(
+      pickDistractors(5, 4, 10, {
+        op: '+',
+        operands: [3, 2],
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([4, 6]) // Class 1 off-by-one
+  })
+
+  it('Class 2 NEVER fires for P1-P3 — gentle ramp wins regardless of distractorClass hint', () => {
+    // Even when op:'-' and distractorClass:'wrong-op' are set, P1-P3
+    // always use the gentle ramp. P3 is GENTLE_RAMP_THROUGH; P4 is
+    // the first discriminate problem.
+    for (const p of [1, 2, 3]) {
+      const result = pickDistractors(8, p, 10, {
+        op: '-',
+        operands: [9, 1],
+        distractorClass: 'wrong-op',
+      })
+      // Gentle for correct=8 maxAnswer=10 minAnswer=0:
+      //   min-ok: 8-0=8 ≥ 2 → 0; max-ok: 10-8=2 ≥ 2 → 10
+      //   pair: [0, 10]
+      expect(result).toEqual([0, 10])
+    }
+  })
+
+  it('Class 2 NEVER fires without operands — defensive fallback to Class 1', () => {
+    // distractorClass:'wrong-op' WITHOUT operands is undecodable. The
+    // dispatch silently degrades to Class 1 rather than throwing.
+    expect(
+      pickDistractors(8, 4, 10, {
+        op: '-',
+        distractorClass: 'wrong-op',
+      }),
+    ).toEqual([7, 9])
+  })
+
+  it('Class 2 NEVER fires when distractorClass !== "wrong-op" — defaults to off-by-one', () => {
+    // op:'-' but no wrong-op hint → falls through to standard
+    // off-by-one Class 1.
+    expect(
+      pickDistractors(8, 4, 10, {
+        op: '-',
+        operands: [9, 1],
+        distractorClass: 'off-by-one',
+      }),
+    ).toEqual([7, 9])
+  })
+
+  it('every Class 2 pair is in [minAnswer, maxAnswer], distinct, and ≠ correct (invariant)', () => {
+    // Exhaustive over the entire sub-to-10 pool (Kyle's spec §1.1).
+    const pool: ReadonlyArray<[number, number]> = [
+      [5, 5],
+      [8, 8], // subtract-self
+      [7, 0],
+      [9, 0], // subtract-zero
+      [10, 5],
+      [8, 4],
+      [6, 3], // doubles
+      [9, 1],
+      [10, 1], // subtract-one
+      [10, 2], // subtract-two
+      [10, 3],
+      [10, 7], // take-from-10
+      [9, 4],
+      [8, 3],
+      [7, 4],
+      [9, 6], // general
+    ]
+    for (const [a, b] of pool) {
+      const correct = a - b
+      for (let p = 4; p <= 8; p++) {
+        const [d1, d2] = pickDistractors(correct, p, 10, {
+          op: '-',
+          operands: [a, b],
+          distractorClass: 'wrong-op',
+        })
+        // In-range
+        expect(d1).toBeGreaterThanOrEqual(0)
+        expect(d1).toBeLessThanOrEqual(10)
+        expect(d2).toBeGreaterThanOrEqual(0)
+        expect(d2).toBeLessThanOrEqual(10)
+        // Distinct
+        expect(d1).not.toBe(d2)
+        // Neither is the correct answer
+        expect(d1).not.toBe(correct)
+        expect(d2).not.toBe(correct)
+      }
+    }
+  })
+
+  it('every Class 1 (off-by-one) sub fact pair is in [minAnswer, maxAnswer], distinct, and ≠ correct', () => {
+    // Sub-to-10 pool, but with the off-by-one hint instead of wrong-op.
+    const pool: ReadonlyArray<[number, number]> = [
+      [5, 5],
+      [8, 8],
+      [7, 0],
+      [9, 0],
+      [10, 5],
+      [8, 4],
+      [6, 3],
+      [9, 1],
+      [10, 1],
+      [10, 2],
+      [10, 3],
+      [10, 7],
+      [9, 4],
+      [8, 3],
+      [7, 4],
+      [9, 6],
+    ]
+    for (const [a, b] of pool) {
+      const correct = a - b
+      for (let p = 4; p <= 8; p++) {
+        const [d1, d2] = pickDistractors(correct, p, 10, {
+          op: '-',
+          operands: [a, b],
+          distractorClass: 'off-by-one',
+        })
+        expect(d1).toBeGreaterThanOrEqual(0)
+        expect(d1).toBeLessThanOrEqual(10)
+        expect(d2).toBeGreaterThanOrEqual(0)
+        expect(d2).toBeLessThanOrEqual(10)
+        expect(d1).not.toBe(d2)
+        expect(d1).not.toBe(correct)
+        expect(d2).not.toBe(correct)
+      }
+    }
+  })
+})

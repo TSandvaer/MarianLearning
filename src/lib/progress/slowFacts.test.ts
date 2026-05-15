@@ -22,6 +22,8 @@ import {
   SLOW_FACT_MIN_ATTEMPTS,
   SLOW_FACT_MIN_CORRECT_RATE,
   SLOW_FACT_MIN_MEDIAN_LATENCY_MS,
+  SLOW_FACT_MIN_MEDIAN_LATENCY_MS_SUB,
+  SLOW_FACT_SUB_WARMUP_SESSIONS,
   buildSlowFactSessionHint,
 } from './slowFacts'
 import { defaultProgress } from './defaults'
@@ -412,3 +414,255 @@ describe('buildSlowFactSessionHint — fact aggregation across sessions', () => 
     expect(hint[1]!.fact).toEqual(factForward)
   })
 })
+
+// ── Sub-to-10 op-parameterized threshold + warmup (Kyle's spec §8) ───────
+//
+// Thomas's 2026-05-15 lock: flat 6000ms threshold for op === '-', plus
+// a 5-session warmup where surfacing is suppressed entirely. The skip-
+// the-3-band-ladder alternative.
+
+describe('buildSlowFactSessionHint — sub-to-10 warmup gate', () => {
+  /** Build N sub-to-10 sessions all on the same single fact at a
+   *  fixed latency. Each session counts toward the warmup window AND
+   *  contributes one attempt to the per-fact aggregator. */
+  function nSubSessionsAt(
+    n: number,
+    fact: { a: number; b: number; op: '+' | '-' | '*' },
+    latencyMs: number,
+  ): Progress {
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < n; i++) {
+      history.push(
+        buildEntry({
+          facts: [fact],
+          latencies: [latencyMs],
+          successRate: 1,
+          focus: 'sub-to-10',
+          dateISO: `2026-05-${String(15 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    return progressWithHistory(history)
+  }
+
+  it('suppresses surfacing entirely below SLOW_FACT_SUB_WARMUP_SESSIONS (5) — even with N≥SLOW_FACT_MIN_ATTEMPTS', () => {
+    // Sanity: SLOW_FACT_MIN_ATTEMPTS is 5 (the per-fact data floor).
+    // The warmup window is the per-NODE session floor — different
+    // count even though they share the same numeric value (5) in v1.
+    // Either floor not met = no surfacing. Here we'd cross the
+    // per-fact attempts floor at N=5 sessions × 1 problem each = 5
+    // attempts, BUT the warmup gate ALSO suppresses at < 5 sessions.
+    // Test both bands.
+    const fact = { a: 10, b: 2, op: '-' as const }
+    for (let n = 1; n < SLOW_FACT_SUB_WARMUP_SESSIONS; n++) {
+      const p = nSubSessionsAt(n, fact, 7000)
+      expect(buildSlowFactSessionHint(p)).toEqual([])
+    }
+  })
+
+  it('engages surfacing once sessionsOnNode >= SLOW_FACT_SUB_WARMUP_SESSIONS AND latency is above the sub-threshold (6000ms)', () => {
+    // N = 5 sessions × 1 problem each = 5 attempts (== MIN_ATTEMPTS).
+    // Each at 7000ms (above the 6000ms sub-threshold). Surfacing
+    // engages.
+    const fact = { a: 10, b: 2, op: '-' as const }
+    const p = nSubSessionsAt(SLOW_FACT_SUB_WARMUP_SESSIONS, fact, 7000)
+    const hint = buildSlowFactSessionHint(p)
+    expect(hint).toHaveLength(1)
+    expect(hint[0]!.fact).toEqual(fact)
+    expect(hint[0]!.medianLatencyMs).toBe(7000)
+    expect(hint[0]!.attempts).toBe(SLOW_FACT_SUB_WARMUP_SESSIONS)
+  })
+
+  it('post-warmup, sub-fact below SLOW_FACT_MIN_MEDIAN_LATENCY_MS_SUB (6000ms) is filtered out', () => {
+    // 5 sessions × 1 problem each at 5500ms. Warmup is satisfied
+    // (5 ≥ 5 sessions) AND the per-fact attempts floor is satisfied
+    // (5 ≥ 5 attempts), BUT the median 5500ms is below the
+    // sub-threshold of 6000ms. Same as the addition path at 5500ms
+    // would surface (it's > 5000ms), but for `-` it's gated higher.
+    const fact = { a: 10, b: 5, op: '-' as const }
+    const p = nSubSessionsAt(SLOW_FACT_SUB_WARMUP_SESSIONS, fact, 5500)
+    expect(buildSlowFactSessionHint(p)).toEqual([])
+  })
+
+  it('the warmup gate counts sub-to-10 sessions, NOT add-to-10 sessions — running adds doesn’t accelerate sub surfacing', () => {
+    // 4 sub-to-10 sessions (below warmup) + 10 add-to-10 sessions
+    // (irrelevant for the sub warmup count). The sub fact has 4
+    // attempts which is below MIN_ATTEMPTS=5 AND the node count is 4
+    // which is below SUB_WARMUP=5; sub surfacing stays suppressed.
+    const subFact = { a: 9, b: 4, op: '-' as const }
+    const addFact = { a: 7, b: 3, op: '+' as const }
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < 4; i++) {
+      history.push(
+        buildEntry({
+          facts: [subFact],
+          latencies: [7000],
+          successRate: 1,
+          focus: 'sub-to-10',
+          dateISO: `2026-05-${String(15 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    for (let i = 0; i < 10; i++) {
+      history.push(
+        buildEntry({
+          facts: [addFact],
+          latencies: [6500],
+          successRate: 1,
+          focus: 'add-to-10',
+          dateISO: `2026-05-${String(20 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    const hint = buildSlowFactSessionHint(progressWithHistory(history))
+    // Sub fact suppressed (warmup not met). Add fact surfaces
+    // (10 attempts × 6500ms > 5000ms threshold).
+    expect(hint).toHaveLength(1)
+    expect(hint[0]!.fact).toEqual(addFact)
+  })
+})
+
+describe('buildSlowFactSessionHint — op-parameterized latency threshold', () => {
+  it('uses 5000ms for op === "+" — addition fact at 5500ms surfaces', () => {
+    // Existing add-to-10 behaviour unchanged. 5 sessions × 1 add fact
+    // at 5500ms median → above SLOW_FACT_MIN_MEDIAN_LATENCY_MS (5000)
+    // and above SLOW_FACT_MIN_ATTEMPTS (5). Surfaces.
+    const fact = { a: 4, b: 3, op: '+' as const }
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < 5; i++) {
+      history.push(
+        buildEntry({
+          facts: [fact],
+          latencies: [5500],
+          successRate: 1,
+          focus: 'add-to-10',
+        }),
+      )
+    }
+    const hint = buildSlowFactSessionHint(progressWithHistory(history))
+    expect(hint).toHaveLength(1)
+    expect(hint[0]!.fact).toEqual(fact)
+    expect(hint[0]!.medianLatencyMs).toBe(5500)
+  })
+
+  it('uses 6000ms for op === "-" — sub fact at 5500ms does NOT surface even post-warmup', () => {
+    // Same setup as above but for op === '-' (warmup satisfied: 5
+    // sessions ≥ 5). 5500ms median is above '+' threshold (5000) but
+    // below '-' threshold (6000). Filtered out.
+    const fact = { a: 8, b: 3, op: '-' as const }
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < 5; i++) {
+      history.push(
+        buildEntry({
+          facts: [fact],
+          latencies: [5500],
+          successRate: 1,
+          focus: 'sub-to-10',
+          dateISO: `2026-05-${String(15 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    expect(buildSlowFactSessionHint(progressWithHistory(history))).toEqual([])
+  })
+
+  it('uses 6000ms for op === "-" — sub fact at 6500ms surfaces post-warmup', () => {
+    const fact = { a: 8, b: 3, op: '-' as const }
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < 5; i++) {
+      history.push(
+        buildEntry({
+          facts: [fact],
+          latencies: [6500],
+          successRate: 1,
+          focus: 'sub-to-10',
+          dateISO: `2026-05-${String(15 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    const hint = buildSlowFactSessionHint(progressWithHistory(history))
+    expect(hint).toHaveLength(1)
+    expect(hint[0]!.fact).toEqual(fact)
+    expect(hint[0]!.medianLatencyMs).toBe(6500)
+  })
+
+  it('cross-op aggregation: 4+3 and 7-3 do NOT aggregate even with same operand digits', () => {
+    // Different ops → different mathFactKey ("4+3" vs "7-3"). Aggregator
+    // treats them as distinct facts. Each must independently satisfy
+    // its own threshold.
+    const addFact = { a: 4, b: 3, op: '+' as const }
+    const subFact = { a: 7, b: 3, op: '-' as const }
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < 5; i++) {
+      history.push(
+        buildEntry({
+          facts: [addFact],
+          latencies: [5500],
+          successRate: 1,
+          focus: 'add-to-10',
+          dateISO: `2026-05-${String(10 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    for (let i = 0; i < 5; i++) {
+      history.push(
+        buildEntry({
+          facts: [subFact],
+          latencies: [6500],
+          successRate: 1,
+          focus: 'sub-to-10',
+          dateISO: `2026-05-${String(15 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    const hint = buildSlowFactSessionHint(progressWithHistory(history))
+    expect(hint).toHaveLength(2)
+    // Sorted DESC by median latency — sub (6500) before add (5500).
+    expect(hint[0]!.fact).toEqual(subFact)
+    expect(hint[1]!.fact).toEqual(addFact)
+  })
+})
+
+describe('buildSlowFactSessionHint — focus-node gating (sub-to-10 widening)', () => {
+  it('includes entries with skillFocus = ["sub-to-10"] (post-widening)', () => {
+    // Was: entries with focus !== 'add-to-10' rejected. Now: both
+    // add-to-10 AND sub-to-10 entries flow through the aggregator,
+    // each subject to its own op-specific threshold.
+    const fact = { a: 9, b: 6, op: '-' as const }
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < 5; i++) {
+      history.push(
+        buildEntry({
+          facts: [fact],
+          latencies: [7000],
+          successRate: 1,
+          focus: 'sub-to-10',
+          dateISO: `2026-05-${String(15 + i).padStart(2, '0')}T10:00:00.000Z`,
+        }),
+      )
+    }
+    const hint = buildSlowFactSessionHint(progressWithHistory(history))
+    expect(hint).toHaveLength(1)
+    expect(hint[0]!.fact).toEqual(fact)
+  })
+
+  it('still rejects unrelated focus nodes — add-to-20 entries do NOT contribute', () => {
+    const fact = { a: 8, b: 5, op: '+' as const }
+    const history: SessionHistoryEntry[] = []
+    for (let i = 0; i < 10; i++) {
+      history.push(
+        buildEntry({
+          facts: [fact],
+          latencies: [7000],
+          successRate: 1,
+          focus: 'add-to-20',
+        }),
+      )
+    }
+    expect(buildSlowFactSessionHint(progressWithHistory(history))).toEqual([])
+  })
+})
+
+// Acknowledge the unused constant import — kept so the test file's
+// imports document the public API surface.
+void SLOW_FACT_MIN_MEDIAN_LATENCY_MS_SUB
+void SLOW_FACT_SUB_WARMUP_SESSIONS

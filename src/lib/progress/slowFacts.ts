@@ -59,14 +59,48 @@
  * the helper conventions in `./leitner.ts`.
  */
 
-import type { MathFact, Progress, SessionHistoryEntry } from './types'
+import type {
+  MathFact,
+  Progress,
+  SessionHistoryEntry,
+  SkillNode,
+} from './types'
 
 /** Min total attempts on a fact before it can be flagged. */
 export const SLOW_FACT_MIN_ATTEMPTS = 5
 /** Min first-tap correctness rate (0..1) — below this it's a Leitner concern. */
 export const SLOW_FACT_MIN_CORRECT_RATE = 0.8
-/** Min median latency in ms — below this the fact is already automatic. */
+/**
+ * Min median latency in ms for `op === '+'` facts (add-to-10 retrieval).
+ * Below this the fact is already automatic. 5s is the rough cut-off
+ * per Dave's research §6 P3 — sub-2s is automatic retrieval; 2-5s is
+ * mixed; 5s+ is reliably counting.
+ */
 export const SLOW_FACT_MIN_MEDIAN_LATENCY_MS = 5000
+/**
+ * Min median latency in ms for `op === '-'` facts (sub-to-10 retrieval),
+ * post-warmup. Higher than the addition default because subtraction
+ * retrieval runs systematically slower at the same grade — Geary 2007
+ * (Dave's research §Source 6) shows higher mean RT and higher variance
+ * vs addition for comparable facts at 2nd grade, because subtraction
+ * lacks the rehearsal scaffolding addition gets from counting-on.
+ * Applying the 5000ms addition threshold to sub-to-10 would flood the
+ * slow-fact payload on early sessions (every new subtraction fact
+ * looks slow), defeating the canon-first fast-path. Thomas locked the
+ * shape 2026-05-15: flat 6000ms post-warmup + a 5-session warmup
+ * where surfacing is suppressed (the simpler-shape alternative from
+ * Kyle's spec §8 over the 3-band tenure ladder).
+ */
+export const SLOW_FACT_MIN_MEDIAN_LATENCY_MS_SUB = 6000
+/**
+ * Sub-to-10 warmup window — sessions where slow-fact surfacing is
+ * suppressed entirely. Per Kyle's spec §8: "Suppress the slow-fact
+ * directive entirely for the first 5 sub-to-10 sessions (treat the
+ * node as 'new tier, baseline phase')". Counted as the number of
+ * history entries whose `skillFocus` includes `sub-to-10`. After 5+
+ * sessions on the node, the normal threshold predicate engages.
+ */
+export const SLOW_FACT_SUB_WARMUP_SESSIONS = 5
 /** Cap on how many slow-fact entries we ship per request. */
 export const SLOW_FACT_HINT_MAX_ITEMS = 8
 
@@ -130,8 +164,16 @@ export function buildSlowFactSessionHint(progress: Progress): SlowFactHint[] {
   }
   const byKey = new Map<string, Acc>()
 
+  // sub-to-10 warmup gate (Kyle's spec §8 + Thomas's 2026-05-15 lock):
+  // suppress slow-fact surfacing for the first 5 sub-to-10 sessions.
+  // Counted once up-front so the per-entry loop doesn't re-derive it.
+  // Counts ALL history entries whose skillFocus includes 'sub-to-10';
+  // see countSessionsOnNode helper below.
+  const subSessionsOnNode = countSessionsOnNode(progress.history, 'sub-to-10')
+  const subSurfacingActive = subSessionsOnNode >= SLOW_FACT_SUB_WARMUP_SESSIONS
+
   for (const entry of progress.history) {
-    if (!isAddToTenEntry(entry)) continue
+    if (!isMathRetrievalEntry(entry)) continue
     const facts = entry.mathFacts
     const lat = entry.latencyMs
     if (!facts || !lat) continue
@@ -174,7 +216,20 @@ export function buildSlowFactSessionHint(progress: Progress): SlowFactHint[] {
     const correctRate = acc.correctSum / acc.attempts
     if (correctRate < SLOW_FACT_MIN_CORRECT_RATE) continue
     const medianLatencyMs = median(acc.latencies)
-    if (medianLatencyMs < SLOW_FACT_MIN_MEDIAN_LATENCY_MS) continue
+    // Op-parameterized latency threshold (Kyle's spec §8 + Thomas's
+    // 2026-05-15 lock). For `op === '-'`, the warmup gate above gives
+    // 5 sub-to-10 sessions of grace before any surfacing happens; once
+    // engaged, the threshold sits at 6000ms (vs 5000ms for '+'). For
+    // `op === '+'` the existing 5000ms threshold applies. `op === '*'`
+    // is not yet wired (no multiplication tier shipped); reuse '+''s
+    // threshold for forward-compat — the planner gate will reject
+    // multiplication slow-facts upstream anyway.
+    if (acc.fact.op === '-') {
+      if (!subSurfacingActive) continue
+      if (medianLatencyMs < SLOW_FACT_MIN_MEDIAN_LATENCY_MS_SUB) continue
+    } else {
+      if (medianLatencyMs < SLOW_FACT_MIN_MEDIAN_LATENCY_MS) continue
+    }
     out.push({
       fact: acc.fact,
       attempts: acc.attempts,
@@ -207,14 +262,49 @@ function mathFactKey(f: { a: number; b: number; op: string }): string {
 }
 
 /**
- * Active scope guard. Slow-fact directive fires for math + add-to-10
- * only today, mirroring `buildLeitnerSessionHint`. An entry's
- * `skillFocus` carries the focus node the planner targeted at
- * session-start; any other node gets skipped here so we don't pollute
- * the latency aggregate with multi-tier data.
+ * Active scope guard. Slow-fact directive fires for math retrieval
+ * focus nodes — `add-to-10` (op `'+'`) and `sub-to-10` (op `'-'`) as
+ * of Kyle's sub-to-10 content tier spec. An entry's `skillFocus`
+ * carries the focus node the planner targeted at session-start; any
+ * other node gets skipped here so we don't pollute the latency
+ * aggregate with multi-tier data. Same posture as
+ * `buildLeitnerSessionHint`, widened by op.
+ *
+ * Cross-op aggregation is safe: facts key on `{a, op, b}` so a 4+2
+ * latency record never aggregates with a 6−2 latency record even
+ * though both share the same operand digits.
  */
-function isAddToTenEntry(entry: SessionHistoryEntry): boolean {
-  return entry.skillFocus.length === 1 && entry.skillFocus[0] === 'add-to-10'
+function isMathRetrievalEntry(entry: SessionHistoryEntry): boolean {
+  if (entry.skillFocus.length !== 1) return false
+  const focus = entry.skillFocus[0]
+  return focus === 'add-to-10' || focus === 'sub-to-10'
+}
+
+/**
+ * Count the number of history entries whose `skillFocus` includes a
+ * specific skill node. Used by the sub-to-10 warmup gate (Kyle's spec
+ * §8): the slow-fact directive is suppressed entirely for the first
+ * `SLOW_FACT_SUB_WARMUP_SESSIONS` (5) sub-to-10 sessions, treating the
+ * node as "new tier, baseline phase" before any retrieval-latency
+ * surfacing engages.
+ *
+ * Implementation note: walks `history` once; matches by
+ * `skillFocus.includes(node)` (not exclusive-match) so an entry with
+ * multiple focus nodes counts toward each. In v1, sessions are single-
+ * focus so the distinction doesn't matter; the looser predicate is
+ * forward-compatible with future fact-family interleaving (Dave's
+ * research §Q3 / McNeil et al. 2025) where a session might list both
+ * add-to-10 and sub-to-10 in skillFocus.
+ */
+function countSessionsOnNode(
+  history: ReadonlyArray<SessionHistoryEntry>,
+  node: SkillNode,
+): number {
+  let n = 0
+  for (const entry of history) {
+    if (entry.skillFocus.includes(node)) n += 1
+  }
+  return n
 }
 
 /**

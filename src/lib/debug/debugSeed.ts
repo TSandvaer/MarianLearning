@@ -153,6 +153,14 @@
  *   walks past those two and lands on `add-to-20` (practicing) per
  *   MATH_NODES_IN_ORDER. Used by Thomas's iPad smoke-test for the
  *   add-to-20 focus session (ticket 86c9q5q13).
+ * - `sub-to-10`: Marian as if she's mastered `number-recog`,
+ *   `add-to-10`, AND `add-to-20`, and is now practicing the sub-to-10
+ *   tier. The picker walks past those three and lands on `sub-to-10`
+ *   (practicing). MATH_TREE order is unchanged per Thomas's Q1 lock
+ *   for the sub-to-10 content tier — `add-to-20` is upstream of
+ *   `sub-to-10`, so the seed bumps it to `mastered`. Used by
+ *   Jessica's failing-first E2E spec for the sub-to-10 content tier
+ *   (2026-05-15).
  *
  * Adding new seeds
  * ----------------
@@ -496,6 +504,28 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
       'number-recog': 'mastered',
       'add-to-10': 'mastered',
       'add-to-20': 'practicing',
+    },
+    skipGreet: true,
+  },
+
+  // Sub-to-10 sibling tier smoke-test entry (sub-to-10 content tier,
+  // 2026-05-15 — Kyle's spec §9 wire-up checklist + Jessica's failing-
+  // first E2E pair). Marian has mastered the prerequisites and is now
+  // practicing sub-to-10. The picker walks MATH_NODES_IN_ORDER, sees
+  // number-recog/add-to-10/add-to-20 mastered, and lands on
+  // `sub-to-10` (practicing). MATH_TREE order is unchanged per
+  // Thomas's Q1 lock (Option A — leave tree alone). `add-to-20` is
+  // bumped to `'mastered'` because it sits before `sub-to-10` in the
+  // tree; without that the picker would land on add-to-20 first.
+  // Used by Jessica's E2E spec for the sub-to-10 focus session AND by
+  // QA for the deep-launch path verifying planner directive + canon +
+  // distractor extension end-to-end.
+  'sub-to-10': {
+    skillLevels: {
+      'number-recog': 'mastered',
+      'add-to-10': 'mastered',
+      'add-to-20': 'mastered',
+      'sub-to-10': 'practicing',
     },
     skipGreet: true,
   },

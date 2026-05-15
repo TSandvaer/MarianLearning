@@ -3114,6 +3114,345 @@ describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', 
   })
 })
 
+// ── sub-to-10 prompt directive (Kyle's spec §4.1 + Dave's research) ─────
+
+describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dave research §Q4)', () => {
+  // Pins the load-bearing phrases of the sub-to-10 directive — the
+  // first MATH content tier spec since add-to-20. Mirrors the
+  // add-to-20 pin shape: any "let me simplify the prompt" edit that
+  // drops one of these breaks CI.
+
+  const STUB_RESPONSE = JSON.stringify({
+    id: 'haiku-sub-to-10',
+    label: 'a',
+    utterances: [
+      {
+        id: 'math.p1.read',
+        text: 'Seven minus three. How many are left?',
+      },
+    ],
+  })
+
+  it('the sub-to-10 menu line uses the "How many are left?" read template (Dave §Q2)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // The "are left" framing follows Dave § Q2 — concrete-removal mental
+    // model, distinct from add-to-10's "How many?" template.
+    expect(systemText).toContain('How many are left?')
+    expect(systemText).toContain('Seven minus three. How many are left?')
+  })
+
+  it('the sub-to-10 menu line ships the first-session "take away" variant (Kyle spec §4.3)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('take away')
+    expect(systemText).toContain("lifetimeFirstEncounters['sub-to-10']")
+  })
+
+  it('the sub-to-10 menu line scopes the read-line template choice to the WHOLE session (not per-problem)', async () => {
+    // Sharpening post-PR-240 — Haiku-3 violation was per-problem template
+    // drift. The directive now frames the choice as session-level + bans
+    // mixing templates within a session.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('SESSION-LEVEL TEMPLATE CHOICE')
+    expect(systemText).toContain(
+      'USE THE CHOSEN TEMPLATE ACROSS ALL 8 PROBLEMS',
+    )
+    expect(systemText).toContain(
+      'DO NOT mix "take away" and "minus" within a single session',
+    )
+  })
+
+  it('the sub-to-10 menu line names the 16-fact canonical pool (Dave §"Concrete fact ordering")', async () => {
+    // Pin every pool fact's a-b=c notation appears literally in the
+    // prompt. This drift-guards the pool — a "let me trim this list"
+    // edit fails on the first missing entry.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    for (const fact of [
+      '5-5=0',
+      '8-8=0',
+      '7-0=7',
+      '9-0=9', // easy: rules
+      '10-5=5',
+      '8-4=4',
+      '6-3=3', // easy: doubles
+      '9-1=8', // easy: subtract-one
+      '10-1=9',
+      '10-2=8', // medium
+      '10-3=7',
+      '10-7=3', // take-from-10
+      '9-4=5',
+      '8-3=5',
+      '7-4=3',
+      '9-6=3', // hard: general
+    ]) {
+      expect(systemText).toContain(fact)
+    }
+  })
+
+  it('the sub-to-10 menu line names the band structure (Dave §"Concrete fact ordering")', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // The three bands are the spine of the sequencing.
+    // Each fact carries an inline [BAND/category] tag in the FACT POOL so
+    // Haiku doesn't lose the band binding when composing the 8-problem
+    // sequence (sharpening per PR #240 follow-up — Haiku-3 violations).
+    expect(systemText).toContain('[EASY/')
+    expect(systemText).toContain('[MEDIUM/')
+    expect(systemText).toContain('[HARD/')
+    // Subcategory names (Dave's research §"Concrete fact ordering").
+    expect(systemText).toContain('subtract-self')
+    expect(systemText).toContain('subtract-zero')
+    expect(systemText).toContain('doubles')
+    expect(systemText).toContain('take-from-10')
+  })
+
+  it('the sub-to-10 menu line enforces the DUAL-EXPOSURE rule (never pair −fact with its + inverse)', async () => {
+    // Dave §Q3 / Risks — the inverse-principle interference rule.
+    // Kyle's spec §7. Lock the load-bearing phrasing.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('DUAL-EXPOSURE RULE')
+    expect(systemText).toContain(
+      'never pair a subtraction fact and its addition inverse',
+    )
+  })
+
+  it('the sub-to-10 menu line lists Class 2 wrong-operation distractor rules (Dave §Q4)', async () => {
+    // The wrong-operation lure: minuend + subtrahend. At least 2 of
+    // P4-P8 must be tagged 'wrong-op'. Subtract-zero is forbidden
+    // (alias collision).
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('DISTRACTOR-CLASS HINT')
+    expect(systemText).toContain('wrong-op')
+    expect(systemText).toContain('minuend + subtrahend')
+    expect(systemText).toMatch(/at least 2 of/i)
+    expect(systemText).toContain('DO NOT use "wrong-op" for subtract-zero')
+  })
+
+  it('the sub-to-10 menu line requires at least one take-from-10 fact in P4-P8 (Dave §"session design rules" #2)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toMatch(/at least one take-from-10 fact/i)
+    // The MUST is load-bearing — high-leverage pedagogy per Dave's
+    // research, anchors the make-10 mental model add-to-20 will use.
+    expect(systemText).toContain('MUST appear somewhere in problems 4-8')
+  })
+
+  it('the sub-to-10 menu line specifies the gentle ramp (P1-P3 from easy band only)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toMatch(/Problems 1-3 \(gentle ramp\)/)
+    // Wording sharpened post-PR-240 (band-binding inlined per fact) — the
+    // semantic invariant is "P1-P3 are EASY-band only".
+    expect(systemText).toContain('EXCLUSIVELY EASY-band facts')
+    // Negative-anchor block paired with the positive directive — explicit
+    // placement bans for HARD-band facts at P1-P3 (sharpening rationale).
+    expect(systemText).toContain('NEGATIVE ANCHOR')
+    expect(systemText).toContain(
+      'DO NOT place 8-3, 9-4, 7-4, or 9-6 at P1, P2, or P3',
+    )
+  })
+
+  it('the sub-to-10 menu line emits op:"-" on every problem (wire-shape contract per Kyle spec §5)', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('every problem MUST emit op: "-"')
+  })
+
+  it('the sub-to-10 menu line includes the per-slot utterance templates including correct=0 form', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // Each slot's example carries the "are left" / "Take away" form.
+    expect(systemText).toContain('"Yes! <answer>!"')
+    expect(systemText).toContain('"Hmm... try again?"')
+    expect(systemText).toContain('Look. Ten. Take away two. How many now?')
+    // correct=0 forms — Emma must spell "zero" in both correct and
+    // giveAnswer slots.
+    expect(systemText).toContain('"Yes! Zero!"')
+    expect(systemText).toContain('"This one is zero."')
+  })
+
+  it('the sub-to-10 prompt is byte-stable across calls (cache prefix invariant)', async () => {
+    // Same shape pin as add-to-10 / add-to-20: the system prompt MUST
+    // NOT change between successive sub-to-10 calls, else Anthropic's
+    // prompt caching breaks and per-session cost jumps.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap1 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap2 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+      recentSuccessRate: 0.5,
+    })
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+
+  it('slow-fact directive scope now includes sub-to-10 (Kyle spec §8 + Thomas 2026-05-15 lock)', async () => {
+    // The directive injects on math + add-to-10 OR sub-to-10 when
+    // slowFacts is non-empty. Pin that sub-to-10 with non-empty
+    // slowFacts triggers the directive.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+      slowFacts: [
+        {
+          fact: { a: 10, b: 2, op: '-' },
+          attempts: 7,
+          correctRate: 1,
+          medianLatencyMs: 6500,
+        },
+      ],
+    })
+    const args = capture.lastArgs as {
+      messages: Array<{ content: string }>
+    }
+    const user = args.messages[0]!.content
+    expect(user).toContain('SLOW-FACT')
+    expect(user).toContain('10-2')
+  })
+
+  it('the sub-to-10 user message names the focus node and preserves the shape', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+      recentSuccessRate: 0.85,
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/Focus skill node: sub-to-10\./)
+    expect(user).toContain('Marian')
+    expect(user).toContain('0.85')
+  })
+})
+
 /**
  * M4.x slow-fact directive tests (follow-up to ticket 86c9pwgc8).
  *

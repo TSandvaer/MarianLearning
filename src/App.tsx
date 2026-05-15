@@ -200,7 +200,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       isGraduationSession: undefined,
       leitner: undefined,
       slowFacts: undefined,
-      lifetimeFirstEncounters: undefined,
+      lifetimeFirstEncounters: undefined, // legacy / first-launch no-progress path; track-aware helpers never see this branch in practice
     }
   }
   const focusNode = pickFocusNode(progress, track)
@@ -237,16 +237,21 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       slowFacts = hint
     }
   }
-  // 86c9q9ben (AC9c-AC9f): ship the lifetime-first-encounter list
-  // for the word-song track only. Math has no first-encounter
-  // scaffolding today. The server uses this to gate the
-  // session.end.opener rewrite (contrast line for short-u, future
-  // box/fox for short-o). Always include the field for word-song
-  // when progress exists — empty array is meaningful (greenfield
-  // Marian, fire scaffolding on every tier's first session). The
-  // read-path defaulter ensures the field is never undefined here.
-  const lifetimeFirstEncounters: readonly string[] | undefined =
-    track === 'word-song' ? (progress.lifetimeFirstEncounters ?? []) : undefined
+  // 86c9q9ben (AC9c-AC9f) + sub-to-10 content tier (Kyle §4.3, 2026-05-15):
+  // ship the lifetime-first-encounter list for BOTH tracks. The server's
+  // `applyFirstEncounterGate` consults this to decide whether to fire
+  // tier-specific scaffolding on `session.end.opener` (word-song today;
+  // math gate is infrastructure-ready for `sub-to-10` per Kyle's spec).
+  // Always include the field when progress exists — empty array is
+  // meaningful (greenfield Marian, fire scaffolding on every tier's first
+  // session). The read-path defaulter ensures the field is never undefined
+  // here. NOTE: `Progress.lifetimeFirstEncounters` is typed
+  // `WordSongNode[]` today; the runtime guard widens to all `SkillNode`s,
+  // so a math node ID (`'sub-to-10'`) will round-trip cleanly even though
+  // the static type can't express it. Widening the static type to
+  // `SkillNode[]` plus session-end append-on-math is Wave 3.4 work.
+  const lifetimeFirstEncounters: readonly string[] =
+    progress.lifetimeFirstEncounters ?? []
   return {
     focusNode,
     recentSuccessRate: pickRecentSuccessRate(progress, track),
@@ -573,7 +578,14 @@ export default function App() {
       ? activePlan.problems.map((p) => ({
           a: p.addendA,
           b: p.addendB,
-          op: '+' as const,
+          // Read op from the per-problem MathProblem (Kyle's sub-to-10
+          // content tier spec §5 + audit §1). Pre-sub-to-10 the field
+          // was hardcoded `'+'` because add-to-10 was the only first-
+          // class math tier; with sub-to-10 emitting `op: '-'`, the
+          // per-problem field is the source of truth — synthesizing
+          // `'+'` here would pollute Leitner + slowFacts aggregates
+          // with op-mismatched facts (10−2=8 keyed as 10+2=12 etc.).
+          op: p.op,
         }))
       : undefined
     setSessionEndPayload({
@@ -842,6 +854,14 @@ export default function App() {
         // for automaticity-building practice. Empty list → undefined,
         // canon-served path stays free.
         slowFacts: mathHints.slowFacts,
+        // sub-to-10 content tier (Kyle §4.3, 2026-05-15): forward the
+        // lifetime-first-encounter list. Server's
+        // `applyFirstEncounterGate` consults it for gated math nodes
+        // (`'sub-to-10'`); rewrite is a no-op until Wave 3.4 widens
+        // schema + adds session-end append-on-math. Jessica's
+        // sub-to-10-first-encounter-gate.spec.ts asserts the field
+        // is present on math requests.
+        lifetimeFirstEncounters: mathHints.lifetimeFirstEncounters,
       },
       { signal: controller.signal },
     )

@@ -158,6 +158,19 @@ export interface PrepareMathPathAArgs {
    * active. Same posture as `leitner` and `isGraduationSession`.
    */
   slowFacts?: SlowFactHint[]
+  /**
+   * Lifetime-first-encounter list (sub-to-10 content tier — Kyle §4.3,
+   * 2026-05-15). Read from `Progress.lifetimeFirstEncounters`. Server
+   * consults this via `applyFirstEncounterGate` to decide whether to
+   * fire tier-specific scaffolding on `session.end.opener` for gated
+   * math nodes (`'sub-to-10'` is on the gated list as infrastructure-
+   * ready; the rewrite is a runtime no-op until Wave 3.4 widens
+   * `lifetimeFirstEncounters` to `SkillNode[]` and adds session-end
+   * append-on-math). Always shipped (even when empty) for the math
+   * track when progress exists; `[]` is meaningful (greenfield
+   * Marian).
+   */
+  lifetimeFirstEncounters?: readonly string[]
 }
 
 export interface PreparedMathPathA {
@@ -242,11 +255,17 @@ export async function prepareMathPathA(
   // empty list.
   const hasLeitner = args.leitner !== undefined && args.leitner.length > 0
   const hasSlowFacts = args.slowFacts !== undefined && args.slowFacts.length > 0
+  // sub-to-10 content tier (Kyle §4.3, 2026-05-15): ship the lifetime-
+  // first-encounter list for math too. Empty array is meaningful
+  // (greenfield Marian); undefined means the caller had no progress at
+  // all (legacy / first-launch path).
+  const hasLifetimeFirstEncounters = args.lifetimeFirstEncounters !== undefined
   const progressBlock =
     args.focusNode !== undefined ||
     args.recentSuccessRate !== undefined ||
     hasLeitner ||
-    hasSlowFacts
+    hasSlowFacts ||
+    hasLifetimeFirstEncounters
       ? {
           progress: {
             ...(args.focusNode !== undefined
@@ -257,6 +276,9 @@ export async function prepareMathPathA(
               : {}),
             ...(hasLeitner ? { leitner: args.leitner } : {}),
             ...(hasSlowFacts ? { slowFacts: args.slowFacts } : {}),
+            ...(hasLifetimeFirstEncounters
+              ? { lifetimeFirstEncounters: [...args.lifetimeFirstEncounters!] }
+              : {}),
           },
         }
       : {}
