@@ -273,20 +273,24 @@ test.describe('sub-to-10 slow-fact threshold + warmup', () => {
     const payload = body.payload as Record<string, unknown>
     expect(payload.track).toBe('math')
 
+    // Pin the shape unconditionally — the math request MUST ship a
+    // progress block (focusNode is always populated when a Progress
+    // doc exists; the seed installs one). Per
+    // feedback_count_assertions_on_regression_tests, the conditional
+    // form admitted a false-green where a full slowFacts.ts
+    // regression returning [] for everything would let the
+    // outer `if` collapse to a no-op and the assertion never fire.
     const progressBlock = payload.progress as
       | Record<string, unknown>
       | undefined
-    if (progressBlock !== undefined) {
-      const has = Object.prototype.hasOwnProperty.call(
-        progressBlock,
-        'slowFacts',
-      )
-      expect(
-        has,
-        'warmup branch (4 prior sessions) must OMIT progress.slowFacts; saw it as a present property',
-      ).toBe(false)
-    }
-    // If progressBlock is undefined, the assertion is satisfied trivially.
+    expect(
+      progressBlock,
+      'math payload must ship a progress block (focusNode is populated for seeded Progress)',
+    ).toBeDefined()
+    expect(
+      Object.prototype.hasOwnProperty.call(progressBlock!, 'slowFacts'),
+      'warmup branch (4 prior sessions) must OMIT progress.slowFacts; saw it as a present property',
+    ).toBe(false)
   })
 
   test('post-warmup branch — 6 prior sub-to-10 sessions with slow fact → progress.slowFacts IS present', async ({

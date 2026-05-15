@@ -326,25 +326,35 @@ test.describe('sub-to-10 progression-mastery loop', () => {
     // SMOKING GUN A — sub-to-10 mastered.
     expect(persisted.skillLevels['sub-to-10']).toBe('mastered')
 
-    // SMOKING GUN B — downstream cascade: sub-to-20 unlocked.
-    // The expected post-cascade state is 'intro' on first
-    // observation, OR 'practicing' if session 3 ran on sub-to-20
-    // (post-cascade) and a fresh `intro → practicing` fired in the
-    // same `applyMasteryRule` pass. Either is correct per the
-    // N+1-session cascade chain in
-    // `progress-and-persistence.md` §"Mastery rule (M3)".
+    // SMOKING GUN B — downstream cascade: sub-to-20 unlocked AND
+    // intro→practicing fired.
+    //
+    // Walk-through of the deterministic expected value:
+    //   - End of session 2: applyMasteryRule promotes sub-to-10
+    //     (practicing → mastered, 2 perfect entries ≥ 80%). nextNode
+    //     cascade flips sub-to-20 from 'locked' → 'intro'.
+    //   - Start of session 3: pickFocusNode walks MATH_NODES_IN_ORDER,
+    //     sub-to-10 is now 'mastered' so the picker returns
+    //     'sub-to-20' (it's the first non-mastered node).
+    //   - Session 3 runs on sub-to-20 at 100% → history gains 1 entry
+    //     with skillFocus: ['sub-to-20'], successRate: 1.
+    //   - End of session 3: applyMasteryRule's intro→practicing pass
+    //     (mastery.ts L309-319) advances sub-to-20 from 'intro' →
+    //     'practicing' (any-success rule). The practicing→mastered
+    //     scan in the same call needs 2 qualifying entries, finds 1,
+    //     skips.
+    //
+    // Single deterministic expected value: 'practicing'. Count-based
+    // assertion per feedback_count_assertions_on_regression_tests.
     const subToTwentyLevel = persisted.skillLevels['sub-to-20']
-    expect(['intro', 'practicing']).toContain(subToTwentyLevel)
-    // Defensive: must NOT still be 'locked' (the cascade fires) and
-    // must NOT be 'mastered' (only 1-2 sessions on it at most).
-    expect(subToTwentyLevel).not.toBe('locked')
-    expect(subToTwentyLevel).not.toBe('mastered')
+    expect(subToTwentyLevel).toBe('practicing')
 
     // SMOKING GUN C — history shape. Three new entries. First two
-    // run on sub-to-10 (the picker landed there). Third entry's
-    // focus depends on whether session 2 already promoted sub-to-10
-    // (in which case session 3 ran on sub-to-20). Both cases are
-    // captured in the count-based assertion below.
+    // run on sub-to-10 (the picker landed there); the third runs on
+    // sub-to-20 because session 2's applyMasteryRule promoted
+    // sub-to-10 → 'mastered' and cascaded sub-to-20 'locked' →
+    // 'intro', so the picker at session 3 start lands on sub-to-20
+    // (first non-mastered node per MATH_NODES_IN_ORDER).
     expect(persisted.history.length).toBe(3)
     const lastThree = persisted.history.slice(-3)
     for (const entry of lastThree) {
@@ -353,12 +363,9 @@ test.describe('sub-to-10 progression-mastery loop', () => {
     // The first two entries are unambiguously on sub-to-10.
     expect(lastThree[0]!.skillFocus).toEqual(['sub-to-10'])
     expect(lastThree[1]!.skillFocus).toEqual(['sub-to-10'])
-    // The third entry is on sub-to-10 OR sub-to-20 depending on
-    // when promotion fired (sessions 2's applyMasteryRule call
-    // promotes; session 3 then runs on the next focus node). Per
-    // `progress-and-persistence.md` §"N+1-session cascade", the
-    // tail entry IS the post-promotion entry — on sub-to-20.
-    const thirdFocus = lastThree[2]!.skillFocus
-    expect([['sub-to-10'], ['sub-to-20']]).toContainEqual(thirdFocus)
+    // The third entry is deterministically on sub-to-20 — per the
+    // walk-through above and the SMOKING GUN B chain. Count-based
+    // assertion per feedback_count_assertions_on_regression_tests.
+    expect(lastThree[2]!.skillFocus).toEqual(['sub-to-20'])
   })
 })
