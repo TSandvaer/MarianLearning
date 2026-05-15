@@ -3,6 +3,7 @@ import {
   PlanFromServerError,
   mathSessionPlanFromServer,
   parseReadAddends,
+  parseReadOperands,
 } from './planFromServer'
 import {
   mathSessionPlanToUtteranceSources,
@@ -93,6 +94,243 @@ describe('parseReadAddends', () => {
     expect(() => parseReadAddends('Hundred plus two. How many?')).toThrow(
       PlanFromServerError,
     )
+  })
+
+  it('throws when called on a subtraction read line (legacy shim is addition-only)', () => {
+    // parseReadAddends is the backwards-compat shim — addition only.
+    // Subtraction templates throw with a clear message directing the
+    // caller to parseReadOperands.
+    expect(() =>
+      parseReadAddends('Seven minus three. How many are left?'),
+    ).toThrow(/parseReadOperands/)
+    expect(() =>
+      parseReadAddends('Eight take away three. How many are left?'),
+    ).toThrow(/parseReadOperands/)
+  })
+})
+
+describe('parseReadOperands — sub-to-10 templates (Kyle spec §9.1)', () => {
+  it('parses the canonical subtraction "minus" template', () => {
+    expect(parseReadOperands('Seven minus three. How many are left?')).toEqual({
+      addendA: 7,
+      addendB: 3,
+      op: '-',
+    })
+  })
+
+  it('parses the first-session "take away" template', () => {
+    expect(
+      parseReadOperands('Eight take away three. How many are left?'),
+    ).toEqual({
+      addendA: 8,
+      addendB: 3,
+      op: '-',
+    })
+  })
+
+  it('accepts subtract-self facts (minuend == subtrahend, correct = 0)', () => {
+    expect(parseReadOperands('Five minus five. How many are left?')).toEqual({
+      addendA: 5,
+      addendB: 5,
+      op: '-',
+    })
+    expect(parseReadOperands('Eight minus eight. How many are left?')).toEqual({
+      addendA: 8,
+      addendB: 8,
+      op: '-',
+    })
+  })
+
+  it('accepts subtract-zero facts (subtrahend = 0)', () => {
+    expect(parseReadOperands('Seven minus zero. How many are left?')).toEqual({
+      addendA: 7,
+      addendB: 0,
+      op: '-',
+    })
+    expect(parseReadOperands('Nine minus zero. How many are left?')).toEqual({
+      addendA: 9,
+      addendB: 0,
+      op: '-',
+    })
+  })
+
+  it('is case-insensitive on the leading word and operator word', () => {
+    expect(parseReadOperands('ten minus three. How Many Are Left?')).toEqual({
+      addendA: 10,
+      addendB: 3,
+      op: '-',
+    })
+    expect(
+      parseReadOperands('TEN TAKE AWAY THREE. HOW MANY ARE LEFT?'),
+    ).toEqual({
+      addendA: 10,
+      addendB: 3,
+      op: '-',
+    })
+  })
+
+  it('still parses addition templates and tags op:"+"', () => {
+    expect(parseReadOperands('Three plus two. How many?')).toEqual({
+      addendA: 3,
+      addendB: 2,
+      op: '+',
+    })
+  })
+
+  it('throws on the wrong trailing phrase — addition uses "How many?", subtraction uses "How many are left?"', () => {
+    // Cross-template mismatch: addition with "are left", subtraction
+    // without "are left". Both rejected.
+    expect(() =>
+      parseReadOperands('Three plus two. How many are left?'),
+    ).toThrow(PlanFromServerError)
+    expect(() => parseReadOperands('Seven minus three. How many?')).toThrow(
+      PlanFromServerError,
+    )
+  })
+
+  it('throws on non-template lines (clearer error than the legacy shim)', () => {
+    expect(() => parseReadOperands('What is seven minus three?')).toThrow(
+      PlanFromServerError,
+    )
+    expect(() => parseReadOperands('Three minus two equals one.')).toThrow(
+      PlanFromServerError,
+    )
+  })
+})
+
+describe('mathSessionPlanFromServer — sub-to-10 plan integration', () => {
+  function buildSubToTenWire() {
+    // Build a sub-to-10 plan matching Dave's pool. 8 problems, mix of
+    // bands. All slots present. op:"-" emitted per problem post-parse.
+    const probs = [
+      { a: 6, b: 3, sub: '6-3=3' }, // easy doubles
+      { a: 8, b: 4, sub: '8-4=4' }, // easy doubles
+      { a: 5, b: 5, sub: '5-5=0' }, // easy subtract-self (correct=0)
+      { a: 10, b: 2, sub: '10-2=8' }, // medium
+      { a: 10, b: 3, sub: '10-3=7' }, // take-from-10
+      { a: 10, b: 7, sub: '10-7=3' }, // take-from-10
+      { a: 9, b: 4, sub: '9-4=5' }, // hard
+      { a: 8, b: 3, sub: '8-3=5' }, // hard
+    ]
+    const numberWord = (n: number): string => {
+      const words = [
+        'zero',
+        'one',
+        'two',
+        'three',
+        'four',
+        'five',
+        'six',
+        'seven',
+        'eight',
+        'nine',
+        'ten',
+      ]
+      return words[n] ?? '?'
+    }
+    const utterances: { id: string; text: string }[] = []
+    probs.forEach((prob, i) => {
+      const p = i + 1
+      const correct = prob.a - prob.b
+      utterances.push({
+        id: `math.p${p}.read`,
+        text: `${cap(numberWord(prob.a))} minus ${numberWord(prob.b)}. How many are left?`,
+      })
+      utterances.push({
+        id: `math.p${p}.correct`,
+        text: `Yes! ${cap(numberWord(correct))}!`,
+      })
+      utterances.push({ id: `math.p${p}.reprompt`, text: 'Hmm... try again?' })
+      utterances.push({
+        id: `math.p${p}.hint`,
+        text: `Look. ${cap(numberWord(prob.a))}. Take away ${numberWord(prob.b)}. How many now?`,
+      })
+      utterances.push({
+        id: `math.p${p}.giveAnswer`,
+        text: `This one is ${numberWord(correct)}.`,
+      })
+    })
+    return {
+      id: 'sub-to-10-level-1',
+      label: 'Subtraction within 10 — Level 1',
+      utterances,
+    }
+  }
+  function cap(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+
+  it('rebuilds a sub-to-10 plan with op:"-" on every problem', () => {
+    const wire = buildSubToTenWire()
+    const rebuilt = mathSessionPlanFromServer(wire)
+    expect(rebuilt.problems).toHaveLength(8)
+    for (const p of rebuilt.problems) {
+      expect(p.op).toBe('-')
+    }
+  })
+
+  it('computes correct = addendA − addendB for each subtraction problem', () => {
+    const wire = buildSubToTenWire()
+    const rebuilt = mathSessionPlanFromServer(wire)
+    // Spot check a couple
+    const p1 = rebuilt.problems[0]!
+    expect(p1.addendA).toBe(6)
+    expect(p1.addendB).toBe(3)
+    expect(p1.correct).toBe(3)
+    const p3 = rebuilt.problems[2]!
+    expect(p3.addendA).toBe(5)
+    expect(p3.addendB).toBe(5)
+    // subtract-self → correct=0
+    expect(p3.correct).toBe(0)
+    const p6 = rebuilt.problems[5]!
+    expect(p6.addendA).toBe(10)
+    expect(p6.addendB).toBe(7)
+    expect(p6.correct).toBe(3)
+  })
+
+  it('rebuilds a mixed addition + subtraction plan (each problem tagged independently)', () => {
+    // Real world: a graduation session or future mixed-op session
+    // could carry both. Parser handles per-problem dispatch.
+    const wire = {
+      id: 'mixed-plan',
+      label: 'mixed',
+      utterances: [
+        // P1: addition
+        { id: 'math.p1.read', text: 'Three plus two. How many?' },
+        { id: 'math.p1.correct', text: 'Yes! Five!' },
+        { id: 'math.p1.reprompt', text: 'Hmm... try again?' },
+        {
+          id: 'math.p1.hint',
+          text: 'Look. Three. And two more. How many now?',
+        },
+        { id: 'math.p1.giveAnswer', text: 'This one is five.' },
+        // P2: subtraction
+        { id: 'math.p2.read', text: 'Seven minus three. How many are left?' },
+        { id: 'math.p2.correct', text: 'Yes! Four!' },
+        { id: 'math.p2.reprompt', text: 'Hmm... try again?' },
+        {
+          id: 'math.p2.hint',
+          text: 'Look. Seven. Take away three. How many now?',
+        },
+        { id: 'math.p2.giveAnswer', text: 'This one is four.' },
+        // P3-P8: addition again (to satisfy 8-problem requirement)
+        ...[3, 4, 5, 6, 7, 8].flatMap((i) => [
+          { id: `math.p${i}.read`, text: 'Four plus two. How many?' },
+          { id: `math.p${i}.correct`, text: 'Yes! Six!' },
+          { id: `math.p${i}.reprompt`, text: 'Hmm... try again?' },
+          {
+            id: `math.p${i}.hint`,
+            text: 'Look. Four. And two more. How many now?',
+          },
+          { id: `math.p${i}.giveAnswer`, text: 'This one is six.' },
+        ]),
+      ],
+    }
+    const rebuilt = mathSessionPlanFromServer(wire)
+    expect(rebuilt.problems).toHaveLength(8)
+    expect(rebuilt.problems[0]!.op).toBe('+')
+    expect(rebuilt.problems[1]!.op).toBe('-')
+    expect(rebuilt.problems[1]!.correct).toBe(4) // 7 - 3
   })
 })
 
