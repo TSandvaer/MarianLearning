@@ -376,34 +376,34 @@ test.describe('sub-to-10 dot-card suppression (PR 2 of 2 — render layer)', () 
 
     // ── RED-on-base lever ───────────────────────────────────────────────────
     //
-    // Read `data-flowers-visible` as a one-shot snapshot at the moment
-    // the canon-derived addends are on screen. Per
-    // [`Math.tsx:2202`](../../src/screens/Math/Math.tsx#L2202) this
-    // attribute is `"false"` while the dot-card overlay is mounted
-    // (flowers cross-faded out) and `"true"` otherwise.
+    // Devon's PR 2 (#241) implements the sub-to-10 visual suppression by
+    // skipping the ENTIRE `math-visual-groups` row at the JSX level —
+    // not by toggling its `data-flowers-visible` attribute. Per
+    // [`Math.tsx:2218`](../../src/screens/Math/Math.tsx#L2218):
     //
-    // On RED main, the predicate `shouldShowDotCard` is op-blind and
-    // returns `true` for `5 - 3 = 2` (both operands in `[1, 5]`); the
-    // overlay mounts at problem-mount time; flowers go `data-flowers-
-    // visible="false"`. On GREEN (Devon's PR 2 op-gate), the overlay
-    // never mounts; flowers stay `data-flowers-visible="true"` from
-    // first paint.
+    //   `{currentProblem.op === '+' && ( <m.div data-testid="math-visual-groups" …
     //
-    // Important — we use a **snapshot read** (`.getAttribute()` once)
-    // rather than `.toHaveAttribute(...)` (which polls and converges).
-    // Polling would silently absorb the dot-card's natural 1.1s
-    // unmount on RED — the attribute flips `"false"` → `"true"` once
-    // the overlay completes, so a polling assertion would eventually
-    // see `"true"` and pass for the wrong reason.
-    const flowersVisible = await page
-      .getByTestId('math-visual-groups')
-      .getAttribute('data-flowers-visible')
-    expect(flowersVisible).toBe('true')
+    // So on GREEN for `5 - 3 = 2`, `math-visual-groups` is absent from
+    // the DOM (count 0). On RED main, the predicate `shouldShowDotCard`
+    // is op-blind and returns `true` for `5 - 3 = 2` (both operands in
+    // `[1, 5]`); the overlay mounts inside the visual-groups row and
+    // the math-dot-card cells are present.
+    //
+    // We use `toHaveCount(0)` here. Because the visual-groups row for
+    // `op === '-'` is a **static** JSX-level suppression (never
+    // mounts — not an animated unmount), polling is safe: the element
+    // truly never appears, so there's no time window in which a flaky
+    // pass could occur. See dispatch brief Patch 1 rationale.
+    await expect(page.getByTestId('math-visual-groups')).toHaveCount(0)
 
-    // Belt-and-suspenders count assertion. On the GREEN side the cells
-    // were never mounted at all, so a one-shot read of the cell count
-    // is also `0`. On RED, the cells are still mounted at this point
-    // and count is `2`.
+    // Belt-and-suspenders count assertions. The dot-card overlay lives
+    // INSIDE the visual-groups row (per Devon's PR 2 commit message:
+    // "The DotCardOverlay lives inside the same conditional so it's
+    // also skipped on subtraction"). On GREEN, these are 0 because the
+    // parent never mounts. On RED, the dot-card mounts and these are
+    // non-zero — the assertions guard against accidental over-narrowing
+    // of the suppression (e.g. a future refactor that hides the row
+    // but resurrects the dot-card via a sibling render).
     const dotCardCount = await page.getByTestId('math-dot-card').count()
     expect(dotCardCount).toBe(0)
     const dotCardCellCount = await page
