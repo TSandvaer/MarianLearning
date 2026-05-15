@@ -44,6 +44,7 @@ import {
 } from '../_shared/gameplayConstants'
 import { WordPicture } from './wordPictures'
 import type { WordEntry } from './wordPack'
+import type { SkillLevel } from '../../lib/progress'
 
 /**
  * Screen 4 — Word Song (CVC short-a, picture-discrimination).
@@ -256,6 +257,31 @@ export interface WordSongProps {
    * `cvc-words-short-u`.
    */
   crossVowelMixing?: boolean
+  /**
+   * Skill level of the `digraphs-th-voiceless` node at session-start
+   * (spec #231). Used to decide whether to show the `emma-th-mouth.svg`
+   * mouth-cue:
+   *   - `'intro'` | `'practicing'` → Placement B corner cue visible.
+   *   - `'intro'` + `digraphsThFirstEncounter` → Placement A panel also.
+   *   - `'locked'` | `'mastered'` | absent → no cue rendered.
+   *
+   * Defaults to `'locked'` (no cue). App.tsx computes and freezes this
+   * once at session-start, same as `crossVowelMixing`.
+   *
+   * The cue is inert to answer outcomes — it never reacts to `pose` or
+   * `problemState`. It is never added to `EmmaPose`; it consumes
+   * `/assets/emma-th-mouth.svg` by direct path.
+   */
+  digraphsThNodeLevel?: SkillLevel
+  /**
+   * True iff `digraphs-th-voiceless` is `'intro'` AND absent from
+   * `lifetimeFirstEncounters` — gates the Placement A first-encounter
+   * intro panel (mounts before `audioReady`, exits when problem area
+   * gates open). Only meaningful when `digraphsThNodeLevel === 'intro'`.
+   *
+   * Defaults to `false`.
+   */
+  digraphsThFirstEncounter?: boolean
   /** Optional: sparkle SFX on correct. Default a Howler-backed silent-fallback. */
   sparkle?: Sfx
   /** Optional: poof SFX on wrong. Default a Howler-backed silent-fallback. */
@@ -362,6 +388,8 @@ function WordSongScreen({
   playUtterance = defaultPlayUtterance,
   audioReady,
   crossVowelMixing = false,
+  digraphsThNodeLevel = 'locked',
+  digraphsThFirstEncounter = false,
   sparkle,
   poof,
   plink,
@@ -378,6 +406,14 @@ function WordSongScreen({
   const unlockAudioSessionFn = unlockAudioSession ?? unlockIosAudioSession
   // Ticket 86c9hf4ef — see Math.tsx for the cold-mount fast-path rationale.
   const getHowlerRunningFn = getHowlerRunning ?? readHowlerContextRunning
+
+  // #231 — digraphs-th mouth-cue visibility derivations.
+  // Placement B: persistent corner cue; shown whenever node is intro or practicing.
+  const showThCornerCue =
+    digraphsThNodeLevel === 'intro' || digraphsThNodeLevel === 'practicing'
+  // Placement A: first-encounter intro panel; shown until audioReady flips.
+  // Mounts before the problem area gate; exits when the gate opens.
+  const showThIntroPanelA = digraphsThFirstEncounter && audioReady !== true
 
   // Plan re-derives whenever `planProp` flips — see Math.tsx for the full
   // rationale (ticket 86c9jteud). Short version: App.tsx swaps `planProp`
@@ -1418,6 +1454,44 @@ function WordSongScreen({
           className="h-[26vh] w-auto select-none"
         />
 
+        {/* Placement A — digraphs-th first-encounter intro panel.
+            Spec #231 §4.1. Mounts alongside Emma during the fetch wait
+            (NOT gated on audioReady). Exits via opacity fade when
+            the problem area gate opens.
+            - ~22vh square, th label below image
+            - spring 260/20 in; 200ms opacity out
+            - reduce-motion: plain opacity fade in
+            - pointer-events-none, aria-hidden; cue is inert to outcomes */}
+        <AnimatePresence>
+          {showThIntroPanelA && (
+            <m.div
+              data-testid="th-intro-panel"
+              aria-hidden
+              className="pointer-events-none flex flex-col items-center gap-1"
+              style={{ width: '22vh', flexShrink: 0 }}
+              initial={{ opacity: 0, scale: reducedMotion ? 1 : 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.2 } }}
+              transition={
+                reducedMotion
+                  ? { duration: 0.2 }
+                  : { type: 'spring', stiffness: 260, damping: 20 }
+              }
+            >
+              <img
+                src="/assets/emma-th-mouth.svg"
+                alt=""
+                aria-hidden
+                className="h-[22vh] w-[22vh] select-none object-contain"
+                draggable={false}
+              />
+              <span className="font-display text-2xl font-bold text-ink">
+                th
+              </span>
+            </m.div>
+          )}
+        </AnimatePresence>
+
         {/* Caption ribbon — to Emma's right. Same word-by-word reveal
             as Greet/Math. */}
         {captionVisible && captionText && (
@@ -1620,6 +1694,42 @@ function WordSongScreen({
           </div>
         </>
       )}
+
+      {/* Placement B — persistent th mouth-cue corner stamp.
+          Spec #231 §4.2. Absolute top-right, below HUD strip (h-14 = 3.5rem).
+          Present whenever digraphsThNodeLevel is intro or practicing.
+          - 64×88pt per spec
+          - 200ms opacity fade in, static thereafter (no exit animation)
+          - reduce-motion: same opacity fade (no difference from normal here)
+          - pointer-events-none, aria-hidden; inert to answer outcomes */}
+      <AnimatePresence>
+        {showThCornerCue && (
+          <m.div
+            data-testid="th-corner-cue"
+            aria-hidden
+            className="pointer-events-none absolute right-3 flex flex-col items-center gap-0.5"
+            style={{
+              top: 'calc(3.5rem + env(safe-area-inset-top))',
+              width: '64pt',
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+          >
+            <img
+              src="/assets/emma-th-mouth.svg"
+              alt=""
+              aria-hidden
+              className="select-none object-contain"
+              style={{ width: '64pt', height: '88pt' }}
+              draggable={false}
+            />
+            <span className="font-display text-base font-bold text-ink">
+              th
+            </span>
+          </m.div>
+        )}
+      </AnimatePresence>
     </m.main>
   )
 }

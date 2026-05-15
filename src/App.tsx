@@ -61,6 +61,7 @@ import {
   type LeitnerSessionHintItem,
   type Progress,
   type ProgressTrack,
+  type SkillLevel,
   type SlowFactHint,
 } from './lib/progress'
 import { projectHubTreeProgress } from './screens/Hub/progressProjection'
@@ -1028,6 +1029,23 @@ export default function App() {
    * potentially-updated progress + parentSettings).
    */
   const [wordSongCrossVowel, setWordSongCrossVowel] = useState(false)
+  /**
+   * Digraphs-th mouth-cue state (#231 spec). Computed once at session-start
+   * from `loadProgress()` alongside `crossVowelMixing`. Frozen on the
+   * `<WordSong>` prop for the session lifetime. Reset to `'locked'` on
+   * leave so the next session re-evaluates against updated progress.
+   */
+  const [wordSongDigraphsThLevel, setWordSongDigraphsThLevel] =
+    useState<SkillLevel>('locked')
+  /**
+   * True iff `digraphs-th-voiceless` is `intro` AND absent from
+   * `lifetimeFirstEncounters` — gates Placement A first-encounter panel.
+   * Frozen with `wordSongDigraphsThLevel`; reset on leave.
+   */
+  const [
+    wordSongDigraphsThFirstEncounter,
+    setWordSongDigraphsThFirstEncounter,
+  ] = useState(false)
   const wordSongUnloadRef = useRef<(() => void) | null>(null)
   const wordSongAbortRef = useRef<AbortController | null>(null)
   const wordSongFetchStartedRef = useRef(false)
@@ -1076,6 +1094,9 @@ export default function App() {
       // re-evaluates the predicate against potentially-updated progress
       // (e.g. mid-session a parent toggled the setting in another tab).
       setWordSongCrossVowel(false)
+      // #231 — reset th mouth-cue state so the next session re-evaluates.
+      setWordSongDigraphsThLevel('locked')
+      setWordSongDigraphsThFirstEncounter(false)
     }
   })
 
@@ -1160,6 +1181,22 @@ export default function App() {
       }
     }
     setWordSongCrossVowel(nextCrossVowel)
+
+    // #231 — digraphs-th mouth-cue: compute node level + first-encounter flag
+    // once at session-start, frozen for the session lifetime. Same structural
+    // pattern as `nextCrossVowel` above.
+    {
+      const thProgress = loadProgress()
+      if (thProgress !== null) {
+        const thLevel = thProgress.skillLevels['digraphs-th-voiceless']
+        setWordSongDigraphsThLevel(thLevel)
+        const lfe = wordSongHints.lifetimeFirstEncounters ?? []
+        setWordSongDigraphsThFirstEncounter(
+          thLevel === 'intro' && !lfe.includes('digraphs-th-voiceless'),
+        )
+      }
+    }
+
     void prepareWordSongPathA(
       {
         level: 1,
@@ -1265,6 +1302,9 @@ export default function App() {
       setWordSongPlan(null)
       // Ticket 86c9qa0kf — symmetry with the imperative tear-down above.
       setWordSongCrossVowel(false)
+      // #231 — symmetry with imperative tear-down.
+      setWordSongDigraphsThLevel('locked')
+      setWordSongDigraphsThFirstEncounter(false)
     })
     return () => {
       cancelled = true
@@ -1309,6 +1349,8 @@ export default function App() {
               playUtterance={wordSongPlay ?? undefined}
               audioReady={wordSongAudioReady}
               crossVowelMixing={wordSongCrossVowel}
+              digraphsThNodeLevel={wordSongDigraphsThLevel}
+              digraphsThFirstEncounter={wordSongDigraphsThFirstEncounter}
               onSessionComplete={handleWordSongComplete}
               onRequestExit={handleBackToHub}
             />
