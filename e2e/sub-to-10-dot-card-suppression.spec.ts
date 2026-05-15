@@ -78,9 +78,20 @@ import type { Page } from '@playwright/test'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// NOTE on `forceHowlerUnlock`
+// ---------------------------
+// We deliberately do NOT call `forceHowlerUnlock(page)` in this spec —
+// see the matching note in `sub-to-10-operator-glyph.spec.ts` for the
+// full rationale (testing-and-ci.md §4.1.2: the helper's WebKit
+// stub-shape `Howler.ctx = { state: 'running' }` is not a real
+// `AudioContext`, so real-bytes canned plans hit
+// `connect() on AudioNode` errors and silently fall back to static).
+//
+// Hub-tree-node click IS the first gesture. Spec is chromium-only by
+// Playwright project config.
 
 const SILENT_MP3 =
   'SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAAAAA8TEFNRTMuMTAwBLgAAAAAAAAAABRAJAUHQQAB4AAAAk8tnaAyAAAAAA=='
@@ -324,12 +335,24 @@ async function navigateToMath(page: Page) {
   })
 }
 
+// ── WebKit-headless skip ─────────────────────────────────────────────────────
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → real-bytes canned plan cannot decode; spec is chromium-only.',
+  )
+}
+
 // ── Spec ─────────────────────────────────────────────────────────────────────
 
 test.describe('sub-to-10 dot-card suppression (PR 2 of 2 — render layer)', () => {
   test('sub-to-10 problem with both operands ≤ 5 does NOT mount math-dot-card', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     await installClaudeMock(page, {
       mathResponse: cannedSubToTenSmallOperandsAtP1,
     })
@@ -339,37 +362,60 @@ test.describe('sub-to-10 dot-card suppression (PR 2 of 2 — render layer)', () 
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
     await navigateToMath(page)
 
-    // Sanity sub-assertion: addends from the canned plan are on screen.
-    // This confirms the screen actually rendered the sub-to-10 problem
-    // and we're not asserting against an empty DOM.
-    const addendAText = await page.getByTestId('math-addend-a').textContent()
-    const addendBText = await page.getByTestId('math-addend-b').textContent()
-    expect(addendAText?.trim()).toBe('5')
-    expect(addendBText?.trim()).toBe('3')
+    // Wait until the canon-derived plan has settled — the addends from
+    // the canned plan (`5 - 3 = 2`) become visible. This is the
+    // canon-landed gate.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('5', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('3', {
+      timeout: 15_000,
+    })
 
     // ── RED-on-base lever ───────────────────────────────────────────────────
     //
-    // The overlay's lifecycle is ~1.1s (fade-in 200ms + hold 700ms +
-    // fade-out 200ms) per dotCard.ts. On RED main the predicate is
-    // op-blind and the overlay mounts at t=0; the count is 1 from the
-    // first paint onward. We assert at a stable point (after the
-    // symbolic row is visible) so the assertion catches the mount even
-    // if the fade-out hadn't fired.
+    // Read `data-flowers-visible` as a one-shot snapshot at the moment
+    // the canon-derived addends are on screen. Per
+    // [`Math.tsx:2202`](../../src/screens/Math/Math.tsx#L2202) this
+    // attribute is `"false"` while the dot-card overlay is mounted
+    // (flowers cross-faded out) and `"true"` otherwise.
     //
-    // We must NOT wait the full 1.1s lifecycle and then assert — that
-    // would race the unmount and produce a flaky pass on RED.
-    await expect(page.getByTestId('math-dot-card')).toHaveCount(0)
-    // Cells should also be absent — defends against a future regression
-    // where the overlay wrapper is gated but cell rendering isn't.
-    await expect(page.getByTestId('math-dot-card-cell')).toHaveCount(0)
+    // On RED main, the predicate `shouldShowDotCard` is op-blind and
+    // returns `true` for `5 - 3 = 2` (both operands in `[1, 5]`); the
+    // overlay mounts at problem-mount time; flowers go `data-flowers-
+    // visible="false"`. On GREEN (Devon's PR 2 op-gate), the overlay
+    // never mounts; flowers stay `data-flowers-visible="true"` from
+    // first paint.
+    //
+    // Important — we use a **snapshot read** (`.getAttribute()` once)
+    // rather than `.toHaveAttribute(...)` (which polls and converges).
+    // Polling would silently absorb the dot-card's natural 1.1s
+    // unmount on RED — the attribute flips `"false"` → `"true"` once
+    // the overlay completes, so a polling assertion would eventually
+    // see `"true"` and pass for the wrong reason.
+    const flowersVisible = await page
+      .getByTestId('math-visual-groups')
+      .getAttribute('data-flowers-visible')
+    expect(flowersVisible).toBe('true')
+
+    // Belt-and-suspenders count assertion. On the GREEN side the cells
+    // were never mounted at all, so a one-shot read of the cell count
+    // is also `0`. On RED, the cells are still mounted at this point
+    // and count is `2`.
+    const dotCardCount = await page.getByTestId('math-dot-card').count()
+    expect(dotCardCount).toBe(0)
+    const dotCardCellCount = await page
+      .getByTestId('math-dot-card-cell')
+      .count()
+    expect(dotCardCellCount).toBe(0)
   })
 
   test('add-to-10 problem with both addends ≤ 5 DOES mount math-dot-card (regression-lock)', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     await installClaudeMock(page, {
       mathResponse: cannedAddToTenSmallAddendsAtP1,
     })
@@ -379,29 +425,37 @@ test.describe('sub-to-10 dot-card suppression (PR 2 of 2 — render layer)', () 
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
     await navigateToMath(page)
 
-    // Sanity sub-assertion: addends from the canned plan are on screen.
-    const addendAText = await page.getByTestId('math-addend-a').textContent()
-    const addendBText = await page.getByTestId('math-addend-b').textContent()
-    expect(addendAText?.trim()).toBe('3')
-    expect(addendBText?.trim()).toBe('4')
+    // Wait until the canon-derived plan has settled — addends from the
+    // canned add-to-10 plan (`3 + 4 = 7`).
+    await expect(page.getByTestId('math-addend-a')).toHaveText('3', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('4', {
+      timeout: 15_000,
+    })
 
     // ── Regression-lock ─────────────────────────────────────────────────────
     //
-    // The dot-card overlay's mount is racy with the fade-out, so we
-    // assert against the cells too — cells are mounted alongside the
-    // overlay container and unmount with it. If the cells exist, the
-    // overlay is/was active. Two assertions form a single count-based
-    // statement of intent.
-    //
-    // We use the dot-card-cell selector (count === 2) because the
-    // overlay wrapper itself may have its `key` swap between problems
-    // (which Math.tsx does at line 2244 by `key={problemIndex}`); the
-    // cells are the most stable structural seam during the lifecycle.
+    // The dot-card overlay mounts on add-to-10 with small addends.
+    // We assert at the same moment as the canon-landed gate — both
+    // before the dot-card's natural ~1.1s lifecycle ends. Pattern
+    // mirrors the sub-to-10 assertion above (snapshot read of
+    // `data-flowers-visible`) so a future regression that prematurely
+    // unmounts the overlay surfaces here.
+    const flowersVisible = await page
+      .getByTestId('math-visual-groups')
+      .getAttribute('data-flowers-visible')
+    expect(flowersVisible).toBe('false')
+
+    // The cells are mounted alongside the overlay container. Using
+    // `toHaveCount(2)` with the default expect.timeout polls until the
+    // count matches; if Devon's PR 2 accidentally over-gates and
+    // prevents the overlay from mounting at all, the count stays `0`
+    // for the full polling window and the assertion fails.
     await expect(page.getByTestId('math-dot-card-cell')).toHaveCount(2, {
-      timeout: 10_000,
+      timeout: 5_000,
     })
     await expect(page.getByTestId('math-dot-card')).toHaveCount(1)
   })

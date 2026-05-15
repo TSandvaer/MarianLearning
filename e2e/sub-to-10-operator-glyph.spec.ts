@@ -38,9 +38,30 @@ import type { Page } from '@playwright/test'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// NOTE on `forceHowlerUnlock`
+// ---------------------------
+// We deliberately do NOT call `forceHowlerUnlock(page)` in this spec. Per
+// `.claude/docs/testing-and-ci.md` §4.1.2, the helper's WebKit stub-shape
+// `Howler.ctx = { state: 'running' }` is incompatible with a real-bytes
+// canned plan — Howler's downstream `connect()` calls throw
+// `TypeError: Failed to execute 'connect' on 'AudioNode'` during decode,
+// `prepareMathPathA` rejects, and Math.tsx silently falls back to the
+// static rotation plan. That fallback masks the canned plan content and
+// any operator-glyph assertion becomes unsatisfiable.
+//
+// Production reality: the user's first tap on the Hub tree node IS the
+// first gesture in the chain. Howler's document-level click listener
+// installs after the first `new Howl(...)` (which happens during
+// `prepareMathPathA`'s `loadAudio` call). The tap on the number-garden
+// tile is the canonical gesture that unlocks the audio context.
+//
+// chromium headless runs this chain naturally. Browser-engine note:
+// WebKit headless has no `AudioContext`, so this spec is `chromium`-
+// only by Playwright project config — same posture as
+// `digraphs-sh-content.spec.ts` and the other real-canon-bytes specs.
 
 // ── Audio fixture ────────────────────────────────────────────────────────────
 
@@ -294,12 +315,36 @@ async function navigateToMath(page: Page) {
   })
 }
 
+// ── WebKit-headless skip ─────────────────────────────────────────────────────
+//
+// Real-canon-bytes specs (the digraphs-sh/ch/th content specs are the
+// precedent) skip on `webkit` headless because Howler's downstream
+// `connect()` calls require a real `AudioContext` to decode the
+// inline-base64 MP3 bytes. WebKit headless has no `AudioContext`, so
+// `prepareMathPathA` rejects, the screen falls back to the static plan,
+// and the canned plan content this spec asserts against is not what
+// the screen actually rendered. Chromium runs the real-bytes path
+// natively.
+//
+// Production iPad Safari has a working `AudioContext` post-gesture;
+// this is a harness limitation, not a Safari-engine concern.
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → real-bytes canned plan cannot decode; spec is chromium-only.',
+  )
+}
+
 // ── Spec ─────────────────────────────────────────────────────────────────────
 
 test.describe('sub-to-10 operator glyph (PR 2 of 2 — render layer)', () => {
   test('subtraction problem renders the MINUS SIGN (U+2212) in math-symbolic', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     await installClaudeMock(page, {
       mathResponse: cannedSubToTenResponse,
     })
@@ -309,8 +354,19 @@ test.describe('sub-to-10 operator glyph (PR 2 of 2 — render layer)', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
     await navigateToMath(page)
+
+    // Wait until the canon-derived plan has settled — the addends from
+    // the canned plan (`5 - 3 = 2`) become visible. Without this gate
+    // we'd read the symbolic row while the static fallback plan is
+    // still mounted (addends `3, 2` from `sums-to-10-A` opener) and
+    // the operator-glyph assertion would be testing addition content.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('5', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('3', {
+      timeout: 15_000,
+    })
 
     // Read the symbolic-row text. On RED main, hardcoded `+` shows.
     // On GREEN (PR 2), Devon reads `currentProblem.op` and renders `−`.
@@ -326,18 +382,12 @@ test.describe('sub-to-10 operator glyph (PR 2 of 2 — render layer)', () => {
     // feedback_count_assertions_on_regression_tests (single boolean
     // value, not `.toContain`).
     expect(symbolicText.includes('−')).toBe(true)
-
-    // Sanity sub-assertion: the addend digits ARE present (the screen
-    // didn't render an empty symbolic row).
-    const addendAText = await page.getByTestId('math-addend-a').textContent()
-    const addendBText = await page.getByTestId('math-addend-b').textContent()
-    expect(addendAText?.trim()).toBe('5')
-    expect(addendBText?.trim()).toBe('3')
   })
 
   test('addition problem renders + in math-symbolic (regression-lock — Devon must keep this passing)', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     await installClaudeMock(page, {
       mathResponse: cannedAddToTenResponse,
     })
@@ -347,8 +397,16 @@ test.describe('sub-to-10 operator glyph (PR 2 of 2 — render layer)', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
     await navigateToMath(page)
+
+    // Wait until the canon-derived plan has settled — addends `3 + 2`
+    // from the canned add-to-10 plan.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('3', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('2', {
+      timeout: 15_000,
+    })
 
     const symbolicText =
       (await page.getByTestId('math-symbolic').textContent())?.trim() ?? ''
@@ -362,11 +420,5 @@ test.describe('sub-to-10 operator glyph (PR 2 of 2 — render layer)', () => {
     expect(symbolicText.includes('+')).toBe(true)
     // The minus glyph must NOT appear on an addition problem.
     expect(symbolicText.includes('−')).toBe(false)
-
-    // Sanity sub-assertion: addends from the canned plan.
-    const addendAText = await page.getByTestId('math-addend-a').textContent()
-    const addendBText = await page.getByTestId('math-addend-b').textContent()
-    expect(addendAText?.trim()).toBe('3')
-    expect(addendBText?.trim()).toBe('2')
   })
 })

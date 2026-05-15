@@ -57,9 +57,20 @@ import type { Page } from '@playwright/test'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// NOTE on `forceHowlerUnlock`
+// ---------------------------
+// We deliberately do NOT call `forceHowlerUnlock(page)` in this spec —
+// see the matching note in `sub-to-10-operator-glyph.spec.ts` for the
+// full rationale (testing-and-ci.md §4.1.2: the helper's WebKit
+// stub-shape `Howler.ctx = { state: 'running' }` is not a real
+// `AudioContext`, so real-bytes canned plans hit
+// `connect() on AudioNode` errors and silently fall back to static).
+//
+// Hub-tree-node click IS the first gesture. Spec is chromium-only by
+// Playwright project config.
 
 const SILENT_MP3 =
   'SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAAAAA8TEFNRTMuMTAwBLgAAAAAAAAAABRAJAUHQQAB4AAAAk8tnaAyAAAAAA=='
@@ -302,12 +313,24 @@ async function navigateToMath(page: Page) {
   await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
 }
 
+// ── WebKit-headless skip ─────────────────────────────────────────────────────
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → real-bytes canned plan cannot decode; spec is chromium-only.',
+  )
+}
+
 // ── Spec ─────────────────────────────────────────────────────────────────────
 
 test.describe('sub-to-10 chip-0 rendering (PR 2 of 2 — render layer)', () => {
   test('5 - 5 = 0 problem renders a chip with data-value="0" and text content "0"', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     await installClaudeMock(page, {
       mathResponse: cannedSubToTenWithSubtractSelfAtP1,
     })
@@ -317,23 +340,27 @@ test.describe('sub-to-10 chip-0 rendering (PR 2 of 2 — render layer)', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
     await navigateToMath(page)
-
-    // Wait for the symbolic row to mount — same gate the other Math
-    // specs use (means audioReady has flipped and chips are about to
-    // render). If buildChipOrder throws on RED main, the chip row
-    // never renders; the assertion below times out at `.toHaveCount(1)`.
-    await expect(page.getByTestId('math-symbolic')).toBeVisible({
-      timeout: 15_000,
-    })
 
     // ── RED-on-base lever ───────────────────────────────────────────────────
     //
-    // Assert exactly ONE chip with data-value="0". On GREEN (PR 2) the
-    // chip mounts as the correct answer. On RED main, `pickDistractors`
-    // throws on correct=0 because minAnswer defaults to 1; chips never
-    // render; count is 0.
+    // On RED main, when the canon-derived plan reaches
+    // `buildChipOrder`, `pickDistractors(0, 1, 10)` throws (correct=0 <
+    // minAnswer=1 because the screen passes no `op` opt). The throw
+    // escapes the `useMemo` and React crashes / fails to render the
+    // chip row. The screen may also fail to mount the canon addends.
+    // Either way, a chip with `data-value="0"` is NEVER present in
+    // the DOM on RED main.
+    //
+    // On GREEN (Devon's PR 2), Math.tsx passes `{ op: problem.op,
+    // minAnswer: 0 }` to `pickDistractors`, the function honours the
+    // widened lower bound, and the chip with `data-value="0"` mounts
+    // as the correct chip.
+    //
+    // `toHaveCount(1, { timeout: 15_000 })` polls until count converges
+    // to 1; on RED main it never reaches 1, so the assertion fails at
+    // the timeout. This is the count-based assertion per
+    // feedback_count_assertions_on_regression_tests.
     const chipZero = page.locator('[data-testid="math-chip"][data-value="0"]')
     await expect(chipZero).toHaveCount(1, { timeout: 15_000 })
 
@@ -345,16 +372,17 @@ test.describe('sub-to-10 chip-0 rendering (PR 2 of 2 — render layer)', () => {
     // The chip is flagged as correct.
     await expect(chipZero).toHaveAttribute('data-correct', 'true')
 
-    // Sanity sub-assertion: addends from the canned plan show on screen.
-    const addendAText = await page.getByTestId('math-addend-a').textContent()
-    const addendBText = await page.getByTestId('math-addend-b').textContent()
-    expect(addendAText?.trim()).toBe('5')
-    expect(addendBText?.trim()).toBe('5')
+    // Sanity sub-assertion: addends from the canned plan landed on screen
+    // — the canon plan reached the screen, so we're not asserting against
+    // a static-fallback artifact.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('5')
+    await expect(page.getByTestId('math-addend-b')).toHaveText('5')
   })
 
   test('chip-0 does NOT render on an add-to-10 problem (regression-lock for the addition path)', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     await installClaudeMock(page, {
       mathResponse: cannedAddToTenResponse,
     })
@@ -364,16 +392,24 @@ test.describe('sub-to-10 chip-0 rendering (PR 2 of 2 — render layer)', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
     await navigateToMath(page)
 
-    // Wait for the chip row to mount so the count is meaningful.
-    await expect(page.getByTestId('math-chips')).toBeVisible({
+    // Wait until the canon-derived add-to-10 plan has settled —
+    // addends `3 + 2 = 5` from the canned plan.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('3', {
       timeout: 15_000,
     })
-    // All three chips for problem 1 (correct=5; distractors gentle-tier
-    // both ≥2 away from 5, biased to range extremes). None of them is 0.
-    await expect(page.getByTestId('math-chip')).toHaveCount(3)
+    await expect(page.getByTestId('math-addend-b')).toHaveText('2', {
+      timeout: 15_000,
+    })
+
+    // All three chips for problem 1 mount (correct=5; distractors
+    // gentle-tier both ≥2 away from 5, biased to range extremes). None
+    // of them is 0. Use `toHaveCount(3)` as the canon-landed gate for
+    // the chip row.
+    await expect(page.getByTestId('math-chip')).toHaveCount(3, {
+      timeout: 5_000,
+    })
 
     // ── Regression-lock ─────────────────────────────────────────────────────
     //
