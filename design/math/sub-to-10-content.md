@@ -1,7 +1,7 @@
 # Number Garden — `sub-to-10` content tier (16-fact pool, wrong-operation distractor, op-parameterized slow-fact threshold)
 
-**Status:** DRAFT — ready for Kevin's implementation. Awaits Devon's design review.
-**Ticket:** TBD — Matt to file. This spec lands the design-side content for the FIRST subtraction tier in Number Garden.
+**Status:** APPROVED with all open questions locked (Thomas, 2026-05-15). Ready for Kevin's implementation. Devon's PR #238 design review passed with nits applied; see §11 for the locked decisions.
+**Ticket:** TBD — Matt to file. This spec lands the design-side content for the FIRST subtraction tier in Number Garden. PR split locked at 2 (content + canon in PR 1; render + parser in PR 2).
 **Authority:** `design/research/sub-to-10-fact-sequencing-marian.md` (Dave, 2026-05-15) — the curriculum-side authority on fact ordering, distractor design, dual-exposure rule, advancement gate, and op-specific slow-fact threshold. This spec consumes Dave's note verbatim where it makes a call and formalises it for Kevin's planner / canon / `distractors.ts` work.
 **Predecessor research (read for context):** `design/research/math-distractor-and-streak-decisions.md` (Dave, 2026-04-25 — the gentle / off-by-one cutoff at problem 3); `design/research/add-to-10-counting-to-recall.md` (Dave, 2026-04-29 — Marian's finger-counting profile); `design/research/speed-feedback-automaticity-marian.md` (Dave, 2026-05-15 — verdict: NO speed-feedback UX; the slow-fact directive is a backend re-targeting tool, not a UI signal).
 **Structural predecessor (precedent shape, cloned section-for-section):** `design/word-song/digraphs-th-word-list.md` (Kyle, 2026-05-14) — the most recently shipped content-tier spec. This is the first MATH content-tier spec; we mirror the word-song shape because Kevin already reads against it.
@@ -27,10 +27,11 @@
 - The two distractor classes for `sub-to-10`, including the NEW **wrong-operation distractor** (§3).
 - The read-line template + per-slot utterance templates (§4).
 - The schema posture — sub-to-10 reuses `MathFact { a, b, op: '-' }` with no new infrastructure (§5).
-- The advancement gate (`add-to-10 → sub-to-10` promotion) — accuracy-only per Dave (§6).
+- The advancement gate (`add-to-20 → sub-to-10` promotion per the locked curriculum order) — accuracy-only per Dave (§6).
 - The dual-exposure rule (never pair a `-` fact with its `+` inverse in the same session) (§7).
 - The op-parameterized slow-fact threshold REQUEST for `slowFacts.ts` (§8).
 - The wire-up checklist for Kevin (§9).
+- The locked Thomas decisions on Q1 (curriculum order), Q2 (slow-fact threshold shape), Q3 (chip-range widening), Q4 (first-session framing) plus the locked PR split (§11).
 
 **Out-of-scope:**
 
@@ -39,7 +40,7 @@
 - **Speed-feedback UX** — killed by Dave's `speed-feedback-automaticity-marian.md`. No streak-fade-on-slow, no timer, no orange/yellow chip, no haptic.
 - **CRA visual scaffolding** — Dave § Q2 ruled out (ten-frame, number-line, manipulative phase). The chip-tap is the representational layer.
 - **Fact-family interleaving (mixed `+` and `-` in one session)** — Dave § Application supports it as a future direction (per McNeil et al. 2025) but the dual-exposure rule (§7) is the conservative posture for v1: do NOT pair a `-` problem and its `+` inverse in the same 8-problem session. A future spec can widen this once `sub-to-10` is established.
-- **`Math.tsx` UI changes.** Subtraction renders through the existing chip-tap pipeline; the screen is operation-agnostic. Already-shipped `pickDistractors(correct, problemIndex, maxAnswer)` accepts any answer in `[1, maxAnswer]`.
+- **Major `Math.tsx` UI redesign.** Subtraction renders through the existing chip-tap pipeline; the screen is operation-agnostic. The PR-2 changes Kevin makes are argument plumbing (`op`, `distractorClass`, `minAnswer` through to `pickDistractors`) and the operator-glyph render (− vs + in the problem display); no layout, no new UI primitives, no new states.
 - **Two-digit-numerals SSML.** The `[1, 10]` answer range stays within Azure's clean single-digit lexicon; no `<phoneme>` overrides needed.
 
 ---
@@ -159,7 +160,7 @@ Algorithm: two distractor values, each ≥2 away from `correct`, biased toward `
 - `9 − 1 = 8`, wrong-op distractor = `10`. In range. Pair with an off-by-one (`7` or `9`) for the second distractor — but `9` would alias the wrong-op answer minus-one, so prefer `7`.
 - `6 − 3 = 3`, wrong-op distractor = `9`. In range. Pair with `4` (off-by-one) for the second distractor.
 
-**Scope.** Class 2 is conditional on `op === '-' && problemIndex >= 4`. Never fires for P1–P3 (gentle ramp). Never fires for `op === '+'` (addition has no equivalent meaningful "wrong-operation" lure within the `[1, 10]` range — the inverse would be `a − b`, often negative; see §3.5).
+**Scope.** Class 2 is conditional on `op === '-' && problemIndex >= 4`. Never fires for P1–P3 (gentle ramp). Never fires for `op === '+'` (addition has no equivalent meaningful "wrong-operation" lure within the `[1, 10]` range — the inverse would be `a − b`, often negative; see §3.6).
 
 **Combined-pair shape (Class 2 plus a second distractor).**
 
@@ -209,7 +210,7 @@ interface MathProblem {
 
 The flat wire `read` text already disambiguates op (`"… minus …"` vs `"… plus …"`); the planFromServer.ts adapter widens its regex branch (see §9 "Parser widening").
 
-### 3.5 Why no wrong-operation distractor for `add-to-10`
+### 3.6 Class 2 is sub-tier-only — `add-to-10` is explicitly UNCHANGED
 
 For symmetry, consider: `3 + 5 = 8`, wrong-op = `3 − 5 = -2`. Negative numbers are out of any chip range. Even if the absolute value (`2`) is used, it lacks the pedagogical hook (no shared error pattern in addition-direction confusion at this age, per Dave § Q4). Class 2 is `sub-to-10`-and-future-sub-tiers only. **`add-to-10` continues to use Classes 0 and 1 only — no code change for `add-to-10`.**
 
@@ -269,7 +270,9 @@ The 5-slot per-problem utterance shape is unchanged from `add-to-10` (`read`, `c
 
 ### 4.3 First-encounter scaffolding gate
 
-Per `architecture-overview.md` §"Session-start derived-state blocks" and `api/_firstEncounterGate.ts:FIRST_ENCOUNTER_GATED_NODES`, the math node `sub-to-10` is already listed in the gated-nodes test ([`_firstEncounterGate.test.ts:104`](../../api/_firstEncounterGate.test.ts#L104)). Kevin's wire-up adds the actual gate entry in `api/_firstEncounterGate.ts` so the `read`-line variant ("take away" on first session, "minus" subsequent) is driven by `Progress.lifetimeFirstEncounters['sub-to-10']`.
+Per `architecture-overview.md` §"Session-start derived-state blocks" and `api/_firstEncounterGate.ts:FIRST_ENCOUNTER_GATED_NODES`, the math node `sub-to-10` needs to be added to the gated set so the `read`-line variant ("take away" on first session, "minus" subsequent) is driven by `Progress.lifetimeFirstEncounters['sub-to-10']`.
+
+**Current state of the gate.** `FIRST_ENCOUNTER_GATED_NODES` in [`api/_firstEncounterGate.ts`](../../api/_firstEncounterGate.ts) today contains ONLY `'cvc-words-short-o'`. No math node is yet in the gated set — `sub-to-10` is the FIRST math node to enter the first-encounter-gating system. The unit test `getFirstEncounterGatedNodes › does NOT include any math focus nodes` at [`_firstEncounterGate.test.ts:99-110`](../../api/_firstEncounterGate.test.ts#L99-L110) is a NEGATIVE-assertion guard (`expect(gated).not.toContain(mathNode)`) — it currently passes because no math node is gated. Adding `'sub-to-10'` to `FIRST_ENCOUNTER_GATED_NODES` will break this test; Kevin's wire-up must revise it (see §9.4).
 
 **Behaviour:**
 
@@ -307,20 +310,20 @@ interface MathFact {
 
 ---
 
-## 6. Advancement gate — `add-to-10 → sub-to-10` (ACCURACY ONLY)
+## 6. Advancement gate — `add-to-20 → sub-to-10` (ACCURACY ONLY)
 
-Per Dave's research note § Q6 / Recommendations: **promote on accuracy alone.** The standard mastery rule applies unchanged:
+Per the locked curriculum order (§11 Q1), `sub-to-10` sits AFTER `add-to-20` in the tree. The advancement gate is therefore `add-to-20 → sub-to-10`, not `add-to-10 → sub-to-10`. Dave's research note frames the promotion as accuracy-only regardless of which addition tier is the predecessor; the rule applies the same way:
 
-> `add-to-10` qualifies for promotion when ≥ 95% accuracy across 3 consecutive `cross-day-deduped` sessions (math default threshold `95/3` locked 2026-05-02, ticket 86c9kwvy0; see `progress-and-persistence.md` § "Mastery rule").
+> The predecessor node qualifies for promotion when ≥ 95% accuracy across 3 consecutive `cross-day-deduped` sessions (math default threshold `95/3` locked 2026-05-02, ticket 86c9kwvy0; see `progress-and-persistence.md` § "Mastery rule").
 
 **Explicitly NOT a gate:**
 
-- ❌ Slow-fact list length. Even if Marian's `add-to-10` slow-fact list is large, she advances to `sub-to-10` once accuracy holds. **Dave § Recommendations / Risks: holding her on `add-to-10` past 95% waiting for latency to drop is _developmentally backwards_ for this transition — fact-family exposure via `sub-to-10` is itself part of the treatment for slow `add-to-10` facts (McNeil et al. 2025).**
+- ❌ Slow-fact list length. Even if Marian's predecessor-node slow-fact list is large, she advances to `sub-to-10` once accuracy holds. **Dave § Recommendations / Risks: holding her on the predecessor past 95% waiting for latency to drop is _developmentally backwards_ for this transition — fact-family exposure via `sub-to-10` is itself part of the treatment for slow upstream addition facts (McNeil et al. 2025).** The rationale Dave originally framed against `add-to-10 → sub-to-10` applies equally to `add-to-20 → sub-to-10`: subtraction practice tightens addition-fact retrieval via the inverse-principle.
 - ❌ Latency median. The slow-fact directive is a backend re-targeting tool; it does NOT inform promotion (Dave's `speed-feedback-automaticity-marian.md` § Recommendation 7).
 
 **Hard stop (parent / observation gate, NOT algorithmic):** Dave § Q6 — do NOT advance if Marian shows emotional distress signals (session abandonment, repeated retries with no improvement). This is a Thomas / parent observation lever, exercised via the existing Parent Settings `autoPromote: false` flag.
 
-**Code implication.** NO code change to `applyMasteryRule` or `pickFocusNode`. The existing rule already promotes on accuracy alone. This spec affirms the existing behaviour is correct for `add-to-10 → sub-to-10` and documents the rationale.
+**Code implication.** NO code change to `applyMasteryRule` or `pickFocusNode`. The existing rule already promotes on accuracy alone. This spec affirms the existing behaviour is correct for the `add-to-20 → sub-to-10` transition and documents the rationale.
 
 **Rationale to capture in `.claude/docs/progress-and-persistence.md`.** Per Dave's research note "Non-obvious findings" #3: any future code path that gates promotion on "slow-fact list is short" would be developmentally backwards for this specific transition. Worth documenting in `progress-and-persistence.md` § "Focus-node picker" as a "DO NOT gate on slow-fact list length" footnote. This is a documentation update flagged for `maintain-docs` routing — not a Kevin task.
 
@@ -409,14 +412,14 @@ This is the ONLY actionable list for the implementing developer. Everything abov
 
 ### 9.1 Parser widening (FIRST — must land before any planner widening)
 
+- [ ] **`src/screens/Math/planFromServer.ts` — HARD REQUIREMENT — add `"zero": 0` to `NUMBER_WORDS`.** Today [`planFromServer.ts:84-104`](../../src/screens/Math/planFromServer.ts#L84-L104) maps `"one"` → `1` through `"twenty"` → `20`. It does NOT contain `"zero"`. Sub-to-10 facts #3 (`7 − 0 = 7`) and #4 (`9 − 0 = 9`) produce read-lines containing the word "zero" ("seven minus zero is seven", "nine minus zero is nine"); the parser routes numeric tokens through `NUMBER_WORDS` and will throw `PlanFromServerError` on these facts without the entry. **Kevin MUST add `"zero": 0` to `NUMBER_WORDS` in this PR.** Devon's audit of the live source confirms the gap.
 - [ ] **`src/screens/Math/planFromServer.ts`** — widen the regex / parse path to accept the `sub-to-10` read templates and tag parsed problems with `op: '-'`:
   - Match `"<minuend-word> minus <subtrahend-word>. How many are left?"`
   - Match `"<minuend-word> take away <subtrahend-word>. How many are left?"` (first-session variant)
   - Keep matching the existing `"<addend-A-word> plus <addend-B-word>. How many?"` template — tag with `op: '+'`.
-  - Use the existing `NUMBER_WORDS` lookup for "zero" through "ten" (verify `"zero"` is present; add if missing).
 - [ ] **`src/screens/Math/sessionPlans.ts`** — add `op: '+' | '-'` to `MathProblem` (REQUIRED). Default `'+'` for all existing fallback plans. Add `distractorClass?: 'off-by-one' | 'wrong-op'` (OPTIONAL).
 - [ ] **`src/screens/Math/planFromServer.ts`** — pass `op` through into the rehydrated `MathSessionPlan`.
-- [ ] **Tests** — `planFromServer.test.ts` gains read-template fixtures for `sub-to-10`: both "minus" and "take away" variants. Assert `op === '-'` after parse.
+- [ ] **Tests** — `planFromServer.test.ts` gains read-template fixtures for `sub-to-10`: both "minus" and "take away" variants. Include explicit fixtures for `7 - 0 = 7` and `9 - 0 = 9` (the subtract-zero pool facts that require the new `"zero"` entry — parse failure here is the regression Devon flagged). Assert `op === '-'` after parse.
 - [ ] **CI gate** — vitest passes locally (`npx vitest run` per `feedback_run_vitest_before_merge`).
 
 ### 9.2 Distractor extension
@@ -442,8 +445,12 @@ This is the ONLY actionable list for the implementing developer. Everything abov
 
 ### 9.4 First-encounter gate
 
-- [ ] **`api/_firstEncounterGate.ts`** — add `'sub-to-10'` to `FIRST_ENCOUNTER_GATED_NODES`. The test at [`_firstEncounterGate.test.ts:104`](../../api/_firstEncounterGate.test.ts#L104) is already pinned to expect this node.
+- [ ] **`api/_firstEncounterGate.ts`** — add `'sub-to-10'` to `FIRST_ENCOUNTER_GATED_NODES`. Today the set contains only `'cvc-words-short-o'`; `sub-to-10` is the FIRST math node to enter first-encounter gating.
 - [ ] **`api/_planner.ts:buildUserMessage`** — wire the first-encounter check into the user-message construction so the read-line variant is selected per session (`"take away"` on first-encounter, `"minus"` otherwise).
+- [ ] **`api/_firstEncounterGate.test.ts:99-110`** — REVISE OR REPLACE the existing negative-assertion test `'does NOT include any math focus nodes'`. That test enumerates `['add-to-10', 'add-to-20', 'sub-to-10', 'sub-to-20', 'two-digit-addsub']` and asserts NONE are gated — adding `'sub-to-10'` to the set will make it fail. The current test was a design statement ("math nodes are not first-encounter-gated") that remains true for every math node EXCEPT `sub-to-10`. Replace with per-node assertions:
+  - `expect(getFirstEncounterGatedNodes()).toContain('sub-to-10')` — the new gated math node.
+  - For each of `'add-to-10'`, `'add-to-20'`, `'sub-to-20'`, `'two-digit-addsub'`: `expect(getFirstEncounterGatedNodes()).not.toContain(mathNode)` — these remain non-gated.
+  Keep the existing pass-through and rewrite-case suites unchanged; only the `getFirstEncounterGatedNodes` describe block needs the per-node split.
 
 ### 9.5 Canon prebake
 
@@ -461,17 +468,12 @@ This is the ONLY actionable list for the implementing developer. Everything abov
 
 ### 9.6 Mastery / focus-node picker — NO CHANGE
 
-- [ ] **`src/lib/progress/mastery.ts`** — `MATH_TREE` already orders `add-to-10 → add-to-20 → sub-to-10 → ...`. **WAIT — verify the order.** The `VALID_MATH_FOCUS_NODES` list in [`_planner.ts:128`](../../api/_planner.ts#L128) is:
-  ```
-  number-recog, add-to-10, add-to-20, sub-to-10, sub-to-20, ...
-  ```
-  This places `sub-to-10` AFTER `add-to-20`, not directly after `add-to-10`. Dave's research note assumes the transition is `add-to-10 → sub-to-10`. **This is a curriculum-order discrepancy to flag for Matt + Thomas.** Kevin's wire-up choices:
-  - **Option A**: leave the existing order `add-to-10 → add-to-20 → sub-to-10`. Marian masters `add-to-10`, advances to `add-to-20`, masters that, then advances to `sub-to-10`. Per Dave's advancement gate analysis, this is fine if she's mastered `add-to-10` — `add-to-20` is its own thing.
-  - **Option B**: re-order to `add-to-10 → sub-to-10 → add-to-20`. Aligns with Dave's note ("the NEXT focus node on the curriculum ladder"). Requires `MATH_TREE` reorder + `MATH_NODES_IN_ORDER` reorder + canon order docs update.
+Per §11 Q1 (Thomas, 2026-05-15): **leave the tree alone.** Existing curriculum order is `number-recog → add-to-10 → add-to-20 → sub-to-10 → sub-to-20 → ...`; that's the order that ships.
 
-  **OPEN QUESTION FOR THOMAS** — see §11. Spec recommendation: **Option A** (no reorder; Dave's note can be interpreted as "next subtraction node," not "next node in absolute curriculum order"). Cleanest, no progression-state-machine risk, ships sub-to-10 as a sibling-after-`add-to-20` rather than a re-ordering of the existing math tree.
-
+- [ ] **`src/lib/progress/mastery.ts`** — NO CHANGE to `MATH_TREE`.
+- [ ] **`src/lib/progress/focusNode.ts`** — NO CHANGE to `MATH_NODES_IN_ORDER`.
 - [ ] **`applyMasteryRule` / `pickFocusNode`** — NO CODE CHANGE. The promotion rule applies as-is.
+- [ ] **`src/lib/progress/defaults.ts:93`** — **HARD REQUIREMENT** — flip `'sub-to-10': 'mastered'` to `'sub-to-10': 'practicing'` in `DEFAULT_SKILL_LEVELS`. Marian's April 2026 diagnostic marked subtraction-within-15 as confident, so the existing default is `'mastered'` — but Dave's research treats `sub-to-10` as a retrieval-automaticity tier (the same gap as `add-to-10`), and leaving it `'mastered'` means a fresh Marian would never see `sub-to-10` problems. Devon's PR #238 review flagged this; Thomas confirmed the flip 2026-05-15. Note: this only affects greenfield boots; existing Marian localStorage state is unaffected (her live blob is what it is).
 
 ### 9.7 Slow-fact widening — DEFERRED FOLLOW-UP
 
@@ -501,32 +503,46 @@ Testable by Jessica's Playwright suite + Kevin's vitest suite.
 - [ ] **AC5**: `correct = 0` chip values render and play correctly (subtract-self facts #1, #2). Emma says "Yes! Zero!" naturally on the cheerful celebration prosody.
 - [ ] **AC6**: Read-line parser accepts both `sub-to-10` templates and tags problems with `op: '-'`; existing `add-to-10` "X plus Y. How many?" continues to parse with `op: '+'`.
 - [ ] **AC7**: Canon JSON `public/canon/math/level-1/sub-to-10.json` baked and committed. Canon-lint passes (ASCII-7, no slash-IPA, no angle tags). File parses via `isSessionStartResponse`.
-- [ ] **AC8**: Advancement gate — `add-to-10 → sub-to-10` (or `add-to-20 → sub-to-10` per Option A in §9.6) fires on accuracy threshold alone, NOT influenced by slow-fact list length. Verified via existing mastery tests; no new gate added.
+- [ ] **AC8**: Advancement gate — `add-to-20 → sub-to-10` (the curriculum-order slot per §9.6, decision locked §11 Q1) fires on accuracy threshold alone, NOT influenced by slow-fact list length. Verified via existing mastery tests; no new gate added.
 - [ ] **AC9**: Dual-exposure rule — within any single 8-problem session, no operand triple appears in both `+` and `-` forms. Today vacuously true because v1 sessions are pure-`−`; covered by the planner test enumerating all 8 problems.
 - [ ] **AC10**: Slow-fact directive remains DISABLED for `sub-to-10` in v1 (`isSlowFactsActive` predicate unchanged — gated on `focusNode === 'add-to-10'`); the §8 op-parameterized threshold lands in a follow-up PR.
 - [ ] **AC11**: `op` field is required on every `MathProblem` emitted by the planner. Backwards compatibility — existing `add-to-10` canon entries can be lazily migrated by `planFromServer.ts` (default `'+'` when absent) so a stale-canon `add-to-10` doesn't break.
 
 ---
 
-## 11. Open questions (for Thomas / Matt to resolve via orchestrator)
+## 11. Decisions locked (Thomas, 2026-05-15)
 
-These are the calls the spec deliberately does NOT make. Flagged so Matt routes correctly.
+The four questions originally surfaced as open are now resolved. The spec is the contract for Kevin's implementation; the section below records the decisions and rationale so Kevin doesn't have to re-derive them.
 
 **Q1 — Curriculum order: insert `sub-to-10` between `add-to-10` and `add-to-20`, or leave it after `add-to-20`?**
 
-Current `VALID_MATH_FOCUS_NODES` order is `number-recog → add-to-10 → add-to-20 → sub-to-10 → sub-to-20 → ...`. Dave's research note frames `sub-to-10` as "the next on the curriculum ladder" after `add-to-10`. Two interpretations are defensible (see §9.6 Options A / B). **Spec recommendation: Option A** (no reorder; ship `sub-to-10` in its existing slot after `add-to-20`). Option B is curriculum-ordering work that's a separate concern. **Asks Thomas via Matt.**
+**DECIDED: Option A — leave the tree alone.** Tree stays `number-recog → add-to-10 → add-to-20 → sub-to-10 → sub-to-20 → ...`. NO changes to `MATH_TREE` in [`src/lib/progress/mastery.ts`](../../src/lib/progress/mastery.ts) or `MATH_NODES_IN_ORDER` in [`src/lib/progress/focusNode.ts`](../../src/lib/progress/focusNode.ts).
+
+Rationale: A re-ordering would be a progression-state-machine change that per `feedback_progression_e2e_mandatory` requires a paired failing-first E2E spec at dispatch time, and would carry the risk of stale `Progress` blobs landing on a node out of expected order. Dave's "next on the curriculum ladder" framing is satisfied by interpretation ("next *subtraction* node," which is unambiguously `sub-to-10`); no pedagogical signal forces re-ordering. Ship `sub-to-10` in its existing slot after `add-to-20`; revisit ordering only if real-Marian data signals a need.
 
 **Q2 — Slow-fact threshold implementation: tenure-banded ladder vs. flat warmup-then-threshold?**
 
-Two shapes proposed in §8; Kevin's call to implement. Flagging for Matt's awareness because if Thomas has a preference (real-life observation of Marian's subtraction latency profile once she's done a few sessions), it shifts which approach Kevin starts with.
+**DECIDED: flat 6000 ms + 5-session warmup for `op === '-'`.** Kevin implements the simpler shape from §8 ("Alternative simpler shape"); the 3-band tenure ladder is dropped.
 
-**Q3 — Voiced-of-existence: is `correct = 0` desirable in the chip range at all?**
+Rationale: There is no empirical `sub-to-10` latency data yet against which to calibrate a 3-band ladder, so the ladder's threshold cliffs (7000 → 6000 → 5000) are speculative. A flat 6000 ms threshold gated by a 5-session warmup avoids the cold-start flood (per `planner-and-canon.md` § "Track-based payload" — non-empty `slowFacts` bypasses canon AND the in-memory cache, which would otherwise tank the canon-first fast-path) while keeping the implementation surface narrow. Retune once Marian has generated ≥ 10 `sub-to-10` sessions and the latency profile is visible in production data. This work remains a follow-up PR (not in this PR's scope per §9.7).
 
-Marian has never seen `0` as a chip value. Subtract-self facts (#1, #2) introduce it. Two options: (A) widen `ANSWER_RANGE_MIN` to `0` for `op === '-'` (spec recommendation, §3.3 Option A); (B) drop facts #1, #2 from the pool and keep `ANSWER_RANGE_MIN = 1`. Option A is more pedagogically complete; Option B is mechanically simpler. **Asks Thomas via Matt.**
+**Q3 — Widen `ANSWER_RANGE_MIN` to 0 for `op === '-'`, or drop subtract-self / subtract-zero facts from the pool?**
 
-**Q4 — First-session "take away" framing — is this a single-session gate or should it persist across the entire `sub-to-10` tier's intro phase?**
+**DECIDED: widen `ANSWER_RANGE_MIN` to 0 for `op === '-'`** (Option A per §3.3). Kevin's wire-up MUST also add `"zero"` to the `NUMBER_WORDS` map in [`src/screens/Math/planFromServer.ts`](../../src/screens/Math/planFromServer.ts) — see §9.1 HARD REQUIREMENT (Devon's audit dependency).
 
-§4.3 + Dave § Q2 recommend single-session-only. The argument for whole-intro-phase is consistency — but Dave specifically scoped the recommendation to "the very first session" and asked for the standard "minus" template subsequently. **Spec defaults to single-session-only. Flag for Thomas only if he disagrees on ear-test once it ships.**
+Rationale: The rule-based identity facts (`n − n = 0`, `n − 0 = n`) are pedagogically the easiest band (Dave § Source 3 — Robinson 2013: 65–73% of children apply the Identity principle correctly). Dropping facts #1, #2, #3, #4 from the pool would forfeit the highest-confidence opener facts and trim the easy band from 8 to 4. `Math.tsx` is already changing in PR 2 for the operator glyph + `op` plumbing, so adding `minAnswer` to `pickDistractors` lands cleanly in that PR. Future subtraction tiers will need `0`-chip support too; getting it in place now avoids a re-litigation.
+
+**Q4 — First-session "take away" framing — single-session gate or persistent through intro phase?**
+
+**DECIDED: single-session-only** (the spec default — see §4.3). The "take away" phrasing fires once on the first session over the lifetime of `sub-to-10`; sessions 2+ use "minus".
+
+Rationale: Dave § Q2 explicitly scopes the recommendation to "the very first session." Persisting "take away" across the whole intro phase would introduce phrasing variability across the tier — a cognitive load signal Marian doesn't need once she's seen subtraction once. The "minus" template aligns with how subtraction is named in standard practice and how she'll encounter it long-term. Re-open only if Thomas's iPad ear-test post-merge signals a problem.
+
+**PR split.** **DECIDED: 2-PR per Kevin's recommendation.**
+- **PR 1 (this content tier):** planner directive (§4.1), `MATH_TRACK_GUIDE` block, first-encounter gate wiring + test revision (§9.4), `NUMBER_WORDS` zero entry (§9.1 hard requirement), canon prebake (§9.5).
+- **PR 2 (Math.tsx render):** `op` field on `MathProblem` wire shape, parser widening for "minus" / "take away" templates (§9.1), `distractors.ts` extension with Class 2 (§9.2 + §3.2), `Math.tsx` argument plumbing, operator-glyph render.
+
+Sequencing follows `project_planner_parser_contract.md`: PR 1's planner widening lands AFTER PR 2's parser widening. The canon bake in PR 1 produces "minus" / "take away" read-lines; if PR 2 hasn't landed yet, the browser parser would throw on those lines. Recommended merge order is PR 2 first (parser-ready browser), THEN PR 1 (planner emits the new content). If Kevin needs PR 1 to land first for canon-bake reasons, the canon's "minus" / "take away" reads are dormant until PR 2 ships; the static fallback plan still works.
 
 ---
 
@@ -540,42 +556,44 @@ Marian has never seen `0` as a chip value. Subtract-self facts (#1, #2) introduc
 
 - **`correct = 0` SSML/audio risk.** Tested mentally only — "Yes! Zero!" should render fine on Emma multilingual. **Real ear-test pending** (post-merge by Thomas on the Vercel preview); spec assumes default Azure prosody handles "zero" cleanly. Fallback: per `planner-and-canon.md` § "Empirical IPA-outcomes taxonomy", the default-Azure-lexicon-is-fine option (Option 1) is the right posture unless ear-test reveals an issue.
 
-- **Curriculum-order question (Q1) is a real product-direction decision.** The spec recommends Option A (no reorder) for safe shipping, but Thomas may prefer Option B if his mental model of Marian's progression order assumes she'll see subtraction immediately after the first addition tier. Flag is in §9.6 and §11.
+- **Curriculum order locked (no reorder).** Thomas decided 2026-05-15 to leave the tree alone (§11 Q1). Marian sees `sub-to-10` after `add-to-20`. If a future ear-test or real-Marian observation suggests she'd benefit from seeing subtraction earlier in the curriculum, a `MATH_TREE` reorder is a progression-state-machine change that per `feedback_progression_e2e_mandatory` requires a paired failing-first E2E spec at dispatch time.
 
 ---
 
 ## 13. Side-effects inventory
 
-What this spec implies for code (Kevin) and content (canon):
+What this spec implies for code (Kevin) and content (canon). PR split per §11: PR 1 = content + canon; PR 2 = render + parser.
 
-**Code changes (Kevin):**
+**PR 1 — content + canon (Kevin):**
 
 - `api/_planner.ts` — `MATH_TRACK_GUIDE` `sub-to-10` block expanded.
-- `api/_firstEncounterGate.ts` — `sub-to-10` added to `FIRST_ENCOUNTER_GATED_NODES`.
-- `src/screens/Math/sessionPlans.ts` — `MathProblem` gains required `op` field + optional `distractorClass`.
-- `src/screens/Math/planFromServer.ts` — read-line parser widened for `sub-to-10` templates; emits `op: '-'`.
-- `src/screens/Math/distractors.ts` — `pickDistractors` signature extended; new `wrongOpDistractors` function; `ANSWER_RANGE_MIN` parameterized for `op === '-'`.
-- `src/screens/Math/Math.tsx` — argument plumbing only (passes `op`, `distractorClass`, `minAnswer` through to `pickDistractors`).
+- `api/_firstEncounterGate.ts` — `'sub-to-10'` added to `FIRST_ENCOUNTER_GATED_NODES` (first math node in the set).
+- `api/_firstEncounterGate.test.ts:99-110` — REVISE the `'does NOT include any math focus nodes'` negative-assertion test to per-node assertions: `sub-to-10` IS gated; the other math nodes (`add-to-10`, `add-to-20`, `sub-to-20`, `two-digit-addsub`) are NOT gated. See §9.4.
+- `api/_planner.ts:buildUserMessage` — first-encounter check wired into user-message construction for read-line variant.
+- `src/lib/progress/defaults.ts:93` — HARD REQUIREMENT — flip `'sub-to-10': 'mastered'` to `'sub-to-10': 'practicing'` in `DEFAULT_SKILL_LEVELS`. Decision locked Thomas 2026-05-15 (see §9.6 + §11 Q1 rationale).
+- `public/canon/math/level-1/sub-to-10.json` — new canon, baked via `npm run canon:regen` per §9.5; ~1.2 MB; 59 utterances at 8 problems × 5 slots + 19 Session-End.
 
-**Content changes:**
+**PR 2 — render + parser (Kevin):**
 
-- New file: `public/canon/math/level-1/sub-to-10.json` (baked via `npm run canon:regen`; ~1.2 MB; 59 utterances at 8 problems × 5 slots + 19 Session-End).
+- `src/screens/Math/planFromServer.ts` — HARD REQUIREMENT — add `"zero": 0` to `NUMBER_WORDS` (Devon's audit, §9.1). Widen the regex / parse path to accept `"X minus Y. How many are left?"` and `"X take away Y. How many are left?"`; emit `op: '-'`. Keep matching the existing `"X plus Y. How many?"` template — tag with `op: '+'`.
+- `src/screens/Math/sessionPlans.ts` — `MathProblem` gains required `op: '+' | '-'` field + optional `distractorClass?: 'off-by-one' | 'wrong-op'`.
+- `src/screens/Math/distractors.ts` — `pickDistractors` signature extended; new `wrongOpDistractors` function; `ANSWER_RANGE_MIN` parameterized to 0 for `op === '-'` (per §3.3 Option A locked Q3).
+- `src/screens/Math/Math.tsx` — argument plumbing (`op`, `distractorClass`, `minAnswer` through to `pickDistractors`) + operator-glyph render (− vs +).
 
 **Test changes:**
 
-- New: `planFromServer.test.ts` `sub-to-10` parser fixtures.
-- New: `distractors.test.ts` Class-2 wrong-op tests; subtract-self / subtract-zero edge cases.
-- New: `_planner.test.ts` `sub-to-10` plan composition tests.
-- New: `e2e/sub-to-10-first-encounter.spec.ts` (Jessica) for read-line variant gate.
+- PR 1: `_planner.test.ts` `sub-to-10` plan composition tests; revised `_firstEncounterGate.test.ts` per-node assertions.
+- PR 2: `planFromServer.test.ts` `sub-to-10` parser fixtures including `7 − 0 = 7` and `9 − 0 = 9` (the "zero" entries Devon flagged); `distractors.test.ts` Class-2 wrong-op tests + subtract-self / subtract-zero edge cases.
+- Cross-PR (Jessica E2E, dispatch-time pairing per `feedback_progression_e2e_mandatory`): `e2e/sub-to-10-first-encounter.spec.ts` for read-line variant gate. Must pair with PR 1 since PR 1 touches `_firstEncounterGate.ts`.
 
 **Doc changes:**
 
 - `.claude/docs/skill-trees-and-content.md` — Math distractors Class 2 subsection added (post-merge, `maintain-docs` may auto-route).
 - `.claude/docs/progress-and-persistence.md` — promotion-gate footnote added.
 
-**Out of this spec's scope (follow-up PR):**
+**Out of both PRs' scope (follow-up):**
 
-- `src/lib/progress/slowFacts.ts` — op-parameterized threshold (§8); `_planner.ts:isSlowFactsActive` widening to include `sub-to-10`.
+- `src/lib/progress/slowFacts.ts` — flat 6000 ms + 5-session warmup for `op === '-'` (§8, decision locked Q2). `_planner.ts:isSlowFactsActive` widening to include `sub-to-10`. Lands once Marian has generated ≥ 10 `sub-to-10` sessions.
 
 ---
 
