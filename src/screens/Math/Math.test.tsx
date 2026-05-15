@@ -3694,4 +3694,221 @@ describe('Math (Number Garden) screen', () => {
       expect(screen.queryAllByTestId('math-dot-card-cell')).toHaveLength(2)
     })
   })
+
+  // ── sub-to-10 render branch (PR 2 of 2 — Kyle's spec §13, Kevin's audit §1)
+  //
+  // Pins three properties of the render layer for `op === '-'`:
+  //   1. Operator glyph renders `−` (U+2212), NOT `+`.
+  //   2. FlowerGroup row is suppressed entirely (Kyle §3, Dave §Q2 —
+  //      no CRA visual scaffold for subtraction).
+  //   3. Chip `0` (subtract-self facts) renders as a normal chip whose
+  //      `data-value="0"` round-trips through the chip layout.
+  //   4. Add-to-10 (op === '+') still renders the flower row and the
+  //      `+` operator — sub-to-10 must not regress addition rendering.
+  describe('sub-to-10 render branch (PR 2 — op-driven operator + flower skip)', () => {
+    function subPlan(): MathSessionPlan {
+      // 8-problem sub-to-10 plan with a chip-0 fact at P1 (`5-5=0`),
+      // a P4 wrong-op-eligible fact (`9-1=8`, trap `10`), and a mix
+      // of standard sub facts. All `op === '-'`.
+      const make = (
+        index: number,
+        a: number,
+        b: number,
+      ): MathSessionPlan['problems'][number] => ({
+        index,
+        addendA: a,
+        addendB: b,
+        correct: a - b,
+        op: '-',
+        utterances: {
+          read: `${numberWord(a)} minus ${numberWord(b)}. How many are left?`,
+          correct: `Yes! ${numberWord(a - b)}!`,
+          reprompt: 'Hmm... try again?',
+          hint: `Look. ${numberWord(a)}. Take away ${numberWord(b)}. How many now?`,
+          giveAnswer: `This one is ${numberWord(a - b).toLowerCase()}.`,
+        },
+      })
+      return {
+        id: 'sub-to-10-test-plan',
+        label: 'Sub-to-10 test plan',
+        problems: [
+          make(1, 5, 5), // = 0  (subtract-self — chip-0 case)
+          make(2, 7, 0), // = 7  (subtract-zero)
+          make(3, 8, 4), // = 4  (doubles halving)
+          make(4, 9, 1), // = 8  (P4, wrong-op trap = 10 in range)
+          make(5, 10, 2), // = 8 (wrong-op trap = 12 OOR → off-by-one)
+          make(6, 10, 7), // = 3 (take-from-10)
+          make(7, 8, 3), // = 5
+          make(8, 9, 6), // = 3
+        ],
+      }
+    }
+
+    function numberWord(n: number): string {
+      const w: Record<number, string> = {
+        0: 'Zero',
+        1: 'One',
+        2: 'Two',
+        3: 'Three',
+        4: 'Four',
+        5: 'Five',
+        6: 'Six',
+        7: 'Seven',
+        8: 'Eight',
+        9: 'Nine',
+        10: 'Ten',
+      }
+      return w[n] ?? String(n)
+    }
+
+    it('renders the U+2212 minus glyph, not + or hyphen, on a sub-to-10 problem', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={subPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const operator = screen.getByTestId('math-operator')
+      // U+2212 MINUS SIGN — the typographically correct glyph at display
+      // size. Distinct from ASCII hyphen-minus (U+002D = '-') and from
+      // the en-dash (U+2013 = '–'). Kyle's spec §13 / brief: must NOT
+      // render the hyphen — the minus sign reads visually balanced
+      // against `+` at 6rem font size.
+      expect(operator.textContent).toBe('−')
+      expect(operator.textContent).not.toBe('+')
+      expect(operator.textContent).not.toBe('-')
+
+      // The symbolic display carries the `op` data-attribute so QA /
+      // screenshot diffs can assert without parsing the glyph.
+      expect(screen.getByTestId('math-symbolic')).toHaveAttribute(
+        'data-op',
+        '-',
+      )
+    })
+
+    it('still renders the `+` glyph on an add-to-10 problem (no regression)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const operator = screen.getByTestId('math-operator')
+      expect(operator.textContent).toBe('+')
+      expect(screen.getByTestId('math-symbolic')).toHaveAttribute(
+        'data-op',
+        '+',
+      )
+    })
+
+    it('suppresses the FlowerGroup row entirely on sub-to-10 problems (Dave §Q2 CRA-skip)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={subPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // The visual-groups wrapper carries `data-testid="math-visual-groups"`
+      // and `math-flower-group` is the per-addend bouquet. Both must be
+      // absent for sub-to-10 — the chip row alone is the interaction.
+      expect(screen.queryByTestId('math-visual-groups')).not.toBeInTheDocument()
+      expect(screen.queryAllByTestId('math-flower-group')).toHaveLength(0)
+    })
+
+    it('still renders the FlowerGroup row on add-to-10 problems (no regression)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Addition keeps the flower visualization (Marian's CRA scaffold
+      // for sums-to-10).
+      expect(screen.getByTestId('math-visual-groups')).toBeInTheDocument()
+      // 2 bouquets — one per addend.
+      expect(screen.queryAllByTestId('math-flower-group')).toHaveLength(2)
+    })
+
+    it('renders chip-0 cleanly for subtract-self facts (5-5=0 at P1)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={subPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // P1 is `5 − 5 = 0`. The correct chip must carry `data-value="0"`.
+      const chips = screen.getAllByTestId('math-chip')
+      expect(chips).toHaveLength(3)
+      const zeroChips = chips.filter(
+        (c) => c.getAttribute('data-value') === '0',
+      )
+      expect(zeroChips).toHaveLength(1)
+      expect(zeroChips[0]).toHaveAttribute('data-correct', 'true')
+      // The chip's rendered text is the value — must read "0" verbatim.
+      // (No aria-hidden, no swallow.)
+      expect(zeroChips[0]?.textContent).toContain('0')
+      // Operator on this problem must be the minus glyph.
+      expect(screen.getByTestId('math-operator').textContent).toBe('−')
+    })
+
+    it('chip distractor set on P1 sub-to-10 (5-5=0) is gentle-ramp — distractors in [2, maxAnswer], distinct, no wrong-op', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={subPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const chips = screen.getAllByTestId('math-chip')
+      const values = chips
+        .map((c) => Number(c.getAttribute('data-value')))
+        .sort((a, b) => a - b)
+      // Gentle tier picks `[2, 10]` for correct=0, maxAnswer=10, minAnswer=0:
+      // minOk: 0-0 < 2 → null; maxOk: 10-0 >= 2 → 10. Anchor=10. Search
+      // ascending from 0; 0 == correct skip, 1 gap < 2 skip, 2 ok.
+      // → distractors [2, 10], correct=0. Chips sorted ascending: [0, 2, 10].
+      expect(values).toEqual([0, 2, 10])
+    })
+  })
 })
