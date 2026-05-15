@@ -367,23 +367,37 @@ export interface Progress {
    */
   pendingPromotion?: SkillNode
   /**
-   * Lifetime-first-encounter gate (ticket 86c9q9ben AC9c).
+   * Lifetime-first-encounter gate (ticket 86c9q9ben AC9c; Wave 3.4
+   * widened the static type from `WordSongNode[]` to `SkillNode[]`).
    *
-   * List of `WordSongNode` ids the child has already seen the
-   * tier-specific first-encounter scaffolding for. Currently consumed
-   * by the `session.end.opener` rewrite at /api/claude render time:
+   * List of `SkillNode` ids the child has already seen the
+   * tier-specific first-encounter scaffolding for. Spans BOTH skill
+   * trees — word-song first-encounter scaffolding ships today and
+   * math first-encounter scaffolding is infrastructure-ready per
+   * Kyle's sub-to-10 content spec §4.3 (the `sub-to-10` `take away` →
+   * `minus` read-line variant). Currently consumed by the
+   * `session.end.opener` rewrite at /api/claude render time:
    *   - `cvc-words-short-u`: the /u/ vs /ʌ/ minimal-pair contrast
    *     opener ("Listen carefully: 'sun' — not 'soon.' …") fires
    *     ONLY when this list does NOT contain `cvc-words-short-u`.
    *   - `cvc-words-short-o`: the box/fox /ks/ first-encounter line
    *     uses the same gate — infrastructure-ready; the canon variant
    *     ships in a future PR.
+   *   - `sub-to-10`: the "take away" first-session read-line variant
+   *     (Kyle's spec §4.3) — infrastructure-ready at the gate-set
+   *     level; the actual session-end append-on-math behavioural
+   *     change ships in a follow-up ticket. The static type widening
+   *     here unblocks that follow-up; persisted shape now legally
+   *     accepts math node ids.
    *
    * Rendered + appended at session-end: when the session-start fetch
    * fired the first-encounter scaffolding for `focusNode`,
    * `progressHistory.recordProgressOnSessionEnd` adds `focusNode` to
    * this list so subsequent sessions on the same focus node skip the
-   * scaffolding.
+   * scaffolding. The append today is word-song-only (gated by
+   * `isWordSongNode(input.focusNode)` in `progressHistory.ts`); the
+   * math-track append lands with the follow-up that activates the
+   * `sub-to-10` rewrite.
    *
    * Optional on the persisted shape because pre-86c9q9ben blobs
    * predate the field. The migration framework + read-path defaulter
@@ -400,7 +414,7 @@ export interface Progress {
    * vowel session: the gate keys on `focusNode`, which is set
    * once-per-session at session-start fetch time.
    */
-  lifetimeFirstEncounters?: WordSongNode[]
+  lifetimeFirstEncounters?: SkillNode[]
 }
 
 export const CURRENT_SCHEMA_VERSION = 1 as const

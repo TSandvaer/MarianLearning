@@ -75,18 +75,17 @@ const FIRST_ENCOUNTER_GATED_NODES: ReadonlySet<string> = new Set([
   'cvc-words-short-o',
   // Sub-to-10 content tier (Kyle's spec §4.3, 2026-05-15) —
   // infrastructure-ready. The browser-side `lifetimeFirstEncounters`
-  // field is typed `WordSongNode[]` so a math node literal can never
-  // surface in the list at runtime — meaning `alreadyEncountered`
-  // is always false for `sub-to-10` and the rewrite never fires under
-  // the current schema. The gate entry is here so Kyle's revised
-  // negative-assertion test (`sub-to-10` IS in the gated set; other
-  // math nodes are NOT) confirms the wire-up. Activating the actual
-  // first-session "take away" vs subsequent-session "minus" read-line
-  // variant requires (a) widening `lifetimeFirstEncounters` to
-  // `SkillNode[]`, (b) appending math focus nodes at session-end, and
-  // (c) a track-aware rewrite path that doesn't borrow audio from
-  // `cvc-words.json` — all three are out of scope for the content
-  // tier PR per the spec and the brief.
+  // schema accepts math node ids post Wave 3.4 (typed `SkillNode[]`),
+  // but the session-end append-on-math producer is not yet wired —
+  // meaning `alreadyEncountered` is always false for `sub-to-10` and
+  // the rewrite never fires today. The gate entry is here so Kyle's
+  // revised negative-assertion test (`sub-to-10` IS in the gated set;
+  // other math nodes are NOT) confirms the wire-up. Activating the
+  // actual first-session "take away" vs subsequent-session "minus"
+  // read-line variant requires (a) appending math focus nodes at
+  // session-end, and (b) a track-aware rewrite path that doesn't
+  // borrow audio from `cvc-words.json` — both out of scope for the
+  // Wave 3.4 type-widening PR.
   'sub-to-10',
   // NOTE: cvc-words-short-u was here (ticket 86c9q9ben) but its
   // scaffolding opener produced Azure gibberish across three fix

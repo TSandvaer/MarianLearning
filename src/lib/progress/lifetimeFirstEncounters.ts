@@ -17,18 +17,32 @@
  *     blob doesn't get the box/fox line replayed when the canon
  *     variant ships).
  *
- * Why the WordSongNode subset (not full SkillNode)
- * ------------------------------------------------
- * Today only word-song tier transitions carry first-encounter
- * scaffolding (the /u/ vs /ʌ/ contrast, the box/fox /ks/ line). Math
- * has no analogous scaffolding — counting, addition, subtraction
- * don't fan out into vowel-pair phonetic-discrimination work. The
- * subset is enforced at the type layer (`Progress.lifetimeFirstEncounters: WordSongNode[]`);
- * the runtime guard widens to `SkillNode` because the persisted
- * shape uses string literals and the SKILL_NODES set is already
- * shaped that way. If math ever picks up first-encounter
- * scaffolding, widen the type to `SkillNode[]` here and add the
- * appropriate `MATH_NODES_IN_ORDER` entries to the migration helper.
+ * Why the helper API is WordSongNode-only (not full SkillNode)
+ * ------------------------------------------------------------
+ * The persisted shape (`Progress.lifetimeFirstEncounters`) is typed
+ * `SkillNode[]` post Wave 3.4 — it spans BOTH tracks so math focus
+ * nodes (`'sub-to-10'` per Kyle's spec §4.3) can round-trip cleanly
+ * once the session-end append-on-math path lights up. However, the
+ * helpers in THIS module (`isFirstEncounter`, `markFirstEncounterSeen`,
+ * `inferLifetimeFirstEncountersFromProgress`) remain `WordSongNode`-
+ * scoped because:
+ *
+ *  - The only producer today is `progressHistory.ts`, which calls
+ *    `markFirstEncounterSeen` gated by `isWordSongNode(focusNode)`.
+ *    The math-track append is intentionally deferred (the timing of
+ *    when a math node counts as "first-encountered" needs design).
+ *  - The only consumer today is the session-start path for word-song.
+ *  - The migration helper walks `WORD_SONG_NODES_IN_ORDER` because
+ *    the inference rule ("any non-locked node is already-encountered")
+ *    only fits the word-song scaffolding it was designed for. Math
+ *    inference would replay the wrong tier scaffolding if widened
+ *    naively — the rule needs its own design pass.
+ *
+ * When math first-encounter scaffolding actually ships, widen these
+ * helpers to `SkillNode`, add a `MATH_NODES_IN_ORDER` entry to the
+ * migration helper (with the right inference rule), and pull the
+ * `isWordSongNode` gate in `progressHistory.ts`. The storage layer
+ * needs no further change — `SkillNode[]` is already its type.
  *
  * Gate level: NODE, not WORD
  * --------------------------
