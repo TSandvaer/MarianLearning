@@ -81,6 +81,38 @@ import {
   seedLocalStorage,
 } from './_helpers/seedStorage'
 
+// NOTE on `forceHowlerUnlock` (deliberate retention)
+// --------------------------------------------------
+// This spec INTENTIONALLY keeps `forceHowlerUnlock(page)` — counter to
+// the PR #242 / sibling-spec drop pattern — because **its assertions
+// are content-agnostic**:
+//
+//   - SMOKING GUN 0 (wire-shape) — asserts on `payload.progress.
+//     lifetimeFirstEncounters` from the first captured math request.
+//     The request body is what `readProgressHintsForTrack` emits, NOT
+//     what the canon serves back. forceHowlerUnlock's silent demote of
+//     the response does not affect the request shape.
+//   - SMOKING GUNS A/B/C (persisted state) — assert on `skillLevels`
+//     and `history.skillFocus`. The mastery rule reads `skillFocus`
+//     from history; the picker derives `skillFocus` from the Progress
+//     doc's focus node, NOT from the rendered plan's content. A
+//     static-fallback addition plan still gets recorded as
+//     `skillFocus: ['sub-to-10']`.
+//
+// Without forceHowlerUnlock, headless chromium with silent-MP3
+// placeholder bytes leaves Howler suspended → read-aloud effect
+// short-circuits → chips never enable → the 3-session chip walk hangs
+// indefinitely (verified empirically — 60s wait, chips remain
+// disabled). This is the same headless-audio-unlock limitation
+// captured in `feedback_playwright_disabled_button_click` and
+// `.claude/docs/testing-and-ci.md` §4.1.2.
+//
+// The PR #242 precedent (canon-content-dependent specs that DO drop
+// forceHowlerUnlock) does not apply here because PR #242's specs use
+// one-shot DOM-presence reads (`toHaveCount`, snapshot
+// `getAttribute`), not chip-walking. The two patterns solve
+// independent sub-problems.
+
 interface PersistedProgress {
   skillLevels: Record<string, string>
   history: Array<{ dateISO: string; skillFocus: string[]; successRate: number }>

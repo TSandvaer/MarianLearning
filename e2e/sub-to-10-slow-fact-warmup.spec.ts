@@ -66,9 +66,31 @@ import type { Page, Request } from '@playwright/test'
 import { canonicalMathSessionResponse } from './fixtures/canonicalSessionResponses'
 import {
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// NOTE on `forceHowlerUnlock`
+// ---------------------------
+// We deliberately do NOT call `forceHowlerUnlock(page)` in this spec.
+// Per `.claude/docs/testing-and-ci.md` §4.1.2 + the empirical finding
+// from PR #242, the helper is incompatible with canned plans (even
+// silent-MP3 placeholder bytes) — it causes a silent fallback to the
+// static rotation plan. This spec asserts only on the math request
+// body (no chip interaction, no rendered canon content assertion),
+// so the audio path is irrelevant to correctness; we drop the call
+// to remove the coupling. The request fires on Hub→Math navigation
+// regardless of audio state.
+
+// ── WebKit-headless skip ─────────────────────────────────────────────────────
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → canned plan cannot decode; spec is chromium-only.',
+  )
+}
 
 // ── Local mock with request capture ─────────────────────────────────────────
 
@@ -238,7 +260,8 @@ const SLOW_ADD_LATENCIES = [5200, 5300, 5400, 5600, 5700, 5800] as const
 test.describe('sub-to-10 slow-fact threshold + warmup', () => {
   test('warmup branch — 4 prior sub-to-10 sessions with slow fact → progress.slowFacts is OMITTED', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     const { requests } = await installMathMock(page)
     await seedLocalStorage(page, {
       progress: buildSlowFactProgress({
@@ -251,7 +274,6 @@ test.describe('sub-to-10 slow-fact threshold + warmup', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
@@ -295,7 +317,8 @@ test.describe('sub-to-10 slow-fact threshold + warmup', () => {
 
   test('post-warmup branch — 6 prior sub-to-10 sessions with slow fact → progress.slowFacts IS present', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     const { requests } = await installMathMock(page)
     await seedLocalStorage(page, {
       progress: buildSlowFactProgress({
@@ -308,7 +331,6 @@ test.describe('sub-to-10 slow-fact threshold + warmup', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
@@ -357,7 +379,8 @@ test.describe('sub-to-10 slow-fact threshold + warmup', () => {
 
   test('parity counter-test — add-to-10 with slow + fact, sessionCount 1 → progress.slowFacts IS present (threshold unchanged)', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     const { requests } = await installMathMock(page)
     await seedLocalStorage(page, {
       progress: buildSlowFactProgress({
@@ -370,7 +393,6 @@ test.describe('sub-to-10 slow-fact threshold + warmup', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page

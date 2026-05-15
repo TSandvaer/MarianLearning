@@ -71,9 +71,29 @@ import type { Page, Request } from '@playwright/test'
 import { canonicalMathSessionResponse } from './fixtures/canonicalSessionResponses'
 import {
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// NOTE on `forceHowlerUnlock`
+// ---------------------------
+// We deliberately do NOT call `forceHowlerUnlock(page)` in this spec.
+// Per `.claude/docs/testing-and-ci.md` §4.1.2 + the empirical finding
+// from PR #242, the helper is incompatible with canned plans — it
+// causes a silent fallback to the static rotation plan. This spec
+// asserts only on the math request body (no chip interaction, no
+// rendered canon content assertion), so the audio path is irrelevant
+// to correctness; we drop the call to remove the coupling.
+
+// ── WebKit-headless skip ─────────────────────────────────────────────────────
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → canned plan cannot decode; spec is chromium-only.',
+  )
+}
 
 // ── Local mock with request capture ─────────────────────────────────────────
 
@@ -191,7 +211,8 @@ function buildSubToTenProgress(
 test.describe('sub-to-10 first-encounter scaffolding gate', () => {
   test('greenfield Marian (lifetimeFirstEncounters empty) → math request ships lifetimeFirstEncounters as an array NOT containing `sub-to-10`', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     const { requests } = await installMathMock(page)
     await seedLocalStorage(page, {
       progress: buildSubToTenProgress([]),
@@ -199,7 +220,6 @@ test.describe('sub-to-10 first-encounter scaffolding gate', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
@@ -242,7 +262,8 @@ test.describe('sub-to-10 first-encounter scaffolding gate', () => {
 
   test('already-encountered Marian (lifetimeFirstEncounters contains sub-to-10) → math request ships the list with sub-to-10 present', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     const { requests } = await installMathMock(page)
     await seedLocalStorage(page, {
       // Seed pre-populated — child has done one prior sub-to-10
@@ -252,7 +273,6 @@ test.describe('sub-to-10 first-encounter scaffolding gate', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page

@@ -58,9 +58,41 @@ import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
 import {
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// NOTE on `forceHowlerUnlock`
+// ---------------------------
+// We deliberately do NOT call `forceHowlerUnlock(page)` in this spec.
+// Per `.claude/docs/testing-and-ci.md` §4.1.2 + the empirical finding
+// from PR #242, the helper's WebKit stub-shape
+// `Howler.ctx = { state: 'running' }` is incompatible with a canned
+// plan (even one carrying silent-placeholder MP3 bytes) — Howler's
+// downstream `connect()` calls throw `TypeError: Failed to execute
+// 'connect' on 'AudioNode'` during decode, `prepareMathPathA` rejects,
+// and Math.tsx silently falls back to the static rotation plan. That
+// fallback masks the canned plan content and the chip-value assertion
+// below becomes unsatisfiable (we'd snapshot the static addition
+// fallback's chip, never the canned `10 - 5 = 5` chip).
+//
+// Production reality: the user's first tap on the Hub tree node IS the
+// first gesture in the chain. Howler's document-level click listener
+// installs after the first `new Howl(...)` (which happens during
+// `prepareMathPathA`'s `loadAudio` call). chromium headless runs this
+// chain naturally. WebKit headless has no `AudioContext`, so this spec
+// is chromium-only via `skipOnWebkitHeadless` — same posture as
+// `sub-to-10-chip-zero-render.spec.ts` (PR #242 precedent).
+
+// ── WebKit-headless skip ─────────────────────────────────────────────────────
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → canned plan cannot decode; spec is chromium-only.',
+  )
+}
 
 // ── Canned sub-to-10 plan factory ────────────────────────────────────────────
 //
@@ -320,7 +352,8 @@ function mathRequests(requests: ReadonlyArray<Request>): Request[] {
 test.describe('sub-to-10 planner payload contract', () => {
   test('math request payload carries track=math, focusNode=sub-to-10, and the screen renders the canned subtraction plan', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     const { requests } = await installCapturingMathMock(page)
     await seedLocalStorage(page, {
       progress: buildSubToTenSeedProgress(),
@@ -328,7 +361,6 @@ test.describe('sub-to-10 planner payload contract', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     // Hub → Number Garden → Math.
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
@@ -358,16 +390,30 @@ test.describe('sub-to-10 planner payload contract', () => {
     expect(progressBlock, 'progress block must be present').toBeDefined()
     expect(progressBlock!.focusNode).toBe('sub-to-10')
 
+    // ── Canon-landed addend gate (PR #242 precedent) ──────────────────────────
+    //
+    // Without this gate we'd snapshot the static-fallback DOM in the
+    // cold-mount window before the canon plan arrived (or, on RED main,
+    // before the parser-fallback static plan replaces it). Wait for the
+    // addends from the canned plan (`10 - 5 = 5`) to land on screen so
+    // every assertion below fires against the canon-served plan, not a
+    // static-rotation artifact.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('10', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('5', {
+      timeout: 15_000,
+    })
+
     // ── Assertion B — the canned plan renders ─────────────────────────────────
     //
     // Failing-first lever. On RED `main`, `planFromServer.parseReadAddends`
     // only accepts the "X plus Y. How many?" template. Our canned response
     // uses "Ten minus five. How many are left?" → the parser throws,
     // App.tsx catches, and the screen falls back to `pickStaticSessionPlan()`
-    // which carries ADDITION facts. The static fallback rotates by minute,
-    // so problem 1's correct answer can be anything in {2, 3, 4} but is
-    // never 5 with addends both 1..N (the static plans open with `1+1`,
-    // `1+2`, `2+2`; none of those have correct == 5).
+    // which carries ADDITION facts. The canon-landed gate above would also
+    // fail in that scenario — addends would be the static fallback's
+    // problem 1 (e.g. `1 + 1`), not the canned `10 - 5`.
     //
     // On GREEN (Kevin's PR 1): the parser accepts "X minus Y. How many are
     // left?", tags `op: '-'`, and rehydrates the canned plan. The first

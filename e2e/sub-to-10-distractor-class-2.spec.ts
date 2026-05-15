@@ -66,9 +66,44 @@ import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
 import {
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// NOTE on `forceHowlerUnlock` + chip-walking limitation
+// -----------------------------------------------------
+// We deliberately do NOT call `forceHowlerUnlock(page)` in this spec.
+// Per `.claude/docs/testing-and-ci.md` §4.1.2 + the empirical finding
+// from PR #242, the helper causes a silent fallback to the static
+// rotation plan, masking the canned plan's distractor content — which
+// IS what this spec asserts on (chip values for specific facts).
+//
+// HEADLESS-CHROMIUM LIMITATION (tests 1 + 3 only): without
+// forceHowlerUnlock, Math.tsx's read-aloud effect short-circuits on
+// silent-MP3 placeholder bytes (Howler.ctx stays suspended), chips
+// never enable, and the multi-problem chip walk for tests 1 (P4
+// wrong-op) and 3 (add-to-10 P4) cannot complete. The cleanest fix is
+// to swap the canned silent-MP3 fixture for real Azure canon bytes
+// (the `installDigraphsThClaudeMock` pattern from
+// `digraphs-th-content.spec.ts`) — but the sub-to-10 canon on disk
+// uses a different fact pool than this spec's synthetic fixture
+// (canon P4 = `10 - 3 = 7`, no in-range wrong-op trap), so naive
+// canon-on-disk read would not exercise the Class 2 logic. Tests 1
+// and 3 should be revisited once the spec → canon → fixture
+// alignment can be redesigned together; until then they will stay
+// RED-for-wrong-reason on chromium headless. Test 2 (P1 gentle,
+// no walk) reads chips at P1 without advancing, so it works with
+// just the canon-landed gate + chromium skip.
+
+// ── WebKit-headless skip ─────────────────────────────────────────────────────
+function skipOnWebkitHeadless(testInfo: {
+  skip: (cond: boolean, msg?: string) => void
+  project: { name: string }
+}): void {
+  testInfo.skip(
+    testInfo.project.name === 'webkit',
+    'WebKit headless has no AudioContext → canned plan cannot decode; spec is chromium-only.',
+  )
+}
 
 const SILENT_MP3 =
   'SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tAxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAAAAA8TEFNRTMuMTAwBLgAAAAAAAAAABRAJAUHQQAB4AAAAk8tnaAyAAAAAA=='
@@ -540,7 +575,8 @@ async function readChipValuesAtProblem(
 test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
   test('problem 4 (discriminate tier) with 9-1=8 carries `10` as the wrong-op trap distractor', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     // 4-session walk-through: tap correct 3 times to reach problem 4,
     // then read chips. Bump test timeout for safety on slow CI runners.
     test.setTimeout(120_000)
@@ -552,13 +588,25 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="number-garden"]')
       .click()
     await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
+
+    // Canon-landed addend gate (PR #242 precedent). Wait for the canned
+    // plan's P1 addends (`10 - 5 = 5`) before walking through chips, so
+    // every distractor read fires against canon, not static fallback.
+    // KNOWN LIMITATION (see file header): chip walk to P4 will hang on
+    // chromium headless because silent-MP3 placeholders leave Howler
+    // suspended → chips never enable. Tracked as a structural follow-up.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('10', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('5', {
+      timeout: 15_000,
+    })
 
     const valuesAtP4 = await readChipValuesAtProblem(page, 4)
 
@@ -576,7 +624,8 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
 
   test('problem 1 (gentle tier) with 9-1=8 does NOT carry the wrong-op `10` as a distractor', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     test.setTimeout(60_000)
 
     await installMathMockReturning(page, cannedSubToTenWithProblem1GentleFact)
@@ -586,13 +635,22 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="number-garden"]')
       .click()
     await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
+
+    // Canon-landed addend gate (PR #242 precedent). P1 of this fixture
+    // is the gentle `9 - 1 = 8` fact — no chip-walk needed, so this test
+    // runs through cleanly on chromium headless without forceHowlerUnlock.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('9', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('1', {
+      timeout: 15_000,
+    })
 
     const valuesAtP1 = await readChipValuesAtProblem(page, 1)
 
@@ -607,7 +665,8 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
 
   test('add-to-10 problem 4 with 5+3=8 does NOT carry `2` (Class 2 is sub-only per spec §3.5)', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    skipOnWebkitHeadless(testInfo)
     test.setTimeout(120_000)
 
     await installMathMockReturning(page, cannedAddToTenWithProblem4Trap)
@@ -617,13 +676,23 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="number-garden"]')
       .click()
     await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
+
+    // Canon-landed addend gate (PR #242 precedent). P1 of this fixture
+    // is `1 + 1 = 2`. KNOWN LIMITATION (see file header): chip walk to
+    // P4 will hang on chromium headless because silent-MP3 placeholders
+    // leave Howler suspended → chips never enable.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('1', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('1', {
+      timeout: 15_000,
+    })
 
     const valuesAtP4 = await readChipValuesAtProblem(page, 4)
 
