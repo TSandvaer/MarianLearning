@@ -51,24 +51,24 @@ The pool below is the union of facts Haiku may draw from for any `sub-to-10` ses
 
 ### 1.1 Pool table (LOCKED — Dave § "Concrete fact ordering")
 
-| #   | Fact      | Band   | Category        | Teaching note (per-fact, where non-obvious)                                                                                                                                                                                                                       |
-| --- | --------- | ------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `5 − 5 = 0` | easy   | subtract-self   | `n − n = 0` rule. No counting — rule-application only. Among the fastest retrievals; baseline confidence-builder.                                                                                                                                                 |
-| 2   | `8 − 8 = 0` | easy   | subtract-self   | Repeats the rule with a larger `n`; confirms generality. Do NOT drill both subtract-self facts in the same session — one per session is sufficient (§2.3).                                                                                                        |
-| 3   | `7 − 0 = 7` | easy   | subtract-zero   | `n − 0 = n` rule (identity). No counting; rule-application only.                                                                                                                                                                                                  |
-| 4   | `9 − 0 = 9` | easy   | subtract-zero   | Repeats the rule. Same one-per-session guidance as `subtract-self`.                                                                                                                                                                                               |
-| 5   | `10 − 5 = 5` | easy   | doubles         | Doubles halving. Highly memorable; Marian knows `5 + 5 = 10` from `add-to-10`. Single-step finger-count.                                                                                                                                                          |
-| 6   | `8 − 4 = 4` | easy   | doubles         | Doubles halving. Marian knows `4 + 4 = 8`.                                                                                                                                                                                                                        |
-| 7   | `6 − 3 = 3` | easy   | doubles         | Doubles halving. Marian knows `3 + 3 = 6`.                                                                                                                                                                                                                        |
-| 8   | `9 − 1 = 8` | easy   | subtract-one    | Count back one step; same scaffold as `n + 1` in addition. Easiest non-rule fact.                                                                                                                                                                                 |
-| 9   | `10 − 1 = 9` | medium | subtract-one    | Count back one step; bridges the decade (anchor for take-from-10).                                                                                                                                                                                                |
-| 10  | `10 − 2 = 8` | medium | subtract-two    | Count back two steps. **Watch wrong-operation lure** (`10 + 2 = 12`) — exemplar of the Class-2 wrong-op distractor (§3.2). The wrong-op value 12 falls outside `[0, 10]`, so the trap delivers via the off-by-one fallback (§3.2 "Out-of-range wrong-op fallback"). |
-| 11  | `10 − 3 = 7` | medium | take-from-10    | Bridges through 10; highest-leverage facts. The make-10 mental model `add-to-20` will later depend on lives here.                                                                                                                                                 |
-| 12  | `10 − 7 = 3` | medium | take-from-10    | Inverse of `7 + 3 = 10`. Expose deliberately to build the fact-family link — but **NEVER in the same session as `7 + 3 = 10`** (§7 dual-exposure rule).                                                                                                           |
-| 13  | `9 − 4 = 5` | hard   | general         | No obvious shortcut; count-back or derive from `10 − 5`. Where retrieval gains will appear last.                                                                                                                                                                  |
-| 14  | `8 − 3 = 5` | hard   | general         | No obvious shortcut; count-back. Wrong-op lure `11` is out of range (`maxAnswer=10`) → fall back to off-by-one (§3.2).                                                                                                                                            |
-| 15  | `7 − 4 = 3` | hard   | general         | Often confused with `7 − 3 = 4` (the Robinson-2013 wrong-direction-of-compensation error). The off-by-one distractor is load-bearing here.                                                                                                                        |
-| 16  | `9 − 6 = 3` | hard   | general         | Hardest in the pool. Subtrahend is large, not a clean anchor. Final-band fact.                                                                                                                                                                                    |
+| #   | Fact         | Band   | Category      | Teaching note (per-fact, where non-obvious)                                                                                                                                                                                                                         |
+| --- | ------------ | ------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `5 − 5 = 0`  | easy   | subtract-self | `n − n = 0` rule. No counting — rule-application only. Among the fastest retrievals; baseline confidence-builder.                                                                                                                                                   |
+| 2   | `8 − 8 = 0`  | easy   | subtract-self | Repeats the rule with a larger `n`; confirms generality. Do NOT drill both subtract-self facts in the same session — one per session is sufficient (§2.3).                                                                                                          |
+| 3   | `7 − 0 = 7`  | easy   | subtract-zero | `n − 0 = n` rule (identity). No counting; rule-application only.                                                                                                                                                                                                    |
+| 4   | `9 − 0 = 9`  | easy   | subtract-zero | Repeats the rule. Same one-per-session guidance as `subtract-self`.                                                                                                                                                                                                 |
+| 5   | `10 − 5 = 5` | easy   | doubles       | Doubles halving. Highly memorable; Marian knows `5 + 5 = 10` from `add-to-10`. Single-step finger-count.                                                                                                                                                            |
+| 6   | `8 − 4 = 4`  | easy   | doubles       | Doubles halving. Marian knows `4 + 4 = 8`.                                                                                                                                                                                                                          |
+| 7   | `6 − 3 = 3`  | easy   | doubles       | Doubles halving. Marian knows `3 + 3 = 6`.                                                                                                                                                                                                                          |
+| 8   | `9 − 1 = 8`  | easy   | subtract-one  | Count back one step; same scaffold as `n + 1` in addition. Easiest non-rule fact.                                                                                                                                                                                   |
+| 9   | `10 − 1 = 9` | medium | subtract-one  | Count back one step; bridges the decade (anchor for take-from-10).                                                                                                                                                                                                  |
+| 10  | `10 − 2 = 8` | medium | subtract-two  | Count back two steps. **Watch wrong-operation lure** (`10 + 2 = 12`) — exemplar of the Class-2 wrong-op distractor (§3.2). The wrong-op value 12 falls outside `[0, 10]`, so the trap delivers via the off-by-one fallback (§3.2 "Out-of-range wrong-op fallback"). |
+| 11  | `10 − 3 = 7` | medium | take-from-10  | Bridges through 10; highest-leverage facts. The make-10 mental model `add-to-20` will later depend on lives here.                                                                                                                                                   |
+| 12  | `10 − 7 = 3` | medium | take-from-10  | Inverse of `7 + 3 = 10`. Expose deliberately to build the fact-family link — but **NEVER in the same session as `7 + 3 = 10`** (§7 dual-exposure rule).                                                                                                             |
+| 13  | `9 − 4 = 5`  | hard   | general       | No obvious shortcut; count-back or derive from `10 − 5`. Where retrieval gains will appear last.                                                                                                                                                                    |
+| 14  | `8 − 3 = 5`  | hard   | general       | No obvious shortcut; count-back. Wrong-op lure `11` is out of range (`maxAnswer=10`) → fall back to off-by-one (§3.2).                                                                                                                                              |
+| 15  | `7 − 4 = 3`  | hard   | general       | Often confused with `7 − 3 = 4` (the Robinson-2013 wrong-direction-of-compensation error). The off-by-one distractor is load-bearing here.                                                                                                                          |
+| 16  | `9 − 6 = 3`  | hard   | general       | Hardest in the pool. Subtrahend is large, not a clean anchor. Final-band fact.                                                                                                                                                                                      |
 
 **Band counts:**
 
@@ -97,16 +97,16 @@ The session is 8 problems, drawn from the 16-fact pool above. The mix obeys the 
 
 ### 2.1 Per-problem index mix
 
-| Problem index | Tier         | Band source             | Distractor class (§3)                           | Why                                                                                                                                                |
-| ------------- | ------------ | ----------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P1            | gentle       | `easy` band only        | Class 0 — gentle (≥2 away, range extremes)      | Session opener. Dave § Application: "problems 1–3 should use well-spaced distractors regardless of how easy the fact itself is, to allow context calibration before tight discriminations begin." Same posture as `add-to-10`. |
-| P2            | gentle       | `easy` band only        | Class 0 — gentle                                | Calibration continues.                                                                                                                             |
-| P3            | gentle       | `easy` band only        | Class 0 — gentle                                | Marian has had 3 successful experiences before the trap distractors arrive — preserves the post-Dave `GENTLE_RAMP_THROUGH = 3` cutoff exactly.    |
-| P4            | discriminate | `medium` or `hard` band | Class 1 — off-by-one **OR** Class 2 — wrong-op  | First diagnostic problem. Distractor class chosen randomly between Class 1 and Class 2.                                                            |
-| P5            | discriminate | `medium` or `hard` band | Class 1 or Class 2                              | "                                                                                                                                                  |
-| P6            | discriminate | `medium` or `hard` band | Class 1 or Class 2                              | "                                                                                                                                                  |
-| P7            | discriminate | `medium` or `hard` band | Class 1 or Class 2                              | "                                                                                                                                                  |
-| P8            | discriminate | `medium` or `hard` band | Class 1 or Class 2                              | Closer; full discriminative pressure.                                                                                                              |
+| Problem index | Tier         | Band source             | Distractor class (§3)                          | Why                                                                                                                                                                                                                            |
+| ------------- | ------------ | ----------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P1            | gentle       | `easy` band only        | Class 0 — gentle (≥2 away, range extremes)     | Session opener. Dave § Application: "problems 1–3 should use well-spaced distractors regardless of how easy the fact itself is, to allow context calibration before tight discriminations begin." Same posture as `add-to-10`. |
+| P2            | gentle       | `easy` band only        | Class 0 — gentle                               | Calibration continues.                                                                                                                                                                                                         |
+| P3            | gentle       | `easy` band only        | Class 0 — gentle                               | Marian has had 3 successful experiences before the trap distractors arrive — preserves the post-Dave `GENTLE_RAMP_THROUGH = 3` cutoff exactly.                                                                                 |
+| P4            | discriminate | `medium` or `hard` band | Class 1 — off-by-one **OR** Class 2 — wrong-op | First diagnostic problem. Distractor class chosen randomly between Class 1 and Class 2.                                                                                                                                        |
+| P5            | discriminate | `medium` or `hard` band | Class 1 or Class 2                             | "                                                                                                                                                                                                                              |
+| P6            | discriminate | `medium` or `hard` band | Class 1 or Class 2                             | "                                                                                                                                                                                                                              |
+| P7            | discriminate | `medium` or `hard` band | Class 1 or Class 2                             | "                                                                                                                                                                                                                              |
+| P8            | discriminate | `medium` or `hard` band | Class 1 or Class 2                             | Closer; full discriminative pressure.                                                                                                                                                                                          |
 
 ### 2.2 Discriminate-tier distractor mix (P4–P8)
 
@@ -166,9 +166,9 @@ Algorithm: two distractor values, each ≥2 away from `correct`, biased toward `
 
 For a Class-2 problem, the two distractors are:
 
-| Slot      | Value                                                                                          |
-| --------- | ---------------------------------------------------------------------------------------------- |
-| Trap      | `a + b` (the wrong-operation lure)                                                             |
+| Slot      | Value                                                                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Trap      | `a + b` (the wrong-operation lure)                                                                                         |
 | Secondary | The off-by-one near-miss (`c - 1` if in range, else `c + 1` if in range — `pickDistractors`'s off-by-one fallback applies) |
 
 **Out-of-range wrong-op fallback.** If `a + b > maxAnswer` (e.g. `10 − 2 = 8` → wrong-op `12` out of range when `maxAnswer = 10`), fall back to a second off-by-one distractor. So `10 − 2 = 8` renders chips `{6, 8, 9}` (correct `8`, off-by-ones `7` and `9`, but `7` is in range so the fallback is the same `{7, 9}` off-by-one pair). Concretely: when wrong-op is OOR, the problem renders identically to a Class-1 off-by-one problem. **Haiku's distractorClass hint is then misleading** — `distractors.ts` must check range-fitness FIRST and silently downgrade to Class 1.
@@ -181,10 +181,10 @@ For a Class-2 problem, the two distractors are:
 
 Two pool facts produce `correct = 0`: #1 (`5 − 5`) and #2 (`8 − 8`). Today `ANSWER_RANGE_MIN = 1` in [`distractors.ts:58`](../../src/screens/Math/distractors.ts#L58). Kevin's wire-up has two options:
 
-| Option | Behaviour                                                                                                      | Trade-off                                                                                                                                                |
-| ------ | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A      | Widen `ANSWER_RANGE_MIN` to `0` for `op === '-'` problems only (operation-parameterized minimum, mirrors `maxAnswer`). | Cleanest. Subtract-self / subtract-zero facts work end-to-end. `0` becomes a valid chip value.                                                            |
-| B      | Keep `ANSWER_RANGE_MIN = 1`; exclude pool facts #1, #2 from any session that needs distractor generation.       | Easier code change but Dave's pool is incomplete. Removes the rule-based identity facts that anchor the easiest band.                                     |
+| Option | Behaviour                                                                                                              | Trade-off                                                                                                             |
+| ------ | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| A      | Widen `ANSWER_RANGE_MIN` to `0` for `op === '-'` problems only (operation-parameterized minimum, mirrors `maxAnswer`). | Cleanest. Subtract-self / subtract-zero facts work end-to-end. `0` becomes a valid chip value.                        |
+| B      | Keep `ANSWER_RANGE_MIN = 1`; exclude pool facts #1, #2 from any session that needs distractor generation.              | Easier code change but Dave's pool is incomplete. Removes the rule-based identity facts that anchor the easiest band. |
 
 **Spec recommendation: Option A.** The rule-based identity facts (`n − n = 0`, `n − 0 = n`) are pedagogically high-value (Dave § Source 3 — Robinson 2013: Identity principle is the easiest derived-fact strategy, used correctly by 65–73% of children). Removing them drops the easiest band from 8 facts to 6 and forfeits the highest-confidence opener facts in the pool.
 
@@ -199,11 +199,11 @@ Haiku emits `distractorClass` per discriminate problem (P4–P8) on the wire. Th
 // `Math.tsx` reads when calling pickDistractors.
 interface MathProblem {
   index: number
-  addendA: number  // minuend when op === '-'
-  addendB: number  // subtrahend when op === '-'
-  op: '+' | '-'    // NEW — required when planner emits sub-to-10 content
+  addendA: number // minuend when op === '-'
+  addendB: number // subtrahend when op === '-'
+  op: '+' | '-' // NEW — required when planner emits sub-to-10 content
   correct: number
-  distractorClass?: 'off-by-one' | 'wrong-op'  // NEW — present on P4-P8 sub-to-10 problems
+  distractorClass?: 'off-by-one' | 'wrong-op' // NEW — present on P4-P8 sub-to-10 problems
   utterances: MathProblemUtterances
 }
 ```
@@ -258,13 +258,13 @@ Replace the one-line skeleton in [`api/_planner.ts:920`](../../api/_planner.ts#L
 
 The 5-slot per-problem utterance shape is unchanged from `add-to-10` (`read`, `correct`, `reprompt`, `hint`, `giveAnswer`). Slot-by-slot:
 
-| Slot         | Template                                                                                                                                | Example for `10 − 2 = 8`                                       | Notes                                                                                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `read`       | `"<minuend> minus <subtrahend>. How many are left?"` *(first-session of node: `"<minuend> take away <subtrahend>. How many are left?"`)* | `"Ten minus two. How many are left?"`                          | "are left" framing follows Dave § Q2 (concrete-removal mental model).                                                                                                |
-| `correct`    | `"Yes! <answer>!"` (same as `add-to-10`)                                                                                                | `"Yes! Eight!"`                                                | **Article-led variant NOT applicable** — math celebration template differs from word-song's `"Yes! That's a <word>."`; the math correct is bare number-celebration. No bang-fallback list. |
-| `reprompt`   | `"Hmm... try again?"` (verbatim, same as `add-to-10`)                                                                                   | `"Hmm... try again?"`                                          | Locked phrasing — do NOT vary.                                                                                                                                       |
-| `hint`       | `"Look. <minuend>. Take away <subtrahend>. How many now?"`                                                                              | `"Look. Ten. Take away two. How many now?"`                    | Mirrors `add-to-10`'s "Look. Three. And two more. How many now?" structure. Uses "take away" framing in the hint regardless of read-line variant (the hint is a scaffold, not a primary read). |
-| `giveAnswer` | `"This one is <answer>."` (same as `add-to-10`)                                                                                         | `"This one is eight."`                                         | Locked.                                                                                                                                                              |
+| Slot         | Template                                                                                                                                 | Example for `10 − 2 = 8`                    | Notes                                                                                                                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`       | `"<minuend> minus <subtrahend>. How many are left?"` _(first-session of node: `"<minuend> take away <subtrahend>. How many are left?"`)_ | `"Ten minus two. How many are left?"`       | "are left" framing follows Dave § Q2 (concrete-removal mental model).                                                                                                                          |
+| `correct`    | `"Yes! <answer>!"` (same as `add-to-10`)                                                                                                 | `"Yes! Eight!"`                             | **Article-led variant NOT applicable** — math celebration template differs from word-song's `"Yes! That's a <word>."`; the math correct is bare number-celebration. No bang-fallback list.     |
+| `reprompt`   | `"Hmm... try again?"` (verbatim, same as `add-to-10`)                                                                                    | `"Hmm... try again?"`                       | Locked phrasing — do NOT vary.                                                                                                                                                                 |
+| `hint`       | `"Look. <minuend>. Take away <subtrahend>. How many now?"`                                                                               | `"Look. Ten. Take away two. How many now?"` | Mirrors `add-to-10`'s "Look. Three. And two more. How many now?" structure. Uses "take away" framing in the hint regardless of read-line variant (the hint is a scaffold, not a primary read). |
+| `giveAnswer` | `"This one is <answer>."` (same as `add-to-10`)                                                                                          | `"This one is eight."`                      | Locked.                                                                                                                                                                                        |
 
 **`correct = 0` celebration form.** For subtract-self facts (#1, #2), the correct line is `"Yes! Zero!"`. The word "zero" reads cleanly on `en-US-EmmaMultilingualNeural` — no SSML override required.
 
@@ -291,9 +291,9 @@ The gate fires once-per-lifetime (the existing `Progress.lifetimeFirstEncounters
 
 ```ts
 interface MathFact {
-  a: number             // minuend for op === '-'
-  b: number             // subtrahend for op === '-'
-  op: '+' | '-' | '*'   // '-' for sub-to-10
+  a: number // minuend for op === '-'
+  b: number // subtrahend for op === '-'
+  op: '+' | '-' | '*' // '-' for sub-to-10
 }
 ```
 
@@ -359,12 +359,12 @@ Per the locked curriculum order (§11 Q1), `sub-to-10` sits AFTER `add-to-20` in
 
 **Proposed shape — operation-parameterized + tenure-aware threshold.** Per Dave's "Non-obvious findings" #1:
 
-| Operation | Sessions on the node | Threshold (ms) |
-| --------- | -------------------- | -------------- |
-| `+`       | any                  | `5000`         |
-| `−`       | 1 – 10               | `7000`         |
-| `−`       | 11 – 20              | `6000`         |
-| `−`       | 21 +                 | `5000`         |
+| Operation | Sessions on the node | Threshold (ms)                                                    |
+| --------- | -------------------- | ----------------------------------------------------------------- |
+| `+`       | any                  | `5000`                                                            |
+| `−`       | 1 – 10               | `7000`                                                            |
+| `−`       | 11 – 20              | `6000`                                                            |
+| `−`       | 21 +                 | `5000`                                                            |
 | `*`       | any                  | `5000` (placeholder — re-evaluate when multiplication tier ships) |
 
 The session-tenure count is `progress.history.filter(e => e.skillFocus.includes('sub-to-10')).length` evaluated at slow-fact-build time.
@@ -450,7 +450,7 @@ This is the ONLY actionable list for the implementing developer. Everything abov
 - [ ] **`api/_firstEncounterGate.test.ts:99-110`** — REVISE OR REPLACE the existing negative-assertion test `'does NOT include any math focus nodes'`. That test enumerates `['add-to-10', 'add-to-20', 'sub-to-10', 'sub-to-20', 'two-digit-addsub']` and asserts NONE are gated — adding `'sub-to-10'` to the set will make it fail. The current test was a design statement ("math nodes are not first-encounter-gated") that remains true for every math node EXCEPT `sub-to-10`. Replace with per-node assertions:
   - `expect(getFirstEncounterGatedNodes()).toContain('sub-to-10')` — the new gated math node.
   - For each of `'add-to-10'`, `'add-to-20'`, `'sub-to-20'`, `'two-digit-addsub'`: `expect(getFirstEncounterGatedNodes()).not.toContain(mathNode)` — these remain non-gated.
-  Keep the existing pass-through and rewrite-case suites unchanged; only the `getFirstEncounterGatedNodes` describe block needs the per-node split.
+    Keep the existing pass-through and rewrite-case suites unchanged; only the `getFirstEncounterGatedNodes` describe block needs the per-node split.
 
 ### 9.5 Canon prebake
 
@@ -518,7 +518,7 @@ The four questions originally surfaced as open are now resolved. The spec is the
 
 **DECIDED: Option A — leave the tree alone.** Tree stays `number-recog → add-to-10 → add-to-20 → sub-to-10 → sub-to-20 → ...`. NO changes to `MATH_TREE` in [`src/lib/progress/mastery.ts`](../../src/lib/progress/mastery.ts) or `MATH_NODES_IN_ORDER` in [`src/lib/progress/focusNode.ts`](../../src/lib/progress/focusNode.ts).
 
-Rationale: A re-ordering would be a progression-state-machine change that per `feedback_progression_e2e_mandatory` requires a paired failing-first E2E spec at dispatch time, and would carry the risk of stale `Progress` blobs landing on a node out of expected order. Dave's "next on the curriculum ladder" framing is satisfied by interpretation ("next *subtraction* node," which is unambiguously `sub-to-10`); no pedagogical signal forces re-ordering. Ship `sub-to-10` in its existing slot after `add-to-20`; revisit ordering only if real-Marian data signals a need.
+Rationale: A re-ordering would be a progression-state-machine change that per `feedback_progression_e2e_mandatory` requires a paired failing-first E2E spec at dispatch time, and would carry the risk of stale `Progress` blobs landing on a node out of expected order. Dave's "next on the curriculum ladder" framing is satisfied by interpretation ("next _subtraction_ node," which is unambiguously `sub-to-10`); no pedagogical signal forces re-ordering. Ship `sub-to-10` in its existing slot after `add-to-20`; revisit ordering only if real-Marian data signals a need.
 
 **Q2 — Slow-fact threshold implementation: tenure-banded ladder vs. flat warmup-then-threshold?**
 
@@ -539,6 +539,7 @@ Rationale: The rule-based identity facts (`n − n = 0`, `n − 0 = n`) are peda
 Rationale: Dave § Q2 explicitly scopes the recommendation to "the very first session." Persisting "take away" across the whole intro phase would introduce phrasing variability across the tier — a cognitive load signal Marian doesn't need once she's seen subtraction once. The "minus" template aligns with how subtraction is named in standard practice and how she'll encounter it long-term. Re-open only if Thomas's iPad ear-test post-merge signals a problem.
 
 **PR split.** **DECIDED: 2-PR per Kevin's recommendation.**
+
 - **PR 1 (this content tier):** planner directive (§4.1), `MATH_TRACK_GUIDE` block, first-encounter gate wiring + test revision (§9.4), `NUMBER_WORDS` zero entry (§9.1 hard requirement), canon prebake (§9.5).
 - **PR 2 (Math.tsx render):** `op` field on `MathProblem` wire shape, parser widening for "minus" / "take away" templates (§9.1), `distractors.ts` extension with Class 2 (§9.2 + §3.2), `Math.tsx` argument plumbing, operator-glyph render.
 
@@ -579,6 +580,8 @@ What this spec implies for code (Kevin) and content (canon). PR split per §11: 
 - `src/screens/Math/sessionPlans.ts` — `MathProblem` gains required `op: '+' | '-'` field + optional `distractorClass?: 'off-by-one' | 'wrong-op'`.
 - `src/screens/Math/distractors.ts` — `pickDistractors` signature extended; new `wrongOpDistractors` function; `ANSWER_RANGE_MIN` parameterized to 0 for `op === '-'` (per §3.3 Option A locked Q3).
 - `src/screens/Math/Math.tsx` — argument plumbing (`op`, `distractorClass`, `minAnswer` through to `pickDistractors`) + operator-glyph render (− vs +).
+
+> **Post-ship correction (2026-05-16, this PR — distractor-class directive reword).** AC4 wrong-op rate is implemented at render time in `Math.tsx:2559-2560` (deterministic default: every `op:'-'` P4-P8 problem attempts `'wrong-op'`; `pickDistractors` silently downgrades to off-by-one when the trap is OOR or aliases the correct answer), NOT via planner emission. The original PR-2 wire plan above (and the §4 "Haiku is asked to TAG each P4-P8 problem with `distractorClass`" framing) is superseded — the `PlannerPlan` wire shape is utterance-only and cannot carry per-problem structured tags. The `MathProblem.distractorClass` field is kept as a forward-compat seam only. The planner directive was reworded in this PR (commit `4129963`) after research confirmed the historical Haiku emissions were silently discarded by the canon adapter and parsers (Devon NOF #1 PR #241, Kevin NOF #1 PR #240).
 
 **Test changes:**
 
