@@ -22,19 +22,22 @@
  * backstop for the manual verification protocol. This file is that
  * backstop.
  *
- * Scope (first pass — sub-to-10 ONLY)
- * -----------------------------------
- * Hard-coded sub-to-10 rules as a single `subToTenRules` config. Migrating
- * to a per-tier `composition-rules.json` (Approach B) is the future
- * architecture once a 2nd tier ships rules. Don't over-engineer the first
- * pass — the rule shape becomes clearer with a 2nd data point.
+ * Scope (current — sub-to-10 + add-to-10)
+ * ---------------------------------------
+ * Two hard-coded tier rule configs: `SUB_TO_TEN_RULES` (PR #245) and
+ * `ADD_TO_TEN_RULES` (this PR). Adding the 2nd tier validates the
+ * Approach-A → B migration path: a 3rd tier should now be a contained
+ * refactor (a new `<TIER>_RULES` config + a new branch in
+ * `resolveTierBinding`). Migrating to a per-tier `composition-rules.json`
+ * (Approach B) is the future architecture once a 3rd tier requests rules —
+ * two data points are not enough to crystallise the JSON shape.
  *
- * Other tiers (digraphs, cvc-words-short-*, add-to-10, add-to-20) have
- * their own composition rules but are out of scope here. File follow-up
- * tickets when they need backstops.
+ * Other tiers (digraphs, cvc-words-short-*, add-to-20) have their own
+ * composition rules but are out of scope here. File follow-up tickets
+ * when they need backstops.
  *
- * Rules enforced (per `design/math/sub-to-10-content.md` §1.1 + §2.3)
- * ------------------------------------------------------------------
+ * Rules enforced — sub-to-10 (per `design/math/sub-to-10-content.md` §1.1 + §2.3)
+ * --------------------------------------------------------------------------------
  *   1. Pool membership — every fact must be one of the 16 (a, b) pairs.
  *   2. Category caps:
  *        doubles-halving ≤ 1
@@ -49,6 +52,49 @@
  *        P5-P8: HARD allowed (general only here).  HARD MUST NOT appear at P1-P4.
  *   4. Take-from-10 coverage: ≥ 1 take-from-10 fact MUST appear in P4-P8.
  *   5. No duplicates: no (a, b) pair repeats within the 8-problem set.
+ *
+ * Rules enforced — add-to-10
+ * --------------------------
+ * NOTE: there is NO `design/math/add-to-10-content.md` spec and NO
+ * structured FACT POOL block in the planner directive (`_planner.ts:921`
+ * is one line — sums 3-10, addends 1-9, prefer bridge-through-5 / easy
+ * doubles / small near-doubles). The rules below are a pedagogical
+ * synthesis of:
+ *   - the directive's stated constraints (sums 3-10, addends 1-9),
+ *   - the sub-to-10 rule shape (band-by-slot + caps + coverage),
+ *   - Marian's diagnostic (April 2026): "Sums to 10, drive automaticity,
+ *     100% finger reliance" — sums-to-10 is the highest-leverage category
+ *     and gets the same in-discriminate-slot coverage rule that
+ *     take-from-10 gets in sub-to-10.
+ *   - the post-PR-245 current canon at `public/canon/math/level-1/
+ *     add-to-10.json` (validated to pass these rules at the time of this
+ *     PR — no canon rebake required).
+ *
+ *   1. Pool membership — every fact must be one of the 44 ordered pairs
+ *      (a, b) with a ≥ 1, b ≥ 1, 3 ≤ a + b ≤ 10. Commutative pairs are
+ *      distinct facts (2+3 ≠ 3+2 in the pool) because the read-lines
+ *      are spoken differently.
+ *   2. Category caps (mutually exclusive — each fact has exactly ONE
+ *      category; priority order is sums-to-10 → doubles → plus-one →
+ *      near-doubles → general):
+ *        doubles      ≤ 2   (3 facts in pool: 2+2, 3+3, 4+4. 5+5 lives
+ *                            in sums-to-10 — see priority order.)
+ *        plus-one     ≤ 2   (14 facts: min(a,b)==1, a≠b, sum≥3, sum<10.
+ *                            1+9 and 9+1 are sums-to-10 instead.)
+ *        near-doubles ≤ 3   (6 facts: |a−b|==1, min(a,b)≥2)
+ *        sums-to-10   ≤ 2   (9 facts: a+b==10 — the highest-leverage
+ *                            category. Includes 1+9 and 9+1 and the 5+5
+ *                            anchor — same make-10 mental model.)
+ *        general      ≤ 2   (12 facts: HARD cap — everything else)
+ *   3. Band-by-slot (by sum):
+ *        EASY (sum 3-5):   slots P1-P8 (gentle ramp anchor).
+ *        MEDIUM (sum 6-8): slots P4-P8.
+ *        HARD (sum 9-10):  slots P5-P8.
+ *   4. Sums-to-10 coverage: ≥ 1 sums-to-10 fact MUST appear in P4-P8.
+ *      This is the make-10 mental model that bridges to add-to-20.
+ *   5. No duplicates: no (a, b) pair repeats within the 8-problem set.
+ *      Note: 2+3 and 3+2 are NOT duplicates — they are distinct ordered
+ *      pairs with distinct read-line text.
  *
  * Surfaces
  * --------
@@ -128,6 +174,14 @@ export class CompositionLintError extends Error {
 //
 // We accept both. Anything else (e.g. addition `"<W> plus <W>. How many?"`)
 // is rejected by the parser — sub-to-10 must be subtraction.
+//
+// Canon utterance text for add-to-10 is:
+//   "<W> plus <W>. How many?"
+//
+// The two parsers are siblings — they share NUMBER_WORDS but have distinct
+// templates and distinct exports so a sub-to-10 canon parsed by the
+// add-to-10 parser (or vice-versa) returns null and fires
+// `unparseable-problem`.
 
 const NUMBER_WORDS: Record<string, number> = {
   zero: 0,
@@ -147,6 +201,7 @@ const RE_TAKE_AWAY =
   /^\s*([a-z]+)\s+take\s+away\s+([a-z]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i
 const RE_MINUS =
   /^\s*([a-z]+)\s+minus\s+([a-z]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i
+const RE_PLUS = /^\s*([a-z]+)\s+plus\s+([a-z]+)\s*\.\s*how\s+many\s*\?\s*$/i
 
 export interface ParsedFact {
   a: number
@@ -162,6 +217,24 @@ export interface ParsedFact {
  */
 export function parseSubToTenReadLine(text: string): ParsedFact | null {
   const m = RE_TAKE_AWAY.exec(text) ?? RE_MINUS.exec(text)
+  if (!m) return null
+  const a = NUMBER_WORDS[m[1]!.toLowerCase()]
+  const b = NUMBER_WORDS[m[2]!.toLowerCase()]
+  if (a === undefined || b === undefined) return null
+  return { a, b }
+}
+
+/**
+ * Parse an add-to-10 read-line into `{ a, b }`. Returns null if the text
+ * doesn't match the addition template `"<W> plus <W>. How many?"` or if
+ * a number word is unrecognised. Pure; no I/O.
+ *
+ * Subtraction templates (sub-to-10's "take away" / "minus") return null
+ * here — by design — so a sub-to-10 canon mis-routed to this parser
+ * fires `unparseable-problem` cleanly.
+ */
+export function parseAddToTenReadLine(text: string): ParsedFact | null {
+  const m = RE_PLUS.exec(text)
   if (!m) return null
   const a = NUMBER_WORDS[m[1]!.toLowerCase()]
   const b = NUMBER_WORDS[m[2]!.toLowerCase()]
@@ -441,20 +514,331 @@ export function assertSubToTenCompositionClean(
   }
 }
 
+// ── add-to-10 rule config (hard-coded — second tier) ─────────────────────
+//
+// No `design/math/add-to-10-content.md` spec exists today, and the
+// planner directive at `api/_planner.ts:921` is a one-line description
+// (sums 3-10, addends 1-9, prefer bridge-through-5 / easy doubles /
+// small near-doubles) with NO structured FACT POOL block. Unlike
+// sub-to-10, there is therefore no directive-side drift-guard parser
+// to run — the pool below is authored fresh from the directive's stated
+// constraints + Marian's diagnostic (sums-to-10 is the high-leverage
+// category) + the post-PR-245 current canon (validated to pass).
+//
+// Pool shape: 44 ordered pairs (a, b) with a ≥ 1, b ≥ 1, 3 ≤ a+b ≤ 10.
+// Commutative pairs (e.g. 2+3 and 3+2) are DISTINCT facts because the
+// read-lines differ — the lint treats them independently. The "no
+// duplicates" rule operates on the (a, b) pair id, not on the unordered
+// {a, b} set.
+//
+// Category taxonomy: mutually exclusive (each fact maps to EXACTLY one
+// category). Order of precedence when a fact could belong to multiple:
+//   sums-to-10  →  doubles  →  plus-one  →  near-doubles  →  general
+// In particular:
+//   - 5+5 lives in `sums-to-10` (not `doubles`) — it IS a sums-to-10
+//     anchor, pedagogically the most valuable doubles fact.
+//   - 1+9 and 9+1 live in `sums-to-10` (not `plus-one`) — same
+//     reasoning: the make-10 mental model dominates the shape.
+// Marian's April diagnostic flags sums-to-10 automaticity as the top
+// priority; the taxonomy is built around making sure those facts are
+// detected and counted as a single high-leverage bucket.
+
+export type AddToTenBand = 'EASY' | 'MEDIUM' | 'HARD'
+
+export type AddToTenCategory =
+  | 'doubles'
+  | 'plus-one'
+  | 'near-doubles'
+  | 'sums-to-10'
+  | 'general'
+
+export interface AddToTenPoolFact {
+  /** "a+b" string id, e.g. "5+5". Stable across runs. */
+  id: string
+  a: number
+  b: number
+  band: AddToTenBand
+  category: AddToTenCategory
+}
+
+/** Build the canonical 44-fact add-to-10 pool deterministically.
+ *
+ *  Why a function (vs a hand-written literal like SUB_TO_TEN_POOL):
+ *    sub-to-10's pool is 16 facts handpicked by Kyle's content spec, so
+ *    a literal is the right shape. add-to-10's pool is the mathematical
+ *    closure of (a≥1, b≥1, 3≤a+b≤10), so a programmatic build is both
+ *    correct-by-construction AND testable (the pool-sanity tests assert
+ *    count 44, unique ids, band counts, category counts). The factory
+ *    runs once at module-load and produces a frozen array.
+ */
+function buildAddToTenPool(): readonly AddToTenPoolFact[] {
+  const out: AddToTenPoolFact[] = []
+  for (let a = 1; a <= 9; a++) {
+    for (let b = 1; b <= 9; b++) {
+      const sum = a + b
+      if (sum < 3 || sum > 10) continue
+
+      // Bands by sum.
+      const band: AddToTenBand =
+        sum <= 5 ? 'EASY' : sum <= 8 ? 'MEDIUM' : 'HARD'
+
+      // Categories — mutually exclusive, priority-ordered:
+      //   1. sums-to-10 (a + b == 10) — includes 5+5 (the anchor)
+      //   2. doubles (a == b, sum < 10)
+      //   3. plus-one (min == 1, a != b)
+      //   4. near-doubles (|a - b| == 1, min >= 2)
+      //   5. general (everything else)
+      let category: AddToTenCategory
+      if (sum === 10) {
+        category = 'sums-to-10'
+      } else if (a === b) {
+        category = 'doubles'
+      } else if (a === 1 || b === 1) {
+        category = 'plus-one'
+      } else if (Math.abs(a - b) === 1) {
+        category = 'near-doubles'
+      } else {
+        category = 'general'
+      }
+
+      out.push({ id: `${a}+${b}`, a, b, band, category })
+    }
+  }
+  return Object.freeze(out)
+}
+
+export const ADD_TO_TEN_POOL: readonly AddToTenPoolFact[] = buildAddToTenPool()
+
+/** Tier rule config — what the add-to-10 lint enforces. Mirrors
+ *  `SubToTenRulesConfig`. Migration to per-tier JSON (Approach B) is
+ *  postponed until at least one more tier requests rules — two data
+ *  points (sub-to-10, add-to-10) are not enough to crystallise the
+ *  JSON shape. */
+export interface AddToTenRulesConfig {
+  pool: readonly AddToTenPoolFact[]
+  categoryCaps: Record<AddToTenCategory, number>
+  /** Slots (1-indexed) where each band is allowed. */
+  bandAllowedSlots: Record<AddToTenBand, readonly number[]>
+  /** Whole-session minimum count of sums-to-10 facts within P4-P8. */
+  sumsToTenInP4ToP8Min: number
+  totalProblems: number
+}
+
+export const ADD_TO_TEN_RULES: AddToTenRulesConfig = {
+  pool: ADD_TO_TEN_POOL,
+  categoryCaps: {
+    doubles: 2,
+    'plus-one': 2,
+    'near-doubles': 3,
+    'sums-to-10': 2,
+    general: 2,
+  },
+  bandAllowedSlots: {
+    EASY: [1, 2, 3, 4, 5, 6, 7, 8],
+    MEDIUM: [4, 5, 6, 7, 8],
+    HARD: [5, 6, 7, 8],
+  },
+  sumsToTenInP4ToP8Min: 1,
+  totalProblems: 8,
+}
+
+// ── core: lint a SessionStartResponse against add-to-10 rules ────────────
+
+interface AddProblemRow {
+  index: number // 1-indexed
+  utteranceId: string
+  text: string
+  parsed: ParsedFact | null
+  poolMatch: AddToTenPoolFact | null
+}
+
+function extractAddProblems(
+  response: Pick<SessionStartResponse, 'utterances'>,
+): AddProblemRow[] {
+  const re = /^math\.p(\d+)\.read$/
+  const rows: AddProblemRow[] = []
+  for (const u of response.utterances) {
+    const m = re.exec(u.id)
+    if (!m) continue
+    const index = Number.parseInt(m[1]!, 10)
+    const parsed = parseAddToTenReadLine(u.text)
+    const poolMatch = parsed
+      ? (ADD_TO_TEN_POOL.find((f) => f.a === parsed.a && f.b === parsed.b) ??
+        null)
+      : null
+    rows.push({
+      index,
+      utteranceId: u.id,
+      text: u.text,
+      parsed,
+      poolMatch,
+    })
+  }
+  rows.sort((x, y) => x.index - y.index)
+  return rows
+}
+
+/**
+ * Lint a canon's plan against the add-to-10 composition rules. Returns
+ * ALL violations across the 8-problem set — does not stop at the first.
+ *
+ * Pure; no I/O.
+ */
+export function lintAddToTenComposition(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: AddToTenRulesConfig = ADD_TO_TEN_RULES,
+): CompositionViolation[] {
+  const violations: CompositionViolation[] = []
+  const problems = extractAddProblems(response)
+
+  // ── unparseable / pool-membership pass ──
+  for (const p of problems) {
+    if (p.parsed === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: p.index,
+        message:
+          `P${p.index} (${p.utteranceId}) text does not match the ` +
+          `add-to-10 read template ("<W> plus <W>. How many?"): ` +
+          JSON.stringify(p.text),
+        factId: null,
+      })
+      continue
+    }
+    if (p.poolMatch === null) {
+      violations.push({
+        rule: 'pool-membership',
+        problemIndex: p.index,
+        message:
+          `P${p.index} fact ${p.parsed.a}+${p.parsed.b}=` +
+          `${p.parsed.a + p.parsed.b} is NOT in the add-to-10 pool ` +
+          `(a≥1, b≥1, 3≤a+b≤10).`,
+        factId: `${p.parsed.a}+${p.parsed.b}`,
+      })
+    }
+  }
+
+  const matched = problems.filter(
+    (p): p is AddProblemRow & { poolMatch: AddToTenPoolFact } =>
+      p.poolMatch !== null,
+  )
+
+  // ── band-by-slot pass ──
+  for (const p of matched) {
+    const allowed = config.bandAllowedSlots[p.poolMatch.band]
+    if (!allowed.includes(p.index)) {
+      violations.push({
+        rule: 'band-by-slot',
+        problemIndex: p.index,
+        message:
+          `P${p.index} carries ${p.poolMatch.band} fact ` +
+          `${p.poolMatch.id} (category ${p.poolMatch.category}). ` +
+          `${p.poolMatch.band}-band is only allowed at slots ` +
+          `[${allowed.join(', ')}].`,
+        factId: p.poolMatch.id,
+      })
+    }
+  }
+
+  // ── category-cap pass ──
+  type MatchedAddRow = AddProblemRow & { poolMatch: AddToTenPoolFact }
+  const categoryCounts: Record<string, MatchedAddRow[]> = {}
+  for (const p of matched) {
+    const cat = p.poolMatch.category
+    if (!categoryCounts[cat]) categoryCounts[cat] = []
+    categoryCounts[cat]!.push(p)
+  }
+  for (const [cat, rows] of Object.entries(categoryCounts)) {
+    const cap = config.categoryCaps[cat as AddToTenCategory]
+    if (cap === undefined) continue
+    if (rows.length > cap) {
+      violations.push({
+        rule: 'category-cap',
+        problemIndex: null,
+        message:
+          `Category "${cat}" cap is ${cap}; canon has ${rows.length} ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}; facts ` +
+          `${rows.map((r) => r.poolMatch.id).join(', ')}).`,
+        factId: null,
+      })
+    }
+  }
+
+  // ── sums-to-10 coverage pass (≥ 1 in P4-P8) ──
+  const sumsToTenInDiscriminate = matched.filter(
+    (p) => p.poolMatch.category === 'sums-to-10' && p.index >= 4,
+  )
+  if (sumsToTenInDiscriminate.length < config.sumsToTenInP4ToP8Min) {
+    violations.push({
+      rule: 'take-from-10-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.sumsToTenInP4ToP8Min} sums-to-10 fact(s) ` +
+        `MUST appear in P4-P8 (highest-leverage category — Marian's ` +
+        `April diagnostic flags sums-to-10 automaticity as the top ` +
+        `priority; bridges to add-to-20's make-10 mental model). ` +
+        `Canon has ${sumsToTenInDiscriminate.length}.`,
+      factId: null,
+    })
+  }
+
+  // ── no-duplicates pass ──
+  const seen = new Map<string, AddProblemRow[]>()
+  for (const p of matched) {
+    const key = p.poolMatch.id
+    if (!seen.has(key)) seen.set(key, [])
+    seen.get(key)!.push(p)
+  }
+  for (const [factId, rows] of seen.entries()) {
+    if (rows.length > 1) {
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: null,
+        message:
+          `Fact ${factId} appears ${rows.length} times ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}). ` +
+          `No duplicates allowed within the 8-problem set.`,
+        factId,
+      })
+    }
+  }
+
+  return violations
+}
+
+/**
+ * Throwing helper for the bake-time integration point. The throw aborts
+ * the bake and stops the (compositionally invalid) JSON from reaching
+ * disk.
+ *
+ * `canonId` is a human-readable identifier (e.g. `"math/add-to-10"`)
+ * used only for the error message.
+ */
+export function assertAddToTenCompositionClean(
+  canonId: string,
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: AddToTenRulesConfig = ADD_TO_TEN_RULES,
+): void {
+  const violations = lintAddToTenComposition(response, config)
+  if (violations.length > 0) {
+    throw new CompositionLintError(canonId, violations)
+  }
+}
+
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
-// First-pass scope is sub-to-10 only. The function returns a (potentially
-// nil) rule config for the supplied canon-file path. Hard-coded matching
-// for now; future tiers slot in here.
+// Current scope is sub-to-10 + add-to-10. The function returns a
+// (potentially nil) rule config for the supplied canon-file path.
+// Hard-coded matching; future tiers slot in here.
 
-export type TierLintBinding = {
-  tier: 'sub-to-10'
-  config: SubToTenRulesConfig
-} | null
+export type TierLintBinding =
+  | { tier: 'sub-to-10'; config: SubToTenRulesConfig }
+  | { tier: 'add-to-10'; config: AddToTenRulesConfig }
+  | null
 
 /**
  * Resolve a canon file path to the tier rule config that should lint it.
- * Returns null for files outside scope (digraphs, cvc-words, add-to-10,
+ * Returns null for files outside scope (digraphs, cvc-words, add-to-20,
  * etc.) — those tiers have their own composition rules but are not
  * mechanically backstopped yet.
  *
@@ -468,10 +852,14 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   if (norm.endsWith('/math/level-1/sub-to-10.json')) {
     return { tier: 'sub-to-10', config: SUB_TO_TEN_RULES }
   }
-  // Also match a bare canon file id (e.g. "sub-to-10.json") for tests
-  // that hand us non-rooted paths.
   if (norm === 'sub-to-10.json' || norm.endsWith('/sub-to-10.json')) {
     return { tier: 'sub-to-10', config: SUB_TO_TEN_RULES }
+  }
+  if (norm.endsWith('/math/level-1/add-to-10.json')) {
+    return { tier: 'add-to-10', config: ADD_TO_TEN_RULES }
+  }
+  if (norm === 'add-to-10.json' || norm.endsWith('/add-to-10.json')) {
+    return { tier: 'add-to-10', config: ADD_TO_TEN_RULES }
   }
   return null
 }
@@ -481,7 +869,7 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
 export interface CompositionFileFinding {
   /** Repo-relative posix-shaped path for log readability. */
   filePath: string
-  tier: 'sub-to-10'
+  tier: 'sub-to-10' | 'add-to-10'
   violations: CompositionViolation[]
 }
 
@@ -551,10 +939,16 @@ export function runCompositionLint(
     // on the top-level `utterances` array. (We deliberately don't read
     // `plan.utterances` — the plan field is `unknown` on the wire type;
     // top-level `utterances` is the validated surface.)
-    const violations = lintSubToTenComposition(
-      parsed as SessionStartResponse,
-      binding.config,
-    )
+    const violations =
+      binding.tier === 'sub-to-10'
+        ? lintSubToTenComposition(
+            parsed as SessionStartResponse,
+            binding.config,
+          )
+        : lintAddToTenComposition(
+            parsed as SessionStartResponse,
+            binding.config,
+          )
     if (violations.length > 0) {
       result.findings.push({
         filePath,
