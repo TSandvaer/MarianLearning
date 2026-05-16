@@ -408,23 +408,55 @@ describe('lintSubToTenComposition — band-by-slot rule', () => {
   })
 
   it('fires when MEDIUM-band fact appears at P2 (P1-P3 EASY-only)', () => {
+    // Note: under the tightened EASY = P1-P3 only rule, every P4-P8 slot
+    // must carry MEDIUM or HARD. This fixture isolates a single MEDIUM-at-
+    // P2 violation by filling P4-P8 with MEDIUM/HARD only and respecting
+    // all caps + take-from-10 coverage.
     const facts: Array<[number, number]> = [
-      [7, 0], // EASY ok
-      [10, 3], // MEDIUM at P2 — band-by-slot violation
-      [9, 1], // EASY ok
-      [10, 2],
-      [8, 3],
-      [9, 4],
-      [10, 7],
-      [6, 3],
+      [7, 0], // P1 subtract-zero EASY ok
+      [10, 3], // P2 take-from-10 MEDIUM — band-by-slot violation (only thing under test)
+      [8, 8], // P3 subtract-self EASY ok
+      [10, 2], // P4 subtract-two MEDIUM
+      [8, 3], // P5 general HARD
+      [9, 4], // P6 general HARD
+      [10, 7], // P7 take-from-10 MEDIUM (satisfies P4-P8 take-from-10 coverage)
+      [10, 1], // P8 subtract-one MEDIUM
     ]
     const violations = lintSubToTenComposition(buildCanonResponse(facts))
     const band = violations.filter((v) => v.rule === 'band-by-slot')
-    // 6-3 at P8 is EASY which is fine.
-    // Just the 10-3 at P2.
     expect(band).toHaveLength(1)
     expect(band[0]!.problemIndex).toBe(2)
     expect(band[0]!.factId).toBe('10-3')
+  })
+
+  it('fires when EASY-band fact appears at P5 (Dave NOF #1 mutation — P4-P8 forbid EASY)', () => {
+    // Tightened band-by-slot rule (post-Dave-NOF-#1 from PR #247): EASY
+    // is allowed at P1-P3 only. Previously the lint allowed EASY at any
+    // slot, which let an EASY-at-P5 slip past the bake-time check in a
+    // previously-shipped canon. This mutation test pins the new
+    // behaviour.
+    //
+    // Move 9-1 (EASY/subtract-one) from its CLEAN P3 home to P5; fill P3
+    // with another EASY fact (8-8) to keep the gentle-ramp slots full.
+    // Re-balance category caps so the only violation under test is the
+    // EASY-at-P5 band-by-slot fire.
+    const facts: Array<[number, number]> = [
+      [7, 0], // P1 subtract-zero EASY ok
+      [6, 3], // P2 doubles-halving EASY ok
+      [8, 8], // P3 subtract-self EASY ok
+      [10, 2], // P4 subtract-two MEDIUM
+      [9, 1], // P5 subtract-one EASY — band-by-slot violation (only thing under test)
+      [8, 3], // P6 general HARD
+      [9, 4], // P7 general HARD
+      [10, 7], // P8 take-from-10 MEDIUM (satisfies P4-P8 take-from-10 coverage)
+    ]
+    const violations = lintSubToTenComposition(buildCanonResponse(facts))
+    const band = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(band).toHaveLength(1)
+    expect(band[0]!.problemIndex).toBe(5)
+    expect(band[0]!.factId).toBe('9-1')
+    expect(band[0]!.message).toContain('EASY')
+    expect(band[0]!.message).toContain('[1, 2, 3]')
   })
 
   it('does NOT fire when HARD facts are at P5-P8', () => {
@@ -919,10 +951,14 @@ describe('SUB_TO_TEN_RULES', () => {
     expect(SUB_TO_TEN_RULES.categoryCaps['subtract-two']).toBe(1)
   })
 
-  it('EASY allowed at all slots P1-P8', () => {
-    expect(SUB_TO_TEN_RULES.bandAllowedSlots.EASY).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8,
-    ])
+  it('EASY allowed at P1-P3 only (gentle ramp; tightened post-Dave-NOF-#1)', () => {
+    // Per directive prose at `api/_planner.ts` SESSION COMPOSITION RULES
+    // rule 3 — "Problems 4-8 (discriminate): draw from MEDIUM + HARD bands"
+    // — EASY is FORBIDDEN at P4-P8. Original PR #245 allowed EASY at any
+    // slot, which let an EASY-at-P5 slip past the bake-time lint in a
+    // previously-shipped canon (Dave's audit, PR #247). This tightening
+    // closes the defense-in-depth gap.
+    expect(SUB_TO_TEN_RULES.bandAllowedSlots.EASY).toEqual([1, 2, 3])
   })
 
   it('MEDIUM allowed at P4-P8 only', () => {
