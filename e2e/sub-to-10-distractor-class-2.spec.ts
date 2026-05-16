@@ -64,6 +64,8 @@
 
 import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   buildSeedSessionHistory,
   seedLocalStorage,
@@ -77,22 +79,19 @@ import {
 // rotation plan, masking the canned plan's distractor content — which
 // IS what this spec asserts on (chip values for specific facts).
 //
-// HEADLESS-CHROMIUM LIMITATION (tests 1 + 3 only): without
-// forceHowlerUnlock, Math.tsx's read-aloud effect short-circuits on
-// silent-MP3 placeholder bytes (Howler.ctx stays suspended), chips
-// never enable, and the multi-problem chip walk for tests 1 (P4
-// wrong-op) and 3 (add-to-10 P4) cannot complete. The cleanest fix is
-// to swap the canned silent-MP3 fixture for real Azure canon bytes
-// (the `installDigraphsThClaudeMock` pattern from
-// `digraphs-th-content.spec.ts`) — but the sub-to-10 canon on disk
-// uses a different fact pool than this spec's synthetic fixture
-// (canon P4 = `10 - 3 = 7`, no in-range wrong-op trap), so naive
-// canon-on-disk read would not exercise the Class 2 logic. Tests 1
-// and 3 should be revisited once the spec → canon → fixture
-// alignment can be redesigned together; until then they will stay
-// RED-for-wrong-reason on chromium headless. Test 2 (P1 gentle,
-// no walk) reads chips at P1 without advancing, so it works with
-// just the canon-landed gate + chromium skip.
+// Tests 1 and 3 (P4 chip-walk) now use REAL CANON BYTES served via
+// `installMathCanonClaudeMock` (the `installDigraphsChClaudeMock`
+// pattern from `digraphs-ch-content.spec.ts`). Real Azure-rendered MP3s
+// decode cleanly under the genuine gesture-unlock chain, so chips
+// enable across the multi-problem walk. Per PR #253 the sub-to-10
+// canon pool was widened to 22 facts and P4 is now `8 - 2 = 6` — a
+// Class-2-eligible fact (a+b=10, in-range trap). This unblocks the
+// re-enable path that was blocked at PR #239 dispatch time, when the
+// pre-#253 canon's P4 (`10 - 3 = 7`) had no in-range wrong-op trap.
+// Per `.claude/docs/testing-and-ci.md` §4.1.3 rule 3, multi-problem
+// chip-walk specs require real-canon-bytes mocks — this is exactly
+// that pattern. Test 2 (P1 gentle) remains `test.fixme`'d for a
+// SEPARATE reason — see the fixme comment on test 2 itself.
 
 // ── WebKit-headless skip ─────────────────────────────────────────────────────
 function skipOnWebkitHeadless(testInfo: {
@@ -119,99 +118,12 @@ function audio() {
 // ── Canned-plan factories ────────────────────────────────────────────────────
 
 /**
- * Sub-to-10 plan placing `9 - 1 = 8` at problem index 4 (discriminate-tier
- * Class-2 wrong-op trap = `9 + 1 = 10`, in range). The other 7 problems
- * are valid sub-to-10 pool facts; none materially affect the assertions
- * below, but they're shaped per the spec to keep the rendered plan
- * coherent.
- */
-function cannedSubToTenWithProblem4WrongOp() {
-  const problems = [
-    {
-      idx: 1,
-      mW: 'Ten',
-      sW: 'five',
-      minuend: 10,
-      subtrahend: 5,
-      ans: 5,
-      ansW: 'Five',
-    },
-    {
-      idx: 2,
-      mW: 'Six',
-      sW: 'three',
-      minuend: 6,
-      subtrahend: 3,
-      ans: 3,
-      ansW: 'Three',
-    },
-    {
-      idx: 3,
-      mW: 'Eight',
-      sW: 'four',
-      minuend: 8,
-      subtrahend: 4,
-      ans: 4,
-      ansW: 'Four',
-    },
-    {
-      idx: 4,
-      mW: 'Nine',
-      sW: 'one',
-      minuend: 9,
-      subtrahend: 1,
-      ans: 8,
-      ansW: 'Eight',
-    },
-    {
-      idx: 5,
-      mW: 'Ten',
-      sW: 'three',
-      minuend: 10,
-      subtrahend: 3,
-      ans: 7,
-      ansW: 'Seven',
-    },
-    {
-      idx: 6,
-      mW: 'Ten',
-      sW: 'seven',
-      minuend: 10,
-      subtrahend: 7,
-      ans: 3,
-      ansW: 'Three',
-    },
-    {
-      idx: 7,
-      mW: 'Nine',
-      sW: 'four',
-      minuend: 9,
-      subtrahend: 4,
-      ans: 5,
-      ansW: 'Five',
-    },
-    {
-      idx: 8,
-      mW: 'Nine',
-      sW: 'six',
-      minuend: 9,
-      subtrahend: 6,
-      ans: 3,
-      ansW: 'Three',
-    },
-  ]
-  return mkResponse(
-    'sub-to-10-level-1',
-    'Subtraction within 10 — Level 1',
-    problems,
-    'minus',
-  )
-}
-
-/**
  * Sub-to-10 plan placing `9 - 1 = 8` at problem index 1 (gentle tier).
  * Gentle ramp uses Class 0 distractors regardless of operation; the
  * wrong-op value `10` must NOT appear.
+ *
+ * Used by test 2 only (P1 gentle, fixme'd for an unrelated spec-design
+ * reason — see the fixme docstring on test 2 itself).
  */
 function cannedSubToTenWithProblem1GentleFact() {
   const problems = [
@@ -296,94 +208,6 @@ function cannedSubToTenWithProblem1GentleFact() {
   )
 }
 
-/**
- * add-to-10 plan placing `5 + 3 = 8` at problem index 4 (discriminate
- * tier). Class 2 is sub-only — even at P4 the addition plan must NOT
- * carry `|5 - 3| = 2` as a distractor (spec §3.5).
- */
-function cannedAddToTenWithProblem4Trap() {
-  const problems = [
-    {
-      idx: 1,
-      mW: 'One',
-      sW: 'one',
-      minuend: 1,
-      subtrahend: 1,
-      ans: 2,
-      ansW: 'Two',
-    },
-    {
-      idx: 2,
-      mW: 'Two',
-      sW: 'one',
-      minuend: 2,
-      subtrahend: 1,
-      ans: 3,
-      ansW: 'Three',
-    },
-    {
-      idx: 3,
-      mW: 'Two',
-      sW: 'two',
-      minuend: 2,
-      subtrahend: 2,
-      ans: 4,
-      ansW: 'Four',
-    },
-    {
-      idx: 4,
-      mW: 'Five',
-      sW: 'three',
-      minuend: 5,
-      subtrahend: 3,
-      ans: 8,
-      ansW: 'Eight',
-    },
-    {
-      idx: 5,
-      mW: 'Four',
-      sW: 'two',
-      minuend: 4,
-      subtrahend: 2,
-      ans: 6,
-      ansW: 'Six',
-    },
-    {
-      idx: 6,
-      mW: 'Three',
-      sW: 'four',
-      minuend: 3,
-      subtrahend: 4,
-      ans: 7,
-      ansW: 'Seven',
-    },
-    {
-      idx: 7,
-      mW: 'Four',
-      sW: 'four',
-      minuend: 4,
-      subtrahend: 4,
-      ans: 8,
-      ansW: 'Eight',
-    },
-    {
-      idx: 8,
-      mW: 'Five',
-      sW: 'four',
-      minuend: 5,
-      subtrahend: 4,
-      ans: 9,
-      ansW: 'Nine',
-    },
-  ]
-  return mkResponse(
-    'sums-to-10-warm-up',
-    'Sums to 10 — warm up',
-    problems,
-    'plus',
-  )
-}
-
 function mkResponse(
   planId: string,
   label: string,
@@ -431,6 +255,101 @@ function mkResponse(
     },
     utterances,
   }
+}
+
+// ── Canon-bytes mock — for tests 1 + 3 (multi-problem chip-walk) ─────────────
+
+/**
+ * Paths to the math session canons we serve for tests 1 + 3. Resolved
+ * from `process.cwd()` because Playwright runs the harness from the
+ * worktree root (same place `vite preview` reads `public/`).
+ *
+ * sub-to-10 canon current state (post PR #253 widening + #255 lint
+ * tightening) — see `api/_planner.ts:972` for the locked 22-fact pool:
+ *   P1=5-5=0  P2=6-3=3  P3=9-1=8  P4=8-2=6  (a+b=10 IN — Class-2 trap)
+ *   P5=10-3=7 P6=10-7=3 P7=7-3=4 (a+b=10 IN) P8=6-4=2 (a+b=10 IN)
+ *
+ * add-to-10 canon P4 = `4 + 3 = 7`. Class 2 is op:'-' ONLY (see
+ * `distractors.ts:224-227`) so even though `|4 - 3| = 1` is the
+ * hypothetical wrong-op trap value, it must NOT appear on the chip
+ * row at P4 — the off-by-one tier emits `[6, 8]` for correct=7.
+ */
+const SUB_TO_TEN_CANON_PATH = resolve(
+  process.cwd(),
+  'public/canon/math/level-1/sub-to-10.json',
+)
+const ADD_TO_TEN_CANON_PATH = resolve(
+  process.cwd(),
+  'public/canon/math/level-1/add-to-10.json',
+)
+
+function readMathCanon(path: string): string {
+  if (!existsSync(path)) {
+    throw new Error(
+      `[sub-to-10-distractor-class-2 spec] canon not found at ${path}. ` +
+        `This canon is required for chip-walk tests; do NOT swap to a ` +
+        `silent-MP3 placeholder — see file header.`,
+    )
+  }
+  return readFileSync(path, 'utf-8')
+}
+
+/**
+ * Install a `/api/claude` mock that serves the on-disk math canon for
+ * `track === 'math'` requests. Modelled on `installDigraphsChClaudeMock`
+ * (`digraphs-ch-content.spec.ts`). Real Azure-rendered MP3 bytes decode
+ * cleanly in headless chromium, so the read-aloud effect resolves and
+ * chips enable across the multi-problem walk — the required pattern per
+ * `.claude/docs/testing-and-ci.md` §4.1.3.
+ *
+ * `canonBody` is the raw JSON string read from disk; we serve it
+ * verbatim as the `track === 'math'` response. Unknown tracks return
+ * 500 loudly so an unintended live hit cannot pass silently.
+ */
+async function installMathCanonClaudeMock(
+  page: Page,
+  canonBody: string,
+): Promise<{ requests: Request[] }> {
+  const requests: Request[] = []
+  await page.route('**/api/claude', async (route) => {
+    const req = route.request()
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    requests.push(req)
+    let body: Record<string, unknown>
+    try {
+      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
+    } catch {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: '{}',
+      })
+      return
+    }
+    const payload = (body.payload ?? {}) as Record<string, unknown>
+    const track = payload.track as string | undefined
+    if (track === 'math') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: canonBody,
+      })
+      return
+    }
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: false,
+        error: 'unexpected-track',
+        message: `distractor-class-2 spec is math-only; saw track=${String(track)}`,
+      }),
+    })
+  })
+  return { requests }
 }
 
 // ── Mock factory — math-only, response is per-test ───────────────────────────
@@ -545,18 +464,26 @@ async function readChipValuesAtProblem(
   page: Page,
   problemIndex: number,
 ): Promise<number[]> {
-  // The math screen renders exactly ONE problem at a time. The chip row
-  // for the current problem is the only `math-chips` block in the DOM.
-  // We advance to `problemIndex` by tapping the correct chip
-  // (problemIndex - 1) times.
+  // `problemIndex` is 1-based in the spec signature (1 = first problem
+  // in the canon, 4 = fourth). The DOM's `data-problem-index` on
+  // `[data-testid="math"]` is 0-based — P1 renders as `"0"`, P4 as
+  // `"3"`. Wait for the 0-based attribute to land before reading chips
+  // to defeat the celebrate→next-problem race that a bare
+  // `waitForTimeout` would absorb (leaving the previous problem's
+  // chips on screen at read time).
   for (let i = 1; i < problemIndex; i++) {
     const correctChip = page.locator(
       '[data-testid="math-chip"][data-correct="true"]',
     )
     await expect(correctChip).toBeEnabled({ timeout: 15_000 })
     await correctChip.click()
-    // Brief pause so the next problem mounts.
-    await page.waitForTimeout(1500)
+    // After tap #i, the screen should advance from 0-based index
+    // `i - 1` to `i`.
+    await expect(page.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      String(i),
+      { timeout: 15_000 },
+    )
   }
   // Now we're on `problemIndex`. Read all 3 chip values.
   const chips = page.locator('[data-testid="math-chip"]')
@@ -573,41 +500,32 @@ async function readChipValuesAtProblem(
 // ── Spec ────────────────────────────────────────────────────────────────────
 
 test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
-  // STOPGAP — chip-walk hang on chromium headless.
+  // RE-ENABLED 2026-05-16 (ClickUp 86c9up8u2). The PR #239 fixme is
+  // resolved by serving the on-disk sub-to-10 canon (PR #253-widened,
+  // PR #255-lint-tightened) instead of the silent-MP3 canned fixture.
+  // Post-#253 the canon's P4 = `8 - 2 = 6` is a Class-2-eligible fact
+  // (a+b=10 IN — boundary, strongest "makes ten" lure per the planner's
+  // pool annotation at `api/_planner.ts:985`). Real Azure MP3 bytes
+  // decode cleanly, so the read-aloud effect resolves and chips enable
+  // across the chip-walk — the canonical pattern per
+  // `.claude/docs/testing-and-ci.md` §4.1.3 rule 3.
   //
-  // Without forceHowlerUnlock, silent-MP3 placeholder bytes leave
-  // Howler.ctx suspended → Math.tsx's read-aloud effect short-circuits
-  // → chips never enable → readChipValuesAtProblem hangs at P1→P2.
-  // forceHowlerUnlock itself causes a silent fallback to the static
-  // rotation plan (per testing-and-ci.md §4.1.2 + empirically
-  // extended in `feedback_force_howler_unlock_demote_extension`), which
-  // masks the canned plan's distractor content — the very thing this
-  // spec asserts on.
-  //
-  // Re-enable when one of:
-  //   (a) a sub-to-10 canon variant with P4 = Class-2-eligible
-  //       subtraction is baked + read via the
-  //       `installDigraphsThClaudeMock`-style pattern from
-  //       `digraphs-th-content.spec.ts`; or
-  //   (b) `__testInitiallyAudioUnlocked` (or equivalent test seam) is
-  //       plumbed through Math.tsx so Howler.ctx can be marked
-  //       running without the silent-fallback demote firing.
-  //
-  // Tracked as a follow-up; per orchestrator dispatch 2026-05-16 the
-  // sub-to-10 wave ships with this test fixme-d. The render layer
-  // (PR #241, merged) ALREADY satisfies the §3.2 wrong-op trap via
-  // PR 1's distractors-test.ts unit coverage (`pickDistractors` returns
-  // `[10, 7]` for the 9-1=8 / wrong-op case); the structural lever
-  // remains an E2E gap.
-  test.fixme('problem 4 (discriminate tier) with 9-1=8 carries `10` as the wrong-op trap distractor', async ({
+  // The original test asserted on `9 - 1 = 8` at P4 (synthetic canned
+  // fact). Canon P3 IS `9 - 1 = 8` but P4 is `8 - 2 = 6`; we re-target
+  // the assertion to the CANON's P4 fact (correct=6, wrong-op trap=10).
+  // The structural assertion is unchanged — "wrong-op trap value
+  // appears on a Class-2-eligible P4 chip row" — only the operands
+  // shift to match where the canon places the lure.
+  test('problem 4 (discriminate tier) with canon `8 - 2 = 6` carries the wrong-op trap `10` as a distractor', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
-    // 4-session walk-through: tap correct 3 times to reach problem 4,
+    // 4-problem walk-through: tap correct 3 times to reach problem 4,
     // then read chips. Bump test timeout for safety on slow CI runners.
     test.setTimeout(120_000)
 
-    await installMathMockReturning(page, cannedSubToTenWithProblem4WrongOp)
+    const canonBody = readMathCanon(SUB_TO_TEN_CANON_PATH)
+    await installMathCanonClaudeMock(page, canonBody)
     await seedLocalStorage(page, {
       progress: buildSubToTenSeedProgress(),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
@@ -621,13 +539,10 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
       .click()
     await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
 
-    // Canon-landed addend gate (PR #242 precedent). Wait for the canned
-    // plan's P1 addends (`10 - 5 = 5`) before walking through chips, so
-    // every distractor read fires against canon, not static fallback.
-    // KNOWN LIMITATION (see file header): chip walk to P4 will hang on
-    // chromium headless because silent-MP3 placeholders leave Howler
-    // suspended → chips never enable. Tracked as a structural follow-up.
-    await expect(page.getByTestId('math-addend-a')).toHaveText('10', {
+    // Canon-landed addend gate (PR #242 precedent). Canon P1 is
+    // `5 - 5 = 0`; wait for those operands so the chip walk starts
+    // against canon (not static fallback) on every distractor read.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('5', {
       timeout: 15_000,
     })
     await expect(page.getByTestId('math-addend-b')).toHaveText('5', {
@@ -636,16 +551,17 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
 
     const valuesAtP4 = await readChipValuesAtProblem(page, 4)
 
-    // Failing-first lever — `10` is the wrong-op trap for `9 - 1 = 8`
-    // (minuend + subtrahend). On RED, the parser falls back to the
-    // static addition plan; problem 4's chips do NOT contain 10.
-    // Count-based assertion per `feedback_count_assertions_on_regression_tests`.
+    // Failing-first lever — for canon P4 `8 - 2 = 6`, the wrong-op
+    // trap value is `a + b = 10` (in range). On RED (pre-Class-2-impl)
+    // the discriminate tier would fall through to plain off-by-one
+    // [5, 7] and `10` would not appear on the chip row. Count-based
+    // assertions per `feedback_count_assertions_on_regression_tests`.
     expect(valuesAtP4).toHaveLength(3)
     const tenCount = valuesAtP4.filter((v) => v === 10).length
     expect(tenCount).toBe(1)
-    // The correct answer 8 must also be among the chips.
-    const eightCount = valuesAtP4.filter((v) => v === 8).length
-    expect(eightCount).toBe(1)
+    // Correct answer 6 must be among the chips.
+    const sixCount = valuesAtP4.filter((v) => v === 6).length
+    expect(sixCount).toBe(1)
   })
 
   // STOPGAP — spec premise was wrong, not the implementation.
@@ -710,18 +626,29 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     expect(eightCount).toBe(1)
   })
 
-  // STOPGAP — chip-walk hang on chromium headless (same root cause
-  // as the first test in this file; see header note). Re-enable when
-  // the structural audio fixture is in place. Class-2-is-sub-only is
-  // unit-tested in `distractors.test.ts` (pickDistractors with
-  // op === '+' never dispatches the wrong-op branch).
-  test.fixme('add-to-10 problem 4 with 5+3=8 does NOT carry `2` (Class 2 is sub-only per spec §3.5)', async ({
+  // RE-ENABLED 2026-05-16 (ClickUp 86c9up8u2). Same fix as test 1 —
+  // switch to real canon bytes + drop `forceHowlerUnlock`. Class-2-is-
+  // sub-only is the counter-test: even on the discriminate tier (P4),
+  // an op:'+' problem must NOT carry `|a - b|` as a distractor.
+  //
+  // Canon `add-to-10.json` P4 = `4 + 3 = 7`. The hypothetical wrong-op
+  // trap value (if Class 2 erroneously fired) would be `|4 - 3| = 1`.
+  // Per `distractors.ts:224-227` the wrong-op branch ONLY fires when
+  // `op === '-'`, so for this op:'+' problem the chip row must be the
+  // plain off-by-one tier `[6, 8]` plus correct `7`. The trap value
+  // `1` must NOT appear. (Re-targeted from the original `5 + 3 = 8`
+  // canned fact whose trap was `|5 - 3| = 2`; structural assertion is
+  // unchanged — "the op:'-'-only Class-2 lure does NOT leak onto an
+  // op:'+' chip row" — only the specific trap value shifts to match
+  // canon operands.)
+  test('add-to-10 problem 4 with canon `4 + 3 = 7` does NOT carry the would-be wrong-op `1` (Class 2 is sub-only per spec §3.5)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
     test.setTimeout(120_000)
 
-    await installMathMockReturning(page, cannedAddToTenWithProblem4Trap)
+    const canonBody = readMathCanon(ADD_TO_TEN_CANON_PATH)
+    await installMathCanonClaudeMock(page, canonBody)
     await seedLocalStorage(page, {
       progress: buildAddToTenSeedProgress(),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
@@ -735,11 +662,9 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
       .click()
     await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
 
-    // Canon-landed addend gate (PR #242 precedent). P1 of this fixture
-    // is `1 + 1 = 2`. KNOWN LIMITATION (see file header): chip walk to
-    // P4 will hang on chromium headless because silent-MP3 placeholders
-    // leave Howler suspended → chips never enable.
-    await expect(page.getByTestId('math-addend-a')).toHaveText('1', {
+    // Canon-landed addend gate (PR #242 precedent). Canon P1 is
+    // `2 + 1 = 3` — wait for those operands before walking chips.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('2', {
       timeout: 15_000,
     })
     await expect(page.getByTestId('math-addend-b')).toHaveText('1', {
@@ -749,12 +674,13 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     const valuesAtP4 = await readChipValuesAtProblem(page, 4)
 
     expect(valuesAtP4).toHaveLength(3)
-    // Counter-test — Class 2 is sub-only. `|5 - 3| = 2` must NOT appear
-    // as a distractor on an add-to-10 problem.
-    const twoCount = valuesAtP4.filter((v) => v === 2).length
-    expect(twoCount).toBe(0)
-    // Correct answer 8 must be present.
-    const eightCount = valuesAtP4.filter((v) => v === 8).length
-    expect(eightCount).toBe(1)
+    // Counter-test — Class 2 is sub-only. `|4 - 3| = 1` (the would-be
+    // wrong-op trap value if Class 2 erroneously fired on op:'+') must
+    // NOT appear as a distractor on an add-to-10 problem.
+    const oneCount = valuesAtP4.filter((v) => v === 1).length
+    expect(oneCount).toBe(0)
+    // Correct answer 7 must be present.
+    const sevenCount = valuesAtP4.filter((v) => v === 7).length
+    expect(sevenCount).toBe(1)
   })
 })
