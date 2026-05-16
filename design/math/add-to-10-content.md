@@ -271,8 +271,9 @@ When the directive-sharpening ticket fires, Kevin should embed the same structur
 >     · general: 2+4, 4+2, 2+5, 5+2, 2+6, 6+2, 3+5, 5+3
 >   - HARD band (sum 9-10; 17 facts):
 >     · sums-to-10: 1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5
+>     · plus-one: 1+8, 8+1
 >     · near-doubles: 4+5, 5+4
->     · general: 1+8, 8+1, 2+7, 7+2, 3+6, 6+3
+>     · general: 2+7, 7+2, 3+6, 6+3
 >
 >   SESSION COMPOSITION RULES (apply IN ORDER):
 >   1. Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts (sum 3-5).
