@@ -946,6 +946,7 @@ The user message names a focus skill node. Generate problems specifically for th
     · 9-6=3   [HARD/general]         (at most two general per session — HARD cap)
   POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) pair appears verbatim above. If 7-3, 7-2, 6-2, 8-5, 9-3, 9-2, or any other pair NOT listed is your candidate, REJECT it and pick another from the 16-fact list.
   GENERAL-CATEGORY CAP SELF-CHECK: across the entire 8-problem session, AT MOST TWO problems may be tagged [HARD/general] (i.e. drawn from {9-4, 8-3, 7-4, 9-6}). Before emitting a third HARD-band fact, REJECT it.
+  DOUBLES-CAP SELF-CHECK: across the entire 8-problem session, AT MOST ONE problem may be tagged [EASY/doubles-halving] (i.e. drawn from {10-5, 8-4, 6-3}). Before emitting a second doubles-halving fact, REJECT it. The three doubles-halving facts share a single slot — pick one and only one. NEGATIVE ANCHOR: it is FORBIDDEN to place 10-5 AND 8-4 in the same session; FORBIDDEN to place 10-5 AND 6-3; FORBIDDEN to place 8-4 AND 6-3. Two consecutive EASY-band doubles in the gentle ramp (P1-P3) is a known failure mode and is explicitly disallowed.
 
   SESSION COMPOSITION RULES (apply IN ORDER):
   1. Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts. Read each fact's [EASY/...] tag before placing it at P1, P2, or P3. ONLY facts tagged [EASY/...] above are eligible for these slots — that is 8 specific facts: 5-5, 8-8, 7-0, 9-0, 10-5, 8-4, 6-3, 9-1.

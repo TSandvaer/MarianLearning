@@ -3299,6 +3299,37 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     expect(systemText).not.toContain('DISTRACTOR-CLASS HINT')
   })
 
+  it('the sub-to-10 directive carries a DOUBLES-CAP SELF-CHECK (mirrors GENERAL-CATEGORY CAP pattern; doubles-halving cap=1)', async () => {
+    // Devon REQUEST_CHANGES on PR #244: positively-worded "at most 1
+    // doubles fact per session" inline pool tags were silently violated
+    // in two consecutive bakes (P2=6-3 + P3=10-5, then P2=6-3 + P3=10-5
+    // again on re-bake). The pattern from `feedback_haiku_directive_sharpening`
+    // (negative anchors over positive quantifiers + explicit self-check
+    // blocks) demands a structurally parallel negative-anchored block.
+    // This test locks the block in place so a future cleanup doesn't
+    // silently strip it and re-introduce the failure mode.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('DOUBLES-CAP SELF-CHECK')
+    expect(systemText).toContain('AT MOST ONE')
+    expect(systemText).toContain('[EASY/doubles-halving]')
+    // The three doubles facts are the pool; the negative anchor names
+    // every forbidden pair explicitly.
+    expect(systemText).toContain('{10-5, 8-4, 6-3}')
+    expect(systemText).toContain('FORBIDDEN to place 10-5 AND 8-4')
+    expect(systemText).toContain('FORBIDDEN to place 10-5 AND 6-3')
+    expect(systemText).toContain('FORBIDDEN to place 8-4 AND 6-3')
+  })
+
   it('the sub-to-10 menu line requires at least one take-from-10 fact in P4-P8 (Dave §"session design rules" #2)', async () => {
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(STUB_RESPONSE, { capture })
