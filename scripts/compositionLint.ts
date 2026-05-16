@@ -134,7 +134,7 @@ export type CompositionRule =
   | 'pool-membership'
   | 'category-cap'
   | 'band-by-slot'
-  | 'take-from-10-coverage'
+  | 'high-leverage-coverage'
   | 'no-duplicates'
   | 'unparseable-problem'
 
@@ -145,7 +145,7 @@ export type CompositionRule =
 export interface CompositionViolation {
   rule: CompositionRule
   /** 1-indexed problem slot (P1-P8). `null` for whole-session rules
-   *  (take-from-10-coverage, certain category-cap cases). */
+   *  (high-leverage-coverage, certain category-cap cases). */
   problemIndex: number | null
   /** Human-readable detail — what went wrong, with the offending fact. */
   message: string
@@ -499,7 +499,7 @@ export function lintSubToTenComposition(
   )
   if (takeFromTenInDiscriminate.length < config.takeFromTenInP4ToP8Min) {
     violations.push({
-      rule: 'take-from-10-coverage',
+      rule: 'high-leverage-coverage',
       problemIndex: null,
       message:
         `At least ${config.takeFromTenInP4ToP8Min} take-from-10 fact(s) ` +
@@ -809,7 +809,7 @@ export function lintAddToTenComposition(
   )
   if (sumsToTenInDiscriminate.length < config.sumsToTenInP4ToP8Min) {
     violations.push({
-      rule: 'take-from-10-coverage',
+      rule: 'high-leverage-coverage',
       problemIndex: null,
       message:
         `At least ${config.sumsToTenInP4ToP8Min} sums-to-10 fact(s) ` +

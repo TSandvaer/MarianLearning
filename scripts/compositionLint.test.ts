@@ -11,7 +11,7 @@
  *   2. pool-membership — fact outside the 16
  *   3. category-cap — doubles=2, generals=3
  *   4. band-by-slot — HARD at P3, MEDIUM at P2
- *   5. take-from-10-coverage — no take-from-10 anywhere
+ *   5. high-leverage-coverage — no take-from-10 anywhere
  *   6. no-duplicates — same fact twice
  *   7. unparseable-problem — read template malformed
  *   8. disk walker — write fixtures to a tmp dir, walk it, verify
@@ -467,7 +467,7 @@ describe('lintSubToTenComposition — band-by-slot rule', () => {
   })
 })
 
-describe('lintSubToTenComposition — take-from-10-coverage rule', () => {
+describe('lintSubToTenComposition — high-leverage-coverage rule', () => {
   it('fires when no take-from-10 fact appears in P4-P8', () => {
     // Replace both 10-3 and 10-7 with other facts.
     const facts: Array<[number, number]> = [
@@ -483,7 +483,7 @@ describe('lintSubToTenComposition — take-from-10-coverage rule', () => {
     ]
     const violations = lintSubToTenComposition(buildCanonResponse(facts))
     expect(
-      violations.find((v) => v.rule === 'take-from-10-coverage'),
+      violations.find((v) => v.rule === 'high-leverage-coverage'),
     ).toBeDefined()
   })
 
@@ -492,7 +492,7 @@ describe('lintSubToTenComposition — take-from-10-coverage rule', () => {
     const facts: Array<[number, number]> = [...CLEAN_FACTS_PR_244]
     expect(
       lintSubToTenComposition(buildCanonResponse(facts)).filter(
-        (v) => v.rule === 'take-from-10-coverage',
+        (v) => v.rule === 'high-leverage-coverage',
       ),
     ).toEqual([])
   })
@@ -512,7 +512,7 @@ describe('lintSubToTenComposition — take-from-10-coverage rule', () => {
     ]
     const violations = lintSubToTenComposition(buildCanonResponse(facts))
     expect(
-      violations.filter((v) => v.rule === 'take-from-10-coverage'),
+      violations.filter((v) => v.rule === 'high-leverage-coverage'),
     ).toEqual([])
     // (band-by-slot does fire — verifies separation of concerns)
     expect(
@@ -602,7 +602,7 @@ describe('lintSubToTenComposition — unparseable-problem rule', () => {
       violations.find((v) => v.rule === 'unparseable-problem'),
     ).toBeDefined()
     expect(
-      violations.find((v) => v.rule === 'take-from-10-coverage'),
+      violations.find((v) => v.rule === 'high-leverage-coverage'),
     ).toBeDefined()
     expect(
       violations.find(
@@ -1718,7 +1718,7 @@ describe('lintAddToTenComposition — sums-to-10-coverage rule', () => {
     ]
     const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
     expect(
-      violations.find((v) => v.rule === 'take-from-10-coverage'),
+      violations.find((v) => v.rule === 'high-leverage-coverage'),
     ).toBeDefined()
   })
 
@@ -1727,7 +1727,7 @@ describe('lintAddToTenComposition — sums-to-10-coverage rule', () => {
     const facts: Array<[number, number]> = [...CLEAN_ADD_FACTS]
     expect(
       lintAddToTenComposition(buildAddCanonResponse(facts)).filter(
-        (v) => v.rule === 'take-from-10-coverage',
+        (v) => v.rule === 'high-leverage-coverage',
       ),
     ).toEqual([])
   })
