@@ -17,7 +17,13 @@
  *   8. disk walker — write fixtures to a tmp dir, walk it, verify
  *      out-of-scope tier files are correctly skipped
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { join, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -1997,5 +2003,232 @@ describe('ADD_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
         10,
       )
     }
+  })
+})
+
+// ── drift-guard: ADD_TO_TEN_RULES.bandAllowedSlots ↔ spec prose ─────────
+//
+// Sibling to the SUB_TO_TEN_RULES.bandAllowedSlots drift-guard above
+// (PR #256). Same hybrid mirror + runtime-parser + 2-sided equality
+// structure, but parses from a DIFFERENT prose source: the planner
+// directive (`MATH_TRACK_GUIDE`) at `api/_planner.ts:921` carries only a
+// one-line summary of add-to-10 (sums 3-10, addends 1-9) — it has NO
+// SESSION COMPOSITION RULES band-by-slot block analogous to sub-to-10's
+// `:960-966`. The authoritative add-to-10 band-by-slot prose lives in
+// the spec at `design/math/add-to-10-content.md` §2.1 (PR #251). That
+// markdown is the prose this guard pins the lint rules against.
+//
+// Why the difference: the add-to-10 directive predates the sub-to-10
+// content spec by months, and the sub-to-10 directive was written from
+// the start with explicit composition rules in-prompt because the
+// sub-to-10 wrong-op trap requires careful band placement. The add-to-10
+// rules are equally load-bearing on the lint side but were never
+// promoted into the directive prose. Until that gap closes (see
+// NON-OBVIOUS FINDING below), the spec markdown is the prose source.
+//
+// Why the parser is NOT a copy of sub-to-10's parser: add-to-10's prose
+// has a different shape — sub-to-10 says "Problems 1-3 (gentle ramp):
+// EXCLUSIVELY EASY-band facts" (band-exclusive to a slot range), but
+// add-to-10 says "EASY (sum 3-5): allowed at any slot P1-P8" (band-led,
+// slot range as a property of the band). Each rule is one bullet,
+// `- BAND (sum-range): allowed at P<s>-P<e>...`. A sibling parser
+// matches the bullet shape.
+//
+// Two-sided guard (same hybrid pattern):
+//   1. EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC (below) is a hand-mirrored
+//      snapshot of the three §2.1 bullets. If the spec moves a band-slot
+//      boundary, this mirror must be updated in lockstep — the
+//      programmatic parser asserts they agree.
+//   2. `ADD_TO_TEN_RULES.bandAllowedSlots` is what the lint enforces.
+//      The mirror is asserted deeply-equal to it — if either side drifts
+//      without the other, the test fails with a clear diff.
+//
+// Three relevant statements in the spec prose (§2.1 "Band-by-slot rule"):
+//   · EASY (sum 3-5): allowed at any slot P1-P8.
+//     → EASY allowed slots = [1, 2, 3, 4, 5, 6, 7, 8].
+//   · MEDIUM (sum 6-8): allowed at P4-P8.
+//     → MEDIUM allowed slots = [4, 5, 6, 7, 8].
+//   · HARD (sum 9-10): allowed at P5-P8 only.
+//     → HARD allowed slots = [5, 6, 7, 8].
+//
+// Failure mode: when either side moves, this test fails with a deep-
+// equality diff pointing at the exact band whose slot range moved. The
+// fix is always "update the OTHER side too, in this same PR".
+
+type AddToTenBandSlots = (typeof ADD_TO_TEN_RULES)['bandAllowedSlots']
+
+/**
+ * MIRROR of the spec's §2.1 band-by-slot bullets. Update both this
+ * mirror and the spec markdown in lockstep when shifting a band-slot
+ * boundary.
+ *
+ * Source prose (excerpted from `design/math/add-to-10-content.md` §2.1
+ * "Band-by-slot rule (LOCKED, matches Kevin's lint `bandAllowedSlots`)"):
+ *   - EASY (sum 3-5): allowed at any slot P1-P8 ...
+ *   - MEDIUM (sum 6-8): allowed at P4-P8.
+ *   - HARD (sum 9-10): allowed at P5-P8 only. **HARD must NOT appear at P1-P4.**
+ */
+const EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC: AddToTenBandSlots = {
+  EASY: [1, 2, 3, 4, 5, 6, 7, 8],
+  MEDIUM: [4, 5, 6, 7, 8],
+  HARD: [5, 6, 7, 8],
+}
+
+/**
+ * Parse the §2.1 band-by-slot bullets from the add-to-10 content spec.
+ * Returns the derived `bandAllowedSlots` map. Throws if any of the three
+ * expected bullets is missing or malformed — a structural reformat of
+ * the spec section must be matched by an update to this parser (in
+ * lockstep with the mirror above).
+ *
+ * Three bullets parsed (one regex per band):
+ *   1. `- EASY (sum N-M): allowed at any slot P<s>-P<e>` (the "any slot"
+ *      hint is the discriminator — distinguishes EASY's "allowed
+ *      anywhere" framing from the more restrictive MEDIUM/HARD bullets).
+ *   2. `- MEDIUM (sum N-M): allowed at P<s>-P<e>.`
+ *   3. `- HARD (sum N-M): allowed at P<s>-P<e> only.` (the trailing
+ *      "only" is the discriminator — distinguishes HARD's tight clause
+ *      from MEDIUM's plain allowance and from the boldface emphasis
+ *      sentence that follows.)
+ */
+function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
+  // EASY: "allowed at any slot P1-P8" — the "any slot" phrase is the
+  // intentional asymmetry that wedges the parser off the EASY bullet
+  // specifically. If a future editor harmonises this to "allowed at
+  // P1-P8" (dropping "any slot"), parseAddToTenBandSlotsFromSpec falls
+  // over loudly — at which point this regex needs an update.
+  const easyMatch =
+    /^-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P(\d+)-P(\d+)/m.exec(prose)
+  if (!easyMatch) {
+    throw new Error(
+      "parseAddToTenBandSlotsFromSpec: could not locate EASY rule — expected '- EASY (sum N-M): allowed at any slot P<s>-P<e>' bullet in spec §2.1",
+    )
+  }
+  const easyStart = Number.parseInt(easyMatch[1]!, 10)
+  const easyEnd = Number.parseInt(easyMatch[2]!, 10)
+
+  // MEDIUM: "allowed at P4-P8." — terminal period (no trailing "only")
+  // is the discriminator. If a future editor adds "only" to MEDIUM's
+  // bullet, this regex stops matching loudly.
+  const mediumMatch =
+    /^-\s+MEDIUM\s+\(sum[^)]*\):\s+allowed at P(\d+)-P(\d+)\.\s*$/m.exec(prose)
+  if (!mediumMatch) {
+    throw new Error(
+      "parseAddToTenBandSlotsFromSpec: could not locate MEDIUM rule — expected '- MEDIUM (sum N-M): allowed at P<s>-P<e>.' bullet in spec §2.1",
+    )
+  }
+  const mediumStart = Number.parseInt(mediumMatch[1]!, 10)
+  const mediumEnd = Number.parseInt(mediumMatch[2]!, 10)
+
+  // HARD: "allowed at P5-P8 only" — the trailing "only" is the
+  // discriminator that distinguishes HARD's tight clause from MEDIUM's.
+  // If a future editor harmonises HARD's bullet to drop "only", this
+  // parser fails loudly.
+  const hardMatch =
+    /^-\s+HARD\s+\(sum[^)]*\):\s+allowed at P(\d+)-P(\d+)\s+only/m.exec(prose)
+  if (!hardMatch) {
+    throw new Error(
+      "parseAddToTenBandSlotsFromSpec: could not locate HARD rule — expected '- HARD (sum N-M): allowed at P<s>-P<e> only' bullet in spec §2.1",
+    )
+  }
+  const hardStart = Number.parseInt(hardMatch[1]!, 10)
+  const hardEnd = Number.parseInt(hardMatch[2]!, 10)
+
+  const range = (start: number, end: number): readonly number[] => {
+    const out: number[] = []
+    for (let i = start; i <= end; i++) out.push(i)
+    return out
+  }
+
+  return {
+    EASY: range(easyStart, easyEnd),
+    MEDIUM: range(mediumStart, mediumEnd),
+    HARD: range(hardStart, hardEnd),
+  }
+}
+
+describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against spec prose', () => {
+  // Resolve the spec path once. `import.meta.url` would be cleaner but
+  // requires ESM-only test env; falling back to cwd-relative keeps this
+  // working in both ts-node + vitest configurations.
+  const SPEC_PATH = join(
+    process.cwd(),
+    'design',
+    'math',
+    'add-to-10-content.md',
+  )
+
+  it('lint rule data matches the hand-mirrored expectation from the spec (lockstep)', () => {
+    // The mirror is the single source of update-pressure: if
+    // ADD_TO_TEN_RULES.bandAllowedSlots changes (a band's slot range
+    // shifts), this assertion fails until the mirror is updated to
+    // match — at which point the separate parser-vs-mirror assertion
+    // below forces the spec markdown to be updated too.
+    //
+    // Mutation-test contract (documented in the PR description):
+    //   Flip ADD_TO_TEN_RULES.bandAllowedSlots.HARD from [5, 6, 7, 8]
+    //   to [4, 5, 6, 7, 8] (replicates a HARD-at-P4 widening that
+    //   would contradict the spec §2.1 bullet "HARD must NOT appear
+    //   at P1-P4"). This test must FAIL with a deep-equality diff
+    //   naming the HARD band as the discrepant key. Restore to
+    //   verify GREEN.
+    expect(ADD_TO_TEN_RULES.bandAllowedSlots).toEqual(
+      EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC,
+    )
+  })
+
+  it('spec §2.1 band-by-slot bullets parse to the hand-mirrored expectation (lockstep)', () => {
+    // Parses `design/math/add-to-10-content.md` §2.1 at runtime. If the
+    // spec moves a band-slot boundary (e.g. relaxes HARD to P4-or-
+    // later, or tightens MEDIUM to P5-P8), this fails until the mirror
+    // is updated to match.
+    //
+    // This is the half of the guard that catches the spec-drifting-
+    // away-from-data class of bug — the symmetric counterpart to the
+    // sub-to-10 PR #255 incident where lint data drifted away from
+    // directive prose.
+    //
+    // NOTE: the spec markdown is the prose source here because the
+    // planner directive (`MATH_TRACK_GUIDE`) does not contain add-to-10
+    // SESSION COMPOSITION RULES. See the file-header comment above for
+    // why, and the NON-OBVIOUS FINDING in the PR description for the
+    // follow-up that would let this guard parse `MATH_TRACK_GUIDE`
+    // directly (closer to sub-to-10's pattern).
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    const parsed = parseAddToTenBandSlotsFromSpec(spec)
+    expect(parsed).toEqual(EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC)
+  })
+
+  it('parser throws a clear error when a required spec bullet is missing', () => {
+    // Sanity check on the parser: catches the case where someone
+    // restructures §2.1's bullets in a way that escapes the regex
+    // (parsed bands would be undefined and the deep-equality assertion
+    // above would fail with a less legible diff). The throw points the
+    // maintainer at which bullet disappeared.
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+
+    const proseMissingEasy = spec.replace(
+      /^-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P\d+-P\d+/m,
+      '- EASY (sum 3-5): [REFORMATTED]',
+    )
+    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingEasy)).toThrow(
+      /EASY rule/,
+    )
+
+    const proseMissingMedium = spec.replace(
+      /^-\s+MEDIUM\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\.\s*$/m,
+      '- MEDIUM (sum 6-8): [REFORMATTED]',
+    )
+    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingMedium)).toThrow(
+      /MEDIUM rule/,
+    )
+
+    const proseMissingHard = spec.replace(
+      /^-\s+HARD\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\s+only/m,
+      '- HARD (sum 9-10): [REFORMATTED]',
+    )
+    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingHard)).toThrow(
+      /HARD rule/,
+    )
   })
 })
