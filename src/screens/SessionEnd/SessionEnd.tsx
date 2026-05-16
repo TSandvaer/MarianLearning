@@ -98,6 +98,19 @@ export interface SessionEndPayload {
    * field; literacy has no Leitner box in v1.
    */
   mathFacts?: readonly { a: number; b: number; op: '+' | '-' | '*' }[]
+  /**
+   * Whether the subitising scaffold (dot-card overlay) rendered for
+   * at least one problem during the just-completed math session
+   * (ticket 86c9ur1zr §2.2). Math-surface only; word-song doesn't
+   * carry this field.
+   *
+   * SessionEnd forwards this into `recordProgressOnSessionEnd` so the
+   * progress writer can bump
+   * `profile.subitisingScaffoldSessionsObserved` once per actual-
+   * exposure session. Absent / `false` on word-song surfaces and on
+   * legacy math test fixtures that predate the scaffold plumbing.
+   */
+  subitisingScaffoldRendered?: boolean
 }
 
 /**
@@ -385,6 +398,16 @@ export default function SessionEnd({
       // concrete fact key without re-deriving from the audio plan.
       ...(p.surface === 'math' && p.mathFacts !== undefined
         ? { mathFacts: p.mathFacts }
+        : {}),
+      // Subitising scaffold exposure flag (ticket 86c9ur1zr §2.2).
+      // Forwarded so the progress writer bumps
+      // profile.subitisingScaffoldSessionsObserved once per actual-
+      // exposure session. Math-surface only; word-song doesn't carry
+      // the field — recordProgressOnSessionEnd defaults to `false` on
+      // absence and the focus-node gate inside the writer skips the
+      // bump for non-`add-to-10` sessions anyway.
+      ...(p.surface === 'math' && p.subitisingScaffoldRendered === true
+        ? { subitisingScaffoldRendered: true }
         : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

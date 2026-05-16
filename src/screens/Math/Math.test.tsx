@@ -3695,6 +3695,108 @@ describe('Math (Number Garden) screen', () => {
     })
   })
 
+  // ── Subitising scaffold mode (ticket 86c9ur1zr) ──────────────────────
+  //
+  // Pins the production-path wiring:
+  //   1. When focusNode + subitisingScaffoldActive are both supplied,
+  //      the overlay carries BOTH testids — `math-dot-card` (legacy
+  //      contract for `e2e/dot-card-affordance.spec.ts`) AND
+  //      `subitising-scaffold-dot-card` (Jessica's new E2E spec).
+  //   2. When subitisingScaffoldActive=false, the overlay does NOT
+  //      mount (per-session decision suppressed the scaffold).
+  //   3. When focusNode='add-to-20' (not the scaffold target), the
+  //      overlay does NOT mount even if subitisingScaffoldActive=true.
+  describe('subitising scaffold mode (ticket 86c9ur1zr)', () => {
+    it('renders BOTH legacy and scaffold testids when scaffold-active on add-to-10', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            focusNode="add-to-10"
+            subitisingScaffoldActive
+          />,
+        ),
+      )
+      // Problem 1 is 3+2 → in scope → overlay renders. Both testids
+      // are present on the DOM so existing specs keep working and
+      // Jessica's new spec finds the scaffold-specific handle.
+      expect(screen.queryAllByTestId('math-dot-card')).toHaveLength(1)
+      expect(
+        screen.queryAllByTestId('subitising-scaffold-dot-card'),
+      ).toHaveLength(1)
+      expect(screen.queryAllByTestId('math-dot-card-cell')).toHaveLength(2)
+    })
+
+    it('does NOT mount the overlay when subitisingScaffoldActive=false (fade gate)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            focusNode="add-to-10"
+            subitisingScaffoldActive={false}
+          />,
+        ),
+      )
+      expect(screen.queryAllByTestId('math-dot-card')).toHaveLength(0)
+      expect(
+        screen.queryAllByTestId('subitising-scaffold-dot-card'),
+      ).toHaveLength(0)
+      expect(screen.queryAllByTestId('math-dot-card-cell')).toHaveLength(0)
+    })
+
+    it('does NOT mount the overlay when focus node is not add-to-10 (C1)', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            focusNode="add-to-20"
+            subitisingScaffoldActive
+          />,
+        ),
+      )
+      expect(screen.queryAllByTestId('math-dot-card')).toHaveLength(0)
+      expect(
+        screen.queryAllByTestId('subitising-scaffold-dot-card'),
+      ).toHaveLength(0)
+    })
+
+    it('legacy callers (no scaffold props) keep the math-dot-card testid only', () => {
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            __testDisableDotCard
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+      // Legacy backward-compat: no `subitising-scaffold-dot-card`
+      // wrapper, but `math-dot-card` still mounts on in-scope problems.
+      expect(screen.queryAllByTestId('math-dot-card')).toHaveLength(1)
+      expect(
+        screen.queryAllByTestId('subitising-scaffold-dot-card'),
+      ).toHaveLength(0)
+    })
+  })
+
   // ── sub-to-10 render branch (PR 2 of 2 — Kyle's spec §13, Kevin's audit §1)
   //
   // Pins three properties of the render layer for `op === '-'`:

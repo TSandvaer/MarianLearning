@@ -62,8 +62,15 @@ import {
   type Progress,
   type ProgressTrack,
   type SkillLevel,
+  type SkillNode,
   type SlowFactHint,
 } from './lib/progress'
+import {
+  createSubitisingRng,
+  easyBandLeitnerMeanBox,
+  readSubitisingScaffoldSessionsObserved,
+  shouldScaffoldThisSession,
+} from './screens/Math/subitisingScaffold'
 import { projectHubTreeProgress } from './screens/Hub/progressProjection'
 import type { HubTreeProgress } from './screens/Hub'
 import type { Route } from './router/route'
@@ -594,6 +601,17 @@ export default function App() {
       perProblemCorrect: result.perProblemCorrect,
       latencyMs: result.latencyMs,
       ...(mathFacts !== undefined ? { mathFacts } : {}),
+      // Subitising scaffold exposure (ticket 86c9ur1zr §2.2). Math
+      // surface only; forwarded into recordProgressOnSessionEnd so
+      // the writer bumps profile.subitisingScaffoldSessionsObserved
+      // when this session actually exposed Marian to the scaffold.
+      // Math.tsx only sets `subitisingScaffoldRendered = true` when
+      // the scaffold-gate path was active AND the overlay rendered
+      // for at least one in-scope problem — see MathSessionResult
+      // and Math.tsx's subitisingScaffoldRenderedRef.
+      ...(result.subitisingScaffoldRendered === true
+        ? { subitisingScaffoldRendered: true }
+        : {}),
     })
     setRoute('session-end')
   }, [])
@@ -708,7 +726,7 @@ export default function App() {
   // re-fetching per render — focus node only changes on mastery
   // promotion, which happens at session-end and the next App mount picks
   // it up.
-  const mathFallbackFocusNode = useMemo<string | undefined>(() => {
+  const mathFallbackFocusNode = useMemo<SkillNode | undefined>(() => {
     const progress = loadProgress()
     if (progress === null) return undefined
     return pickFocusNode(progress, 'math')
@@ -717,6 +735,49 @@ export default function App() {
     () => pickStaticSessionPlan(undefined, mathFallbackFocusNode),
     [mathFallbackFocusNode],
   )
+
+  /**
+   * Subitising scaffold per-session decision (ticket 86c9ur1zr —
+   * `design/math/subitising-scaffold-content.md` §2.3). Computed ONCE
+   * per App mount — the session's "is today a dots day?" answer is
+   * frozen for the lifetime of this mount. Derived from:
+   *   - `subitisingScaffoldSessionsObserved` (counter on profile)
+   *   - `easyBandLeitnerMeanBox` (per-band Leitner-mean signal)
+   *   - `createSubitisingRng(sessionStartISO, focusNode)` for
+   *     deterministic per-session randomness.
+   *
+   * `sessionStartISO` is captured here at App-mount time via a stable
+   * `useMemo([])` so it doesn't shift between re-renders. For a
+   * Marian session that goes Greet → Math → SessionEnd → Hub, the
+   * App mounts once and the ISO is consistent. For a returning
+   * session (Splash → Hub → Math), same App mount, same ISO. The
+   * RNG is keyed on the ISO + focus node, so two different days
+   * (different App mounts) produce different streams.
+   *
+   * Output is `false` for:
+   *   - First-launch / no-progress state — no Progress doc, no need
+   *     to gate (the focus-node check inside the predicate is the
+   *     only relevant test for fresh users; production focus node
+   *     after `defaultProgress()` is 'add-to-10' anyway).
+   *   - Focus node not 'add-to-10' — passes through, doesn't matter
+   *     what the per-session decision is because the C1 gate in
+   *     Math.tsx rejects.
+   *   - Marian post-fluency-fade (Leitner mean ≥ 4.0) — gate disabled.
+   *
+   * Output is `true` for:
+   *   - First-encounter window (counter < 3 sessions).
+   *   - Fluency-fade probabilistic branches that land on the active side.
+   */
+  const subitisingSessionStartISO = useMemo(() => new Date().toISOString(), [])
+  const mathSubitisingScaffoldActive = useMemo<boolean>(() => {
+    const progress = loadProgress()
+    if (progress === null) return false
+    const sessionsObserved = readSubitisingScaffoldSessionsObserved(progress)
+    const mean = easyBandLeitnerMeanBox(progress.mathFactsLeitner)
+    const focusNode = pickFocusNode(progress, 'math')
+    const rng = createSubitisingRng(subitisingSessionStartISO, focusNode)
+    return shouldScaffoldThisSession(mean, sessionsObserved, rng)
+  }, [subitisingSessionStartISO])
   const [mathPlan, setMathPlan] = useState<MathSessionPlan | null>(null)
 
   // Keep the active-math-plan ref synced with whichever plan is rendering
@@ -1356,6 +1417,8 @@ export default function App() {
               plan={mathPlan ?? mathFallbackPlan}
               playUtterance={mathPlay ?? undefined}
               audioReady={mathAudioReady}
+              focusNode={mathFallbackFocusNode}
+              subitisingScaffoldActive={mathSubitisingScaffoldActive}
               onSessionComplete={handleMathComplete}
               onRequestExit={handleBackToHub}
             />
