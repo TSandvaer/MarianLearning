@@ -919,6 +919,48 @@ The user message names a focus skill node. Generate problems specifically for th
 
 - number-recog: number recognition. Say a numeral, child taps it. Numerals 1-10. read: "Tap the <number>." e.g. "Tap the five."
 - add-to-10: addition with sums 3-10. Both addends 1-9. read: "<addend-A> plus <addend-B>. How many?" e.g. "Three plus two. How many?" Prefer bridge-through-5 (3+2, 4+3), easy doubles (2+2, 4+4), and small near-doubles. Sums must be <= 10.
+
+  FACT POOL (44 facts; pick exactly 8 distinct ordered pairs from this pool per session; commutative pairs are DISTINCT facts — "2+3" and "3+2" are separate pool entries). Each fact maps to EXACTLY ONE category per the priority order sums-to-10 -> doubles -> plus-one -> near-doubles -> general:
+  - EASY band (sum 3-5; 9 facts):
+    · plus-one: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1
+    · doubles: 2+2
+    · near-doubles: 2+3, 3+2
+  - MEDIUM band (sum 6-8; 18 facts):
+    · plus-one: 1+5, 5+1, 1+6, 6+1, 1+7, 7+1
+    · doubles: 3+3, 4+4
+    · near-doubles: 3+4, 4+3
+    · general: 2+4, 4+2, 2+5, 5+2, 2+6, 6+2, 3+5, 5+3
+  - HARD band (sum 9-10; 17 facts):
+    · sums-to-10: 1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5
+    · plus-one: 1+8, 8+1
+    · near-doubles: 4+5, 5+4
+    · general: 2+7, 7+2, 3+6, 6+3
+  POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) ordered pair appears verbatim above. Sums below 3 or above 10 are FORBIDDEN; neither addend may be 0; neither addend may exceed 9.
+
+  SESSION COMPOSITION RULES (apply IN ORDER):
+  1. Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts (sum 3-5). Read each fact's band before placing it at P1, P2, or P3. ONLY the 9 EASY-band facts above are eligible for these slots.
+  2. NEGATIVE ANCHOR — P1, P2, P3 PLACEMENT BANS (any one of these is a hard rule violation):
+     · DO NOT place any MEDIUM-band fact (sum 6-8) at P1, P2, or P3. MEDIUM-band only appears at P4 or later.
+     · DO NOT place any HARD-band fact (sum 9-10) at P1, P2, or P3. HARD-band only appears at P5 or later.
+     · The ONLY facts allowed at P1, P2, P3 are: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 2+2, 2+3, 3+2.
+  3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and avoid HARD-band sums-to-10; high score (>= 0.85) -> push into HARD and ensure a sums-to-10 anchor; mid score -> balanced mix. HARD-band facts (sum 9-10) appear at P5 or later only.
+  4. At least one sums-to-10 fact (1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5) MUST appear somewhere in problems 4-8. This is the highest-leverage category — Marian's April diagnostic flags sums-to-10 automaticity as the top priority; it bridges to add-to-20's make-10 mental model.
+  5. NO duplicate (a, b) ordered pairs within the 8-problem set. "2+3" and "3+2" are NOT duplicates — they are distinct ordered pairs.
+  6. Category caps (across the 8-problem session): at most 2 doubles, at most 2 plus-one, at most 3 near-doubles, at most 2 sums-to-10, at most 2 general. Each fact maps to exactly one category per the priority order above.
+
+  BAND-BY-SLOT (canonical restatement of rules 1-3):
+  - EASY (sum 3-5): allowed at any slot P1-P8 (gentle-ramp anchor; also permitted in discriminate-tier as a confidence-preservation fallback when recent score is low).
+  - MEDIUM (sum 6-8): allowed at P4-P8.
+  - HARD (sum 9-10): allowed at P5-P8 only.
+
+  PER-PROBLEM SHAPE for add-to-10: every problem MUST emit op: "+" on the wire. Utterance ids MUST use the literal "math." prefix (NOT "add-to-10."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". Per-slot utterance templates:
+  - read: "<addend-A> plus <addend-B>. How many?" e.g. "Five plus three. How many?"
+  - correct: "Yes! <answer>!" e.g. "Yes! Eight!"
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint: "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Five. And three more. How many now?"
+  - giveAnswer: "This one is <answer>." e.g. "This one is eight."
+
+  PROSODY: numbers are spelled out as words ("one", "two", ... "ten"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10%; no SSML overrides required for any value in [1, 10].
 - add-to-20: addition with sums STRICTLY in 11-20 (inclusive). Every problem's sum MUST be at least 11 and at most 20 — a sum of 10 or below is FORBIDDEN here (that's add-to-10's territory). FORBIDDEN sum examples (do NOT emit): 5+5=10, 4+4=8, 3+7=10, 6+4=10, 2+8=10. Before emitting any add-to-20 problem, COMPUTE the sum mentally and CONFIRM it is between 11 and 20 inclusive; reject any candidate whose sum falls outside that range. BOTH addends MUST be in 1-9 (cross-10-bridge facts like 8+5=13, 7+6=13, 9+4=13). Ten-plus-single forms are FORBIDDEN — neither addend may equal 10. FORBIDDEN addend examples (do NOT emit, regardless of sum): 10+1=11, 10+5=15, 10+8=18, 1+10=11, 5+10=15, 8+10=18. Before emitting any add-to-20 problem, also CONFIRM that addendA in 1-9 AND addendB in 1-9; reject any candidate where either addend equals 10 or exceeds 10. Rationale: ten-plus-single is pedagogically easier than cross-10-bridge (the actual learning target at this tier), and the visual flower-row at addend=10 overflows the iPad portrait safe area. read: same template — e.g. "Seven plus six. How many?" Lean on doubles and near-doubles within range: 6+6=12, 7+7=14, 8+8=16, 9+9=18, 6+7=13, 7+8=15, 8+9=17.
 - sub-to-10: subtraction with both operands in 0-10 and answer in 0-10. read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seven minus three. How many are left?"
 
