@@ -2534,28 +2534,32 @@ function buildChipOrder(
   problem: MathProblem,
   maxAnswer: number,
 ): readonly number[] {
-  // Thread `op`, `operands`, and the planner's `distractorClass` hint
-  // into `pickDistractors` (Kyle's sub-to-10 spec §3.4 + §13 PR 2).
-  // For sub-to-10 problems P4–P8, default the hint to `'wrong-op'` so
-  // the Class-2 trap (a + b) is attempted; `pickDistractors` silently
-  // downgrades to off-by-one when the trap is OOR (e.g. `10 − 2 = 8`,
-  // trap `12` > maxAnswer=10) or aliases the correct answer
-  // (subtract-zero, where a + 0 = a = correct). For P1–P3, the gentle
-  // tier wins regardless of the hint.
+  // Thread `op`, `operands`, and a render-time `distractorClass`
+  // default into `pickDistractors` (Kyle's sub-to-10 spec §3.4 + §13
+  // PR 2). `distractorClass` is a RENDER-TIME default set here, NOT a
+  // planner-emitted field — the canon JSON wire is utterance-only
+  // `{id, text}` and carries no per-problem distractor tag. The
+  // planner directive in `api/_planner.ts` (`MATH_TRACK_GUIDE`,
+  // sub-to-10 PER-PROBLEM SHAPE block) makes this explicit and pairs
+  // it with the planner's actual contribution: FACT-POOL
+  // COMPOSITION — the DISTRACTOR-COVERAGE SELF-CHECK guarantees >= 2
+  // a+b=10 IN-annotated facts across P4-P8, so the wrong-op trap has
+  // an in-range target before the OOR/alias silent-downgrade fires.
   //
-  // The wire shape today (per `planFromServer.ts`) does not carry a
-  // per-problem `distractorClass` field — the planner directive
-  // describes it as a planner-emitted tag, but the canon JSON wire is
-  // utterance-only `{id, text}`. Until the wire shape widens to a
-  // per-problem object (a future schema bump), the deterministic
-  // client-side default is: attempt `'wrong-op'` for every sub-to-10
-  // P4–P8 problem; let the OOR/alias fallback in `pickDistractors`
-  // handle the cases where the trap is invalid. This satisfies Kyle's
-  // spec §2.2 ("≥ 2 of P4–P8 must carry the wrong-op trap") because in
-  // practice ≥ 2 of any sub-to-10 P4–P8 sequence has an in-range
-  // trap — and over-attempting wrong-op is benign (silent downgrade).
-  // If `MathProblem.distractorClass` is explicitly set on the problem
-  // (e.g. by a future server-emitted hint), that wins over the default.
+  // For sub-to-10 problems P4-P8, default the hint to `'wrong-op'`
+  // so the Class-2 trap (a + b) is attempted; `pickDistractors`
+  // silently downgrades to off-by-one when the trap is OOR (e.g.
+  // `10 − 2 = 8`, trap `12` > maxAnswer=10) or aliases the correct
+  // answer (subtract-zero, where a + 0 = a = correct). For P1-P3,
+  // `pickTier` returns `'gentle'` regardless of the hint. Add-to-10
+  // and any non-subtraction tier pass `undefined` here and rely on
+  // `pickTier` alone (`'gentle'` for P1-P3, `'offByOne'` for P4-P8).
+  // Over-attempting wrong-op on subtraction is benign (silent
+  // downgrade); this satisfies Kyle's spec §2.2 ("≥ 2 of P4-P8 must
+  // carry the wrong-op trap") in combination with the planner's
+  // fact-pool composition guarantee. If `MathProblem.distractorClass`
+  // is explicitly set on the problem (e.g. by a future server-emitted
+  // hint), that wins over the default.
   const distractorClass: 'off-by-one' | 'wrong-op' | undefined =
     problem.distractorClass ?? (problem.op === '-' ? 'wrong-op' : undefined)
   const [d1, d2] = pickDistractors(problem.correct, problem.index, maxAnswer, {

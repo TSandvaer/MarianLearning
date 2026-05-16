@@ -3286,7 +3286,7 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     )
   })
 
-  it('the sub-to-10 directive does NOT mention distractorClass — distractor selection is render-time derived (planner wire is utterance-only)', async () => {
+  it('the sub-to-10 directive does NOT instruct Haiku to emit distractorClass — distractor selection is render-time derived (planner wire is utterance-only)', async () => {
     // Drift-guard: the wire shape is utterance-only and cannot carry
     // a per-problem `distractorClass` tag. Distractor selection lives
     // entirely in `src/screens/Math/Math.tsx`'s deterministic default
@@ -3296,6 +3296,15 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     // "tag each problem with distractorClass" line would re-introduce
     // ignored wire emissions (Haiku-3 NOFs from PR #240 + PR #241) —
     // this test locks the reword.
+    //
+    // 2026-05-16: tightened from a bare `not.toContain('distractorClass')`
+    // to instruction-shaped checks. Thomas's Option A amendment
+    // (ClickUp 86c9upc98) added explanatory prose to the directive that
+    // names `distractorClass` while making it explicit that the field
+    // is a RENDER-TIME default, NOT a Haiku-emitted wire field. The
+    // bare string-ban was over-broad for the actual regression class
+    // (Haiku-instruction phrasing); the negative anchors below target
+    // the failure mode directly.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(STUB_RESPONSE, { capture })
     await generateSessionPlan({
@@ -3307,8 +3316,19 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     })
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
-    expect(systemText).not.toContain('distractorClass')
     expect(systemText).not.toContain('DISTRACTOR-CLASS HINT')
+    expect(systemText).not.toMatch(/emit\s+distractorClass/i)
+    expect(systemText).not.toMatch(
+      /tag\s+each\s+problem\s+with\s+distractorClass/i,
+    )
+    expect(systemText).not.toMatch(/set\s+distractorClass\s+(to|on)/i)
+    expect(systemText).not.toMatch(/include\s+distractorClass/i)
+    // The directive MAY mention distractorClass as render-time
+    // explanation; if it does, it MUST also carry the "render-time"
+    // qualifier so the framing stays unambiguous.
+    if (systemText.includes('distractorClass')) {
+      expect(systemText).toMatch(/distractorClass[^.]*RENDER-TIME/i)
+    }
   })
 
   it('the sub-to-10 directive carries a DOUBLES-CAP SELF-CHECK (mirrors GENERAL-CATEGORY CAP pattern; doubles-halving cap=1)', async () => {
