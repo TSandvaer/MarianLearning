@@ -223,6 +223,34 @@ export interface Profile {
   character: Character
   /** ISO 8601 timestamp of the last completed session, or null if never. */
   lastPlayedISO: string | null
+  /**
+   * Subitising-scaffold first-encounter counter (ticket 86c9ur1zr —
+   * `design/math/subitising-scaffold-content.md` §2.2). Increments
+   * once per session where the dot-card scaffold actually rendered
+   * (i.e. on an `add-to-10` math session where at least one in-scope
+   * problem mounted the overlay). Persists across sessions.
+   *
+   * Range: `[0, SCAFFOLD_SESSIONS_OBSERVED_CAP]` (4). We only care
+   * about the boundary at `FIRST_ENCOUNTER_SESSIONS` (3) — sessions
+   * 1, 2, 3 fire the scaffold unconditionally; session 4+ transitions
+   * to the `easyBandLeitnerMeanBox`-driven fluency-fade schedule. The
+   * cap at 4 keeps the persisted value bounded so future migrations /
+   * read-path defaulters have a known finite range.
+   *
+   * Optional on the stored shape because pre-86c9ur1zr blobs predate
+   * the field. Missing → defaulted to 0 at read time (which means
+   * "first encounter, unconditional scaffold" — correct semantics for
+   * any pre-existing user when the scaffold ships). Field is additive
+   * and backward-compatible — schema stays at v1, same precedent as
+   * `parentSettings` and `lifetimeFirstEncounters`.
+   *
+   * The counter measures EXPOSURE TO THE SCAFFOLD, not exposure to
+   * the tier. Marian has run dozens of `add-to-10` sessions before
+   * this ships; the scaffold is new to her on day 1 of the rollout,
+   * so the counter starts at 0 and her first 3 post-merge sessions
+   * are first-encounter regardless of `history` length.
+   */
+  subitisingScaffoldSessionsObserved?: number
 }
 
 /**

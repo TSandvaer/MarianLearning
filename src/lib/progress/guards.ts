@@ -217,6 +217,21 @@ export function isProgressV1(v: unknown): v is Progress {
   if (v.profile.character !== 'melody') return false
   const last = v.profile.lastPlayedISO
   if (last !== null && typeof last !== 'string') return false
+  // subitisingScaffoldSessionsObserved (ticket 86c9ur1zr) is an OPTIONAL
+  // additive field on `Profile`. Pre-86c9ur1zr blobs predate it; absent
+  // is the normal greenfield state and the read-path defaulter
+  // (`readSubitisingScaffoldSessionsObserved` in
+  // `src/screens/Math/subitisingScaffold.ts`) treats missing as 0.
+  // When present, must be a non-negative finite number — non-integer /
+  // negative / NaN values are rejected so the upstream loader falls
+  // back to defaults rather than carrying a corrupted counter forward.
+  if (
+    'subitisingScaffoldSessionsObserved' in v.profile &&
+    v.profile.subitisingScaffoldSessionsObserved !== undefined
+  ) {
+    const n = v.profile.subitisingScaffoldSessionsObserved
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return false
+  }
   if (!isSkillLevels(v.skillLevels)) return false
   if (!isLeitnerBox(v.mathFactsLeitner)) return false
   if (!Array.isArray(v.history)) return false
