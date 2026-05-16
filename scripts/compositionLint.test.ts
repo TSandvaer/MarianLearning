@@ -1228,11 +1228,15 @@ const EXPECTED_BAND_SLOTS_FROM_DIRECTIVE: SubToTenBandSlots = {
 }
 
 /**
- * Parse the SESSION COMPOSITION RULES band-slot statements from the
- * directive prose. Returns the derived `bandAllowedSlots` map. Throws
- * if any of the three expected statements is missing or malformed —
- * a structural directive reformat must be matched by an update to
- * this parser (in lockstep with the mirror above).
+ * Parse the sub-to-10 SESSION COMPOSITION RULES band-slot statements
+ * from a bullet-prose source — either the `MATH_TRACK_GUIDE` sub-to-10
+ * tier-block (directive prose, indented inside the planner-prompt
+ * string literal) OR any spec-markdown source that uses the same
+ * "Problems N-M (label): ..." sentence shape. Returns the derived
+ * `bandAllowedSlots` map. Throws if any of the three expected
+ * statements is missing or malformed — a structural reformat of the
+ * prose must be matched by an update to this parser (in lockstep with
+ * the mirror above).
  *
  * Three statements parsed:
  *   1. EASY exclusivity at P1-P3:
@@ -1244,15 +1248,22 @@ const EXPECTED_BAND_SLOTS_FROM_DIRECTIVE: SubToTenBandSlots = {
  *   3. HARD-only-at-P5+ refinement:
  *      `HARD-band facts ... appear at P<n> or later only`
  *      Yields HARD allowed slots = [n..HARD-end].
+ *
+ * The regexes are anchorless on whitespace, so the parser works
+ * against both directive prose (indented inside template-strings)
+ * and spec markdown (flush-left) — the bullet-shape phrases are the
+ * contract, not the surrounding indentation.
  */
-function parseDirectiveBandSlots(prose: string): SubToTenBandSlots {
+function parseSubToTenBandSlotsFromBulletProse(
+  prose: string,
+): SubToTenBandSlots {
   const r1 =
     /Problems\s+(\d+)-(\d+)\s+\(gentle ramp\):\s+EXCLUSIVELY\s+EASY-band facts/.exec(
       prose,
     )
   if (!r1) {
     throw new Error(
-      "parseDirectiveBandSlots: could not locate EASY rule — expected 'Problems N-M (gentle ramp): EXCLUSIVELY EASY-band facts' in directive prose",
+      "parseSubToTenBandSlotsFromBulletProse: could not locate EASY rule — expected 'Problems N-M (gentle ramp): EXCLUSIVELY EASY-band facts' in directive prose",
     )
   }
   const easyStart = Number.parseInt(r1[1]!, 10)
@@ -1264,7 +1275,7 @@ function parseDirectiveBandSlots(prose: string): SubToTenBandSlots {
     )
   if (!r3a) {
     throw new Error(
-      "parseDirectiveBandSlots: could not locate MEDIUM+HARD rule — expected 'Problems N-M (discriminate): draw from MEDIUM + HARD bands' in directive prose",
+      "parseSubToTenBandSlotsFromBulletProse: could not locate MEDIUM+HARD rule — expected 'Problems N-M (discriminate): draw from MEDIUM + HARD bands' in directive prose",
     )
   }
   const discriminateStart = Number.parseInt(r3a[1]!, 10)
@@ -1273,7 +1284,7 @@ function parseDirectiveBandSlots(prose: string): SubToTenBandSlots {
   const r3b = /HARD-band facts[^.]*?appear at P(\d+) or later only/.exec(prose)
   if (!r3b) {
     throw new Error(
-      "parseDirectiveBandSlots: could not locate HARD-band refinement — expected 'HARD-band facts ... appear at P<N> or later only' in directive prose",
+      "parseSubToTenBandSlotsFromBulletProse: could not locate HARD-band refinement — expected 'HARD-band facts ... appear at P<N> or later only' in directive prose",
     )
   }
   const hardStart = Number.parseInt(r3b[1]!, 10)
@@ -1328,7 +1339,7 @@ describe('SUB_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
     // blocks — `extractTierBlock` removes the coincidence so this
     // parser is exercising sub-to-10's prose specifically.
     const subToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-10')
-    const parsed = parseDirectiveBandSlots(subToTenBlock)
+    const parsed = parseSubToTenBandSlotsFromBulletProse(subToTenBlock)
     expect(parsed).toEqual(EXPECTED_BAND_SLOTS_FROM_DIRECTIVE)
   })
 
@@ -1350,23 +1361,25 @@ describe('SUB_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
       /Problems\s+1-3\s+\(gentle ramp\):\s+EXCLUSIVELY\s+EASY-band facts/,
       'Problems 1-3 (gentle ramp): [REFORMATTED]',
     )
-    expect(() => parseDirectiveBandSlots(proseMissingEasy)).toThrow(/EASY rule/)
+    expect(() =>
+      parseSubToTenBandSlotsFromBulletProse(proseMissingEasy),
+    ).toThrow(/EASY rule/)
 
     const proseMissingMedium = subToTenBlock.replace(
       /Problems\s+4-8\s+\(discriminate\):\s+draw from MEDIUM \+ HARD bands/,
       'Problems 4-8 (discriminate): [REFORMATTED]',
     )
-    expect(() => parseDirectiveBandSlots(proseMissingMedium)).toThrow(
-      /MEDIUM\+HARD rule/,
-    )
+    expect(() =>
+      parseSubToTenBandSlotsFromBulletProse(proseMissingMedium),
+    ).toThrow(/MEDIUM\+HARD rule/)
 
     const proseMissingHard = subToTenBlock.replace(
       /HARD-band facts[^.]*?appear at P\d+ or later only/,
       '[REFORMATTED]',
     )
-    expect(() => parseDirectiveBandSlots(proseMissingHard)).toThrow(
-      /HARD-band refinement/,
-    )
+    expect(() =>
+      parseSubToTenBandSlotsFromBulletProse(proseMissingHard),
+    ).toThrow(/HARD-band refinement/)
   })
 })
 
@@ -2150,14 +2163,14 @@ const EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC: AddToTenBandSlots = {
 }
 
 /**
- * Parse the add-to-10 band-by-slot bullets from a prose source —
- * `design/math/add-to-10-content.md` §2.1 OR the `MATH_TRACK_GUIDE`
- * add-to-10 BAND-BY-SLOT block (the directive uses the same bullet
- * shape, indented within the planner-prompt string literal). Returns
- * the derived `bandAllowedSlots` map. Throws if any of the three
- * expected bullets is missing or malformed — a structural reformat of
- * the prose section must be matched by an update to this parser (in
- * lockstep with the mirror above).
+ * Parse the add-to-10 band-by-slot bullets from a bullet-prose source
+ * — `design/math/add-to-10-content.md` §2.1 (spec markdown, flush-
+ * left) OR the `MATH_TRACK_GUIDE` add-to-10 BAND-BY-SLOT block
+ * (directive prose, indented within the planner-prompt string
+ * literal). Returns the derived `bandAllowedSlots` map. Throws if any
+ * of the three expected bullets is missing or malformed — a structural
+ * reformat of the prose section must be matched by an update to this
+ * parser (in lockstep with the mirror above).
  *
  * Three bullets parsed (one regex per band):
  *   1. `- EASY (sum N-M): allowed at any slot P<s>-P<e>` (the "any slot"
@@ -2174,19 +2187,21 @@ const EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC: AddToTenBandSlots = {
  * at column 0) and the directive prose (`  - `, indented inside the
  * planner template-string).
  */
-function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
+function parseAddToTenBandSlotsFromBulletProse(
+  prose: string,
+): AddToTenBandSlots {
   // EASY: "allowed at any slot P1-P8" — the "any slot" phrase is the
   // intentional asymmetry that wedges the parser off the EASY bullet
   // specifically. If a future editor harmonises this to "allowed at
-  // P1-P8" (dropping "any slot"), parseAddToTenBandSlotsFromSpec falls
-  // over loudly — at which point this regex needs an update.
+  // P1-P8" (dropping "any slot"), parseAddToTenBandSlotsFromBulletProse
+  // falls over loudly — at which point this regex needs an update.
   const easyMatch =
     /^\s*-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P(\d+)-P(\d+)/m.exec(
       prose,
     )
   if (!easyMatch) {
     throw new Error(
-      "parseAddToTenBandSlotsFromSpec: could not locate EASY rule — expected '- EASY (sum N-M): allowed at any slot P<s>-P<e>' bullet in spec §2.1",
+      "parseAddToTenBandSlotsFromBulletProse: could not locate EASY rule — expected '- EASY (sum N-M): allowed at any slot P<s>-P<e>' bullet in spec §2.1",
     )
   }
   const easyStart = Number.parseInt(easyMatch[1]!, 10)
@@ -2201,7 +2216,7 @@ function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
     )
   if (!mediumMatch) {
     throw new Error(
-      "parseAddToTenBandSlotsFromSpec: could not locate MEDIUM rule — expected '- MEDIUM (sum N-M): allowed at P<s>-P<e>.' bullet in spec §2.1",
+      "parseAddToTenBandSlotsFromBulletProse: could not locate MEDIUM rule — expected '- MEDIUM (sum N-M): allowed at P<s>-P<e>.' bullet in spec §2.1",
     )
   }
   const mediumStart = Number.parseInt(mediumMatch[1]!, 10)
@@ -2217,7 +2232,7 @@ function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
     )
   if (!hardMatch) {
     throw new Error(
-      "parseAddToTenBandSlotsFromSpec: could not locate HARD rule — expected '- HARD (sum N-M): allowed at P<s>-P<e> only' bullet in spec §2.1",
+      "parseAddToTenBandSlotsFromBulletProse: could not locate HARD rule — expected '- HARD (sum N-M): allowed at P<s>-P<e> only' bullet in spec §2.1",
     )
   }
   const hardStart = Number.parseInt(hardMatch[1]!, 10)
@@ -2282,7 +2297,7 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against spec prose', () 
     // spec-based guard remains in place to pin Kyle's design doc
     // alongside the directive.
     const spec = readFileSync(SPEC_PATH, 'utf8')
-    const parsed = parseAddToTenBandSlotsFromSpec(spec)
+    const parsed = parseAddToTenBandSlotsFromBulletProse(spec)
     expect(parsed).toEqual(EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC)
   })
 
@@ -2298,25 +2313,25 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against spec prose', () 
       /^-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P\d+-P\d+/m,
       '- EASY (sum 3-5): [REFORMATTED]',
     )
-    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingEasy)).toThrow(
-      /EASY rule/,
-    )
+    expect(() =>
+      parseAddToTenBandSlotsFromBulletProse(proseMissingEasy),
+    ).toThrow(/EASY rule/)
 
     const proseMissingMedium = spec.replace(
       /^-\s+MEDIUM\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\.\s*$/m,
       '- MEDIUM (sum 6-8): [REFORMATTED]',
     )
-    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingMedium)).toThrow(
-      /MEDIUM rule/,
-    )
+    expect(() =>
+      parseAddToTenBandSlotsFromBulletProse(proseMissingMedium),
+    ).toThrow(/MEDIUM rule/)
 
     const proseMissingHard = spec.replace(
       /^-\s+HARD\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\s+only/m,
       '- HARD (sum 9-10): [REFORMATTED]',
     )
-    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingHard)).toThrow(
-      /HARD rule/,
-    )
+    expect(() =>
+      parseAddToTenBandSlotsFromBulletProse(proseMissingHard),
+    ).toThrow(/HARD rule/)
   })
 })
 
@@ -2327,7 +2342,7 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against spec prose', () 
 // COMPOSITION RULES + BAND-BY-SLOT block. The directive's BAND-BY-SLOT
 // bullets reuse the spec's bullet shape verbatim
 // (`- BAND (sum N-M): allowed at P<s>-P<e>...`), so the spec parser
-// `parseAddToTenBandSlotsFromSpec` works without modification — the
+// `parseAddToTenBandSlotsFromBulletProse` works without modification — the
 // shape of the bullets is the contract.
 //
 // Why both: the spec drift-guard pins Kyle's design doc to the lint;
@@ -2359,7 +2374,7 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
     // ADD_TO_TEN_RULES.bandAllowedSlots is the single source of
     // update-pressure for both directive and spec prose.
     const addToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'add-to-10')
-    const parsed = parseAddToTenBandSlotsFromSpec(addToTenBlock)
+    const parsed = parseAddToTenBandSlotsFromBulletProse(addToTenBlock)
     expect(parsed).toEqual(EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC)
   })
 
@@ -2378,25 +2393,25 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
       /^\s*-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P\d+-P\d+/m,
       '  - EASY (sum 3-5): [REFORMATTED]',
     )
-    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingEasy)).toThrow(
-      /EASY rule/,
-    )
+    expect(() =>
+      parseAddToTenBandSlotsFromBulletProse(proseMissingEasy),
+    ).toThrow(/EASY rule/)
 
     const proseMissingMedium = addToTenBlock.replace(
       /^\s*-\s+MEDIUM\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\.\s*$/m,
       '  - MEDIUM (sum 6-8): [REFORMATTED]',
     )
-    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingMedium)).toThrow(
-      /MEDIUM rule/,
-    )
+    expect(() =>
+      parseAddToTenBandSlotsFromBulletProse(proseMissingMedium),
+    ).toThrow(/MEDIUM rule/)
 
     const proseMissingHard = addToTenBlock.replace(
       /^\s*-\s+HARD\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\s+only/m,
       '  - HARD (sum 9-10): [REFORMATTED]',
     )
-    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingHard)).toThrow(
-      /HARD rule/,
-    )
+    expect(() =>
+      parseAddToTenBandSlotsFromBulletProse(proseMissingHard),
+    ).toThrow(/HARD rule/)
   })
 
   it('extractTierBlock isolates the add-to-10 prose from other tier blocks', () => {
