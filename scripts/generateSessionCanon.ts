@@ -105,6 +105,10 @@ import {
   formatLintReport,
   lintCanonResponse,
 } from './canonLint.ts'
+import {
+  CompositionLintError,
+  assertSubToTenCompositionClean,
+} from './compositionLint.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..')
@@ -337,6 +341,37 @@ async function bakeOne(
     }
   }
 
+  // Composition-rule lint gate. Mechanically validates the 8-problem set
+  // against per-tier composition rules (currently scoped to sub-to-10).
+  // Sits after the text-encoding lint so the bake author sees the
+  // hygiene errors first. `--lint-warn` also downgrades this lint —
+  // same dev-iteration semantics as the text-encoding lint.
+  //
+  // Out-of-scope tiers (digraphs, cvc-words, add-to-10, add-to-20) are
+  // no-ops here — `assertSubToTenCompositionClean` only fires when the
+  // canon is recognised as sub-to-10 by `bakeOne`'s combo metadata.
+  if (combo.track === 'math' && combo.focusNode === 'sub-to-10') {
+    try {
+      assertSubToTenCompositionClean(
+        `${combo.track}/${combo.focusNode}`,
+        response,
+      )
+    } catch (err) {
+      if (lintWarn && err instanceof CompositionLintError) {
+        console.warn(
+          `\n[composition-lint] WARN — writing despite violations: ` +
+            `${err.message}\n` +
+            err.violations
+              .map((v) => `  - [${v.rule}] ${v.message}`)
+              .join('\n') +
+            '\n',
+        )
+      } else {
+        throw err
+      }
+    }
+  }
+
   const json = JSON.stringify(response)
   const path = canonFilePath(outRoot, combo)
   mkdirSync(dirname(path), { recursive: true })
@@ -463,6 +498,11 @@ async function main(): Promise<void> {
           console.log(
             `         ↳ [${v.rule}] id=${v.utteranceId} text=${JSON.stringify(v.text)}`,
           )
+        }
+      } else if (err instanceof CompositionLintError) {
+        for (const v of err.violations) {
+          const slot = v.problemIndex === null ? '*' : `P${v.problemIndex}`
+          console.log(`         ↳ [${v.rule}] slot=${slot} ${v.message}`)
         }
       }
     }
