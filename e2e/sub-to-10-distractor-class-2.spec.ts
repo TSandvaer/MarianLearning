@@ -269,10 +269,11 @@ function mkResponse(
  *   P1=5-5=0  P2=6-3=3  P3=9-1=8  P4=8-2=6  (a+b=10 IN — Class-2 trap)
  *   P5=10-3=7 P6=10-7=3 P7=7-3=4 (a+b=10 IN) P8=6-4=2 (a+b=10 IN)
  *
- * add-to-10 canon P4 = `4 + 3 = 7`. Class 2 is op:'-' ONLY (see
- * `distractors.ts:224-227`) so even though `|4 - 3| = 1` is the
- * hypothetical wrong-op trap value, it must NOT appear on the chip
- * row at P4 — the off-by-one tier emits `[6, 8]` for correct=7.
+ * add-to-10 canon P4 = `2 + 4 = 6` (per PR #266 re-bake). Class 2 is
+ * op:'-' ONLY (see `distractors.ts:224-227`) so even though
+ * `|2 - 4| = 2` is the hypothetical wrong-op trap value, it must NOT
+ * appear on the chip row at P4 — the off-by-one tier emits `[5, 7]`
+ * for correct=6.
  */
 const SUB_TO_TEN_CANON_PATH = resolve(
   process.cwd(),
@@ -631,17 +632,19 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
   // sub-only is the counter-test: even on the discriminate tier (P4),
   // an op:'+' problem must NOT carry `|a - b|` as a distractor.
   //
-  // Canon `add-to-10.json` P4 = `4 + 3 = 7`. The hypothetical wrong-op
-  // trap value (if Class 2 erroneously fired) would be `|4 - 3| = 1`.
-  // Per `distractors.ts:224-227` the wrong-op branch ONLY fires when
+  // Canon `add-to-10.json` P4 = `2 + 4 = 6` (per PR #266 re-bake; was
+  // `4 + 3 = 7` pre-#266). The hypothetical wrong-op trap value (if
+  // Class 2 erroneously fired) would be `|2 - 4| = 2`. Per
+  // `distractors.ts:224-227` the wrong-op branch ONLY fires when
   // `op === '-'`, so for this op:'+' problem the chip row must be the
-  // plain off-by-one tier `[6, 8]` plus correct `7`. The trap value
-  // `1` must NOT appear. (Re-targeted from the original `5 + 3 = 8`
-  // canned fact whose trap was `|5 - 3| = 2`; structural assertion is
-  // unchanged — "the op:'-'-only Class-2 lure does NOT leak onto an
-  // op:'+' chip row" — only the specific trap value shifts to match
-  // canon operands.)
-  test('add-to-10 problem 4 with canon `4 + 3 = 7` does NOT carry the would-be wrong-op `1` (Class 2 is sub-only per spec §3.5)', async ({
+  // plain off-by-one tier `[5, 7]` plus correct `6`. The trap value
+  // `2` must NOT appear. (Re-targeted twice — first from `5 + 3 = 8`
+  // (trap `|5-3|=2`) to `4 + 3 = 7` (trap `|4-3|=1`) on PR #239 canon
+  // widening, now to `2 + 4 = 6` (trap `|2-4|=2`) on PR #266 re-bake;
+  // structural assertion is unchanged — "the op:'-'-only Class-2 lure
+  // does NOT leak onto an op:'+' chip row" — only the specific trap
+  // value shifts to match canon operands.)
+  test('add-to-10 problem 4 with canon `2 + 4 = 6` does NOT carry the would-be wrong-op `2` (Class 2 is sub-only per spec §3.5)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -663,24 +666,25 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
 
     // Canon-landed addend gate (PR #242 precedent). Canon P1 is
-    // `2 + 1 = 3` — wait for those operands before walking chips.
-    await expect(page.getByTestId('math-addend-a')).toHaveText('2', {
+    // `1 + 2 = 3` (per PR #266 re-bake) — wait for those operands
+    // before walking chips.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('1', {
       timeout: 15_000,
     })
-    await expect(page.getByTestId('math-addend-b')).toHaveText('1', {
+    await expect(page.getByTestId('math-addend-b')).toHaveText('2', {
       timeout: 15_000,
     })
 
     const valuesAtP4 = await readChipValuesAtProblem(page, 4)
 
     expect(valuesAtP4).toHaveLength(3)
-    // Counter-test — Class 2 is sub-only. `|4 - 3| = 1` (the would-be
+    // Counter-test — Class 2 is sub-only. `|2 - 4| = 2` (the would-be
     // wrong-op trap value if Class 2 erroneously fired on op:'+') must
     // NOT appear as a distractor on an add-to-10 problem.
-    const oneCount = valuesAtP4.filter((v) => v === 1).length
-    expect(oneCount).toBe(0)
-    // Correct answer 7 must be present.
-    const sevenCount = valuesAtP4.filter((v) => v === 7).length
-    expect(sevenCount).toBe(1)
+    const twoCount = valuesAtP4.filter((v) => v === 2).length
+    expect(twoCount).toBe(0)
+    // Correct answer 6 must be present.
+    const sixCount = valuesAtP4.filter((v) => v === 6).length
+    expect(sixCount).toBe(1)
   })
 })
