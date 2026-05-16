@@ -328,13 +328,21 @@ function buildSubToTenSubitisingSeed(): unknown {
 // Test suite
 // ────────────────────────────────────────────────────────────────────────
 
-test.describe('Subitising scaffold — trigger + fluency-fade gate (failing-first, fixme until Devon merges)', () => {
+test.describe('Subitising scaffold — trigger + fluency-fade gate', () => {
   test.beforeEach(async ({ page }) => {
     // `failNetwork: true` — silent caption-walk fallback drives chip
     // enablement on CI runners (no AudioContext, no decode cost). The
     // canonical math fixture rotates to an EASY-band opener (`1 + 2`
     // / `2 + 1` / etc.) so the in-scope predicate fires on Q1. This
     // is the same posture as `dot-card-affordance.spec.ts`.
+    //
+    // Tests 2, 4, 5 re-install with a canned plan; see the per-test
+    // notes. KNOWN ISSUE (flagged by Jessica during the fixme-flip
+    // PR): Tests 2 and 5 fail because the re-install does not
+    // displace this earlier-registered failNetwork handler reliably
+    // — the canned plan never reaches the screen and the static
+    // fallback runs instead. Tests 2 & 5 marked `test.fixme` again
+    // pending follow-up.
     await installClaudeMock(page, { failNetwork: true })
   })
 
@@ -348,7 +356,7 @@ test.describe('Subitising scaffold — trigger + fluency-fade gate (failing-firs
   // does not exist anywhere in `src/`. Even though the existing
   // `math-dot-card` mounts unconditionally for in-scope problems,
   // this spec asserts on the GATED testid Devon adds.
-  test.fixme('first-encounter session: scaffold mounts on in-scope Q1 (1+2 or similar)', async ({
+  test('first-encounter session: scaffold mounts on in-scope Q1 (1+2 or similar)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -409,6 +417,20 @@ test.describe('Subitising scaffold — trigger + fluency-fade gate (failing-firs
   // fixtures (both the canonical and the static fallback open with
   // sums ≤ 5). Instead, we drive a custom canned plan whose Q1 is
   // `6 + 1 = 7` — exercises C2.
+  // KNOWN ISSUE — surfaced during the post-impl fixme-flip
+  // (86c9ureee). Re-installing the `/api/claude` route handler
+  // here with a canned OOS plan does not displace the
+  // beforeEach `failNetwork: true` handler in practice — the
+  // screen falls through to the static plan whose Q1 is in-scope,
+  // and the `math-addend-a === '6'` diagnostic guard trips. The
+  // sister spec `sub-to-10-dot-card-suppression.spec.ts` uses the
+  // identical canned-plan technique and works because it has no
+  // failNetwork beforeEach. Removing the beforeEach + adding
+  // `page.unroute('**/api/claude')` here was both tried and did
+  // not change the outcome — root cause is not yet pinned.
+  // Re-fixme'd until a follow-up specifically rewires the
+  // route-handler posture; the AC2 regression-lock still ships
+  // via Devon's unit test suite at `subitisingScaffold.test.ts`.
   test.fixme('out-of-scope addends (6+1): scaffold does NOT mount even in first-encounter session', async ({
     page,
   }, testInfo) => {
@@ -486,11 +508,7 @@ test.describe('Subitising scaffold — trigger + fluency-fade gate (failing-firs
       }
     }
 
-    // Re-install the mock with our OOS canned plan (clobbers the
-    // beforeEach failNetwork mock — Playwright route handlers are
-    // first-match-wins per registration order, and the second
-    // installClaudeMock call registers a fresh handler that
-    // matches earlier).
+    // Install our OOS canned plan as the only route handler.
     await installClaudeMock(page, { mathResponse: cannedAddToTenOosAtP1 })
 
     await seedLocalStorage(page, {
@@ -546,7 +564,7 @@ test.describe('Subitising scaffold — trigger + fluency-fade gate (failing-firs
   // (sessionsObserved ≥ 3), the scaffold permanently leaves the
   // screen. We saturate Leitner at box 5 (mean = 5.0, well above
   // 4.0).
-  test.fixme('permanent fade: 5 sessions observed + Leitner mean 5.0 → no scaffold even on in-scope Q1', async ({
+  test('permanent fade: 5 sessions observed + Leitner mean 5.0 → no scaffold even on in-scope Q1', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -603,7 +621,7 @@ test.describe('Subitising scaffold — trigger + fluency-fade gate (failing-firs
   // problems (Q4-Q8 in the static plans often include addends > 5);
   // 3 chips is sufficient to lock the stickiness contract without
   // tripping C2 in the middle.
-  test.fixme('sticky-on under low fluency: scaffold mounts on Q1, Q2, Q3 of an in-scope session', async ({
+  test('sticky-on under low fluency: scaffold mounts on Q1, Q2, Q3 of an in-scope session', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -741,6 +759,15 @@ test.describe('Subitising scaffold — trigger + fluency-fade gate (failing-firs
   // (or, if option (b) testid-rename is chosen, the existing spec
   // gets updated and this test becomes redundant — flag in the
   // flip-PR).
+  // KNOWN ISSUE — same root cause as Test 2's KNOWN ISSUE block.
+  // Re-installing the canned sub-to-10 plan over the beforeEach
+  // `failNetwork: true` handler does not displace it; the screen
+  // falls through to the static plan and the `math-addend-a ===
+  // '5'` diagnostic guard trips. Re-fixme'd pending follow-up;
+  // the AC5 regression-lock for non-`add-to-10` focus nodes is
+  // also covered by Devon's unit suite at
+  // `subitisingScaffold.test.ts` and by the existing render-layer
+  // spec `sub-to-10-dot-card-suppression.spec.ts`.
   test.fixme('sub-to-10 focus with both operands ≤ 5: scaffold does NOT mount (C1 gates first)', async ({
     page,
   }, testInfo) => {
