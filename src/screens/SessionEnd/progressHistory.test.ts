@@ -851,4 +851,127 @@ describe('recordProgressOnSessionEnd', () => {
       ])
     })
   })
+
+  // ── Subitising scaffold counter (ticket 86c9ur1zr §2.2) ────────────────
+  // Bumps profile.subitisingScaffoldSessionsObserved by 1 per session
+  // where the scaffold actually rendered. Gated on three conditions:
+  // surface=math, focusNode=add-to-10, subitisingScaffoldRendered=true.
+  describe('subitisingScaffoldSessionsObserved counter (ticket 86c9ur1zr)', () => {
+    it('bumps to 1 on the first scaffold-exposure session (greenfield)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-16T18:00:00.000Z',
+        focusNode: 'add-to-10',
+        subitisingScaffoldRendered: true,
+      })
+
+      const loaded = loadProgress()!
+      expect(loaded.profile.subitisingScaffoldSessionsObserved).toBe(1)
+    })
+
+    it('walks the counter 0 → 1 → 2 → 3 → 4 across successive bumps', () => {
+      const baseISO = '2026-05-16T18:0'
+      for (let i = 0; i < 5; i++) {
+        recordProgressOnSessionEnd({
+          surface: 'math',
+          totalCorrect: 6,
+          dateISO: `${baseISO}${i}:00.000Z`,
+          focusNode: 'add-to-10',
+          subitisingScaffoldRendered: true,
+        })
+      }
+      // Cap pins at SCAFFOLD_SESSIONS_OBSERVED_CAP (4). Fifth bump is
+      // a no-op — we only care about the 1-2-3 first-encounter
+      // boundary; past that the counter is sticky.
+      const loaded = loadProgress()!
+      expect(loaded.profile.subitisingScaffoldSessionsObserved).toBe(4)
+    })
+
+    it('does NOT bump when subitisingScaffoldRendered is false', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-16T18:00:00.000Z',
+        focusNode: 'add-to-10',
+        subitisingScaffoldRendered: false,
+      })
+
+      const loaded = loadProgress()!
+      // Pre-bump state was 0/undefined; absence is preserved when
+      // input is `false`. We accept either undefined or 0 here —
+      // greenfield Marian has the field absent on her profile, and
+      // the writer only writes 0 if it was already present.
+      const counter = loaded.profile.subitisingScaffoldSessionsObserved
+      expect(counter === undefined || counter === 0).toBe(true)
+    })
+
+    it('does NOT bump when subitisingScaffoldRendered is absent (omitted)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-16T18:00:00.000Z',
+        focusNode: 'add-to-10',
+        // subitisingScaffoldRendered omitted entirely
+      })
+
+      const loaded = loadProgress()!
+      const counter = loaded.profile.subitisingScaffoldSessionsObserved
+      expect(counter === undefined || counter === 0).toBe(true)
+    })
+
+    it('does NOT bump on non-add-to-10 focus node (e.g. sub-to-10)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-16T18:00:00.000Z',
+        focusNode: 'sub-to-10',
+        subitisingScaffoldRendered: true,
+      })
+
+      const loaded = loadProgress()!
+      const counter = loaded.profile.subitisingScaffoldSessionsObserved
+      expect(counter === undefined || counter === 0).toBe(true)
+    })
+
+    it('does NOT bump on word-song surface (no scaffold for literacy)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 6,
+        dateISO: '2026-05-16T18:00:00.000Z',
+        focusNode: 'cvc-words',
+        // `subitisingScaffoldRendered` is math-only; pass anyway to
+        // pin that the surface-gate fires before the boolean check.
+        subitisingScaffoldRendered: true,
+      })
+
+      const loaded = loadProgress()!
+      const counter = loaded.profile.subitisingScaffoldSessionsObserved
+      expect(counter === undefined || counter === 0).toBe(true)
+    })
+
+    it('preserves the bumped counter across subsequent non-bump sessions', () => {
+      // First session bumps to 1.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-16T18:00:00.000Z',
+        focusNode: 'add-to-10',
+        subitisingScaffoldRendered: true,
+      })
+
+      // Second session is sub-to-10 — does NOT bump, but must not
+      // clobber the existing counter either.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-16T19:00:00.000Z',
+        focusNode: 'sub-to-10',
+        subitisingScaffoldRendered: false,
+      })
+
+      const loaded = loadProgress()!
+      expect(loaded.profile.subitisingScaffoldSessionsObserved).toBe(1)
+    })
+  })
 })
