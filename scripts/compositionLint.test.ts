@@ -1111,6 +1111,191 @@ describe('SUB_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
   })
 })
 
+// ── drift-guard: SUB_TO_TEN_RULES.bandAllowedSlots ↔ directive prose ────
+//
+// Companion to the POOL drift-guard above (PR #246). The POOL guard
+// pins the FACT POOL bullets to `SUB_TO_TEN_POOL`. This RULE guard pins
+// the SESSION COMPOSITION RULES prose to `SUB_TO_TEN_RULES.bandAllowedSlots`.
+//
+// Why a second guard: the EASY-at-any-slot mismatch closed manually in
+// PR #255 was a RULE-identity disagreement — the directive said "Problems
+// 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts" + "Problems 4-8
+// (discriminate): draw from MEDIUM + HARD bands" (i.e. EASY only at
+// P1-P3), but the data still listed `bandAllowedSlots.EASY = [1..8]`.
+// The POOL guard could not catch this — the pool itself was internally
+// consistent; the failure was in the slot-range rule data falling out of
+// sync with the prose that describes it. A symmetric drift-guard at the
+// RULE-identity layer catches that class of bug at lint time.
+//
+// Two-sided guard (same hybrid pattern as the POOL guard):
+//   1. EXPECTED_BAND_SLOTS_FROM_DIRECTIVE (below) is a hand-mirrored
+//      snapshot of the directive's three slot-range statements. If the
+//      planner directive moves a band-slot boundary, this mirror must
+//      be updated in lockstep — the programmatic parser asserts they
+//      agree.
+//   2. `SUB_TO_TEN_RULES.bandAllowedSlots` is what the lint enforces.
+//      The mirror is asserted deeply-equal to it — if either side
+//      drifts without the other, the test fails with a clear diff.
+//
+// Three relevant statements in the directive prose:
+//   · Rule 1: "Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts."
+//     → EASY allowed slots = [1, 2, 3] (and nowhere else, since Rule 3
+//       restricts P4-P8 to MEDIUM + HARD).
+//   · Rule 3a: "Problems 4-8 (discriminate): draw from MEDIUM + HARD bands."
+//     → MEDIUM allowed slots = [4, 5, 6, 7, 8] (start = 4, end = total).
+//   · Rule 3b: "HARD-band facts ... appear at P5 or later only."
+//     → HARD allowed slots = [5, 6, 7, 8] (start = 5, end = total).
+//
+// Failure mode: when either side moves, this test fails with a deep-
+// equality diff pointing at the exact band whose slot range moved. The
+// fix is always "update the OTHER side too, in this same PR".
+
+type SubToTenBandSlots = (typeof SUB_TO_TEN_RULES)['bandAllowedSlots']
+
+/**
+ * MIRROR of the directive's SESSION COMPOSITION RULES band-slot ranges.
+ * Update both this mirror and the directive prose in lockstep when
+ * shifting a band-slot boundary.
+ *
+ * Source prose (excerpted from `api/_planner.ts` SESSION COMPOSITION RULES):
+ *   1. Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts.
+ *   3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands.
+ *      HARD-band facts ... appear at P5 or later only.
+ */
+const EXPECTED_BAND_SLOTS_FROM_DIRECTIVE: SubToTenBandSlots = {
+  EASY: [1, 2, 3],
+  MEDIUM: [4, 5, 6, 7, 8],
+  HARD: [5, 6, 7, 8],
+}
+
+/**
+ * Parse the SESSION COMPOSITION RULES band-slot statements from the
+ * directive prose. Returns the derived `bandAllowedSlots` map. Throws
+ * if any of the three expected statements is missing or malformed —
+ * a structural directive reformat must be matched by an update to
+ * this parser (in lockstep with the mirror above).
+ *
+ * Three statements parsed:
+ *   1. EASY exclusivity at P1-P3:
+ *      `Problems <s>-<e> (gentle ramp): EXCLUSIVELY EASY-band facts`
+ *      Yields EASY allowed slots = [s..e].
+ *   2. MEDIUM+HARD discrimination at P4-P8:
+ *      `Problems <s>-<e> (discriminate): draw from MEDIUM + HARD bands`
+ *      Yields MEDIUM allowed slots = [s..e]; sets HARD's end = e.
+ *   3. HARD-only-at-P5+ refinement:
+ *      `HARD-band facts ... appear at P<n> or later only`
+ *      Yields HARD allowed slots = [n..HARD-end].
+ */
+function parseDirectiveBandSlots(prose: string): SubToTenBandSlots {
+  const r1 =
+    /Problems\s+(\d+)-(\d+)\s+\(gentle ramp\):\s+EXCLUSIVELY\s+EASY-band facts/.exec(
+      prose,
+    )
+  if (!r1) {
+    throw new Error(
+      "parseDirectiveBandSlots: could not locate EASY rule — expected 'Problems N-M (gentle ramp): EXCLUSIVELY EASY-band facts' in directive prose",
+    )
+  }
+  const easyStart = Number.parseInt(r1[1]!, 10)
+  const easyEnd = Number.parseInt(r1[2]!, 10)
+
+  const r3a =
+    /Problems\s+(\d+)-(\d+)\s+\(discriminate\):\s+draw from MEDIUM \+ HARD bands/.exec(
+      prose,
+    )
+  if (!r3a) {
+    throw new Error(
+      "parseDirectiveBandSlots: could not locate MEDIUM+HARD rule — expected 'Problems N-M (discriminate): draw from MEDIUM + HARD bands' in directive prose",
+    )
+  }
+  const discriminateStart = Number.parseInt(r3a[1]!, 10)
+  const discriminateEnd = Number.parseInt(r3a[2]!, 10)
+
+  const r3b = /HARD-band facts[^.]*?appear at P(\d+) or later only/.exec(prose)
+  if (!r3b) {
+    throw new Error(
+      "parseDirectiveBandSlots: could not locate HARD-band refinement — expected 'HARD-band facts ... appear at P<N> or later only' in directive prose",
+    )
+  }
+  const hardStart = Number.parseInt(r3b[1]!, 10)
+
+  const range = (start: number, end: number): readonly number[] => {
+    const out: number[] = []
+    for (let i = start; i <= end; i++) out.push(i)
+    return out
+  }
+
+  return {
+    EASY: range(easyStart, easyEnd),
+    MEDIUM: range(discriminateStart, discriminateEnd),
+    HARD: range(hardStart, discriminateEnd),
+  }
+}
+
+describe('SUB_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose', () => {
+  it('lint rule data matches the hand-mirrored expectation from the directive (lockstep)', () => {
+    // The mirror is the single source of update-pressure: if
+    // SUB_TO_TEN_RULES.bandAllowedSlots changes (a band's slot range
+    // shifts), this assertion fails until the mirror is updated to
+    // match — at which point the separate parser-vs-mirror assertion
+    // below forces the directive prose to be updated too.
+    //
+    // Mutation-test contract (documented in the PR description):
+    //   Flip SUB_TO_TEN_RULES.bandAllowedSlots.EASY from [1, 2, 3] to
+    //   [1, 2, 3, 4, 5, 6, 7, 8] and this test must FAIL with a deep-
+    //   equality diff naming the EASY band as the discrepant key.
+    //   Restore to verify GREEN.
+    expect(SUB_TO_TEN_RULES.bandAllowedSlots).toEqual(
+      EXPECTED_BAND_SLOTS_FROM_DIRECTIVE,
+    )
+  })
+
+  it('directive SESSION COMPOSITION RULES parse to the hand-mirrored expectation (lockstep)', () => {
+    // Parses `api/_planner.ts` SESSION COMPOSITION RULES at runtime.
+    // If the directive moves a band-slot boundary (e.g. relaxes HARD
+    // to P4-or-later, or tightens EASY to P1-P2), this fails until
+    // the mirror is updated to match.
+    //
+    // This is the half of the guard that catches the PR #255 class of
+    // bug: prose drifting away from data. If the directive said
+    // "Problems 1-2 (gentle ramp): EXCLUSIVELY EASY-band facts" while
+    // the data still said `EASY: [1, 2, 3]`, the parsed slots would
+    // be [1, 2] and the mirror would still be [1, 2, 3] — failure
+    // points at EASY with a clear diff.
+    const parsed = parseDirectiveBandSlots(MATH_TRACK_GUIDE)
+    expect(parsed).toEqual(EXPECTED_BAND_SLOTS_FROM_DIRECTIVE)
+  })
+
+  it('parser throws a clear error when a required directive statement is missing', () => {
+    // Sanity check on the parser: catches the case where someone
+    // restructures the SESSION COMPOSITION RULES prose in a way that
+    // escapes the regex (parsed bands would be undefined and the deep-
+    // equality assertion above would fail with a less legible diff).
+    // The throw points the maintainer at which statement disappeared.
+    const proseMissingEasy = MATH_TRACK_GUIDE.replace(
+      /Problems\s+1-3\s+\(gentle ramp\):\s+EXCLUSIVELY\s+EASY-band facts/,
+      'Problems 1-3 (gentle ramp): [REFORMATTED]',
+    )
+    expect(() => parseDirectiveBandSlots(proseMissingEasy)).toThrow(/EASY rule/)
+
+    const proseMissingMedium = MATH_TRACK_GUIDE.replace(
+      /Problems\s+4-8\s+\(discriminate\):\s+draw from MEDIUM \+ HARD bands/,
+      'Problems 4-8 (discriminate): [REFORMATTED]',
+    )
+    expect(() => parseDirectiveBandSlots(proseMissingMedium)).toThrow(
+      /MEDIUM\+HARD rule/,
+    )
+
+    const proseMissingHard = MATH_TRACK_GUIDE.replace(
+      /HARD-band facts[^.]*?appear at P\d+ or later only/,
+      '[REFORMATTED]',
+    )
+    expect(() => parseDirectiveBandSlots(proseMissingHard)).toThrow(
+      /HARD-band refinement/,
+    )
+  })
+})
+
 // ═════════════════════════════════════════════════════════════════════════
 // add-to-10 lint tests
 // ═════════════════════════════════════════════════════════════════════════
