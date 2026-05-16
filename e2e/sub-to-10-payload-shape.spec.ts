@@ -98,7 +98,7 @@ function skipOnWebkitHeadless(testInfo: {
 //
 // Returns a `SessionStartResponse`-shaped object whose plan + utterances
 // carry 8 subtraction problems, all `op === '-'`, drawn from the locked
-// 16-fact pool in `design/math/sub-to-10-content.md` §1.1.
+// 22-fact pool in `design/math/sub-to-10-content.md` §1.1.
 //
 // Problem 1 is `10 - 5 = 5` (easy band, doubles); the canned plan's other
 // problems are not asserted by this spec.

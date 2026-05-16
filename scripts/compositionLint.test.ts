@@ -220,13 +220,15 @@ describe('lintSubToTenComposition — clean canon passes', () => {
 })
 
 describe('lintSubToTenComposition — pool-membership rule', () => {
-  it('fires when a fact is NOT in the 16-fact pool', () => {
-    // 7-3 is NOT in the pool (the directive lists it as FORBIDDEN).
+  it('fires when a fact is NOT in the 22-fact pool', () => {
+    // 9-2 is NOT in the pool (the directive lists it as FORBIDDEN).
+    // (Pre-PR #249/#252 widening this test used 7-3, but 7-3 is now
+    // IN the pool as a HARD/general fact — see SUB_TO_TEN_POOL.)
     const facts: Array<[number, number]> = [
       [7, 0],
       [6, 3],
       [9, 1],
-      [7, 3], // ← outside pool
+      [9, 2], // ← outside pool
       [10, 3],
       [8, 3],
       [9, 4],
@@ -238,17 +240,19 @@ describe('lintSubToTenComposition — pool-membership rule', () => {
     )
     expect(poolViolations).toHaveLength(1)
     expect(poolViolations[0]!.problemIndex).toBe(4)
-    expect(poolViolations[0]!.factId).toBe('7-3')
-    expect(poolViolations[0]!.message).toContain('NOT in the 16-fact')
+    expect(poolViolations[0]!.factId).toBe('9-2')
+    expect(poolViolations[0]!.message).toContain('NOT in the 22-fact')
   })
 
   it('fires on a manually-curated list of forbidden facts the directive calls out', () => {
-    // Directive line 947 lists: 7-3, 7-2, 6-2, 8-5, 9-3, 9-2 as
-    // explicitly FORBIDDEN. We sanity-check 3 of them.
+    // Post-PR #249/#252 widening, the directive's explicit FORBIDDEN
+    // list shrank — 7-3, 8-1, 7-1, 8-2, 6-2, 6-4 are now IN the pool.
+    // Remaining forbidden facts still flagged by the directive: 7-2,
+    // 8-5, 9-3, 9-2. We sanity-check 3 of them.
     for (const [a, b] of [
       [7, 2],
-      [6, 2],
       [8, 5],
+      [9, 3],
     ] as const) {
       const facts: Array<[number, number]> = [
         [7, 0],
@@ -615,8 +619,8 @@ describe('assertSubToTenCompositionClean', () => {
 // ── pool sanity (defends against accidental edits to SUB_TO_TEN_POOL) ────
 
 describe('SUB_TO_TEN_POOL', () => {
-  it('contains exactly 16 facts', () => {
-    expect(SUB_TO_TEN_POOL).toHaveLength(16)
+  it('contains exactly 22 facts (post-PR #249/#252 widening)', () => {
+    expect(SUB_TO_TEN_POOL).toHaveLength(22)
   })
 
   it('every fact has a unique id', () => {
@@ -638,7 +642,7 @@ describe('SUB_TO_TEN_POOL', () => {
     }
   })
 
-  it('band counts match design spec §1.1: 8 EASY, 4 MEDIUM, 4 HARD', () => {
+  it('band counts match design spec §1.1 (post-amendments): 8 EASY, 8 MEDIUM, 6 HARD', () => {
     const counts = SUB_TO_TEN_POOL.reduce(
       (acc, f) => {
         acc[f.band] = (acc[f.band] ?? 0) + 1
@@ -647,11 +651,16 @@ describe('SUB_TO_TEN_POOL', () => {
       {} as Record<string, number>,
     )
     expect(counts.EASY).toBe(8)
-    expect(counts.MEDIUM).toBe(4)
-    expect(counts.HARD).toBe(4)
+    expect(counts.MEDIUM).toBe(8)
+    expect(counts.HARD).toBe(6)
   })
 
-  it('category counts match design spec §1.1', () => {
+  it('category counts match design spec §1.1 (post-amendments)', () => {
+    // Per design/math/sub-to-10-content.md §1.1 "Category counts":
+    //   subtract-self ×2 · subtract-zero ×2 · doubles ×3 · subtract-one ×4 ·
+    //   subtract-two ×3 · take-from-10 ×2 · general ×6.
+    // (`doubles` in the spec maps to `doubles-halving` in this lint —
+    // the rule rename is deferred to a follow-up ticket per PR #251.)
     const counts = SUB_TO_TEN_POOL.reduce(
       (acc, f) => {
         acc[f.category] = (acc[f.category] ?? 0) + 1
@@ -662,10 +671,10 @@ describe('SUB_TO_TEN_POOL', () => {
     expect(counts['subtract-self']).toBe(2)
     expect(counts['subtract-zero']).toBe(2)
     expect(counts['doubles-halving']).toBe(3)
-    expect(counts['subtract-one']).toBe(2)
-    expect(counts['subtract-two']).toBe(1)
+    expect(counts['subtract-one']).toBe(4)
+    expect(counts['subtract-two']).toBe(3)
     expect(counts['take-from-10']).toBe(2)
-    expect(counts['general']).toBe(4)
+    expect(counts['general']).toBe(6)
   })
 })
 
@@ -933,15 +942,22 @@ describe('SUB_TO_TEN_RULES', () => {
 //
 // Devon's NOF on PR #245 (and Kevin's own NOF #4) flagged that the canon-
 // lint pool (`SUB_TO_TEN_POOL`) and the Haiku-facing planner directive
-// (`MATH_TRACK_GUIDE` FACT POOL block, currently at `api/_planner.ts:931-
-// 946`) carry the SAME 16 facts in DIFFERENT representations — bullets
-// with inline `[BAND/category]` tags vs a typed array of pool entries.
-// They MUST stay in lockstep: drift means the lint either rejects a fact
-// Haiku is told to emit, or accepts a fact Haiku was told is forbidden.
+// (`MATH_TRACK_GUIDE` FACT POOL block, currently at `api/_planner.ts:930+`)
+// carry the SAME 22 facts in DIFFERENT representations — bullets with
+// inline `[BAND/category]` tags vs a typed array of pool entries. They
+// MUST stay in lockstep: drift means the lint either rejects a fact Haiku
+// is told to emit, or accepts a fact Haiku was told is forbidden.
+//
+// Pool size history (kept here as a guard-rail against silent regression):
+//   16 → 20 → 22 facts. The PR #249 spec widened to 20 (4 MEDIUM
+//   additions for in-range wrong-op coverage); PR #252 spec widened to
+//   22 (2 HARD/general additions to close the wrong-op coverage cushion).
+//   Both spec changes ratified by the implementation PR that lands these
+//   tests and the directive mirror in lockstep.
 //
 // Two-sided guard:
 //   1. EXPECTED_POOL_FROM_DIRECTIVE (below) is a hand-mirrored snapshot
-//      of the directive's 16 bullet lines. If the planner directive
+//      of the directive's 22 bullet lines. If the planner directive
 //      changes its pool, this mirror must be updated in lockstep — the
 //      programmatic parser asserts they agree.
 //   2. SUB_TO_TEN_POOL is what the lint enforces. The mirror is asserted
@@ -958,17 +974,24 @@ describe('SUB_TO_TEN_RULES', () => {
 type SubToTenPoolFact = (typeof SUB_TO_TEN_POOL)[number]
 
 /**
- * MIRROR of `api/_planner.ts:931-946` (the `MATH_TRACK_GUIDE` FACT POOL
- * block). Update both in lockstep when widening or reshaping the pool.
+ * MIRROR of `api/_planner.ts` `MATH_TRACK_GUIDE` FACT POOL block (the
+ * `sub-to-10:` directive section, currently 22 bullet lines). Update
+ * both in lockstep when widening or reshaping the pool.
  *
  * Source bullet format (from the directive):
- *   `    · 5-5=0   [EASY/subtract-self]   (at most one ... per session)`
+ *   `    · 5-5=0   [EASY/subtract-self]   (a+b=10 IN — boundary)`
+ *
+ * The trailing annotation `(a+b=N IN/OOR/ALIAS — ...)` is documentation
+ * for Haiku's wrong-op trap selection; the regex below stops at the
+ * `]` after `[BAND/category]` and ignores the annotation, so it doesn't
+ * need to be encoded here.
  *
  * Stored here as the parsed shape — `{ id, a, b, band, category }` —
  * so the deep-equality assertion against `SUB_TO_TEN_POOL` gives a
  * legible failure diff. Order matches the directive's bullet order.
  */
 const EXPECTED_POOL_FROM_DIRECTIVE: readonly SubToTenPoolFact[] = [
+  // EASY band (8 facts)
   { id: '5-5', a: 5, b: 5, band: 'EASY', category: 'subtract-self' },
   { id: '8-8', a: 8, b: 8, band: 'EASY', category: 'subtract-self' },
   { id: '7-0', a: 7, b: 0, band: 'EASY', category: 'subtract-zero' },
@@ -977,14 +1000,22 @@ const EXPECTED_POOL_FROM_DIRECTIVE: readonly SubToTenPoolFact[] = [
   { id: '8-4', a: 8, b: 4, band: 'EASY', category: 'doubles-halving' },
   { id: '6-3', a: 6, b: 3, band: 'EASY', category: 'doubles-halving' },
   { id: '9-1', a: 9, b: 1, band: 'EASY', category: 'subtract-one' },
+  // MEDIUM band (8 facts — post-PR #249 widening; 8-1, 7-1, 8-2, 6-2 added)
   { id: '10-1', a: 10, b: 1, band: 'MEDIUM', category: 'subtract-one' },
+  { id: '8-1', a: 8, b: 1, band: 'MEDIUM', category: 'subtract-one' },
+  { id: '7-1', a: 7, b: 1, band: 'MEDIUM', category: 'subtract-one' },
   { id: '10-2', a: 10, b: 2, band: 'MEDIUM', category: 'subtract-two' },
+  { id: '8-2', a: 8, b: 2, band: 'MEDIUM', category: 'subtract-two' },
+  { id: '6-2', a: 6, b: 2, band: 'MEDIUM', category: 'subtract-two' },
   { id: '10-3', a: 10, b: 3, band: 'MEDIUM', category: 'take-from-10' },
   { id: '10-7', a: 10, b: 7, band: 'MEDIUM', category: 'take-from-10' },
+  // HARD band (6 facts — post-PR #252 widening; 7-3, 6-4 added)
   { id: '9-4', a: 9, b: 4, band: 'HARD', category: 'general' },
   { id: '8-3', a: 8, b: 3, band: 'HARD', category: 'general' },
   { id: '7-4', a: 7, b: 4, band: 'HARD', category: 'general' },
   { id: '9-6', a: 9, b: 6, band: 'HARD', category: 'general' },
+  { id: '7-3', a: 7, b: 3, band: 'HARD', category: 'general' },
+  { id: '6-4', a: 6, b: 4, band: 'HARD', category: 'general' },
 ]
 
 /**
@@ -995,7 +1026,7 @@ const EXPECTED_POOL_FROM_DIRECTIVE: readonly SubToTenPoolFact[] = [
  *
  * Anything that does not match the bullet shape is skipped silently —
  * the FACT POOL section also contains a header line and self-check
- * paragraphs, and we only want the 16 fact bullets.
+ * paragraphs, and we only want the 22 fact bullets.
  */
 function parseDirectiveFactPool(prose: string): readonly SubToTenPoolFact[] {
   // Bullet character is U+00B7 (middle dot). Tolerate leading whitespace.
@@ -1033,14 +1064,14 @@ describe('SUB_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
     expect(parsed).toEqual(EXPECTED_POOL_FROM_DIRECTIVE)
   })
 
-  it('directive prose contains exactly 16 FACT POOL bullets (matches pool size)', () => {
+  it('directive prose contains exactly 22 FACT POOL bullets (matches pool size)', () => {
     // Sanity check on the parser: catches the case where the bullet
     // format is reformatted in a way that escapes the regex (parsed
     // would be []) or where someone adds extra bullets the mirror
-    // doesn't cover.
+    // doesn't cover. Post-PR #252 spec ratification: 22 facts.
     const parsed = parseDirectiveFactPool(MATH_TRACK_GUIDE)
     expect(parsed).toHaveLength(SUB_TO_TEN_POOL.length)
-    expect(parsed).toHaveLength(16)
+    expect(parsed).toHaveLength(22)
   })
 })
 

@@ -927,34 +927,43 @@ The user message names a focus skill node. Generate problems specifically for th
     · ELSE → choose the "minus" template: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seven minus three. How many are left?"
   Then USE THE CHOSEN TEMPLATE ACROSS ALL 8 PROBLEMS. DO NOT mix "take away" and "minus" within a single session. DO NOT switch templates partway through. The "take away" framing matches Marian's mental model from counting back (physical removal); subsequent sessions revert to "minus". Emma's voice config is unchanged — the SSML and prosody pipeline does not change for this tier.
 
-  FACT POOL (16 facts total — this is the ONLY allowed pool. Pick exactly 8 distinct facts FROM THIS LIST per session. No duplicates. DO NOT invent facts outside this list; e.g. 7-3, 7-2, 6-2, 8-5, 9-3 are NOT in the pool and are FORBIDDEN). EVERY FACT IS LABELED INLINE WITH ITS BAND AND CATEGORY — preserve this binding when composing the session:
-    · 5-5=0   [EASY/subtract-self]   (at most one subtract-self per session)
-    · 8-8=0   [EASY/subtract-self]   (at most one subtract-self per session)
-    · 7-0=7   [EASY/subtract-zero]   (at most one subtract-zero per session)
-    · 9-0=9   [EASY/subtract-zero]   (at most one subtract-zero per session)
-    · 10-5=5  [EASY/doubles-halving] (at most one doubles per session)
-    · 8-4=4   [EASY/doubles-halving] (at most one doubles per session)
-    · 6-3=3   [EASY/doubles-halving] (at most one doubles per session)
-    · 9-1=8   [EASY/subtract-one]    (at most one subtract-one per session)
-    · 10-1=9  [MEDIUM/subtract-one]  (at most one subtract-one per session — counts toward same cap as the EASY 9-1)
-    · 10-2=8  [MEDIUM/subtract-two]  (at most one subtract-two per session)
-    · 10-3=7  [MEDIUM/take-from-10]  (at most two take-from-10 per session — high-value category)
-    · 10-7=3  [MEDIUM/take-from-10]  (at most two take-from-10 per session — high-value category)
-    · 9-4=5   [HARD/general]         (at most two general per session — HARD cap)
-    · 8-3=5   [HARD/general]         (at most two general per session — HARD cap)
-    · 7-4=3   [HARD/general]         (at most two general per session — HARD cap)
-    · 9-6=3   [HARD/general]         (at most two general per session — HARD cap)
-  POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) pair appears verbatim above. If 7-3, 7-2, 6-2, 8-5, 9-3, 9-2, or any other pair NOT listed is your candidate, REJECT it and pick another from the 16-fact list.
-  GENERAL-CATEGORY CAP SELF-CHECK: across the entire 8-problem session, AT MOST TWO problems may be tagged [HARD/general] (i.e. drawn from {9-4, 8-3, 7-4, 9-6}). Before emitting a third HARD-band fact, REJECT it.
+  FACT POOL (22 facts total — this is the ONLY allowed pool. Pick exactly 8 distinct facts FROM THIS LIST per session. No duplicates. DO NOT invent facts outside this list; e.g. 7-2, 8-5, 9-3, 9-2, 5-3, 4-3, 5-4 are NOT in the pool and are FORBIDDEN). EVERY FACT IS LABELED INLINE WITH ITS BAND AND CATEGORY, and annotated with (a+b) = the wrong-op trap value used at render time. IN means the trap is <= 10 (a usable in-range wrong-op distractor); OOR means the trap is > 10 (silently downgrades to off-by-one at render time per design/math/sub-to-10-content.md §3.2); ALIAS means the trap aliases the correct answer (forbidden, downgrades). Preserve the BAND/CATEGORY binding when composing the session:
+    · 5-5=0   [EASY/subtract-self]   (a+b=10 IN — boundary)
+    · 8-8=0   [EASY/subtract-self]   (a+b=16 OOR)
+    · 7-0=7   [EASY/subtract-zero]   (a+b=7 ALIAS — forbidden)
+    · 9-0=9   [EASY/subtract-zero]   (a+b=9 ALIAS — forbidden)
+    · 10-5=5  [EASY/doubles-halving] (a+b=15 OOR)
+    · 8-4=4   [EASY/doubles-halving] (a+b=12 OOR)
+    · 6-3=3   [EASY/doubles-halving] (a+b=9 IN)
+    · 9-1=8   [EASY/subtract-one]    (a+b=10 IN — boundary)
+    · 10-1=9  [MEDIUM/subtract-one]  (a+b=11 OOR)
+    · 8-1=7   [MEDIUM/subtract-one]  (a+b=9 IN)
+    · 7-1=6   [MEDIUM/subtract-one]  (a+b=8 IN)
+    · 10-2=8  [MEDIUM/subtract-two]  (a+b=12 OOR)
+    · 8-2=6   [MEDIUM/subtract-two]  (a+b=10 IN — boundary, strongest "makes ten" lure)
+    · 6-2=4   [MEDIUM/subtract-two]  (a+b=8 IN)
+    · 10-3=7  [MEDIUM/take-from-10]  (a+b=13 OOR)
+    · 10-7=3  [MEDIUM/take-from-10]  (a+b=17 OOR)
+    · 9-4=5   [HARD/general]         (a+b=13 OOR)
+    · 8-3=5   [HARD/general]         (a+b=11 OOR)
+    · 7-4=3   [HARD/general]         (a+b=11 OOR)
+    · 9-6=3   [HARD/general]         (a+b=15 OOR)
+    · 7-3=4   [HARD/general]         (a+b=10 IN — boundary, strongest "makes ten" lure)
+    · 6-4=2   [HARD/general]         (a+b=10 IN — boundary, widest correct-vs-trap separation in pool)
+  POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) pair appears verbatim above. If 7-2, 8-5, 9-3, 9-2, 5-3, 4-3, 5-4, or any other pair NOT listed is your candidate, REJECT it and pick another from the 22-fact list.
+  GENERAL-CATEGORY CAP SELF-CHECK: across the entire 8-problem session, AT MOST TWO problems may be tagged [HARD/general] (i.e. drawn from {9-4, 8-3, 7-4, 9-6, 7-3, 6-4}). Before emitting a third HARD-band fact, REJECT it. The HARD-band pool was widened from 4 facts to 6 facts post-PR #252 (added 7-3, 6-4); the per-session CAP IS UNCHANGED at TWO — picking 7-3 + 6-4 EXHAUSTS the general cap, so 9-4, 8-3, 7-4, and 9-6 are then ALL FORBIDDEN for the rest of the session. Symmetrically: picking any two of {9-4, 8-3, 7-4, 9-6, 7-3, 6-4} exhausts the cap; the remaining four HARD facts are all FORBIDDEN. Walk through the P5-P8 slots once and STOP at the second HARD-band fact, regardless of which two you chose.
   DOUBLES-CAP SELF-CHECK: across the entire 8-problem session, AT MOST ONE problem may be tagged [EASY/doubles-halving] (i.e. drawn from {10-5, 8-4, 6-3}). Before emitting a second doubles-halving fact, REJECT it. The three doubles-halving facts share a single slot — pick one and only one. NEGATIVE ANCHOR: it is FORBIDDEN to place 10-5 AND 8-4 in the same session; FORBIDDEN to place 10-5 AND 6-3; FORBIDDEN to place 8-4 AND 6-3. Two consecutive EASY-band doubles in the gentle ramp (P1-P3) is a known failure mode and is explicitly disallowed.
+  SUBTRACT-ONE-CAP SELF-CHECK: across the entire 8-problem session, AT MOST ONE problem may carry the subtract-one category — that is, AT MOST ONE fact drawn from {9-1, 10-1, 8-1, 7-1} (the EASY 9-1 and the three MEDIUM facts share a single combined cap). Before emitting a second subtract-one fact, REJECT it. NEGATIVE ANCHOR: it is FORBIDDEN to place 9-1 AND 10-1 in the same session; FORBIDDEN to place 9-1 AND 8-1; FORBIDDEN to place 9-1 AND 7-1; FORBIDDEN to place 10-1 AND 8-1; FORBIDDEN to place 10-1 AND 7-1; FORBIDDEN to place 8-1 AND 7-1. Pick one subtract-one fact and only one. (Known failure mode: P2=9-1 + P4=8-1 was a category-cap violation in two consecutive bakes during PR #253 pool widening.)
+  SUBTRACT-TWO-CAP SELF-CHECK: across the entire 8-problem session, AT MOST ONE problem may carry the subtract-two category — that is, AT MOST ONE fact drawn from {10-2, 8-2, 6-2}. Before emitting a second subtract-two fact, REJECT it. NEGATIVE ANCHOR: it is FORBIDDEN to place 10-2 AND 8-2 in the same session; FORBIDDEN to place 10-2 AND 6-2; FORBIDDEN to place 8-2 AND 6-2. Pick one subtract-two fact and only one.
+  DISTRACTOR-COVERAGE SELF-CHECK (for problems 4-8): the render pipeline (src/screens/Math/Math.tsx) attempts a wrong-op trap (a+b) on every op:'-' P4-P8 problem and silently downgrades to off-by-one when the trap is OOR or aliases the correct answer. To deliver >= 2 in-range wrong-op traps across P4-P8 (Kyle's spec target), bias the P4-P8 selection toward facts annotated "IN" above. IN-annotated MEDIUM facts: 8-1, 7-1, 8-2, 6-2 (any one subtract-one and any one subtract-two — category caps still binding). IN-annotated HARD/general facts: 7-3, 6-4 (the general cap of 2 lets BOTH co-occur in one session). NEGATIVE ANCHOR: it is FORBIDDEN to fill P4-P8 entirely with OOR facts when >= 2 IN-annotated facts (from any band combination) are still available; before finalising the 5-problem P4-P8 set, count the IN-annotated facts in the set and if it is < 2 AND >= 2 IN-annotated facts are still available within category caps, SWAP one OOR fact for an IN-annotated one. Category caps are still binding: if you pick 8-1=7 (subtract-one IN), you may not also pick 10-1=9 or 7-1=6; if you pick 8-2=6 or 6-2=4 (subtract-two IN), you may not also pick 10-2=8. The maximum achievable IN-count in P4-P8 is 4 — one MEDIUM/subtract-one IN-fact, one MEDIUM/subtract-two IN-fact, AND both HARD/general IN-facts (7-3 + 6-4). The >= 2 target is structurally achievable from HARD/general alone (7-3 + 6-4) under the general cap, so even MEDIUM-light high-recent-score sessions meet the target. Aim for >= 2 IN; do not artificially cap at 2 if more IN-facts fit within category caps and other rules.
 
   SESSION COMPOSITION RULES (apply IN ORDER):
   1. Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts. Read each fact's [EASY/...] tag before placing it at P1, P2, or P3. ONLY facts tagged [EASY/...] above are eligible for these slots — that is 8 specific facts: 5-5, 8-8, 7-0, 9-0, 10-5, 8-4, 6-3, 9-1.
   2. NEGATIVE ANCHOR — P1, P2, P3 PLACEMENT BANS (any one of these is a hard rule violation):
-     · DO NOT place 8-3, 9-4, 7-4, or 9-6 at P1, P2, or P3. These are HARD-band facts; HARD-band only appears at P5 or later.
-     · DO NOT place 10-1, 10-2, 10-3, or 10-7 at P1, P2, or P3. These are MEDIUM-band facts; MEDIUM-band only appears at P4 or later.
+     · DO NOT place 8-3, 9-4, 7-4, 9-6, 7-3, or 6-4 at P1, P2, or P3. These are HARD-band facts; HARD-band only appears at P5 or later.
+     · DO NOT place 10-1, 8-1, 7-1, 10-2, 8-2, 6-2, 10-3, or 10-7 at P1, P2, or P3. These are MEDIUM-band facts; MEDIUM-band only appears at P4 or later.
      · The ONLY facts allowed at P1, P2, P3 are: 5-5, 8-8, 7-0, 9-0, 10-5, 8-4, 6-3, 9-1.
-  3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) → bias toward MEDIUM; high score (>= 0.85) → bias toward HARD; mid score → balanced. HARD-band facts (8-3, 9-4, 7-4, 9-6) appear at P5 or later only.
+  3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) → bias toward MEDIUM; high score (>= 0.85) → bias toward HARD; mid score → balanced. HARD-band facts (8-3, 9-4, 7-4, 9-6, 7-3, 6-4) appear at P5 or later only.
   4. At least one take-from-10 fact (10-3 or 10-7) MUST appear somewhere in problems 4-8.
   5. DUAL-EXPOSURE RULE: never pair a subtraction fact and its addition inverse in the same session. E.g. if 10-7=3 is included, 7+3=10 (or 3+7=10) is FORBIDDEN. This rule is forward-compatible — when Marian later moves to mixed add+sub sessions, this rule remains in force per Dave's research on inverse-principle interference.
   6. NO duplicate facts within the 8-problem set. Before emitting P2 through P8, scan all prior problems' (a, b) pairs and reject any candidate already used. E.g. if P1 is 8-3, then 8-3 is FORBIDDEN at P2 through P8.
