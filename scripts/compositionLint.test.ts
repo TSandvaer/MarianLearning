@@ -1159,6 +1159,59 @@ describe('SUB_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
 type SubToTenBandSlots = (typeof SUB_TO_TEN_RULES)['bandAllowedSlots']
 
 /**
+ * Extract the prose block for a single tier from `MATH_TRACK_GUIDE`.
+ *
+ * The directive lists each math focus-node under a top-level bullet:
+ *   `- <tier>: <one-line summary>` followed by indented prose for the
+ *   tier (FACT POOL, SESSION COMPOSITION RULES, PER-PROBLEM SHAPE, ...).
+ *   The block ends at the next top-level `- <next-tier>:` bullet (or
+ *   end-of-string).
+ *
+ * Returns the prose slice starting at the tier's bullet through (but
+ * excluding) the next top-level bullet. Throws if the requested tier
+ * header is not present in the prose.
+ *
+ * Why this exists: after PR #259 (add-to-10 directive sharpening) the
+ * SESSION COMPOSITION RULES prose shape ("Problems 1-3 (gentle ramp):
+ * EXCLUSIVELY EASY-band facts", "Problems 4-8 (discriminate): draw
+ * from MEDIUM + HARD bands", etc.) appears VERBATIM in both the
+ * sub-to-10 and the add-to-10 directive blocks. The sub-to-10 parser's
+ * regexes, when run against the full `MATH_TRACK_GUIDE`, find the
+ * add-to-10 occurrence first (it precedes sub-to-10 in the prose) —
+ * the parsed values happen to be identical, so the assertion passes
+ * coincidentally rather than by design. Scoping the parser to the
+ * tier-specific block removes the coincidence.
+ */
+function extractTierBlock(prose: string, tier: string): string {
+  // Top-level tier bullets start at column 0 (no leading whitespace)
+  // and use the shape `- <tier>:`. The directive's secondary bullets
+  // (`  - read:`, `  - correct:`, `  - EASY (sum ...):`) are indented
+  // with at least two spaces and must NOT match this anchor.
+  const startRe = new RegExp(`^- ${escapeRegex(tier)}:`, 'm')
+  const startMatch = startRe.exec(prose)
+  if (!startMatch) {
+    throw new Error(
+      `extractTierBlock: could not locate tier header "- ${tier}:" in directive prose`,
+    )
+  }
+  const sliceFrom = startMatch.index
+  // Look for the NEXT top-level `- <name>:` bullet after the tier's
+  // start. The lookahead must skip indented secondary bullets.
+  const nextRe = /^- [\w-]+:/m
+  const remainder = prose.slice(sliceFrom + startMatch[0].length)
+  const nextMatch = nextRe.exec(remainder)
+  const sliceTo =
+    nextMatch === null
+      ? prose.length
+      : sliceFrom + startMatch[0].length + nextMatch.index
+  return prose.slice(sliceFrom, sliceTo)
+}
+
+function escapeRegex(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
  * MIRROR of the directive's SESSION COMPOSITION RULES band-slot ranges.
  * Update both this mirror and the directive prose in lockstep when
  * shifting a band-slot boundary.
@@ -1268,7 +1321,14 @@ describe('SUB_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
     // the data still said `EASY: [1, 2, 3]`, the parsed slots would
     // be [1, 2] and the mirror would still be [1, 2, 3] — failure
     // points at EASY with a clear diff.
-    const parsed = parseDirectiveBandSlots(MATH_TRACK_GUIDE)
+    //
+    // Scope the parser to the sub-to-10 tier-block. After PR #259
+    // (add-to-10 directive sharpening) the SESSION COMPOSITION RULES
+    // prose appears verbatim in both the sub-to-10 and add-to-10
+    // blocks — `extractTierBlock` removes the coincidence so this
+    // parser is exercising sub-to-10's prose specifically.
+    const subToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-10')
+    const parsed = parseDirectiveBandSlots(subToTenBlock)
     expect(parsed).toEqual(EXPECTED_BAND_SLOTS_FROM_DIRECTIVE)
   })
 
@@ -1278,13 +1338,21 @@ describe('SUB_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
     // escapes the regex (parsed bands would be undefined and the deep-
     // equality assertion above would fail with a less legible diff).
     // The throw points the maintainer at which statement disappeared.
-    const proseMissingEasy = MATH_TRACK_GUIDE.replace(
+    //
+    // The mutations are applied to the sub-to-10 tier-block only.
+    // After PR #259's add-to-10 directive sharpening, the SESSION
+    // COMPOSITION RULES prose appears verbatim in both the sub-to-10
+    // and add-to-10 blocks — scoping the mutation to the sub-to-10
+    // slice keeps the "missing statement" assertion tier-relevant.
+    const subToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-10')
+
+    const proseMissingEasy = subToTenBlock.replace(
       /Problems\s+1-3\s+\(gentle ramp\):\s+EXCLUSIVELY\s+EASY-band facts/,
       'Problems 1-3 (gentle ramp): [REFORMATTED]',
     )
     expect(() => parseDirectiveBandSlots(proseMissingEasy)).toThrow(/EASY rule/)
 
-    const proseMissingMedium = MATH_TRACK_GUIDE.replace(
+    const proseMissingMedium = subToTenBlock.replace(
       /Problems\s+4-8\s+\(discriminate\):\s+draw from MEDIUM \+ HARD bands/,
       'Problems 4-8 (discriminate): [REFORMATTED]',
     )
@@ -1292,7 +1360,7 @@ describe('SUB_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
       /MEDIUM\+HARD rule/,
     )
 
-    const proseMissingHard = MATH_TRACK_GUIDE.replace(
+    const proseMissingHard = subToTenBlock.replace(
       /HARD-band facts[^.]*?appear at P\d+ or later only/,
       '[REFORMATTED]',
     )
@@ -2010,29 +2078,36 @@ describe('ADD_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
 //
 // Sibling to the SUB_TO_TEN_RULES.bandAllowedSlots drift-guard above
 // (PR #256). Same hybrid mirror + runtime-parser + 2-sided equality
-// structure, but parses from a DIFFERENT prose source: the planner
-// directive (`MATH_TRACK_GUIDE`) at `api/_planner.ts:921` carries only a
-// one-line summary of add-to-10 (sums 3-10, addends 1-9) — it has NO
-// SESSION COMPOSITION RULES band-by-slot block analogous to sub-to-10's
-// `:960-966`. The authoritative add-to-10 band-by-slot prose lives in
-// the spec at `design/math/add-to-10-content.md` §2.1 (PR #251). That
-// markdown is the prose this guard pins the lint rules against.
+// structure.
 //
-// Why the difference: the add-to-10 directive predates the sub-to-10
-// content spec by months, and the sub-to-10 directive was written from
-// the start with explicit composition rules in-prompt because the
-// sub-to-10 wrong-op trap requires careful band placement. The add-to-10
-// rules are equally load-bearing on the lint side but were never
-// promoted into the directive prose. Until that gap closes (see
-// NON-OBVIOUS FINDING below), the spec markdown is the prose source.
+// PR #259 (add-to-10 directive sharpening) added a full SESSION
+// COMPOSITION RULES block to the planner directive (`MATH_TRACK_GUIDE`)
+// for add-to-10, mirroring the sub-to-10 block at `_planner.ts:1002-
+// 1012`. The directive now carries the authoritative band-by-slot rules
+// in-prompt, AND the spec at `design/math/add-to-10-content.md` §2.1
+// retains the same rules as design documentation. The drift-guards
+// fire against BOTH prose sources to prevent silent divergence:
 //
-// Why the parser is NOT a copy of sub-to-10's parser: add-to-10's prose
-// has a different shape — sub-to-10 says "Problems 1-3 (gentle ramp):
-// EXCLUSIVELY EASY-band facts" (band-exclusive to a slot range), but
-// add-to-10 says "EASY (sum 3-5): allowed at any slot P1-P8" (band-led,
-// slot range as a property of the band). Each rule is one bullet,
-// `- BAND (sum-range): allowed at P<s>-P<e>...`. A sibling parser
-// matches the bullet shape.
+//   1. SPEC drift-guard (this section, original PR #256): parses
+//      `design/math/add-to-10-content.md` §2.1 — keeps Kyle's design
+//      doc honest against the lint data. Same spec parser the original
+//      drift-guard used; unchanged shape after PR #259.
+//
+//   2. DIRECTIVE drift-guard (sibling section below, added PR #259):
+//      parses `MATH_TRACK_GUIDE`'s add-to-10 SESSION COMPOSITION RULES
+//      bullets — mirrors sub-to-10's architecture. Catches a sub-to-10-
+//      style PR #255 drift where the directive prose moves a band-slot
+//      boundary while the lint data lags behind (or vice versa).
+//
+// Why the spec parser is NOT a copy of sub-to-10's parser: add-to-10's
+// SPEC prose has a different shape from sub-to-10's directive prose —
+// sub-to-10 says "Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band
+// facts" (band-exclusive to a slot range), but the add-to-10 spec says
+// "EASY (sum 3-5): allowed at any slot P1-P8" (band-led, slot range as
+// a property of the band). The DIRECTIVE drift-guard below parses
+// add-to-10's new BAND-BY-SLOT bullets in the directive (which echo the
+// spec's bullet shape verbatim), reusing the same regex shape as the
+// spec parser.
 //
 // Two-sided guard (same hybrid pattern):
 //   1. EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC (below) is a hand-mirrored
@@ -2075,10 +2150,13 @@ const EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC: AddToTenBandSlots = {
 }
 
 /**
- * Parse the §2.1 band-by-slot bullets from the add-to-10 content spec.
- * Returns the derived `bandAllowedSlots` map. Throws if any of the three
+ * Parse the add-to-10 band-by-slot bullets from a prose source —
+ * `design/math/add-to-10-content.md` §2.1 OR the `MATH_TRACK_GUIDE`
+ * add-to-10 BAND-BY-SLOT block (the directive uses the same bullet
+ * shape, indented within the planner-prompt string literal). Returns
+ * the derived `bandAllowedSlots` map. Throws if any of the three
  * expected bullets is missing or malformed — a structural reformat of
- * the spec section must be matched by an update to this parser (in
+ * the prose section must be matched by an update to this parser (in
  * lockstep with the mirror above).
  *
  * Three bullets parsed (one regex per band):
@@ -2090,6 +2168,11 @@ const EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC: AddToTenBandSlots = {
  *      "only" is the discriminator — distinguishes HARD's tight clause
  *      from MEDIUM's plain allowance and from the boldface emphasis
  *      sentence that follows.)
+ *
+ * Each regex tolerates leading whitespace before the bullet dash
+ * (`^\s*-`) so the parser works against both the spec markdown (`- `
+ * at column 0) and the directive prose (`  - `, indented inside the
+ * planner template-string).
  */
 function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
   // EASY: "allowed at any slot P1-P8" — the "any slot" phrase is the
@@ -2098,7 +2181,9 @@ function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
   // P1-P8" (dropping "any slot"), parseAddToTenBandSlotsFromSpec falls
   // over loudly — at which point this regex needs an update.
   const easyMatch =
-    /^-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P(\d+)-P(\d+)/m.exec(prose)
+    /^\s*-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P(\d+)-P(\d+)/m.exec(
+      prose,
+    )
   if (!easyMatch) {
     throw new Error(
       "parseAddToTenBandSlotsFromSpec: could not locate EASY rule — expected '- EASY (sum N-M): allowed at any slot P<s>-P<e>' bullet in spec §2.1",
@@ -2111,7 +2196,9 @@ function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
   // is the discriminator. If a future editor adds "only" to MEDIUM's
   // bullet, this regex stops matching loudly.
   const mediumMatch =
-    /^-\s+MEDIUM\s+\(sum[^)]*\):\s+allowed at P(\d+)-P(\d+)\.\s*$/m.exec(prose)
+    /^\s*-\s+MEDIUM\s+\(sum[^)]*\):\s+allowed at P(\d+)-P(\d+)\.\s*$/m.exec(
+      prose,
+    )
   if (!mediumMatch) {
     throw new Error(
       "parseAddToTenBandSlotsFromSpec: could not locate MEDIUM rule — expected '- MEDIUM (sum N-M): allowed at P<s>-P<e>.' bullet in spec §2.1",
@@ -2125,7 +2212,9 @@ function parseAddToTenBandSlotsFromSpec(prose: string): AddToTenBandSlots {
   // If a future editor harmonises HARD's bullet to drop "only", this
   // parser fails loudly.
   const hardMatch =
-    /^-\s+HARD\s+\(sum[^)]*\):\s+allowed at P(\d+)-P(\d+)\s+only/m.exec(prose)
+    /^\s*-\s+HARD\s+\(sum[^)]*\):\s+allowed at P(\d+)-P(\d+)\s+only/m.exec(
+      prose,
+    )
   if (!hardMatch) {
     throw new Error(
       "parseAddToTenBandSlotsFromSpec: could not locate HARD rule — expected '- HARD (sum N-M): allowed at P<s>-P<e> only' bullet in spec §2.1",
@@ -2188,12 +2277,10 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against spec prose', () 
     // sub-to-10 PR #255 incident where lint data drifted away from
     // directive prose.
     //
-    // NOTE: the spec markdown is the prose source here because the
-    // planner directive (`MATH_TRACK_GUIDE`) does not contain add-to-10
-    // SESSION COMPOSITION RULES. See the file-header comment above for
-    // why, and the NON-OBVIOUS FINDING in the PR description for the
-    // follow-up that would let this guard parse `MATH_TRACK_GUIDE`
-    // directly (closer to sub-to-10's pattern).
+    // After PR #259 (add-to-10 directive sharpening), a sibling
+    // drift-guard below parses `MATH_TRACK_GUIDE` directly — this
+    // spec-based guard remains in place to pin Kyle's design doc
+    // alongside the directive.
     const spec = readFileSync(SPEC_PATH, 'utf8')
     const parsed = parseAddToTenBandSlotsFromSpec(spec)
     expect(parsed).toEqual(EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC)
@@ -2229,6 +2316,115 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against spec prose', () 
     )
     expect(() => parseAddToTenBandSlotsFromSpec(proseMissingHard)).toThrow(
       /HARD rule/,
+    )
+  })
+})
+
+// ── drift-guard: ADD_TO_TEN_RULES.bandAllowedSlots ↔ directive prose ────
+//
+// Sibling to the spec-prose drift-guard above, added in PR #259 when
+// the add-to-10 directive at `api/_planner.ts` gained a full SESSION
+// COMPOSITION RULES + BAND-BY-SLOT block. The directive's BAND-BY-SLOT
+// bullets reuse the spec's bullet shape verbatim
+// (`- BAND (sum N-M): allowed at P<s>-P<e>...`), so the spec parser
+// `parseAddToTenBandSlotsFromSpec` works without modification — the
+// shape of the bullets is the contract.
+//
+// Why both: the spec drift-guard pins Kyle's design doc to the lint;
+// the directive drift-guard pins the Haiku prompt to the lint.
+// Diverging the spec from the directive without diverging from the
+// lint slips through one guard but fails the other; the lint is the
+// single source of update-pressure.
+//
+// Source prose (excerpted from `api/_planner.ts` add-to-10 BAND-BY-SLOT
+// canonical restatement):
+//   - EASY (sum 3-5): allowed at any slot P1-P8 ...
+//   - MEDIUM (sum 6-8): allowed at P4-P8.
+//   - HARD (sum 9-10): allowed at P5-P8 only.
+//
+// Scoped via `extractTierBlock` so the parser sees the add-to-10 block
+// only — `MATH_TRACK_GUIDE` carries several tier blocks and the
+// directive's other tiers (notably sub-to-10) use a different
+// composition-rule shape; isolating the add-to-10 block keeps the
+// parser's "find one bullet per band" semantics correct.
+
+describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose', () => {
+  it('directive BAND-BY-SLOT bullets parse to the hand-mirrored expectation (lockstep)', () => {
+    // Parses `api/_planner.ts` add-to-10 BAND-BY-SLOT bullets at
+    // runtime. If the directive moves a band-slot boundary (e.g.
+    // relaxes HARD to P4-or-later, or tightens MEDIUM to P5-P8),
+    // this fails until the mirror is updated to match.
+    //
+    // The mirror is shared with the spec-prose drift-guard above —
+    // ADD_TO_TEN_RULES.bandAllowedSlots is the single source of
+    // update-pressure for both directive and spec prose.
+    const addToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'add-to-10')
+    const parsed = parseAddToTenBandSlotsFromSpec(addToTenBlock)
+    expect(parsed).toEqual(EXPECTED_ADD_TO_TEN_BAND_SLOTS_FROM_SPEC)
+  })
+
+  it('parser throws a clear error when a required directive bullet is missing', () => {
+    // Sanity check on the parser when scoped to the directive prose.
+    // Catches the case where someone restructures `MATH_TRACK_GUIDE`'s
+    // add-to-10 BAND-BY-SLOT bullets in a way that escapes the regex.
+    //
+    // The mutation regexes tolerate leading whitespace (`^\s*-`) because
+    // the directive's bullets are indented inside the planner template-
+    // string literal (`  - EASY ...`), whereas the spec markdown carries
+    // the same bullets at column zero.
+    const addToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'add-to-10')
+
+    const proseMissingEasy = addToTenBlock.replace(
+      /^\s*-\s+EASY\s+\(sum[^)]*\):\s+allowed at any slot P\d+-P\d+/m,
+      '  - EASY (sum 3-5): [REFORMATTED]',
+    )
+    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingEasy)).toThrow(
+      /EASY rule/,
+    )
+
+    const proseMissingMedium = addToTenBlock.replace(
+      /^\s*-\s+MEDIUM\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\.\s*$/m,
+      '  - MEDIUM (sum 6-8): [REFORMATTED]',
+    )
+    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingMedium)).toThrow(
+      /MEDIUM rule/,
+    )
+
+    const proseMissingHard = addToTenBlock.replace(
+      /^\s*-\s+HARD\s+\(sum[^)]*\):\s+allowed at P\d+-P\d+\s+only/m,
+      '  - HARD (sum 9-10): [REFORMATTED]',
+    )
+    expect(() => parseAddToTenBandSlotsFromSpec(proseMissingHard)).toThrow(
+      /HARD rule/,
+    )
+  })
+
+  it('extractTierBlock isolates the add-to-10 prose from other tier blocks', () => {
+    // Sanity check on the tier-block extractor: scoping should produce
+    // a slice that contains add-to-10 prose only, NOT the sub-to-10
+    // SESSION COMPOSITION RULES block (which shares many "Problems N-M"
+    // phrases verbatim after PR #259). Validates the extractor's
+    // tier-isolation guarantee — load-bearing for both the sub-to-10
+    // drift-guard scoping above and this add-to-10 directive guard.
+    const addToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'add-to-10')
+    expect(addToTenBlock).toMatch(/^- add-to-10:/)
+    // The add-to-10 block must NOT carry sub-to-10's tier-distinctive
+    // wrong-op fact-pool annotation (which is sub-to-10-only).
+    expect(addToTenBlock).not.toMatch(/HARD\/general.*a\+b=/)
+    // The add-to-10 block carries the directive's add-to-10-only
+    // sums-to-10 fact list (1+9, 9+1, ...).
+    expect(addToTenBlock).toMatch(/sums-to-10: 1\+9, 9\+1, 2\+8/)
+  })
+
+  it('extractTierBlock throws a clear error when the tier header is missing', () => {
+    // Mutation: rename the add-to-10 header. The extractor must throw
+    // rather than fall back to (e.g.) the previous tier's block.
+    const proseMissingAdd = MATH_TRACK_GUIDE.replace(
+      /^- add-to-10:/m,
+      '- [REMOVED-TIER]:',
+    )
+    expect(() => extractTierBlock(proseMissingAdd, 'add-to-10')).toThrow(
+      /could not locate tier header "- add-to-10:"/,
     )
   })
 })
