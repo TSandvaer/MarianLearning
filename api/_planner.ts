@@ -913,7 +913,7 @@ After the 8 × 5 problem utterances, append the following Session-End utterances
 
 Total Session-End utterances: 1 opener + 11 recap + 6 streak + 1 goodbye = 19. The full flat utterances array therefore has 8 × 5 + 19 = 59 entries. Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
 
-const MATH_TRACK_GUIDE = `Track: Math.
+export const MATH_TRACK_GUIDE = `Track: Math.
 
 The user message names a focus skill node. Generate problems specifically for that node. The full math focus-node menu is:
 

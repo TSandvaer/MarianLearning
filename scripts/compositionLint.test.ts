@@ -33,6 +33,7 @@ import {
   resolveTierBinding,
   runCompositionLint,
 } from './compositionLint.ts'
+import { MATH_TRACK_GUIDE } from '../api/_planner.js'
 import type { SessionStartResponse, Utterance } from '../api/_types.js'
 
 // ── fixture helpers ──────────────────────────────────────────────────────
@@ -863,5 +864,120 @@ describe('SUB_TO_TEN_RULES', () => {
 
   it('takeFromTenInP4ToP8Min = 1', () => {
     expect(SUB_TO_TEN_RULES.takeFromTenInP4ToP8Min).toBe(1)
+  })
+})
+
+// ── drift-guard: SUB_TO_TEN_POOL ↔ MATH_TRACK_GUIDE directive prose ──────
+//
+// Devon's NOF on PR #245 (and Kevin's own NOF #4) flagged that the canon-
+// lint pool (`SUB_TO_TEN_POOL`) and the Haiku-facing planner directive
+// (`MATH_TRACK_GUIDE` FACT POOL block, currently at `api/_planner.ts:931-
+// 946`) carry the SAME 16 facts in DIFFERENT representations — bullets
+// with inline `[BAND/category]` tags vs a typed array of pool entries.
+// They MUST stay in lockstep: drift means the lint either rejects a fact
+// Haiku is told to emit, or accepts a fact Haiku was told is forbidden.
+//
+// Two-sided guard:
+//   1. EXPECTED_POOL_FROM_DIRECTIVE (below) is a hand-mirrored snapshot
+//      of the directive's 16 bullet lines. If the planner directive
+//      changes its pool, this mirror must be updated in lockstep — the
+//      programmatic parser asserts they agree.
+//   2. SUB_TO_TEN_POOL is what the lint enforces. The mirror is asserted
+//      deeply-equal to it — if either side drifts without the other,
+//      the test fails with a clear diff.
+//
+// Failure mode: when either side moves, this test fails with a deep-
+// equality diff pointing at the exact fact that moved. The fix is
+// always "update the OTHER side too, in this same PR".
+
+// Local alias for the pool entry shape — pulled from the exported
+// `SUB_TO_TEN_POOL` const so the mirror reads as a literal in this file
+// without needing a second import. Declared above its first use.
+type SubToTenPoolFact = (typeof SUB_TO_TEN_POOL)[number]
+
+/**
+ * MIRROR of `api/_planner.ts:931-946` (the `MATH_TRACK_GUIDE` FACT POOL
+ * block). Update both in lockstep when widening or reshaping the pool.
+ *
+ * Source bullet format (from the directive):
+ *   `    · 5-5=0   [EASY/subtract-self]   (at most one ... per session)`
+ *
+ * Stored here as the parsed shape — `{ id, a, b, band, category }` —
+ * so the deep-equality assertion against `SUB_TO_TEN_POOL` gives a
+ * legible failure diff. Order matches the directive's bullet order.
+ */
+const EXPECTED_POOL_FROM_DIRECTIVE: readonly SubToTenPoolFact[] = [
+  { id: '5-5', a: 5, b: 5, band: 'EASY', category: 'subtract-self' },
+  { id: '8-8', a: 8, b: 8, band: 'EASY', category: 'subtract-self' },
+  { id: '7-0', a: 7, b: 0, band: 'EASY', category: 'subtract-zero' },
+  { id: '9-0', a: 9, b: 0, band: 'EASY', category: 'subtract-zero' },
+  { id: '10-5', a: 10, b: 5, band: 'EASY', category: 'doubles-halving' },
+  { id: '8-4', a: 8, b: 4, band: 'EASY', category: 'doubles-halving' },
+  { id: '6-3', a: 6, b: 3, band: 'EASY', category: 'doubles-halving' },
+  { id: '9-1', a: 9, b: 1, band: 'EASY', category: 'subtract-one' },
+  { id: '10-1', a: 10, b: 1, band: 'MEDIUM', category: 'subtract-one' },
+  { id: '10-2', a: 10, b: 2, band: 'MEDIUM', category: 'subtract-two' },
+  { id: '10-3', a: 10, b: 3, band: 'MEDIUM', category: 'take-from-10' },
+  { id: '10-7', a: 10, b: 7, band: 'MEDIUM', category: 'take-from-10' },
+  { id: '9-4', a: 9, b: 4, band: 'HARD', category: 'general' },
+  { id: '8-3', a: 8, b: 3, band: 'HARD', category: 'general' },
+  { id: '7-4', a: 7, b: 4, band: 'HARD', category: 'general' },
+  { id: '9-6', a: 9, b: 6, band: 'HARD', category: 'general' },
+]
+
+/**
+ * Parse the directive's FACT POOL block. Returns one entry per bullet
+ * line matching the canonical shape:
+ *
+ *   `    · <a>-<b>=<answer>   [<BAND>/<category>] ...`
+ *
+ * Anything that does not match the bullet shape is skipped silently —
+ * the FACT POOL section also contains a header line and self-check
+ * paragraphs, and we only want the 16 fact bullets.
+ */
+function parseDirectiveFactPool(prose: string): readonly SubToTenPoolFact[] {
+  // Bullet character is U+00B7 (middle dot). Tolerate leading whitespace.
+  const re = /^\s*·\s+(\d+)-(\d+)=\d+\s+\[(EASY|MEDIUM|HARD)\/([a-z0-9-]+)\]/gm
+  const out: SubToTenPoolFact[] = []
+  for (const m of prose.matchAll(re)) {
+    const a = Number.parseInt(m[1]!, 10)
+    const b = Number.parseInt(m[2]!, 10)
+    out.push({
+      id: `${a}-${b}`,
+      a,
+      b,
+      band: m[3]! as SubToTenPoolFact['band'],
+      category: m[4]! as SubToTenPoolFact['category'],
+    })
+  }
+  return out
+}
+
+describe('SUB_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose', () => {
+  it('lint pool matches the hand-mirrored expectation from the directive (lockstep)', () => {
+    // The mirror is the single source of update-pressure: if SUB_TO_TEN_POOL
+    // grows, shrinks, or relabels a fact's band/category, this assertion
+    // fails until the mirror is updated to match — at which point the
+    // separate parser-vs-mirror assertion below forces the directive
+    // prose to be updated too.
+    expect(SUB_TO_TEN_POOL).toEqual(EXPECTED_POOL_FROM_DIRECTIVE)
+  })
+
+  it('directive FACT POOL bullets parse to the hand-mirrored expectation (lockstep)', () => {
+    // Parses `api/_planner.ts` FACT POOL bullets at runtime. If the
+    // directive moves a fact (e.g. relabels a band, removes a fact,
+    // adds a 17th), this fails until the mirror is updated to match.
+    const parsed = parseDirectiveFactPool(MATH_TRACK_GUIDE)
+    expect(parsed).toEqual(EXPECTED_POOL_FROM_DIRECTIVE)
+  })
+
+  it('directive prose contains exactly 16 FACT POOL bullets (matches pool size)', () => {
+    // Sanity check on the parser: catches the case where the bullet
+    // format is reformatted in a way that escapes the regex (parsed
+    // would be []) or where someone adds extra bullets the mirror
+    // doesn't cover.
+    const parsed = parseDirectiveFactPool(MATH_TRACK_GUIDE)
+    expect(parsed).toHaveLength(SUB_TO_TEN_POOL.length)
+    expect(parsed).toHaveLength(16)
   })
 })
