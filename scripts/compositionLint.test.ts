@@ -1182,6 +1182,13 @@ type SubToTenBandSlots = (typeof SUB_TO_TEN_RULES)['bandAllowedSlots']
  * coincidentally rather than by design. Scoping the parser to the
  * tier-specific block removes the coincidence.
  */
+// NOTE: `nextRe` lookahead anchors on top-level `- <tier>:` bullets. If a
+// future caller passes `mult-6-9` (currently the last tier bullet in
+// MATH_TRACK_GUIDE), the lookahead may match `- read:` inside the
+// Per-problem utterance template at api/_planner.ts:1030 rather than a
+// true tier header. Current callers (sub-to-10, add-to-10) only key on
+// `BAND (sum N-M):` bullets, so the over-extended slice is benign today
+// — but be aware before adding a mult-6-9 caller.
 function extractTierBlock(prose: string, tier: string): string {
   // Top-level tier bullets start at column 0 (no leading whitespace)
   // and use the shape `- <tier>:`. The directive's secondary bullets
@@ -1263,7 +1270,7 @@ function parseSubToTenBandSlotsFromBulletProse(
     )
   if (!r1) {
     throw new Error(
-      "parseSubToTenBandSlotsFromBulletProse: could not locate EASY rule — expected 'Problems N-M (gentle ramp): EXCLUSIVELY EASY-band facts' in directive prose",
+      "parseSubToTenBandSlotsFromBulletProse: could not locate EASY rule — expected 'Problems N-M (gentle ramp): EXCLUSIVELY EASY-band facts' in bullet prose",
     )
   }
   const easyStart = Number.parseInt(r1[1]!, 10)
@@ -1275,7 +1282,7 @@ function parseSubToTenBandSlotsFromBulletProse(
     )
   if (!r3a) {
     throw new Error(
-      "parseSubToTenBandSlotsFromBulletProse: could not locate MEDIUM+HARD rule — expected 'Problems N-M (discriminate): draw from MEDIUM + HARD bands' in directive prose",
+      "parseSubToTenBandSlotsFromBulletProse: could not locate MEDIUM+HARD rule — expected 'Problems N-M (discriminate): draw from MEDIUM + HARD bands' in bullet prose",
     )
   }
   const discriminateStart = Number.parseInt(r3a[1]!, 10)
@@ -1284,7 +1291,7 @@ function parseSubToTenBandSlotsFromBulletProse(
   const r3b = /HARD-band facts[^.]*?appear at P(\d+) or later only/.exec(prose)
   if (!r3b) {
     throw new Error(
-      "parseSubToTenBandSlotsFromBulletProse: could not locate HARD-band refinement — expected 'HARD-band facts ... appear at P<N> or later only' in directive prose",
+      "parseSubToTenBandSlotsFromBulletProse: could not locate HARD-band refinement — expected 'HARD-band facts ... appear at P<N> or later only' in bullet prose",
     )
   }
   const hardStart = Number.parseInt(r3b[1]!, 10)
