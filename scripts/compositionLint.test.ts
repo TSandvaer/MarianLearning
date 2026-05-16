@@ -23,12 +23,17 @@ import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import {
+  ADD_TO_TEN_POOL,
+  ADD_TO_TEN_RULES,
   CompositionLintError,
   SUB_TO_TEN_POOL,
   SUB_TO_TEN_RULES,
+  assertAddToTenCompositionClean,
   assertSubToTenCompositionClean,
   formatCompositionLintReport,
+  lintAddToTenComposition,
   lintSubToTenComposition,
+  parseAddToTenReadLine,
   parseSubToTenReadLine,
   resolveTierBinding,
   runCompositionLint,
@@ -101,6 +106,55 @@ const CLEAN_FACTS_PR_244: ReadonlyArray<[number, number]> = [
   [8, 3], // P6 general HARD
   [9, 4], // P7 general HARD
   [10, 7], // P8 take-from-10 MEDIUM
+]
+
+// ── add-to-10 fixture helpers ────────────────────────────────────────────
+
+/** Build a `math.p<N>.read` add-to-10 utterance with the "plus" template. */
+function readAddUtterance(index: number, a: number, b: number): Utterance {
+  return {
+    id: `math.p${index}.read`,
+    text: `${numberWord(a)} plus ${numberWord(b)}. How many?`,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+/** Convenience: build a SessionStartResponse with the given 8 add-to-10 facts. */
+function buildAddCanonResponse(
+  facts: Array<[a: number, b: number]>,
+): SessionStartResponse {
+  const utterances: Utterance[] = facts.map(([a, b], i) =>
+    readAddUtterance(i + 1, a, b),
+  )
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: { id: 'test', label: 'test', utterances: [] },
+    utterances,
+  }
+}
+
+/** The 8 facts currently committed to public/canon/math/level-1/add-to-10.json
+ *  (verified at PR #245 → this-PR baseline). Mapped through the lint
+ *  pool, this is:
+ *    P1 2+1=3 plus-one  EASY
+ *    P2 2+2=4 doubles   EASY
+ *    P3 3+2=5 near-doub EASY
+ *    P4 4+3=7 near-doub MEDIUM
+ *    P5 5+3=8 general   MEDIUM
+ *    P6 4+4=8 doubles   MEDIUM
+ *    P7 5+4=9 near-doub HARD
+ *    P8 5+5=10 sums-to-10 HARD
+ */
+const CLEAN_ADD_FACTS: ReadonlyArray<[number, number]> = [
+  [2, 1],
+  [2, 2],
+  [3, 2],
+  [4, 3],
+  [5, 3],
+  [4, 4],
+  [5, 4],
+  [5, 5],
 ]
 
 // ── parseSubToTenReadLine ────────────────────────────────────────────────
@@ -637,7 +691,11 @@ describe('resolveTierBinding', () => {
   })
 
   it('returns null for out-of-scope tier files', () => {
-    expect(resolveTierBinding('canon/math/level-1/add-to-10.json')).toBeNull()
+    // add-to-10 was previously out-of-scope (PR #245); now bound by this
+    // PR. Out-of-scope examples are now confined to other math tiers
+    // (add-to-20, sub-to-20, mult-*, etc.) and the word-song tiers.
+    expect(resolveTierBinding('canon/math/level-1/add-to-20.json')).toBeNull()
+    expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')).toBeNull()
     expect(
       resolveTierBinding('canon/word-song/level-1/blending-cv.json'),
     ).toBeNull()
@@ -678,22 +736,26 @@ describe('runCompositionLint — disk walker', () => {
     expect(r.totalViolations).toBe(0)
   })
 
-  it('lints sub-to-10 and SKIPS out-of-scope tiers', () => {
-    // In-scope.
+  it('lints in-scope math tiers (sub-to-10 + add-to-10) and SKIPS out-of-scope tiers', () => {
+    // In-scope sub-to-10.
     writeCanon(
       'math/level-1/sub-to-10.json',
       buildCanonResponse([...CLEAN_FACTS_PR_244]),
     )
-    // Out-of-scope (these would fail OUR parser because they're addition,
-    // but the lint MUST skip them).
-    writeCanon('math/level-1/add-to-10.json', {
+    // In-scope add-to-10 (clean canon mirroring the post-PR-245 layout).
+    writeCanon(
+      'math/level-1/add-to-10.json',
+      buildAddCanonResponse([...CLEAN_ADD_FACTS]),
+    )
+    // Out-of-scope.
+    writeCanon('math/level-1/add-to-20.json', {
       ok: true,
       kind: 'session-start',
       plan: {},
       utterances: [
         {
           id: 'math.p1.read',
-          text: 'Two plus three. How many?',
+          text: 'Seven plus six. How many?',
           audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
         },
       ],
@@ -712,8 +774,8 @@ describe('runCompositionLint — disk walker', () => {
     })
 
     const r = runCompositionLint(tmp)
-    expect(r.filesScanned).toBe(3)
-    expect(r.filesLinted).toBe(1)
+    expect(r.filesScanned).toBe(4)
+    expect(r.filesLinted).toBe(2)
     expect(r.filesSkipped).toBe(2)
     expect(r.totalViolations).toBe(0)
     expect(r.findings).toEqual([])
@@ -979,5 +1041,709 @@ describe('SUB_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
     const parsed = parseDirectiveFactPool(MATH_TRACK_GUIDE)
     expect(parsed).toHaveLength(SUB_TO_TEN_POOL.length)
     expect(parsed).toHaveLength(16)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// add-to-10 lint tests
+// ═════════════════════════════════════════════════════════════════════════
+
+// ── parseAddToTenReadLine ────────────────────────────────────────────────
+
+describe('parseAddToTenReadLine', () => {
+  it('parses the "plus" template', () => {
+    expect(parseAddToTenReadLine('Three plus two. How many?')).toEqual({
+      a: 3,
+      b: 2,
+    })
+  })
+
+  it('parses the doubles anchor', () => {
+    expect(parseAddToTenReadLine('Five plus five. How many?')).toEqual({
+      a: 5,
+      b: 5,
+    })
+  })
+
+  it('is case-insensitive', () => {
+    expect(parseAddToTenReadLine('TWO plus three. HOW MANY?')).toEqual({
+      a: 2,
+      b: 3,
+    })
+  })
+
+  it('returns null for subtraction templates (out of scope for add-to-10)', () => {
+    expect(
+      parseAddToTenReadLine('Seven minus three. How many are left?'),
+    ).toBeNull()
+    expect(
+      parseAddToTenReadLine('Eight take away three. How many are left?'),
+    ).toBeNull()
+  })
+
+  it('returns null for unrecognised number words', () => {
+    expect(parseAddToTenReadLine('Eleven plus three. How many?')).toBeNull()
+  })
+
+  it('returns null for completely off-shape text', () => {
+    expect(parseAddToTenReadLine('Tap the cat.')).toBeNull()
+    expect(parseAddToTenReadLine('')).toBeNull()
+  })
+})
+
+// ── ADD_TO_TEN_POOL sanity ───────────────────────────────────────────────
+
+describe('ADD_TO_TEN_POOL', () => {
+  it('contains exactly 44 facts (a≥1, b≥1, 3≤a+b≤10, ordered pairs)', () => {
+    expect(ADD_TO_TEN_POOL).toHaveLength(44)
+  })
+
+  it('every fact has a unique id', () => {
+    const ids = new Set(ADD_TO_TEN_POOL.map((f) => f.id))
+    expect(ids.size).toBe(ADD_TO_TEN_POOL.length)
+  })
+
+  it('every fact id matches its (a, b) numerics', () => {
+    for (const f of ADD_TO_TEN_POOL) {
+      expect(f.id).toBe(`${f.a}+${f.b}`)
+    }
+  })
+
+  it('every fact has a,b in [1,9] and sum in [3,10]', () => {
+    for (const f of ADD_TO_TEN_POOL) {
+      expect(f.a).toBeGreaterThanOrEqual(1)
+      expect(f.a).toBeLessThanOrEqual(9)
+      expect(f.b).toBeGreaterThanOrEqual(1)
+      expect(f.b).toBeLessThanOrEqual(9)
+      const sum = f.a + f.b
+      expect(sum).toBeGreaterThanOrEqual(3)
+      expect(sum).toBeLessThanOrEqual(10)
+    }
+  })
+
+  it('treats commutative pairs as DISTINCT facts (2+3 and 3+2 both present)', () => {
+    expect(ADD_TO_TEN_POOL.find((f) => f.id === '2+3')).toBeDefined()
+    expect(ADD_TO_TEN_POOL.find((f) => f.id === '3+2')).toBeDefined()
+  })
+
+  it('band counts: EASY (sum 3-5) = 9, MEDIUM (sum 6-8) = 18, HARD (sum 9-10) = 17', () => {
+    const counts = ADD_TO_TEN_POOL.reduce(
+      (acc, f) => {
+        acc[f.band] = (acc[f.band] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts.EASY).toBe(9)
+    expect(counts.MEDIUM).toBe(18)
+    expect(counts.HARD).toBe(17)
+  })
+
+  it('category counts: doubles=3, plus-one=14, near-doubles=6, sums-to-10=9, general=12', () => {
+    // Priority order: sums-to-10 wins over plus-one (1+9 and 9+1 are
+    // make-10 facts AND plus-one shape; pedagogically they belong with
+    // sums-to-10 — same make-10 mental model). That makes:
+    //   sums-to-10 = {1+9, 2+8, 3+7, 4+6, 5+5, 6+4, 7+3, 8+2, 9+1} = 9
+    //   plus-one   = 16 (a==1 or b==1, a!=b, sum>=3) − 2 (1+9, 9+1) = 14
+    const counts = ADD_TO_TEN_POOL.reduce(
+      (acc, f) => {
+        acc[f.category] = (acc[f.category] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts.doubles).toBe(3)
+    expect(counts['plus-one']).toBe(14)
+    expect(counts['near-doubles']).toBe(6)
+    expect(counts['sums-to-10']).toBe(9)
+    expect(counts.general).toBe(12)
+  })
+
+  it('5+5 is categorised as sums-to-10 (not doubles) — the pedagogical anchor', () => {
+    // Per the rule design note: 5+5 lives in sums-to-10 because Marian's
+    // diagnostic flags sums-to-10 automaticity as the top priority. The
+    // current canon's P8 = 5+5 satisfies the sums-to-10 coverage rule.
+    const fact55 = ADD_TO_TEN_POOL.find((f) => f.id === '5+5')
+    expect(fact55).toBeDefined()
+    expect(fact55!.category).toBe('sums-to-10')
+  })
+
+  it('doubles category contains exactly {2+2, 3+3, 4+4} — 5+5 is sums-to-10 instead', () => {
+    const doublesIds = ADD_TO_TEN_POOL.filter((f) => f.category === 'doubles')
+      .map((f) => f.id)
+      .sort()
+    expect(doublesIds).toEqual(['2+2', '3+3', '4+4'])
+  })
+
+  it('sums-to-10 category contains exactly the 9 facts summing to 10', () => {
+    // All 9 sum-to-10 facts (including 1+9 and 9+1) land here — the
+    // pedagogical make-10 mental model. The bare plus-one shape doesn't
+    // override it.
+    const stId = ADD_TO_TEN_POOL.filter((f) => f.category === 'sums-to-10')
+      .map((f) => f.id)
+      .sort()
+    expect(stId).toEqual([
+      '1+9',
+      '2+8',
+      '3+7',
+      '4+6',
+      '5+5',
+      '6+4',
+      '7+3',
+      '8+2',
+      '9+1',
+    ])
+  })
+
+  it('forbids sum=2 (1+1 is NOT in the pool — directive says sums 3-10)', () => {
+    expect(ADD_TO_TEN_POOL.find((f) => f.id === '1+1')).toBeUndefined()
+  })
+
+  it('forbids sums > 10 (e.g. 6+6 is NOT in the pool — that is add-to-20 territory)', () => {
+    expect(ADD_TO_TEN_POOL.find((f) => f.id === '6+6')).toBeUndefined()
+    expect(ADD_TO_TEN_POOL.find((f) => f.id === '7+8')).toBeUndefined()
+  })
+})
+
+// ── ADD_TO_TEN_RULES sanity ──────────────────────────────────────────────
+
+describe('ADD_TO_TEN_RULES', () => {
+  it('has totalProblems = 8', () => {
+    expect(ADD_TO_TEN_RULES.totalProblems).toBe(8)
+  })
+
+  it('has sums-to-10 cap of 2 (high-value category)', () => {
+    expect(ADD_TO_TEN_RULES.categoryCaps['sums-to-10']).toBe(2)
+  })
+
+  it('has near-doubles cap of 3 (allows the current canon P3+P4+P7 layout)', () => {
+    expect(ADD_TO_TEN_RULES.categoryCaps['near-doubles']).toBe(3)
+  })
+
+  it('has doubles, plus-one, general all capped at 2', () => {
+    expect(ADD_TO_TEN_RULES.categoryCaps['doubles']).toBe(2)
+    expect(ADD_TO_TEN_RULES.categoryCaps['plus-one']).toBe(2)
+    expect(ADD_TO_TEN_RULES.categoryCaps['general']).toBe(2)
+  })
+
+  it('EASY allowed at all slots P1-P8', () => {
+    expect(ADD_TO_TEN_RULES.bandAllowedSlots.EASY).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ])
+  })
+
+  it('MEDIUM allowed at P4-P8 only', () => {
+    expect(ADD_TO_TEN_RULES.bandAllowedSlots.MEDIUM).toEqual([4, 5, 6, 7, 8])
+  })
+
+  it('HARD allowed at P5-P8 only', () => {
+    expect(ADD_TO_TEN_RULES.bandAllowedSlots.HARD).toEqual([5, 6, 7, 8])
+  })
+
+  it('sumsToTenInP4ToP8Min = 1', () => {
+    expect(ADD_TO_TEN_RULES.sumsToTenInP4ToP8Min).toBe(1)
+  })
+})
+
+// ── lintAddToTenComposition: clean canon ─────────────────────────────────
+
+describe('lintAddToTenComposition — clean canon passes', () => {
+  it('returns 0 violations for the post-PR-245 add-to-10 canon fact set', () => {
+    const response = buildAddCanonResponse([...CLEAN_ADD_FACTS])
+    expect(lintAddToTenComposition(response)).toEqual([])
+  })
+
+  it('does not throw on the clean canon via assert helper', () => {
+    const response = buildAddCanonResponse([...CLEAN_ADD_FACTS])
+    expect(() =>
+      assertAddToTenCompositionClean('math/add-to-10', response),
+    ).not.toThrow()
+  })
+})
+
+// ── lintAddToTenComposition: pool-membership ─────────────────────────────
+
+describe('lintAddToTenComposition — pool-membership rule', () => {
+  it('fires when sum > 10 (1+10 is NOT a valid add-to-10 fact: b > 9)', () => {
+    // We can't actually emit 1+10 via numberWord (it would render as
+    // "ten" which DOES parse), so simulate by using an out-of-pool fact
+    // through the read template. 10+0 is not in the pool either.
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [3, 2],
+      [4, 3],
+      [5, 3],
+      [4, 4],
+      [5, 4],
+      [10, 0], // sum=10 but b=0 — outside the a≥1, b≥1 pool
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(8)
+    expect(pool[0]!.factId).toBe('10+0')
+  })
+
+  it('fires when sum > 10 (8+5=13 → outside add-to-10 territory)', () => {
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [3, 2],
+      [8, 5], // sum=13 — that's add-to-20's domain
+      [5, 3],
+      [4, 4],
+      [5, 4],
+      [5, 5],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.factId).toBe('8+5')
+  })
+
+  it('fires when sum < 3 (1+1=2 is below the directive floor)', () => {
+    const facts: Array<[number, number]> = [
+      [1, 1], // sum=2 — below directive floor of 3
+      [2, 2],
+      [3, 2],
+      [4, 3],
+      [5, 3],
+      [4, 4],
+      [5, 4],
+      [5, 5],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.factId).toBe('1+1')
+  })
+})
+
+// ── lintAddToTenComposition: category-cap rule ───────────────────────────
+
+describe('lintAddToTenComposition — category-cap rule', () => {
+  it('fires on doubles count > 2 (3 doubles blows the cap)', () => {
+    // 2+2, 3+3, 4+4 — three doubles facts (recall 5+5 is sums-to-10,
+    // not doubles).
+    const facts: Array<[number, number]> = [
+      [2, 2],
+      [3, 3],
+      [4, 4], // 3 doubles — cap is 2
+      [4, 3],
+      [5, 3],
+      [3, 4],
+      [5, 4],
+      [5, 5],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const cap = violations.filter((v) => v.rule === 'category-cap')
+    expect(cap.find((v) => v.message.includes('doubles'))).toBeDefined()
+    expect(cap.find((v) => v.message.includes('"doubles"'))!.message).toContain(
+      'cap is 2',
+    )
+    expect(cap.find((v) => v.message.includes('"doubles"'))!.message).toContain(
+      'canon has 3',
+    )
+  })
+
+  it('fires on sums-to-10 count > 2 (3 make-10 facts blows the cap)', () => {
+    // 3+7, 4+6, 5+5 — three sums-to-10 facts (cap 2).
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [3, 2],
+      [4, 3],
+      [3, 7], // sums-to-10 #1, HARD
+      [4, 6], // sums-to-10 #2, HARD
+      [5, 5], // sums-to-10 #3 — cap busted
+      [5, 4],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const cap = violations.filter(
+      (v) => v.rule === 'category-cap' && v.message.includes('sums-to-10'),
+    )
+    expect(cap).toHaveLength(1)
+    expect(cap[0]!.message).toContain('cap is 2')
+    expect(cap[0]!.message).toContain('canon has 3')
+  })
+
+  it('fires on general count > 2 (HARD cap)', () => {
+    // 2+4, 4+2, 5+2 — three general facts.
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [3, 2],
+      [2, 4], // general MEDIUM
+      [4, 2], // general MEDIUM
+      [5, 2], // general MEDIUM — cap busted (3rd general)
+      [5, 4],
+      [5, 5],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const cap = violations.filter(
+      (v) => v.rule === 'category-cap' && v.message.includes('"general"'),
+    )
+    expect(cap).toHaveLength(1)
+    expect(cap[0]!.message).toContain('cap is 2')
+    expect(cap[0]!.message).toContain('canon has 3')
+  })
+
+  it('does NOT fire on near-doubles count of 3 (cap is 3)', () => {
+    // The current canon has 3 near-doubles (3+2, 4+3, 5+4) — exactly at
+    // the cap, not over it.
+    const facts: Array<[number, number]> = [...CLEAN_ADD_FACTS]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    expect(violations.filter((v) => v.rule === 'category-cap')).toEqual([])
+  })
+})
+
+// ── lintAddToTenComposition: band-by-slot rule ───────────────────────────
+
+describe('lintAddToTenComposition — band-by-slot rule', () => {
+  it('fires when HARD-band fact appears at P4 (P1-P4 forbid HARD)', () => {
+    // Move 5+5 (HARD sums-to-10) to P4. Clean canon had it at P8.
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [3, 2],
+      [5, 5], // HARD at P4 — band-by-slot violation
+      [4, 3],
+      [5, 3],
+      [4, 4],
+      [5, 4],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const band = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(band).toHaveLength(1)
+    expect(band[0]!.problemIndex).toBe(4)
+    expect(band[0]!.factId).toBe('5+5')
+    expect(band[0]!.message).toContain('HARD')
+  })
+
+  it('fires when MEDIUM-band fact appears at P3 (P1-P3 EASY-only)', () => {
+    // Move 4+4 (MEDIUM sum=8) to P3.
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [4, 4], // MEDIUM at P3 — band-by-slot violation
+      [3, 2],
+      [4, 3],
+      [5, 3],
+      [5, 4],
+      [5, 5],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const band = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(band).toHaveLength(1)
+    expect(band[0]!.problemIndex).toBe(3)
+    expect(band[0]!.factId).toBe('4+4')
+    expect(band[0]!.message).toContain('MEDIUM')
+  })
+
+  it('does NOT fire when HARD facts are at P5-P8', () => {
+    const facts: Array<[number, number]> = [...CLEAN_ADD_FACTS]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    expect(violations.filter((v) => v.rule === 'band-by-slot')).toEqual([])
+  })
+})
+
+// ── lintAddToTenComposition: sums-to-10-coverage rule ────────────────────
+
+describe('lintAddToTenComposition — sums-to-10-coverage rule', () => {
+  it('fires when no sums-to-10 fact appears in P4-P8', () => {
+    // Replace 5+5 with a non-sums-to-10 HARD fact (5+4 already at P7,
+    // can we use 6+3? Yes, sum=9, HARD, general).
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [3, 2],
+      [4, 3],
+      [5, 3],
+      [4, 4],
+      [5, 4], // HARD near-doubles
+      [6, 3], // HARD general — replaces the sums-to-10 anchor
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    expect(
+      violations.find((v) => v.rule === 'take-from-10-coverage'),
+    ).toBeDefined()
+  })
+
+  it('does NOT fire when ≥ 1 sums-to-10 appears at P4-P8', () => {
+    // CLEAN has 5+5 at P8.
+    const facts: Array<[number, number]> = [...CLEAN_ADD_FACTS]
+    expect(
+      lintAddToTenComposition(buildAddCanonResponse(facts)).filter(
+        (v) => v.rule === 'take-from-10-coverage',
+      ),
+    ).toEqual([])
+  })
+})
+
+// ── lintAddToTenComposition: no-duplicates rule ──────────────────────────
+
+describe('lintAddToTenComposition — no-duplicates rule', () => {
+  it('fires when the same (a,b) ordered pair appears twice', () => {
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 2],
+      [3, 2],
+      [4, 3],
+      [5, 3], // first 5+3
+      [5, 3], // duplicate 5+3
+      [5, 4],
+      [5, 5],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    const dup = violations.filter((v) => v.rule === 'no-duplicates')
+    expect(dup).toHaveLength(1)
+    expect(dup[0]!.factId).toBe('5+3')
+    expect(dup[0]!.message).toContain('appears 2 times')
+  })
+
+  it('does NOT fire on commutative pairs (2+3 and 3+2 are distinct facts)', () => {
+    // Both 2+3 and 3+2 are in the pool as distinct entries — the
+    // read-lines differ, so they are not duplicates.
+    const facts: Array<[number, number]> = [
+      [2, 1],
+      [2, 3], // near-doubles
+      [3, 2], // near-doubles — distinct from 2+3
+      [4, 3],
+      [5, 3],
+      [4, 4],
+      [5, 4],
+      [5, 5],
+    ]
+    const violations = lintAddToTenComposition(buildAddCanonResponse(facts))
+    expect(violations.filter((v) => v.rule === 'no-duplicates')).toEqual([])
+    // But near-doubles cap is 3 — we have 3 here (2+3, 3+2, 4+3). 5+4 at
+    // P7 would make 4, but we placed it; let's check: 2+3 + 3+2 + 4+3 + 5+4 = 4
+    // near-doubles. Cap = 3 → cap violation expected.
+    expect(
+      violations.find(
+        (v) => v.rule === 'category-cap' && v.message.includes('near-doubles'),
+      ),
+    ).toBeDefined()
+  })
+})
+
+// ── lintAddToTenComposition: unparseable-problem rule ────────────────────
+
+describe('lintAddToTenComposition — unparseable-problem rule', () => {
+  it('fires when read text uses the subtraction template (out of scope)', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: {},
+      utterances: [
+        readAddUtterance(1, 2, 1),
+        rawReadUtterance(2, 'Eight minus three. How many are left?'),
+        readAddUtterance(3, 3, 2),
+        readAddUtterance(4, 4, 3),
+        readAddUtterance(5, 5, 3),
+        readAddUtterance(6, 4, 4),
+        readAddUtterance(7, 5, 4),
+        readAddUtterance(8, 5, 5),
+      ],
+    }
+    const violations = lintAddToTenComposition(response)
+    const unp = violations.filter((v) => v.rule === 'unparseable-problem')
+    expect(unp).toHaveLength(1)
+    expect(unp[0]!.problemIndex).toBe(2)
+  })
+
+  it('fires when read text is wholly off-shape', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: {},
+      utterances: [
+        readAddUtterance(1, 2, 1),
+        readAddUtterance(2, 2, 2),
+        readAddUtterance(3, 3, 2),
+        rawReadUtterance(4, 'garbage text'),
+        readAddUtterance(5, 5, 3),
+        readAddUtterance(6, 4, 4),
+        readAddUtterance(7, 5, 4),
+        readAddUtterance(8, 5, 5),
+      ],
+    }
+    const violations = lintAddToTenComposition(response)
+    expect(
+      violations.find((v) => v.rule === 'unparseable-problem'),
+    ).toBeDefined()
+  })
+})
+
+// ── assertAddToTenCompositionClean ───────────────────────────────────────
+
+describe('assertAddToTenCompositionClean', () => {
+  it('does not throw on a clean canon', () => {
+    const response = buildAddCanonResponse([...CLEAN_ADD_FACTS])
+    expect(() =>
+      assertAddToTenCompositionClean('math/add-to-10', response),
+    ).not.toThrow()
+  })
+
+  it('throws CompositionLintError with the canon id + violations', () => {
+    // 3 doubles in a row blows the cap.
+    const facts: Array<[number, number]> = [
+      [2, 2],
+      [3, 3],
+      [4, 4],
+      [4, 3],
+      [5, 3],
+      [3, 4],
+      [5, 4],
+      [5, 5],
+    ]
+    const response = buildAddCanonResponse(facts)
+    try {
+      assertAddToTenCompositionClean('math/add-to-10', response)
+      expect.fail('expected throw')
+    } catch (err) {
+      expect(err).toBeInstanceOf(CompositionLintError)
+      const e = err as CompositionLintError
+      expect(e.canonId).toBe('math/add-to-10')
+      expect(e.violations.length).toBeGreaterThanOrEqual(1)
+      expect(e.message).toContain('math/add-to-10')
+    }
+  })
+})
+
+// ── resolveTierBinding for add-to-10 ─────────────────────────────────────
+
+describe('resolveTierBinding — add-to-10', () => {
+  it('binds the canonical add-to-10 path on this platform (sep-aware)', () => {
+    const binding = resolveTierBinding(
+      'canon/math/level-1/add-to-10.json'.replace(/\//g, sep),
+    )
+    expect(binding).not.toBeNull()
+    expect(binding!.tier).toBe('add-to-10')
+  })
+
+  it('binds a posix add-to-10 path', () => {
+    expect(resolveTierBinding('canon/math/level-1/add-to-10.json')?.tier).toBe(
+      'add-to-10',
+    )
+  })
+
+  it('binds bare add-to-10 basename', () => {
+    expect(resolveTierBinding('add-to-10.json')?.tier).toBe('add-to-10')
+  })
+
+  it('still binds sub-to-10 paths (no cross-tier confusion)', () => {
+    expect(resolveTierBinding('canon/math/level-1/sub-to-10.json')?.tier).toBe(
+      'sub-to-10',
+    )
+  })
+})
+
+// ── runCompositionLint: add-to-10 dispatch ───────────────────────────────
+
+describe('runCompositionLint — add-to-10 dispatch', () => {
+  let tmp: string
+
+  beforeEach(() => {
+    tmp = mkdtempSync(join(tmpdir(), 'composition-lint-add-'))
+  })
+
+  afterEach(() => {
+    rmSync(tmp, { recursive: true, force: true })
+  })
+
+  function writeCanon(path: string, body: SessionStartResponse): void {
+    const abs = join(tmp, path)
+    mkdirSync(join(abs, '..'), { recursive: true })
+    writeFileSync(abs, JSON.stringify(body, null, 2), 'utf8')
+  }
+
+  it('lints a clean add-to-10 canon with zero violations', () => {
+    writeCanon(
+      'math/level-1/add-to-10.json',
+      buildAddCanonResponse([...CLEAN_ADD_FACTS]),
+    )
+    const r = runCompositionLint(tmp)
+    expect(r.filesScanned).toBe(1)
+    expect(r.filesLinted).toBe(1)
+    expect(r.totalViolations).toBe(0)
+    expect(r.findings).toEqual([])
+  })
+
+  it('records add-to-10 violations grouped by file with tier="add-to-10"', () => {
+    // 3 doubles → cap violation.
+    writeCanon(
+      'math/level-1/add-to-10.json',
+      buildAddCanonResponse([
+        [2, 2],
+        [3, 3],
+        [4, 4],
+        [4, 3],
+        [5, 3],
+        [3, 4],
+        [5, 4],
+        [5, 5],
+      ]),
+    )
+    const r = runCompositionLint(tmp)
+    expect(r.filesLinted).toBe(1)
+    expect(r.findings).toHaveLength(1)
+    expect(r.findings[0]!.filePath).toContain('math/level-1/add-to-10.json')
+    expect(r.findings[0]!.tier).toBe('add-to-10')
+    expect(r.findings[0]!.violations.length).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// ── drift-guard: ADD_TO_TEN_POOL ↔ planner directive prose ───────────────
+//
+// The add-to-10 directive at `_planner.ts:921` is a ONE-LINE description
+// — there is NO structured FACT POOL block to parse like sub-to-10's
+// `:931-946`. So this drift-guard is shaped differently than its
+// sub-to-10 sibling: rather than parse a bullet list, we assert the
+// directive prose still names the rule shape the lint enforces (sums
+// 3-10, addends 1-9). If a future PR rewrites that line in a way that
+// changes the math, this test fails with a clear pointer.
+//
+// Once the directive grows a proper FACT POOL block (likely when
+// Marian moves past automaticity work and the planner needs sharper
+// per-fact band/category guidance), the test can be upgraded to the
+// full sub-to-10-style parser/mirror pair.
+
+describe('ADD_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose', () => {
+  it('directive still describes add-to-10 with sums 3-10 and addends 1-9', () => {
+    // If either bound changes, the lint pool must change in lockstep.
+    expect(MATH_TRACK_GUIDE).toContain(
+      'add-to-10: addition with sums 3-10. Both addends 1-9.',
+    )
+  })
+
+  it('lint pool covers every (a,b) the directive permits', () => {
+    // Programmatic check: pool contains every (a,b) with a∈[1,9], b∈[1,9],
+    // a+b∈[3,10]. If the rules above ever drop a fact, this catches it.
+    for (let a = 1; a <= 9; a++) {
+      for (let b = 1; b <= 9; b++) {
+        const sum = a + b
+        if (sum < 3 || sum > 10) continue
+        const found = ADD_TO_TEN_POOL.find((f) => f.a === a && f.b === b)
+        expect(
+          found,
+          `expected pool to contain ${a}+${b} (sum ${sum})`,
+        ).toBeDefined()
+      }
+    }
+  })
+
+  it('lint pool excludes every (a,b) the directive forbids (sums outside 3-10)', () => {
+    for (const f of ADD_TO_TEN_POOL) {
+      const sum = f.a + f.b
+      expect(
+        sum,
+        `pool fact ${f.id} has sum out of range`,
+      ).toBeGreaterThanOrEqual(3)
+      expect(sum, `pool fact ${f.id} has sum out of range`).toBeLessThanOrEqual(
+        10,
+      )
+    }
   })
 })

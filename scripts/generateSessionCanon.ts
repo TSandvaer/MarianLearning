@@ -107,6 +107,7 @@ import {
 } from './canonLint.ts'
 import {
   CompositionLintError,
+  assertAddToTenCompositionClean,
   assertSubToTenCompositionClean,
 } from './compositionLint.ts'
 
@@ -342,17 +343,41 @@ async function bakeOne(
   }
 
   // Composition-rule lint gate. Mechanically validates the 8-problem set
-  // against per-tier composition rules (currently scoped to sub-to-10).
-  // Sits after the text-encoding lint so the bake author sees the
-  // hygiene errors first. `--lint-warn` also downgrades this lint —
+  // against per-tier composition rules (currently scoped to sub-to-10 and
+  // add-to-10). Sits after the text-encoding lint so the bake author sees
+  // the hygiene errors first. `--lint-warn` also downgrades this lint —
   // same dev-iteration semantics as the text-encoding lint.
   //
-  // Out-of-scope tiers (digraphs, cvc-words, add-to-10, add-to-20) are
-  // no-ops here — `assertSubToTenCompositionClean` only fires when the
-  // canon is recognised as sub-to-10 by `bakeOne`'s combo metadata.
+  // Out-of-scope tiers (digraphs, cvc-words, add-to-20, etc.) are no-ops
+  // here — only the math tiers with bindings fire. The dispatch is
+  // duplicated between this file (bake-time) and `compositionLint.ts`
+  // `resolveTierBinding` (CI-time disk walker); both walk the SAME tier
+  // set and must stay in sync. Tests in `compositionLint.test.ts` assert
+  // each binding fires; tests in `generateSessionCanon.test.ts` cover
+  // this dispatch.
   if (combo.track === 'math' && combo.focusNode === 'sub-to-10') {
     try {
       assertSubToTenCompositionClean(
+        `${combo.track}/${combo.focusNode}`,
+        response,
+      )
+    } catch (err) {
+      if (lintWarn && err instanceof CompositionLintError) {
+        console.warn(
+          `\n[composition-lint] WARN — writing despite violations: ` +
+            `${err.message}\n` +
+            err.violations
+              .map((v) => `  - [${v.rule}] ${v.message}`)
+              .join('\n') +
+            '\n',
+        )
+      } else {
+        throw err
+      }
+    }
+  } else if (combo.track === 'math' && combo.focusNode === 'add-to-10') {
+    try {
+      assertAddToTenCompositionClean(
         `${combo.track}/${combo.focusNode}`,
         response,
       )
