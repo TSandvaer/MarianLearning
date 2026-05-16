@@ -1,6 +1,6 @@
-# Number Garden — `sub-to-10` content tier (16-fact pool, wrong-operation distractor, op-parameterized slow-fact threshold)
+# Number Garden — `sub-to-10` content tier (20-fact pool, wrong-operation distractor, op-parameterized slow-fact threshold)
 
-**Status:** APPROVED with all open questions locked (Thomas, 2026-05-15). Ready for Kevin's implementation. Devon's PR #238 design review passed with nits applied; see §11 for the locked decisions.
+**Status:** APPROVED with all open questions locked (Thomas, 2026-05-15). **AMENDED 2026-05-16** to widen the fact pool from 16 to 20 in response to Dave's wrong-op-delivery research (`design/research/canon-pool-wrong-op-delivery.md`, PR #247). The amendment adds 4 MEDIUM-band facts (`8-1=7`, `7-1=6`, `8-2=6`, `6-2=4`) whose wrong-op traps (`a+b`) are IN-range (`≤ 10`); without them, no MEDIUM- or HARD-band fact in the original pool produced an in-range wrong-op trap, making the §2.2 "≥2 of P4-P8 carry wrong-op" rule structurally unsatisfiable. See §13 post-ship correction block.
 **Ticket:** TBD — Matt to file. This spec lands the design-side content for the FIRST subtraction tier in Number Garden. PR split locked at 2 (content + canon in PR 1; render + parser in PR 2).
 **Authority:** `design/research/sub-to-10-fact-sequencing-marian.md` (Dave, 2026-05-15) — the curriculum-side authority on fact ordering, distractor design, dual-exposure rule, advancement gate, and op-specific slow-fact threshold. This spec consumes Dave's note verbatim where it makes a call and formalises it for Kevin's planner / canon / `distractors.ts` work.
 **Predecessor research (read for context):** `design/research/math-distractor-and-streak-decisions.md` (Dave, 2026-04-25 — the gentle / off-by-one cutoff at problem 3); `design/research/add-to-10-counting-to-recall.md` (Dave, 2026-04-29 — Marian's finger-counting profile); `design/research/speed-feedback-automaticity-marian.md` (Dave, 2026-05-15 — verdict: NO speed-feedback UX; the slow-fact directive is a backend re-targeting tool, not a UI signal).
@@ -22,7 +22,7 @@
 
 **Scope of this spec:**
 
-- The 16-fact ordered pool (§1) with band + category + per-fact teaching note.
+- The 20-fact ordered pool (§1) with band + category + wrong-op trap status + per-fact teaching note (originally 16; widened to 20 on 2026-05-16 per Dave's `canon-pool-wrong-op-delivery.md` research, PR #247).
 - The problem-mix rules for an 8-problem session drawn from the pool (§2).
 - The two distractor classes for `sub-to-10`, including the NEW **wrong-operation distractor** (§3).
 - The read-line template + per-slot utterance templates (§4).
@@ -45,55 +45,74 @@
 
 ---
 
-## 1. The 16-fact pool — ordered, banded, categorised
+## 1. The 20-fact pool — ordered, banded, categorised
 
-The pool below is the union of facts Haiku may draw from for any `sub-to-10` session. The full single-digit subtraction surface with answers in `[0, 10]` contains 55 ordered pairs; the 16 below cover each difficulty band and conceptual category without redundancy (Dave § "Concrete fact ordering"). **All 16 are pool-eligible; the per-session mix rules (§2) drive how Haiku composes the 8 problems.**
+The pool below is the union of facts Haiku may draw from for any `sub-to-10` session. The full single-digit subtraction surface with answers in `[0, 10]` contains 55 ordered pairs; the 20 below cover each difficulty band and conceptual category without redundancy (Dave § "Concrete fact ordering" + Dave's 2026-05-16 wrong-op-delivery research). **All 20 are pool-eligible; the per-session mix rules (§2) drive how Haiku composes the 8 problems.**
 
-### 1.1 Pool table (LOCKED — Dave § "Concrete fact ordering")
+### 1.1 Pool table (LOCKED — Dave § "Concrete fact ordering", AMENDED 2026-05-16 per Dave § "Pool-widening candidates" in `canon-pool-wrong-op-delivery.md`)
 
-| #   | Fact         | Band   | Category      | Teaching note (per-fact, where non-obvious)                                                                                                                                                                                                                         |
-| --- | ------------ | ------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `5 − 5 = 0`  | easy   | subtract-self | `n − n = 0` rule. No counting — rule-application only. Among the fastest retrievals; baseline confidence-builder.                                                                                                                                                   |
-| 2   | `8 − 8 = 0`  | easy   | subtract-self | Repeats the rule with a larger `n`; confirms generality. Do NOT drill both subtract-self facts in the same session — one per session is sufficient (§2.3).                                                                                                          |
-| 3   | `7 − 0 = 7`  | easy   | subtract-zero | `n − 0 = n` rule (identity). No counting; rule-application only.                                                                                                                                                                                                    |
-| 4   | `9 − 0 = 9`  | easy   | subtract-zero | Repeats the rule. Same one-per-session guidance as `subtract-self`.                                                                                                                                                                                                 |
-| 5   | `10 − 5 = 5` | easy   | doubles       | Doubles halving. Highly memorable; Marian knows `5 + 5 = 10` from `add-to-10`. Single-step finger-count.                                                                                                                                                            |
-| 6   | `8 − 4 = 4`  | easy   | doubles       | Doubles halving. Marian knows `4 + 4 = 8`.                                                                                                                                                                                                                          |
-| 7   | `6 − 3 = 3`  | easy   | doubles       | Doubles halving. Marian knows `3 + 3 = 6`.                                                                                                                                                                                                                          |
-| 8   | `9 − 1 = 8`  | easy   | subtract-one  | Count back one step; same scaffold as `n + 1` in addition. Easiest non-rule fact.                                                                                                                                                                                   |
-| 9   | `10 − 1 = 9` | medium | subtract-one  | Count back one step; bridges the decade (anchor for take-from-10).                                                                                                                                                                                                  |
-| 10  | `10 − 2 = 8` | medium | subtract-two  | Count back two steps. **Watch wrong-operation lure** (`10 + 2 = 12`) — exemplar of the Class-2 wrong-op distractor (§3.2). The wrong-op value 12 falls outside `[0, 10]`, so the trap delivers via the off-by-one fallback (§3.2 "Out-of-range wrong-op fallback"). |
-| 11  | `10 − 3 = 7` | medium | take-from-10  | Bridges through 10; highest-leverage facts. The make-10 mental model `add-to-20` will later depend on lives here.                                                                                                                                                   |
-| 12  | `10 − 7 = 3` | medium | take-from-10  | Inverse of `7 + 3 = 10`. Expose deliberately to build the fact-family link — but **NEVER in the same session as `7 + 3 = 10`** (§7 dual-exposure rule).                                                                                                             |
-| 13  | `9 − 4 = 5`  | hard   | general       | No obvious shortcut; count-back or derive from `10 − 5`. Where retrieval gains will appear last.                                                                                                                                                                    |
-| 14  | `8 − 3 = 5`  | hard   | general       | No obvious shortcut; count-back. Wrong-op lure `11` is out of range (`maxAnswer=10`) → fall back to off-by-one (§3.2).                                                                                                                                              |
-| 15  | `7 − 4 = 3`  | hard   | general       | Often confused with `7 − 3 = 4` (the Robinson-2013 wrong-direction-of-compensation error). The off-by-one distractor is load-bearing here.                                                                                                                          |
-| 16  | `9 − 6 = 3`  | hard   | general       | Hardest in the pool. Subtrahend is large, not a clean anchor. Final-band fact.                                                                                                                                                                                      |
+| #   | Fact         | Band   | Category      | Wrong-op trap (a+b) | Teaching note (per-fact, where non-obvious)                                                                                                                                                                                                                         |
+| --- | ------------ | ------ | ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `5 − 5 = 0`  | easy   | subtract-self | 10 (IN — boundary, but EASY-band → only P1-P3) | `n − n = 0` rule. No counting — rule-application only. Among the fastest retrievals; baseline confidence-builder.                                                                                                                                                   |
+| 2   | `8 − 8 = 0`  | easy   | subtract-self | 16 (OOR)            | Repeats the rule with a larger `n`; confirms generality. Do NOT drill both subtract-self facts in the same session — one per session is sufficient (§2.3).                                                                                                          |
+| 3   | `7 − 0 = 7`  | easy   | subtract-zero | 7 (alias of correct → forbidden for wrong-op; §3.2 same-value-collision rule) | `n − 0 = n` rule (identity). No counting; rule-application only.                                                                                                                                                                                                    |
+| 4   | `9 − 0 = 9`  | easy   | subtract-zero | 9 (alias → forbidden) | Repeats the rule. Same one-per-session guidance as `subtract-self`.                                                                                                                                                                                                 |
+| 5   | `10 − 5 = 5` | easy   | doubles       | 15 (OOR)            | Doubles halving. Highly memorable; Marian knows `5 + 5 = 10` from `add-to-10`. Single-step finger-count.                                                                                                                                                            |
+| 6   | `8 − 4 = 4`  | easy   | doubles       | 12 (OOR)            | Doubles halving. Marian knows `4 + 4 = 8`.                                                                                                                                                                                                                          |
+| 7   | `6 − 3 = 3`  | easy   | doubles       | 9 (IN — but EASY-band → only P1-P3) | Doubles halving. Marian knows `3 + 3 = 6`.                                                                                                                                                                                                                          |
+| 8   | `9 − 1 = 8`  | easy   | subtract-one  | 10 (IN — boundary, EASY-band → only P1-P3) | Count back one step; same scaffold as `n + 1` in addition. Easiest non-rule fact.                                                                                                                                                                                   |
+| 9   | `10 − 1 = 9` | medium | subtract-one  | 11 (OOR)            | Count back one step; bridges the decade (anchor for take-from-10).                                                                                                                                                                                                  |
+| 10  | `8 − 1 = 7`  | medium | subtract-one  | **9 (IN)**          | **Added 2026-05-16 per Dave § "Pool-widening candidates" Candidate 1.** Count back one step; extends the subtract-one chain. Cleanest pedagogical signal among MEDIUM/HARD candidates: trap=9, correct=7, off-by-one secondary=8 → chips `{7, 8, 9}` (3-way separation, no collisions). Subtract-one is Marian's most reliable category (Robinson et al. 2013 — 65-73% identity-principle correct). |
+| 11  | `7 − 1 = 6`  | medium | subtract-one  | **8 (IN)**          | **Added 2026-05-16 per Dave § "Pool-widening candidates" Candidate 4 (optional 4th).** Subtract-one variety; trap=8 differs from #10's trap=9 so cross-session repetition feels less identical. Note: subtract-one cap is still ≤1 per session (§2.3) — facts #8, #9, #10, #11 compete for one slot. |
+| 12  | `10 − 2 = 8` | medium | subtract-two  | 12 (OOR)            | Count back two steps. Wrong-op lure (`10 + 2 = 12`) falls outside `[0, 10]`, so at render time the trap delivers via the off-by-one fallback (§3.2 "Out-of-range wrong-op fallback"). For an IN-range subtract-two alternative with the same wrong-op lure shape, see fact #13 (`8-2=6`, trap=10) and fact #14 (`6-2=4`, trap=8). |
+| 13  | `8 − 2 = 6`  | medium | subtract-two  | **10 (IN — boundary)** | **Added 2026-05-16 per Dave § "Pool-widening candidates" Candidate 2.** Highest-salience wrong-op lure in the pool — trap=10 is the "makes ten" anchor Marian knows deeply from `add-to-10`. A child who adds instead of subtracts lands confidently on 10. Trap 4-apart from correct (6) → strong discriminate signal. |
+| 14  | `6 − 2 = 4`  | medium | subtract-two  | **8 (IN)**          | **Added 2026-05-16 per Dave § "Pool-widening candidates" Candidate 3.** Subtract-two with lower minuend; useful when recent-score is mid-range and the take-from-10 slot is filled by #15 or #16. Trap 4-apart from correct → strong discriminate. Note: subtract-two cap is ≤1 per session (§2.3) — facts #12, #13, #14 compete for one slot. |
+| 15  | `10 − 3 = 7` | medium | take-from-10  | 13 (OOR)            | Bridges through 10; highest-leverage facts. The make-10 mental model `add-to-20` will later depend on lives here.                                                                                                                                                   |
+| 16  | `10 − 7 = 3` | medium | take-from-10  | 17 (OOR)            | Inverse of `7 + 3 = 10`. Expose deliberately to build the fact-family link — but **NEVER in the same session as `7 + 3 = 10`** (§7 dual-exposure rule).                                                                                                             |
+| 17  | `9 − 4 = 5`  | hard   | general       | 13 (OOR)            | No obvious shortcut; count-back or derive from `10 − 5`. Where retrieval gains will appear last.                                                                                                                                                                    |
+| 18  | `8 − 3 = 5`  | hard   | general       | 11 (OOR)            | No obvious shortcut; count-back. Wrong-op lure `11` is out of range (`maxAnswer=10`) → fall back to off-by-one (§3.2).                                                                                                                                              |
+| 19  | `7 − 4 = 3`  | hard   | general       | 11 (OOR)            | Often confused with `7 − 3 = 4` (the Robinson-2013 wrong-direction-of-compensation error). The off-by-one distractor is load-bearing here.                                                                                                                          |
+| 20  | `9 − 6 = 3`  | hard   | general       | 15 (OOR)            | Hardest in the pool. Subtrahend is large, not a clean anchor. Final-band fact.                                                                                                                                                                                      |
 
-**Band counts:**
+**Band counts (post-amendment):**
 
 - `easy` — 8 facts (#1–8): subtract-self ×2, subtract-zero ×2, doubles ×3, subtract-one ×1.
-- `medium` — 4 facts (#9–12): subtract-one ×1, subtract-two ×1, take-from-10 ×2.
-- `hard` — 4 facts (#13–16): general ×4.
+- `medium` — 8 facts (#9–16): subtract-one ×3, subtract-two ×3, take-from-10 ×2.
+- `hard` — 4 facts (#17–20): general ×4.
 
-**Category counts:** subtract-self ×2 · subtract-zero ×2 · doubles ×3 · subtract-one ×2 · subtract-two ×1 · take-from-10 ×2 · general ×4.
+**Category counts:** subtract-self ×2 · subtract-zero ×2 · doubles ×3 · subtract-one ×4 · subtract-two ×3 · take-from-10 ×2 · general ×4. **Total: 20 facts.**
+
+**In-range wrong-op (a+b ≤ 10) availability per band (this is what makes §2.2's ≥2/5 rule structurally achievable):**
+
+- EASY: 3 facts with usable in-range traps (#1 `5-5` boundary, #7 `6-3`, #8 `9-1` boundary) — but EASY band is restricted to P1-P3 (no traps fire there per §2.1). **Effective contribution to P4-P8 wrong-op delivery: 0.**
+- MEDIUM: 4 facts with usable in-range traps (#10 `8-1=7` trap=9, #11 `7-1=6` trap=8, #13 `8-2=6` trap=10, #14 `6-2=4` trap=8). **This is the load-bearing surface.**
+- HARD: 0 facts with usable in-range traps. All four HARD/general facts have `a+b ≥ 11` and silently downgrade to off-by-one at render time.
+
+**Selection-cap interaction.** Of the 4 MEDIUM in-range facts, only 2 can co-occur in a single session under category caps (≤1 subtract-one across #10/#11; ≤1 subtract-two across #13/#14). The §2.2 ≥2/5 wrong-op-in-P4-P8 rule is therefore **achievable but only just** — it requires Haiku to actively pick the in-range subtract-one AND the in-range subtract-two when filling P4-P8 (rather than #9 `10-1=9` and #12 `10-2=8`, which are OOR). See §4.1 "DISTRACTOR-COVERAGE SELF-CHECK" for the directive that biases this selection.
 
 ### 1.2 Pool-composition cross-check
 
 - **Answer range**: `[0, 9]`. Two facts (#1, #2) have `correct = 0`; the rest `correct ∈ [3, 9]`. **`correct = 0` is a NEW value in the math chip range** — `add-to-10` never produced `0` as a correct answer. Kevin's wire-up must confirm `ANSWER_RANGE_MIN = 1` in [`distractors.ts`](../../src/screens/Math/distractors.ts) is widened to `0` for `op === '-'` problems, OR the two subtract-self facts (#1, #2) are excluded from any session where the chip range can't be widened. See §3.3 + §9.
-- **Minuend range**: `[5, 10]`. The most common minuend is `10` (#5, #9, #10, #11, #12 — five facts), reflecting the take-from-10 emphasis Dave calls out.
+- **Minuend range**: `[6, 10]`. The most common minuend is `10` (#5, #9, #12, #15, #16 — five facts), reflecting the take-from-10 emphasis Dave calls out. The 2026-05-16 amendment adds minuends 6, 7, 8 (existing in EASY band already) into the MEDIUM band, broadening the MEDIUM-band minuend surface beyond `10` for the first time.
 - **Subtrahend range**: `[0, 8]`.
 - **`MathFact` representation**: every pool fact maps cleanly to `{ a: minuend, b: subtrahend, op: '-' }` — see §5.
 
-### 1.3 Why these 16, not more
+### 1.3 Why these 20, not more
 
-The 55-fact full surface contains many redundant facts (e.g. `7 − 1 = 6` and `5 − 1 = 4` both exemplify the subtract-one category without adding pedagogical signal). The 16-fact pool covers every difficulty band and category at a depth that supports Leitner box-aware re-targeting once latency + accuracy data accumulates. Pool extensions (more `general` band facts) can land in a follow-up tier; this pool is the v1 surface for Kevin's first canon bake.
+The 55-fact full surface contains many redundant facts (e.g. `5 − 1 = 4`, `4 − 1 = 3`, `3 − 1 = 2` all exemplify the subtract-one category without adding pedagogical signal beyond what `8 − 1 = 7` already provides). The 20-fact pool covers every difficulty band and category at a depth that supports Leitner box-aware re-targeting once latency + accuracy data accumulates.
+
+The 2026-05-16 amendment grew the pool from 16 to 20 to fix a structural defect in the original 16: every MEDIUM- and HARD-band fact had `a + b ≥ 11`, making the wrong-op trap (`a + b`) out-of-range and forcing every P4-P8 wrong-op attempt to silently downgrade to off-by-one at render time (per §3.2). The four added facts (`8-1=7`, `7-1=6`, `8-2=6`, `6-2=4`) are the smallest set of MEDIUM-band candidates that delivers in-range wrong-op traps under the §2.3 category caps; see Dave's `canon-pool-wrong-op-delivery.md` § "Recommendation" for the full evidence chain.
+
+Pool extensions beyond 20 are deferred:
+
+- **HARD/general in-range candidates** — Dave's research did not evaluate HARD/general facts whose `a + b ≤ 10` (e.g. `7-3=4` trap=10, `6-4=2` trap=10, `5-3=2` trap=8, `4-3=1` trap=7, `5-4=1` trap=9). These would add wrong-op coverage on the HARD band without competing against the subtract-one / subtract-two category caps, and would let Haiku land ≥2 in-range wrong-op facts in P4-P8 from the `general` cap (2) alone. Pedagogical evaluation of these candidates (do they belong in HARD/general, or in a separate "small-general" category? Does their easier minuend dilute the HARD band's intended difficulty profile?) is a Dave-side research question deferred to a follow-up paper. **Flagged for Dave 2026-05-16.**
+- **More `general`-band facts** (Dave's original Section 12 risk note) — Marian-data-driven extension once she generates ≥10 `sub-to-10` sessions.
 
 ---
 
 ## 2. Problem-mix rules — how Haiku draws 8 problems from the pool
 
-The session is 8 problems, drawn from the 16-fact pool above. The mix obeys the warm-up + automaticity-targeting pattern established by `add-to-10` and tightened by Dave's research for `sub-to-10`.
+The session is 8 problems, drawn from the 20-fact pool above (post-2026-05-16 amendment; was 16 pre-amendment). The mix obeys the warm-up + automaticity-targeting pattern established by `add-to-10` and tightened by Dave's research for `sub-to-10`.
 
 ### 2.1 Per-problem index mix
 
@@ -110,9 +129,16 @@ The session is 8 problems, drawn from the 16-fact pool above. The mix obeys the 
 
 ### 2.2 Discriminate-tier distractor mix (P4–P8)
 
-Of the 5 discriminate problems (P4–P8), **at least 2 MUST carry the wrong-operation distractor** (Class 2 — §3.2). The remaining 3 may use Class 1 (off-by-one) OR Class 2. Rationale: Dave § Q4 / Recommendations names the wrong-operation lure as the higher-leverage trap for `sub-to-10`; without an explicit minimum, Haiku may default-to-Class-1 because off-by-one was the only distractor type in `add-to-10`.
+Of the 5 discriminate problems (P4–P8), **at least 2 MUST carry the wrong-operation distractor** (Class 2 — §3.2). The remaining 3 may use Class 1 (off-by-one) OR Class 2. Rationale: Dave § Q4 / Recommendations names the wrong-operation lure as the higher-leverage trap for `sub-to-10`; without an explicit minimum, the renderer would treat every P4-P8 op:'-' problem as a wrong-op attempt but silently downgrade most/all to off-by-one when traps fall out-of-range.
 
-**Constraint flow at the planner directive level** (§4): Haiku is asked to TAG each P4–P8 problem with a `distractorClass: 'off-by-one' | 'wrong-op'` hint. The planner directive specifies the ≥2 minimum; `distractors.ts` at render time honours the hint when present (and falls back to a deterministic round-robin within the session if Haiku omits it — see §3.4).
+**Enforcement is render-side, NOT Haiku-emitted** (per §13 post-ship correction, 2026-05-16). The wire shape is utterance-only (per `planner-and-canon.md` § "Wire shape is utterance-only — invariant"); Haiku cannot tag per-problem `distractorClass` on the wire. Instead:
+
+1. **Pool-side responsibility (this spec):** the 20-fact pool MUST contain enough MEDIUM- and HARD-band facts with in-range wrong-op traps (`a + b ≤ 10`, `a + b ≠ c`) that, given the §2.3 category caps and Haiku's P4-P8 selection, at least 2 in-range facts can land at P4-P8 in every session. **Achieved (just barely) by the 2026-05-16 amendment** — see §1.1 "In-range wrong-op availability per band" + "Selection-cap interaction."
+2. **Directive-side responsibility (Kevin's `_planner.ts` block, §4.1):** the FACT POOL is annotated with each fact's `a+b` value and IN/OOR status; the directive includes a `DISTRACTOR-COVERAGE SELF-CHECK` that biases Haiku toward picking ≥2 in-range MEDIUM facts when filling P4-P8. This is a soft prophylactic, not a hard guarantee (per `planner-and-canon.md` § "Why the self-check blocks aren't enough on their own").
+3. **Render-side responsibility (`distractors.ts`, §3.2):** every P4-P8 op:'-' problem attempts a wrong-op trap; the trap silently downgrades to off-by-one when OOR or aliasing the correct answer. The "≥2 of 5" target is met by the pool+directive in tandem; the renderer applies the trap mechanically per problem.
+4. **Future lint-side reinforcement (Kevin's `compositionLint.ts`, follow-up):** a new lint rule `wrong-op-coverage` MAY be added to `SUB_TO_TEN_RULES` that asserts ≥2 of P4-P8 carry IN-range wrong-op-capable facts (i.e. fact `(a, b)` with `a + b ≤ 10` and `a + b ≠ a - b`). This would mechanically reject bakes that miss the target. **Out of scope for the immediate pool-widening PR; flagged for Kevin's follow-up.**
+
+The previous wording ("Haiku is asked to TAG each P4–P8 problem with a `distractorClass: 'off-by-one' | 'wrong-op'` hint") is **superseded** by the §13 post-ship correction. The `MathProblem.distractorClass` field is kept as a forward-compat seam only.
 
 ### 2.3 Band coverage rules
 
@@ -154,11 +180,15 @@ Algorithm: two distractor values, each ≥2 away from `correct`, biased toward `
 
 **Definition.** For a subtraction problem `a − b = c`, the wrong-operation distractor is `a + b` (the addition answer using the same operand pair). It targets the cognitive error Dave names as "applying the wrong operation" — the most impactful real-world confusion for subtraction (Dave § Q4: "the more impactful distractor to add is the **wrong-operation distractor**").
 
-**Worked examples:**
+**Worked examples (post-2026-05-16 amendment, drawn from the 20-fact pool §1.1):**
 
-- `10 − 2 = 8`, wrong-op distractor = `10 + 2 = 12`. **12 is out of range** (`maxAnswer = 10`). See "Out-of-range wrong-op fallback" below.
-- `9 − 1 = 8`, wrong-op distractor = `10`. In range. Pair with an off-by-one (`7` or `9`) for the second distractor — but `9` would alias the wrong-op answer minus-one, so prefer `7`.
-- `6 − 3 = 3`, wrong-op distractor = `9`. In range. Pair with `4` (off-by-one) for the second distractor.
+- `10 − 2 = 8` (#12), wrong-op distractor = `10 + 2 = 12`. **12 is out of range** (`maxAnswer = 10`). See "Out-of-range wrong-op fallback" below — renders as off-by-one `{7, 8, 9}` or `{6, 7, 8}`.
+- `8 − 1 = 7` (#10, AMENDED-IN), wrong-op distractor = `9`. In range. Off-by-one secondary = `8` (correct + 1). Chips `{7, 8, 9}` — clean 3-way separation.
+- `8 − 2 = 6` (#13, AMENDED-IN), wrong-op distractor = `10`. In range — boundary value. Off-by-one secondary = `5` or `7`. Chips `{5, 6, 10}` or `{6, 7, 10}` — the "makes ten" lure is the highest-salience trap in the pool.
+- `6 − 2 = 4` (#14, AMENDED-IN), wrong-op distractor = `8`. In range. Off-by-one secondary = `3` or `5`. Chips `{3, 4, 8}` or `{4, 5, 8}` — trap is 4-apart from correct.
+- `7 − 1 = 6` (#11, AMENDED-IN, optional 4th), wrong-op distractor = `8`. In range. Off-by-one secondary = `5` or `7`. Chips `{5, 6, 8}` or `{6, 7, 8}` — clean.
+- `9 − 1 = 8` (#8, EASY band — fires only at P1-P3 where wrong-op is NEVER applied per §2.1; included for completeness, NOT a P4-P8 contributor).
+- `6 − 3 = 3` (#7, EASY band — same caveat).
 
 **Scope.** Class 2 is conditional on `op === '-' && problemIndex >= 4`. Never fires for P1–P3 (gentle ramp). Never fires for `op === '+'` (addition has no equivalent meaningful "wrong-operation" lure within the `[1, 10]` range — the inverse would be `a − b`, often negative; see §3.6).
 
@@ -190,25 +220,28 @@ Two pool facts produce `correct = 0`: #1 (`5 − 5`) and #2 (`8 − 8`). Today `
 
 **Concrete change.** Add an optional parameter `minAnswer: number` to `pickDistractors`, default `ANSWER_RANGE_MIN`. For `op === '-'` callers, pass `0`. `gentleDistractors` and `offByOneDistractors` honour the new lower bound. Tests pin both bounds.
 
-### 3.4 Distractor-class hint shape — planner → screen
+### 3.4 Distractor-class field — render-side ONLY (post-2026-05-16 correction)
 
-Haiku emits `distractorClass` per discriminate problem (P4–P8) on the wire. The hint is a SOFT signal — `distractors.ts` may override it (range-fitness, collision avoidance per §3.2). Wire shape:
+**Historical context (pre-2026-05-16):** the original spec claimed Haiku would emit `distractorClass` per discriminate problem on the wire. **SUPERSEDED** — per `planner-and-canon.md` § "Wire shape is utterance-only — invariant", the `PlannerPlan` wire shape is utterance-only and cannot carry per-problem structured tags. Haiku emissions of `distractorClass` are silently discarded by the canon adapter and parsers.
+
+**Current behaviour:** the `distractorClass` field on `MathProblem` is render-derived, not planner-emitted. `Math.tsx:2559-2560` sets `distractorClass: 'wrong-op'` for every op:'-' P4-P8 problem deterministically; `pickDistractors` then silently downgrades to off-by-one when the trap is OOR or aliases the correct answer (§3.2). The field is kept on the shape as a forward-compat seam in case a future wire widening (typed extension to `PlannerPlan` per `planner-and-canon.md`) ever enables planner emission. Wire shape:
 
 ```ts
-// MathProblem (browser shape) gains an optional field. Planner emits;
-// `Math.tsx` reads when calling pickDistractors.
+// MathProblem (browser shape). `op` is required and sourced from the read template parse;
+// `distractorClass` is RENDER-DERIVED, not parsed from the wire, and is present only on P4-P8
+// op:'-' problems in the runtime React state after Math.tsx sets it.
 interface MathProblem {
   index: number
   addendA: number // minuend when op === '-'
   addendB: number // subtrahend when op === '-'
-  op: '+' | '-' // NEW — required when planner emits sub-to-10 content
+  op: '+' | '-' // REQUIRED on every math problem; sourced from read template ("plus" vs "minus"/"take away")
   correct: number
-  distractorClass?: 'off-by-one' | 'wrong-op' // NEW — present on P4-P8 sub-to-10 problems
+  distractorClass?: 'off-by-one' | 'wrong-op' // RENDER-DERIVED — set by Math.tsx, never by planner
   utterances: MathProblemUtterances
 }
 ```
 
-The flat wire `read` text already disambiguates op (`"… minus …"` vs `"… plus …"`); the planFromServer.ts adapter widens its regex branch (see §9 "Parser widening").
+The flat wire `read` text disambiguates op (`"… minus …"` / `"… take away …"` vs `"… plus …"`); the `planFromServer.ts` adapter widens its regex branch (see §9 "Parser widening"). `op` is the ONLY new field actually crossing the wire; `distractorClass` does not.
 
 ### 3.6 Class 2 is sub-tier-only — `add-to-10` is explicitly UNCHANGED
 
@@ -227,18 +260,31 @@ Replace the one-line skeleton in [`api/_planner.ts:920`](../../api/_planner.ts#L
 >
 >   FIRST-SESSION READ-LINE — on the very first session on this node (lifetimeFirstEncounters['sub-to-10'] not yet set), use the warmer phrasing: "<minuend> take away <subtrahend>. How many are left?" e.g. "Eight take away three. How many are left?" This frames subtraction as physical removal, which matches Marian's mental model from counting back. Subsequent sessions revert to the "minus" template. Emma's voice config is unchanged — the SSML and prosody pipeline does not change for this tier.
 >
->   FACT POOL (16 facts; pick exactly 8 distinct facts from this pool per session, no duplicates):
->   - Easy band — rule-application / single-step:
->     · 5-5=0, 8-8=0           (subtract-self — at most one per session)
->     · 7-0=7, 9-0=9           (subtract-zero — at most one per session)
->     · 10-5=5, 8-4=4, 6-3=3   (doubles — at most one per session)
->     · 9-1=8                  (subtract-one)
->   - Medium band — counting back / bridges:
->     · 10-1=9                 (subtract-one)
->     · 10-2=8                 (subtract-two)
->     · 10-3=7, 10-7=3         (take-from-10 — at most TWO per session, this category is high-value)
->   - Hard band — general:
->     · 9-4=5, 8-3=5, 7-4=3, 9-6=3  (general — at most two per session)
+>   FACT POOL (20 facts; pick exactly 8 distinct facts from this pool per session, no duplicates):
+>   Each fact is annotated with [BAND/category] and (a+b) = the wrong-op trap value used at render time. IN means the trap is ≤ 10 (a usable in-range wrong-op distractor); OOR means the trap is > 10 (silently downgrades to off-by-one at render time per design/math/sub-to-10-content.md §3.2); ALIAS means the trap aliases the correct answer (forbidden, downgrades).
+>   - Easy band — rule-application / single-step (P1-P3 only, no wrong-op fires here):
+>     · 5-5=0   [EASY/subtract-self]   (a+b=10 IN — boundary)
+>     · 8-8=0   [EASY/subtract-self]   (a+b=16 OOR)
+>     · 7-0=7   [EASY/subtract-zero]   (a+b=7 ALIAS — forbidden)
+>     · 9-0=9   [EASY/subtract-zero]   (a+b=9 ALIAS — forbidden)
+>     · 10-5=5  [EASY/doubles]         (a+b=15 OOR)
+>     · 8-4=4   [EASY/doubles]         (a+b=12 OOR)
+>     · 6-3=3   [EASY/doubles]         (a+b=9 IN)
+>     · 9-1=8   [EASY/subtract-one]    (a+b=10 IN — boundary)
+>   - Medium band — counting back / bridges (P4-P8 eligible):
+>     · 10-1=9  [MEDIUM/subtract-one]  (a+b=11 OOR)
+>     · 8-1=7   [MEDIUM/subtract-one]  (a+b=9 IN)   ← AMENDED 2026-05-16 (Dave wrong-op research)
+>     · 7-1=6   [MEDIUM/subtract-one]  (a+b=8 IN)   ← AMENDED 2026-05-16 (Dave wrong-op research)
+>     · 10-2=8  [MEDIUM/subtract-two]  (a+b=12 OOR)
+>     · 8-2=6   [MEDIUM/subtract-two]  (a+b=10 IN — boundary, strongest "makes ten" lure) ← AMENDED 2026-05-16
+>     · 6-2=4   [MEDIUM/subtract-two]  (a+b=8 IN)   ← AMENDED 2026-05-16 (Dave wrong-op research)
+>     · 10-3=7  [MEDIUM/take-from-10]  (a+b=13 OOR)
+>     · 10-7=3  [MEDIUM/take-from-10]  (a+b=17 OOR)
+>   - Hard band — general (P5-P8 eligible; all OOR for wrong-op, deliver as off-by-one):
+>     · 9-4=5   [HARD/general]         (a+b=13 OOR)
+>     · 8-3=5   [HARD/general]         (a+b=11 OOR)
+>     · 7-4=3   [HARD/general]         (a+b=11 OOR)
+>     · 9-6=3   [HARD/general]         (a+b=15 OOR)
 >
 >   SESSION COMPOSITION RULES (apply IN ORDER):
 >   1. Problems 1-3 (gentle ramp): draw EXCLUSIVELY from the easy band. Calibration window; no traps yet.
@@ -248,8 +294,8 @@ Replace the one-line skeleton in [`api/_planner.ts:920`](../../api/_planner.ts#L
 >   5. NO duplicate facts within the 8-problem set.
 >   6. Category cap: at most one each of subtract-self, subtract-zero, doubles, subtract-one, subtract-two; at most two of take-from-10; at most two of general.
 >
->   DISTRACTOR-CLASS HINT (for problems 4-8 only):
->   Tag each P4-P8 problem with `distractorClass: "off-by-one" | "wrong-op"`. At least 2 of the 5 problems P4-P8 MUST be tagged "wrong-op" (the trap is `minuend + subtrahend` — the addition answer using the same pair). DO NOT use "wrong-op" for subtract-zero facts (the wrong-op would alias the correct answer). For subtract-self facts placed in P4-P8 (unusual since they live in the easy band, but technically possible if recent-score is very high), prefer "wrong-op" — the lure is `2n`, a strong distractor. Problems 1-3 are NEVER tagged (they use the gentle ramp).
+>   DISTRACTOR-COVERAGE SELF-CHECK (for problems 4-8 — replaces the prior DISTRACTOR-CLASS HINT block, which assumed Haiku could tag per-problem distractorClass on the wire; per planner-and-canon.md § "Wire shape is utterance-only — invariant" the wire is utterance-only, so distractor selection is render-side per design/math/sub-to-10-content.md §3.2):
+>   The render pipeline (src/screens/Math/Math.tsx) attempts a wrong-op trap (a+b) on every op:'-' P4-P8 problem and silently downgrades to off-by-one when the trap is OOR or aliases the correct answer. To deliver ≥2 in-range wrong-op traps across P4-P8 (Kyle's spec target), bias the P4-P8 selection toward facts annotated "IN" above. NEGATIVE ANCHOR: it is FORBIDDEN to fill P4-P8 entirely with OOR facts when at least 2 IN-annotated MEDIUM facts (8-1, 7-1, 8-2, 6-2) are still available; before finalising the 5-problem P4-P8 set, count the IN-annotated facts in the set and if it is < 2 AND ≥ 2 IN-annotated facts are still available within category caps, SWAP one OOR fact for an IN-annotated one. Category caps are still binding (at most one subtract-one and at most one subtract-two per session): if you pick 8-1=7 (subtract-one IN), you may not also pick 10-1=9 or 7-1=6; if you pick 8-2=6 or 6-2=4 (subtract-two IN), you may not also pick 10-2=8. The maximum achievable IN-count in P4-P8 is 2 — one MEDIUM/subtract-one IN-fact AND one MEDIUM/subtract-two IN-fact. Aim for that maximum unless category-cap or take-from-10 coverage forces otherwise.
 >
 >   PROSODY: numbers are spelled out as words ("zero", "one", "two", ... "ten"). Capitalize the first word of each sentence. The "minus" / "take away" template renders cleanly on `en-US-EmmaMultilingualNeural` rate -10%; no SSML overrides required for any value in [0, 10].
 > ```
@@ -438,9 +484,12 @@ This is the ONLY actionable list for the implementing developer. Everything abov
 
 ### 9.3 Planner directive — `MATH_TRACK_GUIDE` `sub-to-10` block
 
-- [ ] **`api/_planner.ts:920`** — replace the one-line `sub-to-10` skeleton with the directive block in §4.1.
-- [ ] **`api/_planner.ts`** — verify the system-prompt JSON contract carries `op` and (optional) `distractorClass` in the emitted `MathProblem` shape. Update the example JSON in the system prompt if `add-to-10`'s example currently shows only `+` problems.
-- [ ] **`api/_planner.test.ts`** — add a focused test: stub Haiku, feed back a `sub-to-10` plan, assert: (a) every problem has `op: '-'`; (b) at least one take-from-10 fact appears in P4-P8; (c) at least 2 of P4-P8 carry `distractorClass: 'wrong-op'`; (d) no operand-triple co-occurs as `-` and `+` (dual-exposure).
+- [ ] **`api/_planner.ts:920`** (post-2026-05-16 amendment) — replace the directive block with the 20-fact-pool version in §4.1, including the new IN/OOR/ALIAS annotations and the DISTRACTOR-COVERAGE SELF-CHECK block (replaces the prior DISTRACTOR-CLASS HINT block per §13 post-ship correction).
+- [ ] **`scripts/compositionLint.ts:SUB_TO_TEN_POOL`** (post-2026-05-16 amendment) — widen the const to 20 facts matching §1.1. Add the 4 new MEDIUM/subtract-one + MEDIUM/subtract-two facts (`8-1`, `7-1`, `8-2`, `6-2`). The drift-guard test from PR #246 will fail until the lint matches the directive.
+- [ ] **`scripts/compositionLint.ts:SUB_TO_TEN_RULES.categoryCaps`** — verify caps stay at `subtract-one: 1, subtract-two: 1` (pool grew but session caps did not). No change expected; sanity-check.
+- [ ] **`scripts/compositionLint.test.ts`** — update fixtures to exercise the new pool entries. Add a positive test: a baked plan picking `{8-1, 8-2}` at P4-P5 with the take-from-10 elsewhere passes the lint. Add a wrong-op-coverage helper test (optional, per §2.2 item 4): count P4-P8 facts with `a+b ≤ 10 && a+b !== correct`; assert ≥ 2 in the baked canon.
+- [ ] **`api/_planner.ts`** — verify the system-prompt JSON contract carries `op` in the emitted `MathProblem` shape. The `distractorClass` field is kept on the wire shape as a forward-compat seam only (per §13 post-ship correction); do NOT re-add a "Haiku must tag distractorClass" directive (`planner-and-canon.md` § "Wire shape is utterance-only — invariant").
+- [ ] **`api/_planner.test.ts`** — add a focused test: stub Haiku, feed back a `sub-to-10` plan, assert: (a) every problem has `op: '-'`; (b) at least one take-from-10 fact appears in P4-P8; (c) at least 2 of P4-P8 are IN-annotated MEDIUM facts (i.e. `(a, b) ∈ {(8, 1), (7, 1), (8, 2), (6, 2)}`); (d) no operand-triple co-occurs as `-` and `+` (dual-exposure).
 - [ ] **`api/_planner.ts:effectiveFocusNode`** — confirm `sub-to-10` is NOT in `WORD_SONG_FIRST_CLASS_FOCUS_NODES` (it's math, not word-song; just sanity-check no off-by-one mistake). Math honours caller-supplied focusNode verbatim; no change needed there.
 
 ### 9.4 First-encounter gate
@@ -455,7 +504,7 @@ This is the ONLY actionable list for the implementing developer. Everything abov
 ### 9.5 Canon prebake
 
 - [ ] **`scripts/generateSessionCanon.ts:activeCombos()`** — confirm `sub-to-10` is in `MATH_FOCUS_NODES` iteration set. It SHOULD already be (the iteration set typically covers all `VALID_MATH_FOCUS_NODES`); verify and add if missing.
-- [ ] **`npm run canon:regen`** — incremental regen for `sub-to-10` only:
+- [ ] **`npm run canon:regen`** — incremental regen for `sub-to-10` only (REQUIRED post-2026-05-16 pool widening — Haiku will likely select different facts from the new 20-fact pool, especially in P4-P8):
   ```
   rm public/canon/math/level-1/sub-to-10.json
   cp .env.local <worktree>/.env.local           # canon-bake needs the keys
@@ -463,7 +512,8 @@ This is the ONLY actionable list for the implementing developer. Everything abov
   npx tsx scripts/generateSessionCanon.ts --require-keys
   ```
   Per `planner-and-canon.md` § "Incremental-by-default trick". Bake produces ~25s of work and ~$0.005 of Haiku + Azure spend. Commit the JSON diff in the same PR.
-- [ ] **Canon-lint gate** — `npm run canon:lint` must pass (ASCII-7 only, no slash-IPA, no angle tags). The "minus" / "take away" / "How many are left" templates are all ASCII; no risk.
+- [ ] **Canon-lint gate** — `npm run canon:lint` must pass (chains text-encoding lint + composition lint). Text encoding: ASCII-7 only, no slash-IPA, no angle tags. Composition: 20-fact pool membership, band-by-slot, category caps, take-from-10 coverage, no duplicates. Both layers run at bake time inside `generateSessionCanon.ts` and at CI gate.
+- [ ] **Post-bake wrong-op spot-check** — `cat public/canon/math/level-1/sub-to-10.json | jq '.utterances[] | select(.id | test("^math\\.p[4-8]\\.read$"))'` then walk each `read` text, compute `a + b`, count facts where `a+b ≤ 10 && a+b !== a-b`. Assert count ≥ 2. If < 2, bake is non-compliant with §2.2 — re-roll. (This check belongs in `compositionLint.ts` long-term, per §9.3 follow-up.)
 - [ ] **`scripts/generateSessionCanon.test.ts`** — the combo-count regression assertion should pick up `sub-to-10` automatically if it's already in the iteration set; if the test pins the count explicitly, bump.
 
 ### 9.6 Mastery / focus-node picker — NO CHANGE
@@ -496,10 +546,10 @@ Per §11 Q1 (Thomas, 2026-05-15): **leave the tree alone.** Existing curriculum 
 
 Testable by Jessica's Playwright suite + Kevin's vitest suite.
 
-- [ ] **AC1**: The 16-fact pool is faithfully encoded in `MATH_TRACK_GUIDE`'s `sub-to-10` block (vitest snapshot on the directive block; planner-test asserts pool membership).
-- [ ] **AC2**: Every Haiku-generated `sub-to-10` plan composition rule from §4.1 holds: P1-P3 from `easy` band, ≥1 take-from-10 in P4-P8, ≥2 `wrong-op` tagged in P4-P8, no duplicates, no operand-triple `−`/`+` co-occurrence within the 8-problem set, category caps respected.
+- [ ] **AC1**: The 20-fact pool (post 2026-05-16 amendment) is faithfully encoded in `MATH_TRACK_GUIDE`'s `sub-to-10` block AND in `scripts/compositionLint.ts:SUB_TO_TEN_POOL` (vitest snapshot on the directive block; planner-test asserts pool membership; compositionLint drift-guard from PR #246 catches any mismatch between directive and lint).
+- [ ] **AC2**: Every Haiku-generated `sub-to-10` plan composition rule from §4.1 holds: P1-P3 from `easy` band, ≥1 take-from-10 in P4-P8, no duplicates, no operand-triple `−`/`+` co-occurrence within the 8-problem set, category caps respected. **The ≥2-wrong-op-in-P4-P8 target is now a pool-side + directive-side responsibility (per §2.2 post-2026-05-16 wording); see AC4 for the render-side verification.**
 - [ ] **AC3**: First-encounter gate — session 1 on `sub-to-10` uses "take away"; sessions 2+ use "minus". Verified via E2E with seeded `lifetimeFirstEncounters`.
-- [ ] **AC4**: Class 2 distractors fire correctly: for every pool fact in P4-P8 with `distractorClass === 'wrong-op'`, one of the two chip distractors is `minuend + subtrahend` when in range; OOR cases fall back to Class 1 (off-by-one); subtract-zero same-value collisions silently downgrade to Class 1.
+- [ ] **AC4**: Class 2 distractors fire correctly at render time: every P4-P8 op:'-' problem attempts a wrong-op trap (a+b) in `Math.tsx:2559-2560`; the trap renders when in range and `a+b ≠ correct`; OOR cases silently downgrade to Class 1 (off-by-one); subtract-zero same-value collisions silently downgrade to Class 1. **Post-pool-widening (2026-05-16): at least 2 of the 5 P4-P8 problems in any canon-baked session deliver in-range wrong-op chips when the §4.1 DISTRACTOR-COVERAGE SELF-CHECK is honoured. Verifiable via a vitest snapshot on the baked `sub-to-10.json` — count P4-P8 facts whose `(a+b) ≤ 10 && a+b !== correct`; assert ≥ 2.**
 - [ ] **AC5**: `correct = 0` chip values render and play correctly (subtract-self facts #1, #2). Emma says "Yes! Zero!" naturally on the cheerful celebration prosody.
 - [ ] **AC6**: Read-line parser accepts both `sub-to-10` templates and tags problems with `op: '-'`; existing `add-to-10` "X plus Y. How many?" continues to parse with `op: '+'`.
 - [ ] **AC7**: Canon JSON `public/canon/math/level-1/sub-to-10.json` baked and committed. Canon-lint passes (ASCII-7, no slash-IPA, no angle tags). File parses via `isSessionStartResponse`.
@@ -549,11 +599,13 @@ Sequencing follows `project_planner_parser_contract.md`: PR 1's planner widening
 
 ## 12. Risks / counter-evidence
 
-- **The wrong-operation distractor risks being too easy if the trap value is far from `correct`.** For `8 − 4 = 4`, wrong-op `12` is OOR → falls back to off-by-one anyway. For `9 − 1 = 8`, wrong-op `10` is only `correct + 2` — close enough to be a meaningful trap. For `10 − 7 = 3`, wrong-op `17` is OOR. **Net: roughly half the pool's wrong-op values are in-range; the other half degrade to Class 1.** Per Dave § Recommendations the wrong-op trap remains valuable for the in-range half; the OOR half doesn't make things worse, just doesn't add the new trap class. Acceptable tradeoff; no special handling needed beyond the §3.2 fallback.
+- **The wrong-operation distractor risks being too easy if the trap value is far from `correct`.** For `8 − 4 = 4`, wrong-op `12` is OOR → falls back to off-by-one anyway. For `9 − 1 = 8`, wrong-op `10` is only `correct + 2` — close enough to be a meaningful trap. For `10 − 7 = 3`, wrong-op `17` is OOR. **Post-2026-05-16 amendment: 4 of the 12 MEDIUM/HARD facts have in-range wrong-op values (all four newly-added MEDIUM facts: `8-1=7` trap=9, `7-1=6` trap=8, `8-2=6` trap=10, `6-2=4` trap=8). The remaining 8 MEDIUM/HARD facts (including all 4 HARD/general facts and all 4 original `10-*` MEDIUM facts) have OOR traps and silently downgrade to off-by-one at render time.** Per Dave § Recommendations the wrong-op trap remains valuable for the in-range half; the OOR half doesn't make things worse, just doesn't add the new trap class. The §2.2 ≥2/5 target is structurally achievable now (it was structurally impossible pre-amendment); achieving it consistently depends on the directive's DISTRACTOR-COVERAGE SELF-CHECK (§4.1) biasing Haiku toward in-range MEDIUM selections.
+
+- **The ≥2/5 wrong-op-in-P4-P8 target is "just-barely-achievable" under category caps.** With the post-amendment pool, the maximum in-range count in P4-P8 is exactly 2 — one MEDIUM/subtract-one IN-fact (`8-1` or `7-1`) AND one MEDIUM/subtract-two IN-fact (`8-2` or `6-2`). Picking both fills the subtract-one and subtract-two category caps (1 each); the remaining 3 P4-P8 slots must come from take-from-10 (1 forced, both OOR) + general (up to 2, all OOR). If Haiku picks `10-1=9` for the subtract-one slot or `10-2=8` for the subtract-two slot, in-range count drops to 1; if Haiku skips both small-minuend categories entirely, in-range count drops to 0. **The structural cushion is thin.** A future pool widening with HARD/general IN-range candidates (Dave-side research, §1.3) would expand the cushion; until then, the directive's NEGATIVE-ANCHOR self-check is the primary safeguard.
 
 - **The dual-exposure rule could be over-restrictive once Marian masters `sub-to-10` and we want to interleave `+`/`-` sessions** (per McNeil et al. 2025, fact-family interleaving is _therapeutic_ for both operations). The rule as worded (§7) applies WITHIN a session, not across sessions. Cross-session interleaving is unaffected; only same-session inverse-pair co-occurrence is forbidden. The spec's intent is preserved even when mixed-operation sessions ship in a future tier.
 
-- **Pool size of 16 may be thin once Marian advances past the easy band.** With 8 easy facts, 4 medium, 4 hard, late-tier sessions risk hitting the same 4-fact `hard` band repeatedly. A pool extension (more `general`-band facts) is the natural follow-up; tracked in §9.7 as a follow-up PR. NOT a blocker for v1.
+- **Pool size of 20 (post-amendment) may still be thin once Marian advances past the easy band.** With 8 easy facts, 8 medium, 4 hard, late-tier sessions still risk hitting the same 4-fact `hard` band repeatedly. The 2026-05-16 amendment widened MEDIUM but did not touch HARD. A future HARD-band extension (more `general`-band facts, especially in-range candidates per §1.3 Dave-followup) is the natural next step; tracked in §9.7 as a follow-up PR. NOT a blocker for v1.
 
 - **`correct = 0` SSML/audio risk.** Tested mentally only — "Yes! Zero!" should render fine on Emma multilingual. **Real ear-test pending** (post-merge by Thomas on the Vercel preview); spec assumes default Azure prosody handles "zero" cleanly. Fallback: per `planner-and-canon.md` § "Empirical IPA-outcomes taxonomy", the default-Azure-lexicon-is-fine option (Option 1) is the right posture unless ear-test reveals an issue.
 
@@ -567,12 +619,14 @@ What this spec implies for code (Kevin) and content (canon). PR split per §11: 
 
 **PR 1 — content + canon (Kevin):**
 
-- `api/_planner.ts` — `MATH_TRACK_GUIDE` `sub-to-10` block expanded.
+- `api/_planner.ts` — `MATH_TRACK_GUIDE` `sub-to-10` block expanded to 20-fact pool with IN/OOR/ALIAS annotations + DISTRACTOR-COVERAGE SELF-CHECK block (per §4.1 post-2026-05-16-amendment).
+- `scripts/compositionLint.ts` — `SUB_TO_TEN_POOL` widened from 16 to 20 facts matching §1.1 (adds `8-1`, `7-1`, `8-2`, `6-2` to MEDIUM band). `SUB_TO_TEN_RULES` category caps unchanged. Drift-guard from PR #246 will fail until both ends match.
+- `scripts/compositionLint.test.ts` — fixtures updated for the new pool entries.
 - `api/_firstEncounterGate.ts` — `'sub-to-10'` added to `FIRST_ENCOUNTER_GATED_NODES` (first math node in the set).
 - `api/_firstEncounterGate.test.ts:99-110` — REVISE the `'does NOT include any math focus nodes'` negative-assertion test to per-node assertions: `sub-to-10` IS gated; the other math nodes (`add-to-10`, `add-to-20`, `sub-to-20`, `two-digit-addsub`) are NOT gated. See §9.4.
 - `api/_planner.ts:buildUserMessage` — first-encounter check wired into user-message construction for read-line variant.
 - `src/lib/progress/defaults.ts:93` — HARD REQUIREMENT — flip `'sub-to-10': 'mastered'` to `'sub-to-10': 'practicing'` in `DEFAULT_SKILL_LEVELS`. Decision locked Thomas 2026-05-15 (see §9.6 + §11 Q1 rationale).
-- `public/canon/math/level-1/sub-to-10.json` — new canon, baked via `npm run canon:regen` per §9.5; ~1.2 MB; 59 utterances at 8 problems × 5 slots + 19 Session-End.
+- `public/canon/math/level-1/sub-to-10.json` — new canon, baked via `npm run canon:regen` per §9.5; ~1.2 MB; 59 utterances at 8 problems × 5 slots + 19 Session-End. **Post-2026-05-16 amendment: bake will likely select different P4-P8 facts than the prior 16-fact canon — expect 1-2 of `{8-1, 7-1, 8-2, 6-2}` to appear in P4-P8 per session.**
 
 **PR 2 — render + parser (Kevin):**
 
@@ -581,7 +635,9 @@ What this spec implies for code (Kevin) and content (canon). PR split per §11: 
 - `src/screens/Math/distractors.ts` — `pickDistractors` signature extended; new `wrongOpDistractors` function; `ANSWER_RANGE_MIN` parameterized to 0 for `op === '-'` (per §3.3 Option A locked Q3).
 - `src/screens/Math/Math.tsx` — argument plumbing (`op`, `distractorClass`, `minAnswer` through to `pickDistractors`) + operator-glyph render (− vs +).
 
-> **Post-ship correction (2026-05-16, this PR — distractor-class directive reword).** AC4 wrong-op rate is implemented at render time in `Math.tsx:2559-2560` (deterministic default: every `op:'-'` P4-P8 problem attempts `'wrong-op'`; `pickDistractors` silently downgrades to off-by-one when the trap is OOR or aliases the correct answer), NOT via planner emission. The original PR-2 wire plan above (and the §4 "Haiku is asked to TAG each P4-P8 problem with `distractorClass`" framing) is superseded — the `PlannerPlan` wire shape is utterance-only and cannot carry per-problem structured tags. The `MathProblem.distractorClass` field is kept as a forward-compat seam only. The planner directive was reworded in this PR (commit `4129963`) after research confirmed the historical Haiku emissions were silently discarded by the canon adapter and parsers (Devon NOF #1 PR #241, Kevin NOF #1 PR #240).
+> **Post-ship correction (2026-05-16, prior PR — distractor-class directive reword).** AC4 wrong-op rate is implemented at render time in `Math.tsx:2559-2560` (deterministic default: every `op:'-'` P4-P8 problem attempts `'wrong-op'`; `pickDistractors` silently downgrades to off-by-one when the trap is OOR or aliases the correct answer), NOT via planner emission. The original PR-2 wire plan above (and the §4 "Haiku is asked to TAG each P4-P8 problem with `distractorClass`" framing) is superseded — the `PlannerPlan` wire shape is utterance-only and cannot carry per-problem structured tags. The `MathProblem.distractorClass` field is kept as a forward-compat seam only. The planner directive was reworded in this PR (commit `4129963`) after research confirmed the historical Haiku emissions were silently discarded by the canon adapter and parsers (Devon NOF #1 PR #241, Kevin NOF #1 PR #240).
+
+> **Post-ship correction (2026-05-16, this PR — 20-fact pool widening).** Kevin's NOF #2 from PR #241 (forwarded by Devon's render review) surfaced that the prior post-ship correction above closed the directive loop but left a deeper pool-side defect: the original 16-fact pool's MEDIUM and HARD bands had ZERO facts whose wrong-op trap (`a + b`) was in-range, so every P4-P8 wrong-op attempt at render time silently downgraded to off-by-one — making §2.2's "≥2 of P4-P8 carry wrong-op" rule structurally unsatisfiable, not just stochastically risky. Dave's `canon-pool-wrong-op-delivery.md` paper (PR #247, 2026-05-16) audited the pool, identified candidate MEDIUM-band additions, and recommended `8-1=7`, `8-2=6`, `6-2=4` (with optional 4th `7-1=6`). Kyle audited Dave's recommendation against this spec and ACCEPTED it with the optional 4th included — the 2026-05-16 spec amendment widens §1.1 from 16 to 20 facts, annotates each fact with its `a+b` IN/OOR/ALIAS status, and adds a `DISTRACTOR-COVERAGE SELF-CHECK` block to the §4.1 directive that biases Haiku toward in-range MEDIUM selections in P4-P8. Downstream: Kevin updates `_planner.ts` directive's FACT POOL to mirror §4.1; Kevin widens `SUB_TO_TEN_POOL` in `scripts/compositionLint.ts` to match; Kevin re-bakes `sub-to-10.json`. The drift-guard test from PR #246 catches any mismatch. **Open follow-up:** Dave-side research on HARD/general candidates with `a+b ≤ 10` (e.g. `7-3=4` trap=10, `6-4=2` trap=10) to thicken the structural cushion beyond the current "just-barely-achievable" 2-fact maximum — see §1.3 + §12.
 
 **Test changes:**
 
