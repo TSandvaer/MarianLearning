@@ -48,8 +48,11 @@
  *        take-from-10    ≤ 2  (high-value, relaxed cap)
  *        general         ≤ 2  (HARD cap)
  *   3. Band-by-slot:
- *        P1-P3: EASY only (gentle ramp).
- *        P5-P8: HARD allowed (general only here).  HARD MUST NOT appear at P1-P4.
+ *        P1-P3: EASY only (gentle ramp) — and EASY appears ONLY here.
+ *        P4-P8: MEDIUM (P4-P8) + HARD (P5-P8); EASY is FORBIDDEN at P4-P8
+ *               (the discriminate tier — gentle-ramp facts undermine
+ *                difficulty modulation if dosed in here).
+ *        HARD MUST NOT appear at P1-P4. EASY MUST NOT appear at P4-P8.
  *   4. Take-from-10 coverage: ≥ 1 take-from-10 fact MUST appear in P4-P8.
  *   5. No duplicates: no (a, b) pair repeats within the 8-problem set.
  *
@@ -317,7 +320,15 @@ export const SUB_TO_TEN_RULES: SubToTenRulesConfig = {
     general: 2,
   },
   bandAllowedSlots: {
-    EASY: [1, 2, 3, 4, 5, 6, 7, 8],
+    // P1-P3 is the gentle-ramp slot range and the ONLY place EASY
+    // facts may appear. The directive prose (`api/_planner.ts` SESSION
+    // COMPOSITION RULES rule 3 — "Problems 4-8 (discriminate): draw
+    // from MEDIUM + HARD bands") forbids EASY at P4-P8, but PR #245's
+    // initial rule allowed EASY at any slot. Dave's audit on PR #247
+    // found an undetected EASY-at-P5 violation in a previously-shipped
+    // canon that this defense-in-depth tightening would have caught.
+    // Tightened in the Dave-NOF-#1 follow-up to enforce P1-P3-only.
+    EASY: [1, 2, 3],
     MEDIUM: [4, 5, 6, 7, 8],
     HARD: [5, 6, 7, 8],
   },
