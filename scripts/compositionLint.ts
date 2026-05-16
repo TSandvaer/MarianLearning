@@ -38,7 +38,7 @@
  *
  * Rules enforced — sub-to-10 (per `design/math/sub-to-10-content.md` §1.1 + §2.3)
  * --------------------------------------------------------------------------------
- *   1. Pool membership — every fact must be one of the 16 (a, b) pairs.
+ *   1. Pool membership — every fact must be one of the 22 (a, b) pairs.
  *   2. Category caps:
  *        doubles-halving ≤ 1
  *        subtract-self   ≤ 1
@@ -246,10 +246,27 @@ export function parseAddToTenReadLine(text: string): ParsedFact | null {
 //
 // Per `design/math/sub-to-10-content.md` §1.1. Each fact carries its band
 // + category tag. The pool is exhaustive — the planner directive
-// (`api/_planner.ts:930`) lists exactly these 16 with inline `[BAND/cat]`
+// (`api/_planner.ts:930`) lists exactly these 22 with inline `[BAND/cat]`
 // tags. If the design spec widens the pool, update BOTH the directive and
-// this config (and add a drift-guard test that asserts the two stay in sync
-// — separate ticket).
+// this config; the drift-guard test in `compositionLint.test.ts` asserts
+// the two stay in sync.
+//
+// History:
+//   16 facts (PR #245, 2026-05-16) — original Dave § "Concrete fact
+//     ordering" surface.
+//   20 facts (PR #249 spec + this PR's impl, 2026-05-16) — 4 MEDIUM
+//     additions (8-1, 7-1, 8-2, 6-2) per Dave's wrong-op delivery research
+//     to bring in-range wrong-op traps into the MEDIUM band (the original
+//     pool had every MEDIUM fact with a+b >= 11, forcing every P4-P8
+//     wrong-op attempt to silently downgrade to off-by-one at render time).
+//   22 facts (PR #252 spec + this PR's impl, 2026-05-16) — 2 HARD/general
+//     additions (7-3, 6-4) per Dave's follow-up paper; both carry a+b=10
+//     (the strongest "makes-ten" lure) and same cognitive load as the
+//     existing 8-3 / 7-4 facts. Closes the wrong-op coverage cushion that
+//     the MEDIUM-only amendment left thin: both HARD IN facts can
+//     co-occur in P4-P8 under the `general` cap of 2, structurally
+//     guaranteeing >=2 in-range traps even on MEDIUM-light high-score
+//     sessions.
 
 export type SubToTenBand = 'EASY' | 'MEDIUM' | 'HARD'
 
@@ -281,16 +298,27 @@ export const SUB_TO_TEN_POOL: readonly SubToTenPoolFact[] = [
   { id: '8-4', a: 8, b: 4, band: 'EASY', category: 'doubles-halving' },
   { id: '6-3', a: 6, b: 3, band: 'EASY', category: 'doubles-halving' },
   { id: '9-1', a: 9, b: 1, band: 'EASY', category: 'subtract-one' },
-  // MEDIUM band (4 facts)
+  // MEDIUM band (8 facts — post-2026-05-16 amendment per Dave's wrong-op
+  // research, `canon-pool-wrong-op-delivery.md`: 4 added facts deliver
+  // in-range wrong-op traps that the original 16-fact pool could not.)
   { id: '10-1', a: 10, b: 1, band: 'MEDIUM', category: 'subtract-one' },
+  { id: '8-1', a: 8, b: 1, band: 'MEDIUM', category: 'subtract-one' },
+  { id: '7-1', a: 7, b: 1, band: 'MEDIUM', category: 'subtract-one' },
   { id: '10-2', a: 10, b: 2, band: 'MEDIUM', category: 'subtract-two' },
+  { id: '8-2', a: 8, b: 2, band: 'MEDIUM', category: 'subtract-two' },
+  { id: '6-2', a: 6, b: 2, band: 'MEDIUM', category: 'subtract-two' },
   { id: '10-3', a: 10, b: 3, band: 'MEDIUM', category: 'take-from-10' },
   { id: '10-7', a: 10, b: 7, band: 'MEDIUM', category: 'take-from-10' },
-  // HARD band (4 facts)
+  // HARD band (6 facts — post-2026-05-16 amendment per Dave's HARD/general
+  // follow-up paper, `canon-pool-wrong-op-delivery-followup-hard-general.md`:
+  // 2 added facts (7-3, 6-4) carry the strongest "makes-ten" wrong-op lure
+  // and same cognitive load as the existing 8-3 / 7-4 facts.)
   { id: '9-4', a: 9, b: 4, band: 'HARD', category: 'general' },
   { id: '8-3', a: 8, b: 3, band: 'HARD', category: 'general' },
   { id: '7-4', a: 7, b: 4, band: 'HARD', category: 'general' },
   { id: '9-6', a: 9, b: 6, band: 'HARD', category: 'general' },
+  { id: '7-3', a: 7, b: 3, band: 'HARD', category: 'general' },
+  { id: '6-4', a: 6, b: 4, band: 'HARD', category: 'general' },
 ] as const
 
 /** Tier rule config — what the lint enforces. Hard-coded for now; will
@@ -398,7 +426,7 @@ export function lintSubToTenComposition(
         problemIndex: p.index,
         message:
           `P${p.index} fact ${p.parsed.a}-${p.parsed.b}=` +
-          `${p.parsed.a - p.parsed.b} is NOT in the 16-fact sub-to-10 ` +
+          `${p.parsed.a - p.parsed.b} is NOT in the 22-fact sub-to-10 ` +
           `pool. See design/math/sub-to-10-content.md §1.1.`,
         factId: `${p.parsed.a}-${p.parsed.b}`,
       })
@@ -564,7 +592,7 @@ export interface AddToTenPoolFact {
 /** Build the canonical 44-fact add-to-10 pool deterministically.
  *
  *  Why a function (vs a hand-written literal like SUB_TO_TEN_POOL):
- *    sub-to-10's pool is 16 facts handpicked by Kyle's content spec, so
+ *    sub-to-10's pool is 22 facts handpicked by Kyle's content spec, so
  *    a literal is the right shape. add-to-10's pool is the mathematical
  *    closure of (a≥1, b≥1, 3≤a+b≤10), so a programmatic build is both
  *    correct-by-construction AND testable (the pool-sanity tests assert

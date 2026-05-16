@@ -3191,10 +3191,13 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     )
   })
 
-  it('the sub-to-10 menu line names the 16-fact canonical pool (Dave §"Concrete fact ordering")', async () => {
+  it('the sub-to-10 menu line names the 22-fact canonical pool (Dave §"Concrete fact ordering"; post-PR #249 MEDIUM + PR #252 HARD/general amendments)', async () => {
     // Pin every pool fact's a-b=c notation appears literally in the
     // prompt. This drift-guards the pool — a "let me trim this list"
-    // edit fails on the first missing entry.
+    // edit fails on the first missing entry. Post-2026-05-16 amendments:
+    //   PR #249: +4 MEDIUM facts (8-1, 7-1, 8-2, 6-2) for in-range
+    //            wrong-op coverage.
+    //   PR #252: +2 HARD/general facts (7-3, 6-4) for makes-ten lure.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(STUB_RESPONSE, { capture })
     await generateSessionPlan({
@@ -3207,22 +3210,31 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
     for (const fact of [
+      // EASY (8): rules + doubles + subtract-one
       '5-5=0',
       '8-8=0',
       '7-0=7',
-      '9-0=9', // easy: rules
+      '9-0=9',
       '10-5=5',
       '8-4=4',
-      '6-3=3', // easy: doubles
-      '9-1=8', // easy: subtract-one
+      '6-3=3',
+      '9-1=8',
+      // MEDIUM (8): subtract-one ×3, subtract-two ×3, take-from-10 ×2
       '10-1=9',
-      '10-2=8', // medium
+      '8-1=7', // ← added PR #249
+      '7-1=6', // ← added PR #249
+      '10-2=8',
+      '8-2=6', // ← added PR #249
+      '6-2=4', // ← added PR #249
       '10-3=7',
-      '10-7=3', // take-from-10
+      '10-7=3',
+      // HARD (6): general
       '9-4=5',
       '8-3=5',
       '7-4=3',
-      '9-6=3', // hard: general
+      '9-6=3',
+      '7-3=4', // ← added PR #252
+      '6-4=2', // ← added PR #252
     ]) {
       expect(systemText).toContain(fact)
     }
@@ -3367,8 +3379,11 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     // Negative-anchor block paired with the positive directive — explicit
     // placement bans for HARD-band facts at P1-P3 (sharpening rationale).
     expect(systemText).toContain('NEGATIVE ANCHOR')
+    // Post-PR #252: the HARD-band ban list grew from 4 to 6 facts
+    // (7-3, 6-4 added). The "DO NOT place ..." line lists every
+    // HARD-band fact by id; assert all six are named.
     expect(systemText).toContain(
-      'DO NOT place 8-3, 9-4, 7-4, or 9-6 at P1, P2, or P3',
+      'DO NOT place 8-3, 9-4, 7-4, 9-6, 7-3, or 6-4 at P1, P2, or P3',
     )
   })
 
