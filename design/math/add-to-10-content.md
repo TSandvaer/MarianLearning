@@ -1,6 +1,6 @@
 # Number Garden — `add-to-10` content tier (44-fact factory pool, no wrong-op distractor)
 
-**Status:** RATIFYING — this spec fills the doc gap flagged by Kevin's NOF #1 on PR #248. Kevin's composition-lint (PR #248) authored the pool + rules from scratch by synthesising the one-line directive, Marian's April diagnostic, and the post-PR-245 current canon. This spec formalises Kevin's lint configuration as the design-side authority and adds the open-question call on the wrong-operation distractor (DECIDED: no Class 2 for `add-to-10`).
+**Status:** RATIFYING — this spec fills the doc gap flagged by Kevin's NOF #1 on PR #248. Kevin's composition-lint (PR #248) authored the pool + rules from scratch by synthesising the one-line directive, Marian's April diagnostic, and the post-PR-245 current canon. This spec formalises Kevin's lint configuration as the design-side authority and adds the open-question call on the wrong-operation distractor (DECIDED: no Class 2 for `add-to-10`). **AMENDED 2026-05-16** (this PR) to land the `tkt-add-to-10-pool-extension-audit` follow-up from §9.4 — verdict HOLD on the 44-fact pool, all four audit dimensions evaluated and re-confirmed in new §1.6. Spec-only, no implementation impact. See §13 post-ship correction block.
 
 **Ticket:** TBD — Matt to file the ratification + the follow-up directive-sharpening ticket described in §4.
 
@@ -107,6 +107,60 @@ The 44 facts cover every meaningful (a, b) pair on the sums-to-10 surface. The f
 ### 1.5 Pool-extension policy
 
 `add-to-10` is mature — no pool extension planned. The follow-up directive-sharpening ticket (§4 + §9.2) embeds the same 44 facts into the directive prose for Haiku discipline; it does not widen the pool.
+
+### 1.6 Pool-extension audit (2026-05-16)
+
+> **Audit verdict: HOLD.** The 44-fact pool is the right breadth for the tier. No facts to add, none to remove. Ticket `tkt-add-to-10-pool-extension-audit` (§9.4) closes as RESOLVED.
+
+The audit was dispatched out of PR #251 (sub-to-10 22-fact pool widening) §9.4 follow-up — that PR's pool-widening discipline raised the question whether `add-to-10`'s 44-fact pool needed parallel reconsideration. It does not. This section captures the audit's four dimensions and their rationale so a future audit does not re-litigate ground already covered.
+
+#### 1.6.1 Pool breadth — WIDEN candidates considered + REJECTED
+
+| Candidate | Pro | Con | Verdict |
+| --- | --- | --- | --- |
+| **Add zero-addend facts** (`0+3`, `0+4` … `0+10`, plus the commutative `3+0` … `10+0`; 18 facts total) | Parallels `sub-to-10`'s `subtract-zero` category (`7-0=7`, `9-0=9`). | (a) **Pedagogical asymmetry.** Subtraction-by-zero is a documented confusable for 7-9 year olds ("if you take nothing, you still have what you started with" requires explicit reasoning). Addition-by-zero (`n + 0 = n`) is not in the same league — Marian internalised the identity rule for addition years ago. Including `subtract-zero` in `sub-to-10` is justified by error-pattern evidence; including `plus-zero` in `add-to-10` has no parallel evidentiary base. (b) **Trivial vs automaticity-targeting.** §1.4 already excluded these for the same reason: "pedagogically `n + 0 = n` is trivial; offers no automaticity gain." The tier's purpose is to drill retrieval pathways for facts Marian currently counts; she does not count `5 + 0`. (c) **Pool dilution.** 18 trivial facts in a 44-fact pool would dilute the discriminate-tier mix without learning value, and would consume `general`-cap slots that should go to retrieval-targeted facts. | ❌ REJECT |
+| **Drop `1+N` / `N+1` plus-one facts at HARD sums** (i.e., drop `1+8` and `8+1`; 2 facts) | Trivial count-on-one; could free pool surface. | (a) **No pool-slot pressure.** The plus-one cap is already 2; dropping 2 facts saves nothing structurally. (b) **Gentle-discriminate utility.** Under recent-score modulation (§2.3), low-score sessions need a low-cost HARD-band option. `1+8` and `8+1` are HARD by sum but EASY by retrieval — a confidence-preservation fallback. (c) **Trap-eligible for discrimination.** Even trivial facts contribute to the discriminate-tier mix when paired with Class 1 off-by-one distractors (`{7, 8, 9}` chips for `correct=8`). | ❌ REJECT |
+| **Split `5+5` from `sums-to-10` into its own category** (1 fact) | Protects the sole doubles-AND-sum-to-10 fact from the doubles cap. | (a) **`5+5` is already structurally protected.** Per §1.2 priority order, `5+5` lives in `sums-to-10` (priority 1) NOT in `doubles` (priority 2). The doubles cap does not touch it. (b) **One-fact categories are anti-patterns.** A single-fact bucket means the planner constraint reduces to "must include 5+5" — which is what §2.4's sums-to-10 coverage rule already achieves probabilistically (9 sums-to-10 facts, 5+5 has 1/9 base-rate appearance per slot, multiplied across many sessions). (c) **No category-cap collision.** No active rule today forces a choice between `5+5` and another sums-to-10 fact within the cap; the cap of 2 accommodates `5+5` PLUS one complementary pair. | ❌ REJECT |
+
+#### 1.6.2 Pool breadth — NARROW candidates considered + REJECTED
+
+| Candidate | Pro | Con | Verdict |
+| --- | --- | --- | --- |
+| **Drop `general` category at HARD** (12 facts → 8 facts: keep only `2+7`, `7+2`, `3+6`, `6+3`; drop the MEDIUM-band generals `2+4, 4+2, 2+5, 5+2, 2+6, 6+2, 3+5, 5+3`) | Narrowing dilutes only the lowest-leverage category (no obvious shortcut, count-back or derive). | (a) **`general` IS the retrieval-pathway category.** Per §1.2's pedagogical role table: "Where retrieval gains appear last; the category Marian will most need direct fact-recall for." Narrowing this is exactly backwards — these are the facts most worth drilling. (b) **MEDIUM-band coverage gap.** Dropping 8 of 18 MEDIUM-band facts would skew MEDIUM toward plus-one and near-doubles (the "easy" categories), starving the band of discriminate pressure. (c) **No measured Marian-side pressure.** Marian's diagnostic does not flag confusion or overload on any specific MEDIUM-band general. Removing facts based on category bias without error-pattern evidence inverts the spec's "drill retrieval, not concept" posture. | ❌ REJECT |
+| **Reduce `near-doubles` from 6 to 2** (drop `3+4, 4+3, 4+5, 5+4`; keep only `2+3, 3+2`) | Cognitive load reduction; doubles-plus-one derivation can be inferred from doubles alone. | (a) **Near-doubles cap is 3 specifically because the category is the highest-value automaticity bridge** (§2.2 + Dave's `add-to-10-counting-to-recall.md` Intervention D rationale: "doubles plus-one bridge is the second-most-important strategy after sums-to-10"). Cutting near-doubles facts removes the practice substrate for that strategy. (b) **Pool-extension cost is asymmetric** — dropping facts is destructive; adding facts is reversible. Lacking evidence Marian is overloaded by near-doubles (her diagnostic is the opposite: "100% finger reliance" — she NEEDS more retrieval surface, not less), do nothing. | ❌ REJECT |
+
+#### 1.6.3 Distractor-class — ADD candidates considered + REJECTED
+
+The dispatch brief flagged "answer-equals-operand" as a possible Class 3 distractor (e.g., for `4 + 1 = 5`, distractor = 4 or 1 — the answer collides with an operand).
+
+| Class | Mechanic | Verdict |
+| --- | --- | --- |
+| **Class 0** (gentle, ≥2-away, P1-P3) | Existing. | ✅ KEEP |
+| **Class 1** (off-by-one, P4-P8) | Existing. | ✅ KEEP |
+| **Class 2** (wrong-op, `a − b`) | Already rejected in §3.2 (pedagogical asymmetry; addition-direction confusion is not a documented error pattern). | ❌ REJECTED — see §3.2 |
+| **Class 3 — answer-equals-operand** (e.g. for `4 + 1 = 5`, distractor = 4 or 1; for `5 + 5 = 10`, distractor = 5) | Conceptually targets the error pattern "child outputs the operand instead of the sum" — but this error pattern is documented for *kindergarteners learning to count*, NOT for 8-year-olds who count accurately. Marian's diagnostic says "100% conceptually correct after self-correction"; she does not confuse `5+5` with `5`. Also: for many pool facts the candidate distractor is ALREADY-close to Class 1 off-by-one (for `4+1=5`, operand `4` IS the Class 1 `correct-1` distractor). Adding a new class layered on top would (a) double-count the same chip pattern in many cases; (b) target a non-error; (c) require a Class 3 branch in `pickDistractors` + tagging in `Math.tsx` + drift-guard test coverage — the same implementation cost as Class 2 with the same near-zero pedagogical payoff. | ❌ REJECT |
+
+#### 1.6.4 Cap saturation — re-confirmed clean
+
+Re-running the §2.5 audit against the 2026-05-16 promotion calendar:
+
+- Pool=44, problems-per-session=8, caps sum to `2 + 2 + 3 + 2 + 2 = 11` permits. Caps allow flexibility without over-constraint.
+- Coverage rule: `sums-to-10 ≥ 1` in P4-P8 is satisfiable from 9 pool facts (any session has on average ~1.6 sums-to-10 candidates available given band-by-slot — comfortable headroom).
+- Per-session distinct-fact ceiling = 8; pool size = 44 → ~5.5× soak factor — Haiku can compose dozens of distinct sessions before repetition pressure forces narrowing.
+- The `doubles ≤ 2` constraint specifically: with only 3 doubles facts (`2+2, 3+3, 4+4`) and a cap of 2, ALL three doubles never appear in a single session. This is correct: cross-session variety (per Leitner-driven prioritisation, §2.7) repeats doubles MORE often than non-doubles, but no single session is doubles-saturated. The Leitner box already does the work of cross-session prioritisation — the per-session cap protects within-session pacing.
+
+**Net: no cap is over- or under-tuned. All §2.5 verdicts re-affirmed.**
+
+#### 1.6.5 What would trigger a future re-audit?
+
+This audit closes the original tkt scope. Future re-opens fire on any of:
+
+- **Real-Marian session data** showing a previously-unanticipated error pattern (e.g., consistent confusion between specific pool facts; engagement drop on a category; sudden retrieval-rate plateau on a band).
+- **Curriculum boundary changes** — if `add-to-10`'s promotion target widens (e.g., dropping the 95/3 accuracy gate in favour of a Leitner-drainage gate, which §6 currently rejects), the pool size becomes load-bearing in a new way and would need re-evaluation.
+- **Class 3+ distractor research** — if Dave's research surfaces a new error pattern for which a 3rd distractor class becomes warranted, both the class and its pool-fitness audit fire together (the §3.2 Class-2 decision is the precedent: pool fitness was 45.5% in-range, sufficient to support the class IF the class were pedagogically motivated, which it was not).
+- **Pool saturation on Marian's session history** — if Marian generates >20 `add-to-10` sessions and her session histories show every fact in the pool has been seen ≥3 times AND she still has not promoted, the pool may be too thin and re-extension at the EASY band (zero-addends rejected here) gets a second look.
+
+None of these triggers are firing today.
 
 ---
 
@@ -382,7 +436,7 @@ These are independent tickets for Matt to file; NONE block the PR for this spec:
 - [ ] **`tkt-add-to-10-directive-sharpening`** — sharpen `api/_planner.ts:921` to embed the structured `[BAND/category]` FACT POOL block per §4.1. Trigger: a future Haiku rebake produces a composition-rule-violating canon, OR Marian's session data shows a Haiku-driven mix problem. Owner: Kevin.
 - [ ] **`tkt-rename-take-from-10-coverage-rule-literal`** — rename the `'take-from-10-coverage'` rule literal in `compositionLint.ts` to a tier-agnostic name (`'high-leverage-coverage'` or similar). Owner: Kevin. Trigger: NOF #3 on Kevin's PR #248; mechanical change, no semantic change.
 - [ ] **`tkt-subitising-scaffold-spec`** — Dave's `add-to-10-counting-to-recall.md` Priority 2 proposes a dot-pattern visual for sums ≤ 5. Owner: Kyle. Trigger: post-Leitner-wire bandwidth.
-- [ ] **`tkt-add-to-10-pool-extension-audit`** — sanity-check at the 5-session-post-promotion mark whether the 44-fact pool is too thin or too broad. Owner: Kyle. Trigger: post-Marian-promotion-to-`add-to-20`.
+- [x] ~~**`tkt-add-to-10-pool-extension-audit`** — sanity-check at the 5-session-post-promotion mark whether the 44-fact pool is too thin or too broad. Owner: Kyle. Trigger: post-Marian-promotion-to-`add-to-20`.~~ **RESOLVED 2026-05-16 (this PR) — verdict HOLD.** Audit dispatched out of PR #251's sub-to-10 pool-widening discipline; conducted ahead of the original "post-promotion" trigger because the question was already structurally surfaced. All four audit dimensions (pool breadth WIDEN, pool breadth NARROW, distractor classes, cap saturation) return HOLD. See §1.6.
 
 ---
 
@@ -426,7 +480,7 @@ The dispatch brief surfaced one open question; this spec also implicitly locks t
 
 - **The `'take-from-10-coverage'` rule literal is misnamed for the `add-to-10` semantic ("sums-to-10 coverage").** Cosmetic naming gap. The rule fires correctly; the literal name persists for backwards-compat with PR #245's surface. Tracked as `tkt-rename-take-from-10-coverage-rule-literal` (§9.4).
 
-- **Pool size of 44 may be too broad once Marian achieves automaticity.** If she retrieves every pool fact in < 2 s, the entire pool is "easy" — the discriminate tier loses discriminative power. **Counter:** the advancement gate `add-to-10 → add-to-20` fires at 95% accuracy across 3 cross-day-deduped sessions. By that point Marian will have moved on. The risk is therefore zero in steady state. Tracked as `tkt-add-to-10-pool-extension-audit` (§9.4) for post-promotion review.
+- **Pool size of 44 may be too broad once Marian achieves automaticity.** If she retrieves every pool fact in < 2 s, the entire pool is "easy" — the discriminate tier loses discriminative power. **Counter:** the advancement gate `add-to-10 → add-to-20` fires at 95% accuracy across 3 cross-day-deduped sessions. By that point Marian will have moved on. The risk is therefore zero in steady state. **Audited 2026-05-16 (this PR) per §1.6 — HOLD verdict; the 44-fact pool remains the right breadth** and the original `tkt-add-to-10-pool-extension-audit` ticket (§9.4) closes as RESOLVED. Re-audit triggers documented in §1.6.5.
 
 - **No subitising scaffold.** Dave's Priority 2 from `add-to-10-counting-to-recall.md` recommends a dot-pattern visual for sums ≤ 5. Not in this spec's scope; tracked as `tkt-subitising-scaffold-spec` (§9.4).
 
@@ -436,7 +490,7 @@ The dispatch brief surfaced one open question; this spec also implicitly locks t
 
 ## 13. Post-ship corrections
 
-*(empty — initialised for future amendments to this spec, parallel to `sub-to-10-content.md` §13)*
+> **Post-ship correction (2026-05-16, this PR — pool-extension audit closure).** SPEC-ONLY. Conducts the `tkt-add-to-10-pool-extension-audit` follow-up filed in §9.4, dispatched out of PR #251's sub-to-10 pool-widening discipline (which raised the parallel question for `add-to-10`). All four audit dimensions return HOLD: (a) **pool breadth WIDEN candidates** — zero-addend facts, drop-plus-one-at-HARD, split-5+5 — all REJECTED with rationale in §1.6.1; (b) **pool breadth NARROW candidates** — drop-general-at-HARD, reduce-near-doubles — all REJECTED in §1.6.2; (c) **distractor-class ADD candidates** — Class 3 answer-equals-operand — REJECTED in §1.6.3 (targets a kindergarten-era error pattern, not Marian's 8-year-old profile; chip-pattern collisions with Class 1 in many pool facts); (d) **cap saturation** — re-confirmed clean per §1.6.4, all §2.5 verdicts re-affirmed. The §9.4 ticket closes as RESOLVED. No `_planner.ts`, `compositionLint.ts`, `public/canon/`, or `src/screens/Math/` change. Re-audit triggers documented in §1.6.5 (real-Marian error pattern, curriculum boundary change, new distractor class research, or pool saturation on session history).
 
 ---
 
