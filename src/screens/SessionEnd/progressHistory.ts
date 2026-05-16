@@ -60,6 +60,10 @@ import {
   type SkillNode,
   type WordSongNode,
 } from '../../lib/progress'
+import {
+  SCAFFOLD_FOCUS_NODE,
+  bumpSubitisingScaffoldSessionsObserved,
+} from '../Math/subitisingScaffold'
 import type { SessionEndSurface } from './SessionEnd'
 
 /**
@@ -201,6 +205,23 @@ export interface RecordProgressInput {
    * the caller's framing on length / contents.
    */
   mathFacts?: readonly { a: number; b: number; op: '+' | '-' | '*' }[]
+  /**
+   * Whether the subitising scaffold (dot-card overlay) rendered on
+   * the just-completed session (ticket 86c9ur1zr §2.2). Math-surface
+   * only; word-song doesn't ship this.
+   *
+   * When `true` AND `surface === 'math'` AND
+   * `focusNode === SCAFFOLD_FOCUS_NODE` ('add-to-10'), the writer
+   * bumps `profile.subitisingScaffoldSessionsObserved` by 1 (capped
+   * at `SCAFFOLD_SESSIONS_OBSERVED_CAP`). When `false` / absent, the
+   * counter is unchanged.
+   *
+   * The counter measures EXPOSURE TO THE SCAFFOLD, not eligibility —
+   * a math session on `add-to-10` where every problem happened to
+   * land out-of-scope (all addends > 5) would emit `false` and
+   * leave the counter unchanged. Spec §2.2.
+   */
+  subitisingScaffoldRendered?: boolean
 }
 
 /**
@@ -239,11 +260,38 @@ export function recordProgressOnSessionEnd(
         )
       : existing.mathFactsLeitner
 
+  // Subitising scaffold counter (ticket 86c9ur1zr §2.2). Bump
+  // profile.subitisingScaffoldSessionsObserved by 1 if (a) the
+  // surface is math, (b) the focus node is the scaffold's target
+  // (add-to-10), AND (c) the screen reported that the overlay
+  // actually rendered for at least one problem this session. Capped
+  // at SCAFFOLD_SESSIONS_OBSERVED_CAP (4); the bump helper handles
+  // the cap + defensive defaulting of malformed inputs.
+  //
+  // Why all three conditions: the counter measures EXPOSURE TO THE
+  // SCAFFOLD, not exposure to the tier (Marian has run dozens of
+  // add-to-10 sessions before this ships) and not eligibility (a
+  // math session with all out-of-scope problems didn't actually
+  // surface the affordance). Spec §2.2.
+  const nextScaffoldCounter =
+    input.surface === 'math' &&
+    input.focusNode === SCAFFOLD_FOCUS_NODE &&
+    input.subitisingScaffoldRendered === true
+      ? bumpSubitisingScaffoldSessionsObserved(
+          existing.profile.subitisingScaffoldSessionsObserved,
+        )
+      : existing.profile.subitisingScaffoldSessionsObserved
+
   const next: Progress = {
     ...existing,
     profile: {
       ...existing.profile,
       lastPlayedISO: input.dateISO,
+      // Carry the post-bump counter forward. When unchanged, this
+      // assigns the same value (or undefined) the spread already
+      // carried — no observable behaviour change for non-scaffold
+      // sessions. For scaffold sessions, the bumped value lands.
+      subitisingScaffoldSessionsObserved: nextScaffoldCounter,
     },
     history: [...existing.history, entry],
     mathFactsLeitner: nextLeitner,

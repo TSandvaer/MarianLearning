@@ -41,6 +41,8 @@ import {
 } from './sessionPlans'
 import { shouldShowDotCard, pipsFromProblem } from './dotCard'
 import { DotCardOverlay } from './DotCardOverlay'
+import { shouldShowSubitisingScaffold } from './subitisingScaffold'
+import type { SkillNode } from '../../lib/progress'
 import {
   ADVANCE_AFTER_CORRECT_MS,
   ADVANCE_HARD_CEILING_MS,
@@ -215,6 +217,27 @@ export interface MathSessionResult {
    * `SessionHistoryEntry.latencyMs`.
    */
   latencyMs: readonly number[]
+  /**
+   * Whether the subitising scaffold (dot-card overlay) actually
+   * rendered for at least one problem during the session (ticket
+   * 86c9ur1zr — `design/math/subitising-scaffold-content.md` §2.2).
+   *
+   * Used by `recordProgressOnSessionEnd` to decide whether to bump
+   * `profile.subitisingScaffoldSessionsObserved`. The counter
+   * measures EXPOSURE TO THE SCAFFOLD, not eligibility — a session
+   * where `scaffoldActiveThisSession` was `true` but where no
+   * in-scope problem appeared (e.g. all 8 problems landed with at
+   * least one addend > 5 — unlikely under the current planner but
+   * defensible) does NOT increment the counter.
+   *
+   * `false` when the scaffold never rendered (out-of-scope problems,
+   * disabled by the per-session decision, or wrong focus node).
+   * Always `false` on legacy callers that don't pass the new
+   * `focusNode` / `subitisingScaffoldActive` props (i.e. unit tests
+   * predating ticket 86c9ur1zr) — the counter only ticks when
+   * App.tsx is the parent and pipes through the production plumbing.
+   */
+  subitisingScaffoldRendered: boolean
 }
 
 /** Function signature for playing one canonical Math utterance. */
@@ -359,6 +382,41 @@ export interface MathProps {
    */
   __testInitiallyAudioUnlocked?: boolean
   /**
+   * The skill node this session targets (ticket 86c9ur1zr —
+   * subitising scaffold). When supplied, the dot-card overlay is
+   * gated by `shouldShowSubitisingScaffold(focusNode, problem,
+   * subitisingScaffoldActive)` per spec §2.1 C1. When undefined
+   * (legacy callers — most unit tests pre-86c9ur1zr), the dot-card
+   * falls back to the original structural-only predicate from
+   * `dotCard.ts` for full backward compat.
+   *
+   * Production passes the focus node derived at session-start fetch
+   * time via `pickFocusNode(loadProgress(), 'math')`.
+   */
+  focusNode?: SkillNode
+  /**
+   * Per-session subitising-scaffold decision (ticket 86c9ur1zr —
+   * spec §2.3). Computed ONCE upstream by App.tsx via
+   * `shouldScaffoldThisSession(easyBandLeitnerMeanBox,
+   * sessionsObserved, rng)` and passed through frozen for the
+   * session's duration.
+   *
+   * When `true`, the dot-card overlay is allowed to fire on every
+   * in-scope problem of this session. When `false`, NO problem
+   * mounts the overlay this session (per-session all-or-nothing —
+   * spec §2.3 "Determinism"). When undefined (legacy callers), the
+   * dot-card falls back to the original structural-only predicate
+   * from `dotCard.ts` for full backward compat.
+   *
+   * The discriminator between "scaffold path" (new testid
+   * `subitising-scaffold-dot-card`) and "legacy path" (testid
+   * `math-dot-card`) is whether THIS prop is supplied. Legacy unit
+   * tests that assert against `math-dot-card` continue to render
+   * with that testid; production renders with the new scaffold
+   * testid Jessica's E2E spec depends on.
+   */
+  subitisingScaffoldActive?: boolean
+  /**
    * Test seam ONLY — when `true`, the subitising dot-card overlay's
    * lifecycle is FROZEN: phase stays at its initial value
    * (`fadingIn` or, under reduced-motion, `holding`), no timers are
@@ -475,6 +533,8 @@ function MathScreen({
   resumeAudioContext,
   unlockAudioSession,
   getHowlerRunning,
+  focusNode,
+  subitisingScaffoldActive,
   __testInitiallyAudioUnlocked = false,
   __testDisableDotCard = false,
 }: MathProps) {
@@ -602,6 +662,33 @@ function MathScreen({
   const [activeDismissForIndex, setActiveDismissForIndex] = useState<
     number | null
   >(null)
+
+  /**
+   * Whether the subitising scaffold (dot-card overlay) has actually
+   * rendered for at least one problem this session (ticket 86c9ur1zr).
+   *
+   * Used to drive `MathSessionResult.subitisingScaffoldRendered` at
+   * session-complete time, which in turn gates the
+   * `profile.subitisingScaffoldSessionsObserved` counter bump in
+   * `recordProgressOnSessionEnd`. Ref (not state) because flipping it
+   * during render would trip the React "setState in render" rule, and
+   * any consumer reads the value at session-complete via the ref —
+   * never via a render path that needs to react to the change.
+   *
+   * Initial value `false`. Flipped to `true` once we know the overlay
+   * is being rendered for the current problem (see render block) —
+   * either by mount-time render or by `useLayoutEffect` synchronously
+   * after commit; we use the render-block approach below since the
+   * `showDotCardOverlay` flag is already derived from props + state
+   * synchronously available at render. A useLayoutEffect with
+   * `[showDotCardOverlay]` deps flips the ref AFTER commit so the
+   * value reflects the actual DOM, not a transient render decision
+   * that could be discarded by React's StrictMode double-invoke.
+   *
+   * Spec §2.2 — "Increments once per session where the scaffold
+   * actually rendered."
+   */
+  const subitisingScaffoldRenderedRef = useRef(false)
 
   /** Per-problem state — resets on advance via setProblemState(FRESH). */
   const [problemState, setProblemState] =
@@ -1351,6 +1438,13 @@ function MathScreen({
         // state.
         perProblemCorrect: perProblemCorrectRef.current.slice(),
         latencyMs: latencyMsByProblemRef.current.slice(),
+        // Subitising scaffold exposure (ticket 86c9ur1zr §2.2). True
+        // iff the overlay rendered for at least one in-scope problem
+        // this session in scaffold mode — drives the counter bump in
+        // recordProgressOnSessionEnd. Always false on legacy test
+        // mounts (no scaffold mode); see MathProps.focusNode +
+        // MathProps.subitisingScaffoldActive for the gate.
+        subitisingScaffoldRendered: subitisingScaffoldRenderedRef.current,
       })
     }
   }, [problemIndex, plan.problems.length, onSessionComplete, storage, now])
@@ -1883,12 +1977,34 @@ function MathScreen({
   const showStreak = streak >= 2 || streakFadingOut
 
   /**
-   * Subitising dot-card scope decision for the current problem (ticket
-   * 86c9q5j9a). Pure function of the problem's addends — does not couple
-   * to Leitner state, accuracy history, or any dynamic signal. See
-   * `dotCard.ts` for the full rationale.
+   * Subitising dot-card scope decision for the current problem.
+   *
+   * Two-mode predicate:
+   *   - **Scaffold mode (ticket 86c9ur1zr)** — when `focusNode` AND
+   *     `subitisingScaffoldActive` are both supplied (production path
+   *     via App.tsx), gate on `shouldShowSubitisingScaffold(...)`
+   *     which combines the structural rule with the §2.1 C1 (focus
+   *     node) + §2.3 (per-session fluency-fade) gates.
+   *   - **Legacy structural mode (ticket 86c9q5j9a)** — when either
+   *     new prop is undefined (the unit-test path that predates the
+   *     scaffold wiring), fall back to the original
+   *     `shouldShowDotCard(currentProblem)` so existing tests
+   *     asserting against `math-dot-card` keep working.
+   *
+   * The DOM testid we expose downstream also branches on the same
+   * discriminator — scaffold mode renders the overlay with testid
+   * `subitising-scaffold-dot-card` (Jessica's E2E spec contract);
+   * legacy mode keeps the original `math-dot-card` testid.
    */
-  const dotCardInScope = shouldShowDotCard(currentProblem)
+  const useScaffoldGate =
+    focusNode !== undefined && subitisingScaffoldActive !== undefined
+  const dotCardInScope = useScaffoldGate
+    ? shouldShowSubitisingScaffold(
+        focusNode,
+        currentProblem,
+        subitisingScaffoldActive,
+      )
+    : shouldShowDotCard(currentProblem)
   const dotCardPips = dotCardInScope ? pipsFromProblem(currentProblem) : null
   /**
    * Has the dot-card lifecycle already completed for THIS problem?
@@ -1921,6 +2037,23 @@ function MathScreen({
    * container itself — see the render block below.
    */
   const flowersVisible = !showDotCardOverlay
+
+  // Sticky session-level flag: once the scaffold renders for ANY
+  // problem in scaffold-mode, mark the session as exposed for the
+  // SessionEnd counter bump (ticket 86c9ur1zr §2.2). Driven via
+  // useLayoutEffect so the flip happens AFTER React commits the
+  // render — protects against StrictMode's double-invoke
+  // discarding a render-time mutation.
+  //
+  // Only flips in scaffold-mode (`useScaffoldGate === true`) — legacy
+  // test mounts shouldn't pollute the session-result flag because
+  // they're not actually exposing Marian to the scaffold (they're
+  // exercising the visual primitive in isolation).
+  useLayoutEffect(() => {
+    if (useScaffoldGate && showDotCardOverlay) {
+      subitisingScaffoldRenderedRef.current = true
+    }
+  }, [useScaffoldGate, showDotCardOverlay])
 
   return (
     <m.main
@@ -2257,23 +2390,69 @@ function MathScreen({
                   <span>+</span>
                   <FlowerGroup count={currentProblem.addendB} />
                 </m.div>
-                {showDotCardOverlay && dotCardPips !== null && (
-                  <DotCardOverlay
-                    // `key` per problemIndex guarantees the overlay
-                    // unmounts/remounts cleanly when Marian advances —
-                    // its internal phase machine resets on each new
-                    // problem. Without this, a tight advance during the
-                    // overlay's `holding` phase could land the next
-                    // problem's overlay mid-cycle.
-                    key={problemIndex}
-                    pipsA={dotCardPips[0]}
-                    pipsB={dotCardPips[1]}
-                    pageHidden={pageHidden}
-                    reducedMotion={reducedMotion}
-                    onComplete={() => setActiveDismissForIndex(problemIndex)}
-                    __testSkipLifecycle={__testDisableDotCard}
-                  />
-                )}
+                {showDotCardOverlay &&
+                  dotCardPips !== null &&
+                  /*
+                   * Scaffold-mode wrapper (ticket 86c9ur1zr).
+                   *
+                   * When Math is running the new subitising-scaffold gate
+                   * (`useScaffoldGate === true` — i.e. App.tsx supplied
+                   * `focusNode` + `subitisingScaffoldActive`), wrap the
+                   * overlay in a thin span carrying the scaffold testid
+                   * Jessica's E2E spec depends on. The inner
+                   * `<DotCardOverlay>` keeps its original `math-dot-card`
+                   * testid intact so `e2e/dot-card-affordance.spec.ts` and
+                   * `e2e/sub-to-10-dot-card-suppression.spec.ts` (which
+                   * key on `math-dot-card`) continue to pass.
+                   *
+                   * The wrapper is a `<span>` (not `<div>`) and carries
+                   * the `contents` display so it adds ZERO layout. The
+                   * `data-testid` is the only DOM signal it produces; the
+                   * absolute-positioned overlay inside continues to drive
+                   * all visual + lifecycle behaviour exactly as before.
+                   * No motion of the actual primitive — additive testid
+                   * only, per Matt's coordination note on dual testids.
+                   *
+                   * In legacy mode (`useScaffoldGate === false`), the
+                   * wrapper is omitted and only the original
+                   * `math-dot-card` testid is emitted — preserves every
+                   * existing unit test that doesn't know about the
+                   * scaffold plumbing.
+                   */
+                  (useScaffoldGate ? (
+                    <span
+                      data-testid="subitising-scaffold-dot-card"
+                      style={{ display: 'contents' }}
+                    >
+                      <DotCardOverlay
+                        key={problemIndex}
+                        pipsA={dotCardPips[0]}
+                        pipsB={dotCardPips[1]}
+                        pageHidden={pageHidden}
+                        reducedMotion={reducedMotion}
+                        onComplete={() =>
+                          setActiveDismissForIndex(problemIndex)
+                        }
+                        __testSkipLifecycle={__testDisableDotCard}
+                      />
+                    </span>
+                  ) : (
+                    <DotCardOverlay
+                      // `key` per problemIndex guarantees the overlay
+                      // unmounts/remounts cleanly when Marian advances —
+                      // its internal phase machine resets on each new
+                      // problem. Without this, a tight advance during
+                      // the overlay's `holding` phase could land the
+                      // next problem's overlay mid-cycle.
+                      key={problemIndex}
+                      pipsA={dotCardPips[0]}
+                      pipsB={dotCardPips[1]}
+                      pageHidden={pageHidden}
+                      reducedMotion={reducedMotion}
+                      onComplete={() => setActiveDismissForIndex(problemIndex)}
+                      __testSkipLifecycle={__testDisableDotCard}
+                    />
+                  ))}
               </div>
             )}
           </div>
