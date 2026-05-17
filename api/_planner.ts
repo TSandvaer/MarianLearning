@@ -996,7 +996,14 @@ The user message names a focus skill node. Generate problems specifically for th
     · 9+9=18  [HARD/doubles]
   POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) pair appears verbatim above. The 22 listed ordered pairs are the ONLY allowed facts. Common FORBIDDEN candidates to REJECT (valid by sum and addend range but NOT in v1 pool): 4+7, 7+4, 5+6, 6+5, 4+8, 8+4, 5+7, 7+5, 6+8, 8+6, 5+9 (and any other (a, b) with a in [1,9], b in [1,9], 11 <= a+b <= 20 not on the list above). These are deferred to a future pool widening; not part of v1.
 
-  SESSION COMPOSITION RULES (apply IN ORDER):
+  CATEGORY-MIX BUDGET (apply BEFORE selecting any facts — this is the FIRST rule because Haiku's prior empirically saturates make-ten-bridge OR doubles when the cap is buried late in the rule list). An 8-problem session has THREE category budgets that MUST all be respected:
+     · make-ten-bridge: AT LEAST 3, AT MOST 5. (Pool has 13 facts; cap is the bound on its dominance.)
+     · doubles:         AT MOST 2. (Pool has 4 facts: 6+6, 7+7, 8+8, 9+9.)
+     · near-doubles:    AT MOST 2. (Pool has 5 facts: 6+7, 7+6, 7+8, 8+7, 8+9.)
+  The three caps SUM TO 9, so an 8-problem session has 1 slot of slack — typical layouts are (5 make-ten-bridge + 2 near-doubles + 1 doubles) or (4 make-ten-bridge + 2 near-doubles + 2 doubles) or (5 make-ten-bridge + 1 near-doubles + 2 doubles). Pick the layout FIRST, then assign facts to slots second.
+  FAILURE MODES BOTH WAYS — the previous canon shipped 4-of-8 doubles (doubles-prior failure), an early correction attempt produced 8-of-8 make-ten-bridge (make-ten-bridge-saturation failure). Both are real; the cap on EACH category corrects ONE failure mode. Do NOT max one category at the expense of the other two.
+
+  SESSION COMPOSITION RULES (apply IN ORDER, AFTER the CATEGORY-MIX BUDGET above):
   1. Problems 1-3 (gentle ramp): draw EXCLUSIVELY from the easy band. Calibration window.
   2. NEGATIVE ANCHOR — P1, P2, P3 PLACEMENT BANS (any one of these is a hard rule violation):
      · DO NOT place any MEDIUM-band fact at P1, P2, or P3. MEDIUM-band only appears at P4 or later.
@@ -1005,11 +1012,23 @@ The user message names a focus skill node. Generate problems specifically for th
   3. Problem 4: MEDIUM-band only (HARD-band still forbidden at P4).
   4. Problems 5-8 (discriminate): draw from medium + hard bands. Recent-score modulation: low score (< 0.5) -> bias toward medium and REDUCE doubles to <= 1 across the session; high score (>= 0.85) -> push toward hard with >= 1 make-ten-bridge in P5-P8; mid score -> balanced.
   5. HIGH-LEVERAGE COVERAGE RULE: at least one make-ten-bridge fact MUST appear in P5-P8 (drawn from: 9+4, 4+9, 8+5, 5+8, 9+5, 9+6, 9+7, 9+8). This is the actual learning target of the tier; Dave's sub-to-20 research § 1.2 frames cross-10-bridge as parallel to take-from-decade for sub-to-20.
-  6. DOUBLES-CAP SELF-CHECK: AT MOST TWO problems across the entire 8-problem session may carry the doubles category (i.e. AT MOST TWO facts drawn from {6+6, 7+7, 8+8, 9+9}). Before emitting a third doubles fact, REJECT it. NEGATIVE ANCHOR — it is FORBIDDEN to place 6+6, 7+7, 8+8, AND 9+9 in the same session (that exceeds the cap by 2). The previous canon shipped with all four doubles present — that is the failure mode this cap corrects. Pick at most 2; let the other 2 lie unused for this session.
-  7. NEAR-DOUBLES-CAP SELF-CHECK: AT MOST TWO problems across the entire 8-problem session may carry the near-doubles category (drawn from {6+7, 7+6, 7+8, 8+7, 8+9}). Before emitting a third near-doubles fact, REJECT it.
+  6. DOUBLES-CAP SELF-CHECK (re-statement of CATEGORY-MIX BUDGET above): AT MOST TWO problems across the 8-problem session may carry the doubles category. Before emitting a third doubles fact, REJECT it. NEGATIVE ANCHOR — it is FORBIDDEN to place 6+6, 7+7, 8+8, AND 9+9 in the same session.
+  7. NEAR-DOUBLES-CAP SELF-CHECK (re-statement): AT MOST TWO problems across the 8-problem session may carry the near-doubles category. Before emitting a third near-doubles fact, REJECT it.
+  7a. MAKE-TEN-BRIDGE-CAP SELF-CHECK (re-statement): AT MOST FIVE problems across the 8-problem session may carry the make-ten-bridge category. Before emitting a sixth make-ten-bridge fact, REJECT it and SWAP for a doubles or near-doubles fact. NEGATIVE ANCHOR — make-ten-bridge IS the learning target, but an 8-problem session with 6 or more make-ten-bridge facts crowds out the doubles + near-doubles strategies the discriminate tier (P4-P8) is meant to mix. CONCRETE NUMERIC GUARDS — if you have selected 5 make-ten-bridge facts already, every remaining slot MUST be doubles or near-doubles; if you have selected 6 or more, the canon will be REJECTED by lint and the bake fails.
   8. NO duplicate (a, b) ordered pairs within the 8-problem set. "9+2" and "2+9" are NOT duplicates — they are distinct ordered pairs with distinct read-line text.
   9. GENERAL-CATEGORY BAN: the v1 pool contains ZERO general-category facts by design. Do NOT invent or emit any fact whose category is "general" — the pool-membership self-check above already rejects any (a, b) outside the 22 listed pairs, and EVERY listed pair maps to make-ten-bridge, doubles, or near-doubles. If a future pool widening introduces general facts, this rule gets a positive cap (currently structurally zero).
   10. DUAL-EXPOSURE RULE (forward-compat scaffold): never pair an addition fact and its subtraction inverse in the same session. E.g. if 8+5=13 is included, 13-5=8 and 13-8=5 are both FORBIDDEN (vacuously satisfied in pure-+ v1 sessions; rule binds once mixed +/- sessions arrive). This rule is forward-compatible with future add-to-20 / sub-to-20 fact-family interleaving.
+
+  WORKED EXAMPLE — a clean 8-problem session that respects all caps (use this as a template, not a verbatim copy):
+     P1=9+2 [EASY/make-ten-bridge]   (make-ten-bridge #1, EASY ramp anchor)
+     P2=8+3 [EASY/make-ten-bridge]   (make-ten-bridge #2)
+     P3=6+6 [EASY/doubles]           (doubles #1 — opens the doubles budget early)
+     P4=9+4 [MEDIUM/make-ten-bridge] (make-ten-bridge #3 — P4 is MEDIUM-only)
+     P5=8+5 [MEDIUM/make-ten-bridge] (make-ten-bridge #4 — P5-P8 high-leverage anchor)
+     P6=6+7 [MEDIUM/near-doubles]    (near-doubles #1)
+     P7=7+8 [HARD/near-doubles]      (near-doubles #2 — at cap)
+     P8=9+8 [HARD/make-ten-bridge]   (make-ten-bridge #5 — at cap)
+  Counts: make-ten-bridge=5 (at cap), doubles=1 (under cap of 2), near-doubles=2 (at cap). Total = 8. EASY 1-3, MEDIUM 4-6, HARD 7-8. P5-P8 carries 2 make-ten-bridge facts (high-leverage rule satisfied with 1 to spare). This is the canonical mix-and-spacing the directive is designed to produce.
 
   DISTRACTOR-COVERAGE SELF-CHECK (for problems 4-8): the render pipeline (src/screens/Math/Math.tsx) uses Class 1 (off-by-one) for every op:'+' P4-P8 problem and does NOT apply a Class 2 (wrong-op) or Class B (dropped-carry) trap — see design/math/add-to-20-content.md §3.3 and §3.4. No coverage self-check needed for distractor classes; the high-leverage coverage rule (Rule 5 above) carries the pedagogical-coverage burden for this tier.
 
