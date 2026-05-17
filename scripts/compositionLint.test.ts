@@ -743,15 +743,13 @@ describe('resolveTierBinding', () => {
   })
 
   it('returns null for out-of-scope tier files', () => {
-    // sub-to-10 + add-to-10 are bake-time-bound in this PR. sub-to-20
-    // infrastructure (POOL, RULES, parser, lint function) ships in this
-    // PR but the resolveTierBinding hook is DEFERRED to the rebake PR
-    // (the committed sub-to-20.json predates Kyle's spec and openly
-    // violates no-borrow — see Jessica's E2E findings in PR #271 and
-    // the long-form comment at the end of resolveTierBinding in
-    // compositionLint.ts).
+    // sub-to-10 + add-to-10 + sub-to-20 are bake-time-bound. The
+    // sub-to-20 binding was activated in the rebake PR (ticket
+    // 86c9utet9) alongside a fresh canon that respects Kyle's PR #269
+    // spec (no-borrow, minuend 11-19, "How many are left?" template).
+    // Asserted positively in the dedicated `resolveTierBinding —
+    // sub-to-20` describe block below.
     expect(resolveTierBinding('canon/math/level-1/add-to-20.json')).toBeNull()
-    expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')).toBeNull()
     expect(
       resolveTierBinding('canon/word-song/level-1/blending-cv.json'),
     ).toBeNull()
@@ -792,7 +790,7 @@ describe('runCompositionLint — disk walker', () => {
     expect(r.totalViolations).toBe(0)
   })
 
-  it('lints in-scope math tiers (sub-to-10 + add-to-10) and SKIPS out-of-scope tiers', () => {
+  it('lints in-scope math tiers (sub-to-10 + add-to-10 + sub-to-20) and SKIPS out-of-scope tiers', () => {
     // In-scope sub-to-10.
     writeCanon(
       'math/level-1/sub-to-10.json',
@@ -802,6 +800,13 @@ describe('runCompositionLint — disk walker', () => {
     writeCanon(
       'math/level-1/add-to-10.json',
       buildAddCanonResponse([...CLEAN_ADD_FACTS]),
+    )
+    // In-scope sub-to-20 (clean canon mirroring the rebake PR 86c9utet9
+    // layout — bound through resolveTierBinding alongside the fresh
+    // post-spec canon).
+    writeCanon(
+      'math/level-1/sub-to-20.json',
+      buildSubToTwentyCanonResponse([...CLEAN_SUB_TO_TWENTY_FACTS]),
     )
     // Out-of-scope.
     writeCanon('math/level-1/add-to-20.json', {
@@ -830,8 +835,8 @@ describe('runCompositionLint — disk walker', () => {
     })
 
     const r = runCompositionLint(tmp)
-    expect(r.filesScanned).toBe(4)
-    expect(r.filesLinted).toBe(2)
+    expect(r.filesScanned).toBe(5)
+    expect(r.filesLinted).toBe(3)
     expect(r.filesSkipped).toBe(2)
     expect(r.totalViolations).toBe(0)
     expect(r.findings).toEqual([])
@@ -3334,25 +3339,32 @@ describe('assertSubToTwentyCompositionClean', () => {
   })
 })
 
-// ── resolveTierBinding for sub-to-20 — DEFERRED to the rebake PR ─────────
+// ── resolveTierBinding for sub-to-20 — ACTIVATED in the rebake PR ────────
 //
-// The dispatch binding is not active in this PR (the committed sub-to-20
-// canon predates Kyle's spec and openly violates no-borrow; binding it
-// here would fail `npm run canon:lint` against the existing borked
-// canon and block CI). The infrastructure (POOL, RULES, parser, lint
-// function, assert helper, drift-guards) IS live; only the
-// resolveTierBinding hook + the runCompositionLint disk-walker dispatch
-// land in the follow-up rebake PR alongside a fresh canon.
+// The dispatch binding was activated in the rebake PR (ticket 86c9utet9)
+// alongside a fresh canon that respects Kyle's PR #269 spec (no-borrow,
+// minuend 11-19, "How many are left?" template, ≥2 CLEAN-annotated facts
+// at P4-P8). The infrastructure (POOL, RULES, parser, lint function,
+// assert helper, drift-guards) authored in PR #273 is now wired through
+// `resolveTierBinding` + the `runCompositionLint` disk-walker.
 
-describe('resolveTierBinding — sub-to-20 is OUT-of-scope until the rebake PR', () => {
-  it('returns null for sub-to-20 canon paths in this PR', () => {
-    // Forward-extension contract: when the rebake PR lands, this test
-    // flips to assert `binding.tier === 'sub-to-20'` (mirroring the
-    // sub-to-10 + add-to-10 dispatch tests above). Until then, the
-    // binding stays out-of-scope so the existing broken canon doesn't
-    // block CI.
-    expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')).toBeNull()
-    expect(resolveTierBinding('sub-to-20.json')).toBeNull()
+describe('resolveTierBinding — sub-to-20', () => {
+  it('binds the canonical sub-to-20 path on this platform (handles both sep flavours)', () => {
+    const binding = resolveTierBinding(
+      'canon/math/level-1/sub-to-20.json'.replace(/\//g, sep),
+    )
+    expect(binding).not.toBeNull()
+    expect(binding!.tier).toBe('sub-to-20')
+  })
+
+  it('binds a posix path as well', () => {
+    expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')?.tier).toBe(
+      'sub-to-20',
+    )
+  })
+
+  it('binds bare basename (used by some test paths)', () => {
+    expect(resolveTierBinding('sub-to-20.json')?.tier).toBe('sub-to-20')
   })
 })
 

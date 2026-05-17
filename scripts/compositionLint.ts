@@ -1414,17 +1414,14 @@ export function assertSubToTwentyCompositionClean(
 
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
-// Current scope is sub-to-10 + add-to-10. The function returns a
-// (potentially nil) rule config for the supplied canon-file path.
-// Hard-coded matching; future tiers slot in here.
-//
-// sub-to-20 INFRASTRUCTURE (POOL, RULES, parser, lint, assert helper) is
-// LIVE in this file but the dispatch binding is DEFERRED until the
-// rebake PR — see the long-form comment at the end of resolveTierBinding.
+// Current scope is sub-to-10 + add-to-10 + sub-to-20. The function
+// returns a (potentially nil) rule config for the supplied canon-file
+// path. Hard-coded matching; future tiers slot in here.
 
 export type TierLintBinding =
   | { tier: 'sub-to-10'; config: SubToTenRulesConfig }
   | { tier: 'add-to-10'; config: AddToTenRulesConfig }
+  | { tier: 'sub-to-20'; config: SubToTwentyRulesConfig }
   | null
 
 /**
@@ -1452,20 +1449,19 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   if (norm === 'add-to-10.json' || norm.endsWith('/add-to-10.json')) {
     return { tier: 'add-to-10', config: ADD_TO_TEN_RULES }
   }
-  // NOTE: sub-to-20 is INFRASTRUCTURE-ONLY in this PR (Kevin ticket 86c9utced).
-  // The committed `public/canon/math/level-1/sub-to-20.json` predates Kyle's
-  // PR #269 spec and openly violates the no-borrow constraint (Jessica's
-  // E2E spec PR #271 surfaced this — facts like 14-7, 18-9, 17-8 are in
-  // the file). Binding sub-to-20 in resolveTierBinding here would fail
-  // `npm run canon:lint` against the existing borked canon and block CI.
-  //
-  // The dispatch binding lands in the follow-up rebake PR (per
-  // `[[planner-and-canon.md §"Per-tier rebake recipe"]]`): rm the JSON,
-  // run `npx tsx scripts/generateSessionCanon.ts`, commit the fresh
-  // canon, and flip resolveTierBinding to bind sub-to-20 to
-  // SUB_TO_TWENTY_RULES in the same PR. The infrastructure (POOL, RULES,
-  // parser, lint function, assert helper, drift-guards) is all live in
-  // this PR — only the bake-time + CI hook is deferred.
+  // sub-to-20 binding ACTIVATED in the rebake PR (ticket 86c9utet9). The
+  // committed `public/canon/math/level-1/sub-to-20.json` was rebaked from
+  // scratch against Kyle's PR #269 spec (no-borrow, minuend 11-19, "How
+  // many are left?" template, ≥2 CLEAN-annotated facts at P4-P8) in the
+  // same PR. The deferred infrastructure (POOL, RULES, parser, lint
+  // function, assert helper, drift-guards) authored in PR #273 is now
+  // wired through the dispatch.
+  if (norm.endsWith('/math/level-1/sub-to-20.json')) {
+    return { tier: 'sub-to-20', config: SUB_TO_TWENTY_RULES }
+  }
+  if (norm === 'sub-to-20.json' || norm.endsWith('/sub-to-20.json')) {
+    return { tier: 'sub-to-20', config: SUB_TO_TWENTY_RULES }
+  }
   return null
 }
 
@@ -1474,7 +1470,7 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
 export interface CompositionFileFinding {
   /** Repo-relative posix-shaped path for log readability. */
   filePath: string
-  tier: 'sub-to-10' | 'add-to-10'
+  tier: 'sub-to-10' | 'add-to-10' | 'sub-to-20'
   violations: CompositionViolation[]
 }
 
@@ -1488,9 +1484,9 @@ export interface RunCompositionLintResult {
 }
 
 /**
- * Walk a canon root, lint every in-scope tier file (currently only
- * sub-to-10), and return the aggregate result without throwing. The CLI
- * driver decides exit code based on the result.
+ * Walk a canon root, lint every in-scope tier file (currently sub-to-10,
+ * add-to-10, sub-to-20), and return the aggregate result without
+ * throwing. The CLI driver decides exit code based on the result.
  */
 export function runCompositionLint(
   canonRoot: string,
@@ -1544,16 +1540,27 @@ export function runCompositionLint(
     // on the top-level `utterances` array. (We deliberately don't read
     // `plan.utterances` — the plan field is `unknown` on the wire type;
     // top-level `utterances` is the validated surface.)
-    const violations =
-      binding.tier === 'sub-to-10'
-        ? lintSubToTenComposition(
-            parsed as SessionStartResponse,
-            binding.config,
-          )
-        : lintAddToTenComposition(
-            parsed as SessionStartResponse,
-            binding.config,
-          )
+    let violations: CompositionViolation[]
+    switch (binding.tier) {
+      case 'sub-to-10':
+        violations = lintSubToTenComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+      case 'add-to-10':
+        violations = lintAddToTenComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+      case 'sub-to-20':
+        violations = lintSubToTwentyComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+    }
     if (violations.length > 0) {
       result.findings.push({
         filePath,

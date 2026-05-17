@@ -1062,7 +1062,22 @@ The user message names a focus skill node. Generate problems specifically for th
   4. At least one take-to-decade fact MUST appear in P4-P8 (drawn from: 14-4, 15-5, 16-6, 17-7, 18-8, 19-9). Highest-leverage facts; Dave § 4.2 names these as memorable anchors.
   5. DUAL-EXPOSURE RULE: never pair a subtraction fact and its addition inverse in the same session. E.g. if 16-4=12 is included, 4+12=16 (or 12+4=16) is FORBIDDEN. This rule is forward-compatible with future add-to-20 / sub-to-20 fact-family interleaving.
   6. NO duplicate facts within the 8-problem set.
-  7. Category caps (across the 8-problem session): at most one each of subtract-one, doubles-anchor, subtract-two, subtract-three; at most two of take-to-decade (high-value, relaxed cap); at most two of general.
+  7. Category caps (across the 8-problem session, summed across ALL 8 slots P1-P8):
+     · subtract-one    ≤ 1  (pool: 11-1, 12-1, 13-1, 10-1 — NOTE 10-1 is NOT in this pool; only 11-1, 12-1, 13-1)
+     · doubles-anchor  ≤ 1  (pool: 12-2)
+     · subtract-two    ≤ 1  (pool: 13-2, 14-2, 15-2)
+     · subtract-three  ≤ 1  (pool: 15-3)
+     · take-to-decade  ≤ 2  (pool: 13-3, 14-4, 15-5, 16-6, 17-7, 18-8, 19-9 — high-value, relaxed cap of 2)
+     · general         ≤ 2  (pool: 14-3, 15-4, 16-5, 16-4, 17-5, 18-6, 19-7 — HARD cap of 2)
+
+  CATEGORY-CAP SELF-CHECK (apply BEFORE finalising the 8-problem set, after every other rule):
+     For each category above, count the facts you have selected for the WHOLE session (P1-P8 inclusive — yes, this means EASY P1-P3 facts count toward their category cap too). If any count exceeds the cap, REJECT the set and SWAP the surplus fact for one in a different category.
+     Worked rejection examples (these are the EXACT failure modes you must NOT emit):
+     · P1=11-1 AND P3=13-1 → subtract-one count = 2 → CAP VIOLATION (cap=1). Swap one of {11-1, 13-1} for a different EASY category at that slot (12-2 doubles-anchor, 13-3 take-to-decade, 13-2 subtract-two).
+     · P3=13-3 AND P5=15-5 AND P8=18-8 → take-to-decade count = 3 → CAP VIOLATION (cap=2). Swap one of the take-to-decade facts for a different category at that slot (a general fact at MEDIUM/HARD; a non-take-to-decade EASY fact at P3).
+     · P1=11-1, P2=12-1, P3=13-1 → subtract-one count = 3 → CAP VIOLATION. Three slots cannot all be subtract-one; vary the categories within P1-P3 — the gentle-ramp doesn't require category monotony.
+     · P3=13-3 (EASY/take-to-decade) AND P4=14-4 AND P5=15-5 → take-to-decade count = 3 → CAP VIOLATION. EASY take-to-decade at P3 COUNTS toward the cap of 2; if 13-3 is at P3, at most ONE take-to-decade fact may appear in P4-P8.
+     Note: rule 4 (>=1 take-to-decade in P4-P8) interacts with this cap. If P3 is NOT a take-to-decade fact (which is most of the time — there are 5 other EASY facts to pick), P4-P8 may safely carry up to 2 take-to-decade facts. If P3 IS 13-3 (take-to-decade), P4-P8 may carry AT MOST 1 take-to-decade fact (to stay under the cap of 2 while satisfying rule 4). Plan P3 first when choosing how many take-to-decade slots remain.
 
   BAND-BY-SLOT (canonical restatement of rules 1-3):
   - EASY (result band, P1-P3 only): allowed at slots P1-P3.
@@ -1073,6 +1088,7 @@ The user message names a focus skill node. Generate problems specifically for th
 
   PER-PROBLEM SHAPE for sub-to-20: every problem MUST emit op: "-" on the wire (the screen renders the operator glyph from op). Wrong-answer chip selection is handled entirely at render time in src/screens/Math/Math.tsx — "distractorClass" is a RENDER-TIME default (set client-side per focus node), NOT a planner-emitted field; the canon JSON wire is utterance-only {id, text} and carries no per-problem distractor tag. The planner's role for distractor delivery is FACT-POOL COMPOSITION: by guaranteeing >=2 CLEAN-annotated facts across P4-P8 (the DISTRACTOR-COVERAGE SELF-CHECK above), the planner ensures the render-time Class B trap (decade-anchor miss) has an in-range target on >=2 problems before pickDistractors silent-downgrades. Emit only the fields listed below. Utterance ids MUST use the literal "math." prefix (NOT "sub-to-20."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". The id namespace is the track name, NOT the focus-node name. Per-slot utterance templates:
   - read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Fifteen minus three. How many are left?"
+    READ-LINE NEGATIVE ANCHOR: the read-line MUST use the word "minus" verbatim — DO NOT substitute "take away" here. The "take away" phrasing belongs in the hint scaffold ONLY (see below). Emitting "Eleven take away one. How many are left?" as a read-line is a hard rule violation; the spec uses "minus" from session 1 onwards for sub-to-20 (see design/math/sub-to-20-content.md §4.3 + §7.2 — no first-session take-away variant for this tier). Every "math.pN.read" utterance text MUST match the pattern: capitalised teen number word, then " minus ", then a lowercased number word, then ". How many are left?".
   - correct: "Yes! <answer>!" e.g. "Yes! Twelve!"
   - reprompt: "Hmm... try again?" (verbatim)
   - hint: "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Fifteen. Take away three. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
