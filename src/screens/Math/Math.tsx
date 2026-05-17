@@ -920,10 +920,18 @@ function MathScreen({
 
   /** Stable seed for `Math.random` substitute on chip-position shuffle. We
    *  avoid Math.random because it makes tests flaky; instead we shuffle
-   *  deterministically per problemIndex via a tiny LCG. */
+   *  deterministically per problemIndex via a tiny LCG.
+   *
+   *  `focusNode` is threaded so `buildChipOrder` can pick the right
+   *  per-tier `distractorClass` default for the discriminate band:
+   *    - `'sub-to-10'` → `'wrong-op'` (Class 2 trap = a + b).
+   *    - `'sub-to-20'` → `'decade-anchor'` (Class B trap = nearest
+   *      multiple of 10). Kyle's sub-to-20 spec §3.3 / ticket 86c9utcf7.
+   *    - other math nodes → undefined (gentle in P1–P3, off-by-one in
+   *      P4–P8). */
   const chipOrder = useMemo(
-    () => buildChipOrder(plan.problems[problemIndex], planMaxAnswer),
-    [plan, problemIndex, planMaxAnswer],
+    () => buildChipOrder(plan.problems[problemIndex], planMaxAnswer, focusNode),
+    [plan, problemIndex, planMaxAnswer, focusNode],
   )
 
   // ── Refs for in-flight cleanup -----------------------------------------
@@ -2708,39 +2716,58 @@ function SparkleBurst() {
  * plans pass 10, add-to-20 plans pass 20. Without it, `pickDistractors`
  * defaults to 10 and throws on any `correct >= 11`, crashing the screen
  * (ticket 86c9q5q13 review).
+ *
+ * `focusNode` picks the per-tier render-time `distractorClass` default
+ * for the discriminate band. See the comment block at the dispatch site
+ * below for the per-focus-node mapping.
  */
 function buildChipOrder(
   problem: MathProblem,
   maxAnswer: number,
+  focusNode?: SkillNode,
 ): readonly number[] {
   // Thread `op`, `operands`, and a render-time `distractorClass`
   // default into `pickDistractors` (Kyle's sub-to-10 spec §3.4 + §13
-  // PR 2). `distractorClass` is a RENDER-TIME default set here, NOT a
-  // planner-emitted field — the canon JSON wire is utterance-only
-  // `{id, text}` and carries no per-problem distractor tag. The
-  // planner directive in `api/_planner.ts` (`MATH_TRACK_GUIDE`,
-  // sub-to-10 PER-PROBLEM SHAPE block) makes this explicit and pairs
-  // it with the planner's actual contribution: FACT-POOL
-  // COMPOSITION — the DISTRACTOR-COVERAGE SELF-CHECK guarantees >= 2
-  // a+b=10 IN-annotated facts across P4-P8, so the wrong-op trap has
-  // an in-range target before the OOR/alias silent-downgrade fires.
+  // PR 2; sub-to-20 spec §3.3 + §3.4). `distractorClass` is a
+  // RENDER-TIME default set here, NOT a planner-emitted field — the
+  // canon JSON wire is utterance-only `{id, text}` and carries no
+  // per-problem distractor tag. The planner directive in
+  // `api/_planner.ts` (`MATH_TRACK_GUIDE`, sub-to-10 PER-PROBLEM SHAPE
+  // + sub-to-20 DISTRACTOR-COVERAGE SELF-CHECK) pairs this with the
+  // planner's actual contribution: FACT-POOL COMPOSITION — the pool +
+  // directive guarantees ≥2 facts where the per-tier trap has an
+  // in-range target before the OOR/alias silent-downgrade fires.
   //
-  // For sub-to-10 problems P4-P8, default the hint to `'wrong-op'`
-  // so the Class-2 trap (a + b) is attempted; `pickDistractors`
-  // silently downgrades to off-by-one when the trap is OOR (e.g.
-  // `10 − 2 = 8`, trap `12` > maxAnswer=10) or aliases the correct
-  // answer (subtract-zero, where a + 0 = a = correct). For P1-P3,
-  // `pickTier` returns `'gentle'` regardless of the hint. Add-to-10
-  // and any non-subtraction tier pass `undefined` here and rely on
-  // `pickTier` alone (`'gentle'` for P1-P3, `'offByOne'` for P4-P8).
-  // Over-attempting wrong-op on subtraction is benign (silent
+  // Per-focus-node mapping (applied only for `op === '-'`):
+  //   - `'sub-to-10'` → `'wrong-op'` (Class 2 trap = a + b; PR #241).
+  //   - `'sub-to-20'` → `'decade-anchor'` (Class B trap =
+  //     Math.round(correct / 10) * 10; ticket 86c9utcf7).
+  //   - `'sub-to-10'`-shaped unknown focus node → fall back to
+  //     `'wrong-op'` for backwards-compat (the pre-sub-to-20 default
+  //     for every `op === '-'` problem).
+  //
+  // For P1-P3, `pickTier` returns `'gentle'` regardless of the hint —
+  // Class B / wrong-op never fires in the warm-up window. For
+  // `op === '+'` (add-to-10 / add-to-20), the hint is `undefined` and
+  // `pickDistractors` falls through to `'offByOne'` at P4-P8.
+  //
+  // Over-attempting either trap on subtraction is benign (silent
   // downgrade); this satisfies Kyle's spec §2.2 ("≥ 2 of P4-P8 must
-  // carry the wrong-op trap") in combination with the planner's
-  // fact-pool composition guarantee. If `MathProblem.distractorClass`
-  // is explicitly set on the problem (e.g. by a future server-emitted
+  // carry the trap") in combination with the planner's fact-pool
+  // composition guarantee. If `MathProblem.distractorClass` is
+  // explicitly set on the problem (e.g. by a future server-emitted
   // hint), that wins over the default.
-  const distractorClass: 'off-by-one' | 'wrong-op' | undefined =
-    problem.distractorClass ?? (problem.op === '-' ? 'wrong-op' : undefined)
+  const distractorClass:
+    | 'off-by-one'
+    | 'wrong-op'
+    | 'decade-anchor'
+    | undefined =
+    problem.distractorClass ??
+    (problem.op === '-'
+      ? focusNode === 'sub-to-20'
+        ? 'decade-anchor'
+        : 'wrong-op'
+      : undefined)
   const [d1, d2] = pickDistractors(problem.correct, problem.index, maxAnswer, {
     op: problem.op,
     operands: [problem.addendA, problem.addendB] as const,

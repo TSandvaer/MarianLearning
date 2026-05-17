@@ -169,16 +169,24 @@ export interface MathProblem {
   /** Render-time hint for the distractor algorithm. Forward-compat
    *  seam: the planner wire shape is utterance-only and does NOT
    *  carry this field. The only writer today is `Math.tsx`'s
-   *  deterministic default at the chip-build site, which sets
-   *  `'wrong-op'` for every `op === '-'` P4–P8 problem; `pickDistractors`
-   *  silently downgrades to off-by-one when the trap value falls
-   *  outside `[minAnswer, maxAnswer]` or aliases the correct answer
-   *  (subtract-zero facts). Kept as an optional field so a future
-   *  planner-side widening (per-problem structured tags via a wire
-   *  envelope extension) can populate it without a type change. See
-   *  Kyle's spec §3.4 and the planner-and-canon doc's "wire shape is
-   *  utterance-only" rule. */
-  distractorClass?: 'off-by-one' | 'wrong-op'
+   *  deterministic default at the chip-build site, which sets:
+   *    - `'wrong-op'` for every `op === '-'` P4–P8 problem when
+   *      `focusNode === 'sub-to-10'`; `pickDistractors` silently
+   *      downgrades to off-by-one when the trap value falls outside
+   *      `[minAnswer, maxAnswer]` or aliases the correct answer
+   *      (subtract-zero facts).
+   *    - `'decade-anchor'` for every `op === '-'` P4–P8 problem when
+   *      `focusNode === 'sub-to-20'`; `pickDistractors` silently
+   *      downgrades to off-by-one when the trap aliases correct
+   *      (take-to-decade facts like `19 − 9 = 10`) or off-by-one
+   *      (boundary facts like `16 − 5 = 11`). See Kyle's sub-to-20
+   *      spec §3.3.
+   *  Kept as an optional field so a future planner-side widening
+   *  (per-problem structured tags via a wire envelope extension) can
+   *  populate it without a type change. See Kyle's sub-to-10 spec §3.4
+   *  and the planner-and-canon doc's "wire shape is utterance-only"
+   *  rule. */
+  distractorClass?: 'off-by-one' | 'wrong-op' | 'decade-anchor'
   /** Pre-canned utterance lines for this problem. */
   utterances: MathProblemUtterances
 }
