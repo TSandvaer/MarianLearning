@@ -1019,7 +1019,66 @@ The user message names a focus skill node. Generate problems specifically for th
   - giveAnswer: "This one is <answer>." e.g. "This one is eight." (for correct=0 → "This one is zero.")
 
   PROSODY: numbers are spelled out as words ("zero", "one", "two", ... "ten"). Capitalize the first word of each sentence. The "minus" / "take away" template renders cleanly on en-US-EmmaMultilingualNeural rate -10%; no SSML overrides required for any value in [0, 10].
-- sub-to-20: subtraction within 20. read: same template; the answer may be 1-19.
+- sub-to-20: subtraction with minuend in [11, 19] and subtrahend in [1, 9] and result in [10, 18]. NO BORROW — the ones-digit of the minuend MUST be >= subtrahend. read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seventeen minus five. How many are left?"
+
+  NO-BORROW SELF-CHECK (apply before emitting every problem): for chosen (minuend a, subtrahend b), COMPUTE ones-digit(a) = a mod 10 and CONFIRM that ones-digit(a) >= b. If ones-digit(a) < b, the problem is a BORROW fact and is FORBIDDEN; reject and pick another from the pool. Worked example: 14-3=11 is no-borrow (ones-digit(14)=4 >= 3 → OK). 14-7=7 is BORROW (ones-digit(14)=4 < 7 → FORBIDDEN). 18-9=9 is BORROW (ones-digit(18)=8 < 9 → FORBIDDEN). The pool below has been pre-filtered; this self-check is a defense-in-depth assertion against drift.
+
+  FACT POOL (22 facts; pick exactly 8 distinct facts from this pool per session, no duplicates):
+  Each fact is annotated with [BAND/category] and DEC = the decade-anchor-miss trap value used at render time. ALIAS means the trap aliases the correct answer (forbidden, downgrades to off-by-one). BOUNDARY means the trap is off-by-one from correct (degenerate, downgrades). CLEAN means the trap is in range, distinct from correct, and >=2 separation (a usable Class B distractor).
+  - Easy band (P1-P3 only, no Class B fires here):
+    · 11-1=10  [EASY/subtract-one]    (DEC=10 ALIAS)
+    · 12-2=10  [EASY/doubles-anchor]  (DEC=10 ALIAS)
+    · 13-3=10  [EASY/take-to-decade]  (DEC=10 ALIAS)
+    · 12-1=11  [EASY/subtract-one]    (DEC=10 BOUNDARY — degenerate, downgrades)
+    · 13-2=11  [EASY/subtract-two]    (DEC=10 BOUNDARY — degenerate, downgrades)
+    · 13-1=12  [EASY/subtract-one]    (DEC=10 CLEAN — separation 2)
+  - Medium band (P4-P8 eligible):
+    · 14-4=10  [MEDIUM/take-to-decade] (DEC=10 ALIAS)
+    · 14-3=11  [MEDIUM/general]        (DEC=10 BOUNDARY — degenerate)
+    · 14-2=12  [MEDIUM/subtract-two]   (DEC=10 CLEAN — separation 2)
+    · 15-5=10  [MEDIUM/take-to-decade] (DEC=10 ALIAS)
+    · 15-4=11  [MEDIUM/general]        (DEC=10 BOUNDARY — degenerate)
+    · 15-3=12  [MEDIUM/subtract-three] (DEC=10 CLEAN — separation 2)
+    · 15-2=13  [MEDIUM/subtract-two]   (DEC=10 CLEAN — separation 3)
+    · 16-6=10  [MEDIUM/take-to-decade] (DEC=10 ALIAS)
+    · 16-5=11  [MEDIUM/general]        (DEC=10 BOUNDARY — degenerate)
+    · 16-4=12  [MEDIUM/general]        (DEC=10 CLEAN — separation 2)
+  - Hard band (P5-P8 eligible):
+    · 17-7=10  [HARD/take-to-decade]   (DEC=10 ALIAS)
+    · 17-5=12  [HARD/general]          (DEC=10 CLEAN — separation 2)
+    · 18-8=10  [HARD/take-to-decade]   (DEC=10 ALIAS)
+    · 18-6=12  [HARD/general]          (DEC=10 CLEAN — separation 2)
+    · 19-9=10  [HARD/take-to-decade]   (DEC=10 ALIAS)
+    · 19-7=12  [HARD/general]          (DEC=10 CLEAN — separation 2)
+  POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) pair appears verbatim above. The 22 listed pairs are the ONLY allowed facts. Common BORROW candidates to REJECT (NOT in the pool, all violate the NO-BORROW SELF-CHECK above): 11-2, 11-3, ... 11-9; 12-3, 12-4, ... 12-9; 13-4, ... 13-9; 14-5, 14-6, 14-7, 14-8, 14-9; 15-6, 15-7, 15-8, 15-9; 16-7, 16-8, 16-9; 17-8, 17-9; 18-9. NOTE that 19-9=10 IS in the pool (ones-digit(19) = 9 >= 9 = subtrahend → no-borrow). Also REJECT any pair where ones-digit(a) >= b but the pair is simply outside the 22-fact curation (e.g. 15-1=14, 16-2=14, 19-5=14 — valid no-borrow facts that are not in the v1 pool).
+
+  SESSION COMPOSITION RULES (apply IN ORDER):
+  1. Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts. Calibration window; no Class B fires yet. ONLY facts tagged [EASY/...] above are eligible for these slots — that is 6 specific facts: 11-1, 12-2, 13-3, 12-1, 13-2, 13-1.
+  2. NEGATIVE ANCHOR — P1, P2, P3 PLACEMENT BANS (any one of these is a hard rule violation):
+     · DO NOT place any MEDIUM-band fact at P1, P2, or P3. MEDIUM-band only appears at P4 or later.
+     · DO NOT place any HARD-band fact at P1, P2, or P3. HARD-band only appears at P5 or later.
+     · The ONLY facts allowed at P1, P2, P3 are: 11-1, 12-2, 13-3, 12-1, 13-2, 13-1.
+  3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) → bias toward MEDIUM; high score (>= 0.85) → push toward HARD with >=1 take-to-decade in P5-P8; mid score → balanced. HARD-band facts (17-7, 17-5, 18-8, 18-6, 19-9, 19-7) appear at P5 or later only.
+  4. At least one take-to-decade fact MUST appear in P4-P8 (drawn from: 14-4, 15-5, 16-6, 17-7, 18-8, 19-9). Highest-leverage facts; Dave § 4.2 names these as memorable anchors.
+  5. DUAL-EXPOSURE RULE: never pair a subtraction fact and its addition inverse in the same session. E.g. if 16-4=12 is included, 4+12=16 (or 12+4=16) is FORBIDDEN. This rule is forward-compatible with future add-to-20 / sub-to-20 fact-family interleaving.
+  6. NO duplicate facts within the 8-problem set.
+  7. Category caps (across the 8-problem session): at most one each of subtract-one, doubles-anchor, subtract-two, subtract-three; at most two of take-to-decade (high-value, relaxed cap); at most two of general.
+
+  BAND-BY-SLOT (canonical restatement of rules 1-3):
+  - EASY (result band, P1-P3 only): allowed at slots P1-P3.
+  - MEDIUM (result band): allowed at P4-P8.
+  - HARD (result band): allowed at P5-P8 only.
+
+  DISTRACTOR-COVERAGE SELF-CHECK (for problems 4-8): the render pipeline (src/screens/Math/Math.tsx) attempts a Class B (decade-anchor miss) trap on every op:'-' P4-P8 problem when focusNode === 'sub-to-20', and silently downgrades to Class A (off-by-one) when the trap aliases correct, aliases off-by-one, or falls out of [minAnswer, maxAnswer]. To deliver >=2 in-range Class B traps across P4-P8 (Kyle's spec target), bias the P4-P8 selection toward CLEAN-annotated facts above. CLEAN-annotated MEDIUM facts: 14-2, 15-3, 15-2, 16-4 (any one each of subtract-two and subtract-three; subtract-two cap is <=1 so 14-2 and 15-2 compete; general cap is <=2 so 16-4 can co-occur with at most one other general). CLEAN-annotated HARD/general facts: 17-5, 18-6, 19-7 (any two — the general cap of 2 lets two co-occur). NEGATIVE ANCHOR: it is FORBIDDEN to fill P4-P8 entirely with ALIAS- or BOUNDARY-annotated facts when >=2 CLEAN-annotated facts (from any band combination) are still available within category caps. Before finalising the 5-problem P4-P8 set, count the CLEAN-annotated facts in the set; if it is < 2 AND >=2 CLEAN-annotated facts are still available within category caps, SWAP an ALIAS/BOUNDARY fact for a CLEAN one. Maximum achievable CLEAN-count in P4-P8 is 5 (one MEDIUM/subtract-two CLEAN + one MEDIUM/subtract-three CLEAN + one MEDIUM/general CLEAN + two HARD/general CLEAN).
+
+  PER-PROBLEM SHAPE for sub-to-20: every problem MUST emit op: "-" on the wire (the screen renders the operator glyph from op). Wrong-answer chip selection is handled entirely at render time in src/screens/Math/Math.tsx — "distractorClass" is a RENDER-TIME default (set client-side per focus node), NOT a planner-emitted field; the canon JSON wire is utterance-only {id, text} and carries no per-problem distractor tag. The planner's role for distractor delivery is FACT-POOL COMPOSITION: by guaranteeing >=2 CLEAN-annotated facts across P4-P8 (the DISTRACTOR-COVERAGE SELF-CHECK above), the planner ensures the render-time Class B trap (decade-anchor miss) has an in-range target on >=2 problems before pickDistractors silent-downgrades. Emit only the fields listed below. Utterance ids MUST use the literal "math." prefix (NOT "sub-to-20."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". The id namespace is the track name, NOT the focus-node name. Per-slot utterance templates:
+  - read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Fifteen minus three. How many are left?"
+  - correct: "Yes! <answer>!" e.g. "Yes! Twelve!"
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint: "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Fifteen. Take away three. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
+  - giveAnswer: "This one is <answer>." e.g. "This one is twelve."
+
+  PROSODY: numbers are spelled out as words ("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"). Capitalize the first word of each sentence. The "minus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10% for all teen values; no SSML overrides required. Do NOT verbally decompose the minuend (e.g. do NOT say "ten and seven, minus five" or "ten plus seven minus five") — per Dave § 2 (L2 context note), verbal decomposition adds L2 cognitive load without pedagogical benefit. Emma says the numeral name plainly.
 - two-digit-addsub: addition or subtraction with at least one two-digit addend. read: "Twenty-three plus four. How many?" Answer < 100, no carrying/borrowing in this slice.
 - skip-counting: count by 2s, 5s, or 10s. read: "Two, four, six, ... what's next?" Answer is the next term.
 - mult-2-5-10: multiplication by 2, 5, or 10. read: "Two times <X>. How many?" Answer is the product.

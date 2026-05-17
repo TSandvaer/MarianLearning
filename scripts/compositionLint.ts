@@ -864,11 +864,563 @@ export function assertAddToTenCompositionClean(
   }
 }
 
+// ── sub-to-20 rule config (third tier — Kyle's PR #269 spec) ─────────────
+//
+// Per `design/math/sub-to-20-content.md` §1.1. The pool is 22 facts handpicked
+// by Kyle from the 45-fact no-borrow teen-minuend single-digit-subtrahend
+// surface; bands + categories per Dave's research note § 4.1-4.2.
+//
+// "No-borrow" definition (strict): ones-digit(minuend) >= subtrahend.
+// Every fact below satisfies this; pool results are in [10, 18].
+//
+// The directive at `api/_planner.ts` sub-to-20 block lists these 22 with
+// inline `[BAND/category]` tags + DEC ALIAS/BOUNDARY/CLEAN annotations.
+// If the spec widens the pool, update BOTH the directive and this config;
+// the drift-guard test in `compositionLint.test.ts` asserts the two stay
+// in sync.
+//
+// NEW vs sub-to-10: Class B (decade-anchor miss) distractor — every pool
+// fact carries a DEC value (computed at render time as
+// Math.round(correct / 10) * 10). For results in [10, 18], DEC = 10 always
+// (Math.round(14/10) = 1 → DEC=10; Math.round(15/10) = 2 → DEC=20 — but
+// no pool fact has correct >= 15 with DEC = 20 distinct from correct,
+// so effectively DEC = 10 for every pool fact). The Class B coverage
+// rule asserts >= 2 CLEAN-annotated facts (separation >=2 from correct,
+// not aliasing, not boundary-degenerate) in P4-P8 — the mechanical
+// backstop for the "deliver >=2 in-range Class B traps" pool/directive
+// posture in spec §2.2.
+
+export type SubToTwentyBand = 'EASY' | 'MEDIUM' | 'HARD'
+
+export type SubToTwentyCategory =
+  | 'subtract-one'
+  | 'doubles-anchor'
+  | 'take-to-decade'
+  | 'subtract-two'
+  | 'subtract-three'
+  | 'general'
+
+/**
+ * DEC status — the Class B (decade-anchor miss) trap classification per
+ * `design/math/sub-to-20-content.md` §3.3 and the directive's FACT POOL
+ * annotation:
+ *   - 'ALIAS'    — DEC === correct; Class B downgrades to off-by-one.
+ *   - 'BOUNDARY' — Math.abs(DEC - correct) === 1; Class B downgrades.
+ *   - 'CLEAN'    — DEC is in-range, distinct, and >=2 separation; usable.
+ *
+ * The Class-B-coverage rule operates on this field exclusively — it does
+ * NOT recompute Math.round(correct / 10) * 10 from the fact's `(a, b)`,
+ * because the spec authors that classification per-fact and a render-time
+ * recompute would couple the lint to the renderer's exact formula. The
+ * field is the contract.
+ */
+export type SubToTwentyDecStatus = 'ALIAS' | 'BOUNDARY' | 'CLEAN'
+
+export interface SubToTwentyPoolFact {
+  /** "a-b" string id, e.g. "16-4". Stable across runs. */
+  id: string
+  a: number
+  b: number
+  band: SubToTwentyBand
+  category: SubToTwentyCategory
+  /** DEC status per spec §3.3 (ALIAS / BOUNDARY / CLEAN). */
+  decStatus: SubToTwentyDecStatus
+}
+
+export const SUB_TO_TWENTY_POOL: readonly SubToTwentyPoolFact[] = [
+  // EASY band (6 facts; P1-P3 only — no Class B fires here)
+  {
+    id: '11-1',
+    a: 11,
+    b: 1,
+    band: 'EASY',
+    category: 'subtract-one',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '12-2',
+    a: 12,
+    b: 2,
+    band: 'EASY',
+    category: 'doubles-anchor',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '13-3',
+    a: 13,
+    b: 3,
+    band: 'EASY',
+    category: 'take-to-decade',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '12-1',
+    a: 12,
+    b: 1,
+    band: 'EASY',
+    category: 'subtract-one',
+    decStatus: 'BOUNDARY',
+  },
+  {
+    id: '13-2',
+    a: 13,
+    b: 2,
+    band: 'EASY',
+    category: 'subtract-two',
+    decStatus: 'BOUNDARY',
+  },
+  {
+    id: '13-1',
+    a: 13,
+    b: 1,
+    band: 'EASY',
+    category: 'subtract-one',
+    decStatus: 'CLEAN',
+  },
+  // MEDIUM band (10 facts; P4-P8 eligible)
+  {
+    id: '14-4',
+    a: 14,
+    b: 4,
+    band: 'MEDIUM',
+    category: 'take-to-decade',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '14-3',
+    a: 14,
+    b: 3,
+    band: 'MEDIUM',
+    category: 'general',
+    decStatus: 'BOUNDARY',
+  },
+  {
+    id: '14-2',
+    a: 14,
+    b: 2,
+    band: 'MEDIUM',
+    category: 'subtract-two',
+    decStatus: 'CLEAN',
+  },
+  {
+    id: '15-5',
+    a: 15,
+    b: 5,
+    band: 'MEDIUM',
+    category: 'take-to-decade',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '15-4',
+    a: 15,
+    b: 4,
+    band: 'MEDIUM',
+    category: 'general',
+    decStatus: 'BOUNDARY',
+  },
+  {
+    id: '15-3',
+    a: 15,
+    b: 3,
+    band: 'MEDIUM',
+    category: 'subtract-three',
+    decStatus: 'CLEAN',
+  },
+  {
+    id: '15-2',
+    a: 15,
+    b: 2,
+    band: 'MEDIUM',
+    category: 'subtract-two',
+    decStatus: 'CLEAN',
+  },
+  {
+    id: '16-6',
+    a: 16,
+    b: 6,
+    band: 'MEDIUM',
+    category: 'take-to-decade',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '16-5',
+    a: 16,
+    b: 5,
+    band: 'MEDIUM',
+    category: 'general',
+    decStatus: 'BOUNDARY',
+  },
+  {
+    id: '16-4',
+    a: 16,
+    b: 4,
+    band: 'MEDIUM',
+    category: 'general',
+    decStatus: 'CLEAN',
+  },
+  // HARD band (6 facts; P5-P8 eligible)
+  {
+    id: '17-7',
+    a: 17,
+    b: 7,
+    band: 'HARD',
+    category: 'take-to-decade',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '17-5',
+    a: 17,
+    b: 5,
+    band: 'HARD',
+    category: 'general',
+    decStatus: 'CLEAN',
+  },
+  {
+    id: '18-8',
+    a: 18,
+    b: 8,
+    band: 'HARD',
+    category: 'take-to-decade',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '18-6',
+    a: 18,
+    b: 6,
+    band: 'HARD',
+    category: 'general',
+    decStatus: 'CLEAN',
+  },
+  {
+    id: '19-9',
+    a: 19,
+    b: 9,
+    band: 'HARD',
+    category: 'take-to-decade',
+    decStatus: 'ALIAS',
+  },
+  {
+    id: '19-7',
+    a: 19,
+    b: 7,
+    band: 'HARD',
+    category: 'general',
+    decStatus: 'CLEAN',
+  },
+] as const
+
+/** Tier rule config — what the sub-to-20 lint enforces. Mirrors
+ *  `SubToTenRulesConfig` shape; adds the Class-B-coverage rule. */
+export interface SubToTwentyRulesConfig {
+  pool: readonly SubToTwentyPoolFact[]
+  categoryCaps: Record<SubToTwentyCategory, number>
+  /** Slots (1-indexed) where each band is allowed. */
+  bandAllowedSlots: Record<SubToTwentyBand, readonly number[]>
+  /** Whole-session minimum count of take-to-decade facts within P4-P8. */
+  takeToDecadeInP4ToP8Min: number
+  /** Whole-session minimum count of CLEAN-annotated facts within P4-P8
+   *  (the Class B coverage rule per spec §2.2). */
+  cleanClassBInP4ToP8Min: number
+  totalProblems: number
+}
+
+export const SUB_TO_TWENTY_RULES: SubToTwentyRulesConfig = {
+  pool: SUB_TO_TWENTY_POOL,
+  categoryCaps: {
+    'subtract-one': 1,
+    'doubles-anchor': 1,
+    'take-to-decade': 2,
+    'subtract-two': 1,
+    'subtract-three': 1,
+    general: 2,
+  },
+  bandAllowedSlots: {
+    // P1-P3 gentle-ramp only; EASY FORBIDDEN at P4-P8.
+    // Mirrors the sub-to-10 tightening from Dave's NOF #1 (PR #247) — the
+    // discriminate tier must not lean on gentle-ramp facts.
+    EASY: [1, 2, 3],
+    MEDIUM: [4, 5, 6, 7, 8],
+    HARD: [5, 6, 7, 8],
+  },
+  takeToDecadeInP4ToP8Min: 1,
+  cleanClassBInP4ToP8Min: 2,
+  totalProblems: 8,
+}
+
+// ── core: lint a SessionStartResponse against sub-to-20 rules ────────────
+
+interface SubProblemRow {
+  index: number // 1-indexed
+  utteranceId: string
+  text: string
+  parsed: ParsedFact | null
+  poolMatch: SubToTwentyPoolFact | null
+}
+
+/**
+ * Parse a sub-to-20 read-line. Sub-to-20 uses the "minus" template
+ * ("<minuend> minus <subtrahend>. How many are left?") from session 1
+ * (spec §4.1 + §7.2 — no first-session "take away" variant). Number
+ * words extend to "nineteen".
+ *
+ * Returns null if the text doesn't match the minus template or if a
+ * number word is unrecognised. Pure; no I/O.
+ *
+ * Exported for tests + render-time consumers.
+ */
+export function parseSubToTwentyReadLine(text: string): ParsedFact | null {
+  const m = SUB_TO_TWENTY_RE_MINUS.exec(text)
+  if (!m) return null
+  const a = SUB_TO_TWENTY_NUMBER_WORDS[m[1]!.toLowerCase()]
+  const b = SUB_TO_TWENTY_NUMBER_WORDS[m[2]!.toLowerCase()]
+  if (a === undefined || b === undefined) return null
+  return { a, b }
+}
+
+// Teen-extended number-word table. Distinct from NUMBER_WORDS above
+// (which stops at "ten") so that an unrelated tier mis-routing a teen
+// word into the sub-to-10 parser still returns null.
+const SUB_TO_TWENTY_NUMBER_WORDS: Record<string, number> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+}
+
+const SUB_TO_TWENTY_RE_MINUS =
+  /^\s*([a-z]+)\s+minus\s+([a-z]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i
+
+function extractSubToTwentyProblems(
+  response: Pick<SessionStartResponse, 'utterances'>,
+): SubProblemRow[] {
+  const re = /^math\.p(\d+)\.read$/
+  const rows: SubProblemRow[] = []
+  for (const u of response.utterances) {
+    const m = re.exec(u.id)
+    if (!m) continue
+    const index = Number.parseInt(m[1]!, 10)
+    const parsed = parseSubToTwentyReadLine(u.text)
+    const poolMatch = parsed
+      ? (SUB_TO_TWENTY_POOL.find((f) => f.a === parsed.a && f.b === parsed.b) ??
+        null)
+      : null
+    rows.push({
+      index,
+      utteranceId: u.id,
+      text: u.text,
+      parsed,
+      poolMatch,
+    })
+  }
+  rows.sort((x, y) => x.index - y.index)
+  return rows
+}
+
+/**
+ * Lint a canon's plan against the sub-to-20 composition rules. Returns
+ * ALL violations across the 8-problem set — does not stop at the first.
+ *
+ * Pure; no I/O.
+ */
+export function lintSubToTwentyComposition(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: SubToTwentyRulesConfig = SUB_TO_TWENTY_RULES,
+): CompositionViolation[] {
+  const violations: CompositionViolation[] = []
+  const problems = extractSubToTwentyProblems(response)
+
+  // ── unparseable / pool-membership pass ──
+  for (const p of problems) {
+    if (p.parsed === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: p.index,
+        message:
+          `P${p.index} (${p.utteranceId}) text does not match the ` +
+          `sub-to-20 read template ("<minuend> minus <subtrahend>. How ` +
+          `many are left?"): ` +
+          JSON.stringify(p.text),
+        factId: null,
+      })
+      continue
+    }
+    if (p.poolMatch === null) {
+      violations.push({
+        rule: 'pool-membership',
+        problemIndex: p.index,
+        message:
+          `P${p.index} fact ${p.parsed.a}-${p.parsed.b}=` +
+          `${p.parsed.a - p.parsed.b} is NOT in the 22-fact sub-to-20 ` +
+          `pool. Either it is a BORROW fact (ones-digit(a) < b) or a ` +
+          `valid no-borrow fact outside the v1 curation. See ` +
+          `design/math/sub-to-20-content.md §1.1.`,
+        factId: `${p.parsed.a}-${p.parsed.b}`,
+      })
+    }
+  }
+
+  const matched = problems.filter(
+    (p): p is SubProblemRow & { poolMatch: SubToTwentyPoolFact } =>
+      p.poolMatch !== null,
+  )
+
+  // ── band-by-slot pass ──
+  for (const p of matched) {
+    const allowed = config.bandAllowedSlots[p.poolMatch.band]
+    if (!allowed.includes(p.index)) {
+      violations.push({
+        rule: 'band-by-slot',
+        problemIndex: p.index,
+        message:
+          `P${p.index} carries ${p.poolMatch.band} fact ` +
+          `${p.poolMatch.id} (category ${p.poolMatch.category}). ` +
+          `${p.poolMatch.band}-band is only allowed at slots ` +
+          `[${allowed.join(', ')}].`,
+        factId: p.poolMatch.id,
+      })
+    }
+  }
+
+  // ── category-cap pass ──
+  type MatchedSubRow = SubProblemRow & { poolMatch: SubToTwentyPoolFact }
+  const categoryCounts: Record<string, MatchedSubRow[]> = {}
+  for (const p of matched) {
+    const cat = p.poolMatch.category
+    if (!categoryCounts[cat]) categoryCounts[cat] = []
+    categoryCounts[cat]!.push(p)
+  }
+  for (const [cat, rows] of Object.entries(categoryCounts)) {
+    const cap = config.categoryCaps[cat as SubToTwentyCategory]
+    if (cap === undefined) continue
+    if (rows.length > cap) {
+      violations.push({
+        rule: 'category-cap',
+        problemIndex: null,
+        message:
+          `Category "${cat}" cap is ${cap}; canon has ${rows.length} ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}; facts ` +
+          `${rows.map((r) => r.poolMatch.id).join(', ')}).`,
+        factId: null,
+      })
+    }
+  }
+
+  // ── take-to-decade coverage pass (>= 1 in P4-P8) ──
+  const takeToDecadeInDiscriminate = matched.filter(
+    (p) => p.poolMatch.category === 'take-to-decade' && p.index >= 4,
+  )
+  if (takeToDecadeInDiscriminate.length < config.takeToDecadeInP4ToP8Min) {
+    violations.push({
+      rule: 'high-leverage-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.takeToDecadeInP4ToP8Min} take-to-decade ` +
+        `fact(s) MUST appear in P4-P8 (highest-leverage category — Dave's ` +
+        `sub-to-20 research § 4.2 names these as memorable anchors; Marian's ` +
+        `future bridging-down-through-the-decade strategy depends on retrieval). ` +
+        `Canon has ${takeToDecadeInDiscriminate.length}.`,
+      factId: null,
+    })
+  }
+
+  // ── Class B coverage pass (>= 2 CLEAN-annotated facts in P4-P8) ──
+  //
+  // The sub-to-20-specific rule (spec §2.2). The render pipeline attempts
+  // a Class B (decade-anchor miss) trap on every op:'-' P4-P8 problem
+  // and silently downgrades to Class A (off-by-one) when the trap
+  // aliases correct, aliases off-by-one, or falls out of range. Without
+  // >= 2 CLEAN-annotated facts at P4-P8, the new distractor class is
+  // effectively dead at render time — every Class B attempt collapses
+  // to the existing Class A behaviour and the pool's whole point is lost.
+  const cleanClassBInDiscriminate = matched.filter(
+    (p) => p.poolMatch.decStatus === 'CLEAN' && p.index >= 4,
+  )
+  if (cleanClassBInDiscriminate.length < config.cleanClassBInP4ToP8Min) {
+    violations.push({
+      rule: 'high-leverage-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.cleanClassBInP4ToP8Min} CLEAN-annotated ` +
+        `(Class B decade-anchor miss capable) fact(s) MUST appear in ` +
+        `P4-P8 (per design/math/sub-to-20-content.md §2.2 — without ` +
+        `this coverage every Class B attempt silently downgrades to ` +
+        `off-by-one and the decade-anchor distractor class is dead at ` +
+        `render time). CLEAN-annotated facts in pool: ` +
+        SUB_TO_TWENTY_POOL.filter((f) => f.decStatus === 'CLEAN')
+          .map((f) => f.id)
+          .join(', ') +
+        `. Canon has ${cleanClassBInDiscriminate.length} CLEAN at P4-P8.`,
+      factId: null,
+    })
+  }
+
+  // ── no-duplicates pass ──
+  const seen = new Map<string, SubProblemRow[]>()
+  for (const p of matched) {
+    const key = p.poolMatch.id
+    if (!seen.has(key)) seen.set(key, [])
+    seen.get(key)!.push(p)
+  }
+  for (const [factId, rows] of seen.entries()) {
+    if (rows.length > 1) {
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: null,
+        message:
+          `Fact ${factId} appears ${rows.length} times ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}). ` +
+          `No duplicates allowed within the 8-problem set.`,
+        factId,
+      })
+    }
+  }
+
+  return violations
+}
+
+/**
+ * Throwing helper for the bake-time integration point. The throw aborts
+ * the bake and stops the (compositionally invalid) JSON from reaching
+ * disk.
+ *
+ * `canonId` is a human-readable identifier (e.g. `"math/sub-to-20"`).
+ */
+export function assertSubToTwentyCompositionClean(
+  canonId: string,
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: SubToTwentyRulesConfig = SUB_TO_TWENTY_RULES,
+): void {
+  const violations = lintSubToTwentyComposition(response, config)
+  if (violations.length > 0) {
+    throw new CompositionLintError(canonId, violations)
+  }
+}
+
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
 // Current scope is sub-to-10 + add-to-10. The function returns a
 // (potentially nil) rule config for the supplied canon-file path.
 // Hard-coded matching; future tiers slot in here.
+//
+// sub-to-20 INFRASTRUCTURE (POOL, RULES, parser, lint, assert helper) is
+// LIVE in this file but the dispatch binding is DEFERRED until the
+// rebake PR — see the long-form comment at the end of resolveTierBinding.
 
 export type TierLintBinding =
   | { tier: 'sub-to-10'; config: SubToTenRulesConfig }
@@ -900,6 +1452,20 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   if (norm === 'add-to-10.json' || norm.endsWith('/add-to-10.json')) {
     return { tier: 'add-to-10', config: ADD_TO_TEN_RULES }
   }
+  // NOTE: sub-to-20 is INFRASTRUCTURE-ONLY in this PR (Kevin ticket 86c9utced).
+  // The committed `public/canon/math/level-1/sub-to-20.json` predates Kyle's
+  // PR #269 spec and openly violates the no-borrow constraint (Jessica's
+  // E2E spec PR #271 surfaced this — facts like 14-7, 18-9, 17-8 are in
+  // the file). Binding sub-to-20 in resolveTierBinding here would fail
+  // `npm run canon:lint` against the existing borked canon and block CI.
+  //
+  // The dispatch binding lands in the follow-up rebake PR (per
+  // `[[planner-and-canon.md §"Per-tier rebake recipe"]]`): rm the JSON,
+  // run `npx tsx scripts/generateSessionCanon.ts`, commit the fresh
+  // canon, and flip resolveTierBinding to bind sub-to-20 to
+  // SUB_TO_TWENTY_RULES in the same PR. The infrastructure (POOL, RULES,
+  // parser, lint function, assert helper, drift-guards) is all live in
+  // this PR — only the bake-time + CI hook is deferred.
   return null
 }
 

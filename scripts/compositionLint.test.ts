@@ -34,13 +34,18 @@ import {
   CompositionLintError,
   SUB_TO_TEN_POOL,
   SUB_TO_TEN_RULES,
+  SUB_TO_TWENTY_POOL,
+  SUB_TO_TWENTY_RULES,
   assertAddToTenCompositionClean,
   assertSubToTenCompositionClean,
+  assertSubToTwentyCompositionClean,
   formatCompositionLintReport,
   lintAddToTenComposition,
   lintSubToTenComposition,
+  lintSubToTwentyComposition,
   parseAddToTenReadLine,
   parseSubToTenReadLine,
+  parseSubToTwentyReadLine,
   resolveTierBinding,
   runCompositionLint,
 } from './compositionLint.ts'
@@ -738,9 +743,13 @@ describe('resolveTierBinding', () => {
   })
 
   it('returns null for out-of-scope tier files', () => {
-    // add-to-10 was previously out-of-scope (PR #245); now bound by this
-    // PR. Out-of-scope examples are now confined to other math tiers
-    // (add-to-20, sub-to-20, mult-*, etc.) and the word-song tiers.
+    // sub-to-10 + add-to-10 are bake-time-bound in this PR. sub-to-20
+    // infrastructure (POOL, RULES, parser, lint function) ships in this
+    // PR but the resolveTierBinding hook is DEFERRED to the rebake PR
+    // (the committed sub-to-20.json predates Kyle's spec and openly
+    // violates no-borrow — see Jessica's E2E findings in PR #271 and
+    // the long-form comment at the end of resolveTierBinding in
+    // compositionLint.ts).
     expect(resolveTierBinding('canon/math/level-1/add-to-20.json')).toBeNull()
     expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')).toBeNull()
     expect(
@@ -1102,7 +1111,15 @@ describe('SUB_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
     // Parses `api/_planner.ts` FACT POOL bullets at runtime. If the
     // directive moves a fact (e.g. relabels a band, removes a fact,
     // adds a 17th), this fails until the mirror is updated to match.
-    const parsed = parseDirectiveFactPool(MATH_TRACK_GUIDE)
+    //
+    // Scope to the sub-to-10 tier-block via `extractTierBlock`: once a
+    // second math tier with the same `· <a>-<b>=<answer> [BAND/category]`
+    // bullet shape lands (sub-to-20 in this PR), an unscoped parse of
+    // the full `MATH_TRACK_GUIDE` would conflate the two tiers' pools.
+    // Per `planner-and-canon.md` § "Tier-block scoping for multi-tier
+    // drift-guards" the parser must operate on the tier-specific slice.
+    const subToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-10')
+    const parsed = parseDirectiveFactPool(subToTenBlock)
     expect(parsed).toEqual(EXPECTED_POOL_FROM_DIRECTIVE)
   })
 
@@ -1111,7 +1128,10 @@ describe('SUB_TO_TEN_POOL drift-guard against MATH_TRACK_GUIDE directive prose',
     // format is reformatted in a way that escapes the regex (parsed
     // would be []) or where someone adds extra bullets the mirror
     // doesn't cover. Post-PR #252 spec ratification: 22 facts.
-    const parsed = parseDirectiveFactPool(MATH_TRACK_GUIDE)
+    //
+    // Tier-block-scoped per the comment above.
+    const subToTenBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-10')
+    const parsed = parseDirectiveFactPool(subToTenBlock)
     expect(parsed).toHaveLength(SUB_TO_TEN_POOL.length)
     expect(parsed).toHaveLength(22)
   })
@@ -2448,5 +2468,1249 @@ describe('ADD_TO_TEN_RULES.bandAllowedSlots drift-guard against directive prose'
     expect(() => extractTierBlock(proseMissingAdd, 'add-to-10')).toThrow(
       /could not locate tier header "- add-to-10:"/,
     )
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// sub-to-20 lint tests (Kyle's PR #269 spec)
+// ═════════════════════════════════════════════════════════════════════════
+
+// ── sub-to-20 fixture helpers ────────────────────────────────────────────
+
+const TEEN_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+] as const
+
+function teenWord(n: number): string {
+  return TEEN_WORDS[n]!
+}
+
+/** Build a `math.p<N>.read` sub-to-20 utterance with the "minus" template. */
+function readSubToTwentyUtterance(
+  index: number,
+  a: number,
+  b: number,
+): Utterance {
+  return {
+    id: `math.p${index}.read`,
+    text: `${teenWord(a)} minus ${teenWord(b)}. How many are left?`,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+/** Convenience: build a SessionStartResponse with the given 8 sub-to-20 facts. */
+function buildSubToTwentyCanonResponse(
+  facts: Array<[a: number, b: number]>,
+): SessionStartResponse {
+  const utterances: Utterance[] = facts.map(([a, b], i) =>
+    readSubToTwentyUtterance(i + 1, a, b),
+  )
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: { id: 'test', label: 'test', utterances: [] },
+    utterances,
+  }
+}
+
+/** A canonically valid 8-fact sub-to-20 session.
+ *
+ *  Picked to satisfy every rule simultaneously:
+ *    P1 11-1 [EASY/subtract-one]     (subtract-one cap=1, satisfied)
+ *    P2 12-2 [EASY/doubles-anchor]   (doubles-anchor cap=1, satisfied)
+ *    P3 13-3 [EASY/take-to-decade]   (take-to-decade #1; EASY at P3
+ *                                     does NOT count toward P4-P8 coverage
+ *                                     — the MEDIUM 15-5 at P5 satisfies it)
+ *    P4 14-2 [MEDIUM/subtract-two]   (CLEAN; subtract-two cap=1, satisfied)
+ *    P5 15-5 [MEDIUM/take-to-decade] (ALIAS; take-to-decade #2 → cap=2 done;
+ *                                     P4-P8 take-to-decade coverage met)
+ *    P6 15-3 [MEDIUM/subtract-three] (CLEAN; subtract-three cap=1, satisfied)
+ *    P7 16-4 [MEDIUM/general]        (CLEAN; general #1)
+ *    P8 17-5 [HARD/general]          (CLEAN; general #2 → cap=2 done)
+ *
+ *  P4-P8 CLEAN count: 4 (14-2, 15-3, 16-4, 17-5) — meets >=2 Class B rule.
+ *  P4-P8 take-to-decade count: 1 (15-5) — meets >=1 coverage rule.
+ *  Band-by-slot: EASY at P1-P3, MEDIUM at P4-P7, HARD at P8 (P5+ ok).
+ */
+const CLEAN_SUB_TO_TWENTY_FACTS: ReadonlyArray<[number, number]> = [
+  [11, 1], // P1 EASY subtract-one
+  [12, 2], // P2 EASY doubles-anchor
+  [13, 3], // P3 EASY take-to-decade
+  [14, 2], // P4 MEDIUM subtract-two CLEAN
+  [15, 5], // P5 MEDIUM take-to-decade ALIAS (covers P4-P8 take-to-decade)
+  [15, 3], // P6 MEDIUM subtract-three CLEAN
+  [16, 4], // P7 MEDIUM general CLEAN
+  [17, 5], // P8 HARD general CLEAN
+]
+
+// ── parseSubToTwentyReadLine ─────────────────────────────────────────────
+
+describe('parseSubToTwentyReadLine', () => {
+  it('parses the "minus" template with teen minuend', () => {
+    expect(
+      parseSubToTwentyReadLine('Fifteen minus three. How many are left?'),
+    ).toEqual({ a: 15, b: 3 })
+  })
+
+  it('parses the extremes of the no-borrow pool (11-1 and 19-9)', () => {
+    expect(
+      parseSubToTwentyReadLine('Eleven minus one. How many are left?'),
+    ).toEqual({ a: 11, b: 1 })
+    expect(
+      parseSubToTwentyReadLine('Nineteen minus nine. How many are left?'),
+    ).toEqual({ a: 19, b: 9 })
+  })
+
+  it('is case-insensitive', () => {
+    expect(
+      parseSubToTwentyReadLine('SIXTEEN minus FOUR. how many ARE LEFT?'),
+    ).toEqual({ a: 16, b: 4 })
+  })
+
+  it('returns null for "take away" template (sub-to-20 uses "minus" only)', () => {
+    // Spec §4.3 + §7.2 — no first-session "take away" variant for sub-to-20.
+    expect(
+      parseSubToTwentyReadLine('Fifteen take away three. How many are left?'),
+    ).toBeNull()
+  })
+
+  it('returns null for addition template (out of scope)', () => {
+    expect(parseSubToTwentyReadLine('Seven plus three. How many?')).toBeNull()
+  })
+
+  it('returns null for unrecognised number words', () => {
+    expect(
+      parseSubToTwentyReadLine('Twenty minus three. How many are left?'),
+    ).toBeNull()
+  })
+
+  it('returns null for completely off-shape text', () => {
+    expect(parseSubToTwentyReadLine('Tap the cat.')).toBeNull()
+    expect(parseSubToTwentyReadLine('')).toBeNull()
+  })
+})
+
+// ── SUB_TO_TWENTY_POOL sanity ────────────────────────────────────────────
+
+describe('SUB_TO_TWENTY_POOL', () => {
+  it("contains exactly 22 facts (per Kyle's spec §1.1)", () => {
+    expect(SUB_TO_TWENTY_POOL).toHaveLength(22)
+  })
+
+  it('every fact has a unique id', () => {
+    const ids = new Set(SUB_TO_TWENTY_POOL.map((f) => f.id))
+    expect(ids.size).toBe(SUB_TO_TWENTY_POOL.length)
+  })
+
+  it('every fact id matches its (a, b) numerics', () => {
+    for (const f of SUB_TO_TWENTY_POOL) {
+      expect(f.id).toBe(`${f.a}-${f.b}`)
+    }
+  })
+
+  it('every fact satisfies the no-borrow constraint (ones-digit(a) >= b)', () => {
+    for (const f of SUB_TO_TWENTY_POOL) {
+      expect(
+        f.a % 10,
+        `pool fact ${f.id} violates no-borrow (ones-digit ${f.a % 10} < b=${f.b})`,
+      ).toBeGreaterThanOrEqual(f.b)
+    }
+  })
+
+  it('every fact answer is in [10, 18]', () => {
+    for (const f of SUB_TO_TWENTY_POOL) {
+      const answer = f.a - f.b
+      expect(answer).toBeGreaterThanOrEqual(10)
+      expect(answer).toBeLessThanOrEqual(18)
+    }
+  })
+
+  it('band counts match spec §1.1: 6 EASY, 10 MEDIUM, 6 HARD', () => {
+    const counts = SUB_TO_TWENTY_POOL.reduce(
+      (acc, f) => {
+        acc[f.band] = (acc[f.band] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts.EASY).toBe(6)
+    expect(counts.MEDIUM).toBe(10)
+    expect(counts.HARD).toBe(6)
+  })
+
+  it('category counts match spec §1.1: subtract-one ×3, doubles-anchor ×1, take-to-decade ×7, subtract-two ×3, subtract-three ×1, general ×7', () => {
+    const counts = SUB_TO_TWENTY_POOL.reduce(
+      (acc, f) => {
+        acc[f.category] = (acc[f.category] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts['subtract-one']).toBe(3)
+    expect(counts['doubles-anchor']).toBe(1)
+    expect(counts['take-to-decade']).toBe(7)
+    expect(counts['subtract-two']).toBe(3)
+    expect(counts['subtract-three']).toBe(1)
+    expect(counts['general']).toBe(7)
+  })
+
+  it('decStatus matches the spec §1.1 column for each fact (4 CLEAN, 5 BOUNDARY, 13 ALIAS)', () => {
+    // Per spec §1.1 availability table: 4 MEDIUM/HARD facts with separation
+    // >= 2 are CLEAN at P4-P8 eligibility; EASY 13-1=12 is CLEAN but EASY-
+    // restricted so does NOT count toward P4-P8 coverage. Total CLEAN = 5
+    // including EASY 13-1, MEDIUM 14-2/15-3/15-2/16-4, HARD 17-5/18-6/19-7
+    // — wait, that's more than 4. Let me recount from SUB_TO_TWENTY_POOL:
+    //   EASY:   13-1 CLEAN                                  → 1
+    //   MEDIUM: 14-2, 15-3, 15-2, 16-4 CLEAN                → 4
+    //   HARD:   17-5, 18-6, 19-7 CLEAN                      → 3
+    //   Total CLEAN: 8.
+    //   BOUNDARY: 12-1, 13-2 (EASY) + 14-3, 15-4, 16-5 (MEDIUM) → 5
+    //   ALIAS: 11-1, 12-2, 13-3 (EASY) + 14-4, 15-5, 16-6 (MEDIUM)
+    //          + 17-7, 18-8, 19-9 (HARD)                        → 9
+    //   Sum: 8 + 5 + 9 = 22. ✓
+    const counts = SUB_TO_TWENTY_POOL.reduce(
+      (acc, f) => {
+        acc[f.decStatus] = (acc[f.decStatus] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts.CLEAN).toBe(8)
+    expect(counts.BOUNDARY).toBe(5)
+    expect(counts.ALIAS).toBe(9)
+  })
+
+  it('forbids borrow facts (e.g. 14-7=7, 18-9=9 are NOT in the pool)', () => {
+    // ones-digit(14)=4 < 7 → BORROW, FORBIDDEN
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '14-7')).toBeUndefined()
+    // ones-digit(18)=8 < 9 → BORROW, FORBIDDEN
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '18-9')).toBeUndefined()
+    // ones-digit(15)=5 < 7 → BORROW, FORBIDDEN
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '15-7')).toBeUndefined()
+  })
+
+  it('includes the highest-leverage HARD take-to-decade exemplars (15-5, 16-6, 17-7, 18-8, 19-9)', () => {
+    // Dave § 4.2 names these as memorable anchors.
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '15-5')).toBeDefined()
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '16-6')).toBeDefined()
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '17-7')).toBeDefined()
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '18-8')).toBeDefined()
+    expect(SUB_TO_TWENTY_POOL.find((f) => f.id === '19-9')).toBeDefined()
+  })
+})
+
+// ── SUB_TO_TWENTY_RULES sanity ───────────────────────────────────────────
+
+describe('SUB_TO_TWENTY_RULES', () => {
+  it('has totalProblems = 8', () => {
+    expect(SUB_TO_TWENTY_RULES.totalProblems).toBe(8)
+  })
+
+  it('has take-to-decade cap of 2 (high-value, relaxed cap per spec §2.3)', () => {
+    expect(SUB_TO_TWENTY_RULES.categoryCaps['take-to-decade']).toBe(2)
+  })
+
+  it('has general cap of 2 (HARD cap)', () => {
+    expect(SUB_TO_TWENTY_RULES.categoryCaps['general']).toBe(2)
+  })
+
+  it('has subtract-one, doubles-anchor, subtract-two, subtract-three all capped at 1', () => {
+    expect(SUB_TO_TWENTY_RULES.categoryCaps['subtract-one']).toBe(1)
+    expect(SUB_TO_TWENTY_RULES.categoryCaps['doubles-anchor']).toBe(1)
+    expect(SUB_TO_TWENTY_RULES.categoryCaps['subtract-two']).toBe(1)
+    expect(SUB_TO_TWENTY_RULES.categoryCaps['subtract-three']).toBe(1)
+  })
+
+  it('EASY allowed at P1-P3 only (gentle ramp; FORBIDDEN at discriminate tier)', () => {
+    expect(SUB_TO_TWENTY_RULES.bandAllowedSlots.EASY).toEqual([1, 2, 3])
+  })
+
+  it('MEDIUM allowed at P4-P8 only', () => {
+    expect(SUB_TO_TWENTY_RULES.bandAllowedSlots.MEDIUM).toEqual([4, 5, 6, 7, 8])
+  })
+
+  it('HARD allowed at P5-P8 only', () => {
+    expect(SUB_TO_TWENTY_RULES.bandAllowedSlots.HARD).toEqual([5, 6, 7, 8])
+  })
+
+  it('takeToDecadeInP4ToP8Min = 1 (Dave § 4.2 high-leverage exemplars)', () => {
+    expect(SUB_TO_TWENTY_RULES.takeToDecadeInP4ToP8Min).toBe(1)
+  })
+
+  it('cleanClassBInP4ToP8Min = 2 (Kyle spec §2.2 Class B coverage)', () => {
+    // The sub-to-20-specific rule: >=2 CLEAN-annotated facts in P4-P8 so
+    // the Class B (decade-anchor miss) distractor class is live at render
+    // time rather than silently downgrading on every problem.
+    expect(SUB_TO_TWENTY_RULES.cleanClassBInP4ToP8Min).toBe(2)
+  })
+})
+
+// ── lintSubToTwentyComposition: clean canon ──────────────────────────────
+
+describe('lintSubToTwentyComposition — clean canon passes', () => {
+  it('returns 0 violations for the canonical 8-fact set', () => {
+    const response = buildSubToTwentyCanonResponse([
+      ...CLEAN_SUB_TO_TWENTY_FACTS,
+    ])
+    expect(lintSubToTwentyComposition(response)).toEqual([])
+  })
+
+  it('does not throw via assert helper', () => {
+    const response = buildSubToTwentyCanonResponse([
+      ...CLEAN_SUB_TO_TWENTY_FACTS,
+    ])
+    expect(() =>
+      assertSubToTwentyCompositionClean('math/sub-to-20', response),
+    ).not.toThrow()
+  })
+})
+
+// ── lintSubToTwentyComposition: pool-membership rule ─────────────────────
+
+describe('lintSubToTwentyComposition — pool-membership rule', () => {
+  it('fires on a BORROW fact (14-7=7) — flagged as outside the 22-fact pool', () => {
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [14, 7], // BORROW — outside pool
+      [15, 5],
+      [16, 4],
+      [17, 5],
+      [19, 9],
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(4)
+    expect(pool[0]!.factId).toBe('14-7')
+    expect(pool[0]!.message).toContain('NOT in the 22-fact sub-to-20')
+  })
+
+  it('fires on a no-borrow fact that is outside the v1 curation (15-1=14)', () => {
+    // 15-1=14: ones-digit(15)=5 >= 1 → no-borrow OK, but NOT in the 22.
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [15, 1], // outside v1 curation
+      [15, 5],
+      [16, 4],
+      [17, 5],
+      [19, 9],
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.factId).toBe('15-1')
+  })
+
+  it('fires on multiple borrow candidates at once (18-9, 17-8, 15-7)', () => {
+    // All three are BORROW (ones-digit < subtrahend). Note: this fixture
+    // also blows other rules (e.g. P4-P8 take-to-decade may not be met)
+    // but the pool-membership rule fires independently per problem.
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [14, 2],
+      [18, 9], // BORROW
+      [17, 8], // BORROW
+      [15, 7], // BORROW
+      [19, 9],
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(3)
+    const factIds = pool.map((v) => v.factId).sort()
+    expect(factIds).toEqual(['15-7', '17-8', '18-9'])
+  })
+})
+
+// ── lintSubToTwentyComposition: category-cap rule ────────────────────────
+
+describe('lintSubToTwentyComposition — category-cap rule', () => {
+  it('fires on subtract-one count > 1 (only one subtract-one allowed)', () => {
+    // 11-1 AND 13-1 are both subtract-one EASY. Pair them at P1+P2 (and
+    // backfill P3 with a non-subtract-one EASY fact to keep gentle ramp
+    // legal). Note: 12-1 is ALSO subtract-one, so picking three would
+    // also blow the cap; we keep two for a minimal fixture.
+    const facts: Array<[number, number]> = [
+      [11, 1], // subtract-one
+      [13, 1], // subtract-one (cap busted; one combined cap)
+      [12, 2], // doubles-anchor (replace any sibling without changing the cap fire)
+      [14, 2],
+      [15, 5],
+      [16, 4],
+      [17, 5],
+      [19, 9],
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const cap = violations.filter(
+      (v) => v.rule === 'category-cap' && v.message.includes('subtract-one'),
+    )
+    expect(cap).toHaveLength(1)
+    expect(cap[0]!.message).toContain('cap is 1')
+    expect(cap[0]!.message).toContain('canon has 2')
+  })
+
+  it('fires on general count > 2 (HARD cap)', () => {
+    // 14-3, 16-4 MEDIUM/general + 17-5, 18-6, 19-7 HARD/general = 5
+    // generals. Reduce to 3 to trip the cap minimally:
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [16, 4], // general MEDIUM
+      [15, 5], // take-to-decade MEDIUM (preserves coverage rule)
+      [17, 5], // general HARD
+      [18, 6], // general HARD (3rd general — cap busted)
+      [19, 9], // take-to-decade HARD
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const cap = violations.filter(
+      (v) => v.rule === 'category-cap' && v.message.includes('"general"'),
+    )
+    expect(cap).toHaveLength(1)
+    expect(cap[0]!.message).toContain('cap is 2')
+    expect(cap[0]!.message).toContain('canon has 3')
+  })
+
+  it('does NOT fire on take-to-decade count of 2 (cap is 2 — at the cap, not over)', () => {
+    // CLEAN_SUB_TO_TWENTY_FACTS has 13-3 at P3 (EASY take-to-decade) +
+    // 15-5 at P5 (MEDIUM take-to-decade ALIAS) = 2 take-to-decade total,
+    // exactly at the cap. No category-cap violation should fire for this
+    // category.
+    const facts: Array<[number, number]> = [...CLEAN_SUB_TO_TWENTY_FACTS]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const cap = violations.filter(
+      (v) => v.rule === 'category-cap' && v.message.includes('take-to-decade'),
+    )
+    expect(cap).toEqual([])
+  })
+
+  it('fires on subtract-two count > 1', () => {
+    // 14-2 + 15-2 both MEDIUM/subtract-two. Cap = 1.
+    // Note: subtract-three (cap 1) and doubles-anchor (cap 1) only have
+    // ONE pool entry each (15-3 and 12-2 respectively), so their caps
+    // are structurally unreachable except via no-duplicates which fires
+    // on the same fixture. Subtract-two and subtract-one are the testable
+    // singleton caps. Subtract-one is covered above; this covers
+    // subtract-two.
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [14, 2], // subtract-two
+      [15, 2], // subtract-two (cap busted; both MEDIUM, both CLEAN)
+      [15, 3],
+      [16, 4],
+      [17, 5],
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const cap = violations.filter(
+      (v) => v.rule === 'category-cap' && v.message.includes('subtract-two'),
+    )
+    expect(cap).toHaveLength(1)
+    expect(cap[0]!.message).toContain('cap is 1')
+    expect(cap[0]!.message).toContain('canon has 2')
+  })
+})
+
+// ── lintSubToTwentyComposition: band-by-slot rule ────────────────────────
+
+describe('lintSubToTwentyComposition — band-by-slot rule', () => {
+  it('fires when HARD-band fact appears at P4 (P1-P4 forbid HARD)', () => {
+    // Move 17-5 (HARD/general) to P4.
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [17, 5], // HARD at P4 — band-by-slot violation
+      [15, 5],
+      [16, 4],
+      [14, 2],
+      [19, 9],
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const band = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(band).toHaveLength(1)
+    expect(band[0]!.problemIndex).toBe(4)
+    expect(band[0]!.factId).toBe('17-5')
+    expect(band[0]!.message).toContain('HARD')
+  })
+
+  it('fires when MEDIUM-band fact appears at P3 (P1-P3 EASY-only)', () => {
+    // Move 14-2 (MEDIUM/subtract-two CLEAN) to P3 — the only violation
+    // under test. We accept that this fixture trips OTHER rules too
+    // (13-3 at P4 is also EASY-at-P4-P8 band-by-slot violation; 17-5 +
+    // 18-6 + 16-4 is 3 generals which busts the general cap) and filter
+    // the assertion to band-by-slot at P3 specifically.
+    const facts: Array<[number, number]> = [
+      [11, 1], // P1 EASY
+      [12, 2], // P2 EASY
+      [14, 2], // P3 MEDIUM at P3 — the band-by-slot violation under test
+      [13, 3], // P4 EASY at P4-P8 — separate (filtered out) violation
+      [15, 5], // P5 MEDIUM take-to-decade
+      [16, 4], // P6 MEDIUM general
+      [17, 5], // P7 HARD general
+      [19, 9], // P8 HARD take-to-decade
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const band = violations.filter(
+      (v) => v.rule === 'band-by-slot' && v.problemIndex === 3,
+    )
+    expect(band).toHaveLength(1)
+    expect(band[0]!.factId).toBe('14-2')
+    expect(band[0]!.message).toContain('MEDIUM')
+  })
+
+  it('fires when EASY-band fact appears at P5 (P4-P8 forbid EASY)', () => {
+    // Fixture sites 13-1 (EASY/subtract-one CLEAN) at P5 to trip the
+    // P4-P8-EASY-forbidden rule. P1 is 12-2 (doubles-anchor) and P2 is
+    // 11-1 (subtract-one) so the subtract-one cap = 1 is satisfied:
+    // only ONE subtract-one fact (11-1 at P2) sits IN the matched set
+    // (13-1 at P5 also-fires band-by-slot but still counts toward
+    // category-cap — so we have to choose between band-by-slot test
+    // isolation vs subtract-one cap cleanliness; here we accept that
+    // category-cap subtract-one ALSO fires, and assert only band-by-slot).
+    const facts: Array<[number, number]> = [
+      [12, 2], // P1 EASY doubles-anchor
+      [11, 1], // P2 EASY subtract-one
+      [13, 3], // P3 EASY take-to-decade
+      [14, 2], // P4 MEDIUM subtract-two CLEAN
+      [13, 1], // P5 EASY subtract-one — band-by-slot violation (the one we want)
+      [16, 4], // P6 MEDIUM general CLEAN
+      [17, 5], // P7 HARD general CLEAN
+      [19, 9], // P8 HARD take-to-decade ALIAS
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const band = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(band).toHaveLength(1)
+    expect(band[0]!.problemIndex).toBe(5)
+    expect(band[0]!.factId).toBe('13-1')
+    expect(band[0]!.message).toContain('EASY')
+    expect(band[0]!.message).toContain('[1, 2, 3]')
+  })
+
+  it('does NOT fire when HARD facts are at P5-P8', () => {
+    const facts: Array<[number, number]> = [...CLEAN_SUB_TO_TWENTY_FACTS]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    expect(violations.filter((v) => v.rule === 'band-by-slot')).toEqual([])
+  })
+})
+
+// ── lintSubToTwentyComposition: take-to-decade coverage rule ─────────────
+
+describe('lintSubToTwentyComposition — take-to-decade coverage rule', () => {
+  it('fires when no take-to-decade fact appears in P4-P8', () => {
+    // Structural note: under pool composition + category caps, a
+    // take-to-decade-FREE P4-P8 forces at least one OTHER rule to fire
+    // alongside (general cap = 2; remaining 5 P4-P8 slots must absorb
+    // 2 HARD generals + 3 MEDIUM non-take-to-decade, but MEDIUM has
+    // only subtract-two ×2 + subtract-three ×1 + general ×3 outside
+    // take-to-decade, and the singleton caps + general cap pin MEDIUM
+    // contribution to <= 3 with at most 1 of each singleton — so 3
+    // generals in P4-P8 always blow the cap). We accept that the
+    // coverage fire here co-occurs with a category-cap fire and assert
+    // only the coverage rule.
+    const facts: Array<[number, number]> = [
+      [11, 1], // P1 EASY subtract-one
+      [12, 2], // P2 EASY doubles-anchor
+      [13, 3], // P3 EASY take-to-decade (at P3 — does NOT count toward P4-P8 coverage)
+      [14, 2], // P4 MEDIUM subtract-two CLEAN
+      [15, 3], // P5 MEDIUM subtract-three CLEAN
+      [16, 4], // P6 MEDIUM general CLEAN
+      [17, 5], // P7 HARD general CLEAN (general count 2)
+      [18, 6], // P8 HARD general CLEAN (general count 3 — cap fires alongside)
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    expect(
+      violations.find(
+        (v) =>
+          v.rule === 'high-leverage-coverage' &&
+          v.message.includes('take-to-decade'),
+      ),
+    ).toBeDefined()
+  })
+
+  it('does NOT fire when >= 1 take-to-decade appears at P4-P8', () => {
+    // CLEAN_SUB_TO_TWENTY_FACTS has 15-5 at P5 and 19-9 at P8.
+    const facts: Array<[number, number]> = [...CLEAN_SUB_TO_TWENTY_FACTS]
+    const cov = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    ).filter(
+      (v) =>
+        v.rule === 'high-leverage-coverage' &&
+        v.message.includes('take-to-decade'),
+    )
+    expect(cov).toEqual([])
+  })
+})
+
+// ── lintSubToTwentyComposition: Class B coverage rule (NEW for sub-to-20) ─
+
+describe('lintSubToTwentyComposition — Class B (decade-anchor miss) coverage rule', () => {
+  it('fires when < 2 CLEAN-annotated facts appear in P4-P8 (every P4-P8 problem is ALIAS or BOUNDARY)', () => {
+    // Pack P4-P8 with ALIAS / BOUNDARY-annotated facts only.
+    //   P4 14-4 MEDIUM/take-to-decade ALIAS
+    //   P5 15-5 MEDIUM/take-to-decade ALIAS — also satisfies take-to-decade coverage
+    //   P6 14-3 MEDIUM/general BOUNDARY (general 1)
+    //   P7 15-4 MEDIUM/general BOUNDARY (general 2)
+    //   P8 17-7 HARD/take-to-decade ALIAS — wait, that's 3 take-to-decade
+    //     (14-4 + 15-5 + 17-7 = 3 > cap 2). Swap to 16-5 MEDIUM/general
+    //     BOUNDARY (general 3 — cap busted). Pick a HARD non-general
+    //     non-take-to-decade: HARD has only take-to-decade and general.
+    //     → Same structural problem: pool composition is forcing
+    //       interactions. Use 18-8 HARD take-to-decade — then 14-4 +
+    //       15-5 + 18-8 = 3 take-to-decade (cap 2). Accept the
+    //       take-to-decade cap fire alongside the Class B coverage fire
+    //       and filter the assertion.
+    const facts: Array<[number, number]> = [
+      [11, 1], // P1 EASY (ALIAS — irrelevant for Class B)
+      [12, 2], // P2 EASY
+      [13, 3], // P3 EASY
+      [14, 4], // P4 MEDIUM take-to-decade ALIAS
+      [15, 5], // P5 MEDIUM take-to-decade ALIAS
+      [14, 3], // P6 MEDIUM general BOUNDARY
+      [15, 4], // P7 MEDIUM general BOUNDARY
+      [17, 7], // P8 HARD take-to-decade ALIAS (3rd take-to-decade — cap)
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const classB = violations.filter(
+      (v) =>
+        v.rule === 'high-leverage-coverage' &&
+        v.message.includes('CLEAN-annotated'),
+    )
+    expect(classB).toHaveLength(1)
+    expect(classB[0]!.message).toContain('At least 2 CLEAN-annotated')
+    expect(classB[0]!.message).toContain('Canon has 0 CLEAN at P4-P8')
+  })
+
+  it('fires when exactly 1 CLEAN-annotated fact appears in P4-P8 (below the >=2 threshold)', () => {
+    //   P4 14-2 MEDIUM/subtract-two CLEAN (the only CLEAN at P4-P8)
+    //   P5 15-5 MEDIUM/take-to-decade ALIAS
+    //   P6 14-3 MEDIUM/general BOUNDARY (general 1)
+    //   P7 15-4 MEDIUM/general BOUNDARY — 2nd general (cap 2)
+    //   P8 17-7 HARD/take-to-decade ALIAS
+    const facts: Array<[number, number]> = [
+      [11, 1], // P1 EASY
+      [12, 2], // P2 EASY
+      [13, 3], // P3 EASY
+      [14, 2], // P4 MEDIUM subtract-two CLEAN — the ONE CLEAN
+      [15, 5], // P5 MEDIUM take-to-decade ALIAS
+      [14, 3], // P6 MEDIUM general BOUNDARY
+      [15, 4], // P7 MEDIUM general BOUNDARY
+      [17, 7], // P8 HARD take-to-decade ALIAS
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const classB = violations.filter(
+      (v) =>
+        v.rule === 'high-leverage-coverage' &&
+        v.message.includes('CLEAN-annotated'),
+    )
+    expect(classB).toHaveLength(1)
+    expect(classB[0]!.message).toContain('Canon has 1 CLEAN at P4-P8')
+  })
+
+  it('does NOT fire when exactly 2 CLEAN-annotated facts appear in P4-P8 (at the threshold)', () => {
+    // CLEAN_SUB_TO_TWENTY_FACTS: P4 14-2 CLEAN + P6 16-4 CLEAN + P7 17-5 CLEAN = 3 CLEAN.
+    // Above the threshold; rule does not fire.
+    const facts: Array<[number, number]> = [...CLEAN_SUB_TO_TWENTY_FACTS]
+    const classB = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    ).filter(
+      (v) =>
+        v.rule === 'high-leverage-coverage' &&
+        v.message.includes('CLEAN-annotated'),
+    )
+    expect(classB).toEqual([])
+  })
+
+  it('does NOT count EASY-band CLEAN facts (13-1 at P3 is CLEAN but EASY-restricted, not in P4-P8)', () => {
+    // Fixture: 13-1 (EASY CLEAN) at P3, then 3 ALIAS/BOUNDARY MEDIUM/HARD
+    // in P4-P8 → Class B rule should still fire because the EASY CLEAN
+    // doesn't qualify under the P4-P8 filter.
+    const facts: Array<[number, number]> = [
+      [11, 1], // P1 EASY
+      [12, 2], // P2 EASY
+      [13, 1], // P3 EASY CLEAN — but P3 is not in P4-P8
+      [14, 4], // P4 MEDIUM ALIAS
+      [15, 5], // P5 MEDIUM ALIAS
+      [14, 3], // P6 MEDIUM BOUNDARY
+      [15, 4], // P7 MEDIUM BOUNDARY
+      [17, 7], // P8 HARD ALIAS (3rd take-to-decade — caps)
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const classB = violations.filter(
+      (v) =>
+        v.rule === 'high-leverage-coverage' &&
+        v.message.includes('CLEAN-annotated'),
+    )
+    expect(classB).toHaveLength(1)
+    expect(classB[0]!.message).toContain('Canon has 0 CLEAN at P4-P8')
+  })
+})
+
+// ── lintSubToTwentyComposition: no-duplicates rule ───────────────────────
+
+describe('lintSubToTwentyComposition — no-duplicates rule', () => {
+  it('fires when the same (a, b) pair appears twice', () => {
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [14, 2], // first 14-2
+      [14, 2], // duplicate 14-2
+      [16, 4],
+      [17, 5],
+      [19, 9],
+    ]
+    const violations = lintSubToTwentyComposition(
+      buildSubToTwentyCanonResponse(facts),
+    )
+    const dup = violations.filter((v) => v.rule === 'no-duplicates')
+    expect(dup).toHaveLength(1)
+    expect(dup[0]!.factId).toBe('14-2')
+    expect(dup[0]!.message).toContain('appears 2 times')
+  })
+})
+
+// ── lintSubToTwentyComposition: unparseable-problem rule ─────────────────
+
+describe('lintSubToTwentyComposition — unparseable-problem rule', () => {
+  it('fires when read text uses sub-to-10\'s "take away" template', () => {
+    // Sub-to-20 uses "minus" only (spec §4.3 + §7.2).
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: {},
+      utterances: [
+        readSubToTwentyUtterance(1, 11, 1),
+        rawReadUtterance(2, 'Twelve take away two. How many are left?'),
+        readSubToTwentyUtterance(3, 13, 3),
+        readSubToTwentyUtterance(4, 14, 2),
+        readSubToTwentyUtterance(5, 15, 5),
+        readSubToTwentyUtterance(6, 16, 4),
+        readSubToTwentyUtterance(7, 17, 5),
+        readSubToTwentyUtterance(8, 19, 9),
+      ],
+    }
+    const violations = lintSubToTwentyComposition(response)
+    const unp = violations.filter((v) => v.rule === 'unparseable-problem')
+    expect(unp).toHaveLength(1)
+    expect(unp[0]!.problemIndex).toBe(2)
+  })
+
+  it('fires when read text uses addition template', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: {},
+      utterances: [
+        readSubToTwentyUtterance(1, 11, 1),
+        readSubToTwentyUtterance(2, 12, 2),
+        readSubToTwentyUtterance(3, 13, 3),
+        rawReadUtterance(4, 'Fourteen plus two. How many?'),
+        readSubToTwentyUtterance(5, 15, 5),
+        readSubToTwentyUtterance(6, 16, 4),
+        readSubToTwentyUtterance(7, 17, 5),
+        readSubToTwentyUtterance(8, 19, 9),
+      ],
+    }
+    const violations = lintSubToTwentyComposition(response)
+    const unp = violations.filter((v) => v.rule === 'unparseable-problem')
+    expect(unp).toHaveLength(1)
+    expect(unp[0]!.problemIndex).toBe(4)
+  })
+
+  it('fires when read text is wholly off-shape', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: {},
+      utterances: [
+        readSubToTwentyUtterance(1, 11, 1),
+        readSubToTwentyUtterance(2, 12, 2),
+        readSubToTwentyUtterance(3, 13, 3),
+        rawReadUtterance(4, 'garbage text'),
+        readSubToTwentyUtterance(5, 15, 5),
+        readSubToTwentyUtterance(6, 16, 4),
+        readSubToTwentyUtterance(7, 17, 5),
+        readSubToTwentyUtterance(8, 19, 9),
+      ],
+    }
+    const violations = lintSubToTwentyComposition(response)
+    expect(
+      violations.find((v) => v.rule === 'unparseable-problem'),
+    ).toBeDefined()
+  })
+})
+
+// ── assertSubToTwentyCompositionClean ────────────────────────────────────
+
+describe('assertSubToTwentyCompositionClean', () => {
+  it('does not throw on a clean canon', () => {
+    const response = buildSubToTwentyCanonResponse([
+      ...CLEAN_SUB_TO_TWENTY_FACTS,
+    ])
+    expect(() =>
+      assertSubToTwentyCompositionClean('math/sub-to-20', response),
+    ).not.toThrow()
+  })
+
+  it('throws CompositionLintError with the canon id + violations', () => {
+    // 3 take-to-decade in P4-P8 → cap busted.
+    const facts: Array<[number, number]> = [
+      [11, 1],
+      [12, 2],
+      [13, 3],
+      [14, 4], // take-to-decade 1
+      [15, 5], // take-to-decade 2
+      [16, 6], // take-to-decade 3 (cap busted)
+      [17, 5],
+      [19, 9], // take-to-decade 4 (further cap busted)
+    ]
+    const response = buildSubToTwentyCanonResponse(facts)
+    try {
+      assertSubToTwentyCompositionClean('math/sub-to-20', response)
+      expect.fail('expected throw')
+    } catch (err) {
+      expect(err).toBeInstanceOf(CompositionLintError)
+      const e = err as CompositionLintError
+      expect(e.canonId).toBe('math/sub-to-20')
+      expect(e.violations.length).toBeGreaterThanOrEqual(1)
+      expect(e.message).toContain('math/sub-to-20')
+    }
+  })
+})
+
+// ── resolveTierBinding for sub-to-20 — DEFERRED to the rebake PR ─────────
+//
+// The dispatch binding is not active in this PR (the committed sub-to-20
+// canon predates Kyle's spec and openly violates no-borrow; binding it
+// here would fail `npm run canon:lint` against the existing borked
+// canon and block CI). The infrastructure (POOL, RULES, parser, lint
+// function, assert helper, drift-guards) IS live; only the
+// resolveTierBinding hook + the runCompositionLint disk-walker dispatch
+// land in the follow-up rebake PR alongside a fresh canon.
+
+describe('resolveTierBinding — sub-to-20 is OUT-of-scope until the rebake PR', () => {
+  it('returns null for sub-to-20 canon paths in this PR', () => {
+    // Forward-extension contract: when the rebake PR lands, this test
+    // flips to assert `binding.tier === 'sub-to-20'` (mirroring the
+    // sub-to-10 + add-to-10 dispatch tests above). Until then, the
+    // binding stays out-of-scope so the existing broken canon doesn't
+    // block CI.
+    expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')).toBeNull()
+    expect(resolveTierBinding('sub-to-20.json')).toBeNull()
+  })
+})
+
+// ── drift-guard: SUB_TO_TWENTY_POOL ↔ MATH_TRACK_GUIDE directive prose ───
+//
+// Mirrors the sub-to-10 POOL drift-guard above (PR #246), forward-extended
+// to sub-to-20. Same hybrid pattern: hand-mirrored constant + runtime
+// parser + 2-sided equality. Tier-block-scoped via `extractTierBlock` per
+// `planner-and-canon.md` § "Tier-block scoping for multi-tier drift-guards"
+// — required because the sub-to-20 FACT POOL block uses the same `· N-M=`
+// bullet format as the sub-to-10 block, so an unscoped parse against
+// `MATH_TRACK_GUIDE` would conflate the two pools.
+
+/** MIRROR of `api/_planner.ts` `MATH_TRACK_GUIDE` sub-to-20 FACT POOL
+ *  block (22 bullet lines). Update both in lockstep when widening or
+ *  reshaping the pool.
+ *
+ *  Source bullet format:
+ *    `    · 11-1=10  [EASY/subtract-one]    (DEC=10 ALIAS)`
+ *
+ *  The DEC annotation `(DEC=N ALIAS|BOUNDARY|CLEAN — ...)` IS encoded
+ *  here (unlike sub-to-10's a+b annotation) because `decStatus` is
+ *  load-bearing for the Class B coverage rule and the drift-guard
+ *  must catch any silent change to that classification. */
+const EXPECTED_SUB_TO_TWENTY_POOL_FROM_DIRECTIVE: readonly (typeof SUB_TO_TWENTY_POOL)[number][] =
+  [
+    // EASY band (6 facts)
+    {
+      id: '11-1',
+      a: 11,
+      b: 1,
+      band: 'EASY',
+      category: 'subtract-one',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '12-2',
+      a: 12,
+      b: 2,
+      band: 'EASY',
+      category: 'doubles-anchor',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '13-3',
+      a: 13,
+      b: 3,
+      band: 'EASY',
+      category: 'take-to-decade',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '12-1',
+      a: 12,
+      b: 1,
+      band: 'EASY',
+      category: 'subtract-one',
+      decStatus: 'BOUNDARY',
+    },
+    {
+      id: '13-2',
+      a: 13,
+      b: 2,
+      band: 'EASY',
+      category: 'subtract-two',
+      decStatus: 'BOUNDARY',
+    },
+    {
+      id: '13-1',
+      a: 13,
+      b: 1,
+      band: 'EASY',
+      category: 'subtract-one',
+      decStatus: 'CLEAN',
+    },
+    // MEDIUM band (10 facts)
+    {
+      id: '14-4',
+      a: 14,
+      b: 4,
+      band: 'MEDIUM',
+      category: 'take-to-decade',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '14-3',
+      a: 14,
+      b: 3,
+      band: 'MEDIUM',
+      category: 'general',
+      decStatus: 'BOUNDARY',
+    },
+    {
+      id: '14-2',
+      a: 14,
+      b: 2,
+      band: 'MEDIUM',
+      category: 'subtract-two',
+      decStatus: 'CLEAN',
+    },
+    {
+      id: '15-5',
+      a: 15,
+      b: 5,
+      band: 'MEDIUM',
+      category: 'take-to-decade',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '15-4',
+      a: 15,
+      b: 4,
+      band: 'MEDIUM',
+      category: 'general',
+      decStatus: 'BOUNDARY',
+    },
+    {
+      id: '15-3',
+      a: 15,
+      b: 3,
+      band: 'MEDIUM',
+      category: 'subtract-three',
+      decStatus: 'CLEAN',
+    },
+    {
+      id: '15-2',
+      a: 15,
+      b: 2,
+      band: 'MEDIUM',
+      category: 'subtract-two',
+      decStatus: 'CLEAN',
+    },
+    {
+      id: '16-6',
+      a: 16,
+      b: 6,
+      band: 'MEDIUM',
+      category: 'take-to-decade',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '16-5',
+      a: 16,
+      b: 5,
+      band: 'MEDIUM',
+      category: 'general',
+      decStatus: 'BOUNDARY',
+    },
+    {
+      id: '16-4',
+      a: 16,
+      b: 4,
+      band: 'MEDIUM',
+      category: 'general',
+      decStatus: 'CLEAN',
+    },
+    // HARD band (6 facts)
+    {
+      id: '17-7',
+      a: 17,
+      b: 7,
+      band: 'HARD',
+      category: 'take-to-decade',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '17-5',
+      a: 17,
+      b: 5,
+      band: 'HARD',
+      category: 'general',
+      decStatus: 'CLEAN',
+    },
+    {
+      id: '18-8',
+      a: 18,
+      b: 8,
+      band: 'HARD',
+      category: 'take-to-decade',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '18-6',
+      a: 18,
+      b: 6,
+      band: 'HARD',
+      category: 'general',
+      decStatus: 'CLEAN',
+    },
+    {
+      id: '19-9',
+      a: 19,
+      b: 9,
+      band: 'HARD',
+      category: 'take-to-decade',
+      decStatus: 'ALIAS',
+    },
+    {
+      id: '19-7',
+      a: 19,
+      b: 7,
+      band: 'HARD',
+      category: 'general',
+      decStatus: 'CLEAN',
+    },
+  ]
+
+/** Parse the sub-to-20 directive's FACT POOL block. Bullet shape:
+ *    `    · <a>-<b>=<answer>   [<BAND>/<category>] (DEC=<n> <STATUS>...`
+ *  Where STATUS ∈ {ALIAS, BOUNDARY, CLEAN}. */
+function parseSubToTwentyDirectiveFactPool(
+  prose: string,
+): readonly (typeof SUB_TO_TWENTY_POOL)[number][] {
+  // Bullet character is U+00B7 (middle dot). Tolerate leading whitespace.
+  // Capture: a, b, BAND, category, decStatus. The DEC=N value itself is
+  // not captured (the lint doesn't read it — it consumes decStatus only).
+  const re =
+    /^\s*·\s+(\d+)-(\d+)=\d+\s+\[(EASY|MEDIUM|HARD)\/([a-z0-9-]+)\]\s+\(DEC=\d+\s+(ALIAS|BOUNDARY|CLEAN)/gm
+  const out: (typeof SUB_TO_TWENTY_POOL)[number][] = []
+  for (const m of prose.matchAll(re)) {
+    const a = Number.parseInt(m[1]!, 10)
+    const b = Number.parseInt(m[2]!, 10)
+    out.push({
+      id: `${a}-${b}`,
+      a,
+      b,
+      band: m[3]! as (typeof SUB_TO_TWENTY_POOL)[number]['band'],
+      category: m[4]! as (typeof SUB_TO_TWENTY_POOL)[number]['category'],
+      decStatus: m[5]! as (typeof SUB_TO_TWENTY_POOL)[number]['decStatus'],
+    })
+  }
+  return out
+}
+
+describe('SUB_TO_TWENTY_POOL drift-guard against MATH_TRACK_GUIDE directive prose', () => {
+  it('lint pool matches the hand-mirrored expectation from the directive (lockstep)', () => {
+    // Mutation contract: flip any single fact's band/category/decStatus
+    // (or insert/remove a fact) and this assertion fires with a deep-
+    // equality diff identifying the discrepant entry.
+    expect(SUB_TO_TWENTY_POOL).toEqual(
+      EXPECTED_SUB_TO_TWENTY_POOL_FROM_DIRECTIVE,
+    )
+  })
+
+  it('directive FACT POOL bullets parse to the hand-mirrored expectation (lockstep)', () => {
+    // Tier-block-scoped: parses only the sub-to-20 block of
+    // MATH_TRACK_GUIDE. An unscoped parse would conflate the bullet-
+    // shape with sub-to-10's (different annotation: a+b vs DEC), but
+    // the regex is decStatus-specific so an unscoped parse would yield
+    // zero matches from the sub-to-10 block anyway. Scoping is the
+    // protocol-correct shape per planner-and-canon.md § "Tier-block
+    // scoping" and is robust against future tier additions that reuse
+    // the DEC annotation pattern.
+    const subToTwentyBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-20')
+    const parsed = parseSubToTwentyDirectiveFactPool(subToTwentyBlock)
+    expect(parsed).toEqual(EXPECTED_SUB_TO_TWENTY_POOL_FROM_DIRECTIVE)
+  })
+
+  it('directive prose contains exactly 22 sub-to-20 FACT POOL bullets', () => {
+    const subToTwentyBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-20')
+    const parsed = parseSubToTwentyDirectiveFactPool(subToTwentyBlock)
+    expect(parsed).toHaveLength(SUB_TO_TWENTY_POOL.length)
+    expect(parsed).toHaveLength(22)
+  })
+
+  it('parser throws zero results when the sub-to-20 prose is mutated to drop the DEC annotation', () => {
+    // Sanity check on the parser: catches the case where the bullet
+    // format is reformatted in a way that escapes the regex. The DEC
+    // annotation `(DEC=N ALIAS|BOUNDARY|CLEAN)` is the discriminator;
+    // dropping it via mutation should cause the parser to find no
+    // bullets.
+    const subToTwentyBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-20')
+    const mutated = subToTwentyBlock.replace(
+      /\(DEC=\d+\s+(ALIAS|BOUNDARY|CLEAN)/g,
+      '(NO-DEC',
+    )
+    const parsed = parseSubToTwentyDirectiveFactPool(mutated)
+    expect(parsed).toEqual([])
+  })
+})
+
+// ── drift-guard: SUB_TO_TWENTY_RULES.bandAllowedSlots ↔ directive prose ──
+//
+// Mirrors the sub-to-10 RULE drift-guard above (PR #256), forward-extended
+// to sub-to-20. The sub-to-20 directive carries the same "Problems 1-3
+// (gentle ramp): EXCLUSIVELY EASY-band facts" / "Problems 4-8
+// (discriminate): draw from MEDIUM + HARD bands" / "HARD-band facts ...
+// appear at P5 or later only" pattern, so the sub-to-10 parser
+// `parseSubToTenBandSlotsFromBulletProse` works without modification —
+// the bullet shape IS the contract. We scope via `extractTierBlock`
+// to isolate the sub-to-20 block (the same prose appears verbatim in
+// sub-to-10 + add-to-10 + sub-to-20 blocks after this PR).
+
+const EXPECTED_SUB_TO_TWENTY_BAND_SLOTS_FROM_DIRECTIVE: (typeof SUB_TO_TWENTY_RULES)['bandAllowedSlots'] =
+  {
+    EASY: [1, 2, 3],
+    MEDIUM: [4, 5, 6, 7, 8],
+    HARD: [5, 6, 7, 8],
+  }
+
+describe('SUB_TO_TWENTY_RULES.bandAllowedSlots drift-guard against directive prose', () => {
+  it('lint rule data matches the hand-mirrored expectation from the directive (lockstep)', () => {
+    expect(SUB_TO_TWENTY_RULES.bandAllowedSlots).toEqual(
+      EXPECTED_SUB_TO_TWENTY_BAND_SLOTS_FROM_DIRECTIVE,
+    )
+  })
+
+  it('directive SESSION COMPOSITION RULES parse to the hand-mirrored expectation (lockstep)', () => {
+    // Scope the parser to the sub-to-20 tier-block. The sub-to-10
+    // parser regexes are reused verbatim (same "Problems N-M (gentle
+    // ramp)" / "(discriminate)" / "HARD-band facts ... appear at P<n>
+    // or later only" phrasings) — the bullet shape IS the contract
+    // across tiers.
+    const subToTwentyBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-20')
+    const parsed = parseSubToTenBandSlotsFromBulletProse(subToTwentyBlock)
+    expect(parsed).toEqual(EXPECTED_SUB_TO_TWENTY_BAND_SLOTS_FROM_DIRECTIVE)
+  })
+
+  it('parser throws a clear error when a required directive statement is missing', () => {
+    // Sanity check: mutate the sub-to-20 prose to drop the EASY rule
+    // and assert the parser throws with a specific error.
+    const subToTwentyBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-20')
+
+    const proseMissingEasy = subToTwentyBlock.replace(
+      /Problems\s+1-3\s+\(gentle ramp\):\s+EXCLUSIVELY\s+EASY-band facts/,
+      'Problems 1-3 (gentle ramp): [REFORMATTED]',
+    )
+    expect(() =>
+      parseSubToTenBandSlotsFromBulletProse(proseMissingEasy),
+    ).toThrow(/EASY rule/)
+
+    const proseMissingMedium = subToTwentyBlock.replace(
+      /Problems\s+4-8\s+\(discriminate\):\s+draw from MEDIUM \+ HARD bands/,
+      'Problems 4-8 (discriminate): [REFORMATTED]',
+    )
+    expect(() =>
+      parseSubToTenBandSlotsFromBulletProse(proseMissingMedium),
+    ).toThrow(/MEDIUM\+HARD rule/)
+
+    const proseMissingHard = subToTwentyBlock.replace(
+      /HARD-band facts[^.]*?appear at P\d+ or later only/,
+      '[REFORMATTED]',
+    )
+    expect(() =>
+      parseSubToTenBandSlotsFromBulletProse(proseMissingHard),
+    ).toThrow(/HARD-band refinement/)
+  })
+
+  it('extractTierBlock isolates the sub-to-20 prose from sibling tier blocks', () => {
+    const subToTwentyBlock = extractTierBlock(MATH_TRACK_GUIDE, 'sub-to-20')
+    expect(subToTwentyBlock).toMatch(/^- sub-to-20:/)
+    // The sub-to-20 block must carry the no-borrow self-check (sub-to-20-only).
+    expect(subToTwentyBlock).toMatch(/NO-BORROW SELF-CHECK/)
+    // The sub-to-20 block must NOT carry sub-to-10's distinctive
+    // wrong-op fact-pool annotation (`(a+b=N IN ...)`).
+    expect(subToTwentyBlock).not.toMatch(/a\+b=\d+\s+IN/)
+    // The sub-to-20 block must NOT carry add-to-10's distinctive
+    // sums-to-10 fact list.
+    expect(subToTwentyBlock).not.toMatch(/sums-to-10: 1\+9, 9\+1, 2\+8/)
   })
 })
