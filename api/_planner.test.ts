@@ -2983,8 +2983,12 @@ describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', 
     const systemText = args.system.map((b) => b.text).join('\n')
 
     // The tightened phrasing — Haiku has misfired here before, so we
-    // pin both the strict-range and the FORBIDDEN markers.
-    expect(systemText).toContain('sums STRICTLY in 11-20')
+    // pin both the strict-range and the FORBIDDEN markers. PR B
+    // (ticket follow-up to 86c9uuqzu) tightened the bracket form
+    // ("[11, 20]"); the prior shipped form was the bare-range
+    // "11-20". The pin intent is unchanged: lock the load-bearing
+    // strict-range language.
+    expect(systemText).toContain('sums STRICTLY in [11, 20]')
     expect(systemText).toContain('FORBIDDEN here')
     // The cross-10-bridge guidance is the heart of the tier; pin it so
     // a future prompt slimming pass can't drop it accidentally.
@@ -3022,18 +3026,26 @@ describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', 
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
     // Both addends must be in 1-9; ten-plus-single is explicitly forbidden.
-    expect(systemText).toContain('BOTH addends MUST be in 1-9')
-    expect(systemText).toContain('Ten-plus-single forms are FORBIDDEN')
-    expect(systemText).toMatch(/neither addend may equal 10/)
+    // Phrasing updated in the PR B directive sharpening (ticket follow-up
+    // to 86c9uuqzu): the prior single-line directive at `:964` was
+    // replaced with a structured FACT POOL block per Kyle's spec §4.1;
+    // the ten-plus-single ban moved to the opener sentence + the
+    // dedicated ADDEND-RANGE SELF-CHECK block. The pin intent is
+    // unchanged (lock the load-bearing ten-plus-single language).
+    expect(systemText).toContain('BOTH addends in [1, 9]')
+    expect(systemText).toContain(
+      "NO TEN-PLUS-SINGLE (10+n, n+10 FORBIDDEN — that's two-digit-addsub territory)",
+    )
+    expect(systemText).toMatch(/either addend is 10 or greater/)
     // The COMPUTE+CONFIRM directive that drove the earlier sums fix is
     // extended to also confirm addend bounds; pin that load-bearing
-    // language too.
-    expect(systemText).toContain(
-      'CONFIRM that addendA in 1-9 AND addendB in 1-9',
-    )
-    // Concrete forbidden-addend exemplars exist in the prompt.
-    expect(systemText).toContain('10+5=15')
-    expect(systemText).toContain('10+8=18')
+    // language too. The structured ADDEND-RANGE SELF-CHECK block names
+    // the same constraint with a different verb shape.
+    expect(systemText).toContain('CONFIRM that a in [1, 9] AND b in [1, 9]')
+    // Concrete forbidden-addend exemplars exist in the prompt (now in
+    // the ADDEND-RANGE SELF-CHECK worked-example block).
+    expect(systemText).toContain('10+8=18 is FORBIDDEN')
+    expect(systemText).toContain('12+5=17 is FORBIDDEN')
     // And the prompt must NOT lean back into the previous phrasing — the
     // earlier draft said "exactly one addend = 10" was permitted.
     expect(systemText).not.toMatch(/exactly one addend\s*=\s*10/)
