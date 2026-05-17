@@ -2768,10 +2768,24 @@ function buildChipOrder(
         ? 'decade-anchor'
         : 'wrong-op'
       : undefined)
+  // Per Kyle's sub-to-20 spec §3.1: chips for sub-to-20 problems live in
+  // `[minAnswer = 10, maxAnswer = 19]` — the no-borrow operating range.
+  // Without threading, `pickDistractors`'s op-keyed default (`minAnswer = 0`
+  // for `op === '-'`) lets the Class A fallback emit a chip < 10. Concrete
+  // failure case: `19 − 9 = 10` is alias-correct (DEC === correct) → Class
+  // B downgrades to off-by-one → chips `[9, 11]`. With `minAnswer = 10`
+  // threaded, the off-by-one walker substitutes the next in-range value
+  // (chips `[10, 11]`), keeping the chip pool inside the no-borrow band.
+  // Threading sits HERE (alongside the focus-node → distractorClass
+  // mapping) rather than as a distractors-module default because the
+  // module is op-keyed not focus-node-keyed, and other `op === '-'` tiers
+  // (sub-to-10) want the existing `minAnswer = 0` default.
+  const minAnswer = focusNode === 'sub-to-20' ? 10 : undefined
   const [d1, d2] = pickDistractors(problem.correct, problem.index, maxAnswer, {
     op: problem.op,
     operands: [problem.addendA, problem.addendB] as const,
     distractorClass,
+    minAnswer,
   })
   const values = [problem.correct, d1, d2]
   // Deterministic Fisher-Yates with a per-problem seed.

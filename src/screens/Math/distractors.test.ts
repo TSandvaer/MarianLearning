@@ -1031,6 +1031,101 @@ describe('pickDistractors — sub-to-20 maxAnswer=20 ceiling (Kyle §7.4 ACCEPT)
   })
 })
 
+// ── sub-to-20 minAnswer=10 threading (Kyle §3.1 — no-borrow operating range)
+//
+// Per Kyle's sub-to-20 spec §3.1, chips for sub-to-20 problems live in the
+// no-borrow band `[minAnswer = 10, maxAnswer = 19]`. The threading happens
+// at the screen layer (`Math.tsx:buildChipOrder` — see commit threading
+// `minAnswer: 10` when `focusNode === 'sub-to-20'`). This block exercises
+// the distractor module directly with `opts.minAnswer = 10` to pin the
+// downstream chip math; the Math.tsx-side mapping is covered by the
+// existing focus-node integration tests + e2e specs.
+// ─────────────────────────────────────────────────────────────────────────
+describe('pickDistractors — sub-to-20 minAnswer=10 threading (Kyle §3.1)', () => {
+  const MAX = ANSWER_RANGE_MAX_TO_20 // 20
+
+  it('19-9=10 alias-correct fallback produces chips in [10, 19] no-borrow range', () => {
+    // Pool #21 HARD/take-to-decade ALIAS. Class B fires:
+    //   DEC = Math.round(10 / 10) * 10 = 10 === correct → null → fall to Class A.
+    // Class A (off-by-one) with minAnswer=10, maxAnswer=20, correct=10:
+    //   low = 9 < minAnswer=10 → low NOT ok.
+    //   high = 11 ≤ 20 → high ok.
+    //   `!lowOk` branch: return [high, high + 1] = [11, 12].
+    // Before this fix (minAnswer defaulted to 0): chips were [9, 11] — a
+    // chip of `9` is OUT of the no-borrow band, contradicting §3.1.
+    const [d1, d2] = pickDistractors(10, 8, MAX, {
+      op: '-',
+      operands: [19, 9],
+      distractorClass: 'decade-anchor',
+      minAnswer: 10,
+    })
+    expect([d1, d2]).toEqual([11, 12])
+    // Hard floor — every chip must be ≥ 10.
+    expect(d1).toBeGreaterThanOrEqual(10)
+    expect(d2).toBeGreaterThanOrEqual(10)
+  })
+
+  it('every sub-to-20 pool ALIAS / BOUNDARY fact produces chips in [10, 19] under minAnswer=10', () => {
+    // Exhaustive over the take-to-decade / boundary facts where Class B
+    // downgrades. Each must produce chips ≥ minAnswer = 10. Pre-fix, the
+    // result=10 facts (#1, #2, #3, #7, #11, #14, #17, #19, #21) and the
+    // boundary facts that hit correct=11 (#4, #5, #15) could emit a chip
+    // of `9` via Class A's `[correct - 1, correct + 1]`.
+    const downgradingFacts: ReadonlyArray<[number, number]> = [
+      [11, 1], // #1  ALIAS  correct=10
+      [12, 2], // #2  ALIAS  correct=10
+      [13, 3], // #3  ALIAS  correct=10
+      [12, 1], // #4  BOUNDARY correct=11
+      [13, 2], // #5  BOUNDARY correct=11
+      [14, 4], // #7  ALIAS  correct=10
+      [14, 3], // #8  BOUNDARY correct=11
+      [15, 4], // BOUNDARY correct=11 (synthetic)
+      [15, 5], // #11 ALIAS  correct=10
+      [16, 5], // #15 BOUNDARY correct=11
+      [16, 6], // #14 ALIAS  correct=10
+      [17, 6], // BOUNDARY correct=11 (synthetic)
+      [17, 7], // #17 ALIAS  correct=10
+      [18, 7], // BOUNDARY correct=11 (synthetic)
+      [18, 8], // #19 ALIAS  correct=10
+      [19, 8], // BOUNDARY correct=11 (synthetic)
+      [19, 9], // #21 ALIAS  correct=10
+    ]
+    for (const [a, b] of downgradingFacts) {
+      const correct = a - b
+      const [d1, d2] = pickDistractors(correct, 4, MAX, {
+        op: '-',
+        operands: [a, b],
+        distractorClass: 'decade-anchor',
+        minAnswer: 10,
+      })
+      // Both chips must sit inside the no-borrow operating range.
+      expect(d1).toBeGreaterThanOrEqual(10)
+      expect(d1).toBeLessThanOrEqual(MAX)
+      expect(d2).toBeGreaterThanOrEqual(10)
+      expect(d2).toBeLessThanOrEqual(MAX)
+      // Distinct from each other and from correct.
+      expect(d1).not.toBe(d2)
+      expect(d1).not.toBe(correct)
+      expect(d2).not.toBe(correct)
+    }
+  })
+
+  it('CLEAN Class B facts still emit DEC=10 (which is in [10, 19]) under minAnswer=10', () => {
+    // CLEAN facts produce chips {DEC=10, correct, correct+1}. DEC=10 is
+    // exactly the floor — verifying inclusivity of `minAnswer` (Class B
+    // helper allows `dec >= minAnswer`, not `dec > minAnswer`).
+    // Pool #16 16 − 4 = 12, DEC = 10, secondary = correct + 1 = 13.
+    expect(
+      pickDistractors(12, 4, MAX, {
+        op: '-',
+        operands: [16, 4],
+        distractorClass: 'decade-anchor',
+        minAnswer: 10,
+      }),
+    ).toEqual([10, 13])
+  })
+})
+
 // ── ANSWER_RANGE_MIN is exported but unused in this block — keep the
 //    import live so future tier additions don't have to re-add it.
 void ANSWER_RANGE_MIN
