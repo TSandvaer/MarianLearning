@@ -31,19 +31,24 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   ADD_TO_TEN_POOL,
   ADD_TO_TEN_RULES,
+  ADD_TO_TWENTY_POOL,
+  ADD_TO_TWENTY_RULES,
   CompositionLintError,
   SUB_TO_TEN_POOL,
   SUB_TO_TEN_RULES,
   SUB_TO_TWENTY_POOL,
   SUB_TO_TWENTY_RULES,
   assertAddToTenCompositionClean,
+  assertAddToTwentyCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
   formatCompositionLintReport,
   lintAddToTenComposition,
+  lintAddToTwentyComposition,
   lintSubToTenComposition,
   lintSubToTwentyComposition,
   parseAddToTenReadLine,
+  parseAddToTwentyReadLine,
   parseSubToTenReadLine,
   parseSubToTwentyReadLine,
   resolveTierBinding,
@@ -3724,5 +3729,1076 @@ describe('SUB_TO_TWENTY_RULES.bandAllowedSlots drift-guard against directive pro
     // The sub-to-20 block must NOT carry add-to-10's distinctive
     // sums-to-10 fact list.
     expect(subToTwentyBlock).not.toMatch(/sums-to-10: 1\+9, 9\+1, 2\+8/)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// add-to-20 lint tests (Kyle's PR #276 spec)
+//
+// Scope per the split-PR pattern (testing-and-ci.md §6): PR A ships the
+// lint infra — POOL, RULES, parser, lintAddToTwentyComposition,
+// assertAddToTwentyCompositionClean, and drift-guards — but does NOT
+// activate the resolveTierBinding / runCompositionLint dispatch. The
+// committed canon at public/canon/math/level-1/add-to-20.json ships in
+// violation (4-of-8 doubles per spec §1.4); wiring the binding in PR A
+// would red-CI the lint pipeline. PR B (canon rebake + binding
+// activation) flips the deferred markers.
+// ═════════════════════════════════════════════════════════════════════════
+
+// ── add-to-20 fixture helpers ────────────────────────────────────────────
+
+const ADD_TO_TWENTY_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+] as const
+
+function addToTwentyWord(n: number): string {
+  return ADD_TO_TWENTY_WORDS[n]!
+}
+
+/** Build a `math.p<N>.read` add-to-20 utterance with the "plus" template. */
+function readAddToTwentyUtterance(
+  index: number,
+  a: number,
+  b: number,
+): Utterance {
+  return {
+    id: `math.p${index}.read`,
+    text: `${capitalize(addToTwentyWord(a))} plus ${addToTwentyWord(b)}. How many?`,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** Convenience: build a SessionStartResponse with the given 8 add-to-20 facts. */
+function buildAddToTwentyCanonResponse(
+  facts: Array<[a: number, b: number]>,
+): SessionStartResponse {
+  const utterances: Utterance[] = facts.map(([a, b], i) =>
+    readAddToTwentyUtterance(i + 1, a, b),
+  )
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: { id: 'test', label: 'test', utterances: [] },
+    utterances,
+  }
+}
+
+/** A canonically valid 8-fact add-to-20 session per spec §6.3 example.
+ *  P1=9+2 P2=8+3 P3=6+6 (EASY ramp; 1 double, 2 make-ten-bridge)
+ *  P4=9+4 (MEDIUM make-ten-bridge — also covers P4-restricted-to-MEDIUM)
+ *  P5=8+5 P6=6+7 P7=7+8 P8=9+8
+ *    → 3 make-ten-bridge in P5-P8 (8+5, 9+8 — plus structural #6=near-doubles
+ *      / #7=near-doubles cover near-doubles cap). doubles=1, near-doubles=2,
+ *      make-ten-bridge=4 across the session — under all caps.
+ *
+ *  Per spec §6.3 acceptance text: "P1=9+2, P2=8+3, P3=6+6, P4=9+4, P5=8+5,
+ *  P6=6+7, P7=7+8, P8=9+8 passes lint (3 make-ten-bridge in P4-P8;
+ *  doubles cap of 1 used; near-doubles cap of 2 used)". */
+const CLEAN_ADD_TO_TWENTY_FACTS: ReadonlyArray<[number, number]> = [
+  [9, 2], // P1 EASY make-ten-bridge
+  [8, 3], // P2 EASY make-ten-bridge
+  [6, 6], // P3 EASY doubles (1/2 used)
+  [9, 4], // P4 MEDIUM make-ten-bridge
+  [8, 5], // P5 MEDIUM make-ten-bridge (P5-P8 coverage anchor #1)
+  [6, 7], // P6 MEDIUM near-doubles (1/2 used)
+  [7, 8], // P7 HARD near-doubles (2/2 used)
+  [9, 8], // P8 HARD make-ten-bridge (P5-P8 coverage anchor #2)
+]
+
+// ── parseAddToTwentyReadLine ─────────────────────────────────────────────
+
+describe('parseAddToTwentyReadLine', () => {
+  it('parses the "plus" template across the teen range', () => {
+    expect(parseAddToTwentyReadLine('Eight plus five. How many?')).toEqual({
+      a: 8,
+      b: 5,
+    })
+    expect(parseAddToTwentyReadLine('Nine plus two. How many?')).toEqual({
+      a: 9,
+      b: 2,
+    })
+    expect(parseAddToTwentyReadLine('Nine plus nine. How many?')).toEqual({
+      a: 9,
+      b: 9,
+    })
+  })
+
+  it('accepts mixed case', () => {
+    expect(parseAddToTwentyReadLine('EIGHT plus FIVE. how many?')).toEqual({
+      a: 8,
+      b: 5,
+    })
+  })
+
+  it('returns null for "minus" template (subtraction)', () => {
+    expect(
+      parseAddToTwentyReadLine('Fifteen minus three. How many are left?'),
+    ).toBeNull()
+  })
+
+  it('returns null for "take away" template (sub-to-10 first-session variant)', () => {
+    expect(
+      parseAddToTwentyReadLine('Seven take away three. How many are left?'),
+    ).toBeNull()
+  })
+
+  it('returns null for unrecognised number words', () => {
+    expect(parseAddToTwentyReadLine('Twenty plus three. How many?')).toBeNull()
+  })
+
+  it('returns null for arbitrary text', () => {
+    expect(parseAddToTwentyReadLine('Tap the cat.')).toBeNull()
+    expect(parseAddToTwentyReadLine('')).toBeNull()
+  })
+})
+
+// ── ADD_TO_TWENTY_POOL sanity ────────────────────────────────────────────
+
+describe('ADD_TO_TWENTY_POOL', () => {
+  it('contains exactly 22 facts (matches spec §1.1 pool size)', () => {
+    expect(ADD_TO_TWENTY_POOL).toHaveLength(22)
+  })
+
+  it('has unique ids across all entries (commutative pairs are distinct)', () => {
+    const ids = new Set(ADD_TO_TWENTY_POOL.map((f) => f.id))
+    expect(ids.size).toBe(ADD_TO_TWENTY_POOL.length)
+  })
+
+  it('every fact satisfies addend range [1, 9]', () => {
+    for (const f of ADD_TO_TWENTY_POOL) {
+      expect(f.a, `fact ${f.id} addend a out of range`).toBeGreaterThanOrEqual(
+        1,
+      )
+      expect(f.a, `fact ${f.id} addend a out of range`).toBeLessThanOrEqual(9)
+      expect(f.b, `fact ${f.id} addend b out of range`).toBeGreaterThanOrEqual(
+        1,
+      )
+      expect(f.b, `fact ${f.id} addend b out of range`).toBeLessThanOrEqual(9)
+    }
+  })
+
+  it('every fact satisfies sum range [11, 18]', () => {
+    for (const f of ADD_TO_TWENTY_POOL) {
+      const sum = f.a + f.b
+      expect(sum, `fact ${f.id} sum out of range`).toBeGreaterThanOrEqual(11)
+      expect(sum, `fact ${f.id} sum out of range`).toBeLessThanOrEqual(18)
+    }
+  })
+
+  it('ids match `a-b` shape (forms a stable serialised key)', () => {
+    for (const f of ADD_TO_TWENTY_POOL) {
+      expect(f.id).toBe(`${f.a}-${f.b}`)
+    }
+  })
+
+  it('band counts match spec §1.1 (EASY=6, MEDIUM=8, HARD=8)', () => {
+    const counts = ADD_TO_TWENTY_POOL.reduce(
+      (acc, f) => {
+        acc[f.band] = (acc[f.band] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts['EASY']).toBe(6)
+    expect(counts['MEDIUM']).toBe(8)
+    expect(counts['HARD']).toBe(8)
+  })
+
+  it('category counts match spec §1.1 (make-ten-bridge=13, near-doubles=5, doubles=4, general=0)', () => {
+    const counts = ADD_TO_TWENTY_POOL.reduce(
+      (acc, f) => {
+        acc[f.category] = (acc[f.category] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts['make-ten-bridge']).toBe(13)
+    expect(counts['near-doubles']).toBe(5)
+    expect(counts['doubles']).toBe(4)
+    // No general facts in v1 by design (spec §1.4 — doubles-prior correction).
+    expect(counts['general']).toBeUndefined()
+  })
+
+  it('contains all 4 doubles facts (6+6, 7+7, 8+8, 9+9) — full doubles surface', () => {
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '6-6')).toBeDefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '7-7')).toBeDefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '8-8')).toBeDefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '9-9')).toBeDefined()
+  })
+
+  it('excludes facts deferred per spec §1.3 (4+7, 7+4, 5+6, 6+5, etc.)', () => {
+    // These are valid in-range facts (sum 11-18, addends 1-9) but
+    // excluded from v1 pool per spec §1.3 — their bridge strategy is
+    // less clean than the canonical 8+5 / 9+4 family. Deferred to v2.
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '4-7')).toBeUndefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '7-4')).toBeUndefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '5-6')).toBeUndefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '6-5')).toBeUndefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '7-5')).toBeUndefined()
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '5-7')).toBeUndefined()
+  })
+
+  it('excludes out-of-range facts (5+5=10 sum-too-low, 10+8 addend-too-high)', () => {
+    // 5+5=10 belongs in add-to-10 territory (sum < 11). Sanity: not in pool.
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '5-5')).toBeUndefined()
+    // 10+8 violates addend range — two-digit-addsub territory.
+    expect(ADD_TO_TWENTY_POOL.find((f) => f.id === '10-8')).toBeUndefined()
+  })
+})
+
+// ── ADD_TO_TWENTY_RULES sanity ───────────────────────────────────────────
+
+describe('ADD_TO_TWENTY_RULES', () => {
+  it('has totalProblems = 8', () => {
+    expect(ADD_TO_TWENTY_RULES.totalProblems).toBe(8)
+  })
+
+  it('caps doubles at 2 (doubles-prior correction lever per spec §1.4)', () => {
+    expect(ADD_TO_TWENTY_RULES.categoryCaps['doubles']).toBe(2)
+  })
+
+  it('caps near-doubles at 2 (prevents chained-derivation over-reliance)', () => {
+    expect(ADD_TO_TWENTY_RULES.categoryCaps['near-doubles']).toBe(2)
+  })
+
+  it('caps make-ten-bridge at 5 (generous — IS the learning target)', () => {
+    expect(ADD_TO_TWENTY_RULES.categoryCaps['make-ten-bridge']).toBe(5)
+  })
+
+  it('caps general at 0 (no v1 pool entries; forward-compat for §8 widening)', () => {
+    expect(ADD_TO_TWENTY_RULES.categoryCaps['general']).toBe(0)
+  })
+
+  it('allows EASY at all slots P1-P8 (matches add-to-10; spec §2.1)', () => {
+    // Differs from sub-to-10 and sub-to-20 which tighten EASY to P1-P3.
+    // add-to-20 inherits add-to-10's "EASY as discriminate fallback"
+    // posture per spec §2.1 + §2.3 (recent-score modulation).
+    expect(ADD_TO_TWENTY_RULES.bandAllowedSlots.EASY).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ])
+  })
+
+  it('allows MEDIUM at slots P4-P8 (HARD-band still forbidden at P4)', () => {
+    expect(ADD_TO_TWENTY_RULES.bandAllowedSlots.MEDIUM).toEqual([4, 5, 6, 7, 8])
+  })
+
+  it('allows HARD at slots P5-P8 only (HARD must NOT appear at P1-P4)', () => {
+    expect(ADD_TO_TWENTY_RULES.bandAllowedSlots.HARD).toEqual([5, 6, 7, 8])
+  })
+
+  it('requires >= 1 make-ten-bridge fact in P5-P8 (STRICTER than sibling tiers; spec §2.4)', () => {
+    // Sibling tiers (add-to-10, sub-to-10, sub-to-20) all use P4-P8 for
+    // the analog rule. add-to-20 STRICTENS to P5-P8 because P4 is
+    // MEDIUM-only and several MEDIUM facts are make-ten-bridge, so a
+    // P4-P8 rule would be trivially satisfied. Field name
+    // `makeTenBridgeInP5ToP8Min` (not `*InP4ToP8Min`) makes the
+    // divergence explicit at the data layer.
+    expect(ADD_TO_TWENTY_RULES.makeTenBridgeInP5ToP8Min).toBe(1)
+  })
+})
+
+// ── lintAddToTwentyComposition: clean canon ──────────────────────────────
+
+describe('lintAddToTwentyComposition — clean canon passes', () => {
+  it('returns no violations for the §6.3 acceptance-example canon', () => {
+    const response = buildAddToTwentyCanonResponse([
+      ...CLEAN_ADD_TO_TWENTY_FACTS,
+    ])
+    expect(lintAddToTwentyComposition(response)).toEqual([])
+  })
+
+  it('assertAddToTwentyCompositionClean does not throw on clean canon', () => {
+    const response = buildAddToTwentyCanonResponse([
+      ...CLEAN_ADD_TO_TWENTY_FACTS,
+    ])
+    expect(() =>
+      assertAddToTwentyCompositionClean('math/add-to-20', response),
+    ).not.toThrow()
+  })
+
+  it('assertAddToTwentyCompositionClean throws CompositionLintError on dirty canon', () => {
+    // 3 doubles violates doubles cap of 2.
+    const dirty: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles (1/2)
+      [7, 7], // P4 — MEDIUM doubles (2/2)
+      [8, 8], // P5 HARD doubles (3/2 — VIOLATES)
+      [9, 6], // P6 HARD make-ten-bridge
+      [9, 7], // P7 HARD make-ten-bridge
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const response = buildAddToTwentyCanonResponse(dirty)
+    expect(() =>
+      assertAddToTwentyCompositionClean('math/add-to-20', response),
+    ).toThrow(CompositionLintError)
+  })
+})
+
+// ── lintAddToTwentyComposition: pool-membership rule ─────────────────────
+
+describe('lintAddToTwentyComposition — pool-membership rule', () => {
+  it('rejects a fact outside the 22-fact pool (4+7 — deferred to v2)', () => {
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1
+      [8, 3], // P2
+      [6, 6], // P3
+      [4, 7], // P4 NOT in pool (deferred per spec §1.3)
+      [8, 5], // P5
+      [6, 7], // P6
+      [7, 8], // P7
+      [9, 8], // P8
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(4)
+    expect(pool[0]!.factId).toBe('4-7')
+    expect(pool[0]!.message).toContain('NOT in the 22-fact add-to-20')
+  })
+
+  it('rejects a sum-too-low fact (5+5 belongs in add-to-10)', () => {
+    const facts: Array<[number, number]> = [
+      [5, 5], // P1 sum=10 — add-to-10 territory
+      [8, 3], // P2
+      [6, 6], // P3
+      [9, 4], // P4
+      [8, 5], // P5
+      [6, 7], // P6
+      [7, 8], // P7
+      [9, 8], // P8
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(1)
+    expect(pool[0]!.factId).toBe('5-5')
+  })
+
+  // Note: a 10+8 addend-out-of-range fact cannot be tested via the read-
+  // line parser because "ten" is in the number-word table but the pool
+  // membership check fires before any addend-range guard. The lint
+  // simply doesn't find a pool entry for (10, 8) and reports
+  // pool-membership — covered by the canonical pool-membership test
+  // above. (Direct addend-range enforcement is a directive-side concern
+  // per spec §4.1 ADDEND-RANGE SELF-CHECK; the lint backstop is
+  // pool-membership.)
+})
+
+// ── lintAddToTwentyComposition: category-cap rule ────────────────────────
+
+describe('lintAddToTwentyComposition — category-cap rule', () => {
+  it('fires when doubles count exceeds cap of 2 (the §1.4 correction target)', () => {
+    // 3 doubles — current 4-of-8 canon's failure mode (spec §1.4).
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles (1/2)
+      [9, 4], // P4 MEDIUM make-ten-bridge
+      [7, 7], // P5 MEDIUM doubles (2/2)
+      [8, 8], // P6 HARD doubles (3/2 — VIOLATES)
+      [9, 7], // P7 HARD make-ten-bridge
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    expect(caps).toHaveLength(1)
+    expect(caps[0]!.message).toContain('"doubles"')
+    expect(caps[0]!.message).toContain('cap is 2')
+    expect(caps[0]!.message).toContain('canon has 3')
+    expect(caps[0]!.message).toContain('Doubles-prior correction lever')
+  })
+
+  it('fires when near-doubles count exceeds cap of 2', () => {
+    // 3 near-doubles — over-reliance on doubles-plus-one derivation.
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles (1/2)
+      [9, 4], // P4 MEDIUM make-ten-bridge
+      [6, 7], // P5 MEDIUM near-doubles (1/2)
+      [7, 6], // P6 MEDIUM near-doubles (2/2)
+      [7, 8], // P7 HARD near-doubles (3/2 — VIOLATES)
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    expect(caps).toHaveLength(1)
+    expect(caps[0]!.message).toContain('"near-doubles"')
+    expect(caps[0]!.message).toContain('cap is 2')
+    expect(caps[0]!.message).toContain('canon has 3')
+  })
+
+  it('clean canon (2 doubles, 2 near-doubles, 4 make-ten-bridge) passes all caps', () => {
+    // Saturates the doubles + near-doubles caps without exceeding either.
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles (1/2)
+      [9, 4], // P4 MEDIUM make-ten-bridge
+      [7, 7], // P5 MEDIUM doubles (2/2)
+      [6, 7], // P6 MEDIUM near-doubles (1/2)
+      [7, 8], // P7 HARD near-doubles (2/2)
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    expect(caps).toEqual([])
+  })
+})
+
+// ── lintAddToTwentyComposition: band-by-slot rule ────────────────────────
+
+describe('lintAddToTwentyComposition — band-by-slot rule', () => {
+  it('fires when HARD-band fact appears at P1', () => {
+    // 9+9 is HARD; P1 is restricted to EASY+MEDIUM (and per directive
+    // even tighter to EASY only) — HARD is forbidden at P1-P4 per
+    // spec §2.1 boldface "HARD must NOT appear at P1-P4".
+    const facts: Array<[number, number]> = [
+      [9, 9], // P1 HARD (VIOLATES — HARD only at P5-P8)
+      [8, 3], // P2 EASY
+      [6, 6], // P3 EASY doubles
+      [9, 4], // P4 MEDIUM
+      [8, 5], // P5 MEDIUM make-ten-bridge
+      [6, 7], // P6 MEDIUM near-doubles
+      [7, 8], // P7 HARD near-doubles
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(slot.length).toBeGreaterThanOrEqual(1)
+    const p1Violation = slot.find((v) => v.problemIndex === 1)
+    expect(p1Violation).toBeDefined()
+    expect(p1Violation!.factId).toBe('9-9')
+    expect(p1Violation!.message).toContain('HARD-band')
+  })
+
+  it('fires when HARD-band fact appears at P4 (MEDIUM-only slot)', () => {
+    // P4 is the first discriminate slot but MEDIUM-only — HARD forbidden.
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY
+      [8, 3], // P2 EASY
+      [6, 6], // P3 EASY doubles
+      [9, 9], // P4 HARD (VIOLATES — HARD only at P5-P8)
+      [8, 5], // P5 MEDIUM make-ten-bridge
+      [6, 7], // P6 MEDIUM near-doubles
+      [7, 8], // P7 HARD near-doubles
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(slot.length).toBeGreaterThanOrEqual(1)
+    const p4Violation = slot.find((v) => v.problemIndex === 4)
+    expect(p4Violation).toBeDefined()
+  })
+
+  it('allows EASY at all slots (spec §2.1 — EASY as discriminate-tier fallback)', () => {
+    // 8 EASY facts (no duplicates per spec §1.1; only 6 EASY facts in
+    // pool so this isn't actually achievable, but use the 6 + something
+    // representative). Skip — this is documented as supported but not
+    // realistic for a real session. Instead test that EASY at P5 is OK.
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY
+      [8, 3], // P2 EASY
+      [6, 6], // P3 EASY doubles
+      [9, 4], // P4 MEDIUM make-ten-bridge
+      [3, 8], // P5 EASY make-ten-bridge (recent-score modulation case)
+      [9, 5], // P6 MEDIUM make-ten-bridge
+      [7, 8], // P7 HARD near-doubles
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(slot).toEqual([])
+  })
+})
+
+// ── lintAddToTwentyComposition: high-leverage-coverage rule (P5-P8 ≥1 make-ten-bridge) ──
+
+describe('lintAddToTwentyComposition — make-ten-bridge coverage (P5-P8) rule', () => {
+  it('fires when no make-ten-bridge fact appears in P5-P8', () => {
+    // P5-P8 carries 4 doubles + near-doubles, NO make-ten-bridge.
+    // P4 carries a MEDIUM make-ten-bridge — would satisfy the SIBLING
+    // tiers' P4-P8 rule, but FAILS the add-to-20 P5-P8 rule. This is
+    // the empirical proof the slot-range divergence binds.
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles (1/2)
+      [9, 4], // P4 MEDIUM make-ten-bridge (NOT in P5-P8 — DOES NOT COUNT)
+      [7, 7], // P5 MEDIUM doubles (2/2)
+      [6, 7], // P6 MEDIUM near-doubles (1/2)
+      [8, 7], // P7 HARD near-doubles (2/2)
+      [8, 9], // P8 HARD near-doubles (3/2 — also trips near-doubles cap)
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const coverage = violations.filter(
+      (v) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toHaveLength(1)
+    expect(coverage[0]!.message).toContain('make-ten-bridge')
+    expect(coverage[0]!.message).toContain('P5-P8')
+    expect(coverage[0]!.message).toContain('STRICTER')
+    expect(coverage[0]!.message).toContain('Canon has 0')
+  })
+
+  it('passes when exactly 1 make-ten-bridge fact appears in P5-P8', () => {
+    // P5 is the only make-ten-bridge slot in P5-P8; minimal satisfaction.
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles (1/2)
+      [9, 4], // P4 MEDIUM make-ten-bridge
+      [8, 5], // P5 MEDIUM make-ten-bridge (P5-P8 coverage anchor)
+      [7, 7], // P6 MEDIUM doubles (2/2)
+      [6, 7], // P7 MEDIUM near-doubles (1/2)
+      [7, 8], // P8 HARD near-doubles (2/2)
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const coverage = violations.filter(
+      (v) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toEqual([])
+  })
+
+  it('passes when multiple make-ten-bridge facts appear in P5-P8', () => {
+    // Clean canon: 3 make-ten-bridge in P5-P8 (8+5, 9+6, 9+8).
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles (1/2)
+      [7, 7], // P4 MEDIUM doubles (2/2)
+      [8, 5], // P5 MEDIUM make-ten-bridge
+      [9, 6], // P6 HARD make-ten-bridge
+      [6, 7], // P7 MEDIUM near-doubles (1/2)
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const coverage = violations.filter(
+      (v) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toEqual([])
+  })
+})
+
+// ── lintAddToTwentyComposition: no-duplicates rule ──────────────────────
+
+describe('lintAddToTwentyComposition — no-duplicates rule', () => {
+  it('fires when an (a, b) ordered pair repeats', () => {
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [8, 3], // P2 EASY make-ten-bridge
+      [6, 6], // P3 EASY doubles
+      [9, 4], // P4 MEDIUM make-ten-bridge
+      [8, 5], // P5 MEDIUM make-ten-bridge
+      [6, 7], // P6 MEDIUM near-doubles
+      [9, 4], // P7 DUPLICATE of P4 (VIOLATES — also band-by-slot OK)
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const dupes = violations.filter((v) => v.rule === 'no-duplicates')
+    expect(dupes).toHaveLength(1)
+    expect(dupes[0]!.factId).toBe('9-4')
+    expect(dupes[0]!.message).toContain('Fact 9-4 appears 2 times')
+    expect(dupes[0]!.message).toContain('P4, P7')
+  })
+
+  it('treats commutative pairs as DISTINCT (9+2 and 2+9 are not duplicates)', () => {
+    const facts: Array<[number, number]> = [
+      [9, 2], // P1 EASY make-ten-bridge
+      [2, 9], // P2 EASY make-ten-bridge (commutative pair, DISTINCT id)
+      [6, 6], // P3 EASY doubles
+      [9, 4], // P4 MEDIUM make-ten-bridge
+      [8, 5], // P5 MEDIUM make-ten-bridge
+      [6, 7], // P6 MEDIUM near-doubles
+      [7, 8], // P7 HARD near-doubles
+      [9, 8], // P8 HARD make-ten-bridge
+    ]
+    const violations = lintAddToTwentyComposition(
+      buildAddToTwentyCanonResponse(facts),
+    )
+    const dupes = violations.filter((v) => v.rule === 'no-duplicates')
+    expect(dupes).toEqual([])
+  })
+})
+
+// ── lintAddToTwentyComposition: unparseable-problem rule ────────────────
+
+describe('lintAddToTwentyComposition — unparseable-problem rule', () => {
+  it('fires when a problem read-line is malformed', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        readAddToTwentyUtterance(1, 9, 2),
+        rawReadUtterance(2, 'Tap the cat.'), // unparseable
+        readAddToTwentyUtterance(3, 6, 6),
+        readAddToTwentyUtterance(4, 9, 4),
+        readAddToTwentyUtterance(5, 8, 5),
+        readAddToTwentyUtterance(6, 6, 7),
+        readAddToTwentyUtterance(7, 7, 8),
+        readAddToTwentyUtterance(8, 9, 8),
+      ],
+    }
+    const violations = lintAddToTwentyComposition(response)
+    const unparseable = violations.filter(
+      (v) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(2)
+    expect(unparseable[0]!.message).toContain('add-to-20 read template')
+    expect(unparseable[0]!.message).toContain('Tap the cat.')
+  })
+
+  it('fires when a problem uses the subtraction template (mis-routed)', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        readAddToTwentyUtterance(1, 9, 2),
+        rawReadUtterance(2, 'Fifteen minus three. How many are left?'), // sub-to-20 template
+        readAddToTwentyUtterance(3, 6, 6),
+        readAddToTwentyUtterance(4, 9, 4),
+        readAddToTwentyUtterance(5, 8, 5),
+        readAddToTwentyUtterance(6, 6, 7),
+        readAddToTwentyUtterance(7, 7, 8),
+        readAddToTwentyUtterance(8, 9, 8),
+      ],
+    }
+    const violations = lintAddToTwentyComposition(response)
+    const unparseable = violations.filter(
+      (v) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(2)
+  })
+})
+
+// ── ADD_TO_TWENTY_POOL drift-guard against spec §1.1 markdown table ─────
+//
+// Mirrors the add-to-10 spec drift-guard pattern (PR #257). The
+// add-to-20 directive at api/_planner.ts:964 is currently a single-line
+// prose (PR A scope — directive sharpening + canon rebake is PR B), so
+// the lint-side mirror is anchored against Kyle's spec markdown rather
+// than the directive. When PR B sharpens the directive prose into a
+// FACT POOL bullet block, an additional sibling directive drift-guard
+// can be added (parallel to the add-to-10 pattern at line ~2398).
+//
+// Mirror approach: hand-mirrored constant
+// EXPECTED_ADD_TO_TWENTY_POOL_FROM_SPEC + runtime parser of the spec
+// §1.1 markdown table. 2-sided equality (mirror ↔ data, mirror ↔
+// parsed-spec) catches drift on either side.
+
+const EXPECTED_ADD_TO_TWENTY_POOL_FROM_SPEC: readonly (typeof ADD_TO_TWENTY_POOL)[number][] =
+  [
+    // EASY (6 facts; rows #1-6 per spec §1.1 table)
+    { id: '9-2', a: 9, b: 2, band: 'EASY', category: 'make-ten-bridge' },
+    { id: '2-9', a: 2, b: 9, band: 'EASY', category: 'make-ten-bridge' },
+    { id: '8-3', a: 8, b: 3, band: 'EASY', category: 'make-ten-bridge' },
+    { id: '3-8', a: 3, b: 8, band: 'EASY', category: 'make-ten-bridge' },
+    { id: '9-3', a: 9, b: 3, band: 'EASY', category: 'make-ten-bridge' },
+    { id: '6-6', a: 6, b: 6, band: 'EASY', category: 'doubles' },
+    // MEDIUM (8 facts; rows #7-14)
+    { id: '9-4', a: 9, b: 4, band: 'MEDIUM', category: 'make-ten-bridge' },
+    { id: '4-9', a: 4, b: 9, band: 'MEDIUM', category: 'make-ten-bridge' },
+    { id: '8-5', a: 8, b: 5, band: 'MEDIUM', category: 'make-ten-bridge' },
+    { id: '5-8', a: 5, b: 8, band: 'MEDIUM', category: 'make-ten-bridge' },
+    { id: '6-7', a: 6, b: 7, band: 'MEDIUM', category: 'near-doubles' },
+    { id: '7-6', a: 7, b: 6, band: 'MEDIUM', category: 'near-doubles' },
+    { id: '7-7', a: 7, b: 7, band: 'MEDIUM', category: 'doubles' },
+    { id: '9-5', a: 9, b: 5, band: 'MEDIUM', category: 'make-ten-bridge' },
+    // HARD (8 facts; rows #15-22)
+    { id: '7-8', a: 7, b: 8, band: 'HARD', category: 'near-doubles' },
+    { id: '8-7', a: 8, b: 7, band: 'HARD', category: 'near-doubles' },
+    { id: '9-6', a: 9, b: 6, band: 'HARD', category: 'make-ten-bridge' },
+    { id: '9-7', a: 9, b: 7, band: 'HARD', category: 'make-ten-bridge' },
+    { id: '8-8', a: 8, b: 8, band: 'HARD', category: 'doubles' },
+    { id: '9-8', a: 9, b: 8, band: 'HARD', category: 'make-ten-bridge' },
+    { id: '8-9', a: 8, b: 9, band: 'HARD', category: 'near-doubles' },
+    { id: '9-9', a: 9, b: 9, band: 'HARD', category: 'doubles' },
+  ]
+
+/** Parse the add-to-20 spec §1.1 pool table.
+ *
+ *  Table row shape (markdown):
+ *    `| #   | <Nx> + <Ny> = <sum>  | <band>   | <category>     | ...`
+ *
+ *  Bands appear lowercase in the table; category strings appear with
+ *  exactly the same shape used in the POOL constant. The parser:
+ *    - matches rows that begin with `| <number> | <a> + <b> = ...`
+ *    - uppercases the band (table has `easy`, POOL has `EASY`)
+ *    - accepts hyphenated category names (`make-ten-bridge`).
+ *
+ *  Discriminator anchors: the leading `|` + leading row number + ` + `
+ *  separator is the wedge. If a future spec editor reformats the table
+ *  (e.g. switches to a different separator or drops the row-number
+ *  column), the parser falls over loudly.
+ */
+function parseAddToTwentyPoolFromSpec(
+  prose: string,
+): readonly (typeof ADD_TO_TWENTY_POOL)[number][] {
+  // Each row: leading `|`, then row#, then `<a> + <b> = <sum>`, then
+  // `<band>`, then `<category>`. Tolerate code-span backticks around the
+  // fact (spec uses `` `9 + 2 = 11` ``).
+  const re =
+    /^\|\s+\d+\s+\|\s+`?(\d+)\s*\+\s*(\d+)\s*=\s*\d+`?\s+\|\s+(easy|medium|hard)\s+\|\s+([a-z][a-z0-9-]+)\s+\|/gm
+  const out: (typeof ADD_TO_TWENTY_POOL)[number][] = []
+  for (const m of prose.matchAll(re)) {
+    const a = Number.parseInt(m[1]!, 10)
+    const b = Number.parseInt(m[2]!, 10)
+    out.push({
+      id: `${a}-${b}`,
+      a,
+      b,
+      band: m[3]!.toUpperCase() as (typeof ADD_TO_TWENTY_POOL)[number]['band'],
+      category: m[4]! as (typeof ADD_TO_TWENTY_POOL)[number]['category'],
+    })
+  }
+  return out
+}
+
+describe('ADD_TO_TWENTY_POOL drift-guard against spec §1.1 markdown table', () => {
+  const SPEC_PATH = join(
+    process.cwd(),
+    'design',
+    'math',
+    'add-to-20-content.md',
+  )
+
+  it('lint pool matches the hand-mirrored expectation from the spec (lockstep)', () => {
+    // Mutation contract: flip any single fact's band/category (or
+    // insert/remove a fact) and this assertion fires with a deep-
+    // equality diff identifying the discrepant entry.
+    expect(ADD_TO_TWENTY_POOL).toEqual(EXPECTED_ADD_TO_TWENTY_POOL_FROM_SPEC)
+  })
+
+  it('spec §1.1 pool-table rows parse to the hand-mirrored expectation (lockstep)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    const parsed = parseAddToTwentyPoolFromSpec(spec)
+    expect(parsed).toEqual(EXPECTED_ADD_TO_TWENTY_POOL_FROM_SPEC)
+  })
+
+  it('spec §1.1 contains exactly 22 pool-table rows (matches pool size)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    const parsed = parseAddToTwentyPoolFromSpec(spec)
+    expect(parsed).toHaveLength(ADD_TO_TWENTY_POOL.length)
+    expect(parsed).toHaveLength(22)
+  })
+
+  it('parser returns no rows when the row-number column is removed from the table (sanity)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    // Strip the leading `| <N>   |` segment from every pool-table row;
+    // parser's `\d+` row-number anchor stops matching, parsed should be
+    // empty. Confirms the regex's row-number discriminator is load-
+    // bearing.
+    const mutated = spec.replace(/^\|\s+\d+\s+\|\s+`?(\d+\s*\+)/gm, '| $1')
+    const parsed = parseAddToTwentyPoolFromSpec(mutated)
+    expect(parsed).toEqual([])
+  })
+})
+
+// ── ADD_TO_TWENTY_RULES.bandAllowedSlots drift-guard against spec §2.1 ──
+//
+// Companion to the POOL guard above. Spec §2.1 carries the band-by-slot
+// bullets in a SHAPE DIFFERENT from add-to-10's "- BAND (sum N-M):" —
+// add-to-20 uses "- BAND (#N–M): allowed at ..." (row-range, not sum-
+// range, and EN-DASH `–` not hyphen `-`). A dedicated parser is needed;
+// the add-to-10 `parseAddToTenBandSlotsFromBulletProse` would not match.
+//
+// Discriminator anchors per the brittleness-is-the-alarm-wire pattern:
+//   - EASY: ends `... at any slot P1–P8 (gentle ramp anchor; ...`
+//     (the trailing `(gentle ramp anchor` phrase IS the discriminator)
+//   - MEDIUM: terminal `.` with NO trailing modifier
+//   - HARD: ends `... only. **HARD must NOT appear at P1–P4.**`
+//     (the boldface clarification IS the discriminator)
+
+type AddToTwentyBandSlots = (typeof ADD_TO_TWENTY_RULES)['bandAllowedSlots']
+
+const EXPECTED_ADD_TO_TWENTY_BAND_SLOTS_FROM_SPEC: AddToTwentyBandSlots = {
+  EASY: [1, 2, 3, 4, 5, 6, 7, 8],
+  MEDIUM: [4, 5, 6, 7, 8],
+  HARD: [5, 6, 7, 8],
+}
+
+/** Parse the add-to-20 spec §2.1 band-by-slot bullets.
+ *
+ *  Bullet shape per spec §2.1:
+ *    `- EASY (#1–6): allowed at any slot P1–P8 (gentle ramp anchor; ...`
+ *    `- MEDIUM (#7–14): allowed at P4–P8.`
+ *    `- HARD (#15–22): allowed at P5–P8 only. **HARD must NOT appear at P1–P4.**`
+ *
+ *  Note the en-dash `–` (U+2013) between row numbers and slot numbers.
+ *  Each parser regex tolerates whitespace around the dash and uses a
+ *  per-band one-feature discriminator:
+ *    - EASY: trailing `(gentle ramp anchor` phrase
+ *    - MEDIUM: terminal `.` with no `only` modifier
+ *    - HARD: trailing `only.` with the `must NOT appear at P1` reinforcement
+ *
+ *  Discriminators are deliberately unique so a future spec editor who
+ *  harmonises the bullet wording (e.g. drops "gentle ramp anchor" from
+ *  EASY or drops the boldface HARD clarification) trips the parser
+ *  loudly per the brittleness-is-the-alarm-wire pattern documented in
+ *  testing-and-ci.md §6.
+ */
+function parseAddToTwentyBandSlotsFromSpec(
+  prose: string,
+): AddToTwentyBandSlots {
+  // EASY: `- EASY (#1–6): allowed at any slot P1–P8 (gentle ramp anchor`
+  // The trailing `(gentle ramp anchor` is the discriminator.
+  const easyMatch =
+    /^\s*-\s+EASY\s+\(#\d+[–-]\d+\):\s+allowed at any slot P(\d+)[–-]P(\d+)\s*\(gentle ramp anchor/m.exec(
+      prose,
+    )
+  if (!easyMatch) {
+    throw new Error(
+      "parseAddToTwentyBandSlotsFromSpec: could not locate EASY rule — expected '- EASY (#N–M): allowed at any slot P<s>–P<e> (gentle ramp anchor' bullet in spec §2.1",
+    )
+  }
+  const easyStart = Number.parseInt(easyMatch[1]!, 10)
+  const easyEnd = Number.parseInt(easyMatch[2]!, 10)
+
+  // MEDIUM: `- MEDIUM (#7–14): allowed at P4–P8.`
+  // Terminal `.` with no trailing `only` is the discriminator.
+  const mediumMatch =
+    /^\s*-\s+MEDIUM\s+\(#\d+[–-]\d+\):\s+allowed at P(\d+)[–-]P(\d+)\.\s*$/m.exec(
+      prose,
+    )
+  if (!mediumMatch) {
+    throw new Error(
+      "parseAddToTwentyBandSlotsFromSpec: could not locate MEDIUM rule — expected '- MEDIUM (#N–M): allowed at P<s>–P<e>.' bullet in spec §2.1",
+    )
+  }
+  const mediumStart = Number.parseInt(mediumMatch[1]!, 10)
+  const mediumEnd = Number.parseInt(mediumMatch[2]!, 10)
+
+  // HARD: `- HARD (#15–22): allowed at P5–P8 only. **HARD must NOT appear at P1–P4.**`
+  // Trailing `only.` plus the boldface clarification is the discriminator.
+  const hardMatch =
+    /^\s*-\s+HARD\s+\(#\d+[–-]\d+\):\s+allowed at P(\d+)[–-]P(\d+)\s+only\.\s+\*\*HARD must NOT appear at P\d+[–-]P\d+/m.exec(
+      prose,
+    )
+  if (!hardMatch) {
+    throw new Error(
+      "parseAddToTwentyBandSlotsFromSpec: could not locate HARD rule — expected '- HARD (#N–M): allowed at P<s>–P<e> only. **HARD must NOT appear at P1–P4.**' bullet in spec §2.1",
+    )
+  }
+  const hardStart = Number.parseInt(hardMatch[1]!, 10)
+  const hardEnd = Number.parseInt(hardMatch[2]!, 10)
+
+  const range = (start: number, end: number): readonly number[] => {
+    const out: number[] = []
+    for (let i = start; i <= end; i++) out.push(i)
+    return out
+  }
+
+  return {
+    EASY: range(easyStart, easyEnd),
+    MEDIUM: range(mediumStart, mediumEnd),
+    HARD: range(hardStart, hardEnd),
+  }
+}
+
+describe('ADD_TO_TWENTY_RULES.bandAllowedSlots drift-guard against spec §2.1', () => {
+  const SPEC_PATH = join(
+    process.cwd(),
+    'design',
+    'math',
+    'add-to-20-content.md',
+  )
+
+  it('lint rule data matches the hand-mirrored expectation from the spec (lockstep)', () => {
+    // Mutation contract: flip ADD_TO_TWENTY_RULES.bandAllowedSlots.HARD
+    // from [5, 6, 7, 8] to [4, 5, 6, 7, 8] (replicates a HARD-at-P4
+    // widening that would contradict spec §2.1 boldface "HARD must NOT
+    // appear at P1-P4"). This test must FAIL with a deep-equality diff
+    // naming the HARD band as the discrepant key. Restore to verify
+    // GREEN.
+    expect(ADD_TO_TWENTY_RULES.bandAllowedSlots).toEqual(
+      EXPECTED_ADD_TO_TWENTY_BAND_SLOTS_FROM_SPEC,
+    )
+  })
+
+  it('spec §2.1 band-by-slot bullets parse to the hand-mirrored expectation (lockstep)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    const parsed = parseAddToTwentyBandSlotsFromSpec(spec)
+    expect(parsed).toEqual(EXPECTED_ADD_TO_TWENTY_BAND_SLOTS_FROM_SPEC)
+  })
+
+  it('parser throws a clear error when a required spec bullet is missing', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+
+    const proseMissingEasy = spec.replace(
+      /^-\s+EASY\s+\(#\d+[–-]\d+\):\s+allowed at any slot P\d+[–-]P\d+\s*\(gentle ramp anchor/m,
+      '- EASY (#1–6): [REFORMATTED]',
+    )
+    expect(() => parseAddToTwentyBandSlotsFromSpec(proseMissingEasy)).toThrow(
+      /EASY rule/,
+    )
+
+    const proseMissingMedium = spec.replace(
+      /^-\s+MEDIUM\s+\(#\d+[–-]\d+\):\s+allowed at P\d+[–-]P\d+\.\s*$/m,
+      '- MEDIUM (#7–14): [REFORMATTED]',
+    )
+    expect(() => parseAddToTwentyBandSlotsFromSpec(proseMissingMedium)).toThrow(
+      /MEDIUM rule/,
+    )
+
+    const proseMissingHard = spec.replace(
+      /^-\s+HARD\s+\(#\d+[–-]\d+\):\s+allowed at P\d+[–-]P\d+\s+only\.\s+\*\*HARD must NOT appear at P\d+[–-]P\d+/m,
+      '- HARD (#15–22): [REFORMATTED]',
+    )
+    expect(() => parseAddToTwentyBandSlotsFromSpec(proseMissingHard)).toThrow(
+      /HARD rule/,
+    )
+  })
+})
+
+// ── ADD_TO_TWENTY_RULES.makeTenBridgeInP5ToP8Min drift-guard ────────────
+//
+// Guard the spec-divergent slot-range field name + value. Spec §2.4
+// fixes this rule at P5-P8 (NOT P4-P8 like the sibling tiers). The
+// field name `makeTenBridgeInP5ToP8Min` is the data-layer flag for the
+// divergence. This guard pins both the value AND the name.
+
+describe('ADD_TO_TWENTY_RULES.makeTenBridgeInP5ToP8Min drift-guard against spec §2.4', () => {
+  const SPEC_PATH = join(
+    process.cwd(),
+    'design',
+    'math',
+    'add-to-20-content.md',
+  )
+
+  it('config field is `makeTenBridgeInP5ToP8Min` (NOT `*InP4ToP8Min` — divergence flag)', () => {
+    // The field name itself is the contract. Renaming to
+    // `makeTenBridgeInP4ToP8Min` (silently widening the rule to match
+    // sibling tiers) would compile cleanly but violate spec §2.4. This
+    // test fails on the rename via the `'makeTenBridgeInP5ToP8Min' in
+    // ADD_TO_TWENTY_RULES` membership check.
+    expect('makeTenBridgeInP5ToP8Min' in ADD_TO_TWENTY_RULES).toBe(true)
+  })
+
+  it('value matches spec §2.4 lock ("Lint enforces P5–P8 ≥ 1 make-ten-bridge")', () => {
+    expect(ADD_TO_TWENTY_RULES.makeTenBridgeInP5ToP8Min).toBe(1)
+  })
+
+  it('spec §2.4 contains the P5-P8 lock literal (drift-guard against spec rewording)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    // The exact "**Lint enforces P5–P8 ≥ 1 make-ten-bridge.**" sentence
+    // is the discriminator. If Kyle softens the lock to "P4-P8" or
+    // drops the boldface, this fails — at which point the rename to
+    // `makeTenBridgeInP4ToP8Min` AND the lint logic must be revisited
+    // in lockstep.
+    expect(spec).toMatch(
+      /Lint enforces P5[–-]P8\s*[≥>=]+\s*1\s+make-ten-bridge/,
+    )
+  })
+})
+
+// ── deferred-binding marker (split-PR pattern; testing-and-ci.md §6) ────
+//
+// PR A scope: add-to-20 binding INTENTIONALLY DEFERRED to PR B. The
+// committed canon at public/canon/math/level-1/add-to-20.json ships
+// with 4-of-8 doubles per spec §1.4 (the doubles-prior correction
+// target); wiring the binding in PR A would red-CI the lint pipeline.
+// PR B (canon rebake + binding activation, ticket follow-up to
+// 86c9uuqzu) flips this marker.
+
+describe('add-to-20 binding (DEFERRED to PR B per testing-and-ci.md §6)', () => {
+  it('resolveTierBinding(`add-to-20.json`) returns null in PR A', () => {
+    // When PR B activates the binding, flip this to:
+    //   expect(resolveTierBinding('canon/math/level-1/add-to-20.json'))
+    //     .toEqual({ tier: 'add-to-20', config: ADD_TO_TWENTY_RULES })
+    expect(resolveTierBinding('canon/math/level-1/add-to-20.json')).toBeNull()
+    expect(resolveTierBinding('add-to-20.json')).toBeNull()
+  })
+
+  it('runCompositionLint SKIPS add-to-20.json files in PR A (binding deferred)', () => {
+    // Sanity check that mirrors the existing out-of-scope assertion in
+    // the disk-walker `lints in-scope math tiers` test above. PR B will
+    // need to:
+    //   1. Move add-to-20.json from the "out-of-scope" writeCanon block
+    //      to the "in-scope" block (line ~812 in this file).
+    //   2. Update the `expect(r.filesLinted).toBe(3)` to 4 and
+    //      `expect(r.filesSkipped).toBe(2)` to 1.
+    //   3. Drop this regression test (it asserts the PR A state).
+    const tmp = mkdtempSync(join(tmpdir(), 'composition-lint-addto20-pra-'))
+    try {
+      const abs = join(tmp, 'math/level-1/add-to-20.json')
+      mkdirSync(join(abs, '..'), { recursive: true })
+      // Even a malformed canon — runCompositionLint should skip without
+      // attempting to validate the shape.
+      writeFileSync(
+        abs,
+        JSON.stringify({
+          ok: true,
+          kind: 'session-start',
+          plan: {},
+          utterances: [
+            {
+              id: 'math.p1.read',
+              text: 'Six plus six. How many?',
+              audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+            },
+          ],
+        }),
+        'utf8',
+      )
+      const r = runCompositionLint(tmp)
+      expect(r.filesScanned).toBe(1)
+      expect(r.filesLinted).toBe(0)
+      expect(r.filesSkipped).toBe(1)
+      expect(r.totalViolations).toBe(0)
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
   })
 })
