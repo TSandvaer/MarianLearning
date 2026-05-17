@@ -1848,19 +1848,19 @@ export function assertAddToTwentyCompositionClean(
 // path. Hard-coded matching; future tiers slot in here.
 //
 // add-to-20: lint infra (POOL, RULES, parser, lintAddToTwentyComposition,
-// assertAddToTwentyCompositionClean) shipped in PR A (ticket 86c9uuqzu)
-// but binding is DEFERRED to PR B per `testing-and-ci.md §6 Split-PR
-// pattern when canon pre-exists in violation`. The committed
-// `public/canon/math/level-1/add-to-20.json` violates the doubles cap
-// (ships 4-of-8 doubles per spec §1.4); wiring the binding in PR A would
-// red-CI the lint pipeline. PR B rebakes the canon and activates the
-// binding together. See the TODO in `lintAddToTwentyComposition` above
-// for the explicit PR B checklist.
+// assertAddToTwentyCompositionClean) shipped in PR A (ticket 86c9uuqzu,
+// PR #278). PR B (this PR — ticket follow-up to 86c9uuqzu) activates the
+// binding alongside a fresh canon rebake. The previous committed
+// `public/canon/math/level-1/add-to-20.json` shipped 4-of-8 doubles
+// (spec §1.4's doubles-prior correction target); the rebake replaces it
+// with a spec-compliant 8-problem session (doubles <= 2, near-doubles
+// <= 2, >= 1 make-ten-bridge in P5-P8).
 
 export type TierLintBinding =
   | { tier: 'sub-to-10'; config: SubToTenRulesConfig }
   | { tier: 'add-to-10'; config: AddToTenRulesConfig }
   | { tier: 'sub-to-20'; config: SubToTwentyRulesConfig }
+  | { tier: 'add-to-20'; config: AddToTwentyRulesConfig }
   | null
 
 /**
@@ -1901,6 +1901,18 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   if (norm === 'sub-to-20.json' || norm.endsWith('/sub-to-20.json')) {
     return { tier: 'sub-to-20', config: SUB_TO_TWENTY_RULES }
   }
+  // add-to-20 binding ACTIVATED in the rebake PR (ticket follow-up to
+  // 86c9uuqzu). PR A (#278) shipped the lint infra with the binding
+  // deferred; this PR (PR B) sharpens the directive, rebakes the canon
+  // to spec-compliant constraints (doubles <= 2, near-doubles <= 2,
+  // >= 1 make-ten-bridge in P5-P8), and wires the binding through the
+  // dispatch.
+  if (norm.endsWith('/math/level-1/add-to-20.json')) {
+    return { tier: 'add-to-20', config: ADD_TO_TWENTY_RULES }
+  }
+  if (norm === 'add-to-20.json' || norm.endsWith('/add-to-20.json')) {
+    return { tier: 'add-to-20', config: ADD_TO_TWENTY_RULES }
+  }
   return null
 }
 
@@ -1909,7 +1921,7 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
 export interface CompositionFileFinding {
   /** Repo-relative posix-shaped path for log readability. */
   filePath: string
-  tier: 'sub-to-10' | 'add-to-10' | 'sub-to-20'
+  tier: 'sub-to-10' | 'add-to-10' | 'sub-to-20' | 'add-to-20'
   violations: CompositionViolation[]
 }
 
@@ -1924,8 +1936,8 @@ export interface RunCompositionLintResult {
 
 /**
  * Walk a canon root, lint every in-scope tier file (currently sub-to-10,
- * add-to-10, sub-to-20), and return the aggregate result without
- * throwing. The CLI driver decides exit code based on the result.
+ * add-to-10, sub-to-20, add-to-20), and return the aggregate result
+ * without throwing. The CLI driver decides exit code based on the result.
  */
 export function runCompositionLint(
   canonRoot: string,
@@ -1995,6 +2007,12 @@ export function runCompositionLint(
         break
       case 'sub-to-20':
         violations = lintSubToTwentyComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+      case 'add-to-20':
+        violations = lintAddToTwentyComposition(
           parsed as SessionStartResponse,
           binding.config,
         )

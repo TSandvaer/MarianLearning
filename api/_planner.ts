@@ -961,7 +961,66 @@ The user message names a focus skill node. Generate problems specifically for th
   - giveAnswer: "This one is <answer>." e.g. "This one is eight."
 
   PROSODY: numbers are spelled out as words ("one", "two", ... "ten"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10%; no SSML overrides required for any value in [1, 10].
-- add-to-20: addition with sums STRICTLY in 11-20 (inclusive). Every problem's sum MUST be at least 11 and at most 20 — a sum of 10 or below is FORBIDDEN here (that's add-to-10's territory). FORBIDDEN sum examples (do NOT emit): 5+5=10, 4+4=8, 3+7=10, 6+4=10, 2+8=10. Before emitting any add-to-20 problem, COMPUTE the sum mentally and CONFIRM it is between 11 and 20 inclusive; reject any candidate whose sum falls outside that range. BOTH addends MUST be in 1-9 (cross-10-bridge facts like 8+5=13, 7+6=13, 9+4=13). Ten-plus-single forms are FORBIDDEN — neither addend may equal 10. FORBIDDEN addend examples (do NOT emit, regardless of sum): 10+1=11, 10+5=15, 10+8=18, 1+10=11, 5+10=15, 8+10=18. Before emitting any add-to-20 problem, also CONFIRM that addendA in 1-9 AND addendB in 1-9; reject any candidate where either addend equals 10 or exceeds 10. Rationale: ten-plus-single is pedagogically easier than cross-10-bridge (the actual learning target at this tier), and the visual flower-row at addend=10 overflows the iPad portrait safe area. read: same template — e.g. "Seven plus six. How many?" Lean on doubles and near-doubles within range: 6+6=12, 7+7=14, 8+8=16, 9+9=18, 6+7=13, 7+8=15, 8+9=17.
+- add-to-20: addition with sums STRICTLY in [11, 20] and BOTH addends in [1, 9]. NO TEN-PLUS-SINGLE (10+n, n+10 FORBIDDEN — that's two-digit-addsub territory); NO sums <= 10 (that's add-to-10's territory). read: "<addend-A> plus <addend-B>. How many?" e.g. "Eight plus five. How many?"
+
+  SUM-RANGE SELF-CHECK (apply before emitting every problem): for chosen (addendA a, addendB b), COMPUTE a + b and CONFIRM that 11 <= a + b <= 18. (V1 pool excludes 19 and 20 — see addend range below.) If the sum is < 11, the problem belongs in add-to-10 and is FORBIDDEN here; if > 18, the (a, b) pair is OUT of the v1 pool. Worked example: 8+3=11 is OK (11 in range). 5+5=10 is FORBIDDEN (sum < 11). 9+10=19 is FORBIDDEN (addend = 10 violates next check).
+
+  ADDEND-RANGE SELF-CHECK (apply before emitting every problem): for chosen (a, b), CONFIRM that a in [1, 9] AND b in [1, 9]. If either addend is 10 or greater, the problem is FORBIDDEN (belongs in a future two-digit tier). Worked example: 9+8=17 is OK (both addends in [1, 9]). 10+8=18 is FORBIDDEN (a = 10). 12+5=17 is FORBIDDEN (a > 9).
+
+  FACT POOL (22 facts; pick exactly 8 distinct ordered pairs from this pool per session, no duplicates; commutative pairs are DISTINCT facts — e.g. "9+2" and "2+9" are separate pool entries):
+  Each fact is annotated with [BAND/category]. Categories: make-ten-bridge (the actual learning target of this tier — child decomposes one addend to reach 10 first); doubles (retrieved; do NOT over-pick — see DOUBLES-CAP SELF-CHECK below); near-doubles (doubles-plus-one derivation; requires doubles to be retrieved).
+  - Easy band (P1-P3 eligible, also P4-P8 fallback):
+    · 9+2=11  [EASY/make-ten-bridge]
+    · 2+9=11  [EASY/make-ten-bridge]
+    · 8+3=11  [EASY/make-ten-bridge]
+    · 3+8=11  [EASY/make-ten-bridge]
+    · 9+3=12  [EASY/make-ten-bridge]
+    · 6+6=12  [EASY/doubles]
+  - Medium band (P4-P8 eligible):
+    · 9+4=13  [MEDIUM/make-ten-bridge]
+    · 4+9=13  [MEDIUM/make-ten-bridge]
+    · 8+5=13  [MEDIUM/make-ten-bridge]
+    · 5+8=13  [MEDIUM/make-ten-bridge]
+    · 6+7=13  [MEDIUM/near-doubles]
+    · 7+6=13  [MEDIUM/near-doubles]
+    · 7+7=14  [MEDIUM/doubles]
+    · 9+5=14  [MEDIUM/make-ten-bridge]
+  - Hard band (P5-P8 eligible):
+    · 7+8=15  [HARD/near-doubles]
+    · 8+7=15  [HARD/near-doubles]
+    · 9+6=15  [HARD/make-ten-bridge]
+    · 9+7=16  [HARD/make-ten-bridge]
+    · 8+8=16  [HARD/doubles]
+    · 9+8=17  [HARD/make-ten-bridge]
+    · 8+9=17  [HARD/near-doubles]
+    · 9+9=18  [HARD/doubles]
+  POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) pair appears verbatim above. The 22 listed ordered pairs are the ONLY allowed facts. Common FORBIDDEN candidates to REJECT (valid by sum and addend range but NOT in v1 pool): 4+7, 7+4, 5+6, 6+5, 4+8, 8+4, 5+7, 7+5, 6+8, 8+6, 5+9 (and any other (a, b) with a in [1,9], b in [1,9], 11 <= a+b <= 20 not on the list above). These are deferred to a future pool widening; not part of v1.
+
+  SESSION COMPOSITION RULES (apply IN ORDER):
+  1. Problems 1-3 (gentle ramp): draw EXCLUSIVELY from the easy band. Calibration window.
+  2. NEGATIVE ANCHOR — P1, P2, P3 PLACEMENT BANS (any one of these is a hard rule violation):
+     · DO NOT place any MEDIUM-band fact at P1, P2, or P3. MEDIUM-band only appears at P4 or later.
+     · DO NOT place any HARD-band fact at P1, P2, P3, or P4. HARD-band only appears at P5 or later.
+     · The ONLY facts allowed at P1, P2, P3 are: 9+2, 2+9, 8+3, 3+8, 9+3, 6+6.
+  3. Problem 4: MEDIUM-band only (HARD-band still forbidden at P4).
+  4. Problems 5-8 (discriminate): draw from medium + hard bands. Recent-score modulation: low score (< 0.5) -> bias toward medium and REDUCE doubles to <= 1 across the session; high score (>= 0.85) -> push toward hard with >= 1 make-ten-bridge in P5-P8; mid score -> balanced.
+  5. HIGH-LEVERAGE COVERAGE RULE: at least one make-ten-bridge fact MUST appear in P5-P8 (drawn from: 9+4, 4+9, 8+5, 5+8, 9+5, 9+6, 9+7, 9+8). This is the actual learning target of the tier; Dave's sub-to-20 research § 1.2 frames cross-10-bridge as parallel to take-from-decade for sub-to-20.
+  6. DOUBLES-CAP SELF-CHECK: AT MOST TWO problems across the entire 8-problem session may carry the doubles category (i.e. AT MOST TWO facts drawn from {6+6, 7+7, 8+8, 9+9}). Before emitting a third doubles fact, REJECT it. NEGATIVE ANCHOR — it is FORBIDDEN to place 6+6, 7+7, 8+8, AND 9+9 in the same session (that exceeds the cap by 2). The previous canon shipped with all four doubles present — that is the failure mode this cap corrects. Pick at most 2; let the other 2 lie unused for this session.
+  7. NEAR-DOUBLES-CAP SELF-CHECK: AT MOST TWO problems across the entire 8-problem session may carry the near-doubles category (drawn from {6+7, 7+6, 7+8, 8+7, 8+9}). Before emitting a third near-doubles fact, REJECT it.
+  8. NO duplicate (a, b) ordered pairs within the 8-problem set. "9+2" and "2+9" are NOT duplicates — they are distinct ordered pairs with distinct read-line text.
+  9. GENERAL-CATEGORY BAN: the v1 pool contains ZERO general-category facts by design. Do NOT invent or emit any fact whose category is "general" — the pool-membership self-check above already rejects any (a, b) outside the 22 listed pairs, and EVERY listed pair maps to make-ten-bridge, doubles, or near-doubles. If a future pool widening introduces general facts, this rule gets a positive cap (currently structurally zero).
+  10. DUAL-EXPOSURE RULE (forward-compat scaffold): never pair an addition fact and its subtraction inverse in the same session. E.g. if 8+5=13 is included, 13-5=8 and 13-8=5 are both FORBIDDEN (vacuously satisfied in pure-+ v1 sessions; rule binds once mixed +/- sessions arrive). This rule is forward-compatible with future add-to-20 / sub-to-20 fact-family interleaving.
+
+  DISTRACTOR-COVERAGE SELF-CHECK (for problems 4-8): the render pipeline (src/screens/Math/Math.tsx) uses Class 1 (off-by-one) for every op:'+' P4-P8 problem and does NOT apply a Class 2 (wrong-op) or Class B (dropped-carry) trap — see design/math/add-to-20-content.md §3.3 and §3.4. No coverage self-check needed for distractor classes; the high-leverage coverage rule (Rule 5 above) carries the pedagogical-coverage burden for this tier.
+
+  PER-PROBLEM SHAPE for add-to-20: every problem MUST emit op: "+" on the wire. Utterance ids MUST use the literal "math." prefix (NOT "add-to-20."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". Per-slot utterance templates:
+  - read: "<addend-A> plus <addend-B>. How many?" e.g. "Eight plus five. How many?"
+  - correct: "Yes! <answer>!" e.g. "Yes! Thirteen!"
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint: "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Eight. And five more. How many now?"
+  - giveAnswer: "This one is <answer>." e.g. "This one is thirteen."
+
+  PROSODY: numbers are spelled out as words ("one", "two", ... "nine", "ten", "eleven", ... "eighteen"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10% for all values in [1, 18]; no SSML overrides required (validated by sub-to-20 §4 for the same teen-number range). Do NOT verbally decompose the addends (e.g. do NOT say "eight plus two plus three" instead of "eight plus five") — per Dave § 2 (L2 context note, sub-to-20 research), verbal decomposition adds L2 cognitive load without pedagogical benefit. The decomposition IS the mental work Marian does to bridge; it stays internal.
 - sub-to-10: subtraction with both operands in 0-10 and answer in 0-10. read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seven minus three. How many are left?"
 
   FIRST-SESSION READ-LINE — SESSION-LEVEL TEMPLATE CHOICE (not per-problem). Make this choice ONCE for the entire 8-problem session:

@@ -748,13 +748,12 @@ describe('resolveTierBinding', () => {
   })
 
   it('returns null for out-of-scope tier files', () => {
-    // sub-to-10 + add-to-10 + sub-to-20 are bake-time-bound. The
-    // sub-to-20 binding was activated in the rebake PR (ticket
-    // 86c9utet9) alongside a fresh canon that respects Kyle's PR #269
-    // spec (no-borrow, minuend 11-19, "How many are left?" template).
-    // Asserted positively in the dedicated `resolveTierBinding —
-    // sub-to-20` describe block below.
-    expect(resolveTierBinding('canon/math/level-1/add-to-20.json')).toBeNull()
+    // sub-to-10 + add-to-10 + sub-to-20 + add-to-20 are bake-time-bound.
+    // The sub-to-20 binding was activated alongside Kyle's PR #269 spec
+    // rebake (ticket 86c9utet9); the add-to-20 binding was activated
+    // alongside this PR's canon rebake (ticket follow-up to 86c9uuqzu).
+    // Both asserted positively in their dedicated `resolveTierBinding —
+    // <tier>` describe blocks below.
     expect(
       resolveTierBinding('canon/word-song/level-1/blending-cv.json'),
     ).toBeNull()
@@ -795,7 +794,7 @@ describe('runCompositionLint — disk walker', () => {
     expect(r.totalViolations).toBe(0)
   })
 
-  it('lints in-scope math tiers (sub-to-10 + add-to-10 + sub-to-20) and SKIPS out-of-scope tiers', () => {
+  it('lints in-scope math tiers (sub-to-10 + add-to-10 + sub-to-20 + add-to-20) and SKIPS out-of-scope tiers', () => {
     // In-scope sub-to-10.
     writeCanon(
       'math/level-1/sub-to-10.json',
@@ -813,19 +812,14 @@ describe('runCompositionLint — disk walker', () => {
       'math/level-1/sub-to-20.json',
       buildSubToTwentyCanonResponse([...CLEAN_SUB_TO_TWENTY_FACTS]),
     )
+    // In-scope add-to-20 (clean canon mirroring the rebake PR layout
+    // — bound through resolveTierBinding alongside the fresh
+    // doubles-prior-corrected canon).
+    writeCanon(
+      'math/level-1/add-to-20.json',
+      buildAddToTwentyCanonResponse([...CLEAN_ADD_TO_TWENTY_FACTS]),
+    )
     // Out-of-scope.
-    writeCanon('math/level-1/add-to-20.json', {
-      ok: true,
-      kind: 'session-start',
-      plan: {},
-      utterances: [
-        {
-          id: 'math.p1.read',
-          text: 'Seven plus six. How many?',
-          audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
-        },
-      ],
-    })
     writeCanon('word-song/level-1/blending-cv.json', {
       ok: true,
       kind: 'session-start',
@@ -841,8 +835,8 @@ describe('runCompositionLint — disk walker', () => {
 
     const r = runCompositionLint(tmp)
     expect(r.filesScanned).toBe(5)
-    expect(r.filesLinted).toBe(3)
-    expect(r.filesSkipped).toBe(2)
+    expect(r.filesLinted).toBe(4)
+    expect(r.filesSkipped).toBe(1)
     expect(r.totalViolations).toBe(0)
     expect(r.findings).toEqual([])
   })
@@ -4743,62 +4737,37 @@ describe('ADD_TO_TWENTY_RULES.makeTenBridgeInP5ToP8Min drift-guard against spec 
   })
 })
 
-// ── deferred-binding marker (split-PR pattern; testing-and-ci.md §6) ────
+// ── resolveTierBinding for add-to-20 — ACTIVATED in the rebake PR ───────
 //
-// PR A scope: add-to-20 binding INTENTIONALLY DEFERRED to PR B. The
-// committed canon at public/canon/math/level-1/add-to-20.json ships
-// with 4-of-8 doubles per spec §1.4 (the doubles-prior correction
-// target); wiring the binding in PR A would red-CI the lint pipeline.
-// PR B (canon rebake + binding activation, ticket follow-up to
-// 86c9uuqzu) flips this marker.
+// PR A (#278) shipped the lint infra with the binding intentionally
+// deferred — the committed canon then violated the doubles cap so a
+// live binding would have red-CI'd the lint pipeline. PR B (this PR —
+// ticket follow-up to 86c9uuqzu) sharpened the directive, rebaked the
+// canon to spec-compliant constraints (doubles <= 2, near-doubles <= 2,
+// >= 1 make-ten-bridge in P5-P8), and activated the binding here.
 
-describe('add-to-20 binding (DEFERRED to PR B per testing-and-ci.md §6)', () => {
-  it('resolveTierBinding(`add-to-20.json`) returns null in PR A', () => {
-    // When PR B activates the binding, flip this to:
-    //   expect(resolveTierBinding('canon/math/level-1/add-to-20.json'))
-    //     .toEqual({ tier: 'add-to-20', config: ADD_TO_TWENTY_RULES })
-    expect(resolveTierBinding('canon/math/level-1/add-to-20.json')).toBeNull()
-    expect(resolveTierBinding('add-to-20.json')).toBeNull()
+describe('resolveTierBinding — add-to-20', () => {
+  it('binds the canonical add-to-20 path on this platform (sep-aware)', () => {
+    const binding = resolveTierBinding(
+      'canon/math/level-1/add-to-20.json'.replace(/\//g, sep),
+    )
+    expect(binding).not.toBeNull()
+    expect(binding!.tier).toBe('add-to-20')
   })
 
-  it('runCompositionLint SKIPS add-to-20.json files in PR A (binding deferred)', () => {
-    // Sanity check that mirrors the existing out-of-scope assertion in
-    // the disk-walker `lints in-scope math tiers` test above. PR B will
-    // need to:
-    //   1. Move add-to-20.json from the "out-of-scope" writeCanon block
-    //      to the "in-scope" block (line ~812 in this file).
-    //   2. Update the `expect(r.filesLinted).toBe(3)` to 4 and
-    //      `expect(r.filesSkipped).toBe(2)` to 1.
-    //   3. Drop this regression test (it asserts the PR A state).
-    const tmp = mkdtempSync(join(tmpdir(), 'composition-lint-addto20-pra-'))
-    try {
-      const abs = join(tmp, 'math/level-1/add-to-20.json')
-      mkdirSync(join(abs, '..'), { recursive: true })
-      // Even a malformed canon — runCompositionLint should skip without
-      // attempting to validate the shape.
-      writeFileSync(
-        abs,
-        JSON.stringify({
-          ok: true,
-          kind: 'session-start',
-          plan: {},
-          utterances: [
-            {
-              id: 'math.p1.read',
-              text: 'Six plus six. How many?',
-              audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
-            },
-          ],
-        }),
-        'utf8',
-      )
-      const r = runCompositionLint(tmp)
-      expect(r.filesScanned).toBe(1)
-      expect(r.filesLinted).toBe(0)
-      expect(r.filesSkipped).toBe(1)
-      expect(r.totalViolations).toBe(0)
-    } finally {
-      rmSync(tmp, { recursive: true, force: true })
-    }
+  it('binds a posix add-to-20 path', () => {
+    expect(resolveTierBinding('canon/math/level-1/add-to-20.json')?.tier).toBe(
+      'add-to-20',
+    )
+  })
+
+  it('binds bare add-to-20 basename', () => {
+    expect(resolveTierBinding('add-to-20.json')?.tier).toBe('add-to-20')
+  })
+
+  it('still binds sub-to-20 paths (no cross-tier confusion)', () => {
+    expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')?.tier).toBe(
+      'sub-to-20',
+    )
   })
 })
