@@ -479,6 +479,14 @@ test.describe('sub-to-20 — trigger + Class B + no-borrow + out-of-scope', () =
   // `sub-to-20.json` canon P1 is `5 minus 2 = 3` — minuend `5` is
   // NOT in the §1.1 pool. The set-membership assertion below fires.
   // Post-Kevin's canon re-bake, P1's minuend lands in {11..19}.
+  // RE-FIXME'd at flip time (2026-05-17, this PR) — see file header
+  // FLIP-DEFICIENCY block at end of describe-suite-comment for full
+  // diagnosis. Briefly: `failNetwork: true` (the shared `beforeEach`
+  // mock) routes through `pickStaticSessionPlan()` which returns
+  // hardcoded add-to-10 problems regardless of focus, so the
+  // `minuend ∈ {11..19}` assertion fires against `1..9`. Fix
+  // requires a sub-to-20-canon-serving mock helper; flagged as
+  // follow-up ticket (see flip-PR description).
   test.fixme('trigger — sub-to-20 P1 has minuend ∈ {11..19} (no-borrow teen)', async ({
     page,
   }, testInfo) => {
@@ -557,6 +565,15 @@ test.describe('sub-to-20 — trigger + Class B + no-borrow + out-of-scope', () =
   // The 1-of-5 P4 sample is the cheapest gate; future polish could
   // walk all 5 P4-P8 slots and assert ≥2 CLEAN-with-10 (matching
   // the §2.2 ≥2/5 rule directly).
+  // RE-FIXME'd at flip time (2026-05-17, this PR) — same root cause
+  // as Test 1. Spec author flagged this exact case in the
+  // docstring block at lines 460-468 of the original spec:
+  // "Test 2 (Class B chip-row assertion) is the exception — it
+  // requires the new canon to land at P4 with a CLEAN
+  // Class-B-eligible fact. When the flip-PR un-fixmes Test 2, the
+  // brief should consider switching to a sub-to-20-canon-serving
+  // mock following the `installCvcWordsClaudeMock` pattern at §4.2
+  // of testing-and-ci. Flag in the flip-PR." Flagged as follow-up.
   test.fixme('Class B fires at P4 when fact is CLEAN — chip row contains the DEC=10 trap', async ({
     page,
   }, testInfo) => {
@@ -644,7 +661,19 @@ test.describe('sub-to-20 — trigger + Class B + no-borrow + out-of-scope', () =
   // The substring filter below catches these. Post-Kevin's canon
   // re-bake under the new directive's NO-BORROW SELF-CHECK +
   // 22-fact pool, all borrow facts are excluded by construction.
-  test.fixme('no-borrow — no session read-line contains a borrow operand pair', async ({
+  // FLIPPED at 2026-05-17 (this PR). PASSES against current main —
+  // but TRIVIALLY-GREEN under the current `failNetwork: true` shared
+  // mock: the static-fallback rotation is op:'+' (add-to-10), so no
+  // borrow substring can ever appear regardless of canon state. The
+  // intent is to assert no-borrow across the rendered sub-to-20
+  // session; once the follow-up flips the shared mock to canon-bytes
+  // (see flip-PR description), this becomes a real RED-on-base ↔
+  // GREEN-after-canon-rebake lever. Keeping flipped because the test
+  // is honest as a regression-guard against a future regression that
+  // would re-introduce borrow facts in the static fallback OR (post-
+  // canon-mock-switch) in the canon, and Devon's review note flagged
+  // it as structurally green per Kevin's NOF #5 of PR #274.
+  test('no-borrow — no session read-line contains a borrow operand pair', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -711,6 +740,14 @@ test.describe('sub-to-20 — trigger + Class B + no-borrow + out-of-scope', () =
   // Trivially-green on base today (Class B doesn't exist at all);
   // becomes a real regression-guard post-Devon-merge against a
   // wire-side widening bug.
+  // RE-FIXME'd at flip time (2026-05-17, this PR). Same shared-mock
+  // root cause as Tests 1 + 2 — `failNetwork: true` makes both
+  // sub-to-10 AND sub-to-20 focus drive the same hardcoded
+  // add-to-10 static fallback. The static plan's `correct == 10`
+  // happens to render `10` on the off-by-one chip set (the spec's
+  // `if (correct === 9)` guard doesn't cover `correct === 10`).
+  // Fix requires the same canon-serving mock as Tests 1 + 2.
+  // Flagged as follow-up.
   test.fixme('out-of-scope — sub-to-10 focus does NOT emit sub-to-20 minuends or DEC=10 traps', async ({
     page,
   }, testInfo) => {
