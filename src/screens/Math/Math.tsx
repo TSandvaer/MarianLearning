@@ -2780,7 +2780,28 @@ function buildChipOrder(
   // mapping) rather than as a distractors-module default because the
   // module is op-keyed not focus-node-keyed, and other `op === '-'` tiers
   // (sub-to-10) want the existing `minAnswer = 0` default.
-  const minAnswer = focusNode === 'sub-to-20' ? 10 : undefined
+  //
+  // Three-gate safety on the threading:
+  //   1. `focusNode === 'sub-to-20'` — only the sub-to-20 tier wants the
+  //      no-borrow band.
+  //   2. `problem.op === '-'` — sub-to-20 facts are all subtraction; the
+  //      static-plan fallback (sums-to-10 addition; see `pickStaticSessionPlan`
+  //      which has no sub-to-20 rotation and defaults to STATIC_SESSION_PLANS)
+  //      emits `op === '+'` problems when canon/live planner is unavailable.
+  //      Threading `minAnswer = 10` against those addition problems makes
+  //      `pickDistractors` throw on `correct < 10` (range guard) and blanks
+  //      the screen — observed via `progression-mastery-loop.spec.ts`
+  //      "two perfect sub-to-20 sessions" under `failNetwork: true`.
+  //   3. `problem.correct >= 10` — defensive against canon drift / future
+  //      fallback rotations: if a `op === '-'` problem with `correct < 10`
+  //      slips through, fall back to the op-keyed default (`minAnswer = 0`)
+  //      rather than throwing. The legitimate sub-to-20 pool (Kyle's spec
+  //      §1.1) emits results in `[10, 18]`, so this gate is a no-op for
+  //      conformant plans.
+  const minAnswer =
+    focusNode === 'sub-to-20' && problem.op === '-' && problem.correct >= 10
+      ? 10
+      : undefined
   const [d1, d2] = pickDistractors(problem.correct, problem.index, maxAnswer, {
     op: problem.op,
     operands: [problem.addendA, problem.addendB] as const,
