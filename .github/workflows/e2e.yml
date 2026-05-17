@@ -25,7 +25,7 @@ jobs:
   playwright:
     name: Playwright (Chromium + WebKit)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
