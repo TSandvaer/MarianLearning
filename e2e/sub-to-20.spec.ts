@@ -426,11 +426,11 @@ async function readAllProblemReadLines(page: Page): Promise<string[]> {
       String(i),
       { timeout: 15_000 },
     )
-    // Read the rendered read-aloud line. `math-read-aloud-text` is
-    // the canonical testid for the visible caption text per
-    // `Math.tsx`; if Devon's wire renames it, this helper updates
+    // Read the rendered read-aloud line. `math-caption` is the
+    // canonical testid for the visible caption text per
+    // `Math.tsx:2265`; if it ever gets renamed this helper updates
     // along with the spec.
-    const text = await page.getByTestId('math-read-aloud-text').textContent()
+    const text = await page.getByTestId('math-caption').textContent()
     if (text !== null) lines.push(text.trim())
     // Advance to the next problem (except after the last one).
     if (i < 7) {
