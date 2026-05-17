@@ -151,12 +151,23 @@ export function pickTier(problemIndex: number): DistractorTier {
  *                          path to take for `op === '-'` problems P4–P8.
  *                          Defaults to `'off-by-one'` when absent. Range-
  *                          fitness re-checked at render time.
+ *
+ *                          Sub-tier discriminator:
+ *                          - `'off-by-one'` → Class 1 / Class A (default).
+ *                          - `'wrong-op'`   → Class 2 trap for sub-to-10
+ *                            (a + b); silently downgrades when OOR /
+ *                            aliases correct. Sub-to-10-specific.
+ *                          - `'decade-anchor'` → Class B trap for
+ *                            sub-to-20 (`Math.round(correct / 10) * 10`);
+ *                            silently downgrades when OOR / aliases
+ *                            correct / aliases off-by-one. Sub-to-20-
+ *                            specific. Per Kyle's sub-to-20 spec §3.3.
  */
 export interface PickDistractorsOpts {
   op?: '+' | '-'
   operands?: readonly [number, number]
   minAnswer?: number
-  distractorClass?: 'off-by-one' | 'wrong-op'
+  distractorClass?: 'off-by-one' | 'wrong-op' | 'decade-anchor'
 }
 
 /**
@@ -215,12 +226,16 @@ export function pickDistractors(
     return gentleDistractors(correct, maxAnswer, minAnswer)
   }
   // Discriminate tier (problems 4-8). Dispatch on op + distractorClass:
-  //   - op === '+'                                  → off-by-one (Class 1)
-  //   - op === '-', class !== 'wrong-op'             → off-by-one (Class 1)
-  //   - op === '-', class === 'wrong-op', no operands → off-by-one (defensive)
-  //   - op === '-', class === 'wrong-op', operands     → try Class 2; fall
-  //                                                       back to Class 1
-  //                                                       on OOR / alias.
+  //   - op === '+'                                       → off-by-one (Class 1)
+  //   - op === '-', class !== 'wrong-op'/'decade-anchor'  → off-by-one
+  //   - op === '-', class === 'wrong-op', no operands     → off-by-one (defensive)
+  //   - op === '-', class === 'wrong-op', operands        → try Class 2; fall
+  //                                                          back to Class 1
+  //                                                          on OOR / alias.
+  //   - op === '-', class === 'decade-anchor'             → try Class B; fall
+  //                                                          back to Class 1
+  //                                                          on OOR / alias /
+  //                                                          alias-off-by-one.
   const wantsWrongOp =
     op === '-' &&
     opts?.distractorClass === 'wrong-op' &&
@@ -235,6 +250,18 @@ export function pickDistractors(
     // Per Kyle's spec §3.2 "Out-of-range wrong-op fallback": the
     // problem renders identically to a Class-1 off-by-one. The planner
     // hint was misleading; this is the documented downgrade.
+  }
+  const wantsDecadeAnchor =
+    op === '-' && opts?.distractorClass === 'decade-anchor'
+  if (wantsDecadeAnchor) {
+    const decade = decadeAnchorDistractors(correct, minAnswer, maxAnswer)
+    if (decade !== null) {
+      return decade
+    }
+    // Class B trap is null — out-of-range, aliases correct, or aliases
+    // off-by-one (degenerate). Per Kyle's sub-to-20 spec §3.3 fallback:
+    // the problem renders identically to a Class-1 off-by-one (chips
+    // `{correct − 1, correct + 1}` clamped).
   }
   return offByOneDistractors(correct, maxAnswer, minAnswer)
 }
@@ -284,6 +311,96 @@ export function wrongOpDistractors(
     return null
   }
   return sortPair(trap, secondary)
+}
+
+/**
+ * Class B — decade-anchor-miss distractor pair for a sub-to-20 subtraction
+ * problem (Kyle's sub-to-20 spec §3.3). Returns `null` when the trap value
+ * can't be used cleanly — the caller's expected behaviour is to fall
+ * through to Class A (off-by-one).
+ *
+ * Trap: `DEC = Math.round(correct / 10) * 10`. The nearest multiple of 10
+ * to `correct`. Targets the decade-anchor lock developmental error
+ * (Baroody 1984; Fuson & Kwon 1992) — a child counting back across the
+ * decade boundary misidentifies which decade they land in.
+ *
+ * Three failure modes downgrade to null:
+ *
+ *   1. **Out-of-range:** `DEC ∉ [minAnswer, maxAnswer]`. Example for
+ *      `maxAnswer = 20`: `correct = 18` → `DEC = 20` (in range, fine).
+ *      Example for hypothetical `correct = 25`: `DEC = 30` > 20 → null.
+ *   2. **Aliases correct:** `DEC === correct`. The pool's take-to-decade
+ *      facts produce this (e.g. `19 − 9 = 10` → `DEC = 10 === correct`);
+ *      Class B is forbidden, downgrade.
+ *   3. **Aliases off-by-one:** `Math.abs(DEC − correct) === 1`. The
+ *      secondary off-by-one in §3.3 sits at `correct ± 1`; if `DEC` is
+ *      already `correct − 1` or `correct + 1`, the chip pair would
+ *      degenerate (the trap and the secondary collapse). For the pool,
+ *      this catches `correct ∈ {9, 11, 19, 21}` boundary cases — e.g.
+ *      `16 − 5 = 11` → `DEC = 10 = correct − 1` → null.
+ *
+ * Secondary distractor pairs with the trap on the OPPOSITE side from
+ * DEC (§3.3 "biases the chip layout away from same-side discrimination"):
+ *
+ *   - If `DEC < correct` (the common case for `correct ≥ 12`): secondary
+ *     = `correct + 1`. Chip set `{DEC, correct, correct + 1}`.
+ *   - If `DEC > correct`: secondary = `correct − 1`. Chip set
+ *     `{correct − 1, correct, DEC}`.
+ *
+ * Secondary range-clamp safety: when the opposite-side off-by-one falls
+ * out of range (rare — only if `correct === maxAnswer` and `DEC < correct`,
+ * or `correct === minAnswer` and `DEC > correct`), the function falls
+ * through to the standard off-by-one walker (`pickSecondaryOffByOne`)
+ * which probes ±1, ±2 in order.
+ *
+ * Returned tuple is sorted ascending for test stability — chip
+ * randomisation happens at render time.
+ *
+ * @returns `[DEC, secondary]` sorted ascending, or `null` when any
+ *          degenerate-case check fires.
+ */
+export function decadeAnchorDistractors(
+  correct: number,
+  minAnswer: number,
+  maxAnswer: number,
+): [number, number] | null {
+  // §3.3 formula: nearest multiple of 10 to `correct`.
+  const dec = Math.round(correct / 10) * 10
+
+  // Failure mode 1: out of range.
+  if (dec < minAnswer || dec > maxAnswer) return null
+  // Failure mode 2: aliases correct (e.g. `19 − 9 = 10` → `DEC = 10`).
+  if (dec === correct) return null
+  // Failure mode 3: aliases off-by-one (e.g. `16 − 5 = 11` → `DEC = 10`).
+  if (Math.abs(dec - correct) === 1) return null
+
+  // Pick the opposite-side off-by-one. DEC < correct (most common —
+  // correct ≥ 12 → DEC = 10): secondary = correct + 1. DEC > correct
+  // (correct ≥ 15 → DEC = 20): secondary = correct − 1.
+  //
+  // Range-fitness: when the preferred opposite-side off-by-one is out
+  // of range (e.g. correct === maxAnswer && DEC < correct), fall back
+  // to the same-side off-by-one — the §3.3 layout-bias is a preference,
+  // not an invariant. Use the existing `pickSecondaryOffByOne` walker
+  // so the alias-with-trap rule is honoured.
+  const preferredSecondary = dec < correct ? correct + 1 : correct - 1
+  if (
+    preferredSecondary >= minAnswer &&
+    preferredSecondary <= maxAnswer &&
+    preferredSecondary !== correct &&
+    preferredSecondary !== dec
+  ) {
+    return sortPair(dec, preferredSecondary)
+  }
+
+  // Preferred-side OOR — walk the secondary off-by-one normally.
+  const secondary = pickSecondaryOffByOne(correct, dec, minAnswer, maxAnswer)
+  if (secondary === null) {
+    // Pathological — couldn't satisfy distinctness even via ±1, ±2 walk.
+    // Caller falls through to plain off-by-one tier.
+    return null
+  }
+  return sortPair(dec, secondary)
 }
 
 /** Pick a single off-by-one secondary distractor that is in range,
