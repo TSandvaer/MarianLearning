@@ -1412,11 +1412,450 @@ export function assertSubToTwentyCompositionClean(
   }
 }
 
+// ── add-to-20 rule config (fourth tier — Kyle's add-to-20 PR #276 spec) ──
+//
+// Per `design/math/add-to-20-content.md` §1.1. The pool is 22 facts
+// covering cross-10-bridge addition (sums in [11, 18], both addends
+// in [1, 9]) with deliberate de-emphasis of doubles per the
+// "Haiku doubles prior" correction (spec §1.4).
+//
+// Categories (mutually exclusive — each fact has exactly one):
+//   - make-ten-bridge — child decomposes one addend to reach 10 first
+//     (e.g. 8 + 5 = 8 + 2 + 3 = 10 + 3 = 13). 13 pool facts; the
+//     ACTUAL learning target of this tier.
+//   - doubles — a == b (4 pool facts: 6+6, 7+7, 8+8, 9+9). High
+//     retrieval salience BUT over-represented by Haiku's prior;
+//     capped tight (≤2 per session) — see DOUBLES-CAP correction.
+//   - near-doubles — |a − b| == 1 (5 pool facts: 6+7, 7+6, 7+8, 8+7,
+//     8+9). Doubles-plus-one derivation; requires doubles to be
+//     retrieved first.
+//   - general — everything else. ZERO facts in v1 pool — by design
+//     (spec §1.4 "if the pool offers no slop bucket, Haiku cannot
+//     over-select facts whose pedagogical role is unclear"). Cap
+//     listed for forward-compat with §8 pool widening.
+//
+// Slot-range divergence from sibling tiers (Devon NOF #3 from PR #276
+// review): Kyle's spec §2.4 + the SESSION COMPOSITION RULES locate the
+// high-leverage coverage rule at P5–P8 — stricter than add-to-10,
+// sub-to-10, and sub-to-20 which all use P4–P8 for the analog rule.
+// To make the divergence explicit at the data layer, the config field
+// is named `makeTenBridgeInP5ToP8Min` (not the bare "P4-P8" framing the
+// siblings carry). See spec §2.4 "Why P5–P8 not P4–P8?" for the
+// pedagogical justification.
+//
+// NEW vs sub-to-20: no DEC-status annotation. add-to-20 does NOT ship
+// a Class B distractor (spec §3.4 — Dave's research gap on cross-10-
+// bridge errors in 7-9 year olds, §7.4 REJECT recommendation). Two-class
+// distractor model (gentle P1-P3, off-by-one P4-P8) unchanged.
+//
+// Commutative-pair wart (Devon non-blocking flag from PR #276): Kyle's
+// pool classifies 9+8 (#20) as make-ten-bridge and 8+9 (#21) as
+// near-doubles for the same numerical sum. Defensible — the strategies
+// genuinely differ — but a future Kyle amendment may unify them.
+// Accepted as-is for v1.
+
+export type AddToTwentyBand = 'EASY' | 'MEDIUM' | 'HARD'
+
+export type AddToTwentyCategory =
+  | 'doubles'
+  | 'near-doubles'
+  | 'make-ten-bridge'
+  | 'general'
+
+export interface AddToTwentyPoolFact {
+  /** "a-b" string id, e.g. "8-5". Stable across runs.
+   *  Note: 9+2 and 2+9 are DISTINCT facts (distinct ids "9-2" and "2-9");
+   *  commutativity per spec §1.1 row #1/#2. */
+  id: string
+  a: number
+  b: number
+  band: AddToTwentyBand
+  category: AddToTwentyCategory
+}
+
+export const ADD_TO_TWENTY_POOL: readonly AddToTwentyPoolFact[] = [
+  // EASY band (6 facts; P1-P3 gentle ramp; also eligible at P4-P8)
+  { id: '9-2', a: 9, b: 2, band: 'EASY', category: 'make-ten-bridge' },
+  { id: '2-9', a: 2, b: 9, band: 'EASY', category: 'make-ten-bridge' },
+  { id: '8-3', a: 8, b: 3, band: 'EASY', category: 'make-ten-bridge' },
+  { id: '3-8', a: 3, b: 8, band: 'EASY', category: 'make-ten-bridge' },
+  { id: '9-3', a: 9, b: 3, band: 'EASY', category: 'make-ten-bridge' },
+  { id: '6-6', a: 6, b: 6, band: 'EASY', category: 'doubles' },
+  // MEDIUM band (8 facts; P4-P8 eligible)
+  { id: '9-4', a: 9, b: 4, band: 'MEDIUM', category: 'make-ten-bridge' },
+  { id: '4-9', a: 4, b: 9, band: 'MEDIUM', category: 'make-ten-bridge' },
+  { id: '8-5', a: 8, b: 5, band: 'MEDIUM', category: 'make-ten-bridge' },
+  { id: '5-8', a: 5, b: 8, band: 'MEDIUM', category: 'make-ten-bridge' },
+  { id: '6-7', a: 6, b: 7, band: 'MEDIUM', category: 'near-doubles' },
+  { id: '7-6', a: 7, b: 6, band: 'MEDIUM', category: 'near-doubles' },
+  { id: '7-7', a: 7, b: 7, band: 'MEDIUM', category: 'doubles' },
+  { id: '9-5', a: 9, b: 5, band: 'MEDIUM', category: 'make-ten-bridge' },
+  // HARD band (8 facts; P5-P8 eligible)
+  { id: '7-8', a: 7, b: 8, band: 'HARD', category: 'near-doubles' },
+  { id: '8-7', a: 8, b: 7, band: 'HARD', category: 'near-doubles' },
+  { id: '9-6', a: 9, b: 6, band: 'HARD', category: 'make-ten-bridge' },
+  { id: '9-7', a: 9, b: 7, band: 'HARD', category: 'make-ten-bridge' },
+  { id: '8-8', a: 8, b: 8, band: 'HARD', category: 'doubles' },
+  { id: '9-8', a: 9, b: 8, band: 'HARD', category: 'make-ten-bridge' },
+  { id: '8-9', a: 8, b: 9, band: 'HARD', category: 'near-doubles' },
+  { id: '9-9', a: 9, b: 9, band: 'HARD', category: 'doubles' },
+] as const
+
+/** Tier rule config — what the add-to-20 lint enforces. Mirrors
+ *  `AddToTenRulesConfig` shape; uses the spec-divergent
+ *  `makeTenBridgeInP5ToP8Min` slot-range field (Devon NOF #3 from
+ *  PR #276 review — spec §2.4 enforces P5-P8 not P4-P8). */
+export interface AddToTwentyRulesConfig {
+  pool: readonly AddToTwentyPoolFact[]
+  categoryCaps: Record<AddToTwentyCategory, number>
+  /** Slots (1-indexed) where each band is allowed. */
+  bandAllowedSlots: Record<AddToTwentyBand, readonly number[]>
+  /** Whole-session minimum count of make-ten-bridge facts within P5-P8.
+   *  STRICTER than sibling tiers (which use P4-P8); explicit field name
+   *  flags the divergence per spec §2.4 "Why P5–P8 not P4–P8?". */
+  makeTenBridgeInP5ToP8Min: number
+  totalProblems: number
+}
+
+export const ADD_TO_TWENTY_RULES: AddToTwentyRulesConfig = {
+  pool: ADD_TO_TWENTY_POOL,
+  categoryCaps: {
+    // Doubles capped tight — the doubles-prior correction lever per
+    // spec §1.4. Pool has 4 doubles; cap at 2 cuts current canon's
+    // 4-of-8 saturation in half.
+    doubles: 2,
+    // Near-doubles capped to prevent over-reliance on doubles-plus-one
+    // derivations (chained dependency on doubles retrieval).
+    'near-doubles': 2,
+    // Make-ten-bridge capped generously — IS the tier's learning
+    // target; cap binds only on doubles-leaning sessions per spec §2.2.
+    'make-ten-bridge': 5,
+    // No general facts in v1 pool by design (spec §1.4). Cap is
+    // structurally zero; forward-compat with §8 pool widening.
+    general: 0,
+  },
+  bandAllowedSlots: {
+    // EASY allowed at any slot — matches add-to-10 (not sub-to-10 or
+    // sub-to-20 which tighten to P1-P3 only). Per spec §2.1 EASY is a
+    // discriminate-tier fallback when recent-score modulation biases
+    // easy (§2.3).
+    EASY: [1, 2, 3, 4, 5, 6, 7, 8],
+    MEDIUM: [4, 5, 6, 7, 8],
+    HARD: [5, 6, 7, 8],
+  },
+  // STRICTER than sibling tiers — spec §2.4 locates the rule at P5-P8
+  // (not P4-P8). The slot-range divergence is intentional: P4 is
+  // MEDIUM-only and many MEDIUM facts are make-ten-bridge, so a
+  // P4-P8 rule would be trivially satisfied; P5-P8 forces the rule
+  // to bind even when P4 happens to carry a non-make-ten-bridge fact.
+  makeTenBridgeInP5ToP8Min: 1,
+  totalProblems: 8,
+}
+
+// ── core: lint a SessionStartResponse against add-to-20 rules ────────────
+
+interface AddToTwentyProblemRow {
+  index: number // 1-indexed
+  utteranceId: string
+  text: string
+  parsed: ParsedFact | null
+  poolMatch: AddToTwentyPoolFact | null
+}
+
+// Teen-extended number-word table. Separate from `NUMBER_WORDS` (which
+// stops at "ten") and from `SUB_TO_TWENTY_NUMBER_WORDS` (which is a
+// distinct const so a sub-to-20 word landing in add-to-20's parser
+// matches independently — no shared state across tiers). add-to-20
+// pool results land in [11, 18] but the table accepts 0-19 for
+// forward-compat (sum-out-of-range trips pool-membership cleanly
+// rather than unparseable-problem).
+const ADD_TO_TWENTY_NUMBER_WORDS: Record<string, number> = {
+  zero: 0,
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+}
+
+const ADD_TO_TWENTY_RE_PLUS =
+  /^\s*([a-z]+)\s+plus\s+([a-z]+)\s*\.\s*how\s+many\s*\?\s*$/i
+
+/**
+ * Parse an add-to-20 read-line into `{ a, b }`. Returns null if the text
+ * doesn't match the addition template `"<W> plus <W>. How many?"` or if
+ * a number word is unrecognised. Pure; no I/O.
+ *
+ * Subtraction templates (sub-to-10's "take away" / "minus" + sub-to-20's
+ * "minus") return null here — by design — so a subtraction canon
+ * mis-routed to this parser fires `unparseable-problem` cleanly.
+ *
+ * Exported for tests + render-time consumers.
+ */
+export function parseAddToTwentyReadLine(text: string): ParsedFact | null {
+  const m = ADD_TO_TWENTY_RE_PLUS.exec(text)
+  if (!m) return null
+  const a = ADD_TO_TWENTY_NUMBER_WORDS[m[1]!.toLowerCase()]
+  const b = ADD_TO_TWENTY_NUMBER_WORDS[m[2]!.toLowerCase()]
+  if (a === undefined || b === undefined) return null
+  return { a, b }
+}
+
+function extractAddToTwentyProblems(
+  response: Pick<SessionStartResponse, 'utterances'>,
+): AddToTwentyProblemRow[] {
+  const re = /^math\.p(\d+)\.read$/
+  const rows: AddToTwentyProblemRow[] = []
+  for (const u of response.utterances) {
+    const m = re.exec(u.id)
+    if (!m) continue
+    const index = Number.parseInt(m[1]!, 10)
+    const parsed = parseAddToTwentyReadLine(u.text)
+    const poolMatch = parsed
+      ? (ADD_TO_TWENTY_POOL.find((f) => f.a === parsed.a && f.b === parsed.b) ??
+        null)
+      : null
+    rows.push({
+      index,
+      utteranceId: u.id,
+      text: u.text,
+      parsed,
+      poolMatch,
+    })
+  }
+  rows.sort((x, y) => x.index - y.index)
+  return rows
+}
+
+/**
+ * Lint a canon's plan against the add-to-20 composition rules. Returns
+ * ALL violations across the 8-problem set — does not stop at the first.
+ *
+ * Pure; no I/O.
+ *
+ * NOTE — PR A scope (split-PR pattern per `testing-and-ci.md §6`):
+ * This function is EXPORTED but NOT yet wired into `bakeOne` /
+ * `resolveTierBinding` / `runCompositionLint` dispatch / the
+ * `CompositionFileFinding` union. The committed
+ * `public/canon/math/level-1/add-to-20.json` pre-exists with violations
+ * the rules here would catch (4-of-8 doubles per spec §1.4 — the
+ * doubles-prior correction target). Wiring is deferred to PR B
+ * (canon rebake + binding activation, ticket follow-up to 86c9uuqzu).
+ *
+ * TODO (PR B): wire the binding once the canon is rebaked.
+ *   1. Add `'add-to-20'` to `TierLintBinding` union below.
+ *   2. Add the `add-to-20.json` branch in `resolveTierBinding`.
+ *   3. Add the `case 'add-to-20':` arm in `runCompositionLint`'s switch.
+ *   4. Add `'add-to-20'` to `CompositionFileFinding.tier` union.
+ *   5. Sharpen the `MATH_TRACK_GUIDE` add-to-20 directive at
+ *      `api/_planner.ts:964` per spec §4.1 — change the bare
+ *      "Lean on doubles and near-doubles within range" prose to the
+ *      explicit FACT POOL + DOUBLES-CAP SELF-CHECK (`general = 0`
+ *      directive enforcement per pattern 5 of
+ *      `feedback_haiku_directive_sharpening`).
+ *   6. Re-bake `public/canon/math/level-1/add-to-20.json` via the
+ *      per-tier rebake recipe (`planner-and-canon.md` § "Per-tier
+ *      rebake recipe"); commit the JSON diff in the same PR.
+ *   7. Flip the deferred test marker:
+ *        expect(resolveTierBinding('add-to-20.json')).toBe('add-to-20')
+ */
+export function lintAddToTwentyComposition(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: AddToTwentyRulesConfig = ADD_TO_TWENTY_RULES,
+): CompositionViolation[] {
+  const violations: CompositionViolation[] = []
+  const problems = extractAddToTwentyProblems(response)
+
+  // ── unparseable / pool-membership pass ──
+  for (const p of problems) {
+    if (p.parsed === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: p.index,
+        message:
+          `P${p.index} (${p.utteranceId}) text does not match the ` +
+          `add-to-20 read template ("<addend-A> plus <addend-B>. How ` +
+          `many?"): ` +
+          JSON.stringify(p.text),
+        factId: null,
+      })
+      continue
+    }
+    if (p.poolMatch === null) {
+      violations.push({
+        rule: 'pool-membership',
+        problemIndex: p.index,
+        message:
+          `P${p.index} fact ${p.parsed.a}+${p.parsed.b}=` +
+          `${p.parsed.a + p.parsed.b} is NOT in the 22-fact add-to-20 ` +
+          `pool. Either it violates sum range [11, 18] (sums <11 belong ` +
+          `in add-to-10; sums >18 require addend >9), addend range ` +
+          `[1, 9] (10+n / n+10 is two-digit-addsub territory), or it ` +
+          `is a valid in-range fact outside the v1 curation ` +
+          `(deferred pool extensions per spec §8). See ` +
+          `design/math/add-to-20-content.md §1.1.`,
+        factId: `${p.parsed.a}-${p.parsed.b}`,
+      })
+    }
+  }
+
+  const matched = problems.filter(
+    (p): p is AddToTwentyProblemRow & { poolMatch: AddToTwentyPoolFact } =>
+      p.poolMatch !== null,
+  )
+
+  // ── band-by-slot pass ──
+  for (const p of matched) {
+    const allowed = config.bandAllowedSlots[p.poolMatch.band]
+    if (!allowed.includes(p.index)) {
+      violations.push({
+        rule: 'band-by-slot',
+        problemIndex: p.index,
+        message:
+          `P${p.index} carries ${p.poolMatch.band} fact ` +
+          `${p.poolMatch.id} (category ${p.poolMatch.category}). ` +
+          `${p.poolMatch.band}-band is only allowed at slots ` +
+          `[${allowed.join(', ')}].`,
+        factId: p.poolMatch.id,
+      })
+    }
+  }
+
+  // ── category-cap pass ──
+  type MatchedAddRow = AddToTwentyProblemRow & {
+    poolMatch: AddToTwentyPoolFact
+  }
+  const categoryCounts: Record<string, MatchedAddRow[]> = {}
+  for (const p of matched) {
+    const cat = p.poolMatch.category
+    if (!categoryCounts[cat]) categoryCounts[cat] = []
+    categoryCounts[cat]!.push(p)
+  }
+  for (const [cat, rows] of Object.entries(categoryCounts)) {
+    const cap = config.categoryCaps[cat as AddToTwentyCategory]
+    if (cap === undefined) continue
+    if (rows.length > cap) {
+      violations.push({
+        rule: 'category-cap',
+        problemIndex: null,
+        message:
+          `Category "${cat}" cap is ${cap}; canon has ${rows.length} ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}; facts ` +
+          `${rows.map((r) => r.poolMatch.id).join(', ')}).` +
+          (cat === 'doubles'
+            ? ` Doubles-prior correction lever — per spec §1.4 the` +
+              ` current canon ships 4 doubles; cap at ${cap} halves` +
+              ` that saturation. Reject the third doubles fact.`
+            : ''),
+        factId: null,
+      })
+    }
+  }
+
+  // ── make-ten-bridge coverage pass (>= 1 in P5-P8) ──
+  //
+  // STRICTER than sibling tiers' P4-P8 framing — per spec §2.4
+  // "Why P5–P8 not P4–P8?": P4 is MEDIUM-only and several MEDIUM facts
+  // are make-ten-bridge (#7, #8, #9, #10, #14), so a P4-P8 rule would
+  // be trivially satisfied. P5-P8 forces the rule to bind even when
+  // P4 happens to carry a non-make-ten-bridge fact.
+  const makeTenBridgeInDiscriminate = matched.filter(
+    (p) => p.poolMatch.category === 'make-ten-bridge' && p.index >= 5,
+  )
+  if (makeTenBridgeInDiscriminate.length < config.makeTenBridgeInP5ToP8Min) {
+    violations.push({
+      rule: 'high-leverage-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.makeTenBridgeInP5ToP8Min} make-ten-bridge ` +
+        `fact(s) MUST appear in P5-P8 (the ACTUAL learning target of ` +
+        `this tier per spec §2.4 + Dave's sub-to-20 research § 1.2). ` +
+        `STRICTER than sibling tiers' P4-P8 framing: P4 is MEDIUM-only ` +
+        `and several MEDIUM facts are make-ten-bridge, so a P4-P8 rule ` +
+        `would be trivially satisfied; P5-P8 forces the rule to bind. ` +
+        `Canon has ${makeTenBridgeInDiscriminate.length} make-ten-bridge ` +
+        `fact(s) in P5-P8.`,
+      factId: null,
+    })
+  }
+
+  // ── no-duplicates pass ──
+  const seen = new Map<string, AddToTwentyProblemRow[]>()
+  for (const p of matched) {
+    const key = p.poolMatch.id
+    if (!seen.has(key)) seen.set(key, [])
+    seen.get(key)!.push(p)
+  }
+  for (const [factId, rows] of seen.entries()) {
+    if (rows.length > 1) {
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: null,
+        message:
+          `Fact ${factId} appears ${rows.length} times ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}). ` +
+          `No duplicates allowed within the 8-problem set. ` +
+          `Note: 9+2 and 2+9 are distinct ordered pairs (distinct ids ` +
+          `"9-2" and "2-9"), NOT duplicates.`,
+        factId,
+      })
+    }
+  }
+
+  return violations
+}
+
+/**
+ * Throwing helper for the bake-time integration point. The throw aborts
+ * the bake and stops the (compositionally invalid) JSON from reaching
+ * disk.
+ *
+ * `canonId` is a human-readable identifier (e.g. `"math/add-to-20"`).
+ *
+ * NOTE (PR A scope): exported but not yet called from `bakeOne`. PR B
+ * activates the binding alongside a fresh canon — see the TODO in
+ * `lintAddToTwentyComposition` above.
+ */
+export function assertAddToTwentyCompositionClean(
+  canonId: string,
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: AddToTwentyRulesConfig = ADD_TO_TWENTY_RULES,
+): void {
+  const violations = lintAddToTwentyComposition(response, config)
+  if (violations.length > 0) {
+    throw new CompositionLintError(canonId, violations)
+  }
+}
+
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
 // Current scope is sub-to-10 + add-to-10 + sub-to-20. The function
 // returns a (potentially nil) rule config for the supplied canon-file
 // path. Hard-coded matching; future tiers slot in here.
+//
+// add-to-20: lint infra (POOL, RULES, parser, lintAddToTwentyComposition,
+// assertAddToTwentyCompositionClean) shipped in PR A (ticket 86c9uuqzu)
+// but binding is DEFERRED to PR B per `testing-and-ci.md §6 Split-PR
+// pattern when canon pre-exists in violation`. The committed
+// `public/canon/math/level-1/add-to-20.json` violates the doubles cap
+// (ships 4-of-8 doubles per spec §1.4); wiring the binding in PR A would
+// red-CI the lint pipeline. PR B rebakes the canon and activates the
+// binding together. See the TODO in `lintAddToTwentyComposition` above
+// for the explicit PR B checklist.
 
 export type TierLintBinding =
   | { tier: 'sub-to-10'; config: SubToTenRulesConfig }
