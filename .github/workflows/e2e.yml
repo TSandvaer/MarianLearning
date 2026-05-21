@@ -21,6 +21,17 @@ on:
   push:
     branches: [main]
 
+# Cancel an in-flight run when a new commit lands on the same ref. Two rapid
+# pushes to the same PR branch will dump the first run rather than running
+# the suite twice in parallel — cheaper, and frees up the runner cap during
+# fix-iterate cycles. Different group keys still proceed in parallel:
+#   - Push to PR-A while PR-B is running   → both proceed (refs differ)
+#   - Push to PR-A while main is running   → both proceed (refs differ)
+#   - Push to PR-A while PR-A is running   → second cancels first  ← target
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   playwright:
     name: Playwright (Chromium + WebKit)
