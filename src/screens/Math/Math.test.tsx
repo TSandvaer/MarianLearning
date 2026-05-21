@@ -3520,6 +3520,218 @@ describe('Math (Number Garden) screen', () => {
     }, 30_000)
   })
 
+  // ─── per-problem first-tap chip value (Kevin schema-first PR, ──────────
+  // pairing with Dave's PR #284 two-digit add/sub research) ───────────────
+  describe('per-problem first-tap chip value capture', () => {
+    /*
+     * The schema-first PR records the literal chip value Marian
+     * tapped on her FIRST tap for each problem, regardless of
+     * correctness. Three tests pin the contract:
+     *   1. Clean run — all 8 correct chips, every entry matches the
+     *      problem's `correct`.
+     *   2. Wrong-then-correct on P1 — entry 0 records the WRONG
+     *      value, not the eventual correct retry.
+     *   3. Length matches plan.problems.length; entries are integer
+     *      or null (no chip tapped = null).
+     *
+     * Count-based assertions throughout per
+     * `feedback_count_assertions_on_regression_tests`.
+     */
+    it("clean run — every entry matches the problem's correct value", async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+          />,
+        ),
+      )
+
+      const tapCorrect = async () => {
+        const chips = screen.getAllByTestId('math-chip')
+        const idx = Number(
+          screen.getByTestId('math').getAttribute('data-problem-index'),
+        )
+        const correctValue = fixedPlan().problems[idx].correct
+        const correctChip = chips.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(correctChip)
+          await Promise.resolve()
+        })
+        await act(async () => {
+          vi.advanceTimersByTime(1200)
+          await Promise.resolve()
+        })
+      }
+
+      for (let i = 0; i < 8; i++) {
+        await tapCorrect()
+      }
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+      // Count-based: the captured array exactly equals the plan's
+      // per-problem correct values.
+      const expected = fixedPlan().problems.map((p) => p.correct)
+      expect(arg.perProblemAnswerValue).toEqual(expected)
+    })
+
+    it('wrong-then-correct — entry records the FIRST (wrong) tap, not the retry', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+          />,
+        ),
+      )
+
+      // P1: tap a WRONG chip first, then the correct one.
+      const chipsP1 = screen.getAllByTestId('math-chip')
+      const correctP1 = fixedPlan().problems[0].correct
+      const wrongChipP1 = chipsP1.find(
+        (c) => Number(c.getAttribute('data-value')) !== correctP1,
+      )!
+      const wrongValueP1 = Number(wrongChipP1.getAttribute('data-value'))
+      await act(async () => {
+        fireEvent.click(wrongChipP1)
+        await Promise.resolve()
+      })
+
+      // Drain any reprompt timing, then tap the correct chip.
+      await act(async () => {
+        vi.advanceTimersByTime(800)
+        await Promise.resolve()
+      })
+      const correctChipP1 = chipsP1.find(
+        (c) => Number(c.getAttribute('data-value')) === correctP1,
+      )!
+      await act(async () => {
+        fireEvent.click(correctChipP1)
+        await Promise.resolve()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(1200)
+        await Promise.resolve()
+      })
+
+      // Walk P2-P8 with clean correct taps.
+      for (let i = 1; i < 8; i++) {
+        const chips = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const correctChip = chips.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(correctChip)
+          await Promise.resolve()
+        })
+        await act(async () => {
+          vi.advanceTimersByTime(1200)
+          await Promise.resolve()
+        })
+      }
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // P1 entry is the WRONG value (the first tap), NOT the correct
+      // retry value — the once-per-problem latch.
+      expect(arg.perProblemAnswerValue[0]).toBe(wrongValueP1)
+      expect(arg.perProblemAnswerValue[0]).not.toBe(correctP1)
+
+      // P2-P8 entries are the (clean) correct values.
+      for (let i = 1; i < 8; i++) {
+        expect(arg.perProblemAnswerValue[i]).toBe(
+          fixedPlan().problems[i].correct,
+        )
+      }
+
+      // Sibling consistency: perProblemCorrect[0] is false (first tap
+      // was wrong), all other entries true.
+      expect(arg.perProblemCorrect).toEqual([
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+      ])
+    })
+
+    it('shape — array length matches plan.problems.length, entries are integer-or-null', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      const onSessionComplete = vi.fn()
+      render(
+        withMotion(
+          <MathScreen
+            __testInitiallyAudioUnlocked
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+          />,
+        ),
+      )
+
+      const tapCorrect = async () => {
+        const chips = screen.getAllByTestId('math-chip')
+        const idx = Number(
+          screen.getByTestId('math').getAttribute('data-problem-index'),
+        )
+        const correctValue = fixedPlan().problems[idx].correct
+        const correctChip = chips.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(correctChip)
+          await Promise.resolve()
+        })
+        await act(async () => {
+          vi.advanceTimersByTime(1200)
+          await Promise.resolve()
+        })
+      }
+
+      for (let i = 0; i < 8; i++) {
+        await tapCorrect()
+      }
+
+      const arg = onSessionComplete.mock.calls[0][0]
+      // Length matches plan.problems.length.
+      expect(arg.perProblemAnswerValue).toHaveLength(8)
+      // Every entry on a clean run is an integer in the legitimate
+      // chip-value band (current tier caps at 10).
+      for (const v of arg.perProblemAnswerValue) {
+        expect(typeof v).toBe('number')
+        expect(Number.isInteger(v)).toBe(true)
+      }
+    })
+  })
+
   // ─── Subitising dot-card overlay (ticket 86c9q5j9a) ─────────────────────
   describe('subitising dot-card overlay (ticket 86c9q5j9a)', () => {
     /*

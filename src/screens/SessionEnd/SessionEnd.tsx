@@ -111,6 +111,42 @@ export interface SessionEndPayload {
    * legacy math test fixtures that predate the scaffold plumbing.
    */
   subitisingScaffoldRendered?: boolean
+  /**
+   * Per-problem first-tap chip value (math only — Kevin schema-first
+   * PR pairing with Dave's PR #284 two-digit add/sub research). Each
+   * entry is the literal numeric value Marian tapped on her FIRST
+   * chip-tap for that problem, regardless of correctness; `null` when
+   * no chip was tapped on that problem.
+   *
+   * Word-song uses the parallel `perProblemAnswerWord` field; the two
+   * are mutually exclusive by surface.
+   *
+   * SessionEnd forwards this into `recordProgressOnSessionEnd` so the
+   * progress writer persists the value on
+   * `SessionHistoryEntry.perProblemAnswerValue`. Optional for back-
+   * compat with hand-built test fixtures predating this PR.
+   *
+   * See `MathSessionResult.perProblemAnswerValue` for the design
+   * rationale (literal value vs distractor-class label).
+   */
+  perProblemAnswerValue?: readonly (number | null)[]
+  /**
+   * Per-problem first-tap chip word (word-song only — Kevin schema-
+   * first PR pairing with Dave's PR #284 two-digit add/sub research,
+   * added for surface parity even though the immediate research case
+   * is math). Each entry is the literal word string Marian tapped on
+   * her FIRST chip-tap for that problem; `null` when no chip was
+   * tapped on that problem.
+   *
+   * Math uses the parallel `perProblemAnswerValue` field; the two are
+   * mutually exclusive by surface.
+   *
+   * No current consumer; plumbed for future word-song error-pattern
+   * classification (e.g. mid-vowel substitution, onset substitution,
+   * coda substitution). Optional for back-compat with hand-built test
+   * fixtures predating this PR.
+   */
+  perProblemAnswerWord?: readonly (string | null)[]
 }
 
 /**
@@ -408,6 +444,20 @@ export default function SessionEnd({
       // bump for non-`add-to-10` sessions anyway.
       ...(p.surface === 'math' && p.subitisingScaffoldRendered === true
         ? { subitisingScaffoldRendered: true }
+        : {}),
+      // Per-problem first-tap chip value (Kevin schema-first PR,
+      // 2026-05-21, pairing with Dave's PR #284 two-digit add/sub
+      // research). Math only; persists on
+      // `SessionHistoryEntry.perProblemAnswerValue` so a future tier-
+      // ship PR can classify wrong-tap patterns post-hoc.
+      ...(p.surface === 'math' && p.perProblemAnswerValue !== undefined
+        ? { perProblemAnswerValue: p.perProblemAnswerValue }
+        : {}),
+      // Per-problem first-tap chip word (Kevin schema-first PR,
+      // 2026-05-21). Word-song only; surface parity with math's
+      // `perProblemAnswerValue`. No current consumer.
+      ...(p.surface === 'word-song' && p.perProblemAnswerWord !== undefined
+        ? { perProblemAnswerWord: p.perProblemAnswerWord }
         : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

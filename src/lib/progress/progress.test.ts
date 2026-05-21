@@ -392,4 +392,203 @@ describe('isProgressV1', () => {
     }
     expect(isProgressV1(noLatency)).toBe(true)
   })
+
+  // ── perProblemAnswerValue / perProblemAnswerWord additive fields ────────
+  // (Kevin schema-first PR, 2026-05-21 — pairing with Dave's PR #284
+  // two-digit add/sub research)
+  it('accepts SessionHistoryEntry with valid perProblemAnswerValue', () => {
+    const p = defaultProgress()
+    const withAnswers: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.75,
+          perProblemAnswerValue: [5, 6, 4, 8, 7, 9, 8, 10],
+        },
+      ],
+    }
+    expect(isProgressV1(withAnswers)).toBe(true)
+  })
+
+  it('accepts null entries inside perProblemAnswerValue (no chip tapped)', () => {
+    const p = defaultProgress()
+    const withNulls: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemAnswerValue: [5, null, 6, null, 7, 8, 9, 10],
+        },
+      ],
+    }
+    expect(isProgressV1(withNulls)).toBe(true)
+  })
+
+  it('rejects non-integer perProblemAnswerValue entries', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemAnswerValue: [5, 6.5, 7],
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('rejects string entries inside perProblemAnswerValue', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemAnswerValue: [5, '6', 7],
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('rejects out-of-range perProblemAnswerValue entries (negative or > 99)', () => {
+    const p = defaultProgress()
+    const negative = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemAnswerValue: [-1, 5],
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(negative)).toBe(false)
+
+    const tooLarge = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemAnswerValue: [5, 100],
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(tooLarge)).toBe(false)
+  })
+
+  it('rejects non-array perProblemAnswerValue', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemAnswerValue: 'not-an-array',
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('omitted perProblemAnswerValue is fine (additive, back-compat)', () => {
+    const p = defaultProgress()
+    const noField: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+        },
+      ],
+    }
+    expect(isProgressV1(noField)).toBe(true)
+  })
+
+  it('accepts SessionHistoryEntry with valid perProblemAnswerWord', () => {
+    const p = defaultProgress()
+    const withWords: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['cvc-words'],
+          successRate: 0.75,
+          perProblemAnswerWord: [
+            'cat',
+            'bat',
+            'mat',
+            'hat',
+            'rat',
+            'pan',
+            'fan',
+            'man',
+          ],
+        },
+      ],
+    }
+    expect(isProgressV1(withWords)).toBe(true)
+  })
+
+  it('accepts null entries inside perProblemAnswerWord', () => {
+    const p = defaultProgress()
+    const withNulls: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['cvc-words'],
+          successRate: 0.5,
+          perProblemAnswerWord: ['cat', null, 'bat', null],
+        },
+      ],
+    }
+    expect(isProgressV1(withNulls)).toBe(true)
+  })
+
+  it('rejects non-string entries inside perProblemAnswerWord', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['cvc-words'],
+          successRate: 0.5,
+          perProblemAnswerWord: ['cat', 5, 'bat'],
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('omitted perProblemAnswerWord is fine (additive, back-compat)', () => {
+    const p = defaultProgress()
+    const noField: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-21T12:00:00.000Z',
+          skillFocus: ['cvc-words'],
+          successRate: 0.5,
+        },
+      ],
+    }
+    expect(isProgressV1(noField)).toBe(true)
+  })
 })

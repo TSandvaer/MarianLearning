@@ -191,6 +191,45 @@ export interface SessionHistoryEntry {
    * additive optional field, no `schemaVersion` bump.
    */
   mathFacts?: { a: number; b: number; op: '+' | '-' | '*' }[]
+  /**
+   * Per-problem first-tap chip value, indexed 0..N-1 — math sessions
+   * only (Kevin schema-first PR, 2026-05-21, pairing with Dave's
+   * PR #284 two-digit add/sub research).
+   *
+   * Each entry is the literal numeric value Marian tapped on her FIRST
+   * chip-tap for that problem, regardless of correctness. `null` when
+   * no chip was tapped on that problem (session abandoned mid-problem,
+   * or the guided-completion give-answer path completed without a
+   * tap). Length matches `latencyMs` / `mathFacts` when present.
+   *
+   * No current consumer; persisted so a future tier-ship PR (two-digit-
+   * addsub) can classify wrong-tap patterns post-hoc. The classification
+   * is pedagogical, not mechanical — knowing the literal value lets the
+   * consumer derive whichever class taxonomy a given tier defines
+   * (off-by-one, wrong-op, decade-anchor, column-cross /
+   * concatenated-single-digit, etc.) without the screen having to
+   * pre-classify at chip-tap time.
+   *
+   * Optional + additive — pre-PR entries do not carry it; the field is
+   * omitted on read. Same additive precedent as `latencyMs` and
+   * `mathFacts`. No `schemaVersion` bump. Word-song sessions persist
+   * the parallel `perProblemAnswerWord` field instead.
+   */
+  perProblemAnswerValue?: (number | null)[]
+  /**
+   * Per-problem first-tap chip word, indexed 0..N-1 — word-song sessions
+   * only (Kevin schema-first PR, 2026-05-21, surface parity with
+   * `perProblemAnswerValue`).
+   *
+   * Each entry is the literal word string Marian tapped on her FIRST
+   * chip-tap for that problem, regardless of correctness. `null` when
+   * no chip was tapped on that problem.
+   *
+   * No current consumer; persisted for future word-song error-pattern
+   * classification (mid-vowel substitution, onset/coda substitution,
+   * etc.). Optional + additive — pre-PR entries do not carry it.
+   */
+  perProblemAnswerWord?: (string | null)[]
 }
 
 export type SessionHistory = SessionHistoryEntry[]

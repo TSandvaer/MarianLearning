@@ -145,6 +145,34 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
       }
     }
   }
+  // perProblemAnswerValue is optional (Kevin schema-first PR,
+  // 2026-05-21 — additive, no schemaVersion bump; same precedent as
+  // `latencyMs` and `mathFacts`). When present each entry must be
+  // either `null` (no chip tapped) or a finite integer in [0, 99]
+  // (the legitimate chip-value range — current tiers cap at 20, but
+  // the future two-digit-addsub tier extends the upper bound; we
+  // mirror `mathFacts.a / .b` bounds for forward compatibility).
+  if ('perProblemAnswerValue' in v && v.perProblemAnswerValue !== undefined) {
+    if (!Array.isArray(v.perProblemAnswerValue)) return false
+    for (const n of v.perProblemAnswerValue) {
+      if (n === null) continue
+      if (typeof n !== 'number' || !Number.isInteger(n) || n < 0 || n > 99) {
+        return false
+      }
+    }
+  }
+  // perProblemAnswerWord is optional (Kevin schema-first PR,
+  // 2026-05-21 — surface parity with `perProblemAnswerValue`). When
+  // present each entry must be either `null` or a string. No further
+  // shape constraint — the word pack widens with each new vowel tier
+  // and a strict allow-list here would force a guard update on every
+  // canon expansion.
+  if ('perProblemAnswerWord' in v && v.perProblemAnswerWord !== undefined) {
+    if (!Array.isArray(v.perProblemAnswerWord)) return false
+    for (const w of v.perProblemAnswerWord) {
+      if (w !== null && typeof w !== 'string') return false
+    }
+  }
   return true
 }
 

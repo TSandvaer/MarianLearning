@@ -222,6 +222,26 @@ export interface RecordProgressInput {
    * leave the counter unchanged. Spec §2.2.
    */
   subitisingScaffoldRendered?: boolean
+  /**
+   * Per-problem first-tap chip value (Kevin schema-first PR,
+   * 2026-05-21). Math only. When supplied, persists onto the recorded
+   * `SessionHistoryEntry.perProblemAnswerValue` field.
+   *
+   * Defensive copy at write time (shallow per-element); writer trusts
+   * the caller's framing on length / contents. No current consumer;
+   * future tier-ship PR (two-digit-addsub) will classify wrong-tap
+   * patterns post-hoc.
+   */
+  perProblemAnswerValue?: readonly (number | null)[]
+  /**
+   * Per-problem first-tap chip word (Kevin schema-first PR,
+   * 2026-05-21). Word-song only. When supplied, persists onto the
+   * recorded `SessionHistoryEntry.perProblemAnswerWord` field.
+   *
+   * Defensive copy at write time; writer trusts the caller's framing
+   * on length / contents. No current consumer.
+   */
+  perProblemAnswerWord?: readonly (string | null)[]
 }
 
 /**
@@ -367,6 +387,22 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
       ? mathFacts.map((f) => ({ a: f.a, b: f.b, op: f.op }))
       : undefined
 
+  // perProblemAnswerValue persistence (Kevin schema-first PR,
+  // 2026-05-21). Same posture as latencyMs / mathFacts — shallow-
+  // clone when supplied, omit when absent. Math only; word-song
+  // callers should not ship this.
+  const answerValueClone =
+    input.perProblemAnswerValue !== undefined
+      ? Array.from(input.perProblemAnswerValue)
+      : undefined
+
+  // perProblemAnswerWord persistence (Kevin schema-first PR,
+  // 2026-05-21). Word-song only; math callers should not ship this.
+  const answerWordClone =
+    input.perProblemAnswerWord !== undefined
+      ? Array.from(input.perProblemAnswerWord)
+      : undefined
+
   if (!useSplit) {
     return {
       dateISO: input.dateISO,
@@ -374,6 +410,12 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
       successRate: input.totalCorrect / PROBLEMS_PER_SESSION,
       ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
       ...(mathFactsClone !== undefined ? { mathFacts: mathFactsClone } : {}),
+      ...(answerValueClone !== undefined
+        ? { perProblemAnswerValue: answerValueClone }
+        : {}),
+      ...(answerWordClone !== undefined
+        ? { perProblemAnswerWord: answerWordClone }
+        : {}),
     }
   }
 
@@ -385,6 +427,12 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
     novelPoolSuccessRate: split.novelCorrect / split.novelCount,
     ...(latencyClone !== undefined ? { latencyMs: latencyClone } : {}),
     ...(mathFactsClone !== undefined ? { mathFacts: mathFactsClone } : {}),
+    ...(answerValueClone !== undefined
+      ? { perProblemAnswerValue: answerValueClone }
+      : {}),
+    ...(answerWordClone !== undefined
+      ? { perProblemAnswerWord: answerWordClone }
+      : {}),
   }
 }
 
