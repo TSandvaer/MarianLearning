@@ -4,6 +4,7 @@ import {
   mathSessionPlanFromServer,
   parseReadAddends,
   parseReadOperands,
+  wordToNumber,
 } from './planFromServer'
 import {
   mathSessionPlanToUtteranceSources,
@@ -84,14 +85,28 @@ describe('parseReadAddends', () => {
     )
   })
 
-  it('throws on number words beyond 20 (defense against prompt drift)', () => {
-    // Anything > 20 should NOT be silently absorbed — that signals a prompt
-    // drift the parser shouldn't normalize away. The two-digit-addsub tier
-    // would route through a different parser if we ever ship one.
+  it('rejects unhyphenated compound forms and out-of-range tokens (defense against prompt drift)', () => {
+    // Two-digit-addsub canon (PR #285 Wave 3) emits hyphenated number words
+    // ("Thirty-one plus four. How many?") — the parser accepts those now.
+    // What still must NOT be silently absorbed:
+    //
+    //   - Unhyphenated compound forms ("twentyone", "thirtyfive") — the
+    //     bake-time prosody constraint REQUIRES the hyphen, so unhyphenated
+    //     drift signals a prompt regression.
+    //   - Tokens beyond 99 ("hundred", "thousand") — out of every shipping
+    //     tier's pool.
+    //   - Malformed compounds ("five-three" — decade slot isn't a decade;
+    //     "thirty-twenty" — unit slot isn't a unit).
     expect(() => parseReadAddends('Twentyone plus two. How many?')).toThrow(
       PlanFromServerError,
     )
     expect(() => parseReadAddends('Hundred plus two. How many?')).toThrow(
+      PlanFromServerError,
+    )
+    expect(() => parseReadAddends('Five-three plus two. How many?')).toThrow(
+      PlanFromServerError,
+    )
+    expect(() => parseReadAddends('Thirty-twenty plus two. How many?')).toThrow(
       PlanFromServerError,
     )
   })
@@ -484,5 +499,282 @@ describe('mathSessionPlanFromServer — skip-not-throw on out-of-namespace ids (
     expect(() => mathSessionPlanFromServer(broken)).toThrow(
       /missing slot "read"/,
     )
+  })
+})
+
+// ─── wordToNumber: compositional decoder for 21..99 (Kyle spec §5.2,
+// Devon Wave 3, PR #285). Pins both the existing single-token range
+// (0..20 + round decades) and the new decade-units composition. ────────
+describe('wordToNumber — single-token forms', () => {
+  it('decodes 0..20 (the existing single-token range)', () => {
+    expect(wordToNumber('zero')).toBe(0)
+    expect(wordToNumber('one')).toBe(1)
+    expect(wordToNumber('ten')).toBe(10)
+    expect(wordToNumber('eleven')).toBe(11)
+    expect(wordToNumber('nineteen')).toBe(19)
+    expect(wordToNumber('twenty')).toBe(20)
+  })
+
+  it('decodes the round decade names 30..90', () => {
+    expect(wordToNumber('thirty')).toBe(30)
+    expect(wordToNumber('forty')).toBe(40)
+    expect(wordToNumber('fifty')).toBe(50)
+    expect(wordToNumber('sixty')).toBe(60)
+    expect(wordToNumber('seventy')).toBe(70)
+    expect(wordToNumber('eighty')).toBe(80)
+    expect(wordToNumber('ninety')).toBe(90)
+  })
+
+  it('returns undefined on unknown single tokens', () => {
+    expect(wordToNumber('hundred')).toBeUndefined()
+    expect(wordToNumber('thousand')).toBeUndefined()
+    expect(wordToNumber('twentyone')).toBeUndefined()
+    expect(wordToNumber('thirtyfive')).toBeUndefined()
+    expect(wordToNumber('')).toBeUndefined()
+    expect(wordToNumber('seven-')).toBeUndefined()
+  })
+})
+
+describe('wordToNumber — compositional decade-units (21..99)', () => {
+  it('decodes the 21..29 band', () => {
+    expect(wordToNumber('twenty-one')).toBe(21)
+    expect(wordToNumber('twenty-five')).toBe(25)
+    expect(wordToNumber('twenty-nine')).toBe(29)
+  })
+
+  it('decodes the 30..99 bands sample (covers every decade)', () => {
+    expect(wordToNumber('thirty-one')).toBe(31)
+    expect(wordToNumber('forty-two')).toBe(42)
+    expect(wordToNumber('fifty-six')).toBe(56)
+    expect(wordToNumber('sixty-three')).toBe(63)
+    expect(wordToNumber('seventy-seven')).toBe(77)
+    expect(wordToNumber('eighty-four')).toBe(84)
+    expect(wordToNumber('ninety-nine')).toBe(99)
+  })
+
+  it('rejects malformed compounds (decade slot not a multiple of 10 in [20,90])', () => {
+    // Decade slot must resolve to a round decade ≥ 20. Anything else is
+    // a malformed compound the parser should not silently accept.
+    expect(wordToNumber('five-three')).toBeUndefined() // unit-then-unit
+    expect(wordToNumber('fifteen-three')).toBeUndefined() // teen-then-unit
+    expect(wordToNumber('ten-three')).toBeUndefined() // 10 is not ≥ 20
+  })
+
+  it('rejects malformed compounds (unit slot not in [1,9])', () => {
+    expect(wordToNumber('thirty-twenty')).toBeUndefined() // 20 not a unit
+    expect(wordToNumber('thirty-ten')).toBeUndefined() // 10 not a unit
+    expect(wordToNumber('thirty-zero')).toBeUndefined() // 0 not in [1,9]
+  })
+
+  it('rejects malformed compounds (multiple hyphens)', () => {
+    expect(wordToNumber('thirty-one-two')).toBeUndefined()
+    expect(wordToNumber('twenty-three-four')).toBeUndefined()
+  })
+
+  it('rejects unknown tokens in either slot', () => {
+    expect(wordToNumber('thirty-foo')).toBeUndefined()
+    expect(wordToNumber('foo-three')).toBeUndefined()
+  })
+})
+
+describe('parseReadOperands — two-digit-addsub templates (Kyle spec §5, PR #285)', () => {
+  // Operand-shape coverage: addition with hyphenated decade-units form.
+  it('parses "Twenty plus three" (decade + single — first canon read line)', () => {
+    expect(parseReadOperands('Twenty plus three. How many?')).toEqual({
+      addendA: 20,
+      addendB: 3,
+      op: '+',
+    })
+  })
+
+  it('parses "Thirty-one plus four. How many?" (hyphenated A)', () => {
+    expect(parseReadOperands('Thirty-one plus four. How many?')).toEqual({
+      addendA: 31,
+      addendB: 4,
+      op: '+',
+    })
+  })
+
+  it('parses "Forty-two plus six. How many?" (hyphenated A across decades)', () => {
+    expect(parseReadOperands('Forty-two plus six. How many?')).toEqual({
+      addendA: 42,
+      addendB: 6,
+      op: '+',
+    })
+  })
+
+  it('parses "Ninety-nine plus zero. How many?" (top-of-range, defense in depth)', () => {
+    expect(parseReadOperands('Ninety-nine plus zero. How many?')).toEqual({
+      addendA: 99,
+      addendB: 0,
+      op: '+',
+    })
+  })
+
+  it('parses subtraction hyphenated forms', () => {
+    expect(
+      parseReadOperands('Twenty-eight minus three. How many are left?'),
+    ).toEqual({
+      addendA: 28,
+      addendB: 3,
+      op: '-',
+    })
+    expect(
+      parseReadOperands('Thirty-four minus two. How many are left?'),
+    ).toEqual({
+      addendA: 34,
+      addendB: 2,
+      op: '-',
+    })
+    expect(
+      parseReadOperands('Thirty-nine minus seven. How many are left?'),
+    ).toEqual({
+      addendA: 39,
+      addendB: 7,
+      op: '-',
+    })
+  })
+
+  it('parses two-digit operands on both sides (hyphenated A AND B)', () => {
+    // Per Kyle's spec §7.2 Option B — two-digit-plus-two-digit no-regroup
+    // facts (e.g. 23 + 14 = 37, 42 + 31 = 73). Parser is shape-only — it
+    // doesn't enforce no-regroup; that's the lint's job.
+    expect(parseReadOperands('Twenty-three plus fourteen. How many?')).toEqual({
+      addendA: 23,
+      addendB: 14,
+      op: '+',
+    })
+    expect(parseReadOperands('Forty-two plus thirty-one. How many?')).toEqual({
+      addendA: 42,
+      addendB: 31,
+      op: '+',
+    })
+  })
+
+  it('is case-insensitive on hyphenated operands', () => {
+    expect(parseReadOperands('THIRTY-ONE plus FOUR. How many?')).toEqual({
+      addendA: 31,
+      addendB: 4,
+      op: '+',
+    })
+    expect(parseReadOperands('twenty-six plus five. How many?')).toEqual({
+      addendA: 26,
+      addendB: 5,
+      op: '+',
+    })
+  })
+
+  it('still rejects malformed hyphenated tokens inside the template', () => {
+    expect(() =>
+      parseReadOperands('Thirty-twenty plus four. How many?'),
+    ).toThrow(PlanFromServerError)
+    expect(() => parseReadOperands('Five-three plus four. How many?')).toThrow(
+      PlanFromServerError,
+    )
+  })
+})
+
+describe('mathSessionPlanFromServer — two-digit-addsub canon integration (PR #285 Wave 3)', () => {
+  // Reproduces the canon's actual read lines verbatim to pin the parser
+  // against the live `public/canon/math/level-1/two-digit-addsub.json`
+  // shape. Before this PR, ANY canon plan touching a hyphenated number
+  // word threw `PlanFromServerError` and fell back to silent mode —
+  // verified by Devon during PR #285 cross-review.
+  function buildTwoDigitAddsubWire() {
+    // Eight read lines extracted from canon `public/canon/math/level-1/
+    // two-digit-addsub.json` head (verified 2026-05-21). Slot text for
+    // correct/reprompt/hint/giveAnswer is placeholder; the parser only
+    // inspects `read` for addends.
+    const reads: ReadonlyArray<{
+      a: number
+      b: number
+      op: '+' | '-'
+      text: string
+    }> = [
+      { a: 20, b: 3, op: '+', text: 'Twenty plus three. How many?' },
+      { a: 15, b: 2, op: '+', text: 'Fifteen plus two. How many?' },
+      { a: 31, b: 4, op: '+', text: 'Thirty-one plus four. How many?' },
+      { a: 26, b: 5, op: '+', text: 'Twenty-six plus five. How many?' },
+      {
+        a: 28,
+        b: 3,
+        op: '-',
+        text: 'Twenty-eight minus three. How many are left?',
+      },
+      {
+        a: 34,
+        b: 2,
+        op: '-',
+        text: 'Thirty-four minus two. How many are left?',
+      },
+      { a: 42, b: 6, op: '+', text: 'Forty-two plus six. How many?' },
+      {
+        a: 39,
+        b: 7,
+        op: '-',
+        text: 'Thirty-nine minus seven. How many are left?',
+      },
+    ]
+    const utterances: { id: string; text: string }[] = []
+    reads.forEach((r, i) => {
+      const p = i + 1
+      utterances.push({ id: `math.p${p}.read`, text: r.text })
+      utterances.push({ id: `math.p${p}.correct`, text: 'Yes!' })
+      utterances.push({ id: `math.p${p}.reprompt`, text: 'Hmm... try again?' })
+      utterances.push({ id: `math.p${p}.hint`, text: 'Look.' })
+      utterances.push({ id: `math.p${p}.giveAnswer`, text: 'This one.' })
+    })
+    return {
+      id: 'two-digit-addsub-level-1',
+      label: 'Two-digit add/sub — Level 1',
+      utterances,
+    }
+  }
+
+  it('parses the canon two-digit-addsub plan without throwing (latent-bug regression test)', () => {
+    const wire = buildTwoDigitAddsubWire()
+    // Pre-PR: throws on problem 3 ("Thirty-one plus four").
+    const rebuilt = mathSessionPlanFromServer(wire)
+    expect(rebuilt.problems).toHaveLength(8)
+  })
+
+  it('rebuilds addends and ops per problem, including hyphenated A and round-decade A', () => {
+    const wire = buildTwoDigitAddsubWire()
+    const rebuilt = mathSessionPlanFromServer(wire)
+    // P1: Twenty plus three — round decade left, single right.
+    expect(rebuilt.problems[0]).toMatchObject({
+      addendA: 20,
+      addendB: 3,
+      op: '+',
+      correct: 23,
+    })
+    // P3: Thirty-one plus four — hyphenated left.
+    expect(rebuilt.problems[2]).toMatchObject({
+      addendA: 31,
+      addendB: 4,
+      op: '+',
+      correct: 35,
+    })
+    // P5: Twenty-eight minus three — hyphenated subtraction.
+    expect(rebuilt.problems[4]).toMatchObject({
+      addendA: 28,
+      addendB: 3,
+      op: '-',
+      correct: 25,
+    })
+    // P7: Forty-two plus six — hyphenated subset crossing decades.
+    expect(rebuilt.problems[6]).toMatchObject({
+      addendA: 42,
+      addendB: 6,
+      op: '+',
+      correct: 48,
+    })
+    // P8: Thirty-nine minus seven — hyphenated subtraction.
+    expect(rebuilt.problems[7]).toMatchObject({
+      addendA: 39,
+      addendB: 7,
+      op: '-',
+      correct: 32,
+    })
   })
 })

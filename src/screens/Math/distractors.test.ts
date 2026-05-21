@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ANSWER_RANGE_MAX,
   ANSWER_RANGE_MAX_TO_20,
+  ANSWER_RANGE_MAX_TWO_DIGIT,
   ANSWER_RANGE_MIN,
   GENTLE_RAMP_THROUGH,
   chipMaxAnswerForCorrects,
@@ -352,12 +353,38 @@ describe('chipMaxAnswerForCorrects', () => {
     expect(chipMaxAnswerForCorrects([])).toBe(ANSWER_RANGE_MAX)
   })
 
-  it('throws when correct exceeds the largest known tier ceiling', () => {
-    // A two-digit-addsub tier or beyond would land here. We throw rather
+  it('returns ANSWER_RANGE_MAX_TWO_DIGIT (99) for two-digit-addsub corrects (Kyle spec §5.1, PR #285)', () => {
+    // Pool envelope per spec §1.1: smallest result is 12, largest is 73
+    // under §7.2 Option B. The ceiling is set at 99 to cover the full
+    // two-digit space rather than the tighter pool max.
+    const corrects = [23, 17, 35, 31, 25, 32, 48, 32]
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(ANSWER_RANGE_MAX_TWO_DIGIT)
+    expect(chipMaxAnswerForCorrects(corrects)).toBe(99)
+  })
+
+  it('promotes to 99 at the boundary correct=21 (first value above the to-20 ceiling)', () => {
+    expect(chipMaxAnswerForCorrects([21])).toBe(99)
+  })
+
+  it('returns 20 at the boundary correct=20 (not 99)', () => {
+    // Pinned defense: an add-to-20 / sub-to-20 plan whose max correct is
+    // exactly 20 must NOT widen to the two-digit tier — the chips would
+    // otherwise span [1, 99] and present nonsense gentle-ramp values for
+    // a 20-ceiling tier.
+    expect(chipMaxAnswerForCorrects([20])).toBe(20)
+    expect(chipMaxAnswerForCorrects([5, 10, 18, 20])).toBe(20)
+  })
+
+  it('promotes to 99 at the top of the two-digit range (correct=99)', () => {
+    expect(chipMaxAnswerForCorrects([99])).toBe(99)
+  })
+
+  it('throws when correct exceeds the largest known tier ceiling (>99)', () => {
+    // A 3-digit-addsub tier or beyond would land here. We throw rather
     // than silently expanding — extending the function is a deliberate
     // change with its own tier-add ticket.
-    expect(() => chipMaxAnswerForCorrects([21])).toThrow(/no tier ceiling/)
-    expect(() => chipMaxAnswerForCorrects([5, 99])).toThrow(/no tier ceiling/)
+    expect(() => chipMaxAnswerForCorrects([100])).toThrow(/no tier ceiling/)
+    expect(() => chipMaxAnswerForCorrects([5, 150])).toThrow(/no tier ceiling/)
   })
 })
 

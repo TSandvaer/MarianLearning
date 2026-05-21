@@ -78,36 +78,58 @@ export const ANSWER_RANGE_MAX = 10
 export const ANSWER_RANGE_MAX_TO_20 = 20
 
 /**
+ * Answer-range upper bound for the two-digit-addsub tier (Kyle's spec §5.1,
+ * PR #285). The no-regroup pool's largest result is 73 (`42 + 31 = 73`
+ * under the §7.2 Option B two-digit-plus-two-digit subset); the ceiling
+ * is set to 99 to cover the full two-digit space rather than the tighter
+ * pool max — defends against any future re-bake or planner directive
+ * widening within the same tier without a chip-range edit.
+ *
+ * Promotes via {@link chipMaxAnswerForCorrects} when any `correct > 20`.
+ * Higher tiers (3-digit, etc.) would extend the tier table with a new
+ * constant + branch.
+ */
+export const ANSWER_RANGE_MAX_TWO_DIGIT = 99
+
+/**
  * Pick the answer-range ceiling that fits a list of correct answers.
  *
- * Returns the smallest tier ceiling (`ANSWER_RANGE_MAX = 10` or
- * `ANSWER_RANGE_MAX_TO_20 = 20`) that contains every value in `corrects`.
+ * Tier table:
+ *
+ *   - `correct ≤ 10` → {@link ANSWER_RANGE_MAX} (10) — add-to-10 / sub-to-10.
+ *   - `correct ≤ 20` → {@link ANSWER_RANGE_MAX_TO_20} (20) — add-to-20 /
+ *     sub-to-20.
+ *   - `correct ≤ 99` → {@link ANSWER_RANGE_MAX_TWO_DIGIT} (99) —
+ *     two-digit-addsub (Kyle's spec §5.1, PR #285).
+ *
  * Used by the Math screen to thread the right `maxAnswer` into
  * `pickDistractors` based on the active plan's actual content, instead of
- * pattern-matching plan ids (`sums-to-20-A`, `add-to-20-level-1`, etc.) at
- * the screen layer.
+ * pattern-matching plan ids (`sums-to-20-A`, `add-to-20-level-1`,
+ * `two-digit-addsub-level-1`, etc.) at the screen layer.
  *
  * Why a single derivation
  * -----------------------
- * Both the static fallback (`STATIC_ADD_TO_20_PLANS`) and the canon
- * (`add-to-20-level-1`) emit problems with `correct ∈ [11, 18]`. Walking
- * the actual correct values is robust against either source — and against
- * future tier additions that don't follow the same id naming convention.
+ * Both the static fallback and the canon emit problems with the
+ * per-tier correct envelope. Walking the actual correct values is robust
+ * against either source — and against future tier additions that don't
+ * follow the same id naming convention.
  *
  * @param corrects The correct answers across the plan (typically
  *                 `plan.problems.map((p) => p.correct)`).
  * @returns The smallest known tier ceiling that contains every correct.
  *          Defaults to `ANSWER_RANGE_MAX` (10) when `corrects` is empty —
  *          a degenerate plan defensively renders inside the smaller range.
- * @throws if any correct exceeds the largest known tier ceiling. Higher
- *         tiers (sub-to-20 widens to its own range; two-digit-addsub up to
- *         99; etc.) plug in by extending the tier table here.
+ * @throws if any correct exceeds the largest known tier ceiling (>99).
+ *         Higher tiers (3-digit and beyond) plug in by extending the tier
+ *         table here.
  */
 export function chipMaxAnswerForCorrects(corrects: readonly number[]): number {
   if (corrects.length === 0) return ANSWER_RANGE_MAX
   const maxCorrect = Math.max(...corrects)
   if (maxCorrect <= ANSWER_RANGE_MAX) return ANSWER_RANGE_MAX
   if (maxCorrect <= ANSWER_RANGE_MAX_TO_20) return ANSWER_RANGE_MAX_TO_20
+  if (maxCorrect <= ANSWER_RANGE_MAX_TWO_DIGIT)
+    return ANSWER_RANGE_MAX_TWO_DIGIT
   throw new Error(
     `[distractors] no tier ceiling covers correct=${maxCorrect}; extend chipMaxAnswerForCorrects`,
   )
