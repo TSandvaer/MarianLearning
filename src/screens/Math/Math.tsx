@@ -175,6 +175,22 @@ export interface MathSessionResult {
    * the corresponding fact one box (cap 5); a first-tap miss demotes
    * to box 1. This matches the Leitner classical rule and matches
    * how the streak counter already counts "consecutive clean wins."
+   *
+   * Per-screen semantic asymmetry (see `src/lib/progress/types.ts`
+   * "DESIGN NOTE" near `SessionHistoryEntry`)
+   * --------------------------------------------------------------
+   * Math: **first-tap correctness**. The write happens inside the
+   * `firstTapRecordedRef` once-per-problem latch in `onChipTap`,
+   * BEFORE the correct/wrong dispatch, so wrong-then-correct retries
+   * record `false`.
+   *
+   * WordSong's same-named `perProblemCorrect` field is written with
+   * **ever-correct** semantics (in `handleCorrectTap`). The two
+   * payloads land on the same `SessionEndPayload.perProblemCorrect`
+   * field; only the surface-gated consumers (`buildLeitnerOutcomes`
+   * for math, `computeGraduationSplit` for word-song) make this safe
+   * today. DO NOT refactor the latch without reading the design note
+   * in `types.ts`.
    */
   perProblemCorrect: readonly boolean[]
   /**
@@ -906,6 +922,25 @@ function MathScreen({
    * `onChipTap` immediately after the latency + correctness capture
    * for the current problem, so subsequent retry taps don't re-record.
    * Reset to `false` on problem advance.
+   *
+   * Gates THREE captures inside the same once-per-problem block in
+   * `onChipTap`:
+   *   1. `perProblemCorrectRef.current[idx] = isCorrect` —
+   *      first-tap correctness (see `MathSessionResult.perProblemCorrect`
+   *      doc for the semantic-asymmetry note against WordSong).
+   *   2. `latencyMsByProblemRef.current[idx]` — sanity-bounded
+   *      first-tap latency in ms.
+   *   3. `perProblemAnswerValueRef.current[idx] = chipValue` —
+   *      literal first-tap chip value.
+   *
+   * All three writes share this latch by design: they form a
+   * positionally-consistent triple. WordSong has a same-named
+   * `firstTapRecordedRef` but gates only ONE capture
+   * (`perProblemAnswerWordRef`) — its `perProblemCorrectRef` is
+   * written elsewhere (`handleCorrectTap`) with ever-correct
+   * semantics. See `src/lib/progress/types.ts` DESIGN NOTE near
+   * `SessionHistoryEntry` for the cross-screen design rationale and
+   * the explicit "do not refactor without coordinating" tag.
    */
   const firstTapRecordedRef = useRef(false)
 
@@ -2002,15 +2037,30 @@ function MathScreen({
 
       // First-tap capture for the current problem (ticket 86c9pwgc8 —
       // M4 Leitner wiring; sanity bounds added 86c9q5au3). Records
-      // BOTH the latency (ms from chip-render-time to first tap) AND
-      // the first-tap correctness. Subsequent retry taps within the
-      // same problem are NOT captured — `firstTapRecordedRef` is the
-      // once-per-problem latch.
+      // THREE values in lock-step under the `firstTapRecordedRef`
+      // latch: (1) first-tap correctness on `perProblemCorrectRef`,
+      // (2) first-tap latency on `latencyMsByProblemRef`, (3) literal
+      // first-tap chip value on `perProblemAnswerValueRef`.
+      // Subsequent retry taps within the same problem are NOT
+      // captured — `firstTapRecordedRef` is the once-per-problem
+      // latch.
       //
       // The capture happens BEFORE the correct/wrong dispatch below
       // so retry taps that would re-enter `handleCorrectTap` after a
       // wrong (which sets `resolved = true`) still see the latch and
-      // skip re-recording.
+      // skip re-recording. This is what gives Math its **first-tap**
+      // semantics on `perProblemCorrect` — wrong-then-correct retries
+      // record `false`.
+      //
+      // PER-SCREEN ASYMMETRY: WordSong writes its `perProblemCorrect`
+      // inside `handleCorrectTap` (NOT inside this latch), giving
+      // word-song **ever-correct** semantics for the same-named field.
+      // The two payloads land on the same `SessionEndPayload.perProblemCorrect`
+      // wire field. Consolidating the two latches would silently
+      // change the semantic of `perProblemCorrect` for one screen —
+      // DO NOT refactor without coordinating across both screens. See
+      // `src/lib/progress/types.ts` DESIGN NOTE near
+      // `SessionHistoryEntry`.
       const isCorrect = chipValue === problem.correct
       if (!firstTapRecordedRef.current) {
         firstTapRecordedRef.current = true

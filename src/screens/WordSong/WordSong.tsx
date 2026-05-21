@@ -180,6 +180,26 @@ export interface WordSongSessionResult {
    *
    * Optional on the public type for back-compat with hand-built
    * test fixtures; the live screen always sets it.
+   *
+   * Per-screen semantic asymmetry (see `src/lib/progress/types.ts`
+   * "DESIGN NOTE" near `SessionHistoryEntry`)
+   * --------------------------------------------------------------
+   * WordSong: **ever-correct**. The write happens inside
+   * `handleCorrectTap`, AFTER the wrong-tap path has already had a
+   * chance to fire. Wrong-then-correct retries record `true` because
+   * the latch fires on the correct resolution, not on the first tap.
+   * Pedagogically intentional: word-song's role is decoding practice
+   * and re-encouragement, so the graduation accounting via
+   * `computeGraduationSplit` credits any eventual correct.
+   *
+   * Math's same-named `perProblemCorrect` field is written with
+   * **first-tap** semantics (in `onChipTap`'s `firstTapRecordedRef`
+   * latch). The two payloads land on the same
+   * `SessionEndPayload.perProblemCorrect` field; only the
+   * surface-gated consumers (`buildLeitnerOutcomes` for math,
+   * `computeGraduationSplit` for word-song) make this safe today.
+   * DO NOT refactor the write-point without reading the design note
+   * in `types.ts`.
    */
   perProblemCorrect?: readonly boolean[]
   /**
@@ -573,17 +593,32 @@ function WordSongScreen({
   )
   /**
    * Word-song once-per-problem first-tap latch (Kevin schema-first
-   * PR, 2026-05-21). Mirrors Math's `firstTapRecordedRef`. Flipped
-   * `true` after the per-problem
+   * PR, 2026-05-21). Mirrors Math's `firstTapRecordedRef` BY NAME but
+   * NOT by responsibility. Flipped `true` after the per-problem
    * `perProblemAnswerWordRef.current[idx] = chipWord` write so retry
    * taps within the same problem don't overwrite the first-tap value.
    * Reset to `false` on problem advance (see the cleanup block in the
    * auto-advance effect).
    *
-   * Word-song does NOT capture latency (no `latencyMs` field on
-   * `WordSongSessionResult` per the result-type doc), so this latch
-   * exists purely to gate the answer-word capture — it is NOT the
-   * same shape as Math's latch, which also gates the latency write.
+   * Gates ONE capture (`perProblemAnswerWordRef`):
+   *   - Word-song does NOT capture latency (no `latencyMs` field on
+   *     `WordSongSessionResult`).
+   *   - Word-song's `perProblemCorrectRef` is written ELSEWHERE — in
+   *     `handleCorrectTap`, NOT inside this latch — giving it
+   *     **ever-correct** semantics (wrong-then-correct retries record
+   *     `true`). Math's same-named latch gates THREE writes including
+   *     `perProblemCorrectRef`, producing **first-tap** semantics
+   *     instead.
+   *
+   * The two `perProblemCorrect` arrays land on the same
+   * `SessionEndPayload.perProblemCorrect` wire field with divergent
+   * semantics. The asymmetry is intentional (pedagogical role
+   * differs: math = automaticity retrieval; word-song = decoding
+   * practice + re-encouragement). DO NOT consolidate this latch with
+   * the `handleCorrectTap` write — it would silently flip word-song
+   * to first-tap semantics. See `src/lib/progress/types.ts` DESIGN
+   * NOTE near `SessionHistoryEntry` for the cross-screen design
+   * rationale and Thomas's 2026-05-21 accept call.
    */
   const firstTapRecordedRef = useRef(false)
   /** Test seam: when `__testInitiallyAudioUnlocked` is set, this starts
@@ -1181,6 +1216,23 @@ function WordSongScreen({
         // Mark this problem as a non-guided correct on the per-problem
         // outcome ref (ticket 86c9m3aec). Index is 0-based; `problem.index`
         // is 1-based per the spec.
+        //
+        // PER-SCREEN ASYMMETRY: this write site gives word-song's
+        // `perProblemCorrect` **ever-correct** semantics — the latch
+        // fires on the correct resolution, NOT on the first tap, so
+        // wrong-then-correct retries record `true`. Math's same-named
+        // `perProblemCorrectRef` is written under the `firstTapRecordedRef`
+        // once-per-problem latch in `onChipTap`, producing **first-tap**
+        // semantics on the same `SessionEndPayload.perProblemCorrect`
+        // wire field. The divergence is intentional (Thomas accepted
+        // 2026-05-21): word-song's pedagogical role is decoding
+        // practice + re-encouragement, so eventual-correct credit is
+        // the right semantic for `computeGraduationSplit`. DO NOT
+        // move this write into the `firstTapRecordedRef` latch
+        // without coordinating across both screens — it would
+        // silently flip word-song to first-tap semantics. See
+        // `src/lib/progress/types.ts` DESIGN NOTE near
+        // `SessionHistoryEntry`.
         if (
           problem.index >= 1 &&
           problem.index <= perProblemCorrectRef.current.length
@@ -1307,6 +1359,19 @@ function WordSongScreen({
       // (which sets resolved = true) still see the latch and skip re-
       // recording. `firstTapRecordedRef` is the once-per-problem
       // latch; reset to `false` on problem advance.
+      //
+      // PER-SCREEN ASYMMETRY: this latch gates ONLY the answer-word
+      // capture. WordSong's `perProblemCorrectRef` is written in
+      // `handleCorrectTap` (not here), giving word-song
+      // **ever-correct** semantics — wrong-then-correct retries
+      // record `true`. Math's same-named `firstTapRecordedRef` gates
+      // THREE writes including `perProblemCorrectRef`, producing
+      // **first-tap** semantics for the math array on the same wire
+      // field (`SessionEndPayload.perProblemCorrect`). DO NOT add a
+      // `perProblemCorrectRef` write here without coordinating across
+      // screens — it would silently flip word-song to first-tap
+      // semantics. See `src/lib/progress/types.ts` DESIGN NOTE near
+      // `SessionHistoryEntry`.
       if (!firstTapRecordedRef.current) {
         firstTapRecordedRef.current = true
         const idx = problemIndex

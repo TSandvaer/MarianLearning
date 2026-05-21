@@ -105,6 +105,56 @@ export interface LeitnerBox<T> {
 // We cap it (see `MAX_SESSION_HISTORY` in adapter) so localStorage stays small.
 // --------------------------------------------------------------------------
 
+/**
+ * Per-screen `perProblemCorrect` semantic asymmetry — DESIGN NOTE.
+ *
+ * `SessionHistoryEntry` itself does NOT persist a `perProblemCorrect`
+ * field today (see `slowFacts.ts` for the v1 approximation that joins
+ * per-session `successRate` against `mathFacts` instead). However, the
+ * in-flight `MathSessionResult.perProblemCorrect` and
+ * `WordSongSessionResult.perProblemCorrect` arrays — both surfaced
+ * via `SessionEndPayload.perProblemCorrect` — carry DIVERGENT
+ * per-screen semantics that any future consumer reading the field
+ * must understand:
+ *
+ *   - **Math** writes `perProblemCorrect[i]` inside the once-per-
+ *     problem `firstTapRecordedRef` latch. Semantics: **first-tap
+ *     correctness**. Wrong-then-correct retries record `false` even
+ *     though the problem eventually resolved. Drives Leitner box
+ *     promotion / demotion at session-end via `buildLeitnerOutcomes`
+ *     (gated on `surface === 'math'`).
+ *
+ *   - **WordSong** writes `perProblemCorrect[i]` inside
+ *     `handleCorrectTap`, AFTER the wrong-tap path has already had a
+ *     chance to fire. Semantics: **ever-correct**. Wrong-then-correct
+ *     retries record `true` because the write happens on the correct
+ *     resolution, not on the first tap. The "ever-correct" framing is
+ *     intentional: word-song's pedagogical role is re-encouragement
+ *     and decoding practice, not fact-automaticity retrieval, so
+ *     downstream graduation accounting via `computeGraduationSplit`
+ *     (gated on `track === 'word-song'`) credits any eventual correct.
+ *
+ * Both arrays are forwarded onto the SAME `SessionEndPayload.perProblemCorrect`
+ * field. Current consumers are surface-gated and safe:
+ *   - `buildLeitnerOutcomes` (math only) reads first-tap semantics.
+ *   - `computeGraduationSplit` (word-song only) reads ever-correct
+ *     semantics.
+ *
+ * This asymmetry was flagged by Devon on PR #286 review and confirmed
+ * by Jessica on PR #288; Thomas decided 2026-05-21 to accept the
+ * divergence rather than align write-points (option (a) per the
+ * session queue). The "ever-correct" semantics on WordSong may be
+ * intentional for re-encouragement.
+ *
+ * NOTE FOR FUTURE WORK — DO NOT consolidate the two latches without
+ * coordinating across both screens. A symmetric refactor would
+ * silently change the persisted-meaning of `perProblemCorrect` for
+ * one track. If a future ticket persists `perProblemCorrect[]` onto
+ * `SessionHistoryEntry`, that field MUST either (a) carry the surface
+ * tag so consumers can apply the right semantics, or (b) be split
+ * into two distinct fields (`firstTapCorrect` vs `everCorrect`) to
+ * remove the ambiguity at the shape level.
+ */
 export interface SessionHistoryEntry {
   /** ISO 8601 date-time the session started. */
   dateISO: string
