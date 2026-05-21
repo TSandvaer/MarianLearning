@@ -612,6 +612,12 @@ export default function App() {
       ...(result.subitisingScaffoldRendered === true
         ? { subitisingScaffoldRendered: true }
         : {}),
+      // Per-problem first-tap chip value (Kevin schema-first PR
+      // pairing with Dave's PR #284 two-digit add/sub research).
+      // Persisted on SessionHistoryEntry.perProblemAnswerValue so a
+      // future tier-ship PR (two-digit-addsub) can classify wrong-
+      // tap patterns post-hoc.
+      perProblemAnswerValue: result.perProblemAnswerValue,
     })
     setRoute('session-end')
   }, [])
@@ -630,6 +636,11 @@ export default function App() {
         // the just-completed session was a graduation run.
         perProblemCorrect: result.perProblemCorrect,
         targetWords: result.targetWords,
+        // Per-problem first-tap chip word (Kevin schema-first PR,
+        // 2026-05-21, surface parity with the math
+        // perProblemAnswerValue field). No current word-song
+        // consumer; plumbed for future error-pattern classification.
+        perProblemAnswerWord: result.perProblemAnswerWord,
       })
       setRoute('session-end')
     },

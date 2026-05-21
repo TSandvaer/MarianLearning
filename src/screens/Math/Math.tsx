@@ -238,6 +238,58 @@ export interface MathSessionResult {
    * App.tsx is the parent and pipes through the production plumbing.
    */
   subitisingScaffoldRendered: boolean
+  /**
+   * Per-problem FIRST-tap chip value, indexed 0..N-1 (parallel to
+   * `plan.problems`). Records the literal numeric value Marian
+   * tapped on her FIRST chip-tap for each problem, regardless of
+   * correctness. `null` when no chip was ever tapped on that problem
+   * (e.g. session abandoned mid-problem, or the guided-completion
+   * give-answer path completed without a tap).
+   *
+   * Length matches `plan.problems.length`. Subsequent retry taps
+   * within the same problem are NOT captured here (mirrors the
+   * once-per-problem latch used by `perProblemCorrect` + `latencyMs`).
+   *
+   * Why "tapped value" and not "tapped distractor class"
+   * ----------------------------------------------------
+   * Dave's two-digit add/sub research (PR #284,
+   * `design/research/two-digit-addsub-error-patterns.md`) flagged
+   * concatenated-single-digit processing as a structural false-
+   * positive on the no-regroup mastery gate: a child who treats
+   * each column independently produces CORRECT answers on every
+   * no-regroup problem like `23 + 14 = 37`, but the processing
+   * pattern is unsound and breaks the moment a problem requires
+   * regrouping. Detecting it requires post-hoc classification of
+   * the wrong-tap values across a session — and the classification
+   * rules are pedagogical, not mechanical (off-by-one, wrong-op,
+   * decade-anchor, column-cross all need both the tap value AND
+   * the operand structure to identify).
+   *
+   * Recording the literal value rather than a pre-computed class
+   * label means the screen does NOT have to thread distractor-class
+   * metadata from `distractors.ts` through `onChipTap`, and the
+   * downstream consumer (`mastery.ts` and a future tier-ship PR's
+   * gate logic) keeps full classification authority — it can read
+   * the value alongside `problem.addendA` / `addendB` / `op` /
+   * `correct` and apply whatever class rules a given tier requires.
+   * The "(number | null)[]" shape also stays decoupled from the
+   * planner wire (`MathProblem.distractorClass` is render-time only;
+   * the planner never emits it) so this field can be populated for
+   * every tier — including tiers that don't yet have a defined
+   * distractor-class taxonomy.
+   *
+   * Population posture for current tiers (add-to-10 / sub-to-10 /
+   * add-to-20 / sub-to-20): best-effort — populated whenever a
+   * chip is tapped. Current tiers' gate logic does NOT yet
+   * consume this field; it is plumbed through and persisted so
+   * the future tier-ship PR (two-digit-addsub) can build on
+   * accumulated history.
+   *
+   * Ticket: Kevin schema-first PR; pairs with Dave's PR #284
+   * research. See "Non-obvious findings" in PR body for the A-vs-B
+   * design choice.
+   */
+  perProblemAnswerValue: readonly (number | null)[]
 }
 
 /** Function signature for playing one canonical Math utterance. */
@@ -766,6 +818,30 @@ function MathScreen({
   const perProblemCorrectRef = useRef<boolean[]>(plan.problems.map(() => false))
 
   /**
+   * Per-problem first-tap chip-value mirror (Kevin schema-first PR
+   * pairing with Dave's PR #284 two-digit add/sub research).
+   *
+   * Indexed 0..N-1; entry N is the literal numeric value Marian
+   * tapped on her FIRST chip-tap for problem N, regardless of
+   * correctness. Initialised to `null` per problem (sentinel for
+   * "no chip tapped yet"). Flipped exactly once per problem on the
+   * first `onChipTap` entry that passes the read-aloud gate;
+   * subsequent retry taps within the same problem are NOT captured.
+   *
+   * Same once-per-problem latch as `perProblemCorrectRef` and
+   * `latencyMsByProblemRef` — the three refs are written in lock-
+   * step inside the `firstTapRecordedRef`-guarded block, so the
+   * three persisted arrays are positionally consistent.
+   *
+   * SessionEnd reads this via `MathSessionResult.perProblemAnswerValue`
+   * — see the `MathSessionResult` doc for the design rationale (literal
+   * value vs distractor-class label).
+   */
+  const perProblemAnswerValueRef = useRef<(number | null)[]>(
+    plan.problems.map(() => null),
+  )
+
+  /**
    * Per-problem first-tap latency mirror (ticket 86c9pwgc8 — M4;
    * sanity-bound semantics added 86c9q5au3).
    *
@@ -1237,6 +1313,14 @@ function MathScreen({
       }
       latencyMsByProblemRef.current = next
     }
+    const answers = perProblemAnswerValueRef.current
+    if (answers.length !== planLength) {
+      const next = new Array<number | null>(planLength).fill(null)
+      for (let i = 0; i < Math.min(answers.length, planLength); i++) {
+        next[i] = answers[i]
+      }
+      perProblemAnswerValueRef.current = next
+    }
   }, [planLength])
 
   useEffect(() => {
@@ -1446,6 +1530,12 @@ function MathScreen({
         // state.
         perProblemCorrect: perProblemCorrectRef.current.slice(),
         latencyMs: latencyMsByProblemRef.current.slice(),
+        // Per-problem first-tap chip value (Kevin schema-first PR
+        // pairing with Dave's PR #284 two-digit add/sub research).
+        // Sliced so downstream consumers can't mutate the screen's
+        // internal state. See `MathSessionResult.perProblemAnswerValue`
+        // doc for the literal-value vs distractor-class rationale.
+        perProblemAnswerValue: perProblemAnswerValueRef.current.slice(),
         // Subitising scaffold exposure (ticket 86c9ur1zr §2.2). True
         // iff the overlay rendered for at least one in-scope problem
         // this session in scaffold mode — drives the counter bump in
@@ -1953,6 +2043,15 @@ function MathScreen({
           const raw = performance.now() - chipReadyAtRef.current
           const isInBand = raw >= LATENCY_FLOOR_MS && raw <= LATENCY_CEILING_MS
           latencyMsByProblemRef.current[idx] = isInBand ? raw : -1
+        }
+        // Per-problem first-tap chip value capture (Kevin schema-first PR
+        // pairing with Dave's PR #284 two-digit add/sub research).
+        // Records the literal numeric value Marian tapped, regardless
+        // of correctness. Stays inside the once-per-problem latch so
+        // wrong-then-correct retries don't overwrite the first-tap
+        // value. See `MathSessionResult.perProblemAnswerValue` doc.
+        if (idx >= 0 && idx < perProblemAnswerValueRef.current.length) {
+          perProblemAnswerValueRef.current[idx] = chipValue
         }
       }
 

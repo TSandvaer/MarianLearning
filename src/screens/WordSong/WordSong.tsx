@@ -192,6 +192,29 @@ export interface WordSongSessionResult {
    * this list with `WORD_SONG_NOVEL_PROBE_WORDS`.
    */
   targetWords?: readonly string[]
+  /**
+   * Per-problem FIRST-tap chip word, indexed 0..N-1 (parallel to
+   * `plan.problems`). Records the literal word string Marian tapped
+   * on her FIRST chip-tap for each problem, regardless of correctness.
+   * `null` when no chip was ever tapped on that problem (e.g. session
+   * abandoned, or guided-completion give-answer path completed
+   * without a tap).
+   *
+   * Length matches `plan.problems.length`. Subsequent retry taps
+   * within the same problem are NOT captured (mirrors the once-per-
+   * problem latch used by `perProblemCorrect`).
+   *
+   * Added 2026-05-21 for surface parity with
+   * `MathSessionResult.perProblemAnswerValue` (Kevin schema-first PR
+   * pairing with Dave's PR #284 two-digit add/sub research). No
+   * current word-song consumer; plumbed so future word-song error-
+   * pattern classification (e.g. mid-vowel substitution, onset/coda
+   * substitution) can build on accumulated history.
+   *
+   * Optional on the public type for back-compat with hand-built test
+   * fixtures predating this PR; the live screen always sets it.
+   */
+  perProblemAnswerWord?: readonly (string | null)[]
 }
 
 /** Function signature for playing one canonical Word Song utterance. */
@@ -528,6 +551,41 @@ function WordSongScreen({
   const perProblemCorrectRef = useRef<boolean[]>(
     Array.from({ length: plan.problems.length }, () => false),
   )
+  /**
+   * Per-problem first-tap chip-word mirror (2026-05-21, surface parity
+   * with `MathSessionResult.perProblemAnswerValue`; Kevin schema-first
+   * PR pairing with Dave's PR #284 two-digit add/sub research).
+   *
+   * Indexed 0..N-1; entry N is the literal word string Marian tapped
+   * on her FIRST chip-tap for problem N, regardless of correctness.
+   * Initialised to `null` per problem (sentinel for "no chip tapped
+   * yet"). Flipped exactly once per problem inside `onChipTap`'s
+   * first-tap latch (mirrors the math screen's
+   * `perProblemAnswerValueRef`).
+   *
+   * SessionEnd reads this via
+   * `WordSongSessionResult.perProblemAnswerWord` — see the result-type
+   * doc for the design rationale. No current word-song consumer;
+   * plumbed for future error-pattern classification.
+   */
+  const perProblemAnswerWordRef = useRef<(string | null)[]>(
+    Array.from({ length: plan.problems.length }, () => null),
+  )
+  /**
+   * Word-song once-per-problem first-tap latch (Kevin schema-first
+   * PR, 2026-05-21). Mirrors Math's `firstTapRecordedRef`. Flipped
+   * `true` after the per-problem
+   * `perProblemAnswerWordRef.current[idx] = chipWord` write so retry
+   * taps within the same problem don't overwrite the first-tap value.
+   * Reset to `false` on problem advance (see the cleanup block in the
+   * auto-advance effect).
+   *
+   * Word-song does NOT capture latency (no `latencyMs` field on
+   * `WordSongSessionResult` per the result-type doc), so this latch
+   * exists purely to gate the answer-word capture — it is NOT the
+   * same shape as Math's latch, which also gates the latency write.
+   */
+  const firstTapRecordedRef = useRef(false)
   /** Test seam: when `__testInitiallyAudioUnlocked` is set, this starts
    *  true so chips render tappable from first paint. See `WordSongProps`. */
   const [audioUnlocked, setAudioUnlocked] = useState(
@@ -897,6 +955,10 @@ function WordSongScreen({
       // Reset the synchronous double-speak latch so the next problem's
       // read-aloud effect can fire. See ticket 86c9hf4ef.
       spokeReadAloudRef.current = false
+      // Reset the once-per-problem first-tap latch (Kevin schema-first
+      // PR, 2026-05-21) so the next problem's chip-tap can record into
+      // `perProblemAnswerWordRef`.
+      firstTapRecordedRef.current = false
       setShakingChip(null)
       setPose('idle')
       setGuidedActive(false)
@@ -922,6 +984,13 @@ function WordSongScreen({
         // construction) and read targets straight from the plan.
         perProblemCorrect: perProblemCorrectRef.current.slice(),
         targetWords: plan.problems.map((p) => p.target.word),
+        // Per-problem first-tap chip word (Kevin schema-first PR,
+        // 2026-05-21, surface parity with
+        // MathSessionResult.perProblemAnswerValue). Sliced so
+        // downstream consumers can't mutate the screen's internal
+        // state. No current word-song consumer; plumbed for future
+        // error-pattern classification.
+        perProblemAnswerWord: perProblemAnswerWordRef.current.slice(),
       })
     }
   }, [problemIndex, plan.problems, onSessionComplete, storage, now])
@@ -1229,6 +1298,22 @@ function WordSongScreen({
       // has completed. The read-aloud effect flips this ref after
       // speak() resolves. See ticket 86c9guh4y.
       if (!readAloudPlayedRef.current) return
+
+      // First-tap capture for the current problem (Kevin schema-first
+      // PR, 2026-05-21, surface parity with Math). Records the
+      // literal word string Marian tapped, regardless of correctness.
+      // The capture happens BEFORE the correct/wrong dispatch below
+      // so retry taps that re-enter `handleCorrectTap` after a wrong
+      // (which sets resolved = true) still see the latch and skip re-
+      // recording. `firstTapRecordedRef` is the once-per-problem
+      // latch; reset to `false` on problem advance.
+      if (!firstTapRecordedRef.current) {
+        firstTapRecordedRef.current = true
+        const idx = problemIndex
+        if (idx >= 0 && idx < perProblemAnswerWordRef.current.length) {
+          perProblemAnswerWordRef.current[idx] = chipWord
+        }
+      }
 
       // Block guided-completion path on non-correct chips.
       if (guidedActive && chipWord !== problem.target.word) return

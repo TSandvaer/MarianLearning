@@ -757,6 +757,175 @@ describe('recordProgressOnSessionEnd', () => {
     })
   })
 
+  // ── per-problem first-tap chip value/word persistence ──────────────────
+  // (Kevin schema-first PR, 2026-05-21 — pairing with Dave's PR #284
+  // two-digit add/sub research)
+  describe('perProblemAnswerValue / perProblemAnswerWord persistence', () => {
+    it('persists perProblemAnswerValue onto math SessionHistoryEntry when supplied', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'add-to-10',
+        perProblemAnswerValue: [5, 4, 6, 8, 7, 9, 8, 10],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemAnswerValue).toEqual([
+        5, 4, 6, 8, 7, 9, 8, 10,
+      ])
+    })
+
+    it('persists null entries on perProblemAnswerValue (no chip tapped on that problem)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 5,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'add-to-10',
+        perProblemAnswerValue: [5, null, 6, 8, null, 9, 8, 10],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemAnswerValue).toEqual([
+        5,
+        null,
+        6,
+        8,
+        null,
+        9,
+        8,
+        10,
+      ])
+    })
+
+    it('omits perProblemAnswerValue from the entry when not supplied (back-compat)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 7,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'add-to-10',
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemAnswerValue).toBeUndefined()
+    })
+
+    it('shallow-clones the perProblemAnswerValue array (caller can mutate after)', () => {
+      const arr: (number | null)[] = [5, 4, 6, 8, 7, 9, 8, 10]
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'add-to-10',
+        perProblemAnswerValue: arr,
+      })
+
+      arr[0] = 999
+      const after = loadProgress()!
+      expect(after.history[0].perProblemAnswerValue?.[0]).toBe(5)
+    })
+
+    it('persists perProblemAnswerWord onto word-song SessionHistoryEntry when supplied', () => {
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 6,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'cvc-words',
+        perProblemAnswerWord: [
+          'cat',
+          'bat',
+          'mat',
+          'hat',
+          'rat',
+          'pan',
+          'fan',
+          'man',
+        ],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemAnswerWord).toEqual([
+        'cat',
+        'bat',
+        'mat',
+        'hat',
+        'rat',
+        'pan',
+        'fan',
+        'man',
+      ])
+    })
+
+    it('persists null entries on perProblemAnswerWord (no chip tapped)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 5,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'cvc-words',
+        perProblemAnswerWord: [
+          'cat',
+          null,
+          'bat',
+          null,
+          'mat',
+          'pan',
+          'fan',
+          'man',
+        ],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemAnswerWord).toEqual([
+        'cat',
+        null,
+        'bat',
+        null,
+        'mat',
+        'pan',
+        'fan',
+        'man',
+      ])
+    })
+
+    it('omits perProblemAnswerWord from the entry when not supplied (back-compat)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 7,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'cvc-words',
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemAnswerWord).toBeUndefined()
+    })
+
+    it('coexists with latencyMs + mathFacts on the same math entry', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-21T12:00:00.000Z',
+        focusNode: 'add-to-10',
+        latencyMs: [1200, 800, 950, 1500, 2100, 700, 1800, 1100],
+        mathFacts: [
+          { a: 3, b: 2, op: '+' },
+          { a: 4, b: 1, op: '+' },
+          { a: 5, b: 5, op: '+' },
+          { a: 2, b: 7, op: '+' },
+          { a: 6, b: 3, op: '+' },
+          { a: 1, b: 8, op: '+' },
+          { a: 4, b: 2, op: '+' },
+          { a: 7, b: 1, op: '+' },
+        ],
+        perProblemAnswerValue: [5, 5, 10, 9, 9, 9, 6, 8],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].latencyMs).toHaveLength(8)
+      expect(after.history[0].mathFacts).toHaveLength(8)
+      expect(after.history[0].perProblemAnswerValue).toHaveLength(8)
+    })
+  })
+
   // ── Lifetime-first-encounter append (ticket 86c9q9ben — AC9f) ──────────
   // The session-start gate reads `lifetimeFirstEncounters` to decide
   // whether to fire tier-specific scaffolding; this writer appends the
