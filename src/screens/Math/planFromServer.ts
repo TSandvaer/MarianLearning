@@ -67,27 +67,32 @@ const ALL_SLOTS: readonly MathUtteranceSlot[] = [
   'giveAnswer',
 ]
 
-/** Words that can appear as an addend / operand in the `read` template.
- *  Covers 0..20 because:
+/** Single-token number words 0..20 — and decade names 30..90. Tens 21..99
+ *  that English spells as a hyphenated compound (`thirty-one`, `forty-five`,
+ *  `ninety-nine`, …) are NOT entries here — they are resolved
+ *  compositionally by {@link wordToNumber} via a hyphen split.
  *
- *   - add-to-10 (sums 3..10) restricts addends to 1..9 — the 10 entry is
- *     defense in depth in case the prompt drifts.
- *   - add-to-20 (ticket 86c9q5q13, sums 11..20) restricts addends to 1..9
- *     OR a teen + 1, so 11..20 entries cover the teen-plus-single pattern
- *     (e.g. "Twelve plus five. How many?" parses as addendA=12, addendB=5,
- *     correct=17).
- *   - sub-to-10 (Kyle's spec §1.1) introduces subtraction problems with
- *     operands and answer in [0, 10]. Two pool facts have operand `0`
- *     (`7 − 0 = 7`, `9 − 0 = 9`) and two have correct `0` (`5 − 5 = 0`,
- *     `8 − 8 = 0`). The "zero" entry is REQUIRED for the parser to
- *     accept those read-lines; without it the parser would throw on
- *     "Seven minus zero. How many are left?" and the screen would fall
- *     back to the silent static plan.
+ *  Covered ranges:
  *
- *  Anything beyond 20 stays out of this table — that signals a prompt
- *  drift the parser shouldn't silently absorb (`two-digit-addsub` has its
- *  own template / focus node and would route through a different parser
- *  if we ever ship one). */
+ *   - 0..10: every add-to-10 / sub-to-10 addend (sub-to-10 needs the
+ *     `zero` entry for the `7 − 0` and `5 − 5` style facts).
+ *   - 11..20: teen-plus-single add-to-20 / sub-to-20 facts
+ *     (e.g. "Twelve plus five. How many?" — addendA=12, addendB=5).
+ *   - 30, 40, 50, 60, 70, 80, 90: the decade names. Solo decade operands
+ *     ("Forty plus three. How many?") parse via direct lookup;
+ *     hyphenated forms ("Thirty-one plus four. How many?") parse via
+ *     {@link wordToNumber} which splits on `-` and adds.
+ *
+ *  Compositional decoding chosen over an 80-entry literal table because
+ *  English number-word formation is regular for 21..99 and the
+ *  compositional approach is robust to any decade × unit pair without
+ *  re-listing 80 strings. {@link wordToNumber} is the only place that
+ *  inspects this map; both decoders share the table.
+ *
+ *  Out-of-range tokens ("Hundred", "Twentyone" without hyphen, etc.)
+ *  return `undefined` from {@link wordToNumber} — the parser then throws
+ *  `PlanFromServerError` so the App's silent-fallback path fires rather
+ *  than silently absorbing prompt drift. */
 const NUMBER_WORDS: Record<string, number> = {
   zero: 0,
   one: 1,
@@ -110,6 +115,57 @@ const NUMBER_WORDS: Record<string, number> = {
   eighteen: 18,
   nineteen: 19,
   twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+}
+
+/** Decode a (possibly hyphenated) number word to its integer value.
+ *
+ *  Single-token forms ("seven", "fifteen", "twenty", "forty") are looked
+ *  up directly. Hyphenated compounds ("thirty-one", "ninety-nine") are
+ *  split on `-` and summed — the contract is "decade + unit", so the left
+ *  side must resolve to a multiple of 10 in [20, 90] AND the right side
+ *  must resolve to a unit in [1, 9].
+ *
+ *  Returns `undefined` on any miss (unknown token, missing decade-then-
+ *  unit composition, malformed hyphenation). Callers translate that into
+ *  a `PlanFromServerError`.
+ *
+ *  Why compositional rather than 80 literal entries: English 21..99 number
+ *  words are formed regularly (decade + `-` + unit). A two-pass decoder
+ *  is shorter, easier to read, and forward-compatible with any future
+ *  re-bake that uses these names. The strict decade ∈ [20, 90] / unit ∈
+ *  [1, 9] check rejects nonsense like "thirty-eleven" or "thirty-twenty"
+ *  rather than silently accepting them.
+ *
+ *  Inputs are expected to be lowercased — callers in this file pass
+ *  `.toLowerCase()` before lookup. */
+export function wordToNumber(word: string): number | undefined {
+  // Single-token form first — covers 0..20 and the round decades.
+  const direct = NUMBER_WORDS[word]
+  if (direct !== undefined) return direct
+
+  // Compositional decade-units form: "thirty-one", "ninety-nine", …
+  const dashIdx = word.indexOf('-')
+  if (dashIdx < 1 || dashIdx !== word.lastIndexOf('-')) {
+    // Either no hyphen (already handled by direct lookup miss) or more
+    // than one hyphen ("twenty-one-two") — both reject.
+    return undefined
+  }
+  const decade = NUMBER_WORDS[word.slice(0, dashIdx)]
+  const unit = NUMBER_WORDS[word.slice(dashIdx + 1)]
+  if (decade === undefined || unit === undefined) return undefined
+  // Decade slot must be a round multiple of 10 in [20, 90]; unit slot
+  // must be a single digit in [1, 9]. Rejects "twenty-twenty",
+  // "thirty-eleven", "five-three", etc. as malformed compounds.
+  if (decade < 20 || decade > 90 || decade % 10 !== 0) return undefined
+  if (unit < 1 || unit > 9) return undefined
+  return decade + unit
 }
 
 /** Flat plan shape returned by /api/claude — mirrors `PlannerPlan` in
@@ -220,17 +276,23 @@ export function parseReadOperands(read: string): {
   op: '+' | '-'
 } {
   // Addition template — anchored to "plus" between two number words.
-  // "Three plus two. How many?" — case-insensitive.
+  // "Three plus two. How many?" / "Thirty-one plus four. How many?" —
+  // case-insensitive. Operand character class `[a-z-]` accepts the
+  // hyphenated compound forms (`twenty-one` … `ninety-nine`); the
+  // structural rejection of malformed hyphenation lives downstream in
+  // {@link wordToNumber}, so the regex is intentionally permissive here.
   const additionMatch = read.match(
-    /^\s*([a-z]+)\s+plus\s+([a-z]+)\s*\.\s*how\s+many\s*\?\s*$/i,
+    /^\s*([a-z-]+)\s+plus\s+([a-z-]+)\s*\.\s*how\s+many\s*\?\s*$/i,
   )
   if (additionMatch) {
     return decodeOperands(additionMatch[1]!, additionMatch[2]!, '+', read)
   }
   // Subtraction template — "minus" between two number words, "how many
   // are left?" trailing. e.g. "Seven minus three. How many are left?"
+  // Hyphenated operands accepted ("Thirty-four minus two. How many are
+  // left?"); decoding rejects malformed forms.
   const subMinusMatch = read.match(
-    /^\s*([a-z]+)\s+minus\s+([a-z]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i,
+    /^\s*([a-z-]+)\s+minus\s+([a-z-]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i,
   )
   if (subMinusMatch) {
     return decodeOperands(subMinusMatch[1]!, subMinusMatch[2]!, '-', read)
@@ -238,7 +300,7 @@ export function parseReadOperands(read: string): {
   // First-session subtraction template — "take away" between operands.
   // e.g. "Eight take away three. How many are left?"
   const subTakeAwayMatch = read.match(
-    /^\s*([a-z]+)\s+take\s+away\s+([a-z]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i,
+    /^\s*([a-z-]+)\s+take\s+away\s+([a-z-]+)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i,
   )
   if (subTakeAwayMatch) {
     return decodeOperands(subTakeAwayMatch[1]!, subTakeAwayMatch[2]!, '-', read)
@@ -276,8 +338,8 @@ function decodeOperands(
   op: '+' | '-',
   rawRead: string,
 ): { addendA: number; addendB: number; op: '+' | '-' } {
-  const a = NUMBER_WORDS[wordA.toLowerCase()]
-  const b = NUMBER_WORDS[wordB.toLowerCase()]
+  const a = wordToNumber(wordA.toLowerCase())
+  const b = wordToNumber(wordB.toLowerCase())
   if (a === undefined || b === undefined) {
     throw new PlanFromServerError(
       `math read line "${rawRead}" had unrecognised number word(s)`,
