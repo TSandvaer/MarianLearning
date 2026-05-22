@@ -5144,7 +5144,18 @@ describe('TWO_DIGIT_ADDSUB_POOL', () => {
     expect(counts['HARD']).toBe(17)
   })
 
-  it('category counts match spec §1.1 (round-ten-anchor=3, mid-decade=11, near-boundary=12, tens-doubles=3, two-digit-plus-two-digit=6)', () => {
+  it('category counts match spec §1.1 (round-ten-anchor=3, mid-decade=11, near-boundary=13, tens-doubles=3, two-digit-plus-two-digit=6)', () => {
+    // Spec §1.1 sanity-check at lines 168-170 enumerates:
+    //   EASY  near-boundary: #4 = 1
+    //   MEDIUM near-boundary: #11, #19 = 2
+    //   HARD  near-boundary: #20, #21, #22, #23, #24, #25, #26, #27,
+    //         #28, #30 = 10
+    //   Total: 13 facts.
+    //
+    // Spec §2.3's category-cap rationale comment ("Pool has 12 ...") is
+    // off-by-one relative to the §1.1 sanity-check enumeration; the
+    // §1.1 line-by-line count is authoritative. Flagged in NOFs for
+    // potential Kyle copy-edit follow-up.
     const counts = TWO_DIGIT_ADDSUB_POOL.reduce(
       (acc, f) => {
         acc[f.category] = (acc[f.category] ?? 0) + 1
@@ -5154,7 +5165,7 @@ describe('TWO_DIGIT_ADDSUB_POOL', () => {
     )
     expect(counts['round-ten-anchor']).toBe(3)
     expect(counts['mid-decade-units-shift']).toBe(11)
-    expect(counts['near-boundary-no-cross']).toBe(12)
+    expect(counts['near-boundary-no-cross']).toBe(13)
     expect(counts['tens-doubles-echo']).toBe(3)
     expect(counts['two-digit-plus-two-digit']).toBe(6)
   })
@@ -5603,128 +5614,69 @@ describe('lintTwoDigitAddsubComposition — dual-exposure rule', () => {
   })
 
   it('fires when + fact and its - inverse co-occur (the §5.5 enforcement target)', () => {
-    // 33+4=37 (in pool) ↔ 37-4=33. The 37-4 form is NOT in the v1 -
-    // pool (it would be a near-boundary - fact but the pool curation
-    // selected 35-4 and 48-7 over it). However, we can construct a
-    // dual-exposure pair using IN-POOL facts: 25-3=22 ↔ 22+3 — neither
-    // 22+3 nor any commutative variant is in pool (the only 22-related
-    // + fact is 22+5). The cleanest in-pool dual-exposure target is
-    // 33+4=37 vs 37-4=33 — but 37-4 isn't in pool. We must therefore
-    // test the rule by injecting a pool-fact pair that does form an
-    // inverse — none exists pure-in-pool, so the rule is load-bearing
-    // FORWARD-COMPAT (per spec §5.5 + module comment). Test below
-    // CONSTRUCTS the inverse by using two pool facts where the inverse
-    // mapping happens to align: 21+3=24 (in pool) is a sibling of 25-1
-    // which would map: 24+1=25 ↔ 25-1=24. Neither 25-1 nor 24+1 is in
-    // pool, so we can't trigger naturally.
+    // The v1 pool ships exactly one in-pool inverse pair:
+    //   33+4=37 (#5 EASY mid-decade-units-shift) ↔ 37-4=33 (#18 MEDIUM
+    //   mid-decade-units-shift). The operand triple (33, 4, 37) appears
+    //   on both sides — spec §5.5 forbids co-occurrence within a single
+    //   session, so the lint MUST fire dual-exposure.
     //
-    // Mock alternative: construct a contrived canon with two facts
-    // where the linter's inverse mapping fires. We can use 19-7=12 vs
-    // 12+7=19 — but 12+7 isn't in pool. The lint compares triples by
-    // tripleKey(a, b, op); the inverse for 19-7 is computed as
-    // 12+7=19 and 7+12=19. Neither is in pool.
-    //
-    // BUT — the lint uses `seenTriples.get(invKey)` which queries the
-    // SESSION's emitted triples, not the pool. So we can inject a
-    // pool-violating PAIR (one fact in pool + one not in pool — the
-    // pool-membership rule fires, but the dual-exposure rule should
-    // ALSO fire because both triples ARE in the session). Construct:
-    //   P1 = 20+3 (+ fact, correct=23)
-    //   P2 = 23-3 (- fact, NOT in pool but parses; correct=20).
-    //        Inverse of 20+3? Yes: 20+3=23, the inverse - is 23-3=20.
+    // Session construction respects band-by-slot (33+4 is EASY → P1-P8
+    // allowed; 37-4 is MEDIUM → P4-P8 allowed). P1 stays '+' per
+    // p1-is-plus rule; op-mix lands at 5+/3-.
     const facts: Array<[number, number, '+' | '-']> = [
-      [20, 3, '+'], // P1 (correct=23)
-      [23, 3, '-'], // P2 (correct=20) — inverse of P1 + parses though
-      // not in pool
-      [22, 5, '+'], // P3
-      [42, 3, '+'], // P4
-      [23, 6, '+'], // P5
-      [48, 7, '-'], // P6
-      [33, 4, '+'], // P7
-      [25, 3, '-'], // P8
+      [20, 3, '+'], // P1 EASY round-ten (1/1 cap)
+      [22, 5, '+'], // P2 EASY tens-doubles (1/1 cap)
+      [33, 4, '+'], // P3 EASY mid-decade (1/4 cap) — inverse pair side A
+      [37, 4, '-'], // P4 MEDIUM mid-decade (2/4 cap) — inverse pair side B
+      [23, 6, '+'], // P5 HARD near-boundary
+      [48, 7, '-'], // P6 HARD near-boundary
+      [42, 3, '+'], // P7 MEDIUM mid-decade (3/4 cap)
+      [25, 3, '-'], // P8 MEDIUM mid-decade (4/4 cap)
     ]
     const violations = lintTwoDigitAddsubComposition(
       buildTwoDigitAddsubCanonResponse(facts),
     )
-    // P2 will also fire pool-membership (23-3 NOT in pool) — that's
-    // expected; the dual-exposure rule asserts independently against
-    // SESSION-EMITTED triples.
     const dual = violations.filter((v) => v.rule === 'dual-exposure')
-    // P2 is not in pool, so its poolMatch is null and the loop skips
-    // P2 in `matched`. The dual-exposure check only runs over `matched`
-    // — so it WILL NOT fire in this case. Documenting the limitation:
-    // dual-exposure is load-bearing forward-compat per spec §5.5; the
-    // current pool has no in-pool inverse pairs that can naturally
-    // construct a violation.
+    expect(dual).toHaveLength(1)
+    expect(dual[0]!.factId).toBe('33+4↔37-4')
+    expect(dual[0]!.message).toContain('Dual-exposure rule')
+    expect(dual[0]!.message).toContain('(33, 4, 37)')
+    expect(dual[0]!.message).toContain('P3')
+    expect(dual[0]!.message).toContain('P4')
+  })
+
+  it('passes when only one half of a potential inverse pair appears (33+4 alone — no 37-4)', () => {
+    // The clean canon already exercises this — 33+4 is at P7 and no
+    // - fact has correct=37 in the session.
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const dual = violations.filter((v) => v.rule === 'dual-exposure')
     expect(dual).toEqual([])
   })
 
-  it('is structurally checked via a synthetic pool-extension fixture (forward-compat)', () => {
-    // To exercise the dual-exposure code path with both halves IN the
-    // pool, supply a custom config that extends the pool with the
-    // inverse of one existing fact. The lint then sees both as matched
-    // and fires dual-exposure.
-    const extendedPool: typeof TWO_DIGIT_ADDSUB_POOL = [
-      ...TWO_DIGIT_ADDSUB_POOL,
-      // Synthetic inverse of 33+4=37 — 37-4=33. NOT in v1 pool by
-      // curation; injected here only for the test.
-      {
-        id: '37-4',
-        a: 37,
-        b: 4,
-        op: '-' as const,
-        band: 'HARD' as const,
-        category: 'mid-decade-units-shift' as const,
-      },
-    ]
-    const extendedConfig: typeof TWO_DIGIT_ADDSUB_RULES = {
-      ...TWO_DIGIT_ADDSUB_RULES,
-      pool: extendedPool,
-    }
+  it('reports each inverse pair exactly once (no double-counting on symmetric forms)', () => {
+    // Inject the 33+4 ↔ 37-4 pair AND a near-duplicate ordering. The
+    // lint's de-dup is "emit only when invMatch.index > p.index"; verify
+    // the pair fires exactly once even though both directions of the
+    // inverse mapping iterate through.
     const facts: Array<[number, number, '+' | '-']> = [
       [20, 3, '+'], // P1
       [22, 5, '+'], // P2
       [15, 3, '-'], // P3
-      [42, 3, '+'], // P4
-      [33, 4, '+'], // P5 (correct=37; inverse 37-4=33)
-      [37, 4, '-'], // P6 (inverse — VIOLATES dual-exposure)
-      [55, 4, '+'], // P7
-      [25, 3, '-'], // P8
+      [37, 4, '-'], // P4 MEDIUM — inverse pair side B (37-4=33)
+      [33, 4, '+'], // P5 — inverse pair side A (33+4=37) - VIOLATES
+      // (EASY at P5; allowed per spec §2.1)
+      [48, 7, '-'], // P6
+      [42, 3, '+'], // P7
+      [27, 2, '+'], // P8 HARD near-boundary
     ]
-    const response = buildTwoDigitAddsubCanonResponse(facts)
-    // Manually rebuild the pool-match step by passing the extended
-    // config. The extractor function inside the lint uses the global
-    // POOL constant, so a `config.pool` override needs the lint to use
-    // it. Verify: does the lint honour `config.pool`?
-    //
-    // Looking at the implementation: the lint hardcodes
-    // `TWO_DIGIT_ADDSUB_POOL` in `extractTwoDigitAddsubProblems`.
-    // `config.pool` is currently advisory — the dual-exposure code path
-    // uses `seenTriples` populated from `matched` rows (themselves
-    // derived from the hardcoded pool). So the synthetic extension
-    // doesn't fire via `lintTwoDigitAddsubComposition(response,
-    // extendedConfig)`.
-    //
-    // Coverage gap: dual-exposure cannot be naturally exercised
-    // end-to-end without a mock pool. We document it via the
-    // limitation comment in the previous test; this test asserts the
-    // CODE PATH exists (the violations array is well-formed) for the
-    // clean canon, providing the regression-lock for the rule's
-    // presence in the lint function.
-    const violations = lintTwoDigitAddsubComposition(response, extendedConfig)
-    // P6 fires pool-membership (37-4 not in the HARDCODED pool the
-    // extractor reads). The dual-exposure check operates on `matched`
-    // which excludes P6. So no dual-exposure fires. This is the
-    // forward-compat posture: the rule is wired but the v1 pool has
-    // no in-pool inverse pairs to trip it.
-    const dual = violations.filter((v) => v.rule === 'dual-exposure')
-    expect(dual).toEqual([])
-    // Verify the pool-membership fires on the inverse fact (it's
-    // session-emitted but not in the hardcoded pool):
-    const poolMembership = violations.filter(
-      (v) => v.rule === 'pool-membership' && v.factId === '37-4',
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
     )
-    expect(poolMembership).toHaveLength(1)
+    const dual = violations.filter((v) => v.rule === 'dual-exposure')
+    expect(dual).toHaveLength(1)
   })
 })
 
@@ -6253,28 +6205,44 @@ function parseTwoDigitAddsubPoolFromSpec(
   // Per testing-and-ci.md §6 en-dash tolerance — the spec's row-range
   // anchors (#10–19) use EN-DASH (U+2013), and operand minus signs use
   // EITHER U+2212 OR ASCII hyphen. Both forms accepted.
+  //
+  // Whitespace between the backtick-closing of the fact and the next `|`
+  // is OPTIONAL — rows 1-30 use `=23`  | ` (with spaces) but the §1.1
+  // conditional table rows 31-36 use `=37`| ` (no space before pipe).
+  // The regex tolerates both via `\s*\|`.
+  //
+  // Row-8 "restate" pattern: spec §1.1 ships fact #8 twice (the EXCLUDED
+  // `40 − 5` constraint-correction row at line 117 + the INCLUDED
+  // `28 − 5` replacement row at line 127 — the spec's prose says
+  // "Replace fact #8 and continue:"). The parser collects all matched
+  // rows then DEDUPES BY ROW NUMBER, keeping the LAST occurrence per
+  // row. That matches the spec's intent — later rows supersede earlier
+  // ones at the same row#.
   const re =
-    /^\|\s+\d+\s+\|\s+`(\d+)\s*([+−-])\s*(\d+)\s*=\s*\d+`\s+\|\s+([+−-])\s+\|\s+(easy|medium|hard)\s+\|\s+([a-z][a-z0-9-]+)\s+\|/gm
-  const out: (typeof TWO_DIGIT_ADDSUB_POOL)[number][] = []
+    /^\|\s+(\d+)\s+\|\s+`(\d+)\s*([+−-])\s*(\d+)\s*=\s*\d+`\s*\|\s+([+−-])\s+\|\s+(easy|medium|hard)\s+\|\s+([a-z][a-z0-9-]+)\s+\|/gm
+  const byRow = new Map<number, (typeof TWO_DIGIT_ADDSUB_POOL)[number]>()
   for (const m of prose.matchAll(re)) {
-    const a = Number.parseInt(m[1]!, 10)
-    const factOp = m[2]! === '+' ? '+' : '-'
-    const b = Number.parseInt(m[3]!, 10)
-    const colOp = m[4]! === '+' ? '+' : '-'
-    // Sanity: fact OP must agree with column OP. If not, skip the row
-    // — the spec table is malformed and a different test should catch
-    // it.
+    const rowNum = Number.parseInt(m[1]!, 10)
+    const a = Number.parseInt(m[2]!, 10)
+    const factOp = m[3]! === '+' ? '+' : '-'
+    const b = Number.parseInt(m[4]!, 10)
+    const colOp = m[5]! === '+' ? '+' : '-'
+    // Sanity: fact OP must agree with column OP. If not, skip the row.
     if (factOp !== colOp) continue
-    out.push({
+    byRow.set(rowNum, {
       id: `${a}${factOp}${b}`,
       a,
       b,
       op: factOp as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['op'],
-      band: m[5]!.toUpperCase() as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['band'],
-      category: m[6]! as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['category'],
+      band: m[6]!.toUpperCase() as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['band'],
+      category: m[7]! as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['category'],
     })
   }
-  return out
+  // Sort by row number to produce the canonical pool ordering (later
+  // rows supersede earlier ones at the same row#, matching the spec's
+  // "Replace fact #8 and continue:" restate semantics).
+  const sortedRows = [...byRow.keys()].sort((a, b) => a - b)
+  return sortedRows.map((n) => byRow.get(n)!)
 }
 
 describe('TWO_DIGIT_ADDSUB_POOL drift-guard against spec §1.1 markdown table', () => {
@@ -6314,7 +6282,7 @@ describe('TWO_DIGIT_ADDSUB_POOL drift-guard against spec §1.1 markdown table', 
     // Confirms the OP-column wedge is load-bearing per
     // testing-and-ci.md §6 brittleness-is-the-alarm-wire pattern.
     const mutated = spec.replace(
-      /^(\|\s+\d+\s+\|\s+`\d+\s*[+−-]\s*\d+\s*=\s*\d+`)\s+\|\s+[+−-]\s+\|/gm,
+      /^(\|\s+\d+\s+\|\s+`\d+\s*[+−-]\s*\d+\s*=\s*\d+`)\s*\|\s+[+−-]\s+\|/gm,
       '$1 |',
     )
     const parsed = parseTwoDigitAddsubPoolFromSpec(mutated)
