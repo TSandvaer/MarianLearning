@@ -507,19 +507,21 @@ PR B (canon rebake + binding activation): re-runs the same lint against the post
 
 ## 5. Canon-state empirical verification
 
-Per `[[feedback_canon_state_empirical_verification]]` — every concrete claim about canon state below is verified via `git`/`grep`/`cat`/Python at spec-author time. **NOT paraphrase. Actual command + actual output.**
+Per `[[feedback_canon_state_empirical_verification]]` — every concrete claim about canon state below is verified via `ls`/`grep`/`cat` at spec-author time. **NOT paraphrase. Actual command + actual output.**
+
+**Refresh provenance:** §5 was first authored 2026-05-22 against the pre-#308 repo state. After Wave-5 PR A (#308 SkillNode split + K2 read-path remap) and Wave-5 PR B (#309 `-no-regroup` canon rebake + planner binding) merged 2026-05-22, §5's empirical claims drifted in five places. This refresh re-runs every command against `main @ 897ea10` (post-#309) and rewrites every prose claim that drifted. Ticket: `86c9y0xc7`.
 
 ### 5.1 Canon file existence for `two-digit-addsub-with-regroup`
 
-**Claim:** No `two-digit-addsub-with-regroup` canon currently exists.
+**Claim:** No `two-digit-addsub-with-regroup` canon currently exists. PR #309 baked `-no-regroup` against the legacy disk-name `two-digit-addsub.json` (via the `canonFileTierFor` wire→disk seam at `api/_canon.ts:148`) but did NOT bake the new `-with-regroup` sibling; that bake is the next Wave-5 follow-up.
 
 **Verification:**
 
 ```bash
-ls C:/Trunk/PRIVATE/MarianLearning-kyle-wt/public/canon/math/level-1/
+ls public/canon/math/level-1/
 ```
 
-Output (2026-05-22 spec-author time):
+Output (2026-05-23 refresh time, `main @ 897ea10`):
 
 ```
 add-to-10.json
@@ -534,57 +536,121 @@ sub-to-20.json
 two-digit-addsub.json
 ```
 
-No `two-digit-addsub-with-regroup.json` present — confirmed.
+No `two-digit-addsub-with-regroup.json` present — confirmed. The disk-file count (10) is unchanged from the pre-refresh ls; the file naming honours the `canonFileTierFor` seam (`'two-digit-addsub-no-regroup'` → `two-digit-addsub.json`).
 
-### 5.2 Current `two-digit-addsub` canon op-mix
-
-**Claim:** The current `two-digit-addsub` canon ships ONE session of 8 problems with op-mix `5+/3-`.
-
-**Verification:**
+**Corroborating exemption flag:** `scripts/generateSessionCanon.test.ts` carries `WAVE_5_PR_B_PENDING_WITH_REGROUP` (a `Set<string>` containing `'two-digit-addsub-with-regroup'`) so the canon-test sweep skips this node until the with-regroup bake follow-up lands:
 
 ```bash
-python -c "import json; c=json.load(open('public/canon/math/level-1/two-digit-addsub.json','r')); plan=c['plan']; reads=[u['text'] for u in plan['utterances'] if 'read' in u['id']]; print('reads:', len(reads)); [print(r) for r in reads]"
+grep -nE "WAVE_5_PR_B_PENDING|two-digit-addsub-with-regroup" scripts/generateSessionCanon.test.ts | head -10
 ```
 
 Output:
 
 ```
-reads: 8
-Twenty plus three. How many?
-Twenty-two plus five. How many?
-Fifteen minus three. How many are left?
-Twenty-five plus four. How many?
-Twenty-three plus six. How many?
-Forty-eight minus seven. How many are left?
-Thirty-three plus four. How many?
-Twenty-five minus three. How many are left?
+38: * `'two-digit-addsub-with-regroup'` is a valid wire literal but NOT in
+40: * (`design/math/two-digit-addsub-with-regroup-content.md`) is parked at
+43: * `-with-regroup` literal via `WAVE_5_PR_B_PENDING_WITH_REGROUP` until a
+46:const WAVE_5_PR_B_PENDING_WITH_REGROUP = new Set<string>([
+47:  'two-digit-addsub-with-regroup',
+119:    // `'two-digit-addsub-no-regroup'`. `'two-digit-addsub-with-regroup'`
+120:    // is exempted via `WAVE_5_PR_B_PENDING_WITH_REGROUP` — the matching
+127:      if (WAVE_5_PR_B_PENDING_WITH_REGROUP.has(node)) continue
 ```
 
-Count of `plus` (`+`) read lines: 5 (P1, P2, P4, P5, P7).
-Count of `minus` (`−`) read lines: 3 (P3, P6, P8).
-Op-mix: **5+/3-** ✓ confirmed.
+The exemption is the canonical machine-checked record that a `-with-regroup` canon bake is the open Wave-5 follow-up; this §5.1 claim and that test's `Set` membership are locked against each other.
 
-### 5.3 Current `distractors.ts` union state — Class 2 / Class 3 NOT yet shipped
+### 5.2 `KNOWN_DISTRACTOR_CLASSES` membership (post-#307 lint infra)
 
-**Claim:** The Wave-4-deferred Class 2 (`'column-cross'`) and Class 3 (`'phantom-borrow'`) literals are NOT yet in the `distractorClass` union.
+**Claim:** `scripts/compositionLint.ts` ships a `KNOWN_DISTRACTOR_CLASSES` `Set` enumerating both Dave's pedagogically-grounded names (canonical post-pivot) and the Wave-4-style names retained transitionally. The transitional names will be removed in a Wave-5 PR-B follow-up once the spec amendment lands (this PR is part of that landing).
 
 **Verification:**
 
 ```bash
-grep -nE "distractorClass\?:" src/screens/Math/distractors.ts | head -3
+grep -nE "KNOWN_DISTRACTOR_CLASSES" scripts/compositionLint.ts | head -10
 ```
 
 Output:
 
 ```
-192:  distractorClass?: 'off-by-one' | 'wrong-op' | 'decade-anchor'
+3017://     PR #302 schema). The naming-agnostic `KNOWN_DISTRACTOR_CLASSES` set
+3054:export const KNOWN_DISTRACTOR_CLASSES = new Set([
 ```
 
-The union ships THREE literals at line 192: `'off-by-one'`, `'wrong-op'`, `'decade-anchor'`. The Wave-4 spec called for adding `'column-cross'` and `'phantom-borrow'` (per `design/math/two-digit-addsub-content.md` §3.7); those additions have **NOT yet shipped** — confirmed at `src/screens/Math/distractors.ts:192`. Wave 5 dispatch is gated on this Wave-4-deferred PR landing first (Q5 in §3.5).
+Full constant body (`scripts/compositionLint.ts:3054-3062`):
+
+```ts
+export const KNOWN_DISTRACTOR_CLASSES = new Set([
+  // Dave's names (canonical post-pivot)
+  'forgottenCarryDistractors',
+  'smallerFromLargerDistractors',
+  'borrowNoDecrementDistractors',
+  // Wave-4-style names (transitional, removed in PR B)
+  'columnCrossDistractor',
+  'phantomBorrowDistractor',
+])
+```
+
+Membership at `main @ 897ea10`: 5 entries total — 3 Dave-named helpers + 2 Wave-4-style transitional names. The 5-element shape is intentional during the spec-pivot transition; once Kevin's PR-B follow-up lands (removing the two transitional entries), the set shrinks to 3. The `KNOWN_DISTRACTOR_CLASSES` set is the naming-agnostic seam that lets `perProblemDistractorClass` schema entries reference either vocabulary without drift; the seam survives the pivot intact.
+
+### 5.3 `distractors.ts` distractor-class union — post-#303 shipped union
+
+**Claim:** The `distractorClass` union at `src/screens/Math/distractors.ts:219-225` ships **six** literals, all post-#303: the three pre-Wave-5 literals (off-by-one, wrong-op, decade-anchor) plus the three Dave-named Wave-5 helpers (forgotten-carry, smaller-from-larger, borrow-no-decrement). The Wave-4-era column-cross / phantom-borrow literals were **never shipped** to the union — Dave's pedagogical-fit pivot (per §2 naming-alignment note) replaced them before any render-side code referenced them.
+
+**Verification — Dave's three Wave-5 helpers ARE in the union:**
+
+```bash
+grep -nE "forgotten-carry|smaller-from-larger|borrow-no-decrement" src/screens/Math/distractors.ts
+```
+
+Output (the 6 union/dispatch sites; doc-comment lines elided):
+
+```
+223:    | 'forgotten-carry'
+224:    | 'smaller-from-larger'
+225:    | 'borrow-no-decrement'
+332:    op === '+' && opts?.distractorClass === 'forgotten-carry'
+341:    opts?.distractorClass === 'smaller-from-larger' &&
+358:    opts?.distractorClass === 'borrow-no-decrement' &&
+```
+
+All three literals appear at 223-225 as union members AND at 332/341/358 as runtime dispatch branches (the chip-derivation pipeline reads `opts.distractorClass` and routes to the matching helper).
+
+**Verification — the Wave-4-style literals are NOT in the union:**
+
+```bash
+grep -cE "column-cross|phantom-borrow" src/screens/Math/distractors.ts
+```
+
+Output:
+
+```
+0
+```
+
+Zero occurrences — the Wave-4-style vocabulary never reached the runtime distractor surface. The §2 naming-alignment note's claim that the Wave-4 vocabulary "is preserved here only as historical record of the divergence resolution" is honoured by the runtime surface: the union is pedagogically-grounded only. (The two transitional names DO survive in `compositionLint.ts`'s `KNOWN_DISTRACTOR_CLASSES` set — see §5.2 — pending Kevin's PR-B follow-up that prunes them.)
+
+**Full union body (`src/screens/Math/distractors.ts:215-226`):**
+
+```ts
+export interface PickDistractorsOpts {
+  op?: '+' | '-'
+  operands?: readonly [number, number]
+  minAnswer?: number
+  distractorClass?:
+    | 'off-by-one'
+    | 'wrong-op'
+    | 'decade-anchor'
+    | 'forgotten-carry'
+    | 'smaller-from-larger'
+    | 'borrow-no-decrement'
+}
+```
+
+**Spec-amendment impact:** the prior §5.3 paragraph "Wave-4-deferred Class 2/Class 3 literals NOT yet shipped — Wave 5 dispatch is gated on this Wave-4-deferred PR landing first (Q5 in §3.5)" is **fully obsolete**. PR #303 shipped the helpers + union before the Wave-5 impl waves dispatched; Q5 in §3.5 was correctly marked RESOLVED at that time, and the Wave-4-style gating is permanently moot per Dave's pivot. §2.9 ("Distractor-class union — shipped at PR #303") and Q5 carry the canonical record; §5.3 is the empirical verification.
 
 ### 5.4 Current chip-range ceiling
 
-**Claim:** `ANSWER_RANGE_MAX_TWO_DIGIT = 99` ships at `distractors.ts:92`; chip-range widening for Wave 5 is NOT required.
+**Claim:** `ANSWER_RANGE_MAX_TWO_DIGIT = 99` ships at `distractors.ts:92`; chip-range widening for Wave 5 is NOT required. Unchanged from pre-refresh.
 
 **Verification:**
 
@@ -592,72 +658,102 @@ The union ships THREE literals at line 192: `'off-by-one'`, `'wrong-op'`, `'deca
 grep -nE "ANSWER_RANGE_MAX_TWO_DIGIT|chipMaxAnswerForCorrects" src/screens/Math/distractors.ts | head -10
 ```
 
-Output:
+Output (`main @ 897ea10`):
 
 ```
 88: * Promotes via {@link chipMaxAnswerForCorrects} when any `correct > 20`.
 92:export const ANSWER_RANGE_MAX_TWO_DIGIT = 99
-99: *   - `correct ≤ 10` → {@link ANSWER_RANGE_MAX} (10) — add-to-10 / sub-to-10.
-100: *   - `correct ≤ 20` → {@link ANSWER_RANGE_MAX_TO_20} (20) — add-to-20 /
 102: *   - `correct ≤ 99` → {@link ANSWER_RANGE_MAX_TWO_DIGIT} (99) —
-120: *          Defaults to `ANSWER_RANGE_MAX` (10) when `corrects` is empty —
 126:export function chipMaxAnswerForCorrects(corrects: readonly number[]): number {
-127:  if (corrects.length === 0) return ANSWER_RANGE_MAX
-129:  if (maxCorrect <= ANSWER_RANGE_MAX) return ANSWER_RANGE_MAX
+131:  if (maxCorrect <= ANSWER_RANGE_MAX_TWO_DIGIT)
+132:    return ANSWER_RANGE_MAX_TWO_DIGIT
+134:    `[distractors] no tier ceiling covers correct=${maxCorrect}; extend chipMaxAnswerForCorrects`,
 ```
 
-`ANSWER_RANGE_MAX_TWO_DIGIT = 99` at line 92 — confirmed. `chipMaxAnswerForCorrects` resolves to `99` for any `correct ∈ [21, 99]` (lines 131–132 in the same file). **NO new chip-range constant required for Wave 5.**
+`ANSWER_RANGE_MAX_TWO_DIGIT = 99` at line 92 — confirmed. `chipMaxAnswerForCorrects` resolves to `99` for any `correct ∈ [21, 99]` (line 131-132). The previous §5.4 output included a couple of doc-only comment lines (99, 100, 120) that have rotated under post-#308 edits to the file's prologue, but the load-bearing claim — the constant declaration at line 92 and the resolution at 131-132 — is unchanged. **NO new chip-range constant required for Wave 5.**
 
-### 5.5 Current `MATH_NODES_IN_ORDER` — no `two-digit-addsub-with-regroup` node
+### 5.5 `MATH_NODES_IN_ORDER` post-#308 — `two-digit-addsub-with-regroup` IS in the union
 
-**Claim:** The Wave 5 node does NOT yet exist in the math-tree taxonomy; node-taxonomy widening per §3.4 is genuinely additive.
+**Claim:** As of `main @ 897ea10` (post-PR #308), `MATH_NODES_IN_ORDER` includes BOTH the SkillNode-split sibling literals — `'two-digit-addsub-no-regroup'` (the legacy-behaviour-preserving rename) AND `'two-digit-addsub-with-regroup'` (the new Wave-5 sibling). The node-taxonomy widening in §3.4 is **already shipped**; the open Wave-5 work is the `-with-regroup` canon bake + impl-wave plumbing, not the taxonomy extension.
 
 **Verification:**
 
 ```bash
-grep -nE "two-digit-addsub-with-regroup|MATH_NODES_IN_ORDER" src/lib/progress/focusNode.ts
+grep -nE "two-digit-addsub-with-regroup|two-digit-addsub-no-regroup|MATH_NODES_IN_ORDER" src/lib/progress/focusNode.ts
 ```
 
 Output:
 
 ```
 45:export const MATH_NODES_IN_ORDER: readonly NumberGardenNode[] = [
-46:  'number-recog',
-47:  'add-to-10',
-48:  'add-to-20',
-49:  'sub-to-10',
-50:  'sub-to-20',
-51:  'two-digit-addsub',
-52:  'skip-counting',
-53:  'mult-2-5-10',
-54:  'mult-3-4',
-55:  'mult-6-9',
-56:]
+52:  // no-regroup tier (existing behaviour — preserves the current
+56:  // contiguous: master no-regroup → unlock with-regroup → master
+58:  'two-digit-addsub-no-regroup',
+59:  'two-digit-addsub-with-regroup',
+68: * MATH_NODES_IN_ORDER.
+141:    track === 'math' ? MATH_NODES_IN_ORDER : WORD_SONG_NODES_IN_ORDER
+170:    track === 'math' ? MATH_NODES_IN_ORDER : WORD_SONG_NODES_IN_ORDER
 ```
 
-No `two-digit-addsub-with-regroup` entry — confirmed. §3.4 node-taxonomy widening is genuinely additive (not duplicative).
-
-### 5.6 Current `TWO_DIGIT_ADDSUB_POOL` shape sanity check
-
-**Claim:** Wave 4 ships a 36-fact pool at `scripts/compositionLint.ts:1939`; Wave 5's new `TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL` will be a sibling constant.
-
-**Verification:**
+Both sibling literals appear at lines 58 + 59 in declaration order. The `NumberGardenNode` union itself (the type literal) carries the same two literals at `src/lib/progress/types.ts:38-39`:
 
 ```bash
-grep -nE "TWO_DIGIT_ADDSUB_POOL|TWO_DIGIT_ADDSUB_RULES" scripts/compositionLint.ts | head -5
+grep -nE "'two-digit-addsub" src/lib/progress/types.ts
 ```
 
 Output:
 
 ```
-1939:export const TWO_DIGIT_ADDSUB_POOL: readonly TwoDigitAddsubPoolFact[] = [
-2261:export const TWO_DIGIT_ADDSUB_RULES: TwoDigitAddsubRulesConfig = {
-2262:  pool: TWO_DIGIT_ADDSUB_POOL,
-3015:    return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
-3021:    return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
+38:  | 'two-digit-addsub-no-regroup'
+39:  | 'two-digit-addsub-with-regroup'
 ```
 
-Wave 4's pool + rules + binding ship at lines 1939, 2261, 3015 — confirmed. Wave 5's pool + rules sibling-constants will live below these (Kevin's call for exact line placement).
+The legacy `'two-digit-addsub'` literal is **no longer in the runtime union**; it survives only as a canon-file-name tier identifier on disk (per `.claude/docs/skill-trees-and-content.md` § "Canon-file-name vs SkillNode-literal — dual identifier surface"). Production-storage migration is handled by the K2 read-path remap shipped in PR #308 (`storage.ts:withDefaultedSkillLevels`).
+
+**Spec-amendment impact:** the §3.4 "Node-taxonomy widening (NEW for Wave 5)" checkboxes are **already satisfied** by PR #308 for both `types.ts` and `focusNode.ts`. Future readers consuming §3.4 as a TODO list should treat those two rows as done; the remaining §3.4 rows (canon bake list, planner directive, etc.) are still the open Wave-5 work.
+
+### 5.6 `compositionLint.ts` pool / rules / binding line-number refresh + Wave-5 sibling-constants now SHIPPED
+
+**Claim:** Wave-4's 36-fact `TWO_DIGIT_ADDSUB_POOL` ships at `scripts/compositionLint.ts:1968` (line-shifted from 1939 pre-#307 due to lint-infra additions). Wave-5's `TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL` (30-fact, matching §1.4) is **already shipped** at line 3104 as a sibling constant — the §4.1 handoff to Kevin is materially complete for the pool + rules + binding scaffold (the canon BAKE against this binding is the open Wave-5 PR-B follow-up).
+
+**Verification:**
+
+```bash
+grep -nE "TWO_DIGIT_ADDSUB_POOL|TWO_DIGIT_ADDSUB_RULES|TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL|TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES" scripts/compositionLint.ts | head -20
+```
+
+Output:
+
+```
+1968:export const TWO_DIGIT_ADDSUB_POOL: readonly TwoDigitAddsubPoolFact[] = [
+2290:export const TWO_DIGIT_ADDSUB_RULES: TwoDigitAddsubRulesConfig = {
+2291:  pool: TWO_DIGIT_ADDSUB_POOL,
+2493:      ? (TWO_DIGIT_ADDSUB_POOL.find(
+2629:  config: TwoDigitAddsubRulesConfig = TWO_DIGIT_ADDSUB_RULES,
+2951:  config: TwoDigitAddsubRulesConfig = TWO_DIGIT_ADDSUB_RULES,
+3104:export const TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL: readonly TwoDigitAddsubWithRegroupPoolFact[] =
+3416:export const TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES: TwoDigitAddsubWithRegroupRulesConfig =
+3418:    pool: TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL,
+3481: * `TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL` — they live in the Wave-4 pool
+3501:      ? (TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.find(
+3546:  config: TwoDigitAddsubWithRegroupRulesConfig = TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+3818:  config: TwoDigitAddsubWithRegroupRulesConfig = TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+3941:      config: TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+3950:      config: TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+3954:    return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
+3960:    return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
+```
+
+| Constant                                                        | Line | Status                                                                                           |
+| --------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------ |
+| `TWO_DIGIT_ADDSUB_POOL` (Wave-4, 36 facts)                      | 1968 | Unchanged content; line-shifted +29 from pre-#307 (was 1939).                                    |
+| `TWO_DIGIT_ADDSUB_RULES` (Wave-4)                               | 2290 | Line-shifted +29 from pre-#307 (was 2261).                                                       |
+| `TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL` (Wave-5, 30 facts)         | 3104 | **Shipped** post-#307 — matches §1.4 pool exactly (verified by `awk` count = 30 fact-objects).   |
+| `TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES` (Wave-5)                  | 3416 | **Shipped** post-#307.                                                                           |
+| `two-digit-addsub` binding in `resolveTierBinding`              | 3954 | Routes legacy disk-name to `TWO_DIGIT_ADDSUB_RULES`. Line-shifted +939 from pre-#307 (was 3015). |
+| `two-digit-addsub-with-regroup` binding in `resolveTierBinding` | 3938 | **Shipped** post-#307. Routes new sibling disk-name to `TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES`.    |
+
+**Spec-amendment impact:** §4.1 and §4.2 of this spec describe pseudocode for the Wave-5 pool + rules + binding additions, framed as "Kevin's call for exact line placement." Those additions have **already shipped** at the listed line numbers in PR #307 (the lint-infra split). The open Wave-5 follow-up is the canon BAKE that exercises this lint binding — the `npm run canon:regen` run that produces `public/canon/math/level-1/two-digit-addsub-with-regroup.json`. The §4.1 / §4.2 handoff prose remains useful as a record of the design intent that landed; future readers consuming it as a TODO list should treat the lint scaffold rows as done.
 
 ---
 
