@@ -1898,11 +1898,12 @@ export function assertAddToTwentyCompositionClean(
 // `lintTwoDigitAddsubComposition` + `assertTwoDigitAddsubCompositionClean`
 // are EXPORTED but NOT yet wired into `bakeOne` / `resolveTierBinding` /
 // `runCompositionLint` dispatch / the `CompositionFileFinding` union.
-// The committed `public/canon/math/level-1/two-digit-addsub.json` shipped
-// with 3 round-ten-anchor facts (the §1.4 round-ten-prior correction
-// target) and would fail the round-ten-anchor cap of 1. Wiring is deferred
-// to PR B (canon rebake + directive sharpening + binding activation +
-// Wave 2 prereq fold-in `86c9xa817`).
+// The pre-existing `public/canon/math/level-1/two-digit-addsub.json` was
+// not yet under spec-compliant composition rules — round-ten-prior is
+// Haiku's empirical saturation failure mode that §1.4 targets via the
+// at-most-1 round-ten-anchor cap. Wiring is deferred to PR B (canon
+// rebake + directive sharpening + binding activation + Wave 2 prereq
+// fold-in `86c9xa817`).
 
 export type TwoDigitAddsubBand = 'EASY' | 'MEDIUM' | 'HARD'
 
@@ -2261,9 +2262,11 @@ export const TWO_DIGIT_ADDSUB_RULES: TwoDigitAddsubRulesConfig = {
   pool: TWO_DIGIT_ADDSUB_POOL,
   categoryCaps: {
     // Round-ten-anchor capped tight per spec §1.4 — the round-ten-prior
-    // correction lever (sibling to add-to-20's doubles cap). The current
-    // committed canon ships 3 round-ten-anchor facts of 8 (`20+3`, `30+5`,
-    // `40+2`); cap at 1 cuts that saturation by two-thirds.
+    // correction lever (sibling to add-to-20's doubles cap). Haiku's
+    // uncapped empirical prior saturates this category across many bakes
+    // (gravitating toward `20+3`, `30+5`, `40+2` — the easiest
+    // representational instance of the tier); cap at 1 holds it to
+    // 1-of-8 (12.5% of the session).
     'round-ten-anchor': 1,
     // mid-decade-units-shift capped at 4 per spec §2.3 — the calibration
     // anchor for typical mid-score sessions. Pool has 11 mid-decade
@@ -2561,11 +2564,12 @@ function phantomBorrowTrap(fact: TwoDigitAddsubPoolFact): number | null {
  * NOTE — PR A scope (split-PR pattern per `testing-and-ci.md §6`):
  * This function is EXPORTED but NOT yet wired into `bakeOne` /
  * `resolveTierBinding` / `runCompositionLint` dispatch / the
- * `CompositionFileFinding` union. The committed
- * `public/canon/math/level-1/two-digit-addsub.json` pre-exists with
- * 3 round-ten-anchor facts (the §1.4 round-ten-prior correction target —
- * `20+3`, `30+5`, `40+2`). Wiring is deferred to PR B (ticket follow-up
- * to 86c9xkz9n).
+ * `CompositionFileFinding` union. The pre-existing
+ * `public/canon/math/level-1/two-digit-addsub.json` was not yet under
+ * spec-compliant composition rules — round-ten-prior is Haiku's
+ * empirical saturation failure mode that §1.4 targets (Haiku gravitates
+ * toward `20+3`, `30+5`, `40+2` across many bakes left unguarded).
+ * Wiring is deferred to PR B (ticket follow-up to 86c9xkz9n).
  *
  * TODO (PR B activates: see testing-and-ci.md §6 "Split-PR pattern"
  * 3-line update — move two-digit-addsub.json out of OOS-list in
@@ -2679,10 +2683,11 @@ export function lintTwoDigitAddsubComposition(
           `(slots P${rows.map((r) => r.index).join(', P')}; facts ` +
           `${rows.map((r) => r.poolMatch.id).join(', ')}).` +
           (cat === 'round-ten-anchor'
-            ? ` Round-ten-prior correction lever — per spec §1.4 the` +
-              ` current canon ships 3 round-ten-anchor facts of 8; cap` +
-              ` at ${cap} cuts that saturation by two-thirds. Reject` +
-              ` the second round-ten-anchor.`
+            ? ` Round-ten-prior correction lever — per spec §1.4 Haiku's` +
+              ` empirical prior saturates this category across bakes (the` +
+              ` easiest representational instance of the tier); cap at` +
+              ` ${cap} holds it to 1-of-8. Reject the second` +
+              ` round-ten-anchor.`
             : ''),
         factId: null,
       })
