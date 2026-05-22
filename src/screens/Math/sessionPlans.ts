@@ -181,12 +181,29 @@ export interface MathProblem {
    *      (take-to-decade facts like `19 − 9 = 10`) or off-by-one
    *      (boundary facts like `16 − 5 = 11`). See Kyle's sub-to-20
    *      spec §3.3.
+   *    - `'forgotten-carry'` for every `op === '+'` P4–P8 problem when
+   *      `focusNode === 'two-digit-addsub'`; trap = `correct − 10`.
+   *      Dave's research PR #300 §3 Candidate A.
+   *    - `'smaller-from-larger'` for every `op === '-'` P4–P8 problem
+   *      when `focusNode === 'two-digit-addsub'`; trap is the column-
+   *      reversal arithmetic. Dave's research PR #300 §3 Candidate B.
+   *    - `'borrow-no-decrement'` — Wave-5 Class 3 trap, P5–P8 only,
+   *      per-problem opt-in via planner (not a render-time default
+   *      because Dave's "one or the other per problem" rule keeps SFL
+   *      and BND from co-presenting on the same problem). Dave's
+   *      research PR #300 §3 Candidate C.
    *  Kept as an optional field so a future planner-side widening
    *  (per-problem structured tags via a wire envelope extension) can
    *  populate it without a type change. See Kyle's sub-to-10 spec §3.4
    *  and the planner-and-canon doc's "wire shape is utterance-only"
    *  rule. */
-  distractorClass?: 'off-by-one' | 'wrong-op' | 'decade-anchor'
+  distractorClass?:
+    | 'off-by-one'
+    | 'wrong-op'
+    | 'decade-anchor'
+    | 'forgotten-carry'
+    | 'smaller-from-larger'
+    | 'borrow-no-decrement'
   /** Pre-canned utterance lines for this problem. */
   utterances: MathProblemUtterances
 }

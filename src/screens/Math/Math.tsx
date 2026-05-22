@@ -2891,32 +2891,61 @@ function buildChipOrder(
   //   - `'sub-to-10'` → `'wrong-op'` (Class 2 trap = a + b; PR #241).
   //   - `'sub-to-20'` → `'decade-anchor'` (Class B trap =
   //     Math.round(correct / 10) * 10; ticket 86c9utcf7).
+  //   - `'two-digit-addsub'` (Wave 5, op === '-') → `'smaller-from-larger'`
+  //     (Class 2 trap = column-reversal arithmetic; Dave's research PR
+  //     #300 §3 Candidate B). Borrow-No-Decrement (Class 3, P5–P8 only)
+  //     is per-problem opt-in via `MathProblem.distractorClass` — Dave's
+  //     "one or the other per problem" rule means we don't surface BND
+  //     as a render-time default; the planner picks it on specific
+  //     problems instead.
   //   - `'sub-to-10'`-shaped unknown focus node → fall back to
   //     `'wrong-op'` for backwards-compat (the pre-sub-to-20 default
   //     for every `op === '-'` problem).
   //
-  // For P1-P3, `pickTier` returns `'gentle'` regardless of the hint —
-  // Class B / wrong-op never fires in the warm-up window. For
-  // `op === '+'` (add-to-10 / add-to-20), the hint is `undefined` and
-  // `pickDistractors` falls through to `'offByOne'` at P4-P8.
+  // Per-focus-node mapping (applied for `op === '+'`):
+  //   - `'two-digit-addsub'` (Wave 5, op === '+') → `'forgotten-carry'`
+  //     (Class 2 trap = correct − 10; Dave's research PR #300 §3
+  //     Candidate A). Targets WM failure to carry — directly models the
+  //     procedural error most likely on Marian's first sessions of
+  //     addition-with-regroup.
+  //   - All other focus nodes (`add-to-10`, `add-to-20`) → `undefined`
+  //     (falls through to `'offByOne'` at P4–P8).
   //
-  // Over-attempting either trap on subtraction is benign (silent
-  // downgrade); this satisfies Kyle's spec §2.2 ("≥ 2 of P4-P8 must
-  // carry the trap") in combination with the planner's fact-pool
-  // composition guarantee. If `MathProblem.distractorClass` is
-  // explicitly set on the problem (e.g. by a future server-emitted
-  // hint), that wins over the default.
+  // For P1-P3, `pickTier` returns `'gentle'` regardless of the hint —
+  // Class B / wrong-op / forgotten-carry / SFL all never fire in the
+  // warm-up window.
+  //
+  // Over-attempting any trap on subtraction is benign (silent downgrade);
+  // this satisfies Kyle's spec §2.2 ("≥ 2 of P4-P8 must carry the trap")
+  // in combination with the planner's fact-pool composition guarantee.
+  // If `MathProblem.distractorClass` is explicitly set on the problem
+  // (e.g. by a future server-emitted hint — including
+  // `'borrow-no-decrement'` for Wave-5 P5–P8), that wins over the default.
+  //
+  // Wave 5 canon doesn't exist yet (Kevin PR B is sequential after the
+  // schema + lint PRs). Until Wave 5 canon ships, the static fallback
+  // emits add-to-10 problems and `focusNode === 'two-digit-addsub'`
+  // never combines with a Wave-5 problem in practice. The mapping below
+  // is forward-compat: when canon lands, the existing render path
+  // picks up the new classes without further Math.tsx edits.
   const distractorClass:
     | 'off-by-one'
     | 'wrong-op'
     | 'decade-anchor'
+    | 'forgotten-carry'
+    | 'smaller-from-larger'
+    | 'borrow-no-decrement'
     | undefined =
     problem.distractorClass ??
     (problem.op === '-'
       ? focusNode === 'sub-to-20'
         ? 'decade-anchor'
-        : 'wrong-op'
-      : undefined)
+        : focusNode === 'two-digit-addsub'
+          ? 'smaller-from-larger'
+          : 'wrong-op'
+      : focusNode === 'two-digit-addsub'
+        ? 'forgotten-carry'
+        : undefined)
   // Per Kyle's sub-to-20 spec §3.1: chips for sub-to-20 problems live in
   // `[minAnswer = 10, maxAnswer = 19]` — the no-borrow operating range.
   // Without threading, `pickDistractors`'s op-keyed default (`minAnswer = 0`
