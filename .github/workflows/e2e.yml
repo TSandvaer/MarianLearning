@@ -57,6 +57,17 @@ jobs:
         # job (~2s) instead of waiting on browsers + the full e2e suite.
         run: yarn canon:lint
 
+      - name: Vitest (unit + component suite)
+        # Retro action 2 (2026-05-22). Closes the trust-the-author gap that
+        # let all 11 Waves 3+4 PRs ship without a CI-enforced vitest run.
+        # Runs BEFORE the browser install / Playwright suite so a vitest
+        # regression fails the cheap node-only job (~2 min) instead of
+        # waiting on the full e2e budget. Uses `yarn test` (== `vitest run`)
+        # so the CI invocation matches the local script in package.json.
+        run: yarn test
+        env:
+          CI: 'true'
+
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
