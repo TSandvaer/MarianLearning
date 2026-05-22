@@ -118,7 +118,36 @@ const cache = new Map<string, CacheValue>()
  * stays format-agnostic.
  */
 export function canonCacheKey(key: CanonKey): string {
-  return `${key.track}/level-${key.level}/${key.focusNode}`
+  return `${key.track}/level-${key.level}/${canonFileTierFor(key.focusNode)}`
+}
+
+/**
+ * Map a runtime `SkillNode` wire literal (from `Progress.skillLevels` /
+ * `pickFocusNode` / the `/api/claude` payload `progress.focusNode` field)
+ * onto the corresponding on-disk canon-file tier identifier.
+ *
+ * The dual-identifier surface (Wave 5 PR B — ticket 86c9y1p99). Most
+ * SkillNode literals pass through unchanged: `'add-to-10'` reads canon
+ * file `add-to-10.json`. The one rebind today (post-PR-#308):
+ *
+ *   `'two-digit-addsub-no-regroup'`  → disk tier `'two-digit-addsub'`
+ *   `'two-digit-addsub-with-regroup'` → disk tier `'two-digit-addsub-with-regroup'`
+ *
+ * Rationale: PR #308 split the legacy `'two-digit-addsub'` SkillNode into
+ * two adjacent sibling literals (`-no-regroup` + `-with-regroup`). The
+ * `-no-regroup` tier inherits the existing canon content + disk file
+ * — so the disk identifier stays `'two-digit-addsub'` while the wire
+ * literal changes. The `-with-regroup` tier is a brand-new sibling with
+ * its own disk file. See `.claude/docs/skill-trees-and-content.md`
+ * § "Canon-file-name vs SkillNode-literal — dual identifier surface".
+ *
+ * This is the ONLY public mapping function for the wire→disk translation;
+ * the bake script imports it from here so generator + reader can't
+ * disagree.
+ */
+export function canonFileTierFor(focusNode: string): string {
+  if (focusNode === 'two-digit-addsub-no-regroup') return 'two-digit-addsub'
+  return focusNode
 }
 
 /**
@@ -127,9 +156,18 @@ export function canonCacheKey(key: CanonKey): string {
  * Exported for the canon-generator script — it writes to the same
  * convention this reader walks, so sharing the path-builder ensures
  * generator and reader can never disagree on naming.
+ *
+ * Wire `focusNode` is translated to the canon-file tier via
+ * `canonFileTierFor` so the disk file naming stays stable across
+ * SkillNode union widenings.
  */
 export function canonFilePath(root: string, key: CanonKey): string {
-  return join(root, key.track, `level-${key.level}`, `${key.focusNode}.json`)
+  return join(
+    root,
+    key.track,
+    `level-${key.level}`,
+    `${canonFileTierFor(key.focusNode)}.json`,
+  )
 }
 
 /**

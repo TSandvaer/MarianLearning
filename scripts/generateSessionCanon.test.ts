@@ -29,29 +29,21 @@ import {
 } from '../api/_planner.js'
 
 /**
- * Wave 5 (ticket 86c9y0bvc) sibling-tier widening of `'two-digit-addsub'`
- * — the SkillNode union split into adjacent no-regroup + with-regroup
- * tiers, but the bake list (`MATH_FOCUS_NODES` in
- * `generateSessionCanon.ts`, row #15 of the sibling-tier checklist) is
- * deferred to PR B. The legacy `'two-digit-addsub'` literal stays in
- * the bake list and on disk as `two-digit-addsub.json` until PR B does
- * the rebake + file rename atomically with the prompt block update in
- * `MATH_TRACK_GUIDE`.
+ * Wave 5 PR B (ticket 86c9y1p99) — bake list now emits the
+ * `'two-digit-addsub-no-regroup'` wire literal (matching the runtime
+ * `SkillNode` shape post-PR-#308). The canon file on disk stays
+ * `two-digit-addsub.json` via the `canonFileTierFor` mapping in
+ * `api/_canon.ts` (dispatch contract: disk-side naming OUT OF SCOPE).
  *
- * Effect on the canon-coverage tripwire below: `VALID_MATH_FOCUS_NODES`
- * now contains TWO entries the bake list does NOT cover (the new
- * `'two-digit-addsub-no-regroup'` and `'two-digit-addsub-with-regroup'`
- * literals) PLUS one entry the bake list still covers under the legacy
- * name (`'two-digit-addsub'`, which the bake list maps to canon file
- * `two-digit-addsub.json` — to be renamed in PR B to
- * `two-digit-addsub-no-regroup.json`).
- *
- * Until PR B lands, the "covers every" sweep skips the post-split
- * literals via `WAVE_5_DEFERRED_TO_PR_B`. PR B's checklist item is to
- * delete this exemption when it widens the bake list.
+ * `'two-digit-addsub-with-regroup'` is a valid wire literal but NOT in
+ * the bake list — the matching canon content brief
+ * (`design/math/two-digit-addsub-with-regroup-content.md`) is parked at
+ * spec stage, and `defaultProgress` has the tier `'locked'`, so no
+ * runtime user surfaces it. The "covers every" sweep below exempts the
+ * `-with-regroup` literal via `WAVE_5_PR_B_PENDING_WITH_REGROUP` until a
+ * future PR bakes the canon + extends the bake list.
  */
-const WAVE_5_DEFERRED_TO_PR_B = new Set<string>([
-  'two-digit-addsub-no-regroup',
+const WAVE_5_PR_B_PENDING_WITH_REGROUP = new Set<string>([
   'two-digit-addsub-with-regroup',
 ])
 
@@ -88,21 +80,13 @@ describe('activeCombos — coverage matches the curriculum', () => {
     expect(wordSongCount).toBe(9)
   })
 
-  it('every math combo names a node from VALID_MATH_FOCUS_NODES (Wave 5 transitional exemption — bake list still ships legacy `two-digit-addsub` until PR B)', () => {
-    // Wave 5 (ticket 86c9y0bvc): the bake list still references the
-    // legacy `'two-digit-addsub'` literal because the canon file on
-    // disk is still `two-digit-addsub.json`. `VALID_MATH_FOCUS_NODES`
-    // no longer contains that literal post-split. PR B renames the
-    // bake-list entry + canon file + prompt block in lockstep; until
-    // then we exempt the legacy literal from the per-combo validity
-    // check. The companion "covers every" sweep below applies the
-    // mirror exemption (new tiers not yet in the bake list).
+  it('every math combo names a node from VALID_MATH_FOCUS_NODES (Wave 5 PR B — bake list emits `-no-regroup` wire literal post-rebake)', () => {
+    // Wave 5 PR B (ticket 86c9y1p99): the bake list now emits
+    // `'two-digit-addsub-no-regroup'` (the wire SkillNode literal post-#308).
+    // The disk file is still `two-digit-addsub.json` via the
+    // `canonFileTierFor` mapping in `api/_canon.ts`.
     const combos = activeCombos().filter((c) => c.track === 'math')
     for (const combo of combos) {
-      if (combo.focusNode === 'two-digit-addsub') {
-        // Legacy literal — accepted in transition; PR B renames it.
-        continue
-      }
       expect(VALID_MATH_FOCUS_NODES).toContain(combo.focusNode)
       expect(combo.level).toBe(1)
     }
@@ -130,19 +114,17 @@ describe('activeCombos — coverage matches the curriculum', () => {
     }
   })
 
-  it('covers every VALID_MATH_FOCUS_NODES entry — drift tripwire (Wave 5 transitional exemption — see WAVE_5_DEFERRED_TO_PR_B)', () => {
-    // Wave 5 (ticket 86c9y0bvc): the SkillNode-level split widened
-    // `VALID_MATH_FOCUS_NODES` with two new tiers, but row #15 of the
-    // sibling-tier checklist (bake list extension) is explicitly
-    // deferred to PR B. Exempt those literals from the "covers every"
-    // drift check until PR B lands the canon + prompt rebake. The
-    // exemption is single-edit removable — delete the
-    // `WAVE_5_DEFERRED_TO_PR_B` Set declaration above + the filter
-    // here, and the tripwire reverts to its pre-Wave-5 strictness.
+  it('covers every VALID_MATH_FOCUS_NODES entry — drift tripwire (Wave 5 PR B exempts `-with-regroup` until canon ships)', () => {
+    // Wave 5 PR B (ticket 86c9y1p99): the bake list emits
+    // `'two-digit-addsub-no-regroup'`. `'two-digit-addsub-with-regroup'`
+    // is exempted via `WAVE_5_PR_B_PENDING_WITH_REGROUP` — the matching
+    // content brief is at spec stage, defaultProgress has the tier
+    // `'locked'`, and no runtime user surfaces it. A future PR removes
+    // the exemption when the canon + spec lands.
     const combos = activeCombos().filter((c) => c.track === 'math')
     const covered = new Set(combos.map((c) => c.focusNode))
     for (const node of VALID_MATH_FOCUS_NODES) {
-      if (WAVE_5_DEFERRED_TO_PR_B.has(node)) continue
+      if (WAVE_5_PR_B_PENDING_WITH_REGROUP.has(node)) continue
       expect(covered.has(node)).toBe(true)
     }
   })

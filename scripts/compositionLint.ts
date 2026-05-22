@@ -128,6 +128,35 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { SessionStartResponse } from '../api/_types.js'
 import { isSessionStartResponse } from '../api/_types.js'
 
+// ── CanonFileTier (Wave 5 PR B — ticket 86c9y1p99 schema-literal rename) ──
+//
+// Distinguishes the DISK-TIER identifier (the canon-file basename, e.g.
+// `'two-digit-addsub'` mapping to `public/canon/math/level-1/two-digit-addsub.json`)
+// from the runtime `SkillNode` literal on the wire (post-PR-#308:
+// `'two-digit-addsub-no-regroup'` / `'two-digit-addsub-with-regroup'`).
+//
+// The dual-identifier surface is documented in
+// `.claude/docs/skill-trees-and-content.md` § "Canon-file-name vs
+// SkillNode-literal — dual identifier surface". Before this rename, the
+// literal `'two-digit-addsub'` in `TierLintBinding` and `CompositionFileFinding`
+// was ambiguous — it COULD be read as either a SkillNode (now wrong since
+// the union widened) or a canon-file-disk-tier (correct). Devon's NIT on
+// PR #307 (ticket 86c9y0xda) flagged the ambiguity.
+//
+// Resolution (Wave 5 PR B): name the disk-side identifier explicitly. The
+// `CanonFileTier` union below is the closed set of canon-file basenames the
+// composition lint knows how to bind. It is INDEPENDENT of `SkillNode` —
+// today every entry happens to match a canon disk file, and the wire-side
+// SkillNode literal is mapped onto a CanonFileTier by `canonFileTierFor`
+// in `generateSessionCanon.ts` + `api/_canon.ts`.
+export type CanonFileTier =
+  | 'sub-to-10'
+  | 'add-to-10'
+  | 'sub-to-20'
+  | 'add-to-20'
+  | 'two-digit-addsub'
+  | 'two-digit-addsub-with-regroup'
+
 // ── rule kinds + error type ──────────────────────────────────────────────
 
 export type CompositionRule =
@@ -3813,14 +3842,28 @@ export function assertTwoDigitAddsubWithRegroupCompositionClean(
 // 6+/2-, ≥ 1 near-boundary-no-cross in P5-P8, ≥ 2 Class 2 + ≥ 1 Class 3
 // traps admissible).
 
+// `tier` here is the `CanonFileTier` disk-identifier (defined at file head),
+// NOT the runtime `SkillNode` literal. Post-PR-#308 the SkillNode union
+// widened away from the legacy `'two-digit-addsub'` string but the canon
+// disk file kept its name — see `.claude/docs/skill-trees-and-content.md`
+// § "Canon-file-name vs SkillNode-literal" for the rationale.
 export type TierLintBinding =
-  | { tier: 'sub-to-10'; config: SubToTenRulesConfig }
-  | { tier: 'add-to-10'; config: AddToTenRulesConfig }
-  | { tier: 'sub-to-20'; config: SubToTwentyRulesConfig }
-  | { tier: 'add-to-20'; config: AddToTwentyRulesConfig }
-  | { tier: 'two-digit-addsub'; config: TwoDigitAddsubRulesConfig }
+  | { tier: Extract<CanonFileTier, 'sub-to-10'>; config: SubToTenRulesConfig }
+  | { tier: Extract<CanonFileTier, 'add-to-10'>; config: AddToTenRulesConfig }
   | {
-      tier: 'two-digit-addsub-with-regroup'
+      tier: Extract<CanonFileTier, 'sub-to-20'>
+      config: SubToTwentyRulesConfig
+    }
+  | {
+      tier: Extract<CanonFileTier, 'add-to-20'>
+      config: AddToTwentyRulesConfig
+    }
+  | {
+      tier: Extract<CanonFileTier, 'two-digit-addsub'>
+      config: TwoDigitAddsubRulesConfig
+    }
+  | {
+      tier: Extract<CanonFileTier, 'two-digit-addsub-with-regroup'>
       config: TwoDigitAddsubWithRegroupRulesConfig
     }
   | null
@@ -3924,13 +3967,9 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
 export interface CompositionFileFinding {
   /** Repo-relative posix-shaped path for log readability. */
   filePath: string
-  tier:
-    | 'sub-to-10'
-    | 'add-to-10'
-    | 'sub-to-20'
-    | 'add-to-20'
-    | 'two-digit-addsub'
-    | 'two-digit-addsub-with-regroup'
+  /** `CanonFileTier` disk-identifier — see file-head note + dual-identifier
+   *  surface doc in `.claude/docs/skill-trees-and-content.md`. */
+  tier: CanonFileTier
   violations: CompositionViolation[]
 }
 

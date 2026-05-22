@@ -147,6 +147,22 @@ export interface SessionEndPayload {
    * fixtures predating this PR.
    */
   perProblemAnswerWord?: readonly (string | null)[]
+  /**
+   * Per-problem OFFERED distractor class (math only — Kevin Wave 5
+   * PR B, ticket 86c9y1p99). Values: `null` for P1–P3 gentle ramp,
+   * one of `'off-by-one' | 'wrong-op' | 'decade-anchor' |
+   * 'forgotten-carry' | 'smaller-from-larger' | 'borrow-no-decrement'`
+   * for P4–P8.
+   *
+   * SessionEnd forwards this into `recordProgressOnSessionEnd` so the
+   * progress writer persists it on
+   * `SessionHistoryEntry.perProblemDistractorClass`. Optional for
+   * back-compat with hand-built test fixtures predating this PR.
+   *
+   * See `MathSessionResult.perProblemDistractorClass` for the
+   * positional / tap-outcome-independent semantics.
+   */
+  perProblemDistractorClass?: readonly (string | null)[]
 }
 
 /**
@@ -458,6 +474,15 @@ export default function SessionEnd({
       // `perProblemAnswerValue`. No current consumer.
       ...(p.surface === 'word-song' && p.perProblemAnswerWord !== undefined
         ? { perProblemAnswerWord: p.perProblemAnswerWord }
+        : {}),
+      // Per-problem OFFERED distractor class (Kevin Wave 5 PR B,
+      // 2026-05-22, ticket 86c9y1p99). Math only; persists on
+      // `SessionHistoryEntry.perProblemDistractorClass`. Wave-1b
+      // schema PR already authored the type-level field + guard
+      // accept-path; this PR ships the population wiring at math
+      // session-end.
+      ...(p.surface === 'math' && p.perProblemDistractorClass !== undefined
+        ? { perProblemDistractorClass: p.perProblemDistractorClass }
         : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -306,6 +306,32 @@ export interface MathSessionResult {
    * design choice.
    */
   perProblemAnswerValue: readonly (number | null)[]
+  /**
+   * Per-problem OFFERED distractor class, indexed 0..N-1 (parallel to
+   * `plan.problems`). Records the post-downgrade rendered class the
+   * chip helper emitted for each problem (Kevin Wave 5 PR B —
+   * ticket 86c9y1p99, paired with Wave-1b schema PR + Devon Wave-3
+   * render-side widening).
+   *
+   * Values:
+   *   - `null` for P1–P3 (gentle ramp; no trap class is offered).
+   *   - `'off-by-one' | 'wrong-op' | 'decade-anchor' | 'forgotten-carry'
+   *      | 'smaller-from-larger' | 'borrow-no-decrement'` for P4–P8 —
+   *     the OFFERED class (positional / tap-outcome-independent) so a
+   *     wrong-then-correct retry leaves the slot unchanged.
+   *
+   * Captured via `perProblemDistractorClassRef` in Math.tsx, which an
+   * effect keyed on `(problemIndex, chipOrderWithClass.distractorClass)`
+   * writes whenever a new chip set renders for the active problem.
+   *
+   * Length matches `plan.problems.length`. The consumer
+   * (`recordProgressOnSessionEnd`) persists the array onto
+   * `SessionHistoryEntry.perProblemDistractorClass`; the diagnostic-aware
+   * mastery gate from Kyle's two-digit-addsub spec §5.4 (and the spec's
+   * Q-new resolution for Wave-5 borrow/carry classes) is the future read
+   * site.
+   */
+  perProblemDistractorClass: readonly (ResolvedDistractorClass | null)[]
 }
 
 /** Function signature for playing one canonical Math utterance. */
@@ -858,6 +884,36 @@ function MathScreen({
   )
 
   /**
+   * Per-problem RESOLVED distractor class — the POST-DOWNGRADE class
+   * the chip helper emitted for each problem (Kevin Wave 5 PR B —
+   * ticket 86c9y1p99, pairs Wave-1b schema PR + Devon's render-side
+   * widening PR).
+   *
+   * Indexed 0..N-1; entry N holds:
+   *   - `null` for P1–P3 (gentle ramp — no trap class offered).
+   *   - `'off-by-one' | 'wrong-op' | 'decade-anchor' | 'forgotten-carry'
+   *      | 'smaller-from-larger' | 'borrow-no-decrement'` for P4–P8 —
+   *     the resolved class captured at chip-render time by
+   *     `buildChipOrderWithClass`.
+   *
+   * Written via a `useEffect` keyed on `problemIndex` so the entry
+   * mirrors the current `chipOrderWithClass.distractorClass`. Once
+   * written, the slot is stable for the rest of the session (no
+   * downgrade-on-tap dynamics — the class is the OFFERED class, not the
+   * tap-outcome class).
+   *
+   * SessionEnd reads this via `MathSessionResult.perProblemDistractorClass`
+   * → `SessionEndPayload.perProblemDistractorClass` →
+   * `recordProgressOnSessionEnd`, persisted onto
+   * `SessionHistoryEntry.perProblemDistractorClass`. Consumer surface
+   * (the diagnostic-aware OUT gate from Kyle's two-digit-addsub spec
+   * §5.4) lands in a future PR.
+   */
+  const perProblemDistractorClassRef = useRef<
+    (ResolvedDistractorClass | null)[]
+  >(plan.problems.map(() => null))
+
+  /**
    * Per-problem first-tap latency mirror (ticket 86c9pwgc8 — M4;
    * sanity-bound semantics added 86c9q5au3).
    *
@@ -1040,10 +1096,31 @@ function MathScreen({
    *      multiple of 10). Kyle's sub-to-20 spec §3.3 / ticket 86c9utcf7.
    *    - other math nodes → undefined (gentle in P1–P3, off-by-one in
    *      P4–P8). */
-  const chipOrder = useMemo(
-    () => buildChipOrder(plan.problems[problemIndex], planMaxAnswer, focusNode),
+  const chipOrderWithClass = useMemo(
+    () =>
+      buildChipOrderWithClass(
+        plan.problems[problemIndex],
+        planMaxAnswer,
+        focusNode,
+      ),
     [plan, problemIndex, planMaxAnswer, focusNode],
   )
+  const chipOrder = chipOrderWithClass.values
+
+  /**
+   * Mirror the resolved per-problem distractor class into the ref the
+   * session-end writer reads. The OFFERED class is positional — once a
+   * problem renders, the offered class is set for that problem's
+   * lifetime regardless of tap outcome. Per Kyle's two-digit-addsub
+   * spec §6.1 ("the chip helper returns the resolved class so the
+   * session-result reflects the actually-rendered class, not the
+   * planner-default") — but no current tier has a planner-emitted hint,
+   * so the offered class is always the chip-helper default for now.
+   */
+  useEffect(() => {
+    perProblemDistractorClassRef.current[problemIndex] =
+      chipOrderWithClass.distractorClass
+  }, [problemIndex, chipOrderWithClass.distractorClass])
 
   // ── Refs for in-flight cleanup -----------------------------------------
 
@@ -1356,6 +1433,16 @@ function MathScreen({
       }
       perProblemAnswerValueRef.current = next
     }
+    const dClasses = perProblemDistractorClassRef.current
+    if (dClasses.length !== planLength) {
+      const next = new Array<ResolvedDistractorClass | null>(planLength).fill(
+        null,
+      )
+      for (let i = 0; i < Math.min(dClasses.length, planLength); i++) {
+        next[i] = dClasses[i]
+      }
+      perProblemDistractorClassRef.current = next
+    }
   }, [planLength])
 
   useEffect(() => {
@@ -1571,6 +1658,12 @@ function MathScreen({
         // internal state. See `MathSessionResult.perProblemAnswerValue`
         // doc for the literal-value vs distractor-class rationale.
         perProblemAnswerValue: perProblemAnswerValueRef.current.slice(),
+        // Per-problem OFFERED distractor class (Kevin Wave 5 PR B —
+        // ticket 86c9y1p99). Sliced for the same mutation-safety reason.
+        // See `MathSessionResult.perProblemDistractorClass` for the
+        // schema contract and `buildChipOrderWithClass` for the per-tier
+        // resolution rules.
+        perProblemDistractorClass: perProblemDistractorClassRef.current.slice(),
         // Subitising scaffold exposure (ticket 86c9ur1zr §2.2). True
         // iff the overlay rendered for at least one in-scope problem
         // this session in scaffold mode — drives the counter bump in
@@ -2870,6 +2963,80 @@ function SparkleBurst() {
  * for the discriminate band. See the comment block at the dispatch site
  * below for the per-focus-node mapping.
  */
+/**
+ * Resolved per-problem distractor class — the POST-DOWNGRADE class the
+ * chip helper actually emitted, mirroring the `distractorClass` chosen
+ * inside `buildChipOrder` below. `null` indicates the gentle-ramp band
+ * (P1–P3, where no Class-2 / Class-B / wrong-op / forgotten-carry /
+ * smaller-from-larger / borrow-no-decrement trap is offered).
+ *
+ * The screen captures this via `buildChipOrderWithClass` and writes the
+ * per-problem array into `perProblemDistractorClassRef`; SessionEnd
+ * persists it onto `SessionHistoryEntry.perProblemDistractorClass` for
+ * future diagnostic-aware mastery gates (Kyle's two-digit-addsub spec
+ * §5.4). See PR header for the full plumbing chain.
+ */
+export type ResolvedDistractorClass =
+  | 'off-by-one'
+  | 'wrong-op'
+  | 'decade-anchor'
+  | 'forgotten-carry'
+  | 'smaller-from-larger'
+  | 'borrow-no-decrement'
+
+export interface ChipOrderWithClass {
+  values: readonly number[]
+  /** Resolved distractor class — `null` for P1–P3 (gentle ramp). */
+  distractorClass: ResolvedDistractorClass | null
+}
+
+function buildChipOrderWithClass(
+  problem: MathProblem,
+  maxAnswer: number,
+  focusNode?: SkillNode,
+): ChipOrderWithClass {
+  const values = buildChipOrder(problem, maxAnswer, focusNode)
+  // The gentle-ramp tier is P1–P3 (`pickTier(problemIndex)` returns
+  // `'gentle'` for indices 1..3) — no trap class is offered; capture as
+  // `null`. The per-problem index is 1-based (`MathProblem.index`).
+  if (problem.index >= 1 && problem.index <= 3) {
+    return { values, distractorClass: null }
+  }
+  // P4–P8: mirror the resolution logic inside `buildChipOrder` so the
+  // captured class is the planner-default (i.e. what the chip-helper
+  // would have used absent a per-problem `MathProblem.distractorClass`
+  // override). If a future planner emits a per-problem class hint, the
+  // hint wins over the default — same posture as the chip helper.
+  const planner = problem.distractorClass
+  if (planner !== undefined) {
+    return { values, distractorClass: planner as ResolvedDistractorClass }
+  }
+  if (problem.op === '-') {
+    if (focusNode === 'sub-to-20') {
+      return { values, distractorClass: 'decade-anchor' }
+    }
+    if (
+      focusNode === 'two-digit-addsub-no-regroup' ||
+      focusNode === 'two-digit-addsub-with-regroup'
+    ) {
+      return { values, distractorClass: 'smaller-from-larger' }
+    }
+    if (focusNode === 'sub-to-10') {
+      return { values, distractorClass: 'wrong-op' }
+    }
+    return { values, distractorClass: 'wrong-op' }
+  }
+  // op === '+'
+  if (
+    focusNode === 'two-digit-addsub-no-regroup' ||
+    focusNode === 'two-digit-addsub-with-regroup'
+  ) {
+    return { values, distractorClass: 'forgotten-carry' }
+  }
+  // add-to-10 / add-to-20 / fallback: off-by-one.
+  return { values, distractorClass: 'off-by-one' }
+}
+
 function buildChipOrder(
   problem: MathProblem,
   maxAnswer: number,

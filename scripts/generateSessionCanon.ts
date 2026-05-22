@@ -194,13 +194,29 @@ interface Combo {
   focusNode: string
 }
 
+// Wire-side `focusNode` literals (`SkillNode` union from
+// `src/lib/progress/types.ts`). The bake script PASSES these literals
+// to the planner — matching what `pickFocusNode` emits at runtime — so
+// the planner's `Focus skill node: <X>.` line matches the runtime
+// shape. Disk-file naming is decoupled via `canonFileTierFor` so the
+// `'two-digit-addsub-no-regroup'` literal lands in
+// `public/canon/math/level-1/two-digit-addsub.json` (the legacy disk
+// name kept stable for the no-regroup tier per dispatch contract).
 const MATH_FOCUS_NODES: readonly string[] = [
   'number-recog',
   'add-to-10',
   'add-to-20',
   'sub-to-10',
   'sub-to-20',
-  'two-digit-addsub',
+  // Wave 5 (ticket 86c9y1p99 — PR B). Sibling-tier split of
+  // `'two-digit-addsub'`. Both literals are valid wire focusNodes
+  // post-PR-#308. The `-no-regroup` literal maps to the existing
+  // `two-digit-addsub.json` canon disk file (kept stable per dispatch
+  // contract); `-with-regroup` would map to a new
+  // `two-digit-addsub-with-regroup.json` disk file (the matching
+  // canon is out of scope for this PR — Marian's default has it
+  // `'locked'` and no runtime user surfaces it yet).
+  'two-digit-addsub-no-regroup',
   'skip-counting',
   'mult-2-5-10',
   'mult-3-4',
@@ -439,10 +455,19 @@ async function bakeOne(
         throw err
       }
     }
-  } else if (combo.track === 'math' && combo.focusNode === 'two-digit-addsub') {
+  } else if (
+    combo.track === 'math' &&
+    combo.focusNode === 'two-digit-addsub-no-regroup'
+  ) {
     try {
+      // `two-digit-addsub-no-regroup` is the wire `SkillNode` literal; the
+      // composition-lint config is keyed on the disk-tier identifier
+      // `'two-digit-addsub'` (see `CanonFileTier` in `compositionLint.ts`).
+      // The assertion runs on the just-baked response regardless of
+      // identifier shape — the disk filename is derived in the writer
+      // below via `canonFileTierFor`.
       assertTwoDigitAddsubCompositionClean(
-        `${combo.track}/${combo.focusNode}`,
+        `${combo.track}/two-digit-addsub`,
         response,
       )
     } catch (err) {
