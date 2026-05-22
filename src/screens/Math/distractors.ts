@@ -184,12 +184,45 @@ export function pickTier(problemIndex: number): DistractorTier {
  *                            silently downgrades when OOR / aliases
  *                            correct / aliases off-by-one. Sub-to-20-
  *                            specific. Per Kyle's sub-to-20 spec §3.3.
+ *                          - `'forgotten-carry'` → Wave-5 add-with-regroup
+ *                            Class 2 trap (`correct − 10`). Models the
+ *                            documented WM-failure-to-carry error. Per
+ *                            Dave's research PR #300 §3 Candidate A.
+ *                            Silently downgrades when OOR / aliases
+ *                            correct / aliases off-by-one.
+ *                          - `'smaller-from-larger'` → Wave-5 sub-with-
+ *                            regroup Class 2 trap
+ *                            (`(tensA − tensB)×10 + (onesB − onesA)`).
+ *                            Models the documented column-reversal
+ *                            error (Jordan et al. 2003; 31% prevalence).
+ *                            Subtraction-only; requires `operands`. Per
+ *                            Dave's research PR #300 §3 Candidate B.
+ *                            Silently downgrades on non-borrow facts
+ *                            (`onesA ≥ onesB`) / OOR / alias collisions.
+ *                          - `'borrow-no-decrement'` → Wave-5 sub-with-
+ *                            regroup Class 3 trap
+ *                            (`(tensA − tensB)×10 + (onesA + 10 − onesB)`,
+ *                            algebraically equal to `correct + 10`).
+ *                            Models the partial-execution error (Brown &
+ *                            VanLehn 1980; Jordan et al. 2003, 8–18%).
+ *                            Subtraction-only; requires `operands`. Per
+ *                            Dave's research PR #300 §3 Candidate C.
+ *                            Conditional on P5–P8 per Dave (planner
+ *                            controls deployment via per-problem class).
+ *                            Silently downgrades on non-borrow facts /
+ *                            OOR / alias collisions.
  */
 export interface PickDistractorsOpts {
   op?: '+' | '-'
   operands?: readonly [number, number]
   minAnswer?: number
-  distractorClass?: 'off-by-one' | 'wrong-op' | 'decade-anchor'
+  distractorClass?:
+    | 'off-by-one'
+    | 'wrong-op'
+    | 'decade-anchor'
+    | 'forgotten-carry'
+    | 'smaller-from-larger'
+    | 'borrow-no-decrement'
 }
 
 /**
@@ -284,6 +317,58 @@ export function pickDistractors(
     // off-by-one (degenerate). Per Kyle's sub-to-20 spec §3.3 fallback:
     // the problem renders identically to a Class-1 off-by-one (chips
     // `{correct − 1, correct + 1}` clamped).
+  }
+  // Wave-5 dispatch (Dave's research PR #300). Three classes:
+  //   - 'forgotten-carry'    — addition WITH-regroup; trap = correct − 10.
+  //   - 'smaller-from-larger' — subtraction WITH-regroup; trap is the
+  //                              column-reversal arithmetic (operand-keyed).
+  //   - 'borrow-no-decrement' — subtraction WITH-regroup; trap is the
+  //                              partial-execution arithmetic (operand-keyed,
+  //                              algebraically `correct + 10`).
+  // All three silently downgrade to Class-1 off-by-one when the trap is
+  // OOR / aliases correct / aliases off-by-one (the same fallback chain
+  // sub-to-10's Class 2 and sub-to-20's Class B use).
+  const wantsForgottenCarry =
+    op === '+' && opts?.distractorClass === 'forgotten-carry'
+  if (wantsForgottenCarry) {
+    const forgotten = forgottenCarryDistractors(correct, minAnswer, maxAnswer)
+    if (forgotten !== null) {
+      return forgotten
+    }
+  }
+  const wantsSmallerFromLarger =
+    op === '-' &&
+    opts?.distractorClass === 'smaller-from-larger' &&
+    opts.operands !== undefined
+  if (wantsSmallerFromLarger) {
+    const [a, b] = opts.operands as [number, number]
+    const sfl = smallerFromLargerDistractors(
+      correct,
+      a,
+      b,
+      minAnswer,
+      maxAnswer,
+    )
+    if (sfl !== null) {
+      return sfl
+    }
+  }
+  const wantsBorrowNoDecrement =
+    op === '-' &&
+    opts?.distractorClass === 'borrow-no-decrement' &&
+    opts.operands !== undefined
+  if (wantsBorrowNoDecrement) {
+    const [a, b] = opts.operands as [number, number]
+    const bnd = borrowNoDecrementDistractors(
+      correct,
+      a,
+      b,
+      minAnswer,
+      maxAnswer,
+    )
+    if (bnd !== null) {
+      return bnd
+    }
   }
   return offByOneDistractors(correct, maxAnswer, minAnswer)
 }
@@ -423,6 +508,180 @@ export function decadeAnchorDistractors(
     return null
   }
   return sortPair(dec, secondary)
+}
+
+/**
+ * Class 2 — Forgotten-Carry distractor pair for an addition-with-regroup
+ * problem `a + b = c` (Dave's research PR #300 §3 Candidate A;
+ * `design/research/wave-5-borrow-carry-error-patterns.md` Error Pattern 2).
+ * Returns `null` when the trap can't be used cleanly — caller falls
+ * through to Class 1 (off-by-one).
+ *
+ * Trap = `correct − 10`. Models the documented working-memory failure to
+ * add the carried 1 to the tens column. Jordan et al. (2003) report 5%
+ * overall addition-bug rate but carry-specific errors are substantially
+ * higher; Klein et al. (2010) document elevated latencies/error rates for
+ * carry problems even in adults.
+ *
+ * Failure modes downgrade to null:
+ *
+ *   1. **Out-of-range:** `correct − 10 < minAnswer`. For minAnswer=1 and
+ *      correct ≤ 10, the trap is ≤ 0 — falls below floor. Wave-5
+ *      addition pool's smallest with-regroup correct is 11 (`2 + 9 = 11`
+ *      → trap = 1), so the floor of 1 stays clean for the pool.
+ *   2. **Aliases off-by-one:** if `|correct − 10 − correct| === 1`, i.e.
+ *      the trap is `correct ± 1`. Algebraically `correct − 10 = correct ± 1`
+ *      only when `10 = ±1` (impossible) — so this branch is mathematically
+ *      unreachable, but check defensively for symmetry with the other
+ *      Class-2-family helpers.
+ *   3. **Aliases correct:** `correct − 10 === correct` only when `10 = 0`
+ *      (impossible). Also defensive.
+ *
+ * Secondary distractor is the standard off-by-one (`correct − 1` / `+1`
+ * clamped). Alias collision between trap and secondary is resolved via
+ * the standard `pickSecondaryOffByOne` walker.
+ *
+ * Returned tuple is sorted ascending for test stability.
+ */
+export function forgottenCarryDistractors(
+  correct: number,
+  minAnswer: number,
+  maxAnswer: number,
+): [number, number] | null {
+  const trap = correct - 10
+  // Failure mode 1: trap out of range.
+  if (trap < minAnswer || trap > maxAnswer) return null
+  // Failure modes 2/3 (defensive — mathematically unreachable).
+  if (trap === correct) return null
+  if (Math.abs(trap - correct) === 1) return null
+
+  const secondary = pickSecondaryOffByOne(correct, trap, minAnswer, maxAnswer)
+  if (secondary === null) return null
+  return sortPair(trap, secondary)
+}
+
+/**
+ * Class 2 — Smaller-From-Larger (SFL) distractor pair for a subtraction-
+ * with-regroup problem `a − b = c` (Dave's research PR #300 §3 Candidate B;
+ * `design/research/wave-5-borrow-carry-error-patterns.md` Error Pattern 1).
+ * Returns `null` when the trap can't be used cleanly — caller falls
+ * through to Class 1 (off-by-one).
+ *
+ * Trap = `(tensA − tensB) × 10 + (onesB − onesA)`. Models the documented
+ * column-reversal error: when the child cannot subtract `onesA − onesB`
+ * because `onesA < onesB`, they reverse the ones column (`onesB − onesA`)
+ * rather than borrowing. Brown & VanLehn (1980); Jordan et al. (2003)
+ * report 31% prevalence in at-risk grade 3-4 children.
+ *
+ * Pre-condition: the formula only models a real error when `onesA < onesB`
+ * (the defining condition for a regroup problem). When `onesA ≥ onesB`
+ * the trap value is mathematically equal to `correct` (algebraic identity:
+ * the "reversal" of `onesA − onesB` to `onesB − onesA` collapses to the
+ * same value when both are 0, and the function's only point is to flip
+ * the sign for borrow problems). On non-borrow facts, return null so the
+ * caller falls through to off-by-one — SFL is meaningless there.
+ *
+ * Failure modes downgrade to null:
+ *
+ *   1. **Non-borrow fact:** `onesA ≥ onesB`. SFL only models the error
+ *      when borrowing is required.
+ *   2. **Out-of-range:** trap ∉ [minAnswer, maxAnswer].
+ *   3. **Aliases correct:** trap === correct (unreachable when onesA <
+ *      onesB by construction, but check defensively).
+ *   4. **Aliases off-by-one:** `|trap − correct| === 1`.
+ *
+ * Secondary distractor is the standard off-by-one via the shared walker.
+ * Returned tuple is sorted ascending for test stability.
+ */
+export function smallerFromLargerDistractors(
+  correct: number,
+  a: number,
+  b: number,
+  minAnswer: number,
+  maxAnswer: number,
+): [number, number] | null {
+  const tensA = Math.floor(a / 10)
+  const onesA = a % 10
+  const tensB = Math.floor(b / 10)
+  const onesB = b % 10
+
+  // Failure mode 1: non-borrow fact — SFL is meaningless.
+  if (onesA >= onesB) return null
+
+  const trap = (tensA - tensB) * 10 + (onesB - onesA)
+  // Failure mode 2: trap out of range.
+  if (trap < minAnswer || trap > maxAnswer) return null
+  // Failure mode 3: trap aliases correct (defensive).
+  if (trap === correct) return null
+  // Failure mode 4: trap aliases off-by-one.
+  if (Math.abs(trap - correct) === 1) return null
+
+  const secondary = pickSecondaryOffByOne(correct, trap, minAnswer, maxAnswer)
+  if (secondary === null) return null
+  return sortPair(trap, secondary)
+}
+
+/**
+ * Class 3 — Borrow-No-Decrement (BND) distractor pair for a subtraction-
+ * with-regroup problem `a − b = c` (Dave's research PR #300 §3 Candidate C;
+ * `design/research/wave-5-borrow-carry-error-patterns.md` Error Pattern 3).
+ * Returns `null` when the trap can't be used cleanly — caller falls
+ * through to Class 1 (off-by-one).
+ *
+ * Trap = `(tensA − tensB) × 10 + (onesA + 10 − onesB)`. Algebraically
+ * equal to `correct + 10` for any borrow-needed fact (the child added 10
+ * to the ones column but forgot to decrement the tens). Brown & VanLehn
+ * (1980); Jordan et al. (2003) report 8–18% prevalence — egalitarian
+ * across groups.
+ *
+ * Pre-condition: only meaningful when `onesA < onesB` (the borrow-needed
+ * condition). On non-borrow facts the formula still computes but doesn't
+ * model the error pattern; return null so the caller falls through to
+ * off-by-one.
+ *
+ * Failure modes downgrade to null:
+ *
+ *   1. **Non-borrow fact:** `onesA ≥ onesB`.
+ *   2. **Out-of-range:** trap ∉ [minAnswer, maxAnswer].
+ *   3. **Aliases correct:** trap === correct (unreachable algebraically
+ *      since BND = correct + 10 ≠ correct, but check defensively).
+ *   4. **Aliases off-by-one:** `|trap − correct| === 1` (also defensive —
+ *      requires `10 = ±1`, unreachable).
+ *
+ * Per Dave's research: "Do NOT include both SFL (Class 2) and BND (Class
+ * 3) as the two wrong options in the same problem. Use one or the other
+ * per problem." This module honours that by exposing them as separate
+ * `distractorClass` values; the planner (or render-time default) picks
+ * one per problem.
+ *
+ * Returned tuple is sorted ascending for test stability.
+ */
+export function borrowNoDecrementDistractors(
+  correct: number,
+  a: number,
+  b: number,
+  minAnswer: number,
+  maxAnswer: number,
+): [number, number] | null {
+  const onesA = a % 10
+  const tensA = Math.floor(a / 10)
+  const onesB = b % 10
+  const tensB = Math.floor(b / 10)
+
+  // Failure mode 1: non-borrow fact.
+  if (onesA >= onesB) return null
+
+  const trap = (tensA - tensB) * 10 + (onesA + 10 - onesB)
+  // Failure mode 2: trap out of range.
+  if (trap < minAnswer || trap > maxAnswer) return null
+  // Failure mode 3: aliases correct (defensive — algebraically unreachable).
+  if (trap === correct) return null
+  // Failure mode 4: aliases off-by-one (defensive — algebraically unreachable).
+  if (Math.abs(trap - correct) === 1) return null
+
+  const secondary = pickSecondaryOffByOne(correct, trap, minAnswer, maxAnswer)
+  if (secondary === null) return null
+  return sortPair(trap, secondary)
 }
 
 /** Pick a single off-by-one secondary distractor that is in range,

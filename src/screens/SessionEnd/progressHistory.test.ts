@@ -926,6 +926,178 @@ describe('recordProgressOnSessionEnd', () => {
     })
   })
 
+  // ── per-problem distractor-class persistence ───────────────────────────
+  // (Kevin schema-first PR, 2026-05-22 — Wave 5 prereq pairing with
+  // Dave's PR #300 two-digit add/sub WITH-regroup research.)
+  describe('perProblemDistractorClass persistence', () => {
+    it('persists perProblemDistractorClass onto SessionHistoryEntry when supplied', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 5,
+        dateISO: '2026-05-22T12:00:00.000Z',
+        focusNode: 'two-digit-addsub',
+        perProblemDistractorClass: [
+          'forgotten-carry',
+          null,
+          'smaller-from-larger',
+          null,
+          'column-reversal',
+          null,
+          null,
+          'forgotten-carry',
+        ],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemDistractorClass).toEqual([
+        'forgotten-carry',
+        null,
+        'smaller-from-larger',
+        null,
+        'column-reversal',
+        null,
+        null,
+        'forgotten-carry',
+      ])
+    })
+
+    it('persists all-null perProblemDistractorClass (no class applies — all-correct session)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 8,
+        dateISO: '2026-05-22T12:00:00.000Z',
+        focusNode: 'two-digit-addsub',
+        perProblemDistractorClass: [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemDistractorClass).toEqual([
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ])
+    })
+
+    it('omits perProblemDistractorClass from the entry when not supplied (back-compat)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 7,
+        dateISO: '2026-05-22T12:00:00.000Z',
+        focusNode: 'add-to-10',
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].perProblemDistractorClass).toBeUndefined()
+    })
+
+    it('shallow-clones the perProblemDistractorClass array (caller can mutate after)', () => {
+      const arr: (string | null)[] = [
+        'forgotten-carry',
+        null,
+        'smaller-from-larger',
+        null,
+        'column-reversal',
+        null,
+        null,
+        'forgotten-carry',
+      ]
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 5,
+        dateISO: '2026-05-22T12:00:00.000Z',
+        focusNode: 'two-digit-addsub',
+        perProblemDistractorClass: arr,
+      })
+
+      arr[0] = 'mutated-after-record'
+      const after = loadProgress()!
+      expect(after.history[0].perProblemDistractorClass?.[0]).toBe(
+        'forgotten-carry',
+      )
+    })
+
+    it('coexists with perProblemAnswerValue + latencyMs on the same math entry', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-22T12:00:00.000Z',
+        focusNode: 'two-digit-addsub',
+        latencyMs: [1200, 800, 950, 1500, 2100, 700, 1800, 1100],
+        perProblemAnswerValue: [38, 27, 45, 53, 60, 71, 80, 99],
+        perProblemDistractorClass: [
+          'forgotten-carry',
+          null,
+          null,
+          'column-reversal',
+          null,
+          null,
+          'smaller-from-larger',
+          null,
+        ],
+      })
+
+      const after = loadProgress()!
+      expect(after.history[0].latencyMs).toHaveLength(8)
+      expect(after.history[0].perProblemAnswerValue).toHaveLength(8)
+      expect(after.history[0].perProblemDistractorClass).toHaveLength(8)
+    })
+
+    it('persists perProblemDistractorClass on a graduation-split entry (novel + canonical pools)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-05-22T12:00:00.000Z',
+        focusNode: 'two-digit-addsub',
+        graduationSplit: {
+          canonicalCorrect: 5,
+          canonicalCount: 6,
+          novelCorrect: 1,
+          novelCount: 2,
+        },
+        perProblemDistractorClass: [
+          null,
+          null,
+          null,
+          null,
+          null,
+          'forgotten-carry',
+          'column-reversal',
+          null,
+        ],
+      })
+
+      const after = loadProgress()!
+      // Graduation-split path branches inside buildEntry — verify the
+      // field rides through that branch too (regression guard against
+      // a future split-only entry shape regressing the field).
+      expect(after.history[0].perProblemDistractorClass).toEqual([
+        null,
+        null,
+        null,
+        null,
+        null,
+        'forgotten-carry',
+        'column-reversal',
+        null,
+      ])
+      expect(after.history[0].novelPoolSuccessRate).toBe(0.5)
+    })
+  })
+
   // ── Lifetime-first-encounter append (ticket 86c9q9ben — AC9f) ──────────
   // The session-start gate reads `lifetimeFirstEncounters` to decide
   // whether to fire tier-specific scaffolding; this writer appends the

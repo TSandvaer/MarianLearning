@@ -591,4 +591,104 @@ describe('isProgressV1', () => {
     }
     expect(isProgressV1(noField)).toBe(true)
   })
+
+  // ── perProblemDistractorClass additive field ───────────────────────────
+  // (Kevin schema-first PR, 2026-05-22 — Wave 5 prereq pairing with
+  // Dave's PR #300 two-digit add/sub WITH-regroup research.)
+  it('accepts SessionHistoryEntry with valid perProblemDistractorClass', () => {
+    const p = defaultProgress()
+    const withClasses: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-22T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemDistractorClass: [
+            'forgotten-carry',
+            'smaller-from-larger',
+            'column-reversal',
+            null,
+            null,
+            'forgotten-carry',
+            null,
+            'borrow-no-decrement',
+          ],
+        },
+      ],
+    }
+    expect(isProgressV1(withClasses)).toBe(true)
+  })
+
+  it('accepts null entries inside perProblemDistractorClass', () => {
+    const p = defaultProgress()
+    const withNulls: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-22T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 1.0,
+          perProblemDistractorClass: [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+          ],
+        },
+      ],
+    }
+    expect(isProgressV1(withNulls)).toBe(true)
+  })
+
+  it('rejects non-string entries inside perProblemDistractorClass', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-22T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemDistractorClass: ['forgotten-carry', 5, 'column-reversal'],
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('rejects non-array perProblemDistractorClass', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-22T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+          perProblemDistractorClass: 'not-an-array',
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('omitted perProblemDistractorClass is fine (additive, back-compat)', () => {
+    const p = defaultProgress()
+    const noField: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-05-22T12:00:00.000Z',
+          skillFocus: ['add-to-10'],
+          successRate: 0.5,
+        },
+      ],
+    }
+    expect(isProgressV1(noField)).toBe(true)
+  })
 })

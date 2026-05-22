@@ -280,6 +280,39 @@ export interface SessionHistoryEntry {
    * etc.). Optional + additive — pre-PR entries do not carry it.
    */
   perProblemAnswerWord?: (string | null)[]
+  /**
+   * Per-problem distractor-class tag, indexed 0..N-1 — Wave 5 schema
+   * prereq (Kevin schema-first PR, 2026-05-22, pairing with Dave's
+   * PR #300 two-digit add/sub WITH-regroup research).
+   *
+   * Each entry is a short string identifying which distractor class
+   * Marian's wrong answer landed on for that problem (e.g.
+   * `'forgotten-carry'`, `'smaller-from-larger'`, `'column-reversal'`
+   * — the exact taxonomy is Wave 5 spec / Kyle's lane, not pinned by
+   * this schema). `null` when no class applies — either Marian got
+   * the problem correct, no chip was tapped, or the tier's distractor
+   * pool doesn't yet have classification metadata (current
+   * pre-Wave-5 tiers). Length matches `perProblemAnswerValue` /
+   * `latencyMs` / `mathFacts` when present.
+   *
+   * Why a separate field instead of joining `perProblemAnswerValue`
+   * to a per-tier classifier post-hoc: the planner authors
+   * distractor-class metadata at session-build time (Wave 5 prompt
+   * directive); persisting the chosen-class-tag avoids having to
+   * round-trip the full distractor pool + per-tier classifier
+   * through the post-session feedback path. The literal-value field
+   * stays as the mechanical evidence; this field is the pedagogical
+   * label.
+   *
+   * No current writer beyond the schema-floor (this PR plumbs
+   * persistence only). The Wave 5 render-side wiring is Devon's
+   * lane (paired ticket 86c9xxhyz). No `schemaVersion` bump — same
+   * additive precedent as `perProblemAnswerValue` /
+   * `perProblemAnswerWord`. Math sessions only in practice; the
+   * type does not constrain surface because future word-song
+   * distractor-class work may reuse the same field name.
+   */
+  perProblemDistractorClass?: (string | null)[]
 }
 
 export type SessionHistory = SessionHistoryEntry[]
