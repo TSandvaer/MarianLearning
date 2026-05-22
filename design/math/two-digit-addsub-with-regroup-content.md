@@ -170,17 +170,21 @@ Across the 8-problem session:
 
 ## 2. Distractor classes
 
+### Naming alignment (2026-05-22)
+
+This §2 was originally drafted carrying forward the Wave-4 Class-2 (column-cross) and Class-3 (phantom-borrow) vocabulary, with the conceptual divergence from Dave's research note surfaced only inline at §2.4 / §2.5 / §3.5 Q6. Thomas ratified the pivot on 2026-05-22 after Devon's PR #303 shipped Dave's pedagogically-grounded helpers (`forgottenCarryDistractors`, `smallerFromLargerDistractors`, `borrowNoDecrementDistractors`) to `src/screens/Math/distractors.ts`. §2 is now rewritten to use Dave's names verbatim throughout. Authority chain: the developmental-fit research at [`design/research/wave-5-borrow-carry-error-patterns.md`](../research/wave-5-borrow-carry-error-patterns.md) (Dave, 2026-05-22, PR #300) is the canonical name source for this tier per `[[feedback_distractor_class_pedagogical_gates_mechanical]]` — pedagogical fit gates mechanical fit, and Dave's names ARE the pedagogical fit (they name the actual developmental error pattern an 8-year-old makes). The Wave-4 column-cross / phantom-borrow vocabulary is retained only in §3.5 Q6 as the historical record of the divergence resolution, and is otherwise removed from this spec. The mechanical specifications below are unchanged from the prior draft — only vocabulary, class numbering, and pedagogical-fit framing change.
+
 ### 2.1 Class repositioning summary (the load-bearing shift from Wave 4)
 
-| Class                                          | Wave 4 role                                                   | Wave 5 role                                                                                                                                                                                                                     |
-| ---------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Class 0 (gentle)                               | P1–P3 gentle ramp                                             | **Unchanged — P1–P3 gentle ramp.**                                                                                                                                                                                              |
-| Class 1 (off-by-one)                           | P4–P8 secondary                                               | **Promoted to PRIMARY** for `+` problems at P4 (catches the most common per-fact error: counting drift inside the carry).                                                                                                       |
-| Class 2 (column-cross)                         | P4–P8 PRIMARY diagnostic instrument (catches false-positives) | **Demoted to PRIMARY error mode** — the swap IS the expected SFL-bug error on carry/borrow problems; the trap chip presence is no longer the diagnostic. Lint targets ≥ 2 in-range Class 2 traps across P4–P8 (same as Wave 4). |
-| Class 3 (phantom-borrow / Borrow-No-Decrement) | P5–P8 `op === '-'` diagnostic instrument                      | **Promoted to PRIMARY error mode** for `−` problems. The Brown-VanLehn "Borrow-No-Decrement" bug now produces the trap chip on the regroup tier where it's the documented expected failure.                                     |
-| Class B (decade-anchor)                        | sub-to-20 PRIMARY; Wave 4 fallback only                       | **Re-promoted to PRIMARY** for `round-ten-cross-down` (`−`) problems — the child snaps to the nearest decade boundary instead of executing the borrow procedure.                                                                |
+| Class                                                       | Wave 4 role                                                           | Wave 5 role                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Class 0 (gentle)                                            | P1–P3 gentle ramp                                                     | **Unchanged — P1–P3 gentle ramp.**                                                                                                                                                                                                                                                                                                         |
+| Class 1 (off-by-one)                                        | P4–P8 secondary                                                       | **Promoted to PRIMARY** for `+` problems at P4 (catches the most common per-fact error: counting drift inside the carry).                                                                                                                                                                                                                  |
+| Class 2 — Forgotten-Carry (`+`) / Smaller-From-Larger (`−`) | Wave-4 column-cross slot (REJECTED by Dave for Wave 5; not shipped)   | **Op-split PRIMARY error mode.** For `+`, `forgottenCarryDistractors` (`correct − 10`) targets the documented WM failure to add the carried `1` to the tens column. For `−`, `smallerFromLargerDistractors` ((`tensA − tensB`)×10 + (`onesB − onesA`)) targets the dominant SFL bug. Lint targets ≥ 2 in-range Class 2 traps across P4–P8. |
+| Class 3 — Borrow-No-Decrement (`−`)                         | Wave-4 phantom-borrow slot (REJECTED by Dave for Wave 5; not shipped) | **PRIMARY error mode for `−` P5–P8.** `borrowNoDecrementDistractors` ((`tensA − tensB`)×10 + (`onesA + 10 − onesB`), algebraically `correct + 10`) targets the partial-execution Borrow-No-Decrement bug — child added 10 to the ones column but forgot to decrement the tens.                                                             |
+| Class B (decade-anchor)                                     | sub-to-20 PRIMARY; Wave 4 fallback only                               | **Re-promoted to PRIMARY** for `round-ten-cross-down` (`−`) problems — the child snaps to the nearest decade boundary instead of executing the borrow procedure.                                                                                                                                                                           |
 
-**This is the structural shift.** Wave 4's Classes 2/3 were diagnostic instruments — their tap rate IDENTIFIED concatenated-single-digit processors. At Wave 5, the underlying procedure IS the failure mode the tier is teaching; Classes 2/3 are EXPECTED tap targets early in the tier and the OUT-gate criterion shifts to "Class-2/3 tap rate REDUCING across sessions" rather than "blanket Class-2 rejection ≥ 80%." See §1.6 above and §3.3 OUT-gate criterion.
+**This is the structural shift.** Wave 4 attempted to use Class-2 column-cross and Class-3 phantom-borrow as diagnostic instruments — those instruments diagnosed the concatenated-single-digit / borrow-over-generalisation error patterns Marian has CLEARED at Wave-4 promotion. At Wave 5, the underlying _regrouping procedure_ IS the failure mode the tier is teaching, so the Wave-5 Class 2 / Class 3 slots are filled by Dave's pedagogically-targeted helpers — `forgottenCarryDistractors` (addition WM failure), `smallerFromLargerDistractors` (subtraction column-reversal), `borrowNoDecrementDistractors` (subtraction partial-execution). These are EXPECTED tap targets early in the tier; the OUT-gate criterion is "Class-2/3 tap rate REDUCING across sessions" rather than "blanket Class-2 rejection ≥ 80%." See §3.3 OUT-gate criterion.
 
 ### 2.2 Class 0 — gentle (P1–P3)
 
@@ -198,30 +202,47 @@ Algorithm: `[correct − 1, correct + 1]` clamped to `[minAnswer, maxAnswer]`. A
 
 **Mechanical specification:** unchanged from Wave 4. No degeneration cases for `correct ∈ [17, 64]`.
 
-### 2.4 Class 2 — column-cross (PRIMARY for `+` P5–P8 and `−` P4)
+### 2.4 Class 2 — Forgotten-Carry (`+`) / Smaller-From-Larger (`−`) (PRIMARY for P4–P8)
 
-Algorithm: swap the units and tens columns of the answer. For `27 + 6 = 33` (decompose: tens 3, units 3 — palindromic), trap is `33` (degenerate, aliases correct ⇒ downgrade to Class 1).
+Class 2 is op-split: addition problems render the Forgotten-Carry trap; subtraction problems render the Smaller-From-Larger (SFL) trap. Both helpers ship at `src/screens/Math/distractors.ts` (Devon, PR #303, 2026-05-22).
 
-> **DEGENERATE-CASE FLAG.** Several Wave-5 pool facts produce palindromic-units answers because the carry frequently lands on a multiple-of-11 result (`33`, `22`, `44`, `55`). Lint should assert the degenerate-fraction ≤ 25% across the pool (looser than Wave 4's ≤ 10%). The downgrade-chain handles the rest. **Dave Wave-5 research §3 Candidate E REJECTS column-cross as a Wave-5 primary class** — Wave-5 entry requires Marian to have cleared the concatenated-single-digit error at Wave-4 promotion (≥ 80% Class-2-rejection), so column-cross targets a confirmed non-error here. Dave's recommendation: substitute Forgotten-Carry (`correct − 10`) for addition and Smaller-From-Larger (`(tens_A − tens_B) × 10 + (ones_B − ones_A)`) for subtraction. **Surface for impl wave (§3.5 Q-new):** retain Kyle's column-cross spec OR pivot to Dave's recommended Forgotten-Carry / SFL. Default recommendation per `[[feedback_distractor_class_pedagogical_gates_mechanical]]` (pedagogical fit gates mechanical fit) is the pivot.
+#### Forgotten-Carry (`+` PRIMARY)
 
-**Pedagogical fit:** REJECTED as Wave-5 primary per Dave Wave-5 research §3 Candidate E. Dave's argument: column-cross targets the concatenated-single-digit error pattern, which is the Wave-4 primary diagnostic; Wave-4 promotion gate (≥ 80% column-cross rejection per `two-digit-addsub-content.md` §5.4) explicitly verifies Marian has CLEARED this error class before entering Wave 5. Deploying column-cross at Wave 5 provides no new diagnostic information — it is "mechanically possible but pedagogically motivated by the wrong error model for her current state" (Dave §3 Candidate E). Dave's recommended substitution for the addition lane is the **Forgotten-Carry** distractor (`correct − 10`), which targets the documented working-memory failure to add the carried `1` to the tens column — the most actionable diagnostic signal for Wave-5 addition per Brown & VanLehn (1980) and Geary (2004) on WM load in finger-reliant children. Impl-wave decision: see §3.5 Q-new.
+**Algorithm:** trap = `correct − 10`. For `27 + 6 = 33`, trap is `23`. For `46 + 7 = 53`, trap is `43`.
 
-**Mechanical specification:** unchanged from Wave 4. The render-side helper `columnCrossDistractor(correct, a, b, op, maxAnswer)` (Wave-3-of-cycle-4 deferred, **NOT YET SHIPPED** per `.claude/docs/skill-trees-and-content.md` § "Wave-3 distractor helpers — planned, not yet shipped (as of 2026-05-22)"). **Implementation gate:** this spec depends on Devon's deferred Wave-4 cycle-4 Wave-3 PR shipping FIRST. Surfaced as Q5 below.
+Models the documented WM-failure-to-carry error pattern: the child correctly adds the units column (units overflow detected, `7 + 6 = 13`) but forgets to add the carried `1` to the tens column when summing. Brown & VanLehn (1980) catalog this as one of the most frequent addition-with-regroup bugs in the BUGGY database; Geary (2004) identifies WM load as the mechanistic basis in finger-reliant children — the carry-and-store-then-add operation taxes working-memory resources that finger-strategy users have already committed to the units-column add. Per Dave's research §3 Candidate A ("STRONG. SHIP at P4–P8 for `+` problems"), this is the highest-leverage diagnostic for Wave-5 addition acquisition.
 
-### 2.5 Class 3 — phantom-borrow / Borrow-No-Decrement (PRIMARY for `−` P5–P8)
+**Mechanical specification:** Render-side helper `forgottenCarryDistractors(correct, minAnswer, maxAnswer)` returns `[trap, secondary]` or `null` when the trap cannot be used cleanly. Failure modes downgrade to null and the caller falls through to Class 1 (off-by-one): (1) `trap < minAnswer` or `trap > maxAnswer` (out of range); (2) `trap === correct` (defensive — unreachable since trap = correct − 10); (3) `|trap − correct| === 1` (defensive — also unreachable).
 
-Algorithm at Wave 4 (`correct − 10`): for `32 − 5 = 27`, trap is `17`. For `30 − 4 = 26`, trap is `16`.
+#### Smaller-From-Larger (`−` PRIMARY)
 
-> **NEW Wave-5 variant: "Borrow-No-Decrement"** — a refinement of the Wave-4 phantom-borrow. The Brown-VanLehn bug catalog distinguishes:
->
-> - **Phantom-borrow over-generalisation** (Wave 4): borrow procedure applied where NOT needed; produces `correct − 10`.
-> - **Borrow-No-Decrement** (Wave 5): borrow procedure applied where NEEDED but child fails to decrement the tens column. Produces `correct + 10`. For `32 − 5 = 27`, Borrow-No-Decrement trap is `37` (child adds 10 to ones column → `12 − 5 = 7`, but forgets to decrement the tens → `3 _ 7` = `37`).
->
-> **Spec recommendation:** at Wave 5, the Class 3 helper produces EITHER `correct − 10` OR `correct + 10`, alternating across the session. **Dave Wave-5 research §3 Candidate C (Borrow-No-Decrement, "MODERATE. CONDITIONAL ship") + §3 Candidate F (phantom-borrow, "REJECTED for Wave 5") REJECT the alternation strategy.** Dave's argument: the `correct − 10` variant is the Wave-4 phantom-borrow / Borrow-Over-Generalisation pattern (applying borrow where NOT needed), which Marian has cleared at Wave-4 promotion. The `correct + 10` variant IS Borrow-No-Decrement — a partial-execution error documented at 8–18% prevalence per Jordan et al. (2003) — and is the correct Wave-5 Class-3 target. **Selected variant: `correct + 10` (Borrow-No-Decrement only).** Drop the alternation. Additional Dave constraint: BND only appears AFTER Marian has completed ≥ 3 Wave-5 sessions (tier-level gentle-ramp; do not render BND in the first 3 sessions of the tier). One-distractor rule: BND must NEVER co-present with SFL in the same problem (use one or the other per problem, not both as trap chips simultaneously — three distinct error procedures in a 3-chip display exceeds the tier's cognitive ceiling).
+**Algorithm:** trap = `(tensA − tensB) × 10 + (onesB − onesA)`. For `32 − 5 = 27` (tens 3/0, ones 2/5), trap is `(3 − 0) × 10 + (5 − 2) = 33`. For `41 − 6 = 35`, trap is `(4 − 0) × 10 + (6 − 1) = 45`.
 
-**Pedagogical fit:** CONFIRMED for the **Borrow-No-Decrement variant only** per Dave Wave-5 research §3 Candidate C ("MODERATE. CONDITIONAL ship — P5–P8 only"). Brown & VanLehn (1980) catalog BND as one of the most frequent bugs in the BUGGY database; developmental cause is dissociation between the _regrouping principle_ (10 ones = 1 ten) and the _place-value principle_ (the tens digit represents 10× its face value) — children learn the borrow MECHANIC (add 10 to ones) before they understand WHY (the 10 was taken from the tens digit), so the decrement step is a separable rule that can be forgotten. Jordan et al. (2003) report 8–18% prevalence across at-risk and control groups (no significant group difference — "most egalitarian bug"). The **phantom-borrow over-generalisation variant** (`correct − 10`) is REJECTED per Dave §3 Candidate F: that pattern targets a no-regroup over-application error and modeling it would contradict Wave 5's instructional aim (teaching under-application of borrow, not over-application).
+Models the dominant subtraction-with-regroup bug per Jordan, Hanich & Kaplan (2003) PMC2788949 — 31% prevalence in at-risk grade 3–4 children, 9% in controls. When the child cannot subtract `onesA − onesB` because `onesA < onesB`, they reverse the subtraction order at the ones column (`onesB − onesA`) instead of initiating the borrow procedure. Brown & VanLehn (1980) catalog this as the "Smaller-From-Larger" bug — one of the foundational systematic-error patterns in the Repair Theory framework. Per Dave's research §3 Candidate B ("STRONG. SHIP at P4–P8 for `−` problems"), this is the highest-leverage diagnostic for Wave-5 subtraction acquisition.
 
-**Mechanical specification:** new helper `phantomBorrowOrNoDecrementDistractor(correct, maxAnswer, variant)` where `variant: 'over-generalised' | 'no-decrement'`. Render-side alternates across the `−` P5–P8 problems. The over-generalised variant maps to the Wave-4 helper signature `phantomBorrowDistractor(correct, maxAnswer)`; the new no-decrement variant is additional.
+**Mechanical specification:** Render-side helper `smallerFromLargerDistractors(correct, a, b, minAnswer, maxAnswer)` returns `[trap, secondary]` or `null`. Failure modes: (1) `onesA ≥ onesB` (non-borrow fact — SFL is meaningless); (2) trap out of range; (3) trap aliases correct (defensive); (4) trap aliases off-by-one (`|trap − correct| === 1`).
+
+#### Pedagogical fit
+
+**CONFIRMED for both lanes** per Dave Wave-5 research §3 Candidates A (Forgotten-Carry, "STRONG. RETAIN") and B (Smaller-From-Larger, "STRONG. RETAIN"). The op-split design satisfies the pedagogical-fit gate per `[[feedback_distractor_class_pedagogical_gates_mechanical]]`: each lane names the actual developmental error pattern an 8-year-old makes on the relevant operation, with named research-literature citations. The earlier-draft column-cross framing (Wave-4 precedent inheritance) was REJECTED by Dave §3 Candidate E because column-cross targets the concatenated-single-digit error Marian has CLEARED at Wave-4 promotion (≥ 80% Class-2-rejection gate per `two-digit-addsub-content.md` §5.4) — historical record retained in §3.5 Q6.
+
+#### Diagnostic-coverage rule
+
+Lint targets ≥ 2 in-range Class 2 traps across P4–P8 (mirrors Wave 4 §3.8). The op-split means an addition-heavy session (5+/3−) will typically see 3–5 Forgotten-Carry candidates and 0–3 SFL candidates; lint counts the union across both lanes.
+
+### 2.5 Class 3 — Borrow-No-Decrement (PRIMARY for `−` P5–P8)
+
+**Algorithm:** trap = `(tensA − tensB) × 10 + (onesA + 10 − onesB)`, algebraically equal to `correct + 10` for any borrow-needed fact. For `32 − 5 = 27`, BND trap is `37` (child adds 10 to ones column → `12 − 5 = 7`, but forgets to decrement the tens → `3 _ 7` = `37`). For `41 − 6 = 35`, BND trap is `45`. For `30 − 4 = 26`, BND trap is `36`.
+
+Models the partial-execution borrow bug: child correctly initiates the borrow procedure (adds 10 to the ones column) but fails to decrement the tens digit. The developmental cause is dissociation between the _regrouping principle_ (10 ones = 1 ten) and the _place-value principle_ (the tens digit represents 10× its face value) — children learn the borrow MECHANIC (add 10 to ones) before they understand WHY (the 10 was taken from the tens digit), so the decrement step is a separable rule that can be forgotten. Brown & VanLehn (1980) catalog BND as one of the most frequent bugs in the BUGGY database; Jordan, Hanich & Kaplan (2003) report 8–18% prevalence across at-risk and control groups (no significant group difference — "most egalitarian bug").
+
+**Pedagogical fit:** CONFIRMED per Dave Wave-5 research §3 Candidate C ("MODERATE. CONDITIONAL ship — P5–P8 only"). The earlier-draft `phantom-borrow over-generalisation` variant (`correct − 10`, applying borrow where NOT needed) is REJECTED per Dave §3 Candidate F: that pattern targets the Wave-4 borrow-over-generalisation error Marian has CLEARED at Wave-4 promotion, and modeling it would contradict Wave 5's instructional aim (teaching under-application of borrow, not over-application). Wave-5 Class 3 is **Borrow-No-Decrement only** — the alternation strategy from the prior draft is dropped.
+
+**Mechanical specification:** Render-side helper `borrowNoDecrementDistractors(correct, a, b, minAnswer, maxAnswer)` returns `[trap, secondary]` or `null`. Failure modes downgrade to null: (1) `onesA ≥ onesB` (non-borrow fact); (2) trap out of range; (3) `trap === correct` (defensive — algebraically unreachable since BND = correct + 10); (4) `|trap − correct| === 1` (defensive — algebraically unreachable). Helper ships at `src/screens/Math/distractors.ts:659` (Devon, PR #303, 2026-05-22).
+
+**Tier-level gentle-ramp constraint (per Dave §3 Candidate C):** BND only appears AFTER Marian has completed ≥ 3 Wave-5 sessions. The planner (or render-time default) gates BND deployment behind a session-count check; the first 3 Wave-5 sessions render Class 1 / Class 2 only.
+
+**One-distractor-per-problem rule (per Dave §3):** BND must NEVER co-present with SFL in the same problem. Render the trap chip as one or the other per problem — three distinct error procedures in a 3-chip display exceeds the tier's cognitive ceiling. The planner picks one Class-2/3 trap per problem via the `perProblemDistractorClass` schema field; the render-side helper resolves to whichever the planner selected.
 
 ### 2.6 Class B — decade-anchor (PRIMARY for `−` `round-ten-cross-down` problems)
 
@@ -229,7 +250,7 @@ Algorithm: `Math.round(correct / 10) * 10`. For `30 − 4 = 26`, trap is `30` (r
 
 **Why promoted to PRIMARY for `round-ten-cross-down`:** the child's most common failure mode on a `30 − 4` problem is to NOT execute the borrow at all — they snap to the decade boundary (`30` — the minuend itself) instead of crossing it. Class B IS that error class.
 
-**Pedagogical fit:** Dave Wave-5 research does NOT include a dedicated decade-anchor candidate evaluation for the `round-ten-cross-down` case — §3 Candidates A–F focus on the SFL / Forgotten-Carry / BND / off-by-one / column-cross / phantom-borrow trade space. The decade-anchor mechanic IS adjacent to Dave's framing: the child snapping to the decade boundary (`30` for `30 − 4`) instead of executing the borrow is operationally equivalent to a "didn't initiate borrow" failure, which Dave §2 Error Pattern 1 (SFL) covers as the dominant under-application bug. For `round-ten-cross-down` specifically, the SFL distractor would be ill-defined (ones_A = 0, so `(ones_B − ones_A) = ones_B` produces a degenerate trap close to off-by-one), making decade-anchor the cleaner trap for this category. **Surface as a flag for impl-wave dispatch:** Dave's note does not explicitly endorse decade-anchor for `round-ten-cross-down`; if Kevin/Devon need a developmental-psychology citation for this specific class, a Dave Wave-5 addendum is required. Mechanical fit is unchanged from sub-to-20 PR #272; pedagogical-fit gate per `[[feedback_distractor_class_pedagogical_gates_mechanical]]` is partially satisfied (adjacent-but-not-explicit).
+**Pedagogical fit:** Dave Wave-5 research §3 Candidates A–F focus on the Forgotten-Carry / Smaller-From-Larger / Borrow-No-Decrement / off-by-one trade space and does NOT include a dedicated decade-anchor candidate evaluation for the `round-ten-cross-down` case. The decade-anchor mechanic IS adjacent to Dave's framing: the child snapping to the decade boundary (`30` for `30 − 4`) instead of executing the borrow is operationally equivalent to a "didn't initiate borrow" failure, which Dave §2 Error Pattern 1 (SFL) covers as the dominant under-application bug. For `round-ten-cross-down` specifically the SFL distractor would be ill-defined (`onesA = 0`, so `(onesB − onesA) = onesB` produces a degenerate trap close to off-by-one), making decade-anchor the cleaner trap for this category. **Surface as a flag for impl-wave dispatch:** Dave's note does not explicitly endorse decade-anchor for `round-ten-cross-down`; if Kevin/Devon need a developmental-psychology citation for this specific class, a Dave Wave-5 addendum is required. Mechanical fit is unchanged from sub-to-20 PR #272; pedagogical-fit gate per `[[feedback_distractor_class_pedagogical_gates_mechanical]]` is partially satisfied (adjacent-but-not-explicit).
 
 **Mechanical specification:** unchanged from sub-to-20 PR #272. Helper already exists in `distractors.ts`.
 
@@ -239,27 +260,27 @@ The Wave-4 §3.6 "no wrong-op class for two-digit-addsub" carries forward. The w
 
 ### 2.8 Diagnostic-coverage rule (high-leverage rule for this tier — INVERTED from Wave 4)
 
-> **At least TWO Class 2 (column-cross) traps AND at least ONE Class 3 (phantom-borrow / Borrow-No-Decrement) trap MUST appear across P4–P8** (identical to Wave 4 §3.8).
+> **At least TWO Class 2 (Forgotten-Carry on `+`, Smaller-From-Larger on `−`) traps AND at least ONE Class 3 (Borrow-No-Decrement) trap MUST appear across P4–P8** (mirrors the Wave 4 §3.8 ≥ 2 + ≥ 1 shape with the pedagogically-grounded class vocabulary substituted).
 >
 > **NEW for Wave 5:** the OUT-gate criterion is **reduction in Class-2/3 tap rate across the 3-session window** (not blanket rejection ≥ 80% as at Wave 4). See §3.3.
 
-This is the diagnostic-coverage rule with the **inverted-role inversion**. The chips that "diagnosed false-positives" at Wave 4 now "diagnose acquisition" at Wave 5 — the same chips, the same lint rule, but the gate criterion flips. Lint enforces the rule the same way (≥ 2 in-range Class 2 traps + ≥ 1 in-range Class 3 trap across P4–P8).
+The Wave-5 diagnostic-coverage rule has the **inverted role** from Wave 4. The Wave-4 Class-2/3 chips (column-cross / phantom-borrow) "diagnosed false-positives" — their tap rate revealed concatenated-single-digit processors. The Wave-5 Class-2/3 chips (Forgotten-Carry / Smaller-From-Larger / Borrow-No-Decrement) "diagnose acquisition" — their tap rate reveals which sub-procedure of the regrouping algorithm a learner has not yet integrated. The lint shape is the same (≥ 2 in-range Class 2 traps + ≥ 1 in-range Class 3 trap across P4–P8); the gate criterion flips (rate-reducing-across-sessions, not blanket-rejection-≥-80%). The class vocabulary is now developmental-error-pattern-named, not column-operation-named.
 
-### 2.9 Distractor-class union widening (DEPENDENCY on deferred Wave-4 PR)
+### 2.9 Distractor-class union — shipped at PR #303
 
-Per `.claude/docs/skill-trees-and-content.md` § "Wave-3 distractor helpers — planned, not yet shipped (as of 2026-05-22)", the Wave-4 cycle-4 Wave-3 PR (Devon — `distractors.ts` widening + helpers `columnCrossDistractor` + `phantomBorrowDistractor`) is **NOT YET SHIPPED**. The current `distractors.ts:192` union is:
-
-```ts
-distractorClass?: 'off-by-one' | 'wrong-op' | 'decade-anchor'
-```
-
-For Wave 5, two new union literals are needed plus a variant tag for Class 3:
+The `distractorClass` union at `src/screens/Math/distractors.ts:219-225` (Devon, PR #303, 2026-05-22) is:
 
 ```ts
-distractorClass?: 'off-by-one' | 'wrong-op' | 'decade-anchor' | 'column-cross' | 'phantom-borrow' | 'borrow-no-decrement'
+distractorClass?:
+  | 'off-by-one'
+  | 'wrong-op'
+  | 'decade-anchor'
+  | 'forgotten-carry'
+  | 'smaller-from-larger'
+  | 'borrow-no-decrement'
 ```
 
-Three new literals total: `'column-cross'`, `'phantom-borrow'`, `'borrow-no-decrement'`. **Two of these (`'column-cross'`, `'phantom-borrow'`) are already specified by the deferred Wave-4 PR** — that PR's scope extends to Wave 5; only `'borrow-no-decrement'` is genuinely new at this spec.
+The Wave-5 additions are `'forgotten-carry'`, `'smaller-from-larger'`, `'borrow-no-decrement'`. **All three are shipped** — no render-side union widening required for the impl-wave PR-A. The Wave-4 Class-2 (`'column-cross'`) and Class-3 (`'phantom-borrow'`) literals from the earlier-draft framing are NOT in the shipped union (and not needed — Dave's classes superseded them per §2 naming-alignment note). Schema-side propagation of these literals into `MathSessionResult.perProblemDistractorClass` is tracked separately in Kevin's schema-extension ticket `86c9xwwxf` (PR #302 landed the type, ticket tracks the per-problem field widening).
 
 ---
 
@@ -355,23 +376,19 @@ The provisional decision in §1.4 was EXCLUDE — these belong to `sub-to-20` (a
 
 **Recommendation:** **EXCLUDE.** v1 `two-digit-addsub-with-regroup` `−` facts result in `[17, 64]` per the pool. Single-digit-result borrows are deferred to a v2 widening.
 
-#### Q5 — Wave-5 spec dispatch BEFORE Wave-4 deferred PR ships?
+#### Q5 — Render-side helper dependency (RESOLVED — shipped via PR #303, 2026-05-22)
 
-The Wave-4 cycle-4 Wave-3 PR (Devon — `distractors.ts` widening + helpers `columnCrossDistractor` + `phantomBorrowDistractor`) is documented as **NOT YET SHIPPED** in `.claude/docs/skill-trees-and-content.md` § "Wave-3 distractor helpers — planned, not yet shipped (as of 2026-05-22)". Wave 5's implementation depends on those helpers existing (with the `'borrow-no-decrement'` variant added on top).
+The Wave-5 distractor helpers `forgottenCarryDistractors`, `smallerFromLargerDistractors`, and `borrowNoDecrementDistractors` plus the widened `distractorClass` union ship at `src/screens/Math/distractors.ts` via Devon PR #303 (2026-05-22). The earlier-draft Wave-4 deferred render-side dependency was superseded by this PR per Dave's pedagogical-fit pivot — see Q6 below for the full resolution narrative. **Sequencing flag for orchestrator/Matt:** impl-wave dispatch is no longer blocked on a render-side prerequisite; PR-A (Kevin lint infrastructure) can dispatch directly against the names in this spec.
 
-**Recommendation:** Wave 5 implementation dispatches ONLY after the deferred Wave-4 cycle-4 Wave-3 PR ships. **Sequencing flag for orchestrator/Matt:** the Wave-4 cycle-4 Wave-3 PR is a hard prerequisite for any Wave-5 implementation wave. Spec dispatches and reviews can proceed now; impl-wave dispatch cannot.
+#### Q6 — Reconcile §2 class structure with Dave's research recommendations (RESOLVED — pivot ratified 2026-05-22)
 
-#### Q6 — Reconcile §2 class structure with Dave's research recommendations (added 2026-05-22 in PR #299 cleanup)
-
-This spec's §2 carries forward the Wave-4 Class-2 (column-cross) + Class-3 (phantom-borrow) framing as "Wave-5 primaries with role inverted." Dave's Wave-5 research note (PR #300) — shipped after this spec's first draft — REJECTS both of those classes as Wave-5 primaries (research note §3 Candidates E and F) on the pedagogical-fit gate (`[[feedback_distractor_class_pedagogical_gates_mechanical]]`): column-cross targets an error Marian has CLEARED at Wave-4 promotion (≥ 80% Class-2-rejection gate); phantom-borrow targets a no-regroup over-application that contradicts Wave-5's instructional aim. Dave recommends instead:
+This spec's first draft carried forward the Wave-4 Class-2 (column-cross) + Class-3 (phantom-borrow) framing as "Wave-5 primaries with role inverted." Dave's Wave-5 research note (PR #300) — shipped after this spec's first draft — REJECTED both of those classes as Wave-5 primaries (research note §3 Candidates E and F) on the pedagogical-fit gate (`[[feedback_distractor_class_pedagogical_gates_mechanical]]`): column-cross targets an error Marian has CLEARED at Wave-4 promotion (≥ 80% Class-2-rejection gate); phantom-borrow targets a no-regroup over-application that contradicts Wave-5's instructional aim. Dave recommended instead:
 
 - **Addition primary at P4–P8:** Forgotten-Carry (`correct − 10`) — Brown & VanLehn (1980), Geary (2004) WM-load mechanism.
 - **Subtraction primary at P4–P8:** Smaller-From-Larger (`(tens_A − tens_B) × 10 + (ones_B − ones_A)`) — Brown & VanLehn (1980), Jordan et al. (2003) 31% prevalence.
 - **Subtraction conditional at P5–P8:** Borrow-No-Decrement (`correct + 10`) — Brown & VanLehn (1980), Jordan et al. (2003) 8–18% prevalence; tier-level gentle ramp (no BND in first 3 Wave-5 sessions); one-distractor rule (never co-present with SFL in the same problem).
 
-**Recommendation per `[[feedback_distractor_class_pedagogical_gates_mechanical]]` (pedagogical fit gates mechanical fit):** pivot the §2 class structure to Dave's three classes (Forgotten-Carry / SFL / BND) + Off-By-One + decade-anchor (for `round-ten-cross-down`). The Kyle column-cross / phantom-borrow framing was a Wave-4-precedent inheritance pattern, NOT a developmentally-grounded Wave-5 design — Dave's note is the developmental authority and supersedes.
-
-**Decision owner:** Thomas (curriculum-design call). Resolution gates the impl-wave PR-A (Kevin lint infrastructure). The spec's mechanical specifications in §2 are retained UNCHANGED in this PR to preserve impl continuity; the pivot — if approved — happens in a follow-up Kyle spec amendment PR before Kevin Wave-2 dispatches.
+**Resolution (2026-05-22):** Thomas ratified the pivot to Dave's vocabulary after Devon shipped `forgottenCarryDistractors`, `smallerFromLargerDistractors`, and `borrowNoDecrementDistractors` to `src/screens/Math/distractors.ts` (PR #303). §2 of this spec was rewritten in the spec-amendment PR (Kyle, 2026-05-22) to adopt Dave's names verbatim — see the Naming-alignment note at the top of §2. The column-cross / phantom-borrow vocabulary is preserved here only as historical record of the divergence resolution; it does not appear elsewhere in the spec.
 
 ---
 
