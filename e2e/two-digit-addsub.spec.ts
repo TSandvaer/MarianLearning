@@ -351,23 +351,36 @@ function isRoundTenAnchor(a: number, _b: number, op: '+' | '-'): boolean {
  * members in this category have their units operation land at or near
  * the decade boundary (units 0 or 9 after operation) WITHOUT crossing.
  *
- * Detection rule:
- *   - `op === '+'` AND `(a mod 10) + b === 9` (units land at 9, just
- *     below the carry boundary). Per spec §1.1 #4, #11, #20, etc.
- *   - `op === '-'` AND `(a mod 10) - b ∈ {0, 1}` (units land at 0 or
- *     1, just above the borrow boundary). Per spec §1.1 #19, #25,
- *     #26, etc.
+ * Detection rule (all three clauses required):
+ *   1. `a >= 10` — the first operand is a true two-digit number.
+ *      WITHOUT this clause, single-digit-fact static-fallback rotations
+ *      like `4 + 5 = 9` would satisfy `(4 % 10) + 5 === 9` and produce
+ *      a false-positive trivially-green signal on Test 4. The §1.1
+ *      pool is all two-digit-first-operand by construction, so this
+ *      clause is the right pool-side gate.
+ *   2. Operation-specific units constraint:
+ *      - `op === '+'` AND `(a mod 10) + b === 9` (units land at 9,
+ *        just below the carry boundary). Per spec §1.1 #4, #11, #20.
+ *      - `op === '-'` AND `(a mod 10) - b ∈ {0, 1}` (units land at 0
+ *        or 1, just above the borrow boundary). Per spec §1.1 #19,
+ *        #25, #26.
  *
- * The §1.1 row 19 example `26 - 5 = 21` (units 6-5=1) and row 27 example
- * `52 - 1 = 51` (units 2-1=1) confirm "≤ 1 ones after subtract" as
- * the upper bound on near-boundary subtraction. Row 28 `64 - 3 = 61`
- * units 4-3=1. The spec's "near-boundary" definition is units ∈ {0, 1}
- * for the `-` side.
+ * The §1.1 row 19 example `26 - 5 = 21` (units 6-5=1), row 27 example
+ * `52 - 1 = 51` (units 2-1=1), row 28 `64 - 3 = 61` (units 4-3=1)
+ * confirm "≤ 1 ones after subtract" as the upper bound on near-
+ * boundary subtraction. The spec's "near-boundary" definition is
+ * units ∈ {0, 1} for the `-` side AND the operand must be two-digit.
  *
  * Encoded as a predicate; the §1.1 facts that satisfy it index by
  * category in the pool table at lines 109-160 of the spec.
+ *
+ * NB: this predicate evaluated against the static-fallback rotation
+ * (single-digit operands) correctly returns false for all 8 problems,
+ * which is the desired behaviour — Test 4 fails as designed (count = 0
+ * < 1) on base because the screen runs add-to-10 not two-digit-addsub.
  */
 function isNearBoundaryNoCross(a: number, b: number, op: '+' | '-'): boolean {
+  if (a < 10) return false
   if (op === '+') {
     return (a % 10) + b === 9
   }
