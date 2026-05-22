@@ -212,6 +212,15 @@ describe('parseSubToTenReadLine', () => {
     expect(parseSubToTenReadLine('Seven plus three. How many?')).toBeNull()
   })
 
+  it('rejects the "-" template carrying the "+" trailing phrase ("How many?") — cross-product op-discriminator (86c9xq0vu)', () => {
+    // Per testing-and-ci.md §6 "Per-spec-author parser convention" — the
+    // wire-side trailing phrase IS the op discriminator. Sub-to-10 "-"
+    // read-lines MUST end with "How many are left?"; the bare "How many?"
+    // suffix is reserved for the "+" template (a sibling-tier shape).
+    expect(parseSubToTenReadLine('Seven minus three. How many?')).toBeNull()
+    expect(parseSubToTenReadLine('Seven take away three. How many?')).toBeNull()
+  })
+
   it('returns null for unrecognised number words', () => {
     expect(
       parseSubToTenReadLine('Eleven take away three. How many are left?'),
@@ -1468,6 +1477,16 @@ describe('parseAddToTenReadLine', () => {
     expect(parseAddToTenReadLine('Eleven plus three. How many?')).toBeNull()
   })
 
+  it('rejects the "+" template carrying the "-" trailing phrase ("How many are left?") — cross-product op-discriminator (86c9xq0vu)', () => {
+    // Per testing-and-ci.md §6 "Per-spec-author parser convention" — the
+    // wire-side trailing phrase IS the op discriminator. Add-to-10 "+"
+    // read-lines MUST end with "How many?"; the "are left" suffix is
+    // reserved for "-" templates (a sibling-tier shape).
+    expect(
+      parseAddToTenReadLine('Seven plus three. How many are left?'),
+    ).toBeNull()
+  })
+
   it('returns null for completely off-shape text', () => {
     expect(parseAddToTenReadLine('Tap the cat.')).toBeNull()
     expect(parseAddToTenReadLine('')).toBeNull()
@@ -2612,6 +2631,16 @@ describe('parseSubToTwentyReadLine', () => {
 
   it('returns null for addition template (out of scope)', () => {
     expect(parseSubToTwentyReadLine('Seven plus three. How many?')).toBeNull()
+  })
+
+  it('rejects the "-" template carrying the "+" trailing phrase ("How many?") — cross-product op-discriminator (86c9xq0vu)', () => {
+    // Per testing-and-ci.md §6 "Per-spec-author parser convention" — the
+    // wire-side trailing phrase IS the op discriminator. Sub-to-20 "-"
+    // read-lines MUST end with "How many are left?"; the bare "How many?"
+    // suffix is reserved for the "+" template (a sibling-tier shape).
+    expect(
+      parseSubToTwentyReadLine('Fifteen minus three. How many?'),
+    ).toBeNull()
   })
 
   it('returns null for unrecognised number words', () => {
@@ -3876,6 +3905,16 @@ describe('parseAddToTwentyReadLine', () => {
     expect(parseAddToTwentyReadLine('Twenty plus three. How many?')).toBeNull()
   })
 
+  it('rejects the "+" template carrying the "-" trailing phrase ("How many are left?") — cross-product op-discriminator (86c9xq0vu)', () => {
+    // Per testing-and-ci.md §6 "Per-spec-author parser convention" — the
+    // wire-side trailing phrase IS the op discriminator. Add-to-20 "+"
+    // read-lines MUST end with "How many?"; the "are left" suffix is
+    // reserved for "-" templates (a sibling-tier shape).
+    expect(
+      parseAddToTwentyReadLine('Eight plus five. How many are left?'),
+    ).toBeNull()
+  })
+
   it('returns null for arbitrary text', () => {
     expect(parseAddToTwentyReadLine('Tap the cat.')).toBeNull()
     expect(parseAddToTwentyReadLine('')).toBeNull()
@@ -5010,6 +5049,16 @@ describe('parseTwoDigitAddsubReadLine', () => {
     ).toBeNull()
     expect(
       parseTwoDigitAddsubReadLine('Fifteen minus three. How many?'),
+    ).toBeNull()
+  })
+
+  it('rejects the "+" template carrying the "-" trailing phrase ("How many are left?") — cross-product op-discriminator (86c9xq0vu)', () => {
+    // Per testing-and-ci.md §6 "Per-spec-author parser convention" — the
+    // wire-side trailing phrase IS the op discriminator. Lock both
+    // directions: "+" template with "How many are left?" suffix is
+    // invalid (the "are left" suffix is reserved for "-" templates).
+    expect(
+      parseTwoDigitAddsubReadLine('Twenty-three plus four. How many are left?'),
     ).toBeNull()
   })
 
@@ -6439,14 +6488,16 @@ describe('TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots drift-guard against spec §2.1
 // ── resolveTierBinding — two-digit-addsub: BINDING ACTIVATED (PR B) ────
 //
 // PR A (#291) shipped the lint infra (POOL, RULES, parser, lint helpers)
-// with the binding deferred and the canon shipping 3 round-ten-anchor
-// facts (the §1.4 correction target). PR B (this PR — ticket follow-up
-// to 86c9xkz9n) sharpens the planner directive (round-ten-anchor cap at
-// 1, mid-decade cap at 4, op-mix 5+/3- or 6+/2-, P1 is "+", dual-exposure
-// across (a, b, c) triples, subtraction read-template tightened to "How
-// many are left?" — folds in Wave 2 prereq 86c9xa817), rebakes the
-// canon to a spec-compliant 8-problem session, and activates the binding
-// through resolveTierBinding + runCompositionLint dispatch.
+// with the binding deferred — the pre-existing canon was not yet under
+// spec-compliant composition rules (round-ten-prior is Haiku's known
+// failure mode that §1.4 targets via the at-most-1 round-ten-anchor cap).
+// PR B (this PR — ticket follow-up to 86c9xkz9n) sharpens the planner
+// directive (round-ten-anchor cap at 1, mid-decade cap at 4, op-mix
+// 5+/3- or 6+/2-, P1 is "+", dual-exposure across (a, b, c) triples,
+// subtraction read-template tightened to "How many are left?" — folds
+// in Wave 2 prereq 86c9xa817), rebakes the canon to a spec-compliant
+// 8-problem session, and activates the binding through
+// resolveTierBinding + runCompositionLint dispatch.
 
 describe('resolveTierBinding — two-digit-addsub (BINDING ACTIVATED in PR B)', () => {
   it('binds two-digit-addsub.json paths to the two-digit-addsub tier config', () => {
