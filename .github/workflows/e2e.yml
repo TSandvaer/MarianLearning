@@ -12,6 +12,22 @@
 # The job builds the prod bundle, boots `vite preview`, and runs all
 # Playwright specs against it. /api/claude is mocked at the route level
 # (see e2e/_helpers/mockClaude.ts) so the suite never hits Anthropic / Azure.
+#
+# Job split (2026-05-22, chore/ci-vitest-split). Authorized fix from the
+# 2026-05-22 decisions-while-away.md entry "Cancel 4 hung CI runs": canon-lint
+# + typecheck + lint + vitest now run in `fast-gate` (~3-5 min total), and
+# Playwright runs in `e2e` gated by `needs: fast-gate`. Two motivations:
+#   1. Cheap fast-fail. A vitest / typecheck / lint / canon-lint regression
+#      now surfaces in 3-5 min instead of waiting on a 35-min Playwright run.
+#   2. Runner-minute discipline. When the fast gate fails we never burn a
+#      Playwright runner on a PR that can't ship anyway. Wave-5 e2e runtimes
+#      legitimately stretched to 2-3 hours (per the 2026-05-22 retro), so
+#      saving a Playwright runner-slot on cheap failures matters for parallel
+#      PR throughput when free-tier concurrency caps bite.
+# Trade-off accepted: `needs: fast-gate` adds 3-5 min of latency to the e2e
+# signal vs running the two jobs in parallel. The throughput benefit on
+# cheap-failure PRs outweighs the latency cost on green-fast-gate PRs given
+# concurrency-cap pressure during high-PR-volume sessions.
 
 name: e2e
 
@@ -33,10 +49,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  playwright:
-    name: Playwright (Chromium + WebKit)
+  fast-gate:
+    # Cheap fast-fail signals — typecheck + lint + canon-lint + vitest.
+    # Targets ~3-5 min total wall-clock. Any failure here short-circuits
+    # the PR before a Playwright runner is allocated.
+    name: Fast gate (typecheck + lint + canon-lint + vitest)
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -49,24 +68,48 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Typecheck (tsc -b --noEmit)
+        run: yarn typecheck
+
+      - name: ESLint
+        run: yarn lint
+
       - name: Canon lint (ASCII / SSML-notation guard)
         # Ticket 86c9qhr9k. Walks public/canon/**/*.json and fails on any
         # non-ASCII codepoint, slash-IPA notation (`/p/`), or angle-tag
-        # (`<phoneme...>`) substring in utterance `text`. Runs BEFORE the
-        # browser install so a corrupt-canon PR fails the cheap node-only
-        # job (~2s) instead of waiting on browsers + the full e2e suite.
+        # (`<phoneme...>`) substring in utterance `text`. Cheap node-only
+        # check (~2s).
         run: yarn canon:lint
 
       - name: Vitest (unit + component suite)
         # Retro action 2 (2026-05-22). Closes the trust-the-author gap that
         # let all 11 Waves 3+4 PRs ship without a CI-enforced vitest run.
-        # Runs BEFORE the browser install / Playwright suite so a vitest
-        # regression fails the cheap node-only job (~2 min) instead of
-        # waiting on the full e2e budget. Uses `yarn test` (== `vitest run`)
-        # so the CI invocation matches the local script in package.json.
+        # Uses `yarn test` (== `vitest run`) so the CI invocation matches
+        # the local script in package.json.
         run: yarn test
         env:
           CI: 'true'
+
+  e2e:
+    name: Playwright (Chromium + WebKit)
+    runs-on: ubuntu-latest
+    # Gate the expensive Playwright run on the cheap fast-gate. When the
+    # fast gate fails, no Playwright runner is allocated — saving ~25-35 min
+    # of runner-minutes on cheap-failure PRs and freeing concurrency-cap
+    # headroom for green PRs to land in parallel.
+    needs: fast-gate
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
