@@ -458,25 +458,23 @@ test.describe('SessionHistoryEntry.perProblemAnswerValue / perProblemAnswerWord 
     // guard isProgressV1 must accept it (additive optional field;
     // see progress.test.ts new cases for the unit-test surface).
     //
-    // We hand-build the Progress shape rather than calling
-    // buildSeedProgress with an `history` override, because the
-    // helper's typed shape doesn't carry latencyMs / mathFacts /
-    // perProblemAnswerValue arrays — pattern matches §4.1.1c
-    // (buildSeedProgress widening flag).
-    const oldShapeHistoryEntry = {
-      dateISO: '2026-05-15T12:00:00.000Z',
-      skillFocus: ['add-to-10'],
-      successRate: 0.875,
-      // NB: no perProblemAnswerValue field. This is the pre-#286
-      // shape. isProgressV1 must accept it.
-    }
-    const baseProgress = buildSeedProgress() as Record<string, unknown>
-    const progressWithOldEntry = {
-      ...baseProgress,
-      history: [oldShapeHistoryEntry],
-    }
+    // Post-86c9xaybc `buildSeedProgress.history` carries the additive
+    // SessionHistoryEntry fields natively, so the back-compat case is
+    // just "pass an entry that omits the new field" — `perProblemAnswerValue`
+    // remains undefined on the seeded blob, which is exactly the
+    // pre-#286 shape we want to round-trip through `isProgressV1`.
     await seedLocalStorage(page, {
-      progress: progressWithOldEntry,
+      progress: buildSeedProgress({
+        history: [
+          {
+            dateISO: '2026-05-15T12:00:00.000Z',
+            skillFocus: ['add-to-10'],
+            successRate: 0.875,
+            // NB: no perProblemAnswerValue field. This is the pre-#286
+            // shape. isProgressV1 must accept it.
+          },
+        ],
+      }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 

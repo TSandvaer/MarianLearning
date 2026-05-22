@@ -12,19 +12,60 @@
  */
 
 import type { Page } from '@playwright/test'
+import type {
+  SessionHistoryEntry,
+  SkillNode,
+} from '../../src/lib/progress/types'
 
 export const PROGRESS_STORAGE_KEY = 'marian-tutor:progress:v1'
 export const SESSION_HISTORY_STORAGE_KEY = 'marian-tutor.session-history.v1'
 
+/**
+ * Helper-side `SessionHistoryEntry` shape used by `SeedProgressOptions.history`.
+ *
+ * Mirrors the production `SessionHistoryEntry` from `src/lib/progress/types.ts`
+ * but with `ReadonlyArray<>` on every array field so callers can pass
+ * `as const` literals without TypeScript fighting them. The helper deep-copies
+ * each array on its way into the seeded blob, so frozen inputs are safe.
+ *
+ * Ticket 86c9xaybc widened this from the prior narrow
+ * `{ dateISO, skillFocus, successRate }` shape after three precedents
+ * (latencyMs, mathFacts, perProblemAnswerValue/Word) hit the type-signature
+ * cap and forced specs to bypass the helper with hand-built Progress docs.
+ * The new shape covers every additive field on `SessionHistoryEntry` so
+ * spec authors stay on the typed helper instead of duplicating the
+ * 23-node `skillLevels` block and 7-field `parentSettings` block by hand.
+ */
+export type SeedSessionHistoryEntry = {
+  /** ISO 8601 date-time the session started. */
+  dateISO: string
+  /** Skill nodes this session focused on. */
+  skillFocus: ReadonlyArray<SkillNode>
+  /** Success rate, 0..1. See `SessionHistoryEntry.successRate` for semantics. */
+  successRate: number
+  /** Graduation-session novel-pool accuracy (cvc-words only). */
+  novelPoolSuccessRate?: number
+  /** Per-problem first-tap latency (ms). Sentinel `-1` = abandoned. */
+  latencyMs?: ReadonlyArray<number>
+  /** Per-problem target fact (math sessions only). */
+  mathFacts?: ReadonlyArray<{ a: number; b: number; op: '+' | '-' | '*' }>
+  /** Per-problem first-tap chip value (math sessions only). */
+  perProblemAnswerValue?: ReadonlyArray<number | null>
+  /** Per-problem first-tap chip word (word-song sessions only). */
+  perProblemAnswerWord?: ReadonlyArray<string | null>
+}
+
 export interface SeedProgressOptions {
   /** Override `skillLevels`; merged on top of the diagnostic defaults. */
   skillLevelOverrides?: Record<string, string>
-  /** Append entries to `history`. */
-  history?: ReadonlyArray<{
-    dateISO: string
-    skillFocus: string[]
-    successRate: number
-  }>
+  /**
+   * Append entries to `history`. Accepts the full `SessionHistoryEntry`
+   * shape including every additive optional field (`latencyMs`,
+   * `mathFacts`, `perProblemAnswerValue`, `perProblemAnswerWord`,
+   * `novelPoolSuccessRate`). Arrays are deep-copied on the way in so
+   * `as const` / frozen inputs are safe — see ticket 86c9xaybc.
+   */
+  history?: ReadonlyArray<SeedSessionHistoryEntry>
   /** ISO timestamp for `profile.lastPlayedISO`. */
   lastPlayedISO?: string | null
   /**
@@ -84,6 +125,44 @@ export interface SeedSessionHistoryOptions {
 }
 
 /**
+ * Deep-copy a `SeedSessionHistoryEntry` into the persisted `SessionHistoryEntry`
+ * shape. Each array field is cloned so the seeded blob does not share
+ * references with the caller's (possibly frozen) input. Optional fields
+ * are emitted only when the caller supplied them — pre-existing absence
+ * semantics are preserved (the read-path defaulter does its own thing
+ * when a field is missing).
+ *
+ * Kept as a module-scope helper so the unit test below can exercise it
+ * directly and so `buildSeedProgress` stays a clean one-liner over
+ * `history.map(cloneSeedHistoryEntry)`.
+ */
+function cloneSeedHistoryEntry(
+  h: SeedSessionHistoryEntry,
+): SessionHistoryEntry {
+  const out: SessionHistoryEntry = {
+    dateISO: h.dateISO,
+    skillFocus: [...h.skillFocus],
+    successRate: h.successRate,
+  }
+  if (h.novelPoolSuccessRate !== undefined) {
+    out.novelPoolSuccessRate = h.novelPoolSuccessRate
+  }
+  if (h.latencyMs !== undefined) {
+    out.latencyMs = [...h.latencyMs]
+  }
+  if (h.mathFacts !== undefined) {
+    out.mathFacts = h.mathFacts.map((f) => ({ a: f.a, b: f.b, op: f.op }))
+  }
+  if (h.perProblemAnswerValue !== undefined) {
+    out.perProblemAnswerValue = [...h.perProblemAnswerValue]
+  }
+  if (h.perProblemAnswerWord !== undefined) {
+    out.perProblemAnswerWord = [...h.perProblemAnswerWord]
+  }
+  return out
+}
+
+/**
  * Build a `Progress` document the e2e spec can install via
  * `seedLocalStorage`. The shape mirrors `defaultProgress()` but lets the
  * caller override the bits the spec cares about (history, mastery
@@ -104,8 +183,7 @@ export function buildSeedProgress(opts: SeedProgressOptions = {}): unknown {
     mathFactsLeitner: {
       items: [],
     },
-    history:
-      opts.history?.map((h) => ({ ...h, skillFocus: [...h.skillFocus] })) ?? [],
+    history: opts.history?.map(cloneSeedHistoryEntry) ?? [],
     parentSettings: {
       autoPromote: true,
       sessionModePicker: 'off',
