@@ -2404,15 +2404,15 @@ const TWO_DIGIT_ADDSUB_NUMBER_WORDS: Record<string, number> = (() => {
 //
 // Character class `[a-z][a-z-]*` requires a leading letter and permits
 // hyphens internally — sibling to Devon's parser widening in PR #287
-// (`planFromServer.ts:225`). Sub-template accepts EITHER "How many?" (the
-// current §4.2 template) OR "How many are left?" (forward-compat for
-// PR B fold-in `86c9xa817` — subtraction read-template tightening to
-// match sub-to-X tiers). Both shapes parse to the same `{a, b}`; the
-// composition-rule check for "are left" suffix is a PR B concern.
+// (`planFromServer.ts:225`). Sub-template REQUIRES "How many are left?"
+// (PR B activated 86c9xa817 — subtraction read-template tightened to
+// match sub-to-X tiers). The "+" template uses "How many?" (no "are
+// left"); the trailing phrase is the wire-side discriminator between
+// addition and subtraction.
 const TWO_DIGIT_ADDSUB_RE_PLUS =
   /^\s*([a-z][a-z-]*)\s+plus\s+([a-z][a-z-]*)\s*\.\s*how\s+many\s*\?\s*$/i
 const TWO_DIGIT_ADDSUB_RE_MINUS =
-  /^\s*([a-z][a-z-]*)\s+minus\s+([a-z][a-z-]*)\s*\.\s*how\s+many(?:\s+are\s+left)?\s*\?\s*$/i
+  /^\s*([a-z][a-z-]*)\s+minus\s+([a-z][a-z-]*)\s*\.\s*how\s+many\s+are\s+left\s*\?\s*$/i
 
 /**
  * Parse a two-digit-addsub read-line into `{ a, b, op }`. Returns null if
@@ -2946,6 +2946,7 @@ export type TierLintBinding =
   | { tier: 'add-to-10'; config: AddToTenRulesConfig }
   | { tier: 'sub-to-20'; config: SubToTwentyRulesConfig }
   | { tier: 'add-to-20'; config: AddToTwentyRulesConfig }
+  | { tier: 'two-digit-addsub'; config: TwoDigitAddsubRulesConfig }
   | null
 
 /**
@@ -2998,6 +2999,22 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   if (norm === 'add-to-20.json' || norm.endsWith('/add-to-20.json')) {
     return { tier: 'add-to-20', config: ADD_TO_TWENTY_RULES }
   }
+  // two-digit-addsub binding ACTIVATED in the rebake PR (ticket follow-up
+  // to 86c9xkz9n). PR A (#291) shipped the lint infra with the binding
+  // deferred; this PR (PR B) sharpens the directive (round-ten-anchor cap
+  // at 1, mid-decade cap at 4, op-mix 5+/3- or 6+/2-, P1 is "+",
+  // dual-exposure across (a, b, c) triples, subtraction read-template
+  // tightened to "How many are left?" — folds in Wave 2 prereq 86c9xa817),
+  // rebakes the canon, and wires the binding through the dispatch.
+  if (norm.endsWith('/math/level-1/two-digit-addsub.json')) {
+    return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
+  }
+  if (
+    norm === 'two-digit-addsub.json' ||
+    norm.endsWith('/two-digit-addsub.json')
+  ) {
+    return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
+  }
   return null
 }
 
@@ -3006,7 +3023,12 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
 export interface CompositionFileFinding {
   /** Repo-relative posix-shaped path for log readability. */
   filePath: string
-  tier: 'sub-to-10' | 'add-to-10' | 'sub-to-20' | 'add-to-20'
+  tier:
+    | 'sub-to-10'
+    | 'add-to-10'
+    | 'sub-to-20'
+    | 'add-to-20'
+    | 'two-digit-addsub'
   violations: CompositionViolation[]
 }
 
@@ -3021,8 +3043,9 @@ export interface RunCompositionLintResult {
 
 /**
  * Walk a canon root, lint every in-scope tier file (currently sub-to-10,
- * add-to-10, sub-to-20, add-to-20), and return the aggregate result
- * without throwing. The CLI driver decides exit code based on the result.
+ * add-to-10, sub-to-20, add-to-20, two-digit-addsub), and return the
+ * aggregate result without throwing. The CLI driver decides exit code
+ * based on the result.
  */
 export function runCompositionLint(
   canonRoot: string,
@@ -3098,6 +3121,12 @@ export function runCompositionLint(
         break
       case 'add-to-20':
         violations = lintAddToTwentyComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+      case 'two-digit-addsub':
+        violations = lintTwoDigitAddsubComposition(
           parsed as SessionStartResponse,
           binding.config,
         )
