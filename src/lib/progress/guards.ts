@@ -173,6 +173,23 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
       if (w !== null && typeof w !== 'string') return false
     }
   }
+  // perProblemDistractorClass is optional (Kevin schema-first PR,
+  // 2026-05-22 — Wave 5 prereq pairing with Dave's PR #300 two-digit
+  // add/sub WITH-regroup research). Same additive posture as
+  // `perProblemAnswerWord`: present-but-not-array rejects; non-null
+  // entries must be strings; null entries are legitimate (no class
+  // applies for that problem). No enum allow-list — Wave 5 spec
+  // pins the taxonomy in canon prompts, and constraining the guard
+  // here would force a re-release on every taxonomy widening.
+  if (
+    'perProblemDistractorClass' in v &&
+    v.perProblemDistractorClass !== undefined
+  ) {
+    if (!Array.isArray(v.perProblemDistractorClass)) return false
+    for (const c of v.perProblemDistractorClass) {
+      if (c !== null && typeof c !== 'string') return false
+    }
+  }
   return true
 }
 
