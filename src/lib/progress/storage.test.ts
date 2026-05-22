@@ -82,7 +82,12 @@ describe('loadProgress — skill-level defaulter (ticket 86c9pkfth)', () => {
       'add-to-20': 'locked',
       'sub-to-10': 'mastered',
       'sub-to-20': 'intro',
-      'two-digit-addsub': 'locked',
+      // Wave 5 sibling-tier split — fixture mirrors the post-split
+      // schema-floor shape; legacy `two-digit-addsub` key would be
+      // accepted via the read-path remap in storage.ts but every NEW
+      // fixture should go straight to the split literals.
+      'two-digit-addsub-no-regroup': 'locked',
+      'two-digit-addsub-with-regroup': 'locked',
       'skip-counting': 'locked',
       'mult-2-5-10': 'intro',
       'mult-3-4': 'locked',
@@ -276,5 +281,97 @@ describe('loadProgress — dead-letter remap: digraphs → digraphs-sh (PR #211)
     expect(loaded?.skillLevels['digraphs-sh']).toBe('locked')
     expect(loaded?.skillLevels['digraphs-ch']).toBe('locked')
     expect(loaded?.skillLevels['digraphs-th-voiceless']).toBe('locked')
+  })
+})
+
+describe('loadProgress — dead-letter remap: two-digit-addsub → two-digit-addsub-no-regroup (Wave 5 — ticket 86c9y0bvc)', () => {
+  // Mirror of the digraphs remap test block above. Wave 5 split the
+  // single `'two-digit-addsub'` SkillNode into adjacent no-regroup +
+  // with-regroup sibling tiers. The remap moves any legacy
+  // `'two-digit-addsub'` key on a persisted blob to
+  // `'two-digit-addsub-no-regroup'` (the rename preserves current
+  // behaviour); the schema-floor defaulter then fills
+  // `'two-digit-addsub-with-regroup'` with `'locked'`. Net: progress
+  // is preserved and the blob validates — no schemaVersion bump.
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('remaps a legacy `two-digit-addsub: <level>` key to `two-digit-addsub-no-regroup: <level>` on load', () => {
+    // Marian's defaultProgress had `'two-digit-addsub': 'locked'` so
+    // production users hit the no-op branch of this remap. The test
+    // uses a non-default value to prove the remap preserves the level
+    // verbatim — the QA hand-edit case (someone setting the legacy
+    // literal to 'practicing' via DevTools during a previous build).
+    const seed = defaultProgress('Marian')
+    const skillLevelsWithLegacy: Record<string, string> = {
+      ...seed.skillLevels,
+    }
+    // Strip the new keys to simulate a pre-Wave-5 blob.
+    delete skillLevelsWithLegacy['two-digit-addsub-no-regroup']
+    delete skillLevelsWithLegacy['two-digit-addsub-with-regroup']
+    // Add the legacy key with a non-default value (hand-edited case).
+    skillLevelsWithLegacy['two-digit-addsub'] = 'practicing'
+
+    const blob = { ...seed, skillLevels: skillLevelsWithLegacy }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    // Legacy value lands on the no-regroup sibling (the band that
+    // preserves the pre-split behaviour).
+    expect(loaded?.skillLevels['two-digit-addsub-no-regroup']).toBe(
+      'practicing',
+    )
+    // The new with-regroup tier defaults to the schema floor.
+    expect(loaded?.skillLevels['two-digit-addsub-with-regroup']).toBe('locked')
+    // The legacy `two-digit-addsub` key is stripped from the validated
+    // shape (the guard rejects unrecognised keys; the remap moves the
+    // value BEFORE the guard runs).
+    expect('two-digit-addsub' in (loaded?.skillLevels ?? {})).toBe(false)
+    // Round-trip validates.
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('treats the new `two-digit-addsub-no-regroup` key as canonical when both legacy and new keys are present', () => {
+    // Edge case: a blob carries BOTH `two-digit-addsub: 'mastered'`
+    // (legacy) AND `two-digit-addsub-no-regroup: 'practicing'`
+    // (post-split). The new key wins — same "trust the explicit
+    // new-shape value over the implicit legacy carry-over" posture
+    // as the digraphs remap.
+    const seed = defaultProgress('Marian')
+    const skillLevelsWithBoth: Record<string, string> = {
+      ...seed.skillLevels,
+      'two-digit-addsub-no-regroup': 'practicing',
+    }
+    skillLevelsWithBoth['two-digit-addsub'] = 'mastered'
+
+    const blob = { ...seed, skillLevels: skillLevelsWithBoth }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.skillLevels['two-digit-addsub-no-regroup']).toBe(
+      'practicing',
+    )
+    expect('two-digit-addsub' in (loaded?.skillLevels ?? {})).toBe(false)
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('leaves a blob untouched when only the new `two-digit-addsub-no-regroup` key is present (post-Wave-5 happy path)', () => {
+    // A fresh-storage Marian saved on post-Wave-5 code: no legacy
+    // `two-digit-addsub` key, only the two new sibling nodes. Load
+    // must round-trip cleanly with no remap firing.
+    const seed = defaultProgress('Marian')
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
+
+    const loaded = loadProgress()
+    expect(loaded).toEqual(seed)
+    expect(loaded?.skillLevels['two-digit-addsub-no-regroup']).toBe('locked')
+    expect(loaded?.skillLevels['two-digit-addsub-with-regroup']).toBe('locked')
   })
 })

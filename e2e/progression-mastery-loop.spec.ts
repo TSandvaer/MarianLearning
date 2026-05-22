@@ -293,7 +293,9 @@ test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
         'add-to-20': 'mastered',
         'sub-to-10': 'mastered',
         'sub-to-20': 'intro',
-        'two-digit-addsub': 'locked',
+        // Wave 5 (ticket 86c9y0bvc) sibling-tier split.
+        'two-digit-addsub-no-regroup': 'locked',
+        'two-digit-addsub-with-regroup': 'locked',
         'skip-counting': 'locked',
         'mult-2-5-10': 'locked',
         'mult-3-4': 'locked',
@@ -328,10 +330,16 @@ test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
    * Pre-fix: sub-to-20 stays at 'intro' forever.
    * Post-fix: 2 perfect sessions → intro → practicing → mastered in one
    * ladder traversal (intro→practicing pass fires session 1; practicing→
-   * mastered fires session 2 with both qualifying entries). two-digit-addsub
-   * unlocks from 'locked' → 'intro'.
+   * mastered fires session 2 with both qualifying entries). The NEXT
+   * node in `MATH_NODES_IN_ORDER` unlocks from 'locked' → 'intro'.
+   *
+   * Wave 5 (ticket 86c9y0bvc) sibling-tier split: `'two-digit-addsub'`
+   * is now `'two-digit-addsub-no-regroup'` (preserves the existing
+   * pedagogical band) — that's the literal that unlocks here. The
+   * `'two-digit-addsub-with-regroup'` tier stays 'locked' until the
+   * cascade walks past no-regroup later.
    */
-  test('two perfect sub-to-20 sessions promote intro → mastered and unlock two-digit-addsub', async ({
+  test('two perfect sub-to-20 sessions promote intro → mastered and unlock two-digit-addsub-no-regroup', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -346,7 +354,13 @@ test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
     expect(persisted).not.toBeNull()
 
     expect(persisted.skillLevels['sub-to-20']).toBe('mastered')
-    expect(persisted.skillLevels['two-digit-addsub']).toBe('intro')
+    // Wave 5 (ticket 86c9y0bvc) sibling-tier split — the cascade lands
+    // on the no-regroup tier first; with-regroup stays locked until
+    // no-regroup masters.
+    expect(persisted.skillLevels['two-digit-addsub-no-regroup']).toBe('intro')
+    expect(persisted.skillLevels['two-digit-addsub-with-regroup']).toBe(
+      'locked',
+    )
 
     expect(persisted.history.length).toBe(2)
     const lastTwo = persisted.history.slice(-2)
@@ -370,7 +384,10 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
         'add-to-20': 'mastered',
         'sub-to-10': 'mastered',
         'sub-to-20': 'mastered',
-        'two-digit-addsub': 'mastered',
+        // Wave 5 (ticket 86c9y0bvc) sibling-tier split — both tiers
+        // mastered to land the picker downstream at mult-2-5-10.
+        'two-digit-addsub-no-regroup': 'mastered',
+        'two-digit-addsub-with-regroup': 'mastered',
         'skip-counting': 'mastered',
         'mult-2-5-10': 'intro',
         'mult-3-4': 'locked',

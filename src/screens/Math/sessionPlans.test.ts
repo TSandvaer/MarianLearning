@@ -493,17 +493,25 @@ describe('pickStaticSessionPlan focus-node dispatch (ticket 86c9q5q13)', () => {
   })
 
   it('falls back to sums-to-10 rotation for unknown / non-add-to-20 focusNodes', () => {
-    // Unknown focus nodes (sub-to-10, two-digit-addsub, etc.) don't
+    // Unknown focus nodes (sub-to-10, two-digit-addsub-*, etc.) don't
     // have first-class fallback rotations yet; they all degrade to the
     // sums-to-10 default. This is the "always render something" posture
     // — a missing tier-fallback never bricks the screen.
+    //
+    // Wave 5 (ticket 86c9y0bvc) sibling-tier split — exercise both
+    // post-split literals to prove neither tier accidentally activates
+    // a first-class rotation it shouldn't have.
     const fixedTime = new Date('2026-05-08T12:00:00Z')
     expect(pickStaticSessionPlan(() => fixedTime, 'sub-to-10').id).toBe(
       pickStaticSessionPlan(() => fixedTime, 'add-to-10').id,
     )
-    expect(pickStaticSessionPlan(() => fixedTime, 'two-digit-addsub').id).toBe(
-      pickStaticSessionPlan(() => fixedTime, 'add-to-10').id,
-    )
+    expect(
+      pickStaticSessionPlan(() => fixedTime, 'two-digit-addsub-no-regroup').id,
+    ).toBe(pickStaticSessionPlan(() => fixedTime, 'add-to-10').id)
+    expect(
+      pickStaticSessionPlan(() => fixedTime, 'two-digit-addsub-with-regroup')
+        .id,
+    ).toBe(pickStaticSessionPlan(() => fixedTime, 'add-to-10').id)
     expect(STATIC_SESSION_PLANS.map((p) => p.id)).toContain(
       pickStaticSessionPlan(() => fixedTime, 'mult-2-5-10').id,
     )

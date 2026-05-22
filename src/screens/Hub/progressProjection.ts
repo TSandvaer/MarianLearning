@@ -92,7 +92,13 @@ const NUMBER_GARDEN_LABELS: Record<NumberGardenNode, string> = {
   'add-to-20': 'add to 20',
   'sub-to-10': 'subtract to 10',
   'sub-to-20': 'subtract to 20',
-  'two-digit-addsub': 'two-digit add and subtract',
+  // Wave 5 (ticket 86c9y0bvc) sibling-tier split. Labels surface in
+  // the celebration caption ("You unlocked …!") so phrasing it as
+  // "(no carrying)" / "(with carrying)" gives a parent-readable cue
+  // for the band difference. The TTS source on Hub uses the bare
+  // SkillNode → name mapping; this label is render-side only.
+  'two-digit-addsub-no-regroup': 'two-digit add and subtract (no carrying)',
+  'two-digit-addsub-with-regroup': 'two-digit add and subtract (with carrying)',
   'skip-counting': 'skip counting',
   'mult-2-5-10': 'multiply by 2, 5, 10',
   'mult-3-4': 'multiply by 3 and 4',

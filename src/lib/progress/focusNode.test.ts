@@ -38,7 +38,10 @@ describe('MATH_NODES_IN_ORDER / WORD_SONG_NODES_IN_ORDER', () => {
       'add-to-20',
       'sub-to-10',
       'sub-to-20',
-      'two-digit-addsub',
+      // Wave 5 (ticket 86c9y0bvc): `'two-digit-addsub'` split into
+      // adjacent no-regroup + with-regroup sibling tiers.
+      'two-digit-addsub-no-regroup',
+      'two-digit-addsub-with-regroup',
       'skip-counting',
       'mult-2-5-10',
       'mult-3-4',
@@ -96,7 +99,9 @@ describe('pickFocusNode — math', () => {
       'add-to-20': 'mastered',
       'sub-to-10': 'mastered',
       'sub-to-20': 'mastered',
-      'two-digit-addsub': 'mastered',
+      // Wave 5 sibling-tier split — both tiers mastered to walk past.
+      'two-digit-addsub-no-regroup': 'mastered',
+      'two-digit-addsub-with-regroup': 'mastered',
       'skip-counting': 'mastered',
       'mult-2-5-10': 'intro',
     })
@@ -126,6 +131,60 @@ describe('pickFocusNode — math', () => {
     // shift focus to a node Marian isn't ready for.
     const progress = defaultProgress()
     expect(pickFocusNode(progress, 'math')).toBe('add-to-10')
+  })
+
+  // ── Wave 5 sibling-tier split (ticket 86c9y0bvc) ─────────────────
+  // The picker walks `'two-digit-addsub-no-regroup'` →
+  // `'two-digit-addsub-with-regroup'` → `'skip-counting'`. Both
+  // tiers are functionally distinguishable through `pickFocusNode`;
+  // seeding one as 'mastered' must move the picker to the next.
+  it('returns two-digit-addsub-no-regroup when upstream math is mastered and no-regroup is practicing', () => {
+    const progress = buildProgress({
+      'number-recog': 'mastered',
+      'add-to-10': 'mastered',
+      'add-to-20': 'mastered',
+      'sub-to-10': 'mastered',
+      'sub-to-20': 'mastered',
+      'two-digit-addsub-no-regroup': 'practicing',
+      'two-digit-addsub-with-regroup': 'locked',
+    })
+    expect(pickFocusNode(progress, 'math')).toBe('two-digit-addsub-no-regroup')
+  })
+
+  it('returns two-digit-addsub-with-regroup when no-regroup is mastered and with-regroup is practicing', () => {
+    // Sibling cascade: mastering no-regroup advances the picker to
+    // the with-regroup tier — the contract that lets Marian progress
+    // from the pre-carrying band into the carrying band.
+    const progress = buildProgress({
+      'number-recog': 'mastered',
+      'add-to-10': 'mastered',
+      'add-to-20': 'mastered',
+      'sub-to-10': 'mastered',
+      'sub-to-20': 'mastered',
+      'two-digit-addsub-no-regroup': 'mastered',
+      'two-digit-addsub-with-regroup': 'practicing',
+    })
+    expect(pickFocusNode(progress, 'math')).toBe(
+      'two-digit-addsub-with-regroup',
+    )
+  })
+
+  it('advances past the entire two-digit cluster when both tiers are mastered', () => {
+    // After mastering both no-regroup and with-regroup, the picker
+    // must move on to skip-counting — proves the two literals are
+    // not duplicates of one another (each one is a distinct gate the
+    // picker walks through).
+    const progress = buildProgress({
+      'number-recog': 'mastered',
+      'add-to-10': 'mastered',
+      'add-to-20': 'mastered',
+      'sub-to-10': 'mastered',
+      'sub-to-20': 'mastered',
+      'two-digit-addsub-no-regroup': 'mastered',
+      'two-digit-addsub-with-regroup': 'mastered',
+      'skip-counting': 'practicing',
+    })
+    expect(pickFocusNode(progress, 'math')).toBe('skip-counting')
   })
 })
 

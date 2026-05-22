@@ -131,7 +131,19 @@ export const VALID_MATH_FOCUS_NODES: readonly string[] = [
   'add-to-20',
   'sub-to-10',
   'sub-to-20',
-  'two-digit-addsub',
+  // Wave 5 (ticket 86c9y0bvc) sibling-tier split of
+  // `'two-digit-addsub'`. The no-regroup tier preserves the existing
+  // pool + canon + prompt block (`MATH_TRACK_GUIDE` still defines a
+  // single `two-digit-addsub:` heading — PR B renames it in lockstep
+  // with canon rebake). The with-regroup tier is accepted on the
+  // wire but has no first-class content yet — a session request for
+  // it would currently fall through to Anthropic with no matching
+  // prompt block, so the focus picker should not surface it until
+  // PR B wires the canon + prompt. Marian's `defaultProgress` has
+  // with-regroup at `'locked'`, so the picker never returns it in
+  // v1 anyway.
+  'two-digit-addsub-no-regroup',
+  'two-digit-addsub-with-regroup',
   'skip-counting',
   'mult-2-5-10',
   'mult-3-4',

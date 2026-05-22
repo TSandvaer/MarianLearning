@@ -151,6 +151,35 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
     withRemap = rest
   }
 
+  // Dead-letter remap: `two-digit-addsub` → `two-digit-addsub-no-regroup`
+  // (Wave 5 — ticket 86c9y0bvc).
+  //
+  // The single `two-digit-addsub` SkillNode was split into adjacent
+  // no-regroup + with-regroup sibling tiers in Wave 5. The no-regroup
+  // tier preserves the existing pedagogical band (no carrying /
+  // borrowing); the with-regroup tier is new (carry / borrow taught
+  // explicitly per Dave's research deliverable, ticket epic 86c9xwjtr).
+  // Marian's `defaultProgress` had `two-digit-addsub: 'locked'`, so
+  // for production users the remap is a no-op. The branch covers the
+  // QA hand-edit case + any session-history records (note: history
+  // entries carry SkillNode strings on `skillFocus`, but the storage
+  // guard tolerates unknown SkillNode strings inside history strings
+  // — see `isHistoryEntry` — only `skillLevels` keys are floor-checked).
+  // When both legacy and new keys are present (post-PR-B QA edits),
+  // the new key wins; the legacy literal is stripped so the strict
+  // guard's downstream check doesn't see an unrecognised key.
+  if (
+    'two-digit-addsub' in withRemap &&
+    !('two-digit-addsub-no-regroup' in withRemap)
+  ) {
+    const { 'two-digit-addsub': legacyTwoDigitLevel, ...rest } = withRemap
+    withRemap = { ...rest, 'two-digit-addsub-no-regroup': legacyTwoDigitLevel }
+  } else if ('two-digit-addsub' in withRemap) {
+    const rest = { ...withRemap }
+    delete rest['two-digit-addsub']
+    withRemap = rest
+  }
+
   const floor = defaultLockedSkillLevels()
   let mutated = withRemap !== present
   const filled: SkillLevels = { ...floor }

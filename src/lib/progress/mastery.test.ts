@@ -161,6 +161,22 @@ describe('nextNode', () => {
     expect(nextNode('math', 'blending-cv')).toBeNull()
     expect(nextNode('word-song', 'add-to-10')).toBeNull()
   })
+
+  // ── Wave 5 sibling-tier split (ticket 86c9y0bvc) ─────────────────
+  it('walks the two-digit-addsub sibling cascade: no-regroup → with-regroup → skip-counting', () => {
+    // The split's load-bearing claim: the two literals are functionally
+    // distinguishable through the SkillNode-aware tree-adjacency
+    // helper. Mastering no-regroup advances to with-regroup; mastering
+    // with-regroup advances to skip-counting. If either literal were a
+    // duplicate of the other, this cascade would short-circuit.
+    expect(nextNode('math', 'sub-to-20')).toBe('two-digit-addsub-no-regroup')
+    expect(nextNode('math', 'two-digit-addsub-no-regroup')).toBe(
+      'two-digit-addsub-with-regroup',
+    )
+    expect(nextNode('math', 'two-digit-addsub-with-regroup')).toBe(
+      'skip-counting',
+    )
+  })
 })
 
 // --------------------------------------------------------------------------

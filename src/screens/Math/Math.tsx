@@ -2924,10 +2924,22 @@ function buildChipOrder(
   //
   // Wave 5 canon doesn't exist yet (Kevin PR B is sequential after the
   // schema + lint PRs). Until Wave 5 canon ships, the static fallback
-  // emits add-to-10 problems and `focusNode === 'two-digit-addsub'`
-  // never combines with a Wave-5 problem in practice. The mapping below
-  // is forward-compat: when canon lands, the existing render path
-  // picks up the new classes without further Math.tsx edits.
+  // emits add-to-10 problems and the with-regroup tier never combines
+  // with a Wave-5 problem in practice. The mapping below is forward-
+  // compat: when canon lands, the existing render path picks up the
+  // new classes without further Math.tsx edits.
+  //
+  // Wave 5 schema-widening (ticket 86c9y0bvc): `'two-digit-addsub'` was
+  // split into adjacent `'two-digit-addsub-no-regroup'` (existing
+  // pedagogical band) + `'two-digit-addsub-with-regroup'` (new band).
+  // Both branches retain the pre-split mapping shape verbatim — `'forgotten-carry'`
+  // for `+`, `'smaller-from-larger'` for `-` — because the no-regroup
+  // pool's distractor authoring still mixes carry-eligible HARD facts
+  // (per `MATH_TRACK_GUIDE` §two-digit-addsub HARD-band entries). PR B
+  // narrows the binding so the no-regroup tier emits a band-appropriate
+  // class (Kyle's spec lane) — at that point the fallback for no-regroup
+  // tightens / changes literal. Per dispatch contract this PR doesn't
+  // alter distractor-class LOGIC, only the literal mapping keys.
   const distractorClass:
     | 'off-by-one'
     | 'wrong-op'
@@ -2940,10 +2952,12 @@ function buildChipOrder(
     (problem.op === '-'
       ? focusNode === 'sub-to-20'
         ? 'decade-anchor'
-        : focusNode === 'two-digit-addsub'
+        : focusNode === 'two-digit-addsub-no-regroup' ||
+            focusNode === 'two-digit-addsub-with-regroup'
           ? 'smaller-from-larger'
           : 'wrong-op'
-      : focusNode === 'two-digit-addsub'
+      : focusNode === 'two-digit-addsub-no-regroup' ||
+          focusNode === 'two-digit-addsub-with-regroup'
         ? 'forgotten-carry'
         : undefined)
   // Per Kyle's sub-to-20 spec §3.1: chips for sub-to-20 problems live in
