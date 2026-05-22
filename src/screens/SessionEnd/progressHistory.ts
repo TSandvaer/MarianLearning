@@ -242,6 +242,21 @@ export interface RecordProgressInput {
    * on length / contents. No current consumer.
    */
   perProblemAnswerWord?: readonly (string | null)[]
+  /**
+   * Per-problem distractor-class tag (Kevin schema-first PR,
+   * 2026-05-22 — Wave 5 prereq pairing with Dave's PR #300 two-digit
+   * add/sub WITH-regroup research). When supplied, persists onto the
+   * recorded `SessionHistoryEntry.perProblemDistractorClass` field.
+   *
+   * Defensive copy at write time (shallow per-element); writer trusts
+   * the caller's framing on length / contents. No current writer
+   * beyond the schema floor — Devon's render-side ticket
+   * (`86c9xxhyz`) wires Math.tsx to populate this at chip-tap time
+   * once the Wave 5 distractor-class taxonomy lands in canon. Until
+   * then this stays `undefined` from callers and is omitted on the
+   * persisted entry.
+   */
+  perProblemDistractorClass?: readonly (string | null)[]
 }
 
 /**
@@ -403,6 +418,16 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
       ? Array.from(input.perProblemAnswerWord)
       : undefined
 
+  // perProblemDistractorClass persistence (Kevin schema-first PR,
+  // 2026-05-22 — Wave 5 prereq). Same posture as the answer-value /
+  // answer-word fields: shallow-clone when supplied, omit when
+  // absent. No current writer beyond the schema floor; Devon's
+  // render-side ticket plumbs the producer once Wave 5 canon lands.
+  const distractorClassClone =
+    input.perProblemDistractorClass !== undefined
+      ? Array.from(input.perProblemDistractorClass)
+      : undefined
+
   if (!useSplit) {
     return {
       dateISO: input.dateISO,
@@ -415,6 +440,9 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
         : {}),
       ...(answerWordClone !== undefined
         ? { perProblemAnswerWord: answerWordClone }
+        : {}),
+      ...(distractorClassClone !== undefined
+        ? { perProblemDistractorClass: distractorClassClone }
         : {}),
     }
   }
@@ -432,6 +460,9 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
       : {}),
     ...(answerWordClone !== undefined
       ? { perProblemAnswerWord: answerWordClone }
+      : {}),
+    ...(distractorClassClone !== undefined
+      ? { perProblemDistractorClass: distractorClassClone }
       : {}),
   }
 }
