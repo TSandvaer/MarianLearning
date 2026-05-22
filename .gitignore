@@ -70,5 +70,20 @@ design/references/picture-pack/**/*.png
 .vercel/
 # generic scratch (e.g. tmp/short-u-validate/ from canon work)
 tmp/
-# orphaned harness convention; canonical .claude/ lives at parent MARIAN-TUTOR/ level per CLAUDE.md
-.claude/
+# Claude Code per-user / cache state — keep team-shared configs (agents, docs, hooks,
+# project-specific skills, retros, decisions-while-away.md, settings.json) in git for
+# audit trail + peer review + cross-machine sync. Selectively ignore only per-user /
+# per-machine / third-party-clone state.
+.claude/settings.local.json
+.claude/projects/
+.claude/worktrees/
+.claude/auto-status.state
+.claude/*.state
+# Third-party upstream skills — re-install locally if needed.
+# claude-skills + mobile-app-design have their own .git/ (would become submodules).
+# motion + pwa-manifest-generator are generic MIT-licensed skills not project-specific.
+# Project-specific skill (maintain-docs) IS in git.
+.claude/skills/claude-skills/
+.claude/skills/mobile-app-design/
+.claude/skills/motion/
+.claude/skills/pwa-manifest-generator/
