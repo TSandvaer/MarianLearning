@@ -5,10 +5,13 @@ import {
   ANSWER_RANGE_MAX_TWO_DIGIT,
   ANSWER_RANGE_MIN,
   GENTLE_RAMP_THROUGH,
+  borrowNoDecrementDistractors,
   chipMaxAnswerForCorrects,
   decadeAnchorDistractors,
+  forgottenCarryDistractors,
   pickDistractors,
   pickTier,
+  smallerFromLargerDistractors,
 } from './distractors'
 
 describe('pickTier', () => {
@@ -1286,6 +1289,372 @@ describe('pickDistractors — two-digit-addsub chip-floor alignment (forward-ris
         minAnswer: hypotheticalMisalignedFloor,
       }),
     ).toEqual([11, 13])
+  })
+})
+
+// ── Wave 5 — Forgotten-Carry, Smaller-From-Larger, Borrow-No-Decrement ──
+// Dave's research PR #300 (design/research/wave-5-borrow-carry-error-patterns.md).
+// Three distractor classes for two-digit-addsub WITH-regroup:
+//
+//   - 'forgotten-carry'      addition;     trap = correct − 10
+//   - 'smaller-from-larger'  subtraction;  trap = (tA−tB)×10 + (oB−oA)
+//   - 'borrow-no-decrement'  subtraction;  trap = (tA−tB)×10 + (oA+10−oB)
+//                            (algebraically = correct + 10)
+//
+// All three follow the established Class-2-family fallback chain: silent
+// downgrade to Class-1 off-by-one on OOR / aliases-correct /
+// aliases-off-by-one. SFL and BND additionally null on non-borrow facts
+// (onesA ≥ onesB) where the formula doesn't model a real error.
+//
+// Test surface: pin each formula EXACTLY on a small set of canonical
+// worked examples (the same ones Dave used in the research note's
+// distractor table § 4). Pin the silent-downgrade path on each failure
+// mode. Pin the caller-site dispatch (pickDistractors) so the wiring
+// chain is end-to-end.
+
+describe('forgottenCarryDistractors — Wave-5 Class 2 (addition)', () => {
+  // Pool envelope: smallest with-regroup answer is 11 (2+9, 3+8, etc.);
+  // largest in 2D+1D with-regroup is ~98 (89+9). Trap = correct − 10 ∈
+  // [1, 88]. Wave-5 callers thread minAnswer=1.
+
+  it("matches Dave's research §3 Candidate A worked example — 27+6=33 → trap=23", () => {
+    // Forgotten-Carry models WM failure to add the carried 1 to tens.
+    // For 27+6: correct=33, trap=23, secondary off-by-one walker picks
+    // 32 (correct−1, distinct from trap 23). Pair sorted: [23, 32].
+    expect(forgottenCarryDistractors(33, 1, 99)).toEqual([23, 32])
+  })
+
+  it('smallest pool fact 2+9=11 → trap=1, secondary walks correct±1', () => {
+    // correct=11, trap=11−10=1 (exactly at minAnswer=1 floor — inclusive).
+    // Secondary walker: -1 → 10 (in range, distinct from trap 1 and
+    // correct 11) → take. Pair: [1, 10].
+    expect(forgottenCarryDistractors(11, 1, 99)).toEqual([1, 10])
+  })
+
+  it('returns null when trap falls below minAnswer — minAnswer=11, correct=15 → trap=5 OOR', () => {
+    // Hypothetical tier with a higher floor. Pin verifies the OOR
+    // downgrade path fires cleanly.
+    expect(forgottenCarryDistractors(15, 11, 99)).toBeNull()
+  })
+
+  it('returns null when trap exceeds maxAnswer — maxAnswer=20, correct=99 → trap=89 OOR', () => {
+    // Pathological for 2-digit tier, but the bound check should hold.
+    expect(forgottenCarryDistractors(99, 1, 20)).toBeNull()
+  })
+})
+
+describe('smallerFromLargerDistractors — Wave-5 Class 2 (subtraction)', () => {
+  // SFL only fires when onesA < onesB (the borrow-required condition).
+  // Trap = (tensA − tensB) × 10 + (onesB − onesA).
+
+  it("matches Dave's research §3 Candidate B worked example — 43-27=16 → trap=24", () => {
+    // onesA=3, onesB=7 → borrow needed. SFL = (4−2)×10 + (7−3) = 24.
+    // Off-by-one of 16 is {15, 17}; trap 24 distinct from both. Walker
+    // picks correct−1=15 as secondary. Pair sorted: [15, 24].
+    expect(smallerFromLargerDistractors(16, 43, 27, 1, 99)).toEqual([15, 24])
+  })
+
+  it('returns null on non-borrow fact (onesA ≥ onesB) — 47-23=24 → null', () => {
+    // onesA=7, onesB=3 → no borrow needed. SFL formula would compute
+    // (4−2)×10 + (3−7) = 20 − 4 = 16, which is NOT the correct answer
+    // (24) and would actually be in-range — but the error pattern SFL
+    // models (column-reversal because the child can't subtract) does
+    // NOT apply when borrowing isn't required. Returning null forces
+    // the caller to fall through to plain off-by-one for these facts.
+    expect(smallerFromLargerDistractors(24, 47, 23, 1, 99)).toBeNull()
+  })
+
+  it('emits trap for 35-18=17 → trap=23', () => {
+    // onesA=5, onesB=8 → borrow needed. SFL = (3−1)×10 + (8−5) = 23.
+    // Off-by-one secondary: 16 (correct−1, distinct from trap 23).
+    expect(smallerFromLargerDistractors(17, 35, 18, 1, 99)).toEqual([16, 23])
+  })
+
+  it('emits trap for 52-26=26 → trap=34', () => {
+    // onesA=2, onesB=6 → borrow. SFL = (5−2)×10 + (6−2) = 34. Secondary
+    // picks correct−1=25.
+    expect(smallerFromLargerDistractors(26, 52, 26, 1, 99)).toEqual([25, 34])
+  })
+
+  it('emits trap for 97-49=48 → trap=52', () => {
+    // onesA=7, onesB=9 → borrow. SFL = (9−4)×10 + (9−7) = 52. Secondary
+    // picks correct−1=47.
+    expect(smallerFromLargerDistractors(48, 97, 49, 1, 99)).toEqual([47, 52])
+  })
+})
+
+describe('borrowNoDecrementDistractors — Wave-5 Class 3 (subtraction)', () => {
+  // BND only fires when onesA < onesB (borrow required). Trap =
+  // (tensA − tensB) × 10 + (onesA + 10 − onesB), algebraically = correct + 10.
+
+  it("matches Dave's research §3 Candidate C worked example — 43-27=16 → trap=26", () => {
+    // onesA=3, onesB=7 → borrow. BND = (4−2)×10 + (3+10−7) = 26.
+    // Off-by-one of 16 is {15, 17}; trap 26 distinct from both. Walker
+    // picks correct−1=15 as secondary. Pair sorted: [15, 26].
+    expect(borrowNoDecrementDistractors(16, 43, 27, 1, 99)).toEqual([15, 26])
+  })
+
+  it('BND = correct + 10 (algebraic identity) — 35-18=17 → trap=27', () => {
+    // BND = (3−1)×10 + (5+10−8) = 20 + 7 = 27 = 17 + 10. ✓
+    expect(borrowNoDecrementDistractors(17, 35, 18, 1, 99)).toEqual([16, 27])
+  })
+
+  it('BND = correct + 10 — 97-49=48 → trap=58', () => {
+    // BND = (9−4)×10 + (7+10−9) = 50 + 8 = 58 = 48 + 10. ✓
+    expect(borrowNoDecrementDistractors(48, 97, 49, 1, 99)).toEqual([47, 58])
+  })
+
+  it('returns null on non-borrow fact — 47-23=24 → null', () => {
+    // onesA=7, onesB=3 → no borrow needed. BND doesn't model a real
+    // error when the child doesn't have to borrow.
+    expect(borrowNoDecrementDistractors(24, 47, 23, 1, 99)).toBeNull()
+  })
+
+  it('returns null when trap exceeds maxAnswer — 97-49=48 with maxAnswer=50 → BND=58 OOR', () => {
+    // Narrow ceiling — BND falls out of range.
+    expect(borrowNoDecrementDistractors(48, 97, 49, 1, 50)).toBeNull()
+  })
+
+  it("verifies Dave's 'BND distinct from SFL on Wave-5 pool' assertion — 43-27=16 → BND=26, SFL=24", () => {
+    // Dave's §4 distractor-table assertion: "BND is always off-by-10
+    // from correct in the upward direction" + "distinct from SFL in
+    // the full pool". Pin both formulas side-by-side on the canonical
+    // fact and assert distinctness.
+    const sfl = smallerFromLargerDistractors(16, 43, 27, 1, 99)
+    const bnd = borrowNoDecrementDistractors(16, 43, 27, 1, 99)
+    expect(sfl).toEqual([15, 24])
+    expect(bnd).toEqual([15, 26])
+    // Traps distinct — secondary off-by-one (15 = correct−1) is shared
+    // because both classes share the off-by-one walker; the trap value
+    // (sorted into position [1]) is what differs: 24 (SFL) vs 26 (BND).
+    expect(sfl![1]).not.toBe(bnd![1])
+    // Algebraically: BND = correct + 10 = 26 ≠ SFL = correct + 8 = 24.
+    expect(bnd![1] - sfl![1]).toBe(2)
+  })
+})
+
+describe('pickDistractors — Wave-5 caller-site dispatch', () => {
+  // End-to-end dispatch: caller passes (correct, problemIndex, maxAnswer,
+  // {op, operands, distractorClass}); the right class branch fires and the
+  // helper output flows through.
+
+  const MAX = ANSWER_RANGE_MAX_TWO_DIGIT // 99
+  const FLOOR = 1
+
+  describe("distractorClass='forgotten-carry' (op='+')", () => {
+    it('27+6=33 P4 emits the Forgotten-Carry trap [23, 32]', () => {
+      expect(
+        pickDistractors(33, 4, MAX, {
+          op: '+',
+          operands: [27, 6],
+          distractorClass: 'forgotten-carry',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([23, 32])
+    })
+
+    it('NEVER fires on op="-" — silently downgrades to off-by-one', () => {
+      // Class is addition-only. Setting it on a subtraction problem is
+      // benign — falls through to off-by-one Class 1.
+      expect(
+        pickDistractors(16, 5, MAX, {
+          op: '-',
+          operands: [43, 27],
+          distractorClass: 'forgotten-carry',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([15, 17])
+    })
+
+    it('NEVER fires for P1-P3 — gentle ramp wins (correct=33 picks range extremes)', () => {
+      // P1 → 'gentle'. For correct=33 with [1, 99]: both extremes ≥2
+      // away → pair [1, 99] sorted ascending.
+      expect(
+        pickDistractors(33, 1, MAX, {
+          op: '+',
+          operands: [27, 6],
+          distractorClass: 'forgotten-carry',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([1, 99])
+    })
+  })
+
+  describe("distractorClass='smaller-from-larger' (op='-')", () => {
+    it('43-27=16 P4 emits the SFL trap [15, 24]', () => {
+      expect(
+        pickDistractors(16, 4, MAX, {
+          op: '-',
+          operands: [43, 27],
+          distractorClass: 'smaller-from-larger',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([15, 24])
+    })
+
+    it('non-borrow fact 47-23=24 silently downgrades to off-by-one [23, 25]', () => {
+      // onesA=7, onesB=3 → SFL helper returns null → fall through.
+      expect(
+        pickDistractors(24, 4, MAX, {
+          op: '-',
+          operands: [47, 23],
+          distractorClass: 'smaller-from-larger',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([23, 25])
+    })
+
+    it('NEVER fires without operands — defensive fallback to off-by-one', () => {
+      // SFL is operand-keyed; without operands it cannot be computed.
+      expect(
+        pickDistractors(16, 4, MAX, {
+          op: '-',
+          distractorClass: 'smaller-from-larger',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([15, 17])
+    })
+
+    it('NEVER fires on op="+" — addition silently downgrades to off-by-one', () => {
+      expect(
+        pickDistractors(33, 4, MAX, {
+          op: '+',
+          operands: [27, 6],
+          distractorClass: 'smaller-from-larger',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([32, 34])
+    })
+  })
+
+  describe("distractorClass='borrow-no-decrement' (op='-')", () => {
+    it('43-27=16 P5 emits the BND trap [15, 26]', () => {
+      // BND is P5–P8 only per Dave; pin at P5.
+      expect(
+        pickDistractors(16, 5, MAX, {
+          op: '-',
+          operands: [43, 27],
+          distractorClass: 'borrow-no-decrement',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([15, 26])
+    })
+
+    it('non-borrow fact 47-23=24 silently downgrades to off-by-one [23, 25]', () => {
+      expect(
+        pickDistractors(24, 5, MAX, {
+          op: '-',
+          operands: [47, 23],
+          distractorClass: 'borrow-no-decrement',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([23, 25])
+    })
+
+    it('NEVER fires without operands — defensive fallback to off-by-one', () => {
+      expect(
+        pickDistractors(16, 5, MAX, {
+          op: '-',
+          distractorClass: 'borrow-no-decrement',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([15, 17])
+    })
+
+    it('NEVER fires on op="+" — addition silently downgrades to off-by-one', () => {
+      expect(
+        pickDistractors(33, 5, MAX, {
+          op: '+',
+          operands: [27, 6],
+          distractorClass: 'borrow-no-decrement',
+          minAnswer: FLOOR,
+        }),
+      ).toEqual([32, 34])
+    })
+  })
+
+  describe('invariants across full Wave-5 sample pool', () => {
+    // Sample of canonical with-regroup facts spanning the 2D±1D / 2D±2D
+    // space. Each distractor must be (a) in range, (b) distinct from
+    // correct, (c) distinct from each other.
+    const WAVE5_SUB_BORROW: ReadonlyArray<[number, number]> = [
+      // 2D − 1D with borrow
+      [21, 5], // 21−5=16, onesA=1 < onesB=5
+      [33, 8], // 33−8=25, onesA=3 < onesB=8
+      [42, 9], // 42−9=33
+      [54, 7], // 54−7=47
+      // 2D − 2D with borrow
+      [43, 27], // 43−27=16 (Dave canonical)
+      [35, 18], // 35−18=17
+      [52, 26], // 52−26=26
+      [97, 49], // 97−49=48
+    ]
+
+    for (const [a, b] of WAVE5_SUB_BORROW) {
+      const correct = a - b
+      it(`${a}-${b}=${correct}: SFL P4 produces in-range distinct chips`, () => {
+        const [d1, d2] = pickDistractors(correct, 4, MAX, {
+          op: '-',
+          operands: [a, b],
+          distractorClass: 'smaller-from-larger',
+          minAnswer: FLOOR,
+        })
+        expect(d1).toBeGreaterThanOrEqual(FLOOR)
+        expect(d1).toBeLessThanOrEqual(MAX)
+        expect(d2).toBeGreaterThanOrEqual(FLOOR)
+        expect(d2).toBeLessThanOrEqual(MAX)
+        expect(d1).not.toBe(d2)
+        expect(d1).not.toBe(correct)
+        expect(d2).not.toBe(correct)
+      })
+
+      it(`${a}-${b}=${correct}: BND P5 produces in-range distinct chips`, () => {
+        const [d1, d2] = pickDistractors(correct, 5, MAX, {
+          op: '-',
+          operands: [a, b],
+          distractorClass: 'borrow-no-decrement',
+          minAnswer: FLOOR,
+        })
+        expect(d1).toBeGreaterThanOrEqual(FLOOR)
+        expect(d1).toBeLessThanOrEqual(MAX)
+        expect(d2).toBeGreaterThanOrEqual(FLOOR)
+        expect(d2).toBeLessThanOrEqual(MAX)
+        expect(d1).not.toBe(d2)
+        expect(d1).not.toBe(correct)
+        expect(d2).not.toBe(correct)
+      })
+    }
+
+    const WAVE5_ADD_CARRY: ReadonlyArray<[number, number]> = [
+      // 2D + 1D with carry
+      [27, 6], // Dave canonical, 33
+      [38, 5], // 43
+      [49, 4], // 53
+      [56, 7], // 63
+      [89, 9], // 98
+      // boundary: smallest with-regroup answers
+      [2, 9], // 11
+      [5, 8], // 13
+    ]
+
+    for (const [a, b] of WAVE5_ADD_CARRY) {
+      const correct = a + b
+      it(`${a}+${b}=${correct}: Forgotten-Carry P4 produces in-range distinct chips`, () => {
+        const [d1, d2] = pickDistractors(correct, 4, MAX, {
+          op: '+',
+          operands: [a, b],
+          distractorClass: 'forgotten-carry',
+          minAnswer: FLOOR,
+        })
+        expect(d1).toBeGreaterThanOrEqual(FLOOR)
+        expect(d1).toBeLessThanOrEqual(MAX)
+        expect(d2).toBeGreaterThanOrEqual(FLOOR)
+        expect(d2).toBeLessThanOrEqual(MAX)
+        expect(d1).not.toBe(d2)
+        expect(d1).not.toBe(correct)
+        expect(d2).not.toBe(correct)
+      })
+    }
   })
 })
 
