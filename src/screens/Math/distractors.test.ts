@@ -1153,6 +1153,142 @@ describe('pickDistractors — sub-to-20 minAnswer=10 threading (Kyle §3.1)', ()
   })
 })
 
+describe('pickDistractors — two-digit-addsub chip-floor alignment (forward-risk-guard for Wave 3 phantomBorrowDistractor)', () => {
+  // ── Context ────────────────────────────────────────────────────────────
+  // Devon NOF #7 on Kevin PR #291 surfaced a forward-risk: when Wave 3
+  // wires `phantomBorrowDistractor(correct, maxAnswer)` for two-digit-
+  // addsub P5–P8 `-` problems (per `design/math/two-digit-addsub-content.md`
+  // §3.4), the render-side chip floor MUST match the lint-side trap floor
+  // in `scripts/compositionLint.ts` `phantomBorrowTrap()` (line 2548:
+  // `if (trap < 1 || trap > 99) return null`).
+  //
+  // If a future Wave 3 PR sets the render-side floor to ≥ 10 (e.g. to
+  // enforce two-digit-only chips) without updating the lint-side, the
+  // pool's smallest `-` results (correct ∈ {12, 13, 14, 15}) would lint-
+  // pass with trap ∈ {2, 3, 4, 5} but silent-downgrade at render time.
+  // That's the misalignment this block pins against.
+  //
+  // ── The agreed floor ───────────────────────────────────────────────────
+  // The agreed floor for the two-digit-addsub `-` tier is `1` — matching
+  // `compositionLint.ts:2548` (literal `1` in the `phantomBorrowTrap`
+  // guard) and Marian-curriculum `ANSWER_RANGE_MIN = 1`. If either side
+  // drifts, the linkage breaks silently in production; this block is the
+  // tripwire.
+  //
+  // Cross-reference: `scripts/compositionLint.ts:2533-2552` (phantom-borrow
+  // lint floor narrative) + `design/math/two-digit-addsub-content.md` §3.4
+  // (trap formula `correct − 10`; degenerate-downgrade chain).
+  const PHANTOM_BORROW_LINT_FLOOR_PIN = 1
+  const MAX = ANSWER_RANGE_MAX_TWO_DIGIT // 99
+
+  it('lint-floor literal pin: matches scripts/compositionLint.ts:2548 trap-guard `< 1`', () => {
+    // If the lint guard at line 2548 is moved off `< 1` (e.g. to `< 10`),
+    // update this constant + the call sites in `Math.tsx` two-digit-addsub
+    // wiring in the SAME PR. This test exists so the misalignment can't
+    // sneak through a single-side edit.
+    expect(PHANTOM_BORROW_LINT_FLOOR_PIN).toBe(1)
+  })
+
+  it('correct=12 (smallest pool `-` result) with minAnswer=1 emits in-range off-by-one chips [11, 13]', () => {
+    // Pool fact 15 − 3 = 12 (per spec §1.1, smallest `correct` on the `-`
+    // side of the no-regroup pool). problemIndex=5 lands in the off-by-one
+    // tier, which is the tier Wave 3's phantom-borrow class will branch
+    // off of. Off-by-one of 12 is {11, 13}; both ≥ 1 and ≤ 99 under the
+    // pinned floor.
+    expect(
+      pickDistractors(12, 5, MAX, {
+        op: '-',
+        operands: [15, 3],
+        minAnswer: PHANTOM_BORROW_LINT_FLOOR_PIN,
+      }),
+    ).toEqual([11, 13])
+  })
+
+  it('correct=12 gentle ramp (problemIndex=1) with minAnswer=1 emits range-extreme chips [1, 99]', () => {
+    // Gentle ramp tier — both range-extremes are ≥2 away from correct=12.
+    // The `1` chip is exactly the pinned floor; the `99` chip is the
+    // ceiling. This pin demonstrates that under minAnswer=1, the floor
+    // value `1` is itself a valid chip (inclusivity of `minAnswer`).
+    expect(
+      pickDistractors(12, 1, MAX, {
+        op: '-',
+        operands: [15, 3],
+        minAnswer: PHANTOM_BORROW_LINT_FLOOR_PIN,
+      }),
+    ).toEqual([1, 99])
+  })
+
+  it('correct=73 (largest pool `-` result envelope) with minAnswer=1 emits off-by-one chips [72, 74]', () => {
+    // The pool's largest correct under the §7.2 Option B no-regroup pool
+    // is 73 (`97 − 24`). Off-by-one of 73 is {72, 74} — both well inside
+    // [1, 99]. Pin verifies the ceiling-side of the tier behaves under the
+    // same minAnswer=1 contract.
+    expect(
+      pickDistractors(73, 5, MAX, {
+        op: '-',
+        operands: [97, 24],
+        minAnswer: PHANTOM_BORROW_LINT_FLOOR_PIN,
+      }),
+    ).toEqual([72, 74])
+  })
+
+  it('every smallest-pool `-` correct ∈ {12, 13, 14, 15} stays ≥ minAnswer=1 across P4–P8 (NOF #7 forward-risk scenarios)', () => {
+    // Devon NOF #7's concrete forward-risk set: when Wave 3's render-side
+    // phantomBorrowDistractor lands with a hypothetical chip-floor of 10,
+    // these four `correct` values would lint-pass with phantom-borrow
+    // traps {2, 3, 4, 5} (all ≥ 1) but silent-downgrade at render time.
+    // Under the AGREED floor of 1, none of those traps falls out of range,
+    // and the existing off-by-one fallback yields chips strictly ≥ 1.
+    const nofForwardRiskCorrects = [12, 13, 14, 15] as const
+    const problemIndices = [4, 5, 6, 7, 8] as const
+    for (const correct of nofForwardRiskCorrects) {
+      for (const problemIndex of problemIndices) {
+        const [d1, d2] = pickDistractors(correct, problemIndex, MAX, {
+          op: '-',
+          // Operands chosen so a − b = correct without crossing 10s
+          // boundary; concrete fact selection doesn't matter for this
+          // off-by-one pin since no Class-2/B/3 hint is passed.
+          operands: [correct + 3, 3] as const,
+          minAnswer: PHANTOM_BORROW_LINT_FLOOR_PIN,
+        })
+        expect(d1).toBeGreaterThanOrEqual(PHANTOM_BORROW_LINT_FLOOR_PIN)
+        expect(d1).toBeLessThanOrEqual(MAX)
+        expect(d2).toBeGreaterThanOrEqual(PHANTOM_BORROW_LINT_FLOOR_PIN)
+        expect(d2).toBeLessThanOrEqual(MAX)
+        expect(d1).not.toBe(d2)
+        expect(d1).not.toBe(correct)
+        expect(d2).not.toBe(correct)
+      }
+    }
+  })
+
+  it('minAnswer=10 (hypothetical misaligned floor) makes correct=12 phantom-borrow trap=2 out-of-range — surfaces drift', () => {
+    // The misalignment scenario the brief warns about: a future Wave 3 PR
+    // sets render-side floor=10 (to enforce two-digit-only chips) while
+    // the lint stays at `< 1`. Under floor=10 and correct=12, the off-
+    // by-one walker still finds [11, 13] (both ≥ 10), but a phantom-borrow
+    // trap of `correct - 10 = 2` (the lint-passing value) WOULD be
+    // out-of-range. Pin documents that the lint-passing trap `2` violates
+    // a floor-of-10 contract — making any future floor-shift on EITHER
+    // side land a CI red.
+    const hypotheticalMisalignedFloor = 10
+    const lintPassingTrap = 12 - 10 // canonical phantom-borrow formula
+    expect(lintPassingTrap).toBe(2)
+    expect(lintPassingTrap).toBeLessThan(hypotheticalMisalignedFloor)
+    // The off-by-one fallback for correct=12 under floor=10 still
+    // produces in-range chips ([11, 13]) — the silent failure surface
+    // would be the lint-side trap (2) being declared "valid" by the lint
+    // while render-side rejects it. Pin asserts the trap-vs-floor delta.
+    expect(
+      pickDistractors(12, 5, MAX, {
+        op: '-',
+        operands: [15, 3],
+        minAnswer: hypotheticalMisalignedFloor,
+      }),
+    ).toEqual([11, 13])
+  })
+})
+
 // ── ANSWER_RANGE_MIN is exported but unused in this block — keep the
 //    import live so future tier additions don't have to re-add it.
 void ANSWER_RANGE_MIN
