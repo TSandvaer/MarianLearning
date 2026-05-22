@@ -618,6 +618,10 @@ export default function App() {
       // future tier-ship PR (two-digit-addsub) can classify wrong-
       // tap patterns post-hoc.
       perProblemAnswerValue: result.perProblemAnswerValue,
+      // Per-problem OFFERED distractor class (Kevin Wave 5 PR B —
+      // ticket 86c9y1p99). Persisted on
+      // SessionHistoryEntry.perProblemDistractorClass.
+      perProblemDistractorClass: result.perProblemDistractorClass,
     })
     setRoute('session-end')
   }, [])
