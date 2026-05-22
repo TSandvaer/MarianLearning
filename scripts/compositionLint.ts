@@ -137,6 +137,15 @@ export type CompositionRule =
   | 'high-leverage-coverage'
   | 'no-duplicates'
   | 'unparseable-problem'
+  // two-digit-addsub-only rules (PR A — ticket 86c9xkz9n). Binding is
+  // deferred per `testing-and-ci.md §6` split-PR pattern, but the rule
+  // literals must be members of CompositionRule so the standalone exported
+  // `lintTwoDigitAddsubComposition` typechecks. Sibling tiers never emit
+  // these rules; their lint functions only emit the rules above.
+  | 'op-mix'
+  | 'p1-is-plus'
+  | 'dual-exposure'
+  | 'diagnostic-coverage'
 
 /**
  * One detected violation against a single problem (or whole-session in the
@@ -1841,20 +1850,1096 @@ export function assertAddToTwentyCompositionClean(
   }
 }
 
+// ── two-digit-addsub: pool, rules, parser, lint, assert ─────────────────
+//
+// First tier with MIXED-OP sessions (`+` AND `-` within an 8-problem set).
+// First tier with HYPHENATED number words (`twenty-three`). First tier
+// where the dual-exposure rule binds in the real (non-forward-compat)
+// sense per spec §5.5.
+//
+// Spec: `design/math/two-digit-addsub-content.md`
+// Ticket: 86c9xkz9n
+// Structural precedent: add-to-20 PR #278 (lint infra) → PR #280 (rebake +
+// binding activation). This module follows the same split-PR pattern per
+// `testing-and-ci.md §6` — PR A ships infra with the binding deferred;
+// PR B (ticket follow-up) rebakes the canon and activates the binding.
+//
+// Six classes of composition rule (vs add-to-20's five):
+//   1. pool-membership — every fact one of the 36 (or 30 under §7.2 Option A)
+//      (a, b, op) triples.
+//   2. category-cap — round-ten-anchor ≤ 1 (the round-ten-prior correction
+//      lever per spec §1.4 — sibling to add-to-20's doubles cap), mid-decade-
+//      units-shift ≤ 4, near-boundary-no-cross ≤ 5, tens-doubles-echo ≤ 1,
+//      two-digit-plus-two-digit ≤ 2 (Option B only).
+//   3. band-by-slot — EASY any slot; MEDIUM P4-P8; HARD P5-P8.
+//   4. op-mix — first tier with mixed-op rules: addCount ∈ [5, 6],
+//      subCount ∈ [2, 3], addCount + subCount === 8. Allowed mixes:
+//      5+/3-, 6+/2-. FORBIDDEN: 8+/0-, 7+/1-, 4+/4-, 3+/5-.
+//   5. p1-is-plus — session opener carries onset anxiety; the more confident
+//      operation enters first (spec §2.2). P1 must be op === '+'.
+//   6. dual-exposure — load-bearing per spec §5.5. For any (a, b, op) triple
+//      in the session, the inverse triple (i.e. for + fact a+b=c, the - fact
+//      c-b=a OR c-a=b; for - fact a-b=c, the + fact c+b=a) is FORBIDDEN.
+//      Only ONE in-pool collision exists today (`33+4=37` ↔ `37-4=33`, but
+//      37-4 is not in the v1 - pool by construction), so dual-exposure is
+//      load-bearing primarily as forward-compat for v2 pool extensions.
+//   7. high-leverage-coverage — ≥ 1 near-boundary-no-cross fact MUST appear
+//      in P5-P8 (the cycle-5-regroup-prep diagnostic per spec §2.4). Uses
+//      the same STRICTER P5-P8 framing as add-to-20's make-ten-bridge rule.
+//   8. diagnostic-coverage — ≥ 2 in-range Class 2 (column-cross) traps
+//      across P4-P8 AND ≥ 1 in-range Class 3 (phantom-borrow) trap across
+//      P5-P8 `-` problems. Per spec §3.8 — the diagnostic instrument for
+//      concatenated-single-digit-processing (Dave NOF #1). Computed purely
+//      from `(a, b, op, correct)` per fact; renders the chip pool at lint
+//      time without coupling to the render pipeline.
+//   9. no-duplicates — no (a, b, op) triple repeats within the 8-problem set.
+//
+// NOTE — PR A scope (split-PR pattern per `testing-and-ci.md §6`):
+// `lintTwoDigitAddsubComposition` + `assertTwoDigitAddsubCompositionClean`
+// are EXPORTED but NOT yet wired into `bakeOne` / `resolveTierBinding` /
+// `runCompositionLint` dispatch / the `CompositionFileFinding` union.
+// The committed `public/canon/math/level-1/two-digit-addsub.json` shipped
+// with 3 round-ten-anchor facts (the §1.4 round-ten-prior correction
+// target) and would fail the round-ten-anchor cap of 1. Wiring is deferred
+// to PR B (canon rebake + directive sharpening + binding activation +
+// Wave 2 prereq fold-in `86c9xa817`).
+
+export type TwoDigitAddsubBand = 'EASY' | 'MEDIUM' | 'HARD'
+
+export type TwoDigitAddsubCategory =
+  | 'round-ten-anchor'
+  | 'mid-decade-units-shift'
+  | 'near-boundary-no-cross'
+  | 'tens-doubles-echo'
+  | 'two-digit-plus-two-digit'
+
+export type TwoDigitAddsubOp = '+' | '-'
+
+export interface TwoDigitAddsubPoolFact {
+  /** Stable "<a><op><b>" id, e.g. "20+3", "48-7". Op is part of identity per
+   *  spec §1.1 — "25-3" and "22+3" are distinct triples (and dual-exposure
+   *  forbids them co-occurring). */
+  id: string
+  a: number
+  b: number
+  op: TwoDigitAddsubOp
+  band: TwoDigitAddsubBand
+  category: TwoDigitAddsubCategory
+}
+
+/** The 36-fact pool from spec §1.1 (§7.2 Option B default).
+ *
+ *  Under §7.2 Option A (Thomas decision), pool drops the last 6
+ *  two-digit-plus-two-digit facts → 30 facts; the lint rule config also
+ *  drops the `two-digit-plus-two-digit` category cap row. The Option-B
+ *  default is what this lint ships against (Kyle's recommendation in
+ *  spec §7.2). If Thomas selects Option A, replace this constant with
+ *  the 30-fact slice. */
+export const TWO_DIGIT_ADDSUB_POOL: readonly TwoDigitAddsubPoolFact[] = [
+  // ── EASY band (9 facts; P1-P3 gentle ramp; also P4-P8 fallback) ────────
+  {
+    id: '20+3',
+    a: 20,
+    b: 3,
+    op: '+',
+    band: 'EASY',
+    category: 'round-ten-anchor',
+  },
+  {
+    id: '30+5',
+    a: 30,
+    b: 5,
+    op: '+',
+    band: 'EASY',
+    category: 'round-ten-anchor',
+  },
+  {
+    id: '40+2',
+    a: 40,
+    b: 2,
+    op: '+',
+    band: 'EASY',
+    category: 'round-ten-anchor',
+  },
+  {
+    id: '25+4',
+    a: 25,
+    b: 4,
+    op: '+',
+    band: 'EASY',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '33+4',
+    a: 33,
+    b: 4,
+    op: '+',
+    band: 'EASY',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '22+5',
+    a: 22,
+    b: 5,
+    op: '+',
+    band: 'EASY',
+    category: 'tens-doubles-echo',
+  },
+  {
+    id: '15-3',
+    a: 15,
+    b: 3,
+    op: '-',
+    band: 'EASY',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '28-5',
+    a: 28,
+    b: 5,
+    op: '-',
+    band: 'EASY',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '19-7',
+    a: 19,
+    b: 7,
+    op: '-',
+    band: 'EASY',
+    category: 'mid-decade-units-shift',
+  },
+  // ── MEDIUM band (10 facts; P4-P8 eligible) ────────────────────────────
+  {
+    id: '21+3',
+    a: 21,
+    b: 3,
+    op: '+',
+    band: 'MEDIUM',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '34+5',
+    a: 34,
+    b: 5,
+    op: '+',
+    band: 'MEDIUM',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '42+3',
+    a: 42,
+    b: 3,
+    op: '+',
+    band: 'MEDIUM',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '54+4',
+    a: 54,
+    b: 4,
+    op: '+',
+    band: 'MEDIUM',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '36+2',
+    a: 36,
+    b: 2,
+    op: '+',
+    band: 'MEDIUM',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '44+3',
+    a: 44,
+    b: 3,
+    op: '+',
+    band: 'MEDIUM',
+    category: 'tens-doubles-echo',
+  },
+  {
+    id: '18-4',
+    a: 18,
+    b: 4,
+    op: '-',
+    band: 'MEDIUM',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '25-3',
+    a: 25,
+    b: 3,
+    op: '-',
+    band: 'MEDIUM',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '37-4',
+    a: 37,
+    b: 4,
+    op: '-',
+    band: 'MEDIUM',
+    category: 'mid-decade-units-shift',
+  },
+  {
+    id: '26-5',
+    a: 26,
+    b: 5,
+    op: '-',
+    band: 'MEDIUM',
+    category: 'near-boundary-no-cross',
+  },
+  // ── HARD band (17 facts; P5-P8 eligible — Option B default) ───────────
+  {
+    id: '23+6',
+    a: 23,
+    b: 6,
+    op: '+',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '41+8',
+    a: 41,
+    b: 8,
+    op: '+',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '32+7',
+    a: 32,
+    b: 7,
+    op: '+',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '55+4',
+    a: 55,
+    b: 4,
+    op: '+',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '27+2',
+    a: 27,
+    b: 2,
+    op: '+',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '35-4',
+    a: 35,
+    b: 4,
+    op: '-',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '48-7',
+    a: 48,
+    b: 7,
+    op: '-',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '52-1',
+    a: 52,
+    b: 1,
+    op: '-',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '64-3',
+    a: 64,
+    b: 3,
+    op: '-',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  {
+    id: '66+3',
+    a: 66,
+    b: 3,
+    op: '+',
+    band: 'HARD',
+    category: 'tens-doubles-echo',
+  },
+  {
+    id: '47+2',
+    a: 47,
+    b: 2,
+    op: '+',
+    band: 'HARD',
+    category: 'near-boundary-no-cross',
+  },
+  // two-digit-plus-two-digit (§7.2 Option B; 6 facts; HARD only)
+  {
+    id: '23+14',
+    a: 23,
+    b: 14,
+    op: '+',
+    band: 'HARD',
+    category: 'two-digit-plus-two-digit',
+  },
+  {
+    id: '42+31',
+    a: 42,
+    b: 31,
+    op: '+',
+    band: 'HARD',
+    category: 'two-digit-plus-two-digit',
+  },
+  {
+    id: '25+14',
+    a: 25,
+    b: 14,
+    op: '+',
+    band: 'HARD',
+    category: 'two-digit-plus-two-digit',
+  },
+  {
+    id: '31+26',
+    a: 31,
+    b: 26,
+    op: '+',
+    band: 'HARD',
+    category: 'two-digit-plus-two-digit',
+  },
+  {
+    id: '52+13',
+    a: 52,
+    b: 13,
+    op: '+',
+    band: 'HARD',
+    category: 'two-digit-plus-two-digit',
+  },
+  {
+    id: '34+22',
+    a: 34,
+    b: 22,
+    op: '+',
+    band: 'HARD',
+    category: 'two-digit-plus-two-digit',
+  },
+] as const
+
+/** Tier rule config — what the two-digit-addsub lint enforces. Mirrors
+ *  `AddToTwentyRulesConfig` shape but adds op-mix + dual-exposure +
+ *  diagnostic-coverage fields per spec §2.2 + §5.5 + §3.8. */
+export interface TwoDigitAddsubRulesConfig {
+  pool: readonly TwoDigitAddsubPoolFact[]
+  categoryCaps: Record<TwoDigitAddsubCategory, number>
+  /** Slots (1-indexed) where each band is allowed. */
+  bandAllowedSlots: Record<TwoDigitAddsubBand, readonly number[]>
+  /** Allowed op-mix combinations per spec §2.2. Each entry is
+   *  `{ addCount, subCount }`; lint asserts the session matches one of
+   *  these. Default: 5+/3-, 6+/2-. */
+  allowedOpMixes: readonly { addCount: number; subCount: number }[]
+  /** Whole-session minimum count of near-boundary-no-cross facts within
+   *  P5-P8 (the cycle-5-regroup-prep diagnostic per spec §2.4). STRICTER
+   *  than the P4-P8 framing used by sibling tiers — same rationale as
+   *  add-to-20's `makeTenBridgeInP5ToP8Min`. */
+  nearBoundaryNoCrossInP5ToP8Min: number
+  /** Whole-session minimum count of in-range Class 2 (column-cross) traps
+   *  across P4-P8 per spec §3.8. Class 2 is the high-leverage diagnostic
+   *  instrument for this tier. */
+  classTwoColumnCrossInP4ToP8Min: number
+  /** Whole-session minimum count of in-range Class 3 (phantom-borrow)
+   *  traps across P5-P8 `-` problems per spec §3.8. */
+  classThreePhantomBorrowInP5ToP8Min: number
+  totalProblems: number
+}
+
+export const TWO_DIGIT_ADDSUB_RULES: TwoDigitAddsubRulesConfig = {
+  pool: TWO_DIGIT_ADDSUB_POOL,
+  categoryCaps: {
+    // Round-ten-anchor capped tight per spec §1.4 — the round-ten-prior
+    // correction lever (sibling to add-to-20's doubles cap). The current
+    // committed canon ships 3 round-ten-anchor facts of 8 (`20+3`, `30+5`,
+    // `40+2`); cap at 1 cuts that saturation by two-thirds.
+    'round-ten-anchor': 1,
+    // mid-decade-units-shift capped at 4 per spec §2.3 — the calibration
+    // anchor for typical mid-score sessions. Pool has 11 mid-decade
+    // facts so the cap binds before pool exhaustion.
+    'mid-decade-units-shift': 4,
+    // near-boundary-no-cross capped generously at 5 per spec §2.3 — IS
+    // the tier's learning target (the cycle-5-regroup-prep diagnostic).
+    // Cap binds only on near-boundary-heavy sessions.
+    'near-boundary-no-cross': 5,
+    // tens-doubles-echo capped at 1 per spec §2.3 — keeps doubles
+    // intuition lightly present without re-introducing add-to-20's
+    // doubles-prior at a new tier.
+    'tens-doubles-echo': 1,
+    // two-digit-plus-two-digit capped at 2 per spec §2.3 (§7.2 Option B
+    // only) — caps the cycle-5-prep representational surface to 25% of
+    // the session. Under §7.2 Option A, drop this row + the 6 pool
+    // facts.
+    'two-digit-plus-two-digit': 2,
+  },
+  bandAllowedSlots: {
+    // EASY allowed at any slot per spec §2.1 — gentle ramp anchor; also
+    // permitted as a discriminate-tier fallback when recent-score
+    // modulation biases easy.
+    EASY: [1, 2, 3, 4, 5, 6, 7, 8],
+    MEDIUM: [4, 5, 6, 7, 8],
+    HARD: [5, 6, 7, 8],
+  },
+  // Spec §2.2: 5+/3- (default) OR 6+/2- (low-score modulation). Lint
+  // FORBIDS 8+/0-, 7+/1-, 4+/4-, 3+/5-, and any combination summing to
+  // something other than 8.
+  allowedOpMixes: [
+    { addCount: 5, subCount: 3 },
+    { addCount: 6, subCount: 2 },
+  ],
+  // Spec §2.4: ≥ 1 near-boundary-no-cross in P5-P8. Same STRICTER
+  // slot-range as add-to-20's make-ten-bridge — P4 is MEDIUM-only and
+  // P4-P8 framing would trivially satisfy when P4 happens to be a MEDIUM
+  // near-boundary fact (#11 or #19).
+  nearBoundaryNoCrossInP5ToP8Min: 1,
+  // Spec §3.8: ≥ 2 Class 2 column-cross traps in P4-P8. The chip pool's
+  // diagnostic-coverage requirement — anything less and Marian's
+  // concatenated-processing signal is not statistically meaningful.
+  classTwoColumnCrossInP4ToP8Min: 2,
+  // Spec §3.8: ≥ 1 Class 3 phantom-borrow trap in P5-P8 `-` problems.
+  classThreePhantomBorrowInP5ToP8Min: 1,
+  totalProblems: 8,
+}
+
+// ── core: lint a SessionStartResponse against two-digit-addsub rules ────
+
+interface TwoDigitAddsubProblemRow {
+  index: number // 1-indexed
+  utteranceId: string
+  text: string
+  parsed: ParsedTwoDigitFact | null
+  poolMatch: TwoDigitAddsubPoolFact | null
+}
+
+/** Parsed fact from a two-digit-addsub read-line — carries `op` because
+ *  the tier is mixed-op (unlike `ParsedFact` which is op-implicit per
+ *  parser). */
+export interface ParsedTwoDigitFact {
+  a: number
+  b: number
+  op: TwoDigitAddsubOp
+}
+
+/** Number-word table extended through 99 with hyphenated forms.
+ *
+ *  Distinct from the other tier-specific tables (`NUMBER_WORDS`,
+ *  `SUB_TO_TWENTY_NUMBER_WORDS`, `ADD_TO_TWENTY_NUMBER_WORDS`) so that an
+ *  off-tier canon mis-routed into this parser still returns null cleanly
+ *  via the unrecognised-word fall-through. No shared mutable state.
+ *
+ *  Decade words (twenty, thirty, ... ninety) + hyphenated forms (twenty-
+ *  one ... ninety-nine) + the 0-19 forms inherited from sibling tables.
+ *  Total: 100 entries (0-99 in spoken form). */
+const TWO_DIGIT_ADDSUB_NUMBER_WORDS: Record<string, number> = (() => {
+  const table: Record<string, number> = {
+    zero: 0,
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+  }
+  const decades: Array<[string, number]> = [
+    ['twenty', 20],
+    ['thirty', 30],
+    ['forty', 40],
+    ['fifty', 50],
+    ['sixty', 60],
+    ['seventy', 70],
+    ['eighty', 80],
+    ['ninety', 90],
+  ]
+  const units: Array<[string, number]> = [
+    ['one', 1],
+    ['two', 2],
+    ['three', 3],
+    ['four', 4],
+    ['five', 5],
+    ['six', 6],
+    ['seven', 7],
+    ['eight', 8],
+    ['nine', 9],
+  ]
+  for (const [decWord, decVal] of decades) {
+    table[decWord] = decVal
+    for (const [unitWord, unitVal] of units) {
+      table[`${decWord}-${unitWord}`] = decVal + unitVal
+    }
+  }
+  return table
+})()
+
+// Read-line regexes. Per testing-and-ci.md §6 "Per-spec-author parser
+// convention" + "en-dash tolerance" — but neither dash form appears
+// inside read-line operand text here; the spec's §4.1 directive uses
+// plain hyphens within compound number words (`twenty-three`) which the
+// character class `[a-z-]` already accepts. The en-dash tolerance pattern
+// applies to spec-prose parsing (§1.1 pool table + §2.1 band-slot bullets)
+// — see `parseTwoDigitAddsubBandSlotsFromSpec` drift-guard below.
+//
+// Character class `[a-z][a-z-]*` requires a leading letter and permits
+// hyphens internally — sibling to Devon's parser widening in PR #287
+// (`planFromServer.ts:225`). Sub-template accepts EITHER "How many?" (the
+// current §4.2 template) OR "How many are left?" (forward-compat for
+// PR B fold-in `86c9xa817` — subtraction read-template tightening to
+// match sub-to-X tiers). Both shapes parse to the same `{a, b}`; the
+// composition-rule check for "are left" suffix is a PR B concern.
+const TWO_DIGIT_ADDSUB_RE_PLUS =
+  /^\s*([a-z][a-z-]*)\s+plus\s+([a-z][a-z-]*)\s*\.\s*how\s+many\s*\?\s*$/i
+const TWO_DIGIT_ADDSUB_RE_MINUS =
+  /^\s*([a-z][a-z-]*)\s+minus\s+([a-z][a-z-]*)\s*\.\s*how\s+many(?:\s+are\s+left)?\s*\?\s*$/i
+
+/**
+ * Parse a two-digit-addsub read-line into `{ a, b, op }`. Returns null if
+ * the text matches neither the `"<W> plus <W>. How many?"` nor the
+ * `"<W> minus <W>. How many?"` (or `"How many are left?"`) template, or
+ * if a number word is unrecognised. Pure; no I/O.
+ *
+ * First mixed-op parser in this module — sibling tier parsers are
+ * op-fixed (sub-to-X is minus-only, add-to-X is plus-only). The op is
+ * inferred from which regex matches; the return value carries it
+ * explicitly so downstream pool-membership lookup can be op-keyed.
+ *
+ * Exported for tests + future render-time consumers.
+ */
+export function parseTwoDigitAddsubReadLine(
+  text: string,
+): ParsedTwoDigitFact | null {
+  const mPlus = TWO_DIGIT_ADDSUB_RE_PLUS.exec(text)
+  if (mPlus) {
+    const a = TWO_DIGIT_ADDSUB_NUMBER_WORDS[mPlus[1]!.toLowerCase()]
+    const b = TWO_DIGIT_ADDSUB_NUMBER_WORDS[mPlus[2]!.toLowerCase()]
+    if (a === undefined || b === undefined) return null
+    return { a, b, op: '+' }
+  }
+  const mMinus = TWO_DIGIT_ADDSUB_RE_MINUS.exec(text)
+  if (mMinus) {
+    const a = TWO_DIGIT_ADDSUB_NUMBER_WORDS[mMinus[1]!.toLowerCase()]
+    const b = TWO_DIGIT_ADDSUB_NUMBER_WORDS[mMinus[2]!.toLowerCase()]
+    if (a === undefined || b === undefined) return null
+    return { a, b, op: '-' }
+  }
+  return null
+}
+
+function extractTwoDigitAddsubProblems(
+  response: Pick<SessionStartResponse, 'utterances'>,
+): TwoDigitAddsubProblemRow[] {
+  const re = /^math\.p(\d+)\.read$/
+  const rows: TwoDigitAddsubProblemRow[] = []
+  for (const u of response.utterances) {
+    const m = re.exec(u.id)
+    if (!m) continue
+    const index = Number.parseInt(m[1]!, 10)
+    const parsed = parseTwoDigitAddsubReadLine(u.text)
+    const poolMatch = parsed
+      ? (TWO_DIGIT_ADDSUB_POOL.find(
+          (f) => f.a === parsed.a && f.b === parsed.b && f.op === parsed.op,
+        ) ?? null)
+      : null
+    rows.push({
+      index,
+      utteranceId: u.id,
+      text: u.text,
+      parsed,
+      poolMatch,
+    })
+  }
+  rows.sort((x, y) => x.index - y.index)
+  return rows
+}
+
+// ── distractor-trap predicates (Class 2 + Class 3 per spec §3) ──────────
+//
+// Both functions return the trap value if it is non-degenerate (in
+// `[1, 99]`, distinct from `correct`, distinct from off-by-one) OR null
+// if the trap collapses. The lint only needs to count non-null returns.
+// Render-side derivation (Math.tsx) silently downgrades the same way.
+
+/** Spec §3.3 — column-cross trap (Class 2, both ops, P4-P8 eligible).
+ *
+ *  For `+` with single-digit `b` (b in [1, 9]): tens digit = `a div 10`,
+ *  units digit = `(a mod 10) + b` (no carry per pool guarantee). Trap is
+ *  the units-tens swap: `((a mod 10) + b) * 10 + (a div 10)`.
+ *
+ *  For `+` with two-digit `b` (b in [10, 99]): tens digit = `(a div 10) +
+ *  (b div 10)` (no carry per pool guarantee), units digit = `(a mod 10) +
+ *  (b mod 10)`. Trap is the swap.
+ *
+ *  For `-` with single-digit `b`: tens digit = `a div 10`, units digit =
+ *  `(a mod 10) - b` (no borrow per pool guarantee). Trap is the swap.
+ *
+ *  Degenerate cases:
+ *    - Palindromic units result (e.g. correct=22 with tens=2,units=2): trap
+ *      aliases correct.
+ *    - Tens-zero result (e.g. trap evaluates to single-digit < 10): trap
+ *      collapses below the chip range floor.
+ *    - Trap within off-by-one of correct.
+ */
+function columnCrossTrap(fact: TwoDigitAddsubPoolFact): number | null {
+  const { a, b, op } = fact
+  const correct = op === '+' ? a + b : a - b
+  let tens: number
+  let units: number
+  if (op === '+') {
+    if (b < 10) {
+      // single-digit-second-operand mainline
+      tens = Math.floor(a / 10)
+      units = (a % 10) + b
+    } else {
+      // two-digit-plus-two-digit (§7.2 Option B)
+      tens = Math.floor(a / 10) + Math.floor(b / 10)
+      units = (a % 10) + (b % 10)
+    }
+  } else {
+    // op === '-' (subtrahend is single-digit per spec §0)
+    tens = Math.floor(a / 10)
+    units = (a % 10) - b
+  }
+  // Non-degeneracy: trap must be a valid 2-digit chip and distinct from
+  // correct + off-by-one.
+  const trap = units * 10 + tens
+  if (trap < 10 || trap > 99) return null
+  if (trap === correct) return null
+  if (trap === correct - 1 || trap === correct + 1) return null
+  return trap
+}
+
+/** Spec §3.4 — phantom-borrow trap (Class 3, op === '-' only, P5-P8
+ *  eligible).
+ *
+ *  Trap formula: `correct - 10`. Models the over-application of borrow
+ *  (child decrements the tens digit unnecessarily on a no-borrow problem).
+ *
+ *  Degenerate when `correct - 10 < 10` (trap drops below chip-range floor;
+ *  for the v1 pool the smallest correct on the `-` side is 12, so trap=2
+ *  — still ≥ 1 but below the typical chip-range floor of 10 for this
+ *  tier. We accept trap ≥ 1 here; the render-side check decides whether
+ *  to surface or downgrade based on the actual chip floor in use). */
+function phantomBorrowTrap(fact: TwoDigitAddsubPoolFact): number | null {
+  if (fact.op !== '-') return null
+  const correct = fact.a - fact.b
+  const trap = correct - 10
+  if (trap < 1 || trap > 99) return null
+  if (trap === correct) return null
+  if (trap === correct - 1 || trap === correct + 1) return null
+  return trap
+}
+
+/**
+ * Lint a canon's plan against the two-digit-addsub composition rules.
+ * Returns ALL violations across the 8-problem set — does not stop at the
+ * first.
+ *
+ * Pure; no I/O.
+ *
+ * NOTE — PR A scope (split-PR pattern per `testing-and-ci.md §6`):
+ * This function is EXPORTED but NOT yet wired into `bakeOne` /
+ * `resolveTierBinding` / `runCompositionLint` dispatch / the
+ * `CompositionFileFinding` union. The committed
+ * `public/canon/math/level-1/two-digit-addsub.json` pre-exists with
+ * 3 round-ten-anchor facts (the §1.4 round-ten-prior correction target —
+ * `20+3`, `30+5`, `40+2`). Wiring is deferred to PR B (ticket follow-up
+ * to 86c9xkz9n).
+ *
+ * TODO (PR B activates: see testing-and-ci.md §6 "Split-PR pattern"
+ * 3-line update — move two-digit-addsub.json out of OOS-list in
+ * `runCompositionLint` disk-walker test, bump filesLinted +1, bump
+ * filesSkipped -1):
+ *   1. Add `'two-digit-addsub'` to `TierLintBinding` union below.
+ *   2. Add the `two-digit-addsub.json` branch in `resolveTierBinding`.
+ *   3. Add the `case 'two-digit-addsub':` arm in `runCompositionLint`'s
+ *      switch.
+ *   4. Add `'two-digit-addsub'` to `CompositionFileFinding.tier` union.
+ *   5. Sharpen the `MATH_TRACK_GUIDE` two-digit-addsub directive at
+ *      `api/_planner.ts:1176-1177` per spec §4.1 — replace the bare
+ *      one-line directive with the full FACT POOL bullet block + the
+ *      SESSION COMPOSITION RULES enumeration. Fold in Wave 2 prereq
+ *      86c9xa817 (subtraction read-template "How many?" → "How many are
+ *      left?" — and tighten `TWO_DIGIT_ADDSUB_RE_MINUS` to require the
+ *      "are left" suffix).
+ *   6. Re-bake `public/canon/math/level-1/two-digit-addsub.json` via the
+ *      per-tier rebake recipe (`planner-and-canon.md` § "Per-tier rebake
+ *      recipe"); commit the JSON diff in the same PR.
+ *   7. Flip the deferred test marker:
+ *        expect(resolveTierBinding('two-digit-addsub.json')).toBe(
+ *          'two-digit-addsub')
+ *      (drop the existing `.toBeNull()` assertion seeded in PR A).
+ */
+export function lintTwoDigitAddsubComposition(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: TwoDigitAddsubRulesConfig = TWO_DIGIT_ADDSUB_RULES,
+): CompositionViolation[] {
+  const violations: CompositionViolation[] = []
+  const problems = extractTwoDigitAddsubProblems(response)
+
+  // ── unparseable / pool-membership pass ──
+  for (const p of problems) {
+    if (p.parsed === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: p.index,
+        message:
+          `P${p.index} (${p.utteranceId}) text does not match either ` +
+          `two-digit-addsub read template ("<addend-A> plus <addend-B>. ` +
+          `How many?" OR "<minuend> minus <subtrahend>. How many?"): ` +
+          JSON.stringify(p.text),
+        factId: null,
+      })
+      continue
+    }
+    if (p.poolMatch === null) {
+      const sum =
+        p.parsed.op === '+' ? p.parsed.a + p.parsed.b : p.parsed.a - p.parsed.b
+      violations.push({
+        rule: 'pool-membership',
+        problemIndex: p.index,
+        message:
+          `P${p.index} fact ${p.parsed.a}${p.parsed.op}${p.parsed.b}=` +
+          `${sum} is NOT in the 36-fact two-digit-addsub pool. Either ` +
+          `it violates the no-regroup constraint, the operand range ` +
+          `(a in [10, 99], b in [1, 9] OR [10, 99] for ` +
+          `two-digit-plus-two-digit), the answer range ([12, 73] for ` +
+          `+, [12, 64] for -), or it is a valid in-range fact outside ` +
+          `the v1 curation (deferred per spec §1.5). See ` +
+          `design/math/two-digit-addsub-content.md §1.1.`,
+        factId: `${p.parsed.a}${p.parsed.op}${p.parsed.b}`,
+      })
+    }
+  }
+
+  const matched = problems.filter(
+    (
+      p,
+    ): p is TwoDigitAddsubProblemRow & { poolMatch: TwoDigitAddsubPoolFact } =>
+      p.poolMatch !== null,
+  )
+
+  // ── band-by-slot pass ──
+  for (const p of matched) {
+    const allowed = config.bandAllowedSlots[p.poolMatch.band]
+    if (!allowed.includes(p.index)) {
+      violations.push({
+        rule: 'band-by-slot',
+        problemIndex: p.index,
+        message:
+          `P${p.index} carries ${p.poolMatch.band} fact ` +
+          `${p.poolMatch.id} (category ${p.poolMatch.category}). ` +
+          `${p.poolMatch.band}-band is only allowed at slots ` +
+          `[${allowed.join(', ')}].`,
+        factId: p.poolMatch.id,
+      })
+    }
+  }
+
+  // ── category-cap pass ──
+  type MatchedTwoDigitRow = TwoDigitAddsubProblemRow & {
+    poolMatch: TwoDigitAddsubPoolFact
+  }
+  const categoryCounts: Record<string, MatchedTwoDigitRow[]> = {}
+  for (const p of matched) {
+    const cat = p.poolMatch.category
+    if (!categoryCounts[cat]) categoryCounts[cat] = []
+    categoryCounts[cat]!.push(p)
+  }
+  for (const [cat, rows] of Object.entries(categoryCounts)) {
+    const cap = config.categoryCaps[cat as TwoDigitAddsubCategory]
+    if (cap === undefined) continue
+    if (rows.length > cap) {
+      violations.push({
+        rule: 'category-cap',
+        problemIndex: null,
+        message:
+          `Category "${cat}" cap is ${cap}; canon has ${rows.length} ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}; facts ` +
+          `${rows.map((r) => r.poolMatch.id).join(', ')}).` +
+          (cat === 'round-ten-anchor'
+            ? ` Round-ten-prior correction lever — per spec §1.4 the` +
+              ` current canon ships 3 round-ten-anchor facts of 8; cap` +
+              ` at ${cap} cuts that saturation by two-thirds. Reject` +
+              ` the second round-ten-anchor.`
+            : ''),
+        factId: null,
+      })
+    }
+  }
+
+  // ── op-mix pass (spec §2.2 — first tier with mixed-op rules) ──
+  if (matched.length === config.totalProblems) {
+    let addCount = 0
+    let subCount = 0
+    for (const p of matched) {
+      if (p.poolMatch.op === '+') addCount++
+      else subCount++
+    }
+    const isAllowed = config.allowedOpMixes.some(
+      (m) => m.addCount === addCount && m.subCount === subCount,
+    )
+    if (!isAllowed) {
+      const allowedStr = config.allowedOpMixes
+        .map((m) => `${m.addCount}+/${m.subCount}-`)
+        .join(', ')
+      violations.push({
+        rule: 'op-mix',
+        problemIndex: null,
+        message:
+          `Op-mix is ${addCount}+/${subCount}-; not in allowed set ` +
+          `[${allowedStr}]. Per spec §2.2: at least 5 '+' AND at least ` +
+          `2 '-' problems; allowed mixes are ${allowedStr}. FORBIDDEN: ` +
+          `8+/0-, 7+/1-, 4+/4-, 3+/5-, and any combination summing to ` +
+          `something other than 8.`,
+        factId: null,
+      })
+    }
+  }
+
+  // ── p1-is-plus pass (spec §2.2 — session opener carries onset anxiety) ──
+  const p1 = matched.find((p) => p.index === 1)
+  if (p1 && p1.poolMatch.op !== '+') {
+    violations.push({
+      rule: 'p1-is-plus',
+      problemIndex: 1,
+      message:
+        `P1 carries op '${p1.poolMatch.op}' (fact ${p1.poolMatch.id}). ` +
+        `Per spec §2.2 P1 must always be op '+': session opener carries ` +
+        `onset anxiety and the more confident operation (per Marian's ` +
+        `April 2026 diagnostic) must enter first.`,
+      factId: p1.poolMatch.id,
+    })
+  }
+
+  // ── dual-exposure pass (spec §5.5 — load-bearing per v1) ──
+  //
+  // For every (a, b, op) triple in the session, the inverse triple is
+  // FORBIDDEN. Inverse for + fact a+b=c: -fact c-b=a OR c-a=b. Inverse for
+  // - fact a-b=c: +fact c+b=a (equivalently a-b=c implies b+c=a).
+  //
+  // Practically (against the v1 pool) the only candidate collisions are
+  // facts where both halves of the operand triple appear as pool entries
+  // in opposite ops. Today: 33+4=37 (in pool) ↔ 37-4=33 (NOT in pool —
+  // pool has 37-4 as a + complement absent). The rule is asserted across
+  // every triple combination regardless; it's load-bearing forward-compat.
+  const tripleKey = (a: number, b: number, op: TwoDigitAddsubOp): string =>
+    `${a}${op}${b}`
+  const seenTriples = new Map<string, MatchedTwoDigitRow>()
+  for (const p of matched) {
+    seenTriples.set(tripleKey(p.poolMatch.a, p.poolMatch.b, p.poolMatch.op), p)
+  }
+  for (const p of matched) {
+    const { a, b, op } = p.poolMatch
+    const correct = op === '+' ? a + b : a - b
+    // Each fact a OP b = c implies three "inverse" forms.
+    // For +: a+b=c → -inverse: c-b=a (always), c-a=b (if a<10 — second
+    //   operand stays single-digit). For 2-digit-plus-2-digit: c-b=a
+    //   and c-a=b both valid candidates.
+    // For -: a-b=c → +inverse: c+b=a (always), b+c=a (commutative).
+    //   For the v1 - pool where b is single-digit, c+b=a is the form
+    //   that would appear as a + fact.
+    const inverses: Array<{ a: number; b: number; op: TwoDigitAddsubOp }> = []
+    if (op === '+') {
+      // c - b = a; c - a = b (latter often out of -pool by being negative
+      // or having two-digit subtrahend, but we check the key match).
+      inverses.push({ a: correct, b, op: '-' })
+      inverses.push({ a: correct, b: a, op: '-' })
+    } else {
+      // c + b = a (the canonical + inverse)
+      inverses.push({ a: correct, b, op: '+' })
+      // b + c = a (commutative — but only if both single-digit, else
+      // not in pool by construction).
+      inverses.push({ a: b, b: correct, op: '+' })
+    }
+    for (const inv of inverses) {
+      const invKey = tripleKey(inv.a, inv.b, inv.op)
+      const invMatch = seenTriples.get(invKey)
+      if (!invMatch) continue
+      // Avoid double-reporting: only emit once per ordered pair (the
+      // pair with smaller `index` raises the violation).
+      if (invMatch.index <= p.index) continue
+      violations.push({
+        rule: 'dual-exposure',
+        problemIndex: null,
+        message:
+          `Dual-exposure rule (spec §5.5): fact ${p.poolMatch.id} at P` +
+          `${p.index} co-occurs with its inverse ${invMatch.poolMatch.id} ` +
+          `at P${invMatch.index}. The operand triple ` +
+          `(${a}, ${b}, ${correct}) must NOT appear in both '+' and '-' ` +
+          `forms within the same session.`,
+        factId: `${p.poolMatch.id}↔${invMatch.poolMatch.id}`,
+      })
+    }
+  }
+
+  // ── high-leverage-coverage pass (>= 1 near-boundary-no-cross in P5-P8) ──
+  //
+  // STRICTER P5-P8 framing per spec §2.4 (sibling to add-to-20's
+  // make-ten-bridge rule) — P4 is MEDIUM-only and several MEDIUM facts
+  // are near-boundary-no-cross (#11=34+5, #19=26-5), so a P4-P8 rule would
+  // be trivially satisfied. P5-P8 forces the rule to bind.
+  const nearBoundaryInDiscriminate = matched.filter(
+    (p) => p.poolMatch.category === 'near-boundary-no-cross' && p.index >= 5,
+  )
+  if (
+    nearBoundaryInDiscriminate.length < config.nearBoundaryNoCrossInP5ToP8Min
+  ) {
+    violations.push({
+      rule: 'high-leverage-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.nearBoundaryNoCrossInP5ToP8Min} ` +
+        `near-boundary-no-cross fact(s) MUST appear in P5-P8 (the ` +
+        `cycle-5-regroup-prep diagnostic per spec §2.4 — the actual ` +
+        `learning target of the tier). STRICTER than sibling tiers' ` +
+        `P4-P8 framing: P4 is MEDIUM-only and several MEDIUM facts are ` +
+        `near-boundary-no-cross (#11=34+5, #19=26-5), so a P4-P8 rule ` +
+        `would be trivially satisfied; P5-P8 forces the rule to bind. ` +
+        `Canon has ${nearBoundaryInDiscriminate.length} ` +
+        `near-boundary-no-cross fact(s) in P5-P8.`,
+      factId: null,
+    })
+  }
+
+  // ── diagnostic-coverage pass (Class 2 + Class 3 trap admissibility) ──
+  //
+  // Spec §3.8: ≥ 2 in-range Class 2 (column-cross) traps across P4-P8
+  // AND ≥ 1 in-range Class 3 (phantom-borrow) trap across P5-P8 '-'
+  // problems. Trap derivation is render-side (Math.tsx); the lint asserts
+  // the pool-fact-set chosen by Haiku ADMITS the trap derivation in-range
+  // for the required minimum count. Computed purely from (a, b, op, c) —
+  // no coupling to the render pipeline.
+  const p4ToP8 = matched.filter((p) => p.index >= 4 && p.index <= 8)
+  const classTwoInRange = p4ToP8.filter(
+    (p) => columnCrossTrap(p.poolMatch) !== null,
+  )
+  if (classTwoInRange.length < config.classTwoColumnCrossInP4ToP8Min) {
+    violations.push({
+      rule: 'diagnostic-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.classTwoColumnCrossInP4ToP8Min} in-range ` +
+        `Class 2 (column-cross) trap(s) MUST be admissible across ` +
+        `P4-P8 per spec §3.8 (the diagnostic instrument for ` +
+        `concatenated-single-digit-processing — Dave NOF #1). Canon ` +
+        `has ${classTwoInRange.length} P4-P8 fact(s) whose column-cross ` +
+        `trap is in [10, 99] AND non-degenerate (distinct from correct ` +
+        `+ off-by-one). Re-bake with at least one additional P4-P8 fact ` +
+        `that admits a non-degenerate column-cross trap.`,
+      factId: null,
+    })
+  }
+  const p5ToP8Minus = matched.filter(
+    (p) => p.index >= 5 && p.index <= 8 && p.poolMatch.op === '-',
+  )
+  const classThreeInRange = p5ToP8Minus.filter(
+    (p) => phantomBorrowTrap(p.poolMatch) !== null,
+  )
+  if (classThreeInRange.length < config.classThreePhantomBorrowInP5ToP8Min) {
+    violations.push({
+      rule: 'diagnostic-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.classThreePhantomBorrowInP5ToP8Min} in-range ` +
+        `Class 3 (phantom-borrow) trap(s) MUST be admissible across ` +
+        `P5-P8 '-' problems per spec §3.8 (the over-regrouping ` +
+        `diagnostic). Canon has ${classThreeInRange.length} P5-P8 '-' ` +
+        `fact(s) whose phantom-borrow trap is in [1, 99] AND ` +
+        `non-degenerate. Re-bake with at least one '-' fact at P5-P8 ` +
+        `whose (correct - 10) admits a non-degenerate trap.`,
+      factId: null,
+    })
+  }
+
+  // ── no-duplicates pass ──
+  const seenIds = new Map<string, TwoDigitAddsubProblemRow[]>()
+  for (const p of matched) {
+    const key = p.poolMatch.id
+    if (!seenIds.has(key)) seenIds.set(key, [])
+    seenIds.get(key)!.push(p)
+  }
+  for (const [factId, rows] of seenIds.entries()) {
+    if (rows.length > 1) {
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: null,
+        message:
+          `Fact ${factId} appears ${rows.length} times ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}). ` +
+          `No duplicate (a, b, op) triples allowed within the 8-problem ` +
+          `set. Note: 25-3 and 22+3 are distinct ordered triples (the ` +
+          `op flag is part of identity) — but dual-exposure forbids ` +
+          `their co-occurrence per spec §5.5.`,
+        factId,
+      })
+    }
+  }
+
+  return violations
+}
+
+/**
+ * Throwing helper for the bake-time integration point. The throw aborts
+ * the bake and stops the (compositionally invalid) JSON from reaching
+ * disk.
+ *
+ * `canonId` is a human-readable identifier (e.g. `"math/two-digit-addsub"`).
+ *
+ * NOTE (PR A scope): exported but not yet called from `bakeOne`. PR B
+ * activates the binding alongside a fresh canon — see the TODO in
+ * `lintTwoDigitAddsubComposition` above.
+ */
+export function assertTwoDigitAddsubCompositionClean(
+  canonId: string,
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: TwoDigitAddsubRulesConfig = TWO_DIGIT_ADDSUB_RULES,
+): void {
+  const violations = lintTwoDigitAddsubComposition(response, config)
+  if (violations.length > 0) {
+    throw new CompositionLintError(canonId, violations)
+  }
+}
+
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
-// Current scope is sub-to-10 + add-to-10 + sub-to-20. The function
-// returns a (potentially nil) rule config for the supplied canon-file
-// path. Hard-coded matching; future tiers slot in here.
+// Current scope is sub-to-10 + add-to-10 + sub-to-20 + add-to-20. The
+// function returns a (potentially nil) rule config for the supplied
+// canon-file path. Hard-coded matching; future tiers slot in here.
 //
-// add-to-20: lint infra (POOL, RULES, parser, lintAddToTwentyComposition,
-// assertAddToTwentyCompositionClean) shipped in PR A (ticket 86c9uuqzu,
-// PR #278). PR B (this PR — ticket follow-up to 86c9uuqzu) activates the
-// binding alongside a fresh canon rebake. The previous committed
-// `public/canon/math/level-1/add-to-20.json` shipped 4-of-8 doubles
-// (spec §1.4's doubles-prior correction target); the rebake replaces it
-// with a spec-compliant 8-problem session (doubles <= 2, near-doubles
-// <= 2, >= 1 make-ten-bridge in P5-P8).
+// two-digit-addsub: lint infra (POOL, RULES, parser,
+// lintTwoDigitAddsubComposition, assertTwoDigitAddsubCompositionClean)
+// shipped in PR A (ticket 86c9xkz9n). PR B (ticket follow-up to
+// 86c9xkz9n) activates the binding alongside a fresh canon rebake + Wave 2
+// prereq fold-in (86c9xa817 — "How many?" → "How many are left?"). The
+// previous committed `public/canon/math/level-1/two-digit-addsub.json`
+// shipped 3-of-8 round-ten-anchor facts (spec §1.4's round-ten-prior
+// correction target); the rebake replaces it with a spec-compliant
+// 8-problem session (round-ten-anchor ≤ 1, mid-decade-units-shift ≤ 4,
+// near-boundary-no-cross ≤ 5, tens-doubles-echo ≤ 1, op-mix 5+/3- or
+// 6+/2-, ≥ 1 near-boundary-no-cross in P5-P8, ≥ 2 Class 2 + ≥ 1 Class 3
+// traps admissible).
 
 export type TierLintBinding =
   | { tier: 'sub-to-10'; config: SubToTenRulesConfig }

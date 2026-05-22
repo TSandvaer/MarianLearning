@@ -38,19 +38,24 @@ import {
   SUB_TO_TEN_RULES,
   SUB_TO_TWENTY_POOL,
   SUB_TO_TWENTY_RULES,
+  TWO_DIGIT_ADDSUB_POOL,
+  TWO_DIGIT_ADDSUB_RULES,
   assertAddToTenCompositionClean,
   assertAddToTwentyCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
+  assertTwoDigitAddsubCompositionClean,
   formatCompositionLintReport,
   lintAddToTenComposition,
   lintAddToTwentyComposition,
   lintSubToTenComposition,
   lintSubToTwentyComposition,
+  lintTwoDigitAddsubComposition,
   parseAddToTenReadLine,
   parseAddToTwentyReadLine,
   parseSubToTenReadLine,
   parseSubToTwentyReadLine,
+  parseTwoDigitAddsubReadLine,
   resolveTierBinding,
   runCompositionLint,
 } from './compositionLint.ts'
@@ -4769,5 +4774,1688 @@ describe('resolveTierBinding — add-to-20', () => {
     expect(resolveTierBinding('canon/math/level-1/sub-to-20.json')?.tier).toBe(
       'sub-to-20',
     )
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════
+// ── two-digit-addsub tests (PR A — ticket 86c9xkz9n) ─────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+//
+// Sibling to the add-to-20 PR #278 lint infra. PR A scope: ship POOL +
+// RULES + parser + lintTwoDigitAddsubComposition + standalone helpers +
+// drift-guards against the spec markdown. Binding intentionally deferred
+// (resolveTierBinding returns null for `two-digit-addsub.json` and the
+// committed canon ships with 3 round-ten-anchor facts — the §1.4
+// correction target — that would fail PR A's lint). PR B activates the
+// binding + rebakes the canon + folds in the Wave 2 prereq (86c9xa817).
+
+const TWO_DIGIT_ADDSUB_DECADES: ReadonlyArray<readonly [string, number]> = [
+  ['twenty', 20],
+  ['thirty', 30],
+  ['forty', 40],
+  ['fifty', 50],
+  ['sixty', 60],
+  ['seventy', 70],
+  ['eighty', 80],
+  ['ninety', 90],
+]
+
+const TWO_DIGIT_ADDSUB_UNITS: ReadonlyArray<readonly [string, number]> = [
+  ['one', 1],
+  ['two', 2],
+  ['three', 3],
+  ['four', 4],
+  ['five', 5],
+  ['six', 6],
+  ['seven', 7],
+  ['eight', 8],
+  ['nine', 9],
+]
+
+const TWO_DIGIT_ADDSUB_SMALL: ReadonlyArray<readonly [string, number]> = [
+  ['zero', 0],
+  ['one', 1],
+  ['two', 2],
+  ['three', 3],
+  ['four', 4],
+  ['five', 5],
+  ['six', 6],
+  ['seven', 7],
+  ['eight', 8],
+  ['nine', 9],
+  ['ten', 10],
+  ['eleven', 11],
+  ['twelve', 12],
+  ['thirteen', 13],
+  ['fourteen', 14],
+  ['fifteen', 15],
+  ['sixteen', 16],
+  ['seventeen', 17],
+  ['eighteen', 18],
+  ['nineteen', 19],
+]
+
+/** Convert n in [0, 99] to its hyphenated quantity-word form. */
+function twoDigitAddsubWord(n: number): string {
+  if (n < 0 || n > 99) throw new Error(`out of word range: ${n}`)
+  if (n < 20) {
+    const entry = TWO_DIGIT_ADDSUB_SMALL.find(([, v]) => v === n)
+    if (!entry) throw new Error(`unmapped small: ${n}`)
+    return entry[0]
+  }
+  const tens = Math.floor(n / 10) * 10
+  const units = n % 10
+  const decade = TWO_DIGIT_ADDSUB_DECADES.find(([, v]) => v === tens)
+  if (!decade) throw new Error(`unmapped decade: ${tens}`)
+  if (units === 0) return decade[0]
+  const unitWord = TWO_DIGIT_ADDSUB_UNITS.find(([, v]) => v === units)
+  if (!unitWord) throw new Error(`unmapped unit: ${units}`)
+  return `${decade[0]}-${unitWord[0]}`
+}
+
+function capitalizeTwoDigit(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+/** Build a `math.p<N>.read` two-digit-addsub utterance. */
+function readTwoDigitAddsubUtterance(
+  index: number,
+  a: number,
+  b: number,
+  op: '+' | '-',
+): Utterance {
+  const aWord = capitalizeTwoDigit(twoDigitAddsubWord(a))
+  const bWord = twoDigitAddsubWord(b)
+  const text =
+    op === '+'
+      ? `${aWord} plus ${bWord}. How many?`
+      : `${aWord} minus ${bWord}. How many?`
+  return {
+    id: `math.p${index}.read`,
+    text,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+/** Build a SessionStartResponse with 8 two-digit-addsub problems. */
+function buildTwoDigitAddsubCanonResponse(
+  facts: Array<[a: number, b: number, op: '+' | '-']>,
+): SessionStartResponse {
+  const utterances: Utterance[] = facts.map(([a, b, op], i) =>
+    readTwoDigitAddsubUtterance(i + 1, a, b, op),
+  )
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: { id: 'test', label: 'test', utterances: [] },
+    utterances,
+  }
+}
+
+/** Clean canonical 8-fact two-digit-addsub session. Composition:
+ *    P1 = 20+3   EASY round-ten-anchor (cap=1, 1/1 used; also the
+ *                only round-ten in session per spec §1.4 cap correction)
+ *    P2 = 22+5   EASY tens-doubles-echo (cap=1, 1/1 used)
+ *    P3 = 15-3   EASY mid-decade-units-shift (1/4 used)
+ *    P4 = 42+3   MEDIUM mid-decade-units-shift (2/4 used)
+ *    P5 = 23+6   HARD near-boundary-no-cross — P5-P8 anchor #1
+ *    P6 = 48-7   HARD near-boundary-no-cross — P5-P8 anchor #2 + Class 3
+ *                phantom-borrow admissible (correct=41, trap=31)
+ *    P7 = 33+4   EASY mid-decade-units-shift (3/4 used) — note: in
+ *                Option-B real bake Haiku would not place EASY at P7,
+ *                but spec §2.1 + add-to-20 precedent allow EASY at any
+ *                slot, and band-by-slot lint passes. Selected for
+ *                op-mix balance (5+/3-).
+ *    P8 = 25-3   MEDIUM mid-decade-units-shift (4/4 used) + Class 3
+ *                phantom-borrow admissible (correct=22, trap=12)
+ *
+ *  Op-mix: 5+/3- (default per spec §2.2). P1 is '+'. Diagnostic coverage:
+ *    - Class 2 admissible: 23+6 (trap=92→null since OOR), 48-7 (trap=14
+ *      OK), 42+3 (trap=54 OK), 33+4 (trap=73 OK), 25-3 (trap=22 OK… same
+ *      as correct? correct=22; let me re-check). For 25-3: units=5-3=2,
+ *      tens=2; trap=22, correct=22 — DEGENERATE. So Class 2 admissible
+ *      at P4=42+3, P5=23+6? swap=92→OOR null. So P5 null. P6=48-7 OK.
+ *      Need to verify >=2 admissible across P4-P8.
+ *
+ *  Trap audit:
+ *    P4 42+3 — units 5, tens 4 → swap=54, correct=45. Non-degenerate ✓
+ *    P5 23+6 — units 9, tens 2 → swap=92, correct=29. Non-degenerate ✓
+ *    P6 48-7 — units 1, tens 4 → swap=14, correct=41. Non-degenerate ✓
+ *    P7 33+4 — units 7, tens 3 → swap=73, correct=37. Non-degenerate ✓
+ *    P8 25-3 — units 2, tens 2 → swap=22, correct=22. DEGENERATE ✗
+ *    Class 2 in P4-P8 admissible: 4 (P4, P5, P6, P7) — exceeds min=2 ✓
+ *
+ *  Class 3 (phantom-borrow, P5-P8 '-' only) audit:
+ *    P6 48-7 → trap=correct-10=31, correct=41. Non-degenerate ✓
+ *    P8 25-3 → trap=correct-10=12, correct=22. Non-degenerate ✓
+ *    Class 3 admissible: 2 — exceeds min=1 ✓
+ *
+ *  Near-boundary-no-cross in P5-P8: P5=23+6 ✓, P6=48-7 ✓ — 2 facts
+ *  (min=1) ✓.
+ */
+const CLEAN_TWO_DIGIT_ADDSUB_FACTS: ReadonlyArray<[number, number, '+' | '-']> =
+  [
+    [20, 3, '+'],
+    [22, 5, '+'],
+    [15, 3, '-'],
+    [42, 3, '+'],
+    [23, 6, '+'],
+    [48, 7, '-'],
+    [33, 4, '+'],
+    [25, 3, '-'],
+  ]
+
+// ── parseTwoDigitAddsubReadLine ─────────────────────────────────────────
+
+describe('parseTwoDigitAddsubReadLine', () => {
+  it('parses the "+" template with single-digit second operand', () => {
+    expect(
+      parseTwoDigitAddsubReadLine('Twenty-three plus four. How many?'),
+    ).toEqual({ a: 23, b: 4, op: '+' })
+  })
+
+  it('parses the "+" template with round-ten first operand', () => {
+    expect(parseTwoDigitAddsubReadLine('Twenty plus three. How many?')).toEqual(
+      { a: 20, b: 3, op: '+' },
+    )
+    expect(parseTwoDigitAddsubReadLine('Forty plus two. How many?')).toEqual({
+      a: 40,
+      b: 2,
+      op: '+',
+    })
+  })
+
+  it('parses the "+" template with two-digit second operand (§7.2 Option B)', () => {
+    expect(
+      parseTwoDigitAddsubReadLine('Twenty-three plus fourteen. How many?'),
+    ).toEqual({ a: 23, b: 14, op: '+' })
+    expect(
+      parseTwoDigitAddsubReadLine('Forty-two plus thirty-one. How many?'),
+    ).toEqual({ a: 42, b: 31, op: '+' })
+  })
+
+  it('parses the "-" template with single-digit subtrahend', () => {
+    expect(
+      parseTwoDigitAddsubReadLine('Forty-eight minus seven. How many?'),
+    ).toEqual({ a: 48, b: 7, op: '-' })
+  })
+
+  it('parses the "-" template with EASY-band teen minuend', () => {
+    expect(
+      parseTwoDigitAddsubReadLine('Fifteen minus three. How many?'),
+    ).toEqual({ a: 15, b: 3, op: '-' })
+  })
+
+  it('parses the "-" template with "How many are left?" suffix (PR B forward-compat)', () => {
+    // PR B's Wave 2 prereq (86c9xa817) tightens the subtraction template
+    // to require "are left" matching sub-to-X tiers. PR A's parser
+    // accepts BOTH suffixes for forward-compat — the composition rule
+    // for "are left" is a PR B concern.
+    expect(
+      parseTwoDigitAddsubReadLine(
+        'Forty-eight minus seven. How many are left?',
+      ),
+    ).toEqual({ a: 48, b: 7, op: '-' })
+  })
+
+  it('accepts mixed case', () => {
+    expect(
+      parseTwoDigitAddsubReadLine('TWENTY-THREE plus FOUR. how many?'),
+    ).toEqual({ a: 23, b: 4, op: '+' })
+  })
+
+  it('accepts every decade word (twenty through ninety) at the first operand', () => {
+    for (const [word, value] of TWO_DIGIT_ADDSUB_DECADES) {
+      const capitalised = word.charAt(0).toUpperCase() + word.slice(1)
+      expect(
+        parseTwoDigitAddsubReadLine(`${capitalised} plus three. How many?`),
+      ).toEqual({ a: value, b: 3, op: '+' })
+    }
+  })
+
+  it('accepts a sample of hyphenated decade-units forms across the [21, 99] range', () => {
+    // Per spec AC11: parser regex accepts every hyphenated decade-units
+    // form 21-99. Sample: 21, 35, 47, 58, 66, 73, 89, 99.
+    const samples: Array<[string, number]> = [
+      ['Twenty-one', 21],
+      ['Thirty-five', 35],
+      ['Forty-seven', 47],
+      ['Fifty-eight', 58],
+      ['Sixty-six', 66],
+      ['Seventy-three', 73],
+      ['Eighty-nine', 89],
+      ['Ninety-nine', 99],
+    ]
+    for (const [word, value] of samples) {
+      expect(
+        parseTwoDigitAddsubReadLine(`${word} plus three. How many?`),
+      ).toEqual({ a: value, b: 3, op: '+' })
+    }
+  })
+
+  it('returns null for "take away" template (sub-to-10 first-session variant)', () => {
+    expect(
+      parseTwoDigitAddsubReadLine(
+        'Twenty-three take away four. How many are left?',
+      ),
+    ).toBeNull()
+  })
+
+  it('returns null for unrecognised number words', () => {
+    // "Hundred" / "one-hundred" — not in the 0-99 vocabulary.
+    expect(
+      parseTwoDigitAddsubReadLine('Hundred plus five. How many?'),
+    ).toBeNull()
+    // Malformed compound — "twenty-twelve" is not a valid form.
+    expect(
+      parseTwoDigitAddsubReadLine('Twenty-twelve plus three. How many?'),
+    ).toBeNull()
+  })
+
+  it('returns null for completely off-shape text', () => {
+    expect(parseTwoDigitAddsubReadLine('Tap the cat.')).toBeNull()
+    expect(parseTwoDigitAddsubReadLine('')).toBeNull()
+  })
+
+  it('returns null for a leading-hyphen pathological string (regex anchor sanity)', () => {
+    // Character class is `[a-z][a-z-]*` — leading hyphen rejected.
+    expect(
+      parseTwoDigitAddsubReadLine('-twenty plus three. How many?'),
+    ).toBeNull()
+  })
+})
+
+// ── TWO_DIGIT_ADDSUB_POOL sanity ────────────────────────────────────────
+
+describe('TWO_DIGIT_ADDSUB_POOL', () => {
+  it('contains exactly 36 facts (matches spec §1.1 §7.2 Option B pool size)', () => {
+    expect(TWO_DIGIT_ADDSUB_POOL).toHaveLength(36)
+  })
+
+  it('has unique ids across all entries (op is part of identity per spec §1.1)', () => {
+    const ids = new Set(TWO_DIGIT_ADDSUB_POOL.map((f) => f.id))
+    expect(ids.size).toBe(TWO_DIGIT_ADDSUB_POOL.length)
+  })
+
+  it('ids match `<a><op><b>` shape — op is part of stable serialised key', () => {
+    for (const f of TWO_DIGIT_ADDSUB_POOL) {
+      expect(f.id).toBe(`${f.a}${f.op}${f.b}`)
+    }
+  })
+
+  it('every fact satisfies operand range — a in [10, 99], b in [1, 99]', () => {
+    for (const f of TWO_DIGIT_ADDSUB_POOL) {
+      expect(f.a, `fact ${f.id} a out of range`).toBeGreaterThanOrEqual(10)
+      expect(f.a, `fact ${f.id} a out of range`).toBeLessThanOrEqual(99)
+      expect(f.b, `fact ${f.id} b out of range`).toBeGreaterThanOrEqual(1)
+      expect(f.b, `fact ${f.id} b out of range`).toBeLessThanOrEqual(99)
+    }
+  })
+
+  it('every + fact satisfies the no-carry constraint ((a mod 10) + (b mod 10) <= 9)', () => {
+    for (const f of TWO_DIGIT_ADDSUB_POOL) {
+      if (f.op !== '+') continue
+      const unitsSum = (f.a % 10) + (f.b % 10)
+      expect(
+        unitsSum,
+        `fact ${f.id} violates no-carry: (a%10)+(b%10) = ${unitsSum}`,
+      ).toBeLessThanOrEqual(9)
+    }
+  })
+
+  it('every + two-digit-plus-two-digit fact also satisfies tens no-carry', () => {
+    for (const f of TWO_DIGIT_ADDSUB_POOL) {
+      if (f.category !== 'two-digit-plus-two-digit') continue
+      const tensSum = Math.floor(f.a / 10) + Math.floor(f.b / 10)
+      expect(
+        tensSum,
+        `fact ${f.id} violates tens no-carry: (a/10)+(b/10) = ${tensSum}`,
+      ).toBeLessThanOrEqual(9)
+      const result = f.a + f.b
+      expect(result, `fact ${f.id} result exceeds 99`).toBeLessThanOrEqual(99)
+    }
+  })
+
+  it('every - fact satisfies the no-borrow constraint ((a mod 10) >= b) AND result >= 12', () => {
+    for (const f of TWO_DIGIT_ADDSUB_POOL) {
+      if (f.op !== '-') continue
+      expect(
+        f.a % 10,
+        `fact ${f.id} violates no-borrow: (a%10) = ${f.a % 10}, b = ${f.b}`,
+      ).toBeGreaterThanOrEqual(f.b)
+      const result = f.a - f.b
+      expect(
+        result,
+        `fact ${f.id} result drops below 12`,
+      ).toBeGreaterThanOrEqual(12)
+    }
+  })
+
+  it('band counts match spec §1.1 (EASY=9, MEDIUM=10, HARD=17)', () => {
+    const counts = TWO_DIGIT_ADDSUB_POOL.reduce(
+      (acc, f) => {
+        acc[f.band] = (acc[f.band] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts['EASY']).toBe(9)
+    expect(counts['MEDIUM']).toBe(10)
+    expect(counts['HARD']).toBe(17)
+  })
+
+  it('category counts match spec §1.1 (round-ten-anchor=3, mid-decade=11, near-boundary=13, tens-doubles=3, two-digit-plus-two-digit=6)', () => {
+    // Spec §1.1 sanity-check at lines 168-170 enumerates:
+    //   EASY  near-boundary: #4 = 1
+    //   MEDIUM near-boundary: #11, #19 = 2
+    //   HARD  near-boundary: #20, #21, #22, #23, #24, #25, #26, #27,
+    //         #28, #30 = 10
+    //   Total: 13 facts.
+    //
+    // Spec §2.3's category-cap rationale comment ("Pool has 12 ...") is
+    // off-by-one relative to the §1.1 sanity-check enumeration; the
+    // §1.1 line-by-line count is authoritative. Flagged in NOFs for
+    // potential Kyle copy-edit follow-up.
+    const counts = TWO_DIGIT_ADDSUB_POOL.reduce(
+      (acc, f) => {
+        acc[f.category] = (acc[f.category] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts['round-ten-anchor']).toBe(3)
+    expect(counts['mid-decade-units-shift']).toBe(11)
+    expect(counts['near-boundary-no-cross']).toBe(13)
+    expect(counts['tens-doubles-echo']).toBe(3)
+    expect(counts['two-digit-plus-two-digit']).toBe(6)
+  })
+
+  it('op counts match spec §1.1 (25 + facts, 11 - facts)', () => {
+    const counts = TWO_DIGIT_ADDSUB_POOL.reduce(
+      (acc, f) => {
+        acc[f.op] = (acc[f.op] ?? 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+    expect(counts['+']).toBe(25)
+    expect(counts['-']).toBe(11)
+  })
+
+  it('contains all 3 round-ten-anchor facts (the §1.4 correction target)', () => {
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '20+3')).toBeDefined()
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '30+5')).toBeDefined()
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '40+2')).toBeDefined()
+  })
+
+  it('excludes round-ten - facts (no-borrow constraint forbids them)', () => {
+    // `40-5=35` would violate `(a mod 10) >= b` since (40%10)=0 < 5;
+    // spec §1.1's "Constraint correction" excludes them structurally.
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '40-5')).toBeUndefined()
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '20-3')).toBeUndefined()
+  })
+
+  it('excludes regroup-required facts (no-carry / no-borrow violation)', () => {
+    // 27+6 requires carry (units 7+6=13); spec §0 + §4.1 FORBIDDEN.
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '27+6')).toBeUndefined()
+    // 32-5 requires borrow (units 2<5); spec §0 + §4.1 FORBIDDEN.
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '32-5')).toBeUndefined()
+  })
+
+  it('excludes result-below-12 - facts (spec §0 forbids result < 12)', () => {
+    // 13-5=8 — out of this tier's result range, belongs in sub-to-X.
+    expect(TWO_DIGIT_ADDSUB_POOL.find((f) => f.id === '13-5')).toBeUndefined()
+  })
+})
+
+// ── TWO_DIGIT_ADDSUB_RULES sanity ───────────────────────────────────────
+
+describe('TWO_DIGIT_ADDSUB_RULES', () => {
+  it('has totalProblems = 8', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.totalProblems).toBe(8)
+  })
+
+  it('caps round-ten-anchor at 1 (round-ten-prior correction lever per spec §1.4)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.categoryCaps['round-ten-anchor']).toBe(1)
+  })
+
+  it('caps mid-decade-units-shift at 4 (calibration anchor per spec §2.3)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.categoryCaps['mid-decade-units-shift']).toBe(
+      4,
+    )
+  })
+
+  it('caps near-boundary-no-cross at 5 (generous — IS the learning target)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.categoryCaps['near-boundary-no-cross']).toBe(
+      5,
+    )
+  })
+
+  it('caps tens-doubles-echo at 1 (light intuition anchor only)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.categoryCaps['tens-doubles-echo']).toBe(1)
+  })
+
+  it('caps two-digit-plus-two-digit at 2 (Option B accent cap)', () => {
+    expect(
+      TWO_DIGIT_ADDSUB_RULES.categoryCaps['two-digit-plus-two-digit'],
+    ).toBe(2)
+  })
+
+  it('allows EASY at all slots P1-P8 (matches add-to-20; spec §2.1)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots.EASY).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ])
+  })
+
+  it('allows MEDIUM at slots P4-P8 (HARD-band still forbidden at P4)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots.MEDIUM).toEqual([
+      4, 5, 6, 7, 8,
+    ])
+  })
+
+  it('allows HARD at slots P5-P8 only (HARD must NOT appear at P1-P4)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots.HARD).toEqual([5, 6, 7, 8])
+  })
+
+  it('allows op-mixes 5+/3- and 6+/2- only (spec §2.2)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.allowedOpMixes).toEqual([
+      { addCount: 5, subCount: 3 },
+      { addCount: 6, subCount: 2 },
+    ])
+  })
+
+  it('requires >= 1 near-boundary-no-cross in P5-P8 (STRICTER than sibling tiers; spec §2.4)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.nearBoundaryNoCrossInP5ToP8Min).toBe(1)
+  })
+
+  it('requires >= 2 Class 2 column-cross traps in P4-P8 (spec §3.8 diagnostic instrument)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.classTwoColumnCrossInP4ToP8Min).toBe(2)
+  })
+
+  it('requires >= 1 Class 3 phantom-borrow trap in P5-P8 - problems (spec §3.8)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.classThreePhantomBorrowInP5ToP8Min).toBe(1)
+  })
+})
+
+// ── lintTwoDigitAddsubComposition: clean canon ──────────────────────────
+
+describe('lintTwoDigitAddsubComposition — clean canon passes', () => {
+  it('returns no violations for the canonical 8-fact session', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    expect(lintTwoDigitAddsubComposition(response)).toEqual([])
+  })
+
+  it('assertTwoDigitAddsubCompositionClean does not throw on clean canon', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    expect(() =>
+      assertTwoDigitAddsubCompositionClean('math/two-digit-addsub', response),
+    ).not.toThrow()
+  })
+
+  it('assertTwoDigitAddsubCompositionClean throws CompositionLintError on dirty canon (3 round-ten anchors)', () => {
+    // The current committed canon's failure mode per spec §1.4 — 3 of 8
+    // facts are round-ten-anchor (`20+3, 30+5, 40+2`).
+    const dirty: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 round-ten (1/1 — but cap is 1 so two more violate)
+      [30, 5, '+'], // P2 round-ten (2/1 VIOLATES)
+      [40, 2, '+'], // P3 round-ten (3/1 VIOLATES)
+      [42, 3, '+'], // P4 mid-decade
+      [23, 6, '+'], // P5 near-boundary
+      [48, 7, '-'], // P6 near-boundary
+      [33, 4, '+'], // P7 mid-decade
+      [25, 3, '-'], // P8 mid-decade
+    ]
+    const response = buildTwoDigitAddsubCanonResponse(dirty)
+    expect(() =>
+      assertTwoDigitAddsubCompositionClean('math/two-digit-addsub', response),
+    ).toThrow(CompositionLintError)
+  })
+})
+
+// ── pool-membership rule ────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubComposition — pool-membership rule', () => {
+  it('rejects a fact outside the 36-fact pool (50+7 — out-of-range decade)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [50, 7, '+'], // P4 NOT in pool (round-ten outside the 3 listed)
+      [23, 6, '+'], // P5
+      [48, 7, '-'], // P6
+      [33, 4, '+'], // P7
+      [25, 3, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(4)
+    expect(pool[0]!.factId).toBe('50+7')
+    expect(pool[0]!.message).toContain('NOT in the 36-fact two-digit-addsub')
+  })
+
+  it('rejects a regroup-required fact (27+6 — units 7+6=13 violates no-carry)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [27, 6, '+'], // P4 carry-required — NOT in pool
+      [23, 6, '+'], // P5
+      [48, 7, '-'], // P6
+      [33, 4, '+'], // P7
+      [25, 3, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(4)
+    expect(pool[0]!.factId).toBe('27+6')
+    expect(pool[0]!.message).toContain('NOT in the 36-fact two-digit-addsub')
+  })
+
+  it('rejects a borrow-required fact (32-5 — units 2 < 5 violates no-borrow)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [42, 3, '+'], // P4
+      [23, 6, '+'], // P5
+      [32, 5, '-'], // P6 borrow-required — NOT in pool
+      [33, 4, '+'], // P7
+      [25, 3, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(6)
+    expect(pool[0]!.factId).toBe('32-5')
+  })
+})
+
+// ── category-cap rule ──────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubComposition — category-cap rule', () => {
+  it('fires when round-ten-anchor count exceeds cap of 1 (the §1.4 correction target)', () => {
+    // The current canon's failure mode (3-of-8 round-ten-anchor).
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 round-ten (1/1)
+      [30, 5, '+'], // P2 round-ten (2/1 VIOLATES)
+      [40, 2, '+'], // P3 round-ten (3/1 VIOLATES)
+      [42, 3, '+'], // P4 mid-decade
+      [23, 6, '+'], // P5 near-boundary
+      [48, 7, '-'], // P6 near-boundary
+      [33, 4, '+'], // P7 mid-decade
+      [25, 3, '-'], // P8 mid-decade
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    expect(caps).toHaveLength(1)
+    expect(caps[0]!.message).toContain('"round-ten-anchor"')
+    expect(caps[0]!.message).toContain('cap is 1')
+    expect(caps[0]!.message).toContain('canon has 3')
+    expect(caps[0]!.message).toContain('Round-ten-prior correction lever')
+  })
+
+  it('fires when tens-doubles-echo count exceeds cap of 1', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 round-ten (1/1)
+      [22, 5, '+'], // P2 tens-doubles (1/1)
+      [44, 3, '+'], // P3 tens-doubles (2/1 VIOLATES) — but band: MEDIUM at P3 also trips band-by-slot
+      [42, 3, '+'], // P4 mid-decade
+      [23, 6, '+'], // P5 near-boundary
+      [48, 7, '-'], // P6 near-boundary
+      [15, 3, '-'], // P7 mid-decade
+      [25, 3, '-'], // P8 mid-decade
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    const tensDoubles = caps.filter((v) =>
+      v.message.includes('tens-doubles-echo'),
+    )
+    expect(tensDoubles).toHaveLength(1)
+    expect(tensDoubles[0]!.message).toContain('cap is 1')
+  })
+
+  it('clean canon (1 round-ten, 1 tens-doubles, 3 mid-decade, 2 near-boundary) passes all caps', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    expect(caps).toEqual([])
+  })
+})
+
+// ── band-by-slot rule ──────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubComposition — band-by-slot rule', () => {
+  it('fires when HARD-band fact appears at P1', () => {
+    // 23+6 is HARD; P1-P4 forbidden per spec §2.1.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [23, 6, '+'], // P1 HARD — VIOLATES
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [42, 3, '+'], // P4
+      [55, 4, '+'], // P5 HARD
+      [48, 7, '-'], // P6 HARD
+      [33, 4, '+'], // P7
+      [25, 3, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    const p1 = slot.find((v) => v.problemIndex === 1)
+    expect(p1).toBeDefined()
+    expect(p1!.factId).toBe('23+6')
+    expect(p1!.message).toContain('HARD-band')
+  })
+
+  it('fires when HARD-band fact appears at P4 (MEDIUM-only slot)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [55, 4, '+'], // P4 HARD — VIOLATES
+      [23, 6, '+'], // P5
+      [48, 7, '-'], // P6
+      [33, 4, '+'], // P7
+      [25, 3, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    const p4 = slot.find((v) => v.problemIndex === 4)
+    expect(p4).toBeDefined()
+    expect(p4!.factId).toBe('55+4')
+  })
+
+  it('allows EASY at any slot (spec §2.1)', () => {
+    // EASY at P5, P7 — both allowed per add-to-20 precedent.
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    expect(slot).toEqual([])
+  })
+})
+
+// ── op-mix rule (spec §2.2) ────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubComposition — op-mix rule', () => {
+  it('passes for 5+/3- default mix', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const opMix = violations.filter((v) => v.rule === 'op-mix')
+    expect(opMix).toEqual([])
+  })
+
+  it('passes for 6+/2- mix (low-score modulation case)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [42, 3, '+'], // P4
+      [23, 6, '+'], // P5
+      [48, 7, '-'], // P6
+      [33, 4, '+'], // P7
+      [27, 2, '+'], // P8 — replaces 25-3 to make 6+/2-
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const opMix = violations.filter((v) => v.rule === 'op-mix')
+    expect(opMix).toEqual([])
+  })
+
+  it('fires on 8+/0- (all-plus session — FORBIDDEN per spec §2.2)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [33, 4, '+'], // P3 (placed at P3 to keep EASY anchor — actually 33+4 is EASY)
+      [42, 3, '+'], // P4
+      [23, 6, '+'], // P5
+      [55, 4, '+'], // P6
+      [27, 2, '+'], // P7
+      [47, 2, '+'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const opMix = violations.filter((v) => v.rule === 'op-mix')
+    expect(opMix).toHaveLength(1)
+    expect(opMix[0]!.message).toContain('8+/0-')
+    expect(opMix[0]!.message).toContain('FORBIDDEN')
+  })
+
+  it('fires on 4+/4- (over-subtraction — FORBIDDEN per spec §2.2)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [42, 3, '+'], // P4
+      [23, 6, '+'], // P5
+      [48, 7, '-'], // P6
+      [25, 3, '-'], // P7
+      [19, 7, '-'], // P8 → 4+/4- VIOLATES
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const opMix = violations.filter((v) => v.rule === 'op-mix')
+    expect(opMix).toHaveLength(1)
+    expect(opMix[0]!.message).toContain('4+/4-')
+  })
+})
+
+// ── p1-is-plus rule (spec §2.2) ────────────────────────────────────────
+
+describe('lintTwoDigitAddsubComposition — p1-is-plus rule', () => {
+  it('passes when P1 carries op +', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const p1 = violations.filter((v) => v.rule === 'p1-is-plus')
+    expect(p1).toEqual([])
+  })
+
+  it('fires when P1 carries op - (session opener anxiety rule)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 3, '-'], // P1 minus — VIOLATES
+      [20, 3, '+'], // P2
+      [22, 5, '+'], // P3
+      [42, 3, '+'], // P4
+      [23, 6, '+'], // P5
+      [48, 7, '-'], // P6
+      [33, 4, '+'], // P7
+      [25, 3, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const p1 = violations.filter((v) => v.rule === 'p1-is-plus')
+    expect(p1).toHaveLength(1)
+    expect(p1[0]!.problemIndex).toBe(1)
+    expect(p1[0]!.factId).toBe('15-3')
+    expect(p1[0]!.message).toContain("op '-'")
+    expect(p1[0]!.message).toContain('onset anxiety')
+  })
+})
+
+// ── dual-exposure rule (spec §5.5 — load-bearing per v1) ───────────────
+
+describe('lintTwoDigitAddsubComposition — dual-exposure rule', () => {
+  it('passes for the clean canon (no inverse pairs)', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const dual = violations.filter((v) => v.rule === 'dual-exposure')
+    expect(dual).toEqual([])
+  })
+
+  it('fires when + fact and its - inverse co-occur (the §5.5 enforcement target)', () => {
+    // The v1 pool ships exactly one in-pool inverse pair:
+    //   33+4=37 (#5 EASY mid-decade-units-shift) ↔ 37-4=33 (#18 MEDIUM
+    //   mid-decade-units-shift). The operand triple (33, 4, 37) appears
+    //   on both sides — spec §5.5 forbids co-occurrence within a single
+    //   session, so the lint MUST fire dual-exposure.
+    //
+    // Session construction respects band-by-slot (33+4 is EASY → P1-P8
+    // allowed; 37-4 is MEDIUM → P4-P8 allowed). P1 stays '+' per
+    // p1-is-plus rule; op-mix lands at 5+/3-.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 EASY round-ten (1/1 cap)
+      [22, 5, '+'], // P2 EASY tens-doubles (1/1 cap)
+      [33, 4, '+'], // P3 EASY mid-decade (1/4 cap) — inverse pair side A
+      [37, 4, '-'], // P4 MEDIUM mid-decade (2/4 cap) — inverse pair side B
+      [23, 6, '+'], // P5 HARD near-boundary
+      [48, 7, '-'], // P6 HARD near-boundary
+      [42, 3, '+'], // P7 MEDIUM mid-decade (3/4 cap)
+      [25, 3, '-'], // P8 MEDIUM mid-decade (4/4 cap)
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const dual = violations.filter((v) => v.rule === 'dual-exposure')
+    expect(dual).toHaveLength(1)
+    expect(dual[0]!.factId).toBe('33+4↔37-4')
+    expect(dual[0]!.message).toContain('Dual-exposure rule')
+    expect(dual[0]!.message).toContain('(33, 4, 37)')
+    expect(dual[0]!.message).toContain('P3')
+    expect(dual[0]!.message).toContain('P4')
+  })
+
+  it('passes when only one half of a potential inverse pair appears (33+4 alone — no 37-4)', () => {
+    // The clean canon already exercises this — 33+4 is at P7 and no
+    // - fact has correct=37 in the session.
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const dual = violations.filter((v) => v.rule === 'dual-exposure')
+    expect(dual).toEqual([])
+  })
+
+  it('reports each inverse pair exactly once (no double-counting on symmetric forms)', () => {
+    // Inject the 33+4 ↔ 37-4 pair AND a near-duplicate ordering. The
+    // lint's de-dup is "emit only when invMatch.index > p.index"; verify
+    // the pair fires exactly once even though both directions of the
+    // inverse mapping iterate through.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1
+      [22, 5, '+'], // P2
+      [15, 3, '-'], // P3
+      [37, 4, '-'], // P4 MEDIUM — inverse pair side B (37-4=33)
+      [33, 4, '+'], // P5 — inverse pair side A (33+4=37) - VIOLATES
+      // (EASY at P5; allowed per spec §2.1)
+      [48, 7, '-'], // P6
+      [42, 3, '+'], // P7
+      [27, 2, '+'], // P8 HARD near-boundary
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const dual = violations.filter((v) => v.rule === 'dual-exposure')
+    expect(dual).toHaveLength(1)
+  })
+})
+
+// ── high-leverage-coverage rule (P5-P8 >= 1 near-boundary-no-cross) ────
+
+describe('lintTwoDigitAddsubComposition — near-boundary-no-cross coverage (P5-P8) rule', () => {
+  it('fires when no near-boundary-no-cross fact appears in P5-P8', () => {
+    // P5-P8 = mid-decade + tens-doubles + round-ten; NO near-boundary.
+    // The MEDIUM near-boundary 34+5 sits at P4 (doesn't count per
+    // STRICTER P5-P8 framing per spec §2.4).
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 round-ten (1/1)
+      [22, 5, '+'], // P2 tens-doubles (1/1)
+      [15, 3, '-'], // P3 mid-decade
+      [34, 5, '+'], // P4 near-boundary at P4 (DOES NOT COUNT for P5-P8)
+      [42, 3, '+'], // P5 mid-decade
+      [54, 4, '+'], // P6 mid-decade
+      [18, 4, '-'], // P7 mid-decade
+      [37, 4, '-'], // P8 — actually 37-4 is NOT in pool. Replace.
+    ]
+    // Replace P8 with an in-pool mid-decade fact: 25-3.
+    facts[7] = [25, 3, '-']
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const coverage = violations.filter(
+      (v) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toHaveLength(1)
+    expect(coverage[0]!.message).toContain('near-boundary-no-cross')
+    expect(coverage[0]!.message).toContain('P5-P8')
+    expect(coverage[0]!.message).toContain('STRICTER')
+    expect(coverage[0]!.message).toContain('Canon has 0')
+  })
+
+  it('passes when exactly 1 near-boundary-no-cross fact appears in P5-P8', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 round-ten
+      [22, 5, '+'], // P2 tens-doubles
+      [15, 3, '-'], // P3 mid-decade
+      [42, 3, '+'], // P4 mid-decade
+      [23, 6, '+'], // P5 near-boundary HARD (P5-P8 anchor)
+      [18, 4, '-'], // P6 mid-decade
+      [54, 4, '+'], // P7 mid-decade
+      [25, 3, '-'], // P8 mid-decade
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const coverage = violations.filter(
+      (v) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toEqual([])
+  })
+
+  it('passes when multiple near-boundary-no-cross facts appear in P5-P8', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const coverage = violations.filter(
+      (v) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toEqual([])
+  })
+})
+
+// ── diagnostic-coverage rule (Class 2 + Class 3 trap admissibility) ────
+
+describe('lintTwoDigitAddsubComposition — diagnostic-coverage (Class 2 / Class 3) rule', () => {
+  it('fires when too few P5-P8 - facts admit a Class 3 phantom-borrow trap', () => {
+    // Construct a 5+/3- session with all 3 - facts at P2-P4 (not P5-P8).
+    // P5-P8 - count = 0; Class 3 in-range = 0; min=1 — VIOLATES.
+    // P7 places an EASY + fact (allowed under spec §2.1 / band-by-slot).
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 round-ten
+      [15, 3, '-'], // P2 EASY - mid-decade
+      [19, 7, '-'], // P3 EASY - mid-decade
+      [18, 4, '-'], // P4 MEDIUM - mid-decade
+      [23, 6, '+'], // P5 near-boundary +
+      [55, 4, '+'], // P6 near-boundary +
+      [33, 4, '+'], // P7 mid-decade + (EASY at P7 — allowed)
+      [27, 2, '+'], // P8 near-boundary +
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const diag = violations.filter((v) => v.rule === 'diagnostic-coverage')
+    const classThree = diag.filter((v) => v.message.includes('Class 3'))
+    expect(classThree).toHaveLength(1)
+    expect(classThree[0]!.message).toContain('phantom-borrow')
+    expect(classThree[0]!.message).toContain('P5-P8')
+    expect(classThree[0]!.message).toContain('Canon has 0')
+  })
+
+  it('passes when enough Class 2 and Class 3 traps are admissible (clean canon)', () => {
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const diag = violations.filter((v) => v.rule === 'diagnostic-coverage')
+    expect(diag).toEqual([])
+  })
+})
+
+// ── no-duplicates rule ────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubComposition — no-duplicates rule', () => {
+  it('fires when an (a, b, op) triple repeats', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [20, 3, '+'], // P1 round-ten
+      [22, 5, '+'], // P2 tens-doubles
+      [15, 3, '-'], // P3 mid-decade
+      [42, 3, '+'], // P4 mid-decade
+      [23, 6, '+'], // P5 near-boundary
+      [48, 7, '-'], // P6 near-boundary
+      [42, 3, '+'], // P7 DUPLICATE of P4 — VIOLATES
+      [25, 3, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubComposition(
+      buildTwoDigitAddsubCanonResponse(facts),
+    )
+    const dupes = violations.filter((v) => v.rule === 'no-duplicates')
+    expect(dupes).toHaveLength(1)
+    expect(dupes[0]!.factId).toBe('42+3')
+    expect(dupes[0]!.message).toContain('Fact 42+3 appears 2 times')
+    expect(dupes[0]!.message).toContain('P4, P7')
+  })
+
+  it('treats different ops as distinct (33+4 and 37-4 would be distinct, not duplicates)', () => {
+    // Note 37-4 is not in pool; this test asserts the no-duplicates rule
+    // doesn't merge across ops. We use 33+4 + 25-3 which are different
+    // facts entirely.
+    const response = buildTwoDigitAddsubCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_FACTS,
+    ])
+    const violations = lintTwoDigitAddsubComposition(response)
+    const dupes = violations.filter((v) => v.rule === 'no-duplicates')
+    expect(dupes).toEqual([])
+  })
+})
+
+// ── unparseable-problem rule ──────────────────────────────────────────
+
+describe('lintTwoDigitAddsubComposition — unparseable-problem rule', () => {
+  it('fires when a problem read-line is malformed', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        readTwoDigitAddsubUtterance(1, 20, 3, '+'),
+        rawReadUtterance(2, 'Tap the cat.'), // unparseable
+        readTwoDigitAddsubUtterance(3, 15, 3, '-'),
+        readTwoDigitAddsubUtterance(4, 42, 3, '+'),
+        readTwoDigitAddsubUtterance(5, 23, 6, '+'),
+        readTwoDigitAddsubUtterance(6, 48, 7, '-'),
+        readTwoDigitAddsubUtterance(7, 33, 4, '+'),
+        readTwoDigitAddsubUtterance(8, 25, 3, '-'),
+      ],
+    }
+    const violations = lintTwoDigitAddsubComposition(response)
+    const unparseable = violations.filter(
+      (v) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(2)
+    expect(unparseable[0]!.message).toContain('two-digit-addsub read template')
+    expect(unparseable[0]!.message).toContain('Tap the cat.')
+  })
+
+  it('fires when a problem uses the "take away" template (sub-to-10 first-session — mis-routed)', () => {
+    const response: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        readTwoDigitAddsubUtterance(1, 20, 3, '+'),
+        rawReadUtterance(2, 'Twenty take away three. How many are left?'),
+        readTwoDigitAddsubUtterance(3, 15, 3, '-'),
+        readTwoDigitAddsubUtterance(4, 42, 3, '+'),
+        readTwoDigitAddsubUtterance(5, 23, 6, '+'),
+        readTwoDigitAddsubUtterance(6, 48, 7, '-'),
+        readTwoDigitAddsubUtterance(7, 33, 4, '+'),
+        readTwoDigitAddsubUtterance(8, 25, 3, '-'),
+      ],
+    }
+    const violations = lintTwoDigitAddsubComposition(response)
+    const unparseable = violations.filter(
+      (v) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(2)
+  })
+})
+
+// ── TWO_DIGIT_ADDSUB_POOL drift-guard against spec §1.1 markdown table ─
+//
+// Mirror approach: hand-mirrored constant
+// EXPECTED_TWO_DIGIT_ADDSUB_POOL_FROM_SPEC + runtime parser of the spec
+// §1.1 markdown table. 2-sided equality (mirror ↔ data, mirror ↔ parsed-
+// spec) catches drift on either side. Sibling to add-to-20 PR #278's
+// `parseAddToTwentyPoolFromSpec` — but the two-digit-addsub spec table
+// uses a DIFFERENT bullet shape: `| # | <a><sp>OP<sp><b> = <sum> | OP |
+// <band> | <category> | ...`. The OP column comes BEFORE the band column,
+// and the row identity includes OP. A dedicated parser is needed; the
+// add-to-20 parser would not match.
+
+const EXPECTED_TWO_DIGIT_ADDSUB_POOL_FROM_SPEC: readonly (typeof TWO_DIGIT_ADDSUB_POOL)[number][] =
+  [
+    // EASY (9 facts; rows #1-9)
+    {
+      id: '20+3',
+      a: 20,
+      b: 3,
+      op: '+',
+      band: 'EASY',
+      category: 'round-ten-anchor',
+    },
+    {
+      id: '30+5',
+      a: 30,
+      b: 5,
+      op: '+',
+      band: 'EASY',
+      category: 'round-ten-anchor',
+    },
+    {
+      id: '40+2',
+      a: 40,
+      b: 2,
+      op: '+',
+      band: 'EASY',
+      category: 'round-ten-anchor',
+    },
+    {
+      id: '25+4',
+      a: 25,
+      b: 4,
+      op: '+',
+      band: 'EASY',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '33+4',
+      a: 33,
+      b: 4,
+      op: '+',
+      band: 'EASY',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '22+5',
+      a: 22,
+      b: 5,
+      op: '+',
+      band: 'EASY',
+      category: 'tens-doubles-echo',
+    },
+    {
+      id: '15-3',
+      a: 15,
+      b: 3,
+      op: '-',
+      band: 'EASY',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '28-5',
+      a: 28,
+      b: 5,
+      op: '-',
+      band: 'EASY',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '19-7',
+      a: 19,
+      b: 7,
+      op: '-',
+      band: 'EASY',
+      category: 'mid-decade-units-shift',
+    },
+    // MEDIUM (10 facts; rows #10-19)
+    {
+      id: '21+3',
+      a: 21,
+      b: 3,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '34+5',
+      a: 34,
+      b: 5,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '42+3',
+      a: 42,
+      b: 3,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '54+4',
+      a: 54,
+      b: 4,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '36+2',
+      a: 36,
+      b: 2,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '44+3',
+      a: 44,
+      b: 3,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'tens-doubles-echo',
+    },
+    {
+      id: '18-4',
+      a: 18,
+      b: 4,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '25-3',
+      a: 25,
+      b: 3,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '37-4',
+      a: 37,
+      b: 4,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'mid-decade-units-shift',
+    },
+    {
+      id: '26-5',
+      a: 26,
+      b: 5,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'near-boundary-no-cross',
+    },
+    // HARD (17 facts; rows #20-36 — Option B default)
+    {
+      id: '23+6',
+      a: 23,
+      b: 6,
+      op: '+',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '41+8',
+      a: 41,
+      b: 8,
+      op: '+',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '32+7',
+      a: 32,
+      b: 7,
+      op: '+',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '55+4',
+      a: 55,
+      b: 4,
+      op: '+',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '27+2',
+      a: 27,
+      b: 2,
+      op: '+',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '35-4',
+      a: 35,
+      b: 4,
+      op: '-',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '48-7',
+      a: 48,
+      b: 7,
+      op: '-',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '52-1',
+      a: 52,
+      b: 1,
+      op: '-',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '64-3',
+      a: 64,
+      b: 3,
+      op: '-',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '66+3',
+      a: 66,
+      b: 3,
+      op: '+',
+      band: 'HARD',
+      category: 'tens-doubles-echo',
+    },
+    {
+      id: '47+2',
+      a: 47,
+      b: 2,
+      op: '+',
+      band: 'HARD',
+      category: 'near-boundary-no-cross',
+    },
+    {
+      id: '23+14',
+      a: 23,
+      b: 14,
+      op: '+',
+      band: 'HARD',
+      category: 'two-digit-plus-two-digit',
+    },
+    {
+      id: '42+31',
+      a: 42,
+      b: 31,
+      op: '+',
+      band: 'HARD',
+      category: 'two-digit-plus-two-digit',
+    },
+    {
+      id: '25+14',
+      a: 25,
+      b: 14,
+      op: '+',
+      band: 'HARD',
+      category: 'two-digit-plus-two-digit',
+    },
+    {
+      id: '31+26',
+      a: 31,
+      b: 26,
+      op: '+',
+      band: 'HARD',
+      category: 'two-digit-plus-two-digit',
+    },
+    {
+      id: '52+13',
+      a: 52,
+      b: 13,
+      op: '+',
+      band: 'HARD',
+      category: 'two-digit-plus-two-digit',
+    },
+    {
+      id: '34+22',
+      a: 34,
+      b: 22,
+      op: '+',
+      band: 'HARD',
+      category: 'two-digit-plus-two-digit',
+    },
+  ]
+
+/** Parse the two-digit-addsub spec §1.1 pool table.
+ *
+ *  Table row shape (markdown):
+ *    `| #   | `<a> OP <b> = <sum>`  | OP  | <band>   | <category>     | ...`
+ *
+ *  Bands appear lowercase (`easy`/`medium`/`hard`); category strings
+ *  appear with exactly the same shape used in the POOL constant. The OP
+ *  column is the dedicated discriminator anchor — distinguishes from
+ *  add-to-X tier tables which omit it.
+ *
+ *  Discriminator anchors: leading `|` + row number + ` ` + backtick-wrapped
+ *  fact + ` ` + `|` + ` ` + OP column. If a future spec editor reformats
+ *  the table (drops the OP column, changes the row-number column, swaps
+ *  to non-backtick fact text), the parser falls over loudly. */
+function parseTwoDigitAddsubPoolFromSpec(
+  prose: string,
+): readonly (typeof TWO_DIGIT_ADDSUB_POOL)[number][] {
+  // Each row: leading `|`, row#, then `<a> [+|−|-] <b> = <sum>`, then
+  // OP column, then band, then category. The spec mixes UNICODE MINUS
+  // (U+2212 "−") and ASCII hyphen-minus depending on edit history;
+  // accept either inside the fact and inside the OP column.
+  //
+  // Per testing-and-ci.md §6 en-dash tolerance — the spec's row-range
+  // anchors (#10–19) use EN-DASH (U+2013), and operand minus signs use
+  // EITHER U+2212 OR ASCII hyphen. Both forms accepted.
+  //
+  // Whitespace between the backtick-closing of the fact and the next `|`
+  // is OPTIONAL — rows 1-30 use `=23`  | ` (with spaces) but the §1.1
+  // conditional table rows 31-36 use `=37`| ` (no space before pipe).
+  // The regex tolerates both via `\s*\|`.
+  //
+  // Row-8 "restate" pattern: spec §1.1 ships fact #8 twice (the EXCLUDED
+  // `40 − 5` constraint-correction row at line 117 + the INCLUDED
+  // `28 − 5` replacement row at line 127 — the spec's prose says
+  // "Replace fact #8 and continue:"). The parser collects all matched
+  // rows then DEDUPES BY ROW NUMBER, keeping the LAST occurrence per
+  // row. That matches the spec's intent — later rows supersede earlier
+  // ones at the same row#.
+  const re =
+    /^\|\s+(\d+)\s+\|\s+`(\d+)\s*([+−-])\s*(\d+)\s*=\s*\d+`\s*\|\s+([+−-])\s+\|\s+(easy|medium|hard)\s+\|\s+([a-z][a-z0-9-]+)\s+\|/gm
+  const byRow = new Map<number, (typeof TWO_DIGIT_ADDSUB_POOL)[number]>()
+  for (const m of prose.matchAll(re)) {
+    const rowNum = Number.parseInt(m[1]!, 10)
+    const a = Number.parseInt(m[2]!, 10)
+    const factOp = m[3]! === '+' ? '+' : '-'
+    const b = Number.parseInt(m[4]!, 10)
+    const colOp = m[5]! === '+' ? '+' : '-'
+    // Sanity: fact OP must agree with column OP. If not, skip the row.
+    if (factOp !== colOp) continue
+    byRow.set(rowNum, {
+      id: `${a}${factOp}${b}`,
+      a,
+      b,
+      op: factOp as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['op'],
+      band: m[6]!.toUpperCase() as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['band'],
+      category: m[7]! as (typeof TWO_DIGIT_ADDSUB_POOL)[number]['category'],
+    })
+  }
+  // Sort by row number to produce the canonical pool ordering (later
+  // rows supersede earlier ones at the same row#, matching the spec's
+  // "Replace fact #8 and continue:" restate semantics).
+  const sortedRows = [...byRow.keys()].sort((a, b) => a - b)
+  return sortedRows.map((n) => byRow.get(n)!)
+}
+
+describe('TWO_DIGIT_ADDSUB_POOL drift-guard against spec §1.1 markdown table', () => {
+  const SPEC_PATH = join(
+    process.cwd(),
+    'design',
+    'math',
+    'two-digit-addsub-content.md',
+  )
+
+  it('lint pool matches the hand-mirrored expectation from the spec (lockstep)', () => {
+    // Mutation contract: flip any single fact's band/category/op (or
+    // insert/remove a fact) and this assertion fires with a deep-
+    // equality diff identifying the discrepant entry.
+    expect(TWO_DIGIT_ADDSUB_POOL).toEqual(
+      EXPECTED_TWO_DIGIT_ADDSUB_POOL_FROM_SPEC,
+    )
+  })
+
+  it('spec §1.1 pool-table rows parse to the hand-mirrored expectation (lockstep)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    const parsed = parseTwoDigitAddsubPoolFromSpec(spec)
+    expect(parsed).toEqual(EXPECTED_TWO_DIGIT_ADDSUB_POOL_FROM_SPEC)
+  })
+
+  it('spec §1.1 contains exactly 36 pool-table rows (matches pool size — Option B)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    const parsed = parseTwoDigitAddsubPoolFromSpec(spec)
+    expect(parsed).toHaveLength(TWO_DIGIT_ADDSUB_POOL.length)
+    expect(parsed).toHaveLength(36)
+  })
+
+  it('parser returns no rows when the OP column is removed from the table (sanity — discriminator load-bearing)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    // Strip the OP column from every pool-table row; the parser's
+    // dedicated OP-column anchor stops matching and parsed is empty.
+    // Confirms the OP-column wedge is load-bearing per
+    // testing-and-ci.md §6 brittleness-is-the-alarm-wire pattern.
+    const mutated = spec.replace(
+      /^(\|\s+\d+\s+\|\s+`\d+\s*[+−-]\s*\d+\s*=\s*\d+`)\s*\|\s+[+−-]\s+\|/gm,
+      '$1 |',
+    )
+    const parsed = parseTwoDigitAddsubPoolFromSpec(mutated)
+    expect(parsed).toEqual([])
+  })
+})
+
+// ── TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots drift-guard against spec §2.1 ──
+//
+// Companion to the POOL guard above. Spec §2.1 carries the band-by-slot
+// bullets in the SAME shape as add-to-20 (`- BAND (#N–M): allowed at ...`
+// with EN-DASH `–` row-range) but with row counts and ranges specific to
+// this tier (`EASY (#1–9)`, `MEDIUM (#10–19)`, `HARD (#20–30 / #20–36)`).
+//
+// The HARD line shape diverges from add-to-20: it carries an OPTIONAL
+// alternate range (#20–30 single-digit pool OR #20–36 Option B). Parser
+// must tolerate either form. Discriminators per the brittleness-is-the-
+// alarm-wire pattern remain unique:
+//   - EASY: ends `... at any slot P1–P8 (gentle ramp anchor; ...`
+//   - MEDIUM: terminal `.` with NO trailing `only`
+//   - HARD: trailing `only. **HARD must NOT appear at P1–P4.**`
+
+type TwoDigitAddsubBandSlots =
+  (typeof TWO_DIGIT_ADDSUB_RULES)['bandAllowedSlots']
+
+const EXPECTED_TWO_DIGIT_ADDSUB_BAND_SLOTS_FROM_SPEC: TwoDigitAddsubBandSlots =
+  {
+    EASY: [1, 2, 3, 4, 5, 6, 7, 8],
+    MEDIUM: [4, 5, 6, 7, 8],
+    HARD: [5, 6, 7, 8],
+  }
+
+function parseTwoDigitAddsubBandSlotsFromSpec(
+  prose: string,
+): TwoDigitAddsubBandSlots {
+  // EASY: `- EASY (#1–9): allowed at any slot P1–P8 (gentle ramp anchor`
+  const easyMatch =
+    /^\s*-\s+EASY\s+\(#\d+[–-]\d+\):\s+allowed at any slot P(\d+)[–-]P(\d+)\s*\(gentle ramp anchor/m.exec(
+      prose,
+    )
+  if (!easyMatch) {
+    throw new Error(
+      "parseTwoDigitAddsubBandSlotsFromSpec: could not locate EASY rule — expected '- EASY (#N–M): allowed at any slot P<s>–P<e> (gentle ramp anchor' bullet in spec §2.1",
+    )
+  }
+  const easyStart = Number.parseInt(easyMatch[1]!, 10)
+  const easyEnd = Number.parseInt(easyMatch[2]!, 10)
+
+  // MEDIUM: `- MEDIUM (#10–19): allowed at P4–P8.`
+  const mediumMatch =
+    /^\s*-\s+MEDIUM\s+\(#\d+[–-]\d+\):\s+allowed at P(\d+)[–-]P(\d+)\.\s*$/m.exec(
+      prose,
+    )
+  if (!mediumMatch) {
+    throw new Error(
+      "parseTwoDigitAddsubBandSlotsFromSpec: could not locate MEDIUM rule — expected '- MEDIUM (#N–M): allowed at P<s>–P<e>.' bullet in spec §2.1",
+    )
+  }
+  const mediumStart = Number.parseInt(mediumMatch[1]!, 10)
+  const mediumEnd = Number.parseInt(mediumMatch[2]!, 10)
+
+  // HARD: `- HARD (#20–30 / #20–36): allowed at P5–P8 only. **HARD must NOT appear at P1–P4.**`
+  // Tolerate the dual-range `(#X–Y / #X–Z)` form OR a simple single
+  // range `(#X–Y)`.
+  const hardMatch =
+    /^\s*-\s+HARD\s+\(#\d+[–-]\d+(?:\s*\/\s*#\d+[–-]\d+)?\):\s+allowed at P(\d+)[–-]P(\d+)\s+only\.\s+\*\*HARD must NOT appear at P\d+[–-]P\d+/m.exec(
+      prose,
+    )
+  if (!hardMatch) {
+    throw new Error(
+      "parseTwoDigitAddsubBandSlotsFromSpec: could not locate HARD rule — expected '- HARD (#N–M [/ #N–K]): allowed at P<s>–P<e> only. **HARD must NOT appear at P1–P4.**' bullet in spec §2.1",
+    )
+  }
+  const hardStart = Number.parseInt(hardMatch[1]!, 10)
+  const hardEnd = Number.parseInt(hardMatch[2]!, 10)
+
+  const range = (start: number, end: number): readonly number[] => {
+    const out: number[] = []
+    for (let i = start; i <= end; i++) out.push(i)
+    return out
+  }
+
+  return {
+    EASY: range(easyStart, easyEnd),
+    MEDIUM: range(mediumStart, mediumEnd),
+    HARD: range(hardStart, hardEnd),
+  }
+}
+
+describe('TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots drift-guard against spec §2.1', () => {
+  const SPEC_PATH = join(
+    process.cwd(),
+    'design',
+    'math',
+    'two-digit-addsub-content.md',
+  )
+
+  it('lint rule data matches the hand-mirrored expectation from the spec (lockstep)', () => {
+    expect(TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots).toEqual(
+      EXPECTED_TWO_DIGIT_ADDSUB_BAND_SLOTS_FROM_SPEC,
+    )
+  })
+
+  it('spec §2.1 band-by-slot bullets parse to the hand-mirrored expectation (lockstep)', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+    const parsed = parseTwoDigitAddsubBandSlotsFromSpec(spec)
+    expect(parsed).toEqual(EXPECTED_TWO_DIGIT_ADDSUB_BAND_SLOTS_FROM_SPEC)
+  })
+
+  it('parser throws a clear error when a required spec bullet is missing', () => {
+    const spec = readFileSync(SPEC_PATH, 'utf8')
+
+    const proseMissingEasy = spec.replace(
+      /^-\s+EASY\s+\(#\d+[–-]\d+\):\s+allowed at any slot P\d+[–-]P\d+\s*\(gentle ramp anchor/m,
+      '- EASY (#1–9): [REFORMATTED]',
+    )
+    expect(() =>
+      parseTwoDigitAddsubBandSlotsFromSpec(proseMissingEasy),
+    ).toThrow(/EASY rule/)
+
+    const proseMissingMedium = spec.replace(
+      /^-\s+MEDIUM\s+\(#\d+[–-]\d+\):\s+allowed at P\d+[–-]P\d+\.\s*$/m,
+      '- MEDIUM (#10–19): [REFORMATTED]',
+    )
+    expect(() =>
+      parseTwoDigitAddsubBandSlotsFromSpec(proseMissingMedium),
+    ).toThrow(/MEDIUM rule/)
+
+    const proseMissingHard = spec.replace(
+      /^-\s+HARD\s+\(#\d+[–-]\d+(?:\s*\/\s*#\d+[–-]\d+)?\):\s+allowed at P\d+[–-]P\d+\s+only\.\s+\*\*HARD must NOT appear at P\d+[–-]P\d+/m,
+      '- HARD (#20–30 / #20–36): [REFORMATTED]',
+    )
+    expect(() =>
+      parseTwoDigitAddsubBandSlotsFromSpec(proseMissingHard),
+    ).toThrow(/HARD rule/)
+  })
+})
+
+// ── resolveTierBinding — two-digit-addsub: BINDING DEFERRED (PR A) ──────
+//
+// PR A scope per `testing-and-ci.md §6` split-PR pattern: the binding is
+// intentionally NOT wired (resolveTierBinding returns null for two-digit-
+// addsub.json). The committed canon at public/canon/math/level-1/
+// two-digit-addsub.json ships with 3 round-ten-anchor facts — the §1.4
+// correction target — which would fail PR A's lint. PR B (ticket
+// follow-up to 86c9xkz9n) activates the binding alongside a fresh canon
+// rebake + Wave 2 prereq fold-in.
+//
+// PR B activates: see testing-and-ci.md §6 "Split-PR pattern" 3-line
+// update — move two-digit-addsub.json out of OOS-list in
+// `runCompositionLint` disk-walker test, bump filesLinted +1, bump
+// filesSkipped -1.
+
+describe('resolveTierBinding — two-digit-addsub (BINDING DEFERRED in PR A)', () => {
+  it('returns null for two-digit-addsub.json paths in PR A scope', () => {
+    // PR B will flip this assertion to:
+    //   expect(resolveTierBinding('two-digit-addsub.json')?.tier).toBe(
+    //     'two-digit-addsub')
+    expect(resolveTierBinding('two-digit-addsub.json')).toBeNull()
+    expect(
+      resolveTierBinding('canon/math/level-1/two-digit-addsub.json'),
+    ).toBeNull()
+    expect(
+      resolveTierBinding(
+        'canon/math/level-1/two-digit-addsub.json'.replace(/\//g, sep),
+      ),
+    ).toBeNull()
+  })
+
+  it('still binds the four currently-active tiers (no cross-tier regression from PR A infra add)', () => {
+    expect(resolveTierBinding('sub-to-10.json')?.tier).toBe('sub-to-10')
+    expect(resolveTierBinding('add-to-10.json')?.tier).toBe('add-to-10')
+    expect(resolveTierBinding('sub-to-20.json')?.tier).toBe('sub-to-20')
+    expect(resolveTierBinding('add-to-20.json')?.tier).toBe('add-to-20')
   })
 })
