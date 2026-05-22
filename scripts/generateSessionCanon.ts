@@ -111,6 +111,7 @@ import {
   assertAddToTwentyCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
+  assertTwoDigitAddsubCompositionClean,
 } from './compositionLint.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -421,6 +422,26 @@ async function bakeOne(
   } else if (combo.track === 'math' && combo.focusNode === 'add-to-20') {
     try {
       assertAddToTwentyCompositionClean(
+        `${combo.track}/${combo.focusNode}`,
+        response,
+      )
+    } catch (err) {
+      if (lintWarn && err instanceof CompositionLintError) {
+        console.warn(
+          `\n[composition-lint] WARN — writing despite violations: ` +
+            `${err.message}\n` +
+            err.violations
+              .map((v) => `  - [${v.rule}] ${v.message}`)
+              .join('\n') +
+            '\n',
+        )
+      } else {
+        throw err
+      }
+    }
+  } else if (combo.track === 'math' && combo.focusNode === 'two-digit-addsub') {
+    try {
+      assertTwoDigitAddsubCompositionClean(
         `${combo.track}/${combo.focusNode}`,
         response,
       )
