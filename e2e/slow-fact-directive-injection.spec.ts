@@ -29,6 +29,7 @@ import { test, expect } from '@playwright/test'
 import type { Request } from '@playwright/test'
 import { canonicalMathSessionResponse } from './fixtures/canonicalSessionResponses'
 import {
+  buildSeedProgress,
   buildSeedSessionHistory,
   forceHowlerUnlock,
   seedLocalStorage,
@@ -130,62 +131,30 @@ function buildSlowFactSeededProgress(): unknown {
   // → correctRate approximation = 1. Latency median over 6 entries
   // sorted: [5500, 5700, 5800, 5900, 6100, 6300] → mean(5800, 5900)
   // = 5850ms. Above the 5000ms floor, so the predicate fires.
+  //
+  // Pre-86c9xaybc this function hand-built the full Progress shape to
+  // get `latencyMs` + `mathFacts` onto each entry; the widened
+  // `buildSeedProgress.history` now carries those fields natively.
   const fact = { a: 4, b: 2, op: '+' as const }
   const baseDateMs = Date.parse('2026-05-01T10:00:00.000Z')
   const dayMs = 24 * 60 * 60 * 1000
   const latencies = [5500, 5700, 5800, 5900, 6100, 6300]
 
-  const history = latencies.map((ms, i) => ({
-    dateISO: new Date(baseDateMs + i * dayMs).toISOString(),
-    skillFocus: ['add-to-10'],
-    successRate: 1,
-    latencyMs: [ms],
-    mathFacts: [{ a: fact.a, b: fact.b, op: fact.op }],
-  }))
-
-  return {
-    schemaVersion: 1,
-    profile: {
-      childName: 'Marian',
-      character: 'melody',
-      lastPlayedISO: history[history.length - 1]!.dateISO,
-    },
-    skillLevels: {
-      'number-recog': 'mastered',
+  return buildSeedProgress({
+    skillLevelOverrides: {
       'add-to-10': 'practicing',
-      'add-to-20': 'locked',
-      'sub-to-10': 'mastered',
-      'sub-to-20': 'intro',
-      'two-digit-addsub': 'locked',
-      'skip-counting': 'locked',
-      'mult-2-5-10': 'intro',
-      'mult-3-4': 'locked',
-      'mult-6-9': 'locked',
-      'letter-names': 'mastered',
-      'letter-sounds': 'practicing',
-      'blending-cv': 'practicing',
-      'cvc-words': 'intro',
-      'cvc-words-short-o': 'locked',
-      'cvc-words-short-u': 'locked',
-      'cvc-words-short-i': 'locked',
-      'cvc-words-short-e': 'locked',
-      // Digraphs split into 3 sequential sibling nodes per PR #211.
-      'digraphs-sh': 'locked',
-      'digraphs-ch': 'locked',
-      'digraphs-th-voiceless': 'locked',
-      'sight-words': 'intro',
-      'simple-sentences': 'locked',
     },
-    mathFactsLeitner: { items: [] },
-    history,
-    parentSettings: {
-      autoPromote: true,
-      sessionModePicker: 'off',
-      masteryThreshold: { percent: 0.95, sessions: 3 },
-      crossDayEnforcement: true,
-      showLevelToMarian: false,
-    },
-  }
+    lastPlayedISO: new Date(
+      baseDateMs + (latencies.length - 1) * dayMs,
+    ).toISOString(),
+    history: latencies.map((ms, i) => ({
+      dateISO: new Date(baseDateMs + i * dayMs).toISOString(),
+      skillFocus: ['add-to-10'],
+      successRate: 1,
+      latencyMs: [ms],
+      mathFacts: [{ a: fact.a, b: fact.b, op: fact.op }],
+    })),
+  })
 }
 
 /** Filter captured requests to math session-starts only. */

@@ -65,6 +65,7 @@ import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
 import { canonicalMathSessionResponse } from './fixtures/canonicalSessionResponses'
 import {
+  buildSeedProgress,
   buildSeedSessionHistory,
   seedLocalStorage,
 } from './_helpers/seedStorage'
@@ -188,6 +189,10 @@ function buildSlowFactProgress(config: SlowFactHistoryConfig): unknown {
   // Each session entry carries 6 per-problem rows of the SAME fact.
   // Using sub-to-10 entries — the aggregator on RED filters these out;
   // on GREEN it accepts them.
+  //
+  // Pre-86c9xaybc this function hand-built the full Progress shape to
+  // get `latencyMs` + `mathFacts` onto each entry; the widened
+  // `buildSeedProgress.history` now carries those fields natively.
   const history = Array.from({ length: config.sessionCount }, (_, i) => ({
     dateISO: new Date(baseDateMs + i * dayMs).toISOString(),
     skillFocus: [config.focusNode],
@@ -200,53 +205,25 @@ function buildSlowFactProgress(config: SlowFactHistoryConfig): unknown {
     })),
   }))
 
-  // Skill-levels: depending on the focus we're rehearsing, set that
-  // node to `practicing` and upstream nodes to `mastered`.
+  // Skill-levels: when rehearsing sub-to-10 we need add-to-10 +
+  // add-to-20 fully mastered so the focus-picker walks down to
+  // sub-to-10. When rehearsing add-to-10 the default Marian baseline
+  // (add-to-10: practicing) already lands the focus there, so no
+  // override is needed.
   const isSub = config.focusNode === 'sub-to-10'
-  const skillLevels: Record<string, string> = {
-    'number-recog': 'mastered',
-    'add-to-10': isSub ? 'mastered' : 'practicing',
-    'add-to-20': isSub ? 'mastered' : 'locked',
-    'sub-to-10': isSub ? 'practicing' : 'mastered',
-    'sub-to-20': 'intro',
-    'two-digit-addsub': 'locked',
-    'skip-counting': 'locked',
-    'mult-2-5-10': 'intro',
-    'mult-3-4': 'locked',
-    'mult-6-9': 'locked',
-    'letter-names': 'mastered',
-    'letter-sounds': 'practicing',
-    'blending-cv': 'practicing',
-    'cvc-words': 'intro',
-    'cvc-words-short-o': 'locked',
-    'cvc-words-short-u': 'locked',
-    'cvc-words-short-i': 'locked',
-    'cvc-words-short-e': 'locked',
-    'digraphs-sh': 'locked',
-    'digraphs-ch': 'locked',
-    'digraphs-th-voiceless': 'locked',
-    'sight-words': 'intro',
-    'simple-sentences': 'locked',
-  }
+  const skillLevelOverrides: Record<string, string> = isSub
+    ? {
+        'add-to-10': 'mastered',
+        'add-to-20': 'mastered',
+        'sub-to-10': 'practicing',
+      }
+    : {}
 
-  return {
-    schemaVersion: 1,
-    profile: {
-      childName: 'Marian',
-      character: 'melody',
-      lastPlayedISO: history[history.length - 1]?.dateISO ?? null,
-    },
-    skillLevels,
-    mathFactsLeitner: { items: [] },
+  return buildSeedProgress({
+    skillLevelOverrides,
+    lastPlayedISO: history[history.length - 1]?.dateISO ?? null,
     history,
-    parentSettings: {
-      autoPromote: true,
-      sessionModePicker: 'off',
-      masteryThreshold: { percent: 0.95, sessions: 3 },
-      crossDayEnforcement: true,
-      showLevelToMarian: false,
-    },
-  }
+  })
 }
 
 // 6 latencies whose median = 6500ms (for sub-to-10 — over 6000ms threshold).
