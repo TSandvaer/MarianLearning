@@ -34,28 +34,34 @@ import {
   ADD_TO_TWENTY_POOL,
   ADD_TO_TWENTY_RULES,
   CompositionLintError,
+  KNOWN_DISTRACTOR_CLASSES,
   SUB_TO_TEN_POOL,
   SUB_TO_TEN_RULES,
   SUB_TO_TWENTY_POOL,
   SUB_TO_TWENTY_RULES,
   TWO_DIGIT_ADDSUB_POOL,
   TWO_DIGIT_ADDSUB_RULES,
+  TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL,
+  TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
   assertAddToTenCompositionClean,
   assertAddToTwentyCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
   assertTwoDigitAddsubCompositionClean,
+  assertTwoDigitAddsubWithRegroupCompositionClean,
   formatCompositionLintReport,
   lintAddToTenComposition,
   lintAddToTwentyComposition,
   lintSubToTenComposition,
   lintSubToTwentyComposition,
   lintTwoDigitAddsubComposition,
+  lintTwoDigitAddsubWithRegroupComposition,
   parseAddToTenReadLine,
   parseAddToTwentyReadLine,
   parseSubToTenReadLine,
   parseSubToTwentyReadLine,
   parseTwoDigitAddsubReadLine,
+  parseTwoDigitAddsubWithRegroupReadLine,
   resolveTierBinding,
   runCompositionLint,
 } from './compositionLint.ts'
@@ -6519,5 +6525,1006 @@ describe('resolveTierBinding — two-digit-addsub (BINDING ACTIVATED in PR B)', 
     expect(resolveTierBinding('add-to-10.json')?.tier).toBe('add-to-10')
     expect(resolveTierBinding('sub-to-20.json')?.tier).toBe('sub-to-20')
     expect(resolveTierBinding('add-to-20.json')?.tier).toBe('add-to-20')
+  })
+})
+
+// ── ─────────────────────────────────────────────────────────────────────
+// two-digit-addsub-with-regroup (Wave 5 — ticket 86c9y01ee)
+// ── ─────────────────────────────────────────────────────────────────────
+
+/** Reuse the Wave-4 sibling's number-word helpers — read-line templates
+ *  are identical per spec §1.6. */
+function readTwoDigitAddsubWithRegroupUtterance(
+  index: number,
+  a: number,
+  b: number,
+  op: '+' | '-',
+): Utterance {
+  return readTwoDigitAddsubUtterance(index, a, b, op)
+}
+
+/** Build a SessionStartResponse with 8 two-digit-addsub-with-regroup
+ *  problems. Identical wire shape to the Wave-4 sibling. */
+function buildTwoDigitAddsubWithRegroupCanonResponse(
+  facts: Array<[a: number, b: number, op: '+' | '-']>,
+): SessionStartResponse {
+  const utterances: Utterance[] = facts.map(([a, b, op], i) =>
+    readTwoDigitAddsubWithRegroupUtterance(i + 1, a, b, op),
+  )
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: { id: 'test', label: 'test', utterances: [] },
+    utterances,
+  }
+}
+
+/** Clean canonical 8-fact two-digit-addsub-with-regroup session.
+ *
+ *  Composition (verified against spec §1.4 + §1.5 caps + §1.3 high-leverage
+ *  coverage):
+ *    P1 = 15+8   EASY carry-from-units    — opener (P1 must be '+')
+ *    P2 = 17+5   EASY carry-from-units
+ *    P3 = 21-4   EASY borrow-from-tens    — first '-' gentle ramp
+ *    P4 = 27+6   MEDIUM carry-from-units  — P4 MEDIUM-only ✓
+ *    P5 = 32-5   MEDIUM borrow-from-tens  — P5-P8 borrow anchor #1
+ *    P6 = 45+8   HARD carry-from-units    — HARD slot
+ *    P7 = 35+7   MEDIUM carry-from-units
+ *    P8 = 52-7   HARD borrow-from-tens    — P5-P8 borrow anchor #2
+ *
+ *  Category counts:
+ *    carry-from-units = 5 (cap 5 ✓ — boundary)
+ *    borrow-from-tens = 3 (cap 3 ✓ — boundary)
+ *    round-ten-cross-down = 0 (cap 1 ✓)
+ *  Op-mix: 5+/3- (default per spec §1.1).
+ *  P1 op: '+' ✓
+ *  Band-by-slot: EASY at P1/P2/P3 ✓, MEDIUM at P4/P5/P7 ✓, HARD at P6/P8 ✓.
+ *  High-leverage: borrow-from-tens count in P5-P8 = 2 (P5, P8); cap min=1 ✓.
+ *  No duplicates: 8 distinct facts ✓.
+ *  Dual-exposure: no inverse-triple in-pool collisions ✓.
+ */
+const CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS: ReadonlyArray<
+  [number, number, '+' | '-']
+> = [
+  [15, 8, '+'],
+  [17, 5, '+'],
+  [21, 4, '-'],
+  [27, 6, '+'],
+  [32, 5, '-'],
+  [45, 8, '+'],
+  [35, 7, '+'],
+  [52, 7, '-'],
+]
+
+// ── parseTwoDigitAddsubWithRegroupReadLine ──────────────────────────────
+
+describe('parseTwoDigitAddsubWithRegroupReadLine', () => {
+  it('parses the "+" carry-required template', () => {
+    expect(
+      parseTwoDigitAddsubWithRegroupReadLine(
+        'Twenty-seven plus six. How many?',
+      ),
+    ).toEqual({ a: 27, b: 6, op: '+' })
+  })
+
+  it('parses the "-" borrow-required template (requires "are left")', () => {
+    expect(
+      parseTwoDigitAddsubWithRegroupReadLine(
+        'Thirty-two minus five. How many are left?',
+      ),
+    ).toEqual({ a: 32, b: 5, op: '-' })
+  })
+
+  it('parses round-ten-cross-down read-lines (e.g. 30-4=26)', () => {
+    expect(
+      parseTwoDigitAddsubWithRegroupReadLine(
+        'Thirty minus four. How many are left?',
+      ),
+    ).toEqual({ a: 30, b: 4, op: '-' })
+  })
+
+  it('rejects the "-" template missing the "are left" suffix (Wave-4 PR B fold-in)', () => {
+    expect(
+      parseTwoDigitAddsubWithRegroupReadLine(
+        'Thirty-two minus five. How many?',
+      ),
+    ).toBeNull()
+  })
+
+  it('shares the Wave-4 sibling parser (function identity check)', () => {
+    // Sanity: the with-regroup parser is a thin alias over the Wave-4
+    // parser. If it diverges in a future refactor, this test surfaces
+    // the divergence — the read-line templates are spec-locked identical
+    // per spec §1.6.
+    expect(
+      parseTwoDigitAddsubWithRegroupReadLine(
+        'Twenty-three plus four. How many?',
+      ),
+    ).toEqual(parseTwoDigitAddsubReadLine('Twenty-three plus four. How many?'))
+  })
+})
+
+// ── TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL sanity ──────────────────────────
+
+describe('TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL', () => {
+  it('contains exactly 30 facts (spec §1.4 Option A v1)', () => {
+    expect(TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL).toHaveLength(30)
+  })
+
+  it('has unique ids across all entries (op is part of identity)', () => {
+    const ids = new Set(TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.map((f) => f.id))
+    expect(ids.size).toBe(TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.length)
+  })
+
+  it('ids match the `<a><op><b>` shape — op is part of stable serialised key', () => {
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      expect(f.id).toBe(`${f.a}${f.op}${f.b}`)
+    }
+  })
+
+  it('every "+" fact carries the carry-required constraint ((a mod 10) + b > 9)', () => {
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      if (f.op !== '+') continue
+      expect((f.a % 10) + f.b).toBeGreaterThan(9)
+    }
+  })
+
+  it('every "-" fact carries the borrow-required constraint ((a mod 10) < b)', () => {
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      if (f.op !== '-') continue
+      expect(f.a % 10).toBeLessThan(f.b)
+    }
+  })
+
+  it('every "+" fact is in the carry-from-units category (by construction)', () => {
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      if (f.op !== '+') continue
+      expect(f.category).toBe('carry-from-units')
+    }
+  })
+
+  it('every "-" fact is in borrow-from-tens or round-ten-cross-down', () => {
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      if (f.op !== '-') continue
+      expect(['borrow-from-tens', 'round-ten-cross-down']).toContain(f.category)
+    }
+  })
+
+  it('every round-ten-cross-down fact has minuend ending in 0', () => {
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      if (f.category !== 'round-ten-cross-down') continue
+      expect(f.a % 10).toBe(0)
+    }
+  })
+
+  it('operand range: a in [10, 69] (v1 decade cap = 60s), b in [1, 9]', () => {
+    // Spec §1.1: "v1 caps decade range at 10–60." The "60" framing
+    // refers to the DECADE (60s inclusive — i.e. minuend ≤ 69), not the
+    // value 60. Pool includes 61-8 and 64-9 (HARD borrow facts in the
+    // 60s). No facts in the 70s, 80s, or 90s.
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      expect(f.a).toBeGreaterThanOrEqual(10)
+      expect(f.a).toBeLessThanOrEqual(69)
+      expect(f.b).toBeGreaterThanOrEqual(1)
+      expect(f.b).toBeLessThanOrEqual(9)
+    }
+  })
+
+  it('answer range: correct in [17, 64] per spec §1.4 cross-check', () => {
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      const correct = f.op === '+' ? f.a + f.b : f.a - f.b
+      expect(correct).toBeGreaterThanOrEqual(17)
+      expect(correct).toBeLessThanOrEqual(64)
+    }
+  })
+
+  it('op counts: 18 "+", 12 "-" (per spec §1.4 cross-check)', () => {
+    const plus = TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.filter((f) => f.op === '+')
+    const minus = TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.filter((f) => f.op === '-')
+    expect(plus).toHaveLength(18)
+    expect(minus).toHaveLength(12)
+  })
+
+  it('band counts: EASY=9, MEDIUM=11, HARD=10 (per spec §1.4 cross-check)', () => {
+    const easy = TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.filter(
+      (f) => f.band === 'EASY',
+    )
+    const medium = TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.filter(
+      (f) => f.band === 'MEDIUM',
+    )
+    const hard = TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.filter(
+      (f) => f.band === 'HARD',
+    )
+    expect(easy).toHaveLength(9)
+    expect(medium).toHaveLength(11)
+    expect(hard).toHaveLength(10)
+  })
+
+  it('category counts: carry-from-units=18, borrow-from-tens=9, round-ten-cross-down=3', () => {
+    const counts: Record<string, number> = {}
+    for (const f of TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL) {
+      counts[f.category] = (counts[f.category] ?? 0) + 1
+    }
+    expect(counts).toEqual({
+      'carry-from-units': 18,
+      'borrow-from-tens': 9,
+      'round-ten-cross-down': 3,
+    })
+  })
+
+  it('round-ten-cross-down facts are 30-4, 40-7, 50-8 (spec §1.4 #20, #29, #30)', () => {
+    const round = TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.filter(
+      (f) => f.category === 'round-ten-cross-down',
+    ).map((f) => f.id)
+    expect(round.sort()).toEqual(['30-4', '40-7', '50-8'])
+  })
+
+  it('NO Wave-4-pool overlap — no in-pool fact violates the regroup-required constraint', () => {
+    // Sibling-tier rejection sanity: the Wave-4 `TWO_DIGIT_ADDSUB_POOL`
+    // is the NO-REGROUP pool. Every fact in that pool fails this tier's
+    // regroup-required constraint by construction — but a defense-in-
+    // depth check that NONE of those facts leak into the with-regroup
+    // pool is worth keeping (catches a stale-data drift if a copy-paste
+    // refactor accidentally cross-pollinates).
+    const withRegroupIds = new Set(
+      TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.map((f) => f.id),
+    )
+    for (const wave4 of TWO_DIGIT_ADDSUB_POOL) {
+      expect(withRegroupIds.has(wave4.id)).toBe(false)
+    }
+  })
+})
+
+// ── TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES sanity ─────────────────────────
+
+describe('TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES', () => {
+  it('category caps match spec §1.5 (5 / 3 / 1)', () => {
+    expect(TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES.categoryCaps).toEqual({
+      'carry-from-units': 5,
+      'borrow-from-tens': 3,
+      'round-ten-cross-down': 1,
+    })
+  })
+
+  it('band-by-slot matches spec §1.3 (EASY P1-P3, MEDIUM P4-P8, HARD P5-P8)', () => {
+    expect(TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES.bandAllowedSlots).toEqual({
+      EASY: [1, 2, 3],
+      MEDIUM: [4, 5, 6, 7, 8],
+      HARD: [5, 6, 7, 8],
+    })
+  })
+
+  it('op-mix allows 5+/3- (default) and 6+/2- (low-score modulation) per spec §1.1', () => {
+    expect(TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES.allowedOpMixes).toEqual([
+      { addCount: 5, subCount: 3 },
+      { addCount: 6, subCount: 2 },
+    ])
+  })
+
+  it('high-leverage coverage requires >= 1 borrow-from-tens in P5-P8 per spec §1.3', () => {
+    expect(TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES.borrowFromTensInP5ToP8Min).toBe(
+      1,
+    )
+  })
+
+  it('totalProblems is 8 (canonical session size)', () => {
+    expect(TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES.totalProblems).toBe(8)
+  })
+})
+
+// ── lintTwoDigitAddsubWithRegroupComposition — clean canon passes ───────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — clean canon passes', () => {
+  it('returns no violations for the canonical 8-fact session', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    expect(lintTwoDigitAddsubWithRegroupComposition(response)).toEqual([])
+  })
+
+  it('assertTwoDigitAddsubWithRegroupCompositionClean does not throw on clean canon', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    expect(() =>
+      assertTwoDigitAddsubWithRegroupCompositionClean(
+        'math/two-digit-addsub-with-regroup',
+        response,
+      ),
+    ).not.toThrow()
+  })
+})
+
+// ── lintBeforeRebake — LOAD-BEARING gate per Retro Action 6 ─────────────
+//
+// The Waves 3+4 miss was: lint scripts shipped but had NO failing test
+// demonstrating they catch the violations they claim to. PR A here MUST
+// NOT repeat that mistake. The block below constructs deliberately-
+// violating canon fixtures, runs the lint on each, and asserts the lint
+// reports the violation with a clear error message.
+//
+// This is the test that proves the lint works as a gate BEFORE PR B
+// bakes the canon. Per `testing-and-ci.md §6` lint-infra split-PR
+// pattern: a green lint run without a paired failing test is NOT a
+// working gate.
+
+describe('lintTwoDigitAddsubWithRegroupComposition — lintBeforeRebake (per Retro Action 6)', () => {
+  it('REJECTS canon with no-regroup fact in pool (e.g. 25+4 from Wave-4 pool)', () => {
+    // Wave-4 fact `25+4` is in the no-regroup pool (units 5+4=9, no
+    // carry); it is NOT a Wave-5 fact. A canon mistakenly carrying it
+    // must surface as pool-membership violation.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [25, 4, '+'], // P4 NO-REGROUP from Wave-4 — VIOLATES
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.problemIndex).toBe(4)
+    expect(pool[0]!.factId).toBe('25+4')
+    expect(pool[0]!.message).toContain(
+      'NOT in the 30-fact two-digit-addsub-with-regroup',
+    )
+    expect(pool[0]!.message).toContain('regroup-required constraint')
+  })
+
+  it('REJECTS canon with operand outside the v1 decade range (e.g. 75+8 — decade 70)', () => {
+    // 75+8 satisfies the carry-required constraint mechanically but is
+    // OUT of the v1 decade cap (10-60); pool-membership must reject.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [75, 8, '+'], // P4 OUT-OF-RANGE — VIOLATES
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.factId).toBe('75+8')
+  })
+
+  it('REJECTS canon where two round-ten-cross-down facts co-occur (cap=1 saturation lever)', () => {
+    // The §1.5 saturation-prior correction lever. Pool has 3 round-ten
+    // facts (#20=30-4, #29=40-7, #30=50-8); cap forbids any two from
+    // appearing together. Replace P5 with 30-4 and P8 with 40-7 to
+    // exercise the cap.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [27, 6, '+'], // P4
+      [30, 4, '-'], // P5 round-ten (1/1)
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [40, 7, '-'], // P8 round-ten (2/1 VIOLATES — cap exceeded)
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    expect(caps).toHaveLength(1)
+    expect(caps[0]!.message).toContain('"round-ten-cross-down"')
+    expect(caps[0]!.message).toContain('cap is 1')
+    expect(caps[0]!.message).toContain('canon has 2')
+    expect(caps[0]!.message).toContain('Saturation-prior correction lever')
+  })
+
+  it('REJECTS an unparseable read-line (canon-bake malformation)', () => {
+    // Defense-in-depth — a corrupt canon read-line should NOT parse to
+    // a pool match silently; the lint must surface the malformation.
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    // Mangle P4's read-line to drop the "How many?" suffix.
+    response.utterances[3] = {
+      id: 'math.p4.read',
+      text: 'Twenty-seven plus six.',
+      audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+    }
+    const violations = lintTwoDigitAddsubWithRegroupComposition(response)
+    const unparseable = violations.filter(
+      (v) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(4)
+    expect(unparseable[0]!.message).toContain(
+      'does not match either two-digit-addsub-with-regroup read template',
+    )
+  })
+
+  it('REJECTS canon violating multiple rules simultaneously (defense-in-depth)', () => {
+    // A canon shipped with multiple violations should surface ALL of
+    // them in a single lint pass (per `compositionLint.ts` "Returns ALL
+    // violations across the 8-problem set" contract). This guards
+    // against early-exit-on-first-violation refactor regressions.
+    //
+    // NOTE: op-mix is gated on matched.length === totalProblems (so a
+    // pool-membership rejection bypasses op-mix). To exercise op-mix
+    // simultaneously we keep every fact in-pool and seed an FORBIDDEN
+    // op-mix (3+/5-) via real pool facts. p1-is-plus + category-cap
+    // are also tripped on the same fixture.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [21, 4, '-'], // P1 op=- — VIOLATES p1-is-plus + borrow (1)
+      [17, 5, '+'], // P2 EASY carry (1)
+      [22, 5, '-'], // P3 EASY borrow (2)
+      [27, 6, '+'], // P4 MEDIUM carry (2)
+      [30, 4, '-'], // P5 MEDIUM round-ten (1/1)
+      [40, 7, '-'], // P6 HARD round-ten (2/1 VIOLATES category-cap)
+      [35, 7, '+'], // P7 MEDIUM carry (3)
+      [50, 8, '-'], // P8 HARD round-ten (3/1) + borrow count = 5
+    ]
+    // op-mix: 3+/5- — FORBIDDEN per spec §1.1 (allowed: 5+/3-, 6+/2-)
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const ruleKinds = new Set(violations.map((v) => v.rule))
+    // The rule set MUST cover at least these three — they are the
+    // structurally-independent failure modes the test seeds.
+    expect(ruleKinds.has('p1-is-plus')).toBe(true)
+    expect(ruleKinds.has('category-cap')).toBe(true)
+    expect(ruleKinds.has('op-mix')).toBe(true)
+  })
+})
+
+// ── pool-membership rule ────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — pool-membership rule', () => {
+  it('rejects a fact outside the 30-fact pool (e.g. 99+9 — both range and category-by-construction)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [99, 9, '+'], // P4 way OUT-OF-RANGE
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.factId).toBe('99+9')
+  })
+
+  it('rejects a no-borrow "-" fact (15-3 — units 5 >= 3, no borrow needed)', () => {
+    // 15-3 satisfies the no-borrow constraint and belongs to the Wave-4
+    // no-regroup pool, NOT this tier.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [15, 3, '-'], // P3 NO-BORROW — VIOLATES (belongs to Wave-4)
+      [27, 6, '+'], // P4
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const pool = violations.filter((v) => v.rule === 'pool-membership')
+    expect(pool).toHaveLength(1)
+    expect(pool[0]!.factId).toBe('15-3')
+  })
+})
+
+// ── category-cap rule ──────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — category-cap rule', () => {
+  it('fires when carry-from-units count exceeds cap of 5 (boundary +1)', () => {
+    // 6 carry-from-units facts. Need to swap one borrow for a carry to
+    // exceed cap; replace P3 (21-4 borrow) with a 6th carry. That
+    // changes op-mix to 6+/2-, which IS allowed. Use 19+4 (EASY carry)
+    // to satisfy band-by-slot at P3.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1 EASY carry (1)
+      [17, 5, '+'], // P2 EASY carry (2)
+      [19, 4, '+'], // P3 EASY carry (3) — replaces 21-4 borrow
+      [27, 6, '+'], // P4 MEDIUM carry (4)
+      [32, 5, '-'], // P5 MEDIUM borrow (1)
+      [45, 8, '+'], // P6 HARD carry (5)
+      [35, 7, '+'], // P7 MEDIUM carry (6 — VIOLATES cap of 5)
+      [52, 7, '-'], // P8 HARD borrow (2)
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const caps = violations.filter((v) => v.rule === 'category-cap')
+    const carryCap = caps.find((v) => v.message.includes('"carry-from-units"'))
+    expect(carryCap).toBeDefined()
+    expect(carryCap!.message).toContain('cap is 5')
+    expect(carryCap!.message).toContain('canon has 6')
+  })
+
+  it('clean canon at boundary (5 carry + 3 borrow + 0 round-ten) passes all caps', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    const caps = lintTwoDigitAddsubWithRegroupComposition(response).filter(
+      (v) => v.rule === 'category-cap',
+    )
+    expect(caps).toEqual([])
+  })
+})
+
+// ── band-by-slot rule ──────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — band-by-slot rule', () => {
+  it('fires when HARD fact appears at P1 (gentle-ramp slot)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [45, 8, '+'], // P1 HARD — VIOLATES (P1 must be EASY)
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [27, 6, '+'], // P4
+      [32, 5, '-'], // P5
+      [49, 4, '+'], // P6 HARD
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    const p1 = slot.find((v) => v.problemIndex === 1)
+    expect(p1).toBeDefined()
+    expect(p1!.factId).toBe('45+8')
+    expect(p1!.message).toContain('HARD-band')
+  })
+
+  it('fires when HARD fact appears at P4 (MEDIUM-only slot)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [49, 4, '+'], // P4 HARD — VIOLATES (P4 is MEDIUM-only)
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    const p4 = slot.find((v) => v.problemIndex === 4)
+    expect(p4).toBeDefined()
+    expect(p4!.factId).toBe('49+4')
+  })
+
+  it('fires when EASY fact appears at P5-P8 (discriminate tier)', () => {
+    // Wave-5 tightens the slot restriction further than the Wave-4
+    // sibling — EASY is P1-P3 ONLY (mirrors sub-to-10 / sub-to-20
+    // tightening from Dave NOF #1). Verify P7=EASY is rejected.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1 EASY
+      [17, 5, '+'], // P2 EASY
+      [21, 4, '-'], // P3 EASY
+      [27, 6, '+'], // P4 MEDIUM
+      [32, 5, '-'], // P5 MEDIUM
+      [45, 8, '+'], // P6 HARD
+      [13, 9, '+'], // P7 EASY — VIOLATES (P7 not in EASY allowedSlots [1,2,3])
+      [52, 7, '-'], // P8 HARD
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const slot = violations.filter((v) => v.rule === 'band-by-slot')
+    const p7 = slot.find((v) => v.problemIndex === 7)
+    expect(p7).toBeDefined()
+    expect(p7!.factId).toBe('13+9')
+    expect(p7!.message).toContain('EASY-band')
+  })
+})
+
+// ── op-mix rule ────────────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — op-mix rule', () => {
+  it('passes for 5+/3- default mix', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    const opMix = lintTwoDigitAddsubWithRegroupComposition(response).filter(
+      (v) => v.rule === 'op-mix',
+    )
+    expect(opMix).toEqual([])
+  })
+
+  it('passes for 6+/2- mix (low-score modulation case)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [19, 4, '+'], // P3 — replaces 21-4 to make 6+/2-
+      [27, 6, '+'], // P4
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const opMix = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    ).filter((v) => v.rule === 'op-mix')
+    expect(opMix).toEqual([])
+  })
+
+  it('fires on 8+/0- (all-plus session — FORBIDDEN per spec §1.1)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [19, 4, '+'], // P3
+      [27, 6, '+'], // P4
+      [29, 5, '+'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [38, 4, '+'], // P8
+    ]
+    const opMix = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    ).filter((v) => v.rule === 'op-mix')
+    expect(opMix).toHaveLength(1)
+    expect(opMix[0]!.message).toContain('8+/0-')
+    expect(opMix[0]!.message).toContain('FORBIDDEN')
+  })
+
+  it('fires on 4+/4- (FORBIDDEN — over-subtraction)', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [27, 6, '+'], // P4
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [22, 5, '-'], // P7 — pushes to 4+/4- (4 minuses)
+      [52, 7, '-'], // P8
+    ]
+    const opMix = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    ).filter((v) => v.rule === 'op-mix')
+    expect(opMix).toHaveLength(1)
+    expect(opMix[0]!.message).toContain('4+/4-')
+  })
+})
+
+// ── p1-is-plus rule ────────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — p1-is-plus rule', () => {
+  it('passes when P1 carries op +', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    const p1 = lintTwoDigitAddsubWithRegroupComposition(response).filter(
+      (v) => v.rule === 'p1-is-plus',
+    )
+    expect(p1).toEqual([])
+  })
+
+  it('fires when P1 carries op -', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [21, 4, '-'], // P1 op=- — VIOLATES (session opener must be +)
+      [17, 5, '+'], // P2
+      [22, 5, '-'], // P3
+      [27, 6, '+'], // P4
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [15, 8, '+'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const p1 = violations.filter((v) => v.rule === 'p1-is-plus')
+    expect(p1).toHaveLength(1)
+    expect(p1[0]!.factId).toBe('21-4')
+    expect(p1[0]!.message).toContain("op '-'")
+    expect(p1[0]!.message).toContain('session opener carries')
+  })
+})
+
+// ── high-leverage coverage rule ────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — borrow-from-tens coverage (P5-P8) rule', () => {
+  it('passes when at least 1 borrow-from-tens fact appears in P5-P8', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    const hl = lintTwoDigitAddsubWithRegroupComposition(response).filter(
+      (v) => v.rule === 'high-leverage-coverage',
+    )
+    expect(hl).toEqual([])
+  })
+
+  it('fires when P5-P8 contains zero borrow-from-tens facts', () => {
+    // Place both borrows in P1-P4 only — leaves P5-P8 all-carry.
+    // Op-mix stays valid (6+/2-). P3 EASY borrow + P4 MEDIUM borrow.
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1 EASY carry
+      [17, 5, '+'], // P2 EASY carry
+      [21, 4, '-'], // P3 EASY borrow (1)
+      [32, 5, '-'], // P4 MEDIUM borrow (2)
+      [29, 5, '+'], // P5 MEDIUM carry
+      [45, 8, '+'], // P6 HARD carry
+      [35, 7, '+'], // P7 MEDIUM carry
+      [47, 6, '+'], // P8 HARD carry
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const hl = violations.filter((v) => v.rule === 'high-leverage-coverage')
+    expect(hl).toHaveLength(1)
+    expect(hl[0]!.message).toContain('borrow-from-tens')
+    expect(hl[0]!.message).toContain('P5-P8')
+  })
+})
+
+// ── no-duplicates rule ─────────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — no-duplicates rule', () => {
+  it('fires when the same (a, b, op) triple appears twice', () => {
+    const facts: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [27, 6, '+'], // P4
+      [32, 5, '-'], // P5
+      [27, 6, '+'], // P6 DUPLICATE of P4 — VIOLATES (also wrong band; that's fine)
+      [35, 7, '+'], // P7
+      [52, 7, '-'], // P8
+    ]
+    const violations = lintTwoDigitAddsubWithRegroupComposition(
+      buildTwoDigitAddsubWithRegroupCanonResponse(facts),
+    )
+    const dup = violations.filter((v) => v.rule === 'no-duplicates')
+    expect(dup).toHaveLength(1)
+    expect(dup[0]!.factId).toBe('27+6')
+    expect(dup[0]!.message).toContain('appears 2 times')
+  })
+})
+
+// ── unparseable-problem rule ────────────────────────────────────────────
+
+describe('lintTwoDigitAddsubWithRegroupComposition — unparseable-problem rule', () => {
+  it('fires on a read-line not matching either template', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    response.utterances[2] = {
+      id: 'math.p3.read',
+      text: 'Tap the cat.',
+      audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+    }
+    const violations = lintTwoDigitAddsubWithRegroupComposition(response)
+    const u = violations.filter((v) => v.rule === 'unparseable-problem')
+    expect(u).toHaveLength(1)
+    expect(u[0]!.problemIndex).toBe(3)
+  })
+
+  it('fires when "-" template lacks the "are left" suffix (Wave-4 fold-in)', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    response.utterances[2] = {
+      id: 'math.p3.read',
+      text: 'Twenty-one minus four. How many?',
+      audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+    }
+    const violations = lintTwoDigitAddsubWithRegroupComposition(response)
+    const u = violations.filter((v) => v.rule === 'unparseable-problem')
+    expect(u).toHaveLength(1)
+  })
+})
+
+// ── assertTwoDigitAddsubWithRegroupCompositionClean ─────────────────────
+
+describe('assertTwoDigitAddsubWithRegroupCompositionClean', () => {
+  it('does not throw on clean canon', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    expect(() =>
+      assertTwoDigitAddsubWithRegroupCompositionClean(
+        'math/two-digit-addsub-with-regroup',
+        response,
+      ),
+    ).not.toThrow()
+  })
+
+  it('throws CompositionLintError on dirty canon (round-ten cap exceeded)', () => {
+    const dirty: Array<[number, number, '+' | '-']> = [
+      [15, 8, '+'], // P1
+      [17, 5, '+'], // P2
+      [21, 4, '-'], // P3
+      [27, 6, '+'], // P4
+      [30, 4, '-'], // P5 round-ten (1/1)
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [40, 7, '-'], // P8 round-ten (2/1 VIOLATES)
+    ]
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse(dirty)
+    expect(() =>
+      assertTwoDigitAddsubWithRegroupCompositionClean(
+        'math/two-digit-addsub-with-regroup',
+        response,
+      ),
+    ).toThrow(CompositionLintError)
+  })
+
+  it('error carries canonId + violations for downstream diagnostics', () => {
+    const dirty: Array<[number, number, '+' | '-']> = [
+      [21, 4, '-'], // P1 op=- — VIOLATES p1-is-plus
+      [17, 5, '+'], // P2
+      [22, 5, '-'], // P3
+      [27, 6, '+'], // P4
+      [32, 5, '-'], // P5
+      [45, 8, '+'], // P6
+      [35, 7, '+'], // P7
+      [15, 8, '+'], // P8
+    ]
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse(dirty)
+    try {
+      assertTwoDigitAddsubWithRegroupCompositionClean(
+        'math/two-digit-addsub-with-regroup',
+        response,
+      )
+      throw new Error('expected throw did not fire')
+    } catch (err) {
+      expect(err).toBeInstanceOf(CompositionLintError)
+      const ce = err as CompositionLintError
+      expect(ce.canonId).toBe('math/two-digit-addsub-with-regroup')
+      expect(ce.violations.length).toBeGreaterThan(0)
+      expect(ce.violations.some((v) => v.rule === 'p1-is-plus')).toBe(true)
+    }
+  })
+})
+
+// ── resolveTierBinding — two-digit-addsub-with-regroup ──────────────────
+
+describe('resolveTierBinding — two-digit-addsub-with-regroup', () => {
+  it('binds two-digit-addsub-with-regroup.json paths to the with-regroup config', () => {
+    expect(resolveTierBinding('two-digit-addsub-with-regroup.json')?.tier).toBe(
+      'two-digit-addsub-with-regroup',
+    )
+    expect(
+      resolveTierBinding(
+        'canon/math/level-1/two-digit-addsub-with-regroup.json',
+      )?.tier,
+    ).toBe('two-digit-addsub-with-regroup')
+    expect(
+      resolveTierBinding(
+        'canon/math/level-1/two-digit-addsub-with-regroup.json'.replace(
+          /\//g,
+          sep,
+        ),
+      )?.tier,
+    ).toBe('two-digit-addsub-with-regroup')
+  })
+
+  it('still binds two-digit-addsub.json to the Wave-4 tier (no cross-tier collision)', () => {
+    // Sibling-tier disambiguation: `two-digit-addsub.json` must NOT
+    // match the with-regroup binding (the suffix differs).
+    expect(resolveTierBinding('two-digit-addsub.json')?.tier).toBe(
+      'two-digit-addsub',
+    )
+    expect(
+      resolveTierBinding('canon/math/level-1/two-digit-addsub.json')?.tier,
+    ).toBe('two-digit-addsub')
+  })
+
+  it('still binds the five sibling active tiers (no cross-tier regression)', () => {
+    expect(resolveTierBinding('sub-to-10.json')?.tier).toBe('sub-to-10')
+    expect(resolveTierBinding('add-to-10.json')?.tier).toBe('add-to-10')
+    expect(resolveTierBinding('sub-to-20.json')?.tier).toBe('sub-to-20')
+    expect(resolveTierBinding('add-to-20.json')?.tier).toBe('add-to-20')
+    expect(resolveTierBinding('two-digit-addsub.json')?.tier).toBe(
+      'two-digit-addsub',
+    )
+  })
+
+  it('returns null for unrelated focus nodes', () => {
+    expect(resolveTierBinding('cvc-words.json')).toBeNull()
+    expect(resolveTierBinding('mult-2-5-10.json')).toBeNull()
+  })
+})
+
+// ── runCompositionLint — disk walker fires the with-regroup binding ─────
+
+describe('runCompositionLint — two-digit-addsub-with-regroup disk-walker dispatch', () => {
+  let tmpRoot: string
+
+  beforeEach(() => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'composition-lint-wave5-'))
+    mkdirSync(join(tmpRoot, 'math', 'level-1'), { recursive: true })
+  })
+
+  afterEach(() => {
+    rmSync(tmpRoot, { recursive: true, force: true })
+  })
+
+  it('lints a clean two-digit-addsub-with-regroup.json fixture without violations', () => {
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse([
+      ...CLEAN_TWO_DIGIT_ADDSUB_WITH_REGROUP_FACTS,
+    ])
+    writeFileSync(
+      join(tmpRoot, 'math', 'level-1', 'two-digit-addsub-with-regroup.json'),
+      JSON.stringify(response),
+    )
+    const result = runCompositionLint(tmpRoot)
+    expect(result.filesScanned).toBe(1)
+    expect(result.filesLinted).toBe(1)
+    expect(result.totalViolations).toBe(0)
+    expect(result.findings).toEqual([])
+  })
+
+  it('surfaces violations on a dirty two-digit-addsub-with-regroup.json fixture (lintBeforeRebake check via disk path)', () => {
+    // Per Retro Action 6 — this is the disk-path version of the
+    // lintBeforeRebake gate. The CI runs the disk-walker via
+    // `yarn canon:lint`; a violation must propagate from rule
+    // detection → CompositionFileFinding → totalViolations > 0.
+    const dirty: Array<[number, number, '+' | '-']> = [
+      [21, 4, '-'], // P1 op=- — VIOLATES p1-is-plus
+      [17, 5, '+'], // P2
+      [22, 5, '-'], // P3
+      [27, 6, '+'], // P4
+      [30, 4, '-'], // P5 round-ten (1/1)
+      [40, 7, '-'], // P6 round-ten (2/1 VIOLATES category-cap)
+      [25, 4, '+'], // P7 NO-REGROUP — VIOLATES pool-membership
+      [52, 7, '-'], // P8
+    ]
+    const response = buildTwoDigitAddsubWithRegroupCanonResponse(dirty)
+    writeFileSync(
+      join(tmpRoot, 'math', 'level-1', 'two-digit-addsub-with-regroup.json'),
+      JSON.stringify(response),
+    )
+    const result = runCompositionLint(tmpRoot)
+    expect(result.filesScanned).toBe(1)
+    expect(result.filesLinted).toBe(1)
+    expect(result.totalViolations).toBeGreaterThan(0)
+    expect(result.findings).toHaveLength(1)
+    expect(result.findings[0]!.tier).toBe('two-digit-addsub-with-regroup')
+    const ruleKinds = new Set(result.findings[0]!.violations.map((v) => v.rule))
+    expect(ruleKinds.has('p1-is-plus')).toBe(true)
+    expect(ruleKinds.has('category-cap')).toBe(true)
+    expect(ruleKinds.has('pool-membership')).toBe(true)
+  })
+})
+
+// ── KNOWN_DISTRACTOR_CLASSES — naming-agnostic schema-level enum ────────
+
+describe('KNOWN_DISTRACTOR_CLASSES', () => {
+  it("includes Dave's canonical post-pivot names", () => {
+    // Per `wave-5-borrow-carry-error-patterns.md` §3 Candidates A/B/C —
+    // the distractor classes Dave recommends for Wave 5.
+    expect(KNOWN_DISTRACTOR_CLASSES.has('forgottenCarryDistractors')).toBe(true)
+    expect(KNOWN_DISTRACTOR_CLASSES.has('smallerFromLargerDistractors')).toBe(
+      true,
+    )
+    expect(KNOWN_DISTRACTOR_CLASSES.has('borrowNoDecrementDistractors')).toBe(
+      true,
+    )
+  })
+
+  it('also includes Wave-4-style names during the transition (PR A)', () => {
+    // Per ticket 86c9y01ee dispatch contract — naming-agnostic at
+    // schema level. PR B will remove these once the pivot lands.
+    expect(KNOWN_DISTRACTOR_CLASSES.has('columnCrossDistractor')).toBe(true)
+    expect(KNOWN_DISTRACTOR_CLASSES.has('phantomBorrowDistractor')).toBe(true)
+  })
+
+  it('contains exactly 5 known classes (3 Dave + 2 Wave-4-style)', () => {
+    expect(KNOWN_DISTRACTOR_CLASSES.size).toBe(5)
   })
 })

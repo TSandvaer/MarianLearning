@@ -2927,6 +2927,873 @@ export function assertTwoDigitAddsubCompositionClean(
   }
 }
 
+// ── two-digit-addsub-with-regroup: pool, rules, parser, lint, assert ────
+//
+// Wave-5 tier (parallel-sequencing cycle 5). FIRST tier where regrouping
+// (carry on `+`, borrow on `-`) is the conceptual learning target — the
+// no-regroup Wave-4 sibling explicitly FORBIDS these facts; this tier
+// explicitly REQUIRES them.
+//
+// Spec: `design/math/two-digit-addsub-with-regroup-content.md`
+// Ticket: 86c9y01ee (PR A — lint infra, naming-agnostic at schema level)
+// Structural precedent: `two-digit-addsub` PR #291 (lint infra) → PR #292
+// (rebake + binding activation). This module follows the SAME split-PR
+// pattern per `testing-and-ci.md §6` — PR A ships infra + binding registry
+// entry; canon does not exist at PR A time (verified spec §5.1), so the
+// disk-walker is a no-op against this tier until PR B bakes the canon and
+// the binding fires for the first time.
+//
+// What's DIFFERENT from the Wave-4 sibling:
+//   - Pool inversion: carry-required `+` and borrow-required `-` facts —
+//     the EXACT facts the Wave-4 lint REJECTS — are now the pool. The
+//     Wave-4 pool's `mid-decade-units-shift` / `near-boundary-no-cross` /
+//     `tens-doubles-echo` / `round-ten-anchor` categories are FORBIDDEN
+//     here (they're no-regroup facts).
+//   - Three pool categories per spec §1.2: `carry-from-units` (`+` only,
+//     18 facts), `borrow-from-tens` (`-` only, 9 facts), `round-ten-cross-
+//     down` (`-` only, 3 facts). Total 30 facts (Option A — spec §1.1
+//     prefers 30 over a 36-fact Wave-4-style mirror given the higher
+//     per-fact cognitive load at this tier).
+//   - Category caps per spec §1.5: carry-from-units ≤ 5, borrow-from-tens
+//     ≤ 3, round-ten-cross-down ≤ 1 (saturation-prior cap — Haiku will
+//     gravitate to round-ten anchors at this tier just as it did at the
+//     Wave-4 round-ten-anchor category, per `[[feedback_haiku_directive_
+//     sharpening]]`).
+//   - High-leverage coverage: ≥ 1 `borrow-from-tens` fact MUST appear at
+//     P5-P8 (the `+` side is satisfied trivially because every `+` fact
+//     in the pool IS a `carry-from-units` fact by construction).
+//   - Read-line templates UNCHANGED from Wave 4 (spec §1.6) — same
+//     hyphenated quantity-word form, same "+" / "-" trailing-phrase
+//     discriminator. Parser reuses the Wave-4 regex + number-word table
+//     via the sibling `parseTwoDigitAddsubReadLine` function (re-exported
+//     here under the with-regroup name for symmetry).
+//
+// What's SHARED with the Wave-4 sibling:
+//   - 8-problem session size, band-by-slot framing (P1 always '+', P1-P3
+//     EASY only, P4 MEDIUM-only, P5-P8 MEDIUM/HARD), op-mix rules (5+/3-
+//     default, 6+/2- allowed, 4+/4- + 8+/0- + 7+/1- + 3+/5- FORBIDDEN),
+//     dual-exposure rule (forward-compat; v1 audit per spec §3.3 finds
+//     ZERO in-pool cross-op collisions but the rule asserts regardless).
+//
+// What's NOT in PR A (deferred to PR B per spec §4 + ticket 86c9y01ee OOS):
+//   - Canon rebake — public/canon/math/level-1/two-digit-addsub-with-
+//     regroup.json does not exist at PR A time; PR B bakes it.
+//   - Class-name finalisation for `perProblemDistractorClass` literals
+//     (Dave's `forgottenCarry*` / `smallerFromLarger*` / `borrowNoDecrement*`
+//     vs Wave-4-style `columnCross*` / `phantomBorrow*`). Lint here is
+//     POOL-CATEGORY-focused (pedagogical categories per spec §1.2 —
+//     `carry-from-units` / `borrow-from-tens` / `round-ten-cross-down`)
+//     and does NOT enforce distractor-class membership from canon JSON;
+//     canon doesn't carry the field (it lives on `Progress.history` per
+//     PR #302 schema). The naming-agnostic `KNOWN_DISTRACTOR_CLASSES` set
+//     below is exported for forward-compat with PR B's render-side
+//     binding activation; it accepts BOTH naming styles during the
+//     transition per ticket 86c9y01ee dispatch contract.
+//   - SkillNode taxonomy widening — separate ticket per
+//     `[[feedback_sibling_tier_checklist]]`; affects schema/Hub/planner,
+//     not this lint module.
+//   - Bake-time `bakeOne` integration — wired in PR B alongside the canon
+//     under-test, mirroring Wave-4's `two-digit-addsub` chain at
+//     `generateSessionCanon.ts:442+`.
+
+/**
+ * Forward-compat enum of every distractor-class literal that production
+ * code (PR B onwards) may set on `Progress.history[].perProblemDistractor
+ * Class` for a `two-digit-addsub-with-regroup` session. Class-naming-
+ * agnostic at PR A per ticket 86c9y01ee dispatch contract:
+ *
+ *   - Dave's names (canonical post-pivot per `wave-5-borrow-carry-error-
+ *     patterns.md` §3 Candidates A/B/C; corresponds to the helper
+ *     function names already exported from `src/screens/Math/distractors.
+ *     ts` at lines 546/596/659): `forgottenCarryDistractors`,
+ *     `smallerFromLargerDistractors`, `borrowNoDecrementDistractors`.
+ *   - Wave-4-style names (transitional; matches the kebab-case literals
+ *     already in the `PickDistractorsOpts.distractorClass` union at
+ *     `distractors.ts:219`): `columnCrossDistractor`, `phantomBorrow
+ *     Distractor`.
+ *
+ * NOTE: this set is EXPORTED but not yet referenced by any in-tree lint
+ * pass — canon JSON does not carry per-problem distractor-class metadata
+ * (it lives on `Progress.history` shipped to `/api/claude` session-end,
+ * not on the static canon envelope). PR B activates the binding once a
+ * concrete consumer surfaces; PR A's job is to fix the schema-level
+ * naming surface so the transition is reversible.
+ *
+ * TODO Wave 5 PR B: remove Wave-4-style names; lock to Dave's names once
+ * Kyle's spec-amendment PR merges (ticket TBD).
+ */
+export const KNOWN_DISTRACTOR_CLASSES = new Set([
+  // Dave's names (canonical post-pivot)
+  'forgottenCarryDistractors',
+  'smallerFromLargerDistractors',
+  'borrowNoDecrementDistractors',
+  // Wave-4-style names (transitional, removed in PR B)
+  'columnCrossDistractor',
+  'phantomBorrowDistractor',
+])
+
+export type TwoDigitAddsubWithRegroupBand = 'EASY' | 'MEDIUM' | 'HARD'
+
+export type TwoDigitAddsubWithRegroupCategory =
+  | 'carry-from-units'
+  | 'borrow-from-tens'
+  | 'round-ten-cross-down'
+
+export type TwoDigitAddsubWithRegroupOp = '+' | '-'
+
+export interface TwoDigitAddsubWithRegroupPoolFact {
+  /** Stable "<a><op><b>" id, e.g. "27+6", "32-5". Op is part of identity
+   *  per spec §1.1 — distinct triples (and dual-exposure forbids inverse
+   *  triples co-occurring per forward-compat rule). */
+  id: string
+  a: number
+  b: number
+  op: TwoDigitAddsubWithRegroupOp
+  band: TwoDigitAddsubWithRegroupBand
+  category: TwoDigitAddsubWithRegroupCategory
+}
+
+/** The 30-fact pool from spec §1.4 (Option A — preferred over a 36-fact
+ *  Wave-4-mirror per spec §1.1 cognitive-load argument). All facts satisfy
+ *  EITHER the carry-required `+` constraint (`(a mod 10) + b > 9`) OR the
+ *  borrow-required `-` constraint (`(a mod 10) < b`). Operand range:
+ *  `a ∈ [10, 99]` (v1 caps decade at 60 for representational coherence
+ *  with Wave 4 — no 70s/80s/90s); `b ∈ [1, 9]` for the single-digit-
+ *  second-operand mainline (two-digit-plus-two-digit-with-regroup deferred
+ *  to v2 per spec §3.5 Q3).
+ *
+ *  Pool composition (verified against spec §1.4 cross-check):
+ *    - EASY band (9 facts): 6 `+` + 3 `-`
+ *    - MEDIUM band (11 facts): 7 `+` + 3 `-` borrow + 1 `-` round-ten
+ *    - HARD band (10 facts): 5 `+` + 3 `-` borrow + 2 `-` round-ten
+ *    - Op counts: 18 `+` (carry-from-units) + 12 `-` (9 borrow + 3
+ *      round-ten)
+ *    - Answer range: [17, 64] — both endpoints in `[1, 99]`.
+ *  Spec §1.4 lists facts numbered 1–30; this constant preserves that
+ *  numbering as inline `// #N` comments for traceability against the
+ *  drift-guard test target. */
+export const TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL: readonly TwoDigitAddsubWithRegroupPoolFact[] =
+  [
+    // ── EASY band (9 facts; P1-P3 gentle ramp; also P4-P8 fallback) ──────
+    // #1
+    {
+      id: '15+8',
+      a: 15,
+      b: 8,
+      op: '+',
+      band: 'EASY',
+      category: 'carry-from-units',
+    },
+    // #2
+    {
+      id: '17+5',
+      a: 17,
+      b: 5,
+      op: '+',
+      band: 'EASY',
+      category: 'carry-from-units',
+    },
+    // #3
+    {
+      id: '19+4',
+      a: 19,
+      b: 4,
+      op: '+',
+      band: 'EASY',
+      category: 'carry-from-units',
+    },
+    // #4
+    {
+      id: '13+9',
+      a: 13,
+      b: 9,
+      op: '+',
+      band: 'EASY',
+      category: 'carry-from-units',
+    },
+    // #5
+    {
+      id: '16+6',
+      a: 16,
+      b: 6,
+      op: '+',
+      band: 'EASY',
+      category: 'carry-from-units',
+    },
+    // #6
+    {
+      id: '14+7',
+      a: 14,
+      b: 7,
+      op: '+',
+      band: 'EASY',
+      category: 'carry-from-units',
+    },
+    // #7 (replaced per spec §1.4 — the original `12-5=7` placeholder was
+    // excluded for crossing the single-digit-result boundary into sub-to-20
+    // territory; #7-revised is `21-4=17` borrow-from-tens, two-digit result)
+    {
+      id: '21-4',
+      a: 21,
+      b: 4,
+      op: '-',
+      band: 'EASY',
+      category: 'borrow-from-tens',
+    },
+    // #8
+    {
+      id: '22-5',
+      a: 22,
+      b: 5,
+      op: '-',
+      band: 'EASY',
+      category: 'borrow-from-tens',
+    },
+    // #9
+    {
+      id: '23-6',
+      a: 23,
+      b: 6,
+      op: '-',
+      band: 'EASY',
+      category: 'borrow-from-tens',
+    },
+    // ── MEDIUM band (11 facts; P4-P8 eligible) ───────────────────────────
+    // #10 — the Wave-4 §1 FORBIDDEN example (`27+6`) surfaces here as
+    // ALLOWED — that role inversion is the whole point of this tier.
+    {
+      id: '27+6',
+      a: 27,
+      b: 6,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'carry-from-units',
+    },
+    // #11
+    {
+      id: '25+8',
+      a: 25,
+      b: 8,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'carry-from-units',
+    },
+    // #12
+    {
+      id: '29+5',
+      a: 29,
+      b: 5,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'carry-from-units',
+    },
+    // #13
+    {
+      id: '35+7',
+      a: 35,
+      b: 7,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'carry-from-units',
+    },
+    // #14
+    {
+      id: '38+4',
+      a: 38,
+      b: 4,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'carry-from-units',
+    },
+    // #15
+    {
+      id: '46+7',
+      a: 46,
+      b: 7,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'carry-from-units',
+    },
+    // #16
+    {
+      id: '48+5',
+      a: 48,
+      b: 5,
+      op: '+',
+      band: 'MEDIUM',
+      category: 'carry-from-units',
+    },
+    // #17 — the Wave-4 §1 FORBIDDEN example (`32-5`) surfaces here as ALLOWED.
+    {
+      id: '32-5',
+      a: 32,
+      b: 5,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'borrow-from-tens',
+    },
+    // #18
+    {
+      id: '41-6',
+      a: 41,
+      b: 6,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'borrow-from-tens',
+    },
+    // #19
+    {
+      id: '53-8',
+      a: 53,
+      b: 8,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'borrow-from-tens',
+    },
+    // #20 — first round-ten-cross-down (minuend ends in 0, units column
+    // starts at 0 ⇒ every subtrahend forces borrow). Saturation-prior cap
+    // candidate per spec §1.5 (≤ 1 per session).
+    {
+      id: '30-4',
+      a: 30,
+      b: 4,
+      op: '-',
+      band: 'MEDIUM',
+      category: 'round-ten-cross-down',
+    },
+    // ── HARD band (10 facts; P5-P8 eligible) ─────────────────────────────
+    // #21
+    {
+      id: '45+8',
+      a: 45,
+      b: 8,
+      op: '+',
+      band: 'HARD',
+      category: 'carry-from-units',
+    },
+    // #22
+    {
+      id: '47+6',
+      a: 47,
+      b: 6,
+      op: '+',
+      band: 'HARD',
+      category: 'carry-from-units',
+    },
+    // #23
+    {
+      id: '49+4',
+      a: 49,
+      b: 4,
+      op: '+',
+      band: 'HARD',
+      category: 'carry-from-units',
+    },
+    // #24
+    {
+      id: '55+9',
+      a: 55,
+      b: 9,
+      op: '+',
+      band: 'HARD',
+      category: 'carry-from-units',
+    },
+    // #25
+    {
+      id: '58+6',
+      a: 58,
+      b: 6,
+      op: '+',
+      band: 'HARD',
+      category: 'carry-from-units',
+    },
+    // #26
+    {
+      id: '52-7',
+      a: 52,
+      b: 7,
+      op: '-',
+      band: 'HARD',
+      category: 'borrow-from-tens',
+    },
+    // #27
+    {
+      id: '61-8',
+      a: 61,
+      b: 8,
+      op: '-',
+      band: 'HARD',
+      category: 'borrow-from-tens',
+    },
+    // #28
+    {
+      id: '64-9',
+      a: 64,
+      b: 9,
+      op: '-',
+      band: 'HARD',
+      category: 'borrow-from-tens',
+    },
+    // #29 — second round-ten-cross-down. §1.5 cap (≤ 1) FORBIDS this
+    // co-occurring with #20 or #30 in a session.
+    {
+      id: '40-7',
+      a: 40,
+      b: 7,
+      op: '-',
+      band: 'HARD',
+      category: 'round-ten-cross-down',
+    },
+    // #30 — third round-ten-cross-down. §1.5 cap (≤ 1) FORBIDS this
+    // co-occurring with #20 or #29 in a session.
+    {
+      id: '50-8',
+      a: 50,
+      b: 8,
+      op: '-',
+      band: 'HARD',
+      category: 'round-ten-cross-down',
+    },
+  ] as const
+
+/** Tier rule config — what the two-digit-addsub-with-regroup lint
+ *  enforces. Mirrors `TwoDigitAddsubRulesConfig` shape but drops the
+ *  Wave-4-specific `nearBoundaryNoCrossInP5ToP8Min` /
+ *  `classTwoColumnCrossInP4ToP8Min` / `classThreePhantomBorrowInP5ToP8Min`
+ *  fields (the trap-admissibility checks belong to the Wave-4 tier where
+ *  the trap classes are diagnostic instruments; at Wave 5 they are
+ *  EXPECTED tap targets and the OUT-gate criterion shifts to "tap-rate
+ *  reduction across sessions" per spec §2.1 — not gated at canon-bake
+ *  time). Adds `borrowFromTensInP5ToP8Min` per spec §1.3 high-leverage
+ *  coverage rule. */
+export interface TwoDigitAddsubWithRegroupRulesConfig {
+  pool: readonly TwoDigitAddsubWithRegroupPoolFact[]
+  categoryCaps: Record<TwoDigitAddsubWithRegroupCategory, number>
+  /** Slots (1-indexed) where each band is allowed. */
+  bandAllowedSlots: Record<TwoDigitAddsubWithRegroupBand, readonly number[]>
+  /** Allowed op-mix combinations per spec §1.1 + §3.2. Each entry is
+   *  `{ addCount, subCount }`; lint asserts the session matches one of
+   *  these. Default: 5+/3-, 6+/2-. */
+  allowedOpMixes: readonly { addCount: number; subCount: number }[]
+  /** Whole-session minimum count of `borrow-from-tens` facts within P5-P8
+   *  (the cycle-5 `-` learning target per spec §1.3). The `+` side is
+   *  satisfied trivially because every `+` fact in the pool IS a
+   *  `carry-from-units` fact by construction — no separate `+` rule
+   *  needed. */
+  borrowFromTensInP5ToP8Min: number
+  totalProblems: number
+}
+
+export const TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES: TwoDigitAddsubWithRegroupRulesConfig =
+  {
+    pool: TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL,
+    categoryCaps: {
+      // Carry-from-units capped generously per spec §1.5 — IS the `+`
+      // learning target. Pool has 18 facts (60% of pool); cap at 5 binds
+      // only on `+`-heavy sessions.
+      'carry-from-units': 5,
+      // Borrow-from-tens capped at 3 per spec §1.5 — matches the `-`
+      // count cap from op-mix; every `-` problem in a default-mix session
+      // IS a borrow problem.
+      'borrow-from-tens': 3,
+      // Round-ten-cross-down capped tight at 1 per spec §1.5 — the
+      // saturation-prior correction lever (sibling to Wave-4's
+      // round-ten-anchor cap). Haiku's empirical prior at the previous
+      // two-digit tier saturates round-ten anchors across bakes (the
+      // easiest representational instance of the tier); cap at 1 holds
+      // it to 1-of-8 (12.5% of the session). NEGATIVE ANCHOR per
+      // `[[feedback_haiku_directive_sharpening]]`: FORBIDDEN to place
+      // any two of `30-4`, `40-7`, `50-8` in the same session.
+      'round-ten-cross-down': 1,
+    },
+    bandAllowedSlots: {
+      // P1-P3 gentle-ramp only — EASY FORBIDDEN at P4-P8 per spec §1.3.
+      // Mirrors the sub-to-10 / sub-to-20 tightening from Dave's NOF #1
+      // (PR #247) — the discriminate tier must not lean on gentle-ramp
+      // facts. Wave-5 inherits the stricter framing from the start.
+      EASY: [1, 2, 3],
+      MEDIUM: [4, 5, 6, 7, 8],
+      HARD: [5, 6, 7, 8],
+    },
+    // Spec §1.1: 5+/3- (default) OR 6+/2- (low-score modulation). Lint
+    // FORBIDS 8+/0-, 7+/1-, 4+/4-, 3+/5-, and any combination summing to
+    // something other than 8.
+    allowedOpMixes: [
+      { addCount: 5, subCount: 3 },
+      { addCount: 6, subCount: 2 },
+    ],
+    // Spec §1.3: ≥ 1 borrow-from-tens fact MUST appear in P5-P8 (the
+    // cycle-5 `-` learning target). Same STRICTER P5-P8 framing as
+    // add-to-20 / two-digit-addsub — P4 is MEDIUM-only and many MEDIUM
+    // facts are borrow-from-tens, so a P4-P8 rule would be trivially
+    // satisfied.
+    borrowFromTensInP5ToP8Min: 1,
+    totalProblems: 8,
+  }
+
+// ── core: lint a SessionStartResponse against with-regroup rules ────────
+
+interface TwoDigitAddsubWithRegroupProblemRow {
+  index: number // 1-indexed
+  utteranceId: string
+  text: string
+  parsed: ParsedTwoDigitFact | null
+  poolMatch: TwoDigitAddsubWithRegroupPoolFact | null
+}
+
+/**
+ * Parse a two-digit-addsub-with-regroup read-line into `{ a, b, op }`.
+ * Read-line templates are IDENTICAL to the Wave-4 sibling per spec §1.6
+ * (no new prosody work); this function is a thin alias over the Wave-4
+ * `parseTwoDigitAddsubReadLine` re-exported here for caller-side
+ * symmetry. The pool-match lookup downstream rejects facts that don't
+ * satisfy the regroup constraint (`(a mod 10) + b > 9` for `+`,
+ * `(a mod 10) < b` for `-`) by virtue of those facts not being in
+ * `TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL` — they live in the Wave-4 pool
+ * instead.
+ */
+export function parseTwoDigitAddsubWithRegroupReadLine(
+  text: string,
+): ParsedTwoDigitFact | null {
+  return parseTwoDigitAddsubReadLine(text)
+}
+
+function extractTwoDigitAddsubWithRegroupProblems(
+  response: Pick<SessionStartResponse, 'utterances'>,
+): TwoDigitAddsubWithRegroupProblemRow[] {
+  const re = /^math\.p(\d+)\.read$/
+  const rows: TwoDigitAddsubWithRegroupProblemRow[] = []
+  for (const u of response.utterances) {
+    const m = re.exec(u.id)
+    if (!m) continue
+    const index = Number.parseInt(m[1]!, 10)
+    const parsed = parseTwoDigitAddsubWithRegroupReadLine(u.text)
+    const poolMatch = parsed
+      ? (TWO_DIGIT_ADDSUB_WITH_REGROUP_POOL.find(
+          (f) => f.a === parsed.a && f.b === parsed.b && f.op === parsed.op,
+        ) ?? null)
+      : null
+    rows.push({
+      index,
+      utteranceId: u.id,
+      text: u.text,
+      parsed,
+      poolMatch,
+    })
+  }
+  rows.sort((x, y) => x.index - y.index)
+  return rows
+}
+
+/**
+ * Lint a canon's plan against the two-digit-addsub-with-regroup
+ * composition rules. Returns ALL violations across the 8-problem set —
+ * does not stop at the first.
+ *
+ * Pure; no I/O.
+ *
+ * Rule passes (in order):
+ *   1. unparseable / pool-membership
+ *   2. band-by-slot
+ *   3. category-cap (5 / 3 / 1 per spec §1.5)
+ *   4. op-mix (5+/3- or 6+/2- per spec §1.1)
+ *   5. p1-is-plus (spec §1.3)
+ *   6. dual-exposure (forward-compat; v1 audit zero collisions per
+ *      spec §3.3)
+ *   7. high-leverage coverage (≥ 1 borrow-from-tens in P5-P8 per
+ *      spec §1.3)
+ *   8. no-duplicates
+ *
+ * NOTE (PR A scope per `testing-and-ci.md §6` split-PR pattern): this
+ * function is EXPORTED and the binding IS registered in `resolveTier
+ * Binding` below. Canon does not exist at PR A time (spec §5.1 verified
+ * empirically); PR B (canon rebake) is the FIRST PR where the binding
+ * fires in production. The `lintBeforeRebake` failing-first test in
+ * `compositionLint.test.ts` proves the lint catches the documented
+ * violations against synthetic fixtures BEFORE the canon ships.
+ */
+export function lintTwoDigitAddsubWithRegroupComposition(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: TwoDigitAddsubWithRegroupRulesConfig = TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+): CompositionViolation[] {
+  const violations: CompositionViolation[] = []
+  const problems = extractTwoDigitAddsubWithRegroupProblems(response)
+
+  // ── unparseable / pool-membership pass ──
+  for (const p of problems) {
+    if (p.parsed === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: p.index,
+        message:
+          `P${p.index} (${p.utteranceId}) text does not match either ` +
+          `two-digit-addsub-with-regroup read template ("<addend-A> plus ` +
+          `<addend-B>. How many?" OR "<minuend> minus <subtrahend>. How ` +
+          `many are left?"): ` +
+          JSON.stringify(p.text),
+        factId: null,
+      })
+      continue
+    }
+    if (p.poolMatch === null) {
+      const sum =
+        p.parsed.op === '+' ? p.parsed.a + p.parsed.b : p.parsed.a - p.parsed.b
+      violations.push({
+        rule: 'pool-membership',
+        problemIndex: p.index,
+        message:
+          `P${p.index} fact ${p.parsed.a}${p.parsed.op}${p.parsed.b}=` +
+          `${sum} is NOT in the 30-fact two-digit-addsub-with-regroup ` +
+          `pool. Either it violates the regroup-required constraint ` +
+          `(carry on '+' requires (a mod 10) + b > 9; borrow on '-' ` +
+          `requires (a mod 10) < b), the operand range (a in [10, 99] ` +
+          `with v1 decade cap at 60, b in [1, 9]), the answer range ` +
+          `([17, 64]), or it is a valid in-range fact outside the v1 ` +
+          `curation (single-digit-result borrows deferred to sub-to-20; ` +
+          `two-digit-plus-two-digit-with-regroup deferred to v2 per ` +
+          `spec §3.5 Q3). See design/math/two-digit-addsub-with-regroup-` +
+          `content.md §1.4.`,
+        factId: `${p.parsed.a}${p.parsed.op}${p.parsed.b}`,
+      })
+    }
+  }
+
+  const matched = problems.filter(
+    (
+      p,
+    ): p is TwoDigitAddsubWithRegroupProblemRow & {
+      poolMatch: TwoDigitAddsubWithRegroupPoolFact
+    } => p.poolMatch !== null,
+  )
+
+  // ── band-by-slot pass ──
+  for (const p of matched) {
+    const allowed = config.bandAllowedSlots[p.poolMatch.band]
+    if (!allowed.includes(p.index)) {
+      violations.push({
+        rule: 'band-by-slot',
+        problemIndex: p.index,
+        message:
+          `P${p.index} carries ${p.poolMatch.band} fact ` +
+          `${p.poolMatch.id} (category ${p.poolMatch.category}). ` +
+          `${p.poolMatch.band}-band is only allowed at slots ` +
+          `[${allowed.join(', ')}].`,
+        factId: p.poolMatch.id,
+      })
+    }
+  }
+
+  // ── category-cap pass ──
+  type MatchedWithRegroupRow = TwoDigitAddsubWithRegroupProblemRow & {
+    poolMatch: TwoDigitAddsubWithRegroupPoolFact
+  }
+  const categoryCounts: Record<string, MatchedWithRegroupRow[]> = {}
+  for (const p of matched) {
+    const cat = p.poolMatch.category
+    if (!categoryCounts[cat]) categoryCounts[cat] = []
+    categoryCounts[cat]!.push(p)
+  }
+  for (const [cat, rows] of Object.entries(categoryCounts)) {
+    const cap = config.categoryCaps[cat as TwoDigitAddsubWithRegroupCategory]
+    if (cap === undefined) continue
+    if (rows.length > cap) {
+      violations.push({
+        rule: 'category-cap',
+        problemIndex: null,
+        message:
+          `Category "${cat}" cap is ${cap}; canon has ${rows.length} ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}; facts ` +
+          `${rows.map((r) => r.poolMatch.id).join(', ')}).` +
+          (cat === 'round-ten-cross-down'
+            ? ` Saturation-prior correction lever per spec §1.5 — Haiku's` +
+              ` empirical prior at the previous two-digit tier saturates` +
+              ` round-ten anchors across bakes; cap at ${cap} holds it to` +
+              ` 1-of-8. Reject the second round-ten-cross-down.`
+            : ''),
+        factId: null,
+      })
+    }
+  }
+
+  // ── op-mix pass (spec §1.1 + §3.2 — mixed-op rules) ──
+  if (matched.length === config.totalProblems) {
+    let addCount = 0
+    let subCount = 0
+    for (const p of matched) {
+      if (p.poolMatch.op === '+') addCount++
+      else subCount++
+    }
+    const isAllowed = config.allowedOpMixes.some(
+      (m) => m.addCount === addCount && m.subCount === subCount,
+    )
+    if (!isAllowed) {
+      const allowedStr = config.allowedOpMixes
+        .map((m) => `${m.addCount}+/${m.subCount}-`)
+        .join(', ')
+      violations.push({
+        rule: 'op-mix',
+        problemIndex: null,
+        message:
+          `Op-mix is ${addCount}+/${subCount}-; not in allowed set ` +
+          `[${allowedStr}]. Per spec §1.1: at least 5 '+' AND at least ` +
+          `2 '-' problems; allowed mixes are ${allowedStr}. FORBIDDEN: ` +
+          `8+/0-, 7+/1-, 4+/4-, 3+/5-, and any combination summing to ` +
+          `something other than 8.`,
+        factId: null,
+      })
+    }
+  }
+
+  // ── p1-is-plus pass (spec §1.3 — session opener anxiety + Marian's
+  // '+'-confident diagnostic) ──
+  const p1 = matched.find((p) => p.index === 1)
+  if (p1 && p1.poolMatch.op !== '+') {
+    violations.push({
+      rule: 'p1-is-plus',
+      problemIndex: 1,
+      message:
+        `P1 carries op '${p1.poolMatch.op}' (fact ${p1.poolMatch.id}). ` +
+        `Per spec §1.3 P1 must always be op '+': session opener carries ` +
+        `onset anxiety and the more confident operation (per Marian's ` +
+        `April 2026 diagnostic) must enter first. This rule is sharper ` +
+        `at Wave 5 than at the no-regroup sibling — borrowing is ` +
+        `documented as the harder regroup procedure per Dave Wave-5 ` +
+        `research §1 (Brown-VanLehn SFL bug catalog).`,
+      factId: p1.poolMatch.id,
+    })
+  }
+
+  // ── dual-exposure pass (forward-compat per spec §3.3) ──
+  //
+  // V1 pool audit (spec §3.3): walk every (a, b, c) for both `+` and `-`
+  // and confirm ZERO in-pool cross-op collisions. Example audit point:
+  // `27+6=33` (#10); inverse `33-6=27` is NOT in the v1 pool (minuend 33
+  // is not a v1 minuend). The rule remains in force for forward-compat
+  // with v2 pool extensions.
+  const tripleKey = (
+    a: number,
+    b: number,
+    op: TwoDigitAddsubWithRegroupOp,
+  ): string => `${a}${op}${b}`
+  const seenTriples = new Map<string, MatchedWithRegroupRow>()
+  for (const p of matched) {
+    seenTriples.set(tripleKey(p.poolMatch.a, p.poolMatch.b, p.poolMatch.op), p)
+  }
+  for (const p of matched) {
+    const { a, b, op } = p.poolMatch
+    const correct = op === '+' ? a + b : a - b
+    const inverses: Array<{
+      a: number
+      b: number
+      op: TwoDigitAddsubWithRegroupOp
+    }> = []
+    if (op === '+') {
+      // c - b = a; c - a = b (latter falls out of pool by being negative
+      // or having two-digit subtrahend, but we check the key match).
+      inverses.push({ a: correct, b, op: '-' })
+      inverses.push({ a: correct, b: a, op: '-' })
+    } else {
+      // c + b = a (the canonical + inverse); b + c = a (commutative).
+      inverses.push({ a: correct, b, op: '+' })
+      inverses.push({ a: b, b: correct, op: '+' })
+    }
+    for (const inv of inverses) {
+      const invKey = tripleKey(inv.a, inv.b, inv.op)
+      const invMatch = seenTriples.get(invKey)
+      if (!invMatch) continue
+      // Emit once per ordered pair (the pair with smaller `index` raises
+      // the violation).
+      if (invMatch.index <= p.index) continue
+      violations.push({
+        rule: 'dual-exposure',
+        problemIndex: null,
+        message:
+          `Dual-exposure rule (spec §3.3): fact ${p.poolMatch.id} at P` +
+          `${p.index} co-occurs with its inverse ${invMatch.poolMatch.id} ` +
+          `at P${invMatch.index}. The operand triple ` +
+          `(${a}, ${b}, ${correct}) must NOT appear in both '+' and '-' ` +
+          `forms within the same session.`,
+        factId: `${p.poolMatch.id}↔${invMatch.poolMatch.id}`,
+      })
+    }
+  }
+
+  // ── high-leverage coverage pass (>= 1 borrow-from-tens in P5-P8) ──
+  //
+  // STRICTER P5-P8 framing per spec §1.3 — sibling to add-to-20 /
+  // two-digit-addsub. P4 is MEDIUM-only and several MEDIUM facts are
+  // borrow-from-tens (#17, #18, #19), so a P4-P8 rule would be trivially
+  // satisfied. P5-P8 forces the rule to bind.
+  const borrowInDiscriminate = matched.filter(
+    (p) => p.poolMatch.category === 'borrow-from-tens' && p.index >= 5,
+  )
+  if (borrowInDiscriminate.length < config.borrowFromTensInP5ToP8Min) {
+    violations.push({
+      rule: 'high-leverage-coverage',
+      problemIndex: null,
+      message:
+        `At least ${config.borrowFromTensInP5ToP8Min} borrow-from-tens ` +
+        `fact(s) MUST appear in P5-P8 (the cycle-5 '-' learning target ` +
+        `per spec §1.3 — borrowing is the documented harder regroup ` +
+        `procedure per Dave Wave-5 research §1). The '+' side is ` +
+        `satisfied trivially because every '+' fact in the pool IS a ` +
+        `carry-from-units fact by construction. Canon has ` +
+        `${borrowInDiscriminate.length} borrow-from-tens fact(s) in P5-P8.`,
+      factId: null,
+    })
+  }
+
+  // ── no-duplicates pass ──
+  const seenIds = new Map<string, TwoDigitAddsubWithRegroupProblemRow[]>()
+  for (const p of matched) {
+    const key = p.poolMatch.id
+    if (!seenIds.has(key)) seenIds.set(key, [])
+    seenIds.get(key)!.push(p)
+  }
+  for (const [factId, rows] of seenIds.entries()) {
+    if (rows.length > 1) {
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: null,
+        message:
+          `Fact ${factId} appears ${rows.length} times ` +
+          `(slots P${rows.map((r) => r.index).join(', P')}). ` +
+          `No duplicate (a, b, op) triples allowed within the 8-problem ` +
+          `set.`,
+        factId,
+      })
+    }
+  }
+
+  return violations
+}
+
+/**
+ * Throwing helper for the bake-time integration point. The throw aborts
+ * the bake and stops the (compositionally invalid) JSON from reaching
+ * disk.
+ *
+ * `canonId` is a human-readable identifier (e.g.
+ * `"math/two-digit-addsub-with-regroup"`).
+ *
+ * NOTE (PR A scope): exported. The binding IS registered in
+ * `resolveTierBinding` so the disk-walker will fire it when the canon
+ * file lands (PR B). The bake-time `bakeOne` integration in
+ * `generateSessionCanon.ts` is wired in PR B alongside the canon
+ * (mirrors the Wave-4 `two-digit-addsub` chain at
+ * `generateSessionCanon.ts:442+`).
+ */
+export function assertTwoDigitAddsubWithRegroupCompositionClean(
+  canonId: string,
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: TwoDigitAddsubWithRegroupRulesConfig = TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+): void {
+  const violations = lintTwoDigitAddsubWithRegroupComposition(response, config)
+  if (violations.length > 0) {
+    throw new CompositionLintError(canonId, violations)
+  }
+}
+
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
 // Current scope is sub-to-10 + add-to-10 + sub-to-20 + add-to-20. The
@@ -2952,6 +3819,10 @@ export type TierLintBinding =
   | { tier: 'sub-to-20'; config: SubToTwentyRulesConfig }
   | { tier: 'add-to-20'; config: AddToTwentyRulesConfig }
   | { tier: 'two-digit-addsub'; config: TwoDigitAddsubRulesConfig }
+  | {
+      tier: 'two-digit-addsub-with-regroup'
+      config: TwoDigitAddsubWithRegroupRulesConfig
+    }
   | null
 
 /**
@@ -3011,6 +3882,31 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   // dual-exposure across (a, b, c) triples, subtraction read-template
   // tightened to "How many are left?" — folds in Wave 2 prereq 86c9xa817),
   // rebakes the canon, and wires the binding through the dispatch.
+  // two-digit-addsub-with-regroup binding REGISTERED in PR A (ticket
+  // 86c9y01ee). Canon does not exist at PR A time (spec §5.1 verified
+  // empirically — no `public/canon/math/level-1/two-digit-addsub-with-
+  // regroup.json` present). PR B (ticket follow-up to 86c9y01ee) sharpens
+  // the planner directive, bakes the canon, and the binding fires for
+  // the first time. ORDERED BEFORE the two-digit-addsub branch below
+  // because `with-regroup.json`'s suffix does not collide with
+  // `two-digit-addsub.json`'s suffix (the `-with-regroup` infix prevents
+  // overlap) — but ordering by specificity is good practice for any
+  // future sibling nodes that DO share a prefix.
+  if (norm.endsWith('/math/level-1/two-digit-addsub-with-regroup.json')) {
+    return {
+      tier: 'two-digit-addsub-with-regroup',
+      config: TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+    }
+  }
+  if (
+    norm === 'two-digit-addsub-with-regroup.json' ||
+    norm.endsWith('/two-digit-addsub-with-regroup.json')
+  ) {
+    return {
+      tier: 'two-digit-addsub-with-regroup',
+      config: TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
+    }
+  }
   if (norm.endsWith('/math/level-1/two-digit-addsub.json')) {
     return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
   }
@@ -3034,6 +3930,7 @@ export interface CompositionFileFinding {
     | 'sub-to-20'
     | 'add-to-20'
     | 'two-digit-addsub'
+    | 'two-digit-addsub-with-regroup'
   violations: CompositionViolation[]
 }
 
@@ -3132,6 +4029,12 @@ export function runCompositionLint(
         break
       case 'two-digit-addsub':
         violations = lintTwoDigitAddsubComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+      case 'two-digit-addsub-with-regroup':
+        violations = lintTwoDigitAddsubWithRegroupComposition(
           parsed as SessionStartResponse,
           binding.config,
         )
