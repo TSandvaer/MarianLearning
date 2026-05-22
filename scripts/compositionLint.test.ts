@@ -799,7 +799,7 @@ describe('runCompositionLint — disk walker', () => {
     expect(r.totalViolations).toBe(0)
   })
 
-  it('lints in-scope math tiers (sub-to-10 + add-to-10 + sub-to-20 + add-to-20) and SKIPS out-of-scope tiers', () => {
+  it('lints in-scope math tiers (sub-to-10 + add-to-10 + sub-to-20 + add-to-20 + two-digit-addsub) and SKIPS out-of-scope tiers', () => {
     // In-scope sub-to-10.
     writeCanon(
       'math/level-1/sub-to-10.json',
@@ -824,6 +824,14 @@ describe('runCompositionLint — disk walker', () => {
       'math/level-1/add-to-20.json',
       buildAddToTwentyCanonResponse([...CLEAN_ADD_TO_TWENTY_FACTS]),
     )
+    // In-scope two-digit-addsub (clean canon mirroring the PR B rebake
+    // layout — bound through resolveTierBinding alongside the fresh
+    // round-ten-anchor-corrected canon + Wave 2 "How many are left?"
+    // fold-in for subtraction read-lines).
+    writeCanon(
+      'math/level-1/two-digit-addsub.json',
+      buildTwoDigitAddsubCanonResponse([...CLEAN_TWO_DIGIT_ADDSUB_FACTS]),
+    )
     // Out-of-scope.
     writeCanon('word-song/level-1/blending-cv.json', {
       ok: true,
@@ -839,8 +847,8 @@ describe('runCompositionLint — disk walker', () => {
     })
 
     const r = runCompositionLint(tmp)
-    expect(r.filesScanned).toBe(5)
-    expect(r.filesLinted).toBe(4)
+    expect(r.filesScanned).toBe(6)
+    expect(r.filesLinted).toBe(5)
     expect(r.filesSkipped).toBe(1)
     expect(r.totalViolations).toBe(0)
     expect(r.findings).toEqual([])
@@ -4866,10 +4874,14 @@ function readTwoDigitAddsubUtterance(
 ): Utterance {
   const aWord = capitalizeTwoDigit(twoDigitAddsubWord(a))
   const bWord = twoDigitAddsubWord(b)
+  // "+" uses "How many?"; "-" uses "How many are left?" (PR B
+  // fold-in of 86c9xa817 — matches the browser parser at
+  // `planFromServer.ts:294` `subMinusMatch`). The trailing phrase
+  // is the wire-side discriminator between addition and subtraction.
   const text =
     op === '+'
       ? `${aWord} plus ${bWord}. How many?`
-      : `${aWord} minus ${bWord}. How many?`
+      : `${aWord} minus ${bWord}. How many are left?`
   return {
     id: `math.p${index}.read`,
     text,
@@ -4974,28 +4986,31 @@ describe('parseTwoDigitAddsubReadLine', () => {
     ).toEqual({ a: 42, b: 31, op: '+' })
   })
 
-  it('parses the "-" template with single-digit subtrahend', () => {
-    expect(
-      parseTwoDigitAddsubReadLine('Forty-eight minus seven. How many?'),
-    ).toEqual({ a: 48, b: 7, op: '-' })
-  })
-
-  it('parses the "-" template with EASY-band teen minuend', () => {
-    expect(
-      parseTwoDigitAddsubReadLine('Fifteen minus three. How many?'),
-    ).toEqual({ a: 15, b: 3, op: '-' })
-  })
-
-  it('parses the "-" template with "How many are left?" suffix (PR B forward-compat)', () => {
-    // PR B's Wave 2 prereq (86c9xa817) tightens the subtraction template
-    // to require "are left" matching sub-to-X tiers. PR A's parser
-    // accepts BOTH suffixes for forward-compat — the composition rule
-    // for "are left" is a PR B concern.
+  it('parses the "-" template with single-digit subtrahend (requires "are left")', () => {
     expect(
       parseTwoDigitAddsubReadLine(
         'Forty-eight minus seven. How many are left?',
       ),
     ).toEqual({ a: 48, b: 7, op: '-' })
+  })
+
+  it('parses the "-" template with EASY-band teen minuend', () => {
+    expect(
+      parseTwoDigitAddsubReadLine('Fifteen minus three. How many are left?'),
+    ).toEqual({ a: 15, b: 3, op: '-' })
+  })
+
+  it('rejects the "-" template missing the "are left" suffix (PR B tightening, 86c9xa817)', () => {
+    // PR B activated the Wave 2 prereq: subtraction read-template MUST
+    // now end with "How many are left?". The bare "How many?" suffix
+    // is reserved for the "+" template — the trailing phrase is the
+    // wire-side discriminator between addition and subtraction.
+    expect(
+      parseTwoDigitAddsubReadLine('Forty-eight minus seven. How many?'),
+    ).toBeNull()
+    expect(
+      parseTwoDigitAddsubReadLine('Fifteen minus three. How many?'),
+    ).toBeNull()
   })
 
   it('accepts mixed case', () => {
@@ -6421,38 +6436,34 @@ describe('TWO_DIGIT_ADDSUB_RULES.bandAllowedSlots drift-guard against spec §2.1
   })
 })
 
-// ── resolveTierBinding — two-digit-addsub: BINDING DEFERRED (PR A) ──────
+// ── resolveTierBinding — two-digit-addsub: BINDING ACTIVATED (PR B) ────
 //
-// PR A scope per `testing-and-ci.md §6` split-PR pattern: the binding is
-// intentionally NOT wired (resolveTierBinding returns null for two-digit-
-// addsub.json). The committed canon at public/canon/math/level-1/
-// two-digit-addsub.json ships with 3 round-ten-anchor facts — the §1.4
-// correction target — which would fail PR A's lint. PR B (ticket
-// follow-up to 86c9xkz9n) activates the binding alongside a fresh canon
-// rebake + Wave 2 prereq fold-in.
-//
-// PR B activates: see testing-and-ci.md §6 "Split-PR pattern" 3-line
-// update — move two-digit-addsub.json out of OOS-list in
-// `runCompositionLint` disk-walker test, bump filesLinted +1, bump
-// filesSkipped -1.
+// PR A (#291) shipped the lint infra (POOL, RULES, parser, lint helpers)
+// with the binding deferred and the canon shipping 3 round-ten-anchor
+// facts (the §1.4 correction target). PR B (this PR — ticket follow-up
+// to 86c9xkz9n) sharpens the planner directive (round-ten-anchor cap at
+// 1, mid-decade cap at 4, op-mix 5+/3- or 6+/2-, P1 is "+", dual-exposure
+// across (a, b, c) triples, subtraction read-template tightened to "How
+// many are left?" — folds in Wave 2 prereq 86c9xa817), rebakes the
+// canon to a spec-compliant 8-problem session, and activates the binding
+// through resolveTierBinding + runCompositionLint dispatch.
 
-describe('resolveTierBinding — two-digit-addsub (BINDING DEFERRED in PR A)', () => {
-  it('returns null for two-digit-addsub.json paths in PR A scope', () => {
-    // PR B will flip this assertion to:
-    //   expect(resolveTierBinding('two-digit-addsub.json')?.tier).toBe(
-    //     'two-digit-addsub')
-    expect(resolveTierBinding('two-digit-addsub.json')).toBeNull()
+describe('resolveTierBinding — two-digit-addsub (BINDING ACTIVATED in PR B)', () => {
+  it('binds two-digit-addsub.json paths to the two-digit-addsub tier config', () => {
+    expect(resolveTierBinding('two-digit-addsub.json')?.tier).toBe(
+      'two-digit-addsub',
+    )
     expect(
-      resolveTierBinding('canon/math/level-1/two-digit-addsub.json'),
-    ).toBeNull()
+      resolveTierBinding('canon/math/level-1/two-digit-addsub.json')?.tier,
+    ).toBe('two-digit-addsub')
     expect(
       resolveTierBinding(
         'canon/math/level-1/two-digit-addsub.json'.replace(/\//g, sep),
-      ),
-    ).toBeNull()
+      )?.tier,
+    ).toBe('two-digit-addsub')
   })
 
-  it('still binds the four currently-active tiers (no cross-tier regression from PR A infra add)', () => {
+  it('still binds the four sibling active tiers (no cross-tier regression from PR B binding add)', () => {
     expect(resolveTierBinding('sub-to-10.json')?.tier).toBe('sub-to-10')
     expect(resolveTierBinding('add-to-10.json')?.tier).toBe('add-to-10')
     expect(resolveTierBinding('sub-to-20.json')?.tier).toBe('sub-to-20')

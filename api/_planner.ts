@@ -1173,7 +1173,124 @@ The user message names a focus skill node. Generate problems specifically for th
   - giveAnswer: "This one is <answer>." e.g. "This one is twelve."
 
   PROSODY: numbers are spelled out as words ("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"). Capitalize the first word of each sentence. The "minus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10% for all teen values; no SSML overrides required. Do NOT verbally decompose the minuend (e.g. do NOT say "ten and seven, minus five" or "ten plus seven minus five") — per Dave § 2 (L2 context note), verbal decomposition adds L2 cognitive load without pedagogical benefit. Emma says the numeral name plainly.
-- two-digit-addsub: addition or subtraction with at least one two-digit addend. read: "Twenty-three plus four. How many?" Answer < 100, no carrying/borrowing in this slice.
+- two-digit-addsub: addition OR subtraction within one mixed-op session, no regrouping. For ADDITION: one OR both operands two-digit, the other one-digit (or both two-digit per the two-digit-plus-two-digit pool slice below), units column sums to AT MOST 9 (no carrying). For SUBTRACTION: minuend is two-digit, subtrahend is one-digit, minuend's units digit >= subtrahend (no borrowing), result >= 12. read for "+": "<addend-A> plus <addend-B>. How many?" e.g. "Twenty-three plus four. How many?". read for "-": "<minuend> minus <subtrahend>. How many are left?" e.g. "Forty-eight minus seven. How many are left?".
+
+  NO-REGROUP SELF-CHECK (apply BEFORE emitting every problem):
+  - For "+" facts: COMPUTE (a mod 10) + (b mod 10) and CONFIRM <= 9. If > 9, the fact requires CARRYING and is FORBIDDEN (regroup territory, deferred). Worked example: 23+4 -> units 3+4=7 OK. 27+6 -> units 7+6=13 FORBIDDEN.
+  - For "-" facts: COMPUTE (a mod 10) and CONFIRM (a mod 10) >= b. If <, the fact requires BORROWING and is FORBIDDEN. Worked example: 28-5 -> units 8>=5 OK. 32-5 -> units 2<5 FORBIDDEN.
+  - For "-" facts: COMPUTE a - b and CONFIRM result >= 12. If < 12, the result has slipped below the two-digit range and is FORBIDDEN (belongs in sub-to-20 or sub-to-10). Worked example: 18-4=14 OK. 13-5=8 FORBIDDEN.
+
+  OPERAND-RANGE SELF-CHECK (apply BEFORE emitting every problem):
+  - First operand a in [10, 99].
+  - Second operand b in [1, 9] for the SINGLE-DIGIT-SECOND-OPERAND mainline; OR b in [10, 99] ONLY for the explicit "two-digit-plus-two-digit" pool entries listed below.
+  - For two-digit-plus-two-digit "+" facts: BOTH units AND tens columns add without carrying — (a mod 10) + (b mod 10) <= 9 AND ((a div 10) + (b div 10)) <= 9 AND result <= 99. Worked example: 23+14 -> units 3+4=7 OK, tens 2+1=3 OK, result 37 OK. 45+27 -> units 5+7=12 FORBIDDEN.
+
+  FACT POOL (36 ordered triples; pick exactly 8 distinct (a, b, op) triples per session, no duplicates. The op flag is part of the fact identity — "25-3" and "22+3" are DISTINCT triples but FORBIDDEN to co-occur per the DUAL-EXPOSURE RULE below):
+  Each fact is annotated with [BAND/op/category]. Categories:
+  - round-ten-anchor: first operand ends in zero (e.g. 20+3); units operation trivial. CAPPED TIGHT at 1.
+  - mid-decade-units-shift: place-value-preserving operation on a non-round operand (e.g. 23+4 -> 27); THE actual learning target.
+  - near-boundary-no-cross: units operation lands at or near 9 (for "+") or 0 (for "-") WITHOUT crossing — the cycle-5-regroup-prep diagnostic. High-leverage.
+  - tens-doubles-echo: first operand has matching tens and units digits (e.g. 22+5); doubles intuition lightly carries from add-to-10.
+  - two-digit-plus-two-digit: BOTH operands two-digit (e.g. 23+14); "+" only.
+  - EASY band (P1-P3 eligible; also P4-P8 fallback):
+    · 20+3=23  [EASY/+/round-ten-anchor]
+    · 30+5=35  [EASY/+/round-ten-anchor]
+    · 40+2=42  [EASY/+/round-ten-anchor]
+    · 25+4=29  [EASY/+/near-boundary-no-cross]
+    · 33+4=37  [EASY/+/mid-decade-units-shift]
+    · 22+5=27  [EASY/+/tens-doubles-echo]
+    · 15-3=12  [EASY/-/mid-decade-units-shift]
+    · 28-5=23  [EASY/-/mid-decade-units-shift]
+    · 19-7=12  [EASY/-/mid-decade-units-shift]
+  - MEDIUM band (P4-P8 eligible):
+    · 21+3=24  [MEDIUM/+/mid-decade-units-shift]
+    · 34+5=39  [MEDIUM/+/near-boundary-no-cross]
+    · 42+3=45  [MEDIUM/+/mid-decade-units-shift]
+    · 54+4=58  [MEDIUM/+/mid-decade-units-shift]
+    · 36+2=38  [MEDIUM/+/mid-decade-units-shift]
+    · 44+3=47  [MEDIUM/+/tens-doubles-echo]
+    · 18-4=14  [MEDIUM/-/mid-decade-units-shift]
+    · 25-3=22  [MEDIUM/-/mid-decade-units-shift]
+    · 37-4=33  [MEDIUM/-/mid-decade-units-shift]
+    · 26-5=21  [MEDIUM/-/near-boundary-no-cross]
+  - HARD band (P5-P8 eligible):
+    · 23+6=29  [HARD/+/near-boundary-no-cross]
+    · 41+8=49  [HARD/+/near-boundary-no-cross]
+    · 32+7=39  [HARD/+/near-boundary-no-cross]
+    · 55+4=59  [HARD/+/near-boundary-no-cross]
+    · 27+2=29  [HARD/+/near-boundary-no-cross]
+    · 35-4=31  [HARD/-/near-boundary-no-cross]
+    · 48-7=41  [HARD/-/near-boundary-no-cross]
+    · 52-1=51  [HARD/-/near-boundary-no-cross]
+    · 64-3=61  [HARD/-/near-boundary-no-cross]
+    · 66+3=69  [HARD/+/tens-doubles-echo]
+    · 47+2=49  [HARD/+/near-boundary-no-cross]
+    · 23+14=37 [HARD/+/two-digit-plus-two-digit]
+    · 42+31=73 [HARD/+/two-digit-plus-two-digit]
+    · 25+14=39 [HARD/+/two-digit-plus-two-digit]
+    · 31+26=57 [HARD/+/two-digit-plus-two-digit]
+    · 52+13=65 [HARD/+/two-digit-plus-two-digit]
+    · 34+22=56 [HARD/+/two-digit-plus-two-digit]
+  POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b, op) triple appears verbatim above. The 36 listed triples are the ONLY allowed facts. Common FORBIDDEN candidates to REJECT (valid by operand/no-regroup constraints but NOT in v1 pool): 73+4 (decade out of v1 range), 81-6 (same), 50+7 (round-ten outside the 3 pool entries), 47-23 (two-digit subtrahend, deferred), 13-5 (result < 12), 27+6 (carry required), 32-5 (borrow required).
+
+  CATEGORY-MIX BUDGET (apply BEFORE selecting any facts — this is the FIRST rule because Haiku's prior empirically saturates round-ten-anchor or mid-decade-units-shift when the cap is buried late in the rule list). An 8-problem session has FIVE category budgets that MUST all be respected:
+     · round-ten-anchor:         AT MOST 1.   (Pool has 3 facts: 20+3, 30+5, 40+2. The current canon ships with all THREE present — that is the failure mode this cap corrects.)
+     · mid-decade-units-shift:   AT MOST 4.   (Pool has 11 facts.)
+     · near-boundary-no-cross:   AT MOST 5.   (Pool has 12 facts. Generous because this IS the learning target.)
+     · tens-doubles-echo:        AT MOST 1.   (Pool has 3 facts: 22+5, 44+3, 66+3.)
+     · two-digit-plus-two-digit: AT MOST 2.   (Pool has 6 facts.)
+  The five caps SUM TO 13, so an 8-problem session has 5 slots of slack. FAILURE MODES BOTH WAYS — the current canon shipped 3-of-8 round-ten-anchor (round-ten-prior failure); a correction over-attempt could produce 6-of-8 mid-decade-units-shift (mid-decade-saturation, the symmetric failure). Both are real. Pick a layout with EACH cap respected before assigning facts to slots.
+
+  SESSION COMPOSITION RULES (apply IN ORDER, AFTER the CATEGORY-MIX BUDGET above):
+  1. Problems 1-3 (gentle ramp): draw EXCLUSIVELY from the EASY band. Calibration window.
+  2. NEGATIVE ANCHOR — P1, P2, P3, P4 PLACEMENT BANS (any one of these is a hard rule violation):
+     · DO NOT place any MEDIUM-band fact at P1, P2, or P3. MEDIUM-band only appears at P4 or later.
+     · DO NOT place any HARD-band fact at P1, P2, P3, or P4. HARD-band only appears at P5 or later.
+     · The ONLY facts allowed at P1, P2, P3 are: 20+3, 30+5, 40+2, 25+4, 33+4, 22+5, 15-3, 28-5, 19-7.
+  3. P1 IS ALWAYS "+". Hard rule — session opener carries onset anxiety; the more confident operation enters first. Allowed P1 facts: 20+3, 30+5, 40+2, 25+4, 33+4, 22+5.
+  4. OP-MIX RULES (mandatory):
+     · The 8-problem session MUST contain AT LEAST 5 problems with op = "+" AND AT LEAST 2 problems with op = "-".
+     · Allowed mixes: 5+/3- (default), 6+/2-.
+     · FORBIDDEN mixes: 8+/0-, 7+/1-, 4+/4-, 3+/5-.
+  5. Problem 4: MEDIUM-band only (HARD-band still forbidden at P4).
+  6. Problems 5-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and REDUCE "-" count to exactly 2; high score (>= 0.85) -> push toward HARD with >= 1 near-boundary-no-cross in P5-P8; mid score -> balanced.
+  7. HIGH-LEVERAGE COVERAGE RULE: at least one near-boundary-no-cross fact MUST appear in P5-P8 (drawn from: 23+6, 41+8, 32+7, 55+4, 27+2, 47+2, 35-4, 48-7, 52-1, 64-3, OR the MEDIUM-band near-boundary 34+5 or 26-5 if placed at P5+). This is the actual learning target of the tier — Marian must recognise that even when the units value is near 9 (or near 0), the operation does NOT cross the decade.
+  8. ROUND-TEN-ANCHOR-CAP SELF-CHECK (re-statement of CATEGORY-MIX BUDGET): AT MOST ONE problem across the entire 8-problem session may carry the round-ten-anchor category (drawn from: 20+3, 30+5, 40+2). Before emitting a second round-ten-anchor, REJECT it. The current canon ships with all three round-ten anchors present (20+3, 30+5, 40+2 at P1, P3, P7) — that IS the failure mode this cap corrects. Pick at most 1; let the other two lie unused for this session. NEGATIVE ANCHOR: it is FORBIDDEN to place 20+3 AND 30+5 in the same session; FORBIDDEN to place 20+3 AND 40+2; FORBIDDEN to place 30+5 AND 40+2.
+  9. MID-DECADE-UNITS-SHIFT-CAP SELF-CHECK (re-statement): AT MOST FOUR problems across the entire 8-problem session may carry the mid-decade-units-shift category. Before emitting a fifth, REJECT it and SWAP for a near-boundary-no-cross or round-ten-anchor or tens-doubles-echo fact. NEGATIVE ANCHOR — mid-decade-units-shift IS the largest pool category (11 facts), but an 8-problem session with 5 or more mid-decade-units-shift facts crowds out the near-boundary-no-cross learning target (rule 7). CONCRETE NUMERIC GUARD — if you have selected 4 mid-decade-units-shift facts already, every remaining slot MUST carry a DIFFERENT category; if you have selected 5 or more, the canon will be REJECTED by lint and the bake fails.
+  10. NEAR-BOUNDARY-NO-CROSS-CAP SELF-CHECK (re-statement): AT MOST FIVE problems may carry the near-boundary-no-cross category. Before emitting a sixth, REJECT it. (Cap binds only on near-boundary-heavy sessions; typical sessions land at 3-4.)
+  11. TENS-DOUBLES-ECHO-CAP SELF-CHECK (re-statement): AT MOST ONE problem may carry the tens-doubles-echo category. Before emitting a second, REJECT it. NEGATIVE ANCHOR: it is FORBIDDEN to place 22+5 AND 44+3 in the same session; FORBIDDEN to place 22+5 AND 66+3; FORBIDDEN to place 44+3 AND 66+3.
+  12. TWO-DIGIT-PLUS-TWO-DIGIT-CAP SELF-CHECK (re-statement): AT MOST TWO problems may carry the two-digit-plus-two-digit category. Before emitting a third, REJECT it.
+  13. NO duplicate (a, b, op) triples within the 8-problem set.
+  14. DUAL-EXPOSURE RULE (LOAD-BEARING — this is the first tier where the rule binds in real (non-forward-compat) sense): never pair a "+" fact and its "-" inverse in the same session, where "inverse" means the same operand triple. E.g. if 25-3=22 is in the session, 22+3=25 is FORBIDDEN. For "+" facts like 23+4=27, the inverse 27-4=23 is FORBIDDEN. Walk through the session once at the end and check every (a, b, c) where a±b=c against the other 7 problems; if any inverse pair is present, SWAP one of the offending facts.
+
+  WORKED EXAMPLE — a clean 8-problem session that respects all caps (use this as a template, not a verbatim copy):
+     P1=20+3 [EASY/+/round-ten-anchor]   (round-ten-anchor #1 — at cap)
+     P2=22+5 [EASY/+/tens-doubles-echo]  (tens-doubles-echo #1 — at cap)
+     P3=15-3 [EASY/-/mid-decade-units-shift] (mid-decade-units-shift #1; "-" count 1/3)
+     P4=42+3 [MEDIUM/+/mid-decade-units-shift] (mid-decade #2 — P4 is MEDIUM-only)
+     P5=23+6 [HARD/+/near-boundary-no-cross] (near-boundary #1 — P5-P8 anchor)
+     P6=48-7 [HARD/-/near-boundary-no-cross] (near-boundary #2; "-" count 2/3)
+     P7=33+4 [EASY/+/mid-decade-units-shift] (mid-decade #3 — EASY at P7 allowed; balances op-mix)
+     P8=25-3 [MEDIUM/-/mid-decade-units-shift] (mid-decade #4 — at cap; "-" count 3/3)
+  Counts: round-ten-anchor=1 (at cap), mid-decade-units-shift=4 (at cap), near-boundary-no-cross=2 (under cap of 5), tens-doubles-echo=1 (at cap), two-digit-plus-two-digit=0. Total = 8. EASY at P1-P3 + P7, MEDIUM at P4 + P8, HARD at P5 + P6. P5-P8 carries 2 near-boundary-no-cross facts (high-leverage rule satisfied with 1 to spare). Op-mix 5+/3-, P1 is "+", no inverse pairs.
+
+  PER-PROBLEM SHAPE for two-digit-addsub: every problem MUST emit op: "+" OR op: "-" on the wire (the screen renders the operator glyph from op). The op flag matches the chosen fact's [.../+/...] or [.../-/...] tag. Wrong-answer chip selection is handled entirely at render time — distractorClass is NOT a planner-emitted field; the canon JSON wire is utterance-only {id, text} and carries no per-problem distractor tag. Utterance ids MUST use the literal "math." prefix (NOT "two-digit-addsub."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". The id namespace is the track name, NOT the focus-node name. Per-slot utterance templates:
+  - read (+): "<addend-A> plus <addend-B>. How many?" e.g. "Twenty-three plus four. How many?"
+  - read (-): "<minuend> minus <subtrahend>. How many are left?" e.g. "Forty-eight minus seven. How many are left?"
+    READ-LINE NEGATIVE ANCHOR ("-" only): the read-line MUST use the word "minus" verbatim AND end with the phrase "How many are left?" — DO NOT substitute "take away" for "minus", and DO NOT shorten the trailing phrase to "How many?". The "take away" phrasing belongs in the hint scaffold ONLY (see below). Emitting "Forty-eight minus seven. How many?" as a "-" read-line is a HARD RULE VIOLATION — the browser parser rejects that shape and the canon falls into silent static. Every "math.pN.read" utterance for an op:"-" problem MUST match the pattern: capitalised first-operand quantity word (possibly hyphenated), then " minus ", then a lowercased subtrahend word, then ". How many are left?". The "+" read-line uses "How many?" (NOT "How many are left?") — the trailing phrase distinguishes addition from subtraction in the wire-side parser.
+  - correct: "Yes! <answer>!" e.g. "Yes! Twenty-seven!"
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint (+): "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Twenty-three. And four more. How many now?"
+  - hint (-): "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Forty-eight. Take away seven. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
+  - giveAnswer: "This one is <answer>." e.g. "This one is twenty-seven."
+
+  PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-three", "forty-five", "sixty-nine") — Emma renders these on en-US-EmmaMultilingualNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", ... "ninety") are NOT hyphenated when emitted alone (e.g. "Twenty plus three", not "Twenty-zero plus three").
+
+  PROSODY PROHIBITION (LOAD-BEARING): never render two-digit operands digit-by-digit. FORBIDDEN: "Two three plus one four. How many?" / "Two-three plus four. How many?" / "Two and three plus one and four. How many?". ALLOWED: "Twenty-three plus fourteen. How many?". Digit-by-digit TTS actively trains the concatenated-single-digit-processing error pattern this tier is designed to remediate. Quantity-word framing is the only correct form.
+
+  STRATEGY PROHIBITION (LOAD-BEARING): never invoke or suggest the make-ten-bridge / cross-10-bridge decomposition strategy from add-to-20 in this tier. FORBIDDEN hint text: "Look. Twenty-three. Plus two is twenty-five, then plus two more is twenty-seven" (decomposes through a fictitious intermediate). ALLOWED hint text: "Look. Twenty-three. And four more. How many now?" — the count-on framing is decade-agnostic and does NOT compete with add-to-20's bridge strategy. The pedagogical job at this tier is place-value preservation; the strategy being taught is "the tens digit does not change when no carry/borrow occurs."
+
+  Do NOT verbally decompose the two-digit operand (e.g. do NOT say "twenty and three plus four" instead of "twenty-three plus four"). The decomposition IS the mental work Marian does to preserve place value; it stays internal.
 - skip-counting: count by 2s, 5s, or 10s. read: "Two, four, six, ... what's next?" Answer is the next term.
 - mult-2-5-10: multiplication by 2, 5, or 10. read: "Two times <X>. How many?" Answer is the product.
 - mult-3-4: multiplication by 3 or 4. read: same template.
