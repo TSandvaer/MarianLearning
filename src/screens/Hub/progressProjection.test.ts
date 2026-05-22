@@ -49,15 +49,18 @@ describe('projectHubTreeProgress', () => {
       'add-to-20': 'mastered',
       'sub-to-10': 'mastered',
       'sub-to-20': 'mastered',
-      'two-digit-addsub': 'mastered',
+      // Wave 5 (ticket 86c9y0bvc) sibling-tier split — both tiers
+      // mastered to walk past. Math track is now 11 nodes (was 10).
+      'two-digit-addsub-no-regroup': 'mastered',
+      'two-digit-addsub-with-regroup': 'mastered',
       'skip-counting': 'mastered',
       'mult-2-5-10': 'mastered',
       'mult-3-4': 'mastered',
       'mult-6-9': 'mastered',
     })
-    // 10 math nodes, all mastered → index 10 (sliding-window helper clamps
+    // 11 math nodes, all mastered → index 11 (sliding-window helper clamps
     // to last cell).
-    expect(projectHubTreeProgress(p).numberGardenIndex).toBe(10)
+    expect(projectHubTreeProgress(p).numberGardenIndex).toBe(11)
   })
 
   it('counts word-song track independently of math track', () => {

@@ -103,7 +103,14 @@ export const MATH_TREE: readonly NumberGardenNode[] = [
   'add-to-20',
   'sub-to-10',
   'sub-to-20',
-  'two-digit-addsub',
+  // Wave 5 (ticket 86c9y0bvc): two-digit-addsub split into adjacent
+  // no-regroup + with-regroup tiers. Mastery walks them sequentially:
+  // no-regroup masters → with-regroup unlocks 'intro' via the normal
+  // `nextNode` cascade; with-regroup masters → skip-counting unlocks.
+  // No special graduation gate (this is a sibling-tier cascade, not a
+  // novel-word generalization probe like cvc-words).
+  'two-digit-addsub-no-regroup',
+  'two-digit-addsub-with-regroup',
   'skip-counting',
   'mult-2-5-10',
   'mult-3-4',

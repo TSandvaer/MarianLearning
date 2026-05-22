@@ -34,7 +34,13 @@ const SCHEMA_FLOOR_NODES: readonly SkillNode[] = [
   'add-to-20',
   'sub-to-10',
   'sub-to-20',
-  'two-digit-addsub',
+  // Wave 5 (ticket 86c9y0bvc) sibling-tier split of `'two-digit-addsub'`.
+  // The schema floor maps both new literals to `'locked'`; the
+  // read-path remap in `storage.ts:withDefaultedSkillLevels` moves any
+  // legacy `'two-digit-addsub': <level>` key on a persisted blob into
+  // the no-regroup tier before the strict guard runs.
+  'two-digit-addsub-no-regroup',
+  'two-digit-addsub-with-regroup',
   'skip-counting',
   'mult-2-5-10',
   'mult-3-4',
@@ -101,7 +107,14 @@ const DEFAULT_SKILL_LEVELS: SkillLevels = {
   // after add-to-20 (existing tree order, no curriculum reorder).
   'sub-to-10': 'practicing', // retrieval-automaticity drill, not concept
   'sub-to-20': 'intro', // diagnostic says extend to 20 no-borrow next — introduced
-  'two-digit-addsub': 'locked',
+  // Wave 5 (ticket 86c9y0bvc) sibling-tier split. Both tiers default
+  // to 'locked'; the existing `'two-digit-addsub'` literal was at
+  // 'locked' before the split, so the no-regroup tier inheriting
+  // 'locked' preserves Marian's diagnostic baseline exactly. The
+  // with-regroup tier unlocks to 'intro' via the normal cascade once
+  // no-regroup masters — same shape as the CVC sibling-vowel cascade.
+  'two-digit-addsub-no-regroup': 'locked',
+  'two-digit-addsub-with-regroup': 'locked',
   'skip-counting': 'locked',
   'mult-2-5-10': 'intro', // repeated addition concept, no x symbol
   'mult-3-4': 'locked',

@@ -510,7 +510,13 @@ function buildTwoDigitAddsubSeedProgress(): unknown {
       'add-to-20': 'mastered',
       'sub-to-10': 'mastered',
       'sub-to-20': 'mastered',
-      'two-digit-addsub': 'practicing',
+      // Wave 5 (ticket 86c9y0bvc) sibling-tier split — the legacy
+      // `'two-digit-addsub'` literal is now `'two-digit-addsub-no-regroup'`.
+      // This spec exercises the existing (no-regroup) pool envelope;
+      // the with-regroup tier is locked here and exercised by PR B's
+      // failing-first E2E spec instead.
+      'two-digit-addsub-no-regroup': 'practicing',
+      'two-digit-addsub-with-regroup': 'locked',
       'skip-counting': 'locked',
       'mult-2-5-10': 'locked',
       'mult-3-4': 'locked',
@@ -1201,7 +1207,11 @@ test.describe('two-digit-addsub — pool envelope + op-mix + round-ten cap + nea
     >
     const reqPayload = (reqBody.payload ?? {}) as Record<string, unknown>
     const reqProgress = (reqPayload.progress ?? {}) as Record<string, unknown>
-    expect(reqProgress.focusNode).toBe('two-digit-addsub')
+    // Wave 5 (ticket 86c9y0bvc) sibling-tier split — picker now
+    // emits the no-regroup tier literal. PR B will introduce a
+    // separate with-regroup spec; this assertion stays on the
+    // no-regroup tier (existing pool envelope unchanged).
+    expect(reqProgress.focusNode).toBe('two-digit-addsub-no-regroup')
 
     // Walk to P4 (0-based index 3). Tap correct 3 times.
     for (let i = 0; i < 3; i++) {
@@ -1330,7 +1340,11 @@ test.describe('two-digit-addsub — pool envelope + op-mix + round-ten cap + nea
     >
     const reqPayload = (reqBody.payload ?? {}) as Record<string, unknown>
     const reqProgress = (reqPayload.progress ?? {}) as Record<string, unknown>
-    expect(reqProgress.focusNode).toBe('two-digit-addsub')
+    // Wave 5 (ticket 86c9y0bvc) sibling-tier split — picker now
+    // emits the no-regroup tier literal. PR B will introduce a
+    // separate with-regroup spec; this assertion stays on the
+    // no-regroup tier (existing pool envelope unchanged).
+    expect(reqProgress.focusNode).toBe('two-digit-addsub-no-regroup')
 
     // Walk problems P1..P8 looking for the first op:'-' at P5+.
     let foundSubIndex = -1

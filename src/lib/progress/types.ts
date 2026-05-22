@@ -12,13 +12,31 @@
 // String-literal unions keep the type system honest about which nodes exist.
 // --------------------------------------------------------------------------
 
+// `two-digit-addsub` was a single literal covering both no-carry and
+// with-carry pedagogical bands until Wave 5 (ticket 86c9y0bvc /
+// 86c9xwjtr — two-digit-addsub WITH-regroup epic). Per Dave's
+// research deliverable (`design/research/wave-5-borrow-carry-error-patterns.md`)
+// + Kyle's content-tier spec (`design/math/two-digit-addsub-with-regroup-content.md`),
+// the with-regroup band needs its own distractor-class taxonomy
+// (forgotten-carry, column-cross, smaller-from-larger, etc.) that
+// doesn't apply at the no-regroup band — and only the SkillNode level
+// can carry per-tier canon, debug-seed, and progression state. The
+// split is mechanical: every existing `'two-digit-addsub'` reference
+// maps to `'two-digit-addsub-no-regroup'` (preserves current
+// behaviour). `'two-digit-addsub-with-regroup'` is the new
+// pedagogical band — no canon, no first-class planner block, no
+// debug seed yet; PR B (canon rebake + binding activation) wires
+// those. A read-path remap in `storage.ts:withDefaultedSkillLevels`
+// covers legacy persisted blobs (parallel to the digraphs remap
+// from PR #211).
 export type NumberGardenNode =
   | 'number-recog'
   | 'add-to-10'
   | 'add-to-20'
   | 'sub-to-10'
   | 'sub-to-20'
-  | 'two-digit-addsub'
+  | 'two-digit-addsub-no-regroup'
+  | 'two-digit-addsub-with-regroup'
   | 'skip-counting'
   | 'mult-2-5-10'
   | 'mult-3-4'

@@ -94,7 +94,14 @@ const DEFAULT_SKILL_LEVELS = {
   'add-to-20': 'locked',
   'sub-to-10': 'mastered',
   'sub-to-20': 'intro',
-  'two-digit-addsub': 'locked',
+  // Wave 5 (ticket 86c9y0bvc) sibling-tier split. Both default to
+  // 'locked' to mirror the production `defaults.ts` schema floor —
+  // an e2e blob seeded via `buildSeedProgress` that doesn't override
+  // these keys still validates against the post-split guard. Specs
+  // wanting to land the picker on either tier override explicitly
+  // (e.g. `skillLevelOverrides: { 'two-digit-addsub-no-regroup': 'practicing' }`).
+  'two-digit-addsub-no-regroup': 'locked',
+  'two-digit-addsub-with-regroup': 'locked',
   'skip-counting': 'locked',
   'mult-2-5-10': 'intro',
   'mult-3-4': 'locked',

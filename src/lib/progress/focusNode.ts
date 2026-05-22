@@ -48,7 +48,15 @@ export const MATH_NODES_IN_ORDER: readonly NumberGardenNode[] = [
   'add-to-20',
   'sub-to-10',
   'sub-to-20',
-  'two-digit-addsub',
+  // Wave 5 (ticket 86c9y0bvc): `'two-digit-addsub'` split into a
+  // no-regroup tier (existing behaviour — preserves the current
+  // canon, prompt block, and pool) followed by a with-regroup tier
+  // (new pedagogical band; PR B wires canon + planner + debug seed).
+  // The siblings are adjacent so Marian's path-strip walk stays
+  // contiguous: master no-regroup → unlock with-regroup → master
+  // with-regroup → unlock skip-counting.
+  'two-digit-addsub-no-regroup',
+  'two-digit-addsub-with-regroup',
   'skip-counting',
   'mult-2-5-10',
   'mult-3-4',

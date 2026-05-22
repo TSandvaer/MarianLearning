@@ -929,13 +929,19 @@ describe('recordProgressOnSessionEnd', () => {
   // ── per-problem distractor-class persistence ───────────────────────────
   // (Kevin schema-first PR, 2026-05-22 — Wave 5 prereq pairing with
   // Dave's PR #300 two-digit add/sub WITH-regroup research.)
+  //
+  // Wave 5 schema-widening (ticket 86c9y0bvc, follow-on PR): every
+  // focusNode literal in this describe block uses
+  // `'two-digit-addsub-no-regroup'` — the post-split rename of the
+  // legacy `'two-digit-addsub'` literal. PR B's failing-first E2E
+  // spec exercises the `'two-digit-addsub-with-regroup'` tier.
   describe('perProblemDistractorClass persistence', () => {
     it('persists perProblemDistractorClass onto SessionHistoryEntry when supplied', () => {
       recordProgressOnSessionEnd({
         surface: 'math',
         totalCorrect: 5,
         dateISO: '2026-05-22T12:00:00.000Z',
-        focusNode: 'two-digit-addsub',
+        focusNode: 'two-digit-addsub-no-regroup',
         perProblemDistractorClass: [
           'forgotten-carry',
           null,
@@ -966,7 +972,7 @@ describe('recordProgressOnSessionEnd', () => {
         surface: 'math',
         totalCorrect: 8,
         dateISO: '2026-05-22T12:00:00.000Z',
-        focusNode: 'two-digit-addsub',
+        focusNode: 'two-digit-addsub-no-regroup',
         perProblemDistractorClass: [
           null,
           null,
@@ -1019,7 +1025,7 @@ describe('recordProgressOnSessionEnd', () => {
         surface: 'math',
         totalCorrect: 5,
         dateISO: '2026-05-22T12:00:00.000Z',
-        focusNode: 'two-digit-addsub',
+        focusNode: 'two-digit-addsub-no-regroup',
         perProblemDistractorClass: arr,
       })
 
@@ -1035,7 +1041,7 @@ describe('recordProgressOnSessionEnd', () => {
         surface: 'math',
         totalCorrect: 6,
         dateISO: '2026-05-22T12:00:00.000Z',
-        focusNode: 'two-digit-addsub',
+        focusNode: 'two-digit-addsub-no-regroup',
         latencyMs: [1200, 800, 950, 1500, 2100, 700, 1800, 1100],
         perProblemAnswerValue: [38, 27, 45, 53, 60, 71, 80, 99],
         perProblemDistractorClass: [
@@ -1061,7 +1067,7 @@ describe('recordProgressOnSessionEnd', () => {
         surface: 'math',
         totalCorrect: 6,
         dateISO: '2026-05-22T12:00:00.000Z',
-        focusNode: 'two-digit-addsub',
+        focusNode: 'two-digit-addsub-no-regroup',
         graduationSplit: {
           canonicalCorrect: 5,
           canonicalCount: 6,

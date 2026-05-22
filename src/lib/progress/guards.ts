@@ -23,7 +23,15 @@ const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
   'add-to-20',
   'sub-to-10',
   'sub-to-20',
-  'two-digit-addsub',
+  // Wave 5 (ticket 86c9y0bvc) split `'two-digit-addsub'` into adjacent
+  // no-regroup + with-regroup tiers. The legacy literal is dropped from
+  // the persisted-blob allow-list here; the read-path defaulter at
+  // `storage.ts:withDefaultedSkillLevels` carries a one-time
+  // `two-digit-addsub → two-digit-addsub-no-regroup` remap so existing
+  // blobs (Marian had it at `'locked'` per defaults; QA hand-edits land
+  // in the remap branch) round-trip cleanly post-merge.
+  'two-digit-addsub-no-regroup',
+  'two-digit-addsub-with-regroup',
   'skip-counting',
   'mult-2-5-10',
   'mult-3-4',

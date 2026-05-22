@@ -16,7 +16,15 @@ export type NumberGardenStageId =
   | 'add-to-20'
   | 'subtract-to-10'
   | 'subtract-to-20'
-  | 'two-digit'
+  // Wave 5 (ticket 86c9y0bvc) — `'two-digit'` stage split into
+  // adjacent `'two-digit-no-regroup'` + `'two-digit-with-regroup'`
+  // siblings mirroring the SkillNode-level split. Stage IDs keep the
+  // path-strip shorthand (`'two-digit'` was already a shortening of
+  // SkillNode `'two-digit-addsub'`); the new literals follow the same
+  // pattern (drop the `-addsub` infix for display). Hub path-strip
+  // index correspondence with `MATH_NODES_IN_ORDER` stays 1:1.
+  | 'two-digit-no-regroup'
+  | 'two-digit-with-regroup'
   | 'skip-counting'
   | 'multiply-2-5-10'
   | 'multiply-3-4'
@@ -46,7 +54,13 @@ export const NUMBER_GARDEN_STAGES: NumberGardenStageId[] = [
   'add-to-20',
   'subtract-to-10',
   'subtract-to-20',
-  'two-digit',
+  // Wave 5 sibling-tier split — adjacent placement mirrors
+  // `MATH_NODES_IN_ORDER` (no-regroup THEN with-regroup) so the
+  // path-strip cell index for either stage equals the SkillNode
+  // index, keeping `projectHubTreeProgress` correct without any
+  // mapping table.
+  'two-digit-no-regroup',
+  'two-digit-with-regroup',
   'skip-counting',
   'multiply-2-5-10',
   'multiply-3-4',

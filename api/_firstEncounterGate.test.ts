@@ -124,8 +124,18 @@ describe('getFirstEncounterGatedNodes', () => {
     expect(getFirstEncounterGatedNodes()).not.toContain('sub-to-20')
   })
 
-  it('does NOT include two-digit-addsub (no first-encounter scaffolding)', () => {
-    expect(getFirstEncounterGatedNodes()).not.toContain('two-digit-addsub')
+  // Wave 5 (ticket 86c9y0bvc) sibling-tier split — neither
+  // post-split tier carries first-encounter scaffolding.
+  it('does NOT include two-digit-addsub-no-regroup (no first-encounter scaffolding)', () => {
+    expect(getFirstEncounterGatedNodes()).not.toContain(
+      'two-digit-addsub-no-regroup',
+    )
+  })
+
+  it('does NOT include two-digit-addsub-with-regroup (no first-encounter scaffolding)', () => {
+    expect(getFirstEncounterGatedNodes()).not.toContain(
+      'two-digit-addsub-with-regroup',
+    )
   })
 })
 

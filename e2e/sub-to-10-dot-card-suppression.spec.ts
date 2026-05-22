@@ -283,7 +283,9 @@ function buildSubToTenSeedProgress(): unknown {
       'add-to-20': 'mastered',
       'sub-to-10': 'practicing',
       'sub-to-20': 'intro',
-      'two-digit-addsub': 'locked',
+      // Wave 5 (ticket 86c9y0bvc) sibling-tier split.
+      'two-digit-addsub-no-regroup': 'locked',
+      'two-digit-addsub-with-regroup': 'locked',
       'skip-counting': 'locked',
       'mult-2-5-10': 'intro',
       'mult-3-4': 'locked',

@@ -154,7 +154,13 @@ const STAGE_LABEL: Record<StageId, string> = {
   'add-to-20': '+',
   'subtract-to-10': '−',
   'subtract-to-20': '−',
-  'two-digit': '±',
+  // Wave 5 (ticket 86c9y0bvc) sibling-tier split. Both share the
+  // `±` glyph — the stage label is a curriculum-shorthand, not a
+  // pedagogical-distinction signpost (Marian's TTS names the tier,
+  // and an 8-year-old isn't reading the inline glyph). Visual
+  // differentiation if needed lands later via Kyle.
+  'two-digit-no-regroup': '±',
+  'two-digit-with-regroup': '±',
   'skip-counting': '…',
   'multiply-2-5-10': '×',
   'multiply-3-4': '×',
