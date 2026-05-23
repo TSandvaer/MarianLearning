@@ -1290,6 +1290,193 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
 })
 
 /**
+ * Letter-sounds directive — current-target-vowel hint injection (Wave 7
+ * Track A7 — Amendment 2 of ticket 86c9y49cd; Devon NOF on PR #332).
+ *
+ * The planner accepts an optional `currentTargetVowel: string` IPA hint
+ * on `GenerateSessionPlanArgs`. When set AND the effective focus node is
+ * `letter-sounds`, the user message gains a `LETTER-SOUNDS DIRECTIVE`
+ * block carrying `current-target-vowel=<IPA>`. The block cycles through
+ * /æ (mastered) → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/ as the locked vowel ladder
+ * (per `design/word-song/letter-sounds-content.md §1.4`).
+ *
+ * Without the hint, the directive falls back to /ɒ/ — Marian's next-
+ * vowel-to-master. /æ/ is the mastered anchor (NOT a current-target
+ * candidate); unrecognised IPAs fall through to /ɒ/ defensively.
+ */
+describe('generateSessionPlan — letter-sounds current-target-vowel hint (Wave 7 Track A7 Amendment 2, ticket 86c9y49cd)', () => {
+  const VALID_LETTER_SOUNDS_RESPONSE = JSON.stringify({
+    id: 'haiku-letter-sounds-001',
+    label: 'letter-sounds short-o session',
+    utterances: [
+      { id: 'word.p1.read', text: 'Which letter says mmm?' },
+      { id: 'word.p1.correct', text: 'Yes! M says mmm.' },
+      { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+      { id: 'word.p1.hint', text: 'Listen. mmm.' },
+      { id: 'word.p1.giveAnswer', text: 'This one is M. M says mmm.' },
+    ],
+  })
+
+  it('emits the LETTER-SOUNDS DIRECTIVE block on letter-sounds tier with the supplied current-target vowel', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'letter-sounds',
+      currentTargetVowel: 'ɒ',
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toContain('LETTER-SOUNDS DIRECTIVE')
+    expect(user).toContain('current-target-vowel=ɒ')
+  })
+
+  it('cycles the current-target vowel through /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/ (the locked ladder)', async () => {
+    // Each call carries a different supplied vowel. The directive
+    // emission must mirror the input verbatim — the planner does NOT
+    // re-validate or coerce within the locked candidate set (the
+    // sanity check IS the candidate filter — only valid IPAs fall
+    // through to the directive; unknowns drop to /ɒ/).
+    const ladder = ['ɒ', 'ʌ', 'ɪ', 'ɛ'] as const
+    for (const ipa of ladder) {
+      const capture: { lastArgs?: unknown } = {}
+      const client = makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture })
+      await generateSessionPlan({
+        client,
+        track: 'word-song',
+        level: 1,
+        childName: 'Marian',
+        focusNode: 'letter-sounds',
+        currentTargetVowel: ipa,
+      })
+      const args = capture.lastArgs as { messages: Array<{ content: string }> }
+      const user = args.messages[0]!.content
+      expect(user).toContain(`current-target-vowel=${ipa}`)
+      expect(user).toContain(`This session's LIFT vowel is ${ipa}.`)
+    }
+  })
+
+  it("falls back to /ɒ/ when currentTargetVowel is omitted (safe default — Marian's next-vowel-to-master)", async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'letter-sounds',
+      // currentTargetVowel omitted
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toContain('LETTER-SOUNDS DIRECTIVE')
+    expect(user).toContain('current-target-vowel=ɒ')
+  })
+
+  it("falls back to /ɒ/ when currentTargetVowel is an unrecognised value (defensive — directive's ADJACENT-VOWEL-BAN SELF-CHECK enforces the ban)", async () => {
+    // /æ/ is NOT a current-target candidate (it's the mastered anchor).
+    // Unrecognised input falls through to /ɒ/.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'letter-sounds',
+      currentTargetVowel: 'æ', // not a current-target candidate
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toContain('current-target-vowel=ɒ')
+    expect(user).not.toContain('current-target-vowel=æ')
+  })
+
+  it('omits the directive on non-letter-sounds tiers (cvc-words ignores the field silently)', async () => {
+    const CVC_RESPONSE = JSON.stringify({
+      id: 'haiku-cvc-001',
+      label: 'cvc-words session',
+      utterances: [
+        { id: 'word.p1.read', text: 'Read the cat.' },
+        { id: 'word.p1.correct', text: 'Yes! Cat.' },
+        { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+        { id: 'word.p1.hint', text: "Let's look. Cat." },
+        { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+      ],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(CVC_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+      currentTargetVowel: 'ɒ', // ignored on a non-letter-sounds tier
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).not.toContain('LETTER-SOUNDS DIRECTIVE')
+    expect(user).not.toContain('current-target-vowel=')
+  })
+
+  it('omits the directive on the math track (defense-in-depth: letter-sounds is word-song-only)', async () => {
+    const MATH_RESPONSE = JSON.stringify({
+      id: 'haiku-math-001',
+      label: 'm',
+      utterances: [{ id: 'math.p1.read', text: 'Three plus two. How many?' }],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(MATH_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      currentTargetVowel: 'ɒ',
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).not.toContain('LETTER-SOUNDS DIRECTIVE')
+  })
+
+  it('cache prefix (system prompt) stays byte-stable across different current-target-vowel calls', async () => {
+    // Cache-prefix invariant — two letter-sounds calls with different
+    // vowel hints must share the system prompt bytes so prompt-cache
+    // hits are not invalidated by per-session vowel cycling.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+    await generateSessionPlan({
+      client: makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture: cap1 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'letter-sounds',
+      currentTargetVowel: 'ɒ',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture: cap2 }),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'letter-sounds',
+      currentTargetVowel: 'ɪ',
+    })
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+})
+
+/**
  * Short-o sibling tier (ticket 86c9m3ae3, extended by 86c9teu2e). The
  * planner emits `cvc-words-short-o` content using the same "Read the
  * <word>." template as `cvc-words`, but the word pool is short-o.
