@@ -1544,8 +1544,19 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Eight first-class content modes today:
+matching that node. Nine first-class content modes today:
 
+  - letter-names: "Tap the letter <NAME>." problems. Marian sees a
+    trio of LETTER GLYPHS (the alphabet, uppercase + lowercase — no
+    pictures) and taps the one named in the read line. This is the
+    FIRST literacy tier in tree order, REVIEW MODE by design: Marian's
+    alphabet is mastered with a minor residual b/d/p/q confusion. The
+    chip is the letter itself rendered as text; no picture-pack assets
+    apply. Wire shape and utterance ids are IDENTICAL to blending-cv
+    (utterance-only "word." namespace, 8 problems × 5 slots); only the
+    read-line template + the chip-content discipline (letter glyph,
+    not picture) differ. See the LETTER-NAMES SESSION COMPOSITION
+    RULES block below.
   - blending-cv: "Tap the <word>." problems. Marian hears the word
     spoken and taps the matching picture chip from a trio. This is the
     earlier-tier content (matching pictures to spoken words).
@@ -1601,8 +1612,12 @@ matching that node. Eight first-class content modes today:
     articulation cue, and the voiceless-vs-voiced disambiguation. See
     the TH-DIGRAPH VOICELESS-/θ/ FRAMING block below.
 
-Pick 8 distinct target words from the focus-node-specific pool below
-(do not invent new words, do not use a target more than once).
+Pick 8 distinct target items from the focus-node-specific pool below
+(do not invent new entries, do not use a target more than once).
+"Items" are WORDS for blending-cv / cvc-words / cvc-words-short-* /
+digraphs-* tiers, and LETTER GLYPHS for letter-names. The letter-names
+tier composition has its own additional case-mix + confusion-band caps
+— see the LETTER-NAMES SESSION COMPOSITION RULES block below.
 
 EXCEPTION for digraphs-sh, digraphs-ch AND digraphs-th-voiceless: each
 digraph-tier pool has only 7 words, so 8 distinct words is impossible.
@@ -1621,6 +1636,26 @@ slot — NOT a hybridMode word (thick / cloth), so the repeated decode
 practice lands on a fully-decodable word. digraphs-sh, digraphs-ch, and
 digraphs-th-voiceless are the only focus nodes where a target may
 legitimately appear twice in a session.
+
+Pool for letter-names (52 glyphs — 26 uppercase + 26 lowercase). Each
+letter carries its inline confusion-band tag; see the LETTER-NAMES
+SESSION COMPOSITION RULES block below for tag-driven distractor rules.
+The full pool (do NOT emit any item not in this list):
+  Uppercase: A [CLEAN] B [CLEAN] C [CLEAN] D [CLEAN] E [CLEAN]
+    F [CLEAN] G [CLEAN] H [CLEAN] I [VERTICAL-STICK] J [CLEAN]
+    K [CLEAN] L [CLEAN] M [DOUBLE-HUMP] N [DOUBLE-HUMP] O [CIRCLE]
+    P [CLEAN] Q [CIRCLE] R [CLEAN] S [CLEAN] T [CLEAN] U [CLEAN]
+    V [CLEAN] W [DOUBLE-HUMP] X [CLEAN] Y [CLEAN] Z [CLEAN]
+  Lowercase: a [CLEAN] b [CIRCLE-STICK] c [CLEAN] d [CIRCLE-STICK]
+    e [CLEAN] f [CLEAN] g [CLEAN] h [CLEAN] i [VERTICAL-STICK]
+    j [CLEAN] k [CLEAN] l [VERTICAL-STICK] m [DOUBLE-HUMP]
+    n [DOUBLE-HUMP] o [CIRCLE] p [CIRCLE-STICK] q [CIRCLE-STICK]
+    r [CLEAN] s [CLEAN] t [CLEAN] u [DOUBLE-HUMP] v [CLEAN]
+    w [DOUBLE-HUMP] x [CLEAN] y [CLEAN] z [CLEAN]
+Bands: CIRCLE-STICK (lowercase b/d/p/q — the load-bearing
+trap class, Marian's residual confusion); DOUBLE-HUMP (M/W/N + m/n/u/w);
+CIRCLE (O/Q/o); VERTICAL-STICK (I + i/l/j); CLEAN (everything else —
+the visually-distinct pool).
 
 Pool for blending-cv and cvc-words (14-word short-a CVC):
 ${WORD_SONG_TARGET_WORDS_FOR_PROMPT}
@@ -1732,6 +1767,149 @@ teaches. This framing is informational scaffolding inside the standard
 "Read the <word>." problem flow — it does NOT change the wire shape,
 the utterance ids, or the problem type.
 
+LETTER-NAMES SESSION COMPOSITION RULES (letter-names tier ONLY; apply
+IN ORDER, AFTER the CONFUSION-CLASS BUDGET block immediately below).
+<drift-guard RULE_IDENTITY=letter-names-pool-and-composition
+SPEC=design/word-song/letter-names-content.md§1
+LINT=scripts/compositionLint.ts:letter-names-binding-TBD-A3>
+
+CONFUSION-CLASS BUDGET (apply BEFORE selecting any letter — this is the
+FIRST rule because the b/d/p/q confusion is the load-bearing
+pedagogical concept for this tier and the natural Haiku failure mode is
+to under-probe it OR over-drill it. An 8-problem session has TWO class
+budgets that MUST both be respected):
+  · CIRCLE-STICK (b/d/p/q lowercase): AT LEAST 1, AT MOST 2.
+    The "at least 1" is the tier's load-bearing assessment anchor —
+    Marian's residual confusion is the literal subject of this tier and
+    a session of 8 trivial-grade items teaches nothing. The "at most 2"
+    cap prevents over-drilling — Marian's CVC tiers handle b/d residue
+    naturally via word-context; this tier surfaces it once or twice per
+    session, not constantly.
+  · CLEAN-band (visually distinct, see pool tags above): AT LEAST 4.
+    Maintains the session's overall "review mode" feel for an
+    alphabet-mastered learner. The first 3 problems (gentle ramp) plus
+    at least 1 of P4-P5 must be CLEAN-band targets.
+FAILURE MODES BOTH WAYS — a session with ZERO b/d/p/q items fails to
+do the tier's job (the assessment never fires); a session with 3 OR
+MORE b/d/p/q items feels like a remediation drill. Neither extreme is
+acceptable.
+
+CASE-MIX BUDGET (apply in the same pass as the CONFUSION-CLASS BUDGET):
+  · AT LEAST 2 of the 8 target letters MUST be uppercase.
+  · AT LEAST 2 of the 8 target letters MUST be lowercase.
+A pure-uppercase or pure-lowercase session breaks the implicit promise
+that the tier covers both glyph systems. Mixed-case sessions are the
+norm; the floor of 2 each leaves flexibility on the other 4 slots.
+
+SESSION COMPOSITION RULES (apply IN ORDER, AFTER the two budgets above):
+
+1. Problems 1-3 (gentle ramp): EXCLUSIVELY CLEAN-band targets. Read
+   each candidate's band tag from the pool above before placing it at
+   P1, P2, or P3. ONLY letters tagged [CLEAN] in the pool are eligible
+   for these slots.
+
+2. NEGATIVE ANCHOR — P1, P2, P3 PLACEMENT BANS (any one of these is a
+   hard rule violation):
+   · DO NOT place any CIRCLE-STICK target (b, d, p, q lowercase) at
+     P1, P2, or P3. CIRCLE-STICK targets only appear at P4 or later.
+   · DO NOT place any DOUBLE-HUMP target (M, W, N upper; m, n, u, w
+     lower) at P1, P2, or P3. DOUBLE-HUMP targets only appear at P4
+     or later.
+   · DO NOT place any CIRCLE-FAMILY target (O, Q upper; o lower) at
+     P1, P2, or P3.
+   · DO NOT place any VERTICAL-STICK target (I upper; i, l, j lower)
+     at P1, P2, or P3.
+
+3. Problems 4-5 (transition window): at least ONE non-CLEAN-band
+   target allowed; the b/d/p/q exposure may start here. Other targets
+   in these slots stay CLEAN-band.
+
+4. Problems 6-8 (trap window): AT LEAST ONE of these 3 problems MUST
+   have a CIRCLE-STICK target (b, d, p, or q). This is the "ensure the
+   tier does its job" anchor — composition is meaningless if every
+   session is 8 gentle items. Other trap-window targets MAY draw from
+   any non-CLEAN band (CIRCLE-FAMILY, VERTICAL-STICK, DOUBLE-HUMP) to
+   probe other shape confusions.
+
+5. B/D/P/Q-CAP SELF-CHECK (re-statement of CONFUSION-CLASS BUDGET): AT
+   MOST TWO problems across the 8-problem session may carry a
+   CIRCLE-STICK target. Before emitting a third b/d/p/q target,
+   REJECT it. NEGATIVE ANCHOR — it is FORBIDDEN to place b, d, AND p
+   in the same session; it is FORBIDDEN to place all four of b, d, p,
+   q in the same session.
+
+6. POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify
+   the chosen letter appears in the 52-glyph pool above. No digits
+   (the character 0 for capital O, the character 1 for capital I —
+   FORBIDDEN). No non-ASCII letters. No punctuation. The pool is
+   exactly 26 × 2 = 52 entries.
+
+7. NO duplicate target within the 8-problem set. A target is the
+   (letter-glyph + case) pair: uppercase A and lowercase a are
+   DISTINCT targets in this tier's bookkeeping even though they
+   share the spoken letter name. A session may emit BOTH A and a
+   as targets in different problems; what it may NOT do is emit the
+   same (glyph + case) pair twice.
+
+8. SAME-LETTER-DIFFERENT-CASE BAN (within a single problem's 3-chip
+   trio): NEVER place the same letter-name in both target and a
+   distractor across the trio — e.g. target A with distractors
+   "a, S" is FORBIDDEN. The chip authoring lives in the screen, not
+   the planner, so this rule is informational for the directive — but
+   the canon's read-line + correct utterance pair must NEVER refer to
+   a case variant that could collide with a distractor at render time.
+
+DISTRACTOR-CLASS HINT (for the screen-side chip render — not emitted by
+the planner). The screen picks 2 distractors per problem from the same
+band as the target when in the trap window (P6-P8) — e.g. target b
+gets distractors "d, p" or "d, q". The planner does NOT author
+distractor letters; the screen's existing pickDistractors extension
+handles it. This hint is documentary only; the planner's job is the
+target letter, the read-line, and the 5 utterance slots.
+
+PER-PROBLEM SHAPE for letter-names: every problem MUST emit a target
+letter from the 52-glyph pool. Utterance ids MUST use the literal
+"word." prefix (NOT "letter." or "letter-names." — see the utterance-id
+rule near the end of this guide): "word.p1.read", "word.p1.correct",
+..., "word.p8.giveAnswer". Per-slot utterance templates for letter-
+names diverge from the cvc-words default — see the per-slot template
+list near the bottom of this guide.
+
+NO SSML / NO PHONEME WRAPPING in letter-names utterance text. Azure
+Speech (en-US-EmmaMultilingualNeural) pronounces the ASCII alphabet
+correctly out of the box — "the letter M" renders as "the letter em"
+without any SSML override. Do NOT wrap individual letters in
+phoneme tags, do NOT use slash-IPA notation, do NOT spell out
+letter names phonetically ("em" / "kyoo" / "double-yoo"). Per
+project_audio_phoneme_overrides memory, defensive SSML wrapping on
+words the engine already handles correctly can DEGRADE pronunciation.
+
+NO LETTER-SOUND TEACHING in letter-names utterance text. Do NOT write
+"M says mmm" or "the letter M makes the mmm sound" or any phoneme-
+association content. This tier teaches GLYPH RECOGNITION (does Marian
+map the shape to the spoken letter name?), NOT phoneme association —
+phoneme association is the next-in-order letter-sounds tier's job.
+Cross-tier scaffolding ahead of the curriculum is OUT OF SCOPE.
+
+WORKED EXAMPLE — a clean 8-problem session that respects all rules
+(use as a template, NOT a verbatim copy — vary letter choices across
+re-bakes):
+   P1=M [CLEAN, upper]      (CLEAN ramp anchor)
+   P2=a [CLEAN, lower]      (CLEAN ramp anchor, lowercase pivot)
+   P3=K [CLEAN, upper]      (CLEAN ramp anchor)
+   P4=S [CLEAN, upper]      (CLEAN, mixed-case bookkeeping)
+   P5=O [CIRCLE-FAMILY, upper]   (first non-CLEAN target, gentle trap)
+   P6=b [CIRCLE-STICK, lower]    (CIRCLE-STICK #1, trap window opens)
+   P7=W [DOUBLE-HUMP, upper]     (rotation-pair trap)
+   P8=d [CIRCLE-STICK, lower]    (CIRCLE-STICK #2 — at cap)
+Counts: CIRCLE-STICK=2 (at cap), CLEAN=4 (at floor), uppercase=4,
+lowercase=4. P1-P3 all CLEAN. P6-P8 has 2 CIRCLE-STICK items (b, d) —
+satisfies "at least 1 b/d/p/q in trap window" with one to spare. No
+duplicates. This is the canonical mix the directive is designed to
+produce.
+
+</drift-guard>
+
 GRADUATION-SESSION EXCEPTION: when the user message contains the
 "GRADUATION SESSION" directive, that directive supplies an additional
 NOVEL pool of words (e.g. nap, rat, map, tap) to be mixed with the
@@ -1771,6 +1949,17 @@ Per-problem utterance template — the read line varies by focus node;
 all other slots are content-mode-agnostic:
 
 - read (varies by focus skill node):
+    - letter-names: "Tap the letter <NAME>." e.g. "Tap the letter M."
+      The <NAME> substitution is the SINGLE-CHARACTER LETTER GLYPH
+      itself with its case preserved (uppercase M for an uppercase
+      target; lowercase b for a lowercase target). Do NOT spell out
+      the letter-name phonetically (no "em", "kyoo", "double-yoo").
+      Azure renders "the letter M" as "the letter em" natively — see
+      the NO SSML / NO PHONEME WRAPPING rule above. The chip Marian
+      taps shows the SAME case as the glyph in the read line; chip
+      case discipline is the screen's responsibility, but the
+      directive's read-line + correct utterance MUST be internally
+      consistent on case.
     - blending-cv: "Tap the <word>." e.g. "Tap the cat."
     - cvc-words:   "Read the <word>." e.g. "Read the cat."
     - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."
@@ -1780,13 +1969,21 @@ all other slots are content-mode-agnostic:
     - digraphs-sh: "Read the <word>." e.g. "Read the ship."
     - digraphs-ch: "Read the <word>." e.g. "Read the chin."
     - digraphs-th-voiceless: "Read the <word>." e.g. "Read the thin."
-  Use lowercase target word; one short sentence; ends with a period.
-  Use the EXACT verb for the focus node — "Tap" for blending-cv,
-  "Read" for cvc-words / cvc-words-short-o / cvc-words-short-u /
-  cvc-words-short-i / cvc-words-short-e / digraphs-sh / digraphs-ch /
+  For non-letter-names tiers: use lowercase target word; one short
+  sentence; ends with a period. Use the EXACT verb for the focus
+  node — "Tap" for blending-cv AND letter-names, "Read" for cvc-words
+  / cvc-words-short-o / cvc-words-short-u / cvc-words-short-i /
+  cvc-words-short-e / digraphs-sh / digraphs-ch /
   digraphs-th-voiceless.
   Do not mix templates within a single plan.
-- correct: default template is "Yes! That's a <word>." (lowercase target
+- correct (letter-names tier): "Yes! That's the letter <NAME>." e.g.
+  "Yes! That's the letter M." — uses the SAME case-preserved
+  single-character <NAME> as the read line. NEVER use the
+  "Yes! That's a <word>." article-led default for letter-names —
+  letters are not nouns. The "letter" word in the template is what
+  carries the grammatical role; the case of <NAME> is preserved from
+  the read line.
+- correct (all other word-song tiers): default template is "Yes! That's a <word>." (lowercase target
   after the article) e.g. "Yes! That's a cat."
   EXCEPTION — chip words that cannot take an indefinite article
   (relational nouns: mom, dad; mass nouns: jam, gum; adjectives: hot,
@@ -1815,9 +2012,16 @@ all other slots are content-mode-agnostic:
   renders naturally. The bare "Yes! <Word>." template triggered
   list-final / declarative-tag intonation (clipped sound) regardless
   of final phoneme class.
-- reprompt: "Hmm... try again?"  (verbatim — do not vary)
-- hint: "Let's look. <Word>." e.g. "Let's look. Cat."
-- giveAnswer: "This one is <word>." e.g. "This one is cat."
+- reprompt: "Hmm... try again?"  (verbatim — do not vary; SAME for
+  letter-names and every other word-song tier)
+- hint (letter-names tier): "Let's look. <NAME>." e.g.
+  "Let's look. M." — <NAME> case-preserved from the read line.
+- hint (all other word-song tiers): "Let's look. <Word>." e.g.
+  "Let's look. Cat."
+- giveAnswer (letter-names tier): "This one is the letter <NAME>."
+  e.g. "This one is the letter M." — <NAME> case-preserved.
+- giveAnswer (all other word-song tiers): "This one is <word>."
+  e.g. "This one is cat."
 
 Utterance ids — REQUIRED:
 Word-song problem utterance ids ALWAYS use the literal prefix "word.",
