@@ -39,17 +39,19 @@
  *
  * Tests 2–4 are progression invariants the Wave 6C bake unlocks:
  *
- *   - Test 2 (rendered-operand range): when the canon is served,
- *     rendered addend-a should be ≥ 10 (two-digit first operand per
- *     Kyle's spec §1.1, `design/math/two-digit-addsub-with-regroup-
- *     content.md`). Today on `main`, with canon absent, the screen
- *     falls into `pickStaticSessionPlan(now,
- *     'two-digit-addsub-with-regroup')` which has NO special-case
- *     for the with-regroup focus (only `add-to-20` is special-cased
- *     at `sessionPlans.ts:445-447`) and returns the default
- *     `add-to-10` rotation with operands in [1, 9]. This assertion
- *     is RED on base for the right reason: the wrong-tier fallback
- *     content cannot satisfy a two-digit operand.
+ *   - Test 2 (rendered-operand range): when the canon is served via
+ *     the Wave-6D canon-bytes mock (reading
+ *     `public/canon/math/level-1/two-digit-addsub-with-regroup.json`
+ *     verbatim — add-to-20 PR #283 pattern), rendered addend-a should
+ *     be ≥ 10 in every one of the 8 slots (two-digit first operand
+ *     per Kyle's spec §1.1, `design/math/two-digit-addsub-with-regroup-
+ *     content.md`). The assertion uses ≥ 1 (not all 8) as the
+ *     threshold to survive any §1.1-compliant re-bake that legitimately
+ *     places a single-operand-first slot — the current canon ships
+ *     addend-a ∈ {15, 17, 21, 25, 27, 32, 41, 45} across P1-P8 so the
+ *     assertion holds with full headroom. Pins canon-binding +
+ *     two-digit operand parser handling (PR #287 widening) against
+ *     future drift.
  *
  *   - Test 3 (focus-node-picker transition): seeds every upstream
  *     math node mastered (including `-no-regroup`), asserts
@@ -132,20 +134,23 @@
  *
  *   - `[[testing-and-ci.md §4.1.1d]]` failNetwork tier-asymmetry —
  *     for `focusNode !== 'add-to-20'`, the static fallback is the
- *     add-to-10 rotation. Test 2 was AUTHORED as a RED-on-base render
- *     lever (rendered operand-a < 10 under fallback → fails the ≥ 10
- *     assertion), with the expectation that once Wave 6C baked the
- *     canon Test 2 would flip GREEN. **Kevin's Wave 6C empirical
- *     finding (PR #318 NOF, 2026-05-23) invalidated that expectation:**
+ *     add-to-10 rotation. Test 2 was ORIGINALLY authored as a RED-on-
+ *     base render lever (rendered operand-a < 10 under fallback →
+ *     fails the ≥ 10 assertion) under `failNetwork: true`. Kevin's
+ *     Wave 6C NOF (PR #318, 2026-05-23) caught the spec defect:
  *     `failNetwork: true` aborts `/api/claude` at the Playwright route
  *     layer BEFORE the server-side canon-lookup codepath ever runs, so
- *     the canon being on disk cannot make Test 2 GREEN. The fix is to
- *     upgrade Test 2's mock from `failNetwork` to a canon-bytes mock
- *     that serves the new file (see add-to-20 PR #283 pattern) — this
- *     was deferred to a Wave 6D polish PR. **Until that lands Test 2
- *     is marked `.fixme`** so it neither passes nor fails on CI
- *     (Playwright lists `.fixme` tests separately) and the paired
- *     merge of this PR after Wave 6C is safe.
+ *     the canon being on disk could not make Test 2 GREEN. Test 2 was
+ *     marked `.fixme` mid-merge-cascade. **Wave 6D (this PR, ticket
+ *     `86c9y3xu0`) upgrades Test 2's mock to canon-bytes** — reading
+ *     `public/canon/math/level-1/two-digit-addsub-with-regroup.json`
+ *     and serving it verbatim for `track === 'math'` requests, per the
+ *     add-to-20 PR #283 pattern. The mock now exercises the served-
+ *     canon codepath rather than aborting the upstream request, so the
+ *     operand-range assertion lands against real canon content.
+ *     `.fixme` removed; Test 2 is once again a load-bearing assertion.
+ *     The base for this PR is post-Wave-6C `main`, so the canon JSON
+ *     is on disk and Test 2 turns GREEN on first CI run.
  *
  *   - `[[feedback_subagent_premature_completion_fabricated_artifacts]]`
  *     — every PR-claim in the final report is verified via `gh pr
@@ -164,27 +169,32 @@
  *                                          absent); GREEN once Wave 6C
  *                                          bakes the canon.
  *
- *   Test 2 (operand range ≥ 10)          — **DEFERRED to Wave 6D**;
- *                                          marked `.fixme` 2026-05-23
- *                                          per Kevin's PR #318 NOF.
- *                                          Authored as a RED-on-base
- *                                          render lever, but Kevin
- *                                          empirically discovered the
- *                                          spec defect: under
- *                                          `failNetwork: true` the
- *                                          Playwright route aborts
- *                                          BEFORE the server-side
- *                                          canon-lookup codepath ever
- *                                          runs — so the canon being
- *                                          on disk cannot make Test 2
- *                                          GREEN. Fix is to swap the
- *                                          mock from `failNetwork` to
- *                                          a canon-bytes mock per
- *                                          add-to-20 PR #283 pattern.
- *                                          Deferred to Wave 6D polish
- *                                          PR; until then the test is
- *                                          `.fixme` so it neither
- *                                          passes nor fails on CI.
+ *   Test 2 (operand range ≥ 10)          — **Regression-lock**
+ *                                          (upgraded in Wave 6D, ticket
+ *                                          `86c9y3xu0`). Now uses a
+ *                                          canon-bytes mock that serves
+ *                                          `public/canon/math/level-1/
+ *                                          two-digit-addsub-with-regroup
+ *                                          .json` verbatim for
+ *                                          `track === 'math'` requests
+ *                                          (per add-to-20 PR #283
+ *                                          pattern). Every read in the
+ *                                          baked canon has addend-a ≥
+ *                                          12 per Kyle's spec §1.1
+ *                                          pool envelope; the
+ *                                          assertion holds against any
+ *                                          §1.1-compliant re-bake. The
+ *                                          original `failNetwork: true`
+ *                                          shape was a spec defect
+ *                                          discovered by Kevin's PR
+ *                                          #318 NOF (route abort fires
+ *                                          BEFORE the canon-lookup
+ *                                          codepath), now resolved.
+ *                                          Pins the with-regroup canon
+ *                                          binding + the parser's
+ *                                          two-digit operand handling
+ *                                          (PR #287 widening) against
+ *                                          future drift.
  *
  *   Test 3 (picker lands on -with-regroup) — **Regression-lock**.
  *                                          PR #308 already shipped
@@ -231,7 +241,8 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { existsSync } from 'node:fs'
+import type { Page, Route } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
@@ -276,6 +287,90 @@ const TWO_DIGIT_ADDSUB_WITH_REGROUP_CANON_PATH = resolve(
   process.cwd(),
   'public/canon/math/level-1/two-digit-addsub-with-regroup.json',
 )
+
+// ── Canon-bytes mock (Wave 6D — for Test 2 only) ────────────────────────
+//
+// Test 2's mock was upgraded from `installClaudeMock(failNetwork: true)`
+// to this canon-bytes pattern (per `[[feedback_failing_first_must_prove_
+// green]]` + Kevin's PR #318 NOF). Modelled on `installAddToTwentyCanon
+// ClaudeMock` in `e2e/add-to-20.spec.ts` (PR #283).
+//
+// Behaviour:
+//   - `track === 'math'` → serve `two-digit-addsub-with-regroup.json`
+//     verbatim (regardless of `focusNode`). Test 2's seed lands the
+//     picker on `'two-digit-addsub-with-regroup'` so the canon shape
+//     matches the request.
+//   - `track === 'word-song'` → 500 loudly. App.tsx catches and
+//     falls through to silent caption-walk on Hub's pre-warm fetch —
+//     same behaviour the production word-song path takes on any
+//     outage, and doesn't affect Hub → Math navigation.
+//   - `OPTIONS` preflight → 204.
+//
+// Tests 1, 3, 4 deliberately keep `installClaudeMock(page,
+// { failNetwork: true })` — their assertions are structural (canon-
+// existence, persisted-progress shape, history attribution) and do
+// NOT depend on the served-canon codepath running. The canon-bytes
+// upgrade applies to Test 2 alone.
+function readMathCanon(path: string): string {
+  if (!existsSync(path)) {
+    throw new Error(
+      `[with-regroup spec] canon not found at ${path}. ` +
+        `This canon is required for the Test 2 canon-bytes mock; do ` +
+        `NOT swap to a silent-MP3 placeholder — per testing-and-ci.md ` +
+        `§4.1.2 + §4.1.3 rule 3 the placeholder also fails decode under ` +
+        `the stub-ctx, falls back to the static add-to-10 rotation, and ` +
+        `silently masks the regression. Wave 6C (PR #318) bakes this ` +
+        `file; if the file is missing here, base-branch state has ` +
+        `regressed.`,
+    )
+  }
+  return readFileSync(path, 'utf-8')
+}
+
+async function installWithRegroupCanonClaudeMock(page: Page): Promise<void> {
+  const canonBody = readMathCanon(TWO_DIGIT_ADDSUB_WITH_REGROUP_CANON_PATH)
+  await page.route('**/api/claude', async (route: Route) => {
+    const req = route.request()
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    let body: Record<string, unknown>
+    try {
+      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
+    } catch {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: '{}',
+      })
+      return
+    }
+    const payload = (body.payload ?? {}) as Record<string, unknown>
+    const track = payload.track as string | undefined
+    if (track === 'math') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: canonBody,
+      })
+      return
+    }
+    // word-song or unknown track — 500 loudly. App.tsx catches and
+    // falls through to silent caption-walk; doesn't affect Hub → Math.
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: false,
+        error: 'unexpected-track',
+        message:
+          `with-regroup Test 2 canon-bytes mock is math-only; saw ` +
+          `track=${String(track)}`,
+      }),
+    })
+  })
+}
 
 // ── Helpers (math session walk, picker seed) ────────────────────────────
 
@@ -413,67 +508,97 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
     ).toBe(true)
   })
 
-  // ── Test 2 — DEFERRED to Wave 6D (marked .fixme) ───────────────────
+  // ── Test 2 — Regression-lock via canon-bytes mock (Wave 6D upgrade) ─
   //
-  // **Why .fixme:** Kevin's Wave 6C bake (PR #318) discovered a
-  // structural spec defect in this test. The test was authored as a
-  // RED-on-base render lever — under `installClaudeMock(failNetwork:
-  // true)` the screen was expected to fall into the add-to-10 static
-  // rotation (operands ∈ [1, 9]) per `testing-and-ci.md §4.1.1d`,
-  // failing the `addend-a >= 10` assertion. The expectation was that
-  // once Wave 6C baked the canon, the served-canon path would deliver
-  // two-digit operands and Test 2 would flip GREEN.
+  // **History — `.fixme` removed in Wave 6D.** This test was originally
+  // authored under `installClaudeMock(page, { failNetwork: true })` as
+  // a RED-on-base render lever (under failNetwork the screen falls
+  // into the add-to-10 static rotation with operands ∈ [1, 9], failing
+  // the `addend-a ≥ 10` assertion). Kevin's PR #318 NOF (2026-05-23)
+  // caught the spec defect: `failNetwork: true` aborts the
+  // `/api/claude` request at the Playwright route layer BEFORE the
+  // server-side canon-lookup codepath runs. So even after Wave 6C
+  // baked the canon on disk, the test could not turn GREEN under
+  // failNetwork. Test 2 was marked `.fixme` mid-merge-cascade.
   //
-  // **Kevin's empirical finding (PR #318 NOF, 2026-05-23):**
-  // `failNetwork: true` aborts the `/api/claude` request at the
-  // Playwright route layer. The canon-lookup logic lives **server-
-  // side** inside the `/api/claude` function handler — an aborted
-  // request never reaches that codepath. So no matter how correctly
-  // Wave 6C bakes the canon, this assertion cannot turn GREEN under
-  // the current mock shape.
+  // **Wave 6D fix (this PR, ticket `86c9y3xu0`):** swap the mock from
+  // `installClaudeMock(failNetwork: true)` to
+  // `installWithRegroupCanonClaudeMock(page)` — a canon-bytes mock
+  // that reads `public/canon/math/level-1/two-digit-addsub-with-
+  // regroup.json` and serves it verbatim for `track === 'math'`
+  // requests, modelled on add-to-20 PR #283's
+  // `installAddToTwentyCanonClaudeMock`. The mock now exercises the
+  // served-canon codepath, so the operand-range assertion is grounded
+  // in real canon content.
   //
-  // **Wave 6D fix:** swap the mock from `failNetwork: true` to a
-  // canon-bytes mock that serves the new tier's canon JSON directly
-  // from the Playwright route (see add-to-20 PR #283 pattern). That
-  // mocks the canon-serving codepath rather than aborting the
-  // upstream request, making the assertion actually exercise the
-  // canon-rendered operand range.
+  // **`forceHowlerUnlock` intentionally NOT called** — per
+  // `[[testing-and-ci.md §4.1.2]]` + `[[feedback_force_howler_unlock_
+  // demote_extension]]` the helper silently demotes the canon-bytes
+  // path to the static-fallback plan, masking the very regression this
+  // test guards. Real Azure-rendered MP3 bytes from the on-disk canon
+  // decode cleanly under the genuine gesture-unlock chain in headless
+  // chromium.
+  //
+  // **Classification.** Now a **regression-lock**. Every read in the
+  // current canon (P1-P8 addend-a = {15, 17, 21, 27, 32, 25, 41, 45})
+  // satisfies addend-a ≥ 10. The threshold is "≥ 1 of 8" (not "all 8")
+  // to survive any §1.1-compliant re-bake that legitimately places a
+  // single-operand-first variant. Pins the canon binding + the
+  // PR #287 parser-widening for hyphenated two-digit number words
+  // ("twenty-one", "forty-five") against future drift — a regression
+  // that breaks the parser would cause silent demote to the
+  // add-to-10 fallback (operands ∈ [1, 9]) and this assertion would
+  // fail loudly per `[[planner-and-canon.md "silent wrong-tier
+  // misrender"]]`.
   //
   // **References:**
   //   - PR #318 (Wave 6C canon bake) — Kevin's NOF that discovered
-  //     this defect
-  //   - PR #283 (add-to-20 add-to-mock-canon pattern) — the mock
-  //     pattern Wave 6D will adopt here
-  //   - `testing-and-ci.md §4.1.1d` — failNetwork tier-asymmetry
-  //     (the load-bearing context Kevin's finding extends)
-  //
-  // **CI impact of `.fixme`:** Playwright lists `.fixme` tests
-  // separately from PASS/FAIL — they neither pass nor fail the
-  // suite. This unblocks paired-merge of this PR after Wave 6C
-  // (PR #318) without breaking CI on post-6C main.
-  test.fixme('rendered operand range — at least one addend-a ≥ 10 across 8 problems (post-canon-bake)', async ({
+  //     the failNetwork spec defect
+  //   - PR #283 (add-to-20 canon-bytes mock pattern) — the model
+  //     this test now follows
+  //   - `[[testing-and-ci.md §4.1.1d]]` — failNetwork tier-
+  //     asymmetry (the load-bearing context behind the fix)
+  //   - `[[feedback_failing_first_must_prove_green]]` — the memory
+  //     rule documenting why failNetwork mocks cannot exercise
+  //     server-side state
+  test('rendered operand range — at least one addend-a ≥ 10 across 8 problems (canon-bytes mock)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
 
     // 8-problem walk-through; size timeout per `testing-and-ci.md
-    // §4.1.1b` (sessions × ~50s wall + ≥30s headroom).
-    test.setTimeout(180_000)
+    // §4.1.1b` (sessions × ~50s wall + ≥30s headroom). Bumped to 240s
+    // to match the established headroom for chip-walks against real
+    // canon-rendered MP3 decoding (see Test 4).
+    test.setTimeout(240_000)
 
-    await installClaudeMock(page, { failNetwork: true })
+    await installWithRegroupCanonClaudeMock(page)
     await seedLocalStorage(page, {
       progress: buildWithRegroupSeedProgress(),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 
     await page.goto('/')
-    await forceHowlerUnlock(page)
 
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="number-garden"]')
       .click()
     await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
+
+    // Canon-landed gate (per testing-and-ci.md §4.1.2) — wait for
+    // caption to populate before walking. Non-empty caption text
+    // means the read-aloud effect has landed on the canon plan
+    // rather than the static fallback. Avoid pinning specific
+    // caption substring per §6 prose-template-coupled drift.
+    await expect
+      .poll(
+        async () =>
+          ((await page.getByTestId('math-caption').textContent()) ?? '').trim()
+            .length,
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(0)
 
     // Walk all 8 problems, capturing rendered addend-a values.
     const renderedAddendAs: number[] = []
@@ -503,9 +628,10 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
         `a >= 12). Got addend-as: ${JSON.stringify(renderedAddendAs)}. ` +
         `If zero, the screen is rendering the static add-to-10 fallback ` +
         `rotation (operands ∈ [1, 9]) per sessionPlans.ts:441 — which ` +
-        `means the canon is absent OR the parser is rejecting the canon ` +
-        `read-lines and falling through. Both failure modes are the RED ` +
-        `signal Wave 6C resolves.`,
+        `means the canon-bytes mock is not serving (or its 'math' branch ` +
+        `mismatched), the parser is rejecting the canon read-lines, OR ` +
+        `the canon binding broke. All three are the regression class ` +
+        `this test locks against.`,
     ).toBeGreaterThanOrEqual(1)
   })
 
