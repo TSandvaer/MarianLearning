@@ -1643,19 +1643,21 @@ SESSION COMPOSITION RULES block below for tag-driven distractor rules.
 The full pool (do NOT emit any item not in this list):
   Uppercase: A [CLEAN] B [CLEAN] C [CLEAN] D [CLEAN] E [CLEAN]
     F [CLEAN] G [CLEAN] H [CLEAN] I [VERTICAL-STICK] J [CLEAN]
-    K [CLEAN] L [CLEAN] M [DOUBLE-HUMP] N [DOUBLE-HUMP] O [CIRCLE]
-    P [CLEAN] Q [CIRCLE] R [CLEAN] S [CLEAN] T [CLEAN] U [CLEAN]
-    V [CLEAN] W [DOUBLE-HUMP] X [CLEAN] Y [CLEAN] Z [CLEAN]
+    K [CLEAN] L [CLEAN] M [DOUBLE-HUMP] N [DOUBLE-HUMP]
+    O [CIRCLE-FAMILY] P [CLEAN] Q [CIRCLE-FAMILY] R [CLEAN]
+    S [CLEAN] T [CLEAN] U [CLEAN] V [CLEAN] W [DOUBLE-HUMP]
+    X [CLEAN] Y [CLEAN] Z [CLEAN]
   Lowercase: a [CLEAN] b [CIRCLE-STICK] c [CLEAN] d [CIRCLE-STICK]
     e [CLEAN] f [CLEAN] g [CLEAN] h [CLEAN] i [VERTICAL-STICK]
     j [CLEAN] k [CLEAN] l [VERTICAL-STICK] m [DOUBLE-HUMP]
-    n [DOUBLE-HUMP] o [CIRCLE] p [CIRCLE-STICK] q [CIRCLE-STICK]
-    r [CLEAN] s [CLEAN] t [CLEAN] u [DOUBLE-HUMP] v [CLEAN]
-    w [DOUBLE-HUMP] x [CLEAN] y [CLEAN] z [CLEAN]
+    n [DOUBLE-HUMP] o [CIRCLE-FAMILY] p [CIRCLE-STICK]
+    q [CIRCLE-STICK] r [CLEAN] s [CLEAN] t [CLEAN]
+    u [DOUBLE-HUMP] v [CLEAN] w [DOUBLE-HUMP] x [CLEAN]
+    y [CLEAN] z [CLEAN]
 Bands: CIRCLE-STICK (lowercase b/d/p/q — the load-bearing
 trap class, Marian's residual confusion); DOUBLE-HUMP (M/W/N + m/n/u/w);
-CIRCLE (O/Q/o); VERTICAL-STICK (I + i/l/j); CLEAN (everything else —
-the visually-distinct pool).
+CIRCLE-FAMILY (O/Q/o); VERTICAL-STICK (I + i/l/j); CLEAN (everything
+else — the visually-distinct pool).
 
 Pool for blending-cv and cvc-words (14-word short-a CVC):
 ${WORD_SONG_TARGET_WORDS_FOR_PROMPT}
