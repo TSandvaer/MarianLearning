@@ -8,6 +8,14 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 
 <!-- Real entries below this line. Newest at top. -->
 
+## 2026-05-23 1030 UTC — Picked option (c) for Matt's dropped `add_task_dependency` tool gap (revise workflow to drop blocker-relationship pattern)
+
+- **Decided:** Edited `matt.md` line 34 to drop the structured-blocker-relationship pattern in favor of dependency notation in ticket descriptions + brief sequencing. Old text: "If a task needs two disciplines, split it into separate ClickUp tasks with a blocker relationship." New text: split into separate tasks, note `depends on <id>` / `blocks <id>` in each ticket description, dispatch upstream first, re-cite the upstream + link the merged PR in the downstream brief. Parenthetical notes the MCP tool gap explicitly so future re-readers know why the pattern reads differently than the prior structured-blocker convention.
+- **Foundation:** Cross-project handoff entry below (RandomGame orch's 0900 UTC entry) explicitly surfaced three options (a/b/c) and asked MARIAN orch to pick before opening the PR. Empirical foundation: `clickup_add_task_dependency` is gone from the new self-hosted MCP — verified in the commit body of `c11e32c`. Option (a) (Thomas relays the blocker-set manually via web UI) is impractical for sub-agent-driven workflow; option (b) (front via REST API direct) over-engineers for a lightly-used pattern. Option (c) is the minimal-change response that preserves Matt's ability to flag dependencies without depending on a tool that no longer exists.
+- **Alternative:** Surface to Thomas. Rejected because (a) the tool removal is empirical, not strategic; (b) the workflow simplification is mechanical persona-doc maintenance and falls under [[feedback_orchestrator_no_coding]]'s in-lane authoring scope; (c) the change is 1-line, fully revertable. Per orchestrator-autonomy 4-gate framework, this passes reversibility + foundation-citable + not-on-never-list + logged-before-execution.
+- **Reversibility:** 1-line edit on a persona file; revert via single Edit operation. If Thomas prefers option (a) or (b), the PR or a follow-up can change matt.md back.
+- **Status:** pending review.
+
 ## 2026-05-23 0900 UTC — Cross-project handoff: ClickUp MCP tool-name rename pre-staged on branch (PR open NOT done — waiting on MARIAN orch)
 
 - **Decided:** RandomGame orchestrator session (`c:/Trunk/PRIVATE/RandomGame`, 2026-05-23 morning) pre-staged a `chore/agent-tool-surface-mcp-rename` branch in this repo with all five persona files + `dispatch-template.md` renamed to the new self-hosted ClickUp MCP tool names. **Branch is pushed to `origin/chore/agent-tool-surface-mcp-rename` but no PR has been opened** — Thomas's explicit ask was "pre-staged branch ready-to-PR so the MARIAN-TUTOR orchestrator can pick it up."
