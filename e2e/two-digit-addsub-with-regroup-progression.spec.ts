@@ -132,13 +132,20 @@
  *
  *   - `[[testing-and-ci.md §4.1.1d]]` failNetwork tier-asymmetry —
  *     for `focusNode !== 'add-to-20'`, the static fallback is the
- *     add-to-10 rotation. Test 2 explicitly exercises this asymmetry
- *     as the RED-on-base render lever (rendered operand-a < 10 under
- *     fallback → fails the ≥ 10 assertion). Once Wave 6C lands, the
- *     spec author will likely want to upgrade Test 2 from `failNetwork`
- *     to a canon-bytes mock that serves the new file (see add-to-20
- *     PR #283 pattern) — that follow-up is deferred to the Wave 6C
- *     author or a Wave 6D polish PR.
+ *     add-to-10 rotation. Test 2 was AUTHORED as a RED-on-base render
+ *     lever (rendered operand-a < 10 under fallback → fails the ≥ 10
+ *     assertion), with the expectation that once Wave 6C baked the
+ *     canon Test 2 would flip GREEN. **Kevin's Wave 6C empirical
+ *     finding (PR #318 NOF, 2026-05-23) invalidated that expectation:**
+ *     `failNetwork: true` aborts `/api/claude` at the Playwright route
+ *     layer BEFORE the server-side canon-lookup codepath ever runs, so
+ *     the canon being on disk cannot make Test 2 GREEN. The fix is to
+ *     upgrade Test 2's mock from `failNetwork` to a canon-bytes mock
+ *     that serves the new file (see add-to-20 PR #283 pattern) — this
+ *     was deferred to a Wave 6D polish PR. **Until that lands Test 2
+ *     is marked `.fixme`** so it neither passes nor fails on CI
+ *     (Playwright lists `.fixme` tests separately) and the paired
+ *     merge of this PR after Wave 6C is safe.
  *
  *   - `[[feedback_subagent_premature_completion_fabricated_artifacts]]`
  *     — every PR-claim in the final report is verified via `gh pr
@@ -157,20 +164,27 @@
  *                                          absent); GREEN once Wave 6C
  *                                          bakes the canon.
  *
- *   Test 2 (operand range ≥ 10)          — **RED-on-base lever**.
- *                                          Under `failNetwork: true`,
- *                                          the screen falls into the
- *                                          add-to-10 static rotation
- *                                          (operands in [1, 9]).
- *                                          Asserts at least one
- *                                          rendered addend-a is ≥ 10
- *                                          across the 8-problem
- *                                          session. RED today; GREEN
- *                                          once the canon serves
- *                                          real -with-regroup content
- *                                          (every -with-regroup
- *                                          mainline fact has a ≥ 10
- *                                          per spec §1.1).
+ *   Test 2 (operand range ≥ 10)          — **DEFERRED to Wave 6D**;
+ *                                          marked `.fixme` 2026-05-23
+ *                                          per Kevin's PR #318 NOF.
+ *                                          Authored as a RED-on-base
+ *                                          render lever, but Kevin
+ *                                          empirically discovered the
+ *                                          spec defect: under
+ *                                          `failNetwork: true` the
+ *                                          Playwright route aborts
+ *                                          BEFORE the server-side
+ *                                          canon-lookup codepath ever
+ *                                          runs — so the canon being
+ *                                          on disk cannot make Test 2
+ *                                          GREEN. Fix is to swap the
+ *                                          mock from `failNetwork` to
+ *                                          a canon-bytes mock per
+ *                                          add-to-20 PR #283 pattern.
+ *                                          Deferred to Wave 6D polish
+ *                                          PR; until then the test is
+ *                                          `.fixme` so it neither
+ *                                          passes nor fails on CI.
  *
  *   Test 3 (picker lands on -with-regroup) — **Regression-lock**.
  *                                          PR #308 already shipped
@@ -195,9 +209,12 @@
  *                                          Pins the mastery rule
  *                                          shape for this tier.
  *
- * At least one RED-on-base lever is required per `jessica.md` Step 2;
- * Tests 1 + 2 both satisfy that requirement. Test 1 is the
- * structurally-cleanest one and the brief's primary ask.
+ * At least one RED-on-base lever is required per `jessica.md` Step 2.
+ * Test 1 (canon-existence) is the structurally-cleanest one and the
+ * brief's primary ask — it remains the load-bearing failing-first
+ * lever. Test 2 was originally a second RED-on-base lever but was
+ * empirically invalidated (see Test 2 classification above); it is
+ * now `.fixme` pending Wave 6D's canon-bytes mock upgrade.
  *
  * ────────────────────────────────────────────────────────────────────
  * Browser engine support
@@ -396,29 +413,45 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
     ).toBe(true)
   })
 
-  // ── Test 2 — RED-on-base rendered-operand range ────────────────────
+  // ── Test 2 — DEFERRED to Wave 6D (marked .fixme) ───────────────────
   //
-  // Asserts that under `installClaudeMock(failNetwork: true)`, AT
-  // LEAST ONE of the 8 rendered problems carries `addend-a >= 10`
-  // (a true two-digit first operand per Kyle's spec §1.1).
+  // **Why .fixme:** Kevin's Wave 6C bake (PR #318) discovered a
+  // structural spec defect in this test. The test was authored as a
+  // RED-on-base render lever — under `installClaudeMock(failNetwork:
+  // true)` the screen was expected to fall into the add-to-10 static
+  // rotation (operands ∈ [1, 9]) per `testing-and-ci.md §4.1.1d`,
+  // failing the `addend-a >= 10` assertion. The expectation was that
+  // once Wave 6C baked the canon, the served-canon path would deliver
+  // two-digit operands and Test 2 would flip GREEN.
   //
-  // Today on `main`, with the canon absent AND no special-case for
-  // `'two-digit-addsub-with-regroup'` in `pickStaticSessionPlan`
-  // (sessionPlans.ts:441-451 — only `add-to-20` is special-cased),
-  // the screen falls back to the default add-to-10 rotation with
-  // operands ∈ [1, 9]. Every rendered addend-a is < 10. The
-  // assertion fails as designed.
+  // **Kevin's empirical finding (PR #318 NOF, 2026-05-23):**
+  // `failNetwork: true` aborts the `/api/claude` request at the
+  // Playwright route layer. The canon-lookup logic lives **server-
+  // side** inside the `/api/claude` function handler — an aborted
+  // request never reaches that codepath. So no matter how correctly
+  // Wave 6C bakes the canon, this assertion cannot turn GREEN under
+  // the current mock shape.
   //
-  // Post-Wave-6C: the screen renders real -with-regroup canon
-  // content; every fact in Kyle's spec §1.4 30-fact pool has
-  // `a >= 12` (smallest pool fact is `12 + 9 = 21` etc.). The
-  // assertion passes.
+  // **Wave 6D fix:** swap the mock from `failNetwork: true` to a
+  // canon-bytes mock that serves the new tier's canon JSON directly
+  // from the Playwright route (see add-to-20 PR #283 pattern). That
+  // mocks the canon-serving codepath rather than aborting the
+  // upstream request, making the assertion actually exercise the
+  // canon-rendered operand range.
   //
-  // Counter to flake risk: the assertion is positive-membership
-  // (`count >= 1`), not negative-membership — per
-  // `testing-and-ci.md §4.1.1e`. Static fallback content is
-  // deterministically single-digit so this is RED on base.
-  test('rendered operand range — at least one addend-a ≥ 10 across 8 problems (post-canon-bake)', async ({
+  // **References:**
+  //   - PR #318 (Wave 6C canon bake) — Kevin's NOF that discovered
+  //     this defect
+  //   - PR #283 (add-to-20 add-to-mock-canon pattern) — the mock
+  //     pattern Wave 6D will adopt here
+  //   - `testing-and-ci.md §4.1.1d` — failNetwork tier-asymmetry
+  //     (the load-bearing context Kevin's finding extends)
+  //
+  // **CI impact of `.fixme`:** Playwright lists `.fixme` tests
+  // separately from PASS/FAIL — they neither pass nor fail the
+  // suite. This unblocks paired-merge of this PR after Wave 6C
+  // (PR #318) without breaking CI on post-6C main.
+  test.fixme('rendered operand range — at least one addend-a ≥ 10 across 8 problems (post-canon-bake)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
