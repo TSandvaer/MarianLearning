@@ -3044,21 +3044,18 @@ export function assertTwoDigitAddsubCompositionClean(
  * NOTE: this set is EXPORTED but not yet referenced by any in-tree lint
  * pass — canon JSON does not carry per-problem distractor-class metadata
  * (it lives on `Progress.history` shipped to `/api/claude` session-end,
- * not on the static canon envelope). PR B activates the binding once a
- * concrete consumer surfaces; PR A's job is to fix the schema-level
- * naming surface so the transition is reversible.
- *
- * TODO Wave 5 PR B: remove Wave-4-style names; lock to Dave's names once
- * Kyle's spec-amendment PR merges (ticket TBD).
+ * not on the static canon envelope). The schema-level enum is locked to
+ * Dave's canonical post-pivot names; the Wave-4-style transitional
+ * literals (`columnCrossDistractor`, `phantomBorrowDistractor`) are
+ * retired post-Wave-6C since the helpers in
+ * `src/screens/Math/distractors.ts` are unbuilt and no in-tree consumer
+ * referenced the transitional names.
  */
 export const KNOWN_DISTRACTOR_CLASSES = new Set([
   // Dave's names (canonical post-pivot)
   'forgottenCarryDistractors',
   'smallerFromLargerDistractors',
   'borrowNoDecrementDistractors',
-  // Wave-4-style names (transitional, removed in PR B)
-  'columnCrossDistractor',
-  'phantomBorrowDistractor',
 ])
 
 export type TwoDigitAddsubWithRegroupBand = 'EASY' | 'MEDIUM' | 'HARD'
