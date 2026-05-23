@@ -259,7 +259,14 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // `design/word-song/digraphs-th-word-list.md` §1 (reconciled against
 // Dave's digraph-th-addendum §3f). Like digraphs-sh, the th tier has
 // hybridMode words (`thick`, `cloth`).
+// Wave 7 Track A3 (ticket 86c9y4983) added `letter-names` — the FIRST
+// literacy tier in WORD_SONG_NODES_IN_ORDER — as a first-class baked
+// tier. The tier ships ZERO picture-pack assets (letter glyphs are
+// rendered as text in the chip frame, no `picture-{word}.svg`
+// pipeline). See `design/word-song/letter-names-content.md` (Kyle A1) +
+// `WORD_SONG_TRACK_GUIDE` letter-names block (Dave A2, PR #329).
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
+  'letter-names',
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',

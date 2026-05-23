@@ -639,8 +639,19 @@ function defaultFocusNodeForTrack(track: PlannerTrack): string {
  * — `thick` (double-digraph `th` + `ck`) and `cloth` (`/kl/` onset
  * blend) — so it REUSES the sh-tier hybridMode problem-type gate
  * (Dave th-addendum §3e / §3f, Kyle spec §6.2).
+ *
+ * Wave 7 Track A3 (ticket 86c9y4983) added `letter-names` as the FIRST
+ * literacy tier to go first-class (it sits at the head of
+ * WORD_SONG_NODES_IN_ORDER before letter-sounds / blending-cv). The
+ * tier ships zero picture-pack assets — letter glyphs are rendered as
+ * text in the chip frame — so the bake adds only a canon JSON + this
+ * literal addition + the iteration-set update in
+ * `scripts/generateSessionCanon.ts`. See
+ * `design/word-song/letter-names-content.md` (Kyle A1) +
+ * `WORD_SONG_TRACK_GUIDE` letter-names block (Dave A2, PR #329).
  */
 const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
+  'letter-names',
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
@@ -655,12 +666,13 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
 /**
  * Resolve the focus node the planner actually generates for. Math honours
  * caller-supplied focusNode verbatim. Word-song honours first-class nodes
- * (`blending-cv`, `cvc-words`, the four short-vowel sibling tiers,
- * `digraphs-sh`, `digraphs-ch`, and `digraphs-th-voiceless`);
- * valid-but-unsupported nodes (`letter-sounds`, `sight-words`,
- * `simple-sentences`) fall back to `blending-cv` content as a stub — the
- * screen always renders, even on tiers we haven't tuned yet. See
- * `WORD_SONG_TRACK_GUIDE` for the prompt-side handling.
+ * (`letter-names`, `blending-cv`, `cvc-words`, the four short-vowel
+ * sibling tiers, `digraphs-sh`, `digraphs-ch`, and
+ * `digraphs-th-voiceless`); valid-but-unsupported nodes
+ * (`letter-sounds`, `sight-words`, `simple-sentences`) fall back to
+ * `blending-cv` content as a stub — the screen always renders, even on
+ * tiers we haven't tuned yet. See `WORD_SONG_TRACK_GUIDE` for the
+ * prompt-side handling.
  *
  * Validation (`generateSessionPlan` above) still rejects an invalid
  * cross-track or unknown focusNode for word-song before reaching here —
