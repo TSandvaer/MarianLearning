@@ -126,7 +126,7 @@
 
 // Wave 5 PR B (ticket 86c9y1p99, 2026-05-22) — the previous `test.fixme`
 // wrapper is removed. The math session-end population wiring now lives in
-// Math.tsx (perProblemDistractorClassRef + buildChipOrderWithClass) →
+// Math.tsx (perProblemDistractorClassRef + buildChipOrder's offeredClass) →
 // App.tsx (handleMathComplete forwards onto SessionEndPayload) →
 // SessionEnd.tsx (forwards to recordProgressOnSessionEnd). The schema
 // guard + persistence in `progressHistory.ts` already shipped via the

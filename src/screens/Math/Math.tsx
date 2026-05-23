@@ -897,11 +897,11 @@ function MathScreen({
    *   - `'off-by-one' | 'wrong-op' | 'decade-anchor' | 'forgotten-carry'
    *      | 'smaller-from-larger' | 'borrow-no-decrement'` for P4–P8 —
    *     the offered class captured at chip-render time by
-   *     `buildChipOrderWithClass` (planner hint when set; otherwise the
+   *     `buildChipOrder` (planner hint when set; otherwise the
    *     per-tier focus-node default).
    *
    * Written via a `useEffect` keyed on `problemIndex` so the entry
-   * mirrors the current `chipOrderWithClass.distractorClass`. Once
+   * mirrors the current `chipOrderWithClass.offeredClass`. Once
    * written, the slot is stable for the rest of the session — the class
    * is positional / tap-outcome-independent (a wrong-then-correct retry
    * leaves the slot unchanged because capture fires at chip-render, not
@@ -1661,8 +1661,9 @@ function MathScreen({
         // Per-problem OFFERED distractor class (Kevin Wave 5 PR B —
         // ticket 86c9y1p99). Sliced for the same mutation-safety reason.
         // See `MathSessionResult.perProblemDistractorClass` for the
-        // schema contract and `buildChipOrderWithClass` for the per-tier
-        // resolution rules.
+        // schema contract and `buildChipOrder` for the per-tier
+        // resolution rules (the class is surfaced via the function's
+        // `offeredClass` return field).
         perProblemDistractorClass: perProblemDistractorClassRef.current.slice(),
         // Subitising scaffold exposure (ticket 86c9ur1zr §2.2). True
         // iff the overlay rendered for at least one in-scope problem
@@ -2983,7 +2984,8 @@ function SparkleBurst() {
  * the slot unchanged because capture fires at chip-render time, not at
  * chip-tap time.
  *
- * The screen captures this via `buildChipOrderWithClass` and writes the
+ * The screen captures this via `buildChipOrder` (returned on the
+ * `offeredClass` field of `ChipOrderWithClass`) and writes the
  * per-problem array into `perProblemDistractorClassRef`; SessionEnd
  * persists it onto `SessionHistoryEntry.perProblemDistractorClass` for
  * future diagnostic-aware mastery gates. See PR header for the full
@@ -3028,12 +3030,13 @@ export interface ChipOrderWithClass {
  * spec §5.4) needs.
  *
  * History: previously split into `buildChipOrder` (values only) +
- * `buildChipOrderWithClass` (class wrapper). Folded in PR #309 NIT 2
- * (ticket 86c9y34xr) to eliminate the parallel-pair duplication Devon
- * flagged in the PR #309 cross-review — both per-tier mappings now live
- * in a single function, captured once and surfaced to the caller via the
- * `offeredClass` field. See `OfferedDistractorClass` for the consumer
- * contract + plumbing.
+ * a thin class-wrapper helper that re-derived the same per-tier
+ * focus-node mapping inline to capture the class label. Folded in
+ * PR #317 (ticket 86c9y34xr) to eliminate the parallel-pair duplication
+ * Devon flagged in the PR #309 cross-review — both per-tier mappings
+ * now live in this single function, captured once and surfaced to the
+ * caller via the `offeredClass` field. See `OfferedDistractorClass`
+ * for the consumer contract + plumbing.
  */
 function buildChipOrder(
   problem: MathProblem,
