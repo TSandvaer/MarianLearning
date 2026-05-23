@@ -324,7 +324,7 @@ export interface MathSessionResult {
    *     wrong-then-correct retry leaves the slot unchanged.
    *
    * Captured via `perProblemDistractorClassRef` in Math.tsx, which an
-   * effect keyed on `(problemIndex, chipOrderWithClass.distractorClass)`
+   * effect keyed on `(problemIndex, chipOrderWithClass.offeredClass)`
    * writes whenever a new chip set renders for the active problem.
    *
    * Length matches `plan.problems.length`. The consumer
