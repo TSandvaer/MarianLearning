@@ -930,7 +930,7 @@ export const MATH_TRACK_GUIDE = `Track: Math.
 The user message names a focus skill node. Generate problems specifically for that node. The full math focus-node menu is:
 
 - number-recog: number recognition. Say a numeral, child taps it. Numerals 1-10. read: "Tap the <number>." e.g. "Tap the five."
-- add-to-10: addition with sums 3-10. Both addends 1-9. read: "<addend-A> plus <addend-B>. How many?" e.g. "Three plus two. How many?" Prefer bridge-through-5 (3+2, 4+3), easy doubles (2+2, 4+4), and small near-doubles. Sums must be <= 10.
+- add-to-10: addition with sums 3-10. Both addends 1-9. <drift-guard>RULE_IDENTITY=add-to-10-composition; SPEC=design/math/add-to-10-content.md§2; LINT=scripts/compositionLint.ts:704 (ADD_TO_TEN_RULES) + 594 (ADD_TO_TEN_POOL) + 764 (lintAddToTenComposition). Do NOT rename, re-band, re-cap, or substitute facts under any seed.</drift-guard> read: "<addend-A> plus <addend-B>. How many?" e.g. "Three plus two. How many?" Prefer bridge-through-5 (3+2, 4+3), easy doubles (2+2, 4+4), and small near-doubles. Sums must be <= 10.
 
   FACT POOL (44 facts; pick exactly 8 distinct ordered pairs from this pool per session; commutative pairs are DISTINCT facts — "2+3" and "3+2" are separate pool entries). Each fact maps to EXACTLY ONE category per the priority order sums-to-10 -> doubles -> plus-one -> near-doubles -> general:
   - EASY band (sum 3-5; 9 facts):
@@ -947,18 +947,41 @@ The user message names a focus skill node. Generate problems specifically for th
     · plus-one: 1+8, 8+1
     · near-doubles: 4+5, 5+4
     · general: 2+7, 7+2, 3+6, 6+3
-  POOL-MEMBERSHIP SELF-CHECK: before emitting each problem, verify the chosen (a, b) ordered pair appears verbatim above. Sums below 3 or above 10 are FORBIDDEN; neither addend may be 0; neither addend may exceed 9.
+  POOL-MEMBERSHIP SELF-CHECK <rule band="hard">apply before emitting every problem</rule>: verify the chosen (a, b) ordered pair appears verbatim above. Sums below 3 or above 10 are FORBIDDEN; neither addend may be 0; neither addend may exceed 9. <self-check>If a candidate (a, b) is NOT on the 44-pair list — e.g. 0+3, 5+6 (sum > 10), or 4+4 read as a sum-9 fact — REJECT and re-pick from the pool above.</self-check>
 
-  SESSION COMPOSITION RULES (apply IN ORDER):
+  CATEGORY-MIX BUDGET <rule band="hard">apply BEFORE selecting any facts — this is the FIRST rule because Haiku's prior empirically saturates ONE category at a time when the cap is buried late in the rule list</rule>:
+     · sums-to-10:   AT MOST 2. (Pool has 9 facts: 1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5. High-leverage anchor — Marian's diagnostic flags this category as top priority — but doubles + plus-one + general MUST also fit in the 8-slot session.)
+     · doubles:      AT MOST 2. (Pool has 3 facts: 2+2, 3+3, 4+4 — 5+5 is sums-to-10 by category priority. Doubles-prior is the EMPIRICALLY-OBSERVED failure mode for add-to-10 — see FAILURE MODES below.)
+     · plus-one:     AT MOST 2. (Pool has 14 facts: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 1+5, 5+1, 1+6, 6+1, 1+7, 7+1, 1+8, 8+1. Largest category by pool size — STRUCTURAL saturation risk if discriminate-tier loses headroom.)
+     · near-doubles: AT MOST 3. (Pool has 6 facts: 2+3, 3+2, 3+4, 4+3, 4+5, 5+4. Slightly relaxed cap because the doubles-plus-one derivation IS a productive bridge strategy.)
+     · general:      AT MOST 2. (Pool has 12 facts: 2+4, 4+2, 2+5, 5+2, 2+6, 6+2, 3+5, 5+3, 2+7, 7+2, 3+6, 6+3. Retrieval-pathway facts; ≤2 keeps focus on the structured categories.)
+  The five caps SUM TO 11; an 8-slot session has 3 slots of slack. Pick a category layout that respects ALL FIVE caps BEFORE assigning facts to slots — typical layouts are (1 plus-one + 1 doubles + 2 near-doubles + 2 sums-to-10 + 2 general) or (2 plus-one + 2 doubles + 1 near-doubles + 2 sums-to-10 + 1 general). <self-check>After selecting all 8 facts, count facts in each category. If ANY count exceeds its cap, REJECT and SWAP the surplus for a fact in a different (under-cap) category at that slot.</self-check>
+  FAILURE MODES BOTH WAYS — the EMPIRICALLY-OBSERVED failure during PR #266 attempts 1 + 2 was the doubles-prior (full doubles trifecta: 2+2 + 3+3 + 4+4 in the same session — composition-lint caught both bakes pre-disk). The LATENT failure mode is plus-one-saturation — the plus-one pool is the LARGEST (14 facts) and Haiku's attention drifts there when other caps bind. The cap on EACH category corrects ONE failure mode; do NOT max one category at the expense of the others.
+
+  WORKED EXAMPLE — a clean 8-problem session that respects ALL caps (use this as a template, NOT a verbatim copy):
+     P1=1+2 [EASY/plus-one]      (plus-one #1; EASY ramp anchor — counting-on-one is the easiest retrieval path)
+     P2=2+2 [EASY/doubles]       (doubles #1 — opens the doubles budget early; doubles strategy anchor)
+     P3=3+2 [EASY/near-doubles]  (near-doubles #1; bridges to doubles-plus-one — end of gentle ramp)
+     P4=2+4 [MEDIUM/general]     (general #1; first discriminate-tier problem at MEDIUM — HARD still forbidden at P4)
+     P5=4+4 [MEDIUM/doubles]     (doubles #2 — AT CAP; doubles-prior anchor satisfied)
+     P6=5+5 [HARD/sums-to-10]    (sums-to-10 #1 — the make-10 anchor, highest-leverage fact in the pool)
+     P7=3+7 [HARD/sums-to-10]    (sums-to-10 #2 — AT CAP; second make-10 fact)
+     P8=4+5 [HARD/near-doubles]  (near-doubles #2; doubles-plus-one derivation in HARD band)
+  Counts: plus-one=1 (under cap of 2), doubles=2 (AT CAP), near-doubles=2 (under cap of 3), sums-to-10=2 (AT CAP), general=1 (under cap of 2). Total = 8. EASY at P1-P3, MEDIUM at P4-P5, HARD at P6-P8. Sums-to-10 coverage in P4-P8 satisfied with 2 (P6, P7). No duplicates. This is the canonical mix-and-spacing the directive is designed to produce.
+
+  SESSION COMPOSITION RULES (apply IN ORDER, AFTER the CATEGORY-MIX BUDGET above):
   1. Problems 1-3 (gentle ramp): EXCLUSIVELY EASY-band facts (sum 3-5). Read each fact's band before placing it at P1, P2, or P3. ONLY the 9 EASY-band facts above are eligible for these slots.
   2. NEGATIVE ANCHOR — P1, P2, P3 PLACEMENT BANS (any one of these is a hard rule violation):
      · DO NOT place any MEDIUM-band fact (sum 6-8) at P1, P2, or P3. MEDIUM-band only appears at P4 or later.
      · DO NOT place any HARD-band fact (sum 9-10) at P1, P2, or P3. HARD-band only appears at P5 or later.
      · The ONLY facts allowed at P1, P2, P3 are: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 2+2, 2+3, 3+2.
   3. Problems 4-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and avoid HARD-band sums-to-10; high score (>= 0.85) -> push into HARD and ensure a sums-to-10 anchor; mid score -> balanced mix. HARD-band facts (sum 9-10) appear at P5 or later only.
-  4. At least one sums-to-10 fact (1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5) MUST appear somewhere in problems 4-8. This is the highest-leverage category — Marian's April diagnostic flags sums-to-10 automaticity as the top priority; it bridges to add-to-20's make-10 mental model.
+  4. HIGH-LEVERAGE COVERAGE RULE <rule band="hard">: at least one sums-to-10 fact (1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5) MUST appear somewhere in problems 4-8. This is the highest-leverage category — Marian's April diagnostic flags sums-to-10 automaticity as the top priority; it bridges to add-to-20's make-10 mental model. <self-check>Scan P4, P5, P6, P7, P8. If zero have category=sums-to-10, REJECT and SWAP one P4-P8 fact for a sums-to-10 fact (respecting the sums-to-10 cap of 2 and band-by-slot rules — sums-to-10 facts are HARD band, so they fit P5-P8 only).</self-check>
   5. NO duplicate (a, b) ordered pairs within the 8-problem set. "2+3" and "3+2" are NOT duplicates — they are distinct ordered pairs.
-  6. Category caps (across the 8-problem session): at most 2 doubles, at most 2 plus-one, at most 3 near-doubles, at most 2 sums-to-10, at most 2 general. Each fact maps to exactly one category per the priority order above.
+  6. DOUBLES-CAP SELF-CHECK <rule band="hard">re-statement of CATEGORY-MIX BUDGET above</rule>: AT MOST TWO problems across the 8-problem session may carry the doubles category (drawn from {2+2, 3+3, 4+4}). CATEGORY-CARVE-OUT — 5+5 is sums-to-10 by priority, NOT doubles; do NOT count 5+5 toward the doubles cap. Before emitting a third doubles fact, REJECT it. NEGATIVE ANCHOR: it is FORBIDDEN to place 2+2 AND 3+3 AND 4+4 in the same session (the full doubles trifecta — known failure mode per PR #266 attempts 1-2, both bakes shipped all three before composition-lint caught them). <self-check>After placing all 8 facts, count {2+2, 3+3, 4+4} occurrences. If > 2, REJECT and SWAP the surplus for a sums-to-10 or near-doubles fact at the same slot.</self-check>
+  7. SUMS-TO-10-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST TWO problems across the 8-problem session may carry the sums-to-10 category (drawn from {1+9, 9+1, 2+8, 8+2, 3+7, 7+3, 4+6, 6+4, 5+5}). Before emitting a third sums-to-10 fact, REJECT it. This cap interacts with the HIGH-LEVERAGE COVERAGE RULE above: place EXACTLY 1 or 2 sums-to-10 facts in P5-P8; never 0 (violates coverage rule), never 3+ (violates this cap).
+  8. PLUS-ONE-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST TWO problems across the 8-problem session may carry the plus-one category. The plus-one pool is the LARGEST (14 facts: 1+2, 2+1, 1+3, 3+1, 1+4, 4+1, 1+5, 5+1, 1+6, 6+1, 1+7, 7+1, 1+8, 8+1) so Haiku's attention drifts there when other caps bind — this cap is load-bearing against plus-one-saturation. Before emitting a third plus-one fact, REJECT it.
+  9. Category caps (across the 8-problem session — restatement of CATEGORY-MIX BUDGET for cross-reference): at most 2 doubles, at most 2 plus-one, at most 3 near-doubles, at most 2 sums-to-10, at most 2 general. Each fact maps to exactly one category per the priority order above.
 
   BAND-BY-SLOT (canonical restatement of rules 1-3):
   - EASY (sum 3-5): allowed at any slot P1-P8 (gentle-ramp anchor; also permitted in discriminate-tier as a confidence-preservation fallback when recent score is low).
