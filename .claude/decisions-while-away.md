@@ -8,6 +8,35 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 
 <!-- Real entries below this line. Newest at top. -->
 
+## 2026-05-23 1030 UTC — Picked option (c) for Matt's dropped `add_task_dependency` tool gap (revise workflow to drop blocker-relationship pattern)
+
+- **Decided:** Edited `matt.md` line 34 to drop the structured-blocker-relationship pattern in favor of dependency notation in ticket descriptions + brief sequencing. Old text: "If a task needs two disciplines, split it into separate ClickUp tasks with a blocker relationship." New text: split into separate tasks, note `depends on <id>` / `blocks <id>` in each ticket description, dispatch upstream first, re-cite the upstream + link the merged PR in the downstream brief. Parenthetical notes the MCP tool gap explicitly so future re-readers know why the pattern reads differently than the prior structured-blocker convention.
+- **Foundation:** Cross-project handoff entry below (RandomGame orch's 0900 UTC entry) explicitly surfaced three options (a/b/c) and asked MARIAN orch to pick before opening the PR. Empirical foundation: `clickup_add_task_dependency` is gone from the new self-hosted MCP — verified in the commit body of `c11e32c`. Option (a) (Thomas relays the blocker-set manually via web UI) is impractical for sub-agent-driven workflow; option (b) (front via REST API direct) over-engineers for a lightly-used pattern. Option (c) is the minimal-change response that preserves Matt's ability to flag dependencies without depending on a tool that no longer exists.
+- **Alternative:** Surface to Thomas. Rejected because (a) the tool removal is empirical, not strategic; (b) the workflow simplification is mechanical persona-doc maintenance and falls under [[feedback_orchestrator_no_coding]]'s in-lane authoring scope; (c) the change is 1-line, fully revertable. Per orchestrator-autonomy 4-gate framework, this passes reversibility + foundation-citable + not-on-never-list + logged-before-execution.
+- **Reversibility:** 1-line edit on a persona file; revert via single Edit operation. If Thomas prefers option (a) or (b), the PR or a follow-up can change matt.md back.
+- **Status:** pending review.
+
+## 2026-05-23 0900 UTC — Cross-project handoff: ClickUp MCP tool-name rename pre-staged on branch (PR open NOT done — waiting on MARIAN orch)
+
+- **Decided:** RandomGame orchestrator session (`c:/Trunk/PRIVATE/RandomGame`, 2026-05-23 morning) pre-staged a `chore/agent-tool-surface-mcp-rename` branch in this repo with all five persona files + `dispatch-template.md` renamed to the new self-hosted ClickUp MCP tool names. **Branch is pushed to `origin/chore/agent-tool-surface-mcp-rename` but no PR has been opened** — Thomas's explicit ask was "pre-staged branch ready-to-PR so the MARIAN-TUTOR orchestrator can pick it up."
+- **What changed (5 files, +13/-13):**
+  - `.claude/agents/matt.md` — `tools:` whitelist trimmed (14 tools without equivalents dropped, 10 renamed/remapped) + body API-casing note
+  - `.claude/agents/kevin.md` — `tools:` + 2 body refs
+  - `.claude/agents/devon.md` — `tools:` + 2 body refs
+  - `.claude/agents/dave.md` — `tools:` + 1 body ref
+  - `.claude/agents/dispatch-template.md` — 3 body refs
+- **KNOWN GAP (surface to Thomas before merge):** matt.md line 34 says "If a task needs two disciplines, split it into separate ClickUp tasks with a blocker relationship" — this relied on `clickup_add_task_dependency` which is **gone** from the new MCP. Other dropped Matt tools: `move_task`, `add_tag_to_task`/`remove_tag_from_task`, `get_custom_fields`, `resolve_assignees`, `find_member_by_name`, `get_workspace_hierarchy`, `add_task_link`/`remove_task_link`, `add_task_dependency`/`remove_task_dependency`. Full list + rename mapping in the commit body (`git show chore/agent-tool-surface-mcp-rename`). Matt may need to either (a) set blocker relationships via ClickUp web UI manually, or (b) MARIAN orch fronts the call via a different tool, or (c) revise the workflow doc.
+- **Foundation:** RandomGame's sister PR #336 (https://github.com/TSandvaer/RandomGame/pull/336) — same rename pattern, Devon peer-reviewed APPROVE, merged at SHA `7357bd2` 2026-05-23. The user-scope MCP swap applies to both projects on the same machine, so MARIAN needed the same rename to function. Without this PR, all MARIAN sub-agent personas would have NO usable ClickUp MCP tools at runtime (whitelist references old names that don't resolve against the new server).
+- **What MARIAN orch should do on pickup:**
+  1. Read the commit (`git show chore/agent-tool-surface-mcp-rename`) — full rename mapping + dropped-tools list documented in the body.
+  2. Decide on Matt's dropped-tool gap (3 options listed above) — this is a small-design call, not a code call.
+  3. Open the PR: `gh pr create --title "chore(agents): rename ClickUp MCP tool refs to nsxdavid self-hosted naming" --body <see commit body>`.
+  4. Dispatch Kevin or Devon for peer-review per cross-persona routing rule.
+  5. Merge after APPROVE + CI green.
+- **Alternative:** Have the RandomGame orch open the PR directly. Rejected because (a) MARIAN orch owns final merge gate per cross-project session boundary, (b) MARIAN orch has context on Matt's dropped-tool gap decision that the RandomGame orch lacks, (c) Thomas explicitly requested "pre-staged ... so MARIAN orch can pick it up."
+- **Reversibility:** Branch is pre-staged only. If MARIAN orch (or Thomas) prefers a different naming convention or wants to revise Matt's tool-set, the branch can be force-reset or deleted with no production impact. ~10 min effort.
+- **Status:** PRE-STAGED. Awaiting MARIAN orchestrator PR-open + merge in next MARIAN session.
+
 ## 2026-05-22 1700 UTC — Cancel 4 hung CI runs (partial — 2 of 4 raced to SUCCESS during cancel)
 
 - **Decided:** Issued `gh run cancel` on 4 GitHub Actions runs stuck at "Run e2e suite" step for 2.5+ hours (started 14:28-14:56Z). Targets: 26293677220 (Kevin #302), 26293679103 (Devon #303), 26293751625 (Jessica #304), 26295114187 (post-#301 main push).

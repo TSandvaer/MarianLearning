@@ -28,7 +28,7 @@ When Matt decomposes a Wave (or any multi-PR work batch) into tickets, every tic
 | 86c9xxxxx | <title> | impl/spec/test/investigation | Kevin/Devon/Jessica     | <paths>       |
 ```
 
-**Parallel-fire discipline (mandatory):** once decomposed, Matt files ALL tickets for the Wave in ONE response (parallel `mcp__clickup__clickup_create_task` calls), then surfaces the list back to the orchestrator. The orchestrator then dispatches the workers **in the same orchestrator round** — multiple `Agent` spawns per response — not serially across multiple rounds. Per `feedback_always_parallel_dispatch.md` + 2026-05-23 retune (Pattern H mitigation).
+**Parallel-fire discipline (mandatory):** once decomposed, Matt files ALL tickets for the Wave in ONE response (parallel `mcp__clickup__create_task` calls), then surfaces the list back to the orchestrator. The orchestrator then dispatches the workers **in the same orchestrator round** — multiple `Agent` spawns per response — not serially across multiple rounds. Per `feedback_always_parallel_dispatch.md` + 2026-05-23 retune (Pattern H mitigation).
 
 **Why this matters:** sequential dispatch (Kevin first, wait, Devon second) serializes a workload that has independent tracks. Track-based author splitting at the decomposition step prevents the Pattern H concentration. Wave 5 evidence (post-rule): Kevin authored planner + canon + lint; Devon authored render-side. Lower per-author load + higher parallel throughput.
 
@@ -124,8 +124,8 @@ Per `[[feedback_clickup_status_sync]]` + `[[feedback_clickup_forward_only_defaul
 ```markdown
 **ClickUp lifecycle (paired flips, NOT advisory):**
 
-- **At run-start** (if orchestrator hasn't already flipped): use your persona's `mcp__clickup__clickup_update_task` (Kevin/Devon have read+update; Kyle/Jessica/Dave have read; Matt has full). Flip ticket to **IN PROGRESS** in the same tool round as your first work. If you lack ClickUp MCP, surface the unflipped state in your hand-back so the orchestrator can dispatch Matt.
-- **On PR open** (`gh pr create`): immediately fire `mcp__clickup__clickup_update_task task_id=<ticket> status="IN REVIEW"` in the same response. Or surface to orchestrator for Matt.
+- **At run-start** (if orchestrator hasn't already flipped): use your persona's `mcp__clickup__update_task` (Kevin/Devon have read+update; Kyle/Jessica/Dave have read; Matt has full). Flip ticket to **IN PROGRESS** in the same tool round as your first work. If you lack ClickUp MCP, surface the unflipped state in your hand-back so the orchestrator can dispatch Matt.
+- **On PR open** (`gh pr create`): immediately fire `mcp__clickup__update_task task_id=<ticket> status="IN REVIEW"` in the same response. Or surface to orchestrator for Matt.
 - **Don't lie to the board.** If you can't open the PR (ran into a blocker), don't flip to IN REVIEW — keep it at IN PROGRESS and surface the blocker.
 - **MCP unreachable / no MCP for your persona:** surface the unflipped state explicitly in your hand-back. Orchestrator routes to Matt.
 ```
