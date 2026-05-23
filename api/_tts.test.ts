@@ -329,6 +329,188 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
   })
 })
 
+describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ticket 86c9y49cd)', () => {
+  // Background: PHONEME_OVERRIDES widened from Record<string, string> to
+  // Record<string, { ipa: string; tiers?: readonly string[] }>. Entries
+  // with `tiers` set are tier-scoped and only fire when the caller
+  // passes a matching `tierFilter`. Global entries (no `tiers`) fire on
+  // every call. This guards both the back-compat surface (existing
+  // `four` consumers, no `tier`) and the new tier-scoped surface
+  // (letter-sounds mnemonics like `mmm`, `buh`, `o`).
+
+  it('global `four` override fires regardless of tierFilter (back-compat with pre-Amendment-1 callers)', () => {
+    // Use a sentence WITHOUT any single-letter words like "I" / "a"
+    // because the letter-sounds tier-scoped entries (`a`, `e`, `i`,
+    // `o`, `u`) match single-letter tokens on `\b` boundaries —
+    // a real letter-sounds tier session would never carry such
+    // English prose, but the test must not conflate them.
+    //
+    // No tier passed — pre-Wave-7 shape. Global entries (no `tiers`
+    // field on the entry) must fire; tier-scoped entries do not.
+    expect(applyPhonemeOverrides('We have four cats.')).toBe(
+      'We have <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> cats.',
+    )
+    // letter-sounds tier — `four` is global, still fires.
+    expect(applyPhonemeOverrides('We have four cats.', 'letter-sounds')).toBe(
+      'We have <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> cats.',
+    )
+    // cvc-words tier — `four` is global, still fires.
+    expect(applyPhonemeOverrides('We have four cats.', 'cvc-words')).toBe(
+      'We have <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> cats.',
+    )
+  })
+
+  it('letter-sounds tier-scoped `mmm` mnemonic fires ONLY when tierFilter === "letter-sounds"', () => {
+    const text = 'Which letter says mmm?'
+    // letter-sounds tier — fires.
+    const out = applyPhonemeOverrides(text, 'letter-sounds')
+    expect(out).toContain('<phoneme alphabet="ipa" ph="m">mmm</phoneme>')
+    // No tier — does NOT fire (tier-scoped entries require matching
+    // tier).
+    expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
+    expect(applyPhonemeOverrides(text)).toBe('Which letter says mmm?')
+    // cvc-words tier — does NOT fire (tier-scope mismatch).
+    expect(applyPhonemeOverrides(text, 'cvc-words')).not.toContain('<phoneme')
+  })
+
+  it('letter-sounds tier-scoped `buh` stop-consonant mnemonic fires ONLY in letter-sounds', () => {
+    const text = 'Which letter says buh?'
+    expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
+      '<phoneme alphabet="ipa" ph="b">buh</phoneme>',
+    )
+    expect(applyPhonemeOverrides(text, 'cvc-words')).not.toContain('<phoneme')
+    expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
+  })
+
+  it('letter-sounds tier-scoped vowel mnemonics fire on /ɒ/ /ʌ/ /ɪ/ /ɛ/ /æ/ ONLY in letter-sounds', () => {
+    // Each vowel mnemonic stands alone in the utterance (matching the
+    // letter-sounds read template `"Which letter says <SOUND>?"`).
+    const cases: ReadonlyArray<[string, string]> = [
+      ['Which letter says a?', 'æ'],
+      ['Which letter says o?', 'ɒ'],
+      ['Which letter says u?', 'ʌ'],
+      ['Which letter says i?', 'ɪ'],
+      ['Which letter says e?', 'ɛ'],
+    ]
+    for (const [text, ipa] of cases) {
+      expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
+        `ph="${ipa}"`,
+      )
+      // Without the tier filter, no wrap. The bare letter is preserved.
+      expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
+    }
+  })
+
+  it('does NOT wrap letter `m` inside the word "math" on a cvc-words tier render (the load-bearing pollution test)', () => {
+    // This is the canonical regression scenario for Amendment 1: the
+    // letter-sounds tier scopes the bare-letter mnemonics so they
+    // never fire on CVC-tier utterances. "math" contains `m` as a
+    // word substring (no \b on the right edge against `a`), so `\b`
+    // already excludes the substring case — but the bare mnemonic
+    // `m` is NOT in PHONEME_OVERRIDES (only `mmm` is, with
+    // tiers=letter-sounds), and `mmm` doesn't appear inside "math".
+    // Belt-and-braces: any tier-scoped entry only activates with the
+    // matching tier filter. The CVC-tier render passes "math" through
+    // plain.
+    expect(applyPhonemeOverrides('Read the math.', 'cvc-words')).toBe(
+      'Read the math.',
+    )
+    // letter-sounds tier on the same text: still passes through
+    // because `m` is not a key (only `mmm` is). The crucial
+    // assertion is "no spurious wrap" — letter-sounds tier seeing a
+    // CVC-shaped string does not break it.
+    expect(applyPhonemeOverrides('Read the math.', 'letter-sounds')).toBe(
+      'Read the math.',
+    )
+  })
+
+  it('cvc-words tier render of "Read the dog." passes through plain (bare letter `o` only fires when wrapped in a letter-sounds utterance)', () => {
+    // The bare letter `o` IS a PHONEME_OVERRIDES key (tier-scoped to
+    // letter-sounds). On cvc-words, the tier-filter rejects the entry
+    // and "dog" is rendered as-is. The `\b` boundary would also
+    // protect against substring match (the `o` in "dog" is not on a
+    // word boundary), but tier-scoping is the primary guard.
+    expect(applyPhonemeOverrides('Read the dog.', 'cvc-words')).toBe(
+      'Read the dog.',
+    )
+    // letter-sounds + "Read the dog." would NOT typically appear (the
+    // letter-sounds tier uses different read templates), but the bare
+    // `o` inside "dog" is still substring-boundary-protected by `\b`.
+    expect(applyPhonemeOverrides('Read the dog.', 'letter-sounds')).toBe(
+      'Read the dog.',
+    )
+  })
+
+  it('emits NO wrap on undefined tier for any tier-scoped entry (defense-in-depth — undefined != "letter-sounds")', () => {
+    // Pre-Amendment-1 call shape: no tier passed. Every tier-scoped
+    // entry MUST be filtered out at pattern-build time. This is the
+    // contract that keeps existing /api/claude callers (no `tier`
+    // field) safe under the new shape.
+    const cases = [
+      'Which letter says mmm?',
+      'Which letter says buh?',
+      'Which letter says a?',
+      'Which letter says o?',
+      'Which letter says i?',
+      'Which letter says e?',
+    ]
+    for (const text of cases) {
+      const out = applyPhonemeOverrides(text)
+      expect(out).not.toContain('<phoneme')
+    }
+  })
+
+  it('combines tier-scoped + global wraps in a single utterance (defense-in-depth — both can fire when both match)', () => {
+    // Hypothetical letter-sounds utterance that mentions "four" plus
+    // the mnemonic `mmm`. Both wraps must land. (Not a real
+    // letter-sounds utterance shape; the test pins the composition
+    // contract — global entries do not exclude tier-scoped ones, and
+    // vice versa.)
+    const out = applyPhonemeOverrides('Hear mmm before four.', 'letter-sounds')
+    expect(out).toContain('<phoneme alphabet="ipa" ph="m">mmm</phoneme>')
+    expect(out).toContain('<phoneme alphabet="ipa" ph="fɔːr">four</phoneme>')
+  })
+
+  it('buildSsmlBody passes TtsRequest.tier through to applyPhonemeOverrides (end-to-end Amendment-1 wiring)', () => {
+    // End-to-end: TtsRequest.tier --> buildSsmlBody --> renderSsmlInnerText
+    // --> applyPhonemeOverrides(text, tierFilter). The letter-sounds
+    // mnemonic `mmm` must wrap when the request carries
+    // tier: 'letter-sounds'.
+    const letterSoundsBody = buildSsmlBody({
+      text: 'Which letter says mmm?',
+      voice: 'en-US-EmmaMultilingualNeural',
+      rate: '-10%',
+      pitch: '+0Hz',
+      volume: '+0%',
+      tier: 'letter-sounds',
+    })
+    expect(letterSoundsBody).toContain(
+      '<phoneme alphabet="ipa" ph="m">mmm</phoneme>',
+    )
+    // Same SSML build without tier: the mnemonic stays bare prose
+    // (the SSML is XML-escape-clean and Azure voices it via lexicon).
+    const noTierBody = buildSsmlBody({
+      text: 'Which letter says mmm?',
+      voice: 'en-US-EmmaMultilingualNeural',
+      rate: '-10%',
+      pitch: '+0Hz',
+      volume: '+0%',
+    })
+    expect(noTierBody).not.toContain('<phoneme')
+    expect(noTierBody).toContain('mmm')
+    // cvc-words tier: ALSO no wrap (tier-scope mismatch).
+    const cvcBody = buildSsmlBody({
+      text: 'Which letter says mmm?',
+      voice: 'en-US-EmmaMultilingualNeural',
+      rate: '-10%',
+      pitch: '+0Hz',
+      volume: '+0%',
+      tier: 'cvc-words',
+    })
+    expect(cvcBody).not.toContain('<phoneme')
+  })
+})
+
 describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () => {
   const baseReq = {
     voice: 'en-US-EmmaMultilingualNeural',

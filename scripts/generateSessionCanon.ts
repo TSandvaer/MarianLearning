@@ -109,6 +109,7 @@ import {
   CompositionLintError,
   assertAddToTenCompositionClean,
   assertAddToTwentyCompositionClean,
+  assertLetterSoundsCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
   assertTwoDigitAddsubCompositionClean,
@@ -265,8 +266,20 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // rendered as text in the chip frame, no `picture-{word}.svg`
 // pipeline). See `design/word-song/letter-names-content.md` (Kyle A1) +
 // `WORD_SONG_TRACK_GUIDE` letter-names block (Dave A2, PR #329).
+// Wave 7 Track A7 (ticket 86c9y49cd) added `letter-sounds` as the FIRST
+// non-CVC word-song tier to ship first-class content — see
+// `design/word-song/letter-sounds-content.md` §1-§6. The tier emits
+// isolated-phoneme prompts (`"Which letter says mmm?"`) using a
+// mnemonic substitution table wrapped at render time via the
+// tier-aware extension of `PHONEME_OVERRIDES` in `api/_tts.ts`
+// (Amendment 1 of this PR). The canon bake produces
+// `public/canon/word-song/level-1/letter-sounds.json` whose utterance
+// text is plain mnemonic ("mmm", "buh", "o", etc.) and whose audio
+// payload is the phoneme-wrapped MP3 (the substitution table fires
+// during the bake-time Azure render call).
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'letter-names',
+  'letter-sounds',
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
@@ -504,6 +517,34 @@ async function bakeOne(
       // `two-digit-addsub-with-regroup`).
       assertTwoDigitAddsubWithRegroupCompositionClean(
         `${combo.track}/two-digit-addsub-with-regroup`,
+        response,
+      )
+    } catch (err) {
+      if (lintWarn && err instanceof CompositionLintError) {
+        console.warn(
+          `\n[composition-lint] WARN — writing despite violations: ` +
+            `${err.message}\n` +
+            err.violations
+              .map((v) => `  - [${v.rule}] ${v.message}`)
+              .join('\n') +
+            '\n',
+        )
+      } else {
+        throw err
+      }
+    }
+  } else if (
+    combo.track === 'word-song' &&
+    combo.focusNode === 'letter-sounds'
+  ) {
+    try {
+      // Wave 7 Track A7 (ticket 86c9y49cd) — bake-time composition lint
+      // for the letter-sounds tier. Validates the §1.3 category-mix
+      // budget + gentle-ramp rule + /ɪ/-/ɛ/ ban + pool membership
+      // against the just-baked utterance set. Mirrors the math-tier
+      // bake-time binding pattern.
+      assertLetterSoundsCompositionClean(
+        `${combo.track}/${combo.focusNode}`,
         response,
       )
     } catch (err) {
