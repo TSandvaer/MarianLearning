@@ -45,6 +45,7 @@ import {
 import { WORD_SONG_NOVEL_PROBE_WORDS } from '../../../api/_plannerWordList'
 import type { GraduationSessionSplit, LeitnerOutcome } from './progressHistory'
 import type { StorageAdapter } from '../Math/stardust'
+import type { OfferedDistractorClass } from '../Math/Math'
 import {
   WORDSONG_SESSION_END_BONUS,
   grantWordSongCompletionBonus,
@@ -150,19 +151,35 @@ export interface SessionEndPayload {
   /**
    * Per-problem OFFERED distractor class (math only — Kevin Wave 5
    * PR B, ticket 86c9y1p99). Values: `null` for P1–P3 gentle ramp,
-   * one of `'off-by-one' | 'wrong-op' | 'decade-anchor' |
-   * 'forgotten-carry' | 'smaller-from-larger' | 'borrow-no-decrement'`
-   * for P4–P8.
+   * one of the `OfferedDistractorClass` union members for P4–P8
+   * (`'off-by-one' | 'wrong-op' | 'decade-anchor' | 'forgotten-carry'
+   * | 'smaller-from-larger' | 'borrow-no-decrement'`).
    *
    * SessionEnd forwards this into `recordProgressOnSessionEnd` so the
    * progress writer persists it on
    * `SessionHistoryEntry.perProblemDistractorClass`. Optional for
    * back-compat with hand-built test fixtures predating this PR.
    *
+   * Type tightened from loose `string | null` to the strict union
+   * `OfferedDistractorClass | null` (PR #309 NIT 3, ticket
+   * `86c9y34xx`). The producer (`MathSessionResult.perProblemDistractorClass`
+   * in `Math.tsx`) has been strict-typed since Wave 5 PR B; the
+   * widening to `string` at this hop was a missed contract. Tightening
+   * here propagates back through `App.tsx#handleMathComplete` so a
+   * future writer can't drop an unknown class label into the in-app
+   * forward chain. The persistence-boundary type
+   * (`RecordProgressInput.perProblemDistractorClass` /
+   * `SessionHistoryEntry.perProblemDistractorClass` in
+   * `src/lib/progress/types.ts`) stays loose
+   * (`readonly (string | null)[]`) by design — that boundary spans
+   * localStorage and must tolerate future taxonomy widenings without
+   * a schema bump, mirroring the same posture the type-guard in
+   * `src/lib/progress/guards.ts` already documents.
+   *
    * See `MathSessionResult.perProblemDistractorClass` for the
    * positional / tap-outcome-independent semantics.
    */
-  perProblemDistractorClass?: readonly (string | null)[]
+  perProblemDistractorClass?: readonly (OfferedDistractorClass | null)[]
 }
 
 /**
