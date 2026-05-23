@@ -1102,12 +1102,7 @@ function MathScreen({
    *    - other math nodes → undefined (gentle in P1–P3, off-by-one in
    *      P4–P8). */
   const chipOrderWithClass = useMemo(
-    () =>
-      buildChipOrderWithClass(
-        plan.problems[problemIndex],
-        planMaxAnswer,
-        focusNode,
-      ),
+    () => buildChipOrder(plan.problems[problemIndex], planMaxAnswer, focusNode),
     [plan, problemIndex, planMaxAnswer, focusNode],
   )
   const chipOrder = chipOrderWithClass.values
@@ -1124,8 +1119,8 @@ function MathScreen({
    */
   useEffect(() => {
     perProblemDistractorClassRef.current[problemIndex] =
-      chipOrderWithClass.distractorClass
-  }, [problemIndex, chipOrderWithClass.distractorClass])
+      chipOrderWithClass.offeredClass
+  }, [problemIndex, chipOrderWithClass.offeredClass])
 
   // ── Refs for in-flight cleanup -----------------------------------------
 
@@ -3004,75 +2999,47 @@ export type OfferedDistractorClass =
 
 export interface ChipOrderWithClass {
   values: readonly number[]
-  /** Offered distractor class — `null` for P1–P3 (gentle ramp). */
-  distractorClass: OfferedDistractorClass | null
+  /**
+   * Offered distractor class — `null` for P1–P3 (gentle ramp). The pre-
+   * downgrade class the chip helper INTENDED to render; the silent OOR /
+   * alias downgrade inside `pickDistractors` operates on the chip values,
+   * NOT on this label. That keeps the captured label aligned with the
+   * pedagogical intent — which is what the diagnostic-aware mastery gate
+   * (Kyle's two-digit-addsub spec §5.4) needs.
+   */
+  offeredClass: OfferedDistractorClass | null
 }
 
 /**
  * Build the chip-value order for a problem AND capture the per-problem
- * OFFERED distractor class — the trap class the chip helper intends to
- * render (planner-emitted hint when set, otherwise the per-tier
- * focus-node default). `null` indicates the gentle-ramp band (P1–P3).
+ * OFFERED distractor class in a single call.
  *
- * The class label here is pre-downgrade: any silent OOR / alias
- * downgrade inside `pickDistractors` operates on the chip values, NOT
- * on the class label. That keeps the captured label aligned with the
- * pedagogical intent, which is what the diagnostic-aware mastery gate
- * (Kyle's two-digit-addsub spec §5.4) needs.
+ * Returns `{ values, offeredClass }`:
+ *   - `values`: the shuffled `[correct, d1, d2]` triple ready for chip
+ *     rendering.
+ *   - `offeredClass`: the trap class the chip helper INTENDED to render
+ *     (planner-emitted hint when set, otherwise the per-tier focus-node
+ *     default). `null` for P1–P3 (gentle ramp — no trap offered).
  *
- * See `OfferedDistractorClass` for the consumer contract + plumbing.
+ * The class label here is pre-downgrade: any silent OOR / alias downgrade
+ * inside `pickDistractors` operates on the chip values, NOT on the class
+ * label. That keeps the captured label aligned with the pedagogical intent,
+ * which is what the diagnostic-aware mastery gate (Kyle's two-digit-addsub
+ * spec §5.4) needs.
+ *
+ * History: previously split into `buildChipOrder` (values only) +
+ * `buildChipOrderWithClass` (class wrapper). Folded in PR #309 NIT 2
+ * (ticket 86c9y34xr) to eliminate the parallel-pair duplication Devon
+ * flagged in the PR #309 cross-review — both per-tier mappings now live
+ * in a single function, captured once and surfaced to the caller via the
+ * `offeredClass` field. See `OfferedDistractorClass` for the consumer
+ * contract + plumbing.
  */
-function buildChipOrderWithClass(
-  problem: MathProblem,
-  maxAnswer: number,
-  focusNode?: SkillNode,
-): ChipOrderWithClass {
-  const values = buildChipOrder(problem, maxAnswer, focusNode)
-  // The gentle-ramp tier is P1–P3 (`pickTier(problemIndex)` returns
-  // `'gentle'` for indices 1..3) — no trap class is offered; capture as
-  // `null`. The per-problem index is 1-based (`MathProblem.index`).
-  if (problem.index >= 1 && problem.index <= 3) {
-    return { values, distractorClass: null }
-  }
-  // P4–P8: mirror the resolution logic inside `buildChipOrder` so the
-  // captured class is the OFFERED class — planner hint when set,
-  // otherwise the per-tier focus-node default the chip helper would
-  // use. The label is pre-downgrade by design; see helper JSDoc above.
-  const planner = problem.distractorClass
-  if (planner !== undefined) {
-    return { values, distractorClass: planner as OfferedDistractorClass }
-  }
-  if (problem.op === '-') {
-    if (focusNode === 'sub-to-20') {
-      return { values, distractorClass: 'decade-anchor' }
-    }
-    if (
-      focusNode === 'two-digit-addsub-no-regroup' ||
-      focusNode === 'two-digit-addsub-with-regroup'
-    ) {
-      return { values, distractorClass: 'smaller-from-larger' }
-    }
-    if (focusNode === 'sub-to-10') {
-      return { values, distractorClass: 'wrong-op' }
-    }
-    return { values, distractorClass: 'wrong-op' }
-  }
-  // op === '+'
-  if (
-    focusNode === 'two-digit-addsub-no-regroup' ||
-    focusNode === 'two-digit-addsub-with-regroup'
-  ) {
-    return { values, distractorClass: 'forgotten-carry' }
-  }
-  // add-to-10 / add-to-20 / fallback: off-by-one.
-  return { values, distractorClass: 'off-by-one' }
-}
-
 function buildChipOrder(
   problem: MathProblem,
   maxAnswer: number,
   focusNode?: SkillNode,
-): readonly number[] {
+): ChipOrderWithClass {
   // Thread `op`, `operands`, and a render-time `distractorClass`
   // default into `pickDistractors` (Kyle's sub-to-10 spec §3.4 + §13
   // PR 2; sub-to-20 spec §3.3 + §3.4). `distractorClass` is a
@@ -3206,7 +3173,21 @@ function buildChipOrder(
     const j = Math.floor(rng() * (i + 1))
     ;[values[i], values[j]] = [values[j], values[i]]
   }
-  return values
+  // Capture the OFFERED distractor class. The gentle-ramp tier is P1–P3
+  // (`pickTier(problemIndex)` returns `'gentle'` for indices 1..3) — no
+  // trap class is offered; capture as `null`. For P4–P8 the offered class
+  // is the `distractorClass` resolved above (planner-emitted hint when
+  // set, otherwise the per-tier focus-node default), with the add-to-10 /
+  // add-to-20 / fallback `op === '+'` branch surfacing as `'off-by-one'`
+  // (matches `pickTier(>=4)` returning `'offByOne'`). Pre-downgrade by
+  // design — see `OfferedDistractorClass` JSDoc above.
+  const offeredClass: OfferedDistractorClass | null =
+    problem.index >= 1 && problem.index <= 3
+      ? null
+      : distractorClass !== undefined
+        ? (distractorClass as OfferedDistractorClass)
+        : 'off-by-one'
+  return { values, offeredClass }
 }
 
 /** Tiny linear-congruential RNG. Deterministic, no Math.random. */
