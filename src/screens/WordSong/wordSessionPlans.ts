@@ -123,13 +123,39 @@ export interface WordSongProblemUtterances {
  *   screen fell into CVC chip layout — see Jessica A4 (PR #338) for the
  *   wire-level failing-first spec.
  *
+ * `letter-sounds` — phoneme→grapheme tier (Wave 7 Track A8b, ticket
+ *   86c9y6gea). Read line is "Which letter says <MNEMONIC>?" where
+ *   `<MNEMONIC>` is a plain English approximation of the target sound
+ *   (e.g. `mmm` for /m/, `tuh` for /t/, `o` for /ɒ/). The TTS render
+ *   pipeline (`api/_tts.ts` PHONEME_OVERRIDES with the `letter-sounds`
+ *   tier filter — shipped via PR #337 / Wave 7 A7) wraps each mnemonic
+ *   in `<phoneme alphabet="ipa" ph="...">` at synthesize time, so the
+ *   utterance text in canon stays plain prose. Targets are LETTERS, not
+ *   words — there is no `WordEntry` in `wordPack.ts` for letter glyphs;
+ *   the parser derives the target letter from a mnemonic→letter map
+ *   (per Kyle's A5 spec §2.3 table) and synthesizes a sentinel
+ *   `WordEntry` so the existing `WordSongProblem.target` slot stays
+ *   typed. Chip render branches on `contentType` in `WordSong.tsx` and
+ *   renders the letter glyph as text in the chip frame (no picture-pack
+ *   asset). Companion canon at `public/canon/word-song/level-1/letter-
+ *   sounds.json` (PR #337). Pre-A8b, letter-sounds canon parsed cleanly
+ *   for the `read` template-shape check, but the planner's default-
+ *   fallback path (`effectiveFocusNode`) returned blending-cv stub
+ *   content for any `letter-sounds` request, so the screen silently
+ *   demoted to CVC chip layout. A8b ships the parser+screen tier that
+ *   lets the canon flow through end-to-end.
+ *
  * The field is optional on the public type for back-compat: callers that
  * predate the widening (e.g. `STATIC_WORD_SONG_PLANS`) don't set it, and
  * downstream code treats the absence as `blending-cv`. The parser always
  * sets it explicitly so plans rebuilt from the wire always carry the
  * discriminant.
  */
-export type WordSongContentType = 'blending-cv' | 'cvc-word' | 'letter-names'
+export type WordSongContentType =
+  | 'blending-cv'
+  | 'cvc-word'
+  | 'letter-names'
+  | 'letter-sounds'
 
 /** A single problem in the session. */
 export interface WordSongProblem {

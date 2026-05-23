@@ -108,6 +108,106 @@ function makeLetterTargetEntry(letter: string): WordEntry {
   }
 }
 
+/**
+ * Sentinel `pictureKey` prefix for synthetic letter-sound target
+ * WordEntries (the `letter-sounds` tier — Wave 7 Track A8b, ticket
+ * 86c9y6gea). Distinct from A4b's `letter:` prefix so a downstream
+ * consumer can tell which tier emitted the entry at a glance. The
+ * preferred dispatch is on `problem.contentType === 'letter-sounds'`,
+ * but the sentinel is useful for diagnostic logging + test assertions.
+ */
+export const LETTER_SOUND_PICTURE_KEY_PREFIX = 'letter-sounds:'
+
+/**
+ * Mnemonic → target-letter map for the `letter-sounds` tier (Wave 7
+ * A8b, ticket 86c9y6gea). Source of truth: Kyle's A5 spec §2.3 table.
+ *
+ * The canon emits read lines of shape `"Which letter says <MNEMONIC>?"`
+ * where `<MNEMONIC>` is a plain-prose English approximation of the
+ * target phoneme — e.g. `mmm` for the bilabial nasal /m/, `tuh` for the
+ * voiceless alveolar stop /t/, `o` for short /ɒ/. The TTS render
+ * pipeline (`api/_tts.ts` PHONEME_OVERRIDES tier-aware substitution
+ * shipped via PR #337) wraps each mnemonic in `<phoneme>` SSML at
+ * synthesize time so Azure produces the correct phoneme — the canon
+ * text stays plain prose. The parser's job is to extract the mnemonic
+ * and look up which letter glyph is the correct answer.
+ *
+ * Pool size: 14 consonant mnemonics + 5 short-vowel mnemonics = 19
+ * entries. Per spec §1.1 the pool excludes `x`, `q`, `z`, voiced-`/ð/`,
+ * `/ʒ/`, `/ŋ/`, semi-vowels, and long vowels for v1.
+ *
+ * Letter case: the target letter is always UPPERCASE per the canon's
+ * `correct` line shape (`"Yes! M says mmm."`). The chip glyph renders
+ * uppercase by default; case-strict matching is the chip-tap contract
+ * (same as A4b's letter-names per Kyle's A1 §3.5).
+ */
+export const LETTER_SOUND_MNEMONIC_TO_LETTER: Readonly<Record<string, string>> =
+  {
+    // Continuant consonants — mnemonic uses a triplet to hint sustained
+    // articulation (`mmm`, `nnn`, `sss`, `fff`, `vvv`, `lll`, `rrr`, `hhh`).
+    mmm: 'M',
+    nnn: 'N',
+    sss: 'S',
+    fff: 'F',
+    vvv: 'V',
+    lll: 'L',
+    rrr: 'R',
+    hhh: 'H',
+    // Stop consonants — mnemonic carries the schwa epenthesis (`puh`,
+    // `buh`, `tuh`, `duh`, `kuh`, `guh`) so Azure produces an audible
+    // schwa-tailed stop rather than an inaudible isolated burst.
+    puh: 'P',
+    buh: 'B',
+    tuh: 'T',
+    duh: 'D',
+    kuh: 'K',
+    guh: 'G',
+    // Short vowels — mnemonic is the bare vowel letter; SSML phoneme wrap
+    // forces the short pronunciation. Mastered vowel /æ/ + 4 current-
+    // target vowels /ɒ/, /ʌ/, /ɪ/, /ɛ/.
+    a: 'A',
+    o: 'O',
+    u: 'U',
+    i: 'I',
+    e: 'E',
+  }
+
+/**
+ * Pool of all valid mnemonic tokens (for membership checks). Derived
+ * from `LETTER_SOUND_MNEMONIC_TO_LETTER` so the two stay in lockstep.
+ */
+export const LETTER_SOUND_MNEMONIC_POOL: ReadonlySet<string> = new Set(
+  Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER),
+)
+
+/**
+ * Build a synthetic `WordEntry` for a single letter-sound target. Used
+ * by the letter-sounds parser path so `WordSongProblem.target` stays
+ * typed uniformly across content types.
+ *
+ * `word` carries the literal letter (uppercase, case-preserved from the
+ * map) — this is what the chip-tap comparison reads when Marian taps a
+ * chip. `pictureKey` carries the `letter-sounds:<X>` sentinel so a
+ * downstream consumer can identify the entry without inspecting
+ * `contentType` again. `vowel` and `phoneme` are intentionally omitted
+ * — the same-vowel distractor logic in `wordDistractors.ts` is never
+ * consulted for letter-sounds (chip-order for this tier is built by a
+ * dedicated letter-sound-distractor path in `WordSong.tsx`).
+ */
+function makeLetterSoundTargetEntry(letter: string): WordEntry {
+  return {
+    word: letter,
+    pictureKey: `${LETTER_SOUND_PICTURE_KEY_PREFIX}${letter}`,
+    // `category` is required on WordEntry. Letters are not nouns of any
+    // existing category — `'object'` is the closest neutral bucket, and
+    // chosen here because the letter-sounds render path NEVER consults
+    // `category` (gentle-tier filtering is bypassed by the
+    // letter-sound-distractor builder in `WordSong.tsx`).
+    category: 'object',
+    isTarget: true,
+  }
+}
+
 const ALL_SLOTS: readonly WordSongUtteranceSlot[] = [
   'read',
   'correct',
@@ -216,14 +316,19 @@ export interface ParsedReadLine {
 /** Per-content-type read-line template config. Source of truth for which
  *  templates the parser accepts. Add a row here to widen further.
  *
- *  Order matters — `letter-names` MUST come before `blending-cv` because
- *  the letter-names template `"Tap the letter <X>."` would otherwise be
- *  greedy-matched by `blending-cv`'s `"Tap the <word>."` pattern (it
- *  would capture `letter` as the word and then fail the
- *  TARGET_WORD_SET membership check, surfacing the wrong error). The
- *  letter-names pattern requires the literal `letter` keyword followed by
- *  a single ASCII glyph, so it is strictly more specific and is tried
- *  first.
+ *  Order matters — letter-specific templates (`letter-names`,
+ *  `letter-sounds`) MUST come before the generic word-tier templates
+ *  (`blending-cv`, `cvc-word`). The letter-names template
+ *  `"Tap the letter <X>."` would otherwise be greedy-matched by
+ *  `blending-cv`'s `"Tap the <word>."` pattern (it would capture
+ *  `letter` as the word and then fail the TARGET_WORD_SET membership
+ *  check, surfacing the wrong error). The letter-names pattern requires
+ *  the literal `letter` keyword followed by a single ASCII glyph, so it
+ *  is strictly more specific. The `letter-sounds` template uses a
+ *  distinct verb (`which letter says`, not `tap the` / `read the`) so
+ *  no greedy-match overlap exists with the word-tier templates — listing
+ *  it among the letter-specific block matches the A4b precedent and
+ *  keeps the dispatch order predictable.
  */
 const READ_LINE_TEMPLATES: ReadonlyArray<{
   contentType: WordSongContentType
@@ -241,6 +346,18 @@ const READ_LINE_TEMPLATES: ReadonlyArray<{
     // fall through to the next template (and ultimately fail).
     pattern: /^\s*tap\s+the\s+letter\s+([A-Za-z])\s*\.\s*$/i,
     label: '"Tap the letter <X>."',
+  },
+  {
+    contentType: 'letter-sounds',
+    // `Which letter says <MNEMONIC>?` — mnemonic is a plain-prose token
+    // (lowercase, 1-3 letters). The token is membership-checked against
+    // `LETTER_SOUND_MNEMONIC_POOL` (19 entries) below; the regex's job
+    // is structural-shape filtering only. `[a-z]+` matches the
+    // mnemonic body case-insensitively — but real canon emits
+    // lowercase. Trailing `?` is anchored so prose like "Which letter
+    // says mmm in cat?" does NOT match.
+    pattern: /^\s*which\s+letter\s+says\s+([a-z]+)\s*\?\s*$/i,
+    label: '"Which letter says <MNEMONIC>?"',
   },
   {
     contentType: 'blending-cv',
@@ -267,16 +384,25 @@ const ACCEPTED_TEMPLATES_LABEL = READ_LINE_TEMPLATES.map((t) => t.label).join(
  *     preserved on the synthesized `WordEntry.word`. Membership is
  *     checked against `LETTER_GLYPH_POOL` (the 52-glyph A-Z + a-z pool
  *     from Kyle's A1 spec §1.1), NOT against `TARGET_WORD_SET`.
+ *   - "Which letter says <MNEMONIC>?" → contentType: 'letter-sounds'
+ *     (Wave 7 A8b, ticket 86c9y6gea). `<MNEMONIC>` is a plain-prose
+ *     English approximation of an isolated phoneme (e.g. `mmm`, `tuh`,
+ *     `o`). The token is membership-checked against
+ *     `LETTER_SOUND_MNEMONIC_POOL` and mapped to a target letter via
+ *     `LETTER_SOUND_MNEMONIC_TO_LETTER`; the parser synthesizes a
+ *     sentinel `WordEntry` (no wordPack lookup; letter glyphs are not
+ *     in `wordPack.ts`).
  *   - "Tap the <word>." → contentType: 'blending-cv'
  *   - "Read the <word>." → contentType: 'cvc-word' (parser-only today;
  *     planner does not emit this until step 2 — see file header)
  *
  * For the two word-tier templates, the word is membership-checked
  * against the wordPack target set so distractor-only entries (`bus`,
- * `sun`, etc.) cannot slip through. For the letter-names template the
- * pool check is the 52-glyph ASCII set + the parser synthesizes a
- * sentinel `WordEntry` (no wordPack lookup; letters do not exist in
- * `wordPack.ts`).
+ * `sun`, etc.) cannot slip through. For the letter-tier templates the
+ * pool check is tier-specific — `LETTER_GLYPH_POOL` (52-glyph ASCII set)
+ * for letter-names, `LETTER_SOUND_MNEMONIC_POOL` (19 mnemonics) for
+ * letter-sounds — and the parser synthesizes a sentinel `WordEntry`
+ * (no wordPack lookup; letter glyphs do not exist in `wordPack.ts`).
  */
 export function parseReadLine(read: string): ParsedReadLine {
   for (const template of READ_LINE_TEMPLATES) {
@@ -293,6 +419,24 @@ export function parseReadLine(read: string): ParsedReadLine {
       }
       return {
         entry: makeLetterTargetEntry(letter),
+        contentType: template.contentType,
+      }
+    }
+
+    // Letter-sounds branch — mnemonic pool check + letter-glyph
+    // synthesis. The mnemonic is lowercased for case-insensitive
+    // membership (canon real emits lowercase; defensive).
+    if (template.contentType === 'letter-sounds') {
+      const mnemonic = match[1]!.toLowerCase()
+      if (!LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)) {
+        throw new PlanFromServerError(
+          `word-song letter-sounds read line "${read}" yielded mnemonic "${mnemonic}" outside the 19-mnemonic pool ` +
+            `(accepted: ${Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER).join(', ')})`,
+        )
+      }
+      const letter = LETTER_SOUND_MNEMONIC_TO_LETTER[mnemonic]!
+      return {
+        entry: makeLetterSoundTargetEntry(letter),
         contentType: template.contentType,
       }
     }

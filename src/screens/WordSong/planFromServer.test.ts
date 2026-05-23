@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   LETTER_GLYPH_PICTURE_KEY_PREFIX,
   LETTER_GLYPH_POOL,
+  LETTER_SOUND_MNEMONIC_POOL,
+  LETTER_SOUND_MNEMONIC_TO_LETTER,
+  LETTER_SOUND_PICTURE_KEY_PREFIX,
   PlanFromServerError,
   parseReadLine,
   parseReadTarget,
@@ -17,6 +20,7 @@ import {
   SAMPLE_MIXED_PLAN,
 } from './__fixtures__/sample-cvc-word-plan'
 import { SAMPLE_LETTER_NAMES_PLAN } from './__fixtures__/sample-letter-names-plan'
+import { SAMPLE_LETTER_SOUNDS_PLAN } from './__fixtures__/sample-letter-sounds-plan'
 
 function staticPlanAsServerShape(planIndex = 0) {
   const plan = STATIC_WORD_SONG_PLANS[planIndex]!
@@ -733,5 +737,315 @@ describe('wordSongSessionPlanFromServer — mixed cv-blend + cvc-word (sanity)',
       'man',
       'pan',
     ])
+  })
+})
+
+/**
+ * Letter-sounds parser widen — Wave 7 A8b (ticket 86c9y6gea).
+ *
+ * The browser parser accepts a new content type (`letter-sounds`,
+ * `"Which letter says <MNEMONIC>?"` template). The PLANNER already
+ * emits this shape (PR #337 / Wave 7 A7 baked it into
+ * `public/canon/word-song/level-1/letter-sounds.json` and registered
+ * the tier as first-class with the tier-aware PHONEME_OVERRIDES
+ * substitution), but until A8b the browser silently demoted to the
+ * blending-cv stub because the parser had no template for it AND
+ * WordSong.tsx had no render branch.
+ *
+ * See `design/word-song/letter-sounds-content.md` for the spec and
+ * `public/canon/word-song/level-1/letter-sounds.json` for the live
+ * canon. Sibling tier: A4b letter-names (PR #339).
+ */
+describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9y6gea)', () => {
+  it('routes "Which letter says mmm?" to contentType: letter-sounds', () => {
+    const result = parseReadLine('Which letter says mmm?')
+    expect(result.contentType).toBe('letter-sounds')
+    expect(result.entry.word).toBe('M')
+    expect(result.entry.isTarget).toBe(true)
+    expect(result.entry.pictureKey).toBe(`${LETTER_SOUND_PICTURE_KEY_PREFIX}M`)
+  })
+
+  it('maps each canonical mnemonic to its expected target letter (spec §2.3)', () => {
+    // Walk the full 19-entry mnemonic→letter map from spec §2.3 and
+    // assert round-trip parsing for every entry. Locks the mapping
+    // against accidental drift if the spec is re-baked.
+    for (const [mnemonic, expectedLetter] of Object.entries(
+      LETTER_SOUND_MNEMONIC_TO_LETTER,
+    )) {
+      const result = parseReadLine(`Which letter says ${mnemonic}?`)
+      expect(result.contentType).toBe('letter-sounds')
+      expect(result.entry.word).toBe(expectedLetter)
+    }
+  })
+
+  it('covers all 14 consonant mnemonics + 5 short-vowel mnemonics (19-entry pool)', () => {
+    expect(LETTER_SOUND_MNEMONIC_POOL.size).toBe(19)
+    // 14 consonant mnemonics
+    for (const mnemonic of [
+      'mmm',
+      'nnn',
+      'sss',
+      'fff',
+      'vvv',
+      'lll',
+      'rrr',
+      'hhh',
+      'puh',
+      'buh',
+      'tuh',
+      'duh',
+      'kuh',
+      'guh',
+    ]) {
+      expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
+    }
+    // 5 short-vowel mnemonics
+    for (const mnemonic of ['a', 'o', 'u', 'i', 'e']) {
+      expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
+    }
+  })
+
+  it('rejects mnemonics outside the 19-entry pool with a clear error', () => {
+    // `zzz` is the right shape (lowercase 1-3 letters) but not in the
+    // pool — the pool guard fires.
+    expect(() => parseReadLine('Which letter says zzz?')).toThrow(
+      /outside the 19-mnemonic pool/,
+    )
+    // `nope` is the right shape but not a known mnemonic.
+    expect(() => parseReadLine('Which letter says nope?')).toThrow(
+      PlanFromServerError,
+    )
+  })
+
+  it('rejects out-of-shape lines (no terminal `?`, wrong verb)', () => {
+    // Missing trailing `?` — the template requires it.
+    expect(() => parseReadLine('Which letter says mmm.')).toThrow(
+      /did not match any known template/,
+    )
+    // Different verb — `says` not `is`.
+    expect(() => parseReadLine('Which letter is mmm?')).toThrow(
+      /did not match any known template/,
+    )
+  })
+
+  it('is case-insensitive on the verb preamble but normalises the mnemonic to lowercase', () => {
+    // The regex `/i` flag makes `which letter says` /
+    // `WHICH LETTER SAYS` valid preambles. The captured mnemonic is
+    // lowercased before pool membership check so `MMM` is accepted as
+    // `mmm` (defensive — canon emits lowercase but mixed-case must not
+    // accidentally bypass the pool guard).
+    const lower = parseReadLine('which letter says mmm?')
+    expect(lower.entry.word).toBe('M')
+    const upper = parseReadLine('WHICH LETTER SAYS MMM?')
+    expect(upper.entry.word).toBe('M')
+  })
+
+  it('the new template is reported in the error message alongside the existing templates', () => {
+    // The error message must surface ALL accepted templates so a
+    // future dev grepping for the template form discovers all three
+    // surfaces (or more after A4b lands).
+    expect(() => parseReadLine('Find the cat.')).toThrow(/Which letter says/)
+    expect(() => parseReadLine('Find the cat.')).toThrow(/Tap the/)
+    expect(() => parseReadLine('Find the cat.')).toThrow(/Read the/)
+  })
+
+  it('letter-sounds parser does NOT consult the wordPack TARGET_WORD_SET', () => {
+    // Letter mnemonics are NOT in `wordPack.ts` — the parser must
+    // bypass the wordPack lookup entirely for letter-sounds. This pin
+    // guards against a refactor that accidentally routes letter-sounds
+    // through `getWordEntry` (which would throw).
+    const result = parseReadLine('Which letter says tuh?')
+    expect(result.entry.word).toBe('T')
+    // The wordPack does not have a `T` entry, but the parser still
+    // succeeds — proof the wordPack lookup is bypassed.
+    expect(result.entry.pictureKey).toBe(`${LETTER_SOUND_PICTURE_KEY_PREFIX}T`)
+  })
+
+  it('target letter is UPPERCASE regardless of mnemonic case (canon correct-line convention)', () => {
+    // Every entry in `LETTER_SOUND_MNEMONIC_TO_LETTER` value-side must
+    // be uppercase — matches the canon's `correct` line shape
+    // (`"Yes! M says mmm."`). Locks against accidental lowercase drift.
+    for (const letter of Object.values(LETTER_SOUND_MNEMONIC_TO_LETTER)) {
+      expect(letter).toBe(letter.toUpperCase())
+      expect(letter.length).toBe(1)
+    }
+  })
+})
+
+describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)', () => {
+  it('parses sample-letter-sounds-plan and stamps contentType: letter-sounds on every problem', () => {
+    const plan = wordSongSessionPlanFromServer(SAMPLE_LETTER_SOUNDS_PLAN)
+    expect(plan.id).toBe('haiku-word-letter-sounds-001')
+    expect(plan.problems).toHaveLength(8)
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('letter-sounds')
+    }
+    // Targets are UPPERCASE letters derived from the mnemonic.
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'M',
+      'S',
+      'H',
+      'A',
+      'T',
+      'O',
+      'L',
+      'B',
+    ])
+  })
+
+  it('synthesizes a sentinel pictureKey on every letter target (letter-sounds:<X>)', () => {
+    const plan = wordSongSessionPlanFromServer(SAMPLE_LETTER_SOUNDS_PLAN)
+    for (const problem of plan.problems) {
+      expect(problem.target.pictureKey).toBe(
+        `${LETTER_SOUND_PICTURE_KEY_PREFIX}${problem.target.word}`,
+      )
+      // isTarget is true so downstream invariants that assume the
+      // target is in the target pool continue to hold.
+      expect(problem.target.isTarget).toBe(true)
+    }
+  })
+
+  it('preserves the read text verbatim (audio-script / on-screen-caption mirror)', () => {
+    const plan = wordSongSessionPlanFromServer(SAMPLE_LETTER_SOUNDS_PLAN)
+    expect(plan.problems[0]!.utterances.read).toBe('Which letter says mmm?')
+    expect(plan.problems[3]!.utterances.read).toBe('Which letter says a?')
+    expect(plan.problems[4]!.utterances.read).toBe('Which letter says tuh?')
+  })
+
+  it('rejects a letter-sounds entry whose mnemonic is outside the 19-entry pool', () => {
+    const broken: typeof SAMPLE_LETTER_SOUNDS_PLAN = {
+      ...SAMPLE_LETTER_SOUNDS_PLAN,
+      utterances: SAMPLE_LETTER_SOUNDS_PLAN.utterances.map((u) =>
+        u.id === 'word.p1.read' ? { ...u, text: 'Which letter says zzz?' } : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /outside the 19-mnemonic pool/,
+    )
+  })
+
+  it('rejects a letter-sounds entry with a malformed template', () => {
+    // "What letter says mmm?" is neither the letter-sounds template
+    // (which requires `which`) nor any other accepted template. The
+    // error surfaces as "no matching template".
+    const broken: typeof SAMPLE_LETTER_SOUNDS_PLAN = {
+      ...SAMPLE_LETTER_SOUNDS_PLAN,
+      utterances: SAMPLE_LETTER_SOUNDS_PLAN.utterances.map((u) =>
+        u.id === 'word.p1.read' ? { ...u, text: 'What letter says mmm?' } : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /did not match any known template/,
+    )
+  })
+})
+
+/**
+ * Live-canon round-trip pin (Wave 7 A8b, 86c9y6gea).
+ *
+ * Exercises the parser against a synthetic re-build of the exact
+ * sequence shipped in `public/canon/word-song/level-1/letter-sounds.json`
+ * (PR #337). Future canon re-bakes that drift away from this exact
+ * mnemonic ordering should still parse; this test pins the mapping
+ * works for the mnemonic set the live canon emits.
+ */
+describe('wordSongSessionPlanFromServer — live canon mnemonic sequence (PR #337)', () => {
+  it('parses the exact mnemonic sequence from the live canon JSON', () => {
+    // The mnemonic + letter pairs the live canon ships (PR #337):
+    //   p1=mmm→M, p2=sss→S, p3=hhh→H, p4=a→A, p5=tuh→T,
+    //   p6=o→O,   p7=lll→L, p8=o→O
+    const liveCanonPairs = [
+      { mnemonic: 'mmm', letter: 'M' },
+      { mnemonic: 'sss', letter: 'S' },
+      { mnemonic: 'hhh', letter: 'H' },
+      { mnemonic: 'a', letter: 'A' },
+      { mnemonic: 'tuh', letter: 'T' },
+      { mnemonic: 'o', letter: 'O' },
+      { mnemonic: 'lll', letter: 'L' },
+      { mnemonic: 'o', letter: 'O' },
+    ]
+    const wire = {
+      id: 'live-canon-letter-sounds-001',
+      label: 'live canon letter-sounds replica',
+      utterances: liveCanonPairs.flatMap(({ mnemonic, letter }, i) => {
+        const n = i + 1
+        return [
+          { id: `word.p${n}.read`, text: `Which letter says ${mnemonic}?` },
+          {
+            id: `word.p${n}.correct`,
+            text: `Yes! ${letter} says ${mnemonic}.`,
+          },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          { id: `word.p${n}.hint`, text: `Listen. ${mnemonic}.` },
+          {
+            id: `word.p${n}.giveAnswer`,
+            text: `This one is ${letter}. ${letter} says ${mnemonic}.`,
+          },
+        ]
+      }),
+    }
+    const plan = wordSongSessionPlanFromServer(wire)
+    expect(plan.problems).toHaveLength(8)
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'M',
+      'S',
+      'H',
+      'A',
+      'T',
+      'O',
+      'L',
+      'O',
+    ])
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('letter-sounds')
+    }
+  })
+})
+
+/**
+ * Back-compat regression — letter-sounds addition must NOT shadow the
+ * existing word-tier templates. The `"Which letter says <MNEMONIC>?"`
+ * template starts with a different verb (`which`, not `tap`/`read`)
+ * so there's no overlap in practice — but pin the back-compat per
+ * spec NOF #2 (template ordering matters).
+ */
+describe('parseReadLine — letter-sounds template does NOT shadow word-tier templates (back-compat)', () => {
+  it('still routes "Tap the cat." to contentType: blending-cv', () => {
+    expect(parseReadLine('Tap the cat.').contentType).toBe('blending-cv')
+    expect(parseReadLine('Tap the cat.').entry.word).toBe('cat')
+  })
+
+  it('still routes "Read the cat." to contentType: cvc-word', () => {
+    expect(parseReadLine('Read the cat.').contentType).toBe('cvc-word')
+    expect(parseReadLine('Read the cat.').entry.word).toBe('cat')
+  })
+
+  it('still rejects non-target words on word-tier templates', () => {
+    expect(() => parseReadLine('Tap the ten.')).toThrow(/non-target word/)
+    expect(() => parseReadLine('Read the ten.')).toThrow(/non-target word/)
+  })
+
+  it('parses every CVC target word in the pack via the blending-cv template', () => {
+    for (const word of [
+      'cat',
+      'hat',
+      'bat',
+      'mat',
+      'bag',
+      'fan',
+      'man',
+      'pan',
+    ]) {
+      const result = parseReadLine(`Tap the ${word}.`)
+      expect(result.contentType).toBe('blending-cv')
+      expect(result.entry.word).toBe(word)
+    }
+  })
+
+  it('parseReadTarget legacy entry point still routes blending-cv correctly', () => {
+    // The legacy `parseReadTarget` is a thin wrapper that returns only
+    // the `entry`. Pin that the wrapper still works after the
+    // letter-sounds widen.
+    expect(parseReadTarget('Tap the bat.').word).toBe('bat')
   })
 })
