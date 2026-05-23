@@ -953,26 +953,29 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
   it('routes first-class focus nodes (blending-cv, cvc-words) verbatim; falls back untuned tiers to blending-cv (sweep)', async () => {
     // Step 2 (ticket 86c9kxu07) widened the planner to first-class
     // emit `cvc-words` content alongside `blending-cv`. Untuned tiers
-    // (letter-names / letter-sounds / digraphs-th-voiceless /
-    // sight-words / simple-sentences) fall back to blending-cv per the
-    // contract doc's §"Tier coverage today" section. This sweep pins
-    // the routing table so a future regression on either side surfaces
-    // here. (PR #211: dead `digraphs` literal dropped; replaced by 3
-    // sequential sibling nodes. `digraphs-sh` went FIRST-CLASS first —
-    // its content tier wired the /ʃ/ digraph pool + hybridMode gate.
-    // `digraphs-ch` went FIRST-CLASS second — its content tier wired the
-    // /tʃ/ digraph pool (ZERO hybridMode words). `digraphs-th-voiceless`
-    // is now ALSO FIRST-CLASS — its content tier (this PR) wires the
-    // voiceless-/θ/ digraph pool + REUSES the sh-tier hybridMode gate
-    // for thick/cloth.)
+    // (letter-sounds / sight-words / simple-sentences) fall back to
+    // blending-cv per the contract doc's §"Tier coverage today"
+    // section. This sweep pins the routing table so a future regression
+    // on either side surfaces here. (PR #211: dead `digraphs` literal
+    // dropped; replaced by 3 sequential sibling nodes. `digraphs-sh`
+    // went FIRST-CLASS first — its content tier wired the /ʃ/ digraph
+    // pool + hybridMode gate. `digraphs-ch` went FIRST-CLASS second —
+    // its content tier wired the /tʃ/ digraph pool (ZERO hybridMode
+    // words). `digraphs-th-voiceless` is now ALSO FIRST-CLASS — its
+    // content tier wires the voiceless-/θ/ digraph pool + REUSES the
+    // sh-tier hybridMode gate for thick/cloth. Wave 7 Track A3 made
+    // `letter-names` FIRST-CLASS — its content tier wires the 52-glyph
+    // alphabet pool with b/d/p/q CIRCLE-STICK trap-class composition
+    // per `design/word-song/letter-names-content.md` Kyle A1 + Dave A2
+    // PR #329 directive.)
     const expectations: ReadonlyArray<[string, string]> = [
-      ['letter-names', 'blending-cv'],
+      ['letter-names', 'letter-names'], // first-class (Wave 7 Track A3 content tier)
       ['letter-sounds', 'blending-cv'],
       ['blending-cv', 'blending-cv'], // first-class
       ['cvc-words', 'cvc-words'], // first-class (the unblock)
       ['digraphs-sh', 'digraphs-sh'], // first-class (sh content tier)
       ['digraphs-ch', 'digraphs-ch'], // first-class (ch content tier)
-      ['digraphs-th-voiceless', 'digraphs-th-voiceless'], // first-class (this PR's content tier)
+      ['digraphs-th-voiceless', 'digraphs-th-voiceless'], // first-class (th content tier)
       ['sight-words', 'blending-cv'],
       ['simple-sentences', 'blending-cv'],
     ]
