@@ -109,6 +109,7 @@ import {
   CompositionLintError,
   assertAddToTenCompositionClean,
   assertAddToTwentyCompositionClean,
+  assertLetterSoundsCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
   assertTwoDigitAddsubCompositionClean,
@@ -516,6 +517,34 @@ async function bakeOne(
       // `two-digit-addsub-with-regroup`).
       assertTwoDigitAddsubWithRegroupCompositionClean(
         `${combo.track}/two-digit-addsub-with-regroup`,
+        response,
+      )
+    } catch (err) {
+      if (lintWarn && err instanceof CompositionLintError) {
+        console.warn(
+          `\n[composition-lint] WARN — writing despite violations: ` +
+            `${err.message}\n` +
+            err.violations
+              .map((v) => `  - [${v.rule}] ${v.message}`)
+              .join('\n') +
+            '\n',
+        )
+      } else {
+        throw err
+      }
+    }
+  } else if (
+    combo.track === 'word-song' &&
+    combo.focusNode === 'letter-sounds'
+  ) {
+    try {
+      // Wave 7 Track A7 (ticket 86c9y49cd) — bake-time composition lint
+      // for the letter-sounds tier. Validates the §1.3 category-mix
+      // budget + gentle-ramp rule + /ɪ/-/ɛ/ ban + pool membership
+      // against the just-baked utterance set. Mirrors the math-tier
+      // bake-time binding pattern.
+      assertLetterSoundsCompositionClean(
+        `${combo.track}/${combo.focusNode}`,
         response,
       )
     } catch (err) {

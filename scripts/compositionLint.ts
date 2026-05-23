@@ -156,6 +156,17 @@ export type CanonFileTier =
   | 'add-to-20'
   | 'two-digit-addsub'
   | 'two-digit-addsub-with-regroup'
+  // Wave 7 Track A7 (ticket 86c9y49cd) — word-song tier. The first
+  // non-math entry in the union; lives under
+  // `public/canon/word-song/level-1/letter-sounds.json` (path layout
+  // is `<root>/<track>/level-<n>/<focusNode>.json`). Per
+  // `design/word-song/letter-sounds-content.md §1` the lint enforces
+  // the load-bearing pedagogical rules: pool membership (16 active
+  // sounds), category-mix budget (mastered-consonant ≥ 4,
+  // current-target vowel 2-3, mastered-/æ/ ≥ 1), the /ɪ/-/ɛ/
+  // acoustic-similarity ban, gentle-ramp P1-P3 mastered-consonant
+  // only, and no-duplicates within the 8-problem set.
+  | 'letter-sounds'
 
 // ── rule kinds + error type ──────────────────────────────────────────────
 
@@ -175,6 +186,14 @@ export type CompositionRule =
   | 'p1-is-plus'
   | 'dual-exposure'
   | 'diagnostic-coverage'
+  // letter-sounds-only rule (Wave 7 Track A7 — ticket 86c9y49cd). The
+  // /ɪ/-/ɛ/ acoustic-similarity ban (per
+  // `design/word-song/letter-sounds-content.md §1.2`): /ɪ/ and /ɛ/
+  // MAY NOT both appear as targets in the same 8-problem session.
+  // This is the load-bearing pedagogical rule for letter-sounds —
+  // distinct from category-cap because it spans two specific
+  // categories (not a single-category cap).
+  | 'adjacent-vowel-ban'
 
 /**
  * One detected violation against a single problem (or whole-session in the
@@ -3820,6 +3839,518 @@ export function assertTwoDigitAddsubWithRegroupCompositionClean(
   }
 }
 
+// ── letter-sounds rule config (Wave 7 Track A7 — ticket 86c9y49cd) ─────────
+//
+// Per `design/word-song/letter-sounds-content.md §1` — the load-bearing
+// pedagogical rules for the letter-sounds tier. The pool of 16 sounds is
+// 14 mastered consonants + the mastered vowel /æ/ + ONE current-target
+// short vowel (one of /ɒ/, /ʌ/, /ɪ/, /ɛ/ per the canonical ladder).
+//
+// Why a separate pool model from math-tier bindings
+// -------------------------------------------------
+// Math tiers work over `{a, b}` fact pairs derived from a "<W> plus <W>"
+// read-line. Letter-sounds works over a single SOUND MNEMONIC (one
+// utterance = one phoneme target). The lint parses a different
+// read-line template (`"Which letter says <SOUND-MNEMONIC>?"`),
+// classifies each target by sound-class (mastered-consonant / mastered-
+// vowel / current-target-vowel), and applies category-mix budgets
+// derived from spec §1.3. The /ɪ/-/ɛ/ adjacency ban (§1.2) is a
+// dedicated `adjacent-vowel-ban` rule because it spans two specific
+// vowels rather than enforcing a single-category cap.
+
+/**
+ * Sound classification for a letter-sounds target. The lint uses this
+ * to enforce the category-mix budget (§1.3 of the spec) — at least 4
+ * mastered-consonant targets, exactly 1+ mastered-vowel /æ/ target in
+ * mid-tier, and 2-3 current-target vowel targets in trap window.
+ */
+export type LetterSoundsCategory =
+  | 'mastered-consonant'
+  | 'mastered-vowel'
+  | 'current-target-vowel'
+
+/** Mnemonic-to-IPA pool entry for the letter-sounds tier. The
+ *  `mnemonic` is the literal token Haiku emits in the canon utterance
+ *  text (per `WORD_SONG_TRACK_GUIDE` LETTER-SOUNDS UTTERANCE TEMPLATE
+ *  substitution table). `letter` is the lowercase grapheme that
+ *  appears on the target chip. `category` drives the §1.3 budget. */
+export interface LetterSoundsPoolFact {
+  /** Stable id, e.g. `"sound-m"`, `"sound-o"`. */
+  id: string
+  /** Mnemonic word in the read-line, e.g. `"mmm"`, `"o"`. Lowercase. */
+  mnemonic: string
+  /** IPA phoneme (informational; the SSML wrap is owned by
+   *  `api/_tts.ts PHONEME_OVERRIDES`). */
+  ipa: string
+  /** Letter glyph the target chip displays. Lowercase. */
+  letter: string
+  category: LetterSoundsCategory
+}
+
+/**
+ * The 14 mastered-consonant + 1 mastered-vowel base pool. The
+ * current-target vowel is selected per-session by the planner's
+ * vowel-cycle hint (Wave 7 Track A7 Amendment 2); the canon parser
+ * recognises any one of the 4 candidates `{o, u, i, e}` and adds the
+ * matching `current-target-vowel` row to the active pool when it
+ * appears. The /æ/ entry is the anchor mastered vowel (always
+ * present).
+ */
+export const LETTER_SOUNDS_BASE_POOL: readonly LetterSoundsPoolFact[] = [
+  // Mastered consonants — continuants (sustained articulation):
+  {
+    id: 'sound-m',
+    mnemonic: 'mmm',
+    ipa: 'm',
+    letter: 'm',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-n',
+    mnemonic: 'nnn',
+    ipa: 'n',
+    letter: 'n',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-s',
+    mnemonic: 'sss',
+    ipa: 's',
+    letter: 's',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-f',
+    mnemonic: 'fff',
+    ipa: 'f',
+    letter: 'f',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-v',
+    mnemonic: 'vvv',
+    ipa: 'v',
+    letter: 'v',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-l',
+    mnemonic: 'lll',
+    ipa: 'l',
+    letter: 'l',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-r',
+    mnemonic: 'rrr',
+    ipa: 'r',
+    letter: 'r',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-h',
+    mnemonic: 'hhh',
+    ipa: 'h',
+    letter: 'h',
+    category: 'mastered-consonant',
+  },
+  // Mastered consonants — stops (schwa-epenthesis tail in mnemonic):
+  {
+    id: 'sound-p',
+    mnemonic: 'puh',
+    ipa: 'p',
+    letter: 'p',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-b',
+    mnemonic: 'buh',
+    ipa: 'b',
+    letter: 'b',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-t',
+    mnemonic: 'tuh',
+    ipa: 't',
+    letter: 't',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-d',
+    mnemonic: 'duh',
+    ipa: 'd',
+    letter: 'd',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-k',
+    mnemonic: 'kuh',
+    ipa: 'k',
+    letter: 'k',
+    category: 'mastered-consonant',
+  },
+  {
+    id: 'sound-g',
+    mnemonic: 'guh',
+    ipa: 'ɡ',
+    letter: 'g',
+    category: 'mastered-consonant',
+  },
+  // Mastered vowel /æ/ — the anchor.
+  {
+    id: 'sound-a',
+    mnemonic: 'a',
+    ipa: 'æ',
+    letter: 'a',
+    category: 'mastered-vowel',
+  },
+]
+
+/**
+ * Current-target vowel candidates (the four short vowels later than
+ * /æ/ in the locked ladder). When a canon contains one of these as a
+ * target, the lint classifies it as `current-target-vowel`. Per spec
+ * §1.2 the /ɪ/-/ɛ/ adjacency ban: /ɪ/ and /ɛ/ MAY NOT both appear in
+ * the same session.
+ */
+export const LETTER_SOUNDS_CURRENT_TARGET_VOWELS: readonly LetterSoundsPoolFact[] =
+  [
+    {
+      id: 'sound-o',
+      mnemonic: 'o',
+      ipa: 'ɒ',
+      letter: 'o',
+      category: 'current-target-vowel',
+    },
+    {
+      id: 'sound-u',
+      mnemonic: 'u',
+      ipa: 'ʌ',
+      letter: 'u',
+      category: 'current-target-vowel',
+    },
+    {
+      id: 'sound-i',
+      mnemonic: 'i',
+      ipa: 'ɪ',
+      letter: 'i',
+      category: 'current-target-vowel',
+    },
+    {
+      id: 'sound-e',
+      mnemonic: 'e',
+      ipa: 'ɛ',
+      letter: 'e',
+      category: 'current-target-vowel',
+    },
+  ]
+
+export interface LetterSoundsRulesConfig {
+  /** Combined active pool: mastered-consonants + mastered-vowel /æ/ +
+   *  all 4 current-target-vowel candidates. The session-level rules
+   *  enforce that ONLY ONE current-target vowel appears in any given
+   *  session (the planner emits one at a time per the directive's
+   *  vowel-ladder self-check). */
+  pool: readonly LetterSoundsPoolFact[]
+  /** Min count for mastered-consonant targets across the 8 problems. */
+  masteredConsonantMin: number
+  /** Min/max counts for current-target-vowel targets. */
+  currentTargetVowelMin: number
+  currentTargetVowelMax: number
+  /** Min count for mastered-vowel /æ/ targets. */
+  masteredVowelMin: number
+  /** Slots (1-indexed) where mastered-consonant targets are the
+   *  ONLY allowed category (gentle ramp). */
+  gentleRampSlots: readonly number[]
+  /** Slots where the mastered-vowel /æ/ anchor SHOULD appear (mid-
+   *  tier window). Documentary only — the floor is enforced
+   *  whole-session, not per-slot. */
+  midTierSlots: readonly number[]
+  totalProblems: number
+}
+
+export const LETTER_SOUNDS_RULES: LetterSoundsRulesConfig = {
+  pool: [...LETTER_SOUNDS_BASE_POOL, ...LETTER_SOUNDS_CURRENT_TARGET_VOWELS],
+  masteredConsonantMin: 4,
+  currentTargetVowelMin: 2,
+  currentTargetVowelMax: 3,
+  masteredVowelMin: 1,
+  gentleRampSlots: [1, 2, 3],
+  midTierSlots: [4, 5],
+  totalProblems: 8,
+}
+
+/**
+ * Parse a letter-sounds read-line into the target sound mnemonic.
+ * Template: `"Which letter says <MNEMONIC>?"`. Returns `null` on
+ * malformed text; the caller fires `unparseable-problem`.
+ *
+ * The regex is case-insensitive on the "Which letter says" framing
+ * but the captured mnemonic is normalised to lowercase for lookup.
+ * Mnemonics in PHONEME_OVERRIDES are lowercase.
+ */
+const RE_LETTER_SOUNDS_READ = /^\s*which\s+letter\s+says\s+([a-z]+)\s*\?\s*$/i
+
+export function parseLetterSoundsReadLine(
+  text: string,
+): { mnemonic: string } | null {
+  const m = RE_LETTER_SOUNDS_READ.exec(text)
+  if (!m) return null
+  return { mnemonic: m[1]!.toLowerCase() }
+}
+
+interface LetterSoundsProblemRow {
+  index: number
+  utteranceId: string
+  text: string
+  mnemonic: string | null
+  poolMatch: LetterSoundsPoolFact | null
+}
+
+function extractLetterSoundsProblems(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  pool: readonly LetterSoundsPoolFact[],
+): LetterSoundsProblemRow[] {
+  // letter-sounds uses the word-song `word.p<N>.read` namespace (see
+  // `api/_planner.ts` WORD_SONG_TRACK_GUIDE — utterance-id rule keeps
+  // the `word.` prefix regardless of focus node).
+  const re = /^word\.p(\d+)\.read$/
+  const rows: LetterSoundsProblemRow[] = []
+  for (const u of response.utterances) {
+    const m = re.exec(u.id)
+    if (!m) continue
+    const index = Number.parseInt(m[1]!, 10)
+    const parsed = parseLetterSoundsReadLine(u.text)
+    const poolMatch = parsed
+      ? (pool.find((f) => f.mnemonic === parsed.mnemonic) ?? null)
+      : null
+    rows.push({
+      index,
+      utteranceId: u.id,
+      text: u.text,
+      mnemonic: parsed?.mnemonic ?? null,
+      poolMatch,
+    })
+  }
+  rows.sort((x, y) => x.index - y.index)
+  return rows
+}
+
+/**
+ * Lint a letter-sounds canon plan. Returns ALL violations across the
+ * 8-problem set — does not stop at the first.
+ *
+ * Pure; no I/O.
+ */
+export function lintLetterSoundsComposition(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: LetterSoundsRulesConfig = LETTER_SOUNDS_RULES,
+): CompositionViolation[] {
+  const violations: CompositionViolation[] = []
+  const rows = extractLetterSoundsProblems(response, config.pool)
+
+  // 1. Unparseable / pool-membership per problem.
+  for (const row of rows) {
+    if (row.mnemonic === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: row.index,
+        message:
+          `P${row.index} read-line "${row.text}" does not match the ` +
+          `"Which letter says <SOUND-MNEMONIC>?" letter-sounds template.`,
+        factId: null,
+      })
+      continue
+    }
+    if (row.poolMatch === null) {
+      violations.push({
+        rule: 'pool-membership',
+        problemIndex: row.index,
+        message:
+          `P${row.index} target sound "${row.mnemonic}" is not in the ` +
+          `letter-sounds active pool (14 mastered consonants + /æ/ + 4 ` +
+          `current-target vowel candidates per design/word-song/` +
+          `letter-sounds-content.md §1.1).`,
+        factId: `sound-${row.mnemonic}`,
+      })
+    }
+  }
+
+  // Rows with a valid pool match — used by every subsequent rule.
+  const matched = rows.filter(
+    (r): r is LetterSoundsProblemRow & { poolMatch: LetterSoundsPoolFact } =>
+      r.poolMatch !== null,
+  )
+
+  // 2. No-duplicates — no two problems may share the same target sound.
+  //    EXCEPTION per spec §1.3 rule 7: when current-target = vowel AND
+  //    the 2-emission floor (rule 3) + 3-emission cap (rule 4) together
+  //    force a repeat (e.g. current-target = /ɒ/ + only one canonical
+  //    letter 'o'), the floor of 2 distinct /ɒ/-target problems may
+  //    share the same sound across two slots. The deduplication rule
+  //    YIELDS to the 2-emission floor. The lint enforces this by
+  //    permitting duplicates on the SINGLE current-target-vowel sound
+  //    up to the cap (3); duplicates on any other category, or on the
+  //    current-target vowel beyond the cap, still fire.
+  type MatchedRow = LetterSoundsProblemRow & {
+    poolMatch: LetterSoundsPoolFact
+  }
+  const byId = new Map<string, MatchedRow[]>()
+  for (const row of matched) {
+    const id = row.poolMatch.id
+    if (!byId.has(id)) byId.set(id, [])
+    byId.get(id)!.push(row)
+  }
+  for (const [id, dups] of byId) {
+    if (dups.length > 1) {
+      const isCurrentTargetVowel =
+        dups[0]!.poolMatch.category === 'current-target-vowel'
+      if (isCurrentTargetVowel && dups.length <= config.currentTargetVowelMax) {
+        // Permitted dedup-yield (§1.3 rule 7 exception). Do not flag.
+        continue
+      }
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: null,
+        message:
+          `Sound ${id} appears ${dups.length} times ` +
+          `(slots P${dups.map((d) => d.index).join(', P')}). ` +
+          `No duplicate target sounds allowed within the 8-problem set ` +
+          `(per design/word-song/letter-sounds-content.md §1.3 rule 7). ` +
+          (isCurrentTargetVowel
+            ? `Note: §1.3 rule 7 PERMITS current-target-vowel dedup up to ` +
+              `the cap of ${config.currentTargetVowelMax}; this session ` +
+              `exceeds that limit.`
+            : ``),
+        factId: id,
+      })
+    }
+  }
+
+  // 3. Gentle-ramp (P1-P3) — mastered-consonant targets ONLY.
+  for (const row of matched) {
+    if (config.gentleRampSlots.includes(row.index)) {
+      if (row.poolMatch.category !== 'mastered-consonant') {
+        violations.push({
+          rule: 'band-by-slot',
+          problemIndex: row.index,
+          message:
+            `P${row.index} (gentle ramp) carries a ${row.poolMatch.category} ` +
+            `target (sound "${row.poolMatch.mnemonic}"); P1-P3 must be ` +
+            `mastered-consonant only per design/word-song/letter-sounds-` +
+            `content.md §1.3 rule 1.`,
+          factId: row.poolMatch.id,
+        })
+      }
+    }
+  }
+
+  // 4. Category-mix budgets (whole-session — §1.3).
+  const counts: Record<LetterSoundsCategory, number> = {
+    'mastered-consonant': 0,
+    'mastered-vowel': 0,
+    'current-target-vowel': 0,
+  }
+  for (const row of matched) {
+    counts[row.poolMatch.category] += 1
+  }
+
+  if (counts['mastered-consonant'] < config.masteredConsonantMin) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `Mastered-consonant target count is ${counts['mastered-consonant']}; ` +
+        `must be at least ${config.masteredConsonantMin} per design/word-` +
+        `song/letter-sounds-content.md §1.3 CATEGORY-MIX BUDGET.`,
+      factId: null,
+    })
+  }
+  if (counts['current-target-vowel'] < config.currentTargetVowelMin) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `Current-target-vowel target count is ${counts['current-target-vowel']}; ` +
+        `must be at least ${config.currentTargetVowelMin} (the tier's ` +
+        `load-bearing assessment anchor — a session with 0-1 instances ` +
+        `teaches nothing new).`,
+      factId: null,
+    })
+  }
+  if (counts['current-target-vowel'] > config.currentTargetVowelMax) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `Current-target-vowel target count is ${counts['current-target-vowel']}; ` +
+        `must be at most ${config.currentTargetVowelMax} (cap prevents ` +
+        `single-vowel drill feel per §1.3).`,
+      factId: null,
+    })
+  }
+  if (counts['mastered-vowel'] < config.masteredVowelMin) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `Mastered-vowel /æ/ target count is ${counts['mastered-vowel']}; ` +
+        `must be at least ${config.masteredVowelMin} (anchor that gives ` +
+        `Marian a "you know this one" reset in the session's middle).`,
+      factId: null,
+    })
+  }
+
+  // 5. /ɪ/-/ɛ/ adjacency ban (§1.2 — the load-bearing acoustic-similarity
+  //    rule). It is FORBIDDEN to emit BOTH /ɪ/ (sound-i) and /ɛ/
+  //    (sound-e) as targets in the same session — they are the most
+  //    acoustically similar English short-vowel pair and Marian's
+  //    diagnostic showed /ɪ/ as her weakest vowel.
+  const hasShortI = matched.some((r) => r.poolMatch.id === 'sound-i')
+  const hasShortE = matched.some((r) => r.poolMatch.id === 'sound-e')
+  if (hasShortI && hasShortE) {
+    const iSlots = matched
+      .filter((r) => r.poolMatch.id === 'sound-i')
+      .map((r) => `P${r.index}`)
+    const eSlots = matched
+      .filter((r) => r.poolMatch.id === 'sound-e')
+      .map((r) => `P${r.index}`)
+    violations.push({
+      rule: 'adjacent-vowel-ban',
+      problemIndex: null,
+      message:
+        `/ɪ/ (slots ${iSlots.join(', ')}) and /ɛ/ (slots ${eSlots.join(', ')}) ` +
+        `both appear as targets in this session. FORBIDDEN by the /ɪ/-/ɛ/ ` +
+        `acoustic-similarity ban (design/word-song/letter-sounds-content.md ` +
+        `§1.2). They are the most acoustically similar English short-vowel ` +
+        `pair; never emit both as targets in one session.`,
+      factId: null,
+    })
+  }
+
+  return violations
+}
+
+/**
+ * Throwing helper for the bake-time integration point. The throw
+ * aborts the bake and stops the (compositionally invalid) JSON from
+ * reaching disk.
+ *
+ * `canonId` is a human-readable identifier (e.g.
+ * `"word-song/letter-sounds"`).
+ */
+export function assertLetterSoundsCompositionClean(
+  canonId: string,
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: LetterSoundsRulesConfig = LETTER_SOUNDS_RULES,
+): void {
+  const violations = lintLetterSoundsComposition(response, config)
+  if (violations.length > 0) {
+    throw new CompositionLintError(canonId, violations)
+  }
+}
+
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
 // Current scope is sub-to-10 + add-to-10 + sub-to-20 + add-to-20. The
@@ -3862,6 +4393,10 @@ export type TierLintBinding =
   | {
       tier: Extract<CanonFileTier, 'two-digit-addsub-with-regroup'>
       config: TwoDigitAddsubWithRegroupRulesConfig
+    }
+  | {
+      tier: Extract<CanonFileTier, 'letter-sounds'>
+      config: LetterSoundsRulesConfig
     }
   | null
 
@@ -3955,6 +4490,16 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
     norm.endsWith('/two-digit-addsub.json')
   ) {
     return { tier: 'two-digit-addsub', config: TWO_DIGIT_ADDSUB_RULES }
+  }
+  // letter-sounds binding (Wave 7 Track A7 — ticket 86c9y49cd). The
+  // disk file is `public/canon/word-song/level-1/letter-sounds.json`;
+  // the lint binding fires at bake-time via `bakeOne` and at CI time
+  // via the disk walker.
+  if (norm.endsWith('/word-song/level-1/letter-sounds.json')) {
+    return { tier: 'letter-sounds', config: LETTER_SOUNDS_RULES }
+  }
+  if (norm === 'letter-sounds.json' || norm.endsWith('/letter-sounds.json')) {
+    return { tier: 'letter-sounds', config: LETTER_SOUNDS_RULES }
   }
   return null
 }
@@ -4071,6 +4616,12 @@ export function runCompositionLint(
         break
       case 'two-digit-addsub-with-regroup':
         violations = lintTwoDigitAddsubWithRegroupComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+      case 'letter-sounds':
+        violations = lintLetterSoundsComposition(
           parsed as SessionStartResponse,
           binding.config,
         )

@@ -35,6 +35,7 @@ import {
   ADD_TO_TWENTY_RULES,
   CompositionLintError,
   KNOWN_DISTRACTOR_CLASSES,
+  LETTER_SOUNDS_RULES,
   SUB_TO_TEN_POOL,
   SUB_TO_TEN_RULES,
   SUB_TO_TWENTY_POOL,
@@ -45,6 +46,7 @@ import {
   TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
   assertAddToTenCompositionClean,
   assertAddToTwentyCompositionClean,
+  assertLetterSoundsCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
   assertTwoDigitAddsubCompositionClean,
@@ -52,12 +54,14 @@ import {
   formatCompositionLintReport,
   lintAddToTenComposition,
   lintAddToTwentyComposition,
+  lintLetterSoundsComposition,
   lintSubToTenComposition,
   lintSubToTwentyComposition,
   lintTwoDigitAddsubComposition,
   lintTwoDigitAddsubWithRegroupComposition,
   parseAddToTenReadLine,
   parseAddToTwentyReadLine,
+  parseLetterSoundsReadLine,
   parseSubToTenReadLine,
   parseSubToTwentyReadLine,
   parseTwoDigitAddsubReadLine,
@@ -7528,5 +7532,501 @@ describe('KNOWN_DISTRACTOR_CLASSES', () => {
 
   it("contains exactly 3 known classes (Dave's canonical names only)", () => {
     expect(KNOWN_DISTRACTOR_CLASSES.size).toBe(3)
+  })
+})
+
+// ── letter-sounds composition lint (Wave 7 Track A7 — ticket 86c9y49cd) ──
+//
+// The letter-sounds binding validates the load-bearing pedagogical rules
+// from `design/word-song/letter-sounds-content.md`:
+//   §1.1   — pool membership (16 active sounds)
+//   §1.2   — /ɪ/-/ɛ/ acoustic-similarity ban
+//   §1.3   — gentle ramp (P1-P3 mastered-consonant only); category-mix
+//            budget (mastered-consonant ≥ 4, current-target-vowel
+//            2-3, mastered-vowel /æ/ ≥ 1)
+//   §1.3#7 — no duplicate target sound within the 8-problem set
+
+/** Build a `word.p<N>.read` letter-sounds utterance with the
+ *  "Which letter says <MNEMONIC>?" template. */
+function readLetterSoundsUtterance(index: number, mnemonic: string): Utterance {
+  return {
+    id: `word.p${index}.read`,
+    text: `Which letter says ${mnemonic}?`,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+function rawLetterSoundsReadUtterance(index: number, text: string): Utterance {
+  return {
+    id: `word.p${index}.read`,
+    text,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+/** Convenience: build a SessionStartResponse with the given 8
+ *  letter-sounds mnemonics. */
+function buildLetterSoundsCanonResponse(
+  mnemonics: readonly string[],
+): SessionStartResponse {
+  const utterances: Utterance[] = mnemonics.map((m, i) =>
+    readLetterSoundsUtterance(i + 1, m),
+  )
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: { id: 'test', label: 'test', utterances: [] },
+    utterances,
+  }
+}
+
+describe('parseLetterSoundsReadLine', () => {
+  it('parses the canonical mnemonic "mmm"', () => {
+    expect(parseLetterSoundsReadLine('Which letter says mmm?')).toEqual({
+      mnemonic: 'mmm',
+    })
+  })
+
+  it('parses the stop-consonant mnemonic "buh"', () => {
+    expect(parseLetterSoundsReadLine('Which letter says buh?')).toEqual({
+      mnemonic: 'buh',
+    })
+  })
+
+  it('parses the bare vowel mnemonic "o"', () => {
+    expect(parseLetterSoundsReadLine('Which letter says o?')).toEqual({
+      mnemonic: 'o',
+    })
+  })
+
+  it('returns null on a non-letter-sounds template (e.g. cvc-words "Read the cat.")', () => {
+    expect(parseLetterSoundsReadLine('Read the cat.')).toBeNull()
+    expect(parseLetterSoundsReadLine('Tap the cat.')).toBeNull()
+  })
+
+  it('case-insensitive on the framing; lowercases the captured mnemonic', () => {
+    expect(parseLetterSoundsReadLine('WHICH LETTER SAYS MMM?')).toEqual({
+      mnemonic: 'mmm',
+    })
+  })
+})
+
+describe('lintLetterSoundsComposition — clean fixture passes (2 /ɒ/ + 1 /æ/ + 5 mastered-consonants)', () => {
+  it('accepts the canonical 8-problem shape with 2 /ɒ/ targets — rule-7 dedup-yield (no violations)', () => {
+    // Per §1.3 rule 7 exception: when current-target = vowel and the
+    // 2-emission floor + 3-emission cap force a repeat (current-target
+    // = /ɒ/ + only one canonical letter 'o'), the floor of 2 distinct
+    // /ɒ/-target problems may share the same sound across two slots.
+    // The lint PERMITS this dedup-yield up to the cap.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    expect(violations).toEqual([])
+  })
+
+  it('accepts a 3 /ɒ/ session (at the upper cap of current-target-vowel — permitted dedup)', () => {
+    // 3 current-target /ɒ/ (at cap) + 1 /æ/ + 4 mastered-consonants.
+    // Triple-dedup is permitted as long as it stays within the cap.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'o',
+      'buh',
+      'o',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    expect(violations).toEqual([])
+  })
+
+  it('FIRES no-duplicates when a mastered-consonant target repeats (NOT covered by rule-7 exception)', () => {
+    // Two 'mmm' (mastered-consonant) targets — outside the rule-7
+    // exception (which only covers current-target-vowel).
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'mmm',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const dupViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'no-duplicates',
+    )
+    expect(dupViolations).toHaveLength(1)
+    expect(dupViolations[0]!.factId).toBe('sound-m')
+  })
+
+  it('FIRES no-duplicates when current-target-vowel dedup exceeds the cap (4 /ɒ/ slots)', () => {
+    // 4 /ɒ/ targets — exceeds cap of 3. Both category-cap (over-cap)
+    // AND no-duplicates (beyond permitted dedup window) fire.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'o',
+      'o',
+      'o',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const ruleKinds = new Set(violations.map((v: { rule: string }) => v.rule))
+    expect(ruleKinds.has('category-cap')).toBe(true)
+    expect(ruleKinds.has('no-duplicates')).toBe(true)
+  })
+})
+
+describe('lintLetterSoundsComposition — pool-membership rule', () => {
+  it('rejects an unknown mnemonic as off-pool', () => {
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'zzz', // 'zzz' off-pool
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const poolViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'pool-membership',
+    )
+    expect(poolViolations).toHaveLength(1)
+    expect(poolViolations[0].message).toMatch(/zzz/)
+    expect(poolViolations[0].problemIndex).toBe(8)
+  })
+
+  it('rejects a long-vowel mnemonic ("ay" is not in pool — long-a is out of scope per §1.1)', () => {
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'ay',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const poolViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'pool-membership',
+    )
+    expect(poolViolations).toHaveLength(1)
+    expect(poolViolations[0].message).toMatch(/ay/)
+  })
+})
+
+describe('lintLetterSoundsComposition — category-cap rule (mastered-consonant min, current-target-vowel min/max, mastered-vowel min)', () => {
+  it('fires when current-target-vowel target count < 2 (the load-bearing assessment floor)', () => {
+    // Only 1 /ɒ/ target (slot P6). Violates min-2 floor.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'sss',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /current-target-vowel/i.test(v.message),
+    )
+    expect(capViolations).toHaveLength(1)
+    expect(capViolations[0].message).toMatch(/at least 2/i)
+  })
+
+  it('fires when current-target-vowel target count > 3 (the cap that prevents single-vowel drill)', () => {
+    // 4 /ɒ/ targets. Violates max-3 cap.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'o',
+      'o',
+      'o',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /current-target-vowel/i.test(v.message),
+    )
+    expect(
+      capViolations.some((v: { message: string }) =>
+        /at most 3/i.test(v.message),
+      ),
+    ).toBe(true)
+  })
+
+  it('fires when mastered-consonant target count < 4 (the review-mode floor)', () => {
+    // 3 mastered-consonants + 1 /æ/ + 4 /ɒ/ — violates both
+    // mastered-consonant floor AND current-target-vowel cap.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'o',
+      'o',
+      'o',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /mastered-consonant/i.test(v.message),
+    )
+    expect(capViolations).toHaveLength(1)
+  })
+
+  it('fires when mastered-vowel /æ/ target count < 1 (the mid-tier anchor floor)', () => {
+    // No /æ/ target at all.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'sss',
+      'buh',
+      'o',
+      'guh',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /mastered-vowel/i.test(v.message),
+    )
+    expect(capViolations).toHaveLength(1)
+  })
+})
+
+describe('lintLetterSoundsComposition — band-by-slot rule (gentle-ramp P1-P3 mastered-consonant only)', () => {
+  it('fires when P1 carries a vowel target (gentle ramp must be mastered-consonant)', () => {
+    // P1 carries 'o' (current-target vowel) — illegal in gentle ramp.
+    const session = buildLetterSoundsCanonResponse([
+      'o',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'sss',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const bandViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'band-by-slot',
+    )
+    expect(bandViolations).toHaveLength(1)
+    expect(bandViolations[0].problemIndex).toBe(1)
+    expect(bandViolations[0].message).toMatch(/current-target-vowel/)
+  })
+
+  it('fires when P2 carries the mastered vowel /æ/ (still illegal in gentle ramp — vowels are LIFT)', () => {
+    // P2 carries 'a' (mastered vowel) — illegal in gentle ramp.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'a',
+      'nnn',
+      'sss',
+      'buh',
+      'o',
+      'guh',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const bandViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'band-by-slot',
+    )
+    expect(bandViolations).toHaveLength(1)
+    expect(bandViolations[0].problemIndex).toBe(2)
+    expect(bandViolations[0].message).toMatch(/mastered-vowel/)
+  })
+
+  it('does NOT fire when vowel target lands in mid-tier (P4) or trap (P6-P8)', () => {
+    // /æ/ at P4 (mid-tier, valid) + /ɒ/ at P6/P8 (trap, valid).
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'o',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const bandViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'band-by-slot',
+    )
+    expect(bandViolations).toHaveLength(0)
+  })
+})
+
+describe('lintLetterSoundsComposition — adjacent-vowel-ban rule (/ɪ/-/ɛ/ acoustic-similarity)', () => {
+  it('fires when BOTH /ɪ/ and /ɛ/ appear as targets in the same session (FORBIDDEN per §1.2)', () => {
+    // /ɪ/ (mnemonic 'i') at P6 + /ɛ/ (mnemonic 'e') at P8 — illegal.
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'i',
+      'guh',
+      'e',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const banViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'adjacent-vowel-ban',
+    )
+    expect(banViolations).toHaveLength(1)
+    expect(banViolations[0].message).toMatch(/ɪ.*ɛ/)
+    expect(banViolations[0].message).toMatch(/P6/)
+    expect(banViolations[0].message).toMatch(/P8/)
+  })
+
+  it('does NOT fire when only /ɪ/ appears (current-target /ɪ/ session)', () => {
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'i',
+      'guh',
+      'i',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const banViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'adjacent-vowel-ban',
+    )
+    expect(banViolations).toHaveLength(0)
+  })
+
+  it('does NOT fire when only /ɛ/ appears (current-target /ɛ/ session — assumes /ɪ/ already mastered)', () => {
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'e',
+      'guh',
+      'e',
+    ])
+    const violations = lintLetterSoundsComposition(session)
+    const banViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'adjacent-vowel-ban',
+    )
+    expect(banViolations).toHaveLength(0)
+  })
+})
+
+describe('lintLetterSoundsComposition — unparseable-problem rule', () => {
+  it('fires when the read-line does NOT match the "Which letter says <MNEMONIC>?" template', () => {
+    const session: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        rawLetterSoundsReadUtterance(1, 'Tap the cat.'), // wrong template
+        readLetterSoundsUtterance(2, 'hhh'),
+        readLetterSoundsUtterance(3, 'nnn'),
+        readLetterSoundsUtterance(4, 'a'),
+        readLetterSoundsUtterance(5, 'buh'),
+        readLetterSoundsUtterance(6, 'o'),
+        readLetterSoundsUtterance(7, 'guh'),
+        readLetterSoundsUtterance(8, 'o'),
+      ],
+    }
+    const violations = lintLetterSoundsComposition(session)
+    const unparseable = violations.filter(
+      (v: { rule: string }) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0].problemIndex).toBe(1)
+  })
+})
+
+describe('assertLetterSoundsCompositionClean (bake-time integration point)', () => {
+  it('throws CompositionLintError on any violation', () => {
+    // Floor-violation session (0 /ɒ/ targets).
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'sss',
+      'guh',
+      'fff',
+    ])
+    expect(() =>
+      assertLetterSoundsCompositionClean('word-song/letter-sounds', session),
+    ).toThrow(CompositionLintError)
+  })
+
+  it('does NOT throw on the canonical 2-/ɒ/-slot session (rule-7 dedup-yield is permitted)', () => {
+    const session = buildLetterSoundsCanonResponse([
+      'mmm',
+      'hhh',
+      'nnn',
+      'a',
+      'buh',
+      'o',
+      'guh',
+      'o',
+    ])
+    expect(() =>
+      assertLetterSoundsCompositionClean('word-song/letter-sounds', session),
+    ).not.toThrow()
+  })
+})
+
+describe('resolveTierBinding — letter-sounds canon file path', () => {
+  it('resolves to the letter-sounds binding for the word-song/level-1/letter-sounds.json path', () => {
+    const binding = resolveTierBinding(
+      'public/canon/word-song/level-1/letter-sounds.json',
+    )
+    expect(binding).not.toBeNull()
+    if (binding === null) throw new Error('unreachable — assertion above')
+    expect(binding.tier).toBe('letter-sounds')
+    expect(binding.config).toBe(LETTER_SOUNDS_RULES)
+  })
+
+  it('resolves on a bare letter-sounds.json basename (CI walker, file already in cwd)', () => {
+    const binding = resolveTierBinding('letter-sounds.json')
+    expect(binding).not.toBeNull()
+    if (binding === null) throw new Error('unreachable — assertion above')
+    expect(binding.tier).toBe('letter-sounds')
+  })
+
+  it('returns null for word-song canon files that are NOT letter-sounds (out-of-scope)', () => {
+    expect(
+      resolveTierBinding('public/canon/word-song/level-1/cvc-words.json'),
+    ).toBeNull()
+    expect(
+      resolveTierBinding('public/canon/word-song/level-1/digraphs-sh.json'),
+    ).toBeNull()
   })
 })
