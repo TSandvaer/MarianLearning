@@ -8,7 +8,26 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 
 <!-- Real entries below this line. Newest at top. -->
 
-## 2026-05-22 1700 UTC — Cancel 4 hung CI runs (partial — 2 of 4 raced to SUCCESS during cancel)
+## 2026-05-23 0900 UTC — Cross-project handoff: ClickUp MCP tool-name rename pre-staged on branch (PR open NOT done — waiting on MARIAN orch)
+
+- **Decided:** RandomGame orchestrator session (`c:/Trunk/PRIVATE/RandomGame`, 2026-05-23 morning) pre-staged a `chore/agent-tool-surface-mcp-rename` branch in this repo with all five persona files + `dispatch-template.md` renamed to the new self-hosted ClickUp MCP tool names. **Branch is pushed to `origin/chore/agent-tool-surface-mcp-rename` but no PR has been opened** — Thomas's explicit ask was "pre-staged branch ready-to-PR so the MARIAN-TUTOR orchestrator can pick it up."
+- **What changed (5 files, +13/-13):**
+  - `.claude/agents/matt.md` — `tools:` whitelist trimmed (14 tools without equivalents dropped, 10 renamed/remapped) + body API-casing note
+  - `.claude/agents/kevin.md` — `tools:` + 2 body refs
+  - `.claude/agents/devon.md` — `tools:` + 2 body refs
+  - `.claude/agents/dave.md` — `tools:` + 1 body ref
+  - `.claude/agents/dispatch-template.md` — 3 body refs
+- **KNOWN GAP (surface to Thomas before merge):** matt.md line 34 says "If a task needs two disciplines, split it into separate ClickUp tasks with a blocker relationship" — this relied on `clickup_add_task_dependency` which is **gone** from the new MCP. Other dropped Matt tools: `move_task`, `add_tag_to_task`/`remove_tag_from_task`, `get_custom_fields`, `resolve_assignees`, `find_member_by_name`, `get_workspace_hierarchy`, `add_task_link`/`remove_task_link`, `add_task_dependency`/`remove_task_dependency`. Full list + rename mapping in the commit body (`git show chore/agent-tool-surface-mcp-rename`). Matt may need to either (a) set blocker relationships via ClickUp web UI manually, or (b) MARIAN orch fronts the call via a different tool, or (c) revise the workflow doc.
+- **Foundation:** RandomGame's sister PR #336 (https://github.com/TSandvaer/RandomGame/pull/336) — same rename pattern, Devon peer-reviewed APPROVE, merged at SHA `7357bd2` 2026-05-23. The user-scope MCP swap applies to both projects on the same machine, so MARIAN needed the same rename to function. Without this PR, all MARIAN sub-agent personas would have NO usable ClickUp MCP tools at runtime (whitelist references old names that don't resolve against the new server).
+- **What MARIAN orch should do on pickup:**
+  1. Read the commit (`git show chore/agent-tool-surface-mcp-rename`) — full rename mapping + dropped-tools list documented in the body.
+  2. Decide on Matt's dropped-tool gap (3 options listed above) — this is a small-design call, not a code call.
+  3. Open the PR: `gh pr create --title "chore(agents): rename ClickUp MCP tool refs to nsxdavid self-hosted naming" --body <see commit body>`.
+  4. Dispatch Kevin or Devon for peer-review per cross-persona routing rule.
+  5. Merge after APPROVE + CI green.
+- **Alternative:** Have the RandomGame orch open the PR directly. Rejected because (a) MARIAN orch owns final merge gate per cross-project session boundary, (b) MARIAN orch has context on Matt's dropped-tool gap decision that the RandomGame orch lacks, (c) Thomas explicitly requested "pre-staged ... so MARIAN orch can pick it up."
+- **Reversibility:** Branch is pre-staged only. If MARIAN orch (or Thomas) prefers a different naming convention or wants to revise Matt's tool-set, the branch can be force-reset or deleted with no production impact. ~10 min effort.
+- **Status:** PRE-STAGED. Awaiting MARIAN orchestrator PR-open + merge in next MARIAN session.
 
 - **Decided:** Issued `gh run cancel` on 4 GitHub Actions runs stuck at "Run e2e suite" step for 2.5+ hours (started 14:28-14:56Z). Targets: 26293677220 (Kevin #302), 26293679103 (Devon #303), 26293751625 (Jessica #304), 26295114187 (post-#301 main push).
 - **Race outcome:** 2 of 4 runs finished SUCCESS between my status-check (16:58Z) and my cancel call (17:00Z): #302 and #303 both completed naturally. The cancel API returned "Cannot cancel a workflow run that is completed" for those. The other 2 (Jessica #304 + main) received cancel signals.
