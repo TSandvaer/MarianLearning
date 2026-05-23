@@ -265,8 +265,20 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // rendered as text in the chip frame, no `picture-{word}.svg`
 // pipeline). See `design/word-song/letter-names-content.md` (Kyle A1) +
 // `WORD_SONG_TRACK_GUIDE` letter-names block (Dave A2, PR #329).
+// Wave 7 Track A7 (ticket 86c9y49cd) added `letter-sounds` as the FIRST
+// non-CVC word-song tier to ship first-class content — see
+// `design/word-song/letter-sounds-content.md` §1-§6. The tier emits
+// isolated-phoneme prompts (`"Which letter says mmm?"`) using a
+// mnemonic substitution table wrapped at render time via the
+// tier-aware extension of `PHONEME_OVERRIDES` in `api/_tts.ts`
+// (Amendment 1 of this PR). The canon bake produces
+// `public/canon/word-song/level-1/letter-sounds.json` whose utterance
+// text is plain mnemonic ("mmm", "buh", "o", etc.) and whose audio
+// payload is the phoneme-wrapped MP3 (the substitution table fires
+// during the bake-time Azure render call).
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'letter-names',
+  'letter-sounds',
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',

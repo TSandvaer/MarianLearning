@@ -926,13 +926,15 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
     expect(prompt).not.toMatch(/sight-words:.*Tap the word/i)
   })
 
-  it('falls back focusNode "letter-sounds" to "blending-cv" in the user message (untuned tier stub)', async () => {
-    // Step 2 (ticket 86c9kxu07): letter-sounds is a valid focus node but
-    // the planner doesn't have first-class content for it yet. Per the
-    // contract doc the server falls back to blending-cv content (a
-    // working stub) so the screen always renders, even on tiers we
-    // haven't tuned. Future tier-content tickets refine letter-sounds
-    // proper.
+  it('routes focusNode "letter-sounds" verbatim as a FIRST-CLASS tier in the user message (Wave 7 Track A7 — ticket 86c9y49cd)', async () => {
+    // Wave 7 Track A7 (ticket 86c9y49cd) promoted letter-sounds from
+    // the stub-fallback (which routed to blending-cv) to first-class:
+    // the planner emits dedicated letter-sounds session content per
+    // Dave's directive in `WORD_SONG_TRACK_GUIDE`, and `_planner.ts`
+    // injects the `LETTER-SOUNDS DIRECTIVE` (with current-target-vowel)
+    // into the user message. Pre-Wave 7 this test asserted the
+    // stub-fallback to blending-cv — flipped here to assert verbatim
+    // routing + directive presence.
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -946,8 +948,13 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
 
     const args = capture.lastArgs as { messages: Array<{ content: string }> }
     const user = args.messages[0]!.content
-    expect(user).toContain('blending-cv')
-    expect(user).not.toContain('letter-sounds')
+    // The focus skill node line carries the verbatim requested
+    // tier name — no stub remap.
+    expect(user).toMatch(/Focus skill node: letter-sounds\./)
+    expect(user).not.toMatch(/Focus skill node: blending-cv\./)
+    // The LETTER-SOUNDS DIRECTIVE is the deterministic anchor for the
+    // Wave 7 A7 wiring — its presence proves the injection seam fired.
+    expect(user).toContain('LETTER-SOUNDS DIRECTIVE')
   })
 
   it('routes first-class focus nodes (blending-cv, cvc-words) verbatim; falls back untuned tiers to blending-cv (sweep)', async () => {
@@ -970,7 +977,7 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
     // PR #329 directive.)
     const expectations: ReadonlyArray<[string, string]> = [
       ['letter-names', 'letter-names'], // first-class (Wave 7 Track A3 content tier)
-      ['letter-sounds', 'blending-cv'],
+      ['letter-sounds', 'letter-sounds'], // first-class (Wave 7 Track A7 — ticket 86c9y49cd)
       ['blending-cv', 'blending-cv'], // first-class
       ['cvc-words', 'cvc-words'], // first-class (the unblock)
       ['digraphs-sh', 'digraphs-sh'], // first-class (sh content tier)

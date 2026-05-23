@@ -72,6 +72,18 @@ export interface TtsRequest {
   pitch: string
   /** Prosody volume, e.g. `'+0%'`. */
   volume: string
+  /**
+   * Optional tier filter for tier-aware `PHONEME_OVERRIDES`
+   * substitutions (Wave 7 Track A7 — Amendment 1 of ticket
+   * 86c9y49cd). Source-of-truth focus-node tier the utterance comes
+   * from (e.g. `'letter-sounds'`, `'cvc-words'`). When set, only
+   * `PHONEME_OVERRIDES` entries whose `tiers` array is undefined
+   * (global) OR includes this tier are activated. When omitted, only
+   * global entries activate (back-compat — existing CVC-tier callers
+   * keep their pre-Amendment-1 behaviour because their wrapped words
+   * like `four` are unconstrained on `tiers`).
+   */
+  tier?: string
 }
 
 export interface TtsResult {
@@ -191,8 +203,103 @@ export function escapeSsml(text: string): string {
  * casing — Azure ignores the visible word once `ph=` is set, but
  * keeping casing consistent helps debugging when reading the SSML.
  */
-const PHONEME_OVERRIDES: Record<string, string> = {
-  four: 'fɔːr',
+/**
+ * One phoneme-override entry. Pre-Wave-7 the table was
+ * `Record<string, string>` (a bare word→IPA map). Wave 7 Track A7
+ * (ticket 86c9y49cd, Amendment 1) widened it to also carry an
+ * optional `tiers` array — the **tier-filter** that gates whether an
+ * entry activates on a given utterance.
+ *
+ * Why the widening
+ * ----------------
+ * The letter-sounds tier emits canon utterances like
+ * `"Which letter says mmm?"` (mnemonic English-letter approximations
+ * of isolated phonemes per `design/word-song/letter-sounds-
+ * content.md §2.3`). These mnemonics MUST be wrapped in
+ * `<phoneme alphabet="ipa" ph="m">mmm</phoneme>` at render time so
+ * Azure voices the phoneme correctly — but if the wrap fires
+ * globally, real English words containing the mnemonic as a
+ * substring or as a word-boundary token (`m` in "math", `o` in
+ * "Read the dog", `a` in "Read the cat") would also be wrapped and
+ * mispronounce CVC-tier utterances. The tier-filter scopes the wrap:
+ * an entry with `tiers: ['letter-sounds']` activates ONLY when the
+ * caller passes `tier: 'letter-sounds'` on `TtsRequest`.
+ *
+ * Back-compat shape
+ * -----------------
+ * Existing entries (e.g. `four`) carry `{ ipa: 'fɔːr' }` with NO
+ * `tiers` field — `tiers === undefined` is the "global, activate on
+ * every tier" sentinel. Pre-Amendment-1 callers that don't set
+ * `TtsRequest.tier` keep their existing behaviour because:
+ *   1. Global entries (no `tiers`) always activate.
+ *   2. Tier-scoped entries only activate when `tier` matches — an
+ *      undefined-tier caller never matches a tier-scoped entry.
+ * So adding letter-sounds entries to the table is safe: existing
+ * Math / CVC callers neither lose `four` nor gain spurious mnemonic
+ * wraps.
+ */
+export interface PhonemeOverrideEntry {
+  /** IPA pronunciation Azure will speak instead of the lexicon entry
+   *  for the mnemonic word. Single ASCII-safe string with no XML
+   *  metacharacters — placed verbatim inside `ph="..."`. */
+  ipa: string
+  /**
+   * Optional tier-filter. When set, the entry activates ONLY when
+   * the current `TtsRequest.tier` is one of these literals. When
+   * undefined, the entry is global (activates on every tier — the
+   * pre-Wave-7 behaviour, preserved for `four`).
+   */
+  tiers?: readonly string[]
+}
+
+const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
+  // Pre-Wave-7 entry — global (no `tiers`). Original ticket
+  // 86c9kj2um docstring above explains the `four → /fɔːr/` rationale.
+  // Stays back-compat under the widened shape: `tiers === undefined`
+  // means "activate on every tier", which is exactly what the bare-
+  // string `Record<string, string>` shape produced before.
+  four: { ipa: 'fɔːr' },
+
+  // Letter-sounds tier mnemonic→IPA mappings (Wave 7 Track A7 —
+  // Amendment 1 of ticket 86c9y49cd, per `design/word-song/letter-
+  // sounds-content.md §2.3` table). Every entry carries
+  // `tiers: ['letter-sounds']` so the wrap fires ONLY on
+  // letter-sounds tier canon (where the utterance text is
+  // `"Which letter says mmm?"`-shaped) and NEVER on other tiers
+  // (where `mmm`, `o`, `a`, etc. could be substrings or word tokens
+  // in real English content).
+  //
+  // Continuant consonants (sustained articulation — mnemonic is a
+  // triplet so the visible word hints at sustained voicing):
+  mmm: { ipa: 'm', tiers: ['letter-sounds'] },
+  nnn: { ipa: 'n', tiers: ['letter-sounds'] },
+  sss: { ipa: 's', tiers: ['letter-sounds'] },
+  fff: { ipa: 'f', tiers: ['letter-sounds'] },
+  vvv: { ipa: 'v', tiers: ['letter-sounds'] },
+  lll: { ipa: 'l', tiers: ['letter-sounds'] },
+  rrr: { ipa: 'r', tiers: ['letter-sounds'] },
+  hhh: { ipa: 'h', tiers: ['letter-sounds'] },
+  // Stop consonants (with schwa epenthesis tail — mnemonic captures
+  // the unavoidable vowel-leak when voicing a stop in isolation):
+  puh: { ipa: 'p', tiers: ['letter-sounds'] },
+  buh: { ipa: 'b', tiers: ['letter-sounds'] },
+  tuh: { ipa: 't', tiers: ['letter-sounds'] },
+  duh: { ipa: 'd', tiers: ['letter-sounds'] },
+  kuh: { ipa: 'k', tiers: ['letter-sounds'] },
+  guh: { ipa: 'ɡ', tiers: ['letter-sounds'] },
+  // Vowels — bare letter glyphs scoped to letter-sounds tier. Without
+  // `tiers`, the bare `a` / `o` / `u` / `i` / `e` would catch the
+  // article "a", the conjunction "o", and any single-letter
+  // appearances in CVC-tier read-lines ("Read the cat." → letter
+  // chip "c" / "a" / "t" inside a longer string would not match
+  // because the bare letter is inside a word, not bordered by `\b` —
+  // but `"Read the a."` style utterances DO exist on some tiers as
+  // letter-name examples, so tier-scoping is the right safety net).
+  a: { ipa: 'æ', tiers: ['letter-sounds'] },
+  o: { ipa: 'ɒ', tiers: ['letter-sounds'] },
+  u: { ipa: 'ʌ', tiers: ['letter-sounds'] },
+  i: { ipa: 'ɪ', tiers: ['letter-sounds'] },
+  e: { ipa: 'ɛ', tiers: ['letter-sounds'] },
 }
 
 /**
@@ -209,9 +316,9 @@ const PHONEME_OVERRIDES: Record<string, string> = {
  *
  * Word-boundary handling
  * ----------------------
- * `\b(four)\b` (currently — the alternation grows as overrides are
- * added). JavaScript's `\b` is the standard ASCII word-boundary, which
- * is exactly the right primitive here:
+ * The alternation pattern is built from active entries' keys.
+ * JavaScript's `\b` is the standard ASCII word-boundary, which is
+ * exactly the right primitive here:
  *   - "fourteen"      → "four" is followed by "t" (word char) → no \b
  *                       at the right edge → no match. Correct.
  *   - "fourth"        → same. Correct.
@@ -221,16 +328,40 @@ const PHONEME_OVERRIDES: Record<string, string> = {
  *   - "Four"          → at start of string (left \b is implicit) and
  *                       followed by space → match. Case-insensitive.
  *
- * The case-insensitive flag means we look up the IPA via
+ * The case-insensitive flag means we look up the entry via
  * `match.toLowerCase()` so the lookup table only needs lowercase keys.
+ *
+ * Tier filter (Wave 7 Track A7 — Amendment 1 of ticket 86c9y49cd)
+ * ---------------------------------------------------------------
+ * The optional `tierFilter` argument is the active utterance's tier
+ * (e.g. `'letter-sounds'`, `'cvc-words'`). The alternation pattern
+ * is built from ONLY those entries whose `tiers` field is undefined
+ * (global) OR includes `tierFilter`. Tier-scoped entries with a
+ * different tier (or `tierFilter` undefined) are silently skipped at
+ * pattern-build time — they never reach the regex, so they cannot
+ * match. This is the architectural seam that keeps the letter-sounds
+ * mnemonics (`mmm`, `buh`, `o`, etc.) from polluting CVC-tier
+ * renderings while still letting the legacy `four` override fire
+ * globally.
  */
-export function applyPhonemeOverrides(text: string): string {
-  // Build the alternation pattern from the override keys so we don't
-  // duplicate the source-of-truth list. New entries in
-  // PHONEME_OVERRIDES become matchable automatically.
-  const keys = Object.keys(PHONEME_OVERRIDES)
-  if (keys.length === 0) return escapeSsml(text)
-  const pattern = new RegExp(`\\b(${keys.join('|')})\\b`, 'gi')
+export function applyPhonemeOverrides(
+  text: string,
+  tierFilter?: string,
+): string {
+  // Build the alternation pattern from ACTIVE entries: every entry
+  // whose `tiers` is undefined (global) OR includes the supplied
+  // tierFilter. New entries in PHONEME_OVERRIDES become matchable
+  // automatically; tier-scoped entries never pollute callers that
+  // pass a different tier.
+  const activeKeys = Object.entries(PHONEME_OVERRIDES)
+    .filter(([, entry]) =>
+      entry.tiers === undefined
+        ? true
+        : tierFilter !== undefined && entry.tiers.includes(tierFilter),
+    )
+    .map(([key]) => key)
+  if (activeKeys.length === 0) return escapeSsml(text)
+  const pattern = new RegExp(`\\b(${activeKeys.join('|')})\\b`, 'gi')
 
   // Walk the string emitting alternating escaped-plain and
   // phoneme-wrapped segments. We can't use replaceAll because plain
@@ -249,9 +380,9 @@ export function applyPhonemeOverrides(text: string): string {
     // readability. The IPA string is ASCII-clean (no XML
     // metacharacters) so no escaping needed on `ph=`.
     const original = m[0]
-    const ipa = PHONEME_OVERRIDES[original.toLowerCase()]
+    const entry = PHONEME_OVERRIDES[original.toLowerCase()]!
     out.push(
-      `<phoneme alphabet="ipa" ph="${ipa}">${escapeSsml(original)}</phoneme>`,
+      `<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`,
     )
     lastIndex = m.index + original.length
   }
@@ -306,18 +437,17 @@ export function applyPhonemeOverrides(text: string): string {
  *  today: greetings, problem reads, correct/reprompt/giveAnswer lines)
  *  are unchanged on the wire. The only utterances affected are those
  *  ending with `?` — that is the bug class. */
-export function renderSsmlInnerText(text: string): string {
+export function renderSsmlInnerText(text: string, tierFilter?: string): string {
   // Use the original text for boundary detection (we want to operate on
   // un-escaped characters). Trailing whitespace doesn't matter for the
   // ends-in-? check.
   const trimmed = text.replace(/\s+$/, '')
   if (!trimmed.endsWith('?')) {
     // Plain text path: applyPhonemeOverrides handles escaping AND
-    // wraps target number-words ("four" / "two") in <phoneme> tags so
-    // Azure picks the long-vowel realization deterministically
-    // (ticket 86c9kj2um). For text that contains no override target,
-    // the helper degrades to a plain XML-escape.
-    return applyPhonemeOverrides(text)
+    // wraps target words in <phoneme> tags so Azure picks the
+    // designed pronunciation deterministically. tierFilter gates
+    // tier-scoped entries (Wave 7 Track A7 — Amendment 1).
+    return applyPhonemeOverrides(text, tierFilter)
   }
   // Find the last sentence-ending boundary BEFORE the trailing clause.
   // Pattern matches `. ` / `! ` / `? ` — punctuation followed by
@@ -340,15 +470,16 @@ export function renderSsmlInnerText(text: string): string {
     '<break time="250ms"/><prosody pitch="+8%" rate="-5%">'
   const QUESTION_WRAP_CLOSE = '</prosody>'
   // Both the lead clause and the trailing-question clause are run
-  // through applyPhonemeOverrides so a "four"/"two" landing in either
-  // half is voiced from IPA. The phoneme element nests cleanly inside
-  // the prosody element per the Azure SSML grammar.
+  // through applyPhonemeOverrides so any tier-scoped or global
+  // mnemonic landing in either half is voiced from IPA. The phoneme
+  // element nests cleanly inside the prosody element per the Azure
+  // SSML grammar.
   if (lastEnd === -1) {
-    return `${QUESTION_WRAP_OPEN}${applyPhonemeOverrides(trimmed)}${QUESTION_WRAP_CLOSE}${trailingWs}`
+    return `${QUESTION_WRAP_OPEN}${applyPhonemeOverrides(trimmed, tierFilter)}${QUESTION_WRAP_CLOSE}${trailingWs}`
   }
   const lead = trimmed.slice(0, lastEnd)
   const clause = trimmed.slice(lastEnd)
-  return `${applyPhonemeOverrides(lead)}${QUESTION_WRAP_OPEN}${applyPhonemeOverrides(clause)}${QUESTION_WRAP_CLOSE}${trailingWs}`
+  return `${applyPhonemeOverrides(lead, tierFilter)}${QUESTION_WRAP_OPEN}${applyPhonemeOverrides(clause, tierFilter)}${QUESTION_WRAP_CLOSE}${trailingWs}`
 }
 
 /** Build the SSML body sent to Azure. All four prosody attribute fields
@@ -370,7 +501,7 @@ export function buildSsmlBody(req: TtsRequest): string {
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">` +
     `<voice name="${escapeSsml(req.voice)}">` +
     `<prosody pitch="${escapeSsml(req.pitch)}" rate="${escapeSsml(req.rate)}" volume="${escapeSsml(req.volume)}">` +
-    `${renderSsmlInnerText(req.text)}` +
+    `${renderSsmlInnerText(req.text, req.tier)}` +
     `</prosody></voice></speak>`
   )
 }

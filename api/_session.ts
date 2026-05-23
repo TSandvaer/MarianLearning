@@ -103,6 +103,24 @@ export interface RenderSessionOptions {
    *  rate-limited. Default 6 keeps us under that floor while still
    *  finishing 5-8 utterances within ~1.5s wall time. */
   concurrency?: number
+  /**
+   * Tier filter for tier-aware `PHONEME_OVERRIDES` substitutions
+   * (Wave 7 Track A7 — Amendment 1 of ticket 86c9y49cd). The
+   * effective focus node passed by `generateSessionStartResponse`
+   * (e.g. `'letter-sounds'`, `'cvc-words'`). Threaded into every
+   * `synth()` call via `TtsRequest.tier`. When a `PHONEME_OVERRIDES`
+   * entry has a `tiers?:` list and this value is set, the entry
+   * activates ONLY when the current tier is in its list (tier-scoped
+   * substitution); global entries (no `tiers` field) activate
+   * regardless. Letter-sounds canon embeds isolated-phoneme mnemonics
+   * (`mmm`, `buh`, `o`) that are wrapped in `<phoneme>` ONLY when
+   * `tierFilter === 'letter-sounds'` — pollution into CVC tiers
+   * (where the letter `m` would mispronounce real words like "math"
+   * or "moth") is structurally impossible. See `api/_tts.ts
+   * PHONEME_OVERRIDES` docstring + `design/word-song/letter-sounds-
+   * content.md §2.4` for the substitution-table architecture.
+   */
+  tierFilter?: string
 }
 
 /**
@@ -168,7 +186,11 @@ export async function renderSessionAudio(
       let result: { audio: Uint8Array }
       try {
         result = await synth(
-          { text: src.text, ...EMMA_VOICE_CONFIG },
+          {
+            text: src.text,
+            ...EMMA_VOICE_CONFIG,
+            ...(opts.tierFilter !== undefined ? { tier: opts.tierFilter } : {}),
+          },
           opts.synthOptions,
         )
       } catch (err) {

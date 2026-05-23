@@ -260,6 +260,41 @@ export interface GenerateSessionPlanArgs {
    * lets the planner pick freely from the focus-node fact pool.
    */
   slowFacts?: SlowFactHintItem[]
+  /**
+   * Letter-sounds current-target vowel hint (Wave 7 Track A7 — ticket
+   * 86c9y49cd). Active only when the effective focus node is
+   * `letter-sounds`. The hint is passed verbatim into the user message
+   * via `buildLetterSoundsDirective` so Dave's directive (in
+   * `WORD_SONG_TRACK_GUIDE`) can cycle through the locked vowel ladder
+   * `/æ (mastered)/ → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/`. When omitted, the
+   * directive falls back to `/ɒ/` (Marian's next-vowel-to-master per
+   * `phonics-sequence-marian.md` §Q1).
+   *
+   * Why a hint, not derived state
+   * -----------------------------
+   * Wave 7 (Option B composite — per `design/word-song/letter-sounds-
+   * content.md` §5.3 + §7 Q4 RESOLVED 2026-05-23) ships against the
+   * existing `progress` shape unchanged — no `progress.literacy.
+   * letterSoundsVowelStates` migration. The vowel cadence is fixed
+   * cycling; the planner accepts the IPA hint as a passthrough so the
+   * caller (or canon-bake script) controls which vowel is current-
+   * target. Wave 8 Option A will derive the value from per-vowel
+   * sub-mastery state when that migration ships; until then, omit
+   * the field to bake against the safe default.
+   *
+   * Wire shape: a single IPA string, one of `'ɒ'`, `'ʌ'`, `'ɪ'`,
+   * `'ɛ'` (the four short-vowel current-target candidates per the
+   * ladder). `/æ/` is the MASTERED anchor and is never a "current-
+   * target" — it's the mid-tier review-mode vowel in every session.
+   * Unrecognised values fall through to the `/ɒ/` default (defensive
+   * — the directive's own ADJACENT-VOWEL-BAN SELF-CHECK enforces the
+   * acoustic-similarity ban anyway).
+   *
+   * Lives in the user message (volatile per call). The cache prefix
+   * (system prompt) is unchanged so two letter-sounds calls with
+   * different current-target vowels share the same prompt-cache hits.
+   */
+  currentTargetVowel?: string
 }
 
 /**
@@ -478,6 +513,9 @@ export interface GenerateSessionStartResponseArgs {
   /** Slow-fact hint (M4.x — follow-up to 86c9pwgc8). See
    *  `GenerateSessionPlanArgs.slowFacts`. */
   slowFacts?: SlowFactHintItem[]
+  /** Letter-sounds current-target vowel hint (Wave 7 Track A7 — ticket
+   *  86c9y49cd). See `GenerateSessionPlanArgs.currentTargetVowel`. */
+  currentTargetVowel?: string
   /** Optional render-pipeline overrides. Production wiring leaves this
    *  empty — `_session.renderSessionAudio` resolves to the real Azure
    *  synth. Tests + the canon generator can swap in a fake synth or tune
@@ -527,8 +565,28 @@ export async function generateSessionStartResponse(
     isGraduationSession: args.isGraduationSession,
     leitner: args.leitner,
     slowFacts: args.slowFacts,
+    currentTargetVowel: args.currentTargetVowel,
   })
-  return renderSessionAudio(plan, args.renderOptions)
+  // Letter-sounds canon utterances embed isolated-phoneme mnemonics
+  // (`mmm`, `buh`, `o`, etc.) that the render path wraps in
+  // `<phoneme alphabet="ipa" ph="...">` via the tier-aware
+  // PHONEME_OVERRIDES extension in `api/_tts.ts` (Wave 7 Track A7 —
+  // Amendment 1 of ticket 86c9y49cd). The tier filter is passed to
+  // `renderSessionAudio` so the substitution activates ONLY on
+  // letter-sounds canon — pollution into other tiers (e.g. wrapping
+  // the letter `m` in every CVC utterance like "math" or "moth") is
+  // structurally impossible. See `api/_tts.ts PHONEME_OVERRIDES`
+  // docstring + `design/word-song/letter-sounds-content.md §2.4` for
+  // the substitution-table architecture rationale.
+  const effectiveTier =
+    args.track === 'word-song'
+      ? effectiveFocusNode({ track: args.track, focusNode: args.focusNode })
+      : undefined
+  const renderOpts: RenderSessionOptions = {
+    ...args.renderOptions,
+    tierFilter: effectiveTier ?? args.renderOptions?.tierFilter,
+  }
+  return renderSessionAudio(plan, renderOpts)
 }
 
 /**
@@ -652,6 +710,7 @@ function defaultFocusNodeForTrack(track: PlannerTrack): string {
  */
 const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'letter-names',
+  'letter-sounds',
   'blending-cv',
   'cvc-words',
   'cvc-words-short-o',
@@ -666,19 +725,21 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
 /**
  * Resolve the focus node the planner actually generates for. Math honours
  * caller-supplied focusNode verbatim. Word-song honours first-class nodes
- * (`letter-names`, `blending-cv`, `cvc-words`, the four short-vowel
- * sibling tiers, `digraphs-sh`, `digraphs-ch`, and
- * `digraphs-th-voiceless`); valid-but-unsupported nodes
- * (`letter-sounds`, `sight-words`, `simple-sentences`) fall back to
- * `blending-cv` content as a stub — the screen always renders, even on
- * tiers we haven't tuned yet. See `WORD_SONG_TRACK_GUIDE` for the
- * prompt-side handling.
+ * (`letter-names`, `letter-sounds`, `blending-cv`, `cvc-words`, the four
+ * short-vowel sibling tiers, `digraphs-sh`, `digraphs-ch`, and
+ * `digraphs-th-voiceless`); valid-but-unsupported nodes (`sight-words`,
+ * `simple-sentences`) fall back to `blending-cv` content as a stub — the
+ * screen always renders, even on tiers we haven't tuned yet. See
+ * `WORD_SONG_TRACK_GUIDE` for the prompt-side handling.
  *
  * Validation (`generateSessionPlan` above) still rejects an invalid
  * cross-track or unknown focusNode for word-song before reaching here —
  * the fallback is for valid-but-untuned nodes only.
  */
-function effectiveFocusNode(args: GenerateSessionPlanArgs): string {
+function effectiveFocusNode(args: {
+  track: PlannerTrack
+  focusNode?: string
+}): string {
   if (args.track === 'math') {
     return args.focusNode ?? defaultFocusNodeForTrack(args.track)
   }
@@ -759,10 +820,33 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
     ? buildSlowFactDirective(args.slowFacts!)
     : null
 
+  // Letter-sounds directive (Wave 7 Track A7 — ticket 86c9y49cd). Only
+  // fires when the effective focus node is `letter-sounds` (word-song
+  // track only). Injects the `current-target-vowel=<IPA>` hint that
+  // Dave's directive in `WORD_SONG_TRACK_GUIDE` reads to pick which
+  // short vowel to make the lift of THIS session.
+  //
+  // Vowel ladder (locked, per `phonics-sequence-marian.md` §Q1 and
+  // `design/word-song/letter-sounds-content.md §1.4`):
+  //     /æ/ (mastered) → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/
+  // /æ/ is the anchor (NOT a current-target candidate). The four
+  // candidate IPAs are /ɒ/, /ʌ/, /ɪ/, /ɛ/. When omitted or
+  // unrecognised, falls back to /ɒ/ (Marian's next-vowel-to-master).
+  //
+  // Lives in the user message (volatile per call). The cache prefix
+  // (system prompt) is unchanged so two letter-sounds calls with
+  // different current-target vowels share the same prompt-cache hits.
+  const isLetterSoundsActive =
+    args.track === 'word-song' && focusNode === 'letter-sounds'
+  const letterSoundsLine = isLetterSoundsActive
+    ? buildLetterSoundsDirective(args.currentTargetVowel)
+    : null
+
   const lines = [
     `Generate a session plan for the ${trackLabel} track at level ${args.level}.`,
     `Focus skill node: ${focusNode}.`,
     recentScoreLine,
+    ...(letterSoundsLine !== null ? [letterSoundsLine] : []),
     ...(graduationLine !== null ? [graduationLine] : []),
     ...(leitnerLine !== null ? [leitnerLine] : []),
     ...(slowFactsLine !== null ? [slowFactsLine] : []),
@@ -896,6 +980,65 @@ function buildGraduationDirective(): string {
     `Use the same "Read the <word>." template for novel words as for`,
     `canonical words. The word.p<N>.<slot> id namespace and all other`,
     `slot copy rules apply to novel-word problems unchanged.`,
+  ].join('\n')
+}
+
+/**
+ * The four candidate current-target vowel IPAs for the letter-sounds
+ * tier. /æ/ is intentionally NOT a candidate — it's the MASTERED
+ * anchor vowel (every session emits at least 1 of it in the mid-tier
+ * window per `WORD_SONG_TRACK_GUIDE` letter-sounds composition rules)
+ * but never the "current-target" of a session. The locked ladder is
+ *     /æ (mastered)/ → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/
+ * (`phonics-sequence-marian.md` §Q1, `design/word-song/letter-sounds-
+ * content.md §1.4`). Unrecognised IPA strings fall through to the
+ * /ɒ/ default — Marian's next-vowel-to-master.
+ */
+const LETTER_SOUNDS_VOWEL_CANDIDATES: readonly string[] = ['ɒ', 'ʌ', 'ɪ', 'ɛ']
+const LETTER_SOUNDS_DEFAULT_VOWEL = 'ɒ'
+
+/**
+ * Build the letter-sounds directive that goes into the user message
+ * (Wave 7 Track A7 — ticket 86c9y49cd, Amendment 2 — Devon NOF on
+ * PR #332). Injects the `current-target-vowel=<IPA>` hint that Dave's
+ * directive in `WORD_SONG_TRACK_GUIDE` reads (search "current-target-
+ * vowel=<IPA>" inside the LETTER-SOUNDS SESSION COMPOSITION RULES
+ * block) to pick which short vowel is the LIFT of THIS session.
+ *
+ * Without this hint, the directive falls back to its safe default
+ * (`/ɒ/`) on every session, and Marian never progresses past short-o.
+ * The directive's own VOWEL-LADDER SELF-CHECK + ADJACENT-VOWEL-BAN
+ * SELF-CHECK gate the picked vowel against the locked ladder.
+ *
+ * Wave 7 ships Option B (composite-tier mastery — see `design/word-
+ * song/letter-sounds-content.md` §5.3 + §7 Q4 RESOLVED 2026-05-23);
+ * the caller is responsible for cycling the vowel across sessions.
+ * Wave 8 Option A (per-vowel sub-mastery) will derive the value from
+ * `progress.literacy.letterSoundsVowelStates` and the picker will
+ * cycle automatically.
+ *
+ * Pure formatter; no I/O. Returns a single-line directive whose
+ * presence is the cheap drift-guard test anchor.
+ */
+function buildLetterSoundsDirective(
+  currentTargetVowel: string | undefined,
+): string {
+  const ipa =
+    typeof currentTargetVowel === 'string' &&
+    LETTER_SOUNDS_VOWEL_CANDIDATES.includes(currentTargetVowel)
+      ? currentTargetVowel
+      : LETTER_SOUNDS_DEFAULT_VOWEL
+  return [
+    `LETTER-SOUNDS DIRECTIVE (Wave 7 Track A7 — ticket 86c9y49cd).`,
+    `current-target-vowel=${ipa}`,
+    `This session's LIFT vowel is ${ipa}. Apply the LETTER-SOUNDS`,
+    `SESSION COMPOSITION RULES from the system prompt: at least 2 and`,
+    `at most 3 of the 8 problems must have this vowel as the target`,
+    `sound; the mastered vowel /æ/ anchors the mid-tier window (P4 or`,
+    `P5); P1-P3 are mastered-consonant gentle-ramp. The directive's`,
+    `ADJACENT-VOWEL-BAN SELF-CHECK applies — do NOT emit both /ɪ/ and`,
+    `/ɛ/ as targets in the same session regardless of which one is`,
+    `current-target.`,
   ].join('\n')
 }
 
