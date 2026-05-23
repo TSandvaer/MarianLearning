@@ -61,6 +61,53 @@ import {
 } from './wordSessionPlans'
 import { TARGET_WORDS, getWordEntry, type WordEntry } from './wordPack'
 
+/**
+ * The 52-glyph ASCII letter pool for the `letter-names` tier (Wave 7 A4b,
+ * ticket 86c9y6nc7). Mirrors Kyle's A1 spec §1.1 — both cases of the 26
+ * English letters are eligible targets. Source of truth at
+ * `design/word-song/letter-names-content.md` §1.1. Pool is exposed for
+ * the parser test suite to assert membership.
+ */
+export const LETTER_GLYPH_POOL: ReadonlySet<string> = new Set([
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  ...'abcdefghijklmnopqrstuvwxyz',
+])
+
+/**
+ * Sentinel `pictureKey` prefix for synthetic letter-target WordEntries
+ * (the `letter-names` tier). Lets downstream consumers (e.g. WordSong.tsx)
+ * detect "this is a letter, not a CVC word" without dragging the
+ * `contentType` discriminant onto every chip-render branch — though the
+ * preferred dispatch is on `problem.contentType === 'letter-names'`.
+ */
+export const LETTER_GLYPH_PICTURE_KEY_PREFIX = 'letter:'
+
+/**
+ * Build a synthetic `WordEntry` for a single letter glyph. Used by the
+ * letter-names parser path so `WordSongProblem.target` stays typed
+ * uniformly across content types. The entry's `word` field carries the
+ * literal letter (case-preserved); `pictureKey` carries the
+ * `letter:<X>` sentinel so a downstream consumer can identify the entry
+ * without inspecting `contentType` again. `vowel` and `phoneme` are
+ * intentionally omitted — the same-vowel distractor logic in
+ * `wordDistractors.ts` is never consulted for letter-names (chip-order
+ * for this tier is built by a dedicated letter-distractor path in
+ * `WordSong.tsx`).
+ */
+function makeLetterTargetEntry(letter: string): WordEntry {
+  return {
+    word: letter,
+    pictureKey: `${LETTER_GLYPH_PICTURE_KEY_PREFIX}${letter}`,
+    // `category` is required on WordEntry. Letters are not nouns of any
+    // existing category — `'object'` is the closest neutral bucket, and
+    // chosen here because the letter-names render path NEVER consults
+    // `category` (gentle-tier filtering is bypassed by the
+    // letter-distractor builder in `WordSong.tsx`).
+    category: 'object',
+    isTarget: true,
+  }
+}
+
 const ALL_SLOTS: readonly WordSongUtteranceSlot[] = [
   'read',
   'correct',
@@ -167,14 +214,34 @@ export interface ParsedReadLine {
 }
 
 /** Per-content-type read-line template config. Source of truth for which
- *  templates the parser accepts. Add a row here to widen further. */
+ *  templates the parser accepts. Add a row here to widen further.
+ *
+ *  Order matters — `letter-names` MUST come before `blending-cv` because
+ *  the letter-names template `"Tap the letter <X>."` would otherwise be
+ *  greedy-matched by `blending-cv`'s `"Tap the <word>."` pattern (it
+ *  would capture `letter` as the word and then fail the
+ *  TARGET_WORD_SET membership check, surfacing the wrong error). The
+ *  letter-names pattern requires the literal `letter` keyword followed by
+ *  a single ASCII glyph, so it is strictly more specific and is tried
+ *  first.
+ */
 const READ_LINE_TEMPLATES: ReadonlyArray<{
   contentType: WordSongContentType
-  /** Anchored, case-insensitive, captures the target word in group 1. */
+  /** Anchored, case-insensitive, captures the target token in group 1. */
   pattern: RegExp
   /** Human-readable form for error messages. */
   label: string
 }> = [
+  {
+    contentType: 'letter-names',
+    // `letter` keyword + single ASCII letter (preserve case in the
+    // capture group via the case-insensitive `i` flag stripping). The
+    // capture is anchored to a single character so multi-character
+    // tokens like `"Tap the letter ABC."` or `"Tap the letter cat."`
+    // fall through to the next template (and ultimately fail).
+    pattern: /^\s*tap\s+the\s+letter\s+([A-Za-z])\s*\.\s*$/i,
+    label: '"Tap the letter <X>."',
+  },
   {
     contentType: 'blending-cv',
     pattern: /^\s*tap\s+the\s+([a-z]+)\s*\.\s*$/i,
@@ -195,18 +262,42 @@ const ACCEPTED_TEMPLATES_LABEL = READ_LINE_TEMPLATES.map((t) => t.label).join(
  * Parse a `read` line and return the target word entry + content type.
  *
  * Templates accepted:
+ *   - "Tap the letter <X>." → contentType: 'letter-names' (Wave 7 A4b,
+ *     ticket 86c9y6nc7). `<X>` is a single ASCII letter; case is
+ *     preserved on the synthesized `WordEntry.word`. Membership is
+ *     checked against `LETTER_GLYPH_POOL` (the 52-glyph A-Z + a-z pool
+ *     from Kyle's A1 spec §1.1), NOT against `TARGET_WORD_SET`.
  *   - "Tap the <word>." → contentType: 'blending-cv'
  *   - "Read the <word>." → contentType: 'cvc-word' (parser-only today;
  *     planner does not emit this until step 2 — see file header)
  *
- * In both cases the word is membership-checked against the wordPack
- * target set so distractor-only entries (`bus`, `sun`, etc.) cannot
- * slip through.
+ * For the two word-tier templates, the word is membership-checked
+ * against the wordPack target set so distractor-only entries (`bus`,
+ * `sun`, etc.) cannot slip through. For the letter-names template the
+ * pool check is the 52-glyph ASCII set + the parser synthesizes a
+ * sentinel `WordEntry` (no wordPack lookup; letters do not exist in
+ * `wordPack.ts`).
  */
 export function parseReadLine(read: string): ParsedReadLine {
   for (const template of READ_LINE_TEMPLATES) {
     const match = read.match(template.pattern)
     if (!match) continue
+
+    // Letter-names branch — pool check + synthesize the target entry.
+    if (template.contentType === 'letter-names') {
+      const letter = match[1]!
+      if (!LETTER_GLYPH_POOL.has(letter)) {
+        throw new PlanFromServerError(
+          `word-song letter-names read line "${read}" yielded letter "${letter}" outside the 52-glyph ASCII pool`,
+        )
+      }
+      return {
+        entry: makeLetterTargetEntry(letter),
+        contentType: template.contentType,
+      }
+    }
+
+    // Word-tier branches — membership check + wordPack lookup.
     const word = match[1]!.toLowerCase()
     if (!TARGET_WORD_SET.has(word)) {
       throw new PlanFromServerError(

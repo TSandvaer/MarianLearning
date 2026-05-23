@@ -1693,62 +1693,128 @@ function WordSongScreen({
       {audioReady !== false && (
         <>
           {/* Word card — picture above letters (per spec §"Word card composition").
-          Picture leads (meaning first), letters below (decoding follows). */}
-          <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
-            <div
-              data-testid="word-song-word-card"
-              data-word={currentProblem.target.word}
-              className="flex flex-col items-center gap-2"
-            >
-              {/* Picture — 180pt square. Renders inline-SVG placeholder until
-              real pack ships (see wordPictures.tsx for sourcing posture). */}
-              <m.div
-                data-testid="word-song-word-picture"
-                className="flex items-center justify-center"
-                style={{ width: '180px', height: '180px' }}
-                initial={
-                  reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
-                }
-                animate={
-                  reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
-                }
-                transition={
-                  reducedMotion
-                    ? { duration: 0.2 }
-                    : { type: 'spring', stiffness: 260, damping: 16 }
-                }
-              >
-                <WordPicture
-                  pictureKey={currentProblem.target.pictureKey}
-                  large
-                  ariaLabel={currentProblem.target.word}
-                />
-              </m.div>
+          Picture leads (meaning first), letters below (decoding follows).
 
-              {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
-              phoneme playback per spec §"Audio dispatch sequence on letter
-              tap". v1 keeps letter taps as visual-only (no phoneme audio
-              authored yet — phoneme files are pending Matt's pipeline call,
-              see spec §"Phoneme audio"). The letter pulse + colour shift
-              still fires so the affordance is visible to Marian. */}
+          Letter-names tier (Wave 7 A4b, ticket 86c9y6nc7) skips this card
+          entirely — the chip strip below carries the assessment in full
+          via letter glyphs. Per Kyle's A1 spec §4 "Visual / render
+          contract (no picture pack)": letter glyphs are the chip
+          content; no picture-pack asset, no letters-of-the-word
+          breakdown beneath. */}
+          {currentProblem.contentType !== 'letter-names' && (
+            <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
               <div
-                data-testid="word-song-letters"
-                className="flex items-center"
-                style={{ gap: '32px' }}
+                data-testid="word-song-word-card"
+                data-word={currentProblem.target.word}
+                className="flex flex-col items-center gap-2"
               >
-                {currentProblem.target.word.split('').map((letter, i) => (
-                  <LetterGlyph
-                    key={`${i}-${letter}`}
-                    letter={letter}
-                    index={i}
-                    reducedMotion={reducedMotion}
+                {/* Picture — 180pt square. Renders inline-SVG placeholder until
+                real pack ships (see wordPictures.tsx for sourcing posture). */}
+                <m.div
+                  data-testid="word-song-word-picture"
+                  className="flex items-center justify-center"
+                  style={{ width: '180px', height: '180px' }}
+                  initial={
+                    reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
+                  }
+                  animate={
+                    reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
+                  }
+                  transition={
+                    reducedMotion
+                      ? { duration: 0.2 }
+                      : { type: 'spring', stiffness: 260, damping: 16 }
+                  }
+                >
+                  <WordPicture
+                    pictureKey={currentProblem.target.pictureKey}
+                    large
+                    ariaLabel={currentProblem.target.word}
                   />
-                ))}
+                </m.div>
+
+                {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
+                phoneme playback per spec §"Audio dispatch sequence on letter
+                tap". v1 keeps letter taps as visual-only (no phoneme audio
+                authored yet — phoneme files are pending Matt's pipeline call,
+                see spec §"Phoneme audio"). The letter pulse + colour shift
+                still fires so the affordance is visible to Marian. */}
+                <div
+                  data-testid="word-song-letters"
+                  className="flex items-center"
+                  style={{ gap: '32px' }}
+                >
+                  {currentProblem.target.word.split('').map((letter, i) => (
+                    <LetterGlyph
+                      key={`${i}-${letter}`}
+                      letter={letter}
+                      index={i}
+                      reducedMotion={reducedMotion}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Picture chips — 3 chips, 96×96pt with 24pt gaps per spec line 143. */}
+          {/* Letter-names word card — single large glyph centered, in the
+          slot the picture would occupy on CVC tiers. Marian sees only the
+          chips below, but the centered glyph reinforces the read-line
+          target while Emma speaks. Kyle's A1 spec §4.1 frames this as
+          "the chip glyph IS the assessment" — the centered card glyph is
+          a visual reading-anchor mirroring the picture role on CVC. */}
+          {currentProblem.contentType === 'letter-names' && (
+            <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
+              <div
+                data-testid="word-song-letter-card"
+                data-letter={currentProblem.target.word}
+                className="flex flex-col items-center gap-2"
+              >
+                <m.div
+                  data-testid="word-song-letter-glyph"
+                  className="flex items-center justify-center"
+                  style={{ width: '180px', height: '180px' }}
+                  initial={
+                    reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
+                  }
+                  animate={
+                    reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
+                  }
+                  transition={
+                    reducedMotion
+                      ? { duration: 0.2 }
+                      : { type: 'spring', stiffness: 260, damping: 16 }
+                  }
+                >
+                  <span
+                    style={{
+                      fontSize: '128px',
+                      lineHeight: 1,
+                      fontWeight: 700,
+                      color: '#1F2937',
+                      // System sans-serif stack; Kyle's A1 spec §4.2 recommends
+                      // Atkinson Hyperlegible but project design-tokens have
+                      // not landed that font yet — pending Devon. System
+                      // sans-serif disambiguates Il1 + bdpq adequately on iPad
+                      // at 128px scale.
+                      fontFamily:
+                        'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                    }}
+                    aria-label={`Letter ${currentProblem.target.word}`}
+                  >
+                    {currentProblem.target.word}
+                  </span>
+                </m.div>
+              </div>
+            </div>
+          )}
+
+          {/* Picture chips — 3 chips, 96×96pt with 24pt gaps per spec line 143.
+          For `letter-names` the chip CONTENT swaps from `<WordPicture>` to
+          a centered letter glyph; the chip FRAME (size, border, spring,
+          hit area, shake animation) is unchanged. Kyle's A1 spec §4.1
+          requires the chip-frame contract stay identical to the CVC
+          chips. */}
           <div
             data-testid="word-song-chips"
             className="
@@ -1761,6 +1827,8 @@ function WordSongScreen({
               const isShaking = shakingChip === entry.word
               const dimForGuided = guidedActive && !isCorrect
               const guidedShimmer = guidedActive && isCorrect
+              const isLetterNames =
+                currentProblem.contentType === 'letter-names'
               return (
                 <m.button
                   key={entry.word}
@@ -1770,7 +1838,11 @@ function WordSongScreen({
                   data-picture-key={entry.pictureKey}
                   data-correct={isCorrect ? 'true' : 'false'}
                   data-shaking={isShaking ? 'true' : 'false'}
-                  aria-label={`Picture of ${entry.word}`}
+                  aria-label={
+                    isLetterNames
+                      ? `Letter ${entry.word}`
+                      : `Picture of ${entry.word}`
+                  }
                   onClick={() => onChipTap(entry.word)}
                   disabled={
                     problemState.resolved || dimForGuided || !readAloudPlayed
@@ -1828,10 +1900,27 @@ function WordSongScreen({
                       : CHIP_TAP_SPRING
                   }
                 >
-                  <WordPicture
-                    pictureKey={entry.pictureKey}
-                    ariaLabel={entry.word}
-                  />
+                  {isLetterNames ? (
+                    <span
+                      data-testid="word-song-chip-letter"
+                      style={{
+                        fontSize: '64px',
+                        lineHeight: 1,
+                        fontWeight: 700,
+                        color: '#1F2937',
+                        fontFamily:
+                          'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                        userSelect: 'none',
+                      }}
+                    >
+                      {entry.word}
+                    </span>
+                  ) : (
+                    <WordPicture
+                      pictureKey={entry.pictureKey}
+                      ariaLabel={entry.word}
+                    />
+                  )}
 
                   <AnimatePresence>
                     {celebrating && isCorrect && !reducedMotion && (
@@ -2053,9 +2142,10 @@ function buildChipOrder(
   problem: WordSongProblem,
   crossVowel: boolean,
 ): readonly WordEntry[] {
-  const [d1, d2] = pickDistractors(problem.target, problem.index, {
-    crossVowel,
-  })
+  const [d1, d2] =
+    problem.contentType === 'letter-names'
+      ? pickLetterDistractors(problem.target, problem.index)
+      : pickDistractors(problem.target, problem.index, { crossVowel })
   const values = [problem.target, d1, d2]
   // Hash word → number for the seed (so different targets shuffle
   // differently for the same problem index in cross-plan QA replay).
@@ -2069,6 +2159,78 @@ function buildChipOrder(
     ;[values[i], values[j]] = [values[j], values[i]]
   }
   return values
+}
+
+/**
+ * The 52-glyph ASCII letter pool for the `letter-names` tier (Wave 7
+ * A4b, ticket 86c9y6nc7). Mirrors `LETTER_GLYPH_POOL` in
+ * `planFromServer.ts` — kept local here to avoid a cross-module import
+ * for chip-render code (the parser owns the pool as the wire-validation
+ * source of truth; this is the screen-side render pool).
+ */
+const LETTER_DISTRACTOR_POOL: readonly string[] = [
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+  ...'abcdefghijklmnopqrstuvwxyz',
+]
+
+/**
+ * Pick 2 distractor letters for a letter-names problem. Deterministic
+ * per problem index (no `Math.random`) so chip layout is stable across
+ * remounts and unit tests. Constraints honoured: (a) distractor case
+ * matches the target's case so the trio is case-uniform (avoids the
+ * "spot the odd-cased chip" shortcut Kyle's A1 spec §3.2 flags as a
+ * giveaway), (b) distractors are distinct from target and from each
+ * other, (c) distractors are drawn from `LETTER_DISTRACTOR_POOL` (no
+ * digits, no whitespace).
+ *
+ * This is a render-time placeholder; the canon already encodes Kyle's
+ * §1.3 / §3 pedagogical band rules (gentle/trap, b/d/p/q cap, etc.) on
+ * the SERVED side and the planner emits the target letter per problem.
+ * The screen-side distractor pool here is a graceful default: chips
+ * stay distinct + case-uniform, but they are NOT band-tuned to the
+ * spec's trap-window rules — that pedagogical layer would require the
+ * server to start emitting distractor letters per problem (a wire-shape
+ * widening out of A4b scope). Until then this gives a usable chip trio
+ * for any in-pool target.
+ */
+function pickLetterDistractors(
+  target: WordEntry,
+  problemIndex: number,
+): readonly [WordEntry, WordEntry] {
+  const letter = target.word
+  const isUpper = letter === letter.toUpperCase()
+  const caseFilteredPool = LETTER_DISTRACTOR_POOL.filter(
+    (g) => (g === g.toUpperCase()) === isUpper && g !== letter,
+  )
+  // Deterministic two-letter pick. Seed on problem index + a hash of the
+  // target letter so different targets at the same index pick different
+  // distractor pairs.
+  const seed = (problemIndex * 31 + letter.charCodeAt(0) + 0xa5) >>> 0
+  const rng = lcg(seed)
+  const pool = caseFilteredPool.slice()
+  // Fisher-Yates partial shuffle — take the first two after shuffling.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    ;[pool[i], pool[j]] = [pool[j], pool[i]]
+  }
+  const [g1, g2] = pool
+  return [letterToTargetEntry(g1!), letterToTargetEntry(g2!)]
+}
+
+/**
+ * Build a render-side synthetic `WordEntry` for a distractor letter
+ * glyph. Mirrors the parser's `makeLetterTargetEntry` so the
+ * letter-names chip pipeline is uniform — chips that compare
+ * `entry.word === problem.target.word` continue to work bit-identically
+ * to the word-tier chips.
+ */
+function letterToTargetEntry(letter: string): WordEntry {
+  return {
+    word: letter,
+    pictureKey: `letter:${letter}`,
+    category: 'object',
+    isTarget: false,
+  }
 }
 
 /** Tiny LCG. Deterministic, no Math.random — same shape as Math's. */

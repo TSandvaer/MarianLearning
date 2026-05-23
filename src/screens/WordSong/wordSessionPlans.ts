@@ -106,13 +106,30 @@ export interface WordSongProblemUtterances {
  *   the picker is still hard-clamped to `blending-cv`, so existing
  *   sessions continue to parse as `blending-cv`.
  *
+ * `letter-names` — alphabet tier (Wave 7 Track A4b, ticket 86c9y6nc7).
+ *   Read line is "Tap the letter <X>." where `<X>` is a single ASCII
+ *   letter (uppercase or lowercase, 52-glyph pool). Targets are letters
+ *   rather than CVC words — there is no `WordEntry` in `wordPack.ts` for
+ *   letter glyphs; the parser synthesizes a `LETTER_GLYPH_SENTINEL`-shaped
+ *   `WordEntry` so the existing `WordSongProblem.target` slot stays typed
+ *   (`word` carries the letter, `pictureKey` carries `letter:<X>` as a
+ *   diagnostic sentinel). Chip render branches on `contentType` in
+ *   `WordSong.tsx` and renders the letter glyph as text in the chip frame
+ *   (no picture-pack asset). Companion canon at
+ *   `public/canon/word-song/level-1/letter-names.json` (shipped via PR
+ *   #335 / ticket 86c9y4960 / Wave 7 A3). The screen-side widen this
+ *   contentType enables ends a silent-demote: pre-A4b, letter-names canon
+ *   parsed cleanly but `WordSong.tsx` lacked a render branch, so the
+ *   screen fell into CVC chip layout — see Jessica A4 (PR #338) for the
+ *   wire-level failing-first spec.
+ *
  * The field is optional on the public type for back-compat: callers that
  * predate the widening (e.g. `STATIC_WORD_SONG_PLANS`) don't set it, and
  * downstream code treats the absence as `blending-cv`. The parser always
  * sets it explicitly so plans rebuilt from the wire always carry the
  * discriminant.
  */
-export type WordSongContentType = 'blending-cv' | 'cvc-word'
+export type WordSongContentType = 'blending-cv' | 'cvc-word' | 'letter-names'
 
 /** A single problem in the session. */
 export interface WordSongProblem {
