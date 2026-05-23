@@ -7517,14 +7517,16 @@ describe('KNOWN_DISTRACTOR_CLASSES', () => {
     )
   })
 
-  it('also includes Wave-4-style names during the transition (PR A)', () => {
-    // Per ticket 86c9y01ee dispatch contract — naming-agnostic at
-    // schema level. PR B will remove these once the pivot lands.
-    expect(KNOWN_DISTRACTOR_CLASSES.has('columnCrossDistractor')).toBe(true)
-    expect(KNOWN_DISTRACTOR_CLASSES.has('phantomBorrowDistractor')).toBe(true)
+  it('does NOT include Wave-4-style transitional names (retired post-Wave-6C)', () => {
+    // Wave 6C (ticket 86c9y34xn): transitional names retired since the
+    // matching helpers in `src/screens/Math/distractors.ts` are unbuilt
+    // and no in-tree consumer references them. The schema-level enum is
+    // locked to Dave's canonical post-pivot names.
+    expect(KNOWN_DISTRACTOR_CLASSES.has('columnCrossDistractor')).toBe(false)
+    expect(KNOWN_DISTRACTOR_CLASSES.has('phantomBorrowDistractor')).toBe(false)
   })
 
-  it('contains exactly 5 known classes (3 Dave + 2 Wave-4-style)', () => {
-    expect(KNOWN_DISTRACTOR_CLASSES.size).toBe(5)
+  it("contains exactly 3 known classes (Dave's canonical names only)", () => {
+    expect(KNOWN_DISTRACTOR_CLASSES.size).toBe(3)
   })
 })
