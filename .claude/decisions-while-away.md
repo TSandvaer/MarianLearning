@@ -29,6 +29,8 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 - **Reversibility:** Branch is pre-staged only. If MARIAN orch (or Thomas) prefers a different naming convention or wants to revise Matt's tool-set, the branch can be force-reset or deleted with no production impact. ~10 min effort.
 - **Status:** PRE-STAGED. Awaiting MARIAN orchestrator PR-open + merge in next MARIAN session.
 
+## 2026-05-22 1700 UTC — Cancel 4 hung CI runs (partial — 2 of 4 raced to SUCCESS during cancel)
+
 - **Decided:** Issued `gh run cancel` on 4 GitHub Actions runs stuck at "Run e2e suite" step for 2.5+ hours (started 14:28-14:56Z). Targets: 26293677220 (Kevin #302), 26293679103 (Devon #303), 26293751625 (Jessica #304), 26295114187 (post-#301 main push).
 - **Race outcome:** 2 of 4 runs finished SUCCESS between my status-check (16:58Z) and my cancel call (17:00Z): #302 and #303 both completed naturally. The cancel API returned "Cannot cancel a workflow run that is completed" for those. The other 2 (Jessica #304 + main) received cancel signals.
 - **Lesson learned:** The "2.5 hour hang" interpretation was WRONG — the runs were genuinely slow (4-5× over the 35-min documented budget), not hung. The new vitest-CI step added by PR #298 + the larger Wave 5 e2e changes appear to have inflated runtime materially. Per `[[feedback_no_fabrication]]`, I should not have escalated to "hung" without harder evidence; the lack of progress signal could equally be "tests running serially with lots of overhead". The status-check at 16:58 still showed IN_PROGRESS because my command captured the state moments before completion.
