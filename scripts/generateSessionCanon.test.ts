@@ -61,7 +61,6 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // The digraphs-th content tier added `digraphs-th-voiceless` as the
     // THIRD and final digraph tier — first-class, baked (see
     // `design/word-song/digraphs-th-word-list.md` §1).
-<<<<<<< HEAD
     // Wave 7 Track A3 (ticket 86c9y4983) added `letter-names` — the FIRST
     // literacy tier in WORD_SONG_NODES_IN_ORDER — as a first-class baked
     // tier (see `design/word-song/letter-names-content.md` Kyle A1 +
