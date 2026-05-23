@@ -115,6 +115,16 @@ Caveat at [\_planner.ts:24](MarianLearning/api/_planner.ts#L24): the prompt is ~
 
 The user message is built per-call by `buildUserMessage` ([\_planner.ts:552](MarianLearning/api/_planner.ts#L552)) — it carries the volatile inputs (track label, level, focus node, recent score line, optional graduation directive, escaped child name) and the "JSON only — no surrounding prose, no markdown fences" instruction.
 
+#### MATH_TRACK_GUIDE insertion-order discipline
+
+**Invariant:** focus-node directive blocks inside `MATH_TRACK_GUIDE` are ordered to match `MATH_NODES_IN_ORDER` (the project's skill-tree ordering, declared in [`src/lib/progress/focusNode.ts`](MarianLearning/src/lib/progress/focusNode.ts)). The same convention holds for `WORD_SONG_TRACK_GUIDE` against `WORD_SONG_NODES_IN_ORDER`.
+
+**Why:** the directive body is long (~2-3000 lines as of Wave 6) and reviewers scan it locally — they jump to the focus-node-under-review and read the surrounding directive blocks for context (cap rules, band tags, drift-guards). Tree-order grouping lets readers locate any focus-node's directive in O(skill-tree-proximity) time. Append-at-end would force O(filesize) navigation for every review and make the surrounding-context reading pattern impossible.
+
+**Rule when adding a new focus-node directive:** insert the new block **between its tree-order siblings**, NOT at the end of `MATH_TRACK_GUIDE`. There is no automated guard — it is a manual authoring + reviewer discipline, and a misordered insert is invisible to typecheck / canon-lint / composition-lint. Reviewers should spot-check the insertion point against `MATH_NODES_IN_ORDER` when reviewing any directive-addition PR.
+
+**Concrete reference:** Dave's Wave 6A directive for `two-digit-addsub-with-regroup` (PR #314, 2026-05-23) was correctly inserted at `api/_planner.ts` line ~1306, between the `two-digit-addsub-no-regroup` directive block (~line 1188) and the `skip-counting` directive block (~line 1408) — matching the skill-tree ordering `... → two-digit-addsub-no-regroup → two-digit-addsub-with-regroup → skip-counting → ...`.
+
 ### Focus-node taxonomy
 
 `VALID_MATH_FOCUS_NODES` ([\_planner.ts:120](MarianLearning/api/_planner.ts#L120)) — 10 entries:

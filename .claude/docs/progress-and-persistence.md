@@ -133,6 +133,28 @@ Properties of the pattern:
 
 When to reach for a real `v1 → v2` schema bump instead: when the shape of the document itself changes (a field type changes, a sub-object is added that needs a non-default initial value derived from other state, a key is moved across nesting boundaries). Pure literal-rename/removal within `SkillLevels` is the K2 remap's domain.
 
+### Producer-strict / boundary-loose persistence pattern
+
+The persistence path has an **asymmetric type discipline** worth naming explicitly: producers + in-app middle hops are strict-typed; the persistence boundary is intentionally loose, with documented rationale. Tightening the boundary is an anti-pattern that has bitten the project before and will keep being tempting if not named.
+
+The three-layer chain (concrete example: per-problem distractor class on math sessions):
+
+1. **Producer — strict.** [`src/screens/Math/Math.tsx`](MarianLearning/src/screens/Math/Math.tsx) constructs `MathSessionResult` with a precise per-problem field (`perProblemDistractorClass: DistractorClass[]`). The producer knows exactly which `DistractorClass` literal each chip row was rendered against — there is no widening reason at the source.
+2. **In-app middle hop — strict.** [`src/screens/SessionEnd/SessionEnd.tsx`](MarianLearning/src/screens/SessionEnd/SessionEnd.tsx) forwards the array into `SessionEndPayload` and on to the `recordProgressOnSessionEnd` call site. Each hop carries the strict `DistractorClass[]` type. Middle-hop hopholes (typing the field as `string[]` to "be flexible") have shipped before and are the recurring failure mode — see PR #316 NIT 3 (Wave 6, 2026-05-23) which closed the `SessionEndPayload.perProblemDistractorClass` hole that had widened the field to `string[]` between producer and boundary.
+3. **Persistence boundary — intentionally loose.** [`src/types/guards.ts:184-200`](MarianLearning/src/types/guards.ts#L184) accepts `string[]` (or absent) for the persisted field, with an inline comment explaining the policy: **no enum allow-list at the read path**. Future tier additions or distractor-class renames don't force a v1→v2 schema bump; old blobs round-trip cleanly.
+
+**The structural-subtype passthrough is the load-bearing mechanic that makes the asymmetry painless.** TypeScript treats `DistractorClass[]` as a structural subtype of `string[]` — every value the strict producer emits is also a valid value at the loose boundary, with zero coercion or runtime cost. The boundary widening is purely on the read side: producers can keep using their narrow types; the boundary just doesn't insist on it.
+
+**Anti-pattern to avoid: tightening the persistence boundary.** Future-Devon will look at the loose `string[]` in `guards.ts` and think "let's just type this as `DistractorClass[]` for safety." Don't. That change forces:
+
+- A parse-on-read normalizer for every existing localStorage blob that carried older `DistractorClass` literals (renames, removed tiers).
+- A migration step (effectively a v1→v2 schema bump in spirit if not in name) for every distractor-class change.
+- A blast radius across `cloudSync.ts` install-time validation, debug seeds, and e2e fixtures.
+
+The `guards.ts:184-200` comment block names this trade-off in-line; the comment is load-bearing, not decorative. Reviewers should push back on any PR that proposes narrowing the persistence boundary without a written migration plan.
+
+**Concrete reference:** PR #316 NIT 3 (Wave 6, 2026-05-23) closed the middle-hop hole on `SessionEndPayload.perProblemDistractorClass` (widened `string[]` → strict `DistractorClass[]`) without touching the boundary in `guards.ts`. The fix was producer-strict propagation only; the structural subtype passthrough meant zero changes downstream of the persistence boundary.
+
 ## localStorage adapter
 
 ### Storage key and load/save
