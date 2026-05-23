@@ -3126,6 +3126,294 @@ describe('generateSessionPlan — add-to-20 prompt content (ticket 86c9q5q13)', 
   })
 })
 
+// ── add-to-10 prompt directive (Wave-6 playbook sharpening, Wave 7 B3) ──
+
+describe('generateSessionPlan — add-to-10 prompt content (Wave 7 Track B3, Dave audit 2026-05-23)', () => {
+  // Drift-guard for the post-Wave-6 sharpening of the add-to-10
+  // directive at api/_planner.ts:933+. Source of truth: Dave's audit at
+  // design/research/add-to-10-canon-audit-2026-05-23.md §5.
+  //
+  // The audit identified 4 missing playbook patterns from
+  // [[feedback_haiku_directive_sharpening]]:
+  //   - Pattern 3: per-rule self-check blocks
+  //   - Pattern 5: DOUBLES-CAP SELF-CHECK (Haiku's strong doubles prior;
+  //                PR #266 attempts 1-2 BOTH produced 2+2 + 3+3 + 4+4
+  //                trifecta — composition-lint caught both pre-disk)
+  //   - Pattern 6: hoisted CATEGORY-MIX BUDGET with both failure modes
+  //                + WORKED EXAMPLE block
+  //   - Pattern 7: RULE_IDENTITY+SPEC+LINT triple-pin drift-guard tag
+  //
+  // These assertions lock the load-bearing block headers and negative
+  // anchors so a future "let me simplify this prompt" edit cannot
+  // silently strip a cap-self-check and reintroduce the doubles-prior
+  // failure mode.
+
+  const STUB_RESPONSE = JSON.stringify({
+    id: 'haiku-add-to-10',
+    label: 'a',
+    utterances: [
+      {
+        id: 'math.p1.read',
+        text: 'One plus two. How many?',
+      },
+    ],
+  })
+
+  it('carries a triple-pin drift-guard tag naming RULE_IDENTITY + SPEC + LINT (Pattern 7)', async () => {
+    // Mirrors Dave's with-regroup drift-guard at PR #314. Single canon
+    // exemplar today; this is the second.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('RULE_IDENTITY=add-to-10-composition')
+    expect(systemText).toContain('SPEC=design/math/add-to-10-content.md§2')
+    expect(systemText).toContain('LINT=scripts/compositionLint.ts:704')
+    expect(systemText).toContain('ADD_TO_TEN_RULES')
+    expect(systemText).toContain('ADD_TO_TEN_POOL')
+    expect(systemText).toContain('lintAddToTenComposition')
+    // The drift-guard must explicitly forbid silent rule re-naming.
+    expect(systemText).toContain(
+      'Do NOT rename, re-band, re-cap, or substitute facts',
+    )
+  })
+
+  it('hoists a CATEGORY-MIX BUDGET block FIRST naming both failure modes (Pattern 6)', async () => {
+    // The CATEGORY-MIX BUDGET must precede the SESSION COMPOSITION RULES
+    // block so Haiku reads the caps BEFORE attention saturates on
+    // doubles or plus-one. Both failure modes must be named explicitly.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('CATEGORY-MIX BUDGET')
+    expect(systemText).toContain('apply BEFORE selecting any facts')
+    // Both failure modes must be named (Dave audit §5 recommendation 1).
+    expect(systemText).toContain('FAILURE MODES BOTH WAYS')
+    expect(systemText).toContain('doubles-prior')
+    expect(systemText).toContain('plus-one-saturation')
+    expect(systemText).toContain('PR #266')
+    // All five caps must be re-stated in the budget block.
+    expect(systemText).toMatch(/sums-to-10:\s+AT MOST 2/)
+    expect(systemText).toMatch(/doubles:\s+AT MOST 2/)
+    expect(systemText).toMatch(/plus-one:\s+AT MOST 2/)
+    expect(systemText).toMatch(/near-doubles:\s+AT MOST 3/)
+    expect(systemText).toMatch(/general:\s+AT MOST 2/)
+    // Structural ordering: CATEGORY-MIX BUDGET must precede the
+    // SESSION COMPOSITION RULES heading.
+    const budgetIdx = systemText.indexOf('CATEGORY-MIX BUDGET')
+    const rulesIdx = systemText.indexOf(
+      'SESSION COMPOSITION RULES (apply IN ORDER, AFTER the CATEGORY-MIX BUDGET',
+    )
+    expect(budgetIdx).toBeGreaterThan(-1)
+    expect(rulesIdx).toBeGreaterThan(budgetIdx)
+  })
+
+  it('carries a DOUBLES-CAP SELF-CHECK negative-anchored block (Pattern 5)', async () => {
+    // Mirrors sub-to-10's DOUBLES-CAP SELF-CHECK at _planner.ts:1087.
+    // The negative anchor must name the full forbidden trifecta — this
+    // is the EMPIRICALLY-OBSERVED failure mode from PR #266 attempts 1-2
+    // (both bakes shipped 2+2, 3+3, 4+4 in the same session before
+    // composition-lint caught them).
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('DOUBLES-CAP SELF-CHECK')
+    expect(systemText).toContain('AT MOST TWO')
+    expect(systemText).toContain('{2+2, 3+3, 4+4}')
+    // The full forbidden trifecta must be named explicitly.
+    expect(systemText).toContain('FORBIDDEN to place 2+2 AND 3+3 AND 4+4')
+    // 5+5 must be explicitly carved out as sums-to-10 (priority order),
+    // NOT doubles — otherwise Haiku may double-count it.
+    expect(systemText).toContain('5+5 is sums-to-10 by priority, NOT doubles')
+  })
+
+  it('carries per-rule self-check tags anchored against attention-budget-shift (Pattern 3)', async () => {
+    // Pattern 3 manifests as <self-check>...</self-check> annotations
+    // attached to each load-bearing rule (CATEGORY-MIX BUDGET, the
+    // HIGH-LEVERAGE COVERAGE RULE, DOUBLES-CAP, etc.). At minimum we
+    // require ≥4 self-check annotations across the add-to-10 block —
+    // matching the with-regroup template (PR #314) and Dave's audit §5.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // Isolate the add-to-10 block so we don't accidentally count
+    // self-check tags from sibling tiers (sub-to-10, with-regroup,
+    // add-to-20 all carry their own self-checks).
+    const addToTenStart = systemText.indexOf('- add-to-10:')
+    const addToTwentyStart = systemText.indexOf('- add-to-20:')
+    expect(addToTenStart).toBeGreaterThan(-1)
+    expect(addToTwentyStart).toBeGreaterThan(addToTenStart)
+    const block = systemText.slice(addToTenStart, addToTwentyStart)
+    const selfCheckMatches = block.match(/<self-check>/g) ?? []
+    expect(selfCheckMatches.length).toBeGreaterThanOrEqual(4)
+    // <rule band="hard"> annotations on the load-bearing rules.
+    const ruleBandMatches = block.match(/<rule band="hard">/g) ?? []
+    expect(ruleBandMatches.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('carries a WORKED EXAMPLE block showing a clean 8-problem session (Pattern 6 second half)', async () => {
+    // The worked example grounds Haiku on the target distribution.
+    // Mirrors add-to-20 at _planner.ts:1034 + with-regroup at :1393.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('WORKED EXAMPLE')
+    // The worked example must show inline [BAND/category] tags per fact
+    // (the strong shape per [[feedback_haiku_directive_sharpening]]
+    // Pattern 1).
+    expect(systemText).toMatch(/P1=\d\+\d \[EASY\/[a-z-]+\]/)
+    expect(systemText).toMatch(/P8=\d\+\d \[HARD\/[a-z-]+\]/)
+    // The example must explicitly call out per-category counts so Haiku
+    // can verify against the cap budget.
+    expect(systemText).toMatch(/Counts:\s+plus-one=/)
+    expect(systemText).toContain('doubles=2 (AT CAP)')
+    expect(systemText).toContain('sums-to-10=2 (AT CAP)')
+  })
+
+  it('names the 44-fact canonical pool with band groupings (drift-guard)', async () => {
+    // Pin every pool fact (sampled) appears in the prompt. Drift-guards
+    // the pool — a "let me trim this list" edit fails on the first
+    // missing entry. Sample representative facts from each band +
+    // category.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    // Pool size header.
+    expect(systemText).toContain('FACT POOL (44 facts')
+    // EASY-band facts (the gentle-ramp pool, 9 facts).
+    for (const fact of [
+      '1+2',
+      '2+1',
+      '1+3',
+      '3+1',
+      '1+4',
+      '4+1',
+      '2+2',
+      '2+3',
+      '3+2',
+    ]) {
+      expect(systemText).toContain(fact)
+    }
+    // HARD-band sums-to-10 (the highest-leverage category, 9 facts).
+    for (const fact of [
+      '1+9',
+      '9+1',
+      '2+8',
+      '8+2',
+      '3+7',
+      '7+3',
+      '4+6',
+      '6+4',
+      '5+5',
+    ]) {
+      expect(systemText).toContain(fact)
+    }
+    // Band labels (every fact carries a band binding either inline in
+    // the WORKED EXAMPLE or under the band header in the FACT POOL).
+    expect(systemText).toContain('EASY band (sum 3-5')
+    expect(systemText).toContain('MEDIUM band (sum 6-8')
+    expect(systemText).toContain('HARD band (sum 9-10')
+  })
+
+  it('preserves the HIGH-LEVERAGE COVERAGE RULE (≥1 sums-to-10 in P4-P8)', async () => {
+    // The make-10 anchor is the single most important add-to-10
+    // pedagogical commitment (Dave audit §2 + spec §2.4). Lock the
+    // load-bearing language even though the sharpening reordered the
+    // rule numbers.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain('HIGH-LEVERAGE COVERAGE RULE')
+    expect(systemText).toContain('at least one sums-to-10 fact')
+    expect(systemText).toContain('MUST appear somewhere in problems 4-8')
+  })
+
+  it('the add-to-10 prompt is byte-stable across calls (cache prefix invariant)', async () => {
+    // Same shape pin as sub-to-10 / add-to-20 / with-regroup: the
+    // sharpening MUST NOT introduce any per-call variability that would
+    // break Anthropic's prompt cache and inflate per-session cost.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap1 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap2 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+      recentSuccessRate: 0.5,
+    })
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+})
+
 // ── sub-to-10 prompt directive (Kyle's spec §4.1 + Dave's research) ─────
 
 describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dave research §Q4)', () => {
