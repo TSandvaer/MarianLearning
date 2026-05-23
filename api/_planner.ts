@@ -1580,6 +1580,22 @@ matching that node. Nine first-class content modes today:
     read-line template + the chip-content discipline (letter glyph,
     not picture) differ. See the LETTER-NAMES SESSION COMPOSITION
     RULES block below.
+  - letter-sounds: "Which letter says <SOUND>?" problems. Marian hears
+    Emma voice an isolated short-vowel or consonant phoneme and taps
+    the LETTER GLYPH that maps to that sound (no pictures). This is
+    the SECOND literacy tier in tree order (between letter-names and
+    blending-cv): phoneme → grapheme mapping. Marian's consonant sounds
+    are mastered and her short /a/ sound is mastered (per CLAUDE.md
+    current-levels table); the lift of this tier is the short-vowel
+    ladder /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/ (per design/research/phonics-sequence-
+    marian.md §Q1, locked 2026-04-26). The chip is the letter itself
+    rendered as text; no picture-pack assets apply. Wire shape and
+    utterance ids match every other word-song tier (utterance-only
+    "word." namespace, 8 problems × 5 slots). The read-line template,
+    the chip-content discipline (letter glyph, not picture), and the
+    isolated-phoneme utterance shape diverge from cvc-words — see the
+    LETTER-SOUNDS SESSION COMPOSITION RULES block below and the
+    LETTER-SOUNDS UTTERANCE TEMPLATE block below.
   - blending-cv: "Tap the <word>." problems. Marian hears the word
     spoken and taps the matching picture chip from a trio. This is the
     earlier-tier content (matching pictures to spoken words).
@@ -1638,9 +1654,13 @@ matching that node. Nine first-class content modes today:
 Pick 8 distinct target items from the focus-node-specific pool below
 (do not invent new entries, do not use a target more than once).
 "Items" are WORDS for blending-cv / cvc-words / cvc-words-short-* /
-digraphs-* tiers, and LETTER GLYPHS for letter-names. The letter-names
-tier composition has its own additional case-mix + confusion-band caps
-— see the LETTER-NAMES SESSION COMPOSITION RULES block below.
+digraphs-* tiers, LETTER GLYPHS for letter-names, and SOUND→LETTER
+PAIRS for letter-sounds. The letter-names tier composition has its own
+additional case-mix + confusion-band caps — see the LETTER-NAMES
+SESSION COMPOSITION RULES block below. The letter-sounds tier
+composition has its own additional category-mix budget and
+vowel-ladder gating — see the LETTER-SOUNDS SESSION COMPOSITION RULES
+block below.
 
 EXCEPTION for digraphs-sh, digraphs-ch AND digraphs-th-voiceless: each
 digraph-tier pool has only 7 words, so 8 distinct words is impossible.
@@ -1705,6 +1725,56 @@ ${WORD_SONG_TARGET_WORDS_DIGRAPHS_CH}
 
 Pool for digraphs-th-voiceless (7-word voiceless-th-digraph):
 ${WORD_SONG_TARGET_WORDS_DIGRAPHS_TH}
+
+Pool for letter-sounds (16 active sounds per session — 14 mastered
+consonants + 1 mastered vowel + 1 current-target vowel). Each sound
+carries its inline [BAND/sub-class] tag; see the LETTER-SOUNDS SESSION
+COMPOSITION RULES block below for tag-driven gentle-ramp + trap-window
+rules. The four short-vowels not currently in-play (the unintroduced
+vowels later than current-target in the locked ladder /æ/ → /ɒ/ → /ʌ/
+→ /ɪ/ → /ɛ/) are OFF-POOL as targets — they MAY appear as distractor
+chips on consonant-target problems, but MAY NEVER be the target sound
+(see SHORT-VOWEL-NOT-YET-INTRODUCED ANCHOR below).
+  Mastered consonants — continuant sub-class (sustained articulation;
+    no voiced/unvoiced trap partner in the consonant pool, except
+    /f/-/v/ and /s/-/z/ where /z/ is OFF-POOL):
+      /m/ [MASTERED-CONSONANT/continuant]    → letter m, mnemonic mmm
+      /n/ [MASTERED-CONSONANT/continuant]    → letter n, mnemonic nnn
+      /s/ [MASTERED-CONSONANT/continuant]    → letter s, mnemonic sss
+      /f/ [MASTERED-CONSONANT/voiceless-pair-f-v] → letter f, mnemonic fff
+      /v/ [MASTERED-CONSONANT/voiced-pair-f-v]    → letter v, mnemonic vvv
+      /l/ [MASTERED-CONSONANT/continuant]    → letter l, mnemonic lll
+      /r/ [MASTERED-CONSONANT/continuant]    → letter r, mnemonic rrr
+      /h/ [MASTERED-CONSONANT/continuant]    → letter h, mnemonic hhh
+  Mastered consonants — stop sub-class (cannot voice without epenthesis
+    schwa tail; voiced/unvoiced trap-pair structure):
+      /p/ [MASTERED-CONSONANT/voiceless-pair-p-b] → letter p, mnemonic puh
+      /b/ [MASTERED-CONSONANT/voiced-pair-p-b]    → letter b, mnemonic buh
+      /t/ [MASTERED-CONSONANT/voiceless-pair-t-d] → letter t, mnemonic tuh
+      /d/ [MASTERED-CONSONANT/voiced-pair-t-d]    → letter d, mnemonic duh
+      /k/ [MASTERED-CONSONANT/voiceless-pair-k-g] → letter k, mnemonic kuh
+      /g/ [MASTERED-CONSONANT/voiced-pair-k-g]    → letter g, mnemonic guh
+  Mastered vowel (always in-pool — anchor):
+      /æ/ [MASTERED-VOWEL/short-a]                → letter a, mnemonic a
+  Current-target short vowel (EXACTLY ONE per session — the lift; pick
+    per the user-message current-target-vowel=<IPA> hint or default to
+    /ɒ/ per VOWEL-LADDER SELF-CHECK below):
+      /ɒ/ [CURRENT-TARGET-VOWEL/short-o]          → letter o, mnemonic o
+      /ʌ/ [CURRENT-TARGET-VOWEL/short-u]          → letter u, mnemonic u
+      /ɪ/ [CURRENT-TARGET-VOWEL/short-i]          → letter i, mnemonic i
+      /ɛ/ [CURRENT-TARGET-VOWEL/short-e]          → letter e, mnemonic e
+  Voiced/unvoiced trap pairs (within MASTERED-CONSONANT band — the
+    pedagogically-grounded auditory confusion class per spec §3.1):
+      p ↔ b   t ↔ d   k ↔ g   f ↔ v
+    /s/-/z/ is a real pair but /z/ is OFF-POOL (see §1.1 exclusion);
+    /h, l, r, m, n/ have NO voiced/unvoiced partner in pool and are
+    clean-distinct targets only.
+  Sounds OFF-POOL (NOT eligible as target or as distractor — REJECT
+    on sight): long-a /eɪ/, long-o /oʊ/, long-u /u:/, long-i /aɪ/,
+    long-e /i:/, voiced-th /ð/, /ʒ/, /ŋ/, semi-vowels /w/ and /y/,
+    /ks/ (the x-grapheme — two-phoneme), /kw/ (the q-grapheme — almost
+    never standalone), /z/ (rare in Marian's CVC corpus, deferred to
+    v2). Per design/word-song/letter-sounds-content.md §1.1.
 
 HYBRIDMODE PROBLEM-TYPE GATE (digraphs-sh AND digraphs-th-voiceless
 tiers): three of the seven sh-words —
@@ -1935,6 +2005,315 @@ produce.
 
 </drift-guard>
 
+LETTER-SOUNDS SESSION COMPOSITION RULES (letter-sounds tier ONLY; apply
+IN ORDER, AFTER the CATEGORY-MIX BUDGET block immediately below).
+<drift-guard RULE_IDENTITY=letter-sounds-pool
+SPEC=design/word-song/letter-sounds-content.md§1
+LINT=scripts/compositionLint.ts:letter-sounds-binding-TBD-A7>
+
+CATEGORY-MIX BUDGET (apply BEFORE selecting any sound — this is the
+FIRST rule because the consonant-vs-vowel mix is the load-bearing
+pedagogical concept for this tier and the natural Haiku failure mode is
+to under-rep the current-target vowel OR drill it to exhaustion. An
+8-problem session has THREE category budgets that MUST all be
+respected):
+  · MASTERED-CONSONANT targets: AT LEAST 4 of 8 problems. The first 3
+    problems (gentle ramp) plus at least 1 of P4-P5 must be mastered-
+    consonant targets. Maintains the session's overall "review mode"
+    feel for a consonant-mastered learner and prevents the lift vowel
+    from dominating.
+  · CURRENT-TARGET VOWEL: AT LEAST 2, AT MOST 3 of 8 problems.
+    The "at least 2" is the tier's load-bearing assessment anchor —
+    the current-target vowel IS the lift of every session and a session
+    that emits 0-1 instances of it teaches nothing new. The "at most 3"
+    cap prevents single-vowel drill feel — even when Marian is
+    introducing /ɒ/ she sees only 2-3 /ɒ/ problems, not 5-6.
+  · MASTERED-VOWEL /æ/ (short-a): AT LEAST 1 of 8 problems, placed in
+    the mid-tier window (P4 or P5). The anchor vowel that gives Marian
+    a "you know this one" reset in the session's middle.
+FAILURE MODES BOTH WAYS — a session with ZERO current-target-vowel
+items fails to do the tier's job (the lift never fires); a session
+with 4 OR MORE current-target-vowel items feels like a single-vowel
+drill. Neither extreme is acceptable.
+
+VOWEL-LADDER SELF-CHECK (apply BEFORE picking the current-target
+vowel for any session — this is the hard sequencing rule that gates
+WHICH vowel is in play). The user message names the focus skill node
+(letter-sounds); the current-target vowel for THIS session is named
+explicitly in the user message via a "current-target-vowel=<IPA>"
+hint. If that hint is absent, the planner defaults to /ɒ/ (short-o) —
+Marian's next-vowel-to-master per the locked ladder
+/æ (mastered) → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/.
+
+ADJACENT-VOWEL-BAN SELF-CHECK (HARD GATE, NO EXCEPTIONS):
+  · If current-target-vowel = /ɪ/ (short-i): the sound /ɛ/ (short-e)
+    MAY NOT appear as a target in this session. /ɪ/ and /ɛ/ are the
+    most acoustically similar English short-vowel pair (per
+    phonics-sequence-marian.md §Q1) and Marian's diagnostic showed
+    /ɪ/ as her weakest vowel — introducing /ɛ/ adjacent risks merging
+    the two in her memory.
+  · If current-target-vowel = /ɛ/ (short-e): the sound /ɪ/ (short-i)
+    MAY NOT appear as a target in this session.
+  · If current-target-vowel = /ɒ/ or /ʌ/: the sounds /ɪ/ and /ɛ/ MAY
+    NOT appear as targets either — they are not yet introduced in
+    Marian's ladder when /ɒ/ or /ʌ/ is current-target.
+NEGATIVE ANCHOR — it is FORBIDDEN to emit BOTH /ɪ/ and /ɛ/ as targets
+in the same 8-problem session, regardless of which one is current-
+target. This is the load-bearing acoustic-similarity ban for this
+tier.
+
+SHORT-VOWEL-NOT-YET-INTRODUCED ANCHOR (apply when picking each
+target slot): only the MASTERED vowel /æ/ and the CURRENT-TARGET
+vowel may appear as TARGETS. Future-ladder vowels (vowels later
+than current-target in /æ/ → /ɒ/ → /ʌ/ → /ɪ/ → /ɛ/) MAY appear as
+LETTER chips for distractor purposes but MAY NOT be the target
+sound. E.g. when current-target = /ɒ/, the letters i, e, u may
+appear as distractor chips on consonant-target problems but
+NEVER as the target sound of any problem.
+
+SESSION COMPOSITION RULES (apply IN ORDER, AFTER the budget blocks
+above):
+
+1. Problems 1-3 (gentle ramp): EXCLUSIVELY MASTERED-CONSONANT
+   targets. Pull each of P1, P2, P3 from the 14-sound mastered-
+   consonant pool: /m/, /n/, /p/, /b/, /t/, /d/, /k/, /g/, /s/,
+   /h/, /l/, /r/, /f/, /v/. NEGATIVE ANCHOR: do NOT place any
+   vowel target (neither /æ/ nor the current-target vowel) at P1,
+   P2, or P3 — vowel mapping is the LIFT, not the warmup.
+
+2. Problems 4-5 (mid-tier window): EXACTLY ONE of P4 or P5 MUST
+   carry the MASTERED-VOWEL /æ/ (short-a) target — letter chip
+   a. The other mid-tier slot MAY carry a mastered consonant
+   that participates in a voiced/unvoiced trap pair (e.g. /b/
+   with d and p as distractors). Mid-tier introduces the
+   mastered vowel as a "you know this" anchor before the lift
+   vowel arrives.
+
+3. Problems 6-8 (trap window — the LIFT): AT LEAST TWO of these 3
+   problems MUST have the CURRENT-TARGET VOWEL as the target
+   sound. This is the "ensure the tier does its job" anchor —
+   composition is meaningless if every session is 8 review items.
+   The remaining trap slot (1 of P6-P8) MAY carry a mastered-
+   consonant target whose voiced/unvoiced partner is included as
+   a distractor (b/p, d/t, g/k, v/f — within-class trap, see
+   DISTRACTOR-CLASS HINT below).
+
+4. CATEGORY-MIX SELF-CHECK (re-statement of CATEGORY-MIX BUDGET):
+   AT MOST 3 problems across the 8-problem session may carry the
+   current-target vowel as the target. Before emitting a fourth
+   current-target-vowel target, REJECT it. AT LEAST 4 problems
+   across the session must carry mastered-consonant targets;
+   before placing fewer than 4, REJECT the composition and re-
+   draw.
+
+5. POOL-MEMBERSHIP SELF-CHECK: before emitting each problem,
+   verify the chosen target sound appears in this tier's
+   16-sound active pool (14 mastered consonants + /æ/ +
+   current-target vowel). No long-vowel sounds (long-a /eɪ/,
+   long-o /oʊ/, long-u /u:/, long-i /aɪ/, long-e /i:/). No
+   voiced-th /ð/, /ʒ/, /ŋ/. No /ks/ (x), /kw/ (q), /z/ — these
+   are out of scope for v1 (per design/word-song/letter-sounds-
+   content.md §1.1).
+
+6. ADJACENT-VOWEL-BAN SELF-CHECK (re-statement of the hard gate
+   above): before emitting any vowel target, verify it is either
+   the MASTERED /æ/ or the CURRENT-TARGET vowel. If the chosen
+   target would result in BOTH /ɪ/ and /ɛ/ appearing as targets
+   in the session, REJECT it. NEGATIVE ANCHOR — it is FORBIDDEN
+   to place /ɪ/ AND /ɛ/ in the same session as targets.
+
+7. NO duplicate target sound within the 8-problem set. Each of
+   the 8 target sounds must be distinct. EXCEPTION: when
+   current-target = vowel and the 2-emission floor (rule 3) and
+   the 3-emission cap (rule 4) together force a repeat (e.g.
+   current-target = /ɒ/ + only one canonical letter 'o'), the
+   floor of 2 distinct /ɒ/-target problems may share the same
+   sound across two slots. The deduplication rule yields to the
+   2-emission floor; planner SHOULD prefer a 2-vowel + 1-trap-
+   consonant trap-window composition (rule 3) to avoid the
+   collision entirely.
+
+8. SAME-LETTER-DIFFERENT-CASE BAN (within a single problem's
+   3-chip trio): NEVER author a read-line + correct utterance
+   pair whose target letter could collide with a distractor at
+   render time. Letter-sounds renders chips in LOWERCASE by
+   default (consistent with CVC tier rendering); the screen owns
+   chip case discipline, but the planner's utterance text must
+   reference letters in their lowercase glyph form in the read
+   line, and in their uppercase glyph form ONLY in the correct
+   and giveAnswer utterance slots (where the uppercase glyph
+   triggers Azure to read the letter NAME — see the LETTER-
+   SOUNDS UTTERANCE TEMPLATE block below).
+
+DISTRACTOR-CLASS HINT (for the screen-side chip render — not emitted
+by the planner). The screen picks 2 distractors per problem from one
+of three classes depending on target type:
+  · TARGET is a voiced/unvoiced consonant pair member (/b/, /p/,
+    /d/, /t/, /g/, /k/, /v/, /f/): at least one distractor SHOULD
+    be the voiced/unvoiced partner letter (target /b/ → distractor
+    p; target /d/ → distractor t; target /g/ → distractor k;
+    target /v/ → distractor f). The other distractor is from the
+    clean-distinct consonant pool.
+  · TARGET is the current-target VOWEL: at least one distractor
+    SHOULD be a vowel letter — either the mastered /æ/ letter a
+    or another short-vowel letter NOT on the forbidden side of
+    the /ɪ/↔/ɛ/ ban. When current-target = /ɪ/, the letter e is
+    BANNED as a distractor on /ɪ/-target problems (soft
+    discrimination scope — per spec §3.2). When current-target =
+    /ɛ/, the letter i is BANNED as a distractor on /ɛ/-target
+    problems. The other distractor is a consonant from the clean-
+    distinct pool.
+  · TARGET is a mastered consonant with NO voiced/unvoiced
+    partner in pool (/m/, /n/, /s/, /h/, /l/, /r/): both
+    distractors are clean-distinct consonants — different
+    articulation place AND different voicing from target.
+The planner does NOT author distractor letters; the screen's
+existing pickDistractors extension (extended at A7 for letter-sounds)
+handles it. This hint is documentary only; the planner's job is the
+target sound→letter pair, the read-line, and the 5 utterance slots.
+
+PER-PROBLEM SHAPE for letter-sounds: every problem MUST emit a
+target SOUND from the 16-sound active pool (14 mastered consonants +
+/æ/ + current-target vowel) paired with its single canonical letter
+glyph. Utterance ids MUST use the literal "word." prefix (NOT
+"sound." or "letter-sounds." — see the utterance-id rule near the
+end of this guide): "word.p1.read", "word.p1.correct", ...,
+"word.p8.giveAnswer". Per-slot utterance templates for letter-sounds
+diverge from the cvc-words default — see the LETTER-SOUNDS
+UTTERANCE TEMPLATE block immediately below.
+
+LETTER-SOUNDS UTTERANCE TEMPLATE (letter-sounds tier ONLY; OVERRIDES
+the default per-slot templates in the per-problem section near the
+end of this guide).
+
+PHONEME→MNEMONIC SUBSTITUTION TABLE — every utterance slot whose
+content IS the isolated phoneme MUST emit the MNEMONIC English-
+letter word from the table below in the utterance TEXT. The
+mnemonic is NOT wrapped in any SSML in the canon — the canon stays
+plain text. Wrapping into <phoneme alphabet="ipa" ph="..."> is
+performed at render time by the tier-aware extension of
+PHONEME_OVERRIDES in api/_tts.ts (added by Wave 7 Track A7 — see
+design/word-song/letter-sounds-content.md §2.4 and §8 obs #3 for
+why inline-SSML-in-canon is BLOCKED by escapeSsml at
+api/_tts.ts:117 and the substitution-table is the only viable
+path). DO NOT write inline <phoneme> tags, slash-IPA notation,
+or raw IPA characters into utterance text. Write the mnemonic.
+
+Sound → mnemonic (the literal string to emit in utterance text):
+  Continuant consonants (sustained articulation):
+    /m/ → mmm     /n/ → nnn     /s/ → sss
+    /f/ → fff     /v/ → vvv     /l/ → lll
+    /r/ → rrr     /h/ → hhh
+  Stop consonants (with schwa epenthesis tail):
+    /p/ → puh     /b/ → buh     /t/ → tuh
+    /d/ → duh     /k/ → kuh     /g/ → guh
+  Mastered vowel:
+    /æ/ → a
+  Current-target short vowels:
+    /ɒ/ → o       /ʌ/ → u       /ɪ/ → i       /ɛ/ → e
+
+NEGATIVE ANCHOR — DO NOT spell out letter NAMES phonetically in
+utterance text. "em", "kyoo", "double-yoo", "see" are FORBIDDEN.
+DO NOT use slash-IPA notation. DO NOT use raw IPA characters in
+utterance text. DO NOT use inline SSML tags. The mnemonic word is
+the canonical surface form; the render-time substitution does the
+phoneme conversion. (Rationale: per project_audio_phoneme_overrides
+memory, defensive SSML wrapping on words the engine already
+handles correctly DEGRADES pronunciation. The tier-aware
+PHONEME_OVERRIDES extension at A7 is the single SSML construction
+site; the canon stays plain text and the substitution activates
+ONLY for letter-sounds tier utterances per the tier-filter
+parameter.)
+
+Per-slot templates (letter-sounds tier; <SOUND-MNEMONIC> is the
+substituted word from the table above; <LETTER-UPPER> is the
+uppercase letter glyph for the target):
+
+- read: "Which letter says <SOUND-MNEMONIC>?"
+    e.g. "Which letter says mmm?" (target letter: m)
+    e.g. "Which letter says o?"   (target letter: o, sound /ɒ/)
+    e.g. "Which letter says buh?" (target letter: b, sound /b/)
+- correct: "Yes! <LETTER-UPPER> says <SOUND-MNEMONIC>."
+    e.g. "Yes! M says mmm."
+    e.g. "Yes! O says o."
+    e.g. "Yes! B says buh."
+  The <LETTER-UPPER> in correct/giveAnswer is the UPPERCASE letter
+  glyph (M, O, B) — read by Azure as the letter NAME ("em", "oh",
+  "bee") rather than the phoneme. The letter-name pronunciation is
+  INTENTIONAL: only the <SOUND-MNEMONIC> (mmm, o, buh) is wrapped
+  in <phoneme> at render time; the letter-name reference stays
+  plain prose and Azure renders it as its native letter name. This
+  separates the two concepts (the letter has a NAME and a SOUND)
+  cleanly in Marian's hearing.
+- reprompt: "Hmm... try again?"  (verbatim — SAME as every other
+  word-song tier)
+- hint: "Listen. <SOUND-MNEMONIC>."
+    e.g. "Listen. mmm."
+    e.g. "Listen. o."
+    e.g. "Listen. buh."
+  The hint slot voices ONLY the sound — gives Marian a clean
+  second listen with no other framing.
+- giveAnswer: "This one is <LETTER-UPPER>. <LETTER-UPPER> says <SOUND-MNEMONIC>."
+    e.g. "This one is M. M says mmm."
+    e.g. "This one is O. O says o."
+    e.g. "This one is B. B says buh."
+
+NO ARTICLE-LED FALLBACK for letter-sounds — the "Yes! That's a
+<word>." article-led default (used by blending-cv / cvc-words /
+cvc-words-short-* / digraphs-*) is INCORRECT for letter-sounds.
+Letters are not nouns and sounds are not nouns; the correct
+template uses the LETTER as the subject ("M says mmm.") and the
+giveAnswer uses the demonstrative ("This one is M."). NEVER write
+"Yes! That's a m." or "Yes! That's an mmm." for letter-sounds.
+
+NO CROSS-TIER SCAFFOLDING in letter-sounds utterance text. Do NOT
+write CVC words ("M says mmm like in mat"), do NOT reference the
+sh/ch/th digraphs, do NOT cross-link the letter NAME tier ("M is
+the letter M and it says mmm"). This tier teaches the isolated
+phoneme → letter mapping ONLY — every other tier handles its own
+content.
+
+WORKED EXAMPLE — a clean 8-problem session with current-target
+vowel = /ɒ/ that respects all rules (use as a template, NOT a
+verbatim copy — vary sound choices across re-bakes):
+   P1: target /m/ → m  (MASTERED-CONSONANT, gentle ramp)
+       read: "Which letter says mmm?"
+       correct: "Yes! M says mmm."
+   P2: target /h/ → h  (MASTERED-CONSONANT, gentle ramp)
+       read: "Which letter says hhh?"
+       correct: "Yes! H says hhh."
+   P3: target /n/ → n  (MASTERED-CONSONANT, gentle ramp)
+       read: "Which letter says nnn?"
+       correct: "Yes! N says nnn."
+   P4: target /æ/ → a  (MASTERED-VOWEL anchor at mid-tier)
+       read: "Which letter says a?"
+       correct: "Yes! A says a."
+   P5: target /b/ → b  (MASTERED-CONSONANT with voiced/unvoiced
+                        trap; distractors include p, d)
+       read: "Which letter says buh?"
+       correct: "Yes! B says buh."
+   P6: target /ɒ/ → o  (CURRENT-TARGET vowel #1 — lift fires)
+       read: "Which letter says o?"
+       correct: "Yes! O says o."
+   P7: target /g/ → g  (MASTERED-CONSONANT, voiced/unvoiced trap
+                        with k as distractor — gives the
+                        trap window a non-vowel item between the
+                        two /ɒ/ slots)
+       read: "Which letter says guh?"
+       correct: "Yes! G says guh."
+   P8: target /ɒ/ → o  (CURRENT-TARGET vowel #2 — at floor of 2)
+       read: "Which letter says o?"
+       correct: "Yes! O says o."
+Counts: MASTERED-CONSONANT=6 (above floor of 4), MASTERED-VOWEL
+/æ/=1 (at floor), CURRENT-TARGET /ɒ/=2 (at floor of 2). P1-P3
+all mastered-consonant. P4 carries mastered vowel /æ/. P6 and P8
+carry current-target /ɒ/ (2 distinct slots; rule 7 deduplication
+yields to rule 3 floor). No /ɪ/ or /ɛ/ targets (current-target is
+/ɒ/). This is the canonical mix the directive is designed to
+produce.
+
+</drift-guard>
+
 GRADUATION-SESSION EXCEPTION: when the user message contains the
 "GRADUATION SESSION" directive, that directive supplies an additional
 NOVEL pool of words (e.g. nap, rat, map, tap) to be mixed with the
@@ -1985,6 +2364,10 @@ all other slots are content-mode-agnostic:
       case discipline is the screen's responsibility, but the
       directive's read-line + correct utterance MUST be internally
       consistent on case.
+    - letter-sounds: "Which letter says <SOUND-MNEMONIC>?" e.g.
+      "Which letter says mmm?" — see the LETTER-SOUNDS UTTERANCE
+      TEMPLATE block above for the phoneme→mnemonic substitution
+      table (mmm, buh, o, a, etc.) and the no-inline-SSML rule.
     - blending-cv: "Tap the <word>." e.g. "Tap the cat."
     - cvc-words:   "Read the <word>." e.g. "Read the cat."
     - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."
@@ -1994,10 +2377,11 @@ all other slots are content-mode-agnostic:
     - digraphs-sh: "Read the <word>." e.g. "Read the ship."
     - digraphs-ch: "Read the <word>." e.g. "Read the chin."
     - digraphs-th-voiceless: "Read the <word>." e.g. "Read the thin."
-  For non-letter-names tiers: use lowercase target word; one short
-  sentence; ends with a period. Use the EXACT verb for the focus
-  node — "Tap" for blending-cv AND letter-names, "Read" for cvc-words
-  / cvc-words-short-o / cvc-words-short-u / cvc-words-short-i /
+  For non-letter-names / non-letter-sounds tiers: use lowercase target
+  word; one short sentence; ends with a period. Use the EXACT verb for
+  the focus node — "Tap" for blending-cv AND letter-names, "Which
+  letter says" for letter-sounds, "Read" for cvc-words /
+  cvc-words-short-o / cvc-words-short-u / cvc-words-short-i /
   cvc-words-short-e / digraphs-sh / digraphs-ch /
   digraphs-th-voiceless.
   Do not mix templates within a single plan.
@@ -2008,6 +2392,10 @@ all other slots are content-mode-agnostic:
   letters are not nouns. The "letter" word in the template is what
   carries the grammatical role; the case of <NAME> is preserved from
   the read line.
+- correct (letter-sounds tier): "Yes! <LETTER-UPPER> says <SOUND-MNEMONIC>."
+  e.g. "Yes! M says mmm." — see LETTER-SOUNDS UTTERANCE TEMPLATE
+  block above. NEVER use the article-led "Yes! That's a <word>."
+  default for letter-sounds — letters and sounds are not nouns.
 - correct (all other word-song tiers): default template is "Yes! That's a <word>." (lowercase target
   after the article) e.g. "Yes! That's a cat."
   EXCEPTION — chip words that cannot take an indefinite article
@@ -2038,13 +2426,18 @@ all other slots are content-mode-agnostic:
   list-final / declarative-tag intonation (clipped sound) regardless
   of final phoneme class.
 - reprompt: "Hmm... try again?"  (verbatim — do not vary; SAME for
-  letter-names and every other word-song tier)
+  letter-names, letter-sounds, and every other word-song tier)
 - hint (letter-names tier): "Let's look. <NAME>." e.g.
   "Let's look. M." — <NAME> case-preserved from the read line.
+- hint (letter-sounds tier): "Listen. <SOUND-MNEMONIC>." e.g.
+  "Listen. mmm." — see LETTER-SOUNDS UTTERANCE TEMPLATE block above.
 - hint (all other word-song tiers): "Let's look. <Word>." e.g.
   "Let's look. Cat."
 - giveAnswer (letter-names tier): "This one is the letter <NAME>."
   e.g. "This one is the letter M." — <NAME> case-preserved.
+- giveAnswer (letter-sounds tier): "This one is <LETTER-UPPER>. <LETTER-UPPER> says <SOUND-MNEMONIC>."
+  e.g. "This one is M. M says mmm." — see LETTER-SOUNDS UTTERANCE
+  TEMPLATE block above.
 - giveAnswer (all other word-song tiers): "This one is <word>."
   e.g. "This one is cat."
 
