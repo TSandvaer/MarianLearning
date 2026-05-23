@@ -14,7 +14,7 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 - **Foundation:** Cross-project handoff entry below (RandomGame orch's 0900 UTC entry) explicitly surfaced three options (a/b/c) and asked MARIAN orch to pick before opening the PR. Empirical foundation: `clickup_add_task_dependency` is gone from the new self-hosted MCP — verified in the commit body of `c11e32c`. Option (a) (Thomas relays the blocker-set manually via web UI) is impractical for sub-agent-driven workflow; option (b) (front via REST API direct) over-engineers for a lightly-used pattern. Option (c) is the minimal-change response that preserves Matt's ability to flag dependencies without depending on a tool that no longer exists.
 - **Alternative:** Surface to Thomas. Rejected because (a) the tool removal is empirical, not strategic; (b) the workflow simplification is mechanical persona-doc maintenance and falls under [[feedback_orchestrator_no_coding]]'s in-lane authoring scope; (c) the change is 1-line, fully revertable. Per orchestrator-autonomy 4-gate framework, this passes reversibility + foundation-citable + not-on-never-list + logged-before-execution.
 - **Reversibility:** 1-line edit on a persona file; revert via single Edit operation. If Thomas prefers option (a) or (b), the PR or a follow-up can change matt.md back.
-- **Status:** pending review.
+- **Status:** accepted by Thomas 2026-05-23
 
 ## 2026-05-23 0900 UTC — Cross-project handoff: ClickUp MCP tool-name rename pre-staged on branch (PR open NOT done — waiting on MARIAN orch)
 
@@ -35,7 +35,7 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
   5. Merge after APPROVE + CI green.
 - **Alternative:** Have the RandomGame orch open the PR directly. Rejected because (a) MARIAN orch owns final merge gate per cross-project session boundary, (b) MARIAN orch has context on Matt's dropped-tool gap decision that the RandomGame orch lacks, (c) Thomas explicitly requested "pre-staged ... so MARIAN orch can pick it up."
 - **Reversibility:** Branch is pre-staged only. If MARIAN orch (or Thomas) prefers a different naming convention or wants to revise Matt's tool-set, the branch can be force-reset or deleted with no production impact. ~10 min effort.
-- **Status:** PRE-STAGED. Awaiting MARIAN orchestrator PR-open + merge in next MARIAN session.
+- **Status:** accepted by Thomas 2026-05-23 — executed by MARIAN orchestrator as PR #333, merged at SHA `f53d3de` 2026-05-23 11:57:48Z. Cross-project pre-stage-and-pickup model approved for future use.
 
 ## 2026-05-22 1700 UTC — Cancel 4 hung CI runs (partial — 2 of 4 raced to SUCCESS during cancel)
 
@@ -48,7 +48,7 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 - **Follow-up:** Jessica #304's CI needs to re-run against new main (now has #302 + #303 merged). Triggering via `gh pr update-branch 304` to rebase her branch + fresh CI run. Main post-#303 will get a new CI run automatically on next push.
 - **Side effects:** Jessica #304 CI was actively running when cancel signal arrived; it may have been mid-execution. Update-branch creates a new run, so the cancelled state is moot once fresh CI starts.
 - **Calibration note:** This was a false-positive escalation. Pattern to apply on future similar cases: don't conclude "hung" from a single status-check; check at +2-3 minutes apart for delta. Adjust the "expected duration" mental model — Wave 5 e2e runs may legitimately take 2-3 hours now with the new vitest gate + larger test suites.
-- **Status:** pending review.
+- **Status:** accepted by Thomas 2026-05-23 (calibration note acknowledged; orchestrator to apply +2-3 min delta-check pattern going forward)
 
 ## 2026-05-21 1235 UTC — Dispatch Devon Wave 3 parser fixes (hyphen support + ANSWER_RANGE_MAX_TWO_DIGIT)
 
