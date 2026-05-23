@@ -308,10 +308,13 @@ export interface MathSessionResult {
   perProblemAnswerValue: readonly (number | null)[]
   /**
    * Per-problem OFFERED distractor class, indexed 0..N-1 (parallel to
-   * `plan.problems`). Records the post-downgrade rendered class the
-   * chip helper emitted for each problem (Kevin Wave 5 PR B —
-   * ticket 86c9y1p99, paired with Wave-1b schema PR + Devon Wave-3
-   * render-side widening).
+   * `plan.problems`). Records the pre-downgrade class the chip helper
+   * intended to render — the planner-emitted hint when set, otherwise
+   * the per-tier focus-node default. Silent OOR / alias downgrade
+   * inside `pickDistractors` operates on chip VALUES, not on this class
+   * label, so the captured label reflects the pedagogical intent (Kevin
+   * Wave 5 PR B — ticket 86c9y1p99, paired with Wave-1b schema PR +
+   * Devon Wave-3 render-side widening).
    *
    * Values:
    *   - `null` for P1–P3 (gentle ramp; no trap class is offered).
@@ -331,7 +334,7 @@ export interface MathSessionResult {
    * Q-new resolution for Wave-5 borrow/carry classes) is the future read
    * site.
    */
-  perProblemDistractorClass: readonly (ResolvedDistractorClass | null)[]
+  perProblemDistractorClass: readonly (OfferedDistractorClass | null)[]
 }
 
 /** Function signature for playing one canonical Math utterance. */
@@ -884,8 +887,8 @@ function MathScreen({
   )
 
   /**
-   * Per-problem RESOLVED distractor class — the POST-DOWNGRADE class
-   * the chip helper emitted for each problem (Kevin Wave 5 PR B —
+   * Per-problem OFFERED distractor class — the pre-downgrade class the
+   * chip helper INTENDED to render for each problem (Kevin Wave 5 PR B —
    * ticket 86c9y1p99, pairs Wave-1b schema PR + Devon's render-side
    * widening PR).
    *
@@ -893,14 +896,16 @@ function MathScreen({
    *   - `null` for P1–P3 (gentle ramp — no trap class offered).
    *   - `'off-by-one' | 'wrong-op' | 'decade-anchor' | 'forgotten-carry'
    *      | 'smaller-from-larger' | 'borrow-no-decrement'` for P4–P8 —
-   *     the resolved class captured at chip-render time by
-   *     `buildChipOrderWithClass`.
+   *     the offered class captured at chip-render time by
+   *     `buildChipOrderWithClass` (planner hint when set; otherwise the
+   *     per-tier focus-node default).
    *
    * Written via a `useEffect` keyed on `problemIndex` so the entry
    * mirrors the current `chipOrderWithClass.distractorClass`. Once
-   * written, the slot is stable for the rest of the session (no
-   * downgrade-on-tap dynamics — the class is the OFFERED class, not the
-   * tap-outcome class).
+   * written, the slot is stable for the rest of the session — the class
+   * is positional / tap-outcome-independent (a wrong-then-correct retry
+   * leaves the slot unchanged because capture fires at chip-render, not
+   * at chip-tap).
    *
    * SessionEnd reads this via `MathSessionResult.perProblemDistractorClass`
    * → `SessionEndPayload.perProblemDistractorClass` →
@@ -910,7 +915,7 @@ function MathScreen({
    * §5.4) lands in a future PR.
    */
   const perProblemDistractorClassRef = useRef<
-    (ResolvedDistractorClass | null)[]
+    (OfferedDistractorClass | null)[]
   >(plan.problems.map(() => null))
 
   /**
@@ -1435,7 +1440,7 @@ function MathScreen({
     }
     const dClasses = perProblemDistractorClassRef.current
     if (dClasses.length !== planLength) {
-      const next = new Array<ResolvedDistractorClass | null>(planLength).fill(
+      const next = new Array<OfferedDistractorClass | null>(planLength).fill(
         null,
       )
       for (let i = 0; i < Math.min(dClasses.length, planLength); i++) {
@@ -2964,19 +2969,32 @@ function SparkleBurst() {
  * below for the per-focus-node mapping.
  */
 /**
- * Resolved per-problem distractor class — the POST-DOWNGRADE class the
- * chip helper actually emitted, mirroring the `distractorClass` chosen
- * inside `buildChipOrder` below. `null` indicates the gentle-ramp band
- * (P1–P3, where no Class-2 / Class-B / wrong-op / forgotten-carry /
+ * Offered per-problem distractor class — the PRE-DOWNGRADE class the chip
+ * helper INTENDED to emit, i.e. the planner-emitted hint
+ * (`problem.distractorClass`) when set, otherwise the focus-node default
+ * for the current tier. `null` indicates the gentle-ramp band (P1–P3,
+ * where no Class-2 / Class-B / wrong-op / forgotten-carry /
  * smaller-from-larger / borrow-no-decrement trap is offered).
+ *
+ * "Offered" rather than "resolved": the label captures the trap class the
+ * helper SET OUT TO render. The silent OOR / alias downgrade that may
+ * happen inside `pickDistractors` operates on the chip VALUES (the number
+ * array), not on this class label — so what telemetry persists here is
+ * the pedagogical intent, which is what the diagnostic-aware mastery gate
+ * (Kyle's two-digit-addsub spec §5.4) needs in order to know which trap
+ * Marian was presented with on each problem.
+ *
+ * Positional / tap-outcome-independent: wrong-then-correct retries leave
+ * the slot unchanged because capture fires at chip-render time, not at
+ * chip-tap time.
  *
  * The screen captures this via `buildChipOrderWithClass` and writes the
  * per-problem array into `perProblemDistractorClassRef`; SessionEnd
  * persists it onto `SessionHistoryEntry.perProblemDistractorClass` for
- * future diagnostic-aware mastery gates (Kyle's two-digit-addsub spec
- * §5.4). See PR header for the full plumbing chain.
+ * future diagnostic-aware mastery gates. See PR header for the full
+ * plumbing chain.
  */
-export type ResolvedDistractorClass =
+export type OfferedDistractorClass =
   | 'off-by-one'
   | 'wrong-op'
   | 'decade-anchor'
@@ -2986,10 +3004,24 @@ export type ResolvedDistractorClass =
 
 export interface ChipOrderWithClass {
   values: readonly number[]
-  /** Resolved distractor class — `null` for P1–P3 (gentle ramp). */
-  distractorClass: ResolvedDistractorClass | null
+  /** Offered distractor class — `null` for P1–P3 (gentle ramp). */
+  distractorClass: OfferedDistractorClass | null
 }
 
+/**
+ * Build the chip-value order for a problem AND capture the per-problem
+ * OFFERED distractor class — the trap class the chip helper intends to
+ * render (planner-emitted hint when set, otherwise the per-tier
+ * focus-node default). `null` indicates the gentle-ramp band (P1–P3).
+ *
+ * The class label here is pre-downgrade: any silent OOR / alias
+ * downgrade inside `pickDistractors` operates on the chip values, NOT
+ * on the class label. That keeps the captured label aligned with the
+ * pedagogical intent, which is what the diagnostic-aware mastery gate
+ * (Kyle's two-digit-addsub spec §5.4) needs.
+ *
+ * See `OfferedDistractorClass` for the consumer contract + plumbing.
+ */
 function buildChipOrderWithClass(
   problem: MathProblem,
   maxAnswer: number,
@@ -3003,13 +3035,12 @@ function buildChipOrderWithClass(
     return { values, distractorClass: null }
   }
   // P4–P8: mirror the resolution logic inside `buildChipOrder` so the
-  // captured class is the planner-default (i.e. what the chip-helper
-  // would have used absent a per-problem `MathProblem.distractorClass`
-  // override). If a future planner emits a per-problem class hint, the
-  // hint wins over the default — same posture as the chip helper.
+  // captured class is the OFFERED class — planner hint when set,
+  // otherwise the per-tier focus-node default the chip helper would
+  // use. The label is pre-downgrade by design; see helper JSDoc above.
   const planner = problem.distractorClass
   if (planner !== undefined) {
-    return { values, distractorClass: planner as ResolvedDistractorClass }
+    return { values, distractorClass: planner as OfferedDistractorClass }
   }
   if (problem.op === '-') {
     if (focusNode === 'sub-to-20') {
