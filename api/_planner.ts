@@ -1303,6 +1303,108 @@ The user message names a focus skill node. Generate problems specifically for th
   STRATEGY PROHIBITION (LOAD-BEARING): never invoke or suggest the make-ten-bridge / cross-10-bridge decomposition strategy from add-to-20 in this tier. FORBIDDEN hint text: "Look. Twenty-three. Plus two is twenty-five, then plus two more is twenty-seven" (decomposes through a fictitious intermediate). ALLOWED hint text: "Look. Twenty-three. And four more. How many now?" — the count-on framing is decade-agnostic and does NOT compete with add-to-20's bridge strategy. The pedagogical job at this tier is place-value preservation; the strategy being taught is "the tens digit does not change when no carry/borrow occurs."
 
   Do NOT verbally decompose the two-digit operand (e.g. do NOT say "twenty and three plus four" instead of "twenty-three plus four"). The decomposition IS the mental work Marian does to preserve place value; it stays internal.
+- two-digit-addsub-with-regroup: addition OR subtraction within one mixed-op session, WITH regrouping required. <drift-guard>RULE_IDENTITY=two-digit-addsub-with-regroup; SPEC=design/math/two-digit-addsub-with-regroup-content.md; LINT=scripts/compositionLint.ts:3104 (POOL) + 3416 (RULES) + 3938 (BINDING). Do NOT rename, re-band, re-cap, or substitute facts under any seed.</drift-guard> For ADDITION: first operand two-digit in [10, 60], second operand single-digit in [1, 9], units column sums to STRICTLY > 9 (carry REQUIRED). For SUBTRACTION: minuend two-digit in [10, 64], subtrahend single-digit in [1, 9], minuend's units digit STRICTLY < subtrahend (borrow REQUIRED), result two-digit in [17, 64]. read for "+": "<addend-A> plus <addend-B>. How many?" e.g. "Twenty-seven plus six. How many?". read for "-": "<minuend> minus <subtrahend>. How many are left?" e.g. "Thirty-two minus five. How many are left?".
+
+  REGROUP-REQUIRED SELF-CHECK <rule band="hard">apply BEFORE emitting every problem</rule>:
+  - For "+" facts: COMPUTE (a mod 10) + b and CONFIRM > 9. If <= 9, the fact is NO-REGROUP territory and is FORBIDDEN (belongs in two-digit-addsub-no-regroup). Worked example: 27+6 -> units 7+6=13 > 9 OK. 23+4 -> units 3+4=7 <= 9 FORBIDDEN.
+  - For "-" facts: COMPUTE (a mod 10) and CONFIRM < b. If >=, the fact is NO-BORROW territory and is FORBIDDEN. Worked example: 32-5 -> units 2 < 5 OK. 28-5 -> units 8 >= 5 FORBIDDEN.
+  - For "-" facts: COMPUTE a - b and CONFIRM result >= 17. If < 17, the result has slipped into sub-to-20 territory and is FORBIDDEN (single-digit results belong to sub-to-20). Worked example: 21-4=17 OK. 12-5=7 FORBIDDEN.
+  - <self-check>Did I just emit a fact that satisfies the no-regroup constraint? If yes, REJECT — that fact belongs to two-digit-addsub-no-regroup, not here. Re-pick from the 30-fact pool below.</self-check>
+
+  FACT POOL (30 ordered triples; pick exactly 8 distinct (a, b, op) triples per session, no duplicates):
+  Each fact is annotated with [BAND/op/category]. Categories:
+  - carry-from-units (+ only): the actual learning target on "+". Single-digit b where (a mod 10) + b > 9.
+  - borrow-from-tens (- only): the actual learning target on "-". Single-digit b where (a mod 10) < b. Pool has 8 mid-decade-minuend facts.
+  - round-ten-cross-down (- only): minuend ends in 0; units column starts at 0, so every subtrahend forces a borrow. SATURATION-PRIOR cap target (Haiku's empirical prior gravitates to round-ten anchors across bakes); pool has 3 facts (30-4, 40-7, 50-8).
+  - EASY band (P1-P3 ONLY; 9 facts):
+    · 15+8=23  [EASY/+/carry-from-units]
+    · 17+5=22  [EASY/+/carry-from-units]
+    · 19+4=23  [EASY/+/carry-from-units]
+    · 13+9=22  [EASY/+/carry-from-units]
+    · 16+6=22  [EASY/+/carry-from-units]
+    · 14+7=21  [EASY/+/carry-from-units]
+    · 21-4=17  [EASY/-/borrow-from-tens]
+    · 22-5=17  [EASY/-/borrow-from-tens]
+    · 23-6=17  [EASY/-/borrow-from-tens]
+  - MEDIUM band (P4-P8 eligible; 11 facts):
+    · 27+6=33  [MEDIUM/+/carry-from-units]
+    · 25+8=33  [MEDIUM/+/carry-from-units]
+    · 29+5=34  [MEDIUM/+/carry-from-units]
+    · 35+7=42  [MEDIUM/+/carry-from-units]
+    · 38+4=42  [MEDIUM/+/carry-from-units]
+    · 46+7=53  [MEDIUM/+/carry-from-units]
+    · 48+5=53  [MEDIUM/+/carry-from-units]
+    · 32-5=27  [MEDIUM/-/borrow-from-tens]
+    · 41-6=35  [MEDIUM/-/borrow-from-tens]
+    · 53-8=45  [MEDIUM/-/borrow-from-tens]
+    · 30-4=26  [MEDIUM/-/round-ten-cross-down]
+  - HARD band (P5-P8 ONLY; 10 facts):
+    · 45+8=53  [HARD/+/carry-from-units]
+    · 47+6=53  [HARD/+/carry-from-units]
+    · 49+4=53  [HARD/+/carry-from-units]
+    · 55+9=64  [HARD/+/carry-from-units]
+    · 58+6=64  [HARD/+/carry-from-units]
+    · 52-7=45  [HARD/-/borrow-from-tens]
+    · 61-8=53  [HARD/-/borrow-from-tens]
+    · 64-9=55  [HARD/-/borrow-from-tens]
+    · 40-7=33  [HARD/-/round-ten-cross-down]
+    · 50-8=42  [HARD/-/round-ten-cross-down]
+  POOL-MEMBERSHIP SELF-CHECK <rule band="hard">: before emitting each problem, verify the chosen (a, b, op) triple appears verbatim above. The 30 listed triples are the ONLY allowed facts. Common FORBIDDEN candidates to REJECT (valid by operand range but NOT in v1 pool): 12-5 (result < 17, single-digit, sub-to-20 territory), 73+8 (operand outside v1 decade range [10, 64]), 20+3 (no-carry, two-digit-addsub-no-regroup territory), 26-8 (borrow OK but not curated in v1 pool).
+
+  CATEGORY-CAP BUDGET <rule band="hard">apply BEFORE selecting any facts — this is the FIRST rule because Haiku's prior empirically saturates round-ten-cross-down when the cap is buried late in the rule list</rule>:
+  - carry-from-units:     AT MOST 5.   (Pool has 18 facts; generous because this IS the "+" learning target.)
+  - borrow-from-tens:     AT MOST 3.   (Pool has 9 facts; matches the "-" cap from op-mix.)
+  - round-ten-cross-down: AT MOST 1.   (Pool has 3 facts: 30-4, 40-7, 50-8. SATURATION-PRIOR cap — load-bearing.) NEGATIVE ANCHOR: it is FORBIDDEN to place 30-4 AND 40-7 in the same session; FORBIDDEN to place 30-4 AND 50-8; FORBIDDEN to place 40-7 AND 50-8. AT MOST ONE round-ten-cross-down fact per session — pick at most one of {30-4, 40-7, 50-8}; let the other two lie unused. <self-check>After placing all 8 facts, count round-ten-cross-down occurrences. If > 1, REJECT and SWAP the surplus for a borrow-from-tens fact at the same slot.</self-check>
+  The three caps SUM TO 9, giving an 8-problem session 1 slot of slack. <self-check>Pick a category layout that respects ALL THREE caps BEFORE assigning facts to slots — Haiku attention drifts to round-ten-cross-down on bake-2+ when the cap is buried; pin the count to 1 at the START of fact selection.</self-check>
+
+  SESSION COMPOSITION RULES (apply IN ORDER, AFTER the CATEGORY-CAP BUDGET above):
+  1. Problems 1-3 (gentle ramp): draw EXCLUSIVELY from the EASY band. Calibration window.
+  2. NEGATIVE ANCHOR — P1, P2, P3, P4 PLACEMENT BANS (any one of these is a hard rule violation):
+     · DO NOT place any MEDIUM-band fact at P1, P2, or P3. MEDIUM-band only appears at P4 or later.
+     · DO NOT place any HARD-band fact at P1, P2, P3, or P4. HARD-band only appears at P5 or later.
+     · The ONLY facts allowed at P1, P2, P3 are: 15+8, 17+5, 19+4, 13+9, 16+6, 14+7, 21-4, 22-5, 23-6.
+  3. P1 IS ALWAYS "+". Hard rule — session opener carries onset anxiety; the more confident operation enters first. Allowed P1 facts: 15+8, 17+5, 19+4, 13+9, 16+6, 14+7.
+  4. OP-MIX RULES <rule band="hard">mandatory; lint rejects any other mix</rule>:
+     · The 8-problem session MUST contain EXACTLY 5 OR 6 problems with op = "+" AND EXACTLY 2 OR 3 problems with op = "-".
+     · Allowed mixes: 5+/3- (default), 6+/2- (low-score modulation).
+     · FORBIDDEN mixes: 8+/0-, 7+/1-, 4+/4-, 3+/5-, 2+/6-, 1+/7-, 0+/8-. <self-check>Count "+" and "-" across all 8 slots. If add-count ∉ {5, 6} OR sub-count ∉ {2, 3}, REJECT and rebalance.</self-check>
+  5. Problem 4: MEDIUM-band only (HARD-band still FORBIDDEN at P4).
+  6. Problems 5-8 (discriminate): draw from MEDIUM + HARD bands. Recent-score modulation: low score (< 0.5) -> bias toward MEDIUM and use op-mix 6+/2-; high score (>= 0.85) -> push toward HARD with >= 2 borrow-from-tens facts in P5-P8; mid score -> balanced.
+  7. HIGH-LEVERAGE COVERAGE RULE <rule band="hard">: at least one borrow-from-tens fact MUST appear in P5-P8 (drawn from: 32-5, 41-6, 53-8, 52-7, 61-8, 64-9, OR the MEDIUM-band borrow-from-tens facts placed at P5+). The "+" side is satisfied trivially because every "+" fact in the pool IS a carry-from-units fact. <self-check>Scan P5, P6, P7, P8. If zero have category=borrow-from-tens, REJECT and SWAP one P5-P8 fact for a borrow-from-tens fact (respecting the op-mix and category caps).</self-check>
+  8. ROUND-TEN-CROSS-DOWN-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST ONE problem across the entire 8-problem session may carry the round-ten-cross-down category (drawn from: 30-4, 40-7, 50-8). Before emitting a second round-ten-cross-down, REJECT it and SWAP for a mid-decade borrow-from-tens fact. NEGATIVE ANCHOR: it is FORBIDDEN to place 30-4 AND 40-7 in the same session; FORBIDDEN to place 30-4 AND 50-8; FORBIDDEN to place 40-7 AND 50-8. Haiku's empirical prior at sibling Wave-4 two-digit-addsub saturated round-ten-anchor (the "+" sibling of round-ten-cross-down) across multiple bakes until the cap was hoisted to the top of the rule list. Wave 5 inherits this prior — the cap MUST be respected from bake-1.
+  9. CARRY-FROM-UNITS-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST FIVE problems may carry the carry-from-units category. Before emitting a sixth, REJECT it. (Cap binds only on "+"-heavy sessions; the 6+/2- op-mix uses exactly 5 carry-from-units + 1 round-ten-cross-down OR 5 carry-from-units + 1 borrow-from-tens — never 6 carry-from-units.)
+  10. BORROW-FROM-TENS-CAP SELF-CHECK <rule band="hard">re-statement</rule>: AT MOST THREE problems may carry the borrow-from-tens category. Before emitting a fourth, REJECT it. (Cap matches the "-" count cap from op-mix; every "-" problem in a default 5+/3- mix IS a borrow problem.)
+  11. NO duplicate (a, b, op) triples within the 8-problem set.
+  12. DUAL-EXPOSURE RULE <rule band="hard">: never pair a "+" fact and its "-" inverse in the same session, where "inverse" means the same operand triple. E.g. if 32-5=27 is in the session, 27+5=32 is FORBIDDEN. Walk through the session once at the end and check every (a, b, c) where a±b=c against the other 7 problems; if any inverse pair is present, SWAP one of the offending facts. AUDIT NOTE: in the v1 pool, ZERO in-pool cross-op collisions exist (every "+" fact's inverse falls outside the curated pool); the rule remains in force for forward-compat with v2 widening.
+
+  WORKED EXAMPLE — a clean 8-problem session that respects ALL caps (use this as a template, NOT a verbatim copy):
+     P1=15+8 [EASY/+/carry-from-units]    (carry-from-units #1; "+" count 1)
+     P2=17+5 [EASY/+/carry-from-units]    (carry-from-units #2; "+" count 2)
+     P3=21-4 [EASY/-/borrow-from-tens]    (borrow-from-tens #1; "-" count 1)
+     P4=27+6 [MEDIUM/+/carry-from-units]  (carry-from-units #3; "+" count 3; P4 is MEDIUM-only)
+     P5=41-6 [MEDIUM/-/borrow-from-tens]  (borrow-from-tens #2; "-" count 2; P5-P8 borrow-from-tens anchor)
+     P6=38+4 [MEDIUM/+/carry-from-units]  (carry-from-units #4; "+" count 4)
+     P7=30-4 [MEDIUM/-/round-ten-cross-down] (round-ten-cross-down #1 — at cap; "-" count 3)
+     P8=55+9 [HARD/+/carry-from-units]    (carry-from-units #5 — at cap; "+" count 5)
+  Counts: carry-from-units=5 (at cap), borrow-from-tens=2 (under cap of 3), round-ten-cross-down=1 (at cap). Total = 8. EASY at P1-P3, MEDIUM at P4-P7, HARD at P8. P5-P8 carries 1 borrow-from-tens + 1 round-ten-cross-down (high-leverage rule satisfied). Op-mix 5+/3-, P1 is "+", no inverse pairs, no duplicates.
+
+  PER-PROBLEM SHAPE for two-digit-addsub-with-regroup: every problem MUST emit op: "+" OR op: "-" on the wire (the screen renders the operator glyph from op). The op flag matches the chosen fact's [.../+/...] or [.../-/...] tag. Wrong-answer chip selection is handled entirely at render time — distractorClass is NOT a planner-emitted field; the canon JSON wire is utterance-only {id, text} and carries no per-problem distractor tag. The render-time helpers (forgottenCarryDistractors on "+", smallerFromLargerDistractors on "-", borrowNoDecrementDistractors on "-" P5-P8) consume the parsed (a, b, op) from the read-line — the planner's job is FACT-POOL COMPOSITION, not trap selection. Utterance ids MUST use the literal "math." prefix (NOT "two-digit-addsub-with-regroup."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". The id namespace is the track name, NOT the focus-node name. Per-slot utterance templates:
+  - read (+): "<addend-A> plus <addend-B>. How many?" e.g. "Twenty-seven plus six. How many?"
+  - read (-): "<minuend> minus <subtrahend>. How many are left?" e.g. "Thirty-two minus five. How many are left?"
+    READ-LINE NEGATIVE ANCHOR ("-" only) <rule band="hard">: the read-line MUST use the word "minus" verbatim AND end with the phrase "How many are left?" — DO NOT substitute "take away" for "minus", and DO NOT shorten the trailing phrase to "How many?". The "take away" phrasing belongs in the hint scaffold ONLY (see below). Emitting "Thirty-two minus five. How many?" as a "-" read-line is a HARD RULE VIOLATION — the browser parser rejects that shape and the canon falls into silent static. Every "math.pN.read" utterance for an op:"-" problem MUST match the pattern: capitalised first-operand quantity word (possibly hyphenated), then " minus ", then a lowercased subtrahend word, then ". How many are left?". The "+" read-line uses "How many?" (NOT "How many are left?") — the trailing phrase distinguishes addition from subtraction in the wire-side parser.
+  - correct: "Yes! <answer>!" e.g. "Yes! Thirty-three!"
+  - reprompt: "Hmm... try again?" (verbatim)
+  - hint (+): "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Twenty-seven. And six more. How many now?"
+  - hint (-): "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Thirty-two. Take away five. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
+  - giveAnswer: "This one is <answer>." e.g. "This one is thirty-three."
+
+  PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-seven", "thirty-three", "forty-two", "fifty-three", "sixty-four") — Emma renders these on en-US-EmmaMultilingualNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", "forty", "fifty", "sixty") are NOT hyphenated when emitted alone (e.g. "Thirty minus four", not "Thirty-zero minus four").
+
+  PROSODY PROHIBITION <rule band="hard">LOAD-BEARING, carried forward from two-digit-addsub-no-regroup unchanged</rule>: never render two-digit operands digit-by-digit. FORBIDDEN: "Two seven plus six. How many?" / "Two-seven plus six. How many?" / "Three and two minus five. How many are left?". ALLOWED: "Twenty-seven plus six. How many?". Digit-by-digit TTS at the regrouping tier trains the concatenated-with-carry-suppression error pattern — the child hears the operands as independent digits, then fails to integrate the carry across them. Quantity-word framing is the only correct form. <self-check>After composing each "+" or "-" read-line, scan for any space-or-hyphen-separated single-digit pair within an operand (e.g. "two seven", "three-two"). If present, REJECT and re-emit as a quantity word.</self-check>
+
+  STRATEGY PROHIBITION <rule band="hard">NEW for Wave 5; spec §1.6</rule>: the read-line MUST NOT verbally pre-execute the regroup. FORBIDDEN: "Twenty-seven plus six. Carry the one to thirty. How many?" (gives the answer scaffold-first). FORBIDDEN: "Thirty-two minus five. Borrow from the thirty. How many are left?" (same). The regroup procedure IS the conceptual learning target — verbalising it pre-emptively short-circuits the diagnostic. The hint slot (NOT the read slot) carries the scaffold per the existing hint template. <self-check>After composing each read-line, scan for any of the strings "carry", "borrow", "regroup", or any clause-after-the-operand explaining the operation. If present in the read slot, REJECT and strip back to the bare operand-operator-operand-question template.</self-check>
+
+  Do NOT verbally decompose the two-digit operand (e.g. do NOT say "twenty and seven plus six" instead of "twenty-seven plus six"). The decomposition IS the mental work Marian does to execute the regroup; verbalising it short-circuits the diagnostic.
 - skip-counting: count by 2s, 5s, or 10s. read: "Two, four, six, ... what's next?" Answer is the next term.
 - mult-2-5-10: multiplication by 2, 5, or 10. read: "Two times <X>. How many?" Answer is the product.
 - mult-3-4: multiplication by 3 or 4. read: same template.

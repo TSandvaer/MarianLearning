@@ -158,12 +158,12 @@ When Marian taps a skill-tree chip mid-greeting, [`handleNodeTap`](MarianLearnin
 
 **Per-problem capture refs — four-ref lockstep pattern (post PR #309, 2026-05-22).** Math.tsx maintains **four** per-problem capture refs that flow Math → App (`handleMathComplete`) → `SessionEndPayload` → `recordProgressOnSessionEnd` → `SessionHistoryEntry`. All four follow the same shape:
 
-| Ref                            | Slot value type                                                | Captured by                                                                              | Drives                                                                   |
-| ------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `perProblemCorrectRef`         | `boolean` (first-tap semantics)                                | `firstTapRecordedRef`-gated assignment inside chip-tap handler                           | Mastery rule via `successRate`                                           |
-| `latencyMsByProblemRef`        | `number` (ms; `-1` sentinel for not-measured)                  | `useLayoutEffect([readAloudPlayed])` anchor + chip-tap delta                             | M4 Leitner / M4.x slow-fact directive                                    |
-| `perProblemAnswerValueRef`     | `number \| null` (literal chip value of first tap)             | `firstTapRecordedRef`-gated assignment inside chip-tap handler                           | Future wrong-tap classification                                          |
-| `perProblemDistractorClassRef` | `ResolvedDistractorClass \| null` (offered class, gentle=null) | `useEffect([problemIndex, chipOrderWithClass.distractorClass])` writes when chips render | Future diagnostic-aware mastery gate (Kyle's two-digit-addsub spec §5.4) |
+| Ref                            | Slot value type                                               | Captured by                                                                              | Drives                                                                   |
+| ------------------------------ | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `perProblemCorrectRef`         | `boolean` (first-tap semantics)                               | `firstTapRecordedRef`-gated assignment inside chip-tap handler                           | Mastery rule via `successRate`                                           |
+| `latencyMsByProblemRef`        | `number` (ms; `-1` sentinel for not-measured)                 | `useLayoutEffect([readAloudPlayed])` anchor + chip-tap delta                             | M4 Leitner / M4.x slow-fact directive                                    |
+| `perProblemAnswerValueRef`     | `number \| null` (literal chip value of first tap)            | `firstTapRecordedRef`-gated assignment inside chip-tap handler                           | Future wrong-tap classification                                          |
+| `perProblemDistractorClassRef` | `OfferedDistractorClass \| null` (offered class, gentle=null) | `useEffect([problemIndex, chipOrderWithClass.distractorClass])` writes when chips render | Future diagnostic-aware mastery gate (Kyle's two-digit-addsub spec §5.4) |
 
 **Pattern at each sync point:**
 

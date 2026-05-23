@@ -29,26 +29,19 @@ import {
 } from '../api/_planner.js'
 
 /**
- * Wave 5 PR B (ticket 86c9y1p99) — bake list now emits the
- * `'two-digit-addsub-no-regroup'` wire literal (matching the runtime
- * `SkillNode` shape post-PR-#308). The canon file on disk stays
- * `two-digit-addsub.json` via the `canonFileTierFor` mapping in
- * `api/_canon.ts` (dispatch contract: disk-side naming OUT OF SCOPE).
+ * Wave 6C (ticket 86c9y34xn) — `'two-digit-addsub-with-regroup'` is now
+ * a first-class baked tier. Dave's directive shipped in PR #314; this
+ * arc bakes the canon, removes the prior Wave-5 deferral exemption, and
+ * extends the bake list to 11 math nodes. The deferral helper from
+ * Wave 5 PR B (`WAVE_5_PR_B_PENDING_WITH_REGROUP`) is retired.
  *
- * `'two-digit-addsub-with-regroup'` is a valid wire literal but NOT in
- * the bake list — the matching canon content brief
- * (`design/math/two-digit-addsub-with-regroup-content.md`) is parked at
- * spec stage, and `defaultProgress` has the tier `'locked'`, so no
- * runtime user surfaces it. The "covers every" sweep below exempts the
- * `-with-regroup` literal via `WAVE_5_PR_B_PENDING_WITH_REGROUP` until a
- * future PR bakes the canon + extends the bake list.
+ * Disk mapping (`canonFileTierFor`):
+ *   `'two-digit-addsub-no-regroup'`   → `two-digit-addsub.json` (legacy disk name)
+ *   `'two-digit-addsub-with-regroup'` → `two-digit-addsub-with-regroup.json` (new)
  */
-const WAVE_5_PR_B_PENDING_WITH_REGROUP = new Set<string>([
-  'two-digit-addsub-with-regroup',
-])
 
 describe('activeCombos — coverage matches the curriculum', () => {
-  it('produces 19 combos: 10 math nodes × level 1 + 9 word-song nodes × level 1 (digraphs-th content tier added)', () => {
+  it('produces 20 combos: 11 math nodes × level 1 + 9 word-song nodes × level 1 (with-regroup baked post-Wave 6C)', () => {
     // Step 2 of the planner-parser contract added cvc-words alongside
     // blending-cv as a first-class word-song content mode. Ticket
     // 86c9m3ae3 added `cvc-words-short-o` as the next-vowel sibling
@@ -73,18 +66,19 @@ describe('activeCombos — coverage matches the curriculum', () => {
     // to blending-cv content via the planner's `effectiveFocusNode`, so
     // baking a duplicate blob would be wasted bytes.
     const combos = activeCombos()
-    expect(combos).toHaveLength(19)
+    expect(combos).toHaveLength(20)
     const mathCount = combos.filter((c) => c.track === 'math').length
     const wordSongCount = combos.filter((c) => c.track === 'word-song').length
-    expect(mathCount).toBe(10)
+    expect(mathCount).toBe(11)
     expect(wordSongCount).toBe(9)
   })
 
-  it('every math combo names a node from VALID_MATH_FOCUS_NODES (Wave 5 PR B — bake list emits `-no-regroup` wire literal post-rebake)', () => {
-    // Wave 5 PR B (ticket 86c9y1p99): the bake list now emits
-    // `'two-digit-addsub-no-regroup'` (the wire SkillNode literal post-#308).
-    // The disk file is still `two-digit-addsub.json` via the
-    // `canonFileTierFor` mapping in `api/_canon.ts`.
+  it('every math combo names a node from VALID_MATH_FOCUS_NODES (Wave 6C — bake list emits BOTH `-no-regroup` and `-with-regroup` wire literals)', () => {
+    // Wave 6C (ticket 86c9y34xn): the bake list now emits both
+    // `'two-digit-addsub-no-regroup'` and `'two-digit-addsub-with-regroup'`.
+    // The disk files diverge per `canonFileTierFor`: no-regroup writes
+    // `two-digit-addsub.json` (legacy stable disk name); with-regroup
+    // writes `two-digit-addsub-with-regroup.json` (new).
     const combos = activeCombos().filter((c) => c.track === 'math')
     for (const combo of combos) {
       expect(VALID_MATH_FOCUS_NODES).toContain(combo.focusNode)
@@ -114,17 +108,13 @@ describe('activeCombos — coverage matches the curriculum', () => {
     }
   })
 
-  it('covers every VALID_MATH_FOCUS_NODES entry — drift tripwire (Wave 5 PR B exempts `-with-regroup` until canon ships)', () => {
-    // Wave 5 PR B (ticket 86c9y1p99): the bake list emits
-    // `'two-digit-addsub-no-regroup'`. `'two-digit-addsub-with-regroup'`
-    // is exempted via `WAVE_5_PR_B_PENDING_WITH_REGROUP` — the matching
-    // content brief is at spec stage, defaultProgress has the tier
-    // `'locked'`, and no runtime user surfaces it. A future PR removes
-    // the exemption when the canon + spec lands.
+  it('covers every VALID_MATH_FOCUS_NODES entry — drift tripwire (post-Wave-6C: no exemptions)', () => {
+    // Wave 6C (ticket 86c9y34xn): every VALID_MATH_FOCUS_NODES literal
+    // is now baked. The Wave-5 deferral exemption for
+    // `'two-digit-addsub-with-regroup'` is retired.
     const combos = activeCombos().filter((c) => c.track === 'math')
     const covered = new Set(combos.map((c) => c.focusNode))
     for (const node of VALID_MATH_FOCUS_NODES) {
-      if (WAVE_5_PR_B_PENDING_WITH_REGROUP.has(node)) continue
       expect(covered.has(node)).toBe(true)
     }
   })

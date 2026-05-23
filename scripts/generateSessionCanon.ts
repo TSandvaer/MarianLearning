@@ -112,6 +112,7 @@ import {
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
   assertTwoDigitAddsubCompositionClean,
+  assertTwoDigitAddsubWithRegroupCompositionClean,
 } from './compositionLint.ts'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -212,11 +213,12 @@ const MATH_FOCUS_NODES: readonly string[] = [
   // `'two-digit-addsub'`. Both literals are valid wire focusNodes
   // post-PR-#308. The `-no-regroup` literal maps to the existing
   // `two-digit-addsub.json` canon disk file (kept stable per dispatch
-  // contract); `-with-regroup` would map to a new
-  // `two-digit-addsub-with-regroup.json` disk file (the matching
-  // canon is out of scope for this PR — Marian's default has it
-  // `'locked'` and no runtime user surfaces it yet).
+  // contract); `-with-regroup` maps to its own
+  // `two-digit-addsub-with-regroup.json` disk file (Wave 6C — ticket
+  // 86c9y34xn — bakes the regrouping canon now that Dave's directive
+  // ships via PR #314).
   'two-digit-addsub-no-regroup',
+  'two-digit-addsub-with-regroup',
   'skip-counting',
   'mult-2-5-10',
   'mult-3-4',
@@ -468,6 +470,33 @@ async function bakeOne(
       // below via `canonFileTierFor`.
       assertTwoDigitAddsubCompositionClean(
         `${combo.track}/two-digit-addsub`,
+        response,
+      )
+    } catch (err) {
+      if (lintWarn && err instanceof CompositionLintError) {
+        console.warn(
+          `\n[composition-lint] WARN — writing despite violations: ` +
+            `${err.message}\n` +
+            err.violations
+              .map((v) => `  - [${v.rule}] ${v.message}`)
+              .join('\n') +
+            '\n',
+        )
+      } else {
+        throw err
+      }
+    }
+  } else if (
+    combo.track === 'math' &&
+    combo.focusNode === 'two-digit-addsub-with-regroup'
+  ) {
+    try {
+      // Wave 6C (ticket 86c9y34xn) — bake-time composition lint for the
+      // regrouping tier. Wire literal and disk-file tier identifier match
+      // verbatim (`canonFileTierFor` is a pass-through for
+      // `two-digit-addsub-with-regroup`).
+      assertTwoDigitAddsubWithRegroupCompositionClean(
+        `${combo.track}/two-digit-addsub-with-regroup`,
         response,
       )
     } catch (err) {
