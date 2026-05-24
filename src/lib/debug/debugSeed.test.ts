@@ -185,6 +185,48 @@ describe('maybeApplyDebugSeed', () => {
     })
   })
 
+  describe('letter-names seed (ticket 86c9y6g6n)', () => {
+    beforeEach(() => {
+      setSearch('?debug=1&seed=letter-names')
+    })
+
+    it('writes letter-names: practicing into progress', () => {
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(progress?.skillLevels['letter-names']).toBe('practicing')
+    })
+
+    it('round-trip integration: maybeApplyDebugSeed → pickFocusNode("word-song") → "letter-names"', () => {
+      // letter-names is the FIRST node in WORD_SONG_NODES_IN_ORDER, so
+      // no preceding-node mastery patch is needed — the picker walks
+      // the tree and lands on letter-names immediately because it's
+      // 'practicing' (i.e. non-mastered). This is the load-bearing AC:
+      // without this seed, the natural fresh-launch path can never
+      // reach letter-names (defaults.ts ships it as 'mastered' per
+      // Marian's diagnostic) and pickFocusNode routes past it.
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(pickFocusNode(progress!, 'word-song')).toBe('letter-names')
+    })
+
+    it('bumps session-history sessionCount to 1 (skips Greet on next mount)', () => {
+      maybeApplyDebugSeed()
+      const history = readSessionHistory()
+      expect(history.sessionCount).toBe(1)
+      expect(history.schemaVersion).toBe(2)
+    })
+
+    it('is idempotent on progress — second call does not change skillLevels', () => {
+      maybeApplyDebugSeed()
+      const after1 = window.localStorage.getItem(PROGRESS_KEY)
+      maybeApplyDebugSeed()
+      const after2 = window.localStorage.getItem(PROGRESS_KEY)
+      expect(after2).toBe(after1)
+    })
+  })
+
   describe('cvc-words-short-o seed', () => {
     beforeEach(() => {
       setSearch('?debug=1&seed=cvc-words-short-o')
