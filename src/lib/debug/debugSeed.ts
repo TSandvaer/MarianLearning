@@ -67,6 +67,18 @@
  *
  * Recognized seed values
  * ----------------------
+ * - `letter-names`: Marian as if she's at the very first node in the
+ *   word-song tree — `letter-names` set to `'practicing'`. This is the
+ *   FIRST node in WORD_SONG_NODES_IN_ORDER, so no preceding-node
+ *   mastery patch is needed; the picker walks the tree and lands on
+ *   `letter-names` immediately. Because `defaults.ts` ships
+ *   `letter-names: 'mastered'` per Marian's diagnostic baseline (alphabet
+ *   mastered), the natural fresh-launch progress path can never reach
+ *   this tier — `pickFocusNode` routes past it to whatever's next in
+ *   WORD_SONG_NODES_IN_ORDER. The seed exists ONLY for manual testing /
+ *   iPad smoke convenience: put a fresh device on letter-names without
+ *   manually editing localStorage. Ticket 86c9y6g6n (Devon NOF #3 on
+ *   PR #335 — Kevin A3 letter-names bake).
  * - `cvc-words`: Marian as if she's mastered everything through
  *   `blending-cv` and is now practicing `cvc-words`. Skips Greet (sets
  *   sessionCount to 1) so the app deep-routes to Hub on first mount,
@@ -234,6 +246,26 @@ function buildGraduationReadyHistory(): SessionHistoryEntry[] {
 }
 
 const SEEDS: Readonly<Record<string, SeedRecipe>> = {
+  // Letter-names content tier smoke-test entry (ticket 86c9y6g6n —
+  // Devon NOF #3 on PR #335, Kevin A3 letter-names bake). Marian as if
+  // she's at the very FIRST node in WORD_SONG_NODES_IN_ORDER —
+  // `letter-names` set to 'practicing'. No preceding-node mastery patch
+  // is needed: letter-names is the root, so the picker walks the tree
+  // and lands on letter-names immediately.
+  //
+  // Why this seed exists: defaults.ts ships `letter-names: 'mastered'`
+  // per Marian's April 2026 diagnostic (alphabet mastered), so the
+  // natural fresh-launch progress path can never reach this tier —
+  // pickFocusNode routes past it. For manual testing / iPad smoke
+  // (Wave 7 round 3 + future tier work touching letter-names), there
+  // was previously no easy way to put a fresh device on letter-names
+  // without hand-editing localStorage. This seed unblocks that path.
+  'letter-names': {
+    skillLevels: {
+      'letter-names': 'practicing',
+    },
+    skipGreet: true,
+  },
   'cvc-words': {
     skillLevels: {
       // Mark every preceding word-song node as mastered so the picker
