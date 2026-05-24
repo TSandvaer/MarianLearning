@@ -1847,7 +1847,7 @@ The full pool (do NOT emit any item not in this list):
     X [CLEAN] Y [CLEAN] Z [CLEAN]
   Lowercase: a [CLEAN] b [CIRCLE-STICK] c [CLEAN] d [CIRCLE-STICK]
     e [CLEAN] f [CLEAN] g [CLEAN] h [CLEAN] i [VERTICAL-STICK]
-    j [CLEAN] k [CLEAN] l [VERTICAL-STICK] m [DOUBLE-HUMP]
+    j [VERTICAL-STICK] k [CLEAN] l [VERTICAL-STICK] m [DOUBLE-HUMP]
     n [DOUBLE-HUMP] o [CIRCLE-FAMILY] p [CIRCLE-STICK]
     q [CIRCLE-STICK] r [CLEAN] s [CLEAN] t [CLEAN]
     u [DOUBLE-HUMP] v [CLEAN] w [DOUBLE-HUMP] x [CLEAN]
