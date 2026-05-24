@@ -60,6 +60,21 @@ import {
   type WordSongUtteranceSlot,
 } from './wordSessionPlans'
 import { TARGET_WORDS, getWordEntry, type WordEntry } from './wordPack'
+import {
+  LETTER_SOUND_MNEMONIC_POOL,
+  LETTER_SOUND_MNEMONIC_TO_LETTER,
+  LETTER_SOUND_PICTURE_KEY_PREFIX,
+} from './letterSoundsPool'
+
+// Re-export the shared letter-sounds tier constants so existing
+// callers (notably `planFromServer.test.ts`) keep their import path
+// unchanged. `letterSoundsPool.ts` is the single source of truth as of
+// ticket 86c9y6xkh — see that file's header for rationale.
+export {
+  LETTER_SOUND_MNEMONIC_POOL,
+  LETTER_SOUND_MNEMONIC_TO_LETTER,
+  LETTER_SOUND_PICTURE_KEY_PREFIX,
+}
 
 /**
  * The 52-glyph ASCII letter pool for the `letter-names` tier (Wave 7 A4b,
@@ -107,78 +122,6 @@ function makeLetterTargetEntry(letter: string): WordEntry {
     isTarget: true,
   }
 }
-
-/**
- * Sentinel `pictureKey` prefix for synthetic letter-sound target
- * WordEntries (the `letter-sounds` tier — Wave 7 Track A8b, ticket
- * 86c9y6gea). Distinct from A4b's `letter:` prefix so a downstream
- * consumer can tell which tier emitted the entry at a glance. The
- * preferred dispatch is on `problem.contentType === 'letter-sounds'`,
- * but the sentinel is useful for diagnostic logging + test assertions.
- */
-export const LETTER_SOUND_PICTURE_KEY_PREFIX = 'letter-sounds:'
-
-/**
- * Mnemonic → target-letter map for the `letter-sounds` tier (Wave 7
- * A8b, ticket 86c9y6gea). Source of truth: Kyle's A5 spec §2.3 table.
- *
- * The canon emits read lines of shape `"Which letter says <MNEMONIC>?"`
- * where `<MNEMONIC>` is a plain-prose English approximation of the
- * target phoneme — e.g. `mmm` for the bilabial nasal /m/, `tuh` for the
- * voiceless alveolar stop /t/, `o` for short /ɒ/. The TTS render
- * pipeline (`api/_tts.ts` PHONEME_OVERRIDES tier-aware substitution
- * shipped via PR #337) wraps each mnemonic in `<phoneme>` SSML at
- * synthesize time so Azure produces the correct phoneme — the canon
- * text stays plain prose. The parser's job is to extract the mnemonic
- * and look up which letter glyph is the correct answer.
- *
- * Pool size: 14 consonant mnemonics + 5 short-vowel mnemonics = 19
- * entries. Per spec §1.1 the pool excludes `x`, `q`, `z`, voiced-`/ð/`,
- * `/ʒ/`, `/ŋ/`, semi-vowels, and long vowels for v1.
- *
- * Letter case: the target letter is always UPPERCASE per the canon's
- * `correct` line shape (`"Yes! M says mmm."`). The chip glyph renders
- * uppercase by default; case-strict matching is the chip-tap contract
- * (same as A4b's letter-names per Kyle's A1 §3.5).
- */
-export const LETTER_SOUND_MNEMONIC_TO_LETTER: Readonly<Record<string, string>> =
-  {
-    // Continuant consonants — mnemonic uses a triplet to hint sustained
-    // articulation (`mmm`, `nnn`, `sss`, `fff`, `vvv`, `lll`, `rrr`, `hhh`).
-    mmm: 'M',
-    nnn: 'N',
-    sss: 'S',
-    fff: 'F',
-    vvv: 'V',
-    lll: 'L',
-    rrr: 'R',
-    hhh: 'H',
-    // Stop consonants — mnemonic carries the schwa epenthesis (`puh`,
-    // `buh`, `tuh`, `duh`, `kuh`, `guh`) so Azure produces an audible
-    // schwa-tailed stop rather than an inaudible isolated burst.
-    puh: 'P',
-    buh: 'B',
-    tuh: 'T',
-    duh: 'D',
-    kuh: 'K',
-    guh: 'G',
-    // Short vowels — mnemonic is the bare vowel letter; SSML phoneme wrap
-    // forces the short pronunciation. Mastered vowel /æ/ + 4 current-
-    // target vowels /ɒ/, /ʌ/, /ɪ/, /ɛ/.
-    a: 'A',
-    o: 'O',
-    u: 'U',
-    i: 'I',
-    e: 'E',
-  }
-
-/**
- * Pool of all valid mnemonic tokens (for membership checks). Derived
- * from `LETTER_SOUND_MNEMONIC_TO_LETTER` so the two stay in lockstep.
- */
-export const LETTER_SOUND_MNEMONIC_POOL: ReadonlySet<string> = new Set(
-  Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER),
-)
 
 /**
  * Build a synthetic `WordEntry` for a single letter-sound target. Used

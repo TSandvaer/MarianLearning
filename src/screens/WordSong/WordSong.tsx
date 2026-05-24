@@ -44,6 +44,7 @@ import {
 } from '../_shared/gameplayConstants'
 import { WordPicture } from './wordPictures'
 import type { WordEntry } from './wordPack'
+import { LETTER_SOUNDS_POOL } from './letterSoundsPool'
 import type { SkillLevel } from '../../lib/progress'
 
 /**
@@ -2297,50 +2298,15 @@ function letterToTargetEntry(letter: string): WordEntry {
 }
 
 /**
- * The 19-letter target pool for the `letter-sounds` tier (Wave 7 A8b,
- * ticket 86c9y6gea). Mirrors `LETTER_SOUND_MNEMONIC_TO_LETTER` value-set
- * in `planFromServer.ts` — the 14 mastered consonants (M N P B T D K G
- * S H L R F V) + 5 short vowels (A O U I E). Per Kyle's A5 spec §1.1
- * this is the full universe of letters the letter-sounds tier exposes;
- * X / Q / Z / Y / W / J are deferred to a later tier.
- *
- * Letter case is uppercase to match the canon's `correct` line shape
- * (`"Yes! M says mmm."`) and the spec §3.1.3 chip-case rule (all chips
- * case-uniform with the read-line target letter).
- */
-const LETTER_SOUND_DISTRACTOR_POOL: readonly string[] = [
-  // Consonants
-  'M',
-  'N',
-  'P',
-  'B',
-  'T',
-  'D',
-  'K',
-  'G',
-  'S',
-  'H',
-  'L',
-  'R',
-  'F',
-  'V',
-  // Short vowels
-  'A',
-  'O',
-  'U',
-  'I',
-  'E',
-]
-
-/**
  * Pick 2 distractor letters for a letter-sounds problem. Deterministic
  * per problem index (no `Math.random`) so chip layout is stable across
  * remounts and unit tests. Constraints honoured: (a) distractors are
- * drawn from `LETTER_SOUND_DISTRACTOR_POOL` (the 19-letter Wave-7 pool
- * per spec §1.1), (b) distractors are distinct from target and from
- * each other, (c) distractors share the target's case (the pool is
- * uppercase, so this is implicit today — pool-case-equality is asserted
- * in the test suite).
+ * drawn from `LETTER_SOUNDS_POOL` (the 19-letter Wave-7 pool per spec
+ * §1.1 — single source of truth in `letterSoundsPool.ts`, shared with
+ * the wire parser in `planFromServer.ts`), (b) distractors are
+ * distinct from target and from each other, (c) distractors share the
+ * target's case (the pool is uppercase, so this is implicit today —
+ * pool-case-equality is asserted in the test suite).
  *
  * This is a render-time placeholder; Kyle's A5 spec §3 calls for
  * band-aware distractor selection (gentle = clean-distinct, gentle-
@@ -2357,7 +2323,7 @@ function pickSoundDistractors(
   problemIndex: number,
 ): readonly [WordEntry, WordEntry] {
   const letter = target.word
-  const pool = LETTER_SOUND_DISTRACTOR_POOL.filter((g) => g !== letter)
+  const pool = LETTER_SOUNDS_POOL.filter((g) => g !== letter)
   // Deterministic two-letter pick. Seed on problem index + a hash of
   // the target letter so different targets at the same index pick
   // different distractor pairs.
