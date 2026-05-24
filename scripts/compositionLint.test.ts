@@ -8133,17 +8133,17 @@ describe('LETTER_NAMES_POOL', () => {
     )
   })
 
-  it('VERTICAL-STICK band matches directive: I upper + i/l lower (j is CLEAN per directive)', () => {
+  it('VERTICAL-STICK band matches directive: I upper + i/j/l lower (J upper is CLEAN per directive)', () => {
     const verticalStick = LETTER_NAMES_POOL.filter(
       (f) => f.band === 'VERTICAL-STICK',
     ).map((f) => `${f.glyph}-${f.case}`)
-    // Per the directive's pool block at api/_planner.ts:
+    // Per the directive's pool block at api/_planner.ts (post-#350):
     //   "Uppercase: ... I [VERTICAL-STICK] ... J [CLEAN] ..."
-    //   "Lowercase: ... i [VERTICAL-STICK] ... j [CLEAN] ...
+    //   "Lowercase: ... i [VERTICAL-STICK] ... j [VERTICAL-STICK] ...
     //                  l [VERTICAL-STICK] ..."
-    // Lowercase j is CLEAN (per directive); only I/i/l are VERTICAL-STICK.
+    // Uppercase J is CLEAN (per directive); I/i/j/l are VERTICAL-STICK.
     expect(verticalStick.sort()).toEqual(
-      ['I-upper', 'i-lower', 'l-lower'].sort(),
+      ['I-upper', 'i-lower', 'j-lower', 'l-lower'].sort(),
     )
   })
 

@@ -4480,7 +4480,7 @@ export const LETTER_NAMES_POOL: readonly LetterNamesPoolFact[] = [
   { id: 'letter-g-lower', glyph: 'g', case: 'lower', band: 'CLEAN' },
   { id: 'letter-h-lower', glyph: 'h', case: 'lower', band: 'CLEAN' },
   { id: 'letter-i-lower', glyph: 'i', case: 'lower', band: 'VERTICAL-STICK' },
-  { id: 'letter-j-lower', glyph: 'j', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-j-lower', glyph: 'j', case: 'lower', band: 'VERTICAL-STICK' },
   { id: 'letter-k-lower', glyph: 'k', case: 'lower', band: 'CLEAN' },
   { id: 'letter-l-lower', glyph: 'l', case: 'lower', band: 'VERTICAL-STICK' },
   { id: 'letter-m-lower', glyph: 'm', case: 'lower', band: 'DOUBLE-HUMP' },
