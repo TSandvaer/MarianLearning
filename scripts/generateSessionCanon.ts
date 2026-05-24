@@ -109,6 +109,7 @@ import {
   CompositionLintError,
   assertAddToTenCompositionClean,
   assertAddToTwentyCompositionClean,
+  assertLetterNamesCompositionClean,
   assertLetterSoundsCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
@@ -544,6 +545,35 @@ async function bakeOne(
       // against the just-baked utterance set. Mirrors the math-tier
       // bake-time binding pattern.
       assertLetterSoundsCompositionClean(
+        `${combo.track}/${combo.focusNode}`,
+        response,
+      )
+    } catch (err) {
+      if (lintWarn && err instanceof CompositionLintError) {
+        console.warn(
+          `\n[composition-lint] WARN — writing despite violations: ` +
+            `${err.message}\n` +
+            err.violations
+              .map((v) => `  - [${v.rule}] ${v.message}`)
+              .join('\n') +
+            '\n',
+        )
+      } else {
+        throw err
+      }
+    }
+  } else if (
+    combo.track === 'word-song' &&
+    combo.focusNode === 'letter-names'
+  ) {
+    try {
+      // Wave 7 Track g5x (ticket 86c9y6g5x) — defense-in-depth bake-
+      // time composition lint for the letter-names tier. Validates
+      // 52-glyph pool membership, CIRCLE-STICK 1-2 cap, CLEAN ≥ 4
+      // floor, case-mix ≥ 2 each, gentle-ramp P1-P3 CLEAN-only, and
+      // trap-window CIRCLE-STICK ≥ 1 anchor. Mirrors the letter-
+      // sounds bake-time binding pattern.
+      assertLetterNamesCompositionClean(
         `${combo.track}/${combo.focusNode}`,
         response,
       )

@@ -35,6 +35,8 @@ import {
   ADD_TO_TWENTY_RULES,
   CompositionLintError,
   KNOWN_DISTRACTOR_CLASSES,
+  LETTER_NAMES_POOL,
+  LETTER_NAMES_RULES,
   LETTER_SOUNDS_RULES,
   SUB_TO_TEN_POOL,
   SUB_TO_TEN_RULES,
@@ -46,6 +48,7 @@ import {
   TWO_DIGIT_ADDSUB_WITH_REGROUP_RULES,
   assertAddToTenCompositionClean,
   assertAddToTwentyCompositionClean,
+  assertLetterNamesCompositionClean,
   assertLetterSoundsCompositionClean,
   assertSubToTenCompositionClean,
   assertSubToTwentyCompositionClean,
@@ -54,6 +57,7 @@ import {
   formatCompositionLintReport,
   lintAddToTenComposition,
   lintAddToTwentyComposition,
+  lintLetterNamesComposition,
   lintLetterSoundsComposition,
   lintSubToTenComposition,
   lintSubToTwentyComposition,
@@ -61,6 +65,7 @@ import {
   lintTwoDigitAddsubWithRegroupComposition,
   parseAddToTenReadLine,
   parseAddToTwentyReadLine,
+  parseLetterNamesReadLine,
   parseLetterSoundsReadLine,
   parseSubToTenReadLine,
   parseSubToTwentyReadLine,
@@ -8027,6 +8032,703 @@ describe('resolveTierBinding — letter-sounds canon file path', () => {
     ).toBeNull()
     expect(
       resolveTierBinding('public/canon/word-song/level-1/digraphs-sh.json'),
+    ).toBeNull()
+  })
+})
+
+// ── letter-names composition lint (Wave 7 Track g5x — ticket 86c9y6g5x) ──
+//
+// The letter-names binding validates the load-bearing pedagogical
+// rules from `design/word-song/letter-names-content.md` + the
+// LETTER-NAMES SESSION COMPOSITION RULES block of
+// `api/_planner.ts` WORD_SONG_TRACK_GUIDE:
+//   §1     — 52-glyph pool (26 uppercase + 26 lowercase ASCII letters)
+//   §1     — CONFUSION-CLASS BUDGET: CIRCLE-STICK (b/d/p/q) 1-2,
+//            CLEAN-band ≥ 4
+//   §1     — CASE-MIX BUDGET: uppercase ≥ 2, lowercase ≥ 2
+//   §1-2   — Gentle ramp (P1-P3 CLEAN-band only — CIRCLE-STICK /
+//            DOUBLE-HUMP / CIRCLE-FAMILY / VERTICAL-STICK FORBIDDEN
+//            at P1, P2, P3)
+//   §4     — Trap-window CIRCLE-STICK anchor (≥ 1 CIRCLE-STICK
+//            target in P6-P8)
+//   §7     — No duplicate target within the 8-problem set
+//            (uppercase A and lowercase a are DISTINCT targets)
+
+/** Build a `word.p<N>.read` letter-names utterance with the
+ *  "Tap the letter <GLYPH>." template. Glyph case is preserved. */
+function readLetterNamesUtterance(index: number, glyph: string): Utterance {
+  return {
+    id: `word.p${index}.read`,
+    text: `Tap the letter ${glyph}.`,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+function rawLetterNamesReadUtterance(index: number, text: string): Utterance {
+  return {
+    id: `word.p${index}.read`,
+    text,
+    audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
+  }
+}
+
+/** Convenience: build a SessionStartResponse with the given 8
+ *  letter-names target glyphs (case-preserved). */
+function buildLetterNamesCanonResponse(
+  glyphs: readonly string[],
+): SessionStartResponse {
+  const utterances: Utterance[] = glyphs.map((g, i) =>
+    readLetterNamesUtterance(i + 1, g),
+  )
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: { id: 'test', label: 'test', utterances: [] },
+    utterances,
+  }
+}
+
+describe('LETTER_NAMES_POOL', () => {
+  it('contains exactly 52 entries (26 uppercase + 26 lowercase)', () => {
+    expect(LETTER_NAMES_POOL).toHaveLength(52)
+    const upper = LETTER_NAMES_POOL.filter((f) => f.case === 'upper')
+    const lower = LETTER_NAMES_POOL.filter((f) => f.case === 'lower')
+    expect(upper).toHaveLength(26)
+    expect(lower).toHaveLength(26)
+  })
+
+  it('CIRCLE-STICK band is exactly {b, d, p, q} lowercase (per directive)', () => {
+    const circleStick = LETTER_NAMES_POOL.filter(
+      (f) => f.band === 'CIRCLE-STICK',
+    )
+    const glyphs = circleStick.map((f) => f.glyph).sort()
+    expect(glyphs).toEqual(['b', 'd', 'p', 'q'])
+    // All CIRCLE-STICK entries are lowercase.
+    expect(circleStick.every((f) => f.case === 'lower')).toBe(true)
+  })
+
+  it('DOUBLE-HUMP band matches directive: M/N/W upper + m/n/u/w lower', () => {
+    const doubleHump = LETTER_NAMES_POOL.filter(
+      (f) => f.band === 'DOUBLE-HUMP',
+    ).map((f) => `${f.glyph}-${f.case}`)
+    expect(doubleHump.sort()).toEqual(
+      [
+        'M-upper',
+        'N-upper',
+        'W-upper',
+        'm-lower',
+        'n-lower',
+        'u-lower',
+        'w-lower',
+      ].sort(),
+    )
+  })
+
+  it('CIRCLE-FAMILY band matches directive: O/Q upper + o lower', () => {
+    const circleFamily = LETTER_NAMES_POOL.filter(
+      (f) => f.band === 'CIRCLE-FAMILY',
+    ).map((f) => `${f.glyph}-${f.case}`)
+    expect(circleFamily.sort()).toEqual(
+      ['O-upper', 'Q-upper', 'o-lower'].sort(),
+    )
+  })
+
+  it('VERTICAL-STICK band matches directive: I upper + i/j/l lower (J upper is CLEAN per directive)', () => {
+    const verticalStick = LETTER_NAMES_POOL.filter(
+      (f) => f.band === 'VERTICAL-STICK',
+    ).map((f) => `${f.glyph}-${f.case}`)
+    // Per the directive's pool block at api/_planner.ts (post-#350):
+    //   "Uppercase: ... I [VERTICAL-STICK] ... J [CLEAN] ..."
+    //   "Lowercase: ... i [VERTICAL-STICK] ... j [VERTICAL-STICK] ...
+    //                  l [VERTICAL-STICK] ..."
+    // Uppercase J is CLEAN (per directive); I/i/j/l are VERTICAL-STICK.
+    expect(verticalStick.sort()).toEqual(
+      ['I-upper', 'i-lower', 'j-lower', 'l-lower'].sort(),
+    )
+  })
+
+  it('every entry has a stable id of the form "letter-<glyph>-<case>"', () => {
+    for (const f of LETTER_NAMES_POOL) {
+      expect(f.id).toBe(`letter-${f.glyph}-${f.case}`)
+    }
+  })
+})
+
+describe('LETTER_NAMES_RULES', () => {
+  it('mirrors the directive prose: CIRCLE-STICK 1-2, CLEAN ≥ 4, case-mix ≥ 2 each', () => {
+    expect(LETTER_NAMES_RULES.circleStickMin).toBe(1)
+    expect(LETTER_NAMES_RULES.circleStickMax).toBe(2)
+    expect(LETTER_NAMES_RULES.cleanMin).toBe(4)
+    expect(LETTER_NAMES_RULES.uppercaseMin).toBe(2)
+    expect(LETTER_NAMES_RULES.lowercaseMin).toBe(2)
+  })
+
+  it('gentle-ramp slots are P1-P3; trap-window slots are P6-P8; totalProblems is 8', () => {
+    expect([...LETTER_NAMES_RULES.gentleRampSlots]).toEqual([1, 2, 3])
+    expect([...LETTER_NAMES_RULES.trapWindowSlots]).toEqual([6, 7, 8])
+    expect(LETTER_NAMES_RULES.totalProblems).toBe(8)
+  })
+})
+
+describe('parseLetterNamesReadLine', () => {
+  it('parses an uppercase target ("Tap the letter A.")', () => {
+    expect(parseLetterNamesReadLine('Tap the letter A.')).toEqual({
+      glyph: 'A',
+    })
+  })
+
+  it('parses a lowercase target with case PRESERVED ("Tap the letter a.")', () => {
+    // Case preservation is load-bearing — A and a are distinct
+    // targets in this tier per the directive §7.
+    expect(parseLetterNamesReadLine('Tap the letter a.')).toEqual({
+      glyph: 'a',
+    })
+  })
+
+  it('parses a CIRCLE-STICK target ("Tap the letter b.")', () => {
+    expect(parseLetterNamesReadLine('Tap the letter b.')).toEqual({
+      glyph: 'b',
+    })
+  })
+
+  it('case-insensitive on the framing but case-preserved on the glyph', () => {
+    expect(parseLetterNamesReadLine('TAP THE LETTER M.')).toEqual({
+      glyph: 'M',
+    })
+    expect(parseLetterNamesReadLine('tap the letter m.')).toEqual({
+      glyph: 'm',
+    })
+  })
+
+  it('returns null on a non-letter-names template (e.g. cvc-words "Read the cat.")', () => {
+    expect(parseLetterNamesReadLine('Read the cat.')).toBeNull()
+    expect(parseLetterNamesReadLine('Tap the cat.')).toBeNull()
+  })
+
+  it('returns null on a phonetic spell-out ("Tap the letter em.") — the NO PHONEME WRAPPING rule', () => {
+    // The directive forbids spelling out letter names phonetically.
+    // The single-character regex enforces this — multi-character
+    // glyph fails to parse.
+    expect(parseLetterNamesReadLine('Tap the letter em.')).toBeNull()
+    expect(parseLetterNamesReadLine('Tap the letter kyoo.')).toBeNull()
+  })
+
+  it('returns null on a digit (0 for O, 1 for I — FORBIDDEN per §6)', () => {
+    expect(parseLetterNamesReadLine('Tap the letter 0.')).toBeNull()
+    expect(parseLetterNamesReadLine('Tap the letter 1.')).toBeNull()
+  })
+})
+
+describe('lintLetterNamesComposition — clean fixture passes (current committed canon)', () => {
+  it('accepts the current committed letter-names canon (C, e, G, J, O, b, W, d)', () => {
+    // Mirrors `public/canon/word-song/level-1/letter-names.json` as
+    // of PR #335 + PR #344 (g53 WORKED EXAMPLE fix). Per the canon
+    // inspection:
+    //   P1 C [CLEAN]           — gentle ramp
+    //   P2 e [CLEAN]           — gentle ramp
+    //   P3 G [CLEAN]           — gentle ramp
+    //   P4 J [CLEAN]           — transition
+    //   P5 O [CIRCLE-FAMILY]   — transition
+    //   P6 b [CIRCLE-STICK]    — trap-window anchor (≥ 1 here)
+    //   P7 W [DOUBLE-HUMP]     — trap
+    //   P8 d [CIRCLE-STICK]    — trap (CIRCLE-STICK cap at 2 — OK)
+    // CIRCLE-STICK count = 2 (≤ 2 cap ✓), CLEAN count = 4 (≥ 4 ✓),
+    // uppercase = 5 (C, G, J, O, W), lowercase = 3 (e, b, d).
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'G',
+      'J',
+      'O',
+      'b',
+      'W',
+      'd',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    expect(violations).toEqual([])
+  })
+
+  it('accepts a 1-CIRCLE-STICK session (floor met, cap respected)', () => {
+    // CLEAN P1-P3 + P4 + P5, CIRCLE-FAMILY at P6, CIRCLE-STICK at P7,
+    // CLEAN at P8.
+    const session = buildLetterNamesCanonResponse([
+      'A',
+      'C',
+      'e',
+      'F',
+      'h',
+      'O',
+      'b',
+      'K',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    expect(violations).toEqual([])
+  })
+})
+
+describe('lintLetterNamesComposition — pool-membership rule', () => {
+  it('rejects a non-ASCII letter (e.g. Ø)', () => {
+    // Per §6 POOL-MEMBERSHIP SELF-CHECK: no non-ASCII letters.
+    const session: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        rawLetterNamesReadUtterance(1, 'Tap the letter Ø.'),
+        readLetterNamesUtterance(2, 'C'),
+        readLetterNamesUtterance(3, 'e'),
+        readLetterNamesUtterance(4, 'F'),
+        readLetterNamesUtterance(5, 'h'),
+        readLetterNamesUtterance(6, 'O'),
+        readLetterNamesUtterance(7, 'b'),
+        readLetterNamesUtterance(8, 'K'),
+      ],
+    }
+    const violations = lintLetterNamesComposition(session)
+    // Non-ASCII fails the regex → unparseable-problem fires, NOT
+    // pool-membership (the latter requires a successful parse).
+    const unparseable = violations.filter(
+      (v: { rule: string }) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(1)
+  })
+})
+
+describe('lintLetterNamesComposition — no-duplicates rule', () => {
+  it('fires when the same target (glyph + case) appears twice', () => {
+    // Two 'b' targets — duplicate CIRCLE-STICK target. Also blows
+    // the CIRCLE-STICK cap (2 b's = at-cap, but identical glyph).
+    const session = buildLetterNamesCanonResponse([
+      'A',
+      'C',
+      'e',
+      'F',
+      'h',
+      'b',
+      'M',
+      'b',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const dupViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'no-duplicates',
+    )
+    expect(dupViolations).toHaveLength(1)
+    expect(dupViolations[0]!.factId).toBe('letter-b-lower')
+    expect(dupViolations[0]!.message).toMatch(/P6/)
+    expect(dupViolations[0]!.message).toMatch(/P8/)
+  })
+
+  it('does NOT fire when uppercase A and lowercase a co-occur (DISTINCT targets per §7)', () => {
+    // Uppercase A at P1 (CLEAN, gentle ramp) + lowercase a at P4
+    // (CLEAN, transition). Both targets are CLEAN-band so they
+    // count toward the CLEAN floor. The case-mix budget needs
+    // ≥ 2 of each case, so add other targets to satisfy.
+    const session = buildLetterNamesCanonResponse([
+      'A',
+      'C',
+      'e',
+      'a',
+      'F',
+      'b',
+      'K',
+      'h',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const dupViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'no-duplicates',
+    )
+    expect(dupViolations).toHaveLength(0)
+  })
+})
+
+describe('lintLetterNamesComposition — band-by-slot rule (gentle-ramp P1-P3 CLEAN only)', () => {
+  it('fires when P1 carries a CIRCLE-STICK target (forbidden at gentle ramp)', () => {
+    // P1 = 'b' (CIRCLE-STICK) — illegal in gentle ramp.
+    const session = buildLetterNamesCanonResponse([
+      'b',
+      'C',
+      'e',
+      'F',
+      'h',
+      'O',
+      'M',
+      'K',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const bandViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'band-by-slot',
+    )
+    expect(bandViolations).toHaveLength(1)
+    expect(bandViolations[0]!.problemIndex).toBe(1)
+    expect(bandViolations[0]!.message).toMatch(/CIRCLE-STICK/)
+  })
+
+  it('fires when P2 carries a DOUBLE-HUMP target', () => {
+    // P2 = 'M' (DOUBLE-HUMP) — illegal in gentle ramp.
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'M',
+      'e',
+      'F',
+      'h',
+      'b',
+      'K',
+      'd',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const bandViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'band-by-slot',
+    )
+    expect(bandViolations).toHaveLength(1)
+    expect(bandViolations[0]!.problemIndex).toBe(2)
+    expect(bandViolations[0]!.message).toMatch(/DOUBLE-HUMP/)
+  })
+
+  it('fires when P3 carries a CIRCLE-FAMILY target', () => {
+    // P3 = 'O' (CIRCLE-FAMILY) — illegal in gentle ramp.
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'O',
+      'F',
+      'h',
+      'b',
+      'K',
+      'd',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const bandViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'band-by-slot',
+    )
+    expect(bandViolations).toHaveLength(1)
+    expect(bandViolations[0]!.problemIndex).toBe(3)
+    expect(bandViolations[0]!.message).toMatch(/CIRCLE-FAMILY/)
+  })
+
+  it('does NOT fire when non-CLEAN targets land in P4-P8', () => {
+    // CLEAN at P1-P3 (gentle ramp), CIRCLE-FAMILY at P5
+    // (transition), DOUBLE-HUMP at P7, CIRCLE-STICK at P8.
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'F',
+      'h',
+      'O',
+      'K',
+      'M',
+      'b',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const bandViolations = violations.filter(
+      (v: { rule: string }) => v.rule === 'band-by-slot',
+    )
+    expect(bandViolations).toHaveLength(0)
+  })
+})
+
+describe('lintLetterNamesComposition — category-cap rule (CIRCLE-STICK 1-2, CLEAN ≥ 4)', () => {
+  it('fires when CIRCLE-STICK target count is 0 (the assessment-anchor floor)', () => {
+    // No b/d/p/q in the session — fails the "at least 1" floor.
+    const session = buildLetterNamesCanonResponse([
+      'A',
+      'C',
+      'e',
+      'F',
+      'h',
+      'O',
+      'M',
+      'K',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /CIRCLE-STICK/i.test(v.message),
+    )
+    expect(capViolations).toHaveLength(1)
+    expect(capViolations[0]!.message).toMatch(/at least 1/i)
+  })
+
+  it('fires when CIRCLE-STICK target count exceeds 2 (the drill-prevention cap)', () => {
+    // 3 CIRCLE-STICK targets (b, d, p) at P6, P7, P8. Also fires
+    // the trap-window anchor (still met by all 3 being at P6-P8)
+    // and CLEAN floor (only 2 CLEAN at P1-P3 + 1 at P4 = 3 < 4).
+    const session = buildLetterNamesCanonResponse([
+      'A',
+      'C',
+      'e',
+      'F',
+      'h',
+      'b',
+      'd',
+      'p',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /CIRCLE-STICK/i.test(v.message),
+    )
+    expect(
+      capViolations.some((v: { message: string }) =>
+        /at most 2/i.test(v.message),
+      ),
+    ).toBe(true)
+  })
+
+  it('fires when CLEAN-band target count is below 4 (the review-mode floor)', () => {
+    // Only 3 CLEAN targets (C, e, F). Trap window is all
+    // CIRCLE-STICK / DOUBLE-HUMP (b, M, K is CLEAN — let me
+    // use b, M, q instead). q is CIRCLE-STICK so this also
+    // blows the cap. Use a careful mix:
+    //   P1-P3 CLEAN (3 CLEAN, gentle-ramp legal)
+    //   P4 DOUBLE-HUMP (m)
+    //   P5 CIRCLE-FAMILY (O)
+    //   P6 CIRCLE-STICK (b)
+    //   P7 DOUBLE-HUMP (W)
+    //   P8 CIRCLE-FAMILY (Q)
+    // CLEAN total = 3 (< 4). CIRCLE-STICK = 1 (OK).
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'F',
+      'm',
+      'O',
+      'b',
+      'W',
+      'Q',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /CLEAN-band/i.test(v.message),
+    )
+    expect(capViolations).toHaveLength(1)
+    expect(capViolations[0]!.message).toMatch(/at least 4/i)
+  })
+
+  it('fires when uppercase target count is below 2 (case-mix floor)', () => {
+    // Only 1 uppercase target (C at P1). 7 lowercase.
+    //   P1 C [CLEAN, upper]
+    //   P2 e [CLEAN, lower]
+    //   P3 f [CLEAN, lower]
+    //   P4 a [CLEAN, lower]
+    //   P5 h [CLEAN, lower]
+    //   P6 b [CIRCLE-STICK, lower]
+    //   P7 k [CLEAN, lower]
+    //   P8 d [CIRCLE-STICK, lower]
+    // CIRCLE-STICK = 2 (OK), CLEAN = 6 (OK). Only the uppercase
+    // floor fails.
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'f',
+      'a',
+      'h',
+      'b',
+      'k',
+      'd',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /[Uu]ppercase/.test(v.message),
+    )
+    expect(capViolations).toHaveLength(1)
+    expect(capViolations[0]!.message).toMatch(/at least 2/i)
+  })
+
+  it('fires when lowercase target count is below 2 (case-mix floor)', () => {
+    // Only 1 lowercase target (b at P6).
+    //   P1 C [CLEAN, upper]
+    //   P2 E [CLEAN, upper]
+    //   P3 F [CLEAN, upper]
+    //   P4 A [CLEAN, upper]
+    //   P5 H [CLEAN, upper]
+    //   P6 b [CIRCLE-STICK, lower]   — trap-window anchor
+    //   P7 K [CLEAN, upper]
+    //   P8 J [CLEAN, upper]
+    // CIRCLE-STICK = 1 (OK floor). CLEAN = 7 (OK). lowercase = 1.
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'E',
+      'F',
+      'A',
+      'H',
+      'b',
+      'K',
+      'J',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const capViolations = violations.filter(
+      (v: { rule: string; message: string }) =>
+        v.rule === 'category-cap' && /[Ll]owercase/.test(v.message),
+    )
+    expect(capViolations).toHaveLength(1)
+    expect(capViolations[0]!.message).toMatch(/at least 2/i)
+  })
+})
+
+describe('lintLetterNamesComposition — high-leverage-coverage rule (trap-window CIRCLE-STICK anchor)', () => {
+  it('fires when no CIRCLE-STICK target lands at P6, P7, or P8 (the trap-window anchor)', () => {
+    // CIRCLE-STICK target at P4 (in transition window — meets the
+    // CIRCLE-STICK floor of 1) but P6-P8 are CIRCLE-FAMILY /
+    // DOUBLE-HUMP / VERTICAL-STICK. Trap-window anchor fails.
+    //   P1-P3 CLEAN (gentle ramp)
+    //   P4 b [CIRCLE-STICK]   — floor met here, NOT in trap window
+    //   P5 a [CLEAN]
+    //   P6 O [CIRCLE-FAMILY]  — trap, not CIRCLE-STICK
+    //   P7 M [DOUBLE-HUMP]    — trap, not CIRCLE-STICK
+    //   P8 I [VERTICAL-STICK] — trap, not CIRCLE-STICK
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'F',
+      'b',
+      'a',
+      'O',
+      'M',
+      'I',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const coverage = violations.filter(
+      (v: { rule: string }) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toHaveLength(1)
+    expect(coverage[0]!.message).toMatch(/Trap window/)
+    expect(coverage[0]!.message).toMatch(/CIRCLE-STICK/)
+  })
+
+  it('does NOT fire when at least one CIRCLE-STICK target is at P6, P7, or P8', () => {
+    // CIRCLE-STICK 'd' at P8 — anchor met.
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'F',
+      'h',
+      'a',
+      'O',
+      'M',
+      'd',
+    ])
+    const violations = lintLetterNamesComposition(session)
+    const coverage = violations.filter(
+      (v: { rule: string }) => v.rule === 'high-leverage-coverage',
+    )
+    expect(coverage).toHaveLength(0)
+  })
+})
+
+describe('lintLetterNamesComposition — unparseable-problem rule', () => {
+  it('fires when the read-line does NOT match the "Tap the letter <CHARACTER>." template', () => {
+    const session: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        rawLetterNamesReadUtterance(1, 'Read the cat.'), // wrong template
+        readLetterNamesUtterance(2, 'C'),
+        readLetterNamesUtterance(3, 'e'),
+        readLetterNamesUtterance(4, 'F'),
+        readLetterNamesUtterance(5, 'h'),
+        readLetterNamesUtterance(6, 'b'),
+        readLetterNamesUtterance(7, 'K'),
+        readLetterNamesUtterance(8, 'd'),
+      ],
+    }
+    const violations = lintLetterNamesComposition(session)
+    const unparseable = violations.filter(
+      (v: { rule: string }) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(1)
+  })
+
+  it('fires when the target is a phonetic spell-out ("Tap the letter em.")', () => {
+    // The NO PHONEME WRAPPING rule (directive prose). Multi-
+    // character glyph fails the single-character regex.
+    const session: SessionStartResponse = {
+      ok: true,
+      kind: 'session-start',
+      plan: { id: 'test', label: 'test', utterances: [] },
+      utterances: [
+        rawLetterNamesReadUtterance(1, 'Tap the letter em.'),
+        readLetterNamesUtterance(2, 'C'),
+        readLetterNamesUtterance(3, 'e'),
+        readLetterNamesUtterance(4, 'F'),
+        readLetterNamesUtterance(5, 'h'),
+        readLetterNamesUtterance(6, 'b'),
+        readLetterNamesUtterance(7, 'K'),
+        readLetterNamesUtterance(8, 'd'),
+      ],
+    }
+    const violations = lintLetterNamesComposition(session)
+    const unparseable = violations.filter(
+      (v: { rule: string }) => v.rule === 'unparseable-problem',
+    )
+    expect(unparseable).toHaveLength(1)
+    expect(unparseable[0]!.problemIndex).toBe(1)
+  })
+})
+
+describe('assertLetterNamesCompositionClean (bake-time integration point)', () => {
+  it('throws CompositionLintError on any violation', () => {
+    // Floor-violation session (0 CIRCLE-STICK targets).
+    const session = buildLetterNamesCanonResponse([
+      'A',
+      'C',
+      'e',
+      'F',
+      'h',
+      'O',
+      'M',
+      'K',
+    ])
+    expect(() =>
+      assertLetterNamesCompositionClean('word-song/letter-names', session),
+    ).toThrow(CompositionLintError)
+  })
+
+  it('does NOT throw on the canonical committed canon (C, e, G, J, O, b, W, d)', () => {
+    const session = buildLetterNamesCanonResponse([
+      'C',
+      'e',
+      'G',
+      'J',
+      'O',
+      'b',
+      'W',
+      'd',
+    ])
+    expect(() =>
+      assertLetterNamesCompositionClean('word-song/letter-names', session),
+    ).not.toThrow()
+  })
+})
+
+describe('resolveTierBinding — letter-names canon file path', () => {
+  it('resolves to the letter-names binding for the word-song/level-1/letter-names.json path', () => {
+    const binding = resolveTierBinding(
+      'public/canon/word-song/level-1/letter-names.json',
+    )
+    expect(binding).not.toBeNull()
+    if (binding === null) throw new Error('unreachable — assertion above')
+    expect(binding.tier).toBe('letter-names')
+    expect(binding.config).toBe(LETTER_NAMES_RULES)
+  })
+
+  it('resolves on a bare letter-names.json basename (CI walker, file already in cwd)', () => {
+    const binding = resolveTierBinding('letter-names.json')
+    expect(binding).not.toBeNull()
+    if (binding === null) throw new Error('unreachable — assertion above')
+    expect(binding.tier).toBe('letter-names')
+  })
+
+  it('returns null for word-song canon files that are NOT letter-names (out-of-scope)', () => {
+    expect(
+      resolveTierBinding('public/canon/word-song/level-1/blending-cv.json'),
+    ).toBeNull()
+    expect(
+      resolveTierBinding('public/canon/word-song/level-1/cvc-words.json'),
     ).toBeNull()
   })
 })
