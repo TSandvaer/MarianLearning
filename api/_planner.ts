@@ -2144,9 +2144,9 @@ Cross-tier scaffolding ahead of the curriculum is OUT OF SCOPE.
 WORKED EXAMPLE — a clean 8-problem session that respects all rules
 (use as a template, NOT a verbatim copy — vary letter choices across
 re-bakes):
-   P1=M [CLEAN, upper]      (CLEAN ramp anchor)
-   P2=a [CLEAN, lower]      (CLEAN ramp anchor, lowercase pivot)
-   P3=K [CLEAN, upper]      (CLEAN ramp anchor)
+   P1=t [CLEAN, lower]      (CLEAN ramp anchor)
+   P2=a [CLEAN, lower]      (CLEAN ramp anchor)
+   P3=K [CLEAN, upper]      (CLEAN ramp anchor, uppercase pivot)
    P4=S [CLEAN, upper]      (CLEAN, mixed-case bookkeeping)
    P5=O [CIRCLE-FAMILY, upper]   (first non-CLEAN target, gentle trap)
    P6=b [CIRCLE-STICK, lower]    (CIRCLE-STICK #1, trap window opens)
