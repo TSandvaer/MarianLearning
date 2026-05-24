@@ -167,6 +167,20 @@ export type CanonFileTier =
   // acoustic-similarity ban, gentle-ramp P1-P3 mastered-consonant
   // only, and no-duplicates within the 8-problem set.
   | 'letter-sounds'
+  // Wave 7 Track g5x (ticket 86c9y6g5x) — letter-names tier. Defense-
+  // in-depth binding for the FIRST literacy tier. Lives under
+  // `public/canon/word-song/level-1/letter-names.json`. Per
+  // `design/word-song/letter-names-content.md §1` + the
+  // LETTER-NAMES SESSION COMPOSITION RULES block of
+  // `api/_planner.ts` WORD_SONG_TRACK_GUIDE the lint enforces:
+  // 52-glyph pool membership (26 uppercase + 26 lowercase),
+  // CIRCLE-STICK (b/d/p/q) cap 1-2 (assessment anchor + drill cap),
+  // CLEAN-band floor ≥ 4 (review-mode feel), case-mix floor ≥ 2
+  // uppercase + ≥ 2 lowercase, P1-P3 gentle ramp CLEAN-band only,
+  // P6-P8 trap-window CIRCLE-STICK anchor (≥ 1), and no-duplicates
+  // within the 8-problem set (case-sensitive: uppercase A and
+  // lowercase a are DISTINCT targets).
+  | 'letter-names'
 
 // ── rule kinds + error type ──────────────────────────────────────────────
 
@@ -4351,6 +4365,457 @@ export function assertLetterSoundsCompositionClean(
   }
 }
 
+// ── letter-names rule config (Wave 7 Track g5x — ticket 86c9y6g5x) ─────────
+//
+// Per `design/word-song/letter-names-content.md §1` and the
+// LETTER-NAMES SESSION COMPOSITION RULES block of `api/_planner.ts`
+// WORD_SONG_TRACK_GUIDE. The pool is the 52-glyph alphabet (26
+// uppercase + 26 lowercase). Each letter carries a confusion-band
+// tag that drives gentle-ramp + trap-window placement.
+//
+// Why a separate model from letter-sounds
+// ----------------------------------------
+// Letter-sounds works over phoneme MNEMONICS (single utterance =
+// one phoneme target classified into mastered-consonant / mastered-
+// vowel /æ/ / current-target-vowel). Letter-names works over GLYPH
+// + CASE pairs (case-sensitive distinct targets — A and a are
+// different targets even though they share a spoken name). The
+// confusion bands (CIRCLE-STICK / DOUBLE-HUMP / CIRCLE-FAMILY /
+// VERTICAL-STICK / CLEAN) classify visual confusion, not auditory,
+// so the rules don't transfer.
+//
+// The trap-window CIRCLE-STICK anchor (≥ 1 CIRCLE-STICK target in
+// P6-P8) reuses the `high-leverage-coverage` rule literal — same
+// semantic shape as sub-to-10's take-from-10-coverage rule: a
+// whole-session anchor that ensures the tier's pedagogical job
+// fires.
+
+/**
+ * Confusion-band classification for a letter-names target glyph.
+ * Drives gentle-ramp (P1-P3 CLEAN only), trap-window (≥ 1
+ * CIRCLE-STICK in P6-P8), and the CIRCLE-STICK cap of 2.
+ */
+export type LetterNamesBand =
+  | 'CLEAN'
+  | 'CIRCLE-STICK'
+  | 'DOUBLE-HUMP'
+  | 'CIRCLE-FAMILY'
+  | 'VERTICAL-STICK'
+
+/**
+ * Pool entry for the letter-names tier. `glyph` is the literal
+ * character that appears in the read-line; `case` is `'upper'` or
+ * `'lower'` so the lint can enforce the case-mix budget without
+ * inspecting char codes. `id` is a stable identifier of the form
+ * `"letter-<glyph>-<case>"` so error messages can reference the
+ * exact target.
+ */
+export interface LetterNamesPoolFact {
+  /** Stable id: `letter-<glyph>-<case>` (e.g. `letter-A-upper`,
+   *  `letter-b-lower`). Uppercase A and lowercase a have distinct
+   *  ids — they are different targets in this tier. */
+  id: string
+  /** Single-character glyph with case preserved (e.g. `'A'`,
+   *  `'b'`). */
+  glyph: string
+  /** Letter case — `'upper'` or `'lower'`. Derived from glyph but
+   *  stored to keep the case-mix budget rule O(1). */
+  case: 'upper' | 'lower'
+  band: LetterNamesBand
+}
+
+/**
+ * The 52-glyph letter-names pool. 26 uppercase + 26 lowercase, each
+ * tagged with its confusion band per the directive prose at
+ * `api/_planner.ts` (LETTER-NAMES Pool block). Sourced verbatim
+ * from `design/word-song/letter-names-content.md §1`.
+ *
+ * Band assignments are the load-bearing pedagogical content:
+ *   - CIRCLE-STICK (b/d/p/q lowercase): the trap class — Marian's
+ *     residual confusion. AT LEAST 1, AT MOST 2 per session.
+ *   - DOUBLE-HUMP (M/W/N upper; m/n/u/w lower): secondary shape
+ *     confusion.
+ *   - CIRCLE-FAMILY (O/Q upper; o lower): closed-loop shape
+ *     family.
+ *   - VERTICAL-STICK (I upper; i/l/j lower): tall-thin shape
+ *     family.
+ *   - CLEAN: everything else (visually distinct from the trap
+ *     classes — the "review-mode" base pool).
+ */
+export const LETTER_NAMES_POOL: readonly LetterNamesPoolFact[] = [
+  // Uppercase row.
+  { id: 'letter-A-upper', glyph: 'A', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-B-upper', glyph: 'B', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-C-upper', glyph: 'C', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-D-upper', glyph: 'D', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-E-upper', glyph: 'E', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-F-upper', glyph: 'F', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-G-upper', glyph: 'G', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-H-upper', glyph: 'H', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-I-upper', glyph: 'I', case: 'upper', band: 'VERTICAL-STICK' },
+  { id: 'letter-J-upper', glyph: 'J', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-K-upper', glyph: 'K', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-L-upper', glyph: 'L', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-M-upper', glyph: 'M', case: 'upper', band: 'DOUBLE-HUMP' },
+  { id: 'letter-N-upper', glyph: 'N', case: 'upper', band: 'DOUBLE-HUMP' },
+  { id: 'letter-O-upper', glyph: 'O', case: 'upper', band: 'CIRCLE-FAMILY' },
+  { id: 'letter-P-upper', glyph: 'P', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-Q-upper', glyph: 'Q', case: 'upper', band: 'CIRCLE-FAMILY' },
+  { id: 'letter-R-upper', glyph: 'R', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-S-upper', glyph: 'S', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-T-upper', glyph: 'T', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-U-upper', glyph: 'U', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-V-upper', glyph: 'V', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-W-upper', glyph: 'W', case: 'upper', band: 'DOUBLE-HUMP' },
+  { id: 'letter-X-upper', glyph: 'X', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-Y-upper', glyph: 'Y', case: 'upper', band: 'CLEAN' },
+  { id: 'letter-Z-upper', glyph: 'Z', case: 'upper', band: 'CLEAN' },
+  // Lowercase row.
+  { id: 'letter-a-lower', glyph: 'a', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-b-lower', glyph: 'b', case: 'lower', band: 'CIRCLE-STICK' },
+  { id: 'letter-c-lower', glyph: 'c', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-d-lower', glyph: 'd', case: 'lower', band: 'CIRCLE-STICK' },
+  { id: 'letter-e-lower', glyph: 'e', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-f-lower', glyph: 'f', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-g-lower', glyph: 'g', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-h-lower', glyph: 'h', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-i-lower', glyph: 'i', case: 'lower', band: 'VERTICAL-STICK' },
+  { id: 'letter-j-lower', glyph: 'j', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-k-lower', glyph: 'k', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-l-lower', glyph: 'l', case: 'lower', band: 'VERTICAL-STICK' },
+  { id: 'letter-m-lower', glyph: 'm', case: 'lower', band: 'DOUBLE-HUMP' },
+  { id: 'letter-n-lower', glyph: 'n', case: 'lower', band: 'DOUBLE-HUMP' },
+  { id: 'letter-o-lower', glyph: 'o', case: 'lower', band: 'CIRCLE-FAMILY' },
+  { id: 'letter-p-lower', glyph: 'p', case: 'lower', band: 'CIRCLE-STICK' },
+  { id: 'letter-q-lower', glyph: 'q', case: 'lower', band: 'CIRCLE-STICK' },
+  { id: 'letter-r-lower', glyph: 'r', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-s-lower', glyph: 's', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-t-lower', glyph: 't', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-u-lower', glyph: 'u', case: 'lower', band: 'DOUBLE-HUMP' },
+  { id: 'letter-v-lower', glyph: 'v', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-w-lower', glyph: 'w', case: 'lower', band: 'DOUBLE-HUMP' },
+  { id: 'letter-x-lower', glyph: 'x', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-y-lower', glyph: 'y', case: 'lower', band: 'CLEAN' },
+  { id: 'letter-z-lower', glyph: 'z', case: 'lower', band: 'CLEAN' },
+]
+
+export interface LetterNamesRulesConfig {
+  /** The 52-glyph pool. Lint asserts every target's glyph+case
+   *  appears here. */
+  pool: readonly LetterNamesPoolFact[]
+  /** Min CIRCLE-STICK (b/d/p/q lowercase) target count per session
+   *  — the load-bearing assessment anchor. */
+  circleStickMin: number
+  /** Max CIRCLE-STICK target count per session — prevents drill
+   *  feel. */
+  circleStickMax: number
+  /** Min CLEAN-band target count per session — maintains review-
+   *  mode feel for an alphabet-mastered learner. */
+  cleanMin: number
+  /** Min uppercase target count per session — half of the case-mix
+   *  floor. */
+  uppercaseMin: number
+  /** Min lowercase target count per session — half of the case-mix
+   *  floor. */
+  lowercaseMin: number
+  /** Slots (1-indexed) where ONLY CLEAN-band targets are eligible
+   *  (gentle ramp). */
+  gentleRampSlots: readonly number[]
+  /** Slots (1-indexed) where CIRCLE-STICK coverage is enforced
+   *  (≥ 1 trap-window target). */
+  trapWindowSlots: readonly number[]
+  totalProblems: number
+}
+
+export const LETTER_NAMES_RULES: LetterNamesRulesConfig = {
+  pool: LETTER_NAMES_POOL,
+  circleStickMin: 1,
+  circleStickMax: 2,
+  cleanMin: 4,
+  uppercaseMin: 2,
+  lowercaseMin: 2,
+  gentleRampSlots: [1, 2, 3],
+  trapWindowSlots: [6, 7, 8],
+  totalProblems: 8,
+}
+
+/**
+ * Parse a letter-names read-line into the target glyph (case
+ * preserved). Template: `"Tap the letter <SINGLE-CHARACTER>."` —
+ * the single character is the literal letter glyph itself (NOT a
+ * phonetic spell-out — see the NO SSML / NO PHONEME WRAPPING rule
+ * in WORD_SONG_TRACK_GUIDE). Returns `null` on malformed text;
+ * the caller fires `unparseable-problem`.
+ *
+ * The regex captures a single ASCII letter (`[A-Za-z]`) for the
+ * `<NAME>` substitution. Anything else — a multi-char spell-out
+ * like "em", a digit like "1", a non-ASCII letter — fails the
+ * regex and parses as `null` (which then fires the pool-membership
+ * branch via the `null` poolMatch path).
+ */
+const RE_LETTER_NAMES_READ = /^\s*tap\s+the\s+letter\s+([A-Za-z])\s*\.\s*$/i
+
+export function parseLetterNamesReadLine(
+  text: string,
+): { glyph: string } | null {
+  const m = RE_LETTER_NAMES_READ.exec(text)
+  if (!m) return null
+  // Case PRESERVED — uppercase 'A' and lowercase 'a' are distinct
+  // targets in this tier's bookkeeping.
+  return { glyph: m[1]! }
+}
+
+interface LetterNamesProblemRow {
+  index: number
+  utteranceId: string
+  text: string
+  glyph: string | null
+  poolMatch: LetterNamesPoolFact | null
+}
+
+function extractLetterNamesProblems(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  pool: readonly LetterNamesPoolFact[],
+): LetterNamesProblemRow[] {
+  // letter-names uses the word-song `word.p<N>.read` namespace (see
+  // `api/_planner.ts` WORD_SONG_TRACK_GUIDE — utterance-id rule keeps
+  // the `word.` prefix regardless of focus node).
+  const re = /^word\.p(\d+)\.read$/
+  const rows: LetterNamesProblemRow[] = []
+  for (const u of response.utterances) {
+    const m = re.exec(u.id)
+    if (!m) continue
+    const index = Number.parseInt(m[1]!, 10)
+    const parsed = parseLetterNamesReadLine(u.text)
+    const poolMatch = parsed
+      ? (pool.find((f) => f.glyph === parsed.glyph) ?? null)
+      : null
+    rows.push({
+      index,
+      utteranceId: u.id,
+      text: u.text,
+      glyph: parsed?.glyph ?? null,
+      poolMatch,
+    })
+  }
+  rows.sort((x, y) => x.index - y.index)
+  return rows
+}
+
+/**
+ * Lint a letter-names canon plan. Returns ALL violations across the
+ * 8-problem set — does not stop at the first.
+ *
+ * Pure; no I/O.
+ */
+export function lintLetterNamesComposition(
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: LetterNamesRulesConfig = LETTER_NAMES_RULES,
+): CompositionViolation[] {
+  const violations: CompositionViolation[] = []
+  const rows = extractLetterNamesProblems(response, config.pool)
+
+  // 1. Unparseable / pool-membership per problem.
+  for (const row of rows) {
+    if (row.glyph === null) {
+      violations.push({
+        rule: 'unparseable-problem',
+        problemIndex: row.index,
+        message:
+          `P${row.index} read-line "${row.text}" does not match the ` +
+          `"Tap the letter <SINGLE-CHARACTER>." letter-names template.`,
+        factId: null,
+      })
+      continue
+    }
+    if (row.poolMatch === null) {
+      violations.push({
+        rule: 'pool-membership',
+        problemIndex: row.index,
+        message:
+          `P${row.index} target letter "${row.glyph}" is not in the ` +
+          `52-glyph letter-names pool (26 uppercase + 26 lowercase ASCII ` +
+          `letters per design/word-song/letter-names-content.md §1).`,
+        factId: `letter-${row.glyph}`,
+      })
+    }
+  }
+
+  // Rows with a valid pool match — used by every subsequent rule.
+  type MatchedRow = LetterNamesProblemRow & {
+    poolMatch: LetterNamesPoolFact
+  }
+  const matched = rows.filter((r): r is MatchedRow => r.poolMatch !== null)
+
+  // 2. No-duplicates — no two problems may share the same (glyph +
+  //    case) target. Uppercase A and lowercase a ARE permitted to
+  //    co-occur in the same session (they are distinct targets);
+  //    what's forbidden is the SAME target letter twice.
+  const byId = new Map<string, MatchedRow[]>()
+  for (const row of matched) {
+    const id = row.poolMatch.id
+    if (!byId.has(id)) byId.set(id, [])
+    byId.get(id)!.push(row)
+  }
+  for (const [id, dups] of byId) {
+    if (dups.length > 1) {
+      violations.push({
+        rule: 'no-duplicates',
+        problemIndex: null,
+        message:
+          `Target ${id} appears ${dups.length} times ` +
+          `(slots P${dups.map((d) => d.index).join(', P')}). ` +
+          `No duplicate target within the 8-problem set ` +
+          `(per LETTER-NAMES SESSION COMPOSITION RULES §7 — note that ` +
+          `uppercase A and lowercase a are DISTINCT targets and MAY both ` +
+          `appear in the same session as different problems).`,
+        factId: id,
+      })
+    }
+  }
+
+  // 3. Gentle-ramp (P1-P3) — CLEAN-band targets ONLY. Negative-
+  //    anchor rule from the directive prose: CIRCLE-STICK,
+  //    DOUBLE-HUMP, CIRCLE-FAMILY, and VERTICAL-STICK are all
+  //    FORBIDDEN at P1-P3.
+  for (const row of matched) {
+    if (config.gentleRampSlots.includes(row.index)) {
+      if (row.poolMatch.band !== 'CLEAN') {
+        violations.push({
+          rule: 'band-by-slot',
+          problemIndex: row.index,
+          message:
+            `P${row.index} (gentle ramp) carries a ${row.poolMatch.band} ` +
+            `target ("${row.poolMatch.glyph}"); P1-P3 must be CLEAN-band ` +
+            `only per LETTER-NAMES SESSION COMPOSITION RULES §1-2.`,
+          factId: row.poolMatch.id,
+        })
+      }
+    }
+  }
+
+  // 4. Confusion-class budget (whole-session — CIRCLE-STICK 1-2,
+  //    CLEAN ≥ 4) + case-mix budget (uppercase ≥ 2, lowercase ≥ 2).
+  let circleStickCount = 0
+  let cleanCount = 0
+  let upperCount = 0
+  let lowerCount = 0
+  for (const row of matched) {
+    if (row.poolMatch.band === 'CIRCLE-STICK') circleStickCount++
+    if (row.poolMatch.band === 'CLEAN') cleanCount++
+    if (row.poolMatch.case === 'upper') upperCount++
+    if (row.poolMatch.case === 'lower') lowerCount++
+  }
+
+  if (circleStickCount < config.circleStickMin) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `CIRCLE-STICK (b/d/p/q lowercase) target count is ` +
+        `${circleStickCount}; must be at least ${config.circleStickMin} ` +
+        `per CONFUSION-CLASS BUDGET. The "at least 1" floor is the tier's ` +
+        `load-bearing assessment anchor — a session with zero b/d/p/q ` +
+        `targets teaches nothing new.`,
+      factId: null,
+    })
+  }
+  if (circleStickCount > config.circleStickMax) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `CIRCLE-STICK (b/d/p/q lowercase) target count is ` +
+        `${circleStickCount}; must be at most ${config.circleStickMax} ` +
+        `per CONFUSION-CLASS BUDGET. The "at most 2" cap prevents drill ` +
+        `feel — Marian's CVC tiers handle b/d residue naturally via ` +
+        `word-context.`,
+      factId: null,
+    })
+  }
+  if (cleanCount < config.cleanMin) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `CLEAN-band target count is ${cleanCount}; must be at least ` +
+        `${config.cleanMin} per CONFUSION-CLASS BUDGET (maintains the ` +
+        `session's review-mode feel for an alphabet-mastered learner).`,
+      factId: null,
+    })
+  }
+  if (upperCount < config.uppercaseMin) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `Uppercase target count is ${upperCount}; must be at least ` +
+        `${config.uppercaseMin} per CASE-MIX BUDGET (a pure-lowercase ` +
+        `session breaks the implicit promise that the tier covers both ` +
+        `glyph systems).`,
+      factId: null,
+    })
+  }
+  if (lowerCount < config.lowercaseMin) {
+    violations.push({
+      rule: 'category-cap',
+      problemIndex: null,
+      message:
+        `Lowercase target count is ${lowerCount}; must be at least ` +
+        `${config.lowercaseMin} per CASE-MIX BUDGET (a pure-uppercase ` +
+        `session breaks the implicit promise that the tier covers both ` +
+        `glyph systems).`,
+      factId: null,
+    })
+  }
+
+  // 5. Trap-window CIRCLE-STICK coverage — AT LEAST ONE of P6-P8
+  //    must be CIRCLE-STICK. This is the "ensure the tier does its
+  //    job" anchor — composition is meaningless if every session
+  //    has the CIRCLE-STICK floor met only at P4 or P5. Reuses the
+  //    `high-leverage-coverage` rule kind (same semantic shape as
+  //    sub-to-10's take-from-10 trap-window anchor).
+  const trapWindowMatched = matched.filter((r) =>
+    config.trapWindowSlots.includes(r.index),
+  )
+  const trapCircleStick = trapWindowMatched.filter(
+    (r) => r.poolMatch.band === 'CIRCLE-STICK',
+  )
+  if (trapCircleStick.length < 1) {
+    violations.push({
+      rule: 'high-leverage-coverage',
+      problemIndex: null,
+      message:
+        `Trap window (P${config.trapWindowSlots.join(', P')}) has ` +
+        `0 CIRCLE-STICK (b/d/p/q lowercase) targets; must be at least 1 ` +
+        `per LETTER-NAMES SESSION COMPOSITION RULES §4 — composition is ` +
+        `meaningless if every session is 8 gentle items.`,
+      factId: null,
+    })
+  }
+
+  return violations
+}
+
+/**
+ * Throwing helper for the bake-time integration point. The throw
+ * aborts the bake and stops the (compositionally invalid) JSON from
+ * reaching disk.
+ *
+ * `canonId` is a human-readable identifier (e.g.
+ * `"word-song/letter-names"`).
+ */
+export function assertLetterNamesCompositionClean(
+  canonId: string,
+  response: Pick<SessionStartResponse, 'utterances'>,
+  config: LetterNamesRulesConfig = LETTER_NAMES_RULES,
+): void {
+  const violations = lintLetterNamesComposition(response, config)
+  if (violations.length > 0) {
+    throw new CompositionLintError(canonId, violations)
+  }
+}
+
 // ── tier dispatch: which canon files get composition-linted ──────────────
 //
 // Current scope is sub-to-10 + add-to-10 + sub-to-20 + add-to-20. The
@@ -4397,6 +4862,10 @@ export type TierLintBinding =
   | {
       tier: Extract<CanonFileTier, 'letter-sounds'>
       config: LetterSoundsRulesConfig
+    }
+  | {
+      tier: Extract<CanonFileTier, 'letter-names'>
+      config: LetterNamesRulesConfig
     }
   | null
 
@@ -4500,6 +4969,17 @@ export function resolveTierBinding(canonFilePath: string): TierLintBinding {
   }
   if (norm === 'letter-sounds.json' || norm.endsWith('/letter-sounds.json')) {
     return { tier: 'letter-sounds', config: LETTER_SOUNDS_RULES }
+  }
+  // letter-names binding (Wave 7 Track g5x — ticket 86c9y6g5x —
+  // defense-in-depth for the FIRST literacy tier). The disk file is
+  // `public/canon/word-song/level-1/letter-names.json`; the lint
+  // binding fires at bake-time via `bakeOne` (when the canon is
+  // re-baked) and at CI time via the disk walker (on every push).
+  if (norm.endsWith('/word-song/level-1/letter-names.json')) {
+    return { tier: 'letter-names', config: LETTER_NAMES_RULES }
+  }
+  if (norm === 'letter-names.json' || norm.endsWith('/letter-names.json')) {
+    return { tier: 'letter-names', config: LETTER_NAMES_RULES }
   }
   return null
 }
@@ -4622,6 +5102,12 @@ export function runCompositionLint(
         break
       case 'letter-sounds':
         violations = lintLetterSoundsComposition(
+          parsed as SessionStartResponse,
+          binding.config,
+        )
+        break
+      case 'letter-names':
+        violations = lintLetterNamesComposition(
           parsed as SessionStartResponse,
           binding.config,
         )
