@@ -23,7 +23,8 @@
       "Bash(gh pr comment:*)",
       "Bash(gh pr merge:*)",
       "Bash(yarn:*)",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "mcp__clickup__*"
     ]
   },
   "hooks": {
