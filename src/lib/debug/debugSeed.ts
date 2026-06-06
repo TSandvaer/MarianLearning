@@ -79,6 +79,15 @@
  *   iPad smoke convenience: put a fresh device on letter-names without
  *   manually editing localStorage. Ticket 86c9y6g6n (Devon NOF #3 on
  *   PR #335 — Kevin A3 letter-names bake).
+ * - `letter-sounds`: Marian as if she's mastered `letter-names` and is
+ *   now practicing `letter-sounds` — the SECOND node in
+ *   WORD_SONG_NODES_IN_ORDER. Only the one preceding node needs the
+ *   mastery patch; the picker walks past `letter-names` (mastered) and
+ *   lands on `letter-sounds` (practicing). Exists so QA/Thomas can
+ *   deep-launch straight into a letter-sounds session to ear-test the
+ *   isolated-phoneme TTS (Emma pronouncing individual letter sounds)
+ *   without playing through the natural progression. Mirrors the
+ *   `letter-names` recipe one step further down the tree.
  * - `cvc-words`: Marian as if she's mastered everything through
  *   `blending-cv` and is now practicing `cvc-words`. Skips Greet (sets
  *   sessionCount to 1) so the app deep-routes to Hub on first mount,
@@ -263,6 +272,23 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
   'letter-names': {
     skillLevels: {
       'letter-names': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Letter-sounds content tier smoke-test entry. Marian as if she's
+  // mastered `letter-names` (the first word-song node) and is now
+  // practicing `letter-sounds` — the SECOND node in
+  // WORD_SONG_NODES_IN_ORDER. Only one preceding node needs the mastery
+  // patch (letter-names); the picker walks past it and lands on
+  // `letter-sounds` (practicing). Used for an isolated-phoneme TTS
+  // ear-test: QA/Thomas can deep-launch straight into a letter-sounds
+  // session to listen to Emma pronounce individual phonemes without
+  // playing through the natural progression. Mirrors the `letter-names`
+  // recipe one step further down the tree.
+  'letter-sounds': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'practicing',
     },
     skipGreet: true,
   },

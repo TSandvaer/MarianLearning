@@ -227,6 +227,39 @@ describe('maybeApplyDebugSeed', () => {
     })
   })
 
+  describe('letter-sounds seed', () => {
+    beforeEach(() => {
+      setSearch('?debug=1&seed=letter-sounds')
+    })
+
+    it('writes letter-names: mastered + letter-sounds: practicing into progress', () => {
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(progress?.skillLevels['letter-names']).toBe('mastered')
+      expect(progress?.skillLevels['letter-sounds']).toBe('practicing')
+    })
+
+    it('round-trip integration: maybeApplyDebugSeed → pickFocusNode("word-song") → "letter-sounds"', () => {
+      // letter-sounds is the SECOND node in WORD_SONG_NODES_IN_ORDER, so
+      // only the preceding node (letter-names) needs the mastery patch —
+      // the picker walks past it and lands on letter-sounds because it's
+      // 'practicing' (i.e. non-mastered). Mirrors the letter-names /
+      // cvc-words-short-o round-trip tests.
+      maybeApplyDebugSeed()
+      const progress = loadProgress()
+      expect(progress).not.toBeNull()
+      expect(pickFocusNode(progress!, 'word-song')).toBe('letter-sounds')
+    })
+
+    it('bumps session-history sessionCount to 1 (skips Greet on next mount)', () => {
+      maybeApplyDebugSeed()
+      const history = readSessionHistory()
+      expect(history.sessionCount).toBe(1)
+      expect(history.schemaVersion).toBe(2)
+    })
+  })
+
   describe('cvc-words-short-o seed', () => {
     beforeEach(() => {
       setSearch('?debug=1&seed=cvc-words-short-o')
