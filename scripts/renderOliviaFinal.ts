@@ -1,27 +1,27 @@
 /**
- * One-off diagnostic render — final letter-sounds on Emma's chosen voice.
+ * One-off diagnostic render — FINAL letter-sounds on Emma's chosen voice.
  *
- * Thomas picked Voice 4 = en-GB-OliviaNeural as Emma's voice. Diagnosis:
- * on Olivia the IPA <phoneme>+stress(ˈ)/length(ː) markup SCRATCHES on
- * isolated sounds, while plain text + the sample sentence are clean. The
- * phoneme apparatus was compensating for the US voice; on a native GB
- * voice the lexicon says these sounds correctly from plain text.
+ * Decision trail:
+ *  - Thomas picked en-GB-OliviaNeural as Emma's voice.
+ *  - On Olivia, the IPA stress(ˈ)/length(ː) marks SCRATCH. PLAIN TEXT
+ *    fails differently: Olivia reads the literal mnemonic as letter NAMES
+ *    / spells them ("s s s s", "l l l", a="ay", o="oh", t="to").
+ *  - WINNER (Thomas ear-test): BARE <phoneme alphabet="ipa" ph="X"> with
+ *    NO stress, NO length marks. The mark-free phoneme tag is clean AND
+ *    the GB lexicon says the sound correctly.
+ *  - Reads were "a bit scratchy" with the nested question-prosody wrapper
+ *    (<prosody pitch="+8%" rate="-5%">). The declarative hint was perfect.
+ *    So: DROP the inner question-prosody on read lines (keep outer -10%
+ *    rate, the 300ms break, and the trailing "?" text). Hints stay
+ *    declarative.
  *
- * Hypothesis to prove: plain-text mnemonics on Olivia are clean AND
- * correct (a literal "mmm"/"hhh" reads as a held/audible sound). This
- * script renders the 8 shipped letter-sounds (plan
- * "letter-sounds-short-o-intro": M, S, H, A, T, O, L — read + hint) on
- * Olivia at rate -10%, PLAIN TEXT, with the 300ms pre-sound <break>
- * preserved, and NO redundant en-GB lang wrapper (voice is natively GB).
- *
- * Insurance: for the riskiest sounds (H, M, S) we ALSO render a MARK-FREE
- * bare <phoneme ph="..."> variant (no stress, no length) to test whether
- * a mark-free phoneme is clean — in case plain text doesn't hold/isn't
- * audible. Plain text is the lead candidate.
+ * This renders the 7 distinct shipped sounds (M S H A T O L), read + hint,
+ * on Olivia at rate -10%, bare-phoneme, no question-prosody on reads.
  *
  * Diagnostic ONLY: NOT part of the canon bake, does NOT touch
- * public/canon/**, does NOT change api/_tts.ts. After Thomas ear-confirms,
- * the winning treatment is rolled across all canon on Olivia — SEPARATE.
+ * public/canon/**, does NOT change api/_tts.ts. After Thomas signs off we
+ * lock (voice→Olivia, bare-phoneme no-marks rendering, drop question-
+ * prosody on reads) and roll across all canon — SEPARATE change.
  *
  * Run from repo root (kevin-wt) with a live Azure subscription:
  *   npx tsx scripts/renderOliviaFinal.ts
@@ -63,9 +63,8 @@ const PITCH = '+0Hz'
 const VOLUME = '+0%'
 const BREAK = '<break time="300ms"/>'
 
-/** Envelope WITHOUT the en-GB lang wrapper on the inner text — the voice
- *  is natively GB. `xml:lang` on <speak> is required by Azure but matches
- *  the voice locale (en-GB) so it is not a mid-utterance switch. */
+/** Outer envelope only — no nested question-prosody. The voice is
+ *  natively GB so xml:lang matches (not a mid-utterance switch). */
 function envelope(inner: string): string {
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-GB">` +
@@ -76,91 +75,61 @@ function envelope(inner: string): string {
   )
 }
 
-/** The 8 shipped problems → 7 distinct sounds (O repeats at P6/P8).
- *  `mnemonic` is the plain-text token spoken. `risky` flags H/M/S, which
- *  also get a mark-free bare-phoneme insurance variant. `bareIpa` is the
- *  mark-free IPA for that insurance variant (no ˈ, no ː). */
-interface SoundSpec {
+/** The 7 distinct shipped sounds. `mnemonic` = visible word inside the
+ *  phoneme tag; `ipa` = BARE IPA (no ˈ, no ː). */
+const SOUNDS: ReadonlyArray<{
   letter: string
   mnemonic: string
-  risky: boolean
-  bareIpa?: string
-}
-
-const SOUNDS: readonly SoundSpec[] = [
-  { letter: 'M', mnemonic: 'mmm', risky: true, bareIpa: 'm' },
-  { letter: 'S', mnemonic: 'sss', risky: true, bareIpa: 's' },
-  { letter: 'H', mnemonic: 'hhh', risky: true, bareIpa: 'h' },
-  { letter: 'A', mnemonic: 'a', risky: false },
-  { letter: 'T', mnemonic: 'tuh', risky: false },
-  { letter: 'O', mnemonic: 'o', risky: false },
-  { letter: 'L', mnemonic: 'lll', risky: false },
+  ipa: string
+  hint: string
+}> = [
+  { letter: 'M', mnemonic: 'mmm', ipa: 'm', hint: 'held "mmmm"' },
+  { letter: 'S', mnemonic: 'sss', ipa: 's', hint: 'held "ssss"' },
+  { letter: 'H', mnemonic: 'hhh', ipa: 'h', hint: 'audible breath "hhh"' },
+  { letter: 'A', mnemonic: 'a', ipa: 'æ', hint: 'short a (as in cat)' },
+  { letter: 'T', mnemonic: 'tuh', ipa: 't', hint: 'stop /t/ (as in top)' },
+  { letter: 'O', mnemonic: 'o', ipa: 'ɒ', hint: 'short o (as in hot)' },
+  { letter: 'L', mnemonic: 'lll', ipa: 'l', hint: 'held "llll"' },
 ]
 
-/** Build the inner fragment for a slot.
- *  - read (plain):  "Which letter says <break>mmm?"
- *  - hint (plain):  "Listen. <break>mmm."
- *  - read/hint (bare-phoneme insurance): same but the mnemonic wrapped in
- *    a MARK-FREE <phoneme ph="m"> (no stress/length). */
-function readInner(mnemonic: string, bareIpa?: string): string {
-  const token = bareIpa
-    ? `<phoneme alphabet="ipa" ph="${bareIpa}">${mnemonic}</phoneme>`
-    : mnemonic
-  return `Which letter says ${BREAK}${token}?`
-}
-function hintInner(mnemonic: string, bareIpa?: string): string {
-  const token = bareIpa
-    ? `<phoneme alphabet="ipa" ph="${bareIpa}">${mnemonic}</phoneme>`
-    : mnemonic
-  return `Listen. ${BREAK}${token}.`
+function phoneme(mnemonic: string, ipa: string): string {
+  // BARE phoneme — no stress mark, no length mark.
+  return `<phoneme alphabet="ipa" ph="${ipa}">${mnemonic}</phoneme>`
 }
 
-interface Job {
-  file: string
-  ssml: string
-  desc: string
+/** Read line: outer -10% rate + 300ms break + trailing "?" TEXT, but NO
+ *  nested question-prosody wrapper (that made reads scratchy). */
+function readInner(mnemonic: string, ipa: string): string {
+  return `Which letter says ${BREAK}${phoneme(mnemonic, ipa)}?`
 }
-
-function buildJobs(): Job[] {
-  const jobs: Job[] = []
-  for (const s of SOUNDS) {
-    // Lead candidate: PLAIN TEXT.
-    jobs.push({
-      file: `${s.letter}-read-plain.mp3`,
-      ssml: envelope(readInner(s.mnemonic)),
-      desc: `${s.letter} read  (plain "${s.mnemonic}")`,
-    })
-    jobs.push({
-      file: `${s.letter}-hint-plain.mp3`,
-      ssml: envelope(hintInner(s.mnemonic)),
-      desc: `${s.letter} hint  (plain "${s.mnemonic}")`,
-    })
-    // Insurance: mark-free bare <phoneme> for the risky sounds only.
-    if (s.risky && s.bareIpa) {
-      jobs.push({
-        file: `${s.letter}-read-bare.mp3`,
-        ssml: envelope(readInner(s.mnemonic, s.bareIpa)),
-        desc: `${s.letter} read  (mark-free <phoneme ph="${s.bareIpa}">)`,
-      })
-      jobs.push({
-        file: `${s.letter}-hint-bare.mp3`,
-        ssml: envelope(hintInner(s.mnemonic, s.bareIpa)),
-        desc: `${s.letter} hint  (mark-free <phoneme ph="${s.bareIpa}">)`,
-      })
-    }
-  }
-  return jobs
+/** Hint line: declarative. */
+function hintInner(mnemonic: string, ipa: string): string {
+  return `Listen. ${BREAK}${phoneme(mnemonic, ipa)}.`
 }
 
 async function main(): Promise<void> {
   const { key } = readAzureCredentials()
   const region = process.env.AZURE_SPEECH_REGION!
-  console.log(`Voice: ${VOICE} @ ${RATE} — region ${region}`)
+  console.log(`Voice: ${VOICE} @ ${RATE} — bare-phoneme, no question-prosody`)
 
   const outDir = join(REPO_ROOT, 'public', 'olivia-final')
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
 
-  for (const job of buildJobs()) {
+  const jobs: Array<{ file: string; ssml: string; desc: string }> = []
+  for (const s of SOUNDS) {
+    jobs.push({
+      file: `${s.letter}-read.mp3`,
+      ssml: envelope(readInner(s.mnemonic, s.ipa)),
+      desc: `${s.letter} read  (bare ph="${s.ipa}", no question-prosody)`,
+    })
+    jobs.push({
+      file: `${s.letter}-hint.mp3`,
+      ssml: envelope(hintInner(s.mnemonic, s.ipa)),
+      desc: `${s.letter} hint  (bare ph="${s.ipa}")`,
+    })
+  }
+
+  for (const job of jobs) {
     try {
       const res = await fetch(buildAzureEndpoint(region), {
         method: 'POST',

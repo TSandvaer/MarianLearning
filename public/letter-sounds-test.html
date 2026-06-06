@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Letter-sounds audition (QA only)</title>
+    <title>Emma (Olivia) letter-sounds audition (QA only)</title>
     <style>
       /* Deliberately minimal — clarity over polish. QA-only tooling. */
       :root {
@@ -86,11 +86,6 @@
         color: #5a6072;
         font-weight: 400;
       }
-      button.play .utext {
-        display: block;
-        font-style: italic;
-        font-size: 0.85rem;
-      }
       .err {
         color: #b00020;
         font-weight: 600;
@@ -103,61 +98,52 @@
     </style>
   </head>
   <body>
-    <h1>Letter-sounds audition</h1>
+    <h1>Emma (Olivia) — letter-sounds audition</h1>
     <p class="sub">
-      QA-only tooling — not linked from the app. Plays each utterance from the
-      shipped <code>letter-sounds</code> canon on demand so you can ear-test the
-      isolated-phoneme TTS. For each sound, the <strong>read</strong> line (with
-      the "Which letter says…?" question prosody) sits next to the
-      <strong>hint</strong> line (the bare sound, no question wrapper) — they're
-      one click apart so you can compare directly.
+      QA-only tooling — not linked from the app. Plays the shipped
+      <code>letter-sounds</code> on Emma's British voice
+      (<strong>Olivia</strong>), rendered with the bare-phoneme treatment (IPA
+      <code>&lt;phoneme&gt;</code> tag, no stress/length marks) at rate −10%,
+      with a short pause before each sound. The <strong>read</strong> line uses
+      no question-prosody (declarative pitch); the <strong>hint</strong> line is
+      the bare sound. They're one click apart so you can compare directly.
     </p>
 
-    <!-- Emma (Olivia) FINAL letter-sounds (diagnostic ear-confirm). Static
-         MP3s rendered by scripts/renderOliviaFinal.ts on en-GB-OliviaNeural
-         (Thomas's picked voice) using PLAIN-TEXT mnemonics (no <phoneme>, no
-         stress/length marks — those scratched on Olivia), keeping the 300ms
-         pre-sound break. For the riskiest sounds (M/S/H) a mark-free bare
-         <phoneme> variant is offered as a fallback. Independent of the canon
-         below; placed first. -->
+    <!-- Emma (Olivia) FINAL letter-sounds — bare-phoneme treatment (Thomas's
+         winning ear-test result). Static MP3s rendered by
+         scripts/renderOliviaFinal.ts on en-GB-OliviaNeural. File naming:
+         <LETTER>-<read|hint>.mp3. This is the ONLY section — all US-voice /
+         canon-driven clips were removed once Olivia + bare-phoneme were
+         decided. -->
     <div class="group" id="olivia-final">
-      <h2>Emma (Olivia) — final letter-sounds</h2>
+      <h2>Emma (Olivia) letter-sounds — read &amp; hint</h2>
       <p class="desc">
-        Emma's voice is now <strong>British (Olivia)</strong>. These play the 8
-        shipped sounds with <strong>plain-text</strong> mnemonics (no phoneme
-        markup — that caused the scratch), keeping the short pause before the
-        sound. For each: does <strong>read</strong> + <strong>hint</strong>
-        sound clean (no scratch) AND correct (M held "mmmm", H an audible
-        breath, O a clean "o as in hot")? M / S / H also have a "fallback" pair
-        — only check those if the plain version of that sound is unclear.
+        For each sound, tap <strong>Read</strong> ("Which letter says …?") and
+        <strong>Hint</strong> ("Listen. …"). Confirm each is clean (no scratch)
+        AND correct: M / S / L held, H an audible breath, A "as in cat", O "as
+        in hot", T a clean /t/.
       </p>
       <div id="olivia-rows"></div>
     </div>
 
-    <div id="status">Loading canon…</div>
-    <div id="groups"></div>
-
-    <p class="meta" id="meta"></p>
+    <p class="meta" id="meta">
+      Voice: en-GB-OliviaNeural · rate −10% · bare-phoneme (no stress/length) ·
+      300ms pre-sound break · read line has no question-prosody.
+    </p>
 
     <script>
-      // Served path of the committed letter-sounds canon. Relative to this
-      // file's location (public/ is the site root on Vercel), so this resolves
-      // identically on a local `vite preview` build and on the deployed origin.
-      var CANON_URL = 'canon/word-song/level-1/letter-sounds.json'
-
-      // ── Emma (Olivia) final letter-sounds (diagnostic ear-confirm) ─────
+      // ── Emma (Olivia) letter-sounds (diagnostic ear-confirm) ───────────
       // Static MP3s under public/olivia-final/, played by direct URL
-      // (relative to this page's origin). Plain-text mnemonics on
-      // en-GB-OliviaNeural; M/S/H also have a mark-free bare-<phoneme>
-      // fallback pair. File naming: <LETTER>-<read|hint>-<plain|bare>.mp3
+      // (relative to this page's origin, so the preview serves THIS branch's
+      // clips). File naming: <LETTER>-<read|hint>.mp3.
       var OLIVIA_SOUNDS = [
-        { letter: 'M', hint: 'should hold "mmmm"', risky: true },
-        { letter: 'S', hint: 'should hold "ssss"', risky: true },
-        { letter: 'H', hint: 'audible breath "hhh"', risky: true },
-        { letter: 'A', hint: 'short a (as in cat)', risky: false },
-        { letter: 'T', hint: 'stop /t/ (as in top)', risky: false },
-        { letter: 'O', hint: 'short o (as in hot)', risky: false },
-        { letter: 'L', hint: 'should hold "llll"', risky: false },
+        { letter: 'M', hint: 'held "mmmm" (as in mom)' },
+        { letter: 'S', hint: 'held "ssss" (as in sun)' },
+        { letter: 'H', hint: 'audible breath "hhh" (as in hat)' },
+        { letter: 'A', hint: 'short a (as in cat)' },
+        { letter: 'T', hint: 'stop /t/ (as in top)' },
+        { letter: 'O', hint: 'short o (as in hot)' },
+        { letter: 'L', hint: 'held "llll" (as in log)' },
       ]
 
       function playUrl(url, btn, slotEl, restoreText) {
@@ -179,7 +165,7 @@
           })
       }
 
-      function oliviaButton(letter, slot, variant, faceLabel) {
+      function oliviaButton(letter, slot, faceLabel) {
         var btn = document.createElement('button')
         btn.className = 'play'
         btn.type = 'button'
@@ -188,7 +174,7 @@
         var restoreText = '▶ ' + faceLabel
         slotEl.textContent = restoreText
         btn.appendChild(slotEl)
-        var url = 'olivia-final/' + letter + '-' + slot + '-' + variant + '.mp3'
+        var url = 'olivia-final/' + letter + '-' + slot + '.mp3'
         btn.addEventListener('click', function () {
           playUrl(url, btn, slotEl, restoreText)
         })
@@ -213,252 +199,12 @@
           labelEl.appendChild(hintWord)
           row.appendChild(labelEl)
 
-          // Lead: plain-text read + hint.
-          row.appendChild(oliviaButton(s.letter, 'read', 'plain', 'Read'))
-          row.appendChild(oliviaButton(s.letter, 'hint', 'plain', 'Hint'))
-          // Fallback (M/S/H only): mark-free bare <phoneme>.
-          if (s.risky) {
-            row.appendChild(
-              oliviaButton(s.letter, 'read', 'bare', 'Read (fallback)'),
-            )
-            row.appendChild(
-              oliviaButton(s.letter, 'hint', 'bare', 'Hint (fallback)'),
-            )
-          }
+          row.appendChild(oliviaButton(s.letter, 'read', 'Read'))
+          row.appendChild(oliviaButton(s.letter, 'hint', 'Hint'))
           host.appendChild(row)
         })
       }
       renderOliviaFinal()
-
-      // Three suspected-defect buckets (sponsor instruction). A letter is
-      // classified by membership; anything we can't classify falls into
-      // "Other" so a future canon re-bake with new letters still renders.
-      var GROUPS = [
-        {
-          id: 'continuant',
-          title: 'Continuants (should be HELD)',
-          desc: 'These should sound sustained ("mmmmm"). Suspected bug: they play as one short clip instead of being held.',
-          letters: ['M', 'N', 'S', 'F', 'V', 'L', 'R', 'H'],
-        },
-        {
-          id: 'stop',
-          title: 'Stop consonants (short by nature)',
-          desc: 'Short by nature. Suspected clipped / unclear in isolation.',
-          letters: ['P', 'B', 'T', 'D', 'K', 'G'],
-        },
-        {
-          id: 'vowel',
-          title: 'Short vowels',
-          desc: 'Suspected blurry — /i/ vs /e/ especially. Compare them back to back.',
-          letters: ['A', 'O', 'U', 'I', 'E'],
-        },
-        {
-          id: 'other',
-          title: 'Other / unclassified',
-          desc: 'Sounds present in the canon that do not fall into the buckets above.',
-          letters: [],
-        },
-      ]
-
-      // Plain-language "should sound like" hints, keyed by letter.
-      var HINT_WORDS = {
-        M: 'should sound like "mmmm" (as in mom)',
-        N: 'should sound like "nnnn" (as in net)',
-        S: 'should sound like "ssss" (as in sun)',
-        F: 'should sound like "ffff" (as in fan)',
-        V: 'should sound like "vvvv" (as in van)',
-        L: 'should sound like "llll" (as in log)',
-        R: 'should sound like "rrrr" (as in red)',
-        H: 'should sound like "hhh" breath (as in hat)',
-        P: 'stop sound /p/ (as in pin)',
-        B: 'stop sound /b/ (as in bat)',
-        T: 'stop sound /t/ (as in top)',
-        D: 'stop sound /d/ (as in dog)',
-        K: 'stop sound /k/ (as in cat)',
-        G: 'stop sound /g/ (as in goat)',
-        A: 'short a (as in cat)',
-        O: 'short o (as in hot)',
-        U: 'short u (as in cup)',
-        I: 'short i (as in sit)',
-        E: 'short e (as in bed)',
-      }
-
-      function groupForLetter(letter) {
-        for (var i = 0; i < GROUPS.length; i++) {
-          if (GROUPS[i].letters.indexOf(letter) !== -1) return GROUPS[i].id
-        }
-        return 'other'
-      }
-
-      // Derive the taught letter from the `correct` slot text:
-      // "Yes! M says mmm." -> "M". Falls back to null if no match.
-      function deriveLetter(correctText) {
-        if (!correctText) return null
-        var m = correctText.match(/Yes!\s+([A-Za-z]+)\s+says/i)
-        return m ? m[1].toUpperCase() : null
-      }
-
-      // base64 -> Blob, then play via a fresh <audio> element.
-      function playInline(audio, btn) {
-        try {
-          var b64 = audio.base64
-          var mime = audio.mime || 'audio/mpeg'
-          var bin = atob(b64)
-          var len = bin.length
-          var bytes = new Uint8Array(len)
-          for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i)
-          var blob = new Blob([bytes], { type: mime })
-          var url = URL.createObjectURL(blob)
-          var el = new Audio(url)
-          el.addEventListener('ended', function () {
-            URL.revokeObjectURL(url)
-          })
-          el.play().catch(function (e) {
-            btn.classList.add('err')
-            btn.firstChild &&
-              (btn.querySelector('.slot').textContent =
-                'PLAY FAILED: ' + e.message)
-          })
-        } catch (e) {
-          btn.classList.add('err')
-          var slot = btn.querySelector('.slot')
-          if (slot) slot.textContent = 'DECODE FAILED: ' + e.message
-        }
-      }
-
-      function makePlayButton(utter) {
-        var btn = document.createElement('button')
-        btn.className = 'play'
-        btn.type = 'button'
-        var slot = utter.id.split('.').pop() // read | hint | ...
-        var slotEl = document.createElement('span')
-        slotEl.className = 'slot'
-        slotEl.textContent = '▶ Play — ' + slot
-        var textEl = document.createElement('span')
-        textEl.className = 'utext'
-        textEl.textContent = '"' + utter.text + '"'
-        btn.appendChild(slotEl)
-        btn.appendChild(textEl)
-        if (
-          !utter.audio ||
-          utter.audio.kind !== 'inline' ||
-          !utter.audio.base64
-        ) {
-          btn.disabled = true
-          slotEl.textContent = '(no inline audio: ' + slot + ')'
-        } else {
-          btn.addEventListener('click', function () {
-            playInline(utter.audio, btn)
-          })
-        }
-        return btn
-      }
-
-      function render(canon) {
-        var utterances = canon.utterances || []
-        // Index by id for quick lookup of the audio payloads.
-        var byId = {}
-        utterances.forEach(function (u) {
-          byId[u.id] = u
-        })
-
-        // Discover problem indices present in the canon (word.pN.*).
-        var probIndices = []
-        utterances.forEach(function (u) {
-          var m = u.id.match(/^word\.p(\d+)\./)
-          if (m) {
-            var n = parseInt(m[1], 10)
-            if (probIndices.indexOf(n) === -1) probIndices.push(n)
-          }
-        })
-        probIndices.sort(function (a, b) {
-          return a - b
-        })
-
-        // Build a row descriptor per problem: letter + read + hint utterances.
-        var rows = []
-        probIndices.forEach(function (n) {
-          var read = byId['word.p' + n + '.read']
-          var hint = byId['word.p' + n + '.hint']
-          var correct = byId['word.p' + n + '.correct']
-          var letter = deriveLetter(correct && correct.text)
-          rows.push({
-            problem: n,
-            letter: letter,
-            group: letter ? groupForLetter(letter) : 'other',
-            read: read,
-            hint: hint,
-          })
-        })
-
-        // Render groups in fixed order; only show groups that have rows.
-        var container = document.getElementById('groups')
-        container.innerHTML = ''
-        var totalRendered = 0
-        GROUPS.forEach(function (g) {
-          var groupRows = rows.filter(function (r) {
-            return r.group === g.id
-          })
-          if (groupRows.length === 0) return
-          var section = document.createElement('div')
-          section.className = 'group'
-          var h2 = document.createElement('h2')
-          h2.textContent = g.title
-          var desc = document.createElement('p')
-          desc.className = 'desc'
-          desc.textContent = g.desc
-          section.appendChild(h2)
-          section.appendChild(desc)
-
-          groupRows.forEach(function (r) {
-            var row = document.createElement('div')
-            row.className = 'row'
-            var label = document.createElement('div')
-            label.className = 'label'
-            var letterSpan = document.createElement('span')
-            letterSpan.className = 'letter'
-            letterSpan.textContent = r.letter
-              ? r.letter
-              : 'problem ' + r.problem
-            var hintWord = document.createElement('span')
-            hintWord.className = 'hintword'
-            hintWord.textContent =
-              r.letter && HINT_WORDS[r.letter] ? HINT_WORDS[r.letter] : ''
-            label.appendChild(letterSpan)
-            label.appendChild(hintWord)
-            row.appendChild(label)
-            if (r.read) row.appendChild(makePlayButton(r.read))
-            if (r.hint) row.appendChild(makePlayButton(r.hint))
-            section.appendChild(row)
-            totalRendered++
-          })
-          container.appendChild(section)
-        })
-
-        document.getElementById('status').textContent = ''
-        document.getElementById('meta').textContent =
-          'Canon: ' +
-          CANON_URL +
-          ' — plan "' +
-          (canon.plan && canon.plan.id ? canon.plan.id : '?') +
-          '" — ' +
-          rows.length +
-          ' sounds, ' +
-          totalRendered +
-          ' rows rendered.'
-      }
-
-      fetch(CANON_URL)
-        .then(function (res) {
-          if (!res.ok)
-            throw new Error('HTTP ' + res.status + ' fetching ' + CANON_URL)
-          return res.json()
-        })
-        .then(render)
-        .catch(function (e) {
-          document.getElementById('status').innerHTML =
-            '<span class="err">Failed to load canon: ' + e.message + '</span>'
-        })
     </script>
   </body>
 </html>
