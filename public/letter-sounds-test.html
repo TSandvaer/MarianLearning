@@ -113,6 +113,24 @@
       one click apart so you can compare directly.
     </p>
 
+    <!-- British voice candidates (diagnostic A/B). Static MP3 clips rendered
+         by scripts/renderVoiceCandidates.ts — independent of the canon below.
+         Neutral labels (Voice 1..4); the actual Azure voice name is NOT shown,
+         so the ear-test is unbiased. Placed first so Thomas hears it first. -->
+    <div class="group" id="voice-candidates">
+      <h2>British voice candidates — which voice should Emma have?</h2>
+      <p class="desc">
+        Thomas wants Emma to have a <strong>British</strong> voice (a GB voice
+        says "o as in hot" naturally). Below are a few candidates. For each, tap
+        the clips and judge: does the <strong>short-O</strong> sound like a
+        clean "o as in HOT"? Does <strong>M</strong> hold ("mmmm")? And does the
+        <strong>character sample</strong> sound warm and right for Emma? Two
+        short-O takes per voice (a) and (b) — pick the voice whose short-O +
+        overall timbre you like best.
+      </p>
+      <div id="voice-rows"></div>
+    </div>
+
     <div id="status">Loading canon…</div>
     <div id="groups"></div>
 
@@ -123,6 +141,77 @@
       // file's location (public/ is the site root on Vercel), so this resolves
       // identically on a local `vite preview` build and on the deployed origin.
       var CANON_URL = 'canon/word-song/level-1/letter-sounds.json'
+
+      // ── British voice candidates (diagnostic A/B) ──────────────────────
+      // Static MP3s under public/voice-candidates/, played by direct URL
+      // (relative to this page's origin). Neutral labels only — no Azure
+      // voice name shown, unbiased ear-test. Each voice has 5 clips.
+      var VOICE_CANDIDATES = [
+        { id: 'v1', label: 'Voice 1' },
+        { id: 'v2', label: 'Voice 2' },
+        { id: 'v3', label: 'Voice 3' },
+        { id: 'v4', label: 'Voice 4' },
+      ]
+      var VOICE_CLIPS = [
+        { slot: 'short-o-plain', label: 'Short-O (a) — "says o?"' },
+        { slot: 'short-o-ipa', label: 'Short-O (b) — "says o?"' },
+        { slot: 'm', label: 'M — "says mmm?"' },
+        { slot: 'short-a', label: 'Short-A — "says aaa?"' },
+        { slot: 'sample', label: 'Emma sample sentence' },
+      ]
+
+      function playUrl(url, btn, slotEl, restoreText) {
+        var el = new Audio(url)
+        el.addEventListener('error', function () {
+          btn.classList.add('err')
+          slotEl.textContent = 'PLAY FAILED (load error)'
+        })
+        el.play()
+          .then(function () {
+            slotEl.textContent = '▶ Playing…'
+            el.addEventListener('ended', function () {
+              slotEl.textContent = restoreText
+            })
+          })
+          .catch(function (e) {
+            btn.classList.add('err')
+            slotEl.textContent = 'PLAY FAILED: ' + e.message
+          })
+      }
+
+      function renderVoiceCandidates() {
+        var host = document.getElementById('voice-rows')
+        if (!host) return
+        VOICE_CANDIDATES.forEach(function (v) {
+          var row = document.createElement('div')
+          row.className = 'row'
+          var labelEl = document.createElement('div')
+          labelEl.className = 'label'
+          var letterSpan = document.createElement('span')
+          letterSpan.className = 'letter'
+          letterSpan.textContent = v.label
+          labelEl.appendChild(letterSpan)
+          row.appendChild(labelEl)
+
+          VOICE_CLIPS.forEach(function (clip) {
+            var btn = document.createElement('button')
+            btn.className = 'play'
+            btn.type = 'button'
+            var slotEl = document.createElement('span')
+            slotEl.className = 'slot'
+            var restoreText = '▶ ' + clip.label
+            slotEl.textContent = restoreText
+            btn.appendChild(slotEl)
+            var url = 'voice-candidates/' + v.id + '-' + clip.slot + '.mp3'
+            btn.addEventListener('click', function () {
+              playUrl(url, btn, slotEl, restoreText)
+            })
+            row.appendChild(btn)
+          })
+          host.appendChild(row)
+        })
+      }
+      renderVoiceCandidates()
 
       // Three suspected-defect buckets (sponsor instruction). A letter is
       // classified by membership; anything we can't classify falls into
