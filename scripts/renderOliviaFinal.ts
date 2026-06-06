@@ -97,15 +97,53 @@ function phoneme(mnemonic: string, ipa: string): string {
   return `<phoneme alphabet="ipa" ph="${ipa}">${mnemonic}</phoneme>`
 }
 
-/** Read line: outer -10% rate + 300ms break + trailing "?" TEXT, but NO
- *  nested question-prosody wrapper (that made reads scratchy). */
+/** v1 read line: outer -10% rate + LEADING 300ms break + trailing "?"
+ *  TEXT, no nested question-prosody. */
 function readInner(mnemonic: string, ipa: string): string {
   return `Which letter says ${BREAK}${phoneme(mnemonic, ipa)}?`
 }
-/** Hint line: declarative. */
+/** v1 hint line: declarative, with the LEADING 300ms break. */
 function hintInner(mnemonic: string, ipa: string): string {
   return `Listen. ${BREAK}${phoneme(mnemonic, ipa)}.`
 }
+
+// ── v2 variants (Thomas A/B refinement round 2) ────────────────────────
+// v1 had a LEADING 300ms break. Thomas heard residual artifacts that
+// smell like that break:
+//   - reads SCRATCHY on M, O, L (L "very scratchy"); A has "a missound
+//     before the aaa". (S, H, T reads are perfect.)
+//   - hints have "a little sound before" the phoneme on S and H (an
+//     intake/onset). (M, A, O, L, T hints are perfect.)
+// v2 hypotheses:
+//   - reads: NO leading break; instead a 200ms break AFTER the phoneme,
+//     before the "?" — lets the voiced M/O/L resolve without the clipped/
+//     scratchy tail and removes the leading-break glitch.
+//   - hints: NO break at all — "Listen." + period already separates; the
+//     break is what produced the "sound before".
+const BREAK_200 = '<break time="200ms"/>'
+
+/** v2 read: no leading break; trailing 200ms break before the "?". */
+function readInnerV2(mnemonic: string, ipa: string): string {
+  return `Which letter says ${phoneme(mnemonic, ipa)}${BREAK_200}?`
+}
+/** v2 hint: no break at all. */
+function hintInnerV2(mnemonic: string, ipa: string): string {
+  return `Listen. ${phoneme(mnemonic, ipa)}.`
+}
+
+/** The 6 problem clips that get a v2 variant. `slot` + `letter` map to the
+ *  SOUNDS entry; `kind` selects the v2 builder. */
+const V2_CLIPS: ReadonlyArray<{
+  letter: string
+  slot: 'read' | 'hint'
+}> = [
+  { letter: 'M', slot: 'read' },
+  { letter: 'O', slot: 'read' },
+  { letter: 'L', slot: 'read' },
+  { letter: 'A', slot: 'read' },
+  { letter: 'S', slot: 'hint' },
+  { letter: 'H', slot: 'hint' },
+]
 
 async function main(): Promise<void> {
   const { key } = readAzureCredentials()
@@ -115,21 +153,55 @@ async function main(): Promise<void> {
   const outDir = join(REPO_ROOT, 'public', 'olivia-final')
   if (!existsSync(outDir)) mkdirSync(outDir, { recursive: true })
 
-  const jobs: Array<{ file: string; ssml: string; desc: string }> = []
+  const byLetter = new Map(SOUNDS.map((s) => [s.letter, s]))
+
+  const jobs: Array<{
+    file: string
+    ssml: string
+    desc: string
+    skipIfExists: boolean
+  }> = []
+  // v1 clips — keep byte-identical (already ear-confirmed correct). Skip
+  // if already on disk so this re-run only renders the new v2 variants
+  // and never re-bills / perturbs the committed v1 clips.
   for (const s of SOUNDS) {
     jobs.push({
       file: `${s.letter}-read.mp3`,
       ssml: envelope(readInner(s.mnemonic, s.ipa)),
-      desc: `${s.letter} read  (bare ph="${s.ipa}", no question-prosody)`,
+      desc: `${s.letter} read v1 (leading break)`,
+      skipIfExists: true,
     })
     jobs.push({
       file: `${s.letter}-hint.mp3`,
       ssml: envelope(hintInner(s.mnemonic, s.ipa)),
-      desc: `${s.letter} hint  (bare ph="${s.ipa}")`,
+      desc: `${s.letter} hint v1 (leading break)`,
+      skipIfExists: true,
+    })
+  }
+  // v2 clips — the 6 problem clips, always (re)rendered.
+  for (const c of V2_CLIPS) {
+    const s = byLetter.get(c.letter)
+    if (!s) throw new Error(`V2_CLIPS references unknown letter ${c.letter}`)
+    const inner =
+      c.slot === 'read'
+        ? readInnerV2(s.mnemonic, s.ipa)
+        : hintInnerV2(s.mnemonic, s.ipa)
+    jobs.push({
+      file: `${s.letter}-${c.slot}-v2.mp3`,
+      ssml: envelope(inner),
+      desc:
+        c.slot === 'read'
+          ? `${s.letter} read v2 (no lead break; trailing 200ms)`
+          : `${s.letter} hint v2 (no break)`,
+      skipIfExists: false,
     })
   }
 
   for (const job of jobs) {
+    if (job.skipIfExists && existsSync(join(outDir, job.file))) {
+      console.log(`  · skip ${job.file} (exists) — ${job.desc}`)
+      continue
+    }
     try {
       const res = await fetch(buildAzureEndpoint(region), {
         method: 'POST',

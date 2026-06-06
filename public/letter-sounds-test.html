@@ -119,9 +119,13 @@
       <h2>Emma (Olivia) letter-sounds — read &amp; hint</h2>
       <p class="desc">
         For each sound, tap <strong>Read</strong> ("Which letter says …?") and
-        <strong>Hint</strong> ("Listen. …"). Confirm each is clean (no scratch)
-        AND correct: M / S / L held, H an audible breath, A "as in cat", O "as
-        in hot", T a clean /t/.
+        <strong>Hint</strong> ("Listen. …"). All 7 are now CORRECT; we're
+        chasing residual scratch/onset artifacts. Six clips have a
+        <strong>v2</strong> button beside the original — A/B them and tell me
+        which is cleaner per clip: <em>Read v2 (no lead pause)</em> on M / O / L
+        / A (moves the pause to after the sound), and
+        <em>Hint v2 (no pause)</em> on S / H (drops the pause). T and the
+        unmarked clips are already perfect (v1 only).
       </p>
       <div id="olivia-rows"></div>
     </div>
@@ -135,15 +139,19 @@
       // ── Emma (Olivia) letter-sounds (diagnostic ear-confirm) ───────────
       // Static MP3s under public/olivia-final/, played by direct URL
       // (relative to this page's origin, so the preview serves THIS branch's
-      // clips). File naming: <LETTER>-<read|hint>.mp3.
+      // clips). File naming: <LETTER>-<read|hint>.mp3, and v2 variants
+      // <LETTER>-<read|hint>-v2.mp3 for the 6 clips with residual artifacts.
+      //   readV2  = v1 read had a scratchy tail / leading-break glitch →
+      //             v2 moves the break AFTER the phoneme (200ms before "?").
+      //   hintV2  = v1 hint had "a little sound before" → v2 drops the break.
       var OLIVIA_SOUNDS = [
-        { letter: 'M', hint: 'held "mmmm" (as in mom)' },
-        { letter: 'S', hint: 'held "ssss" (as in sun)' },
-        { letter: 'H', hint: 'audible breath "hhh" (as in hat)' },
-        { letter: 'A', hint: 'short a (as in cat)' },
+        { letter: 'M', hint: 'held "mmmm" (as in mom)', readV2: true },
+        { letter: 'S', hint: 'held "ssss" (as in sun)', hintV2: true },
+        { letter: 'H', hint: 'audible breath "hhh" (as in hat)', hintV2: true },
+        { letter: 'A', hint: 'short a (as in cat)', readV2: true },
         { letter: 'T', hint: 'stop /t/ (as in top)' },
-        { letter: 'O', hint: 'short o (as in hot)' },
-        { letter: 'L', hint: 'held "llll" (as in log)' },
+        { letter: 'O', hint: 'short o (as in hot)', readV2: true },
+        { letter: 'L', hint: 'held "llll" (as in log)', readV2: true },
       ]
 
       function playUrl(url, btn, slotEl, restoreText) {
@@ -165,7 +173,9 @@
           })
       }
 
-      function oliviaButton(letter, slot, faceLabel) {
+      // `fileSlot` is the filename suffix (e.g. 'read' or 'read-v2');
+      // `faceLabel` is the button caption.
+      function oliviaButton(letter, fileSlot, faceLabel) {
         var btn = document.createElement('button')
         btn.className = 'play'
         btn.type = 'button'
@@ -174,7 +184,7 @@
         var restoreText = '▶ ' + faceLabel
         slotEl.textContent = restoreText
         btn.appendChild(slotEl)
-        var url = 'olivia-final/' + letter + '-' + slot + '.mp3'
+        var url = 'olivia-final/' + letter + '-' + fileSlot + '.mp3'
         btn.addEventListener('click', function () {
           playUrl(url, btn, slotEl, restoreText)
         })
@@ -199,8 +209,20 @@
           labelEl.appendChild(hintWord)
           row.appendChild(labelEl)
 
+          // v1 read, then v2 read right beside it if this clip got a v2.
           row.appendChild(oliviaButton(s.letter, 'read', 'Read'))
+          if (s.readV2) {
+            row.appendChild(
+              oliviaButton(s.letter, 'read-v2', 'Read v2 (no lead pause)'),
+            )
+          }
+          // v1 hint, then v2 hint beside it if this clip got a v2.
           row.appendChild(oliviaButton(s.letter, 'hint', 'Hint'))
+          if (s.hintV2) {
+            row.appendChild(
+              oliviaButton(s.letter, 'hint-v2', 'Hint v2 (no pause)'),
+            )
+          }
           host.appendChild(row)
         })
       }
