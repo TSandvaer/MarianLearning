@@ -113,22 +113,25 @@
       one click apart so you can compare directly.
     </p>
 
-    <!-- British voice candidates (diagnostic A/B). Static MP3 clips rendered
-         by scripts/renderVoiceCandidates.ts — independent of the canon below.
-         Neutral labels (Voice 1..4); the actual Azure voice name is NOT shown,
-         so the ear-test is unbiased. Placed first so Thomas hears it first. -->
-    <div class="group" id="voice-candidates">
-      <h2>British voice candidates — which voice should Emma have?</h2>
+    <!-- Emma (Olivia) FINAL letter-sounds (diagnostic ear-confirm). Static
+         MP3s rendered by scripts/renderOliviaFinal.ts on en-GB-OliviaNeural
+         (Thomas's picked voice) using PLAIN-TEXT mnemonics (no <phoneme>, no
+         stress/length marks — those scratched on Olivia), keeping the 300ms
+         pre-sound break. For the riskiest sounds (M/S/H) a mark-free bare
+         <phoneme> variant is offered as a fallback. Independent of the canon
+         below; placed first. -->
+    <div class="group" id="olivia-final">
+      <h2>Emma (Olivia) — final letter-sounds</h2>
       <p class="desc">
-        Thomas wants Emma to have a <strong>British</strong> voice (a GB voice
-        says "o as in hot" naturally). Below are a few candidates. For each, tap
-        the clips and judge: does the <strong>short-O</strong> sound like a
-        clean "o as in HOT"? Does <strong>M</strong> hold ("mmmm")? And does the
-        <strong>character sample</strong> sound warm and right for Emma? Two
-        short-O takes per voice (a) and (b) — pick the voice whose short-O +
-        overall timbre you like best.
+        Emma's voice is now <strong>British (Olivia)</strong>. These play the 8
+        shipped sounds with <strong>plain-text</strong> mnemonics (no phoneme
+        markup — that caused the scratch), keeping the short pause before the
+        sound. For each: does <strong>read</strong> + <strong>hint</strong>
+        sound clean (no scratch) AND correct (M held "mmmm", H an audible
+        breath, O a clean "o as in hot")? M / S / H also have a "fallback" pair
+        — only check those if the plain version of that sound is unclear.
       </p>
-      <div id="voice-rows"></div>
+      <div id="olivia-rows"></div>
     </div>
 
     <div id="status">Loading canon…</div>
@@ -142,22 +145,19 @@
       // identically on a local `vite preview` build and on the deployed origin.
       var CANON_URL = 'canon/word-song/level-1/letter-sounds.json'
 
-      // ── British voice candidates (diagnostic A/B) ──────────────────────
-      // Static MP3s under public/voice-candidates/, played by direct URL
-      // (relative to this page's origin). Neutral labels only — no Azure
-      // voice name shown, unbiased ear-test. Each voice has 5 clips.
-      var VOICE_CANDIDATES = [
-        { id: 'v1', label: 'Voice 1' },
-        { id: 'v2', label: 'Voice 2' },
-        { id: 'v3', label: 'Voice 3' },
-        { id: 'v4', label: 'Voice 4' },
-      ]
-      var VOICE_CLIPS = [
-        { slot: 'short-o-plain', label: 'Short-O (a) — "says o?"' },
-        { slot: 'short-o-ipa', label: 'Short-O (b) — "says o?"' },
-        { slot: 'm', label: 'M — "says mmm?"' },
-        { slot: 'short-a', label: 'Short-A — "says aaa?"' },
-        { slot: 'sample', label: 'Emma sample sentence' },
+      // ── Emma (Olivia) final letter-sounds (diagnostic ear-confirm) ─────
+      // Static MP3s under public/olivia-final/, played by direct URL
+      // (relative to this page's origin). Plain-text mnemonics on
+      // en-GB-OliviaNeural; M/S/H also have a mark-free bare-<phoneme>
+      // fallback pair. File naming: <LETTER>-<read|hint>-<plain|bare>.mp3
+      var OLIVIA_SOUNDS = [
+        { letter: 'M', hint: 'should hold "mmmm"', risky: true },
+        { letter: 'S', hint: 'should hold "ssss"', risky: true },
+        { letter: 'H', hint: 'audible breath "hhh"', risky: true },
+        { letter: 'A', hint: 'short a (as in cat)', risky: false },
+        { letter: 'T', hint: 'stop /t/ (as in top)', risky: false },
+        { letter: 'O', hint: 'short o (as in hot)', risky: false },
+        { letter: 'L', hint: 'should hold "llll"', risky: false },
       ]
 
       function playUrl(url, btn, slotEl, restoreText) {
@@ -179,39 +179,56 @@
           })
       }
 
-      function renderVoiceCandidates() {
-        var host = document.getElementById('voice-rows')
+      function oliviaButton(letter, slot, variant, faceLabel) {
+        var btn = document.createElement('button')
+        btn.className = 'play'
+        btn.type = 'button'
+        var slotEl = document.createElement('span')
+        slotEl.className = 'slot'
+        var restoreText = '▶ ' + faceLabel
+        slotEl.textContent = restoreText
+        btn.appendChild(slotEl)
+        var url = 'olivia-final/' + letter + '-' + slot + '-' + variant + '.mp3'
+        btn.addEventListener('click', function () {
+          playUrl(url, btn, slotEl, restoreText)
+        })
+        return btn
+      }
+
+      function renderOliviaFinal() {
+        var host = document.getElementById('olivia-rows')
         if (!host) return
-        VOICE_CANDIDATES.forEach(function (v) {
+        OLIVIA_SOUNDS.forEach(function (s) {
           var row = document.createElement('div')
           row.className = 'row'
           var labelEl = document.createElement('div')
           labelEl.className = 'label'
           var letterSpan = document.createElement('span')
           letterSpan.className = 'letter'
-          letterSpan.textContent = v.label
+          letterSpan.textContent = s.letter
+          var hintWord = document.createElement('span')
+          hintWord.className = 'hintword'
+          hintWord.textContent = s.hint
           labelEl.appendChild(letterSpan)
+          labelEl.appendChild(hintWord)
           row.appendChild(labelEl)
 
-          VOICE_CLIPS.forEach(function (clip) {
-            var btn = document.createElement('button')
-            btn.className = 'play'
-            btn.type = 'button'
-            var slotEl = document.createElement('span')
-            slotEl.className = 'slot'
-            var restoreText = '▶ ' + clip.label
-            slotEl.textContent = restoreText
-            btn.appendChild(slotEl)
-            var url = 'voice-candidates/' + v.id + '-' + clip.slot + '.mp3'
-            btn.addEventListener('click', function () {
-              playUrl(url, btn, slotEl, restoreText)
-            })
-            row.appendChild(btn)
-          })
+          // Lead: plain-text read + hint.
+          row.appendChild(oliviaButton(s.letter, 'read', 'plain', 'Read'))
+          row.appendChild(oliviaButton(s.letter, 'hint', 'plain', 'Hint'))
+          // Fallback (M/S/H only): mark-free bare <phoneme>.
+          if (s.risky) {
+            row.appendChild(
+              oliviaButton(s.letter, 'read', 'bare', 'Read (fallback)'),
+            )
+            row.appendChild(
+              oliviaButton(s.letter, 'hint', 'bare', 'Hint (fallback)'),
+            )
+          }
           host.appendChild(row)
         })
       }
-      renderVoiceCandidates()
+      renderOliviaFinal()
 
       // Three suspected-defect buckets (sponsor instruction). A letter is
       // classified by membership; anything we can't classify falls into
