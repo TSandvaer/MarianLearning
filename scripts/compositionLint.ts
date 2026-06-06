@@ -4011,10 +4011,14 @@ export const LETTER_SOUNDS_BASE_POOL: readonly LetterSoundsPoolFact[] = [
     letter: 'g',
     category: 'mastered-consonant',
   },
-  // Mastered vowel /æ/ — the anchor.
+  // Mastered vowel /æ/ — the anchor. Mnemonic is the TRIPLET `aaa`
+  // (post-remediation 2026-06-06): vowel mnemonics are triplets so the
+  // canon's letter-name glyph (A/O) never collides with the mnemonic
+  // sound key at render-time phoneme-wrap (the double-wrap fix). The
+  // read-line parser captures `aaa` from "Which letter says aaa?".
   {
     id: 'sound-a',
-    mnemonic: 'a',
+    mnemonic: 'aaa',
     ipa: 'æ',
     letter: 'a',
     category: 'mastered-vowel',
@@ -4030,30 +4034,36 @@ export const LETTER_SOUNDS_BASE_POOL: readonly LetterSoundsPoolFact[] = [
  */
 export const LETTER_SOUNDS_CURRENT_TARGET_VOWELS: readonly LetterSoundsPoolFact[] =
   [
+    // Vowel mnemonics are TRIPLETS (post-remediation 2026-06-06) — the
+    // read-line parser captures `ooo`/`uuu`/`iii`/`eee` from
+    // "Which letter says <triplet>?". `ipa` is documentary (the
+    // adjacency ban below keys on `id`, not `ipa`); short-o ships as
+    // the rounded /ɔ/ at render time (the US voice flattens /ɒ/ to
+    // "ahh"), reflected here for accuracy.
     {
       id: 'sound-o',
-      mnemonic: 'o',
-      ipa: 'ɒ',
+      mnemonic: 'ooo',
+      ipa: 'ɔ',
       letter: 'o',
       category: 'current-target-vowel',
     },
     {
       id: 'sound-u',
-      mnemonic: 'u',
+      mnemonic: 'uuu',
       ipa: 'ʌ',
       letter: 'u',
       category: 'current-target-vowel',
     },
     {
       id: 'sound-i',
-      mnemonic: 'i',
+      mnemonic: 'iii',
       ipa: 'ɪ',
       letter: 'i',
       category: 'current-target-vowel',
     },
     {
       id: 'sound-e',
-      mnemonic: 'e',
+      mnemonic: 'eee',
       ipa: 'ɛ',
       letter: 'e',
       category: 'current-target-vowel',

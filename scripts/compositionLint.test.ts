@@ -7598,9 +7598,9 @@ describe('parseLetterSoundsReadLine', () => {
     })
   })
 
-  it('parses the bare vowel mnemonic "o"', () => {
-    expect(parseLetterSoundsReadLine('Which letter says o?')).toEqual({
-      mnemonic: 'o',
+  it('parses the triplet vowel mnemonic "ooo" (post-remediation — vowels are triplets)', () => {
+    expect(parseLetterSoundsReadLine('Which letter says ooo?')).toEqual({
+      mnemonic: 'ooo',
     })
   })
 
@@ -7627,11 +7627,11 @@ describe('lintLetterSoundsComposition — clean fixture passes (2 /ɒ/ + 1 /æ/ 
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
-      'o',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     expect(violations).toEqual([])
@@ -7644,11 +7644,11 @@ describe('lintLetterSoundsComposition — clean fixture passes (2 /ɒ/ + 1 /æ/ 
       'mmm',
       'hhh',
       'nnn',
-      'a',
-      'o',
+      'aaa',
+      'ooo',
       'buh',
-      'o',
-      'o',
+      'ooo',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     expect(violations).toEqual([])
@@ -7661,11 +7661,11 @@ describe('lintLetterSoundsComposition — clean fixture passes (2 /ɒ/ + 1 /æ/ 
       'mmm',
       'mmm',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
-      'o',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const dupViolations = violations.filter(
@@ -7682,11 +7682,11 @@ describe('lintLetterSoundsComposition — clean fixture passes (2 /ɒ/ + 1 /æ/ 
       'mmm',
       'hhh',
       'nnn',
-      'a',
-      'o',
-      'o',
-      'o',
-      'o',
+      'aaa',
+      'ooo',
+      'ooo',
+      'ooo',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const ruleKinds = new Set(violations.map((v: { rule: string }) => v.rule))
@@ -7701,9 +7701,9 @@ describe('lintLetterSoundsComposition — pool-membership rule', () => {
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
       'zzz', // 'zzz' off-pool
     ])
@@ -7721,11 +7721,11 @@ describe('lintLetterSoundsComposition — pool-membership rule', () => {
       'mmm',
       'ay',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
-      'o',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const poolViolations = violations.filter(
@@ -7743,9 +7743,9 @@ describe('lintLetterSoundsComposition — category-cap rule (mastered-consonant 
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
       'sss',
     ])
@@ -7764,11 +7764,11 @@ describe('lintLetterSoundsComposition — category-cap rule (mastered-consonant 
       'mmm',
       'hhh',
       'nnn',
-      'a',
-      'o',
-      'o',
-      'o',
-      'o',
+      'aaa',
+      'ooo',
+      'ooo',
+      'ooo',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const capViolations = violations.filter(
@@ -7789,11 +7789,11 @@ describe('lintLetterSoundsComposition — category-cap rule (mastered-consonant 
       'mmm',
       'hhh',
       'nnn',
-      'a',
-      'o',
-      'o',
-      'o',
-      'o',
+      'aaa',
+      'ooo',
+      'ooo',
+      'ooo',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const capViolations = violations.filter(
@@ -7811,9 +7811,9 @@ describe('lintLetterSoundsComposition — category-cap rule (mastered-consonant 
       'nnn',
       'sss',
       'buh',
-      'o',
+      'ooo',
       'guh',
-      'o',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const capViolations = violations.filter(
@@ -7828,12 +7828,12 @@ describe('lintLetterSoundsComposition — band-by-slot rule (gentle-ramp P1-P3 m
   it('fires when P1 carries a vowel target (gentle ramp must be mastered-consonant)', () => {
     // P1 carries 'o' (current-target vowel) — illegal in gentle ramp.
     const session = buildLetterSoundsCanonResponse([
-      'o',
+      'ooo',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
       'sss',
     ])
@@ -7850,13 +7850,13 @@ describe('lintLetterSoundsComposition — band-by-slot rule (gentle-ramp P1-P3 m
     // P2 carries 'a' (mastered vowel) — illegal in gentle ramp.
     const session = buildLetterSoundsCanonResponse([
       'mmm',
-      'a',
+      'aaa',
       'nnn',
       'sss',
       'buh',
-      'o',
+      'ooo',
       'guh',
-      'o',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const bandViolations = violations.filter(
@@ -7873,11 +7873,11 @@ describe('lintLetterSoundsComposition — band-by-slot rule (gentle-ramp P1-P3 m
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
-      'o',
+      'ooo',
     ])
     const violations = lintLetterSoundsComposition(session)
     const bandViolations = violations.filter(
@@ -7894,11 +7894,11 @@ describe('lintLetterSoundsComposition — adjacent-vowel-ban rule (/ɪ/-/ɛ/ aco
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'i',
+      'iii',
       'guh',
-      'e',
+      'eee',
     ])
     const violations = lintLetterSoundsComposition(session)
     const banViolations = violations.filter(
@@ -7915,11 +7915,11 @@ describe('lintLetterSoundsComposition — adjacent-vowel-ban rule (/ɪ/-/ɛ/ aco
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'i',
+      'iii',
       'guh',
-      'i',
+      'iii',
     ])
     const violations = lintLetterSoundsComposition(session)
     const banViolations = violations.filter(
@@ -7933,11 +7933,11 @@ describe('lintLetterSoundsComposition — adjacent-vowel-ban rule (/ɪ/-/ɛ/ aco
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'e',
+      'eee',
       'guh',
-      'e',
+      'eee',
     ])
     const violations = lintLetterSoundsComposition(session)
     const banViolations = violations.filter(
@@ -7957,11 +7957,11 @@ describe('lintLetterSoundsComposition — unparseable-problem rule', () => {
         rawLetterSoundsReadUtterance(1, 'Tap the cat.'), // wrong template
         readLetterSoundsUtterance(2, 'hhh'),
         readLetterSoundsUtterance(3, 'nnn'),
-        readLetterSoundsUtterance(4, 'a'),
+        readLetterSoundsUtterance(4, 'aaa'),
         readLetterSoundsUtterance(5, 'buh'),
-        readLetterSoundsUtterance(6, 'o'),
+        readLetterSoundsUtterance(6, 'ooo'),
         readLetterSoundsUtterance(7, 'guh'),
-        readLetterSoundsUtterance(8, 'o'),
+        readLetterSoundsUtterance(8, 'ooo'),
       ],
     }
     const violations = lintLetterSoundsComposition(session)
@@ -7980,7 +7980,7 @@ describe('assertLetterSoundsCompositionClean (bake-time integration point)', () 
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
       'sss',
       'guh',
@@ -7996,11 +7996,11 @@ describe('assertLetterSoundsCompositionClean (bake-time integration point)', () 
       'mmm',
       'hhh',
       'nnn',
-      'a',
+      'aaa',
       'buh',
-      'o',
+      'ooo',
       'guh',
-      'o',
+      'ooo',
     ])
     expect(() =>
       assertLetterSoundsCompositionClean('word-song/letter-sounds', session),
