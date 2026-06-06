@@ -150,6 +150,26 @@ const V3_CLIPS: ReadonlyArray<{
   { letter: 'H', slot: 'hint' },
 ]
 
+// ── v4 variant (Thomas A/B round 4) — S/H hint ONLY ────────────────────
+// Final residual: the S/H HINT has an onset artifact in BOTH v1
+// ("Listen. sss." → the /n/ of "Listen" bleeds in: "nh-sss") AND v3
+// (standalone "sss." → cold-start transient). The sound is correct; the
+// lead-in is wrong. The READ is perfect for S/H — there the fricative is
+// preceded by "say(s)" (/z/) which flows cleanly into the voiceless
+// fricative. v4 mirrors that: a "It says" lead-in so /z/ glides into the
+// fricative and kills the onset. Declarative, bare phoneme, no question-
+// prosody. No leading break — the "says" lead-in is the onset fix, not a
+// pause.
+function hintInnerV4(mnemonic: string, ipa: string): string {
+  return `It says ${phoneme(mnemonic, ipa)}.`
+}
+
+/** v4 applies to the S and H HINT only. */
+const V4_CLIPS: ReadonlyArray<{ letter: string; slot: 'hint' }> = [
+  { letter: 'S', slot: 'hint' },
+  { letter: 'H', slot: 'hint' },
+]
+
 async function main(): Promise<void> {
   const { key } = readAzureCredentials()
   const region = process.env.AZURE_SPEECH_REGION!
@@ -183,7 +203,8 @@ async function main(): Promise<void> {
       skipIfExists: true,
     })
   }
-  // v3 clips — the 6 problem clips, always (re)rendered.
+  // v3 clips — keep byte-identical (already on disk + ear-tested). Skip
+  // if present so this run only renders the new v4 variants.
   for (const c of V3_CLIPS) {
     const s = byLetter.get(c.letter)
     if (!s) throw new Error(`V3_CLIPS references unknown letter ${c.letter}`)
@@ -198,6 +219,17 @@ async function main(): Promise<void> {
         c.slot === 'read'
           ? `${s.letter} read v3 (declarative, leading break)`
           : `${s.letter} hint v3 (no "Listen.")`,
+      skipIfExists: true,
+    })
+  }
+  // v4 clips — S/H hint only, always (re)rendered.
+  for (const c of V4_CLIPS) {
+    const s = byLetter.get(c.letter)
+    if (!s) throw new Error(`V4_CLIPS references unknown letter ${c.letter}`)
+    jobs.push({
+      file: `${s.letter}-${c.slot}-v4.mp3`,
+      ssml: envelope(hintInnerV4(s.mnemonic, s.ipa)),
+      desc: `${s.letter} hint v4 ("It says" flow-in)`,
       skipIfExists: false,
     })
   }

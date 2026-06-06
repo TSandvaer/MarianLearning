@@ -118,15 +118,13 @@
     <div class="group" id="olivia-final">
       <h2>Emma (Olivia) letter-sounds — read &amp; hint</h2>
       <p class="desc">
-        For each sound, tap <strong>Read</strong> ("Which letter says …?") and
-        <strong>Hint</strong> ("Listen. …"). All 7 are CORRECT; we're chasing
-        residual scratch/onset artifacts. Six clips have a
-        <strong>v3</strong> button beside the original — A/B them and tell me
-        which is cleaner per clip: <em>Read v3 (statement)</em> on M / A / O / L
-        (makes the read a statement so the question pitch can't creak the voiced
-        sound), and <em>Hint v3 (no Listen)</em> on S / H (drops the "Listen."
-        lead-in that caused the breath intake). T and the unmarked clips are
-        already perfect (v1 only).
+        LOCKED so far: M / A / O / L use <em>Read v3 (statement)</em> + Hint v1;
+        S / H use Read v1 + (hint TBD); T is v1 both. The ONLY open question is
+        the <strong>S / H hint</strong>: both Hint v1 and Hint v3 have an onset
+        artifact (S "nh-sss", H a "drum beat"). Try <em>Hint v4 (flows in)</em>
+        — "It says sss." — the "says" lead-in should glide into the fricative
+        cleanly (same as the perfect S/H read). If Hint v4 is clean for both,
+        we're done.
       </p>
       <div id="olivia-rows"></div>
     </div>
@@ -151,8 +149,18 @@
       //  the reads ran together and the hint fix was the wrong lever.)
       var OLIVIA_SOUNDS = [
         { letter: 'M', hint: 'held "mmmm" (as in mom)', readV3: true },
-        { letter: 'S', hint: 'held "ssss" (as in sun)', hintV3: true },
-        { letter: 'H', hint: 'audible breath "hhh" (as in hat)', hintV3: true },
+        {
+          letter: 'S',
+          hint: 'held "ssss" (as in sun)',
+          hintV3: true,
+          hintV4: true,
+        },
+        {
+          letter: 'H',
+          hint: 'audible breath "hhh" (as in hat)',
+          hintV3: true,
+          hintV4: true,
+        },
         { letter: 'A', hint: 'short a (as in cat)', readV3: true },
         { letter: 'T', hint: 'stop /t/ (as in top)' },
         { letter: 'O', hint: 'short o (as in hot)', readV3: true },
@@ -222,12 +230,17 @@
               oliviaButton(s.letter, 'read-v3', 'Read v3 (statement)'),
             )
           }
-          // v1 hint, then v3 hint (no "Listen.") beside it if this clip
-          // got one (S/H).
+          // v1 hint, then v3 hint (no "Listen.") and v4 hint ("It says"
+          // flow-in) beside it if this clip got them (S/H).
           row.appendChild(oliviaButton(s.letter, 'hint', 'Hint'))
           if (s.hintV3) {
             row.appendChild(
               oliviaButton(s.letter, 'hint-v3', 'Hint v3 (no Listen)'),
+            )
+          }
+          if (s.hintV4) {
+            row.appendChild(
+              oliviaButton(s.letter, 'hint-v4', 'Hint v4 (flows in)'),
             )
           }
           host.appendChild(row)
