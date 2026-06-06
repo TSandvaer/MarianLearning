@@ -107,40 +107,45 @@ function hintInner(mnemonic: string, ipa: string): string {
   return `Listen. ${BREAK}${phoneme(mnemonic, ipa)}.`
 }
 
-// ── v2 variants (Thomas A/B refinement round 2) ────────────────────────
-// v1 had a LEADING 300ms break. Thomas heard residual artifacts that
-// smell like that break:
-//   - reads SCRATCHY on M, O, L (L "very scratchy"); A has "a missound
-//     before the aaa". (S, H, T reads are perfect.)
-//   - hints have "a little sound before" the phoneme on S and H (an
-//     intake/onset). (M, A, O, L, T hints are perfect.)
-// v2 hypotheses:
-//   - reads: NO leading break; instead a 200ms break AFTER the phoneme,
-//     before the "?" — lets the voiced M/O/L resolve without the clipped/
-//     scratchy tail and removes the leading-break glitch.
-//   - hints: NO break at all — "Listen." + period already separates; the
-//     break is what produced the "sound before".
-const BREAK_200 = '<break time="200ms"/>'
+// ── v2 variants (Thomas A/B round 2) — REJECTED ────────────────────────
+// v2 reads (no lead break, trailing 200ms) RAN TOGETHER ("SaysM/SaysA/…")
+// — the leading break IS needed. v2 hints (no break) didn't fix the S/H
+// onset (the "sink" was the "Listen." lead-in, not the break). v2 is
+// abandoned; the 4 read-v2 clips are removed. See v3 below.
 
-/** v2 read: no leading break; trailing 200ms break before the "?". */
-function readInnerV2(mnemonic: string, ipa: string): string {
-  return `Which letter says ${phoneme(mnemonic, ipa)}${BREAK_200}?`
+// ── v3 variants (Thomas A/B round 3) ───────────────────────────────────
+// Refined diagnosis:
+//   - The read SCRATCH hits ONLY voiced M/A/O/L; their HINTS (declarative)
+//     are perfect. Reads are QUESTIONS → the question-final intonation
+//     creaks the voiced held sounds. Voiceless reads (S/H/T) are perfect.
+//     v3 read = make the read DECLARATIVE (end "." not "?"), keep the
+//     leading 300ms break (v2 proved it's needed), bare phoneme, rate -10%.
+//   - S/H reads are perfect; their HINTS have a breath "sink" before the
+//     fricative — present in hint v1 AND v2, so it's the "Listen." lead-in,
+//     NOT the break. v3 hint = drop "Listen." (standalone phoneme).
+// T = perfect both (untouched). M/A/O/L hints perfect (untouched). S/H
+// reads perfect (untouched).
+
+/** v3 read: DECLARATIVE — leading 300ms break + bare phoneme + "." (no
+ *  "?", no question-prosody). For the voiced sounds M/A/O/L. */
+function readInnerV3(mnemonic: string, ipa: string): string {
+  return `Which letter says ${BREAK}${phoneme(mnemonic, ipa)}.`
 }
-/** v2 hint: no break at all. */
-function hintInnerV2(mnemonic: string, ipa: string): string {
-  return `Listen. ${phoneme(mnemonic, ipa)}.`
+/** v3 hint: NO "Listen." lead-in — standalone phoneme as its own
+ *  utterance. For the fricatives S/H. */
+function hintInnerV3(mnemonic: string, ipa: string): string {
+  return `${phoneme(mnemonic, ipa)}.`
 }
 
-/** The 6 problem clips that get a v2 variant. `slot` + `letter` map to the
- *  SOUNDS entry; `kind` selects the v2 builder. */
-const V2_CLIPS: ReadonlyArray<{
+/** The 6 problem clips that get a v3 variant. */
+const V3_CLIPS: ReadonlyArray<{
   letter: string
   slot: 'read' | 'hint'
 }> = [
   { letter: 'M', slot: 'read' },
+  { letter: 'A', slot: 'read' },
   { letter: 'O', slot: 'read' },
   { letter: 'L', slot: 'read' },
-  { letter: 'A', slot: 'read' },
   { letter: 'S', slot: 'hint' },
   { letter: 'H', slot: 'hint' },
 ]
@@ -178,21 +183,21 @@ async function main(): Promise<void> {
       skipIfExists: true,
     })
   }
-  // v2 clips — the 6 problem clips, always (re)rendered.
-  for (const c of V2_CLIPS) {
+  // v3 clips — the 6 problem clips, always (re)rendered.
+  for (const c of V3_CLIPS) {
     const s = byLetter.get(c.letter)
-    if (!s) throw new Error(`V2_CLIPS references unknown letter ${c.letter}`)
+    if (!s) throw new Error(`V3_CLIPS references unknown letter ${c.letter}`)
     const inner =
       c.slot === 'read'
-        ? readInnerV2(s.mnemonic, s.ipa)
-        : hintInnerV2(s.mnemonic, s.ipa)
+        ? readInnerV3(s.mnemonic, s.ipa)
+        : hintInnerV3(s.mnemonic, s.ipa)
     jobs.push({
-      file: `${s.letter}-${c.slot}-v2.mp3`,
+      file: `${s.letter}-${c.slot}-v3.mp3`,
       ssml: envelope(inner),
       desc:
         c.slot === 'read'
-          ? `${s.letter} read v2 (no lead break; trailing 200ms)`
-          : `${s.letter} hint v2 (no break)`,
+          ? `${s.letter} read v3 (declarative, leading break)`
+          : `${s.letter} hint v3 (no "Listen.")`,
       skipIfExists: false,
     })
   }
