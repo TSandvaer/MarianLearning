@@ -150,24 +150,34 @@ const V3_CLIPS: ReadonlyArray<{
   { letter: 'H', slot: 'hint' },
 ]
 
-// ── v4 variant (Thomas A/B round 4) — S/H hint ONLY ────────────────────
-// Final residual: the S/H HINT has an onset artifact in BOTH v1
-// ("Listen. sss." → the /n/ of "Listen" bleeds in: "nh-sss") AND v3
-// (standalone "sss." → cold-start transient). The sound is correct; the
-// lead-in is wrong. The READ is perfect for S/H — there the fricative is
-// preceded by "say(s)" (/z/) which flows cleanly into the voiceless
-// fricative. v4 mirrors that: a "It says" lead-in so /z/ glides into the
-// fricative and kills the onset. Declarative, bare phoneme, no question-
-// prosody. No leading break — the "says" lead-in is the onset fix, not a
-// pause.
-function hintInnerV4(mnemonic: string, ipa: string): string {
-  return `It says ${phoneme(mnemonic, ipa)}.`
+// ── v4 variant (Thomas A/B round 4) — S/H hint — FAILED ────────────────
+// v4 = "It says <phoneme>sss</phoneme>." with NO leading break. The
+// utterance-final fricative after "says" got SWALLOWED (rendered as just
+// "It says", fricative inaudible). The "says" lead-in alone wasn't enough.
+// Removed — superseded by v5/v6 which restore the 300ms break.
+
+// ── v5 / v6 variants (Thomas A/B round 5) — S/H hint ONLY ──────────────
+// The PERFECT S/H READ is "Which letter says <break 300ms> sss?" — it
+// keeps BOTH the 300ms break AND ends in "?". The break + the question
+// terminal are what keep the fricative pronounced as its own audible
+// unit. v4 dropped the break and the fricative vanished. v5/v6 restore the
+// break after "It says":
+//   v5 = break + STATEMENT ("." terminal)
+//   v6 = break + QUESTION  ("?" terminal — mirrors the proven-audible read)
+// Both: bare phoneme, no question-prosody wrapper. If v5's "." still
+// swallows the fricative, v6's "?" is the fallback (matches the read that
+// is known-audible).
+function hintInnerV5(mnemonic: string, ipa: string): string {
+  return `It says ${BREAK}${phoneme(mnemonic, ipa)}.`
+}
+function hintInnerV6(mnemonic: string, ipa: string): string {
+  return `It says ${BREAK}${phoneme(mnemonic, ipa)}?`
 }
 
-/** v4 applies to the S and H HINT only. */
-const V4_CLIPS: ReadonlyArray<{ letter: string; slot: 'hint' }> = [
-  { letter: 'S', slot: 'hint' },
-  { letter: 'H', slot: 'hint' },
+/** v5 + v6 apply to the S and H HINT only. */
+const V56_CLIPS: ReadonlyArray<{ letter: string }> = [
+  { letter: 'S' },
+  { letter: 'H' },
 ]
 
 async function main(): Promise<void> {
@@ -222,14 +232,20 @@ async function main(): Promise<void> {
       skipIfExists: true,
     })
   }
-  // v4 clips — S/H hint only, always (re)rendered.
-  for (const c of V4_CLIPS) {
+  // v5 + v6 clips — S/H hint only, always (re)rendered.
+  for (const c of V56_CLIPS) {
     const s = byLetter.get(c.letter)
-    if (!s) throw new Error(`V4_CLIPS references unknown letter ${c.letter}`)
+    if (!s) throw new Error(`V56_CLIPS references unknown letter ${c.letter}`)
     jobs.push({
-      file: `${s.letter}-${c.slot}-v4.mp3`,
-      ssml: envelope(hintInnerV4(s.mnemonic, s.ipa)),
-      desc: `${s.letter} hint v4 ("It says" flow-in)`,
+      file: `${s.letter}-hint-v5.mp3`,
+      ssml: envelope(hintInnerV5(s.mnemonic, s.ipa)),
+      desc: `${s.letter} hint v5 ("It says" + break, statement)`,
+      skipIfExists: false,
+    })
+    jobs.push({
+      file: `${s.letter}-hint-v6.mp3`,
+      ssml: envelope(hintInnerV6(s.mnemonic, s.ipa)),
+      desc: `${s.letter} hint v6 ("It says" + break, question)`,
       skipIfExists: false,
     })
   }

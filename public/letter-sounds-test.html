@@ -118,13 +118,14 @@
     <div class="group" id="olivia-final">
       <h2>Emma (Olivia) letter-sounds — read &amp; hint</h2>
       <p class="desc">
-        LOCKED so far: M / A / O / L use <em>Read v3 (statement)</em> + Hint v1;
-        S / H use Read v1 + (hint TBD); T is v1 both. The ONLY open question is
-        the <strong>S / H hint</strong>: both Hint v1 and Hint v3 have an onset
-        artifact (S "nh-sss", H a "drum beat"). Try <em>Hint v4 (flows in)</em>
-        — "It says sss." — the "says" lead-in should glide into the fricative
-        cleanly (same as the perfect S/H read). If Hint v4 is clean for both,
-        we're done.
+        LOCKED: M / A / O / L use <em>Read v3 (statement)</em> + Hint v1; S / H
+        use Read v1; T is v1 both. The ONLY open question is the
+        <strong>S / H hint</strong>. v4 ("It says sss." with no break) swallowed
+        the fricative, so it's gone. Try <em>Hint v5 (says, statement)</em> =
+        "It says &lt;pause&gt; sss." and <em>Hint v6 (says, question)</em> = "It
+        says &lt;pause&gt; sss?" — both restore the 300ms pause that keeps the
+        fricative audible (v6 also ends in "?", mirroring the proven-audible S/H
+        read). Pick whichever makes the S/H sound clean AND fully audible.
       </p>
       <div id="olivia-rows"></div>
     </div>
@@ -153,13 +154,15 @@
           letter: 'S',
           hint: 'held "ssss" (as in sun)',
           hintV3: true,
-          hintV4: true,
+          hintV5: true,
+          hintV6: true,
         },
         {
           letter: 'H',
           hint: 'audible breath "hhh" (as in hat)',
           hintV3: true,
-          hintV4: true,
+          hintV5: true,
+          hintV6: true,
         },
         { letter: 'A', hint: 'short a (as in cat)', readV3: true },
         { letter: 'T', hint: 'stop /t/ (as in top)' },
@@ -230,17 +233,23 @@
               oliviaButton(s.letter, 'read-v3', 'Read v3 (statement)'),
             )
           }
-          // v1 hint, then v3 hint (no "Listen.") and v4 hint ("It says"
-          // flow-in) beside it if this clip got them (S/H).
+          // S/H hint candidates beside v1: v3 (no "Listen."), v5 ("It says"
+          // + break, statement), v6 ("It says" + break, question). v4 was
+          // dropped — it swallowed the fricative (no break).
           row.appendChild(oliviaButton(s.letter, 'hint', 'Hint'))
           if (s.hintV3) {
             row.appendChild(
               oliviaButton(s.letter, 'hint-v3', 'Hint v3 (no Listen)'),
             )
           }
-          if (s.hintV4) {
+          if (s.hintV5) {
             row.appendChild(
-              oliviaButton(s.letter, 'hint-v4', 'Hint v4 (flows in)'),
+              oliviaButton(s.letter, 'hint-v5', 'Hint v5 (says, statement)'),
+            )
+          }
+          if (s.hintV6) {
+            row.appendChild(
+              oliviaButton(s.letter, 'hint-v6', 'Hint v6 (says, question)'),
             )
           }
           host.appendChild(row)
