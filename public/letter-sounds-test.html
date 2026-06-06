@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Letter-sounds audition (QA only)</title>
+    <style>
+      /* Deliberately minimal — clarity over polish. QA-only tooling. */
+      :root {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        color: #1d2230;
+        background: #fbfaf7;
+        line-height: 1.4;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin: 0 0 4px;
+      }
+      .sub {
+        color: #5a6072;
+        font-size: 0.95rem;
+        margin: 0 0 20px;
+      }
+      .group {
+        margin: 0 0 28px;
+      }
+      .group h2 {
+        font-size: 1.1rem;
+        margin: 0 0 2px;
+        border-bottom: 2px solid #d9d3c6;
+        padding-bottom: 6px;
+      }
+      .group .desc {
+        color: #5a6072;
+        font-size: 0.9rem;
+        margin: 4px 0 12px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 0;
+        border-bottom: 1px solid #ece7dd;
+      }
+      .label {
+        flex: 1 1 240px;
+        min-width: 240px;
+        font-size: 1.05rem;
+      }
+      .label .letter {
+        font-weight: 700;
+        font-size: 1.25rem;
+      }
+      .label .hintword {
+        color: #5a6072;
+        font-size: 0.95rem;
+        display: block;
+      }
+      button.play {
+        font-size: 1.05rem;
+        padding: 14px 18px;
+        min-width: 150px;
+        min-height: 56px;
+        border: 2px solid #2f6db0;
+        border-radius: 12px;
+        background: #eaf2fb;
+        color: #18395f;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button.play:active {
+        background: #d3e4f7;
+      }
+      button.play .slot {
+        display: block;
+        font-size: 0.78rem;
+        color: #5a6072;
+        font-weight: 400;
+      }
+      button.play .utext {
+        display: block;
+        font-style: italic;
+        font-size: 0.85rem;
+      }
+      .err {
+        color: #b00020;
+        font-weight: 600;
+      }
+      .meta {
+        color: #8a8f9c;
+        font-size: 0.8rem;
+        margin-top: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Letter-sounds audition</h1>
+    <p class="sub">
+      QA-only tooling — not linked from the app. Plays each utterance from the
+      shipped <code>letter-sounds</code> canon on demand so you can ear-test the
+      isolated-phoneme TTS. For each sound, the <strong>read</strong> line (with
+      the "Which letter says…?" question prosody) sits next to the
+      <strong>hint</strong> line (the bare sound, no question wrapper) — they're
+      one click apart so you can compare directly.
+    </p>
+
+    <div id="status">Loading canon…</div>
+    <div id="groups"></div>
+
+    <p class="meta" id="meta"></p>
+
+    <script>
+      // Served path of the committed letter-sounds canon. Relative to this
+      // file's location (public/ is the site root on Vercel), so this resolves
+      // identically on a local `vite preview` build and on the deployed origin.
+      var CANON_URL = 'canon/word-song/level-1/letter-sounds.json'
+
+      // Three suspected-defect buckets (sponsor instruction). A letter is
+      // classified by membership; anything we can't classify falls into
+      // "Other" so a future canon re-bake with new letters still renders.
+      var GROUPS = [
+        {
+          id: 'continuant',
+          title: 'Continuants (should be HELD)',
+          desc: 'These should sound sustained ("mmmmm"). Suspected bug: they play as one short clip instead of being held.',
+          letters: ['M', 'N', 'S', 'F', 'V', 'L', 'R', 'H'],
+        },
+        {
+          id: 'stop',
+          title: 'Stop consonants (short by nature)',
+          desc: 'Short by nature. Suspected clipped / unclear in isolation.',
+          letters: ['P', 'B', 'T', 'D', 'K', 'G'],
+        },
+        {
+          id: 'vowel',
+          title: 'Short vowels',
+          desc: 'Suspected blurry — /i/ vs /e/ especially. Compare them back to back.',
+          letters: ['A', 'O', 'U', 'I', 'E'],
+        },
+        {
+          id: 'other',
+          title: 'Other / unclassified',
+          desc: 'Sounds present in the canon that do not fall into the buckets above.',
+          letters: [],
+        },
+      ]
+
+      // Plain-language "should sound like" hints, keyed by letter.
+      var HINT_WORDS = {
+        M: 'should sound like "mmmm" (as in mom)',
+        N: 'should sound like "nnnn" (as in net)',
+        S: 'should sound like "ssss" (as in sun)',
+        F: 'should sound like "ffff" (as in fan)',
+        V: 'should sound like "vvvv" (as in van)',
+        L: 'should sound like "llll" (as in log)',
+        R: 'should sound like "rrrr" (as in red)',
+        H: 'should sound like "hhh" breath (as in hat)',
+        P: 'stop sound /p/ (as in pin)',
+        B: 'stop sound /b/ (as in bat)',
+        T: 'stop sound /t/ (as in top)',
+        D: 'stop sound /d/ (as in dog)',
+        K: 'stop sound /k/ (as in cat)',
+        G: 'stop sound /g/ (as in goat)',
+        A: 'short a (as in cat)',
+        O: 'short o (as in hot)',
+        U: 'short u (as in cup)',
+        I: 'short i (as in sit)',
+        E: 'short e (as in bed)',
+      }
+
+      function groupForLetter(letter) {
+        for (var i = 0; i < GROUPS.length; i++) {
+          if (GROUPS[i].letters.indexOf(letter) !== -1) return GROUPS[i].id
+        }
+        return 'other'
+      }
+
+      // Derive the taught letter from the `correct` slot text:
+      // "Yes! M says mmm." -> "M". Falls back to null if no match.
+      function deriveLetter(correctText) {
+        if (!correctText) return null
+        var m = correctText.match(/Yes!\s+([A-Za-z]+)\s+says/i)
+        return m ? m[1].toUpperCase() : null
+      }
+
+      // base64 -> Blob, then play via a fresh <audio> element.
+      function playInline(audio, btn) {
+        try {
+          var b64 = audio.base64
+          var mime = audio.mime || 'audio/mpeg'
+          var bin = atob(b64)
+          var len = bin.length
+          var bytes = new Uint8Array(len)
+          for (var i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i)
+          var blob = new Blob([bytes], { type: mime })
+          var url = URL.createObjectURL(blob)
+          var el = new Audio(url)
+          el.addEventListener('ended', function () {
+            URL.revokeObjectURL(url)
+          })
+          el.play().catch(function (e) {
+            btn.classList.add('err')
+            btn.firstChild &&
+              (btn.querySelector('.slot').textContent =
+                'PLAY FAILED: ' + e.message)
+          })
+        } catch (e) {
+          btn.classList.add('err')
+          var slot = btn.querySelector('.slot')
+          if (slot) slot.textContent = 'DECODE FAILED: ' + e.message
+        }
+      }
+
+      function makePlayButton(utter) {
+        var btn = document.createElement('button')
+        btn.className = 'play'
+        btn.type = 'button'
+        var slot = utter.id.split('.').pop() // read | hint | ...
+        var slotEl = document.createElement('span')
+        slotEl.className = 'slot'
+        slotEl.textContent = '▶ Play — ' + slot
+        var textEl = document.createElement('span')
+        textEl.className = 'utext'
+        textEl.textContent = '"' + utter.text + '"'
+        btn.appendChild(slotEl)
+        btn.appendChild(textEl)
+        if (
+          !utter.audio ||
+          utter.audio.kind !== 'inline' ||
+          !utter.audio.base64
+        ) {
+          btn.disabled = true
+          slotEl.textContent = '(no inline audio: ' + slot + ')'
+        } else {
+          btn.addEventListener('click', function () {
+            playInline(utter.audio, btn)
+          })
+        }
+        return btn
+      }
+
+      function render(canon) {
+        var utterances = canon.utterances || []
+        // Index by id for quick lookup of the audio payloads.
+        var byId = {}
+        utterances.forEach(function (u) {
+          byId[u.id] = u
+        })
+
+        // Discover problem indices present in the canon (word.pN.*).
+        var probIndices = []
+        utterances.forEach(function (u) {
+          var m = u.id.match(/^word\.p(\d+)\./)
+          if (m) {
+            var n = parseInt(m[1], 10)
+            if (probIndices.indexOf(n) === -1) probIndices.push(n)
+          }
+        })
+        probIndices.sort(function (a, b) {
+          return a - b
+        })
+
+        // Build a row descriptor per problem: letter + read + hint utterances.
+        var rows = []
+        probIndices.forEach(function (n) {
+          var read = byId['word.p' + n + '.read']
+          var hint = byId['word.p' + n + '.hint']
+          var correct = byId['word.p' + n + '.correct']
+          var letter = deriveLetter(correct && correct.text)
+          rows.push({
+            problem: n,
+            letter: letter,
+            group: letter ? groupForLetter(letter) : 'other',
+            read: read,
+            hint: hint,
+          })
+        })
+
+        // Render groups in fixed order; only show groups that have rows.
+        var container = document.getElementById('groups')
+        container.innerHTML = ''
+        var totalRendered = 0
+        GROUPS.forEach(function (g) {
+          var groupRows = rows.filter(function (r) {
+            return r.group === g.id
+          })
+          if (groupRows.length === 0) return
+          var section = document.createElement('div')
+          section.className = 'group'
+          var h2 = document.createElement('h2')
+          h2.textContent = g.title
+          var desc = document.createElement('p')
+          desc.className = 'desc'
+          desc.textContent = g.desc
+          section.appendChild(h2)
+          section.appendChild(desc)
+
+          groupRows.forEach(function (r) {
+            var row = document.createElement('div')
+            row.className = 'row'
+            var label = document.createElement('div')
+            label.className = 'label'
+            var letterSpan = document.createElement('span')
+            letterSpan.className = 'letter'
+            letterSpan.textContent = r.letter
+              ? r.letter
+              : 'problem ' + r.problem
+            var hintWord = document.createElement('span')
+            hintWord.className = 'hintword'
+            hintWord.textContent =
+              r.letter && HINT_WORDS[r.letter] ? HINT_WORDS[r.letter] : ''
+            label.appendChild(letterSpan)
+            label.appendChild(hintWord)
+            row.appendChild(label)
+            if (r.read) row.appendChild(makePlayButton(r.read))
+            if (r.hint) row.appendChild(makePlayButton(r.hint))
+            section.appendChild(row)
+            totalRendered++
+          })
+          container.appendChild(section)
+        })
+
+        document.getElementById('status').textContent = ''
+        document.getElementById('meta').textContent =
+          'Canon: ' +
+          CANON_URL +
+          ' — plan "' +
+          (canon.plan && canon.plan.id ? canon.plan.id : '?') +
+          '" — ' +
+          rows.length +
+          ' sounds, ' +
+          totalRendered +
+          ' rows rendered.'
+      }
+
+      fetch(CANON_URL)
+        .then(function (res) {
+          if (!res.ok)
+            throw new Error('HTTP ' + res.status + ' fetching ' + CANON_URL)
+          return res.json()
+        })
+        .then(render)
+        .catch(function (e) {
+          document.getElementById('status').innerHTML =
+            '<span class="err">Failed to load canon: ' + e.message + '</span>'
+        })
+    </script>
+  </body>
+</html>
