@@ -4097,14 +4097,23 @@ export const LETTER_SOUNDS_RULES: LetterSoundsRulesConfig = {
 
 /**
  * Parse a letter-sounds read-line into the target sound mnemonic.
- * Template: `"Which letter says <MNEMONIC>?"`. Returns `null` on
- * malformed text; the caller fires `unparseable-problem`.
+ * Template: `"Which letter says <MNEMONIC><TERM>"` where <TERM> is
+ * either `?` (VOICELESS sound — question intonation) or `.` (VOICED
+ * sound — declarative intonation). The sound-class-dependent terminal
+ * punctuation was introduced in the British-voice rollout (2026-06-06):
+ * en-GB-OliviaNeural renders an isolated voiced phoneme cleanly with
+ * declarative falling intonation, while a voiceless phoneme rides the
+ * rising question intonation so it does not vanish. The lint accepts
+ * BOTH terminals here; the per-class punctuation correctness is a
+ * directive self-check + ear-test concern (consistent with composition
+ * rules being bake-time/self-check, not canon-lint-enforced). Returns
+ * `null` on malformed text; the caller fires `unparseable-problem`.
  *
  * The regex is case-insensitive on the "Which letter says" framing
  * but the captured mnemonic is normalised to lowercase for lookup.
  * Mnemonics in PHONEME_OVERRIDES are lowercase.
  */
-const RE_LETTER_SOUNDS_READ = /^\s*which\s+letter\s+says\s+([a-z]+)\s*\?\s*$/i
+const RE_LETTER_SOUNDS_READ = /^\s*which\s+letter\s+says\s+([a-z]+)\s*[.?]\s*$/i
 
 export function parseLetterSoundsReadLine(
   text: string,
@@ -4172,7 +4181,7 @@ export function lintLetterSoundsComposition(
         problemIndex: row.index,
         message:
           `P${row.index} read-line "${row.text}" does not match the ` +
-          `"Which letter says <SOUND-MNEMONIC>?" letter-sounds template.`,
+          `"Which letter says <SOUND-MNEMONIC>." / "...?" letter-sounds template.`,
         factId: null,
       })
       continue

@@ -101,7 +101,7 @@ if (!AZURE_KEY && !DRY_RUN) {
 
 // ── Voice + line config (duplicated; see header) ────────────────────────
 
-const VOICE = 'en-US-EmmaMultilingualNeural'
+const VOICE = 'en-GB-OliviaNeural'
 const RATE = '-10%'
 const PITCH = '+0Hz'
 const VOLUME = '+0%'

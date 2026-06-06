@@ -7614,6 +7614,20 @@ describe('parseLetterSoundsReadLine', () => {
       mnemonic: 'mmm',
     })
   })
+
+  it('parses the DECLARATIVE (voiced-sound) form ending in "." (British-voice rollout, 2026-06-06)', () => {
+    // Voiced sounds (nasals, liquids, voiced fricatives, vowels, voiced
+    // stops) carry declarative falling intonation → read ends with ".".
+    expect(parseLetterSoundsReadLine('Which letter says mmm.')).toEqual({
+      mnemonic: 'mmm',
+    })
+    expect(parseLetterSoundsReadLine('Which letter says o.')).toEqual({
+      mnemonic: 'o',
+    })
+    expect(parseLetterSoundsReadLine('Which letter says buh.')).toEqual({
+      mnemonic: 'buh',
+    })
+  })
 })
 
 describe('lintLetterSoundsComposition — clean fixture passes (2 /ɒ/ + 1 /æ/ + 5 mastered-consonants)', () => {

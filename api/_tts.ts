@@ -347,6 +347,7 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
 export function applyPhonemeOverrides(
   text: string,
   tierFilter?: string,
+  prependBreakMs?: number,
 ): string {
   // Build the alternation pattern from ACTIVE entries: every entry
   // whose `tiers` is undefined (global) OR includes the supplied
@@ -362,6 +363,17 @@ export function applyPhonemeOverrides(
     .map(([key]) => key)
   if (activeKeys.length === 0) return escapeSsml(text)
   const pattern = new RegExp(`\\b(${activeKeys.join('|')})\\b`, 'gi')
+
+  // Optional `<break time="Nms"/>` injected immediately BEFORE each
+  // phoneme wrap (en-GB-OliviaNeural letter-sounds path — British
+  // voice rollout). The break gives Olivia a clean prosodic reset so
+  // the isolated phoneme is not swallowed by the carrier phrase
+  // ("Which letter says …"). prependBreakMs is undefined for every
+  // non-letter-sounds caller, so this is a no-op for math/CVC/greet.
+  const breakTag =
+    prependBreakMs !== undefined && prependBreakMs > 0
+      ? `<break time="${prependBreakMs}ms"/>`
+      : ''
 
   // Walk the string emitting alternating escaped-plain and
   // phoneme-wrapped segments. We can't use replaceAll because plain
@@ -382,7 +394,7 @@ export function applyPhonemeOverrides(
     const original = m[0]
     const entry = PHONEME_OVERRIDES[original.toLowerCase()]!
     out.push(
-      `<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`,
+      `${breakTag}<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`,
     )
     lastIndex = m.index + original.length
   }
@@ -438,6 +450,23 @@ export function applyPhonemeOverrides(
  *  are unchanged on the wire. The only utterances affected are those
  *  ending with `?` — that is the bug class. */
 export function renderSsmlInnerText(text: string, tierFilter?: string): string {
+  // Letter-sounds tier (British-voice rollout): the question-prosody
+  // wrapper (`<break/><prosody pitch="+8%" rate="-5%">`) is DELIBERATELY
+  // NOT applied here, even when the read line ends with `?`. Per the
+  // ear-test cycle, letter-sounds reads carry their intonation cue via
+  // the sound-class-dependent terminal punctuation already baked into
+  // the canon text (declarative for voiced sounds, question for
+  // voiceless), and en-GB-OliviaNeural renders that natively. Layering
+  // the +8% pitch / -5% rate question-prosody on top scratched the
+  // isolated phoneme. Instead, letter-sounds gets a 300ms `<break>`
+  // injected immediately before each mnemonic phoneme (inside
+  // applyPhonemeOverrides) for a clean prosodic reset. The
+  // question-prosody wrapper stays in force for EVERY OTHER tier
+  // (math "How many?", word-song reprompts, etc.) via the fall-through
+  // below.
+  if (tierFilter === 'letter-sounds') {
+    return applyPhonemeOverrides(text, tierFilter, 300)
+  }
   // Use the original text for boundary detection (we want to operate on
   // un-escaped characters). Trailing whitespace doesn't matter for the
   // ends-in-? check.

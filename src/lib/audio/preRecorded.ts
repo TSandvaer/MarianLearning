@@ -25,8 +25,8 @@
  * Voice provenance
  * ----------------
  * MP3s in `public/assets/audio/greet/` are re-rendered whenever the voice
- * config changes. Current voice (Phase 3a, ticket 86c9hjnq1, 2026-04-28):
- * `en-US-EmmaMultilingualNeural` at -10% rate via Azure Speech REST.
+ * config changes. Current voice (British-voice rollout, 2026-06-06):
+ * `en-GB-OliviaNeural` at -10% rate via Azure Speech REST.
  * Re-render via `node scripts/render-greet-mp3s.mjs` (the script reads
  * `.env.local` for AZURE_SPEECH_KEY / AZURE_SPEECH_REGION). Total asset
  * budget: ~56 KB across the 4 lines, well under the ticket's 200 KB
@@ -43,6 +43,11 @@
  *    the voice swap is part of the broader character pivot away from
  *    Sanrio IP rather than a prosody fix; the prosody win lands in
  *    Path A (Math hint utterances) which uses the same voice config.
+ *  - 2026-06-06 (British-voice rollout, Thomas directive): re-rendered
+ *    with `en-GB-OliviaNeural` at the same rate. The US Emma voice
+ *    mangled isolated short-vowel phonemes in the letter-sounds tier;
+ *    Olivia renders the short-vowel ladder cleanly. Same voice config
+ *    (`EMMA_VOICE_CONFIG` in `api/_session.ts`) drives Greet + Path A.
  */
 
 import { Howl } from 'howler'

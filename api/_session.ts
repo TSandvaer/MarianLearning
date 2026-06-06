@@ -50,12 +50,24 @@ import type { SessionStartResponse, Utterance } from './_types.js'
  * lands separately. Phase 3b (ticket 86c9jccp7, 2026-04-29) renames
  * this constant from `EMMA_VOICE_CONFIG` → `EMMA_VOICE_CONFIG` along
  * with the rest of the cascading symbol pass.
+ *
+ * - British-voice rollout (2026-06-06, Thomas directive): swap
+ *   `en-US-EmmaMultilingualNeural` → `en-GB-OliviaNeural`. The US
+ *   multilingual voice mangled isolated short-vowel phonemes
+ *   (notably "o as in hot" rendered as "ah"/"jar") in the letter-
+ *   sounds tier; a long ear-test cycle confirmed the en-GB female
+ *   neural voice Olivia renders the short-vowel ladder and isolated
+ *   consonant phonemes correctly, with a per-sound-class SSML
+ *   treatment for letter-sounds reads/hints (see api/_tts.ts
+ *   renderSsmlInnerText + the LETTER-SOUNDS UTTERANCE TEMPLATE in
+ *   api/_planner.ts). All canon + bundled Greet/Hub MP3s re-baked on
+ *   Olivia; CACHE_VERSION bumped to 4 to drop stale US-voice audio.
  */
 export const EMMA_VOICE_CONFIG: Pick<
   TtsRequest,
   'voice' | 'rate' | 'pitch' | 'volume'
 > = {
-  voice: 'en-US-EmmaMultilingualNeural',
+  voice: 'en-GB-OliviaNeural',
   rate: '-10%',
   pitch: '+0Hz',
   volume: '+0%',

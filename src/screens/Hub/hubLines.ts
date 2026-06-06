@@ -4,7 +4,7 @@
  * Source-of-truth: `design/screen-hub.md` § "Audio integration contract".
  * 9 anchor lines + 9 rotation variants + 2 node-tap = 20 MP3s total.
  *
- * Voice provenance: same `en-US-EmmaMultilingualNeural` rate `-10%` config
+ * Voice provenance: same `en-GB-OliviaNeural` rate `-10%` config
  * Greet uses (re-rendered via `scripts/render-greet-mp3s.mjs` once Kyle
  * authors the line text — ticket `86c9j53yx`).
  *

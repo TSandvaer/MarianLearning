@@ -511,6 +511,63 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
   })
 })
 
+describe('letter-sounds SSML treatment (British-voice rollout, 2026-06-06)', () => {
+  it('injects a 300ms break before each phoneme when prependBreakMs is set', () => {
+    const out = applyPhonemeOverrides(
+      'Which letter says mmm.',
+      'letter-sounds',
+      300,
+    )
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="m">mmm</phoneme>.',
+    )
+  })
+
+  it('does NOT inject a break for non-letter-sounds callers (back-compat)', () => {
+    // No prependBreakMs → no break, even when a global entry wraps.
+    expect(applyPhonemeOverrides('Hear four.', 'cvc-words')).toBe(
+      'Hear <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+    )
+    expect(applyPhonemeOverrides('Hear four.')).toBe(
+      'Hear <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+    )
+  })
+
+  it('does NOT apply the question-prosody wrapper to a VOICELESS letter-sounds read (ends with "?")', () => {
+    // "Which letter says sss?" is a voiceless-sound read — it ends with
+    // "?" but must NOT pick up the +8%/-5% question-prosody wrapper that
+    // math "How many?" gets. The intonation cue is the punctuation + the
+    // 300ms break only.
+    const out = renderSsmlInnerText('Which letter says sss?', 'letter-sounds')
+    expect(out).not.toContain('pitch="+8%"')
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="s">sss</phoneme>?',
+    )
+  })
+
+  it('handles a VOICED (declarative) letter-sounds read with the break + phoneme', () => {
+    const out = renderSsmlInnerText('Which letter says o.', 'letter-sounds')
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ɒ">o</phoneme>.',
+    )
+  })
+
+  it('handles the fricative hint "It says hhh?" without question prosody', () => {
+    const out = renderSsmlInnerText('It says hhh?', 'letter-sounds')
+    expect(out).not.toContain('pitch="+8%"')
+    expect(out).toBe(
+      'It says <break time="300ms"/><phoneme alphabet="ipa" ph="h">hhh</phoneme>?',
+    )
+  })
+
+  it('STILL applies question prosody to math reads (tierFilter undefined — unaffected by the letter-sounds scoping)', () => {
+    const out = renderSsmlInnerText('Three plus two. How many?')
+    expect(out).toBe(
+      'Three plus two. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
+    )
+  })
+})
+
 describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () => {
   const baseReq = {
     voice: 'en-US-EmmaMultilingualNeural',
