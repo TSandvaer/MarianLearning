@@ -1910,14 +1910,16 @@ chips on consonant-target problems, but MAY NEVER be the target sound
       /k/ [MASTERED-CONSONANT/voiceless-pair-k-g] → letter k, mnemonic kuh
       /g/ [MASTERED-CONSONANT/voiced-pair-k-g]    → letter g, mnemonic guh
   Mastered vowel (always in-pool — anchor):
-      /æ/ [MASTERED-VOWEL/short-a]                → letter a, mnemonic a
+      /æ/ [MASTERED-VOWEL/short-a]                → letter a, mnemonic aaa
   Current-target short vowel (EXACTLY ONE per session — the lift; pick
     per the user-message current-target-vowel=<IPA> hint or default to
-    /ɒ/ per VOWEL-LADDER SELF-CHECK below):
-      /ɒ/ [CURRENT-TARGET-VOWEL/short-o]          → letter o, mnemonic o
-      /ʌ/ [CURRENT-TARGET-VOWEL/short-u]          → letter u, mnemonic u
-      /ɪ/ [CURRENT-TARGET-VOWEL/short-i]          → letter i, mnemonic i
-      /ɛ/ [CURRENT-TARGET-VOWEL/short-e]          → letter e, mnemonic e
+    /ɒ/ per VOWEL-LADDER SELF-CHECK below). Mnemonics are TRIPLETS
+    (ooo/uuu/iii/eee), NOT bare letters — see the PHONEME→MNEMONIC
+    SUBSTITUTION TABLE below for why (double-wrap avoidance):
+      /ɒ/ [CURRENT-TARGET-VOWEL/short-o]          → letter o, mnemonic ooo
+      /ʌ/ [CURRENT-TARGET-VOWEL/short-u]          → letter u, mnemonic uuu
+      /ɪ/ [CURRENT-TARGET-VOWEL/short-i]          → letter i, mnemonic iii
+      /ɛ/ [CURRENT-TARGET-VOWEL/short-e]          → letter e, mnemonic eee
   Voiced/unvoiced trap pairs (within MASTERED-CONSONANT band — the
     pedagogically-grounded auditory confusion class per spec §3.1):
       p ↔ b   t ↔ d   k ↔ g   f ↔ v
@@ -2363,9 +2365,22 @@ Sound → mnemonic (the literal string to emit in utterance text):
     /p/ → puh     /b/ → buh     /t/ → tuh
     /d/ → duh     /k/ → kuh     /g/ → guh
   Mastered vowel:
-    /æ/ → a
+    /æ/ → aaa
   Current-target short vowels:
-    /ɒ/ → o       /ʌ/ → u       /ɪ/ → i       /ɛ/ → e
+    /ɒ/ → ooo     /ʌ/ → uuu     /ɪ/ → iii     /ɛ/ → eee
+
+VOWEL MNEMONICS ARE TRIPLETS — the vowel sounds emit a TRIPLET
+mnemonic (aaa, ooo, uuu, iii, eee), EXACTLY like the continuant
+consonants, NEVER a bare single letter (a, o, u, i, e). This is
+load-bearing for the render-time phoneme substitution: the canon's
+letter-NAME reference (the uppercase glyph O / A in the correct and
+giveAnswer slots) MUST NOT collide with the mnemonic SOUND key. With
+a bare-letter mnemonic, "Yes! O says o." would have its render-time
+<phoneme> wrap fire on BOTH the uppercase O (letter name) AND the
+lowercase o (sound) — destroying the letter-name beat. The triplet
+mnemonic ooo makes the glyph (O) and the sound key (ooo) distinct,
+so only the sound wraps. Write "Yes! O says ooo." NEVER "Yes! O says
+o.". Same for a→aaa, u→uuu, i→iii, e→eee.
 
 NEGATIVE ANCHOR — DO NOT spell out letter NAMES phonetically in
 utterance text. "em", "kyoo", "double-yoo", "see" are FORBIDDEN.
@@ -2386,11 +2401,11 @@ uppercase letter glyph for the target):
 
 - read: "Which letter says <SOUND-MNEMONIC>?"
     e.g. "Which letter says mmm?" (target letter: m)
-    e.g. "Which letter says o?"   (target letter: o, sound /ɒ/)
+    e.g. "Which letter says ooo?" (target letter: o, sound /ɒ/)
     e.g. "Which letter says buh?" (target letter: b, sound /b/)
 - correct: "Yes! <LETTER-UPPER> says <SOUND-MNEMONIC>."
     e.g. "Yes! M says mmm."
-    e.g. "Yes! O says o."
+    e.g. "Yes! O says ooo."
     e.g. "Yes! B says buh."
   The <LETTER-UPPER> in correct/giveAnswer is the UPPERCASE letter
   glyph (M, O, B) — read by Azure as the letter NAME ("em", "oh",
@@ -2404,13 +2419,13 @@ uppercase letter glyph for the target):
   word-song tier)
 - hint: "Listen. <SOUND-MNEMONIC>."
     e.g. "Listen. mmm."
-    e.g. "Listen. o."
+    e.g. "Listen. ooo."
     e.g. "Listen. buh."
   The hint slot voices ONLY the sound — gives Marian a clean
   second listen with no other framing.
 - giveAnswer: "This one is <LETTER-UPPER>. <LETTER-UPPER> says <SOUND-MNEMONIC>."
     e.g. "This one is M. M says mmm."
-    e.g. "This one is O. O says o."
+    e.g. "This one is O. O says ooo."
     e.g. "This one is B. B says buh."
 
 NO ARTICLE-LED FALLBACK for letter-sounds — the "Yes! That's a
@@ -2440,25 +2455,25 @@ verbatim copy — vary sound choices across re-bakes):
    P3: target /n/ → n  (MASTERED-CONSONANT, gentle ramp)
        read: "Which letter says nnn?"
        correct: "Yes! N says nnn."
-   P4: target /æ/ → a  (MASTERED-VOWEL anchor at mid-tier)
-       read: "Which letter says a?"
-       correct: "Yes! A says a."
+   P4: target /æ/ → aaa  (MASTERED-VOWEL anchor at mid-tier)
+       read: "Which letter says aaa?"
+       correct: "Yes! A says aaa."
    P5: target /b/ → b  (MASTERED-CONSONANT with voiced/unvoiced
                         trap; distractors include p, d)
        read: "Which letter says buh?"
        correct: "Yes! B says buh."
-   P6: target /ɒ/ → o  (CURRENT-TARGET vowel #1 — lift fires)
-       read: "Which letter says o?"
-       correct: "Yes! O says o."
+   P6: target /ɒ/ → ooo  (CURRENT-TARGET vowel #1 — lift fires)
+       read: "Which letter says ooo?"
+       correct: "Yes! O says ooo."
    P7: target /g/ → g  (MASTERED-CONSONANT, voiced/unvoiced trap
                         with k as distractor — gives the
                         trap window a non-vowel item between the
                         two /ɒ/ slots)
        read: "Which letter says guh?"
        correct: "Yes! G says guh."
-   P8: target /ɒ/ → o  (CURRENT-TARGET vowel #2 — at floor of 2)
-       read: "Which letter says o?"
-       correct: "Yes! O says o."
+   P8: target /ɒ/ → ooo  (CURRENT-TARGET vowel #2 — at floor of 2)
+       read: "Which letter says ooo?"
+       correct: "Yes! O says ooo."
 Counts: MASTERED-CONSONANT=6 (above floor of 4), MASTERED-VOWEL
 /æ/=1 (at floor), CURRENT-TARGET /ɒ/=2 (at floor of 2). P1-P3
 all mastered-consonant. P4 carries mastered vowel /æ/. P6 and P8
@@ -2522,7 +2537,8 @@ all other slots are content-mode-agnostic:
     - letter-sounds: "Which letter says <SOUND-MNEMONIC>?" e.g.
       "Which letter says mmm?" — see the LETTER-SOUNDS UTTERANCE
       TEMPLATE block above for the phoneme→mnemonic substitution
-      table (mmm, buh, o, a, etc.) and the no-inline-SSML rule.
+      table (mmm, buh, ooo, aaa, etc. — vowels are TRIPLETS) and the
+      no-inline-SSML rule.
     - blending-cv: "Tap the <word>." e.g. "Tap the cat."
     - cvc-words:   "Read the <word>." e.g. "Read the cat."
     - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."

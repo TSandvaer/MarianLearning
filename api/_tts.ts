@@ -270,36 +270,58 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   // in real English content).
   //
   // Continuant consonants (sustained articulation — mnemonic is a
-  // triplet so the visible word hints at sustained voicing):
-  mmm: { ipa: 'm', tiers: ['letter-sounds'] },
-  nnn: { ipa: 'n', tiers: ['letter-sounds'] },
-  sss: { ipa: 's', tiers: ['letter-sounds'] },
-  fff: { ipa: 'f', tiers: ['letter-sounds'] },
-  vvv: { ipa: 'v', tiers: ['letter-sounds'] },
-  lll: { ipa: 'l', tiers: ['letter-sounds'] },
-  rrr: { ipa: 'r', tiers: ['letter-sounds'] },
-  hhh: { ipa: 'h', tiers: ['letter-sounds'] },
+  // triplet so the visible word hints at sustained voicing). Each IPA
+  // carries a primary-stress mark `ˈ` (U+02C8) AND a length mark `ː`
+  // (U+02D0) so Azure (a) emphasises the isolated phoneme rather than
+  // swallowing it into the surrounding prose and (b) sustains the
+  // continuant audibly. Thomas's production ear-test (2026-06-06)
+  // reported continuants rendered too short (esp. /m/) — the length
+  // mark is the fix. `ph=` is interpolated raw (not escaped), so the
+  // non-ASCII IPA characters reach Azure intact (ticket — letter-sounds
+  // pronunciation remediation).
+  mmm: { ipa: 'ˈmː', tiers: ['letter-sounds'] },
+  nnn: { ipa: 'ˈnː', tiers: ['letter-sounds'] },
+  sss: { ipa: 'ˈsː', tiers: ['letter-sounds'] },
+  fff: { ipa: 'ˈfː', tiers: ['letter-sounds'] },
+  vvv: { ipa: 'ˈvː', tiers: ['letter-sounds'] },
+  lll: { ipa: 'ˈlː', tiers: ['letter-sounds'] },
+  rrr: { ipa: 'ˈrː', tiers: ['letter-sounds'] },
+  // H is special: /h/ is voiceless and near-inaudible in isolation —
+  // Thomas reported it as silent in production. A length mark on /h/
+  // does nothing (there is nothing to sustain). Adding a schwa `ə`
+  // gives the voiceless onset something to land on, making the breathy
+  // /h/ audible. NOT a length mark.
+  hhh: { ipa: 'ˈhə', tiers: ['letter-sounds'] },
   // Stop consonants (with schwa epenthesis tail — mnemonic captures
-  // the unavoidable vowel-leak when voicing a stop in isolation):
-  puh: { ipa: 'p', tiers: ['letter-sounds'] },
-  buh: { ipa: 'b', tiers: ['letter-sounds'] },
-  tuh: { ipa: 't', tiers: ['letter-sounds'] },
-  duh: { ipa: 'd', tiers: ['letter-sounds'] },
-  kuh: { ipa: 'k', tiers: ['letter-sounds'] },
-  guh: { ipa: 'ɡ', tiers: ['letter-sounds'] },
-  // Vowels — bare letter glyphs scoped to letter-sounds tier. Without
-  // `tiers`, the bare `a` / `o` / `u` / `i` / `e` would catch the
-  // article "a", the conjunction "o", and any single-letter
-  // appearances in CVC-tier read-lines ("Read the cat." → letter
-  // chip "c" / "a" / "t" inside a longer string would not match
-  // because the bare letter is inside a word, not bordered by `\b` —
-  // but `"Read the a."` style utterances DO exist on some tiers as
-  // letter-name examples, so tier-scoping is the right safety net).
-  a: { ipa: 'æ', tiers: ['letter-sounds'] },
-  o: { ipa: 'ɒ', tiers: ['letter-sounds'] },
-  u: { ipa: 'ʌ', tiers: ['letter-sounds'] },
-  i: { ipa: 'ɪ', tiers: ['letter-sounds'] },
-  e: { ipa: 'ɛ', tiers: ['letter-sounds'] },
+  // the unavoidable vowel-leak when voicing a stop in isolation). Stops
+  // are instantaneous so a length mark is meaningless; they carry the
+  // stress mark only, so Azure emphasises the burst.
+  puh: { ipa: 'ˈp', tiers: ['letter-sounds'] },
+  buh: { ipa: 'ˈb', tiers: ['letter-sounds'] },
+  tuh: { ipa: 'ˈt', tiers: ['letter-sounds'] },
+  duh: { ipa: 'ˈd', tiers: ['letter-sounds'] },
+  kuh: { ipa: 'ˈk', tiers: ['letter-sounds'] },
+  guh: { ipa: 'ˈɡ', tiers: ['letter-sounds'] },
+  // Vowels — TRIPLET mnemonic keys (aaa/ooo/uuu/iii/eee), NOT the bare
+  // single-letter glyphs. The triplet keys are load-bearing for the
+  // double-wrap fix: the canon's letter-name reference (e.g. `O` in
+  // "Yes! O says ooo.") must NOT collide with the mnemonic key. With
+  // bare keys (`o`) the case-insensitive `\b(o)\b` regex wrapped BOTH
+  // the uppercase letter-name `O` AND the lowercase mnemonic `o`,
+  // producing "/ɔ/ says /ɔ/" — the letter-name beat was destroyed.
+  // Triplet keys make the letter glyph (`O`) ≠ mnemonic key (`ooo`),
+  // so only the mnemonic wraps. The bare single-letter keys are
+  // DELETED (Option 1, per Dave's spec). Each IPA carries a primary-
+  // stress mark for emphasis.
+  //   /ɒ/ flattens to "ahh" on this US voice (Thomas's ear-test); use
+  //   the rounded open-o /ɔ/ instead — restores the rounding while
+  //   staying short-vowel-correct. NOT the diphthong /oʊ/, which is
+  //   the LETTER NAME "oh".
+  aaa: { ipa: 'ˈæ', tiers: ['letter-sounds'] },
+  ooo: { ipa: 'ˈɔ', tiers: ['letter-sounds'] },
+  uuu: { ipa: 'ˈʌ', tiers: ['letter-sounds'] },
+  iii: { ipa: 'ˈɪ', tiers: ['letter-sounds'] },
+  eee: { ipa: 'ˈɛ', tiers: ['letter-sounds'] },
 }
 
 /**
@@ -377,10 +399,36 @@ export function applyPhonemeOverrides(
       out.push(escapeSsml(text.slice(lastIndex, m.index)))
     }
     // Matched word: keep original casing inside the tag for log
-    // readability. The IPA string is ASCII-clean (no XML
-    // metacharacters) so no escaping needed on `ph=`.
+    // readability. The IPA string is ASCII-clean for `four` and
+    // non-ASCII (IPA stress/length marks) for the letter-sounds
+    // mnemonics; either way it is placed verbatim inside `ph=` (no
+    // escaping — `ph=` is interpolated raw and the values carry no XML
+    // metacharacters).
     const original = m[0]
     const entry = PHONEME_OVERRIDES[original.toLowerCase()]!
+    // Pre-phoneme pause (letter-sounds mnemonics ONLY). Thomas's
+    // production ear-test (2026-06-06) reported the sounds running into
+    // the preceding "says" / "Listen." with no gap ("saysssss" /
+    // "saysel"). A 300ms break immediately before the <phoneme> tag
+    // inserts a clean beat so Marian hears the framing word and the
+    // isolated phoneme as two distinct events.
+    //
+    // Gated on BOTH `tierFilter === 'letter-sounds'` AND the matched
+    // entry being tier-scoped to letter-sounds (i.e. NOT a global
+    // entry). This double-gate means:
+    //   - the math `four` override (global, `tiers === undefined`)
+    //     NEVER gets a break — even if it ever appeared on a
+    //     letter-sounds render — so math canon stays byte-identical
+    //     (no math re-bake);
+    //   - only the letter-sounds mnemonics (mmm, buh, ooo, …) get the
+    //     pause, which is exactly the run-on Thomas heard.
+    if (
+      tierFilter === 'letter-sounds' &&
+      entry.tiers !== undefined &&
+      entry.tiers.includes('letter-sounds')
+    ) {
+      out.push('<break time="300ms"/>')
+    }
     out.push(
       `<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`,
     )

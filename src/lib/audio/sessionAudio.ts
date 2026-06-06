@@ -165,8 +165,18 @@ export interface CreateSessionAudioOptions {
  *    Ana → Emma multilingual. The SSML strategy is unchanged, but the
  *    rendered audio bytes differ entirely (different voice timbre), so
  *    every cached row from v2 must be invalidated.
+ *  - v4 = letter-sounds pronunciation remediation (2026-06-06). The
+ *    letter-sounds tier SSML changed: phoneme IPA now carries stress +
+ *    length marks, /h/ gained a schwa, /ɒ/ moved /ɒ/→/ɔ/, vowel
+ *    mnemonics became triplets, and a 300ms pre-phoneme <break> is
+ *    inserted on letter-sounds renders. The cache key is sessionId-only
+ *    (does NOT fingerprint SSML), so returning users would otherwise
+ *    keep their stale pre-remediation MP3s — this bump drops every prior
+ *    store so the new audio is fetched. (Only letter-sounds canon bytes
+ *    changed, but the cache is per-session, not per-tier, so a global
+ *    bump is the correct invalidation.)
  */
-export const CACHE_VERSION = 3
+export const CACHE_VERSION = 4
 export const STORE_NAME = `session-audio-v${CACHE_VERSION}`
 export const DB_NAME = 'marian-tutor-session-audio'
 /** Tied to CACHE_VERSION so `onupgradeneeded` fires on any bump. The IDB

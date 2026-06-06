@@ -362,9 +362,12 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
 
   it('letter-sounds tier-scoped `mmm` mnemonic fires ONLY when tierFilter === "letter-sounds"', () => {
     const text = 'Which letter says mmm?'
-    // letter-sounds tier — fires.
+    // letter-sounds tier — fires. Post-remediation: stress mark `ˈ`
+    // (U+02C8) + length mark `ː` (U+02D0) so Azure sustains the
+    // continuant audibly. A 300ms pre-phoneme break is inserted on the
+    // letter-sounds tier (see dedicated break test below).
     const out = applyPhonemeOverrides(text, 'letter-sounds')
-    expect(out).toContain('<phoneme alphabet="ipa" ph="m">mmm</phoneme>')
+    expect(out).toContain('<phoneme alphabet="ipa" ph="ˈmː">mmm</phoneme>')
     // No tier — does NOT fire (tier-scoped entries require matching
     // tier).
     expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
@@ -375,30 +378,98 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
 
   it('letter-sounds tier-scoped `buh` stop-consonant mnemonic fires ONLY in letter-sounds', () => {
     const text = 'Which letter says buh?'
+    // Stops carry the stress mark only — no length mark (a stop burst
+    // is instantaneous; nothing to sustain).
     expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
-      '<phoneme alphabet="ipa" ph="b">buh</phoneme>',
+      '<phoneme alphabet="ipa" ph="ˈb">buh</phoneme>',
     )
     expect(applyPhonemeOverrides(text, 'cvc-words')).not.toContain('<phoneme')
     expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
   })
 
-  it('letter-sounds tier-scoped vowel mnemonics fire on /ɒ/ /ʌ/ /ɪ/ /ɛ/ /æ/ ONLY in letter-sounds', () => {
-    // Each vowel mnemonic stands alone in the utterance (matching the
-    // letter-sounds read template `"Which letter says <SOUND>?"`).
+  it('letter-sounds H mnemonic `hhh` uses a schwa (ˈhə), NOT a length mark — makes the voiceless /h/ audible', () => {
+    // Thomas's production ear-test reported H as silent. A length mark
+    // on /h/ does nothing (voiceless, nothing to sustain); the schwa
+    // gives the breathy onset something to land on.
+    const out = applyPhonemeOverrides('Which letter says hhh?', 'letter-sounds')
+    expect(out).toContain('<phoneme alphabet="ipa" ph="ˈhə">hhh</phoneme>')
+  })
+
+  it('letter-sounds vowel mnemonics are TRIPLETS and use stressed IPA; /ɒ/ moved to rounded /ɔ/', () => {
+    // Mnemonic keys are triplets (aaa/ooo/uuu/iii/eee), NOT bare
+    // letters — load-bearing for the double-wrap fix. IPA carries the
+    // stress mark; the short-o sound is the rounded open-o /ɔ/ (the US
+    // voice flattens /ɒ/ to "ahh"), NOT the diphthong /oʊ/.
     const cases: ReadonlyArray<[string, string]> = [
-      ['Which letter says a?', 'æ'],
-      ['Which letter says o?', 'ɒ'],
-      ['Which letter says u?', 'ʌ'],
-      ['Which letter says i?', 'ɪ'],
-      ['Which letter says e?', 'ɛ'],
+      ['Which letter says aaa?', 'ˈæ'],
+      ['Which letter says ooo?', 'ˈɔ'],
+      ['Which letter says uuu?', 'ˈʌ'],
+      ['Which letter says iii?', 'ˈɪ'],
+      ['Which letter says eee?', 'ˈɛ'],
     ]
     for (const [text, ipa] of cases) {
       expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
         `ph="${ipa}"`,
       )
-      // Without the tier filter, no wrap. The bare letter is preserved.
+      // Without the tier filter, no wrap. The triplet mnemonic is
+      // preserved verbatim.
       expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
     }
+  })
+
+  it('the bare single-letter vowel keys (a/o/u/i/e) are DELETED — they no longer wrap on letter-sounds', () => {
+    // Option 1 fix: bare-vowel keys were removed so the letter-name
+    // glyph can never collide with a mnemonic key. A bare `o` / `a` /
+    // etc. token on a letter-sounds render passes through plain.
+    for (const text of [
+      'Which letter says o?',
+      'Which letter says a?',
+      'Which letter says u?',
+      'Which letter says i?',
+      'Which letter says e?',
+    ]) {
+      expect(applyPhonemeOverrides(text, 'letter-sounds')).not.toContain(
+        '<phoneme',
+      )
+    }
+  })
+
+  it('inserts a 300ms pre-phoneme <break> on the letter-sounds tier, but NOT on the global `four` (math) tier', () => {
+    // Thomas's ear-test: sounds ran into the preceding "says"/"Listen."
+    // The break gives a clean beat before the isolated phoneme. Gated
+    // on tierFilter === 'letter-sounds' so the math `four` override
+    // stays break-free and math canon is byte-identical.
+    const ls = applyPhonemeOverrides('Which letter says mmm?', 'letter-sounds')
+    expect(ls).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ˈmː">mmm</phoneme>?',
+    )
+    // Global `four` on the math (no-tier) path — NO break.
+    const four = applyPhonemeOverrides('I want four apples.')
+    expect(four).not.toContain('<break')
+    expect(four).toBe(
+      'I want <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> apples.',
+    )
+    // `four` rendered with a non-letter-sounds tier — still NO break.
+    expect(
+      applyPhonemeOverrides('I want four apples.', 'cvc-words'),
+    ).not.toContain('<break')
+  })
+
+  it('the vowel `correct`-slot canon line "Yes! O says ooo." wraps ONLY the mnemonic, NOT the letter-name glyph (double-wrap fix)', () => {
+    // The remediation's central fix. The triplet mnemonic ooo ≠ the
+    // letter glyph O, so the case-insensitive regex wraps exactly one
+    // token (ooo) and leaves the letter-name `O` as plain prose for
+    // Azure to render as "oh". Pre-fix ("Yes! O says o.") the regex
+    // wrapped BOTH O and o.
+    const out = applyPhonemeOverrides('Yes! O says ooo.', 'letter-sounds')
+    const phonemeMatches = out.match(/<phoneme alphabet="ipa"/g) ?? []
+    expect(phonemeMatches).toHaveLength(1)
+    expect(out).toBe(
+      'Yes! O says <break time="300ms"/><phoneme alphabet="ipa" ph="ˈɔ">ooo</phoneme>.',
+    )
+    // The bare letter-name `O` survives outside any phoneme tag.
+    const stripped = out.replace(/<phoneme[^>]*>[^<]*<\/phoneme>/g, '')
+    expect(stripped).toContain('Yes! O says')
   })
 
   it('does NOT wrap letter `m` inside the word "math" on a cvc-words tier render (the load-bearing pollution test)', () => {
@@ -424,18 +495,15 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     )
   })
 
-  it('cvc-words tier render of "Read the dog." passes through plain (bare letter `o` only fires when wrapped in a letter-sounds utterance)', () => {
-    // The bare letter `o` IS a PHONEME_OVERRIDES key (tier-scoped to
-    // letter-sounds). On cvc-words, the tier-filter rejects the entry
-    // and "dog" is rendered as-is. The `\b` boundary would also
-    // protect against substring match (the `o` in "dog" is not on a
-    // word boundary), but tier-scoping is the primary guard.
+  it('cvc-words tier render of "Read the dog." passes through plain (no vowel-key collision post-remediation)', () => {
+    // Post-remediation the bare single-letter vowel keys are DELETED;
+    // only triplet keys (ooo/aaa/...) remain. So even a hypothetical
+    // bare `o` token would not wrap. On cvc-words the `o` inside "dog"
+    // is also substring-boundary-protected by `\b`. Either way "dog"
+    // renders as-is on both tiers.
     expect(applyPhonemeOverrides('Read the dog.', 'cvc-words')).toBe(
       'Read the dog.',
     )
-    // letter-sounds + "Read the dog." would NOT typically appear (the
-    // letter-sounds tier uses different read templates), but the bare
-    // `o` inside "dog" is still substring-boundary-protected by `\b`.
     expect(applyPhonemeOverrides('Read the dog.', 'letter-sounds')).toBe(
       'Read the dog.',
     )
@@ -467,7 +535,7 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     // contract — global entries do not exclude tier-scoped ones, and
     // vice versa.)
     const out = applyPhonemeOverrides('Hear mmm before four.', 'letter-sounds')
-    expect(out).toContain('<phoneme alphabet="ipa" ph="m">mmm</phoneme>')
+    expect(out).toContain('<phoneme alphabet="ipa" ph="ˈmː">mmm</phoneme>')
     expect(out).toContain('<phoneme alphabet="ipa" ph="fɔːr">four</phoneme>')
   })
 
@@ -485,7 +553,7 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
       tier: 'letter-sounds',
     })
     expect(letterSoundsBody).toContain(
-      '<phoneme alphabet="ipa" ph="m">mmm</phoneme>',
+      '<phoneme alphabet="ipa" ph="ˈmː">mmm</phoneme>',
     )
     // Same SSML build without tier: the mnemonic stays bare prose
     // (the SSML is XML-escape-clean and Azure voices it via lexicon).
