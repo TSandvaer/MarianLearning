@@ -4011,10 +4011,14 @@ export const LETTER_SOUNDS_BASE_POOL: readonly LetterSoundsPoolFact[] = [
     letter: 'g',
     category: 'mastered-consonant',
   },
-  // Mastered vowel /æ/ — the anchor.
+  // Mastered vowel /æ/ — the anchor. Mnemonic is a TRIPLET (not the
+  // bare vowel letter) so it never collides with the single-letter
+  // letter-NAME in the same utterance — see the vowel double-wrap fix
+  // in `api/_tts.ts` PHONEME_OVERRIDES + `src/screens/WordSong/
+  // letterSoundsPool.ts`.
   {
     id: 'sound-a',
-    mnemonic: 'a',
+    mnemonic: 'aaa',
     ipa: 'æ',
     letter: 'a',
     category: 'mastered-vowel',
@@ -4032,28 +4036,28 @@ export const LETTER_SOUNDS_CURRENT_TARGET_VOWELS: readonly LetterSoundsPoolFact[
   [
     {
       id: 'sound-o',
-      mnemonic: 'o',
+      mnemonic: 'ooo',
       ipa: 'ɒ',
       letter: 'o',
       category: 'current-target-vowel',
     },
     {
       id: 'sound-u',
-      mnemonic: 'u',
+      mnemonic: 'uuu',
       ipa: 'ʌ',
       letter: 'u',
       category: 'current-target-vowel',
     },
     {
       id: 'sound-i',
-      mnemonic: 'i',
+      mnemonic: 'iii',
       ipa: 'ɪ',
       letter: 'i',
       category: 'current-target-vowel',
     },
     {
       id: 'sound-e',
-      mnemonic: 'e',
+      mnemonic: 'eee',
       ipa: 'ɛ',
       letter: 'e',
       category: 'current-target-vowel',

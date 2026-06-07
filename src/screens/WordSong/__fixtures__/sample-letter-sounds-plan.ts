@@ -39,7 +39,8 @@
  * table + the live canon at `public/canon/word-song/level-1/letter-
  * sounds.json` shipped via PR #337):
  *
- *   mmm → M, sss → S, hhh → H, a → A, tuh → T, o → O, lll → L, buh → B
+ *   mmm → M, sss → S, hhh → H, aaa → A, tuh → T, ooo → O, lll → L, buh → B
+ *   (vowel mnemonics are TRIPLETS — the vowel double-wrap fix)
  */
 
 import type { ServerPlan } from '../planFromServer'
@@ -52,12 +53,15 @@ export const SAMPLE_LETTER_SOUNDS_PLAN: ServerPlan = {
     [
       // readTerm: '.' = VOICED (declarative), '?' = VOICELESS (question).
       // hint: 'It says X?' = FRICATIVE, 'Listen. X.' = non-fricative.
+      // Vowel mnemonics are TRIPLETS (aaa/ooo — vowel double-wrap fix):
+      // the triplet never equals the single-letter letter-NAME, so the
+      // correct/giveAnswer slots (which carry BOTH) don't double-wrap.
       { mnemonic: 'mmm', letter: 'M', readTerm: '.', hint: 'Listen. mmm.' },
       { mnemonic: 'sss', letter: 'S', readTerm: '?', hint: 'It says sss?' },
       { mnemonic: 'hhh', letter: 'H', readTerm: '?', hint: 'It says hhh?' },
-      { mnemonic: 'a', letter: 'A', readTerm: '.', hint: 'Listen. a.' },
+      { mnemonic: 'aaa', letter: 'A', readTerm: '.', hint: 'Listen. aaa.' },
       { mnemonic: 'tuh', letter: 'T', readTerm: '?', hint: 'Listen. tuh.' },
-      { mnemonic: 'o', letter: 'O', readTerm: '.', hint: 'Listen. o.' },
+      { mnemonic: 'ooo', letter: 'O', readTerm: '.', hint: 'Listen. ooo.' },
       { mnemonic: 'lll', letter: 'L', readTerm: '.', hint: 'Listen. lll.' },
       { mnemonic: 'buh', letter: 'B', readTerm: '.', hint: 'Listen. buh.' },
     ] as const

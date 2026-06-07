@@ -373,30 +373,34 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     expect(applyPhonemeOverrides(text, 'cvc-words')).not.toContain('<phoneme')
   })
 
-  it('letter-sounds tier-scoped `buh` stop-consonant mnemonic fires ONLY in letter-sounds', () => {
+  it('letter-sounds tier-scoped `buh` stop-consonant mnemonic fires ONLY in letter-sounds (voiced stop carries a schwa /bə/ for audible release)', () => {
     const text = 'Which letter says buh?'
+    // VOICED stops (b/d/g) carry a schwa /ə/ in the IPA so Olivia
+    // releases them audibly (a bare /b/ rendered near-silent — Thomas's
+    // "B-silent" report). Voiceless stops (p/t/k) stay bare.
     expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
-      '<phoneme alphabet="ipa" ph="b">buh</phoneme>',
+      '<phoneme alphabet="ipa" ph="bə">buh</phoneme>',
     )
     expect(applyPhonemeOverrides(text, 'cvc-words')).not.toContain('<phoneme')
     expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
   })
 
   it('letter-sounds tier-scoped vowel mnemonics fire on /ɒ/ /ʌ/ /ɪ/ /ɛ/ /æ/ ONLY in letter-sounds', () => {
-    // Each vowel mnemonic stands alone in the utterance (matching the
-    // letter-sounds read template `"Which letter says <SOUND>?"`).
+    // Vowel mnemonics are TRIPLETS (aaa/ooo/uuu/iii/eee) — the vowel
+    // double-wrap fix. A bare single-letter vowel mnemonic used to
+    // collide with the single-letter letter-NAME in the same utterance.
     const cases: ReadonlyArray<[string, string]> = [
-      ['Which letter says a?', 'æ'],
-      ['Which letter says o?', 'ɒ'],
-      ['Which letter says u?', 'ʌ'],
-      ['Which letter says i?', 'ɪ'],
-      ['Which letter says e?', 'ɛ'],
+      ['Which letter says aaa.', 'æ'],
+      ['Which letter says ooo.', 'ɒ'],
+      ['Which letter says uuu.', 'ʌ'],
+      ['Which letter says iii.', 'ɪ'],
+      ['Which letter says eee.', 'ɛ'],
     ]
     for (const [text, ipa] of cases) {
       expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
         `ph="${ipa}"`,
       )
-      // Without the tier filter, no wrap. The bare letter is preserved.
+      // Without the tier filter, no wrap. The bare triplet is preserved.
       expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
     }
   })
@@ -449,10 +453,10 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     const cases = [
       'Which letter says mmm?',
       'Which letter says buh?',
-      'Which letter says a?',
-      'Which letter says o?',
-      'Which letter says i?',
-      'Which letter says e?',
+      'Which letter says aaa.',
+      'Which letter says ooo.',
+      'Which letter says iii.',
+      'Which letter says eee.',
     ]
     for (const text of cases) {
       const out = applyPhonemeOverrides(text)
@@ -546,10 +550,34 @@ describe('letter-sounds SSML treatment (British-voice rollout, 2026-06-06)', () 
   })
 
   it('handles a VOICED (declarative) letter-sounds read with the break + phoneme', () => {
-    const out = renderSsmlInnerText('Which letter says o.', 'letter-sounds')
+    // Vowel mnemonic is a TRIPLET (ooo), not the bare letter (o) — the
+    // vowel double-wrap fix. Only the triplet is wrapped.
+    const out = renderSsmlInnerText('Which letter says ooo.', 'letter-sounds')
     expect(out).toBe(
-      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ɒ">o</phoneme>.',
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ɒ">ooo</phoneme>.',
     )
+  })
+
+  it('does NOT double-wrap a vowel correct line — only the triplet mnemonic is wrapped, the letter-NAME stays bare (vowel double-wrap regression guard)', () => {
+    // The bug: "Yes A says a." → both the letter-name "A" and the bare
+    // mnemonic "a" matched the case-insensitive override → both rendered
+    // /æ/ ("Yes ahh says ahh"). The NEW correct shape (Dave master spec)
+    // is "Yes. A. aaa." — letter-name its own sentence, "says" dropped.
+    // With the TRIPLET mnemonic the letter-name "A" is NOT a key, so it
+    // stays bare prose (Azure speaks "ay") and only "aaa" is wrapped /æ/.
+    const out = applyPhonemeOverrides('Yes. A. aaa.', 'letter-sounds')
+    // Exactly ONE phoneme wrap, and it surrounds the triplet — NOT the
+    // letter-name.
+    expect(out).toBe('Yes. A. <phoneme alphabet="ipa" ph="æ">aaa</phoneme>.')
+    // The standalone letter-name "A" is never wrapped.
+    expect(out).not.toContain('>A</phoneme>')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('mirrors the consonant case — a consonant correct line wraps only the mnemonic, never the letter-name', () => {
+    const out = applyPhonemeOverrides('Yes. M. mmm.', 'letter-sounds')
+    expect(out).toBe('Yes. M. <phoneme alphabet="ipa" ph="m">mmm</phoneme>.')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
   })
 
   it('handles the fricative hint "It says hhh?" without question prosody', () => {

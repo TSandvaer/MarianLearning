@@ -799,9 +799,14 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
     ]) {
       expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
     }
-    // 5 short-vowel mnemonics
-    for (const mnemonic of ['a', 'o', 'u', 'i', 'e']) {
+    // 5 short-vowel mnemonics — TRIPLETS (vowel double-wrap fix), NOT
+    // bare single letters.
+    for (const mnemonic of ['aaa', 'ooo', 'uuu', 'iii', 'eee']) {
       expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
+    }
+    // The bare single-letter vowel mnemonics are NO LONGER in the pool.
+    for (const bare of ['a', 'o', 'u', 'i', 'e']) {
+      expect(LETTER_SOUND_MNEMONIC_POOL.has(bare)).toBe(false)
     }
   })
 
@@ -885,7 +890,8 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
   it('target letter is UPPERCASE regardless of mnemonic case (canon correct-line convention)', () => {
     // Every entry in `LETTER_SOUND_MNEMONIC_TO_LETTER` value-side must
     // be uppercase — matches the canon's `correct` line shape
-    // (`"Yes! M says mmm."`). Locks against accidental lowercase drift.
+    // (`"Yes. M. mmm."` — Dave master spec). Locks against accidental
+    // lowercase drift.
     for (const letter of Object.values(LETTER_SOUND_MNEMONIC_TO_LETTER)) {
       expect(letter).toBe(letter.toUpperCase())
       expect(letter.length).toBe(1)
@@ -930,8 +936,9 @@ describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)',
     const plan = wordSongSessionPlanFromServer(SAMPLE_LETTER_SOUNDS_PLAN)
     // Terminals are sound-class-dependent (British-voice rollout):
     // /m/ + /æ/ are VOICED → declarative "."; /t/ is VOICELESS → "?".
+    // The /æ/ mnemonic is the TRIPLET "aaa" (vowel double-wrap fix).
     expect(plan.problems[0]!.utterances.read).toBe('Which letter says mmm.')
-    expect(plan.problems[3]!.utterances.read).toBe('Which letter says a.')
+    expect(plan.problems[3]!.utterances.read).toBe('Which letter says aaa.')
     expect(plan.problems[4]!.utterances.read).toBe('Which letter says tuh?')
   })
 
@@ -974,18 +981,19 @@ describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)',
  */
 describe('wordSongSessionPlanFromServer — live canon mnemonic sequence (PR #337)', () => {
   it('parses the exact mnemonic sequence from the live canon JSON', () => {
-    // The mnemonic + letter pairs the live canon ships (PR #337):
-    //   p1=mmm→M, p2=sss→S, p3=hhh→H, p4=a→A, p5=tuh→T,
-    //   p6=o→O,   p7=lll→L, p8=o→O
+    // The mnemonic + letter pairs the live canon ships. Vowels use the
+    // TRIPLET mnemonic (aaa/ooo — vowel double-wrap fix):
+    //   p1=mmm→M, p2=sss→S, p3=hhh→H, p4=aaa→A, p5=tuh→T,
+    //   p6=ooo→O, p7=lll→L, p8=ooo→O
     const liveCanonPairs = [
       { mnemonic: 'mmm', letter: 'M' },
       { mnemonic: 'sss', letter: 'S' },
       { mnemonic: 'hhh', letter: 'H' },
-      { mnemonic: 'a', letter: 'A' },
+      { mnemonic: 'aaa', letter: 'A' },
       { mnemonic: 'tuh', letter: 'T' },
-      { mnemonic: 'o', letter: 'O' },
+      { mnemonic: 'ooo', letter: 'O' },
       { mnemonic: 'lll', letter: 'L' },
-      { mnemonic: 'o', letter: 'O' },
+      { mnemonic: 'ooo', letter: 'O' },
     ]
     const wire = {
       id: 'live-canon-letter-sounds-001',
@@ -996,13 +1004,13 @@ describe('wordSongSessionPlanFromServer — live canon mnemonic sequence (PR #33
           { id: `word.p${n}.read`, text: `Which letter says ${mnemonic}?` },
           {
             id: `word.p${n}.correct`,
-            text: `Yes! ${letter} says ${mnemonic}.`,
+            text: `Yes. ${letter}. ${mnemonic}.`,
           },
           { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
           { id: `word.p${n}.hint`, text: `Listen. ${mnemonic}.` },
           {
             id: `word.p${n}.giveAnswer`,
-            text: `This one is ${letter}. ${letter} says ${mnemonic}.`,
+            text: `This one is ${letter}. ${mnemonic}.`,
           },
         ]
       }),
@@ -1075,12 +1083,13 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
     { mnemonic: 'puh', letter: 'P', readTerm: '?', hint: 'Listen. puh.' },
     { mnemonic: 'tuh', letter: 'T', readTerm: '?', hint: 'Listen. tuh.' },
     { mnemonic: 'kuh', letter: 'K', readTerm: '?', hint: 'Listen. kuh.' },
-    // Vowels (voiced, non-fricative)
-    { mnemonic: 'a', letter: 'A', readTerm: '.', hint: 'Listen. a.' },
-    { mnemonic: 'o', letter: 'O', readTerm: '.', hint: 'Listen. o.' },
-    { mnemonic: 'u', letter: 'U', readTerm: '.', hint: 'Listen. u.' },
-    { mnemonic: 'i', letter: 'I', readTerm: '.', hint: 'Listen. i.' },
-    { mnemonic: 'e', letter: 'E', readTerm: '.', hint: 'Listen. e.' },
+    // Vowels (voiced, non-fricative) — TRIPLET mnemonics (vowel
+    // double-wrap fix): the triplet never equals the single letter-name.
+    { mnemonic: 'aaa', letter: 'A', readTerm: '.', hint: 'Listen. aaa.' },
+    { mnemonic: 'ooo', letter: 'O', readTerm: '.', hint: 'Listen. ooo.' },
+    { mnemonic: 'uuu', letter: 'U', readTerm: '.', hint: 'Listen. uuu.' },
+    { mnemonic: 'iii', letter: 'I', readTerm: '.', hint: 'Listen. iii.' },
+    { mnemonic: 'eee', letter: 'E', readTerm: '.', hint: 'Listen. eee.' },
   ]
 
   it('parses the read line for EVERY sound class (declarative + question terminals)', () => {
@@ -1150,13 +1159,13 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
           },
           {
             id: `word.p${n}.correct`,
-            text: `Yes! ${letter} says ${mnemonic}.`,
+            text: `Yes. ${letter}. ${mnemonic}.`,
           },
           { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
           { id: `word.p${n}.hint`, text: hint },
           {
             id: `word.p${n}.giveAnswer`,
-            text: `This one is ${letter}. ${letter} says ${mnemonic}.`,
+            text: `This one is ${letter}. ${mnemonic}.`,
           },
         ]
       }),
@@ -1182,6 +1191,16 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
     // The hint shapes are preserved verbatim (audio plays by id).
     expect(plan.problems[0]!.utterances.hint).toBe('Listen. mmm.')
     expect(plan.problems[1]!.utterances.hint).toBe('It says sss?')
+    // P4 is the mastered vowel /æ/ — its mnemonic is the TRIPLET "aaa",
+    // so the correct line carries BOTH the bare letter-name "A" AND the
+    // triplet (which never collide at render time). This is the vowel
+    // double-wrap fix at the text level.
+    expect(plan.problems[3]!.target.word).toBe('A')
+    expect(plan.problems[3]!.utterances.read).toBe('Which letter says aaa.')
+    // NEW correct/giveAnswer shapes (Dave master spec): letter-name its
+    // own sentence, "says" dropped, no redundant second clause.
+    expect(plan.problems[3]!.utterances.correct).toBe('Yes. A. aaa.')
+    expect(plan.problems[3]!.utterances.giveAnswer).toBe('This one is A. aaa.')
   })
 })
 

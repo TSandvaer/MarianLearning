@@ -120,14 +120,26 @@ export const LETTER_SOUND_MNEMONIC_TO_LETTER: Readonly<Record<string, string>> =
     duh: 'D',
     kuh: 'K',
     guh: 'G',
-    // Short vowels — mnemonic is the bare vowel letter; SSML phoneme
-    // wrap forces the short pronunciation. Mastered vowel /æ/ + 4
-    // current-target vowels /ɒ/, /ʌ/, /ɪ/, /ɛ/.
-    a: 'A',
-    o: 'O',
-    u: 'U',
-    i: 'I',
-    e: 'E',
+    // Short vowels — mnemonic is a TRIPLET (NOT the bare vowel letter);
+    // SSML phoneme wrap forces the short pronunciation. Mastered vowel
+    // /æ/ + 4 current-target vowels /ɒ/, /ʌ/, /ɪ/, /ɛ/.
+    //
+    // Why triplets (the vowel double-wrap fix): the canon emits BOTH the
+    // mnemonic AND the letter-NAME in the correct/giveAnswer slots (e.g.
+    // "Yes A says aaa."). A bare single-letter vowel mnemonic would equal
+    // the single-letter name, so the render-time phoneme wrap (case-
+    // insensitive, word-bounded) matched BOTH → both rendered /æ/ ("Yes
+    // ahh says ahh"). The triplet aaa ≠ the letter-name A, so only the
+    // triplet is wrapped and the letter-name stays bare (spoken "ay").
+    // Consonants never collided (mmm ≠ M). Restores Dave's Option 1
+    // (triplet vowel mnemonics) lost when the British rollout branched
+    // from main. The read parser accepts triplets because its mnemonic
+    // capture is `[a-z]+`.
+    aaa: 'A',
+    ooo: 'O',
+    uuu: 'U',
+    iii: 'I',
+    eee: 'E',
   }
 
 /**

@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Letter-Sounds Audition — Olivia (en-GB)</title>
+    <style>
+      :root {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 1.25rem 1rem 4rem;
+        background: #faf7f2;
+        color: #2a2a2a;
+        max-width: 880px;
+        margin-inline: auto;
+      }
+      h1 {
+        font-size: 1.4rem;
+        margin: 0 0 0.25rem;
+      }
+      .sub {
+        color: #6b6b6b;
+        font-size: 0.92rem;
+        margin: 0 0 1rem;
+        line-height: 1.45;
+      }
+      .voice {
+        display: inline-block;
+        background: #1b5e20;
+        color: #fff;
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+      .status {
+        font-size: 0.85rem;
+        color: #8a6d3b;
+        background: #fcf8e3;
+        border: 1px solid #faebcc;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        margin: 0.5rem 0 1rem;
+      }
+      .status.ok {
+        color: #1b5e20;
+        background: #eaf3ea;
+        border-color: #cce4cc;
+      }
+      .status.err {
+        color: #a94442;
+        background: #f2dede;
+        border-color: #ebccd1;
+      }
+      .group {
+        margin: 0 0 1.5rem;
+      }
+      .group > h2 {
+        font-size: 1.05rem;
+        margin: 0 0 0.5rem;
+        padding-bottom: 0.25rem;
+        border-bottom: 2px solid #e6ddcf;
+      }
+      .group-note {
+        color: #6b6b6b;
+        font-size: 0.82rem;
+        margin: -0.35rem 0 0.6rem;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.55rem 0.6rem;
+        border: 1px solid #ece4d6;
+        border-radius: 10px;
+        background: #fff;
+        margin-bottom: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .letter {
+        font-size: 1.5rem;
+        font-weight: 700;
+        width: 2.2rem;
+        text-align: center;
+        color: #1b5e20;
+      }
+      .meta {
+        flex: 1 1 12rem;
+        min-width: 10rem;
+      }
+      .meta .label {
+        font-weight: 600;
+        font-size: 0.95rem;
+      }
+      .meta .like {
+        color: #6b6b6b;
+        font-size: 0.82rem;
+      }
+      .slots {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+      button.play {
+        appearance: none;
+        border: 1px solid #cdbfa6;
+        background: #f4ecdd;
+        color: #2a2a2a;
+        border-radius: 8px;
+        padding: 0.4rem 0.7rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        min-width: 6.5rem;
+        text-align: left;
+      }
+      button.play:hover {
+        background: #ece0c8;
+      }
+      button.play:active {
+        transform: translateY(1px);
+      }
+      button.play[disabled] {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      button.play .txt {
+        display: block;
+        font-weight: 400;
+        font-size: 0.72rem;
+        color: #6b6b6b;
+        margin-top: 0.1rem;
+      }
+      button.play.playing {
+        background: #1b5e20;
+        color: #fff;
+      }
+      button.play.playing .txt {
+        color: #d9ecd9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>
+      Letter-Sounds Audition <span class="voice">en-GB-OliviaNeural</span>
+    </h1>
+    <p class="sub">
+      Every clip below is decoded from the
+      <strong>real production canon</strong> (baked through the same Azure
+      render pipeline the app uses), not a hand-rendered sample. Each phoneme
+      class shows the letter, its &ldquo;should sound like&rdquo; label, and one
+      Play button per spoken slot (<em>Read / Hint / Correct / Give-answer</em
+      >). Listen for: the letter NAME spoken plainly in Correct/Give-answer
+      (&ldquo;Yes. O. ooo.&rdquo; — <em>not</em> &ldquo;Yes ahh ahh&rdquo;),
+      audible voiced stops (B/D/G), and the isolated short vowels.
+    </p>
+    <div id="status" class="status">Loading baked canon&hellip;</div>
+    <div id="groups"></div>
+
+    <script>
+      // ── Canon sources ─────────────────────────────────────────────────
+      const SHIPPED = '/canon/word-song/level-1/letter-sounds.json'
+      const AUDIT = '/canon/word-song/level-1/letter-sounds-audit.json'
+
+      // Slots we audition, in spoken order.
+      const SLOTS = [
+        { key: 'read', label: 'Read' },
+        { key: 'hint', label: 'Hint' },
+        { key: 'correct', label: 'Correct' },
+        { key: 'giveAnswer', label: 'Give-answer' },
+      ]
+
+      // Per-phoneme-class grouping + "should sound like" labels, keyed by the
+      // UPPERCASE letter the canon's correct line names.
+      const CLASS_OF = {
+        // letter: [groupId, "should sound like"]
+        M: ['nasal', 'mmm (as in mom)'],
+        N: ['nasal', 'nnn (as in net)'],
+        L: ['liquid', 'lll (as in lap)'],
+        R: ['liquid', 'rrr (as in run)'],
+        V: ['voiced-fric', 'vvv (as in van)'],
+        S: ['voiceless-fric', 'sss (as in sun)'],
+        F: ['voiceless-fric', 'fff (as in fan)'],
+        H: ['voiceless-fric', 'hhh (as in hat)'],
+        B: ['voiced-stop', 'buh (as in bat) — audible /b/'],
+        D: ['voiced-stop', 'duh (as in dog) — audible /d/'],
+        G: ['voiced-stop', 'guh (as in go) — audible /g/'],
+        P: ['voiceless-stop', 'puh (as in pat)'],
+        T: ['voiceless-stop', 'tuh (as in top)'],
+        K: ['voiceless-stop', 'kuh (as in kite)'],
+        A: ['vowel', 'aaa — short /æ/ (as in cat)'],
+        O: ['vowel', 'ooo — short /ɒ/ (as in hot)'],
+        U: ['vowel', 'uuu — short /ʌ/ (as in cup)'],
+        I: ['vowel', 'iii — short /ɪ/ (as in pig)'],
+        E: ['vowel', 'eee — short /ɛ/ (as in bed)'],
+      }
+      const GROUPS = [
+        ['nasal', 'Nasals (continuant-voiced)'],
+        ['liquid', 'Liquids (continuant-voiced)'],
+        ['voiced-fric', 'Voiced fricative'],
+        ['voiceless-fric', 'Voiceless fricatives'],
+        ['voiced-stop', 'Voiced stops — schwa-released (B-silent fix)'],
+        ['voiceless-stop', 'Voiceless stops'],
+        ['vowel', 'Short vowels — triplet mnemonics (double-wrap fix)'],
+      ]
+
+      function setStatus(msg, cls) {
+        const el = document.getElementById('status')
+        el.textContent = msg
+        el.className = 'status' + (cls ? ' ' + cls : '')
+      }
+
+      // Decode a base64 inline utterance into a playable object URL.
+      function base64ToBlobUrl(base64, mime) {
+        const bin = atob(base64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        return URL.createObjectURL(
+          new Blob([bytes], { type: mime || 'audio/mpeg' }),
+        )
+      }
+
+      // Build {letter -> {slotKey -> {text, url}}} from a canon JSON.
+      function indexCanon(canon) {
+        const byId = new Map()
+        for (const u of canon.utterances) byId.set(u.id, u)
+        // Map problem index -> letter via the correct-line "Yes. <L>. ..."
+        // shape (robust: the letter is the second sentence's single glyph).
+        const perLetter = new Map()
+        for (let n = 1; n <= 12; n++) {
+          const correct = byId.get(`word.p${n}.correct`)
+          if (!correct) continue
+          const m = correct.text.match(/^Yes\.\s+([A-Z])\.\s/)
+          if (!m) continue
+          const letter = m[1]
+          const slots = {}
+          for (const { key } of SLOTS) {
+            const u = byId.get(`word.p${n}.${key}`)
+            if (u && u.audio && u.audio.base64) {
+              slots[key] = {
+                text: u.text,
+                url: base64ToBlobUrl(u.audio.base64, u.audio.mime),
+              }
+            }
+          }
+          // First occurrence wins (shipped session repeats O at p6/p8).
+          if (!perLetter.has(letter)) perLetter.set(letter, slots)
+        }
+        return perLetter
+      }
+
+      let currentAudio = null
+      let currentBtn = null
+      function play(url, btn) {
+        if (currentAudio) {
+          currentAudio.pause()
+          currentAudio = null
+        }
+        if (currentBtn) currentBtn.classList.remove('playing')
+        const audio = new Audio(url)
+        currentAudio = audio
+        currentBtn = btn
+        btn.classList.add('playing')
+        audio.onended = () => btn.classList.remove('playing')
+        audio.onerror = () => btn.classList.remove('playing')
+        audio.play().catch(() => btn.classList.remove('playing'))
+      }
+
+      function renderRow(letter, slots) {
+        const [, like] = CLASS_OF[letter] || ['', '']
+        const row = document.createElement('div')
+        row.className = 'row'
+
+        const lt = document.createElement('div')
+        lt.className = 'letter'
+        lt.textContent = letter
+        row.appendChild(lt)
+
+        const meta = document.createElement('div')
+        meta.className = 'meta'
+        meta.innerHTML =
+          `<div class="label">Letter ${letter}</div>` +
+          `<div class="like">should sound like: ${like}</div>`
+        row.appendChild(meta)
+
+        const slotWrap = document.createElement('div')
+        slotWrap.className = 'slots'
+        for (const { key, label } of SLOTS) {
+          const btn = document.createElement('button')
+          btn.className = 'play'
+          const slot = slots[key]
+          if (slot) {
+            btn.innerHTML = `▶ ${label}<span class="txt">${slot.text.replace(/</g, '&lt;')}</span>`
+            btn.addEventListener('click', () => play(slot.url, btn))
+          } else {
+            btn.innerHTML = `${label}<span class="txt">(no clip)</span>`
+            btn.disabled = true
+          }
+          slotWrap.appendChild(btn)
+        }
+        row.appendChild(slotWrap)
+        return row
+      }
+
+      async function main() {
+        try {
+          const [shippedRes, auditRes] = await Promise.all([
+            fetch(SHIPPED),
+            fetch(AUDIT),
+          ])
+          if (!shippedRes.ok)
+            throw new Error(`shipped canon ${shippedRes.status}`)
+          if (!auditRes.ok) throw new Error(`audit canon ${auditRes.status}`)
+          const shipped = await shippedRes.json()
+          const audit = await auditRes.json()
+
+          // Merge: shipped letters take priority; audit fills the rest.
+          const merged = new Map()
+          for (const [k, v] of indexCanon(shipped)) merged.set(k, v)
+          for (const [k, v] of indexCanon(audit))
+            if (!merged.has(k)) merged.set(k, v)
+
+          const groupsEl = document.getElementById('groups')
+          let total = 0
+          for (const [groupId, title] of GROUPS) {
+            const letters = Object.keys(CLASS_OF).filter(
+              (L) => CLASS_OF[L][0] === groupId && merged.has(L),
+            )
+            if (letters.length === 0) continue
+            const g = document.createElement('div')
+            g.className = 'group'
+            const h = document.createElement('h2')
+            h.textContent = title
+            g.appendChild(h)
+            for (const L of letters) {
+              g.appendChild(renderRow(L, merged.get(L)))
+              total += 1
+            }
+            groupsEl.appendChild(g)
+          }
+          setStatus(
+            `Loaded ${total} letters from the baked canon (shipped /ɒ/ session + audit). Tap any slot to play the real Olivia clip.`,
+            'ok',
+          )
+        } catch (err) {
+          setStatus(
+            `Failed to load baked canon: ${err.message}. Are the canon JSONs deployed?`,
+            'err',
+          )
+        }
+      }
+      main()
+    </script>
+  </body>
+</html>

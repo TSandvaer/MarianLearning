@@ -279,27 +279,45 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
-  // Stop consonants (with schwa epenthesis tail — mnemonic captures
-  // the unavoidable vowel-leak when voicing a stop in isolation):
+  // Stop consonants. VOICELESS stops (p/t/k) stay BARE — Olivia
+  // releases them audibly on their own. VOICED stops (b/d/g) carry a
+  // schwa /ə/ in the IPA so the release is audible: a bare voiced stop
+  // /b/ /d/ /ɡ/ rendered nearly silent on Olivia (Thomas's "B-silent"
+  // report). The schwa /ə/ is the minimal audible release vowel and is
+  // pedagogically the unavoidable vowel-leak when voicing a stop in
+  // isolation — "buh" IS /bə/. Bare phonemes otherwise, NO stress or
+  // length marks (the British Olivia treatment). Keep U+0261 ɡ (script
+  // g), NOT ASCII g, on /ɡ/.
   puh: { ipa: 'p', tiers: ['letter-sounds'] },
-  buh: { ipa: 'b', tiers: ['letter-sounds'] },
+  buh: { ipa: 'bə', tiers: ['letter-sounds'] },
   tuh: { ipa: 't', tiers: ['letter-sounds'] },
-  duh: { ipa: 'd', tiers: ['letter-sounds'] },
+  duh: { ipa: 'də', tiers: ['letter-sounds'] },
   kuh: { ipa: 'k', tiers: ['letter-sounds'] },
-  guh: { ipa: 'ɡ', tiers: ['letter-sounds'] },
-  // Vowels — bare letter glyphs scoped to letter-sounds tier. Without
-  // `tiers`, the bare `a` / `o` / `u` / `i` / `e` would catch the
-  // article "a", the conjunction "o", and any single-letter
-  // appearances in CVC-tier read-lines ("Read the cat." → letter
-  // chip "c" / "a" / "t" inside a longer string would not match
-  // because the bare letter is inside a word, not bordered by `\b` —
-  // but `"Read the a."` style utterances DO exist on some tiers as
-  // letter-name examples, so tier-scoping is the right safety net).
-  a: { ipa: 'æ', tiers: ['letter-sounds'] },
-  o: { ipa: 'ɒ', tiers: ['letter-sounds'] },
-  u: { ipa: 'ʌ', tiers: ['letter-sounds'] },
-  i: { ipa: 'ɪ', tiers: ['letter-sounds'] },
-  e: { ipa: 'ɛ', tiers: ['letter-sounds'] },
+  guh: { ipa: 'ɡə', tiers: ['letter-sounds'] },
+  // Vowels — TRIPLET mnemonics (NOT bare single letters). The triplet
+  // is the load-bearing fix for the vowel double-wrap collision: the
+  // letter-sounds canon emits BOTH the mnemonic AND the letter-NAME in
+  // the same utterance (e.g. correct slot "Yes A says aaa."). With a
+  // bare single-letter vowel key, the case-insensitive `\b`-bounded
+  // regex matched BOTH the mnemonic "a" AND the letter-name "A" → both
+  // rendered /æ/ → Thomas heard "Yes ahh says ahh" instead of "Yes
+  // A[ay] says ahh[/æ/]". Consonants never collided (mnemonic "mmm" ≠
+  // letter "M"); only vowels collided because the bare mnemonic equalled
+  // the single-letter name. The triplet `aaa` ≠ the single letter-name
+  // "A", so only the triplet is wrapped; the letter-name "A" stays bare
+  // prose and Azure renders it as its native letter NAME ("ay").
+  //
+  // Sound-neutral: inside `<phoneme ph="æ">aaa</phoneme>` Azure uses
+  // the `ph`, so "aaa" sounds identical to the bare "a" Thomas approved.
+  // This restores Dave's Option 1 (triplet vowel mnemonics) from PR #355
+  // that the British rollout (#356, branched from main) lost.
+  //
+  // Bare phonemes, no stress/length marks (the British Olivia treatment).
+  aaa: { ipa: 'æ', tiers: ['letter-sounds'] },
+  ooo: { ipa: 'ɒ', tiers: ['letter-sounds'] },
+  uuu: { ipa: 'ʌ', tiers: ['letter-sounds'] },
+  iii: { ipa: 'ɪ', tiers: ['letter-sounds'] },
+  eee: { ipa: 'ɛ', tiers: ['letter-sounds'] },
 }
 
 /**
