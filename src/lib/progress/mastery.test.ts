@@ -1682,3 +1682,272 @@ describe('applyMasteryRule — intro → practicing transition (86c9qu91g)', () 
     expect(result.skillLevels['sight-words']).toBe('practicing')
   })
 })
+
+// --------------------------------------------------------------------------
+// Per-vowel letter-sounds sub-mastery (Wave 9 W9.3 — ticket 86c9ya3m6)
+//
+// When `progress.literacy.letterSoundsVowelStates` is present AND at least
+// one letter-sounds history entry carries a `currentTargetVowel`, each
+// short vowel (/o/ /u/ /i/ /e/) promotes independently under the standard
+// word-song 90/3 rule. The composite `letter-sounds` node flips to
+// `'mastered'` ONLY when all four vowels are mastered. When the sub-state
+// is absent (or no entry carries a vowel tag), the Wave 7 composite-tier
+// 90/3 path runs unchanged.
+// --------------------------------------------------------------------------
+
+describe('letter-sounds per-vowel sub-mastery (W9.3)', () => {
+  type Vowel = '/o/' | '/u/' | '/i/' | '/e/'
+  type VowelState = 'intro' | 'practicing' | 'mastered'
+
+  /** Build a letter-sounds history entry tagged with a current-target vowel. */
+  function vowelEntry(
+    dateISO: string,
+    vowel: Vowel,
+    successRate: number,
+  ): SessionHistoryEntry {
+    return {
+      dateISO,
+      skillFocus: ['letter-sounds'],
+      successRate,
+      currentTargetVowel: vowel,
+    }
+  }
+
+  /**
+   * Build a Progress with per-vowel tracking ON: `letter-sounds` at
+   * 'practicing' plus a `literacy.letterSoundsVowelStates` map. The
+   * supplied history must carry `currentTargetVowel` for tracking to
+   * activate.
+   */
+  function perVowelProgress(args: {
+    vowelStates: Record<Vowel, VowelState>
+    history: SessionHistoryEntry[]
+    skillLevelOverrides?: Partial<SkillLevels>
+  }): Progress {
+    const base = buildProgress({
+      skillLevels: levels({
+        'letter-names': 'mastered',
+        'letter-sounds': 'practicing',
+        ...args.skillLevelOverrides,
+      }),
+      history: args.history,
+    })
+    return {
+      ...base,
+      literacy: { letterSoundsVowelStates: { ...args.vowelStates } },
+    }
+  }
+
+  const allIntro: Record<Vowel, VowelState> = {
+    '/o/': 'intro',
+    '/u/': 'intro',
+    '/i/': 'intro',
+    '/e/': 'intro',
+  }
+
+  // ── per-vowel intro → practicing ──────────────────────────────────────
+  it('promotes a vowel from intro to practicing on first any-success session', () => {
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro },
+      history: [vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 0.5)],
+    })
+    const result = applyMasteryRule(progress)
+    const states = result.literacy!.letterSoundsVowelStates!
+    expect(states['/o/']).toBe('practicing')
+    // No cross-pollination: the other vowels stay at intro.
+    expect(states['/u/']).toBe('intro')
+    expect(states['/i/']).toBe('intro')
+    expect(states['/e/']).toBe('intro')
+  })
+
+  it('does NOT promote a vowel from intro on a zero-success session', () => {
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro },
+      history: [vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 0)],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('intro')
+  })
+
+  // ── per-vowel practicing → mastered (90/3) ────────────────────────────
+  it('promotes a vowel from practicing to mastered after 3 cross-day 90%+ sessions', () => {
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro, '/o/': 'practicing' },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/o/', 0.9),
+        vowelEntry('2026-05-03T10:00:00.000Z', '/o/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('mastered')
+    // The composite node is NOT mastered — only one of four vowels is.
+    expect(result.skillLevels['letter-sounds']).toBe('practicing')
+  })
+
+  it('traverses intro → practicing → mastered for a vowel in a single call', () => {
+    // All three sessions carry the same vowel and clear 90%; the vowel
+    // starts at 'intro'. One call should walk it all the way through.
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-03T10:00:00.000Z', '/o/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('mastered')
+  })
+
+  // ── no cross-pollination ──────────────────────────────────────────────
+  it('a /o/-target session does not count toward /u/ 90/3', () => {
+    // /u/ has only ONE genuine /u/ session; the other two are /o/. /u/
+    // must NOT master off the /o/ sessions.
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro, '/o/': 'practicing', '/u/': 'practicing' },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-03T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-04T10:00:00.000Z', '/u/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    const states = result.literacy!.letterSoundsVowelStates!
+    expect(states['/o/']).toBe('mastered')
+    expect(states['/u/']).toBe('practicing') // only 1 /u/ session — no master
+  })
+
+  // ── tier-composite AND-of-four ────────────────────────────────────────
+  it('flips composite letter-sounds to mastered only when ALL FOUR vowels are mastered', () => {
+    // Three vowels already mastered; the fourth (/e/) qualifies this call.
+    const progress = perVowelProgress({
+      vowelStates: {
+        '/o/': 'mastered',
+        '/u/': 'mastered',
+        '/i/': 'mastered',
+        '/e/': 'practicing',
+      },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/e/', 1),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/e/', 1),
+        vowelEntry('2026-05-03T10:00:00.000Z', '/e/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.literacy!.letterSoundsVowelStates!['/e/']).toBe('mastered')
+    expect(result.skillLevels['letter-sounds']).toBe('mastered')
+    // Composite promotion surfaces a Hub celebration cue.
+    expect(result.pendingPromotion).toBe('letter-sounds')
+    // Downstream cascade: blending-cv was locked → unlocks to intro.
+    expect(result.skillLevels['blending-cv']).toBe('intro')
+  })
+
+  it('does NOT flip composite when only three of four vowels are mastered', () => {
+    const progress = perVowelProgress({
+      vowelStates: {
+        '/o/': 'mastered',
+        '/u/': 'mastered',
+        '/i/': 'mastered',
+        '/e/': 'practicing',
+      },
+      history: [
+        // /e/ only has two qualifying sessions — short of the 3-session gate.
+        vowelEntry('2026-05-01T10:00:00.000Z', '/e/', 1),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/e/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.literacy!.letterSoundsVowelStates!['/e/']).toBe('practicing')
+    expect(result.skillLevels['letter-sounds']).toBe('practicing')
+  })
+
+  // ── fallback: composite-tier path when sub-state absent ───────────────
+  it('FALLBACK — uses Wave 7 composite-tier 90/3 when letterSoundsVowelStates is absent', () => {
+    // No `literacy` field at all → per-vowel tracking inactive →
+    // letter-sounds promotes via the standard node-level 90/3 rule on
+    // its untagged history entries.
+    const base = buildProgress({
+      skillLevels: levels({
+        'letter-names': 'mastered',
+        'letter-sounds': 'practicing',
+      }),
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'letter-sounds', 1),
+        entry('2026-05-02T10:00:00.000Z', 'letter-sounds', 1),
+        entry('2026-05-03T10:00:00.000Z', 'letter-sounds', 1),
+      ],
+    })
+    const progress: Progress = { ...base }
+    delete progress.literacy
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['letter-sounds']).toBe('mastered')
+    expect(result.pendingPromotion).toBe('letter-sounds')
+  })
+
+  it('FALLBACK — uses composite-tier path when sub-state present but entries lack a vowel tag', () => {
+    // The sub-state map exists, but the history entries carry no
+    // `currentTargetVowel` — so per-vowel tracking does NOT activate and
+    // the composite path runs unchanged.
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro },
+      history: [
+        entry('2026-05-01T10:00:00.000Z', 'letter-sounds', 1),
+        entry('2026-05-02T10:00:00.000Z', 'letter-sounds', 1),
+        entry('2026-05-03T10:00:00.000Z', 'letter-sounds', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['letter-sounds']).toBe('mastered')
+    // The vowel sub-state is untouched (no vowel-tagged history to scan).
+    expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('intro')
+  })
+
+  it('does NOT promote composite via 90/3 when per-vowel tracking is active and vowels are not all mastered', () => {
+    // Tracking is ACTIVE (vowel-tagged history present) and the raw
+    // letter-sounds history would clear 90/3 — but the composite must
+    // stay 'practicing' because only one vowel is mastered. This is the
+    // gate that proves per-vowel supersedes the composite path when
+    // active.
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro, '/o/': 'mastered' },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-03T10:00:00.000Z', '/o/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['letter-sounds']).toBe('practicing')
+  })
+
+  // ── cross-day dedupe applies per-vowel ────────────────────────────────
+  it('cross-day dedupe collapses same-day vowel sessions (latest wins)', () => {
+    // Two sessions on the SAME local day for /o/ collapse to one — so
+    // there are only two distinct days, short of the 3-session gate.
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro, '/o/': 'practicing' },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-01T20:00:00.000Z', '/o/', 1), // same local day
+        vowelEntry('2026-05-02T10:00:00.000Z', '/o/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    // Only 2 distinct days → no master.
+    expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('practicing')
+  })
+
+  it('returns a fresh literacy object without mutating the input states', () => {
+    const inputStates: Record<Vowel, VowelState> = { ...allIntro }
+    const progress = perVowelProgress({
+      vowelStates: inputStates,
+      history: [vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 0.5)],
+    })
+    const snapshot = { ...progress.literacy!.letterSoundsVowelStates! }
+    applyMasteryRule(progress)
+    // Input document's sub-state is unchanged (pure function).
+    expect(progress.literacy!.letterSoundsVowelStates).toEqual(snapshot)
+  })
+})

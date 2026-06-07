@@ -382,6 +382,29 @@ export interface SessionHistoryEntry {
    * distractor-class work may reuse the same field name.
    */
   perProblemDistractorClass?: (string | null)[]
+  /**
+   * Current-target short vowel for a `letter-sounds` session (Wave 9 W9.3
+   * — ticket 86c9ya3m6). Letter-sounds sessions ONLY.
+   *
+   * Records which of the four trackable short vowels (`/o/ /u/ /i/ /e/`)
+   * was the active lift-vowel when this session was emitted — the same
+   * vowel the planner used to derive the §1.4 letter-sounds content. The
+   * per-vowel sub-mastery rule in `mastery.ts` filters history on
+   * `skillFocus.includes('letter-sounds') && currentTargetVowel === <v>`
+   * so each vowel promotes independently under the standard 90/3
+   * word-song threshold (Option A per-vowel sub-mastery).
+   *
+   * Math + non-letter-sounds word-song sessions OMIT the field — it is
+   * letter-sounds-specific. Absence on a letter-sounds entry signals a
+   * session written before per-vowel tracking shipped (or by an older
+   * bundle); the mastery rule falls back to the Wave 7 composite-tier
+   * 90/3 path for letter-sounds in that case.
+   *
+   * Optional + additive — pre-W9.3 entries do not carry it; the field is
+   * omitted on read. Same additive precedent as `latencyMs` /
+   * `mathFacts` — no `schemaVersion` bump.
+   */
+  currentTargetVowel?: LetterSoundsVowel
 }
 
 export type SessionHistory = SessionHistoryEntry[]

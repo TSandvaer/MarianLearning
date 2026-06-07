@@ -1321,4 +1321,61 @@ describe('recordProgressOnSessionEnd', () => {
       expect(loaded.profile.subitisingScaffoldSessionsObserved).toBe(1)
     })
   })
+
+  // ── currentTargetVowel write path (Wave 9 W9.3 — ticket 86c9ya3m6) ──────
+  describe('currentTargetVowel capture', () => {
+    it('writes currentTargetVowel onto a letter-sounds entry', () => {
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 7,
+        dateISO: '2026-06-07T18:00:00.000Z',
+        focusNode: 'letter-sounds',
+        currentTargetVowel: '/o/',
+      })
+
+      const entry = loadProgress()!.history[0]
+      expect(entry.skillFocus).toEqual(['letter-sounds'])
+      expect(entry.currentTargetVowel).toBe('/o/')
+    })
+
+    it('omits currentTargetVowel when the focus is NOT letter-sounds (math)', () => {
+      // Defensive gate: even if a caller mistakenly ships the field on a
+      // math session, the writer drops it.
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-06-07T18:00:00.000Z',
+        focusNode: 'add-to-10',
+        currentTargetVowel: '/o/',
+      })
+
+      const entry = loadProgress()!.history[0]
+      expect('currentTargetVowel' in entry).toBe(false)
+    })
+
+    it('omits currentTargetVowel when the focus is a non-letter-sounds word-song node', () => {
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 6,
+        dateISO: '2026-06-07T18:00:00.000Z',
+        focusNode: 'blending-cv',
+        currentTargetVowel: '/o/',
+      })
+
+      const entry = loadProgress()!.history[0]
+      expect('currentTargetVowel' in entry).toBe(false)
+    })
+
+    it('omits the field on a letter-sounds entry when no vowel is supplied (back-compat)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'word-song',
+        totalCorrect: 6,
+        dateISO: '2026-06-07T18:00:00.000Z',
+        focusNode: 'letter-sounds',
+      })
+
+      const entry = loadProgress()!.history[0]
+      expect('currentTargetVowel' in entry).toBe(false)
+    })
+  })
 })

@@ -54,6 +54,7 @@ import {
   saveProgress,
   WORD_SONG_NODES_IN_ORDER,
   type LeitnerBox,
+  type LetterSoundsVowel,
   type MathFact,
   type Progress,
   type SessionHistoryEntry,
@@ -257,6 +258,23 @@ export interface RecordProgressInput {
    * persisted entry.
    */
   perProblemDistractorClass?: readonly (string | null)[]
+  /**
+   * Current-target short vowel for a letter-sounds session (Wave 9 W9.3
+   * — ticket 86c9ya3m6). Letter-sounds focus ONLY.
+   *
+   * The caller (SessionEnd.tsx) reads the active letter-sounds plan's
+   * current-target vowel — the same `/o/ /u/ /i/ /e/` lift-vowel the
+   * planner used to derive the §1.4 content — and passes it here. The
+   * writer records it onto `SessionHistoryEntry.currentTargetVowel`
+   * ONLY when `focusNode === 'letter-sounds'`; math and other word-song
+   * surfaces omit the field even if a stray value is passed (defensive
+   * gate, see `buildEntry`). The per-vowel mastery rule in `mastery.ts`
+   * then sequences each vowel independently.
+   *
+   * Optional + additive — callers that don't ship it (every surface
+   * except letter-sounds) leave the persisted entry's field absent.
+   */
+  currentTargetVowel?: LetterSoundsVowel
 }
 
 /**
@@ -428,6 +446,16 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
       ? Array.from(input.perProblemDistractorClass)
       : undefined
 
+  // currentTargetVowel persistence (Wave 9 W9.3 — ticket 86c9ya3m6).
+  // Letter-sounds focus ONLY: even if a caller mistakenly ships the
+  // field on a math / other-word-song session, we drop it here so a
+  // stray vowel tag never lands on a non-letter-sounds entry. The
+  // per-vowel mastery scan filters on `skillFocus.includes('letter-
+  // sounds')` first, so this gate is belt-and-suspenders — but keeping
+  // the persisted shape clean avoids confusing future debugging.
+  const currentTargetVowel: LetterSoundsVowel | undefined =
+    input.focusNode === 'letter-sounds' ? input.currentTargetVowel : undefined
+
   if (!useSplit) {
     return {
       dateISO: input.dateISO,
@@ -444,6 +472,7 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
       ...(distractorClassClone !== undefined
         ? { perProblemDistractorClass: distractorClassClone }
         : {}),
+      ...(currentTargetVowel !== undefined ? { currentTargetVowel } : {}),
     }
   }
 
@@ -464,6 +493,7 @@ function buildEntry(input: RecordProgressInput): SessionHistoryEntry {
     ...(distractorClassClone !== undefined
       ? { perProblemDistractorClass: distractorClassClone }
       : {}),
+    ...(currentTargetVowel !== undefined ? { currentTargetVowel } : {}),
   }
 }
 

@@ -693,6 +693,71 @@ describe('isProgressV1', () => {
     expect(isProgressV1(noField)).toBe(true)
   })
 
+  // ── currentTargetVowel additive field (Wave 9 W9.3 — ticket
+  //    86c9ya3m6) ──────────────────────────────────────────────────────
+  it('accepts a letter-sounds entry with a valid currentTargetVowel', () => {
+    const p = defaultProgress()
+    const withVowel: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-06-07T12:00:00.000Z',
+          skillFocus: ['letter-sounds'],
+          successRate: 0.875,
+          currentTargetVowel: '/o/',
+        },
+      ],
+    }
+    expect(isProgressV1(withVowel)).toBe(true)
+  })
+
+  it('rejects an invalid currentTargetVowel string', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-06-07T12:00:00.000Z',
+          skillFocus: ['letter-sounds'],
+          successRate: 0.5,
+          currentTargetVowel: '/a/', // /a/ is excluded (already mastered)
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('rejects a non-string currentTargetVowel', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-06-07T12:00:00.000Z',
+          skillFocus: ['letter-sounds'],
+          successRate: 0.5,
+          currentTargetVowel: 5,
+        },
+      ],
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('omitted currentTargetVowel is fine (additive, back-compat)', () => {
+    const p = defaultProgress()
+    const noField: Progress = {
+      ...p,
+      history: [
+        {
+          dateISO: '2026-06-07T12:00:00.000Z',
+          skillFocus: ['letter-sounds'],
+          successRate: 0.5,
+        },
+      ],
+    }
+    expect(isProgressV1(noField)).toBe(true)
+  })
+
   // ── literacy.letterSoundsVowelStates additive field (Wave 9 W9.2 —
   //    ticket 86c9ya3gd) ───────────────────────────────────────────────
   it('accepts a Progress with a fully-populated literacy.letterSoundsVowelStates', () => {
