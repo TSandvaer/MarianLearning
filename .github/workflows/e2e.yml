@@ -98,7 +98,9 @@ jobs:
     # of runner-minutes on cheap-failure PRs and freeing concurrency-cap
     # headroom for green PRs to land in parallel.
     needs: fast-gate
-    timeout-minutes: 35
+    # Suite runs ~33-35min and was at the edge of the old 35-min cap
+    # (a green run hit 35:15 and got killed mid-test). 50 gives headroom.
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
 
