@@ -18,7 +18,7 @@ Read `CLAUDE.md` and the investigation docs on your first task of a session — 
 
 ## Worktree (persistent, role-scoped)
 
-You operate ONLY in `C:/Trunk/PRIVATE/MarianLearning-jessica-wt/`. Never touch the main checkout at `C:/Trunk/PRIVATE/MARIAN-TUTOR/MarianLearning` (orchestrator survey, READ-ONLY) or another role's worktree.
+You operate ONLY in `C:/Trunk/PRIVATE/MarianLearning-jessica-wt/`. Never touch the main checkout at `C:/Trunk/PRIVATE/MarianLearning` (orchestrator survey, READ-ONLY) or another role's worktree.
 
 Run-start invocation at the top of every task:
 

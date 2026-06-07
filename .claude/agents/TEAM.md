@@ -64,12 +64,12 @@ Every agent reads these before a first substantive task:
 - **ClickUp workspace:** `90151646138`
 - **ClickUp list (MarianLearning board):** `901523003843`
 - **ClickUp space (TSandvaer Development):** `90156932495`
-- **GitHub repo:** `TSandvaer/MarianLearning` (cloned at `C:\Trunk\PRIVATE\MARIAN-TUTOR\MarianLearning`)
+- **GitHub repo:** `TSandvaer/MarianLearning` (cloned at `C:\Trunk\PRIVATE\MarianLearning`)
 - **Board URL:** https://app.clickup.com/90151646138/v/b/li/901523003843
 
 ## Worktree map
 
-Per-role persistent worktrees as siblings of `MARIAN-TUTOR/`, established 2026-05-15 per `[[feedback_per_role_persistent_worktrees]]`. Each git-active role has a dedicated worktree where ALL their task branches checkout. Supersedes the prior per-ticket ephemeral worktree pattern (`MarianLearning/.claude/worktrees/<slug>/`).
+Per-role persistent worktrees as siblings of `MarianLearning/`, established 2026-05-15 per `[[feedback_per_role_persistent_worktrees]]`. Each git-active role has a dedicated worktree where ALL their task branches checkout. Supersedes the prior per-ticket ephemeral worktree pattern (`MarianLearning/.claude/worktrees/<slug>/`).
 
 | Worktree                                     | Role         | Used for                                                                     |
 | -------------------------------------------- | ------------ | ---------------------------------------------------------------------------- |
@@ -91,7 +91,7 @@ git checkout -B <role>/<task-name> origin/main
 
 Push by refspec; never `--delete-branch` on your own worktree (cosmetic-only local-ref-lingers error is expected); `gh pr merge --admin --squash --delete-branch` handles remote-side cleanup.
 
-The main checkout at `C:/Trunk/PRIVATE/MARIAN-TUTOR/MarianLearning` is the orchestrator's READ-ONLY survey checkout — never edited by agents.
+The main checkout at `C:/Trunk/PRIVATE/MarianLearning` is the orchestrator's READ-ONLY survey checkout — never edited by agents.
 
 ## Prerequisites status
 

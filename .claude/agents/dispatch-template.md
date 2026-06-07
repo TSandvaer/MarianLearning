@@ -56,7 +56,7 @@ Per `[[feedback_per_role_persistent_worktrees]]`.
 ````markdown
 **Worktree state — IMPORTANT:**
 
-- Operate ONLY in `C:/Trunk/PRIVATE/MarianLearning-<your-role>-wt` (your role-persistent worktree). Do NOT touch other agents' worktrees. Do NOT operate in the main checkout `C:/Trunk/PRIVATE/MARIAN-TUTOR/` — that's the orchestrator's survey directory, READ-ONLY.
+- Operate ONLY in `C:/Trunk/PRIVATE/MarianLearning-<your-role>-wt` (your role-persistent worktree). Do NOT touch other agents' worktrees. Do NOT operate in the main checkout `C:/Trunk/PRIVATE/MarianLearning/` — that's the orchestrator's survey directory, READ-ONLY.
 - Run-start invocation:
   ```bash
   cd C:/Trunk/PRIVATE/MarianLearning-<your-role>-wt
@@ -188,7 +188,7 @@ Detailed content goes in artifacts the orchestrator can read on-demand, NOT in t
 Per `[[feedback_subagent_doc_edits_visibility]]` + `[[feedback_claude_docs_not_in_git]]`.
 
 ```markdown
-**Doc updates (`.claude/docs/`):** if your maintain-docs Stop hook ran and produced an update to any file under `.claude/docs/`, list those files + the rationale in your final report. Format: `Doc updates: <file> — <one-line rationale>`. If no docs were updated, state explicitly: `Doc updates: none.` Apply doc edits DIRECTLY to the parent workspace `C:/Trunk/PRIVATE/MARIAN-TUTOR/.claude/docs/` — these files are not in git (per `[[feedback_claude_docs_not_in_git]]`); propagation is via SessionStart hook. NEVER include `.claude/docs/` files in your PR.
+**Doc updates (`.claude/docs/`):** if your maintain-docs Stop hook ran and produced an update to any file under `.claude/docs/`, list those files + the rationale in your final report. Format: `Doc updates: <file> — <one-line rationale>`. If no docs were updated, state explicitly: `Doc updates: none.` Apply doc edits DIRECTLY to the parent workspace `C:/Trunk/PRIVATE/MarianLearning/.claude/docs/` — these files are not in git (per `[[feedback_claude_docs_not_in_git]]`); propagation is via SessionStart hook. NEVER include `.claude/docs/` files in your PR.
 ```
 
 ## Self-Test Report (UX-visible PRs only)
