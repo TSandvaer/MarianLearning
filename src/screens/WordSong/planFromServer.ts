@@ -292,15 +292,27 @@ const READ_LINE_TEMPLATES: ReadonlyArray<{
   },
   {
     contentType: 'letter-sounds',
-    // `Which letter says <MNEMONIC>?` — mnemonic is a plain-prose token
-    // (lowercase, 1-3 letters). The token is membership-checked against
-    // `LETTER_SOUND_MNEMONIC_POOL` (19 entries) below; the regex's job
-    // is structural-shape filtering only. `[a-z]+` matches the
-    // mnemonic body case-insensitively — but real canon emits
-    // lowercase. Trailing `?` is anchored so prose like "Which letter
-    // says mmm in cat?" does NOT match.
-    pattern: /^\s*which\s+letter\s+says\s+([a-z]+)\s*\?\s*$/i,
-    label: '"Which letter says <MNEMONIC>?"',
+    // `Which letter says <MNEMONIC><TERM>` — mnemonic is a plain-prose
+    // token (lowercase, 1-3 letters). The token is membership-checked
+    // against `LETTER_SOUND_MNEMONIC_POOL` (19 entries) below; the
+    // regex's job is structural-shape filtering only. `[a-z]+` matches
+    // the mnemonic body case-insensitively — but real canon emits
+    // lowercase.
+    //
+    // <TERM> is `[.?]` — the British-voice rollout (2026-06-06) made the
+    // read line's terminal punctuation SOUND-CLASS-DEPENDENT: VOICELESS
+    // sounds (s, f, h, voiceless stops p/t/k) keep the question form
+    // `"...?"`, while VOICED sounds (nasals, liquids, voiced fricatives,
+    // voiced stops, ALL vowels) emit the DECLARATIVE form `"...."`. The
+    // pre-rollout parser only accepted `?`, so declarative voiced reads
+    // like `"Which letter says mmm."` were rejected → Path A silent
+    // fallback ("Tap the cat"). This is the planner↔parser contract
+    // (`project_planner_parser_contract` memory): the browser parser
+    // MUST accept every read shape the canon emits. The terminal is
+    // anchored so prose like "Which letter says mmm in cat?" does NOT
+    // match.
+    pattern: /^\s*which\s+letter\s+says\s+([a-z]+)\s*[.?]\s*$/i,
+    label: '"Which letter says <MNEMONIC>." / "...?"',
   },
   {
     contentType: 'blending-cv',
@@ -327,10 +339,14 @@ const ACCEPTED_TEMPLATES_LABEL = READ_LINE_TEMPLATES.map((t) => t.label).join(
  *     preserved on the synthesized `WordEntry.word`. Membership is
  *     checked against `LETTER_GLYPH_POOL` (the 52-glyph A-Z + a-z pool
  *     from Kyle's A1 spec §1.1), NOT against `TARGET_WORD_SET`.
- *   - "Which letter says <MNEMONIC>?" → contentType: 'letter-sounds'
- *     (Wave 7 A8b, ticket 86c9y6gea). `<MNEMONIC>` is a plain-prose
- *     English approximation of an isolated phoneme (e.g. `mmm`, `tuh`,
- *     `o`). The token is membership-checked against
+ *   - "Which letter says <MNEMONIC>." / "...?" → contentType:
+ *     'letter-sounds' (Wave 7 A8b, ticket 86c9y6gea; terminal
+ *     punctuation widened in the 2026-06-06 British-voice rollout).
+ *     `<MNEMONIC>` is a plain-prose English approximation of an
+ *     isolated phoneme (e.g. `mmm`, `tuh`, `o`). The terminal is `.`
+ *     for VOICED sounds (declarative) and `?` for VOICELESS sounds
+ *     (question) — both are accepted. The token is membership-checked
+ *     against
  *     `LETTER_SOUND_MNEMONIC_POOL` and mapped to a target letter via
  *     `LETTER_SOUND_MNEMONIC_TO_LETTER`; the parser synthesizes a
  *     sentinel `WordEntry` (no wordPack lookup; letter glyphs are not

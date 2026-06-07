@@ -280,11 +280,15 @@ function targetMnemonicsByProblem(canon: CanonShape): Map<number, string> {
     const idMatch = u.id.match(/^word\.p(\d+)\.read$/)
     if (idMatch === null) continue
     const problemNum = Number(idMatch[1])
-    // Anchored "Which letter says <MNEMONIC>?" — `<MNEMONIC>` matches
-    // `\S+` so any non-whitespace mnemonic shape is accepted by the
-    // parser (the mnemonic-pool check below is the gate that rejects
-    // unknown mnemonics).
-    const textMatch = u.text.match(/^Which letter says (\S+)\?$/)
+    // Anchored "Which letter says <MNEMONIC><TERM>" — `<MNEMONIC>`
+    // matches `\S+?` (non-greedy so it does not swallow the terminal)
+    // and `<TERM>` is `[.?]`. The British-voice rollout (2026-06-06)
+    // made the read terminal sound-class-dependent: declarative "." for
+    // VOICED sounds, question "?" for VOICELESS. Both must be extracted
+    // here or the per-problem mnemonic map loses every voiced-sound
+    // problem. The mnemonic-pool check below is the gate that rejects
+    // unknown mnemonics.
+    const textMatch = u.text.match(/^Which letter says (\S+?)[.?]$/)
     if (textMatch === null) continue
     byProblem.set(problemNum, textMatch[1]!)
   }
