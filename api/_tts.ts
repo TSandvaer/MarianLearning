@@ -275,24 +275,43 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   nnn: { ipa: 'n', tiers: ['letter-sounds'] },
   sss: { ipa: 's', tiers: ['letter-sounds'] },
   fff: { ipa: 'f', tiers: ['letter-sounds'] },
-  vvv: { ipa: 'v', tiers: ['letter-sounds'] },
+  // /v/ is a VOICED fricative — round-2 (Dave straggler spec) adds a
+  // schwa /ə/ tail so Olivia gives it an audible voiced run-out (a bare
+  // /v/ rendered as a cold, near-silent onset). S/F/H (voiceless fric)
+  // stay bare — they get their run-up from the flowing "says it" text
+  // lead-in instead.
+  vvv: { ipa: 'və', tiers: ['letter-sounds'] },
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
-  // Stop consonants. VOICELESS stops (p/t/k) stay BARE — Olivia
-  // releases them audibly on their own. VOICED stops (b/d/g) carry a
-  // schwa /ə/ in the IPA so the release is audible: a bare voiced stop
-  // /b/ /d/ /ɡ/ rendered nearly silent on Olivia (Thomas's "B-silent"
-  // report). The schwa /ə/ is the minimal audible release vowel and is
-  // pedagogically the unavoidable vowel-leak when voicing a stop in
-  // isolation — "buh" IS /bə/. Bare phonemes otherwise, NO stress or
-  // length marks (the British Olivia treatment). Keep U+0261 ɡ (script
-  // g), NOT ASCII g, on /ɡ/.
-  puh: { ipa: 'p', tiers: ['letter-sounds'] },
+  // Stop consonants. Round-2 (Dave straggler spec): MOST stops need a
+  // schwa /ə/ release on Olivia — a bare stop rendered nearly silent
+  // (Thomas's "B-silent" report generalised). Only the ALVEOLAR /t/
+  // survives bare. Round-1 gave b/d/g the schwa (GREEN); round-2 adds
+  // the schwa to the bilabial pair p/b and the velar pair k/g, leaving
+  // /t/ as the sole bare stop.
+  //   - /p/ /b/ (bilabial) → pə / bə
+  //   - /t/        (alveolar) → t   (bare — survives)
+  //   - /d/        (alveolar voiced) → də  (round-1 GREEN, kept)
+  //   - /k/ /ɡ/ (velar)    → kə / ɡə
+  // Keep U+0261 ɡ (script g), NOT ASCII g, on /ɡ/.
+  //
+  // K-KEY CONFLICT (Dave finding #5): `kuh` is a SINGLE override key
+  // feeding BOTH the green K-read AND the broken K hint/correct/give.
+  // Changing kuh → kə changes ALL K slots' render. Decision: apply
+  // kə to the single key (no key-split, no read-text churn) and flag
+  // K-read for re-audition on kə. Splitting into a read-only `k` key
+  // would require the K-read mnemonic to differ from the other slots'
+  // mnemonic text (same word "kuh" everywhere → cannot distinguish by
+  // token within one tier), which would mean changing the read text
+  // away from "kuh" — a bigger, more surprising change than letting
+  // Thomas confirm K-read on kə. If kə regresses K-read, the follow-up
+  // is a read-only key with a distinct read mnemonic.
+  puh: { ipa: 'pə', tiers: ['letter-sounds'] },
   buh: { ipa: 'bə', tiers: ['letter-sounds'] },
   tuh: { ipa: 't', tiers: ['letter-sounds'] },
   duh: { ipa: 'də', tiers: ['letter-sounds'] },
-  kuh: { ipa: 'k', tiers: ['letter-sounds'] },
+  kuh: { ipa: 'kə', tiers: ['letter-sounds'] },
   guh: { ipa: 'ɡə', tiers: ['letter-sounds'] },
   // Vowels — TRIPLET mnemonics (NOT bare single letters). The triplet
   // is the load-bearing fix for the vowel double-wrap collision: the
@@ -313,11 +332,19 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   // that the British rollout (#356, branched from main) lost.
   //
   // Bare phonemes, no stress/length marks (the British Olivia treatment).
+  // A and O are FROZEN (Thomas-approved): æ / ɒ. Round-2 (Dave straggler
+  // spec) re-points u/i/e to en-GB lexical-set realisations because
+  // Olivia mis-realises the bare phonemic /ʌ/ /ɪ/ /ɛ/:
+  //   - /ʌ/ → ə   (STRUT vowel; fallback ɐ if ə regresses)
+  //   - /ɪ/ → ɘ   (KIT — Dave flags this as the stubborn one; if I/E
+  //                 still merge after this, next step is a lexicon probe)
+  //   - /ɛ/ → e   (DRESS realised as cardinal e on en-GB Olivia)
+  // All HYPOTHESIS pending Thomas's ear.
   aaa: { ipa: 'æ', tiers: ['letter-sounds'] },
   ooo: { ipa: 'ɒ', tiers: ['letter-sounds'] },
-  uuu: { ipa: 'ʌ', tiers: ['letter-sounds'] },
-  iii: { ipa: 'ɪ', tiers: ['letter-sounds'] },
-  eee: { ipa: 'ɛ', tiers: ['letter-sounds'] },
+  uuu: { ipa: 'ə', tiers: ['letter-sounds'] },
+  iii: { ipa: 'ɘ', tiers: ['letter-sounds'] },
+  eee: { ipa: 'e', tiers: ['letter-sounds'] },
 }
 
 /**

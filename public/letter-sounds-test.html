@@ -141,6 +141,34 @@
       button.play.playing .txt {
         color: #d9ecd9;
       }
+      /* Round-2 changed-cell highlighting */
+      .row.v2row {
+        border-color: #d9822b;
+        box-shadow: 0 0 0 1px #f0c089 inset;
+      }
+      button.play.v2 {
+        border-color: #d9822b;
+        background: #fdf0e1;
+      }
+      button.play.v2:hover {
+        background: #fbe6cf;
+      }
+      .badge {
+        display: inline-block;
+        background: #d9822b;
+        color: #fff;
+        border-radius: 999px;
+        padding: 0 0.4rem;
+        font-size: 0.7rem;
+        font-weight: 700;
+        vertical-align: middle;
+        margin-left: 0.25rem;
+      }
+      .badge.sm {
+        font-size: 0.6rem;
+        padding: 0 0.3rem;
+        margin: 0 0.2rem 0 0;
+      }
     </style>
   </head>
   <body>
@@ -156,6 +184,16 @@
       >). Listen for: the letter NAME spoken plainly in Correct/Give-answer
       (&ldquo;Yes. O. ooo.&rdquo; — <em>not</em> &ldquo;Yes ahh ahh&rdquo;),
       audible voiced stops (B/D/G), and the isolated short vowels.
+    </p>
+    <p class="sub">
+      <span class="badge">v2</span> marks the
+      <strong>round-2 changed cells</strong> — re-audition <em>only</em> these;
+      the un-badged cells are already approved and frozen. Round-2 changes:
+      <strong>V</strong> (all), <strong>S/F/H</strong> (Correct + Give-answer
+      &ldquo;says it&rdquo; lead-in), <strong>B/D/G</strong> (Read →
+      declarative), <strong>P</strong> (all — schwa),
+      <strong>K</strong> (Hint/Correct/Give + re-confirm Read on the shared
+      key), <strong>U/I/E</strong> (all — new en-GB vowel realisations).
     </p>
     <div id="status" class="status">Loading baked canon&hellip;</div>
     <div id="groups"></div>
@@ -206,6 +244,31 @@
         ['voiceless-stop', 'Voiceless stops'],
         ['vowel', 'Short vowels — triplet mnemonics (double-wrap fix)'],
       ]
+
+      // ── ROUND-2 changed cells (Dave straggler spec) ───────────────────
+      // Which slots changed THIS round, per letter. Only these get the
+      // "v2" badge so Thomas re-auditions ONLY what changed; approved
+      // cells stay visible but un-badged.
+      //   V: all slots (read flip + saysIt correct/give + ph və)
+      //   S/F/H: correct + give (saysIt lead-in)
+      //   B/D/G: read (flip to declarative)
+      //   P: all slots (schwa pə + read declarative)
+      //   K: hint/correct/give get kə + re-confirm read (shared key)
+      //   U/I/E: all slots (ph re-pointed)
+      const V2 = {
+        V: ['read', 'hint', 'correct', 'giveAnswer'],
+        S: ['correct', 'giveAnswer'],
+        F: ['correct', 'giveAnswer'],
+        H: ['correct', 'giveAnswer'],
+        B: ['read'],
+        D: ['read'],
+        G: ['read'],
+        P: ['read', 'hint', 'correct', 'giveAnswer'],
+        K: ['read', 'hint', 'correct', 'giveAnswer'],
+        U: ['read', 'hint', 'correct', 'giveAnswer'],
+        I: ['read', 'hint', 'correct', 'giveAnswer'],
+        E: ['read', 'hint', 'correct', 'giveAnswer'],
+      }
 
       function setStatus(msg, cls) {
         const el = document.getElementById('status')
@@ -271,8 +334,9 @@
 
       function renderRow(letter, slots) {
         const [, like] = CLASS_OF[letter] || ['', '']
+        const changed = V2[letter] || []
         const row = document.createElement('div')
-        row.className = 'row'
+        row.className = 'row' + (changed.length ? ' v2row' : '')
 
         const lt = document.createElement('div')
         lt.className = 'letter'
@@ -281,8 +345,9 @@
 
         const meta = document.createElement('div')
         meta.className = 'meta'
+        const rowBadge = changed.length ? ' <span class="badge">v2</span>' : ''
         meta.innerHTML =
-          `<div class="label">Letter ${letter}</div>` +
+          `<div class="label">Letter ${letter}${rowBadge}</div>` +
           `<div class="like">should sound like: ${like}</div>`
         row.appendChild(meta)
 
@@ -290,13 +355,15 @@
         slotWrap.className = 'slots'
         for (const { key, label } of SLOTS) {
           const btn = document.createElement('button')
-          btn.className = 'play'
+          const isV2 = changed.includes(key)
+          btn.className = 'play' + (isV2 ? ' v2' : '')
+          const badge = isV2 ? '<span class="badge sm">v2</span> ' : ''
           const slot = slots[key]
           if (slot) {
-            btn.innerHTML = `▶ ${label}<span class="txt">${slot.text.replace(/</g, '&lt;')}</span>`
+            btn.innerHTML = `${badge}▶ ${label}<span class="txt">${slot.text.replace(/</g, '&lt;')}</span>`
             btn.addEventListener('click', () => play(slot.url, btn))
           } else {
-            btn.innerHTML = `${label}<span class="txt">(no clip)</span>`
+            btn.innerHTML = `${badge}${label}<span class="txt">(no clip)</span>`
             btn.disabled = true
           }
           slotWrap.appendChild(btn)

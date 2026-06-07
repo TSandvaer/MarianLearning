@@ -51,34 +51,35 @@ export const SAMPLE_LETTER_SOUNDS_PLAN: ServerPlan = {
   label: 'Letter Sounds — consonants + vowels mix (fixture)',
   utterances: (
     [
-      // readTerm: '.' = VOICED (declarative), '?' = VOICELESS (question).
-      // hint: 'It says X?' = FRICATIVE, 'Listen. X.' = non-fricative.
-      // Vowel mnemonics are TRIPLETS (aaa/ooo — vowel double-wrap fix):
-      // the triplet never equals the single-letter letter-NAME, so the
-      // correct/giveAnswer slots (which carry BOTH) don't double-wrap.
-      { mnemonic: 'mmm', letter: 'M', readTerm: '.', hint: 'Listen. mmm.' },
-      { mnemonic: 'sss', letter: 'S', readTerm: '?', hint: 'It says sss?' },
-      { mnemonic: 'hhh', letter: 'H', readTerm: '?', hint: 'It says hhh?' },
-      { mnemonic: 'aaa', letter: 'A', readTerm: '.', hint: 'Listen. aaa.' },
-      { mnemonic: 'tuh', letter: 'T', readTerm: '?', hint: 'Listen. tuh.' },
-      { mnemonic: 'ooo', letter: 'O', readTerm: '.', hint: 'Listen. ooo.' },
-      { mnemonic: 'lll', letter: 'L', readTerm: '.', hint: 'Listen. lll.' },
-      { mnemonic: 'buh', letter: 'B', readTerm: '.', hint: 'Listen. buh.' },
+      // readTerm: round-2 partition. hint: 'It says X?' = FRICATIVE,
+      // 'Listen. X.' = non-fricative. fric: true = round-2 "says it"
+      // correct/give lead-in (S/F/H/V). Vowel mnemonics are TRIPLETS.
+      { mnemonic: 'mmm', letter: 'M', readTerm: '.', hint: 'Listen. mmm.', fric: false }, // prettier-ignore
+      { mnemonic: 'sss', letter: 'S', readTerm: '?', hint: 'It says sss?', fric: true }, // prettier-ignore
+      { mnemonic: 'hhh', letter: 'H', readTerm: '?', hint: 'It says hhh?', fric: true }, // prettier-ignore
+      { mnemonic: 'aaa', letter: 'A', readTerm: '.', hint: 'Listen. aaa.', fric: false }, // prettier-ignore
+      { mnemonic: 'tuh', letter: 'T', readTerm: '?', hint: 'Listen. tuh.', fric: false }, // prettier-ignore
+      { mnemonic: 'ooo', letter: 'O', readTerm: '.', hint: 'Listen. ooo.', fric: false }, // prettier-ignore
+      { mnemonic: 'lll', letter: 'L', readTerm: '.', hint: 'Listen. lll.', fric: false }, // prettier-ignore
+      { mnemonic: 'buh', letter: 'B', readTerm: '.', hint: 'Listen. buh.', fric: false }, // prettier-ignore
     ] as const
-  ).flatMap(({ mnemonic, letter, readTerm, hint }, i) => {
+  ).flatMap(({ mnemonic, letter, readTerm, hint, fric }, i) => {
     const n = i + 1
+    const correct = fric
+      ? `Yes. ${letter} says it. ${mnemonic}?`
+      : `Yes. ${letter}. ${mnemonic}.`
+    const giveAnswer = fric
+      ? `This one is ${letter}. ${letter} says it. ${mnemonic}?`
+      : `This one is ${letter}. ${mnemonic}.`
     return [
       {
         id: `word.p${n}.read`,
         text: `Which letter says ${mnemonic}${readTerm}`,
       },
-      { id: `word.p${n}.correct`, text: `Yes! ${letter} says ${mnemonic}.` },
+      { id: `word.p${n}.correct`, text: correct },
       { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
       { id: `word.p${n}.hint`, text: hint },
-      {
-        id: `word.p${n}.giveAnswer`,
-        text: `This one is ${letter}. ${letter} says ${mnemonic}.`,
-      },
+      { id: `word.p${n}.giveAnswer`, text: giveAnswer },
     ]
   }),
 }

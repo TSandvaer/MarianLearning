@@ -57,42 +57,60 @@ function loadEnvLocal(): void {
 }
 
 // ── Per-sound class config (mirror of api/_planner.ts SOUND-CLASS table) ─
-// readTerm: '.' = CONTINUANT-VOICED (declarative); '?' = STOP/VOICELESS.
-// hintKind: 'fric' → "It says <mnem>?" ; 'plain' → "Listen. <mnem>."
+// readTerm: '.' = declarative; '?' = question.
+// hintKind:    'fric'   → "It says <mnem>?" ; 'plain' → "Listen. <mnem>."
+// correctKind: 'saysIt' → fricative flowing lead-in (S/F/H/V):
+//                correct    "Yes. <L> says it. <mnem>?"
+//                giveAnswer "This one is <L>. <L> says it. <mnem>?"
+//              'plain'  → everyone else (round-1 approved):
+//                correct    "Yes. <L>. <mnem>."
+//                giveAnswer "This one is <L>. <mnem>."
+//
+// Round-2 read terminals (Dave straggler spec): voiced stops B/D/G and
+// /p/ flip to declarative "." (their schwa-tail makes them vowel-final
+// → want declarative); /t/ and /k/ KEEP the question read (k read is
+// GREEN, t is round-1 approved). V flips to "?" (round-2). S/F/H stay
+// "?". Nasals/liquids/vowels stay ".".
 interface SoundSpec {
   letter: string // UPPERCASE letter name
   mnemonic: string
   readTerm: '.' | '?'
   hintKind: 'fric' | 'plain'
+  correctKind: 'saysIt' | 'plain'
 }
 
 const SOUND: Record<string, SoundSpec> = {
-  // Nasals (continuant-voiced, non-fricative)
-  m: { letter: 'M', mnemonic: 'mmm', readTerm: '.', hintKind: 'plain' },
-  n: { letter: 'N', mnemonic: 'nnn', readTerm: '.', hintKind: 'plain' },
-  // Liquids (continuant-voiced, non-fricative)
-  l: { letter: 'L', mnemonic: 'lll', readTerm: '.', hintKind: 'plain' },
-  r: { letter: 'R', mnemonic: 'rrr', readTerm: '.', hintKind: 'plain' },
-  // Voiced fricative (continuant-voiced, fricative)
-  v: { letter: 'V', mnemonic: 'vvv', readTerm: '.', hintKind: 'fric' },
-  // Voiceless fricatives (voiceless, fricative)
-  s: { letter: 'S', mnemonic: 'sss', readTerm: '?', hintKind: 'fric' },
-  f: { letter: 'F', mnemonic: 'fff', readTerm: '?', hintKind: 'fric' },
-  h: { letter: 'H', mnemonic: 'hhh', readTerm: '?', hintKind: 'fric' },
-  // Voiced stops (STOP → question; schwa carries it; non-fricative hint)
-  b: { letter: 'B', mnemonic: 'buh', readTerm: '?', hintKind: 'plain' },
-  d: { letter: 'D', mnemonic: 'duh', readTerm: '?', hintKind: 'plain' },
-  g: { letter: 'G', mnemonic: 'guh', readTerm: '?', hintKind: 'plain' },
-  // Voiceless stops (STOP → question; non-fricative hint)
-  p: { letter: 'P', mnemonic: 'puh', readTerm: '?', hintKind: 'plain' },
-  t: { letter: 'T', mnemonic: 'tuh', readTerm: '?', hintKind: 'plain' },
-  k: { letter: 'K', mnemonic: 'kuh', readTerm: '?', hintKind: 'plain' },
-  // Vowels (continuant-voiced, non-fricative) — TRIPLET mnemonics.
-  a: { letter: 'A', mnemonic: 'aaa', readTerm: '.', hintKind: 'plain' },
-  o: { letter: 'O', mnemonic: 'ooo', readTerm: '.', hintKind: 'plain' },
-  u: { letter: 'U', mnemonic: 'uuu', readTerm: '.', hintKind: 'plain' },
-  i: { letter: 'I', mnemonic: 'iii', readTerm: '.', hintKind: 'plain' },
-  e: { letter: 'E', mnemonic: 'eee', readTerm: '.', hintKind: 'plain' },
+  // Nasals (declarative read, plain hint+correct) — FROZEN.
+  m: { letter: 'M', mnemonic: 'mmm', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  n: { letter: 'N', mnemonic: 'nnn', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  // Liquids — L FROZEN; R read+hint approved.
+  l: { letter: 'L', mnemonic: 'lll', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  r: { letter: 'R', mnemonic: 'rrr', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  // Voiced fricative V — round-2: read "?", fricative hint + saysIt
+  // correct/give. ph="və".
+  v: { letter: 'V', mnemonic: 'vvv', readTerm: '?', hintKind: 'fric', correctKind: 'saysIt' }, // prettier-ignore
+  // Voiceless fricatives S/F/H — read+hint approved; round-2 saysIt
+  // correct/give (fixes cold-onset sink/drumbeat).
+  s: { letter: 'S', mnemonic: 'sss', readTerm: '?', hintKind: 'fric', correctKind: 'saysIt' }, // prettier-ignore
+  f: { letter: 'F', mnemonic: 'fff', readTerm: '?', hintKind: 'fric', correctKind: 'saysIt' }, // prettier-ignore
+  h: { letter: 'H', mnemonic: 'hhh', readTerm: '?', hintKind: 'fric', correctKind: 'saysIt' }, // prettier-ignore
+  // Voiced stops B/D/G — round-2: read flips to declarative ".".
+  // hint/correct/give UNCHANGED (approved). ph bə/də/ɡə (round-1 green).
+  b: { letter: 'B', mnemonic: 'buh', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  d: { letter: 'D', mnemonic: 'duh', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  g: { letter: 'G', mnemonic: 'guh', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  // P — round-2: all slots schwa (pə) + read declarative ".".
+  p: { letter: 'P', mnemonic: 'puh', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  // T — FROZEN (read "?" approved). K — read "?" GREEN (kept); ph kə
+  // applies to all K slots incl read (re-audition flag).
+  t: { letter: 'T', mnemonic: 'tuh', readTerm: '?', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  k: { letter: 'K', mnemonic: 'kuh', readTerm: '?', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  // Vowels — TRIPLET mnemonics. A/O FROZEN; u/i/e re-pointed ph only.
+  a: { letter: 'A', mnemonic: 'aaa', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  o: { letter: 'O', mnemonic: 'ooo', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  u: { letter: 'U', mnemonic: 'uuu', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  i: { letter: 'I', mnemonic: 'iii', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  e: { letter: 'E', mnemonic: 'eee', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
 }
 
 interface Utt {
@@ -108,15 +126,20 @@ function problemUtterances(n: number, key: string): Utt[] {
   const read = `Which letter says ${s.mnemonic}${s.readTerm}`
   const hint =
     s.hintKind === 'fric' ? `It says ${s.mnemonic}?` : `Listen. ${s.mnemonic}.`
+  const correct =
+    s.correctKind === 'saysIt'
+      ? `Yes. ${s.letter} says it. ${s.mnemonic}?`
+      : `Yes. ${s.letter}. ${s.mnemonic}.`
+  const giveAnswer =
+    s.correctKind === 'saysIt'
+      ? `This one is ${s.letter}. ${s.letter} says it. ${s.mnemonic}?`
+      : `This one is ${s.letter}. ${s.mnemonic}.`
   return [
     { id: `word.p${n}.read`, text: read },
-    { id: `word.p${n}.correct`, text: `Yes. ${s.letter}. ${s.mnemonic}.` },
+    { id: `word.p${n}.correct`, text: correct },
     { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
     { id: `word.p${n}.hint`, text: hint },
-    {
-      id: `word.p${n}.giveAnswer`,
-      text: `This one is ${s.letter}. ${s.mnemonic}.`,
-    },
+    { id: `word.p${n}.giveAnswer`, text: giveAnswer },
   ]
 }
 

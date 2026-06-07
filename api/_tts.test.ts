@@ -385,16 +385,17 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
   })
 
-  it('letter-sounds tier-scoped vowel mnemonics fire on /ɒ/ /ʌ/ /ɪ/ /ɛ/ /æ/ ONLY in letter-sounds', () => {
+  it('letter-sounds tier-scoped vowel mnemonics fire ONLY in letter-sounds (round-2 en-GB realisations for u/i/e)', () => {
     // Vowel mnemonics are TRIPLETS (aaa/ooo/uuu/iii/eee) — the vowel
-    // double-wrap fix. A bare single-letter vowel mnemonic used to
-    // collide with the single-letter letter-NAME in the same utterance.
+    // double-wrap fix. A/O are FROZEN at æ/ɒ. Round-2 (Dave straggler
+    // spec) re-points u/i/e to en-GB lexical-set realisations because
+    // Olivia mis-realises the bare phonemic /ʌ/ /ɪ/ /ɛ/: u→ə, i→ɘ, e→e.
     const cases: ReadonlyArray<[string, string]> = [
-      ['Which letter says aaa.', 'æ'],
-      ['Which letter says ooo.', 'ɒ'],
-      ['Which letter says uuu.', 'ʌ'],
-      ['Which letter says iii.', 'ɪ'],
-      ['Which letter says eee.', 'ɛ'],
+      ['Which letter says aaa.', 'æ'], // FROZEN
+      ['Which letter says ooo.', 'ɒ'], // FROZEN
+      ['Which letter says uuu.', 'ə'], // round-2 (was ʌ)
+      ['Which letter says iii.', 'ɘ'], // round-2 (was ɪ)
+      ['Which letter says eee.', 'e'], // round-2 (was ɛ)
     ]
     for (const [text, ipa] of cases) {
       expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(

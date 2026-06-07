@@ -1069,18 +1069,18 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
     // Liquids (voiced, non-fricative)
     { mnemonic: 'lll', letter: 'L', readTerm: '.', hint: 'Listen. lll.' },
     { mnemonic: 'rrr', letter: 'R', readTerm: '.', hint: 'Listen. rrr.' },
-    // Voiced fricatives (voiced read, fricative hint)
-    { mnemonic: 'vvv', letter: 'V', readTerm: '.', hint: 'It says vvv?' },
+    // Voiced fricative V — round-2: read flips to "?" (question).
+    { mnemonic: 'vvv', letter: 'V', readTerm: '?', hint: 'It says vvv?' },
     // Voiceless fricatives (voiceless read, fricative hint)
     { mnemonic: 'sss', letter: 'S', readTerm: '?', hint: 'It says sss?' },
     { mnemonic: 'fff', letter: 'F', readTerm: '?', hint: 'It says fff?' },
     { mnemonic: 'hhh', letter: 'H', readTerm: '?', hint: 'It says hhh?' },
-    // Voiced stops (voiced read, non-fricative hint)
+    // Voiced stops — round-2: schwa-tailed → DECLARATIVE "." read.
     { mnemonic: 'buh', letter: 'B', readTerm: '.', hint: 'Listen. buh.' },
     { mnemonic: 'duh', letter: 'D', readTerm: '.', hint: 'Listen. duh.' },
     { mnemonic: 'guh', letter: 'G', readTerm: '.', hint: 'Listen. guh.' },
-    // Voiceless stops (voiceless read, non-fricative hint)
-    { mnemonic: 'puh', letter: 'P', readTerm: '?', hint: 'Listen. puh.' },
+    // Stops P (round-2: schwa → declarative ".") ; T/K keep question read.
+    { mnemonic: 'puh', letter: 'P', readTerm: '.', hint: 'Listen. puh.' },
     { mnemonic: 'tuh', letter: 'T', readTerm: '?', hint: 'Listen. tuh.' },
     { mnemonic: 'kuh', letter: 'K', readTerm: '?', hint: 'Listen. kuh.' },
     // Vowels (voiced, non-fricative) — TRIPLET mnemonics (vowel
@@ -1101,30 +1101,45 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
     }
   })
 
-  it('every VOICED sound uses the declarative "." read terminal and parses', () => {
-    const voiced = SOUND_CLASSES.filter((s) => s.readTerm === '.')
-    // Sanity: voiced set covers nasals, liquids, voiced fric, voiced
-    // stops, and all 5 vowels.
-    expect(voiced.length).toBeGreaterThanOrEqual(13)
-    for (const { mnemonic, letter } of voiced) {
+  it('every DECLARATIVE-read sound (round-2 partition) parses with the "." terminal', () => {
+    const declarative = SOUND_CLASSES.filter((s) => s.readTerm === '.')
+    // Round-2 declarative set: nasals m/n, liquids l/r, schwa-tailed
+    // stops p/b/d/g, and all 5 vowels = 13.
+    expect(declarative.map((s) => s.letter).sort()).toEqual([
+      'A',
+      'B',
+      'D',
+      'E',
+      'G',
+      'I',
+      'L',
+      'M',
+      'N',
+      'O',
+      'P',
+      'R',
+      'U',
+    ])
+    for (const { mnemonic, letter } of declarative) {
       expect(parseReadLine(`Which letter says ${mnemonic}.`).entry.word).toBe(
         letter,
       )
     }
   })
 
-  it('every VOICELESS sound uses the question "?" read terminal and parses', () => {
-    const voiceless = SOUND_CLASSES.filter((s) => s.readTerm === '?')
-    // s, f, h + voiceless stops p, t, k.
-    expect(voiceless.map((s) => s.letter).sort()).toEqual([
+  it('every QUESTION-read sound (round-2 partition) parses with the "?" terminal', () => {
+    const question = SOUND_CLASSES.filter((s) => s.readTerm === '?')
+    // Round-2 question set: voiceless fricatives s/f/h, voiced fricative
+    // v, and the two stops t/k that keep the question read = 6.
+    expect(question.map((s) => s.letter).sort()).toEqual([
       'F',
       'H',
       'K',
-      'P',
       'S',
       'T',
+      'V',
     ])
-    for (const { mnemonic, letter } of voiceless) {
+    for (const { mnemonic, letter } of question) {
       expect(parseReadLine(`Which letter says ${mnemonic}?`).entry.word).toBe(
         letter,
       )
@@ -1138,35 +1153,38 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
     // plays by utterance id) but we include the real shapes to pin that
     // they never cause a Path A rejection.
     const pick = [
-      SOUND_CLASSES[0]!, // mmm  → "." read, "Listen." hint
-      SOUND_CLASSES[5]!, // sss  → "?" read, "It says" hint
-      SOUND_CLASSES[7]!, // hhh  → "?" read, "It says" hint
-      SOUND_CLASSES[14]!, // a    → "." read, "Listen." hint
-      SOUND_CLASSES[12]!, // tuh  → "?" read, "Listen." hint
-      SOUND_CLASSES[15]!, // o    → "." read, "Listen." hint
-      SOUND_CLASSES[2]!, // lll  → "." read, "Listen." hint
-      SOUND_CLASSES[4]!, // vvv  → "." read, "It says" hint
+      SOUND_CLASSES[0]!, // mmm  → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[5]!, // sss  → "?" read, "It says" hint, saysIt correct
+      SOUND_CLASSES[7]!, // hhh  → "?" read, "It says" hint, saysIt correct
+      SOUND_CLASSES[14]!, // a    → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[12]!, // tuh  → "?" read, "Listen." hint, plain correct
+      SOUND_CLASSES[15]!, // o    → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[2]!, // lll  → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[4]!, // vvv  → "?" read, "It says" hint, saysIt correct (round-2)
     ]
+    // Fricatives (S/F/H/V) use the round-2 "says it" correct/give shape.
+    const FRIC = new Set(['S', 'F', 'H', 'V'])
     const wire = {
       id: 'contract-per-class-letter-sounds',
       label: 'per-sound-class contract session',
       utterances: pick.flatMap(({ mnemonic, letter, readTerm, hint }, i) => {
         const n = i + 1
+        const isFric = FRIC.has(letter)
+        const correct = isFric
+          ? `Yes. ${letter} says it. ${mnemonic}?`
+          : `Yes. ${letter}. ${mnemonic}.`
+        const giveAnswer = isFric
+          ? `This one is ${letter}. ${letter} says it. ${mnemonic}?`
+          : `This one is ${letter}. ${mnemonic}.`
         return [
           {
             id: `word.p${n}.read`,
             text: `Which letter says ${mnemonic}${readTerm}`,
           },
-          {
-            id: `word.p${n}.correct`,
-            text: `Yes. ${letter}. ${mnemonic}.`,
-          },
+          { id: `word.p${n}.correct`, text: correct },
           { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
           { id: `word.p${n}.hint`, text: hint },
-          {
-            id: `word.p${n}.giveAnswer`,
-            text: `This one is ${letter}. ${mnemonic}.`,
-          },
+          { id: `word.p${n}.giveAnswer`, text: giveAnswer },
         ]
       }),
     }
@@ -1201,6 +1219,16 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
     // own sentence, "says" dropped, no redundant second clause.
     expect(plan.problems[3]!.utterances.correct).toBe('Yes. A. aaa.')
     expect(plan.problems[3]!.utterances.giveAnswer).toBe('This one is A. aaa.')
+    // P2 is /s/ — a FRICATIVE. Round-2 (Dave straggler spec) gives
+    // fricatives the flowing "says it" lead-in in correct/giveAnswer to
+    // fix the cold-onset sink/drumbeat. The read line still parses (the
+    // parser only shape-checks the read; correct/give flow through).
+    expect(plan.problems[1]!.target.word).toBe('S')
+    expect(plan.problems[1]!.utterances.read).toBe('Which letter says sss?')
+    expect(plan.problems[1]!.utterances.correct).toBe('Yes. S says it. sss?')
+    expect(plan.problems[1]!.utterances.giveAnswer).toBe(
+      'This one is S. S says it. sss?',
+    )
   })
 })
 
