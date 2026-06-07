@@ -98,6 +98,57 @@ export type SkillLevel = 'locked' | 'intro' | 'practicing' | 'mastered'
 export type SkillLevels = Record<SkillNode, SkillLevel>
 
 // --------------------------------------------------------------------------
+// Literacy sub-state (Wave 9 W9.2 — ticket 86c9ya3gd).
+//
+// The `letter-sounds` SkillNode tracks a single coarse mastery level via
+// `SkillLevels` like every other node. Wave 9 layers a finer per-vowel
+// sub-state BENEATH that node so the (W9.3) mastery rule and (W9.4)
+// focus-picker can sequence Marian through the short vowels one at a time
+// (Option A per-vowel sub-mastery), rather than treating letter-sounds as
+// a single composite tier (Wave 7's Option B).
+//
+// Short-/a/ is already mastered per CLAUDE.md's April 2026 diagnostic and
+// is NOT tracked here. The four trackable short vowels are /o/ /u/ /i/ /e/,
+// matching the locked teaching sequence in
+// `design/research/phonics-sequence-marian.md` §Q1 (o → u → i → e).
+// --------------------------------------------------------------------------
+
+/**
+ * The four trackable short vowels for `letter-sounds` per-vowel mastery.
+ * IPA-slash notation matches the canon's letter-sounds metadata. Short-/a/
+ * is excluded (already mastered).
+ */
+export type LetterSoundsVowel = '/o/' | '/u/' | '/i/' | '/e/'
+
+/**
+ * Per-vowel sub-mastery state. Mirrors the non-`locked` arm of
+ * `SkillLevel` — a vowel sub-state has no `'locked'` because the parent
+ * `letter-sounds` node owns the locked/unlocked gate; once that node is
+ * unlocked, all four vowels start at `'intro'` and progress
+ * independently.
+ */
+export type VowelSubMasteryState = 'intro' | 'practicing' | 'mastered'
+
+/**
+ * Literacy namespace on the Progress envelope (Wave 9 W9.2 — ticket
+ * 86c9ya3gd). Carries per-vowel sub-mastery for `letter-sounds` today;
+ * the namespace exists so future literacy-specific sub-state (digraph
+ * sub-tiers, sight-word lists, etc.) has a home that doesn't widen the
+ * top-level `Progress` shape one field at a time.
+ *
+ * `letterSoundsVowelStates` is optional + partial: a fresh greenfield
+ * Marian gets all four vowels at `'intro'` via
+ * `DEFAULT_LETTER_SOUNDS_VOWEL_STATES`, but a blob written before this
+ * field shipped (or by a device on an older bundle) won't carry it. The
+ * read-path defaulter (`storage.ts:withDefaultedLetterSoundsVowelStates`)
+ * fills missing per-vowel keys with `'intro'` at load time so downstream
+ * consumers always see a fully-populated map.
+ */
+export interface LiteracyProgress {
+  letterSoundsVowelStates?: Record<LetterSoundsVowel, VowelSubMasteryState>
+}
+
+// --------------------------------------------------------------------------
 // Leitner box — five-box spaced repetition over math facts (or anything).
 // Pure data; helpers live in `leitner.ts`.
 // --------------------------------------------------------------------------
@@ -583,6 +634,22 @@ export interface Progress {
    * once-per-session at session-start fetch time.
    */
   lifetimeFirstEncounters?: SkillNode[]
+  /**
+   * Literacy namespace (Wave 9 W9.2 — ticket 86c9ya3gd). Carries the
+   * per-vowel `letterSoundsVowelStates` sub-mastery map for
+   * `letter-sounds`. See `LiteracyProgress` above for the shape +
+   * defaulting rationale.
+   *
+   * Optional on the persisted shape because pre-W9.2 blobs predate it.
+   * Field is additive and backward-compatible — schemaVersion stays at 1
+   * (same precedent as `parentSettings`, `pendingPromotion`,
+   * `lifetimeFirstEncounters`). The read-path defaulter
+   * (`storage.ts:withDefaultedLetterSoundsVowelStates`) fills any missing
+   * per-vowel keys with `'intro'` at load time; W9.3 (mastery rule) and
+   * W9.4 (focus-picker) are the consumers — until they ship, the field
+   * sits inert and the Wave 7 composite-tier path stays active.
+   */
+  literacy?: LiteracyProgress
 }
 
 export const CURRENT_SCHEMA_VERSION = 1 as const

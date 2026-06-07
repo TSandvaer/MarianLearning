@@ -379,6 +379,78 @@ describe('Progress — additive-no-bump field migrations', () => {
   })
 
   // -------------------------------------------------------------------------
+  // 11. literacy.letterSoundsVowelStates (Wave 9 W9.2 — ticket 86c9ya3gd)
+  // -------------------------------------------------------------------------
+
+  it('pre-W9.2 payload (no literacy field) gets letterSoundsVowelStates defaulted to all-intro at load time', () => {
+    // Simulate a blob written before W9.2: no `literacy` namespace. The
+    // read-path defaulter (`withDefaultedLetterSoundsVowelStates`) must
+    // add it with every trackable vowel at 'intro'. Same additive
+    // precedent as `lifetimeFirstEncounters` — no schemaVersion bump.
+    const seed = defaultProgress('Marian')
+    const blob: Record<string, unknown> = { ...seed }
+    delete blob.literacy
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'intro',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('blob carrying a hand-set partial letterSoundsVowelStates round-trips earned values + fills the rest', () => {
+    // A partial map (e.g. Marian mid-way through the vowels) must keep
+    // her earned per-vowel states and only fill the absent ones — no
+    // clobbering, same fill-not-reset contract as the skillLevels
+    // defaulter.
+    const seed = defaultProgress('Marian')
+    const blob = {
+      ...seed,
+      literacy: {
+        letterSoundsVowelStates: { '/o/': 'mastered', '/u/': 'practicing' },
+      },
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'mastered',
+      '/u/': 'practicing',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('a fully-populated v1 blob WITH literacy round-trips deep-equal (no defaulter mutation)', () => {
+    // Belt-and-braces: the W9.2 field, when fully present, must NOT be
+    // mutated by any defaulter. Output deep-equal to input.
+    const seed = defaultProgress('Marian')
+    const fullBlob: Progress = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-07T10:00:00.000Z' },
+      literacy: {
+        letterSoundsVowelStates: {
+          '/o/': 'mastered',
+          '/u/': 'practicing',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        },
+      },
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(fullBlob))
+
+    const loaded = loadProgress()
+    expect(loaded).toEqual(fullBlob)
+  })
+
+  // -------------------------------------------------------------------------
   // 10. Cross-cutting: skillLevels missing key + lifetimeFirstEncounters
   //     missing — both defaulters fire correctly in sequence
   // -------------------------------------------------------------------------

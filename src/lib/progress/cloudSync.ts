@@ -44,11 +44,16 @@
  * continues to function locally with no network noise.
  */
 
-import { defaultLockedSkillLevels } from './defaults'
+import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isProgressV1 } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { saveProgress } from './storage'
-import type { Progress, SkillLevels } from './types'
+import type {
+  LetterSoundsVowel,
+  Progress,
+  SkillLevels,
+  VowelSubMasteryState,
+} from './types'
 
 // ---------------------------------------------------------------------------
 // Configuration knobs
@@ -417,7 +422,12 @@ export async function reconcileWithCloud(
  * if a future change touches one.
  */
 function installCloudBlob(blob: unknown): Progress | null {
-  const defaulted = withDefaultedSkillLevels(blob)
+  // Pre-guard defaulters, in the SAME order as storage.ts:loadProgress —
+  // skill-level floor first, then the W9.2 per-vowel letter-sounds
+  // defaulter (ticket 86c9ya3gd), then the strict guard.
+  const defaulted = withDefaultedLetterSoundsVowelStates(
+    withDefaultedSkillLevels(blob),
+  )
   if (!isProgressV1(defaulted)) return null
   // Mirror of `storage.ts:withDefaultedLifetimeFirstEncounters`. A
   // cloud blob written by an older device that doesn't know about
@@ -475,6 +485,66 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
   }
   if (!mutated) return parsed
   return { ...obj, skillLevels: filled }
+}
+
+/**
+ * Mirror of `storage.ts:withDefaultedLetterSoundsVowelStates` (Wave 9
+ * W9.2 — ticket 86c9ya3gd). See the lengthy comment in that file for the
+ * three-shape healing rationale; the contract is preserved here verbatim.
+ * If the storage version changes, this MUST change in the same PR.
+ *
+ * The `cloudSync.test.ts` "letterSoundsVowelStates parity" test pins the
+ * two implementations together — a cloud blob written by a pre-W9.2
+ * device must heal identically to a locally-loaded one.
+ */
+function withDefaultedLetterSoundsVowelStates(parsed: unknown): unknown {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return parsed
+  }
+  const obj = parsed as Record<string, unknown>
+
+  const literacyRaw = obj.literacy
+  if (
+    literacyRaw !== undefined &&
+    (typeof literacyRaw !== 'object' ||
+      literacyRaw === null ||
+      Array.isArray(literacyRaw))
+  ) {
+    return parsed
+  }
+
+  const literacy = (literacyRaw ?? {}) as Record<string, unknown>
+  const statesRaw = literacy.letterSoundsVowelStates
+  if (
+    statesRaw !== undefined &&
+    (typeof statesRaw !== 'object' ||
+      statesRaw === null ||
+      Array.isArray(statesRaw))
+  ) {
+    return parsed
+  }
+
+  const present = (statesRaw ?? {}) as Record<string, unknown>
+  let mutated = literacyRaw === undefined || statesRaw === undefined
+  const filled: Record<string, unknown> = { ...present }
+  for (const vowel of LETTER_SOUNDS_VOWELS) {
+    if (vowel in present && present[vowel] !== undefined) continue
+    filled[vowel] = 'intro' satisfies VowelSubMasteryState
+    mutated = true
+  }
+
+  if (!mutated) return parsed
+
+  return {
+    ...obj,
+    literacy: {
+      ...literacy,
+      letterSoundsVowelStates: filled as Record<
+        LetterSoundsVowel,
+        VowelSubMasteryState
+      >,
+    },
+  }
 }
 
 // ---------------------------------------------------------------------------
