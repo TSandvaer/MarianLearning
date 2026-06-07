@@ -2879,7 +2879,7 @@ describe('generateSessionStartResponse — combined planner + TTS callable (D, 8
     expect(synthCalls).toHaveLength(1)
     expect(synthCalls[0]).toMatchObject({
       text: 'Three plus two. How many?',
-      voice: 'en-US-EmmaMultilingualNeural',
+      voice: 'en-GB-OliviaNeural',
     })
   })
 

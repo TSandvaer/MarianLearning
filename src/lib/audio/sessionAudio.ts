@@ -46,7 +46,7 @@
  * -----------------
  * Server pipeline locks to whatever `EMMA_VOICE_CONFIG` declares in
  * `api/_session.ts`. Phase 3a (ticket 86c9hjnq1, 2026-04-28) moved that
- * to `en-US-EmmaMultilingualNeural` rate `-10%`; same config applies to
+ * to `en-GB-OliviaNeural` rate `-10%`; same config applies to
  * Greet's bundled MP3s. Frontend has no voice config to manage — the
  * audio is already rendered.
  */
@@ -165,8 +165,14 @@ export interface CreateSessionAudioOptions {
  *    Ana → Emma multilingual. The SSML strategy is unchanged, but the
  *    rendered audio bytes differ entirely (different voice timbre), so
  *    every cached row from v2 must be invalidated.
+ *  - v4 = British-voice rollout (2026-06-06, Thomas directive): voice swap
+ *    en-US-EmmaMultilingualNeural → en-GB-OliviaNeural, PLUS a per-sound-
+ *    class SSML treatment for the letter-sounds tier (300ms break before
+ *    each isolated phoneme; question-prosody wrapper no longer applied to
+ *    letter-sounds reads). Every cached row from v3 was rendered on the US
+ *    voice and must be invalidated.
  */
-export const CACHE_VERSION = 3
+export const CACHE_VERSION = 4
 export const STORE_NAME = `session-audio-v${CACHE_VERSION}`
 export const DB_NAME = 'marian-tutor-session-audio'
 /** Tied to CACHE_VERSION so `onupgradeneeded` fires on any bump. The IDB

@@ -119,8 +119,17 @@ describe('letterSoundsPool — shared single source of truth', () => {
   })
 
   describe('LETTER_SOUND_MNEMONIC_TO_LETTER', () => {
-    it('has exactly 19 entries (14 consonant mnemonics + 5 short-vowel mnemonics)', () => {
-      expect(Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER).length).toBe(19)
+    it('has 21 entries (14 consonant mnemonics + 5 short-vowel triplets + 2 round-3 isolate leads uh/ih)', () => {
+      // Round-3 (Dave) added the example-word-anchoring isolate leads
+      // `uh`→U and `ih`→I (Primary candidate). They are real 2-char
+      // mnemonics with PHONEME_OVERRIDES entries, NOT single letters, so
+      // no double-wrap risk.
+      expect(Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER).length).toBe(21)
+    })
+
+    it('includes the round-3 isolate leads uh→U and ih→I', () => {
+      expect(LETTER_SOUND_MNEMONIC_TO_LETTER['uh']).toBe('U')
+      expect(LETTER_SOUND_MNEMONIC_TO_LETTER['ih']).toBe('I')
     })
 
     it('maps every mnemonic to a target letter in LETTER_SOUNDS_POOL', () => {

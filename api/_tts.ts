@@ -275,31 +275,89 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   nnn: { ipa: 'n', tiers: ['letter-sounds'] },
   sss: { ipa: 's', tiers: ['letter-sounds'] },
   fff: { ipa: 'f', tiers: ['letter-sounds'] },
-  vvv: { ipa: 'v', tiers: ['letter-sounds'] },
+  // /v/ is a VOICED fricative — round-2 (Dave straggler spec) adds a
+  // schwa /ə/ tail so Olivia gives it an audible voiced run-out (a bare
+  // /v/ rendered as a cold, near-silent onset). S/F/H (voiceless fric)
+  // stay bare — they get their run-up from the flowing "says it" text
+  // lead-in instead.
+  vvv: { ipa: 'və', tiers: ['letter-sounds'] },
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
-  // Stop consonants (with schwa epenthesis tail — mnemonic captures
-  // the unavoidable vowel-leak when voicing a stop in isolation):
-  puh: { ipa: 'p', tiers: ['letter-sounds'] },
-  buh: { ipa: 'b', tiers: ['letter-sounds'] },
+  // Stop consonants. Round-2 (Dave straggler spec): MOST stops need a
+  // schwa /ə/ release on Olivia — a bare stop rendered nearly silent
+  // (Thomas's "B-silent" report generalised). Only the ALVEOLAR /t/
+  // survives bare. Round-1 gave b/d/g the schwa (GREEN); round-2 adds
+  // the schwa to the bilabial pair p/b and the velar pair k/g, leaving
+  // /t/ as the sole bare stop.
+  //   - /p/ /b/ (bilabial) → pə / bə
+  //   - /t/        (alveolar) → t   (bare — survives)
+  //   - /d/        (alveolar voiced) → də  (round-1 GREEN, kept)
+  //   - /k/ /ɡ/ (velar)    → kə / ɡə
+  // Keep U+0261 ɡ (script g), NOT ASCII g, on /ɡ/.
+  //
+  // K-KEY CONFLICT (Dave finding #5): `kuh` is a SINGLE override key
+  // feeding BOTH the green K-read AND the broken K hint/correct/give.
+  // Changing kuh → kə changes ALL K slots' render. Decision: apply
+  // kə to the single key (no key-split, no read-text churn) and flag
+  // K-read for re-audition on kə. Splitting into a read-only `k` key
+  // would require the K-read mnemonic to differ from the other slots'
+  // mnemonic text (same word "kuh" everywhere → cannot distinguish by
+  // token within one tier), which would mean changing the read text
+  // away from "kuh" — a bigger, more surprising change than letting
+  // Thomas confirm K-read on kə. If kə regresses K-read, the follow-up
+  // is a read-only key with a distinct read mnemonic.
+  puh: { ipa: 'pə', tiers: ['letter-sounds'] },
+  buh: { ipa: 'bə', tiers: ['letter-sounds'] },
   tuh: { ipa: 't', tiers: ['letter-sounds'] },
-  duh: { ipa: 'd', tiers: ['letter-sounds'] },
-  kuh: { ipa: 'k', tiers: ['letter-sounds'] },
-  guh: { ipa: 'ɡ', tiers: ['letter-sounds'] },
-  // Vowels — bare letter glyphs scoped to letter-sounds tier. Without
-  // `tiers`, the bare `a` / `o` / `u` / `i` / `e` would catch the
-  // article "a", the conjunction "o", and any single-letter
-  // appearances in CVC-tier read-lines ("Read the cat." → letter
-  // chip "c" / "a" / "t" inside a longer string would not match
-  // because the bare letter is inside a word, not bordered by `\b` —
-  // but `"Read the a."` style utterances DO exist on some tiers as
-  // letter-name examples, so tier-scoping is the right safety net).
-  a: { ipa: 'æ', tiers: ['letter-sounds'] },
-  o: { ipa: 'ɒ', tiers: ['letter-sounds'] },
-  u: { ipa: 'ʌ', tiers: ['letter-sounds'] },
-  i: { ipa: 'ɪ', tiers: ['letter-sounds'] },
-  e: { ipa: 'ɛ', tiers: ['letter-sounds'] },
+  duh: { ipa: 'də', tiers: ['letter-sounds'] },
+  kuh: { ipa: 'kə', tiers: ['letter-sounds'] },
+  guh: { ipa: 'ɡə', tiers: ['letter-sounds'] },
+  // Vowels — TRIPLET mnemonics (NOT bare single letters). The triplet
+  // is the load-bearing fix for the vowel double-wrap collision: the
+  // letter-sounds canon emits BOTH the mnemonic AND the letter-NAME in
+  // the same utterance (e.g. correct slot "Yes A says aaa."). With a
+  // bare single-letter vowel key, the case-insensitive `\b`-bounded
+  // regex matched BOTH the mnemonic "a" AND the letter-name "A" → both
+  // rendered /æ/ → Thomas heard "Yes ahh says ahh" instead of "Yes
+  // A[ay] says ahh[/æ/]". Consonants never collided (mnemonic "mmm" ≠
+  // letter "M"); only vowels collided because the bare mnemonic equalled
+  // the single-letter name. The triplet `aaa` ≠ the single letter-name
+  // "A", so only the triplet is wrapped; the letter-name "A" stays bare
+  // prose and Azure renders it as its native letter NAME ("ay").
+  //
+  // Sound-neutral: inside `<phoneme ph="æ">aaa</phoneme>` Azure uses
+  // the `ph`, so "aaa" sounds identical to the bare "a" Thomas approved.
+  // This restores Dave's Option 1 (triplet vowel mnemonics) from PR #355
+  // that the British rollout (#356, branched from main) lost.
+  //
+  // Bare phonemes, no stress/length marks (the British Olivia treatment).
+  // A and O are FROZEN (Thomas-approved): æ / ɒ. Round-2 (Dave straggler
+  // spec) re-points u/i/e to en-GB lexical-set realisations because
+  // Olivia mis-realises the bare phonemic /ʌ/ /ɪ/ /ɛ/:
+  //   - /ʌ/ → ə   (STRUT vowel; fallback ɐ if ə regresses)
+  //   - /ɪ/ → ɘ   (KIT — Dave flags this as the stubborn one; if I/E
+  //                 still merge after this, next step is a lexicon probe)
+  //   - /ɛ/ → e   (DRESS realised as cardinal e on en-GB Olivia)
+  // All HYPOTHESIS pending Thomas's ear.
+  aaa: { ipa: 'æ', tiers: ['letter-sounds'] },
+  ooo: { ipa: 'ɒ', tiers: ['letter-sounds'] },
+  uuu: { ipa: 'ə', tiers: ['letter-sounds'] },
+  iii: { ipa: 'ɘ', tiers: ['letter-sounds'] },
+  eee: { ipa: 'e', tiers: ['letter-sounds'] },
+  // Round-3 (Dave round-3): EXAMPLE-WORD ANCHORING for the central/lax
+  // vowels Olivia can't separate from bare IPA (ʌ/ə/ɘ collapse toward
+  // æ; ɪ/ɘ merge). The "Primary" candidate pairs a short ISOLATE lead
+  // (`uh` /ʌ/, `ih` /ɪ/) with a PLAIN-TEXT anchor word ("like in cup",
+  // "like in ink"). Only the isolate lead is phoneme-wrapped here.
+  //
+  // CRITICAL: the anchor words `cup` and `ink` are deliberately
+  // UN-WRAPPED — do NOT add them to this table. Their entire value is
+  // Olivia's native lexicon voicing them correctly; wrapping them in a
+  // <phoneme> would defeat the anchoring. The structured-literacy
+  // pattern is "the sound, like in <real word the learner knows>".
+  uh: { ipa: 'ʌ', tiers: ['letter-sounds'] },
+  ih: { ipa: 'ɪ', tiers: ['letter-sounds'] },
 }
 
 /**
@@ -347,6 +405,7 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
 export function applyPhonemeOverrides(
   text: string,
   tierFilter?: string,
+  prependBreakMs?: number,
 ): string {
   // Build the alternation pattern from ACTIVE entries: every entry
   // whose `tiers` is undefined (global) OR includes the supplied
@@ -362,6 +421,17 @@ export function applyPhonemeOverrides(
     .map(([key]) => key)
   if (activeKeys.length === 0) return escapeSsml(text)
   const pattern = new RegExp(`\\b(${activeKeys.join('|')})\\b`, 'gi')
+
+  // Optional `<break time="Nms"/>` injected immediately BEFORE each
+  // phoneme wrap (en-GB-OliviaNeural letter-sounds path — British
+  // voice rollout). The break gives Olivia a clean prosodic reset so
+  // the isolated phoneme is not swallowed by the carrier phrase
+  // ("Which letter says …"). prependBreakMs is undefined for every
+  // non-letter-sounds caller, so this is a no-op for math/CVC/greet.
+  const breakTag =
+    prependBreakMs !== undefined && prependBreakMs > 0
+      ? `<break time="${prependBreakMs}ms"/>`
+      : ''
 
   // Walk the string emitting alternating escaped-plain and
   // phoneme-wrapped segments. We can't use replaceAll because plain
@@ -382,7 +452,7 @@ export function applyPhonemeOverrides(
     const original = m[0]
     const entry = PHONEME_OVERRIDES[original.toLowerCase()]!
     out.push(
-      `<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`,
+      `${breakTag}<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`,
     )
     lastIndex = m.index + original.length
   }
@@ -438,6 +508,23 @@ export function applyPhonemeOverrides(
  *  are unchanged on the wire. The only utterances affected are those
  *  ending with `?` — that is the bug class. */
 export function renderSsmlInnerText(text: string, tierFilter?: string): string {
+  // Letter-sounds tier (British-voice rollout): the question-prosody
+  // wrapper (`<break/><prosody pitch="+8%" rate="-5%">`) is DELIBERATELY
+  // NOT applied here, even when the read line ends with `?`. Per the
+  // ear-test cycle, letter-sounds reads carry their intonation cue via
+  // the sound-class-dependent terminal punctuation already baked into
+  // the canon text (declarative for voiced sounds, question for
+  // voiceless), and en-GB-OliviaNeural renders that natively. Layering
+  // the +8% pitch / -5% rate question-prosody on top scratched the
+  // isolated phoneme. Instead, letter-sounds gets a 300ms `<break>`
+  // injected immediately before each mnemonic phoneme (inside
+  // applyPhonemeOverrides) for a clean prosodic reset. The
+  // question-prosody wrapper stays in force for EVERY OTHER tier
+  // (math "How many?", word-song reprompts, etc.) via the fall-through
+  // below.
+  if (tierFilter === 'letter-sounds') {
+    return applyPhonemeOverrides(text, tierFilter, 300)
+  }
   // Use the original text for boundary detection (we want to operate on
   // un-escaped characters). Trailing whitespace doesn't matter for the
   // ends-in-? check.

@@ -19,7 +19,7 @@ vi.mock('./_session.js', () => {
   return {
     renderSessionAudio: vi.fn(),
     EMMA_VOICE_CONFIG: {
-      voice: 'en-US-EmmaMultilingualNeural',
+      voice: 'en-GB-OliviaNeural',
       rate: '-10%',
       pitch: '+0Hz',
       volume: '+0%',

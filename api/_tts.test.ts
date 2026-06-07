@@ -373,30 +373,35 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     expect(applyPhonemeOverrides(text, 'cvc-words')).not.toContain('<phoneme')
   })
 
-  it('letter-sounds tier-scoped `buh` stop-consonant mnemonic fires ONLY in letter-sounds', () => {
+  it('letter-sounds tier-scoped `buh` stop-consonant mnemonic fires ONLY in letter-sounds (voiced stop carries a schwa /bə/ for audible release)', () => {
     const text = 'Which letter says buh?'
+    // VOICED stops (b/d/g) carry a schwa /ə/ in the IPA so Olivia
+    // releases them audibly (a bare /b/ rendered near-silent — Thomas's
+    // "B-silent" report). Voiceless stops (p/t/k) stay bare.
     expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
-      '<phoneme alphabet="ipa" ph="b">buh</phoneme>',
+      '<phoneme alphabet="ipa" ph="bə">buh</phoneme>',
     )
     expect(applyPhonemeOverrides(text, 'cvc-words')).not.toContain('<phoneme')
     expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
   })
 
-  it('letter-sounds tier-scoped vowel mnemonics fire on /ɒ/ /ʌ/ /ɪ/ /ɛ/ /æ/ ONLY in letter-sounds', () => {
-    // Each vowel mnemonic stands alone in the utterance (matching the
-    // letter-sounds read template `"Which letter says <SOUND>?"`).
+  it('letter-sounds tier-scoped vowel mnemonics fire ONLY in letter-sounds (round-2 en-GB realisations for u/i/e)', () => {
+    // Vowel mnemonics are TRIPLETS (aaa/ooo/uuu/iii/eee) — the vowel
+    // double-wrap fix. A/O are FROZEN at æ/ɒ. Round-2 (Dave straggler
+    // spec) re-points u/i/e to en-GB lexical-set realisations because
+    // Olivia mis-realises the bare phonemic /ʌ/ /ɪ/ /ɛ/: u→ə, i→ɘ, e→e.
     const cases: ReadonlyArray<[string, string]> = [
-      ['Which letter says a?', 'æ'],
-      ['Which letter says o?', 'ɒ'],
-      ['Which letter says u?', 'ʌ'],
-      ['Which letter says i?', 'ɪ'],
-      ['Which letter says e?', 'ɛ'],
+      ['Which letter says aaa.', 'æ'], // FROZEN
+      ['Which letter says ooo.', 'ɒ'], // FROZEN
+      ['Which letter says uuu.', 'ə'], // round-2 (was ʌ)
+      ['Which letter says iii.', 'ɘ'], // round-2 (was ɪ)
+      ['Which letter says eee.', 'e'], // round-2 (was ɛ)
     ]
     for (const [text, ipa] of cases) {
       expect(applyPhonemeOverrides(text, 'letter-sounds')).toContain(
         `ph="${ipa}"`,
       )
-      // Without the tier filter, no wrap. The bare letter is preserved.
+      // Without the tier filter, no wrap. The bare triplet is preserved.
       expect(applyPhonemeOverrides(text)).not.toContain('<phoneme')
     }
   })
@@ -449,10 +454,10 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     const cases = [
       'Which letter says mmm?',
       'Which letter says buh?',
-      'Which letter says a?',
-      'Which letter says o?',
-      'Which letter says i?',
-      'Which letter says e?',
+      'Which letter says aaa.',
+      'Which letter says ooo.',
+      'Which letter says iii.',
+      'Which letter says eee.',
     ]
     for (const text of cases) {
       const out = applyPhonemeOverrides(text)
@@ -508,6 +513,142 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
       tier: 'cvc-words',
     })
     expect(cvcBody).not.toContain('<phoneme')
+  })
+})
+
+describe('letter-sounds SSML treatment (British-voice rollout, 2026-06-06)', () => {
+  it('injects a 300ms break before each phoneme when prependBreakMs is set', () => {
+    const out = applyPhonemeOverrides(
+      'Which letter says mmm.',
+      'letter-sounds',
+      300,
+    )
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="m">mmm</phoneme>.',
+    )
+  })
+
+  it('does NOT inject a break for non-letter-sounds callers (back-compat)', () => {
+    // No prependBreakMs → no break, even when a global entry wraps.
+    expect(applyPhonemeOverrides('Hear four.', 'cvc-words')).toBe(
+      'Hear <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+    )
+    expect(applyPhonemeOverrides('Hear four.')).toBe(
+      'Hear <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+    )
+  })
+
+  it('does NOT apply the question-prosody wrapper to a VOICELESS letter-sounds read (ends with "?")', () => {
+    // "Which letter says sss?" is a voiceless-sound read — it ends with
+    // "?" but must NOT pick up the +8%/-5% question-prosody wrapper that
+    // math "How many?" gets. The intonation cue is the punctuation + the
+    // 300ms break only.
+    const out = renderSsmlInnerText('Which letter says sss?', 'letter-sounds')
+    expect(out).not.toContain('pitch="+8%"')
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="s">sss</phoneme>?',
+    )
+  })
+
+  it('handles a VOICED (declarative) letter-sounds read with the break + phoneme', () => {
+    // Vowel mnemonic is a TRIPLET (ooo), not the bare letter (o) — the
+    // vowel double-wrap fix. Only the triplet is wrapped.
+    const out = renderSsmlInnerText('Which letter says ooo.', 'letter-sounds')
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ɒ">ooo</phoneme>.',
+    )
+  })
+
+  it('does NOT double-wrap a vowel correct line — only the triplet mnemonic is wrapped, the letter-NAME stays bare (vowel double-wrap regression guard)', () => {
+    // The bug: "Yes A says a." → both the letter-name "A" and the bare
+    // mnemonic "a" matched the case-insensitive override → both rendered
+    // /æ/ ("Yes ahh says ahh"). The NEW correct shape (Dave master spec)
+    // is "Yes. A. aaa." — letter-name its own sentence, "says" dropped.
+    // With the TRIPLET mnemonic the letter-name "A" is NOT a key, so it
+    // stays bare prose (Azure speaks "ay") and only "aaa" is wrapped /æ/.
+    const out = applyPhonemeOverrides('Yes. A. aaa.', 'letter-sounds')
+    // Exactly ONE phoneme wrap, and it surrounds the triplet — NOT the
+    // letter-name.
+    expect(out).toBe('Yes. A. <phoneme alphabet="ipa" ph="æ">aaa</phoneme>.')
+    // The standalone letter-name "A" is never wrapped.
+    expect(out).not.toContain('>A</phoneme>')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('mirrors the consonant case — a consonant correct line wraps only the mnemonic, never the letter-name', () => {
+    const out = applyPhonemeOverrides('Yes. M. mmm.', 'letter-sounds')
+    expect(out).toBe('Yes. M. <phoneme alphabet="ipa" ph="m">mmm</phoneme>.')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('handles the fricative hint "It says hhh?" without question prosody', () => {
+    const out = renderSsmlInnerText('It says hhh?', 'letter-sounds')
+    expect(out).not.toContain('pitch="+8%"')
+    expect(out).toBe(
+      'It says <break time="300ms"/><phoneme alphabet="ipa" ph="h">hhh</phoneme>?',
+    )
+  })
+
+  it('STILL applies question prosody to math reads (tierFilter undefined — unaffected by the letter-sounds scoping)', () => {
+    const out = renderSsmlInnerText('Three plus two. How many?')
+    expect(out).toBe(
+      'Three plus two. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
+    )
+  })
+
+  // ── Round-3: example-word anchoring (Dave round-3) ──────────────────
+  it('anchored U Primary read: wraps ONLY the isolate lead "uh" (/ʌ/); the anchor word "cup" stays PLAIN TEXT', () => {
+    const out = renderSsmlInnerText(
+      'Which letter says uh, like in cup?',
+      'letter-sounds',
+    )
+    // The isolate lead is the only wrap, with the 300ms break.
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ʌ">uh</phoneme>, like in cup?',
+    )
+    // "cup" is NEVER phoneme-wrapped — its value is Olivia's native
+    // lexicon. Exactly one phoneme tag total.
+    expect(out).not.toContain('>cup<')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('anchored I Primary read: wraps ONLY "ih" (/ɪ/); "ink" stays plain text', () => {
+    const out = renderSsmlInnerText(
+      'Which letter says ih, like in ink?',
+      'letter-sounds',
+    )
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ɪ">ih</phoneme>, like in ink?',
+    )
+    expect(out).not.toContain('>ink<')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('anchored U correct line: letter-name "U" un-wrapped, "Uh" isolate wrapped, "cup" plain', () => {
+    const out = renderSsmlInnerText('Yes. U. Uh, like in cup.', 'letter-sounds')
+    // "Uh" (capitalised, sentence-initial) is the only wrap; the case-
+    // insensitive override matches it. The letter-name "U" and "cup"
+    // stay bare prose.
+    expect(out).toBe(
+      'Yes. U. <break time="300ms"/><phoneme alphabet="ipa" ph="ʌ">Uh</phoneme>, like in cup.',
+    )
+    expect(out).not.toContain('>U</phoneme>')
+    expect(out).not.toContain('>cup<')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('defensive: a bare single-letter "u"/"i" is NEVER phoneme-wrapped (double-wrap guard; the rejected Anchor-only form would have relied on this)', () => {
+    // The bare "u"/"i" is NOT a PHONEME_OVERRIDES key (only the triplet
+    // "uuu"/"iii" and the round-3 isolate leads "uh"/"ih" are). So a bare
+    // single letter is never wrapped — this guards the double-wrap fix.
+    // (The Anchor-only candidate that emitted bare-letter reads was
+    // rejected and removed; this stays as a defensive guard.)
+    expect(
+      renderSsmlInnerText('Which letter says u, like in cup?', 'letter-sounds'),
+    ).not.toContain('<phoneme')
+    expect(
+      renderSsmlInnerText('Which letter says i, like in ink?', 'letter-sounds'),
+    ).not.toContain('<phoneme')
   })
 })
 

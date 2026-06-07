@@ -18,7 +18,7 @@ chime, no nag copy — same posture as Math's silent-fallback path.
 
 Render via Azure Speech REST using
 `scripts/render-greet-mp3s.mjs` as the template. Voice config:
-`en-US-EmmaMultilingualNeural`, rate `-10%`, default pitch.
+`en-GB-OliviaNeural`, rate `-10%`, default pitch.
 
 Ticket `86c9j53yx` (Kyle's asset queue) tracks the actual line
 recording. The Hub-implementation PR (ticket `86c9j53ra`) ships the

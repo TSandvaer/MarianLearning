@@ -21,12 +21,15 @@
  *  - 2026-04-25 (PR #25, ticket 86c9gqprh): initial bake via the Python
  *    `edge-tts` CLI at `en-US-AnaNeural` rate `-10%`. Hand-run, not
  *    committed as a script.
- *  - 2026-04-28 (this PR, ticket 86c9hjnq1, Phase 3a): re-rendered with
+ *  - 2026-04-28 (ticket 86c9hjnq1, Phase 3a): re-rendered with
  *    `en-US-EmmaMultilingualNeural` at the same rate; line 2 also
  *    re-keyed from "I'm Melody." to "I'm Emma." as part of the broader
  *    character pivot away from Sanrio IP. Committed as a script so future
  *    voice/text changes don't require recovering the production recipe
  *    from a chat transcript.
+ *  - 2026-06-06 (British-voice rollout, Thomas directive): VOICE const
+ *    swapped `en-US-EmmaMultilingualNeural` → `en-GB-OliviaNeural`; all
+ *    4 Greet MP3s re-rendered. See `api/_session.ts` EMMA_VOICE_CONFIG.
  *
  * Usage
  * -----
@@ -112,7 +115,7 @@ if (!AZURE_KEY && !DRY_RUN) {
 
 // ── Voice + line config (duplicated; see header rationale) ──────────────
 
-const VOICE = 'en-US-EmmaMultilingualNeural'
+const VOICE = 'en-GB-OliviaNeural'
 const RATE = '-10%'
 const PITCH = '+0Hz'
 const VOLUME = '+0%'

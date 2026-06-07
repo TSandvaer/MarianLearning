@@ -40,12 +40,14 @@ describe('extractUtteranceTexts', () => {
 })
 
 describe('EMMA_VOICE_CONFIG', () => {
-  it('uses Emma multilingual at -10% (Phase 3a voice, ticket 86c9hjnq1)', () => {
-    // Voice swapped from en-US-AnaNeural to en-US-EmmaMultilingualNeural
-    // on 2026-04-28 — see the constant's docstring for full history. Rate /
-    // pitch / volume are unchanged across the swap.
+  it('uses the British Olivia voice at -10% (British-voice rollout, 2026-06-06)', () => {
+    // Voice swapped en-US-EmmaMultilingualNeural → en-GB-OliviaNeural on
+    // 2026-06-06 (Thomas directive) — the US voice mangled isolated short-
+    // vowel phonemes in the letter-sounds tier. See the constant's
+    // docstring for full history. Rate / pitch / volume are unchanged
+    // across the swap.
     expect(EMMA_VOICE_CONFIG).toEqual({
-      voice: 'en-US-EmmaMultilingualNeural',
+      voice: 'en-GB-OliviaNeural',
       rate: '-10%',
       pitch: '+0Hz',
       volume: '+0%',
@@ -75,7 +77,7 @@ describe('renderSessionAudio', () => {
 
     for (const call of synth.mock.calls) {
       const req = call[0] as TtsRequest
-      expect(req.voice).toBe('en-US-EmmaMultilingualNeural')
+      expect(req.voice).toBe('en-GB-OliviaNeural')
       expect(req.rate).toBe('-10%')
       expect(req.pitch).toBe('+0Hz')
       expect(req.volume).toBe('+0%')

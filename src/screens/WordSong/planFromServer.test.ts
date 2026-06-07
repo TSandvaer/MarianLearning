@@ -778,8 +778,8 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
     }
   })
 
-  it('covers all 14 consonant mnemonics + 5 short-vowel mnemonics (19-entry pool)', () => {
-    expect(LETTER_SOUND_MNEMONIC_POOL.size).toBe(19)
+  it('covers 14 consonant mnemonics + 5 short-vowel triplets + 2 round-3 isolate leads (21-entry pool)', () => {
+    expect(LETTER_SOUND_MNEMONIC_POOL.size).toBe(21)
     // 14 consonant mnemonics
     for (const mnemonic of [
       'mmm',
@@ -799,17 +799,28 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
     ]) {
       expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
     }
-    // 5 short-vowel mnemonics
-    for (const mnemonic of ['a', 'o', 'u', 'i', 'e']) {
+    // 5 short-vowel mnemonics — TRIPLETS (vowel double-wrap fix), NOT
+    // bare single letters.
+    for (const mnemonic of ['aaa', 'ooo', 'uuu', 'iii', 'eee']) {
       expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
+    }
+    // Round-3 isolate leads (example-word anchoring Primary candidate).
+    for (const mnemonic of ['uh', 'ih']) {
+      expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
+    }
+    // The bare single-letter vowel mnemonics are NOT in the main pool
+    // (they resolve only via the anchored-only fallback, with an anchor
+    // suffix present).
+    for (const bare of ['a', 'o', 'u', 'i', 'e']) {
+      expect(LETTER_SOUND_MNEMONIC_POOL.has(bare)).toBe(false)
     }
   })
 
-  it('rejects mnemonics outside the 19-entry pool with a clear error', () => {
+  it('rejects mnemonics outside the pool with a clear error', () => {
     // `zzz` is the right shape (lowercase 1-3 letters) but not in the
     // pool — the pool guard fires.
     expect(() => parseReadLine('Which letter says zzz?')).toThrow(
-      /outside the 19-mnemonic pool/,
+      /outside the mnemonic pool/,
     )
     // `nope` is the right shape but not a known mnemonic.
     expect(() => parseReadLine('Which letter says nope?')).toThrow(
@@ -817,15 +828,36 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
     )
   })
 
-  it('rejects out-of-shape lines (no terminal `?`, wrong verb)', () => {
-    // Missing trailing `?` — the template requires it.
-    expect(() => parseReadLine('Which letter says mmm.')).toThrow(
+  it('rejects out-of-shape lines (wrong terminal, wrong verb)', () => {
+    // The British-voice rollout (2026-06-06) widened the accepted
+    // terminals to `[.?]` — both `.` (voiced/declarative) and `?`
+    // (voiceless/question) parse. A terminal OUTSIDE that set still
+    // fails the template.
+    expect(() => parseReadLine('Which letter says mmm!')).toThrow(
       /did not match any known template/,
     )
-    // Different verb — `says` not `is`.
+    // No terminal at all — the template requires one of `[.?]`.
+    expect(() => parseReadLine('Which letter says mmm')).toThrow(
+      /did not match any known template/,
+    )
+    // Different verb — `is` not `says`.
     expect(() => parseReadLine('Which letter is mmm?')).toThrow(
       /did not match any known template/,
     )
+  })
+
+  it('accepts BOTH the declarative (voiced) and question (voiceless) read terminals (British-voice rollout, 2026-06-06)', () => {
+    // VOICED sound → declarative "." form. This is the exact shape that
+    // surfaced the prod silence on PR #356 (canon emits `mmm.` for the
+    // voiced nasal /m/; the pre-rollout `?`-only parser rejected it →
+    // Path A silent fallback to "Tap the cat").
+    const declarative = parseReadLine('Which letter says mmm.')
+    expect(declarative.contentType).toBe('letter-sounds')
+    expect(declarative.entry.word).toBe('M')
+    // VOICELESS sound → question "?" form (unchanged).
+    const question = parseReadLine('Which letter says sss?')
+    expect(question.contentType).toBe('letter-sounds')
+    expect(question.entry.word).toBe('S')
   })
 
   it('is case-insensitive on the verb preamble but normalises the mnemonic to lowercase', () => {
@@ -864,7 +896,8 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
   it('target letter is UPPERCASE regardless of mnemonic case (canon correct-line convention)', () => {
     // Every entry in `LETTER_SOUND_MNEMONIC_TO_LETTER` value-side must
     // be uppercase — matches the canon's `correct` line shape
-    // (`"Yes! M says mmm."`). Locks against accidental lowercase drift.
+    // (`"Yes. M. mmm."` — Dave master spec). Locks against accidental
+    // lowercase drift.
     for (const letter of Object.values(LETTER_SOUND_MNEMONIC_TO_LETTER)) {
       expect(letter).toBe(letter.toUpperCase())
       expect(letter.length).toBe(1)
@@ -907,12 +940,15 @@ describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)',
 
   it('preserves the read text verbatim (audio-script / on-screen-caption mirror)', () => {
     const plan = wordSongSessionPlanFromServer(SAMPLE_LETTER_SOUNDS_PLAN)
-    expect(plan.problems[0]!.utterances.read).toBe('Which letter says mmm?')
-    expect(plan.problems[3]!.utterances.read).toBe('Which letter says a?')
+    // Terminals are sound-class-dependent (British-voice rollout):
+    // /m/ + /æ/ are VOICED → declarative "."; /t/ is VOICELESS → "?".
+    // The /æ/ mnemonic is the TRIPLET "aaa" (vowel double-wrap fix).
+    expect(plan.problems[0]!.utterances.read).toBe('Which letter says mmm.')
+    expect(plan.problems[3]!.utterances.read).toBe('Which letter says aaa.')
     expect(plan.problems[4]!.utterances.read).toBe('Which letter says tuh?')
   })
 
-  it('rejects a letter-sounds entry whose mnemonic is outside the 19-entry pool', () => {
+  it('rejects a letter-sounds entry whose mnemonic is outside the pool', () => {
     const broken: typeof SAMPLE_LETTER_SOUNDS_PLAN = {
       ...SAMPLE_LETTER_SOUNDS_PLAN,
       utterances: SAMPLE_LETTER_SOUNDS_PLAN.utterances.map((u) =>
@@ -920,7 +956,7 @@ describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)',
       ),
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
-      /outside the 19-mnemonic pool/,
+      /outside the mnemonic pool/,
     )
   })
 
@@ -951,18 +987,19 @@ describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)',
  */
 describe('wordSongSessionPlanFromServer — live canon mnemonic sequence (PR #337)', () => {
   it('parses the exact mnemonic sequence from the live canon JSON', () => {
-    // The mnemonic + letter pairs the live canon ships (PR #337):
-    //   p1=mmm→M, p2=sss→S, p3=hhh→H, p4=a→A, p5=tuh→T,
-    //   p6=o→O,   p7=lll→L, p8=o→O
+    // The mnemonic + letter pairs the live canon ships. Vowels use the
+    // TRIPLET mnemonic (aaa/ooo — vowel double-wrap fix):
+    //   p1=mmm→M, p2=sss→S, p3=hhh→H, p4=aaa→A, p5=tuh→T,
+    //   p6=ooo→O, p7=lll→L, p8=ooo→O
     const liveCanonPairs = [
       { mnemonic: 'mmm', letter: 'M' },
       { mnemonic: 'sss', letter: 'S' },
       { mnemonic: 'hhh', letter: 'H' },
-      { mnemonic: 'a', letter: 'A' },
+      { mnemonic: 'aaa', letter: 'A' },
       { mnemonic: 'tuh', letter: 'T' },
-      { mnemonic: 'o', letter: 'O' },
+      { mnemonic: 'ooo', letter: 'O' },
       { mnemonic: 'lll', letter: 'L' },
-      { mnemonic: 'o', letter: 'O' },
+      { mnemonic: 'ooo', letter: 'O' },
     ]
     const wire = {
       id: 'live-canon-letter-sounds-001',
@@ -973,13 +1010,13 @@ describe('wordSongSessionPlanFromServer — live canon mnemonic sequence (PR #33
           { id: `word.p${n}.read`, text: `Which letter says ${mnemonic}?` },
           {
             id: `word.p${n}.correct`,
-            text: `Yes! ${letter} says ${mnemonic}.`,
+            text: `Yes. ${letter}. ${mnemonic}.`,
           },
           { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
           { id: `word.p${n}.hint`, text: `Listen. ${mnemonic}.` },
           {
             id: `word.p${n}.giveAnswer`,
-            text: `This one is ${letter}. ${letter} says ${mnemonic}.`,
+            text: `This one is ${letter}. ${mnemonic}.`,
           },
         ]
       }),
@@ -999,6 +1036,284 @@ describe('wordSongSessionPlanFromServer — live canon mnemonic sequence (PR #33
     for (const problem of plan.problems) {
       expect(problem.contentType).toBe('letter-sounds')
     }
+  })
+})
+
+/**
+ * Planner↔parser contract regression guard (British-voice rollout,
+ * 2026-06-06; PR #356 silent-fallback bug).
+ *
+ * The British-voice rollout made the letter-sounds read line's terminal
+ * punctuation SOUND-CLASS-DEPENDENT (declarative `.` for VOICED sounds,
+ * question `?` for VOICELESS) and introduced two hint shapes (`It says
+ * X?` for FRICATIVES, `Listen. X.` for non-fricatives). The browser
+ * Path A parser only accepted the `?` read form, so VOICED declarative
+ * reads (e.g. `"Which letter says mmm."`) were rejected → silent
+ * fallback to the "Tap the cat" static plan. The audition page bypassed
+ * Path A (hand-rendered clips), so this only surfaced in the real app
+ * flow.
+ *
+ * This block is the contract guard: EVERY read/hint shape the planner
+ * can emit per sound class MUST parse successfully through
+ * `wordSongSessionPlanFromServer` (the runtime Path A entry point). The
+ * sound-class classification mirrors `api/_planner.ts`'s LETTER-SOUNDS
+ * UTTERANCE TEMPLATE → SOUND-CLASS CLASSIFICATION table.
+ */
+describe('parseReadLine — letter-sounds planner↔parser contract (per sound class, British-voice rollout)', () => {
+  // Sound-class classification per api/_planner.ts SOUND-CLASS
+  // CLASSIFICATION table. read: VOICED → "." , VOICELESS → "?".
+  // hint: FRICATIVE → "It says X?" , NON-FRICATIVE → "Listen. X.".
+  const SOUND_CLASSES: ReadonlyArray<{
+    mnemonic: string
+    letter: string
+    readTerm: '.' | '?'
+    hint: string
+  }> = [
+    // Nasals (voiced, non-fricative)
+    { mnemonic: 'mmm', letter: 'M', readTerm: '.', hint: 'Listen. mmm.' },
+    { mnemonic: 'nnn', letter: 'N', readTerm: '.', hint: 'Listen. nnn.' },
+    // Liquids (voiced, non-fricative)
+    { mnemonic: 'lll', letter: 'L', readTerm: '.', hint: 'Listen. lll.' },
+    { mnemonic: 'rrr', letter: 'R', readTerm: '.', hint: 'Listen. rrr.' },
+    // Voiced fricative V — round-2: read flips to "?" (question).
+    { mnemonic: 'vvv', letter: 'V', readTerm: '?', hint: 'It says vvv?' },
+    // Voiceless fricatives (voiceless read, fricative hint)
+    { mnemonic: 'sss', letter: 'S', readTerm: '?', hint: 'It says sss?' },
+    { mnemonic: 'fff', letter: 'F', readTerm: '?', hint: 'It says fff?' },
+    { mnemonic: 'hhh', letter: 'H', readTerm: '?', hint: 'It says hhh?' },
+    // Voiced stops — round-2: schwa-tailed → DECLARATIVE "." read.
+    { mnemonic: 'buh', letter: 'B', readTerm: '.', hint: 'Listen. buh.' },
+    { mnemonic: 'duh', letter: 'D', readTerm: '.', hint: 'Listen. duh.' },
+    { mnemonic: 'guh', letter: 'G', readTerm: '.', hint: 'Listen. guh.' },
+    // Stops P (round-2: schwa → declarative ".") ; T/K keep question read.
+    { mnemonic: 'puh', letter: 'P', readTerm: '.', hint: 'Listen. puh.' },
+    { mnemonic: 'tuh', letter: 'T', readTerm: '?', hint: 'Listen. tuh.' },
+    { mnemonic: 'kuh', letter: 'K', readTerm: '?', hint: 'Listen. kuh.' },
+    // Vowels (voiced, non-fricative) — TRIPLET mnemonics (vowel
+    // double-wrap fix): the triplet never equals the single letter-name.
+    { mnemonic: 'aaa', letter: 'A', readTerm: '.', hint: 'Listen. aaa.' },
+    { mnemonic: 'ooo', letter: 'O', readTerm: '.', hint: 'Listen. ooo.' },
+    { mnemonic: 'uuu', letter: 'U', readTerm: '.', hint: 'Listen. uuu.' },
+    { mnemonic: 'iii', letter: 'I', readTerm: '.', hint: 'Listen. iii.' },
+    { mnemonic: 'eee', letter: 'E', readTerm: '.', hint: 'Listen. eee.' },
+  ]
+
+  it('parses the read line for EVERY sound class (declarative + question terminals)', () => {
+    for (const { mnemonic, letter, readTerm } of SOUND_CLASSES) {
+      const read = `Which letter says ${mnemonic}${readTerm}`
+      const result = parseReadLine(read)
+      expect(result.contentType).toBe('letter-sounds')
+      expect(result.entry.word).toBe(letter)
+    }
+  })
+
+  it('every DECLARATIVE-read sound (round-2 partition) parses with the "." terminal', () => {
+    const declarative = SOUND_CLASSES.filter((s) => s.readTerm === '.')
+    // Round-2 declarative set: nasals m/n, liquids l/r, schwa-tailed
+    // stops p/b/d/g, and all 5 vowels = 13.
+    expect(declarative.map((s) => s.letter).sort()).toEqual([
+      'A',
+      'B',
+      'D',
+      'E',
+      'G',
+      'I',
+      'L',
+      'M',
+      'N',
+      'O',
+      'P',
+      'R',
+      'U',
+    ])
+    for (const { mnemonic, letter } of declarative) {
+      expect(parseReadLine(`Which letter says ${mnemonic}.`).entry.word).toBe(
+        letter,
+      )
+    }
+  })
+
+  it('every QUESTION-read sound (round-2 partition) parses with the "?" terminal', () => {
+    const question = SOUND_CLASSES.filter((s) => s.readTerm === '?')
+    // Round-2 question set: voiceless fricatives s/f/h, voiced fricative
+    // v, and the two stops t/k that keep the question read = 6.
+    expect(question.map((s) => s.letter).sort()).toEqual([
+      'F',
+      'H',
+      'K',
+      'S',
+      'T',
+      'V',
+    ])
+    for (const { mnemonic, letter } of question) {
+      expect(parseReadLine(`Which letter says ${mnemonic}?`).entry.word).toBe(
+        letter,
+      )
+    }
+  })
+
+  it('a full per-class session (declarative + question reads, both hint shapes) round-trips through Path A without rejection', () => {
+    // Build an 8-problem session that exercises BOTH read terminals AND
+    // BOTH hint shapes, mirroring what the canon emits. The hint text is
+    // carried verbatim (the parser does not shape-validate hint — audio
+    // plays by utterance id) but we include the real shapes to pin that
+    // they never cause a Path A rejection.
+    const pick = [
+      SOUND_CLASSES[0]!, // mmm  → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[5]!, // sss  → "?" read, "It says" hint, saysIt correct
+      SOUND_CLASSES[7]!, // hhh  → "?" read, "It says" hint, saysIt correct
+      SOUND_CLASSES[14]!, // a    → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[12]!, // tuh  → "?" read, "Listen." hint, plain correct
+      SOUND_CLASSES[15]!, // o    → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[2]!, // lll  → "." read, "Listen." hint, plain correct
+      SOUND_CLASSES[4]!, // vvv  → "?" read, "It says" hint, saysIt correct (round-2)
+    ]
+    // Fricatives (S/F/H/V) use the round-2 "says it" correct/give shape.
+    const FRIC = new Set(['S', 'F', 'H', 'V'])
+    const wire = {
+      id: 'contract-per-class-letter-sounds',
+      label: 'per-sound-class contract session',
+      utterances: pick.flatMap(({ mnemonic, letter, readTerm, hint }, i) => {
+        const n = i + 1
+        const isFric = FRIC.has(letter)
+        const correct = isFric
+          ? `Yes. ${letter} says it. ${mnemonic}?`
+          : `Yes. ${letter}. ${mnemonic}.`
+        const giveAnswer = isFric
+          ? `This one is ${letter}. ${letter} says it. ${mnemonic}?`
+          : `This one is ${letter}. ${mnemonic}.`
+        return [
+          {
+            id: `word.p${n}.read`,
+            text: `Which letter says ${mnemonic}${readTerm}`,
+          },
+          { id: `word.p${n}.correct`, text: correct },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          { id: `word.p${n}.hint`, text: hint },
+          { id: `word.p${n}.giveAnswer`, text: giveAnswer },
+        ]
+      }),
+    }
+    // The bug: pre-fix this threw PlanFromServerError "did not match any
+    // known template" on the very first declarative read → Path A
+    // silent fallback. Post-fix it must parse cleanly.
+    const plan = wordSongSessionPlanFromServer(wire)
+    expect(plan.problems).toHaveLength(8)
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'M',
+      'S',
+      'H',
+      'A',
+      'T',
+      'O',
+      'L',
+      'V',
+    ])
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('letter-sounds')
+    }
+    // The hint shapes are preserved verbatim (audio plays by id).
+    expect(plan.problems[0]!.utterances.hint).toBe('Listen. mmm.')
+    expect(plan.problems[1]!.utterances.hint).toBe('It says sss?')
+    // P4 is the mastered vowel /æ/ — its mnemonic is the TRIPLET "aaa",
+    // so the correct line carries BOTH the bare letter-name "A" AND the
+    // triplet (which never collide at render time). This is the vowel
+    // double-wrap fix at the text level.
+    expect(plan.problems[3]!.target.word).toBe('A')
+    expect(plan.problems[3]!.utterances.read).toBe('Which letter says aaa.')
+    // NEW correct/giveAnswer shapes (Dave master spec): letter-name its
+    // own sentence, "says" dropped, no redundant second clause.
+    expect(plan.problems[3]!.utterances.correct).toBe('Yes. A. aaa.')
+    expect(plan.problems[3]!.utterances.giveAnswer).toBe('This one is A. aaa.')
+    // P2 is /s/ — a FRICATIVE. Round-2 (Dave straggler spec) gives
+    // fricatives the flowing "says it" lead-in in correct/giveAnswer to
+    // fix the cold-onset sink/drumbeat. The read line still parses (the
+    // parser only shape-checks the read; correct/give flow through).
+    expect(plan.problems[1]!.target.word).toBe('S')
+    expect(plan.problems[1]!.utterances.read).toBe('Which letter says sss?')
+    expect(plan.problems[1]!.utterances.correct).toBe('Yes. S says it. sss?')
+    expect(plan.problems[1]!.utterances.giveAnswer).toBe(
+      'This one is S. S says it. sss?',
+    )
+  })
+})
+
+describe('parseReadLine — round-3 example-word-anchored U/I reads (LOCKED to Primary)', () => {
+  it('parses the LOCKED Primary form (isolate lead + anchor): "...says uh, like in cup?" → U', () => {
+    const u = parseReadLine('Which letter says uh, like in cup?')
+    expect(u.contentType).toBe('letter-sounds')
+    expect(u.entry.word).toBe('U')
+    const i = parseReadLine('Which letter says ih, like in ink?')
+    expect(i.entry.word).toBe('I')
+  })
+
+  it('REJECTS the rejected Anchor-only bare-letter read (the fallback was removed)', () => {
+    // The Anchor-only candidate (`"...says u, like in cup?"`) was
+    // A/B-rejected — Olivia spoke the letter NAME "you"/"eye". Its
+    // bare-letter resolution fallback was removed, so a bare `u`/`i`
+    // leading token no longer resolves even WITH an anchor suffix.
+    expect(() => parseReadLine('Which letter says u, like in cup?')).toThrow(
+      /outside the mnemonic pool/,
+    )
+    expect(() => parseReadLine('Which letter says i, like in ink?')).toThrow(
+      /outside the mnemonic pool/,
+    )
+  })
+
+  it('also rejects a bare single-letter vowel without any anchor (double-wrap guard intact)', () => {
+    expect(() => parseReadLine('Which letter says u.')).toThrow(
+      /outside the mnemonic pool/,
+    )
+    expect(() => parseReadLine('Which letter says i?')).toThrow(
+      /outside the mnemonic pool/,
+    )
+  })
+
+  it('the isolate leads uh/ih parse WITHOUT an anchor too (they are real pool mnemonics)', () => {
+    expect(parseReadLine('Which letter says uh?').entry.word).toBe('U')
+    expect(parseReadLine('Which letter says ih.').entry.word).toBe('I')
+  })
+
+  it('a full session of LOCKED Primary U/I reads round-trips through Path A', () => {
+    const wire = {
+      id: 'round3-anchored',
+      label: 'round-3 anchored U/I (Primary)',
+      utterances: [
+        { read: 'Which letter says uh, like in cup?', hint: 'Listen. Uh, like in cup.', correct: 'Yes. U. Uh, like in cup.', give: 'This one is U. Uh, like in cup.' }, // prettier-ignore
+        { read: 'Which letter says ih, like in ink?', hint: 'Listen. Ih, like in ink.', correct: 'Yes. I. Ih, like in ink.', give: 'This one is I. Ih, like in ink.' }, // prettier-ignore
+        { read: 'Which letter says eee.', hint: 'Listen. eee.', correct: 'Yes. E. eee.', give: 'This one is E. eee.' }, // prettier-ignore
+        { read: 'Which letter says mmm.', hint: 'Listen. mmm.', correct: 'Yes. M. mmm.', give: 'This one is M. mmm.' }, // prettier-ignore
+        { read: 'Which letter says sss?', hint: 'It says sss?', correct: 'Yes. S says it. sss?', give: 'This one is S. S says it. sss?' }, // prettier-ignore
+        { read: 'Which letter says kuh.', hint: 'Listen. kuh.', correct: 'Yes. K. kuh.', give: 'This one is K. kuh.' }, // prettier-ignore
+        { read: 'Which letter says buh.', hint: 'Listen. buh.', correct: 'Yes. B. buh.', give: 'This one is B. buh.' }, // prettier-ignore
+        { read: 'Which letter says lll.', hint: 'Listen. lll.', correct: 'Yes. L. lll.', give: 'This one is L. lll.' }, // prettier-ignore
+      ].flatMap((c, idx) => {
+        const n = idx + 1
+        return [
+          { id: `word.p${n}.read`, text: c.read },
+          { id: `word.p${n}.correct`, text: c.correct },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          { id: `word.p${n}.hint`, text: c.hint },
+          { id: `word.p${n}.giveAnswer`, text: c.give },
+        ]
+      }),
+    }
+    const plan = wordSongSessionPlanFromServer(wire)
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'U',
+      'I',
+      'E',
+      'M',
+      'S',
+      'K',
+      'B',
+      'L',
+    ])
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('letter-sounds')
+    }
+    // K read is round-3 declarative.
+    expect(plan.problems[5]!.utterances.read).toBe('Which letter says kuh.')
   })
 })
 

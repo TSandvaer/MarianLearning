@@ -7551,12 +7551,34 @@ describe('KNOWN_DISTRACTOR_CLASSES', () => {
 //            2-3, mastered-vowel /æ/ ≥ 1)
 //   §1.3#7 — no duplicate target sound within the 8-problem set
 
+/**
+ * Test-convenience map: the bulk session-builder fixtures below pass
+ * vowels by their single-letter shorthand (`'a'`, `'o'`, ...) for
+ * readability. The real canon + lint pool now use TRIPLET vowel
+ * mnemonics (`aaa`, `ooo`, ... — the vowel double-wrap fix). This map
+ * normalises the shorthand to the triplet the pool expects so the
+ * existing fixtures stay terse. Consonant mnemonics are passed verbatim
+ * (they were never single letters, so no collision and no remap).
+ */
+const VOWEL_SHORTHAND_TO_TRIPLET: Readonly<Record<string, string>> = {
+  a: 'aaa',
+  o: 'ooo',
+  u: 'uuu',
+  i: 'iii',
+  e: 'eee',
+}
+
+function normaliseMnemonic(mnemonic: string): string {
+  return VOWEL_SHORTHAND_TO_TRIPLET[mnemonic] ?? mnemonic
+}
+
 /** Build a `word.p<N>.read` letter-sounds utterance with the
- *  "Which letter says <MNEMONIC>?" template. */
+ *  "Which letter says <MNEMONIC>?" template. Single-letter vowel
+ *  shorthands are normalised to their triplet mnemonic. */
 function readLetterSoundsUtterance(index: number, mnemonic: string): Utterance {
   return {
     id: `word.p${index}.read`,
-    text: `Which letter says ${mnemonic}?`,
+    text: `Which letter says ${normaliseMnemonic(mnemonic)}?`,
     audio: { kind: 'inline', base64: 'AA==', mime: 'audio/mpeg' },
   }
 }
@@ -7598,9 +7620,9 @@ describe('parseLetterSoundsReadLine', () => {
     })
   })
 
-  it('parses the bare vowel mnemonic "o"', () => {
-    expect(parseLetterSoundsReadLine('Which letter says o?')).toEqual({
-      mnemonic: 'o',
+  it('parses the triplet vowel mnemonic "ooo"', () => {
+    expect(parseLetterSoundsReadLine('Which letter says ooo?')).toEqual({
+      mnemonic: 'ooo',
     })
   })
 
@@ -7612,6 +7634,20 @@ describe('parseLetterSoundsReadLine', () => {
   it('case-insensitive on the framing; lowercases the captured mnemonic', () => {
     expect(parseLetterSoundsReadLine('WHICH LETTER SAYS MMM?')).toEqual({
       mnemonic: 'mmm',
+    })
+  })
+
+  it('parses the DECLARATIVE (voiced-sound) form ending in "." (British-voice rollout, 2026-06-06)', () => {
+    // Voiced sounds (nasals, liquids, voiced fricatives, vowels, voiced
+    // stops) carry declarative falling intonation → read ends with ".".
+    expect(parseLetterSoundsReadLine('Which letter says mmm.')).toEqual({
+      mnemonic: 'mmm',
+    })
+    expect(parseLetterSoundsReadLine('Which letter says ooo.')).toEqual({
+      mnemonic: 'ooo',
+    })
+    expect(parseLetterSoundsReadLine('Which letter says buh.')).toEqual({
+      mnemonic: 'buh',
     })
   })
 })

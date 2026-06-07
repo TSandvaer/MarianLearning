@@ -897,7 +897,13 @@ test.describe('digraphs-ch content + intro→practicing transition (AC1 + AC9 + 
       timeout: 10_000,
     })
     const cta = page.getByTestId('session-end-cta')
-    await expect(cta).toBeVisible({ timeout: 12_000 })
+    // 12s → 20s (British-voice rollout). This is a REAL-canon-audio
+    // session; the session-end recap reveals the CTA only after its
+    // recap utterances finish playing. en-GB-OliviaNeural clips run a
+    // touch longer than the prior voice, so the recap-to-CTA reveal can
+    // exceed 12s on Chromium (the CTA appears, just past the old cap).
+    // 20s gives Olivia headroom.
+    await expect(cta).toBeVisible({ timeout: 20_000 })
     await cta.click()
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
 

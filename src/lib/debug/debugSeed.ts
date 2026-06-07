@@ -79,6 +79,17 @@
  *   iPad smoke convenience: put a fresh device on letter-names without
  *   manually editing localStorage. Ticket 86c9y6g6n (Devon NOF #3 on
  *   PR #335 — Kevin A3 letter-names bake).
+ * - `letter-sounds`: Marian as if `letter-names` is mastered and she's
+ *   now practicing `letter-sounds` — the SECOND node in
+ *   WORD_SONG_NODES_IN_ORDER (phoneme → grapheme mapping). The picker
+ *   walks past the mastered `letter-names` root and lands on
+ *   `letter-sounds` (practicing). Skips Greet so the app deep-routes to
+ *   Hub. Used by Thomas's iPad smoke-test to confirm the production
+ *   letter-sounds canon (baked through the real render pipeline on
+ *   en-GB-OliviaNeural) reproduces the approved isolated-phoneme sound
+ *   in-app — the ear-test clips were hand-rendered standalone, so this
+ *   seed exercises the full canon path end-to-end. Brought onto the
+ *   production branch from the abandoned PR #354 (Devon's seed).
  * - `cvc-words`: Marian as if she's mastered everything through
  *   `blending-cv` and is now practicing `cvc-words`. Skips Greet (sets
  *   sessionCount to 1) so the app deep-routes to Hub on first mount,
@@ -263,6 +274,24 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
   'letter-names': {
     skillLevels: {
       'letter-names': 'practicing',
+    },
+    skipGreet: true,
+  },
+  // Letter-sounds content tier smoke-test entry. Marian as if the
+  // `letter-names` root is mastered and she's now practicing
+  // `letter-sounds` — the SECOND node in WORD_SONG_NODES_IN_ORDER
+  // (phoneme → grapheme mapping). The picker walks past the mastered
+  // `letter-names` root and lands on `letter-sounds` (practicing).
+  // Purpose: let Thomas smoke the ACTUAL baked letter-sounds canon in
+  // the real app flow on en-GB-OliviaNeural — the ear-test clips he
+  // approved were hand-rendered standalone, so this seed confirms the
+  // canon (which went through the real render pipeline) reproduces the
+  // approved isolated-phoneme sound in-app end-to-end. Brought onto the
+  // production branch from the abandoned PR #354 (Devon's seed).
+  'letter-sounds': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'practicing',
     },
     skipGreet: true,
   },

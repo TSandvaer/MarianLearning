@@ -120,14 +120,34 @@ export const LETTER_SOUND_MNEMONIC_TO_LETTER: Readonly<Record<string, string>> =
     duh: 'D',
     kuh: 'K',
     guh: 'G',
-    // Short vowels — mnemonic is the bare vowel letter; SSML phoneme
-    // wrap forces the short pronunciation. Mastered vowel /æ/ + 4
-    // current-target vowels /ɒ/, /ʌ/, /ɪ/, /ɛ/.
-    a: 'A',
-    o: 'O',
-    u: 'U',
-    i: 'I',
-    e: 'E',
+    // Short vowels — mnemonic is a TRIPLET (NOT the bare vowel letter);
+    // SSML phoneme wrap forces the short pronunciation. Mastered vowel
+    // /æ/ + 4 current-target vowels /ɒ/, /ʌ/, /ɪ/, /ɛ/.
+    //
+    // Why triplets (the vowel double-wrap fix): the canon emits BOTH the
+    // mnemonic AND the letter-NAME in the correct/giveAnswer slots (e.g.
+    // "Yes A says aaa."). A bare single-letter vowel mnemonic would equal
+    // the single-letter name, so the render-time phoneme wrap (case-
+    // insensitive, word-bounded) matched BOTH → both rendered /æ/ ("Yes
+    // ahh says ahh"). The triplet aaa ≠ the letter-name A, so only the
+    // triplet is wrapped and the letter-name stays bare (spoken "ay").
+    // Consonants never collided (mmm ≠ M). Restores Dave's Option 1
+    // (triplet vowel mnemonics) lost when the British rollout branched
+    // from main. The read parser accepts triplets because its mnemonic
+    // capture is `[a-z]+`.
+    aaa: 'A',
+    ooo: 'O',
+    uuu: 'U',
+    iii: 'I',
+    eee: 'E',
+    // Round-3 isolate leads for example-word anchoring (Dave round-3).
+    // `uh`/`ih` are the phoneme-wrapped isolate leads in the Primary
+    // anchored candidate (`"...says uh, like in cup?"`). They are real
+    // 2-char mnemonics (NOT single letters), so they do NOT collide with
+    // the single-letter letter-NAME — no double-wrap risk. The read
+    // parser captures only the leading token, so `uh`/`ih` resolve U/I.
+    uh: 'U',
+    ih: 'I',
   }
 
 /**
@@ -137,6 +157,14 @@ export const LETTER_SOUND_MNEMONIC_TO_LETTER: Readonly<Record<string, string>> =
 export const LETTER_SOUND_MNEMONIC_POOL: ReadonlySet<string> = new Set(
   Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER),
 )
+
+// NOTE (round-3 finalisation): an "Anchor-only" U/I candidate that
+// emitted a bare single-letter read (`"Which letter says u, like in
+// cup?"`) was A/B-tested and REJECTED — Olivia spoke the letter NAME
+// "you"/"eye" instead of the sound. The bare-letter resolution map and
+// parser fallback it needed were removed. The LOCKED Primary form uses
+// the `uh`/`ih` isolate leads, which ARE in the pool above, so no
+// bare-letter resolution is needed any more.
 
 /**
  * Sentinel `pictureKey` prefix for synthetic letter-sound target

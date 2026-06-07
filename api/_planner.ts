@@ -1150,7 +1150,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - hint: "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Five. And three more. How many now?"
   - giveAnswer: "This one is <answer>." e.g. "This one is eight."
 
-  PROSODY: numbers are spelled out as words ("one", "two", ... "ten"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10%; no SSML overrides required for any value in [1, 10].
+  PROSODY: numbers are spelled out as words ("one", "two", ... "ten"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10%; no SSML overrides required for any value in [1, 10].
 - add-to-20: addition with sums STRICTLY in [11, 20] and BOTH addends in [1, 9]. NO TEN-PLUS-SINGLE (10+n, n+10 FORBIDDEN — that's two-digit-addsub territory); NO sums <= 10 (that's add-to-10's territory). read: "<addend-A> plus <addend-B>. How many?" e.g. "Eight plus five. How many?"
 
   SUM-RANGE SELF-CHECK (apply before emitting every problem): for chosen (addendA a, addendB b), COMPUTE a + b and CONFIRM that 11 <= a + b <= 18. (V1 pool excludes 19 and 20 — see addend range below.) If the sum is < 11, the problem belongs in add-to-10 and is FORBIDDEN here; if > 18, the (a, b) pair is OUT of the v1 pool. Worked example: 8+3=11 is OK (11 in range). 5+5=10 is FORBIDDEN (sum < 11). 9+10=19 is FORBIDDEN (addend = 10 violates next check).
@@ -1229,7 +1229,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - hint: "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Eight. And five more. How many now?"
   - giveAnswer: "This one is <answer>." e.g. "This one is thirteen."
 
-  PROSODY: numbers are spelled out as words ("one", "two", ... "nine", "ten", "eleven", ... "eighteen"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10% for all values in [1, 18]; no SSML overrides required (validated by sub-to-20 §4 for the same teen-number range). Do NOT verbally decompose the addends (e.g. do NOT say "eight plus two plus three" instead of "eight plus five") — per Dave § 2 (L2 context note, sub-to-20 research), verbal decomposition adds L2 cognitive load without pedagogical benefit. The decomposition IS the mental work Marian does to bridge; it stays internal.
+  PROSODY: numbers are spelled out as words ("one", "two", ... "nine", "ten", "eleven", ... "eighteen"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10% for all values in [1, 18]; no SSML overrides required (validated by sub-to-20 §4 for the same teen-number range). Do NOT verbally decompose the addends (e.g. do NOT say "eight plus two plus three" instead of "eight plus five") — per Dave § 2 (L2 context note, sub-to-20 research), verbal decomposition adds L2 cognitive load without pedagogical benefit. The decomposition IS the mental work Marian does to bridge; it stays internal.
 - sub-to-10: subtraction with both operands in 0-10 and answer in 0-10. read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seven minus three. How many are left?"
 
   FIRST-SESSION READ-LINE — SESSION-LEVEL TEMPLATE CHOICE (not per-problem). Make this choice ONCE for the entire 8-problem session:
@@ -1286,7 +1286,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - hint: "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Ten. Take away two. How many now?" (use "take away" framing in the hint regardless of read-line variant — the hint is a scaffold, not a primary read)
   - giveAnswer: "This one is <answer>." e.g. "This one is eight." (for correct=0 → "This one is zero.")
 
-  PROSODY: numbers are spelled out as words ("zero", "one", "two", ... "ten"). Capitalize the first word of each sentence. The "minus" / "take away" template renders cleanly on en-US-EmmaMultilingualNeural rate -10%; no SSML overrides required for any value in [0, 10].
+  PROSODY: numbers are spelled out as words ("zero", "one", "two", ... "ten"). Capitalize the first word of each sentence. The "minus" / "take away" template renders cleanly on en-GB-OliviaNeural rate -10%; no SSML overrides required for any value in [0, 10].
 - sub-to-20: subtraction with minuend in [11, 19] and subtrahend in [1, 9] and result in [10, 18]. NO BORROW — the ones-digit of the minuend MUST be >= subtrahend. read: "<minuend> minus <subtrahend>. How many are left?" e.g. "Seventeen minus five. How many are left?"
 
   NO-BORROW SELF-CHECK (apply before emitting every problem): for chosen (minuend a, subtrahend b), COMPUTE ones-digit(a) = a mod 10 and CONFIRM that ones-digit(a) >= b. If ones-digit(a) < b, the problem is a BORROW fact and is FORBIDDEN; reject and pick another from the pool. Worked example: 14-3=11 is no-borrow (ones-digit(14)=4 >= 3 → OK). 14-7=7 is BORROW (ones-digit(14)=4 < 7 → FORBIDDEN). 18-9=9 is BORROW (ones-digit(18)=8 < 9 → FORBIDDEN). The pool below has been pre-filtered; this self-check is a defense-in-depth assertion against drift.
@@ -1362,7 +1362,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - hint: "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Fifteen. Take away three. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
   - giveAnswer: "This one is <answer>." e.g. "This one is twelve."
 
-  PROSODY: numbers are spelled out as words ("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"). Capitalize the first word of each sentence. The "minus" template renders cleanly on en-US-EmmaMultilingualNeural rate -10% for all teen values; no SSML overrides required. Do NOT verbally decompose the minuend (e.g. do NOT say "ten and seven, minus five" or "ten plus seven minus five") — per Dave § 2 (L2 context note), verbal decomposition adds L2 cognitive load without pedagogical benefit. Emma says the numeral name plainly.
+  PROSODY: numbers are spelled out as words ("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"). Capitalize the first word of each sentence. The "minus" template renders cleanly on en-GB-OliviaNeural rate -10% for all teen values; no SSML overrides required. Do NOT verbally decompose the minuend (e.g. do NOT say "ten and seven, minus five" or "ten plus seven minus five") — per Dave § 2 (L2 context note), verbal decomposition adds L2 cognitive load without pedagogical benefit. Emma says the numeral name plainly.
 - two-digit-addsub-no-regroup: addition OR subtraction within one mixed-op session, no regrouping. For ADDITION: one OR both operands two-digit, the other one-digit (or both two-digit per the two-digit-plus-two-digit pool slice below), units column sums to AT MOST 9 (no carrying). For SUBTRACTION: minuend is two-digit, subtrahend is one-digit, minuend's units digit >= subtrahend (no borrowing), result >= 12. read for "+": "<addend-A> plus <addend-B>. How many?" e.g. "Twenty-three plus four. How many?". read for "-": "<minuend> minus <subtrahend>. How many are left?" e.g. "Forty-eight minus seven. How many are left?".
 
   NO-REGROUP SELF-CHECK (apply BEFORE emitting every problem):
@@ -1474,7 +1474,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - hint (-): "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Forty-eight. Take away seven. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
   - giveAnswer: "This one is <answer>." e.g. "This one is twenty-seven."
 
-  PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-three", "forty-five", "sixty-nine") — Emma renders these on en-US-EmmaMultilingualNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", ... "ninety") are NOT hyphenated when emitted alone (e.g. "Twenty plus three", not "Twenty-zero plus three").
+  PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-three", "forty-five", "sixty-nine") — Emma renders these on en-GB-OliviaNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", ... "ninety") are NOT hyphenated when emitted alone (e.g. "Twenty plus three", not "Twenty-zero plus three").
 
   PROSODY PROHIBITION (LOAD-BEARING): never render two-digit operands digit-by-digit. FORBIDDEN: "Two three plus one four. How many?" / "Two-three plus four. How many?" / "Two and three plus one and four. How many?". ALLOWED: "Twenty-three plus fourteen. How many?". Digit-by-digit TTS actively trains the concatenated-single-digit-processing error pattern this tier is designed to remediate. Quantity-word framing is the only correct form.
 
@@ -1576,7 +1576,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - hint (-): "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Thirty-two. Take away five. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
   - giveAnswer: "This one is <answer>." e.g. "This one is thirty-three."
 
-  PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-seven", "thirty-three", "forty-two", "fifty-three", "sixty-four") — Emma renders these on en-US-EmmaMultilingualNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", "forty", "fifty", "sixty") are NOT hyphenated when emitted alone (e.g. "Thirty minus four", not "Thirty-zero minus four").
+  PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-seven", "thirty-three", "forty-two", "fifty-three", "sixty-four") — Emma renders these on en-GB-OliviaNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", "forty", "fifty", "sixty") are NOT hyphenated when emitted alone (e.g. "Thirty minus four", not "Thirty-zero minus four").
 
   PROSODY PROHIBITION <rule band="hard">LOAD-BEARING, carried forward from two-digit-addsub-no-regroup unchanged</rule>: never render two-digit operands digit-by-digit. FORBIDDEN: "Two seven plus six. How many?" / "Two-seven plus six. How many?" / "Three and two minus five. How many are left?". ALLOWED: "Twenty-seven plus six. How many?". Digit-by-digit TTS at the regrouping tier trains the concatenated-with-carry-suppression error pattern — the child hears the operands as independent digits, then fails to integrate the carry across them. Quantity-word framing is the only correct form. <self-check>After composing each "+" or "-" read-line, scan for any space-or-hyphen-separated single-digit pair within an operand (e.g. "two seven", "three-two"). If present, REJECT and re-emit as a quantity word.</self-check>
 
@@ -1735,7 +1735,10 @@ matching that node. Nine first-class content modes today:
     read-line template + the chip-content discipline (letter glyph,
     not picture) differ. See the LETTER-NAMES SESSION COMPOSITION
     RULES block below.
-  - letter-sounds: "Which letter says <SOUND>?" problems. Marian hears
+  - letter-sounds: "Which letter says <SOUND>" problems (terminal
+    punctuation is sound-class-dependent — declarative for voiced
+    sounds, question for voiceless; see the SOUND-CLASS CLASSIFICATION
+    block in the LETTER-SOUNDS UTTERANCE TEMPLATE). Marian hears
     Emma voice an isolated short-vowel or consonant phoneme and taps
     the LETTER GLYPH that maps to that sound (no pictures). This is
     the SECOND literacy tier in tree order (between letter-names and
@@ -1910,14 +1913,14 @@ chips on consonant-target problems, but MAY NEVER be the target sound
       /k/ [MASTERED-CONSONANT/voiceless-pair-k-g] → letter k, mnemonic kuh
       /g/ [MASTERED-CONSONANT/voiced-pair-k-g]    → letter g, mnemonic guh
   Mastered vowel (always in-pool — anchor):
-      /æ/ [MASTERED-VOWEL/short-a]                → letter a, mnemonic a
+      /æ/ [MASTERED-VOWEL/short-a]                → letter a, mnemonic aaa
   Current-target short vowel (EXACTLY ONE per session — the lift; pick
     per the user-message current-target-vowel=<IPA> hint or default to
     /ɒ/ per VOWEL-LADDER SELF-CHECK below):
-      /ɒ/ [CURRENT-TARGET-VOWEL/short-o]          → letter o, mnemonic o
-      /ʌ/ [CURRENT-TARGET-VOWEL/short-u]          → letter u, mnemonic u
-      /ɪ/ [CURRENT-TARGET-VOWEL/short-i]          → letter i, mnemonic i
-      /ɛ/ [CURRENT-TARGET-VOWEL/short-e]          → letter e, mnemonic e
+      /ɒ/ [CURRENT-TARGET-VOWEL/short-o]          → letter o, mnemonic ooo
+      /ʌ/ [CURRENT-TARGET-VOWEL/short-u]          → letter u, mnemonic uuu
+      /ɪ/ [CURRENT-TARGET-VOWEL/short-i]          → letter i, mnemonic iii
+      /ɛ/ [CURRENT-TARGET-VOWEL/short-e]          → letter e, mnemonic eee
   Voiced/unvoiced trap pairs (within MASTERED-CONSONANT band — the
     pedagogically-grounded auditory confusion class per spec §3.1):
       p ↔ b   t ↔ d   k ↔ g   f ↔ v
@@ -2126,7 +2129,7 @@ names diverge from the cvc-words default — see the per-slot template
 list near the bottom of this guide.
 
 NO SSML / NO PHONEME WRAPPING in letter-names utterance text. Azure
-Speech (en-US-EmmaMultilingualNeural) pronounces the ASCII alphabet
+Speech (en-GB-OliviaNeural) pronounces the ASCII alphabet
 correctly out of the box — "the letter M" renders as "the letter em"
 without any SSML override. Do NOT wrap individual letters in
 phoneme tags, do NOT use slash-IPA notation, do NOT spell out
@@ -2362,10 +2365,70 @@ Sound → mnemonic (the literal string to emit in utterance text):
   Stop consonants (with schwa epenthesis tail):
     /p/ → puh     /b/ → buh     /t/ → tuh
     /d/ → duh     /k/ → kuh     /g/ → guh
-  Mastered vowel:
-    /æ/ → a
-  Current-target short vowels:
-    /ɒ/ → o       /ʌ/ → u       /ɪ/ → i       /ɛ/ → e
+  Mastered vowel (TRIPLET mnemonic — see VOWEL TRIPLET RULE below):
+    /æ/ → aaa
+  Current-target short vowels (TRIPLET mnemonics):
+    /ɒ/ → ooo     /ʌ/ → uuu     /ɪ/ → iii     /ɛ/ → eee
+
+VOWEL TRIPLET RULE (load-bearing — DO NOT emit a single-letter vowel
+mnemonic). Vowel mnemonics MUST be TRIPLETS (aaa, ooo, uuu, iii, eee),
+never the bare single letter (a, o, u, i, e). The correct/giveAnswer
+slots emit BOTH the mnemonic AND the letter-NAME in the same utterance
+(e.g. "Yes A says aaa."). If the vowel mnemonic were the bare single
+letter, the render-time phoneme wrap (case-insensitive, word-bounded)
+would match BOTH the mnemonic "a" AND the letter-name "A" and render
+BOTH as /æ/ — Marian would hear "Yes ahh says ahh" instead of "Yes A
+says ahh". The triplet aaa ≠ the single letter-name A, so only the
+triplet is wrapped; the letter-name stays bare prose and Azure speaks
+it as the letter NAME ("ay"). Consonants are immune (mnemonic mmm ≠
+letter M) — this rule exists ONLY because the bare vowel mnemonic used
+to equal the single-letter name. Inside <phoneme ph="æ">aaa</phoneme>
+Azure uses the ph, so "aaa" sounds identical to the approved "a".
+
+SOUND-CLASS CLASSIFICATION (drives read terminal punctuation and hint
+framing — apply per target sound). Two independent axes:
+
+  READ terminal punctuation — ROUND-2 per-sound partition (Dave
+  straggler spec; supersedes round-1 "all stops are questions"):
+    · DECLARATIVE, read ends with "." :
+        nasals  /m/ /n/
+        liquids /l/ /r/
+        ALL vowels /æ/ /ɒ/ /ʌ/ /ɪ/ /ɛ/
+        SCHWA-TAILED stops /p/ /b/ /d/ /g/  (round-2 — vowel-final after
+          the schwa, so declarative fits better than a question)
+    · QUESTION, read ends with "?" :
+        voiceless fricatives /s/ /f/ /h/
+        voiced fricative /v/  (round-2 — flipped TO question)
+        the two non-schwa-or-velar stops /t/ /k/  (/t/ bare-FROZEN;
+          /k/ question read Thomas-approved GREEN)
+
+  FRICATIVE vs NON-FRICATIVE (drives HINT framing):
+    · FRICATIVE → hint "It says <SOUND-MNEMONIC>?" :
+        /s/ /f/ /h/ /v/ /z/  (+ sh/th digraph sounds, out of scope here)
+    · NON-FRICATIVE → hint "Listen. <SOUND-MNEMONIC>." :
+        nasals /m/ /n/, liquids /l/ /r/, ALL vowels, ALL stops
+        /p/ /b/ /t/ /d/ /k/ /g/
+
+  Per-sound resolved table for THIS tier's 16-sound active pool
+  (mastered consonants + /æ/ + current-target vowel):
+    /m/ → read "."  hint "Listen."     (voiced nasal, non-fric)
+    /n/ → read "."  hint "Listen."     (voiced nasal, non-fric)
+    /l/ → read "."  hint "Listen."     (voiced liquid, non-fric)
+    /r/ → read "."  hint "Listen."     (voiced liquid, non-fric)
+    /v/ → read "?"  hint "It says …?"  (voiced fric; round-2 read flip; saysIt correct/give; ph və)
+    /z/ → read "?"  hint "It says …?"  (voiced fricative; OOS v1)
+    /s/ → read "?"  hint "It says …?"  (voiceless fric; saysIt correct/give)
+    /f/ → read "?"  hint "It says …?"  (voiceless fric; saysIt correct/give)
+    /h/ → read "?"  hint "It says …?"  (voiceless fric; saysIt correct/give)
+    /b/ → read "."  hint "Listen."     (voiced stop — schwa /bə/; round-2 read flip)
+    /d/ → read "."  hint "Listen."     (voiced stop — schwa /də/; round-2 read flip)
+    /g/ → read "."  hint "Listen."     (voiced stop — schwa /ɡə/; round-2 read flip)
+    /p/ → read "."  hint "Listen."     (voiceless stop — schwa /pə/; round-2 read flip)
+    /t/ → read "?"  hint "Listen."     (voiceless stop — bare /t/, FROZEN)
+    /k/ → read "."  hint "Listen."     (voiceless stop — ph kə; ROUND-3: read flips to declarative, like every other schwa-stop — "kuh was scratching" on the question read)
+    /æ/ /ɒ/ → read "."  hint "Listen."  (vowels A/O — FROZEN æ/ɒ)
+    /ʌ/ /ɪ/ → read "."  hint "Listen."  (vowels U/I — ROUND-3 example-word anchored; see ANCHORED VOWEL block below)
+    /ɛ/ → read "."  hint "Listen."  (vowel E — ph "e")
 
 NEGATIVE ANCHOR — DO NOT spell out letter NAMES phonetically in
 utterance text. "em", "kyoo", "double-yoo", "see" are FORBIDDEN.
@@ -2384,34 +2447,132 @@ Per-slot templates (letter-sounds tier; <SOUND-MNEMONIC> is the
 substituted word from the table above; <LETTER-UPPER> is the
 uppercase letter glyph for the target):
 
-- read: "Which letter says <SOUND-MNEMONIC>?"
-    e.g. "Which letter says mmm?" (target letter: m)
-    e.g. "Which letter says o?"   (target letter: o, sound /ɒ/)
-    e.g. "Which letter says buh?" (target letter: b, sound /b/)
-- correct: "Yes! <LETTER-UPPER> says <SOUND-MNEMONIC>."
-    e.g. "Yes! M says mmm."
-    e.g. "Yes! O says o."
-    e.g. "Yes! B says buh."
-  The <LETTER-UPPER> in correct/giveAnswer is the UPPERCASE letter
-  glyph (M, O, B) — read by Azure as the letter NAME ("em", "oh",
-  "bee") rather than the phoneme. The letter-name pronunciation is
-  INTENTIONAL: only the <SOUND-MNEMONIC> (mmm, o, buh) is wrapped
-  in <phoneme> at render time; the letter-name reference stays
-  plain prose and Azure renders it as its native letter name. This
-  separates the two concepts (the letter has a NAME and a SOUND)
-  cleanly in Marian's hearing.
+- read: SOUND-CLASS-DEPENDENT terminal punctuation (see SOUND-CLASS
+    CLASSIFICATION block below). The canon TEXT is bare prose
+    "Which letter says <SOUND-MNEMONIC>" + terminal punctuation; the
+    300ms break before the mnemonic and the phoneme wrap
+    are BOTH injected at render time by the tier-aware letter-sounds
+    path in api/_tts.ts — do NOT write any SSML tag into the canon
+    text. The terminal punctuation is per-sound (ROUND-2 partition, Dave
+    straggler spec, supersedes round-1 "all stops are questions"):
+      · DECLARATIVE, ends with "." : nasals m/n, liquids l/r, ALL vowels
+        /æ ɒ ʌ ɪ ɛ/, AND ALL SCHWA-TAILED stops /p b d g k/ (round-2
+        added p/b/d/g; ROUND-3 adds /k/ — their schwa makes them
+        vowel-final, so a falling declarative fits better than a
+        question):
+          "Which letter says mmm."
+          "Which letter says ooo." (sound /ɒ/ — TRIPLET vowel mnemonic)
+          "Which letter says buh." (voiced stop /b/ — round-2: declarative)
+          "Which letter says puh." (voiceless stop /p/ — round-2: declarative)
+          "Which letter says kuh." (voiceless stop /k/ — ROUND-3: declarative; "kuh was scratching" on the question read)
+      · QUESTION, ends with "?" : voiceless fricatives /s f h/, the
+        VOICED fricative /v/ (round-2), AND the bare stop /t/ (the only
+        stop with NO schwa, so it keeps the question read):
+          "Which letter says sss?"
+          "Which letter says vvv?" (voiced fricative /v/ — round-2)
+          "Which letter says tuh?" (voiceless stop /t/ — bare /t/, FROZEN)
+    Rationale: the round-1 "all stops are questions" was wrong for the
+    SCHWA-tailed stops — once they carry a schwa tail they are
+    vowel-final and the rising question contour over-inflected them;
+    declarative is the fix. Round-2 flipped /p b d g/; ROUND-3 flips /k/
+    (which moved to a schwa ph="kə" in round-2 but kept the question read
+    by oversight — "kuh was scratching"). Only bare /t/ (no schwa) keeps
+    the question read. /v/ flips TO a question. Continuant-voiced sounds
+    (nasals, liquids, vowels) keep their round-1 declarative.
+- correct: SOUND-CLASS-DEPENDENT (round-2, Dave straggler spec):
+    · FRICATIVE (S/F/H/V) → flowing "says it" lead-in, ends "?" :
+        "Yes. <LETTER-UPPER> says it. <SOUND-MNEMONIC>?"
+        e.g. "Yes. S says it. sss?"   e.g. "Yes. V says it. vvv?"
+      Why: a bare fricative had a cold near-silent onset (sink/drumbeat
+      artefact). The voiced "says it" run-up + trailing "?" gives Olivia
+      a flowing lead-in INTO the fricative so it doesn't start cold. The
+      letter-NAME ("S") stays un-wrapped (Azure speaks "ess"); only the
+      mnemonic is <phoneme>-wrapped at render time. Renders as
+      "Yes. <name> says it. <break/><phoneme>sss</phoneme>?".
+    · EVERYONE ELSE (nasals/liquids/vowels/stops) → round-1 approved
+      three-sentence shape "Yes. <LETTER-UPPER>. <SOUND-MNEMONIC>." :
+        e.g. "Yes. M. mmm."
+        e.g. "Yes. O. ooo."   (vowel — TRIPLET; letter-name O stays bare)
+        e.g. "Yes. B. buh."
+  THREE-SENTENCE SHAPE (Dave master spec, non-fricatives): the letter-NAME is its OWN sentence
+  (followed by a period), then the SOUND-MNEMONIC is its own sentence.
+  DROP the word "says" — on Olivia "O says ooo" ran together as
+  "Osays". Three short sentences ("Yes." / "<LETTER>." / "<MNEMONIC>.")
+  give Olivia clean sentence boundaries so the letter NAME and the
+  SOUND are each spoken distinctly. The <LETTER-UPPER> is the UPPERCASE
+  letter glyph (M, O, B) — read by Azure as the letter NAME ("em",
+  "oh", "bee") rather than the phoneme. Only the <SOUND-MNEMONIC> (mmm,
+  ooo, buh) is wrapped in <phoneme> at render time; the letter-name
+  reference stays plain prose and Azure renders it as its native letter
+  name. For VOWELS this separation is ONLY correct because the mnemonic
+  is a TRIPLET (ooo) that differs from the single letter-name (O) — see
+  the VOWEL TRIPLET RULE above. A bare "o" mnemonic would collide with
+  the letter-name "O" and both would render /ɒ/ ("Yes ahh ahh").
 - reprompt: "Hmm... try again?"  (verbatim — SAME as every other
   word-song tier)
-- hint: "Listen. <SOUND-MNEMONIC>."
-    e.g. "Listen. mmm."
-    e.g. "Listen. o."
-    e.g. "Listen. buh."
-  The hint slot voices ONLY the sound — gives Marian a clean
-  second listen with no other framing.
-- giveAnswer: "This one is <LETTER-UPPER>. <LETTER-UPPER> says <SOUND-MNEMONIC>."
-    e.g. "This one is M. M says mmm."
-    e.g. "This one is O. O says o."
-    e.g. "This one is B. B says buh."
+- hint: SOUND-CLASS-DEPENDENT framing (see SOUND-CLASS CLASSIFICATION
+    block below). The canon TEXT is bare prose; the <break> + <phoneme>
+    wrap are injected at render time (same as read). The hint shape
+    depends on whether the target sound is a FRICATIVE:
+      · FRICATIVE (s, f, h, v, z, and the sh/th digraph sounds) →
+        "It says <SOUND-MNEMONIC>?" :
+          "It says sss?"
+          "It says hhh?"
+          "It says fff?"
+      · NON-FRICATIVE (nasals m/n, liquids l/r, ALL vowels, and ALL
+        stops p/b/t/d/k/g) → "Listen. <SOUND-MNEMONIC>." :
+          "Listen. mmm."
+          "Listen. ooo." (vowel /ɒ/ — TRIPLET mnemonic)
+          "Listen. buh." (stop /b/ — a stop is NOT a fricative)
+  Rationale: a fricative can be sustained and "tried on" by Marian, so
+  the inviting "It says …?" prompt with rising intonation works; a
+  non-fricative is voiced once cleanly after the "Listen." cue with
+  falling intonation. The hint slot voices ONLY the sound — no other
+  framing beyond the class-appropriate carrier.
+- giveAnswer: SOUND-CLASS-DEPENDENT (round-2, Dave straggler spec):
+    · FRICATIVE (S/F/H/V) → flowing "says it" lead-in, ends "?" :
+        "This one is <LETTER-UPPER>. <LETTER-UPPER> says it. <SOUND-MNEMONIC>?"
+        e.g. "This one is S. S says it. sss?"
+        e.g. "This one is V. V says it. vvv?"
+      Same cold-onset fix as the fricative correct: the second "<L> says
+      it." clause gives Olivia a voiced run-up into the fricative. Both
+      letter-NAME mentions stay un-wrapped; only the mnemonic is wrapped.
+    · EVERYONE ELSE → round-1 approved shape:
+        "This one is <LETTER-UPPER>. <SOUND-MNEMONIC>."
+        e.g. "This one is M. mmm."
+        e.g. "This one is O. ooo."   (vowel — TRIPLET mnemonic)
+        e.g. "This one is B. buh."
+  NON-FRICATIVE shape (Dave master spec): DROP the redundant second
+  "<LETTER> says <MNEMONIC>" clause. The letter-NAME is named once
+  ("This one is O."), then the SOUND is voiced once as its own sentence
+  ("ooo."). Only the mnemonic is phoneme-wrapped; the letter-name stays
+  bare prose.
+
+ANCHORED VOWELS U/I (ROUND-3 — example-word anchoring, LOCKED). Olivia
+cannot separate the central/lax vowels from bare IPA (ʌ/ə/ɘ collapse
+toward /æ/; ɪ/ɘ merge). The fix is structured-literacy keyword
+anchoring: pair the sound with a real word Olivia's lexicon voices
+correctly. U anchors to "cup", I anchors to "ink". When /ʌ/ (letter u)
+or /ɪ/ (letter i) is the target sound in a real session, ALWAYS emit the
+PRIMARY anchored form below — this is the Thomas-approved final
+treatment:
+      U read "Which letter says uh, like in cup?"
+        hint "Listen. Uh, like in cup."
+        correct "Yes. U. Uh, like in cup."
+        giveAnswer "This one is U. Uh, like in cup."
+      I read "Which letter says ih, like in ink?"
+        hint "Listen. Ih, like in ink."
+        correct "Yes. I. Ih, like in ink."
+        giveAnswer "This one is I. Ih, like in ink."
+The isolate lead (uh /ʌ/, ih /ɪ/) is phoneme-wrapped; the anchor word
+(cup/ink) is DELIBERATELY PLAIN TEXT — its whole value is Olivia's
+native lexicon voicing it correctly. NEVER wrap cup/ink.
+The comma before "like in" keeps it one flowing intonation unit. The
+300ms break before the wrapped isolate is injected at render time as
+usual. (A and O are FROZEN at æ/ɒ; E at "e" — no anchoring needed.)
+(An "Anchor-only" variant that dropped the isolate lead was A/B-tested
+and REJECTED — Olivia spoke the bare letter NAME "you"/"eye" instead of
+the sound. Do NOT emit a bare-letter u/i read.)
 
 NO ARTICLE-LED FALLBACK for letter-sounds — the "Yes! That's a
 <word>." article-led default (used by blending-cv / cvc-words /
@@ -2428,44 +2589,60 @@ the letter M and it says mmm"). This tier teaches the isolated
 phoneme → letter mapping ONLY — every other tier handles its own
 content.
 
-WORKED EXAMPLE — a clean 8-problem session with current-target
-vowel = /ɒ/ that respects all rules (use as a template, NOT a
-verbatim copy — vary sound choices across re-bakes):
-   P1: target /m/ → m  (MASTERED-CONSONANT, gentle ramp)
-       read: "Which letter says mmm?"
-       correct: "Yes! M says mmm."
-   P2: target /h/ → h  (MASTERED-CONSONANT, gentle ramp)
-       read: "Which letter says hhh?"
-       correct: "Yes! H says hhh."
-   P3: target /n/ → n  (MASTERED-CONSONANT, gentle ramp)
-       read: "Which letter says nnn?"
-       correct: "Yes! N says nnn."
-   P4: target /æ/ → a  (MASTERED-VOWEL anchor at mid-tier)
-       read: "Which letter says a?"
-       correct: "Yes! A says a."
-   P5: target /b/ → b  (MASTERED-CONSONANT with voiced/unvoiced
-                        trap; distractors include p, d)
-       read: "Which letter says buh?"
-       correct: "Yes! B says buh."
-   P6: target /ɒ/ → o  (CURRENT-TARGET vowel #1 — lift fires)
-       read: "Which letter says o?"
-       correct: "Yes! O says o."
-   P7: target /g/ → g  (MASTERED-CONSONANT, voiced/unvoiced trap
-                        with k as distractor — gives the
-                        trap window a non-vowel item between the
-                        two /ɒ/ slots)
-       read: "Which letter says guh?"
-       correct: "Yes! G says guh."
-   P8: target /ɒ/ → o  (CURRENT-TARGET vowel #2 — at floor of 2)
-       read: "Which letter says o?"
-       correct: "Yes! O says o."
-Counts: MASTERED-CONSONANT=6 (above floor of 4), MASTERED-VOWEL
-/æ/=1 (at floor), CURRENT-TARGET /ɒ/=2 (at floor of 2). P1-P3
-all mastered-consonant. P4 carries mastered vowel /æ/. P6 and P8
-carry current-target /ɒ/ (2 distinct slots; rule 7 deduplication
-yields to rule 3 floor). No /ɪ/ or /ɛ/ targets (current-target is
-/ɒ/). This is the canonical mix the directive is designed to
-produce.
+PINNED SESSION (Dave master spec Part A — DETERMINISTIC, current-target
+vowel = /ɒ/). For the shipped /ɒ/ session, emit EXACTLY this 8-tuple of
+targets in this order: m, s, l, a, b, o, n, o. This pin removes the
+stochastic re-roll churn AND satisfies every composition rule below
+(MASTERED-CONSONANT=5 ≥ 4; MASTERED-VOWEL /æ/=1 at P4; CURRENT-TARGET
+/ɒ/=2 at P6+P8; P1-P3 all mastered-consonant; no /ɪ/+/ɛ/ collision).
+Emit each slot per the class-dependent templates above:
+   P1: target /m/ → letter m  (MASTERED-CONSONANT, gentle ramp)
+       read: "Which letter says mmm."   (continuant-voiced → declarative)
+       hint: "Listen. mmm."             (non-fric → Listen)
+       correct: "Yes. M. mmm."
+       giveAnswer: "This one is M. mmm."
+   P2: target /s/ → letter s  (MASTERED-CONSONANT, gentle ramp)
+       read: "Which letter says sss?"   (voiceless fric → question)
+       hint: "It says sss?"             (fricative → It says…?)
+       correct: "Yes. S says it. sss?"  (round-2 fricative saysIt lead-in)
+       giveAnswer: "This one is S. S says it. sss?"
+   P3: target /l/ → letter l  (MASTERED-CONSONANT, gentle ramp)
+       read: "Which letter says lll."   (continuant-voiced → declarative)
+       hint: "Listen. lll."             (non-fric → Listen)
+       correct: "Yes. L. lll."
+       giveAnswer: "This one is L. lll."
+   P4: target /æ/ → letter a  (MASTERED-VOWEL anchor at mid-tier)
+       read: "Which letter says aaa."   (vowel → declarative; TRIPLET)
+       hint: "Listen. aaa."             (non-fric → Listen; TRIPLET)
+       correct: "Yes. A. aaa."          (letter-name A bare; only aaa wrapped)
+       giveAnswer: "This one is A. aaa."
+   P5: target /b/ → letter b  (MASTERED-CONSONANT, voiced stop)
+       read: "Which letter says buh."   (round-2: schwa /bə/ → DECLARATIVE)
+       hint: "Listen. buh."             (stop, non-fric → Listen)
+       correct: "Yes. B. buh."
+       giveAnswer: "This one is B. buh."
+   P6: target /ɒ/ → letter o  (CURRENT-TARGET vowel #1 — lift fires)
+       read: "Which letter says ooo."   (vowel → declarative; TRIPLET)
+       hint: "Listen. ooo."             (non-fric → Listen; TRIPLET)
+       correct: "Yes. O. ooo."          (letter-name O bare; only ooo wrapped)
+       giveAnswer: "This one is O. ooo."
+   P7: target /n/ → letter n  (MASTERED-CONSONANT, between the two /ɒ/ slots)
+       read: "Which letter says nnn."   (continuant-voiced → declarative)
+       hint: "Listen. nnn."             (non-fric → Listen)
+       correct: "Yes. N. nnn."
+       giveAnswer: "This one is N. nnn."
+   P8: target /ɒ/ → letter o  (CURRENT-TARGET vowel #2 — at floor of 2)
+       read: "Which letter says ooo."   (vowel → declarative; TRIPLET)
+       hint: "Listen. ooo."             (non-fric → Listen; TRIPLET)
+       correct: "Yes. O. ooo."          (letter-name O bare; only ooo wrapped)
+       giveAnswer: "This one is O. ooo."
+Counts (pinned m,s,l,a,b,o,n,o): MASTERED-CONSONANT=5 (m,s,l,b,n —
+above floor of 4), MASTERED-VOWEL /æ/=1 at P4 (at floor), CURRENT-TARGET
+/ɒ/=2 at P6+P8 (at floor of 2). P1-P3 all mastered-consonant. P4 carries
+mastered vowel /æ/. P6 and P8 carry current-target /ɒ/ (2 distinct
+slots; rule 7 deduplication yields to rule 3 floor). No /ɪ/ or /ɛ/
+targets (current-target is /ɒ/). This is the exact deterministic mix the
+pin produces — ship it verbatim for the /ɒ/ session.
 
 </drift-guard>
 
@@ -2519,10 +2696,14 @@ all other slots are content-mode-agnostic:
       case discipline is the screen's responsibility, but the
       directive's read-line + correct utterance MUST be internally
       consistent on case.
-    - letter-sounds: "Which letter says <SOUND-MNEMONIC>?" e.g.
-      "Which letter says mmm?" — see the LETTER-SOUNDS UTTERANCE
-      TEMPLATE block above for the phoneme→mnemonic substitution
-      table (mmm, buh, o, a, etc.) and the no-inline-SSML rule.
+    - letter-sounds: "Which letter says <SOUND-MNEMONIC>" with
+      SOUND-CLASS-DEPENDENT terminal punctuation — declarative "."
+      for VOICED sounds (e.g. "Which letter says mmm."), question "?"
+      for VOICELESS sounds (e.g. "Which letter says sss?"). See the
+      LETTER-SOUNDS UTTERANCE TEMPLATE block above for the
+      phoneme→mnemonic substitution table (mmm, buh, ooo, aaa, etc. —
+      vowels are TRIPLETS per the VOWEL TRIPLET RULE), the SOUND-CLASS
+      CLASSIFICATION table, and the no-inline-SSML rule.
     - blending-cv: "Tap the <word>." e.g. "Tap the cat."
     - cvc-words:   "Read the <word>." e.g. "Read the cat."
     - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."
@@ -2584,8 +2765,10 @@ all other slots are content-mode-agnostic:
   letter-names, letter-sounds, and every other word-song tier)
 - hint (letter-names tier): "Let's look. <NAME>." e.g.
   "Let's look. M." — <NAME> case-preserved from the read line.
-- hint (letter-sounds tier): "Listen. <SOUND-MNEMONIC>." e.g.
-  "Listen. mmm." — see LETTER-SOUNDS UTTERANCE TEMPLATE block above.
+- hint (letter-sounds tier): SOUND-CLASS-DEPENDENT — "It says
+  <SOUND-MNEMONIC>?" for FRICATIVES (s/f/h/v/z), e.g. "It says sss?";
+  "Listen. <SOUND-MNEMONIC>." for NON-FRICATIVES, e.g. "Listen. mmm."
+  — see LETTER-SOUNDS UTTERANCE TEMPLATE block above.
 - hint (all other word-song tiers): "Let's look. <Word>." e.g.
   "Let's look. Cat."
 - giveAnswer (letter-names tier): "This one is the letter <NAME>."
