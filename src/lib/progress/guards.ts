@@ -210,6 +210,25 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
       if (c !== null && typeof c !== 'string') return false
     }
   }
+  // currentTargetVowel is optional (Wave 9 W9.3 — ticket 86c9ya3m6;
+  // additive, no schemaVersion bump). Letter-sounds sessions only. When
+  // present + not undefined it must be one of the four KNOWN trackable
+  // short vowels (`/o/ /u/ /i/ /e/`). An invalid vowel string is a real
+  // corruption signal → reject so the upstream loader falls back to
+  // defaults rather than carrying a bogus vowel tag into the per-vowel
+  // mastery scan. We do NOT cross-check `skillFocus` here — a stray vowel
+  // on a math entry is harmless (the mastery scan filters on
+  // `skillFocus.includes('letter-sounds')` before reading the field) and
+  // a strict membership check would over-constrain the loose persistence
+  // boundary.
+  if ('currentTargetVowel' in v && v.currentTargetVowel !== undefined) {
+    if (
+      typeof v.currentTargetVowel !== 'string' ||
+      !LETTER_SOUNDS_VOWELS.has(v.currentTargetVowel as LetterSoundsVowel)
+    ) {
+      return false
+    }
+  }
   return true
 }
 

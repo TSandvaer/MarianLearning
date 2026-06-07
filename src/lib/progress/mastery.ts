@@ -38,18 +38,34 @@
  * impossible.
  */
 
+import { LETTER_SOUNDS_VOWELS } from './defaults'
 import { getSettings } from './parentSettings'
 import type {
+  LetterSoundsVowel,
   MasteryThreshold,
   NumberGardenNode,
   ParentSettings,
   Progress,
   SessionHistoryEntry,
   SkillNode,
+  VowelSubMasteryState,
   WordSongNode,
 } from './types'
 
 export type MasteryTrack = 'math' | 'word-song'
+
+/**
+ * The `letter-sounds` node owns per-vowel sub-mastery (Wave 9 — Option A).
+ * When `progress.literacy.letterSoundsVowelStates` is present AND the
+ * loaded history carries `currentTargetVowel` on letter-sounds entries,
+ * the engine sequences each short vowel (`/o/ /u/ /i/ /e/`) through its
+ * own intro → practicing → mastered lifecycle, and only flips the
+ * COMPOSITE `skillLevels['letter-sounds']` node to `'mastered'` once all
+ * four vowels reach `'mastered'`. When that sub-state is absent or no
+ * letter-sounds entry carries a vowel tag, the node falls back to the
+ * Wave 7 composite-tier 90/3 path walked by `qualifies()` — unchanged.
+ */
+const LETTER_SOUNDS_NODE: WordSongNode = 'letter-sounds'
 
 /**
  * Graduation-gated word-song nodes (ticket 86c9m3aec, novel-word
@@ -325,6 +341,38 @@ export function applyMasteryRule(progress: Progress): Progress {
     }
   }
 
+  // ── Per-vowel letter-sounds sub-mastery pass (Wave 9 W9.3 — 86c9ya3m6) ──
+  // When per-vowel tracking is active (W9.2 sub-state present AND at least
+  // one letter-sounds entry carries a `currentTargetVowel` tag), each of
+  // the four short vowels (`/o/ /u/ /i/ /e/`) promotes independently under
+  // the word-song 90/3 threshold. The composite `letter-sounds` node only
+  // flips to `'mastered'` once ALL FOUR vowels are mastered — gated below
+  // in the candidate scan. When tracking is INACTIVE, this whole block is
+  // skipped and `letter-sounds` falls through to the unchanged Wave 7
+  // composite-tier path in the candidate scan.
+  const perVowelActive = perVowelTrackingActive(progress)
+  let perVowelAllMastered = false
+  if (perVowelActive) {
+    // letter-sounds is a word-song node — always uses the word-song
+    // threshold for per-vowel sub-mastery (90/3 default).
+    const wordSongThreshold = settings.masteryThreshold['word-song']
+    const result = scanPerVowelSubMastery(
+      progress,
+      // Non-null: `perVowelTrackingActive` only returns true when the
+      // sub-state map is present.
+      progress.literacy!.letterSoundsVowelStates!,
+      wordSongThreshold,
+      settings,
+    )
+    perVowelAllMastered = result.allMastered
+    if (result.changed) {
+      out.literacy = {
+        ...out.literacy,
+        letterSoundsVowelStates: result.states,
+      }
+    }
+  }
+
   // ── Walk both trees, evaluate promotion candidates ──
   // We collect candidates first so the autoPromote=false branch can
   // pick the earliest in tree order without scanning twice.
@@ -337,6 +385,23 @@ export function applyMasteryRule(progress: Progress): Progress {
     const trackThreshold = settings.masteryThreshold[track]
     for (const node of nodes) {
       if (out.skillLevels[node] !== 'practicing') continue
+      // ── letter-sounds composite gate (Wave 9 W9.3) ──────────────────
+      // When per-vowel tracking is active, the composite `letter-sounds`
+      // node does NOT promote via the standard 90/3 `qualifies()` path —
+      // it promotes ONLY when all four vowels are mastered. Two branches:
+      //   - all four mastered → admit `letter-sounds` as a candidate
+      //     (skip the `qualifies()` history check entirely; the AND-of-
+      //     four IS the gate).
+      //   - not all four mastered → skip `letter-sounds` (it stays at
+      //     'practicing' while individual vowels keep promoting).
+      // When tracking is INACTIVE this branch is bypassed and
+      // `letter-sounds` follows the unchanged composite-tier path below.
+      if (perVowelActive && node === LETTER_SOUNDS_NODE) {
+        if (perVowelAllMastered) {
+          candidates.push({ track, node })
+        }
+        continue
+      }
       if (!qualifies(progress.history, node, trackThreshold, settings)) continue
       // Graduation gate (ticket 86c9m3aec). For graduation-gated nodes
       // the standard rule is necessary but not sufficient — the most
@@ -408,6 +473,124 @@ export function applyMasteryRule(progress: Progress): Progress {
   return out
 }
 
+// ── Per-vowel letter-sounds sub-mastery (Wave 9 W9.3 — 86c9ya3m6) ────────
+
+/**
+ * Result of the per-vowel sub-mastery scan.
+ *
+ * - `states`: the updated per-vowel map (fresh object; input not mutated).
+ * - `allMastered`: true iff all four trackable vowels are `'mastered'`
+ *   AFTER this scan — the precondition for flipping the composite
+ *   `letter-sounds` node to `'mastered'`.
+ * - `changed`: true iff any vowel state moved this call (so the caller
+ *   knows whether to write the map back onto the output document).
+ */
+interface PerVowelScanResult {
+  states: Record<LetterSoundsVowel, VowelSubMasteryState>
+  allMastered: boolean
+  changed: boolean
+}
+
+/**
+ * True iff per-vowel letter-sounds tracking is active for this document —
+ * meaning the engine should sequence the four short vowels individually
+ * rather than treating `letter-sounds` as a single composite tier.
+ *
+ * Two conditions must hold (per AC fallback rule):
+ *   1. `progress.literacy.letterSoundsVowelStates` is present (the W9.2
+ *      defaulter fills it on first read, so absence means a blob that
+ *      predates W9.2 AND cloud-sync hasn't installed yet — vanishingly
+ *      rare).
+ *   2. At least one `letter-sounds` history entry carries a
+ *      `currentTargetVowel` tag. Without any tagged entry there's nothing
+ *      to scan per-vowel, and forcing the per-vowel path would strand
+ *      `letter-sounds` (it could never promote). The Wave 7 composite
+ *      path must stay live in that case.
+ *
+ * When EITHER condition fails, the caller falls through to the unchanged
+ * Wave 7 composite-tier 90/3 rule for `letter-sounds`.
+ */
+function perVowelTrackingActive(progress: Progress): boolean {
+  const states = progress.literacy?.letterSoundsVowelStates
+  if (states === undefined) return false
+  return progress.history.some(
+    (entry) =>
+      entry.skillFocus.includes(LETTER_SOUNDS_NODE) &&
+      entry.currentTargetVowel !== undefined,
+  )
+}
+
+/**
+ * Run the per-vowel intro → practicing + practicing → mastered scan for
+ * `letter-sounds`, keyed on each history entry's `currentTargetVowel`.
+ *
+ * Mirrors the node-level rules exactly, scoped to one vowel at a time:
+ *   - intro → practicing: at least one entry where
+ *     `skillFocus.includes('letter-sounds') && currentTargetVowel === v`
+ *     AND `successRate > 0` (post-#201 intro→practicing shape).
+ *   - practicing → mastered: the standard word-song 90/3 rule over the
+ *     vowel-filtered, cross-day-deduped history.
+ *
+ * NO cross-pollination: a `/o/`-target session is filtered out for `/u/`
+ * because the `currentTargetVowel === v` predicate excludes it. The
+ * dedupe + last-N-window machinery is the SAME `qualifies()` pipeline,
+ * so per-vowel and per-node stay in lockstep on history shape.
+ *
+ * Pure — returns a fresh `states` map; never mutates the input.
+ */
+function scanPerVowelSubMastery(
+  progress: Progress,
+  states: Record<LetterSoundsVowel, VowelSubMasteryState>,
+  threshold: MasteryThreshold,
+  settings: ParentSettings,
+): PerVowelScanResult {
+  const out = { ...states }
+  let changed = false
+
+  for (const vowel of LETTER_SOUNDS_VOWELS) {
+    const current = out[vowel]
+    if (current === 'mastered') continue
+
+    // Vowel-scoped history slice: letter-sounds entries tagged with this
+    // exact vowel. The `currentTargetVowel === vowel` predicate is what
+    // prevents cross-pollination between vowels.
+    const vowelHistory = progress.history.filter(
+      (entry) =>
+        entry.skillFocus.includes(LETTER_SOUNDS_NODE) &&
+        entry.currentTargetVowel === vowel,
+    )
+
+    // intro → practicing: one any-success session is sufficient (mirrors
+    // the node-level rule). A 0/8 session does not clear the gate.
+    let level: VowelSubMasteryState = current
+    if (level === 'intro') {
+      const hasAnySuccess = vowelHistory.some((entry) => entry.successRate > 0)
+      if (hasAnySuccess) {
+        level = 'practicing'
+      }
+    }
+
+    // practicing → mastered: standard word-song 90/3 over the
+    // vowel-scoped, cross-day-deduped window. Runs against the freshly
+    // advanced `level` so a vowel can traverse intro → practicing →
+    // mastered in a single call when history is sufficient (same
+    // same-call-traversal property as the node-level scan).
+    if (level === 'practicing') {
+      if (qualifiesOverHistory(vowelHistory, threshold, settings)) {
+        level = 'mastered'
+      }
+    }
+
+    if (level !== current) {
+      out[vowel] = level
+      changed = true
+    }
+  }
+
+  const allMastered = LETTER_SOUNDS_VOWELS.every((v) => out[v] === 'mastered')
+  return { states: out, allMastered, changed }
+}
+
 // ── internals ──────────────────────────────────────────────────────────
 
 /**
@@ -435,6 +618,25 @@ function qualifies(
   settings: ParentSettings,
 ): boolean {
   const focused = history.filter((entry) => entry.skillFocus.includes(node))
+  return qualifiesOverHistory(focused, threshold, settings)
+}
+
+/**
+ * Core 90/3-style qualification check over an ALREADY-FILTERED history
+ * slice. `qualifies()` (node-level) and the per-vowel sub-mastery scan
+ * (vowel-level) both funnel through here so the cross-day dedupe +
+ * last-N-window + threshold logic stays in ONE place — the node and
+ * per-vowel paths can never drift on history shape.
+ *
+ * The `focused` argument is the caller's already-narrowed slice (filtered
+ * by node membership, or by node + `currentTargetVowel`). Returns false
+ * for an empty slice or a window shorter than `threshold.sessions`.
+ */
+function qualifiesOverHistory(
+  focused: readonly SessionHistoryEntry[],
+  threshold: MasteryThreshold,
+  settings: ParentSettings,
+): boolean {
   if (focused.length === 0) return false
 
   const filtered = settings.crossDayEnforcement
