@@ -59,11 +59,13 @@ import {
   pickRecentSuccessRate,
   reconcileWithCloud,
   type LeitnerSessionHintItem,
+  type LetterSoundsVowel,
   type Progress,
   type ProgressTrack,
   type SkillLevel,
   type SkillNode,
   type SlowFactHint,
+  type VowelSubMasteryState,
 } from './lib/progress'
 import {
   createSubitisingRng,
@@ -198,6 +200,9 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   leitner: LeitnerSessionHintItem[] | undefined
   slowFacts: SlowFactHint[] | undefined
   lifetimeFirstEncounters: readonly string[] | undefined
+  letterSoundsVowelStates:
+    | Record<LetterSoundsVowel, VowelSubMasteryState>
+    | undefined
 } {
   const progress = loadProgress()
   if (progress === null) {
@@ -208,6 +213,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       leitner: undefined,
       slowFacts: undefined,
       lifetimeFirstEncounters: undefined, // legacy / first-launch no-progress path; track-aware helpers never see this branch in practice
+      letterSoundsVowelStates: undefined,
     }
   }
   const focusNode = pickFocusNode(progress, track)
@@ -256,6 +262,22 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   // session-end append-on-math is a follow-up.
   const lifetimeFirstEncounters: readonly string[] =
     progress.lifetimeFirstEncounters ?? []
+  // Wave 9 W9.4 (ticket 86c9ya3r9): ship the per-vowel letter-sounds
+  // sub-mastery map for the word-song track when the picked focus node
+  // is `letter-sounds`. The server derives the current-target vowel via
+  // the §1.4 algorithm and bypasses canon/cache only on non-greenfield
+  // state. The read-path defaulter
+  // (`storage.ts:withDefaultedLetterSoundsVowelStates`) guarantees a
+  // fully-populated 4-vowel map whenever progress exists, so we ship a
+  // complete map or omit the field entirely (no partial ships). Other
+  // tracks / focus nodes omit it — the server ignores a misrouted map
+  // anyway (the derivation gates on effective focus === letter-sounds).
+  let letterSoundsVowelStates:
+    | Record<LetterSoundsVowel, VowelSubMasteryState>
+    | undefined = undefined
+  if (track === 'word-song' && focusNode === 'letter-sounds') {
+    letterSoundsVowelStates = progress.literacy?.letterSoundsVowelStates
+  }
   return {
     focusNode,
     recentSuccessRate: pickRecentSuccessRate(progress, track),
@@ -263,6 +285,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
     leitner,
     slowFacts,
     lifetimeFirstEncounters,
+    letterSoundsVowelStates,
   }
 }
 
@@ -645,6 +668,15 @@ export default function App() {
         // perProblemAnswerValue field). No current word-song
         // consumer; plumbed for future error-pattern classification.
         perProblemAnswerWord: result.perProblemAnswerWord,
+        // Wave 9 W9.4 (ticket 86c9ya3r9): the planner-derived
+        // letter-sounds current-target vowel frozen at session-start.
+        // `null` (canon / cache / fallback / non-letter-sounds /
+        // tier-mastered) → omit so SessionEnd's W9.3 write falls back
+        // to the composite-tier mastery path. SessionEnd additionally
+        // gates on the re-derived focus node being `letter-sounds`.
+        ...(wordSongCurrentTargetVowelRef.current !== null
+          ? { currentTargetVowel: wordSongCurrentTargetVowelRef.current }
+          : {}),
       })
       setRoute('session-end')
     },
@@ -1114,6 +1146,21 @@ export default function App() {
   const [wordSongPlay, setWordSongPlay] =
     useState<PlayWordSongUtteranceFn | null>(null)
   /**
+   * Letter-sounds current-target vowel (slash notation) the planner
+   * derived for the active session (Wave 9 W9.4 — ticket 86c9ya3r9).
+   * Captured from the `/api/claude` response envelope when the live
+   * Path A fetch resolves; frozen for the session lifetime and read at
+   * session-end so `recordProgressOnSessionEnd` tags the history entry
+   * with the exact vowel the planner targeted (no re-derivation).
+   * `null` on canon-served / cached / fallback / non-letter-sounds /
+   * tier-mastered responses → the W9.3 composite-tier mastery path
+   * applies. Reset whenever the word-song fetch latch resets so a stale
+   * vowel can't leak into the next session's entry.
+   */
+  const wordSongCurrentTargetVowelRef = useRef<
+    '/o/' | '/u/' | '/i/' | '/e/' | null
+  >(null)
+  /**
    * Cross-vowel distractor mix mode for the active session (ticket
    * 86c9qa0kf). Computed once from `loadProgress()` + the live
    * parentSettings at session-start kick-time, frozen on the
@@ -1191,6 +1238,10 @@ export default function App() {
       // #231 — reset th mouth-cue state so the next session re-evaluates.
       setWordSongDigraphsThLevel('locked')
       setWordSongDigraphsThFirstEncounter(false)
+      // Wave 9 W9.4 (ticket 86c9ya3r9) — reset the frozen current-target
+      // vowel so a stale vowel can't leak into the next session's
+      // history entry.
+      wordSongCurrentTargetVowelRef.current = null
     }
   })
 
@@ -1302,6 +1353,11 @@ export default function App() {
         // 86c9q9ben (AC9f): drives the server-side session.end.opener
         // gate for tier-specific first-encounter scaffolding.
         lifetimeFirstEncounters: wordSongHints.lifetimeFirstEncounters,
+        // Wave 9 W9.4 (ticket 86c9ya3r9): per-vowel letter-sounds
+        // sub-mastery map. Only populated by the hint reader when the
+        // picked focus node is `letter-sounds`; the server derives the
+        // current-target vowel + round-trips it on the response.
+        letterSoundsVowelStates: wordSongHints.letterSoundsVowelStates,
       },
       { signal: controller.signal },
     )
@@ -1311,6 +1367,12 @@ export default function App() {
           return
         }
         wordSongUnloadRef.current = prepared.unload
+        // Wave 9 W9.4 (ticket 86c9ya3r9): freeze the planner-derived
+        // current-target vowel for this session so session-end can tag
+        // the history entry without re-deriving. `undefined` (canon /
+        // cache / fallback / tier-mastered) → store `null`.
+        wordSongCurrentTargetVowelRef.current =
+          prepared.currentTargetVowel ?? null
         // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). See
         // the Math fetch-effect for the rationale.
         recordPathASettleEvent('wordSong', 'resolve')
@@ -1399,6 +1461,13 @@ export default function App() {
       // #231 — symmetry with imperative tear-down.
       setWordSongDigraphsThLevel('locked')
       setWordSongDigraphsThFirstEncounter(false)
+      // Wave 9 W9.4 (ticket 86c9ya3r9): reset the frozen current-target
+      // vowel — symmetry with the imperative tear-down. Deferred into
+      // the microtask (not the effect body) so React 19's ref-
+      // immutability rule is satisfied; the ref is non-null only when a
+      // resolve also set the audio state, so `hadAudio` is true on every
+      // path that could have left a stale vowel.
+      wordSongCurrentTargetVowelRef.current = null
     })
     return () => {
       cancelled = true

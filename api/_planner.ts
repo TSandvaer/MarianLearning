@@ -334,6 +334,45 @@ export interface SlowFactHintItem {
   medianLatencyMs: number
 }
 
+/**
+ * Per-vowel letter-sounds sub-mastery state (Wave 9 W9.4 — ticket
+ * 86c9ya3r9). Mirrors the browser-side `LiteracyProgress.
+ * letterSoundsVowelStates` shape (`src/lib/progress/types.ts`).
+ *
+ * Keys are IPA-slash notation (`'/o/'`, `'/u/'`, `'/i/'`, `'/e/'`) —
+ * NOT the bare-IPA the planner directive consumes. This is deliberate:
+ * the slash notation is the persisted progress vocabulary (matches the
+ * canon's letter-sounds metadata + `SessionHistoryEntry.
+ * currentTargetVowel`), while the directive's `current-target-vowel=`
+ * hint wants the bare IPA (`ɒ`, `ʌ`, `ɪ`, `ɛ`). The derivation in
+ * `deriveCurrentTargetVowel` reads the slash map and the response
+ * envelope stamps back the slash value; `buildLetterSoundsDirective`
+ * receives the bare IPA after `slashVowelToIpa` translation.
+ *
+ * Values are the non-`locked` arm of the tier-level `SkillLevel`
+ * triple: `'intro' | 'practicing' | 'mastered'`. The parent
+ * `letter-sounds` SkillNode owns the locked/unlocked gate; once
+ * unlocked, all four vowels start at `'intro'` and progress
+ * independently.
+ *
+ * Browser → server: shipped on `/api/claude` payload as
+ * `progress.letterSoundsVowelStates`. Server → browser: the DERIVED
+ * current-target vowel (slash notation) is round-tripped on the
+ * response envelope `SessionStartResponse.currentTargetVowel` so the
+ * browser stamps it onto the session-end history entry without
+ * re-deriving (closes the W9.3 write-path loop).
+ */
+export interface LetterSoundsVowelStatesHint {
+  '/o/': VowelSubMasteryState
+  '/u/': VowelSubMasteryState
+  '/i/': VowelSubMasteryState
+  '/e/': VowelSubMasteryState
+}
+
+export type LetterSoundsVowelSlash = keyof LetterSoundsVowelStatesHint
+
+export type VowelSubMasteryState = 'intro' | 'practicing' | 'mastered'
+
 /** Plan shape returned by the planner — flat, wire-ready. Mirrors what
  *  `mathSessionPlanToUtteranceSources` / `wordSongSessionPlanToUtteranceSources`
  *  emit on the client. */
@@ -998,6 +1037,167 @@ const LETTER_SOUNDS_VOWEL_CANDIDATES: readonly string[] = ['ɒ', 'ʌ', 'ɪ', 'ɛ
 const LETTER_SOUNDS_DEFAULT_VOWEL = 'ɒ'
 
 /**
+ * The locked vowel ladder in slash notation (Wave 9 W9.4 — ticket
+ * 86c9ya3r9). Order is load-bearing: the derivation walks it in this
+ * exact sequence per `design/word-song/letter-sounds-content.md §1.4`
+ * (`/o/ → /u/ → /i/ → /e/`). `/a/` (short-a) is excluded — it's the
+ * mastered anchor, never a current-target.
+ */
+const LETTER_SOUNDS_VOWEL_LADDER: readonly LetterSoundsVowelSlash[] = [
+  '/o/',
+  '/u/',
+  '/i/',
+  '/e/',
+]
+
+/**
+ * Slash-notation → bare-IPA translation for the letter-sounds vowels.
+ * The persisted progress vocabulary uses slash notation (`/o/`); the
+ * planner directive's `current-target-vowel=` hint uses the bare IPA
+ * (`ɒ`). See `LetterSoundsVowelStatesHint` docstring for why the two
+ * vocabularies coexist.
+ */
+const SLASH_VOWEL_TO_IPA: Readonly<Record<LetterSoundsVowelSlash, string>> = {
+  '/o/': 'ɒ',
+  '/u/': 'ʌ',
+  '/i/': 'ɪ',
+  '/e/': 'ɛ',
+}
+
+/**
+ * Bare-IPA → letter-glyph for the `CURRENT TARGET VOWEL: /<vowel>/`
+ * directive line (Wave 9 W9.4 — ticket 86c9ya3r9). `/o/` etc. is the
+ * persisted slash-notation vocabulary that uses the LETTER glyph, not
+ * the IPA symbol (`/o/`, not `/ɒ/`).
+ */
+const IPA_TO_LETTER_VOWEL: Readonly<Record<string, string>> = {
+  ɒ: 'o',
+  ʌ: 'u',
+  ɪ: 'i',
+  ɛ: 'e',
+}
+
+const VALID_VOWEL_SUB_STATES: ReadonlySet<string> = new Set([
+  'intro',
+  'practicing',
+  'mastered',
+])
+
+/**
+ * Translate a slash-notation letter-sounds vowel to its bare IPA for
+ * the directive hint. Pure lookup; falls back to the `/o/` default IPA
+ * for any unrecognised key (defensive — callers pass ladder members).
+ */
+export function slashVowelToIpa(vowel: LetterSoundsVowelSlash): string {
+  return SLASH_VOWEL_TO_IPA[vowel] ?? LETTER_SOUNDS_DEFAULT_VOWEL
+}
+
+/**
+ * Parse + soft-validate the wire-shape `letterSoundsVowelStates` hint
+ * (Wave 9 W9.4 — ticket 86c9ya3r9). Sibling of `parseLeitnerHint`:
+ * any malformed value drops the WHOLE field (returns `null`), so the
+ * planner falls back to the Wave-7 directive-level approximation
+ * rather than acting on a partially-trusted map.
+ *
+ * Validity requires ALL FOUR ladder vowels present with a recognised
+ * sub-state. A partial map (e.g. only `/o/` shipped) is rejected —
+ * the browser's read-path defaulter
+ * (`storage.ts:withDefaultedLetterSoundsVowelStates`) guarantees a
+ * fully-populated map on every legitimate ship, so a partial map on
+ * the wire is a bug / tampered payload and we degrade to fallback
+ * rather than guess the missing vowels.
+ *
+ * Pure function; no I/O.
+ */
+export function parseLetterSoundsVowelStates(
+  raw: unknown,
+): LetterSoundsVowelStatesHint | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const r = raw as Record<string, unknown>
+  const out = {} as LetterSoundsVowelStatesHint
+  for (const vowel of LETTER_SOUNDS_VOWEL_LADDER) {
+    const state = r[vowel]
+    if (typeof state !== 'string' || !VALID_VOWEL_SUB_STATES.has(state)) {
+      return null
+    }
+    out[vowel] = state as VowelSubMasteryState
+  }
+  return out
+}
+
+/**
+ * Derive the current-target vowel from per-vowel sub-mastery state
+ * (Wave 9 W9.4 — ticket 86c9ya3r9). Implements the Kyle §1.4 algorithm
+ * as a HARD runtime gate (replaces the Wave-7 directive-level
+ * approximation). Returns the slash-notation vowel, or `null` when the
+ * tier is fully mastered (all four vowels `'mastered'`) — the caller
+ * treats `null` as "no current-target emission; tier-mastered".
+ *
+ * Algorithm (locked, `design/word-song/letter-sounds-content.md §1.4`):
+ *   1. Walk the ladder `/o/ → /u/ → /i/ → /e/`.
+ *   2. First vowel in `'practicing'` state is current-target (common
+ *      case — Marian mid-stream on a vowel).
+ *   3. If no vowel is `'practicing'`, the first `'intro'` (unintroduced)
+ *      vowel becomes current-target (emission begins; W9.3 mastery rule
+ *      flips it to `'practicing'` on session-end).
+ *   4. `/e/` adjacency guard: if step 2 or 3 would pick `/e/` while
+ *      `/i/` is not yet `'mastered'`, skip to the next `'mastered'`
+ *      vowel for review-mode emission. Under the locked sequence this
+ *      is unreachable in normal play (steps 2-3 stop at the first
+ *      practicing/intro vowel, which precedes `/e/`); it is belt-and-
+ *      braces against a debug seed / state-mutation bug that skips
+ *      `/i/`. Implements the cross-session `/i/ → /e/` ban (§1.2 #2).
+ *   5. All four `'mastered'` → return `null` (tier-mastered, the
+ *      composite `letter-sounds` node will promote via the W9.3
+ *      AND-of-four gate).
+ *
+ * Pure function; no I/O.
+ */
+export function deriveCurrentTargetVowel(
+  states: LetterSoundsVowelStatesHint,
+): LetterSoundsVowelSlash | null {
+  // Step 2: first 'practicing' in ladder order.
+  const practicing = LETTER_SOUNDS_VOWEL_LADDER.find(
+    (v) => states[v] === 'practicing',
+  )
+  // Step 3: else first 'intro' (unintroduced) in ladder order.
+  const candidate =
+    practicing ??
+    LETTER_SOUNDS_VOWEL_LADDER.find((v) => states[v] === 'intro') ??
+    null
+
+  // Step 5: nothing practicing or intro → all four mastered → tier-mastered.
+  if (candidate === null) return null
+
+  // Step 4: /e/ adjacency guard. If we'd pick /e/ while /i/ is not yet
+  // mastered, skip to the next mastered vowel for review-mode emission.
+  if (candidate === '/e/' && states['/i/'] !== 'mastered') {
+    const masteredReview = LETTER_SOUNDS_VOWEL_LADDER.find(
+      (v) => states[v] === 'mastered',
+    )
+    return masteredReview ?? null
+  }
+
+  return candidate
+}
+
+/**
+ * Is this a "non-fallback" state map — i.e. does Marian have real
+ * per-vowel progress beyond greenfield all-`'intro'`? (Wave 9 W9.4 —
+ * ticket 86c9ya3r9.) Drives the canon + in-memory-cache bypass: an
+ * all-`'intro'` map derives `/o/` exactly as the baked canon's default
+ * already targets, so it stays on the free canon-served path. Any vowel
+ * at `'practicing'` or `'mastered'` means the derived target may differ
+ * from canon — force a live Haiku run, mirroring the
+ * `lifetimeFirstEncounters` / `leitner` bypass posture.
+ */
+export function letterSoundsStatesAreNonFallback(
+  states: LetterSoundsVowelStatesHint,
+): boolean {
+  return LETTER_SOUNDS_VOWEL_LADDER.some((v) => states[v] !== 'intro')
+}
+
+/**
  * Build the letter-sounds directive that goes into the user message
  * (Wave 7 Track A7 — ticket 86c9y49cd, Amendment 2 — Devon NOF on
  * PR #332). Injects the `current-target-vowel=<IPA>` hint that Dave's
@@ -1028,8 +1228,16 @@ function buildLetterSoundsDirective(
     LETTER_SOUNDS_VOWEL_CANDIDATES.includes(currentTargetVowel)
       ? currentTargetVowel
       : LETTER_SOUNDS_DEFAULT_VOWEL
+  // Wave 9 W9.4 (ticket 86c9ya3r9): the explicit slash-notation
+  // `CURRENT TARGET VOWEL: /<vowel>/` line. Slash notation matches the
+  // persisted progress vocabulary + canon metadata; the bare-IPA
+  // `current-target-vowel=` line below remains for Dave's Wave-7
+  // directive in `WORD_SONG_TRACK_GUIDE`. `IPA_TO_LETTER_VOWEL` maps
+  // the bare IPA back to its letter glyph (ɒ → o, etc.).
+  const letterVowel = IPA_TO_LETTER_VOWEL[ipa] ?? 'o'
   return [
     `LETTER-SOUNDS DIRECTIVE (Wave 7 Track A7 — ticket 86c9y49cd).`,
+    `CURRENT TARGET VOWEL: /${letterVowel}/`,
     `current-target-vowel=${ipa}`,
     `This session's LIFT vowel is ${ipa}. Apply the LETTER-SOUNDS`,
     `SESSION COMPOSITION RULES from the system prompt: at least 2 and`,

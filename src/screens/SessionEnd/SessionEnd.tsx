@@ -180,6 +180,23 @@ export interface SessionEndPayload {
    * positional / tap-outcome-independent semantics.
    */
   perProblemDistractorClass?: readonly (OfferedDistractorClass | null)[]
+  /**
+   * Planner-derived letter-sounds current-target vowel, slash notation
+   * (`'/o/'`, `'/u/'`, `'/i/'`, `'/e/'`) (Wave 9 W9.4 — ticket
+   * 86c9ya3r9). Word-song letter-sounds surface only. App.tsx captures
+   * this from the `/api/claude` response envelope at session-start
+   * (`prepareWordSongPathA().currentTargetVowel`), freezes it for the
+   * session lifetime, and forwards it here so SessionEnd stamps it onto
+   * `RecordProgressInput.currentTargetVowel` — closing the W9.3
+   * per-vowel mastery write loop WITHOUT re-deriving from progress.
+   *
+   * Absent when the server served canon / cache / fallback (greenfield
+   * all-`'intro'` state) or when the tier is fully mastered; in those
+   * cases the W9.3 mastery rule falls back to the Wave-7 composite-tier
+   * 90/3 path. Math + non-letter-sounds word-song surfaces never carry
+   * it.
+   */
+  currentTargetVowel?: '/o/' | '/u/' | '/i/' | '/e/'
 }
 
 /**
@@ -500,6 +517,19 @@ export default function SessionEnd({
       // session-end.
       ...(p.surface === 'math' && p.perProblemDistractorClass !== undefined
         ? { perProblemDistractorClass: p.perProblemDistractorClass }
+        : {}),
+      // Letter-sounds current-target vowel (Wave 9 W9.4 — ticket
+      // 86c9ya3r9). Forward the planner-derived vowel App.tsx captured
+      // from the session-start response so the W9.3 per-vowel mastery
+      // rule tags this history entry with the exact vowel the planner
+      // targeted — no re-derivation. Gated on the re-derived focus node
+      // being `letter-sounds` (the writer itself also gates on this, so
+      // the guard is belt-and-braces). Absent → writer falls back to
+      // the Wave-7 composite-tier mastery path.
+      ...(p.surface === 'word-song' &&
+      focusNode === 'letter-sounds' &&
+      p.currentTargetVowel !== undefined
+        ? { currentTargetVowel: p.currentTargetVowel }
         : {}),
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps

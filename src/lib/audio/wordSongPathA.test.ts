@@ -125,6 +125,91 @@ describe('prepareWordSongPathA — happy path', () => {
     })
   })
 
+  it('ships letterSoundsVowelStates on the progress block when supplied (Wave 9 W9.4 — ticket 86c9ya3r9)', async () => {
+    const plan = STATIC_WORD_SONG_PLANS[0]!
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(buildServerResponse(plan)),
+    )
+
+    await prepareWordSongPathA(
+      {
+        ...STD_ARGS,
+        focusNode: 'letter-sounds',
+        letterSoundsVowelStates: {
+          '/o/': 'practicing',
+          '/u/': 'intro',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        },
+      },
+      {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        loadSessionAudio: vi.fn(async () => new Map()),
+        playSessionUtterance: vi.fn(async () => {}),
+      },
+    )
+
+    const [, init] = fetchMock.mock.calls[0]!
+    const body = JSON.parse(init?.body as string) as {
+      payload: { progress: Record<string, unknown> }
+    }
+    expect(body.payload.progress.letterSoundsVowelStates).toEqual({
+      '/o/': 'practicing',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+  })
+
+  it('reads currentTargetVowel off the response envelope (Wave 9 W9.4 — ticket 86c9ya3r9)', async () => {
+    const plan = STATIC_WORD_SONG_PLANS[0]!
+    const response = {
+      ...buildServerResponse(plan),
+      currentTargetVowel: '/u/' as const,
+    }
+    const fetchMock = makeFetchMock(async () => jsonResp(response))
+
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
+      fetch: fetchMock as unknown as typeof globalThis.fetch,
+      loadSessionAudio: vi.fn(async () => new Map()),
+      playSessionUtterance: vi.fn(async () => {}),
+    })
+
+    expect(prepared.currentTargetVowel).toBe('/u/')
+  })
+
+  it('leaves currentTargetVowel undefined when the response omits it (canon / fallback path)', async () => {
+    const plan = STATIC_WORD_SONG_PLANS[0]!
+    const fetchMock = makeFetchMock(async () =>
+      jsonResp(buildServerResponse(plan)),
+    )
+
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
+      fetch: fetchMock as unknown as typeof globalThis.fetch,
+      loadSessionAudio: vi.fn(async () => new Map()),
+      playSessionUtterance: vi.fn(async () => {}),
+    })
+
+    expect(prepared.currentTargetVowel).toBeUndefined()
+  })
+
+  it('drops a bogus currentTargetVowel value from the response (defensive validation)', async () => {
+    const plan = STATIC_WORD_SONG_PLANS[0]!
+    const response = {
+      ...buildServerResponse(plan),
+      currentTargetVowel: 'not-a-vowel',
+    }
+    const fetchMock = makeFetchMock(async () => jsonResp(response))
+
+    const prepared = await prepareWordSongPathA(STD_ARGS, {
+      fetch: fetchMock as unknown as typeof globalThis.fetch,
+      loadSessionAudio: vi.fn(async () => new Map()),
+      playSessionUtterance: vi.fn(async () => {}),
+    })
+
+    expect(prepared.currentTargetVowel).toBeUndefined()
+  })
+
   it('returns the rehydrated WordSongSessionPlan from the server response', async () => {
     const sourcePlan = STATIC_WORD_SONG_PLANS[1]!
     const fetchMock = makeFetchMock(async () =>
