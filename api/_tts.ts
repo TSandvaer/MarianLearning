@@ -345,6 +345,19 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   uuu: { ipa: 'ə', tiers: ['letter-sounds'] },
   iii: { ipa: 'ɘ', tiers: ['letter-sounds'] },
   eee: { ipa: 'e', tiers: ['letter-sounds'] },
+  // Round-3 (Dave round-3): EXAMPLE-WORD ANCHORING for the central/lax
+  // vowels Olivia can't separate from bare IPA (ʌ/ə/ɘ collapse toward
+  // æ; ɪ/ɘ merge). The "Primary" candidate pairs a short ISOLATE lead
+  // (`uh` /ʌ/, `ih` /ɪ/) with a PLAIN-TEXT anchor word ("like in cup",
+  // "like in ink"). Only the isolate lead is phoneme-wrapped here.
+  //
+  // CRITICAL: the anchor words `cup` and `ink` are deliberately
+  // UN-WRAPPED — do NOT add them to this table. Their entire value is
+  // Olivia's native lexicon voicing them correctly; wrapping them in a
+  // <phoneme> would defeat the anchoring. The structured-literacy
+  // pattern is "the sound, like in <real word the learner knows>".
+  uh: { ipa: 'ʌ', tiers: ['letter-sounds'] },
+  ih: { ipa: 'ɪ', tiers: ['letter-sounds'] },
 }
 
 /**

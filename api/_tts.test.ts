@@ -595,6 +595,61 @@ describe('letter-sounds SSML treatment (British-voice rollout, 2026-06-06)', () 
       'Three plus two. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
     )
   })
+
+  // ── Round-3: example-word anchoring (Dave round-3) ──────────────────
+  it('anchored U Primary read: wraps ONLY the isolate lead "uh" (/ʌ/); the anchor word "cup" stays PLAIN TEXT', () => {
+    const out = renderSsmlInnerText(
+      'Which letter says uh, like in cup?',
+      'letter-sounds',
+    )
+    // The isolate lead is the only wrap, with the 300ms break.
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ʌ">uh</phoneme>, like in cup?',
+    )
+    // "cup" is NEVER phoneme-wrapped — its value is Olivia's native
+    // lexicon. Exactly one phoneme tag total.
+    expect(out).not.toContain('>cup<')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('anchored I Primary read: wraps ONLY "ih" (/ɪ/); "ink" stays plain text', () => {
+    const out = renderSsmlInnerText(
+      'Which letter says ih, like in ink?',
+      'letter-sounds',
+    )
+    expect(out).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="ɪ">ih</phoneme>, like in ink?',
+    )
+    expect(out).not.toContain('>ink<')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('anchored U correct line: letter-name "U" un-wrapped, "Uh" isolate wrapped, "cup" plain', () => {
+    const out = renderSsmlInnerText('Yes. U. Uh, like in cup.', 'letter-sounds')
+    // "Uh" (capitalised, sentence-initial) is the only wrap; the case-
+    // insensitive override matches it. The letter-name "U" and "cup"
+    // stay bare prose.
+    expect(out).toBe(
+      'Yes. U. <break time="300ms"/><phoneme alphabet="ipa" ph="ʌ">Uh</phoneme>, like in cup.',
+    )
+    expect(out).not.toContain('>U</phoneme>')
+    expect(out).not.toContain('>cup<')
+    expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
+  })
+
+  it('Anchor-only candidate: NOTHING is phoneme-wrapped (no isolate lead; bare "u" and "cup" both plain)', () => {
+    // The Anchor-only read drops the isolate lead. The bare "u" is NOT a
+    // PHONEME_OVERRIDES key (only "uh" is), so neither "u" nor the anchor
+    // word "cup" is wrapped — Olivia voices "u" as the letter name and
+    // the anchor word carries the sound. Zero phoneme tags.
+    const read = renderSsmlInnerText(
+      'Which letter says u, like in cup?',
+      'letter-sounds',
+    )
+    expect(read).not.toContain('<phoneme')
+    const correct = renderSsmlInnerText('Yes. U. Like in cup.', 'letter-sounds')
+    expect(correct).not.toContain('<phoneme')
+  })
 })
 
 describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () => {

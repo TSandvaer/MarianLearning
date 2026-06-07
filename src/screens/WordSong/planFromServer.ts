@@ -61,6 +61,7 @@ import {
 } from './wordSessionPlans'
 import { TARGET_WORDS, getWordEntry, type WordEntry } from './wordPack'
 import {
+  LETTER_SOUND_ANCHORED_ONLY_TO_LETTER,
   LETTER_SOUND_MNEMONIC_POOL,
   LETTER_SOUND_MNEMONIC_TO_LETTER,
   LETTER_SOUND_PICTURE_KEY_PREFIX,
@@ -71,10 +72,16 @@ import {
 // unchanged. `letterSoundsPool.ts` is the single source of truth as of
 // ticket 86c9y6xkh — see that file's header for rationale.
 export {
+  LETTER_SOUND_ANCHORED_ONLY_TO_LETTER,
   LETTER_SOUND_MNEMONIC_POOL,
   LETTER_SOUND_MNEMONIC_TO_LETTER,
   LETTER_SOUND_PICTURE_KEY_PREFIX,
 }
+
+/** Detects the round-3 anchored read suffix `", like in <word>"`. Used
+ *  by the letter-sounds branch to allow the bare single-letter leading
+ *  token (Anchor-only candidate) ONLY when the anchor phrase is present. */
+const LETTER_SOUNDS_ANCHOR_SUFFIX = /,\s*like\s+in\s+[a-z]+\s*[.?]\s*$/i
 
 /**
  * The 52-glyph ASCII letter pool for the `letter-names` tier (Wave 7 A4b,
@@ -308,11 +315,20 @@ const READ_LINE_TEMPLATES: ReadonlyArray<{
     // like `"Which letter says mmm."` were rejected → Path A silent
     // fallback ("Tap the cat"). This is the planner↔parser contract
     // (`project_planner_parser_contract` memory): the browser parser
-    // MUST accept every read shape the canon emits. The terminal is
-    // anchored so prose like "Which letter says mmm in cat?" does NOT
-    // match.
-    pattern: /^\s*which\s+letter\s+says\s+([a-z]+)\s*[.?]\s*$/i,
-    label: '"Which letter says <MNEMONIC>." / "...?"',
+    // MUST accept every read shape the canon emits.
+    //
+    // Round-3 (example-word anchoring): the read MAY carry an optional
+    // `, like in <word>` anchor suffix for the central/lax vowels U/I,
+    // e.g. `"Which letter says uh, like in cup?"` (Primary) or
+    // `"Which letter says u, like in cup?"` (Anchor-only). Group 1
+    // captures ONLY the leading mnemonic token (`uh` / `u`); the anchor
+    // phrase is consumed by the optional non-capturing group. The
+    // leading token is resolved via the anchored-aware lookup in the
+    // letter-sounds branch below. The terminal stays anchored so prose
+    // like "Which letter says mmm in cat?" does NOT match.
+    pattern:
+      /^\s*which\s+letter\s+says\s+([a-z]+)(?:,\s*like\s+in\s+[a-z]+)?\s*[.?]\s*$/i,
+    label: '"Which letter says <MNEMONIC>[, like in <word>]." / "...?"',
   },
   {
     contentType: 'blending-cv',
@@ -384,20 +400,39 @@ export function parseReadLine(read: string): ParsedReadLine {
 
     // Letter-sounds branch — mnemonic pool check + letter-glyph
     // synthesis. The mnemonic is lowercased for case-insensitive
-    // membership (canon real emits lowercase; defensive).
+    // membership (canon real emits lowercase; defensive). Group 1 is the
+    // LEADING token only; any round-3 `, like in <word>` anchor suffix
+    // was consumed by the regex's optional non-capturing group.
     if (template.contentType === 'letter-sounds') {
       const mnemonic = match[1]!.toLowerCase()
-      if (!LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)) {
-        throw new PlanFromServerError(
-          `word-song letter-sounds read line "${read}" yielded mnemonic "${mnemonic}" outside the 19-mnemonic pool ` +
-            `(accepted: ${Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER).join(', ')})`,
-        )
+      // Primary resolution: the main 21-mnemonic pool (consonants +
+      // triplet vowels + the round-3 isolate leads uh/ih).
+      const fromPool = LETTER_SOUND_MNEMONIC_TO_LETTER[mnemonic]
+      if (fromPool !== undefined) {
+        return {
+          entry: makeLetterSoundTargetEntry(fromPool),
+          contentType: template.contentType,
+        }
       }
-      const letter = LETTER_SOUND_MNEMONIC_TO_LETTER[mnemonic]!
-      return {
-        entry: makeLetterSoundTargetEntry(letter),
-        contentType: template.contentType,
+      // Round-3 Anchor-only fallback: the bare single-letter leading
+      // token (`u` / `i`) is valid ONLY when the read carries an
+      // `, like in <word>` anchor suffix. These bare letters are
+      // deliberately absent from the main pool (double-wrap guard), so
+      // they resolve here.
+      if (LETTER_SOUNDS_ANCHOR_SUFFIX.test(read)) {
+        const fromAnchored = LETTER_SOUND_ANCHORED_ONLY_TO_LETTER[mnemonic]
+        if (fromAnchored !== undefined) {
+          return {
+            entry: makeLetterSoundTargetEntry(fromAnchored),
+            contentType: template.contentType,
+          }
+        }
       }
+      throw new PlanFromServerError(
+        `word-song letter-sounds read line "${read}" yielded mnemonic "${mnemonic}" outside the mnemonic pool ` +
+          `(accepted: ${Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER).join(', ')}` +
+          `; anchored-only: ${Object.keys(LETTER_SOUND_ANCHORED_ONLY_TO_LETTER).join(', ')})`,
+      )
     }
 
     // Word-tier branches — membership check + wordPack lookup.

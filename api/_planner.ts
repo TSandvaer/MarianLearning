@@ -2425,8 +2425,10 @@ framing — apply per target sound). Two independent axes:
     /g/ → read "."  hint "Listen."     (voiced stop — schwa /ɡə/; round-2 read flip)
     /p/ → read "."  hint "Listen."     (voiceless stop — schwa /pə/; round-2 read flip)
     /t/ → read "?"  hint "Listen."     (voiceless stop — bare /t/, FROZEN)
-    /k/ → read "?"  hint "Listen."     (voiceless stop — ph kə; read GREEN, re-audition)
-    /æ/ /ɒ/ /ʌ/ /ɪ/ /ɛ/ → read "."  hint "Listen."  (vowels: voiced, non-fric)
+    /k/ → read "."  hint "Listen."     (voiceless stop — ph kə; ROUND-3: read flips to declarative, like every other schwa-stop — "kuh was scratching" on the question read)
+    /æ/ /ɒ/ → read "."  hint "Listen."  (vowels A/O — FROZEN æ/ɒ)
+    /ʌ/ /ɪ/ → read "."  hint "Listen."  (vowels U/I — ROUND-3 example-word anchored; see ANCHORED VOWEL block below)
+    /ɛ/ → read "."  hint "Listen."  (vowel E — ph "e")
 
 NEGATIVE ANCHOR — DO NOT spell out letter NAMES phonetically in
 utterance text. "em", "kyoo", "double-yoo", "see" are FORBIDDEN.
@@ -2454,28 +2456,29 @@ uppercase letter glyph for the target):
     text. The terminal punctuation is per-sound (ROUND-2 partition, Dave
     straggler spec, supersedes round-1 "all stops are questions"):
       · DECLARATIVE, ends with "." : nasals m/n, liquids l/r, ALL vowels
-        /æ ɒ ʌ ɪ ɛ/, AND the SCHWA-TAILED stops /p b d g/ (round-2 —
-        their schwa makes them vowel-final, so a falling declarative
-        fits better than a question):
+        /æ ɒ ʌ ɪ ɛ/, AND ALL SCHWA-TAILED stops /p b d g k/ (round-2
+        added p/b/d/g; ROUND-3 adds /k/ — their schwa makes them
+        vowel-final, so a falling declarative fits better than a
+        question):
           "Which letter says mmm."
           "Which letter says ooo." (sound /ɒ/ — TRIPLET vowel mnemonic)
           "Which letter says buh." (voiced stop /b/ — round-2: declarative)
           "Which letter says puh." (voiceless stop /p/ — round-2: declarative)
+          "Which letter says kuh." (voiceless stop /k/ — ROUND-3: declarative; "kuh was scratching" on the question read)
       · QUESTION, ends with "?" : voiceless fricatives /s f h/, the
-        VOICED fricative /v/ (round-2), AND the two stops /t k/ that keep
-        the question read (/t/ is bare-FROZEN, /k/'s question read is
-        Thomas-approved GREEN):
+        VOICED fricative /v/ (round-2), AND the bare stop /t/ (the only
+        stop with NO schwa, so it keeps the question read):
           "Which letter says sss?"
           "Which letter says vvv?" (voiced fricative /v/ — round-2)
           "Which letter says tuh?" (voiceless stop /t/ — bare /t/, FROZEN)
-          "Which letter says kuh?" (voiceless stop /k/ — GREEN read kept)
-    Rationale (Dave round-2): the round-1 "all stops are questions" was
-    wrong for /p b d g/ — once they carry a schwa tail they are
+    Rationale: the round-1 "all stops are questions" was wrong for the
+    SCHWA-tailed stops — once they carry a schwa tail they are
     vowel-final and the rising question contour over-inflected them;
-    declarative is the fix. /t/ stays bare (no schwa) and /k/'s question
-    read was already approved, so both keep the question form. /v/ flips
-    TO a question this round. Continuant-voiced sounds (nasals, liquids,
-    vowels) keep their round-1 declarative.
+    declarative is the fix. Round-2 flipped /p b d g/; ROUND-3 flips /k/
+    (which moved to a schwa ph="kə" in round-2 but kept the question read
+    by oversight — "kuh was scratching"). Only bare /t/ (no schwa) keeps
+    the question read. /v/ flips TO a question. Continuant-voiced sounds
+    (nasals, liquids, vowels) keep their round-1 declarative.
 - correct: SOUND-CLASS-DEPENDENT (round-2, Dave straggler spec):
     · FRICATIVE (S/F/H/V) → flowing "says it" lead-in, ends "?" :
         "Yes. <LETTER-UPPER> says it. <SOUND-MNEMONIC>?"
@@ -2544,6 +2547,33 @@ uppercase letter glyph for the target):
   ("This one is O."), then the SOUND is voiced once as its own sentence
   ("ooo."). Only the mnemonic is phoneme-wrapped; the letter-name stays
   bare prose.
+
+ANCHORED VOWELS U/I (ROUND-3, Dave round-3 — example-word anchoring).
+Olivia cannot separate the central/lax vowels from bare IPA (ʌ/ə/ɘ
+collapse toward /æ/; ɪ/ɘ merge). The fix is structured-literacy
+keyword anchoring: pair the sound with a real word Olivia's lexicon
+voices correctly. U anchors to "cup", I anchors to "ink". TWO candidates
+are auditioned side-by-side (Thomas A/Bs them); pick the winner per his
+ear:
+  · PRIMARY (isolate lead + anchor word):
+      U read "Which letter says uh, like in cup?"
+        hint "Listen. Uh, like in cup."
+        correct "Yes. U. Uh, like in cup."
+        give "This one is U. Uh, like in cup."
+      I uses the "ih" isolate + "ink" analogously.
+    The isolate lead (uh /ʌ/, ih /ɪ/) is phoneme-wrapped; the anchor
+    word (cup/ink) is DELIBERATELY PLAIN TEXT — its whole value is
+    Olivia's native lexicon voicing it correctly. NEVER wrap cup/ink.
+  · ANCHOR-ONLY (drop the isolate; letter-name + anchor carries it):
+      U read "Which letter says u, like in cup?"
+        hint "Listen. U, like in cup."
+        correct "Yes. U. Like in cup."
+        give "This one is U. Like in cup."
+    The bare letter "u"/"i" is NOT phoneme-wrapped — Olivia voices it as
+    the letter name; the anchor word carries the sound.
+The comma before "like in" keeps it one flowing intonation unit. The
+300ms break before the wrapped isolate is injected at render time as
+usual. (A and O are FROZEN at æ/ɒ; E at "e" — no anchoring needed.)
 
 NO ARTICLE-LED FALLBACK for letter-sounds — the "Yes! That's a
 <word>." article-led default (used by blending-cv / cvc-words /

@@ -778,8 +778,8 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
     }
   })
 
-  it('covers all 14 consonant mnemonics + 5 short-vowel mnemonics (19-entry pool)', () => {
-    expect(LETTER_SOUND_MNEMONIC_POOL.size).toBe(19)
+  it('covers 14 consonant mnemonics + 5 short-vowel triplets + 2 round-3 isolate leads (21-entry pool)', () => {
+    expect(LETTER_SOUND_MNEMONIC_POOL.size).toBe(21)
     // 14 consonant mnemonics
     for (const mnemonic of [
       'mmm',
@@ -804,17 +804,23 @@ describe('parseReadLine — letter-sounds content-type routing (Wave 7 A8b, 86c9
     for (const mnemonic of ['aaa', 'ooo', 'uuu', 'iii', 'eee']) {
       expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
     }
-    // The bare single-letter vowel mnemonics are NO LONGER in the pool.
+    // Round-3 isolate leads (example-word anchoring Primary candidate).
+    for (const mnemonic of ['uh', 'ih']) {
+      expect(LETTER_SOUND_MNEMONIC_POOL.has(mnemonic)).toBe(true)
+    }
+    // The bare single-letter vowel mnemonics are NOT in the main pool
+    // (they resolve only via the anchored-only fallback, with an anchor
+    // suffix present).
     for (const bare of ['a', 'o', 'u', 'i', 'e']) {
       expect(LETTER_SOUND_MNEMONIC_POOL.has(bare)).toBe(false)
     }
   })
 
-  it('rejects mnemonics outside the 19-entry pool with a clear error', () => {
+  it('rejects mnemonics outside the pool with a clear error', () => {
     // `zzz` is the right shape (lowercase 1-3 letters) but not in the
     // pool — the pool guard fires.
     expect(() => parseReadLine('Which letter says zzz?')).toThrow(
-      /outside the 19-mnemonic pool/,
+      /outside the mnemonic pool/,
     )
     // `nope` is the right shape but not a known mnemonic.
     expect(() => parseReadLine('Which letter says nope?')).toThrow(
@@ -942,7 +948,7 @@ describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)',
     expect(plan.problems[4]!.utterances.read).toBe('Which letter says tuh?')
   })
 
-  it('rejects a letter-sounds entry whose mnemonic is outside the 19-entry pool', () => {
+  it('rejects a letter-sounds entry whose mnemonic is outside the pool', () => {
     const broken: typeof SAMPLE_LETTER_SOUNDS_PLAN = {
       ...SAMPLE_LETTER_SOUNDS_PLAN,
       utterances: SAMPLE_LETTER_SOUNDS_PLAN.utterances.map((u) =>
@@ -950,7 +956,7 @@ describe('wordSongSessionPlanFromServer — letter-sounds fixture (Wave 7 A8b)',
       ),
     }
     expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
-      /outside the 19-mnemonic pool/,
+      /outside the mnemonic pool/,
     )
   })
 
@@ -1229,6 +1235,84 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
     expect(plan.problems[1]!.utterances.giveAnswer).toBe(
       'This one is S. S says it. sss?',
     )
+  })
+})
+
+describe('parseReadLine — round-3 example-word-anchored U/I reads', () => {
+  it('parses the Primary candidate (isolate lead + anchor): "...says uh, like in cup?" → U', () => {
+    const u = parseReadLine('Which letter says uh, like in cup?')
+    expect(u.contentType).toBe('letter-sounds')
+    expect(u.entry.word).toBe('U')
+    const i = parseReadLine('Which letter says ih, like in ink?')
+    expect(i.entry.word).toBe('I')
+  })
+
+  it('parses the Anchor-only candidate (bare letter + anchor): "...says u, like in cup?" → U', () => {
+    // The bare single-letter token `u`/`i` is valid ONLY because the
+    // anchor suffix is present (anchored-only fallback).
+    const u = parseReadLine('Which letter says u, like in cup?')
+    expect(u.contentType).toBe('letter-sounds')
+    expect(u.entry.word).toBe('U')
+    const i = parseReadLine('Which letter says i, like in ink?')
+    expect(i.entry.word).toBe('I')
+  })
+
+  it('still REJECTS a bare single-letter vowel WITHOUT the anchor suffix (double-wrap guard intact)', () => {
+    // No anchor → the anchored-only fallback does not apply → `u` is not
+    // in the main pool → reject.
+    expect(() => parseReadLine('Which letter says u.')).toThrow(
+      /outside the mnemonic pool/,
+    )
+    expect(() => parseReadLine('Which letter says i?')).toThrow(
+      /outside the mnemonic pool/,
+    )
+  })
+
+  it('the isolate leads uh/ih parse WITHOUT an anchor too (they are real pool mnemonics)', () => {
+    expect(parseReadLine('Which letter says uh?').entry.word).toBe('U')
+    expect(parseReadLine('Which letter says ih.').entry.word).toBe('I')
+  })
+
+  it('a full session mixing Primary + Anchor-only anchored reads round-trips through Path A', () => {
+    const wire = {
+      id: 'round3-anchored',
+      label: 'round-3 anchored U/I',
+      utterances: [
+        { mnemonic: 'uh', letter: 'U', read: 'Which letter says uh, like in cup?', hint: 'Listen. Uh, like in cup.', correct: 'Yes. U. Uh, like in cup.', give: 'This one is U. Uh, like in cup.' }, // prettier-ignore
+        { mnemonic: 'u', letter: 'U', read: 'Which letter says u, like in cup?', hint: 'Listen. U, like in cup.', correct: 'Yes. U. Like in cup.', give: 'This one is U. Like in cup.' }, // prettier-ignore
+        { mnemonic: 'ih', letter: 'I', read: 'Which letter says ih, like in ink?', hint: 'Listen. Ih, like in ink.', correct: 'Yes. I. Ih, like in ink.', give: 'This one is I. Ih, like in ink.' }, // prettier-ignore
+        { mnemonic: 'i', letter: 'I', read: 'Which letter says i, like in ink?', hint: 'Listen. I, like in ink.', correct: 'Yes. I. Like in ink.', give: 'This one is I. Like in ink.' }, // prettier-ignore
+        { mnemonic: 'eee', letter: 'E', read: 'Which letter says eee.', hint: 'Listen. eee.', correct: 'Yes. E. eee.', give: 'This one is E. eee.' }, // prettier-ignore
+        { mnemonic: 'mmm', letter: 'M', read: 'Which letter says mmm.', hint: 'Listen. mmm.', correct: 'Yes. M. mmm.', give: 'This one is M. mmm.' }, // prettier-ignore
+        { mnemonic: 'sss', letter: 'S', read: 'Which letter says sss?', hint: 'It says sss?', correct: 'Yes. S says it. sss?', give: 'This one is S. S says it. sss?' }, // prettier-ignore
+        { mnemonic: 'kuh', letter: 'K', read: 'Which letter says kuh.', hint: 'Listen. kuh.', correct: 'Yes. K. kuh.', give: 'This one is K. kuh.' }, // prettier-ignore
+      ].flatMap((c, idx) => {
+        const n = idx + 1
+        return [
+          { id: `word.p${n}.read`, text: c.read },
+          { id: `word.p${n}.correct`, text: c.correct },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          { id: `word.p${n}.hint`, text: c.hint },
+          { id: `word.p${n}.giveAnswer`, text: c.give },
+        ]
+      }),
+    }
+    const plan = wordSongSessionPlanFromServer(wire)
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'U',
+      'U',
+      'I',
+      'I',
+      'E',
+      'M',
+      'S',
+      'K',
+    ])
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('letter-sounds')
+    }
+    // K read is round-3 declarative.
+    expect(plan.problems[7]!.utterances.read).toBe('Which letter says kuh.')
   })
 })
 

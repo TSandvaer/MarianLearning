@@ -140,6 +140,14 @@ export const LETTER_SOUND_MNEMONIC_TO_LETTER: Readonly<Record<string, string>> =
     uuu: 'U',
     iii: 'I',
     eee: 'E',
+    // Round-3 isolate leads for example-word anchoring (Dave round-3).
+    // `uh`/`ih` are the phoneme-wrapped isolate leads in the Primary
+    // anchored candidate (`"...says uh, like in cup?"`). They are real
+    // 2-char mnemonics (NOT single letters), so they do NOT collide with
+    // the single-letter letter-NAME — no double-wrap risk. The read
+    // parser captures only the leading token, so `uh`/`ih` resolve U/I.
+    uh: 'U',
+    ih: 'I',
   }
 
 /**
@@ -149,6 +157,29 @@ export const LETTER_SOUND_MNEMONIC_TO_LETTER: Readonly<Record<string, string>> =
 export const LETTER_SOUND_MNEMONIC_POOL: ReadonlySet<string> = new Set(
   Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER),
 )
+
+/**
+ * ANCHORED-ONLY leading tokens (round-3 — Dave round-3 example-word
+ * anchoring). The "Anchor-only" candidate read drops the isolate lead
+ * and uses the BARE single-letter as the leading token
+ * (`"Which letter says u, like in cup?"`). These bare single letters
+ * are deliberately NOT in `LETTER_SOUND_MNEMONIC_TO_LETTER` /
+ * `LETTER_SOUND_MNEMONIC_POOL` — they would reintroduce the vowel
+ * double-wrap risk if they were render-time PHONEME_OVERRIDES keys, and
+ * the no-bare-vowel pool guard explicitly asserts their absence. They
+ * are valid ONLY in the anchored read context (where an
+ * `, like in <word>` suffix is present), resolved by the parser's
+ * letter-sounds branch via this map AFTER it confirms the main pool
+ * doesn't contain the token. Bare `u`/`i` are NOT phoneme-wrapped — the
+ * Anchor-only candidate intentionally lets Olivia voice them as the
+ * letter name while the plain-text anchor word carries the sound.
+ */
+export const LETTER_SOUND_ANCHORED_ONLY_TO_LETTER: Readonly<
+  Record<string, string>
+> = {
+  u: 'U',
+  i: 'I',
+}
 
 /**
  * Sentinel `pictureKey` prefix for synthetic letter-sound target

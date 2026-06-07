@@ -101,10 +101,15 @@ const SOUND: Record<string, SoundSpec> = {
   g: { letter: 'G', mnemonic: 'guh', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
   // P — round-2: all slots schwa (pə) + read declarative ".".
   p: { letter: 'P', mnemonic: 'puh', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
-  // T — FROZEN (read "?" approved). K — read "?" GREEN (kept); ph kə
-  // applies to all K slots incl read (re-audition flag).
+  // T — FROZEN (read "?" approved, bare /t/). K — ROUND-3: read flips to
+  // DECLARATIVE "." (was "?"). Thomas: "kuh is scratching" on the K read.
+  // Root cause: round-2 moved K to ph="kə" (schwa) but kept the QUESTION
+  // read — a schwa-final stop wants a DECLARATIVE read (like B/D/G/P,
+  // all accepted). "Which letter says kuh." makes K consistent with every
+  // other schwa-stop and avoids a key split. K hint/correct/give stay
+  // (kə, accepted).
   t: { letter: 'T', mnemonic: 'tuh', readTerm: '?', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
-  k: { letter: 'K', mnemonic: 'kuh', readTerm: '?', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
+  k: { letter: 'K', mnemonic: 'kuh', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
   // Vowels — TRIPLET mnemonics. A/O FROZEN; u/i/e re-pointed ph only.
   a: { letter: 'A', mnemonic: 'aaa', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
   o: { letter: 'O', mnemonic: 'ooo', readTerm: '.', hintKind: 'plain', correctKind: 'plain' }, // prettier-ignore
@@ -134,6 +139,69 @@ function problemUtterances(n: number, key: string): Utt[] {
     s.correctKind === 'saysIt'
       ? `This one is ${s.letter}. ${s.letter} says it. ${s.mnemonic}?`
       : `This one is ${s.letter}. ${s.mnemonic}.`
+  return [
+    { id: `word.p${n}.read`, text: read },
+    { id: `word.p${n}.correct`, text: correct },
+    { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+    { id: `word.p${n}.hint`, text: hint },
+    { id: `word.p${n}.giveAnswer`, text: giveAnswer },
+  ]
+}
+
+/**
+ * Round-3: build the 5 per-problem utterances for an ANCHORED vowel
+ * candidate (example-word anchoring — Dave round-3). Two variants per
+ * vowel are baked side-by-side so Thomas A/Bs them.
+ *
+ *   variant 'primary'     → isolate lead + anchor word:
+ *       read       "Which letter says <iso>, like in <word>?"
+ *       hint       "Listen. <Iso>, like in <word>."
+ *       correct    "Yes. <L>. <Iso>, like in <word>."
+ *       giveAnswer "This one is <L>. <Iso>, like in <word>."
+ *     <iso> is the phoneme-wrapped isolate lead (uh /ʌ/, ih /ɪ/);
+ *     <Iso> is its capitalised sentence-initial form. The anchor word
+ *     (<word> = cup/ink) is PLAIN TEXT — never phoneme-wrapped.
+ *
+ *   variant 'anchorOnly'  → drop the isolate; letter-name + anchor word
+ *       read       "Which letter says <letterLower>, like in <word>?"
+ *       hint       "Listen. <L>, like in <word>."
+ *       correct    "Yes. <L>. Like in <word>."
+ *       giveAnswer "This one is <L>. Like in <word>."
+ *     The read's leading token is the bare lowercase letter; it is NOT
+ *     phoneme-wrapped (not a PHONEME_OVERRIDES key) — Olivia voices it
+ *     as the letter name, and the anchor word carries the sound.
+ *
+ * The comma before "like in" keeps it one flowing intonation unit; the
+ * 300ms break before the wrapped isolate is injected at render time as
+ * usual.
+ */
+function anchoredVowelUtterances(
+  n: number,
+  opts: {
+    letter: string // 'U' / 'I'
+    iso: string // 'uh' / 'ih' (PHONEME_OVERRIDES key)
+    word: string // 'cup' / 'ink' (PLAIN TEXT anchor)
+    variant: 'primary' | 'anchorOnly'
+  },
+): Utt[] {
+  const { letter, iso, word, variant } = opts
+  const Iso = iso.charAt(0).toUpperCase() + iso.slice(1)
+  const letterLower = letter.toLowerCase()
+  let read: string
+  let hint: string
+  let correct: string
+  let giveAnswer: string
+  if (variant === 'primary') {
+    read = `Which letter says ${iso}, like in ${word}?`
+    hint = `Listen. ${Iso}, like in ${word}.`
+    correct = `Yes. ${letter}. ${Iso}, like in ${word}.`
+    giveAnswer = `This one is ${letter}. ${Iso}, like in ${word}.`
+  } else {
+    read = `Which letter says ${letterLower}, like in ${word}?`
+    hint = `Listen. ${letter}, like in ${word}.`
+    correct = `Yes. ${letter}. Like in ${word}.`
+    giveAnswer = `This one is ${letter}. Like in ${word}.`
+  }
   return [
     { id: `word.p${n}.read`, text: read },
     { id: `word.p${n}.correct`, text: correct },
@@ -216,29 +284,36 @@ async function main(): Promise<void> {
     `  ok ${shipped.path} (${(shipped.bytes / 1024).toFixed(0)}KB, ${shipped.problems} problems)`,
   )
 
-  // ── AUDIT canon — ONE problem per remaining class (Dave Part B) ───────
+  // ── AUDIT canon — one problem per class + U/I A/B candidates ──────────
   // Audition-only (NOT a real Marian session): every phoneme class so
   // Thomas hears them all. No composition rules apply; i and e can
-  // coexist here (no learner).
-  const auditTuple = [
-    'f',
-    'v',
-    'h',
-    'r',
-    'p',
-    't',
-    'k',
-    'd',
-    'g',
-    'u',
-    'i',
-    'e',
+  // coexist here (no learner). Round-3: U and I each get TWO problems
+  // (Primary + Anchor-only) baked side-by-side for A/B; E sits right
+  // after them for the three-way distinctness test (U=cup ≠ I=ink ≠
+  // E=bed, none ≈ A=cat).
+  const auditConsonants = ['f', 'v', 'h', 'r', 'p', 't', 'k', 'd', 'g']
+  const auditProblems: Utt[] = []
+  let pIdx = 0
+  for (const key of auditConsonants) {
+    pIdx += 1
+    auditProblems.push(...problemUtterances(pIdx, key))
+  }
+  // U Primary, U Anchor-only, I Primary, I Anchor-only.
+  const anchoredCells: Array<Parameters<typeof anchoredVowelUtterances>[1]> = [
+    { letter: 'U', iso: 'uh', word: 'cup', variant: 'primary' },
+    { letter: 'U', iso: 'uh', word: 'cup', variant: 'anchorOnly' },
+    { letter: 'I', iso: 'ih', word: 'ink', variant: 'primary' },
+    { letter: 'I', iso: 'ih', word: 'ink', variant: 'anchorOnly' },
   ]
-  const auditProblems = auditTuple.flatMap((key, i) =>
-    problemUtterances(i + 1, key),
-  )
+  for (const cell of anchoredCells) {
+    pIdx += 1
+    auditProblems.push(...anchoredVowelUtterances(pIdx, cell))
+  }
+  // E last — un-changed round-2 vowel, kept adjacent for distinctness.
+  pIdx += 1
+  auditProblems.push(...problemUtterances(pIdx, 'e'))
   console.log(
-    `Baking AUDIT letter-sounds (one-per-class: ${auditTuple.join(',')})`,
+    `Baking AUDIT letter-sounds (${pIdx} problems: consonants + U/I A/B candidates + E)`,
   )
   const audit = await bake(
     'public/canon/word-song/level-1/letter-sounds-audit.json',

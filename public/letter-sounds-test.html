@@ -169,6 +169,17 @@
         padding: 0 0.3rem;
         margin: 0 0.2rem 0 0;
       }
+      .variant {
+        display: inline-block;
+        background: #3a6ea5;
+        color: #fff;
+        border-radius: 999px;
+        padding: 0 0.45rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        vertical-align: middle;
+        margin-left: 0.3rem;
+      }
     </style>
   </head>
   <body>
@@ -186,14 +197,18 @@
       audible voiced stops (B/D/G), and the isolated short vowels.
     </p>
     <p class="sub">
-      <span class="badge">v2</span> marks the
-      <strong>round-2 changed cells</strong> — re-audition <em>only</em> these;
-      the un-badged cells are already approved and frozen. Round-2 changes:
-      <strong>V</strong> (all), <strong>S/F/H</strong> (Correct + Give-answer
-      &ldquo;says it&rdquo; lead-in), <strong>B/D/G</strong> (Read →
-      declarative), <strong>P</strong> (all — schwa),
-      <strong>K</strong> (Hint/Correct/Give + re-confirm Read on the shared
-      key), <strong>U/I/E</strong> (all — new en-GB vowel realisations).
+      <span class="badge">v3</span> marks the
+      <strong>round-3 changed cells</strong> — re-audition <em>only</em> these;
+      everything un-badged is already accepted and frozen. Round-3 changes:
+      <strong>K-Read</strong> (now declarative &ldquo;Which letter says
+      kuh.&rdquo; — fixes the scratch), and <strong>U</strong> /
+      <strong>I</strong> example-word anchoring with two candidates each to A/B
+      (<span class="variant">Primary</span> = isolate lead + anchor word, e.g.
+      &ldquo;uh, like in cup&rdquo;; <span class="variant">Anchor-only</span> =
+      drop the isolate, e.g. &ldquo;u, like in cup&rdquo;). Pick the U/I
+      candidate that sounds right, and re-confirm <strong>E</strong> (un-badged,
+      kept adjacent) still separates from the corrected I — three-way test:
+      U=cup ≠ I=ink ≠ E=bed, none ≈ A=cat.
     </p>
     <div id="status" class="status">Loading baked canon&hellip;</div>
     <div id="groups"></div>
@@ -229,11 +244,11 @@
         P: ['voiceless-stop', 'puh (as in pat)'],
         T: ['voiceless-stop', 'tuh (as in top)'],
         K: ['voiceless-stop', 'kuh (as in kite)'],
-        A: ['vowel', 'aaa — short /æ/ (as in cat)'],
-        O: ['vowel', 'ooo — short /ɒ/ (as in hot)'],
-        U: ['vowel', 'uuu — short /ʌ/ (as in cup)'],
-        I: ['vowel', 'iii — short /ɪ/ (as in pig)'],
-        E: ['vowel', 'eee — short /ɛ/ (as in bed)'],
+        A: ['vowel', 'short /æ/ (as in cat) — FROZEN'],
+        O: ['vowel', 'short /ɒ/ (as in hot) — FROZEN'],
+        U: ['vowel', 'short /ʌ/ — anchored to "cup"'],
+        I: ['vowel', 'short /ɪ/ — anchored to "ink"'],
+        E: ['vowel', 'short /ɛ/ (as in bed) — re-confirm vs I'],
       }
       const GROUPS = [
         ['nasal', 'Nasals (continuant-voiced)'],
@@ -242,32 +257,26 @@
         ['voiceless-fric', 'Voiceless fricatives'],
         ['voiced-stop', 'Voiced stops — schwa-released (B-silent fix)'],
         ['voiceless-stop', 'Voiceless stops'],
-        ['vowel', 'Short vowels — triplet mnemonics (double-wrap fix)'],
+        [
+          'vowel',
+          'Short vowels — U/I example-word anchored (round-3 A/B); three-way distinctness: U=cup ≠ I=ink ≠ E=bed, none ≈ A=cat',
+        ],
       ]
 
       // ── ROUND-2 changed cells (Dave straggler spec) ───────────────────
       // Which slots changed THIS round, per letter. Only these get the
-      // "v2" badge so Thomas re-auditions ONLY what changed; approved
-      // cells stay visible but un-badged.
-      //   V: all slots (read flip + saysIt correct/give + ph və)
-      //   S/F/H: correct + give (saysIt lead-in)
-      //   B/D/G: read (flip to declarative)
-      //   P: all slots (schwa pə + read declarative)
-      //   K: hint/correct/give get kə + re-confirm read (shared key)
-      //   U/I/E: all slots (ph re-pointed)
-      const V2 = {
-        V: ['read', 'hint', 'correct', 'giveAnswer'],
-        S: ['correct', 'giveAnswer'],
-        F: ['correct', 'giveAnswer'],
-        H: ['correct', 'giveAnswer'],
-        B: ['read'],
-        D: ['read'],
-        G: ['read'],
-        P: ['read', 'hint', 'correct', 'giveAnswer'],
-        K: ['read', 'hint', 'correct', 'giveAnswer'],
-        U: ['read', 'hint', 'correct', 'giveAnswer'],
-        I: ['read', 'hint', 'correct', 'giveAnswer'],
-        E: ['read', 'hint', 'correct', 'giveAnswer'],
+      // "v3" badge so Thomas re-auditions ONLY what changed THIS round;
+      // approved cells stay visible but un-badged. Keyed by cellId
+      // (letter, or "U·Primary"/"U·Anchor-only" etc. for the A/B cells).
+      // ROUND-3 changed cells ONLY:
+      //   K: read (flip to declarative ".", keeping kə)
+      //   U/I Primary + Anchor-only: all slots (example-word anchoring)
+      const V3 = {
+        K: ['read'],
+        'U·Primary': ['read', 'hint', 'correct', 'giveAnswer'],
+        'U·Anchor-only': ['read', 'hint', 'correct', 'giveAnswer'],
+        'I·Primary': ['read', 'hint', 'correct', 'giveAnswer'],
+        'I·Anchor-only': ['read', 'hint', 'correct', 'giveAnswer'],
       }
 
       function setStatus(msg, cls) {
@@ -286,19 +295,38 @@
         )
       }
 
-      // Build {letter -> {slotKey -> {text, url}}} from a canon JSON.
+      // Derive a CELL from a problem's correct-line text. Most letters
+      // are a single cell keyed by the letter. Round-3 U/I carry TWO
+      // candidates (Primary vs Anchor-only) distinguished by the correct
+      // text shape:
+      //   Primary    correct: "Yes. U. Uh, like in cup."   (isolate lead)
+      //   Anchor-only correct: "Yes. U. Like in cup."       (no isolate)
+      function cellFromCorrect(text) {
+        // "Yes. <L>." prefix then the remainder.
+        const m = text.match(/^Yes\.\s+([A-Z])\.\s*(.*)$/)
+        if (!m) return null
+        const letter = m[1]
+        const rest = (m[2] || '').trim()
+        if (letter === 'U' || letter === 'I') {
+          // Anchor-only remainder starts with "Like in"; Primary starts
+          // with the capitalised isolate ("Uh," / "Ih,").
+          const variant = /^like\s+in\b/i.test(rest) ? 'Anchor-only' : 'Primary'
+          return { cellId: `${letter}·${variant}`, letter, variant }
+        }
+        return { cellId: letter, letter, variant: null }
+      }
+
+      // Build {cellId -> {letter, variant, slots:{slotKey:{text,url}}}}
+      // from a canon JSON. Iterates ALL problems (no fixed bound).
       function indexCanon(canon) {
         const byId = new Map()
         for (const u of canon.utterances) byId.set(u.id, u)
-        // Map problem index -> letter via the correct-line "Yes. <L>. ..."
-        // shape (robust: the letter is the second sentence's single glyph).
-        const perLetter = new Map()
-        for (let n = 1; n <= 12; n++) {
+        const cells = new Map()
+        for (let n = 1; n <= 40; n++) {
           const correct = byId.get(`word.p${n}.correct`)
           if (!correct) continue
-          const m = correct.text.match(/^Yes\.\s+([A-Z])\.\s/)
-          if (!m) continue
-          const letter = m[1]
+          const cell = cellFromCorrect(correct.text)
+          if (!cell) continue
           const slots = {}
           for (const { key } of SLOTS) {
             const u = byId.get(`word.p${n}.${key}`)
@@ -310,9 +338,10 @@
             }
           }
           // First occurrence wins (shipped session repeats O at p6/p8).
-          if (!perLetter.has(letter)) perLetter.set(letter, slots)
+          if (!cells.has(cell.cellId))
+            cells.set(cell.cellId, { ...cell, slots })
         }
-        return perLetter
+        return cells
       }
 
       let currentAudio = null
@@ -332,9 +361,10 @@
         audio.play().catch(() => btn.classList.remove('playing'))
       }
 
-      function renderRow(letter, slots) {
+      function renderRow(cell) {
+        const { cellId, letter, variant, slots } = cell
         const [, like] = CLASS_OF[letter] || ['', '']
-        const changed = V2[letter] || []
+        const changed = V3[cellId] || []
         const row = document.createElement('div')
         row.className = 'row' + (changed.length ? ' v2row' : '')
 
@@ -345,9 +375,12 @@
 
         const meta = document.createElement('div')
         meta.className = 'meta'
-        const rowBadge = changed.length ? ' <span class="badge">v2</span>' : ''
+        const rowBadge = changed.length ? ' <span class="badge">v3</span>' : ''
+        const variantTag = variant
+          ? ` <span class="variant">${variant}</span>`
+          : ''
         meta.innerHTML =
-          `<div class="label">Letter ${letter}${rowBadge}</div>` +
+          `<div class="label">Letter ${letter}${variantTag}${rowBadge}</div>` +
           `<div class="like">should sound like: ${like}</div>`
         row.appendChild(meta)
 
@@ -355,9 +388,9 @@
         slotWrap.className = 'slots'
         for (const { key, label } of SLOTS) {
           const btn = document.createElement('button')
-          const isV2 = changed.includes(key)
-          btn.className = 'play' + (isV2 ? ' v2' : '')
-          const badge = isV2 ? '<span class="badge sm">v2</span> ' : ''
+          const isV3 = changed.includes(key)
+          btn.className = 'play' + (isV3 ? ' v2' : '')
+          const badge = isV3 ? '<span class="badge sm">v3</span> ' : ''
           const slot = slots[key]
           if (slot) {
             btn.innerHTML = `${badge}▶ ${label}<span class="txt">${slot.text.replace(/</g, '&lt;')}</span>`
@@ -384,32 +417,53 @@
           const shipped = await shippedRes.json()
           const audit = await auditRes.json()
 
-          // Merge: shipped letters take priority; audit fills the rest.
+          // Merge by cellId: shipped takes priority; audit fills the rest.
           const merged = new Map()
           for (const [k, v] of indexCanon(shipped)) merged.set(k, v)
           for (const [k, v] of indexCanon(audit))
             if (!merged.has(k)) merged.set(k, v)
 
+          // Fixed display order per group. Vowels: A, O, then the U/I A/B
+          // candidates, then E — so E sits next to U/I for the three-way
+          // distinctness test (U=cup ≠ I=ink ≠ E=bed, none ≈ A=cat).
+          const DISPLAY_ORDER = {
+            nasal: ['M', 'N'],
+            liquid: ['L', 'R'],
+            'voiced-fric': ['V'],
+            'voiceless-fric': ['S', 'F', 'H'],
+            'voiced-stop': ['B', 'D', 'G'],
+            'voiceless-stop': ['P', 'T', 'K'],
+            vowel: [
+              'A',
+              'O',
+              'U·Primary',
+              'U·Anchor-only',
+              'I·Primary',
+              'I·Anchor-only',
+              'E',
+            ],
+          }
+
           const groupsEl = document.getElementById('groups')
           let total = 0
           for (const [groupId, title] of GROUPS) {
-            const letters = Object.keys(CLASS_OF).filter(
-              (L) => CLASS_OF[L][0] === groupId && merged.has(L),
+            const ids = (DISPLAY_ORDER[groupId] || []).filter((id) =>
+              merged.has(id),
             )
-            if (letters.length === 0) continue
+            if (ids.length === 0) continue
             const g = document.createElement('div')
             g.className = 'group'
             const h = document.createElement('h2')
             h.textContent = title
             g.appendChild(h)
-            for (const L of letters) {
-              g.appendChild(renderRow(L, merged.get(L)))
+            for (const id of ids) {
+              g.appendChild(renderRow(merged.get(id)))
               total += 1
             }
             groupsEl.appendChild(g)
           }
           setStatus(
-            `Loaded ${total} letters from the baked canon (shipped /ɒ/ session + audit). Tap any slot to play the real Olivia clip.`,
+            `Loaded ${total} cells from the baked canon (shipped /ɒ/ session + audit, incl. U/I Primary vs Anchor-only A/B). Tap any slot to play the real Olivia clip.`,
             'ok',
           )
         } catch (err) {
