@@ -158,28 +158,13 @@ export const LETTER_SOUND_MNEMONIC_POOL: ReadonlySet<string> = new Set(
   Object.keys(LETTER_SOUND_MNEMONIC_TO_LETTER),
 )
 
-/**
- * ANCHORED-ONLY leading tokens (round-3 — Dave round-3 example-word
- * anchoring). The "Anchor-only" candidate read drops the isolate lead
- * and uses the BARE single-letter as the leading token
- * (`"Which letter says u, like in cup?"`). These bare single letters
- * are deliberately NOT in `LETTER_SOUND_MNEMONIC_TO_LETTER` /
- * `LETTER_SOUND_MNEMONIC_POOL` — they would reintroduce the vowel
- * double-wrap risk if they were render-time PHONEME_OVERRIDES keys, and
- * the no-bare-vowel pool guard explicitly asserts their absence. They
- * are valid ONLY in the anchored read context (where an
- * `, like in <word>` suffix is present), resolved by the parser's
- * letter-sounds branch via this map AFTER it confirms the main pool
- * doesn't contain the token. Bare `u`/`i` are NOT phoneme-wrapped — the
- * Anchor-only candidate intentionally lets Olivia voice them as the
- * letter name while the plain-text anchor word carries the sound.
- */
-export const LETTER_SOUND_ANCHORED_ONLY_TO_LETTER: Readonly<
-  Record<string, string>
-> = {
-  u: 'U',
-  i: 'I',
-}
+// NOTE (round-3 finalisation): an "Anchor-only" U/I candidate that
+// emitted a bare single-letter read (`"Which letter says u, like in
+// cup?"`) was A/B-tested and REJECTED — Olivia spoke the letter NAME
+// "you"/"eye" instead of the sound. The bare-letter resolution map and
+// parser fallback it needed were removed. The LOCKED Primary form uses
+// the `uh`/`ih` isolate leads, which ARE in the pool above, so no
+// bare-letter resolution is needed any more.
 
 /**
  * Sentinel `pictureKey` prefix for synthetic letter-sound target

@@ -2548,32 +2548,31 @@ uppercase letter glyph for the target):
   ("ooo."). Only the mnemonic is phoneme-wrapped; the letter-name stays
   bare prose.
 
-ANCHORED VOWELS U/I (ROUND-3, Dave round-3 — example-word anchoring).
-Olivia cannot separate the central/lax vowels from bare IPA (ʌ/ə/ɘ
-collapse toward /æ/; ɪ/ɘ merge). The fix is structured-literacy
-keyword anchoring: pair the sound with a real word Olivia's lexicon
-voices correctly. U anchors to "cup", I anchors to "ink". TWO candidates
-are auditioned side-by-side (Thomas A/Bs them); pick the winner per his
-ear:
-  · PRIMARY (isolate lead + anchor word):
+ANCHORED VOWELS U/I (ROUND-3 — example-word anchoring, LOCKED). Olivia
+cannot separate the central/lax vowels from bare IPA (ʌ/ə/ɘ collapse
+toward /æ/; ɪ/ɘ merge). The fix is structured-literacy keyword
+anchoring: pair the sound with a real word Olivia's lexicon voices
+correctly. U anchors to "cup", I anchors to "ink". When /ʌ/ (letter u)
+or /ɪ/ (letter i) is the target sound in a real session, ALWAYS emit the
+PRIMARY anchored form below — this is the Thomas-approved final
+treatment:
       U read "Which letter says uh, like in cup?"
         hint "Listen. Uh, like in cup."
         correct "Yes. U. Uh, like in cup."
-        give "This one is U. Uh, like in cup."
-      I uses the "ih" isolate + "ink" analogously.
-    The isolate lead (uh /ʌ/, ih /ɪ/) is phoneme-wrapped; the anchor
-    word (cup/ink) is DELIBERATELY PLAIN TEXT — its whole value is
-    Olivia's native lexicon voicing it correctly. NEVER wrap cup/ink.
-  · ANCHOR-ONLY (drop the isolate; letter-name + anchor carries it):
-      U read "Which letter says u, like in cup?"
-        hint "Listen. U, like in cup."
-        correct "Yes. U. Like in cup."
-        give "This one is U. Like in cup."
-    The bare letter "u"/"i" is NOT phoneme-wrapped — Olivia voices it as
-    the letter name; the anchor word carries the sound.
+        giveAnswer "This one is U. Uh, like in cup."
+      I read "Which letter says ih, like in ink?"
+        hint "Listen. Ih, like in ink."
+        correct "Yes. I. Ih, like in ink."
+        giveAnswer "This one is I. Ih, like in ink."
+The isolate lead (uh /ʌ/, ih /ɪ/) is phoneme-wrapped; the anchor word
+(cup/ink) is DELIBERATELY PLAIN TEXT — its whole value is Olivia's
+native lexicon voicing it correctly. NEVER wrap cup/ink.
 The comma before "like in" keeps it one flowing intonation unit. The
 300ms break before the wrapped isolate is injected at render time as
 usual. (A and O are FROZEN at æ/ɒ; E at "e" — no anchoring needed.)
+(An "Anchor-only" variant that dropped the isolate lead was A/B-tested
+and REJECTED — Olivia spoke the bare letter NAME "you"/"eye" instead of
+the sound. Do NOT emit a bare-letter u/i read.)
 
 NO ARTICLE-LED FALLBACK for letter-sounds — the "Yes! That's a
 <word>." article-led default (used by blending-cv / cvc-words /

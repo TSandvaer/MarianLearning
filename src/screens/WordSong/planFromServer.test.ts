@@ -1238,8 +1238,8 @@ describe('parseReadLine — letter-sounds planner↔parser contract (per sound c
   })
 })
 
-describe('parseReadLine — round-3 example-word-anchored U/I reads', () => {
-  it('parses the Primary candidate (isolate lead + anchor): "...says uh, like in cup?" → U', () => {
+describe('parseReadLine — round-3 example-word-anchored U/I reads (LOCKED to Primary)', () => {
+  it('parses the LOCKED Primary form (isolate lead + anchor): "...says uh, like in cup?" → U', () => {
     const u = parseReadLine('Which letter says uh, like in cup?')
     expect(u.contentType).toBe('letter-sounds')
     expect(u.entry.word).toBe('U')
@@ -1247,19 +1247,20 @@ describe('parseReadLine — round-3 example-word-anchored U/I reads', () => {
     expect(i.entry.word).toBe('I')
   })
 
-  it('parses the Anchor-only candidate (bare letter + anchor): "...says u, like in cup?" → U', () => {
-    // The bare single-letter token `u`/`i` is valid ONLY because the
-    // anchor suffix is present (anchored-only fallback).
-    const u = parseReadLine('Which letter says u, like in cup?')
-    expect(u.contentType).toBe('letter-sounds')
-    expect(u.entry.word).toBe('U')
-    const i = parseReadLine('Which letter says i, like in ink?')
-    expect(i.entry.word).toBe('I')
+  it('REJECTS the rejected Anchor-only bare-letter read (the fallback was removed)', () => {
+    // The Anchor-only candidate (`"...says u, like in cup?"`) was
+    // A/B-rejected — Olivia spoke the letter NAME "you"/"eye". Its
+    // bare-letter resolution fallback was removed, so a bare `u`/`i`
+    // leading token no longer resolves even WITH an anchor suffix.
+    expect(() => parseReadLine('Which letter says u, like in cup?')).toThrow(
+      /outside the mnemonic pool/,
+    )
+    expect(() => parseReadLine('Which letter says i, like in ink?')).toThrow(
+      /outside the mnemonic pool/,
+    )
   })
 
-  it('still REJECTS a bare single-letter vowel WITHOUT the anchor suffix (double-wrap guard intact)', () => {
-    // No anchor → the anchored-only fallback does not apply → `u` is not
-    // in the main pool → reject.
+  it('also rejects a bare single-letter vowel without any anchor (double-wrap guard intact)', () => {
     expect(() => parseReadLine('Which letter says u.')).toThrow(
       /outside the mnemonic pool/,
     )
@@ -1273,19 +1274,19 @@ describe('parseReadLine — round-3 example-word-anchored U/I reads', () => {
     expect(parseReadLine('Which letter says ih.').entry.word).toBe('I')
   })
 
-  it('a full session mixing Primary + Anchor-only anchored reads round-trips through Path A', () => {
+  it('a full session of LOCKED Primary U/I reads round-trips through Path A', () => {
     const wire = {
       id: 'round3-anchored',
-      label: 'round-3 anchored U/I',
+      label: 'round-3 anchored U/I (Primary)',
       utterances: [
-        { mnemonic: 'uh', letter: 'U', read: 'Which letter says uh, like in cup?', hint: 'Listen. Uh, like in cup.', correct: 'Yes. U. Uh, like in cup.', give: 'This one is U. Uh, like in cup.' }, // prettier-ignore
-        { mnemonic: 'u', letter: 'U', read: 'Which letter says u, like in cup?', hint: 'Listen. U, like in cup.', correct: 'Yes. U. Like in cup.', give: 'This one is U. Like in cup.' }, // prettier-ignore
-        { mnemonic: 'ih', letter: 'I', read: 'Which letter says ih, like in ink?', hint: 'Listen. Ih, like in ink.', correct: 'Yes. I. Ih, like in ink.', give: 'This one is I. Ih, like in ink.' }, // prettier-ignore
-        { mnemonic: 'i', letter: 'I', read: 'Which letter says i, like in ink?', hint: 'Listen. I, like in ink.', correct: 'Yes. I. Like in ink.', give: 'This one is I. Like in ink.' }, // prettier-ignore
-        { mnemonic: 'eee', letter: 'E', read: 'Which letter says eee.', hint: 'Listen. eee.', correct: 'Yes. E. eee.', give: 'This one is E. eee.' }, // prettier-ignore
-        { mnemonic: 'mmm', letter: 'M', read: 'Which letter says mmm.', hint: 'Listen. mmm.', correct: 'Yes. M. mmm.', give: 'This one is M. mmm.' }, // prettier-ignore
-        { mnemonic: 'sss', letter: 'S', read: 'Which letter says sss?', hint: 'It says sss?', correct: 'Yes. S says it. sss?', give: 'This one is S. S says it. sss?' }, // prettier-ignore
-        { mnemonic: 'kuh', letter: 'K', read: 'Which letter says kuh.', hint: 'Listen. kuh.', correct: 'Yes. K. kuh.', give: 'This one is K. kuh.' }, // prettier-ignore
+        { read: 'Which letter says uh, like in cup?', hint: 'Listen. Uh, like in cup.', correct: 'Yes. U. Uh, like in cup.', give: 'This one is U. Uh, like in cup.' }, // prettier-ignore
+        { read: 'Which letter says ih, like in ink?', hint: 'Listen. Ih, like in ink.', correct: 'Yes. I. Ih, like in ink.', give: 'This one is I. Ih, like in ink.' }, // prettier-ignore
+        { read: 'Which letter says eee.', hint: 'Listen. eee.', correct: 'Yes. E. eee.', give: 'This one is E. eee.' }, // prettier-ignore
+        { read: 'Which letter says mmm.', hint: 'Listen. mmm.', correct: 'Yes. M. mmm.', give: 'This one is M. mmm.' }, // prettier-ignore
+        { read: 'Which letter says sss?', hint: 'It says sss?', correct: 'Yes. S says it. sss?', give: 'This one is S. S says it. sss?' }, // prettier-ignore
+        { read: 'Which letter says kuh.', hint: 'Listen. kuh.', correct: 'Yes. K. kuh.', give: 'This one is K. kuh.' }, // prettier-ignore
+        { read: 'Which letter says buh.', hint: 'Listen. buh.', correct: 'Yes. B. buh.', give: 'This one is B. buh.' }, // prettier-ignore
+        { read: 'Which letter says lll.', hint: 'Listen. lll.', correct: 'Yes. L. lll.', give: 'This one is L. lll.' }, // prettier-ignore
       ].flatMap((c, idx) => {
         const n = idx + 1
         return [
@@ -1300,19 +1301,19 @@ describe('parseReadLine — round-3 example-word-anchored U/I reads', () => {
     const plan = wordSongSessionPlanFromServer(wire)
     expect(plan.problems.map((p) => p.target.word)).toEqual([
       'U',
-      'U',
-      'I',
       'I',
       'E',
       'M',
       'S',
       'K',
+      'B',
+      'L',
     ])
     for (const problem of plan.problems) {
       expect(problem.contentType).toBe('letter-sounds')
     }
     // K read is round-3 declarative.
-    expect(plan.problems[7]!.utterances.read).toBe('Which letter says kuh.')
+    expect(plan.problems[5]!.utterances.read).toBe('Which letter says kuh.')
   })
 })
 

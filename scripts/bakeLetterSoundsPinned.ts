@@ -149,31 +149,22 @@ function problemUtterances(n: number, key: string): Utt[] {
 }
 
 /**
- * Round-3: build the 5 per-problem utterances for an ANCHORED vowel
- * candidate (example-word anchoring — Dave round-3). Two variants per
- * vowel are baked side-by-side so Thomas A/Bs them.
- *
- *   variant 'primary'     → isolate lead + anchor word:
+ * Round-3 (LOCKED): build the 5 per-problem utterances for an ANCHORED
+ * vowel (example-word anchoring — Dave round-3). This is the Primary
+ * form, Thomas-approved as the FINAL treatment:
  *       read       "Which letter says <iso>, like in <word>?"
  *       hint       "Listen. <Iso>, like in <word>."
  *       correct    "Yes. <L>. <Iso>, like in <word>."
  *       giveAnswer "This one is <L>. <Iso>, like in <word>."
- *     <iso> is the phoneme-wrapped isolate lead (uh /ʌ/, ih /ɪ/);
- *     <Iso> is its capitalised sentence-initial form. The anchor word
- *     (<word> = cup/ink) is PLAIN TEXT — never phoneme-wrapped.
- *
- *   variant 'anchorOnly'  → drop the isolate; letter-name + anchor word
- *       read       "Which letter says <letterLower>, like in <word>?"
- *       hint       "Listen. <L>, like in <word>."
- *       correct    "Yes. <L>. Like in <word>."
- *       giveAnswer "This one is <L>. Like in <word>."
- *     The read's leading token is the bare lowercase letter; it is NOT
- *     phoneme-wrapped (not a PHONEME_OVERRIDES key) — Olivia voices it
- *     as the letter name, and the anchor word carries the sound.
+ *   <iso> is the phoneme-wrapped isolate lead (uh /ʌ/, ih /ɪ/); <Iso>
+ *   is its capitalised sentence-initial form. The anchor word (<word> =
+ *   cup/ink) is PLAIN TEXT — never phoneme-wrapped.
  *
  * The comma before "like in" keeps it one flowing intonation unit; the
  * 300ms break before the wrapped isolate is injected at render time as
- * usual.
+ * usual. (An "Anchor-only" variant that dropped the isolate lead was
+ * A/B-tested and REJECTED — Olivia spoke the bare letter NAME instead of
+ * the sound. Removed.)
  */
 function anchoredVowelUtterances(
   n: number,
@@ -181,27 +172,14 @@ function anchoredVowelUtterances(
     letter: string // 'U' / 'I'
     iso: string // 'uh' / 'ih' (PHONEME_OVERRIDES key)
     word: string // 'cup' / 'ink' (PLAIN TEXT anchor)
-    variant: 'primary' | 'anchorOnly'
   },
 ): Utt[] {
-  const { letter, iso, word, variant } = opts
+  const { letter, iso, word } = opts
   const Iso = iso.charAt(0).toUpperCase() + iso.slice(1)
-  const letterLower = letter.toLowerCase()
-  let read: string
-  let hint: string
-  let correct: string
-  let giveAnswer: string
-  if (variant === 'primary') {
-    read = `Which letter says ${iso}, like in ${word}?`
-    hint = `Listen. ${Iso}, like in ${word}.`
-    correct = `Yes. ${letter}. ${Iso}, like in ${word}.`
-    giveAnswer = `This one is ${letter}. ${Iso}, like in ${word}.`
-  } else {
-    read = `Which letter says ${letterLower}, like in ${word}?`
-    hint = `Listen. ${letter}, like in ${word}.`
-    correct = `Yes. ${letter}. Like in ${word}.`
-    giveAnswer = `This one is ${letter}. Like in ${word}.`
-  }
+  const read = `Which letter says ${iso}, like in ${word}?`
+  const hint = `Listen. ${Iso}, like in ${word}.`
+  const correct = `Yes. ${letter}. ${Iso}, like in ${word}.`
+  const giveAnswer = `This one is ${letter}. ${Iso}, like in ${word}.`
   return [
     { id: `word.p${n}.read`, text: read },
     { id: `word.p${n}.correct`, text: correct },
@@ -284,12 +262,12 @@ async function main(): Promise<void> {
     `  ok ${shipped.path} (${(shipped.bytes / 1024).toFixed(0)}KB, ${shipped.problems} problems)`,
   )
 
-  // ── AUDIT canon — one problem per class + U/I A/B candidates ──────────
-  // Audition-only (NOT a real Marian session): every phoneme class so
-  // Thomas hears them all. No composition rules apply; i and e can
-  // coexist here (no learner). Round-3: U and I each get TWO problems
-  // (Primary + Anchor-only) baked side-by-side for A/B; E sits right
-  // after them for the three-way distinctness test (U=cup ≠ I=ink ≠
+  // ── AUDIT canon — one problem per class + anchored U/I + E ────────────
+  // Audition-only QA tooling (NOT a real Marian session): every phoneme
+  // class so Thomas can hear them all. No composition rules apply; i and
+  // e can coexist here (no learner). U/I use the LOCKED Primary anchored
+  // form (the Anchor-only A/B candidate was rejected and removed). E sits
+  // right after for the three-way distinctness test (U=cup ≠ I=ink ≠
   // E=bed, none ≈ A=cat).
   const auditConsonants = ['f', 'v', 'h', 'r', 'p', 't', 'k', 'd', 'g']
   const auditProblems: Utt[] = []
@@ -298,22 +276,20 @@ async function main(): Promise<void> {
     pIdx += 1
     auditProblems.push(...problemUtterances(pIdx, key))
   }
-  // U Primary, U Anchor-only, I Primary, I Anchor-only.
+  // U + I anchored (Primary form, LOCKED).
   const anchoredCells: Array<Parameters<typeof anchoredVowelUtterances>[1]> = [
-    { letter: 'U', iso: 'uh', word: 'cup', variant: 'primary' },
-    { letter: 'U', iso: 'uh', word: 'cup', variant: 'anchorOnly' },
-    { letter: 'I', iso: 'ih', word: 'ink', variant: 'primary' },
-    { letter: 'I', iso: 'ih', word: 'ink', variant: 'anchorOnly' },
+    { letter: 'U', iso: 'uh', word: 'cup' },
+    { letter: 'I', iso: 'ih', word: 'ink' },
   ]
   for (const cell of anchoredCells) {
     pIdx += 1
     auditProblems.push(...anchoredVowelUtterances(pIdx, cell))
   }
-  // E last — un-changed round-2 vowel, kept adjacent for distinctness.
+  // E last — kept adjacent for distinctness.
   pIdx += 1
   auditProblems.push(...problemUtterances(pIdx, 'e'))
   console.log(
-    `Baking AUDIT letter-sounds (${pIdx} problems: consonants + U/I A/B candidates + E)`,
+    `Baking AUDIT letter-sounds (${pIdx} problems: consonants + anchored U/I + E)`,
   )
   const audit = await bake(
     'public/canon/word-song/level-1/letter-sounds-audit.json',

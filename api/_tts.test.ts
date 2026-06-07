@@ -637,18 +637,18 @@ describe('letter-sounds SSML treatment (British-voice rollout, 2026-06-06)', () 
     expect((out.match(/<phoneme/g) ?? []).length).toBe(1)
   })
 
-  it('Anchor-only candidate: NOTHING is phoneme-wrapped (no isolate lead; bare "u" and "cup" both plain)', () => {
-    // The Anchor-only read drops the isolate lead. The bare "u" is NOT a
-    // PHONEME_OVERRIDES key (only "uh" is), so neither "u" nor the anchor
-    // word "cup" is wrapped — Olivia voices "u" as the letter name and
-    // the anchor word carries the sound. Zero phoneme tags.
-    const read = renderSsmlInnerText(
-      'Which letter says u, like in cup?',
-      'letter-sounds',
-    )
-    expect(read).not.toContain('<phoneme')
-    const correct = renderSsmlInnerText('Yes. U. Like in cup.', 'letter-sounds')
-    expect(correct).not.toContain('<phoneme')
+  it('defensive: a bare single-letter "u"/"i" is NEVER phoneme-wrapped (double-wrap guard; the rejected Anchor-only form would have relied on this)', () => {
+    // The bare "u"/"i" is NOT a PHONEME_OVERRIDES key (only the triplet
+    // "uuu"/"iii" and the round-3 isolate leads "uh"/"ih" are). So a bare
+    // single letter is never wrapped — this guards the double-wrap fix.
+    // (The Anchor-only candidate that emitted bare-letter reads was
+    // rejected and removed; this stays as a defensive guard.)
+    expect(
+      renderSsmlInnerText('Which letter says u, like in cup?', 'letter-sounds'),
+    ).not.toContain('<phoneme')
+    expect(
+      renderSsmlInnerText('Which letter says i, like in ink?', 'letter-sounds'),
+    ).not.toContain('<phoneme')
   })
 })
 
