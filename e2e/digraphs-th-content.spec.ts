@@ -1035,7 +1035,11 @@ test.describe('digraphs-th content + hybridMode partial gate + intro→practicin
       timeout: 10_000,
     })
     const cta = page.getByTestId('session-end-cta')
-    await expect(cta).toBeVisible({ timeout: 12_000 })
+    // 12s → 20s (British-voice rollout). Real-canon-audio session: the
+    // session-end recap reveals the CTA only after its recap utterances
+    // finish; en-GB-OliviaNeural clips run a touch longer, so the
+    // reveal can exceed 12s on Chromium. 20s gives Olivia headroom.
+    await expect(cta).toBeVisible({ timeout: 20_000 })
     await cta.click()
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
 

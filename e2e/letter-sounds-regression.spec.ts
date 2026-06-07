@@ -214,24 +214,40 @@ const MNEMONIC_TO_MAPPING: ReadonlyMap<string, MnemonicMapping> = new Map([
   ['duh', { ipa: 'd', target: 'd', category: 'mastered-consonant' }],
   ['kuh', { ipa: 'k', target: 'k', category: 'mastered-consonant' }],
   ['guh', { ipa: 'ɡ', target: 'g', category: 'mastered-consonant' }],
-  // Mastered vowel /æ/ — short-a (A5 §2.3 row 3).
-  ['a', { ipa: 'æ', target: 'a', category: 'mastered-vowel' }],
-  // Current-target short vowels (A5 §2.3 row 4).
-  ['o', { ipa: 'ɒ', target: 'o', category: 'short-vowel' }],
-  ['u', { ipa: 'ʌ', target: 'u', category: 'short-vowel' }],
-  ['i', { ipa: 'ɪ', target: 'i', category: 'short-vowel' }],
-  ['e', { ipa: 'ɛ', target: 'e', category: 'short-vowel' }],
+  // Mastered vowel /æ/ — short-a. British-voice rollout: vowel mnemonics
+  // are TRIPLETS (the vowel double-wrap fix), NOT the bare single letter.
+  ['aaa', { ipa: 'æ', target: 'a', category: 'mastered-vowel' }],
+  // Current-target short vowels — TRIPLET mnemonics. The u/i/e IPA were
+  // re-pointed in round-2/3 (ə/ɘ/e and the example-word anchoring for
+  // U/I), but the read-line mnemonic→target-letter mapping this spec
+  // checks is what matters here.
+  ['ooo', { ipa: 'ɒ', target: 'o', category: 'short-vowel' }],
+  ['uuu', { ipa: 'ʌ', target: 'u', category: 'short-vowel' }],
+  ['iii', { ipa: 'ɪ', target: 'i', category: 'short-vowel' }],
+  ['eee', { ipa: 'e', target: 'e', category: 'short-vowel' }],
+  // Round-3 example-word-anchoring isolate leads for U/I. The anchored
+  // read leads with `uh`/`ih`, e.g. "Which letter says uh, like in cup?".
+  ['uh', { ipa: 'ʌ', target: 'u', category: 'short-vowel' }],
+  ['ih', { ipa: 'ɪ', target: 'i', category: 'short-vowel' }],
 ])
 
-/** The set of mnemonics that map to short vowels (A5 §1.1 — /ɒ, ʌ, ɪ, ɛ/). */
-const SHORT_VOWEL_MNEMONICS: ReadonlySet<string> = new Set(['o', 'u', 'i', 'e'])
+/** The set of mnemonics that map to short vowels (triplets + round-3
+ *  anchored isolate leads). */
+const SHORT_VOWEL_MNEMONICS: ReadonlySet<string> = new Set([
+  'ooo',
+  'uuu',
+  'iii',
+  'eee',
+  'uh',
+  'ih',
+])
 
 /** The set of mnemonics that map to the mastered vowel /æ/. */
-const MASTERED_VOWEL_MNEMONICS: ReadonlySet<string> = new Set(['a'])
+const MASTERED_VOWEL_MNEMONICS: ReadonlySet<string> = new Set(['aaa'])
 
 /** The set of mnemonics that map to short-i and short-e — the
- *  load-bearing adjacency-ban pair from A5 §1.2. */
-const I_E_VOWEL_MNEMONICS: ReadonlySet<string> = new Set(['i', 'e'])
+ *  load-bearing adjacency-ban pair. */
+const I_E_VOWEL_MNEMONICS: ReadonlySet<string> = new Set(['iii', 'eee', 'ih'])
 
 /** Minimal shape of the on-disk session canon this spec inspects. */
 interface CanonUtterance {
@@ -297,12 +313,20 @@ function targetMnemonicsByProblem(canon: CanonShape): Map<number, string> {
 
 /**
  * Extract the per-problem target LETTER from the canon `correct`
- * slot. Each problem's `correct` slot text is `"Yes! <LETTER> says
- * <MNEMONIC>."` per A5 §2.2 + Dave A6 directive template. Returns a
- * map from problem number (1..8) to the target letter (lowercase —
- * the `correct` slot emits uppercase Azure-friendly glyph; we lower-
- * case here for category-membership checks against the lowercase
- * canonical letter set).
+ * slot. Returns a map from problem number (1..8) to the target letter
+ * (lowercase — the `correct` slot emits the uppercase Azure-friendly
+ * glyph; we lower-case here for category-membership checks against the
+ * lowercase canonical letter set).
+ *
+ * British-voice-rollout `correct` shapes (the OLD "Yes! <L> says <M>."
+ * was retired):
+ *   - non-fricative:  "Yes. <L>. <mnemonic>."        e.g. "Yes. M. mmm."
+ *   - fricative S/F/H/V: "Yes. <L> says it. <mnemonic>?"
+ *                                                    e.g. "Yes. S says it. sss?"
+ *   - anchored U/I:   "Yes. <L>. <Iso>, like in <word>."
+ *                                                    e.g. "Yes. U. Uh, like in cup."
+ * In every shape the LETTER is the single ASCII glyph immediately
+ * after the leading "Yes." — captured by the anchored regex below.
  *
  * Cross-checks against `targetMnemonicsByProblem` via the
  * `MNEMONIC_TO_MAPPING` table — the (mnemonic, target-letter) pair
@@ -314,10 +338,11 @@ function targetLettersByProblem(canon: CanonShape): Map<number, string> {
     const idMatch = u.id.match(/^word\.p(\d+)\.correct$/)
     if (idMatch === null) continue
     const problemNum = Number(idMatch[1])
-    // Anchored "Yes! <LETTER> says <MNEMONIC>." — `<LETTER>` is a
-    // single uppercase ASCII letter (A5 §2.2 directive — the
-    // uppercase glyph triggers Azure to read the letter NAME).
-    const textMatch = u.text.match(/^Yes! ([A-Za-z]) says (\S+)\.$/)
+    // The letter is the single ASCII glyph right after "Yes. " — either
+    // "Yes. <L>. ..." (non-fric / vowels) or "Yes. <L> says it. ..."
+    // (fricatives). Anchor on the leading "Yes." + the glyph + a
+    // following "." or " says it".
+    const textMatch = u.text.match(/^Yes\. ([A-Za-z])(?:\.| says it)/)
     if (textMatch === null) continue
     byProblem.set(problemNum, textMatch[1]!.toLowerCase())
   }
@@ -636,13 +661,15 @@ test.describe('letter-sounds content first-class wiring (Wave 7 Track A7/A8)', (
    *       COMPOSITION RULES §3): AT LEAST 2 of P6-P8 must have the
    *       current-target vowel as the target sound.
    *
-   * On the shipped canon (commit `4091e95`): mnemonics are
-   * mmm, sss, hhh, a, tuh, o, lll, o. Current-target /ɒ/ count = 2
-   * (within 2-3 cap), mastered-consonants = 5 (m, s, h, t, l, ≥4),
-   * mastered-vowel /æ/ = 1 at P4 (mid-tier), no /ɪ/ or /ɛ/ targets
-   * (adjacency ban satisfied), gentle-ramp P1-P3 = all consonants
-   * (m, s, h), trap-window P6-P8 current-target = 2 of 3 (P6=o,
-   * P8=o). All eight rules pass.
+   * On the shipped canon (British-voice rollout PINNED /ɒ/ session,
+   * tuple m,s,l,a,b,o,n,o): mnemonics are mmm, sss, lll, aaa, buh, ooo,
+   * nnn, ooo. Current-target /ɒ/ count = 2 (ooo at P6 + P8, within 2-3
+   * cap), mastered-consonants = 5 (m, s, l, b, n, ≥4), mastered-vowel
+   * /æ/ = 1 (aaa at P4, mid-tier), no /ɪ/ or /ɛ/ targets (adjacency ban
+   * satisfied), gentle-ramp P1-P3 = all consonants (m, s, l),
+   * trap-window P6-P8 current-target = 2 of 3 (P6=ooo, P8=ooo). All
+   * eight rules pass. (Vowel mnemonics are TRIPLETS post-rollout — the
+   * vowel double-wrap fix.)
    *
    * If a future re-bake drifts (e.g. emits 4 short-vowel targets, or
    * places /æ/ at P1, or both `i` and `e` as targets, or fewer than
