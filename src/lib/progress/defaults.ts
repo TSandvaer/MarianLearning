@@ -9,8 +9,66 @@
 
 import { emptyLeitner } from './leitner'
 import { DEFAULT_PARENT_SETTINGS } from './parentSettings'
-import type { Progress, SkillLevels, SkillNode } from './types'
+import type {
+  LetterSoundsVowel,
+  Progress,
+  SkillLevels,
+  SkillNode,
+  VowelSubMasteryState,
+} from './types'
 import { CURRENT_SCHEMA_VERSION } from './types'
+
+/**
+ * The trackable short vowels for `letter-sounds` per-vowel mastery, in
+ * teaching order (Wave 9 W9.2 — ticket 86c9ya3gd). Order matches
+ * `design/research/phonics-sequence-marian.md` §Q1 (o → u → i → e); short
+ * -/a/ is excluded (already mastered per the April 2026 diagnostic).
+ *
+ * Single source of truth for "every letter-sounds vowel the schema knows
+ * about" — walked by `DEFAULT_LETTER_SOUNDS_VOWEL_STATES` here and by the
+ * read-path defaulter (`storage.ts:withDefaultedLetterSoundsVowelStates`)
+ * / its cloudSync mirror to fill missing keys.
+ */
+export const LETTER_SOUNDS_VOWELS: readonly LetterSoundsVowel[] = [
+  '/o/',
+  '/u/',
+  '/i/',
+  '/e/',
+] as const
+
+/**
+ * Default per-vowel sub-mastery for a brand-new profile: all four short
+ * vowels at `'intro'` (Wave 9 W9.2 — ticket 86c9ya3gd). Greenfield Marian
+ * starts every trackable vowel at first-exposure scaffolding; the (W9.3)
+ * mastery rule promotes them independently as she practises.
+ *
+ * Returns a FRESH object each call so callers can spread + mutate without
+ * touching the singleton — mirrors `defaultLockedSkillLevels()`.
+ */
+export function defaultLetterSoundsVowelStates(): Record<
+  LetterSoundsVowel,
+  VowelSubMasteryState
+> {
+  const out = {} as Record<LetterSoundsVowel, VowelSubMasteryState>
+  for (const vowel of LETTER_SOUNDS_VOWELS) {
+    out[vowel] = 'intro'
+  }
+  return out
+}
+
+/**
+ * Frozen literal form of the per-vowel default, for tests + call-sites
+ * that want the canonical shape without a function call. Prefer
+ * `defaultLetterSoundsVowelStates()` when you need a mutable copy.
+ */
+export const DEFAULT_LETTER_SOUNDS_VOWEL_STATES: Readonly<
+  Record<LetterSoundsVowel, VowelSubMasteryState>
+> = {
+  '/o/': 'intro',
+  '/u/': 'intro',
+  '/i/': 'intro',
+  '/e/': 'intro',
+}
 
 /**
  * Schema-floor skill-level keys (ticket 86c9pkfth).
@@ -193,5 +251,13 @@ export function defaultProgress(childName = 'Marian'): Progress {
     // appended at session-end. See types.ts comment + the migration
     // path in `migrate.ts` for the existing-blob fill rule.
     lifetimeFirstEncounters: [],
+    // Literacy namespace (Wave 9 W9.2 — ticket 86c9ya3gd). Greenfield
+    // Marian starts every trackable short vowel at 'intro'. The field is
+    // additive + optional on the persisted shape; include it on fresh
+    // defaults and rely on `withDefaultedLetterSoundsVowelStates` to fill
+    // it in for any blob that predates the field. See types.ts comment.
+    literacy: {
+      letterSoundsVowelStates: defaultLetterSoundsVowelStates(),
+    },
   }
 }

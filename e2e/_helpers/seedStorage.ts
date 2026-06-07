@@ -84,6 +84,18 @@ export interface SeedProgressOptions {
    * pass `lifetimeFirstEncounters: []` here so the gate fires.
    */
   lifetimeFirstEncounters?: ReadonlyArray<string>
+  /**
+   * Override `literacy.letterSoundsVowelStates` (Wave 9 W9.2 — ticket
+   * 86c9ya3gd). Loose `Record<string, string>` shape so specs can pass
+   * partial maps without TypeScript fighting them — same boundary-loose
+   * posture as `skillLevelOverrides` (see `.claude/docs/testing-and-ci.md`
+   * §4.1.1a). When omitted, the field is left absent on the seeded blob
+   * and the storage adapter's read-path defaulter fills all four vowels
+   * with `'intro'` at load time. Pass a partial map (e.g.
+   * `{ '/o/': 'mastered' }`) to land a specific per-vowel state; the
+   * defaulter fills the rest.
+   */
+  letterSoundsVowelStates?: Record<string, string>
 }
 
 /** Diagnostic defaults from `src/lib/progress/defaults.ts`. Mirrored here
@@ -207,6 +219,19 @@ export function buildSeedProgress(opts: SeedProgressOptions = {}): unknown {
     // produce after one read-cycle post-deploy.
     ...(opts.lifetimeFirstEncounters !== undefined
       ? { lifetimeFirstEncounters: [...opts.lifetimeFirstEncounters] }
+      : {}),
+    // Seed `literacy.letterSoundsVowelStates` ONLY when the caller asks
+    // explicitly (Wave 9 W9.2 — ticket 86c9ya3gd). Otherwise leave the
+    // `literacy` namespace absent — the production read-path defaulter
+    // (`withDefaultedLetterSoundsVowelStates`) then fills all four vowels
+    // with `'intro'` at load time, mirroring what a real Marian's
+    // localStorage produces after one read-cycle post-deploy.
+    ...(opts.letterSoundsVowelStates !== undefined
+      ? {
+          literacy: {
+            letterSoundsVowelStates: { ...opts.letterSoundsVowelStates },
+          },
+        }
       : {}),
   }
 }

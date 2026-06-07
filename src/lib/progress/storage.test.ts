@@ -375,3 +375,139 @@ describe('loadProgress — dead-letter remap: two-digit-addsub → two-digit-add
     expect(loaded?.skillLevels['two-digit-addsub-with-regroup']).toBe('locked')
   })
 })
+
+describe('loadProgress — letterSoundsVowelStates defaulter (Wave 9 W9.2 — ticket 86c9ya3gd)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('fills all four vowels with "intro" when the literacy field is entirely absent (pre-W9.2 blob)', () => {
+    // A blob written before W9.2 shipped carries no `literacy` namespace
+    // at all. The defaulter must add it with every trackable vowel at
+    // 'intro' so downstream consumers (W9.3 / W9.4) see a populated map.
+    const seed = defaultProgress('Marian')
+    const blob: Record<string, unknown> = { ...seed }
+    delete blob.literacy
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'intro',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('fills missing vowels with "intro" while preserving present per-vowel values (partial map)', () => {
+    // A blob carrying a PARTIAL map — e.g. only /o/ and /u/ set — must
+    // get the missing /i/ and /e/ filled to 'intro', and the present
+    // values must round-trip verbatim (no clobbering of earned state).
+    const seed = defaultProgress('Marian')
+    const blob = {
+      ...seed,
+      literacy: {
+        letterSoundsVowelStates: { '/o/': 'mastered', '/u/': 'practicing' },
+      },
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'mastered',
+      '/u/': 'practicing',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('fills all four vowels when literacy exists but letterSoundsVowelStates is absent', () => {
+    // `literacy: {}` (the namespace present but empty) → fill the full
+    // default map.
+    const seed = defaultProgress('Marian')
+    const blob = { ...seed, literacy: {} }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'intro',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+  })
+
+  it('round-trips a fully-populated map unchanged (defaulter is a no-op)', () => {
+    // When every vowel is already present, the defaulter must NOT mutate
+    // the blob — a fresh-storage Marian saved on post-W9.2 code round-
+    // trips deep-equal.
+    const seed = defaultProgress('Marian')
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seed))
+
+    const loaded = loadProgress()
+    expect(loaded).toEqual(seed)
+    expect(loaded?.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'intro',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+  })
+
+  it('preserves an earned per-vowel value verbatim — defaulter never downgrades a present vowel', () => {
+    // The defaulter is a fill, not a reset. A vowel Marian has at
+    // 'mastered' must NOT be downgraded to the 'intro' floor.
+    const seed = defaultProgress('Marian')
+    const blob = {
+      ...seed,
+      literacy: {
+        letterSoundsVowelStates: {
+          '/o/': 'mastered',
+          '/u/': 'mastered',
+          '/i/': 'practicing',
+          '/e/': 'intro',
+        },
+      },
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded?.literacy?.letterSoundsVowelStates?.['/o/']).toBe('mastered')
+    expect(loaded?.literacy?.letterSoundsVowelStates?.['/i/']).toBe(
+      'practicing',
+    )
+  })
+
+  it('rejects a blob where a present vowel carries an invalid state (defaulter does not coerce bad values)', () => {
+    // The defaulter only fills MISSING vowels. A present vowel with an
+    // invalid value ('locked' is not a VowelSubMasteryState) is a real
+    // corruption signal — the strict guard rejects the blob.
+    const seed = defaultProgress('Marian')
+    const blob = {
+      ...seed,
+      literacy: {
+        letterSoundsVowelStates: { '/o/': 'locked' },
+      },
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    expect(loadProgress()).toBeNull()
+  })
+
+  it('rejects a blob where literacy is a non-object (defaulter does not paper over corruption)', () => {
+    const seed = defaultProgress('Marian')
+    const blob = { ...seed, literacy: 'nope' }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    expect(loadProgress()).toBeNull()
+  })
+})

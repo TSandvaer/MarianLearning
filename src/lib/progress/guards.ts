@@ -9,11 +9,13 @@
 import type {
   LeitnerBox,
   LeitnerItem,
+  LetterSoundsVowel,
   Progress,
   SessionHistoryEntry,
   SkillLevel,
   SkillLevels,
   SkillNode,
+  VowelSubMasteryState,
 } from './types'
 
 const SKILL_NODES: ReadonlySet<SkillNode> = new Set<SkillNode>([
@@ -62,6 +64,16 @@ const SKILL_LEVELS: ReadonlySet<SkillLevel> = new Set<SkillLevel>([
   'practicing',
   'mastered',
 ])
+
+// Wave 9 W9.2 (ticket 86c9ya3gd) — letter-sounds per-vowel sub-mastery.
+// The four trackable short vowels (short-/a/ excluded — already mastered)
+// and their sub-mastery states (no 'locked' — the parent letter-sounds
+// node owns the lock gate).
+const LETTER_SOUNDS_VOWELS: ReadonlySet<LetterSoundsVowel> =
+  new Set<LetterSoundsVowel>(['/o/', '/u/', '/i/', '/e/'])
+
+const VOWEL_SUB_MASTERY_STATES: ReadonlySet<VowelSubMasteryState> =
+  new Set<VowelSubMasteryState>(['intro', 'practicing', 'mastered'])
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -261,6 +273,48 @@ function isParentSettings(v: unknown): boolean {
   return false
 }
 
+/**
+ * Validate the optional `literacy` namespace (Wave 9 W9.2 — ticket
+ * 86c9ya3gd).
+ *
+ * The only field today is `letterSoundsVowelStates`, itself optional +
+ * partial. Validation rule (per AC):
+ *
+ *  - `literacy` must be an object.
+ *  - `letterSoundsVowelStates`, when present + not undefined, must be an
+ *    object whose KNOWN-vowel keys (`/o/ /u/ /i/ /e/`) carry a valid
+ *    `VowelSubMasteryState` value. A key declared on the map that isn't a
+ *    known vowel is tolerated (round-trips silently) — same forward-compat
+ *    posture as the loose persistence boundary elsewhere in this module;
+ *    a future fifth vowel or a stray key never forces a v1→v2 bump.
+ *  - A KNOWN-vowel key with an INVALID value (not intro/practicing/
+ *    mastered) is a real corruption signal → reject.
+ *
+ * Absent / undefined `letterSoundsVowelStates` is fine — the read-path
+ * defaulter (`storage.ts:withDefaultedLetterSoundsVowelStates`) fills the
+ * missing keys at load time.
+ */
+export function isLiteracyProgress(v: unknown): boolean {
+  if (!isObject(v)) return false
+  const states = v.letterSoundsVowelStates
+  if (states !== undefined) {
+    if (!isObject(states)) return false
+    for (const key of Object.keys(states)) {
+      // Tolerate keys we don't recognise (forward-compat); only
+      // validate the value when the key IS a known vowel.
+      if (!LETTER_SOUNDS_VOWELS.has(key as LetterSoundsVowel)) continue
+      const state = states[key]
+      if (
+        typeof state !== 'string' ||
+        !VOWEL_SUB_MASTERY_STATES.has(state as VowelSubMasteryState)
+      ) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
 /** True iff `v` matches the v1 Progress shape exactly. */
 export function isProgressV1(v: unknown): v is Progress {
   if (!isObject(v)) return false
@@ -326,6 +380,13 @@ export function isProgressV1(v: unknown): v is Progress {
         return false
       }
     }
+  }
+  // literacy is optional (Wave 9 W9.2 — ticket 86c9ya3gd; additive, no
+  // schemaVersion bump). When present + not undefined it must pass
+  // isLiteracyProgress. Absent is the normal pre-W9.2 state and the
+  // read-path defaulter fills `letterSoundsVowelStates` at load time.
+  if ('literacy' in v && v.literacy !== undefined) {
+    if (!isLiteracyProgress(v.literacy)) return false
   }
   return true
 }

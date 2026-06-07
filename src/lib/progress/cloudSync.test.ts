@@ -522,6 +522,78 @@ describe('reconcileWithCloud', () => {
     expect(installed[0]!.lifetimeFirstEncounters).toEqual(['cvc-words-short-u'])
   })
 
+  it('letterSoundsVowelStates parity — cloud blob without literacy (pre-W9.2 device) → field defaulted at install time', async () => {
+    // T1 parity for the W9.2 letterSoundsVowelStates defaulter (ticket
+    // 86c9ya3gd). A cloud blob written by a device on an older bundle
+    // that doesn't know about the `literacy` namespace comes in with it
+    // absent. The cloudSync install path must run the SAME defaulter the
+    // storage adapter does — all four trackable vowels filled to 'intro'.
+    // Pins cloudSync.ts:withDefaultedLetterSoundsVowelStates against
+    // storage.ts:withDefaultedLetterSoundsVowelStates.
+    const seed = defaultProgress()
+    const cloudBlob: Record<string, unknown> = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-07T10:00:00.000Z' },
+    }
+    delete cloudBlob.literacy
+    const local = defaultProgress()
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-07T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'intro',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+    expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
+  it('letterSoundsVowelStates parity — cloud blob with a partial map fills missing vowels + preserves earned ones', async () => {
+    // A cloud blob carrying a PARTIAL letterSoundsVowelStates (only /o/
+    // earned) must heal identically to the local read path: missing
+    // vowels filled to 'intro', the earned /o/ preserved verbatim.
+    const seed = defaultProgress()
+    const cloudBlob = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-07T10:00:00.000Z' },
+      literacy: {
+        letterSoundsVowelStates: { '/o/': 'mastered' },
+      },
+    }
+    const local = defaultProgress()
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-07T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.literacy?.letterSoundsVowelStates).toEqual({
+      '/o/': 'mastered',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
+    expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
   it('cloud blob with completely invalid shape → cloud-blob-rejected (local kept)', async () => {
     const local = defaultProgress()
     const installed: Progress[] = []

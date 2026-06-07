@@ -11,6 +11,7 @@ import {
   demote,
   emptyLeitner,
   findItem,
+  isLiteracyProgress,
   isProgressV1,
   loadProgress,
   promote,
@@ -690,5 +691,125 @@ describe('isProgressV1', () => {
       ],
     }
     expect(isProgressV1(noField)).toBe(true)
+  })
+
+  // ── literacy.letterSoundsVowelStates additive field (Wave 9 W9.2 —
+  //    ticket 86c9ya3gd) ───────────────────────────────────────────────
+  it('accepts a Progress with a fully-populated literacy.letterSoundsVowelStates', () => {
+    const p = defaultProgress()
+    const withLiteracy: Progress = {
+      ...p,
+      literacy: {
+        letterSoundsVowelStates: {
+          '/o/': 'practicing',
+          '/u/': 'intro',
+          '/i/': 'mastered',
+          '/e/': 'intro',
+        },
+      },
+    }
+    expect(isProgressV1(withLiteracy)).toBe(true)
+  })
+
+  it('omitted literacy is fine (additive, back-compat)', () => {
+    const p = defaultProgress()
+    const noLiteracy: Record<string, unknown> = { ...p }
+    delete noLiteracy.literacy
+    expect(isProgressV1(noLiteracy)).toBe(true)
+  })
+
+  it('rejects literacy with an invalid per-vowel state on a KNOWN vowel', () => {
+    const p = defaultProgress()
+    const broken = {
+      ...p,
+      literacy: {
+        letterSoundsVowelStates: { '/o/': 'super-mastered' },
+      },
+    } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+
+  it('rejects literacy that is not an object', () => {
+    const p = defaultProgress()
+    const broken = { ...p, literacy: 'nope' } as unknown
+    expect(isProgressV1(broken)).toBe(false)
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// isLiteracyProgress — Wave 9 W9.2 (ticket 86c9ya3gd)
+// ──────────────────────────────────────────────────────────────────────────
+describe('isLiteracyProgress', () => {
+  it('accepts an empty literacy object (letterSoundsVowelStates absent)', () => {
+    expect(isLiteracyProgress({})).toBe(true)
+  })
+
+  it('accepts a fully-populated per-vowel map', () => {
+    expect(
+      isLiteracyProgress({
+        letterSoundsVowelStates: {
+          '/o/': 'intro',
+          '/u/': 'practicing',
+          '/i/': 'mastered',
+          '/e/': 'intro',
+        },
+      }),
+    ).toBe(true)
+  })
+
+  it('accepts a PARTIAL per-vowel map (missing vowels tolerated — defaulter fills)', () => {
+    expect(
+      isLiteracyProgress({
+        letterSoundsVowelStates: { '/o/': 'mastered' },
+      }),
+    ).toBe(true)
+  })
+
+  it('accepts each valid VowelSubMasteryState value', () => {
+    for (const state of ['intro', 'practicing', 'mastered'] as const) {
+      expect(
+        isLiteracyProgress({ letterSoundsVowelStates: { '/o/': state } }),
+      ).toBe(true)
+    }
+  })
+
+  it('tolerates an extra (non-vowel) key on the map (forward-compat)', () => {
+    // A stray key that isn't one of the four known vowels round-trips
+    // silently — same boundary-loose posture as the rest of the module.
+    expect(
+      isLiteracyProgress({
+        letterSoundsVowelStates: { '/o/': 'intro', '/y/': 'whatever' },
+      }),
+    ).toBe(true)
+  })
+
+  it('rejects an invalid state on a KNOWN vowel', () => {
+    expect(
+      isLiteracyProgress({
+        letterSoundsVowelStates: { '/i/': 'locked' },
+      }),
+    ).toBe(false)
+  })
+
+  it('rejects a non-string state value on a KNOWN vowel', () => {
+    expect(
+      isLiteracyProgress({
+        letterSoundsVowelStates: { '/e/': 3 },
+      }),
+    ).toBe(false)
+  })
+
+  it('rejects letterSoundsVowelStates that is not an object', () => {
+    // `isObject` rejects arrays + non-objects → the map must be a plain
+    // object when present.
+    expect(isLiteracyProgress({ letterSoundsVowelStates: 'nope' })).toBe(false)
+    expect(isLiteracyProgress({ letterSoundsVowelStates: [] })).toBe(false)
+    expect(isLiteracyProgress({ letterSoundsVowelStates: null })).toBe(false)
+  })
+
+  it('rejects a non-object literacy value', () => {
+    expect(isLiteracyProgress('nope')).toBe(false)
+    expect(isLiteracyProgress(null)).toBe(false)
+    expect(isLiteracyProgress([])).toBe(false)
   })
 })

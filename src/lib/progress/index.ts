@@ -8,6 +8,8 @@ export type {
   LeitnerBox,
   LeitnerBoxIndex,
   LeitnerItem,
+  LetterSoundsVowel,
+  LiteracyProgress,
   MasteryThreshold,
   MasteryTrackKey,
   MathFact,
@@ -22,6 +24,7 @@ export type {
   SkillLevel,
   SkillLevels,
   SkillNode,
+  VowelSubMasteryState,
   WordSongNode,
 } from './types'
 
@@ -54,9 +57,14 @@ export {
 } from './slowFacts'
 export type { SlowFactHint } from './slowFacts'
 
-export { defaultProgress } from './defaults'
+export {
+  DEFAULT_LETTER_SOUNDS_VOWEL_STATES,
+  LETTER_SOUNDS_VOWELS,
+  defaultLetterSoundsVowelStates,
+  defaultProgress,
+} from './defaults'
 export { migrate } from './migrate'
-export { isProgressV1 } from './guards'
+export { isLiteracyProgress, isProgressV1 } from './guards'
 
 // Lifetime-first-encounter gate (ticket 86c9q9ben).
 export {

@@ -8,12 +8,17 @@
  * Pure module: zero React, zero side effects beyond `window.localStorage`.
  */
 
-import { defaultLockedSkillLevels } from './defaults'
+import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isProgressV1, readSchemaVersion } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { migrate } from './migrate'
 import { getSettings } from './parentSettings'
-import type { Progress, SkillLevels } from './types'
+import type {
+  LetterSoundsVowel,
+  Progress,
+  SkillLevels,
+  VowelSubMasteryState,
+} from './types'
 import { CURRENT_SCHEMA_VERSION } from './types'
 
 export const STORAGE_KEY = 'marian-tutor:progress:v1'
@@ -49,7 +54,17 @@ export function loadProgress(): Progress | null {
     // missing skill-level keys with the schema-floor 'locked' value lets a
     // pre-node-addition blob round-trip cleanly post-addition; the strict
     // guard stays strict and rejects truly-corrupt input.
-    const defaulted = withDefaultedSkillLevels(parsed)
+    //
+    // Ordering is load-bearing (Wave 9 W9.2 — ticket 86c9ya3gd):
+    //   withDefaultedSkillLevels → withDefaultedLetterSoundsVowelStates →
+    //   isProgressV1. The per-vowel defaulter runs AFTER the skill-level
+    //   floor (so the guard sees a fully-populated skillLevels) and
+    //   BEFORE the strict guard (so a pre-W9.2 blob that carries a
+    //   partial `literacy.letterSoundsVowelStates` — or none at all —
+    //   never trips the guard once the field IS present).
+    const defaulted = withDefaultedLetterSoundsVowelStates(
+      withDefaultedSkillLevels(parsed),
+    )
     if (!isProgressV1(defaulted)) return null
     // Two layered post-guard defaulters: first parentSettings (M2.5),
     // then lifetimeFirstEncounters (ticket 86c9q9ben). Both are
@@ -204,6 +219,100 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
   }
   if (!mutated) return parsed
   return { ...obj, skillLevels: filled }
+}
+
+/**
+ * Read-path defaulter for `literacy.letterSoundsVowelStates` (Wave 9
+ * W9.2 — ticket 86c9ya3gd).
+ *
+ * Fills any missing per-vowel key with `'intro'` so downstream consumers
+ * (W9.3 mastery rule, W9.4 focus-picker) always see a fully-populated
+ * map. Runs BEFORE the strict guard, mirroring `withDefaultedSkillLevels`
+ * and `withDefaultedLifetimeFirstEncounters`. Input is `unknown` because
+ * it runs pre-guard; we downcast defensively and only touch the
+ * `literacy.letterSoundsVowelStates` field.
+ *
+ * Three input shapes the defaulter heals:
+ *
+ *  1. No `literacy` field at all (pre-W9.2 blob) → add
+ *     `literacy.letterSoundsVowelStates` with all four vowels at
+ *     `'intro'`.
+ *  2. `literacy` present, `letterSoundsVowelStates` absent/undefined →
+ *     same fill.
+ *  3. `letterSoundsVowelStates` present but PARTIAL (missing one or more
+ *     vowels — e.g. a blob written before a vowel was added to the map)
+ *     → fill only the missing vowels with `'intro'`; existing per-vowel
+ *     values round-trip verbatim.
+ *
+ * Like the sibling defaulters:
+ *  - It ONLY fills missing keys. A present-but-invalid value (e.g.
+ *    `'/o/': 'super-mastered'`) is left untouched so the strict guard
+ *    rejects it downstream — no silent coercion masking corruption.
+ *  - It is a no-op (returns input unchanged) when `parsed`,
+ *    `literacy`, or `letterSoundsVowelStates` is present-but-not-an-object
+ *    in a way the guard would reject — except the genuinely-absent cases
+ *    above, which it heals. A `literacy` that is non-object (string,
+ *    array, number) is left for the guard to reject.
+ *  - Extra (non-vowel) keys on the map are preserved (forward-compat),
+ *    parallel to `withDefaultedSkillLevels`.
+ *  - Returns a fresh object on the modified path; never mutates input.
+ */
+function withDefaultedLetterSoundsVowelStates(parsed: unknown): unknown {
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return parsed
+  }
+  const obj = parsed as Record<string, unknown>
+
+  const literacyRaw = obj.literacy
+  // `literacy` present but a non-object (string / array / number) is
+  // corrupt — leave it for the strict guard to reject rather than
+  // papering over it.
+  if (
+    literacyRaw !== undefined &&
+    (typeof literacyRaw !== 'object' ||
+      literacyRaw === null ||
+      Array.isArray(literacyRaw))
+  ) {
+    return parsed
+  }
+
+  const literacy = (literacyRaw ?? {}) as Record<string, unknown>
+  const statesRaw = literacy.letterSoundsVowelStates
+  // Same guard as above for the inner map: a present-but-non-object
+  // value is corrupt; defer to the strict guard.
+  if (
+    statesRaw !== undefined &&
+    (typeof statesRaw !== 'object' ||
+      statesRaw === null ||
+      Array.isArray(statesRaw))
+  ) {
+    return parsed
+  }
+
+  const present = (statesRaw ?? {}) as Record<string, unknown>
+  let mutated = literacyRaw === undefined || statesRaw === undefined
+  const filled: Record<string, unknown> = { ...present }
+  for (const vowel of LETTER_SOUNDS_VOWELS) {
+    if (vowel in present && present[vowel] !== undefined) {
+      // Preserve verbatim — even if invalid; the guard catches that.
+      continue
+    }
+    filled[vowel] = 'intro' satisfies VowelSubMasteryState
+    mutated = true
+  }
+
+  if (!mutated) return parsed
+
+  return {
+    ...obj,
+    literacy: {
+      ...literacy,
+      letterSoundsVowelStates: filled as Record<
+        LetterSoundsVowel,
+        VowelSubMasteryState
+      >,
+    },
+  }
 }
 
 /**
