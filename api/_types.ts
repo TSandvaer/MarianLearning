@@ -74,6 +74,25 @@ export interface SessionStartResponse {
   kind: 'session-start'
   plan: unknown
   utterances: Utterance[]
+  /**
+   * Planner-derived letter-sounds current-target vowel, slash notation
+   * (`'/o/'`, `'/u/'`, `'/i/'`, `'/e/'`) (Wave 9 W9.4 — ticket
+   * 86c9ya3r9). Present ONLY on live letter-sounds responses where the
+   * server derived the target from `letterSoundsVowelStates` via the
+   * §1.4 algorithm. Absent on:
+   *  - canon-served / cached letter-sounds responses (fallback /
+   *    all-intro state — the canon's baked `/o/` default applies);
+   *  - every non-letter-sounds response (math, other word-song tiers);
+   *  - tier-mastered state (all four vowels mastered → no emission).
+   *
+   * The browser stamps this onto `SessionHistoryEntry.currentTargetVowel`
+   * at session-end so the W9.3 per-vowel mastery rule tags the new entry
+   * with the correct vowel WITHOUT re-deriving from progress — closing
+   * the response→record loop. The slash notation matches
+   * `LetterSoundsVowel` in `src/lib/progress/types.ts` exactly, so the
+   * browser stamps it verbatim (no translation).
+   */
+  currentTargetVowel?: '/o/' | '/u/' | '/i/' | '/e/'
 }
 
 /** Error response shape. `error` is a stable machine-readable code; `message`

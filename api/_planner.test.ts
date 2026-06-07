@@ -23,11 +23,16 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  deriveCurrentTargetVowel,
   generateSessionPlan,
+  letterSoundsStatesAreNonFallback,
+  parseLetterSoundsVowelStates,
   PlannerError,
+  slashVowelToIpa,
   stripMarkdownFence,
   VALID_WORD_SONG_FOCUS_NODES,
   type GenerateSessionPlanArgs,
+  type LetterSoundsVowelStatesHint,
   type PlannerAnthropicClient,
 } from './_planner.js'
 
@@ -1473,6 +1478,250 @@ describe('generateSessionPlan — letter-sounds current-target-vowel hint (Wave 
       .map((b) => b.text)
       .join('\n')
     expect(sys1).toBe(sys2)
+  })
+})
+
+/**
+ * Letter-sounds per-vowel runtime gate (Wave 9 W9.4 — ticket
+ * 86c9ya3r9). The planner consumes `letterSoundsVowelStates` (per-vowel
+ * sub-mastery, slash notation) and derives the current-target vowel via
+ * the Kyle §1.4 algorithm — a HARD runtime gate replacing the Wave-7
+ * directive-level approximation. Covers:
+ *   - the four current-target derivations (all-intro→/o/, /o/-mastered→
+ *     /u/, /i/-not-mastered+/e/-would-pick→skip-to-mastered-review,
+ *     all-mastered→tier-mastered null);
+ *   - the soft-validator (full-map required, any malformed value drops
+ *     the whole field);
+ *   - the non-fallback bypass predicate (all-intro = fallback);
+ *   - the slash↔IPA notation translation;
+ *   - the `CURRENT TARGET VOWEL: /<vowel>/` directive line.
+ */
+describe('letter-sounds per-vowel derivation (Wave 9 W9.4 — ticket 86c9ya3r9)', () => {
+  const allIntro: LetterSoundsVowelStatesHint = {
+    '/o/': 'intro',
+    '/u/': 'intro',
+    '/i/': 'intro',
+    '/e/': 'intro',
+  }
+
+  describe('deriveCurrentTargetVowel — §1.4 algorithm', () => {
+    it('all-intro (greenfield) → /o/ (first unintroduced in ladder order)', () => {
+      expect(deriveCurrentTargetVowel(allIntro)).toBe('/o/')
+    })
+
+    it('/o/-mastered, rest intro → /u/ (first unintroduced after the mastered head)', () => {
+      expect(
+        deriveCurrentTargetVowel({
+          '/o/': 'mastered',
+          '/u/': 'intro',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        }),
+      ).toBe('/u/')
+    })
+
+    it('first practicing vowel wins over a later intro vowel (common mid-stream case)', () => {
+      // /o/ mastered, /u/ practicing → /u/ is current-target even though
+      // /i/ and /e/ are still intro (step 2 before step 3).
+      expect(
+        deriveCurrentTargetVowel({
+          '/o/': 'mastered',
+          '/u/': 'practicing',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        }),
+      ).toBe('/u/')
+    })
+
+    it('/i/-not-mastered + /e/ would be picked → skip to a mastered vowel for review (the /e/ adjacency gate)', () => {
+      // Contrived state that forces the guard: /o/, /u/ mastered, /i/
+      // practicing, /e/ intro. Normal walk stops at /i/ (practicing) —
+      // that's the expected current-target, NOT /e/. The guard never
+      // fires here because /i/ precedes /e/ and is practicing.
+      expect(
+        deriveCurrentTargetVowel({
+          '/o/': 'mastered',
+          '/u/': 'mastered',
+          '/i/': 'practicing',
+          '/e/': 'intro',
+        }),
+      ).toBe('/i/')
+    })
+
+    it('/e/ adjacency guard: a mutated state that would pick /e/ while /i/ is unmastered skips to a mastered review vowel', () => {
+      // Belt-and-braces branch (debug-seed / state-mutation bug):
+      // /o/ mastered, /u/ mastered, /i/ intro (NOT mastered), /e/
+      // practicing. Step 2 finds /e/ practicing first in the practicing
+      // scan? No — /i/ is intro not practicing, so step 2 finds /e/.
+      // The guard catches /e/ + /i/ !== mastered → skip to the first
+      // mastered vowel (/o/) for review-mode emission. This enforces the
+      // cross-session /i/ → /e/ ban (§1.2 #2) even under a corrupt seed.
+      expect(
+        deriveCurrentTargetVowel({
+          '/o/': 'mastered',
+          '/u/': 'mastered',
+          '/i/': 'intro',
+          '/e/': 'practicing',
+        }),
+      ).toBe('/o/')
+    })
+
+    it('all-mastered → null (tier-mastered, no current-target emission)', () => {
+      expect(
+        deriveCurrentTargetVowel({
+          '/o/': 'mastered',
+          '/u/': 'mastered',
+          '/i/': 'mastered',
+          '/e/': 'mastered',
+        }),
+      ).toBeNull()
+    })
+
+    it('/i/ mastered unlocks /e/ as the legitimate current-target', () => {
+      // /o/, /u/, /i/ mastered, /e/ intro → /e/ is now allowed (the
+      // adjacency gate clears once /i/ is mastered).
+      expect(
+        deriveCurrentTargetVowel({
+          '/o/': 'mastered',
+          '/u/': 'mastered',
+          '/i/': 'mastered',
+          '/e/': 'intro',
+        }),
+      ).toBe('/e/')
+    })
+  })
+
+  describe('parseLetterSoundsVowelStates — soft-validator (sibling of parseLeitnerHint)', () => {
+    it('accepts a full valid 4-vowel map', () => {
+      expect(parseLetterSoundsVowelStates(allIntro)).toEqual(allIntro)
+    })
+
+    it('accepts all three sub-states', () => {
+      const mixed = {
+        '/o/': 'mastered',
+        '/u/': 'practicing',
+        '/i/': 'intro',
+        '/e/': 'intro',
+      }
+      expect(parseLetterSoundsVowelStates(mixed)).toEqual(mixed)
+    })
+
+    it('rejects a partial map (missing a ladder vowel) → null', () => {
+      expect(
+        parseLetterSoundsVowelStates({
+          '/o/': 'intro',
+          '/u/': 'intro',
+          '/i/': 'intro',
+          // /e/ missing
+        }),
+      ).toBeNull()
+    })
+
+    it('rejects an invalid sub-state value → null (whole field dropped)', () => {
+      expect(
+        parseLetterSoundsVowelStates({
+          '/o/': 'locked', // not a valid sub-state (no locked arm)
+          '/u/': 'intro',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        }),
+      ).toBeNull()
+    })
+
+    it('rejects non-object / null / array inputs → null', () => {
+      expect(parseLetterSoundsVowelStates(null)).toBeNull()
+      expect(parseLetterSoundsVowelStates('intro')).toBeNull()
+      expect(parseLetterSoundsVowelStates([])).toBeNull()
+      expect(parseLetterSoundsVowelStates(42)).toBeNull()
+    })
+  })
+
+  describe('letterSoundsStatesAreNonFallback — canon/cache bypass predicate', () => {
+    it('all-intro is FALLBACK (false) — derives /o/ identical to canon default → canon-served', () => {
+      expect(letterSoundsStatesAreNonFallback(allIntro)).toBe(false)
+    })
+
+    it('any practicing vowel is NON-FALLBACK (true) — bypass canon + cache', () => {
+      expect(
+        letterSoundsStatesAreNonFallback({
+          '/o/': 'practicing',
+          '/u/': 'intro',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        }),
+      ).toBe(true)
+    })
+
+    it('any mastered vowel is NON-FALLBACK (true)', () => {
+      expect(
+        letterSoundsStatesAreNonFallback({
+          '/o/': 'mastered',
+          '/u/': 'intro',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        }),
+      ).toBe(true)
+    })
+  })
+
+  describe('slashVowelToIpa — notation translation', () => {
+    it('maps each ladder vowel to its bare IPA', () => {
+      expect(slashVowelToIpa('/o/')).toBe('ɒ')
+      expect(slashVowelToIpa('/u/')).toBe('ʌ')
+      expect(slashVowelToIpa('/i/')).toBe('ɪ')
+      expect(slashVowelToIpa('/e/')).toBe('ɛ')
+    })
+  })
+
+  describe('CURRENT TARGET VOWEL directive line (slash notation)', () => {
+    const VALID_LETTER_SOUNDS_RESPONSE = JSON.stringify({
+      id: 'ls-001',
+      label: 'ls',
+      utterances: [{ id: 'word.p1.read', text: 'Which letter says mmm?' }],
+    })
+
+    it('emits "CURRENT TARGET VOWEL: /o/" for the /ɒ/ bare-IPA hint', async () => {
+      const capture: { lastArgs?: unknown } = {}
+      const client = makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture })
+      await generateSessionPlan({
+        client,
+        track: 'word-song',
+        level: 1,
+        childName: 'Marian',
+        focusNode: 'letter-sounds',
+        currentTargetVowel: 'ɒ',
+      })
+      const args = capture.lastArgs as { messages: Array<{ content: string }> }
+      const user = args.messages[0]!.content
+      expect(user).toContain('CURRENT TARGET VOWEL: /o/')
+    })
+
+    it('emits the matching slash line for each ladder vowel', async () => {
+      const cases: Array<[string, string]> = [
+        ['ɒ', '/o/'],
+        ['ʌ', '/u/'],
+        ['ɪ', '/i/'],
+        ['ɛ', '/e/'],
+      ]
+      for (const [ipa, slash] of cases) {
+        const capture: { lastArgs?: unknown } = {}
+        const client = makeMockClient(VALID_LETTER_SOUNDS_RESPONSE, { capture })
+        await generateSessionPlan({
+          client,
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          focusNode: 'letter-sounds',
+          currentTargetVowel: ipa,
+        })
+        const args = capture.lastArgs as {
+          messages: Array<{ content: string }>
+        }
+        expect(args.messages[0]!.content).toContain(
+          `CURRENT TARGET VOWEL: ${slash}`,
+        )
+      }
+    })
   })
 })
 

@@ -118,6 +118,18 @@ export interface PrepareWordSongPathAArgs {
    * progress exists; `[]` is meaningful (greenfield Marian).
    */
   lifetimeFirstEncounters?: readonly string[]
+  /**
+   * Per-vowel letter-sounds sub-mastery map (Wave 9 W9.4 — ticket
+   * 86c9ya3r9). Read from `Progress.literacy.letterSoundsVowelStates`
+   * by the caller, shipped ONLY when the picked focus node is
+   * `letter-sounds`. Keys are IPA-slash notation (`'/o/'`, `'/u/'`,
+   * `'/i/'`, `'/e/'`); values are `'intro' | 'practicing' | 'mastered'`.
+   * The server derives the current-target vowel via the §1.4 algorithm
+   * and bypasses canon/cache only on non-greenfield state. Omitted for
+   * non-letter-sounds focus / no-progress paths — the server falls back
+   * to the Wave-7 directive-level approximation.
+   */
+  letterSoundsVowelStates?: Record<string, string>
 }
 
 export interface PreparedWordSongPathA {
@@ -131,6 +143,18 @@ export interface PreparedWordSongPathA {
   textToId: ReadonlyMap<string, string>
   /** Number of utterances loaded. */
   utteranceCount: number
+  /**
+   * Planner-derived letter-sounds current-target vowel, slash notation
+   * (`'/o/'`, `'/u/'`, `'/i/'`, `'/e/'`) (Wave 9 W9.4 — ticket
+   * 86c9ya3r9). Present only on live letter-sounds responses where the
+   * server derived the target from `letterSoundsVowelStates`. The caller
+   * (App.tsx) freezes this for the session lifetime and forwards it into
+   * `recordProgressOnSessionEnd` so the W9.3 per-vowel mastery rule tags
+   * the session-end history entry without re-deriving. `undefined` on
+   * canon-served / cached / fallback / tier-mastered responses — the
+   * Wave-7 composite-tier mastery path applies for those.
+   */
+  currentTargetVowel?: '/o/' | '/u/' | '/i/' | '/e/'
   /** Tear down all loaded Howls. */
   unload: () => void
 }
@@ -186,7 +210,8 @@ export async function prepareWordSongPathA(
     args.focusNode !== undefined ||
     args.recentSuccessRate !== undefined ||
     args.isGraduationSession !== undefined ||
-    args.lifetimeFirstEncounters !== undefined
+    args.lifetimeFirstEncounters !== undefined ||
+    args.letterSoundsVowelStates !== undefined
   const progressBlock = hasProgress
     ? {
         progress: {
@@ -203,6 +228,13 @@ export async function prepareWordSongPathA(
             ? {
                 lifetimeFirstEncounters: [...args.lifetimeFirstEncounters],
               }
+            : {}),
+          // Wave 9 W9.4 (ticket 86c9ya3r9): per-vowel letter-sounds
+          // sub-mastery map. Shipped only when the picked focus node is
+          // `letter-sounds` (caller-gated). Server derives the
+          // current-target vowel + round-trips it on the response.
+          ...(args.letterSoundsVowelStates !== undefined
+            ? { letterSoundsVowelStates: { ...args.letterSoundsVowelStates } }
             : {}),
         },
       }
@@ -339,11 +371,29 @@ export async function prepareWordSongPathA(
     playUtterance as PlayWordSongUtteranceFn & { __playerKind?: 'real' }
   ).__playerKind = 'real'
 
+  // Wave 9 W9.4 (ticket 86c9ya3r9): read the server-derived
+  // current-target vowel off the response envelope. Validated
+  // defensively here (the `isSessionStartResponse` guard treats the
+  // field as additive/optional and doesn't check it) — only one of the
+  // four ladder vowels in slash notation is accepted; anything else is
+  // dropped to undefined so the browser falls back to the W9.3
+  // composite-tier mastery path.
+  const rawVowel = (sessionResponse as { currentTargetVowel?: unknown })
+    .currentTargetVowel
+  const currentTargetVowel: '/o/' | '/u/' | '/i/' | '/e/' | undefined =
+    rawVowel === '/o/' ||
+    rawVowel === '/u/' ||
+    rawVowel === '/i/' ||
+    rawVowel === '/e/'
+      ? rawVowel
+      : undefined
+
   return {
     plan,
     playUtterance,
     textToId,
     utteranceCount: sessionResponse.utterances.length,
+    currentTargetVowel,
     unload: () => unloadAudio(),
   }
 }

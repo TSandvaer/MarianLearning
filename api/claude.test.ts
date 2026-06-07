@@ -1722,3 +1722,359 @@ describe('M4 Leitner-hint payload (ticket 86c9pwgc8)', () => {
     )
   })
 })
+
+describe('Wave 9 W9.4 letter-sounds vowel-states (ticket 86c9ya3r9)', () => {
+  let sessionCache = createSessionCache({ ttlMs: 60_000, now: () => 1000 })
+  let rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+  const nowFn = () => 1000
+
+  /** Well-formed word-song letter-sounds plan from the stub Haiku. */
+  const STUB_LETTER_SOUNDS_BODY = JSON.stringify({
+    id: 'haiku-letter-sounds-test',
+    label: 'letter-sounds — test',
+    utterances: [{ id: 'word.p1.read', text: 'Which letter says mmm?' }],
+  })
+
+  /** Canon fixture for the letter-sounds (track, level, focusNode) tuple. */
+  const LS_CANON_FIXTURE = {
+    ok: true as const,
+    kind: 'session-start' as const,
+    plan: { id: 'canon-letter-sounds', utterances: [] },
+    utterances: [
+      {
+        id: 'word.p1.read',
+        text: 'CANON: Which letter says mmm?',
+        audio: {
+          kind: 'inline' as const,
+          base64: 'Q0FOT04=',
+          mime: 'audio/mpeg' as const,
+        },
+      },
+    ],
+  }
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = 'test-key-not-real'
+    mockedRender.mockReset()
+    sessionCache = createSessionCache({ ttlMs: 60_000, now: nowFn })
+    rateLimiter = createRateLimiter({ limit: 100, windowMs: 60_000 })
+    mockedRender.mockResolvedValue({
+      ok: true,
+      kind: 'session-start',
+      plan: { utterances: [] },
+      utterances: [
+        {
+          id: 'word.p1.read',
+          text: 'LIVE: Which letter says mmm?',
+          audio: { kind: 'inline', base64: 'TElWRQ==', mime: 'audio/mpeg' },
+        },
+      ],
+    })
+  })
+
+  it('non-fallback state (a vowel practicing) BYPASSES canon — live planner runs even on a canon hit', async () => {
+    const canonStub = vi.fn(() => LS_CANON_FIXTURE)
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_LETTER_SOUNDS_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'letter-sounds',
+            letterSoundsVowelStates: {
+              '/o/': 'practicing',
+              '/u/': 'intro',
+              '/i/': 'intro',
+              '/e/': 'intro',
+            },
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string }[]
+      currentTargetVowel?: string
+    }
+    // Live mock served (LIVE:), NOT the canon fixture (CANON:).
+    expect(body.utterances[0]!.text).toContain('LIVE')
+    // Derived current-target vowel stamped on the envelope (slash).
+    expect(body.currentTargetVowel).toBe('/o/')
+    // The directive carried the bare-IPA hint into the user message.
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    expect(args.messages[0]!.content).toContain('CURRENT TARGET VOWEL: /o/')
+  })
+
+  it('derives /u/ when /o/ is mastered and stamps it on the envelope', async () => {
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(STUB_LETTER_SOUNDS_BODY)
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'letter-sounds',
+            letterSoundsVowelStates: {
+              '/o/': 'mastered',
+              '/u/': 'intro',
+              '/i/': 'intro',
+              '/e/': 'intro',
+            },
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { currentTargetVowel?: string }
+    expect(body.currentTargetVowel).toBe('/u/')
+  })
+
+  it('all-mastered (tier-mastered) stays on the live path but OMITS currentTargetVowel from the envelope', async () => {
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(STUB_LETTER_SOUNDS_BODY)
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'letter-sounds',
+            letterSoundsVowelStates: {
+              '/o/': 'mastered',
+              '/u/': 'mastered',
+              '/i/': 'mastered',
+              '/e/': 'mastered',
+            },
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { currentTargetVowel?: string }
+    // null derivation → no envelope stamp → browser falls back to the
+    // W9.3 composite-tier mastery path.
+    expect(body.currentTargetVowel).toBeUndefined()
+  })
+
+  it('all-intro (greenfield / fallback) state HITS canon — no bypass, no envelope stamp', async () => {
+    const canonStub = vi.fn(() => LS_CANON_FIXTURE)
+    const anthropicClient = makeStubAnthropicClient(STUB_LETTER_SOUNDS_BODY)
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'letter-sounds',
+            letterSoundsVowelStates: {
+              '/o/': 'intro',
+              '/u/': 'intro',
+              '/i/': 'intro',
+              '/e/': 'intro',
+            },
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string }[]
+      currentTargetVowel?: string
+    }
+    // Canon served (CANON:) — all-intro derives /o/ identical to the
+    // baked default, so the free path is preserved.
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(canonStub).toHaveBeenCalledTimes(1)
+    // Canon-served responses carry no envelope stamp.
+    expect(body.currentTargetVowel).toBeUndefined()
+  })
+
+  it('does NOT cache a non-fallback letter-sounds response under the standard key', async () => {
+    const canonStub = vi.fn(() => null)
+    const anthropicClient = makeStubAnthropicClient(STUB_LETTER_SOUNDS_BODY)
+
+    // First call — non-fallback (/o/ practicing).
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'letter-sounds',
+            letterSoundsVowelStates: {
+              '/o/': 'practicing',
+              '/u/': 'intro',
+              '/i/': 'intro',
+              '/e/': 'intro',
+            },
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    // Second call — same key, no vowel states. Canon stub returns null
+    // so a cached first response would short-circuit the planner. Both
+    // hitting the live render proves the bypass skipped caching.
+    await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: { focusNode: 'letter-sounds' },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(mockedRender).toHaveBeenCalledTimes(2)
+  })
+
+  it('malformed letterSoundsVowelStates (partial map) is silently dropped → canon-served, no bypass', async () => {
+    const canonStub = vi.fn(() => LS_CANON_FIXTURE)
+    const anthropicClient = makeStubAnthropicClient(STUB_LETTER_SOUNDS_BODY)
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'letter-sounds',
+            letterSoundsVowelStates: {
+              '/o/': 'practicing',
+              // /u/, /i/, /e/ missing → parser returns null → field dropped
+            },
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string }[]
+      currentTargetVowel?: string
+    }
+    // Dropped → no bypass → canon served, no envelope stamp.
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(body.currentTargetVowel).toBeUndefined()
+  })
+
+  it('letterSoundsVowelStates on a NON-letter-sounds focus is ignored (no bypass, no stamp)', async () => {
+    // Misrouted onto cvc-words: the derivation gates on effective focus
+    // === letter-sounds, so a valid map here is harmless.
+    const canonStub = vi.fn(() => LS_CANON_FIXTURE)
+    const anthropicClient = makeStubAnthropicClient(STUB_LETTER_SOUNDS_BODY)
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'word-song',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'cvc-words',
+            letterSoundsVowelStates: {
+              '/o/': 'practicing',
+              '/u/': 'intro',
+              '/i/': 'intro',
+              '/e/': 'intro',
+            },
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string }[]
+      currentTargetVowel?: string
+    }
+    // cvc-words canon served — the letter-sounds derivation never fired.
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(body.currentTargetVowel).toBeUndefined()
+  })
+})

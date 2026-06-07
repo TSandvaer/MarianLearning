@@ -79,9 +79,14 @@ import {
 } from './_types.js'
 import { renderSessionAudio } from './_session.js'
 import {
+  deriveCurrentTargetVowel,
   generateSessionStartResponse,
+  letterSoundsStatesAreNonFallback,
+  parseLetterSoundsVowelStates,
   PlannerError,
+  slashVowelToIpa,
   type LeitnerHintItem,
+  type LetterSoundsVowelStatesHint,
   type PlannerAnthropicClient,
   type PlannerTrack,
   type SlowFactHintItem,
@@ -256,6 +261,27 @@ interface TrackPayload {
    * server treats undefined as "no hint" and the planner picks freely.
    */
   slowFacts?: SlowFactHintItem[]
+  /**
+   * Per-vowel letter-sounds sub-mastery state (Wave 9 W9.4 — ticket
+   * 86c9ya3r9). Browser ships `progress.literacy.letterSoundsVowelStates`
+   * for word-song letter-sounds requests. The server derives the
+   * current-target vowel via the §1.4 algorithm
+   * (`deriveCurrentTargetVowel`) and:
+   *  - emits a `CURRENT TARGET VOWEL: /<vowel>/` directive (bare-IPA
+   *    hint to `buildLetterSoundsDirective`);
+   *  - stamps the derived vowel (slash notation) onto the response
+   *    envelope so the browser tags the session-end history entry.
+   *
+   * Bypasses canon + cache ONLY when non-fallback (some vowel beyond
+   * greenfield all-`'intro'`); all-`'intro'` / fallback / absent stays
+   * on the free canon-served path. Soft-validated by
+   * `parseLetterSoundsVowelStates` — a malformed / partial map drops
+   * the whole field and the planner falls back to the Wave-7
+   * directive-level approximation. Misrouted onto non-letter-sounds
+   * focus / math track is harmless — the derivation only fires when
+   * the effective focus node is `letter-sounds`.
+   */
+  letterSoundsVowelStates?: LetterSoundsVowelStatesHint
 }
 
 const VALID_TRACKS: readonly PlannerTrack[] = ['math', 'word-song']
@@ -399,6 +425,20 @@ function extractTrackPayload(payload: unknown): TrackPayload | null {
       const valid = parseSlowFactHint(pr.slowFacts)
       if (valid !== null && valid.length > 0) {
         out.slowFacts = valid
+      }
+    }
+    // letterSoundsVowelStates (Wave 9 W9.4 — ticket 86c9ya3r9): the
+    // per-vowel sub-mastery map. Soft-validate via
+    // `parseLetterSoundsVowelStates` — any malformed / partial value
+    // drops the whole field (returns null), same posture as
+    // parseLeitnerHint. The server then falls back to the Wave-7
+    // directive-level approximation. Misrouted onto a non-letter-sounds
+    // focus / math track is harmless — the derivation downstream only
+    // fires when the effective focus node is `letter-sounds`.
+    if (pr.letterSoundsVowelStates !== undefined) {
+      const valid = parseLetterSoundsVowelStates(pr.letterSoundsVowelStates)
+      if (valid !== null) {
+        out.letterSoundsVowelStates = valid
       }
     }
   }
@@ -780,16 +820,43 @@ export async function handler(
       const hasSlowFactHint =
         trackPayload.slowFacts !== undefined &&
         trackPayload.slowFacts.length > 0
-      const bypassCanonAndCache =
-        trackPayload.isGraduationSession === true ||
-        hasLeitnerHint ||
-        hasSlowFactHint
       // Effective focus node for downstream gating. Same default-
       // resolution shape `effectiveFocusNode` uses inside the
       // planner; pulled out here so the first-encounter gate gets
       // the same answer the canon resolver does.
       const effectiveFocus =
         trackPayload.focusNode ?? defaultFocusNodeForTrack(trackPayload.track)
+      // Letter-sounds per-vowel derivation (Wave 9 W9.4 — ticket
+      // 86c9ya3r9). When the effective focus node is `letter-sounds`
+      // AND the browser shipped a valid `letterSoundsVowelStates`
+      // map that is NON-FALLBACK (some vowel beyond greenfield all-
+      // `'intro'`), derive the current-target vowel via the §1.4
+      // algorithm. A non-fallback derivation BYPASSES canon + cache
+      // (the baked canon targets the `/o/` default; a different
+      // derived target needs a live Haiku run) and feeds the bare-IPA
+      // hint into the directive + stamps the slash vowel onto the
+      // response envelope. All-`'intro'` / fallback / absent stays on
+      // the free canon-served path (derives `/o/`, identical to the
+      // baked default). Mirrors the leitner / slow-fact bypass posture.
+      const letterSoundsActive =
+        trackPayload.track === 'word-song' && effectiveFocus === 'letter-sounds'
+      const letterSoundsStates = letterSoundsActive
+        ? trackPayload.letterSoundsVowelStates
+        : undefined
+      const letterSoundsNonFallback =
+        letterSoundsStates !== undefined &&
+        letterSoundsStatesAreNonFallback(letterSoundsStates)
+      // Derived current-target vowel (slash notation) for the
+      // non-fallback live path. `null` when the tier is fully mastered
+      // (all four vowels mastered → no current-target emission).
+      const derivedTargetVowel = letterSoundsNonFallback
+        ? deriveCurrentTargetVowel(letterSoundsStates!)
+        : null
+      const bypassCanonAndCache =
+        trackPayload.isGraduationSession === true ||
+        hasLeitnerHint ||
+        hasSlowFactHint ||
+        letterSoundsNonFallback
       if (!bypassCanonAndCache) {
         const canonHit = canonResolver({
           track: trackPayload.track,
@@ -934,6 +1001,19 @@ export async function handler(
           // math + add-to-10 only — lives in `buildUserMessage`;
           // passing the raw array through is safe.
           slowFacts: trackPayload.slowFacts,
+          // Letter-sounds current-target vowel (Wave 9 W9.4 — ticket
+          // 86c9ya3r9). The directive consumes the BARE IPA (`ɒ`),
+          // derived from the slash-notation per-vowel state map via
+          // `deriveCurrentTargetVowel`. Set only on the non-fallback
+          // live path; `null` (tier-mastered) and the fallback path
+          // leave it undefined so `buildLetterSoundsDirective` uses its
+          // Wave-7 `/ɒ/` default — no behaviour change on the legacy /
+          // greenfield path. The SLASH value is stamped onto the
+          // response envelope below for the browser's session-end write.
+          currentTargetVowel:
+            derivedTargetVowel !== null
+              ? slashVowelToIpa(derivedTargetVowel)
+              : undefined,
         })
         // Cache the rendered response under the track payload key. Even
         // partial renders (some utterances soft-failed) are cacheable —
@@ -970,7 +1050,19 @@ export async function handler(
           focusNode: effectiveFocus,
           lifetimeFirstEncounters: trackPayload.lifetimeFirstEncounters,
         })
-        return jsonResponse(gated, 200, headers)
+        // Wave 9 W9.4 (ticket 86c9ya3r9): stamp the derived
+        // current-target vowel (slash notation) onto the response
+        // envelope so the browser tags `SessionHistoryEntry.
+        // currentTargetVowel` at session-end without re-deriving.
+        // Only present on the non-fallback live path with a derivable
+        // target (not tier-mastered). Canon-served / cached / fallback
+        // responses omit the field — the browser falls back to the
+        // Wave-7 composite-tier mastery path for those (per W9.3).
+        const withVowel: SessionStartResponse =
+          derivedTargetVowel !== null
+            ? { ...gated, currentTargetVowel: derivedTargetVowel }
+            : gated
+        return jsonResponse(withVowel, 200, headers)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         const stack = err instanceof Error ? err.stack : undefined
