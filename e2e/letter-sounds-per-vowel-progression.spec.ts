@@ -306,11 +306,10 @@ function readRequestVowelStates(
  * Build a `Progress` blob with `letter-sounds: 'practicing'` AND a
  * `literacy.letterSoundsVowelStates` block layered on top.
  *
- * `buildSeedProgress` returns `unknown` so we hand-extend the literacy
- * block via spread (raw-spread workaround, `.claude/docs/testing-and-ci.md`
- * §4.1.1c). W9.2 will add typed support via `SeedProgressOptions.literacy`;
- * a future cleanup PR migrates this spec to the typed shape with no
- * behavioural change.
+ * Routes the per-vowel `letterSoundsVowelStates` map AND the
+ * `currentTargetVowel`-tagged history through the typed
+ * `SeedProgressOptions` path; `buildSeedProgress` clones both through the
+ * production helpers (`.claude/docs/testing-and-ci.md` §4.1.1c).
  */
 function buildSeedWithVowelStates(opts: {
   vowelStates?: Record<VowelKey, VowelState>
@@ -1066,7 +1065,11 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
     // was expected, the canon-level template check would still
     // catch the drift. (This is the same mutation-sensitivity
     // proof the A8 sibling spec uses verbatim.)
-    const letterSoundsTemplate = /^Which letter says \S+\?$/
+    // Punctuation-agnostic: real letter-sounds read-lines are mostly
+    // `.`-terminated (only 1 of 8 carry a trailing `?`), so the template
+    // matches the canon's `"Which letter says <MNEMONIC><TERM>"` shape
+    // without pinning the terminal punctuation.
+    const letterSoundsTemplate = /^Which letter says /
     const matchesInWrongCanon = wrongPlanUtterances.filter(
       (u) => u.id.endsWith('.read') && letterSoundsTemplate.test(u.text),
     )
