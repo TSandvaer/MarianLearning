@@ -17,87 +17,81 @@
  *     drives multi-session progression with `test.setTimeout(240_000)`
  *     and explicit cross-day history seeding (post-#206 timeout fix).
  *
- * Failing-first posture (THIS spec ships RED on origin/main)
- * ----------------------------------------------------------
- * Per `[[feedback_progression_e2e_mandatory]]` + `[[feedback_failing_first_must_prove_green]]`:
- * this spec is **paired** with the W9.2/3/4 implementation stack
- * (Kevin/Devon/Kevin), which has NOT YET MERGED on origin/main at
- * authoring time. Every test below is engineered to FAIL on current
- * main for a SPECIFIC reason:
+ * Failing-first posture + GREEN attestation
+ * ------------------------------------------
+ * Per `[[feedback_progression_e2e_mandatory]]` +
+ * `[[feedback_failing_first_must_prove_green]]`: this spec is paired with
+ * the W9.2/3/4 implementation stack (now merged on main: W9.2 `d2ac7fd`,
+ * W9.3 `0afa4d9`, W9.4 `8b0be09`). The W9.5 GREEN-attestation pass
+ * RE-AUTHORED the assertions against the SHIPPED contract — the original
+ * draft (May 24, pre-impl) guessed the wire shape wrong. The corrections
+ * and the evidence trail live in the PR body's RED→GREEN block.
  *
- *   Test 1 (intro → practicing /o/) — fails because today's
- *     `mastery.ts` has no per-vowel rule; `applyMasteryRule` does not
- *     touch a `progress.literacy.letterSoundsVowelStates` field that
- *     doesn't exist. The persisted Progress carries no `literacy`
- *     block → assertion `letterSoundsVowelStates['/o/'] === 'practicing'`
- *     reads `undefined` and fails.
- *   Test 2 (practicing → mastered /o/) — same failure mode at the
- *     per-vowel state assertion; additionally the planner's next
- *     session does not yet emit `currentTargetVowel` on the request
- *     body, so the "next session is /u/" assertion fails.
- *   Test 3 (/i/ → /e/ runtime gate) — today's planner has no
- *     awareness of `letterSoundsVowelStates`; with a seeded
- *     `{'/i/': 'practicing', '/e/': 'intro'}` it would still rotate
- *     vowels by session turn (Option-B approximation). The captured
- *     request body would carry `currentTargetVowel` absent (or per a
- *     turn-order rule, possibly '/e/'); either way the positive
- *     assertion `currentTargetVowel === '/i/'` fails.
- *   Test 4 (composite-tier fallback) — fails on main BUT for a
- *     subtle reason: today's main already runs composite-tier 90/3
- *     since there's no Option-A layer to fall through. The
- *     assertion-sensitivity sub-test inside test 4 is the load-
- *     bearing RED proof here — it asserts an Option-A code path
- *     does NOT fire when `literacy` is absent. On main that path
- *     simply doesn't exist, so the assertion proxy (e.g. the
- *     `bakeMetadata.perVowelTrackingActive` flag is absent on the
- *     current canon → composite path is the only one that runs) is
- *     vacuously true. Test 4 then expects `letterSoundsVowelStates`
- *     to NOT be persisted after a session in legacy mode — on main
- *     this trivially holds, so the failure mode for test 4 is
- *     reversed: it's the GREEN test that flips, not the RED test.
- *     We document this asymmetry explicitly inside test 4.
- *   Test 5 (tier-level composite promotion when all 4 vowels
- *     mastered) — fails because seeding all 4 sub-states `mastered`
- *     and running `applyMasteryRule` does nothing on today's main
- *     (no `letterSoundsVowelStates` lookup); `skillLevels['letter-
- *     sounds']` stays at `'practicing'` and `pendingPromotion`
- *     remains undefined.
- *   Test 6 (assertion-sensitivity sub-test) — locks the spec's
- *     mutation-sensitivity per Wave 7 retro Pattern 3.
+ * The shipped contract this spec verifies (load-bearing facts the
+ * original draft got wrong):
+ *   - The OUTBOUND request carries `payload.progress.letterSoundsVowelStates`
+ *     — the App reads the per-vowel map off persisted Progress and forwards
+ *     it (`App.tsx:278-279` + `wordSongPathA.ts:236-238`). It does NOT
+ *     carry `currentTargetVowel`; that is a RESPONSE-side field
+ *     (`wordSongPathA.ts:157,381-396`), planner-derived server-side.
+ *   - The per-vowel mastery scan keys on history entries TAGGED with
+ *     `currentTargetVowel` (`mastery.ts:557-561`). `perVowelTrackingActive`
+ *     (`mastery.ts:513-521`) requires literacy present AND ≥1 tagged
+ *     letter-sounds history entry; with untagged history the engine falls
+ *     through to the Wave 7 composite-tier 90/3 path.
+ *   - The W9.2 read-path defaulter ALWAYS installs an all-`'intro'`
+ *     `literacy.letterSoundsVowelStates` on load (`storage.ts:
+ *     withDefaultedLetterSoundsVowelStates`) — even on a legacy blob.
  *
- * GREEN attestation (filled in by Jessica pre-merge per
- * `[[feedback_failing_first_must_prove_green]]`): stacked W9.2 + W9.3 +
- * W9.4 locally on a scratch branch and ran this spec; expect SHA + paste
- * the GREEN run summary into the PR body before requesting peer review.
- * The PR body's RED+GREEN evidence block is the contract — a "spec is
- * red" claim without paste-back is not evidence (per `jessica.md
- * §"Failing-First Verification Protocol"` step 3).
+ * Assertion classification (Step 2, `jessica.md` Failing-First Protocol):
+ *   Test 1 — RED-on-base lever. Request-side `letterSoundsVowelStates`
+ *     (W9.4 plumbing absent on base) + persisted `/o/` intro→practicing
+ *     (W9.2 defaulter + W9.3 scan absent on base).
+ *   Test 2 — RED-on-base lever. /o/ practicing→mastered over 3 cross-day
+ *     tagged sessions + freshly-mastered state propagated onto the next
+ *     request.
+ *   Test 3 — RED-on-base lever. /i/-practicing map forwarded; /i/ masters;
+ *     gate-flipped map (/i/ mastered) propagated onto next request.
+ *   Test 4 — Regression-lock. Composite-tier 90/3 still masters
+ *     letter-sounds on untagged history (per-vowel scan skipped) AND the
+ *     W9.2-defaulted vowel states stay all-intro. RED on base because the
+ *     defaulter doesn't exist → `literacy` undefined → `toBeDefined()`
+ *     fails.
+ *   Test 5 — RED-on-base lever. All-four-mastered flips the composite
+ *     `letter-sounds` tier to mastered + fires `pendingPromotion`.
+ *   Test 6 — Assertion-sensitivity (Wave 7 retro Pattern 3). Pure
+ *     canon-file read; cross-browser. Trivially-green on base (the
+ *     wrong-tier canon is just bytes), but locks the silent-demote
+ *     mutation sensitivity once the impl ships.
  *
- * Why the loose-typed seed shape compiles (§4.1.1a)
- * --------------------------------------------------
- * `buildSeedProgress` returns `unknown` (the helper's signature is
- * intentionally loose so failing-first specs can author against not-
- * yet-shipped field shapes — see `.claude/docs/testing-and-ci.md`
- * §4.1.1a). The W9.2 widening will add typed support for
- * `literacy.letterSoundsVowelStates` via `SeedProgressOptions.literacy`;
- * until then, this spec hand-extends the seed blob via a spread cast
- * (the "raw-spread workaround" pattern in §4.1.1c). When W9.2 lands
- * and the typed override exists, a follow-up cleanup PR migrates the
- * spread sites to the typed shape — that PR is a no-op for behaviour,
- * a typing tightening only.
+ * RED-on-base proof: at pre-W9 base `39531a9` (parent of W9.2), a
+ * `git grep -c letterSoundsVowelStates` over `App.tsx`,
+ * `wordSongPathA.ts`, `storage.ts`, `mastery.ts` returns 0 in every file
+ * — the request-side field cannot appear and the persisted literacy block
+ * cannot be written, so the lever assertions fail for the intended reason.
+ *
+ * Seed-shape typing (§4.1.1a / §4.1.1c)
+ * -------------------------------------
+ * W9.2 shipped the typed `SeedProgressOptions.letterSoundsVowelStates`
+ * override AND (in the W9.5 helper widening) the typed
+ * `SeedSessionHistoryEntry.currentTargetVowel` tag. The raw-spread
+ * workaround the original draft used is GONE — `buildSeedWithVowelStates`
+ * routes the per-vowel map AND the tagged history through the production
+ * clone helpers directly.
  *
  * Mock strategy — canon-bytes pass-through (§4.1.1d)
  * --------------------------------------------------
  * Per `.claude/docs/testing-and-ci.md` §4.1.1d trivially-green trap:
- * `failNetwork: true` is FORBIDDEN here — without canon bytes the
- * static word-song fallback emits blending-cv stub content, and the
- * positive `currentTargetVowel` assertions would never get a chance
- * to discriminate against real letter-sounds canon. Every test below
- * uses a canon-bytes mock that serves the real shipped
- * `letter-sounds.json` AND captures the outbound request body so
- * `payload.progress.currentTargetVowel` can be asserted directly
- * (positive discriminator per §4.1.1e). This is the same shape as the
- * Wave 7 sibling specs.
+ * `failNetwork: true` is FORBIDDEN here — without canon bytes the static
+ * word-song fallback emits blending-cv stub content and the positive
+ * `letterSoundsVowelStates` request assertions could not discriminate.
+ * Every test serves the real shipped `letter-sounds.json` AND captures
+ * the outbound request body so `payload.progress.letterSoundsVowelStates`
+ * is asserted directly (positive discriminator per §4.1.1e). The mock
+ * also STAMPS `currentTargetVowel` onto the served response so the
+ * in-test session tags its history entry — simulating the server's
+ * non-fallback response stamp, since the real server derivation is
+ * bypassed by the route mock (see `installLetterSoundsCanonMock`).
  *
  * Webkit caveat (§2.2)
  * --------------------
@@ -127,6 +121,15 @@ import {
   readProgressFromPage,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+import type { SeedSessionHistoryEntry } from './_helpers/seedStorage'
+
+/**
+ * Letter-sounds-tagged seed history entry. Narrows the helper's
+ * `SeedSessionHistoryEntry` to the fields this spec sets: a letter-sounds
+ * focus, a successRate, a cross-day dateISO, and the load-bearing
+ * `currentTargetVowel` tag the per-vowel mastery scan filters on.
+ */
+type SeedLetterSoundsHistoryEntry = SeedSessionHistoryEntry
 
 /** Path to the shipped letter-sounds canon used as the mock response. */
 const LETTER_SOUNDS_CANON_PATH = resolve(
@@ -172,16 +175,60 @@ function readCanonText(path: string): string {
  * Math requests are rejected with 500 — letter-sounds triggers a
  * word-song fetch only.
  *
+ * Mock boundary note (the load-bearing architectural fact this spec
+ * tests around)
+ * ------------------------------------------------------------------
+ * This mock fulfils `/api/claude` directly, so the SERVER-SIDE per-vowel
+ * derivation (`api/claude.ts` → `deriveCurrentTargetVowel` →
+ * `CURRENT TARGET VOWEL: /<vowel>/` directive, slash-vowel stamped on the
+ * response envelope) NEVER runs in this spec. That server logic — including
+ * the non-fallback bypass-canon-and-cache rule (`api/claude.ts:841-854`,
+ * "all-`'intro'` stays canon-served / non-fallback triggers a live Haiku
+ * run") and the bare-IPA-vs-slash-notation translation — is covered by
+ * `api/_planner.test.ts` (`currentTargetVowel: 'ɒ'` IPA hint tests) and
+ * `api/claude.test.ts`. THIS spec exercises the BROWSER + STORAGE +
+ * MASTERY-ENGINE wiring: that the App reads `letterSoundsVowelStates` off
+ * persisted Progress and forwards it on the request body
+ * (`wordSongPathA.ts:236-238`), that the response-envelope
+ * `currentTargetVowel` is read back (`wordSongPathA.ts:381-396`) and tagged
+ * onto the session-end history entry (`App.tsx:677-679` →
+ * `progressHistory.ts:449-457`), and that the W9.3 per-vowel sub-mastery
+ * scan (`mastery.ts:540-592`) flips vowel states given tagged history.
+ *
+ * Because the in-test session's history-entry vowel tag is sourced from
+ * the RESPONSE envelope (`prepared.currentTargetVowel ?? null`), the mock
+ * must STAMP `currentTargetVowel` onto the served canon body for the
+ * in-test session to participate in per-vowel tracking. `responseVowel`
+ * does exactly that — it simulates what the real server stamps on a
+ * non-fallback live run.
+ *
  * Optional `wordSongBodyOverride` lets test 6 (sensitivity sub-test)
  * serve a DIFFERENT canon body so the spec can prove its assertions
  * fail against the wrong-tier canon.
  */
 async function installLetterSoundsCanonMock(
   page: Page,
-  wordSongBodyOverride?: string,
+  opts: {
+    wordSongBodyOverride?: string
+    responseVowel?: VowelKey
+  } = {},
 ): Promise<{ requests: Request[] }> {
-  const canonBody =
-    wordSongBodyOverride ?? readCanonText(LETTER_SOUNDS_CANON_PATH)
+  const baseCanonText =
+    opts.wordSongBodyOverride ?? readCanonText(LETTER_SOUNDS_CANON_PATH)
+  // Stamp `currentTargetVowel` onto the canon envelope (only when the
+  // caller asks AND we're serving the real canon, not the wrong-tier
+  // override). This simulates the server's non-fallback response stamp
+  // (`api/claude.ts:1004-1008`) so the browser tags its session-end
+  // history entry with the right vowel.
+  let canonBody = baseCanonText
+  if (
+    opts.responseVowel !== undefined &&
+    opts.wordSongBodyOverride === undefined
+  ) {
+    const parsed = JSON.parse(baseCanonText) as Record<string, unknown>
+    parsed.currentTargetVowel = opts.responseVowel
+    canonBody = JSON.stringify(parsed)
+  }
   const requests: Request[] = []
   await page.route('**/api/claude', async (route) => {
     const request = route.request()
@@ -240,6 +287,21 @@ async function installLetterSoundsCanonMock(
   return { requests }
 }
 
+/** Extract `payload.progress.letterSoundsVowelStates` from a captured
+ *  request body — the real positive discriminator on the OUTBOUND request
+ *  (the App forwards the seeded per-vowel map; the planner-derived
+ *  `currentTargetVowel` is a RESPONSE-side field, not a request-side one). */
+function readRequestVowelStates(
+  body: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const payload = (body.payload ?? {}) as Record<string, unknown>
+  const progress = (payload.progress ?? {}) as Record<string, unknown>
+  const states = progress.letterSoundsVowelStates
+  return typeof states === 'object' && states !== null
+    ? (states as Record<string, unknown>)
+    : undefined
+}
+
 /**
  * Build a `Progress` blob with `letter-sounds: 'practicing'` AND a
  * `literacy.letterSoundsVowelStates` block layered on top.
@@ -252,33 +314,25 @@ async function installLetterSoundsCanonMock(
  */
 function buildSeedWithVowelStates(opts: {
   vowelStates?: Record<VowelKey, VowelState>
-  history?: ReadonlyArray<{
-    dateISO: string
-    skillFocus: ReadonlyArray<string>
-    successRate: number
-  }>
+  history?: ReadonlyArray<SeedLetterSoundsHistoryEntry>
   skillLevelOverrides?: Record<string, string>
 }): unknown {
-  const base = buildSeedProgress({
+  // Migrated to the typed `SeedProgressOptions` shape (W9.2 shipped both
+  // `history` carrying `currentTargetVowel` — via the W9.5 helper
+  // widening — and `letterSoundsVowelStates` as a typed override). No more
+  // raw-spread workaround: the typed path round-trips the per-vowel map
+  // AND the tagged history entries through the production clone helpers.
+  return buildSeedProgress({
     skillLevelOverrides: {
       'letter-names': 'mastered',
       'letter-sounds': 'practicing',
       ...(opts.skillLevelOverrides ?? {}),
     },
-    // Cast through the helper-internal SkillNode type by spreading
-    // string-shaped history entries into the helper's typed shape.
-    // The helper's `cloneSeedHistoryEntry` only reads dateISO,
-    // skillFocus, successRate (no compile-time check on the literal
-    // values inside skillFocus), so string literals round-trip safely.
-    history: opts.history as unknown as undefined,
+    ...(opts.history !== undefined ? { history: opts.history } : {}),
+    ...(opts.vowelStates !== undefined
+      ? { letterSoundsVowelStates: opts.vowelStates }
+      : {}),
   })
-  if (opts.vowelStates === undefined) return base
-  return {
-    ...(base as Record<string, unknown>),
-    literacy: {
-      letterSoundsVowelStates: { ...opts.vowelStates },
-    },
-  }
 }
 
 /**
@@ -300,16 +354,8 @@ function buildLetterSoundsHistory(opts: {
   sessions: number
   successRate: number
   currentTargetVowel: VowelKey
-}): ReadonlyArray<{
-  dateISO: string
-  skillFocus: ReadonlyArray<string>
-  successRate: number
-}> {
-  const entries: Array<{
-    dateISO: string
-    skillFocus: ReadonlyArray<string>
-    successRate: number
-  }> = []
+}): ReadonlyArray<SeedLetterSoundsHistoryEntry> {
+  const entries: SeedLetterSoundsHistoryEntry[] = []
   for (let i = opts.sessions - 1; i >= 0; i--) {
     const d = new Date()
     d.setUTCDate(d.getUTCDate() - (i + 1))
@@ -318,6 +364,11 @@ function buildLetterSoundsHistory(opts: {
       dateISO: d.toISOString(),
       skillFocus: ['letter-sounds'],
       successRate: opts.successRate,
+      // W9.3 per-vowel scan keys on this tag: `mastery.ts:557-561`
+      // filters history to `currentTargetVowel === <vowel>`. Without it
+      // `perVowelTrackingActive` (`mastery.ts:513-521`) returns false and
+      // the engine falls through to the composite-tier 90/3 path.
+      currentTargetVowel: opts.currentTargetVowel,
     })
   }
   return entries
@@ -338,17 +389,6 @@ async function waitForWordSongRequest(
   }).toPass({ timeout: 15_000 })
   const recorded = requests[requests.length - 1]!
   return JSON.parse(recorded.postData() ?? '{}') as Record<string, unknown>
-}
-
-/** Extract `payload.progress.currentTargetVowel` from a captured body,
- *  with explicit null/undefined surface for the failing-first assertions. */
-function readCurrentTargetVowel(
-  body: Record<string, unknown>,
-): string | undefined {
-  const payload = (body.payload ?? {}) as Record<string, unknown>
-  const progress = (payload.progress ?? {}) as Record<string, unknown>
-  const val = progress.currentTargetVowel
-  return typeof val === 'string' ? val : undefined
 }
 
 /** Skip helper for tests that need to drive chip taps. */
@@ -430,18 +470,31 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 
-    const { requests } = await installLetterSoundsCanonMock(page)
+    // The mock stamps `currentTargetVowel: '/o/'` on the response so the
+    // in-test session tags its history entry (simulating the server's
+    // non-fallback stamp). For an all-intro seed the real server would
+    // stay canon-served + derive `/o/`; the value is identical, so the
+    // simulation is faithful for /o/.
+    const { requests } = await installLetterSoundsCanonMock(page, {
+      responseVowel: '/o/',
+    })
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
-    // Positive discriminator: captured request body carries the
-    // current-target vowel. RED on main because the field is not
-    // emitted by today's planner.
+    // Positive discriminator on the OUTBOUND request: the App reads the
+    // seeded per-vowel map off persisted Progress and forwards it on the
+    // request body (`wordSongPathA.ts:236-238`). RED on main because the
+    // `letterSoundsVowelStates` field is not plumbed onto the request.
     const body = await waitForWordSongRequest(requests)
-    expect(readCurrentTargetVowel(body)).toBe('/o/')
+    expect(readRequestVowelStates(body)).toEqual({
+      '/o/': 'intro',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
 
     // Drive the session to completion + SessionEnd.
     await drive8ProblemSession(page)
@@ -518,19 +571,25 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
         history: priorHistory,
       }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
+      // Re-entry test: reload must preserve the post-mastery state, not
+      // re-seed it. See `seedLocalStorage` seedOnce.
+      seedOnce: true,
     })
 
-    const { requests } = await installLetterSoundsCanonMock(page)
+    const { requests } = await installLetterSoundsCanonMock(page, {
+      responseVowel: '/o/',
+    })
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
-    // First captured request: still /o/ because it's the third
-    // qualifying session, not yet mastered until session-end.
+    // First captured request forwards the seeded per-vowel map. /o/ is
+    // still 'practicing' on the request side — it only flips to mastered
+    // at session-end after this third qualifying session lands.
     const firstBody = await waitForWordSongRequest(requests)
-    expect(readCurrentTargetVowel(firstBody)).toBe('/o/')
+    expect(readRequestVowelStates(firstBody)?.['/o/']).toBe('practicing')
 
     await drive8ProblemSession(page)
 
@@ -545,28 +604,40 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
     expect(vowelStates).toBeDefined()
     expect(vowelStates?.['/o/']).toBe('mastered')
 
-    // Return to Hub and re-enter Word Song — the next session-start
-    // request carries `currentTargetVowel: '/u/'`, proving the
-    // planner reads the freshly-mastered state.
-    const sessionEnd = page.getByTestId('session-end')
-    // Tap through SessionEnd → Hub. The "all done" path exists on
-    // SessionEnd; if a subsequent design pivots the exit affordance
-    // this is the place to update.
-    const allDone = sessionEnd.locator('[data-testid="session-end-all-done"]')
-    if ((await allDone.count()) > 0) {
-      await allDone.click()
-    } else {
-      // Fallback: click the SessionEnd surface as the universal
-      // "advance to Hub" affordance until the AC anchors here.
-      await sessionEnd.click()
-    }
+    // Re-enter Word Song to capture the NEXT session-start request.
+    // Rather than walking the SessionEnd caption-walk to its CTA (which
+    // partially-stalls under a real-canon mock that lacks the
+    // `session.end.*` audio sources — the auto-unlocked howler cancels
+    // the fallback-CTA timer, then a later utterance never resolves), we
+    // reload the page. Reload re-mounts the App against the SAME persisted
+    // localStorage (the mastery rule already ran + saved at session-end),
+    // so the next Word Song request is derived from the freshly-persisted
+    // state — exactly what the CTA → Hub → re-enter path would produce,
+    // minus the audio-walk dependency.
+    await expect(page.getByTestId('session-end')).toBeVisible({
+      timeout: 10_000,
+    })
+    await page.reload()
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
+    // The next session-start request forwards the FRESHLY-MASTERED /o/
+    // state (mastery rule ran at the prior session-end). The server's
+    // §1.4 picker then derives /u/ from this map — but that derivation is
+    // server-side (`api/claude.ts:deriveCurrentTargetVowel`, covered by
+    // `api/_planner.test.ts`); the mock bypasses it. The browser-side
+    // contract this spec proves is that the mastered /o/ propagates onto
+    // the next request, which is the input the server's /u/ pick depends
+    // on. /u/ is still 'intro' (only /o/ moved).
     const secondBody = await waitForWordSongRequest(requests, 2)
-    expect(readCurrentTargetVowel(secondBody)).toBe('/u/')
+    expect(readRequestVowelStates(secondBody)).toEqual({
+      '/o/': 'mastered',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
   })
 
   /**
@@ -617,20 +688,31 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
         history: priorHistory,
       }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
+      // Re-entry test: reload must preserve the post-mastery state.
+      seedOnce: true,
     })
 
-    const { requests } = await installLetterSoundsCanonMock(page)
+    const { requests } = await installLetterSoundsCanonMock(page, {
+      responseVowel: '/i/',
+    })
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
-    // Load-bearing assertion: with /i/ at 'practicing' and /e/ at
-    // 'intro', the planner picks /i/ — NOT /e/, even though /e/ is
-    // next in the locked vowel sequence under naive turn-order.
+    // Load-bearing assertion: the request forwards the seeded map with
+    // /i/ at 'practicing' and /e/ at 'intro'. The server's §1.4 picker
+    // reads THIS map and picks /i/ (first practicing vowel), NOT /e/ —
+    // that derivation is server-side. Browser-side we prove the map
+    // (the picker's input) is forwarded intact.
     const firstBody = await waitForWordSongRequest(requests)
-    expect(readCurrentTargetVowel(firstBody)).toBe('/i/')
+    expect(readRequestVowelStates(firstBody)).toEqual({
+      '/o/': 'mastered',
+      '/u/': 'mastered',
+      '/i/': 'practicing',
+      '/e/': 'intro',
+    })
 
     await drive8ProblemSession(page)
 
@@ -646,76 +728,97 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
       | undefined
     expect(vowelStates?.['/i/']).toBe('mastered')
 
-    const sessionEnd = page.getByTestId('session-end')
-    const allDone = sessionEnd.locator('[data-testid="session-end-all-done"]')
-    if ((await allDone.count()) > 0) {
-      await allDone.click()
-    } else {
-      await sessionEnd.click()
-    }
+    // Re-enter via page reload (see test 2 for why the SessionEnd CTA
+    // walk is avoided under a real-canon mock). Reload re-derives the
+    // next request from the freshly-persisted post-mastery state.
+    await expect(page.getByTestId('session-end')).toBeVisible({
+      timeout: 10_000,
+    })
+    await page.reload()
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
-    // Gate flipped: planner now picks /e/.
+    // Gate flipped: the next request forwards /i/ now 'mastered', /e/
+    // still 'intro'. The server's picker derives /e/ from this map (the
+    // only non-mastered vowel left), but that pick is server-side. The
+    // browser-side proof is that the gate-flipping state (/i/ mastered)
+    // propagated onto the next session's request.
     const secondBody = await waitForWordSongRequest(requests, 2)
-    expect(readCurrentTargetVowel(secondBody)).toBe('/e/')
+    expect(readRequestVowelStates(secondBody)).toEqual({
+      '/o/': 'mastered',
+      '/u/': 'mastered',
+      '/i/': 'mastered',
+      '/e/': 'intro',
+    })
   })
 
   /**
-   * Test 4 — Composite-tier fallback when `letterSoundsVowelStates`
-   * is absent on the loaded blob.
+   * Test 4 — Composite-tier fallback when no history entry carries a
+   * `currentTargetVowel` tag (the genuine legacy case).
    *
-   * Seeded state: legacy Progress doc — `letter-sounds: 'practicing'`,
-   * NO `literacy` block. (This matches what an existing Marian on
-   * pre-W9.2 main has in localStorage.) The engine MUST fall through
-   * to the Wave-7 composite-tier 90/3 rule, mastering the whole tier
-   * on 3 cross-day 90%+ sessions across the pool — exactly as
-   * Wave 7 ships.
+   * Seeded state: a legacy Progress doc — `letter-sounds: 'practicing'`,
+   * NO `literacy` block, and prior history with NO `currentTargetVowel`
+   * tags (entries written before W9.3 shipped). This matches what an
+   * existing Marian on pre-W9 main has in localStorage.
    *
-   * Positive discriminator: after 3 cross-day 100% sessions, the
-   * persisted Progress shows `skillLevels['letter-sounds'] ===
-   * 'mastered'` AND NO `literacy.letterSoundsVowelStates` block
-   * was written (the engine did NOT manufacture a per-vowel state
-   * out of nothing — composite path is observable by its absence).
+   * Real W9.2/3 contract (corrected against the shipped impl — the
+   * original spec guessed wrong here):
+   *   - The W9.2 read-path defaulter ALWAYS installs
+   *     `literacy.letterSoundsVowelStates = { all four → 'intro' }` on
+   *     load (`storage.ts:withDefaultedLetterSoundsVowelStates`, input
+   *     shape 1). So the persisted blob DOES carry a defaulted literacy
+   *     block — the original assertion "no literacy block is
+   *     manufactured" contradicts the shipped W9.2 defaulter and was
+   *     deleted.
+   *   - `perVowelTrackingActive` (`mastery.ts:513-521`) requires BOTH a
+   *     present literacy map AND ≥1 letter-sounds history entry carrying
+   *     a `currentTargetVowel` tag. With untagged history (this test),
+   *     the second condition fails → the per-vowel scan is SKIPPED and
+   *     the engine falls through to the unchanged Wave 7 composite-tier
+   *     90/3 path.
    *
-   * RED on main (subtle — see header docstring):
-   *   - On current main this test PARTIALLY passes — composite-tier
-   *     mastery is already implemented (it's Wave 7's shape). The
-   *     RED proof here is layered: the test's load-bearing
-   *     assertions are (a) composite still works AND (b) no
-   *     `literacy` block is written when seed had none. (a) is true
-   *     on main, (b) is also true on main (trivially — no W9 code).
-   *     This test does not have an organic RED→GREEN flip on the
-   *     core assertion; instead its job post-W9.2/3/4 merge is to
-   *     LOCK the regression that ANY future W9+ work doesn't
-   *     accidentally over-write a legacy blob with an unsolicited
-   *     `literacy` block. The proof of sensitivity comes from
-   *     test 6 (the assertion-sensitivity sub-test below) which
-   *     verifies these very assertions fail when the engine writes
-   *     a `literacy` block over the legacy seed.
-   *   - Per `letter-sounds-content.md` §5.3 Option B + the W9.5
-   *     ticket AC #4 phrasing ("Composite-tier fallback when
-   *     `letterSoundsVowelStates` absent (legacy blob)"), this
-   *     test's job is REGRESSION-LOCKING the fallback path, not
-   *     proving a brand-new behaviour.
+   * Load-bearing assertions:
+   *   (a) Composite-tier mastery still fires on 3 cross-day 100%:
+   *       `skillLevels['letter-sounds'] === 'mastered'`.
+   *   (b) The defaulted vowel states stay all-`'intro'` — the per-vowel
+   *       scan did NOT run (it can't, with no tagged history), so no
+   *       vowel was promoted out from under the composite path. This is
+   *       the regression-lock: a future change that activated per-vowel
+   *       tracking on untagged history would flip some vowel off 'intro'
+   *       and fail this assertion.
+   *
+   * RED on main (W9.2/3/4 unmerged): the literacy block isn't defaulted
+   * in at all (no W9.2 defaulter), so `post.literacy` is undefined and
+   * assertion (b) reads `undefined?.['/o/']` → fails.
    */
-  test('4. composite-tier fallback: legacy Progress doc (no literacy block) still masters letter-sounds via Wave-7 90/3 rule and does NOT manufacture a literacy block', async ({
+  test('4. composite-tier fallback: untagged-history legacy blob masters letter-sounds via Wave-7 90/3 rule; defaulted vowel states stay all-intro (per-vowel scan skipped)', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
     test.setTimeout(300_000)
 
-    // 2 prior cross-day 100% sessions on letter-sounds; third
-    // session runs in-test → 3 cross-day at 100% → composite 90/3
-    // gate fires. No `literacy` block on the seeded blob — the
-    // engine MUST run the composite path.
-    const priorHistory = buildLetterSoundsHistory({
-      sessions: 2,
-      successRate: 1.0,
-      currentTargetVowel: '/o/',
-    })
+    // 2 prior cross-day 100% sessions on letter-sounds, UNTAGGED (no
+    // currentTargetVowel) — the genuine legacy shape. Third session runs
+    // in-test → 3 cross-day at 100% → composite 90/3 gate fires. Because
+    // no entry carries a vowel tag, `perVowelTrackingActive` is false and
+    // the engine runs the composite path.
+    const priorHistory: ReadonlyArray<SeedLetterSoundsHistoryEntry> = (() => {
+      const out: SeedLetterSoundsHistoryEntry[] = []
+      for (let i = 1; i >= 0; i--) {
+        const d = new Date()
+        d.setUTCDate(d.getUTCDate() - (i + 1))
+        d.setUTCHours(12, 0, 0, 0)
+        out.push({
+          dateISO: d.toISOString(),
+          skillFocus: ['letter-sounds'],
+          successRate: 1.0,
+          // No currentTargetVowel — legacy untagged entry.
+        })
+      }
+      return out
+    })()
 
     await seedLocalStorage(page, {
       progress: buildSeedProgress({
@@ -723,22 +826,13 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
           'letter-names': 'mastered',
           'letter-sounds': 'practicing',
         },
-        // Cast through the helper's typed shape. The string-literal
-        // skillFocus entries above match the SkillNode union; the
-        // cast is needed only because `buildSeedProgress` doesn't
-        // export the loose `Record<string, string>` history shape
-        // pre-W9.2.
-        history: priorHistory as unknown as Parameters<
-          typeof buildSeedProgress
-        >[0] extends infer P
-          ? P extends { history?: infer H }
-            ? H
-            : never
-          : never,
+        history: priorHistory,
       }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 
+    // No responseVowel: the in-test session is ALSO untagged (legacy
+    // canon-served path), keeping `perVowelTrackingActive` false.
     await installLetterSoundsCanonMock(page)
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
@@ -751,29 +845,33 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
     const post = (await readProgressFromPage(page)) as Record<string, unknown>
     expect(post).not.toBeNull()
 
-    // (a) Composite-tier mastery fires on 3 cross-day 100%.
+    // (a) Composite-tier mastery fires on 3 cross-day 100% — the
+    // unchanged Wave 7 90/3 path runs because per-vowel tracking is
+    // inactive (untagged history).
     const skillLevels = post.skillLevels as Record<string, unknown>
     expect(skillLevels['letter-sounds']).toBe('mastered')
 
-    // (b) NO `literacy` block was manufactured on the persisted
-    // shape — the engine did not write a sub-state structure for a
-    // user who never had one. This locks the migration discipline:
-    // a legacy user on Wave 9 stays legacy until their first session
-    // emits letter-sounds canon WITH the bake-metadata flag (which
-    // is a W9.3 concern, not a W9.5 spec concern). The persisted
-    // blob may have `literacy` set to `undefined` if the read-path
-    // defaulter chose to set the key but with no sub-state value —
-    // we accept both (`undefined` literacy field OR absent literacy
-    // field). What we reject is a `literacy.letterSoundsVowelStates`
-    // object materialising on a legacy blob.
+    // (b) The W9.2 defaulter DOES install a literacy block (all four
+    // vowels at 'intro') on load — that is the shipped contract. The
+    // regression-lock here is that the per-vowel SCAN did NOT run: with
+    // no `currentTargetVowel`-tagged history, `perVowelTrackingActive`
+    // is false, so no vowel was promoted off 'intro'. A future change
+    // that wrongly activated per-vowel tracking on untagged history
+    // would flip a vowel and fail this assertion.
     const literacy = post.literacy as Record<string, unknown> | undefined
-    if (literacy !== undefined) {
-      // Field exists but must NOT carry per-vowel sub-state.
-      expect(
-        literacy.letterSoundsVowelStates,
-        'Composite-tier fallback path must NOT manufacture letterSoundsVowelStates on a legacy blob.',
-      ).toBeUndefined()
-    }
+    expect(
+      literacy,
+      'W9.2 read-path defaulter must install a literacy block on every loaded blob.',
+    ).toBeDefined()
+    const vowelStates = literacy?.letterSoundsVowelStates as
+      | Record<string, unknown>
+      | undefined
+    expect(vowelStates).toEqual({
+      '/o/': 'intro',
+      '/u/': 'intro',
+      '/i/': 'intro',
+      '/e/': 'intro',
+    })
   })
 
   /**
@@ -823,16 +921,25 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 
-    const { requests } = await installLetterSoundsCanonMock(page)
+    const { requests } = await installLetterSoundsCanonMock(page, {
+      responseVowel: '/e/',
+    })
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
       .click()
 
-    // Current target is /e/ (only practicing vowel left).
+    // Request forwards the seeded map: /e/ is the only non-mastered
+    // vowel left, so the server's picker targets it. Browser-side proof
+    // is the forwarded map shape.
     const body = await waitForWordSongRequest(requests)
-    expect(readCurrentTargetVowel(body)).toBe('/e/')
+    expect(readRequestVowelStates(body)).toEqual({
+      '/o/': 'mastered',
+      '/u/': 'mastered',
+      '/i/': 'mastered',
+      '/e/': 'practicing',
+    })
 
     await drive8ProblemSession(page)
 
@@ -932,10 +1039,9 @@ test.describe('letter-sounds per-vowel progression (Wave 9 W9.5 — ticket 86c9y
       progress: buildSeedWithVowelStates({ vowelStates: initialStates }),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
-    const { requests } = await installLetterSoundsCanonMock(
-      page,
-      wrongCanonBody,
-    )
+    const { requests } = await installLetterSoundsCanonMock(page, {
+      wordSongBodyOverride: wrongCanonBody,
+    })
 
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })

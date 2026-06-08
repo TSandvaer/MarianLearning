@@ -13,6 +13,7 @@
 
 import type { Page } from '@playwright/test'
 import type {
+  LetterSoundsVowel,
   SessionHistoryEntry,
   SkillNode,
 } from '../../src/lib/progress/types'
@@ -53,6 +54,17 @@ export type SeedSessionHistoryEntry = {
   perProblemAnswerValue?: ReadonlyArray<number | null>
   /** Per-problem first-tap chip word (word-song sessions only). */
   perProblemAnswerWord?: ReadonlyArray<string | null>
+  /**
+   * Letter-sounds per-vowel tag (Wave 9 W9.3 — ticket 86c9ya3m6).
+   * Slash-notation IPA (`/o/ /u/ /i/ /e/`). Set ONLY on letter-sounds
+   * history entries. The per-vowel sub-mastery scan in `mastery.ts`
+   * filters on `skillFocus.includes('letter-sounds') && currentTargetVowel
+   * === <v>`, so seeded prior sessions MUST carry this tag to activate
+   * per-vowel tracking (`perVowelTrackingActive` requires at least one
+   * tagged letter-sounds entry). Without it the engine falls through to
+   * the Wave 7 composite-tier 90/3 path.
+   */
+  currentTargetVowel?: LetterSoundsVowel
 }
 
 export interface SeedProgressOptions {
@@ -178,6 +190,9 @@ function cloneSeedHistoryEntry(
   if (h.perProblemAnswerWord !== undefined) {
     out.perProblemAnswerWord = [...h.perProblemAnswerWord]
   }
+  if (h.currentTargetVowel !== undefined) {
+    out.currentTargetVowel = h.currentTargetVowel
+  }
   return out
 }
 
@@ -261,21 +276,48 @@ export function buildSeedSessionHistory(
   }
 }
 
+/** Sentinel key written by the `seedOnce` guard so a `page.reload()` does
+ *  not clobber app-mutated localStorage with the original seed. */
+const SEED_SENTINEL_KEY = 'marian-tutor.e2e.seeded.v1'
+
 /**
  * Install Progress + SessionHistory blobs into localStorage BEFORE the
  * App mounts. Called from `beforeEach` in specs that need preloaded
  * state.
+ *
+ * `seedOnce` (default false): `addInitScript` runs on EVERY navigation,
+ * including `page.reload()` and in-SPA `page.goto('/')`. By default that
+ * means a reload RE-SEEDS — clobbering any state the app mutated during
+ * the session (e.g. a mastery flip persisted at session-end). When a spec
+ * needs to reload + re-read the app-mutated state (the progression
+ * re-entry pattern), pass `seedOnce: true`: the init script writes a
+ * sentinel on first run and skips re-seeding on subsequent navigations,
+ * so reload preserves the live state — matching real-device behaviour
+ * where localStorage survives a reload.
  */
 export async function seedLocalStorage(
   page: Page,
   seeds: {
     progress?: unknown
     sessionHistory?: unknown
+    seedOnce?: boolean
   },
 ): Promise<void> {
   await page.addInitScript(
-    ({ progressKey, historyKey, progress, sessionHistory }) => {
+    ({
+      progressKey,
+      historyKey,
+      sentinelKey,
+      progress,
+      sessionHistory,
+      seedOnce,
+    }) => {
       try {
+        if (seedOnce && window.localStorage.getItem(sentinelKey) !== null) {
+          // Already seeded once — a reload / re-nav must preserve the
+          // app's mutated state, so skip re-seeding.
+          return
+        }
         if (progress !== undefined) {
           window.localStorage.setItem(progressKey, JSON.stringify(progress))
         }
@@ -284,6 +326,9 @@ export async function seedLocalStorage(
             historyKey,
             JSON.stringify(sessionHistory),
           )
+        }
+        if (seedOnce) {
+          window.localStorage.setItem(sentinelKey, '1')
         }
       } catch {
         // If the test browser blocks localStorage, the app's own
@@ -294,8 +339,10 @@ export async function seedLocalStorage(
     {
       progressKey: PROGRESS_STORAGE_KEY,
       historyKey: SESSION_HISTORY_STORAGE_KEY,
+      sentinelKey: SEED_SENTINEL_KEY,
       progress: seeds.progress,
       sessionHistory: seeds.sessionHistory,
+      seedOnce: seeds.seedOnce ?? false,
     },
   )
 }
