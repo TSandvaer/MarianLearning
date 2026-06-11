@@ -26,6 +26,9 @@ import {
   fetchWithBackoff,
   parseRetryAfterMs,
   readAzureCredentials,
+  renderFourSubjectHint,
+  renderLetterNamesScratchyHint,
+  renderLetterSoundsInnerText,
   renderSsmlInnerText,
   synthesizeUtterance,
   uint8ToBase64,
@@ -1363,6 +1366,309 @@ describe('uint8ToBase64', () => {
 
   it('returns the empty string for an empty Uint8Array', () => {
     expect(uint8ToBase64(new Uint8Array(0))).toBe('')
+  })
+})
+
+// --- Voice-QA baseline fixes (ticket 86ca7u3gr, GitHub issue #372) ------
+//
+// 5 SSML fix clusters from Thomas's voice-QA baseline. Each block proves
+// (a) the flagged shape gets its fix AND (b) the passing-baseline
+// siblings stay byte-identical — that asymmetry IS the targeted-only
+// invariant the ticket requires.
+
+describe('cluster 1 — "row" homophone (rəʊ not raʊ)', () => {
+  it('wraps "row" in <phoneme ph="rəʊ"> in the streak praise line', () => {
+    expect(applyPhonemeOverrides('Three in a row! Wow!')).toBe(
+      'Three in a <phoneme alphabet="ipa" ph="rəʊ">row</phoneme>! Wow!',
+    )
+  })
+
+  it('fires on every streak count 3–8 (global override, both tracks)', () => {
+    for (const n of ['Three', 'Four', 'Five', 'Six', 'Seven', 'Eight']) {
+      const out = applyPhonemeOverrides(`${n} in a row! Wow!`)
+      expect(out).toContain('<phoneme alphabet="ipa" ph="rəʊ">row</phoneme>')
+    }
+  })
+
+  it('does NOT match "row" inside "grow" / "brown" / "arrow" (boundary guard)', () => {
+    expect(applyPhonemeOverrides('They grow.')).toBe('They grow.')
+    expect(applyPhonemeOverrides('A brown arrow.')).toBe('A brown arrow.')
+    expect(applyPhonemeOverrides('They grow.')).not.toContain('<phoneme')
+  })
+
+  it('co-fires with "four" on "Four in a row! Wow!" — both wrapped, no break (math tier)', () => {
+    expect(renderSsmlInnerText('Four in a row! Wow!')).toBe(
+      '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme> in a ' +
+        '<phoneme alphabet="ipa" ph="rəʊ">row</phoneme>! Wow!',
+    )
+  })
+})
+
+describe('cluster 3 — "twenty-four" spoken as a unit (hyphen boundary)', () => {
+  it('does NOT split "four" out of "twenty-four" (no phoneme wrap across the hyphen)', () => {
+    expect(applyPhonemeOverrides('Yes! Twenty-four!')).toBe('Yes! Twenty-four!')
+    expect(applyPhonemeOverrides('This one is twenty-four.')).toBe(
+      'This one is twenty-four.',
+    )
+  })
+
+  it('still wraps a STANDALONE "four" (hyphen guard does not break the base case)', () => {
+    expect(applyPhonemeOverrides('I want four.')).toBe(
+      'I want <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+    )
+  })
+
+  it('preserves the fourteen / fourth substring guards under the hyphen-aware boundary', () => {
+    expect(applyPhonemeOverrides('I want fourteen apples.')).toBe(
+      'I want fourteen apples.',
+    )
+    expect(applyPhonemeOverrides('fourth grade')).toBe('fourth grade')
+  })
+
+  it('does not split a hyphenated tier-scoped mnemonic either (forward guard)', () => {
+    // No letter-sounds mnemonic is hyphen-adjacent today, but the
+    // boundary must hold for them too if a future canon introduced one.
+    expect(applyPhonemeOverrides('says mmm-ish', 'letter-sounds')).toBe(
+      'says mmm-ish',
+    )
+  })
+})
+
+describe('cluster 4a — no break before "four" on the letter-sounds path', () => {
+  it('letter-sounds recap.4 wraps "four" WITHOUT a leading break (global word, not a mnemonic)', () => {
+    expect(renderSsmlInnerText('You earned four stars!', 'letter-sounds')).toBe(
+      'You earned <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> stars!',
+    )
+  })
+
+  it('letter-sounds streak.4 matches the math-tier render (collapses the dedup split)', () => {
+    const math = renderSsmlInnerText('Four in a row! Wow!')
+    const letterSounds = renderSsmlInnerText(
+      'Four in a row! Wow!',
+      'letter-sounds',
+    )
+    expect(letterSounds).toBe(math)
+  })
+
+  it('STILL injects the 300ms break before a genuine tier-scoped mnemonic', () => {
+    expect(renderSsmlInnerText('Which letter says mmm.', 'letter-sounds')).toBe(
+      'Which letter says <break time="300ms"/><phoneme alphabet="ipa" ph="m">mmm</phoneme>.',
+    )
+  })
+})
+
+describe('cluster 2 — break after "This one is X." in the fricative giveAnswer', () => {
+  it('injects a 350ms break after the letter sentence for S/F/H fricative giveAnswers', () => {
+    expect(
+      renderSsmlInnerText('This one is S. S says it. sss?', 'letter-sounds'),
+    ).toBe(
+      'This one is S.<break time="350ms"/>S says it. ' +
+        '<break time="300ms"/><phoneme alphabet="ipa" ph="s">sss</phoneme>?',
+    )
+    expect(
+      renderSsmlInnerText('This one is F. F says it. fff?', 'letter-sounds'),
+    ).toContain('This one is F.<break time="350ms"/>')
+    expect(
+      renderSsmlInnerText('This one is H. H says it. hhh?', 'letter-sounds'),
+    ).toContain('This one is H.<break time="350ms"/>')
+  })
+
+  it('does NOT add the break to a PASSING plain giveAnswer (M/L/B/O/N)', () => {
+    // These were clean on the baseline — must stay byte-identical.
+    for (const [text, ipa, mnem] of [
+      ['This one is M. mmm.', 'm', 'mmm'],
+      ['This one is O. ooo.', 'ɒ', 'ooo'],
+      ['This one is B. buh.', 'bə', 'buh'],
+    ] as const) {
+      expect(renderSsmlInnerText(text, 'letter-sounds')).toBe(
+        text.replace(
+          new RegExp(`\\b${mnem}\\b`),
+          `<break time="300ms"/><phoneme alphabet="ipa" ph="${ipa}">${mnem}</phoneme>`,
+        ),
+      )
+      expect(renderSsmlInnerText(text, 'letter-sounds')).not.toContain('350ms')
+    }
+  })
+
+  it('adds the break to the flagged "This one is A. aaa." giveAnswer but NOT the passing O giveAnswer', () => {
+    expect(
+      renderSsmlInnerText('This one is A. aaa.', 'letter-sounds'),
+    ).toContain('This one is A.<break time="350ms"/>')
+    expect(
+      renderSsmlInnerText('This one is O. ooo.', 'letter-sounds'),
+    ).not.toContain('350ms')
+  })
+})
+
+describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)', () => {
+  it('softens vvv in EVERY /v/ slot (read/correct/hint/giveAnswer all flagged)', () => {
+    for (const text of [
+      'Which letter says vvv?',
+      'Yes. V says it. vvv?',
+      'It says vvv?',
+    ]) {
+      expect(renderSsmlInnerText(text, 'letter-sounds')).toContain(
+        '<prosody rate="-12%"><phoneme alphabet="ipa" ph="və">vvv</phoneme></prosody>',
+      )
+    }
+  })
+
+  it('softens aaa/ooo in the CORRECT slot only (read/hint stay byte-identical)', () => {
+    expect(renderSsmlInnerText('Yes. A. aaa.', 'letter-sounds')).toContain(
+      '<prosody rate="-12%"><phoneme alphabet="ipa" ph="æ">aaa</phoneme></prosody>',
+    )
+    expect(renderSsmlInnerText('Yes. O. ooo.', 'letter-sounds')).toContain(
+      '<prosody rate="-12%"><phoneme alphabet="ipa" ph="ɒ">ooo</phoneme></prosody>',
+    )
+    // read + hint were clean on the baseline → NO prosody wrap.
+    expect(
+      renderSsmlInnerText('Which letter says aaa.', 'letter-sounds'),
+    ).not.toContain('<prosody')
+    expect(renderSsmlInnerText('Listen. ooo.', 'letter-sounds')).not.toContain(
+      '<prosody',
+    )
+  })
+
+  it('softens aaa in the giveAnswer slot (flagged) but NOT ooo (O giveAnswer passed)', () => {
+    expect(
+      renderSsmlInnerText('This one is A. aaa.', 'letter-sounds'),
+    ).toContain(
+      '<prosody rate="-12%"><phoneme alphabet="ipa" ph="æ">aaa</phoneme></prosody>',
+    )
+    expect(
+      renderSsmlInnerText('This one is O. ooo.', 'letter-sounds'),
+    ).not.toContain('<prosody')
+  })
+
+  it('does NOT soften a non-scratchy mnemonic even in the correct slot', () => {
+    expect(renderSsmlInnerText('Yes. M. mmm.', 'letter-sounds')).not.toContain(
+      '<prosody',
+    )
+  })
+
+  it('softenScratchy is opt-in on applyPhonemeOverrides (default off)', () => {
+    expect(applyPhonemeOverrides('says vvv', 'letter-sounds')).not.toContain(
+      '<prosody',
+    )
+    expect(
+      applyPhonemeOverrides('says vvv', 'letter-sounds', 300, true),
+    ).toContain('<prosody rate="-12%">')
+  })
+})
+
+describe('cluster 4b — stress de-stressed "Four comes after three."', () => {
+  it('stresses the subject "Four" with a lead break + slowed prosody around the phoneme', () => {
+    // <prosody> (not <emphasis> — Olivia ignores emphasis on this voice).
+    expect(renderSsmlInnerText('Look. Four comes after three.')).toBe(
+      'Look. <break time="200ms"/><prosody rate="-18%">' +
+        '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme>' +
+        '</prosody> comes after three.',
+    )
+  })
+
+  it('is text-shape gated — other "four" math utterances stay on the plain override', () => {
+    // Sentence-final fours (baseline-passing) keep the un-emphasised wrap.
+    expect(renderSsmlInnerText('You earned four stars!')).toBe(
+      'You earned <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> stars!',
+    )
+    expect(
+      renderFourSubjectHint('You earned four stars!', undefined),
+    ).toBeNull()
+  })
+
+  it('does not fire on a word-song tier (tierFilter set → null)', () => {
+    expect(
+      renderFourSubjectHint('Look. Four comes after three.', 'cvc-words'),
+    ).toBeNull()
+  })
+})
+
+describe('cluster 5 — letter-NAMES scratchy hint (e drum-beat, O scratchy)', () => {
+  it('softens the flagged "Let\'s look. e." and "Let\'s look. O." hints', () => {
+    expect(
+      renderLetterNamesScratchyHint("Let's look. e.", 'letter-names'),
+    ).toBe(
+      'Let&apos;s look.<break time="250ms"/><prosody rate="-12%">e.</prosody>',
+    )
+    expect(
+      renderLetterNamesScratchyHint("Let's look. O.", 'letter-names'),
+    ).toBe(
+      'Let&apos;s look.<break time="250ms"/><prosody rate="-12%">O.</prosody>',
+    )
+  })
+
+  it('returns null (falls through, byte-identical) for the PASSING letter-names hints', () => {
+    for (const text of [
+      "Let's look. C.",
+      "Let's look. G.",
+      "Let's look. J.",
+      "Let's look. b.",
+      "Let's look. W.",
+      "Let's look. d.",
+    ]) {
+      expect(renderLetterNamesScratchyHint(text, 'letter-names')).toBeNull()
+      // …and the full render path leaves them unchanged.
+      expect(renderSsmlInnerText(text, 'letter-names')).toBe(
+        text.replace(/'/g, '&apos;'),
+      )
+    }
+  })
+
+  it('does not fire off the letter-names tier (wrong tier → null)', () => {
+    expect(
+      renderLetterNamesScratchyHint("Let's look. e.", 'letter-sounds'),
+    ).toBeNull()
+    expect(
+      renderLetterNamesScratchyHint("Let's look. e.", undefined),
+    ).toBeNull()
+  })
+})
+
+describe('renderLetterSoundsInnerText — passing-baseline byte-identity guard', () => {
+  // The whole point of the slot×class gating: a re-render must touch ONLY
+  // the flagged utterances. These passed on Thomas's baseline and MUST
+  // render exactly as the pre-fix pipeline did (no break, no prosody).
+  const PASSING: Array<[string, string]> = [
+    [
+      'Which letter says mmm.',
+      '<break time="300ms"/><phoneme alphabet="ipa" ph="m">mmm</phoneme>',
+    ],
+    [
+      'Listen. aaa.',
+      '<break time="300ms"/><phoneme alphabet="ipa" ph="æ">aaa</phoneme>',
+    ],
+    [
+      'Listen. ooo.',
+      '<break time="300ms"/><phoneme alphabet="ipa" ph="ɒ">ooo</phoneme>',
+    ],
+    [
+      'Which letter says ooo.',
+      '<break time="300ms"/><phoneme alphabet="ipa" ph="ɒ">ooo</phoneme>',
+    ],
+    [
+      'This one is M. mmm.',
+      'This one is M. <break time="300ms"/><phoneme alphabet="ipa" ph="m">mmm</phoneme>.',
+    ],
+    [
+      'This one is O. ooo.',
+      'This one is O. <break time="300ms"/><phoneme alphabet="ipa" ph="ɒ">ooo</phoneme>.',
+    ],
+  ]
+
+  it('renders every passing slot with no 350ms break and no softening prosody', () => {
+    for (const [text] of PASSING) {
+      const out = renderLetterSoundsInnerText(text, 'letter-sounds')
+      expect(out).not.toContain('350ms')
+      expect(out).not.toContain('<prosody')
+    }
+  })
+
+  it('matches the exact expected SSML for the give-answer passing siblings', () => {
+    expect(
+      renderLetterSoundsInnerText('This one is M. mmm.', 'letter-sounds'),
+    ).toBe(
+      'This one is M. <break time="300ms"/><phoneme alphabet="ipa" ph="m">mmm</phoneme>.',
+    )
   })
 })
 

@@ -260,6 +260,16 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   // string `Record<string, string>` shape produced before.
   four: { ipa: 'fɔːr' },
 
+  // "row" — global (no `tiers`). Voice-QA baseline fix (ticket
+  // 86ca7u3gr, GitHub issue #372, cluster 1). en-GB-OliviaNeural reads
+  // "row" in the "X in a row! Wow!" streak lines as /raʊ/ ("a row" = a
+  // quarrel/argument) instead of /rəʊ/ ("a row" = a line of things).
+  // The override pins the GOOSE/non-rhotic-British realisation /rəʊ/
+  // so the streak praise reads as "a line of correct answers". Same
+  // mechanism that fixed "four"; the hyphen-and-word-boundary guard in
+  // applyPhonemeOverrides keeps it from firing inside larger words.
+  row: { ipa: 'rəʊ' },
+
   // Letter-sounds tier mnemonic→IPA mappings (Wave 7 Track A7 —
   // Amendment 1 of ticket 86c9y49cd, per `design/word-song/letter-
   // sounds-content.md §2.3` table). Every entry carries
@@ -402,36 +412,63 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
  * renderings while still letting the legacy `four` override fire
  * globally.
  */
+/**
+ * Tier-scoped mnemonics that Olivia renders with a "scratchy" isolated
+ * onset (ticket 86ca7u3gr cluster 5 — Thomas's ear). A bare short
+ * phoneme on en-GB-OliviaNeural can come out as a hard, buzzy burst.
+ * Slowing the phoneme region slightly with `<prosody rate>` softens the
+ * onset/offset without changing the sound's identity. Activation is
+ * opt-in per call (`softenScratchy`) because the same mnemonic is NOT
+ * scratchy in every slot — e.g. "aaa" was clean in the read/hint slots
+ * ("Which letter says aaa.", "Listen. aaa.") but scratchy in the
+ * correct/giveAnswer slots where it trails its own letter-name. The
+ * caller (`renderLetterSoundsInnerText`) decides per-slot whether to
+ * pass the flag, so passing-baseline slots stay byte-identical.
+ */
+const SCRATCHY_MNEMONICS = new Set(['vvv', 'aaa', 'ooo'])
+const SCRATCHY_PROSODY_RATE = '-12%'
+
 export function applyPhonemeOverrides(
   text: string,
   tierFilter?: string,
   prependBreakMs?: number,
+  softenScratchy = false,
 ): string {
   // Build the alternation pattern from ACTIVE entries: every entry
   // whose `tiers` is undefined (global) OR includes the supplied
   // tierFilter. New entries in PHONEME_OVERRIDES become matchable
   // automatically; tier-scoped entries never pollute callers that
   // pass a different tier.
-  const activeKeys = Object.entries(PHONEME_OVERRIDES)
-    .filter(([, entry]) =>
-      entry.tiers === undefined
-        ? true
-        : tierFilter !== undefined && entry.tiers.includes(tierFilter),
-    )
-    .map(([key]) => key)
-  if (activeKeys.length === 0) return escapeSsml(text)
-  const pattern = new RegExp(`\\b(${activeKeys.join('|')})\\b`, 'gi')
+  const activeEntries = Object.entries(PHONEME_OVERRIDES).filter(([, entry]) =>
+    entry.tiers === undefined
+      ? true
+      : tierFilter !== undefined && entry.tiers.includes(tierFilter),
+  )
+  if (activeEntries.length === 0) return escapeSsml(text)
+  const activeKeys = activeEntries.map(([key]) => key)
+  // Lowercase keys that are TIER-SCOPED (carry a `tiers` array) — these
+  // are the isolated-phoneme letter-sounds mnemonics (mmm, buh, aaa, …)
+  // that need the prosodic-reset break. GLOBAL keys (four, row) are NOT
+  // in this set, so they never receive the break (see breakTag below).
+  const tierScopedKeys = new Set(
+    activeEntries
+      .filter(([, entry]) => entry.tiers !== undefined)
+      .map(([key]) => key.toLowerCase()),
+  )
 
-  // Optional `<break time="Nms"/>` injected immediately BEFORE each
-  // phoneme wrap (en-GB-OliviaNeural letter-sounds path — British
-  // voice rollout). The break gives Olivia a clean prosodic reset so
-  // the isolated phoneme is not swallowed by the carrier phrase
-  // ("Which letter says …"). prependBreakMs is undefined for every
-  // non-letter-sounds caller, so this is a no-op for math/CVC/greet.
-  const breakTag =
-    prependBreakMs !== undefined && prependBreakMs > 0
-      ? `<break time="${prependBreakMs}ms"/>`
-      : ''
+  // Word boundary that ALSO treats a hyphen as a boundary character on
+  // BOTH edges. Plain `\b` treats `-` as a non-word char, so `\bfour\b`
+  // WRONGLY matches the "four" inside "twenty-four" — Azure then voices
+  // "twenty" + a separate <phoneme>four</phoneme> with its own prosody
+  // scope, producing the audible gap Thomas flagged (ticket 86ca7u3gr
+  // cluster 3). Anchoring on `(?<![\w-])…(?![\w-])` keeps every existing
+  // boundary guarantee (fourteen / fourth / Bartholomew still don't
+  // match) AND stops a target word from firing as the tail/head of a
+  // hyphenated compound, so "twenty-four" is voiced as one number.
+  const pattern = new RegExp(
+    `(?<![\\w-])(${activeKeys.join('|')})(?![\\w-])`,
+    'gi',
+  )
 
   // Walk the string emitting alternating escaped-plain and
   // phoneme-wrapped segments. We can't use replaceAll because plain
@@ -451,8 +488,33 @@ export function applyPhonemeOverrides(
     // metacharacters) so no escaping needed on `ph=`.
     const original = m[0]
     const entry = PHONEME_OVERRIDES[original.toLowerCase()]!
+    // `<break>` reset ONLY before a TIER-SCOPED isolated-phoneme
+    // mnemonic (the letter-sounds reads/correct/hints). A GLOBAL word
+    // like `four` / `row` that happens to appear in a letter-sounds
+    // session-end line ("You earned four stars!", "Four in a row!
+    // Wow!") must NOT get the break — the 300ms gap before "four"
+    // made the streak/recap lines sound clipped/wrong-speed (ticket
+    // 86ca7u3gr cluster 4a). Gating the break on tierScopedKeys keeps
+    // the prosodic reset where it belongs (isolated phonemes) and
+    // leaves connected prose flowing.
+    const breakTag =
+      prependBreakMs !== undefined &&
+      prependBreakMs > 0 &&
+      tierScopedKeys.has(original.toLowerCase())
+        ? `<break time="${prependBreakMs}ms"/>`
+        : ''
+    // Scratchy-mnemonic softening (cluster 5): wrap the phoneme in a
+    // gentle rate-slowing prosody so the isolated short sound doesn't
+    // render as a hard buzzy burst. Opt-in per call AND per matched key
+    // — only the scratchy classes (vvv/aaa/ooo) and only when the slot
+    // caller asked for it.
+    const soften =
+      softenScratchy && SCRATCHY_MNEMONICS.has(original.toLowerCase())
+    const phonemeTag = `<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`
     out.push(
-      `${breakTag}<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`,
+      soften
+        ? `${breakTag}<prosody rate="${SCRATCHY_PROSODY_RATE}">${phonemeTag}</prosody>`
+        : `${breakTag}${phonemeTag}`,
     )
     lastIndex = m.index + original.length
   }
@@ -461,6 +523,156 @@ export function applyPhonemeOverrides(
     out.push(escapeSsml(text.slice(lastIndex)))
   }
   return out.join('')
+}
+
+/**
+ * Letter-sounds tier inner-text rendering (en-GB-OliviaNeural).
+ *
+ * The base treatment is `applyPhonemeOverrides(text, 'letter-sounds',
+ * 300)` — a 300ms break before each isolated-phoneme mnemonic so the
+ * sound gets a clean prosodic reset. Two voice-QA-baseline refinements
+ * layer on top (ticket 86ca7u3gr); both are SLOT-SHAPE-GATED so they
+ * only touch the utterances Thomas flagged and leave every
+ * passing-baseline slot byte-identical:
+ *
+ *   • Cluster 2 — pause after the leading "This one is <L>." sentence in
+ *     the FRICATIVE giveAnswer shape ("This one is S. S says it. sss?").
+ *     Olivia ran the letter sentence straight into "<L> says it…" with
+ *     no audible beat despite the period. The plain non-fricative
+ *     giveAnswer ("This one is M. mmm.") was clean on the baseline, so
+ *     the break is gated to the "… says it." shape (S/F/H/V), NOT every
+ *     giveAnswer.
+ *
+ *   • Cluster 5 — soften the scratchy vowel mnemonics (aaa/ooo) in the
+ *     correct/giveAnswer slots where the mnemonic trails its own
+ *     letter-name ("Yes. A. aaa.", "This one is A. aaa."), plus all four
+ *     /v/ slots (vvv was scratchy in every slot). The read/hint slots
+ *     for a/o were clean on the baseline, so they do NOT get softened.
+ *
+ * Slot is inferred from the text shape (no id is threaded to this
+ * layer): the leading carrier word distinguishes correct ("Yes.") from
+ * giveAnswer ("This one is") from read/hint.
+ */
+export function renderLetterSoundsInnerText(
+  text: string,
+  tierFilter: string,
+): string {
+  // Slot inference from the leading carrier.
+  const isCorrect = /^Yes\. /.test(text) // "Yes. A. aaa." / "Yes. V says it. vvv?"
+  const isGiveAnswer = /^This one is /.test(text)
+
+  // Scratchy-softening is gated to the EXACT (slot × mnemonic) combos
+  // Thomas flagged on the baseline — softening a passing slot would
+  // re-render it and violate the targeted-only invariant. The combos:
+  //   • vvv — scratchy in EVERY slot (read/correct/hint/giveAnswer all
+  //           flagged) → soften whenever vvv is present.
+  //   • aaa — scratchy in correct AND giveAnswer ("Yes. A. aaa.",
+  //           "This one is A. aaa.") but CLEAN in read/hint → soften only
+  //           in those two slots.
+  //   • ooo — scratchy in correct ONLY ("Yes. O. ooo."); the O
+  //           giveAnswer / read / hint all PASSED → soften only correct.
+  const hasVvv = /\bvvv\b/.test(text)
+  const hasAaa = /\baaa\b/.test(text)
+  const hasOoo = /\booo\b/.test(text)
+  const softenScratchy =
+    hasVvv || (hasAaa && (isCorrect || isGiveAnswer)) || (hasOoo && isCorrect)
+
+  // Post-"This one is <L>." break (cluster 2). Gated to the flagged
+  // giveAnswer shapes only:
+  //   • FRICATIVE giveAnswer "This one is <L>. <L> says it. <mnem>?"
+  //     (S/F/H/V — the "<L> says it." second clause is the tell).
+  //   • the scratchy-A giveAnswer "This one is A. aaa." (Thomas: "need a
+  //     little break after This one is"). The O giveAnswer "This one is
+  //     O. ooo." (same plain shape) PASSED, so the break is gated to the
+  //     aaa mnemonic, NOT every plain-vowel giveAnswer.
+  // Plain non-flagged giveAnswers (M/L/B/O/N/…) get NO break and stay
+  // byte-identical to the baseline.
+  const fricativeGiveAnswer = /^This one is ([A-Z])\.\s+\1 says it\./.test(text)
+  const needsLeadBreak = fricativeGiveAnswer || (isGiveAnswer && hasAaa)
+
+  if (needsLeadBreak) {
+    // Split off the leading "This one is <L>." sentence and inject a
+    // 350ms break before the remainder. Render each half independently
+    // so the phoneme wrap + escaping compose.
+    const lead = text.slice(0, text.indexOf('.') + 1) // "This one is S."
+    const rest = text.slice(lead.length).replace(/^\s+/, '')
+    return (
+      `${applyPhonemeOverrides(lead, tierFilter)}` +
+      `<break time="350ms"/>` +
+      `${applyPhonemeOverrides(rest, tierFilter, 300, softenScratchy)}`
+    )
+  }
+
+  return applyPhonemeOverrides(text, tierFilter, 300, softenScratchy)
+}
+
+/**
+ * Letter-NAMES tier scratchy-hint softening (ticket 86ca7u3gr cluster
+ * 5). The "Let's look. <L>." hint ends on an isolated letter NAME;
+ * Olivia renders the terminal "e" with a clipped drum-beat and "O" with
+ * a scratchy onset. Returns the softened inner-text when the utterance
+ * is a flagged "Let's look. <e|O>." hint, or `null` to fall through to
+ * the normal path (every other letter-names utterance — and the 6
+ * passing hints C/G/J/b/W/d — render unchanged).
+ *
+ * The fix: a short lead `<break>` (clean prosodic reset before the
+ * letter) + a gentle `<prosody rate>` around the final letter so it is
+ * spoken a touch slower and softer. The letter glyph stays bare prose
+ * so Azure still voices it as its NAME ("ee", "oh"), not a phoneme.
+ */
+export function renderLetterNamesScratchyHint(
+  text: string,
+  tierFilter?: string,
+): string | null {
+  if (tierFilter !== 'letter-names') return null
+  // Match exactly "Let's look. <L>." where <L> is a flagged letter.
+  // Case-sensitive on the letter so only "e" (lowercase) and "O"
+  // (uppercase) — the two Thomas flagged — are softened; the passing
+  // hints carry different letters.
+  const m = /^(Let's look\.)\s+([eO])\.\s*$/.exec(text)
+  if (!m) return null
+  const lead = m[1]! // "Let's look."
+  const letter = m[2]! // "e" or "O"
+  return (
+    `${escapeSsml(lead)}` +
+    `<break time="250ms"/>` +
+    `<prosody rate="-12%">${escapeSsml(letter)}.</prosody>`
+  )
+}
+
+/**
+ * number-recog "Four comes after three." hint (ticket 86ca7u3gr cluster
+ * 4b). Restores stress on the de-stressed mid-sentence "Four" so Olivia
+ * gives it the long-vowel realisation instead of collapsing it to "for".
+ *
+ * NOTE: `<emphasis level="strong">` was tried first and Azure
+ * en-GB-OliviaNeural IGNORED it — the re-render produced byte-identical
+ * audio (same class as the parked `two → /tuː/` override that Olivia also
+ * ignored, per the PHONEME_OVERRIDES history). `<prosody>` IS honoured by
+ * this voice (it drives the question-prosody + scratchy-soften paths), so
+ * we stress "Four" with a slower rate + small lead break instead: the
+ * slowdown lengthens the stressed vowel and the break isolates it from
+ * the carrier so it isn't swallowed/de-stressed.
+ *
+ * Text-shape-gated to this exact hint string so every other
+ * (baseline-passing) "four" utterance renders unchanged. Returns the
+ * full inner SSML for the match, or `null` to fall through.
+ */
+export function renderFourSubjectHint(
+  text: string,
+  tierFilter?: string,
+): string | null {
+  // Math tier only (tierFilter undefined). Match the exact hint text.
+  if (tierFilter !== undefined) return null
+  if (text !== 'Look. Four comes after three.') return null
+  return (
+    'Look. ' +
+    '<break time="200ms"/>' +
+    '<prosody rate="-18%">' +
+    '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme>' +
+    '</prosody>' +
+    ' comes after three.'
+  )
 }
 
 /** Render the inner-text region of the SSML body — the bit between
@@ -523,8 +735,30 @@ export function renderSsmlInnerText(text: string, tierFilter?: string): string {
   // (math "How many?", word-song reprompts, etc.) via the fall-through
   // below.
   if (tierFilter === 'letter-sounds') {
-    return applyPhonemeOverrides(text, tierFilter, 300)
+    return renderLetterSoundsInnerText(text, tierFilter)
   }
+  // Letter-NAMES tier (ticket 86ca7u3gr cluster 5): the "Let's look.
+  // <L>." hint ends on an isolated letter NAME. Olivia renders the
+  // terminal "e" with a clipped drum-beat pressure and "O" with a
+  // scratchy onset (Thomas's ear). A short lead break + a gentle
+  // rate-slow prosody around the final letter softens both. Gated to
+  // the EXACT flagged letters (e, O) so the 6 passing letter-names
+  // hints (C/G/J/b/W/d) stay byte-identical.
+  const lnHint = renderLetterNamesScratchyHint(text, tierFilter)
+  if (lnHint !== null) return lnHint
+  // number-recog "Four comes after three." hint (ticket 86ca7u3gr
+  // cluster 4b): on en-GB-OliviaNeural (non-rhotic) the mid-sentence,
+  // de-stressed "Four" collapses toward unstressed "for" — even with the
+  // global fɔːr phoneme override, because the rhotic /r/ the override
+  // leans on is not realised as a consonant on this voice and the
+  // de-stressed position robs the vowel of length. Sentence-FINAL fours
+  // ("Two plus four.") stayed clear on Thomas's baseline because the
+  // question break + final position keep them stressed. Restoring stress
+  // with <emphasis level="strong"> rescues the long-vowel realisation.
+  // Text-shape-gated to this single hint string so every other "four"
+  // utterance (all baseline-passing) stays byte-identical.
+  const fourSubjectHint = renderFourSubjectHint(text, tierFilter)
+  if (fourSubjectHint !== null) return fourSubjectHint
   // Use the original text for boundary detection (we want to operate on
   // un-escaped characters). Trailing whitespace doesn't matter for the
   // ends-in-? check.
