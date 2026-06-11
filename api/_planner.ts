@@ -66,6 +66,7 @@ import {
   WORD_SONG_TARGET_WORDS_DIGRAPHS_CH,
   WORD_SONG_TARGET_WORDS_DIGRAPHS_TH,
   WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID,
+  WORD_SONG_TARGET_WORDS_SIGHT,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
 } from './_plannerWordList.js'
@@ -1941,7 +1942,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Nine first-class content modes today:
+matching that node. Ten first-class content modes today:
 
   - letter-names: "Tap the letter <NAME>." problems. Marian sees a
     trio of LETTER GLYPHS (the alphabet, uppercase + lowercase — no
@@ -2027,17 +2028,32 @@ matching that node. Nine first-class content modes today:
     teaching points sh and ch did not: the tongue-between-teeth
     articulation cue, and the voiceless-vs-voiced disambiguation. See
     the TH-DIGRAPH VOICELESS-/θ/ FRAMING block below.
+  - sight-words: "Find the word: <word>." problems with HIGH-FREQUENCY
+    SIGHT WORDS (the, a, is, was, said, he, she, ...). This is the FIRST
+    whole-word-RECOGNITION tier — Marian arrives here after she's
+    mastered all three digraph tiers. CRITICAL DISTINCTION from EVERY
+    prior tier: sight words are NOT decoded letter-by-letter. They are
+    high-frequency, often phonics-IRREGULAR words ("the", "was", "said")
+    that the child must recognise INSTANTLY as whole shapes. Emma speaks
+    the target word; Marian taps the matching WRITTEN word from a trio of
+    written-word chips (NO picture chips — these words have no picturable
+    referent). You MUST NOT instruct sounding-out / decoding for sight
+    words: sounding out "was" by letter rules gives the wrong non-word
+    sound. See the SIGHT-WORDS RECOGNITION block below for the
+    whole-word framing and the per-slot template overrides.
 
 Pick 8 distinct target items from the focus-node-specific pool below
 (do not invent new entries, do not use a target more than once).
 "Items" are WORDS for blending-cv / cvc-words / cvc-words-short-* /
-digraphs-* tiers, LETTER GLYPHS for letter-names, and SOUND→LETTER
-PAIRS for letter-sounds. The letter-names tier composition has its own
-additional case-mix + confusion-band caps — see the LETTER-NAMES
-SESSION COMPOSITION RULES block below. The letter-sounds tier
-composition has its own additional category-mix budget and
+digraphs-* / sight-words tiers, LETTER GLYPHS for letter-names, and
+SOUND→LETTER PAIRS for letter-sounds. The letter-names tier composition
+has its own additional case-mix + confusion-band caps — see the
+LETTER-NAMES SESSION COMPOSITION RULES block below. The letter-sounds
+tier composition has its own additional category-mix budget and
 vowel-ladder gating — see the LETTER-SOUNDS SESSION COMPOSITION RULES
-block below.
+block below. The sight-words tier is whole-word RECOGNITION (NOT
+decoding) and uses its own read + correct templates — see the
+SIGHT-WORDS RECOGNITION block below.
 
 EXCEPTION for digraphs-sh, digraphs-ch AND digraphs-th-voiceless: each
 digraph-tier pool has only 7 words, so 8 distinct words is impossible.
@@ -2102,6 +2118,9 @@ ${WORD_SONG_TARGET_WORDS_DIGRAPHS_CH}
 
 Pool for digraphs-th-voiceless (7-word voiceless-th-digraph):
 ${WORD_SONG_TARGET_WORDS_DIGRAPHS_TH}
+
+Pool for sight-words (20 high-frequency sight words):
+${WORD_SONG_TARGET_WORDS_SIGHT}
 
 Pool for letter-sounds (16 active sounds per session — 14 mastered
 consonants + 1 mastered vowel + 1 current-target vowel). Each sound
@@ -2238,6 +2257,68 @@ tick") since the t-contrast is the core discrimination this tier
 teaches. This framing is informational scaffolding inside the standard
 "Read the <word>." problem flow — it does NOT change the wire shape,
 the utterance ids, or the problem type.
+
+SIGHT-WORDS RECOGNITION (sight-words tier ONLY; OVERRIDES the default
+word-tier read + correct templates — apply these instead). The
+sight-words tier is a WHOLE-WORD RECOGNITION tier, fundamentally
+different from every decoding tier above. The teaching goal is INSTANT
+recognition of high-frequency words AS WHOLE SHAPES, not letter-by-letter
+decoding. Many of these words are phonics-IRREGULAR ("the", "was",
+"said", "of") — sounding them out by letter rules produces the WRONG
+sound. So:
+
+(1) NEVER instruct sounding-out, decoding, segmentation, or
+"what sounds do you hear" for ANY sight word. Do NOT write
+spell-it-out, stretch-the-sounds, or first-letter-sound prompts. The
+child recognises the whole word; she does not decode it. This is the
+single most important rule for this tier.
+
+(2) Read-line template (ALL 8 problems): "Find the word: <word>." —
+e.g. "Find the word: the." / "Find the word: was." Use the lowercase
+target word after the colon; one short instruction; ends with a period.
+Emma speaks this aloud and Marian taps the matching WRITTEN-WORD chip
+(no picture). Do NOT use "Tap the <word>." or "Read the <word>." for
+sight words — those templates belong to the picture-decoding tiers. Use
+"Find the word:" verbatim for every sight-word read line; do not vary
+the verb.
+
+(3) correct-slot template (sight-words ONLY): "Yes! <Word>." —
+capitalised target word, trailing period, NO article. E.g.
+"Yes! The." / "Yes! Was." / "Yes! A." Do NOT use the article-led
+"Yes! That's a <word>." default — "Yes! That's a the." is ungrammatical,
+and sight words (articles, pronouns, function words) are not count nouns
+that take "a". Do NOT use the "Yes! <Word>!" bang fallback either; the
+period form is required.
+
+(4) hint-slot template (sight-words ONLY): "Look. <Word>." —
+capitalised target, e.g. "Look. The." Keep it whole-word; do NOT hint by
+sounding out letters.
+
+(5) giveAnswer-slot template (sight-words ONLY): "This one is <word>."
+— same as the default lowercase giveAnswer template (no change needed,
+stated here for completeness).
+
+(6) reprompt is "Hmm... try again?" verbatim, same as every other tier.
+
+(7) Gentle ramp vs trap window — sequencing only (does NOT change the
+templates above). Problems 1-3 (gentle): pick the most visually-distinct
+and most familiar sight words (the, a, go, see, can are safe openers);
+the chip trio's two distractors are visually distinct from the target
+(different length, different first letter). Problems 4-8 (trap): the
+chip trio's distractors are visual-shape / high-frequency confusables
+(was vs saw, the vs he, he vs she, of vs off, do vs to) — forcing TRUE
+whole-word discrimination, not "pick the only word I recognise". YOU are
+NOT authoring the distractor chips here (the screen does that) — you are
+only ordering easier sight words early and richer ones later, and
+authoring the spoken lines. Place the very-high-frequency anchors (the,
+a, is, was) so the session feels like steady recognition practice.
+
+(8) L2 note: Marian's first language (Tagalog) has no articles and
+distributes grammatical function differently, so words like "the", "a",
+"for", "of" have no direct translation. Do NOT try to define or
+translate them — just have Emma name and celebrate the word. Keep every
+utterance in natural spoken English; no phonetic notation, no slashes,
+no IPA.
 
 LETTER-NAMES SESSION COMPOSITION RULES (letter-names tier ONLY; apply
 IN ORDER, AFTER the CONFUSION-CLASS BUDGET block immediately below).
@@ -2932,13 +3013,16 @@ all other slots are content-mode-agnostic:
     - digraphs-sh: "Read the <word>." e.g. "Read the ship."
     - digraphs-ch: "Read the <word>." e.g. "Read the chin."
     - digraphs-th-voiceless: "Read the <word>." e.g. "Read the thin."
+    - sight-words: "Find the word: <word>." e.g. "Find the word: the."
+      (whole-word recognition — see SIGHT-WORDS RECOGNITION block above;
+      NOT a decoding "Read"/"Tap" template).
   For non-letter-names / non-letter-sounds tiers: use lowercase target
   word; one short sentence; ends with a period. Use the EXACT verb for
   the focus node — "Tap" for blending-cv AND letter-names, "Which
   letter says" for letter-sounds, "Read" for cvc-words /
   cvc-words-short-o / cvc-words-short-u / cvc-words-short-i /
   cvc-words-short-e / digraphs-sh / digraphs-ch /
-  digraphs-th-voiceless.
+  digraphs-th-voiceless, "Find the word:" for sight-words.
   Do not mix templates within a single plan.
 - correct (letter-names tier): "Yes! That's the letter <NAME>." e.g.
   "Yes! That's the letter M." — uses the SAME case-preserved
@@ -2951,6 +3035,13 @@ all other slots are content-mode-agnostic:
   e.g. "Yes! M says mmm." — see LETTER-SOUNDS UTTERANCE TEMPLATE
   block above. NEVER use the article-led "Yes! That's a <word>."
   default for letter-sounds — letters and sounds are not nouns.
+- correct (sight-words tier): "Yes! <Word>." — capitalised target,
+  trailing PERIOD, NO article. E.g. "Yes! The." / "Yes! Was." /
+  "Yes! A." NEVER use the article-led "Yes! That's a <word>." default
+  (sight words are articles/pronouns/function words, not count nouns:
+  "Yes! That's a the." is ungrammatical), and NEVER the bang fallback
+  "Yes! <Word>!" — the period form is required for this tier. See the
+  SIGHT-WORDS RECOGNITION block above.
 - correct (all other word-song tiers): default template is "Yes! That's a <word>." (lowercase target
   after the article) e.g. "Yes! That's a cat."
   EXCEPTION — chip words that cannot take an indefinite article
@@ -2988,6 +3079,8 @@ all other slots are content-mode-agnostic:
   <SOUND-MNEMONIC>?" for FRICATIVES (s/f/h/v/z), e.g. "It says sss?";
   "Listen. <SOUND-MNEMONIC>." for NON-FRICATIVES, e.g. "Listen. mmm."
   — see LETTER-SOUNDS UTTERANCE TEMPLATE block above.
+- hint (sight-words tier): "Look. <Word>." — capitalised target, e.g.
+  "Look. The." Whole-word only; do NOT hint by sounding out letters.
 - hint (all other word-song tiers): "Let's look. <Word>." e.g.
   "Let's look. Cat."
 - giveAnswer (letter-names tier): "This one is the letter <NAME>."
