@@ -1486,7 +1486,96 @@
       // page is torn down (NIT 1). With the single-live-blob discipline above,
       // at most one object URL is ever outstanding, so stopActive() suffices.
       window.addEventListener('pagehide', stopActive)
-      main()
+
+      // ── Service-worker bypass (VQA-FIX.2, ticket 86ca7y0gw) ───────────────
+      // The QA page must ear-test NETWORK-FRESH bytes. The app's Workbox SW
+      // (src/pwa/sw.ts) does `precacheAndRoute(self.__WB_MANIFEST)`, and
+      // precache matching STRIPS the query string — so the greet/hub
+      // `?v=<Date.now()>` + cache:no-store cache-bust defeats the HTTP cache but
+      // NOT the SW precache. On an installed iPad standalone PWA whose SW
+      // predates a re-render (e.g. PR #356's British-voice swap), every
+      // precached `*.mp3` is served from the stale precache and the ear-test
+      // hashes/plays the wrong voice. (Canon `.json` is exempt — not in
+      // vite.config.ts globPatterns — which is why canon items show CURRENT
+      // hashes while greet/hub show STALE in the same report; the investigation
+      // evidence is on ticket 86ca7y0hj.)
+      //
+      // Fix: this QA page gets no value from the SW, so on first load we
+      // unregister every SW registration, delete every Cache Storage bucket
+      // (the precache lives there), then reload ONCE so the reloaded document is
+      // no longer SW-controlled and fetches go straight to the network. A
+      // sessionStorage one-shot flag guards against a reload loop: it is set
+      // BEFORE the reload, so the reloaded page sees it and skips straight to
+      // main(). Scope is this page only — the app's SW config is untouched; the
+      // app re-registers its SW normally on its own next load.
+      const SW_BYPASS_FLAG = 'vqa-sw-bypassed'
+
+      async function bypassServiceWorker() {
+        // Already bypassed this tab session, or SW unsupported (older engines /
+        // non-secure contexts): nothing to do, just boot.
+        let alreadyBypassed = false
+        try {
+          alreadyBypassed = sessionStorage.getItem(SW_BYPASS_FLAG) === '1'
+        } catch {
+          /* sessionStorage blocked (private mode) — treat as not-bypassed but
+             the set below will also no-op, so fall through to a single attempt
+             that, worst case, never reloads. */
+        }
+        if (alreadyBypassed) return false
+        if (!('serviceWorker' in navigator)) return false
+
+        // Is there actually anything to clear? If no SW controls this page AND
+        // there are no registrations AND no caches, skip the reload entirely so
+        // a clean (uninstalled-PWA / fresh-browser) load isn't penalised with a
+        // wasted round-trip.
+        let hadSomethingToClear = false
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations()
+          if (regs.length > 0) hadSomethingToClear = true
+          await Promise.all(regs.map((r) => r.unregister().catch(() => false)))
+        } catch {
+          /* getRegistrations can throw in locked-down contexts — ignore. */
+        }
+        try {
+          if ('caches' in self) {
+            const keys = await caches.keys()
+            if (keys.length > 0) hadSomethingToClear = true
+            await Promise.all(
+              keys.map((k) => caches.delete(k).catch(() => false)),
+            )
+          }
+        } catch {
+          /* Cache Storage unavailable — ignore. */
+        }
+        // navigator.serviceWorker.controller is non-null when THIS document is
+        // currently controlled by an active SW — that's the case that actually
+        // serves stale precache, so it must force a reload even if the
+        // registration/cache enumeration came back empty (timing edge).
+        if (navigator.serviceWorker.controller) hadSomethingToClear = true
+
+        if (!hadSomethingToClear) return false
+
+        // Mark BEFORE reload so the reloaded page short-circuits this function.
+        try {
+          sessionStorage.setItem(SW_BYPASS_FLAG, '1')
+        } catch {
+          /* If we cannot persist the flag we must NOT reload (would loop). Fall
+             through to booting on the (still possibly SW-controlled) page —
+             degraded but safe; better a possibly-stale read than an infinite
+             reload. */
+          return false
+        }
+        setStatus('Clearing service worker cache for a fresh ear-test…')
+        location.reload()
+        return true // reloading — do not boot main() in this document
+      }
+
+      async function boot() {
+        const reloading = await bypassServiceWorker()
+        if (reloading) return // the reloaded document will run boot() again
+        main()
+      }
+      boot()
     </script>
   </body>
 </html>
