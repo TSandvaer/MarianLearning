@@ -4268,6 +4268,329 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
   })
 })
 
+// ── sub-to-20 prompt directive (Kyle's spec §1.1/§4.1 + Dave PR #327) ───
+
+describe('generateSessionPlan — sub-to-20 prompt content (Kyle spec §1.1/§4.1, Dave PR #327 audit follow-ups a+b, W10.4)', () => {
+  // Directive-side defense-in-depth for the sub-to-20 tier. Mirrors the
+  // sub-to-10 distractorClass drift-guard suite above (and the broader
+  // add-to-20 / sub-to-10 pin shape): any "let me simplify the prompt"
+  // edit that drops a load-bearing rule, pool fact, annotation, or
+  // negative anchor breaks CI here — BEFORE a re-bake could silently
+  // ship an inside-bounds-but-wrong canon. Per `planner-and-canon.md`
+  // § "Wire shape is utterance-only — invariant": these assertions pin
+  // the DIRECTIVE TEXT (`systemText`), not Haiku's emitted plan; the
+  // baked-canon composition rules are mechanically enforced by the
+  // sub-to-20 compositionLint binding (`scripts/compositionLint.ts`
+  // SUB_TO_TWENTY_RULES + lintSubToTwentyComposition + resolveTierBinding).
+  // This suite is the missing planner-test coverage Dave PR #327 § 4
+  // risk-register flagged ("no planner-test sub-to-20 coverage", MEDIUM).
+  //
+  // NO RE-BAKE: this ticket (W10.4) adds test coverage + a one-line
+  // directive drift-guard tag only — zero canon bytes touched (Dave
+  // PR #327 verdict "do NOT re-bake; close audit").
+
+  const STUB_RESPONSE = JSON.stringify({
+    id: 'haiku-sub-to-20',
+    label: 'a',
+    utterances: [
+      {
+        id: 'math.p1.read',
+        text: 'Seventeen minus five. How many are left?',
+      },
+    ],
+  })
+
+  // Helper: capture the joined system-prompt text for a sub-to-20 call.
+  async function captureSubToTwentySystemText(): Promise<string> {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-20',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    return args.system.map((b) => b.text).join('\n')
+  }
+
+  // Slice `systemText` to the sub-to-20 directive block so block-scoped
+  // assertions don't leak into a sibling tier's directive. The block
+  // runs from the `- sub-to-20:` header to the next tier header
+  // (`- two-digit-addsub-no-regroup:`). Per `planner-and-canon.md`
+  // § "Block-scoped count assertions must slice systemText to the tier's
+  // directive block (Kevin NOF #4 on PR #330)".
+  function sliceSubToTwentyBlock(systemText: string): string {
+    const start = systemText.indexOf('- sub-to-20:')
+    expect(start, 'sub-to-20 directive header not found').toBeGreaterThan(-1)
+    const next = systemText.indexOf('- two-digit-addsub-no-regroup:', start)
+    expect(
+      next,
+      'next-tier header (two-digit-addsub-no-regroup) not found after sub-to-20',
+    ).toBeGreaterThan(start)
+    return systemText.slice(start, next)
+  }
+
+  it('AC1 — the sub-to-20 read-line uses the "minus … How many are left?" template (Kyle §4.1/§4.2)', async () => {
+    // The directive's read-line example + per-slot template both carry the
+    // "minus" + "How many are left?" shape. The browser parser
+    // (planFromServer.ts) rejects any other shape into silent static, so
+    // this is the load-bearing read-line contract.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toContain('minus')
+    expect(block).toContain('How many are left?')
+    expect(block).toContain(
+      '"<minuend> minus <subtrahend>. How many are left?"',
+    )
+    expect(block).toContain('Seventeen minus five. How many are left?')
+  })
+
+  it('AC2 — the sub-to-20 directive bans "take away" in the READ-LINE (READ-LINE NEGATIVE ANCHOR)', async () => {
+    // The directive INTENTIONALLY uses "take away" in the HINT scaffold
+    // (concrete-removal mental model) — so a blanket "no take away" ban is
+    // wrong. The drift this AC guards against is "take away" leaking into
+    // the read-line. The directive locks this with a READ-LINE NEGATIVE
+    // ANCHOR (§4.1 directive note + design/math/sub-to-20-content.md §4.3).
+    // Pinning that anchor's phrasing is the directive-side lock that keeps
+    // a future re-bake from emitting "Eleven take away one. How many are
+    // left?" as a read-line.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toContain('READ-LINE NEGATIVE ANCHOR')
+    expect(block).toContain('the read-line MUST use the word "minus" verbatim')
+    expect(block).toContain('DO NOT substitute "take away" here')
+    // The "take away" string DOES appear in the block — but only in the
+    // hint scaffold, never as the read-line template. Confirm the hint
+    // carries it (so we're guarding the right surface, not a typo).
+    expect(block).toContain(
+      'Look. <minuend>. Take away <subtrahend>. How many now?',
+    )
+  })
+
+  it('AC3 — every (a, b) pair in the directive FACT POOL is one of the 22 SUB_TO_TWENTY_POOL facts', async () => {
+    // Pin every pool fact's a-b=c notation appears literally in the
+    // prompt — drift-guards the 22-fact pool. A "let me trim this list"
+    // edit fails on the first missing entry. The 22 facts below are the
+    // EXACT pool from design/math/sub-to-20-content.md §1.1 (LOCKED) and
+    // SUB_TO_TWENTY_POOL in scripts/compositionLint.ts.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    const POOL_22 = [
+      // EASY (6)
+      '11-1=10',
+      '12-2=10',
+      '13-3=10',
+      '12-1=11',
+      '13-2=11',
+      '13-1=12',
+      // MEDIUM (10)
+      '14-4=10',
+      '14-3=11',
+      '14-2=12',
+      '15-5=10',
+      '15-4=11',
+      '15-3=12',
+      '15-2=13',
+      '16-6=10',
+      '16-5=11',
+      '16-4=12',
+      // HARD (6)
+      '17-7=10',
+      '17-5=12',
+      '18-8=10',
+      '18-6=12',
+      '19-9=10',
+      '19-7=12',
+    ] as const
+    expect(POOL_22).toHaveLength(22)
+    for (const fact of POOL_22) {
+      expect(block, `pool fact ${fact} missing from directive`).toContain(fact)
+    }
+  })
+
+  it('AC4a — the directive requires >=1 take-to-decade fact in P4-P8 (Dave §4.2 high-leverage anchors)', async () => {
+    // The take-to-decade facts (results land exactly on the decade) are
+    // the highest-leverage facts; Dave §4.2 names them by name. The
+    // directive's rule 4 makes >=1 in P4-P8 a hard requirement.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toMatch(/at least one take-to-decade fact MUST appear/i)
+    expect(block).toContain('MUST appear in P4-P8')
+    // The take-to-decade pool is named explicitly so Haiku can satisfy
+    // the rule without inventing.
+    expect(block).toContain('14-4, 15-5, 16-6, 17-7, 18-8, 19-9')
+  })
+
+  it('AC4b — the directive requires >=2 CLEAN Class-B facts available across P4-P8 (DISTRACTOR-COVERAGE SELF-CHECK)', async () => {
+    // The Class B (decade-anchor miss) distractor is the sub-to-20-specific
+    // error mode (no sub-to-10 analog). Without a >=2 CLEAN minimum, the
+    // renderer can silently downgrade every P4-P8 Class B attempt to
+    // off-by-one when traps alias/degenerate — leaving the new class dead
+    // at render time. The directive biases selection toward CLEAN facts.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toContain('DISTRACTOR-COVERAGE SELF-CHECK')
+    expect(block).toMatch(/>=\s*2 in-range Class B traps across P4-P8/i)
+    // The CLEAN-annotated facts are enumerated so the bias is actionable.
+    expect(block).toContain(
+      'CLEAN-annotated MEDIUM facts: 14-2, 15-3, 15-2, 16-4',
+    )
+    expect(block).toContain(
+      'CLEAN-annotated HARD/general facts: 17-5, 18-6, 19-7',
+    )
+    // NEGATIVE ANCHOR: forbidding an all-ALIAS/BOUNDARY P4-P8 set when
+    // CLEAN facts remain available is the structural lock.
+    expect(block).toContain(
+      'it is FORBIDDEN to fill P4-P8 entirely with ALIAS- or BOUNDARY-annotated facts',
+    )
+  })
+
+  it('AC5 — the directive carries the [BAND/category] + DEC= per-fact annotations', async () => {
+    // Each pool fact is inline-tagged with its band, category, and DEC
+    // (decade-anchor-miss trap value) so Haiku keeps the band/category
+    // binding while composing the 8-problem sequence and so the
+    // CLEAN/ALIAS/BOUNDARY status is legible. Stripping these annotations
+    // silently weakens cap + Class-B awareness (the annotation-style-switch
+    // load-bearing trap, `planner-and-canon.md` § "Annotation-style
+    // switches must audit which old annotations were structurally
+    // load-bearing on Haiku attention").
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    // Band tags.
+    expect(block).toContain('[EASY/')
+    expect(block).toContain('[MEDIUM/')
+    expect(block).toContain('[HARD/')
+    // DEC= annotation + its three status words.
+    expect(block).toContain('DEC=10')
+    expect(block).toContain('ALIAS')
+    expect(block).toContain('BOUNDARY')
+    expect(block).toContain('CLEAN')
+    // Representative inline-annotated pool lines (band + category + DEC
+    // status on one fact each).
+    expect(block).toContain('[EASY/subtract-one]')
+    expect(block).toContain('[MEDIUM/take-to-decade]')
+    expect(block).toContain('[HARD/general]')
+    expect(block).toContain('[EASY/doubles-anchor]')
+  })
+
+  it('AC6 — the sub-to-20 directive does NOT instruct Haiku to emit distractorClass (wire is utterance-only)', async () => {
+    // Sibling of the sub-to-10 distractorClass drift-guard at the top of
+    // this file (mirrors _planner.test.ts sub-to-10 suite). The wire shape
+    // is utterance-only and cannot carry a per-problem `distractorClass`
+    // tag — distractor selection (incl. the Class B decade-anchor trap)
+    // lives entirely in src/screens/Math/Math.tsx's render-time default.
+    // A future Haiku-tuning pass that re-adds a "tag each problem with
+    // distractorClass" line would re-introduce ignored wire emissions
+    // (the exact Haiku-3 NOF class from PR #240/#241). The negative anchors
+    // below target the Haiku-instruction phrasing directly (per
+    // `planner-and-canon.md` § "Drift-guard shape for these locks" —
+    // name-shaped bans need instruction-anchored regex).
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).not.toContain('DISTRACTOR-CLASS HINT')
+    expect(block).not.toMatch(/emit\s+distractorClass/i)
+    expect(block).not.toMatch(/tag\s+each\s+problem\s+with\s+distractorClass/i)
+    expect(block).not.toMatch(/set\s+distractorClass\s+(to|on)/i)
+    expect(block).not.toMatch(/include\s+distractorClass/i)
+    // The directive MAY mention distractorClass as render-time
+    // explanation; if it does, it MUST also carry the "RENDER-TIME"
+    // qualifier (MAY-mention-MUST-qualify pattern). Same-sentence
+    // proximity is enforced by `[^.]*`.
+    if (block.includes('distractorClass')) {
+      expect(block).toMatch(/distractorClass[^.]*RENDER-TIME/i)
+    }
+  })
+
+  it('AC7 — the sub-to-20 block head carries the Pattern 7 triple-pin <drift-guard> tag', async () => {
+    // The triple-pin tag links the directive block to its SPEC §1.1 and
+    // the three compositionLint binding sites (RULES + lint fn + path
+    // BINDING). It is the Pattern 7 (per-tier drift-guard tag) annotation
+    // from `feedback_haiku_directive_sharpening` — the cheap, greppable
+    // anchor that makes the directive ↔ spec ↔ lint coupling explicit for
+    // any future editor. Mirrors the add-to-10 / two-digit-addsub-with-
+    // regroup tags already present in MATH_TRACK_GUIDE.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toContain('<drift-guard')
+    expect(block).toContain('RULE_IDENTITY=sub-to-20')
+    expect(block).toContain('SPEC=design/math/sub-to-20-content.md§1.1')
+    expect(block).toContain('scripts/compositionLint.ts')
+  })
+
+  it('the sub-to-20 NO-BORROW SELF-CHECK + POOL-MEMBERSHIP SELF-CHECK are present (defense-in-depth against borrow-fact drift)', async () => {
+    // Borrow facts (ones-digit(minuend) < subtrahend) are the hard
+    // pedagogical line (Dave §4.5). The directive's two self-checks are
+    // the directive-side defense-in-depth that keeps a re-bake from
+    // hallucinating a borrow fact off the skeleton.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toContain('NO-BORROW SELF-CHECK')
+    expect(block).toContain('ones-digit(a) >= b')
+    expect(block).toContain('POOL-MEMBERSHIP SELF-CHECK')
+    expect(block).toContain('22 listed pairs are the ONLY allowed facts')
+  })
+
+  it('the sub-to-20 directive enforces the DUAL-EXPOSURE rule + category caps', async () => {
+    // Dual-exposure (never pair a − fact with its + inverse) is
+    // forward-compat scaffolding for mixed +/- sessions; category caps
+    // keep the 8-problem set from monotony. Both are load-bearing
+    // composition rules the compositionLint binding also enforces at bake.
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toContain('DUAL-EXPOSURE RULE')
+    expect(block).toContain(
+      'never pair a subtraction fact and its addition inverse',
+    )
+    expect(block).toContain('Category caps')
+    expect(block).toContain('CATEGORY-CAP SELF-CHECK')
+  })
+
+  it('the sub-to-20 directive emits op:"-" on every problem (wire-shape contract)', async () => {
+    const block = sliceSubToTwentyBlock(await captureSubToTwentySystemText())
+    expect(block).toContain('every problem MUST emit op: "-"')
+  })
+
+  it('the sub-to-20 prompt is byte-stable across calls (cache prefix invariant)', async () => {
+    // Same shape pin as add-to-10 / sub-to-10: the system prompt MUST NOT
+    // change between successive sub-to-20 calls, else Anthropic's prompt
+    // caching breaks and per-session cost jumps.
+    const cap1: { lastArgs?: unknown } = {}
+    const cap2: { lastArgs?: unknown } = {}
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap1 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-20',
+    })
+    await generateSessionPlan({
+      client: makeMockClient(STUB_RESPONSE, { capture: cap2 }),
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-20',
+      recentSuccessRate: 0.5,
+    })
+    const sys1 = (cap1.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    const sys2 = (cap2.lastArgs as { system: Array<{ text: string }> }).system
+      .map((b) => b.text)
+      .join('\n')
+    expect(sys1).toBe(sys2)
+  })
+
+  it('the sub-to-20 user message names the focus node and preserves the shape', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(STUB_RESPONSE, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'sub-to-20',
+      recentSuccessRate: 0.85,
+    })
+    const args = capture.lastArgs as { messages: Array<{ content: string }> }
+    const user = args.messages[0]!.content
+    expect(user).toMatch(/Focus skill node: sub-to-20\./)
+    expect(user).toContain('Marian')
+    expect(user).toContain('0.85')
+  })
+})
+
 /**
  * M4.x slow-fact directive tests (follow-up to ticket 86c9pwgc8).
  *
