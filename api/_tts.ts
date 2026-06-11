@@ -285,12 +285,25 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   nnn: { ipa: 'n', tiers: ['letter-sounds'] },
   sss: { ipa: 's', tiers: ['letter-sounds'] },
   fff: { ipa: 'f', tiers: ['letter-sounds'] },
-  // /v/ is a VOICED fricative — round-2 (Dave straggler spec) adds a
+  // /v/ is a VOICED fricative — round-2 (Dave straggler spec) added a
   // schwa /ə/ tail so Olivia gives it an audible voiced run-out (a bare
   // /v/ rendered as a cold, near-silent onset). S/F/H (voiceless fric)
   // stay bare — they get their run-up from the flowing "says it" text
   // lead-in instead.
-  vvv: { ipa: 'və', tiers: ['letter-sounds'] },
+  //
+  // ROUND-2 STRONGER (ticket 86ca7y0hj): the schwa tail (`və`) was not
+  // enough — Thomas re-tested the current bytes and still heard "vvv is
+  // still very scratchy" across all four /v/ slots (read/correct/hint/
+  // giveAnswer). The residual scratch is the HARD ONSET: Olivia attacks a
+  // bare /v/ as a loud, clipped buzz. A length mark on the fricative
+  // (`vːə`) makes Olivia SUSTAIN the voiced labiodental into a smooth run
+  // rather than a clipped burst, so the energy is spread over time instead
+  // of front-loaded into a buzzy attack. Paired with the vvv-specific
+  // softening prosody below (deeper rate + reduced volume) which tames the
+  // loudness of the onset directly. Length-marked consonants are valid W3C
+  // IPA and Olivia honours `<phoneme>` (the voice that ignores `<emphasis>`
+  // still respects phoneme + prosody — see this file's history).
+  vvv: { ipa: 'vːə', tiers: ['letter-sounds'] },
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
@@ -428,6 +441,36 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
 const SCRATCHY_MNEMONICS = new Set(['vvv', 'aaa', 'ooo'])
 const SCRATCHY_PROSODY_RATE = '-12%'
 
+/**
+ * Per-mnemonic scratchy-softening prosody (ticket 86ca7y0hj — round-2
+ * stronger). Round-1 (86ca7u3gr) wrapped EVERY scratchy mnemonic in a
+ * single shared `<prosody rate="-12%">`. That GREENED aaa/ooo to Thomas's
+ * ear but the /v/ slots were re-tested against the shipped bytes and STILL
+ * came back "very scratchy" ×4. The /v/ scratch is louder/harder than the
+ * vowel scratch (a voiced fricative attacks as a buzz, a vowel just needs
+ * gentle slowing), so vvv needs a STRONGER prosody than the vowels:
+ *
+ *   • deeper rate (`-20%` vs `-12%`) — stretches the sustained `vːə` run
+ *     so the smoothed onset has room to ramp instead of bursting.
+ *   • reduced volume (`-12%`) — directly tames the loud buzzy attack that
+ *     is the residual scratch; Olivia honours `<prosody volume>` (same
+ *     attribute the top-level EMMA_VOICE_CONFIG sets at the speak root).
+ *
+ * aaa/ooo are LEFT on the `-12%`-rate / no-volume treatment so their
+ * Thomas-approved (round-1 GREEN) bytes are preserved byte-for-byte — only
+ * vvv's render changes. A mnemonic absent from this map falls back to the
+ * shared rate-only prosody.
+ */
+interface ScratchyProsody {
+  rate: string
+  /** Optional `<prosody volume>`; omitted → no volume attribute (the
+   *  round-1 aaa/ooo shape, kept byte-identical). */
+  volume?: string
+}
+const SCRATCHY_PROSODY_BY_MNEMONIC: Record<string, ScratchyProsody> = {
+  vvv: { rate: '-20%', volume: '-12%' },
+}
+
 export function applyPhonemeOverrides(
   text: string,
   tierFilter?: string,
@@ -507,15 +550,23 @@ export function applyPhonemeOverrides(
     // gentle rate-slowing prosody so the isolated short sound doesn't
     // render as a hard buzzy burst. Opt-in per call AND per matched key
     // — only the scratchy classes (vvv/aaa/ooo) and only when the slot
-    // caller asked for it.
-    const soften =
-      softenScratchy && SCRATCHY_MNEMONICS.has(original.toLowerCase())
+    // caller asked for it. The prosody is per-mnemonic (round-2,
+    // 86ca7y0hj): vvv gets a STRONGER rate + volume cut than the vowels,
+    // which stay on the round-1 rate-only shape (byte-identical).
+    const lower = original.toLowerCase()
+    const soften = softenScratchy && SCRATCHY_MNEMONICS.has(lower)
     const phonemeTag = `<phoneme alphabet="ipa" ph="${entry.ipa}">${escapeSsml(original)}</phoneme>`
-    out.push(
-      soften
-        ? `${breakTag}<prosody rate="${SCRATCHY_PROSODY_RATE}">${phonemeTag}</prosody>`
-        : `${breakTag}${phonemeTag}`,
-    )
+    if (soften) {
+      const p = SCRATCHY_PROSODY_BY_MNEMONIC[lower] ?? {
+        rate: SCRATCHY_PROSODY_RATE,
+      }
+      const volAttr = p.volume !== undefined ? ` volume="${p.volume}"` : ''
+      out.push(
+        `${breakTag}<prosody rate="${p.rate}"${volAttr}>${phonemeTag}</prosody>`,
+      )
+    } else {
+      out.push(`${breakTag}${phonemeTag}`)
+    }
     lastIndex = m.index + original.length
   }
   // Tail.
@@ -619,7 +670,25 @@ export function renderLetterSoundsInnerText(
  * letter) + a gentle `<prosody rate>` around the final letter so it is
  * spoken a touch slower and softer. The letter glyph stays bare prose
  * so Azure still voices it as its NAME ("ee", "oh"), not a phoneme.
+ *
+ * ROUND-2 STRONGER (ticket 86ca7y0hj): on a re-test of the shipped bytes,
+ * "e" GREENED at the round-1 `-12%` rate but "O" came back "still slightly
+ * scratchy". The O letter-name ("oh") has a harder onset than "e" ("ee"),
+ * so it needs a stronger softening: a deeper rate (`-18%`) plus a small
+ * volume cut (`-8%`) to take the edge off the onset (Olivia honours
+ * `<prosody volume>`). "e" is LEFT on the round-1 `-12%`-rate / no-volume
+ * shape so its Thomas-approved bytes stay byte-for-byte identical — the
+ * stronger treatment is gated to the O letter only.
  */
+const LETTER_NAMES_SCRATCHY_PROSODY: Record<
+  string,
+  { rate: string; volume?: string }
+> = {
+  // Lowercase-keyed; "e" keeps the round-1 rate-only shape (byte-identical),
+  // "O" gets the stronger round-2 rate + volume.
+  e: { rate: '-12%' },
+  o: { rate: '-18%', volume: '-8%' },
+}
 export function renderLetterNamesScratchyHint(
   text: string,
   tierFilter?: string,
@@ -633,10 +702,14 @@ export function renderLetterNamesScratchyHint(
   if (!m) return null
   const lead = m[1]! // "Let's look."
   const letter = m[2]! // "e" or "O"
+  const p = LETTER_NAMES_SCRATCHY_PROSODY[letter.toLowerCase()] ?? {
+    rate: '-12%',
+  }
+  const volAttr = p.volume !== undefined ? ` volume="${p.volume}"` : ''
   return (
     `${escapeSsml(lead)}` +
     `<break time="250ms"/>` +
-    `<prosody rate="-12%">${escapeSsml(letter)}.</prosody>`
+    `<prosody rate="${p.rate}"${volAttr}>${escapeSsml(letter)}.</prosody>`
   )
 }
 
@@ -650,9 +723,25 @@ export function renderLetterNamesScratchyHint(
  * audio (same class as the parked `two → /tuː/` override that Olivia also
  * ignored, per the PHONEME_OVERRIDES history). `<prosody>` IS honoured by
  * this voice (it drives the question-prosody + scratchy-soften paths), so
- * we stress "Four" with a slower rate + small lead break instead: the
- * slowdown lengthens the stressed vowel and the break isolates it from
- * the carrier so it isn't swallowed/de-stressed.
+ * we stress "Four" with prosody instead of emphasis.
+ *
+ * ROUND-2 STRONGER (ticket 86ca7y0hj): round-1 used rate `-18%` + a 200ms
+ * lead break + the `fɔːr` phoneme. Thomas re-tested the shipped bytes and
+ * still heard "for comes after three" — the override IS applying, but the
+ * de-stressed mid-sentence position keeps collapsing the vowel toward the
+ * reduced "for". Rate-slowing alone lengthens the vowel but does NOT
+ * restore the PROMINENCE that distinguishes a stressed "four" from a
+ * reduced "for". The acoustic correlate of lexical stress is primarily
+ * PITCH (f0) prominence — so round-2 adds a pitch lift on the word, the
+ * lever that actually separates stressed from reduced:
+ *
+ *   • pitch `+12%` — the dominant cue; lifts "Four" out of the
+ *     carrier's flat de-stressed contour (Olivia honours `<prosody pitch>`
+ *     — it drives the question-prosody path's `pitch="+8%"`).
+ *   • rate `-25%` (deeper than round-1's -18%) — lengthens the long open-O
+ *     so `fɔːr` reads as a full long vowel, not a clipped reduced one.
+ *   • break `250ms` (up from 200ms) — fully isolates "Four" from the
+ *     de-stressing "Look." carrier so the prosody reset lands cleanly.
  *
  * Text-shape-gated to this exact hint string so every other
  * (baseline-passing) "four" utterance renders unchanged. Returns the
@@ -667,8 +756,8 @@ export function renderFourSubjectHint(
   if (text !== 'Look. Four comes after three.') return null
   return (
     'Look. ' +
-    '<break time="200ms"/>' +
-    '<prosody rate="-18%">' +
+    '<break time="250ms"/>' +
+    '<prosody pitch="+12%" rate="-25%">' +
     '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme>' +
     '</prosody>' +
     ' comes after three.'
@@ -747,16 +836,18 @@ export function renderSsmlInnerText(text: string, tierFilter?: string): string {
   const lnHint = renderLetterNamesScratchyHint(text, tierFilter)
   if (lnHint !== null) return lnHint
   // number-recog "Four comes after three." hint (ticket 86ca7u3gr
-  // cluster 4b): on en-GB-OliviaNeural (non-rhotic) the mid-sentence,
-  // de-stressed "Four" collapses toward unstressed "for" — even with the
-  // global fɔːr phoneme override, because the rhotic /r/ the override
-  // leans on is not realised as a consonant on this voice and the
-  // de-stressed position robs the vowel of length. Sentence-FINAL fours
-  // ("Two plus four.") stayed clear on Thomas's baseline because the
-  // question break + final position keep them stressed. Restoring stress
-  // with <emphasis level="strong"> rescues the long-vowel realisation.
-  // Text-shape-gated to this single hint string so every other "four"
-  // utterance (all baseline-passing) stays byte-identical.
+  // cluster 4b; round-2 stronger in 86ca7y0hj): on en-GB-OliviaNeural
+  // (non-rhotic) the mid-sentence, de-stressed "Four" collapses toward
+  // unstressed "for" — even with the global fɔːr phoneme override, because
+  // the rhotic /r/ the override leans on is not realised as a consonant on
+  // this voice and the de-stressed position robs the vowel of length.
+  // Sentence-FINAL fours ("Two plus four.") stayed clear on Thomas's
+  // baseline because the question break + final position keep them
+  // stressed. We restore stress with a <prosody pitch+rate> wrap (NOT
+  // <emphasis> — Olivia ignores emphasis on this voice; see
+  // renderFourSubjectHint's doc). Text-shape-gated to this single hint
+  // string so every other "four" utterance (all baseline-passing) stays
+  // byte-identical.
   const fourSubjectHint = renderFourSubjectHint(text, tierFilter)
   if (fourSubjectHint !== null) return fourSubjectHint
   // Use the original text for boundary detection (we want to operate on

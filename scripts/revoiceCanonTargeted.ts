@@ -37,6 +37,18 @@
  * `--dry` prints the expansion plan (dedup members per fail id + the total
  * changed-entry count) WITHOUT calling Azure — used to assemble the PR
  * body's hash-diff inventory before spending render budget.
+ *
+ * `--ids a#b,c#d` overrides the default `FAIL_ITEM_IDS` list with an
+ * explicit, comma-separated subset. This is the entry point for a
+ * ROUND-N targeted re-render that fixes only a handful of the original
+ * round-1 ids with a STRONGER SSML treatment (e.g. ticket 86ca7y0hj
+ * re-rendered the 6 ear-confirmed /v/, O, and "four" fails). It keeps the
+ * committed `FAIL_ITEM_IDS` (the round-1 PR #375 scope) intact while
+ * letting a follow-up render touch ONLY the still-failing subset, so the
+ * other items' Thomas-approved bytes are never re-rendered (Azure is not
+ * byte-deterministic across bake runs — see planner-and-canon.md). Each
+ * supplied id is still dedup-expanded to its full group like the default
+ * path. Omit the flag to re-render the whole `FAIL_ITEM_IDS` set.
  */
 
 import { createHash } from 'node:crypto'
@@ -167,8 +179,38 @@ interface Member {
   id: string
 }
 
+/**
+ * Parse an optional `--ids a#b,c#d` override of the default
+ * `FAIL_ITEM_IDS`. Returns the explicit subset (trimmed, empties dropped)
+ * or `FAIL_ITEM_IDS` when the flag is absent. Supports both
+ * `--ids x,y` and `--ids=x,y` forms.
+ */
+function resolveTargetIds(argv: readonly string[]): readonly string[] {
+  let raw: string | undefined
+  const eqArg = argv.find((a) => a.startsWith('--ids='))
+  if (eqArg) {
+    raw = eqArg.slice('--ids='.length)
+  } else {
+    const flagIdx = argv.indexOf('--ids')
+    if (flagIdx >= 0 && flagIdx + 1 < argv.length) {
+      raw = argv[flagIdx + 1]
+    }
+  }
+  if (raw === undefined) return FAIL_ITEM_IDS
+  const ids = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  if (ids.length === 0) {
+    console.error('ERROR: --ids was passed but resolved to an empty list')
+    process.exit(1)
+  }
+  return ids
+}
+
 async function main(): Promise<void> {
   const dryRun = process.argv.includes('--dry')
+  const targetIds = resolveTargetIds(process.argv)
   loadEnvLocal()
   if (
     !dryRun &&
@@ -230,7 +272,7 @@ async function main(): Promise<void> {
   // they don't today, but be safe).
   const targets = new Map<string, Member>() // key: stem#id
   const expansionReport: Array<{ failId: string; members: string[] }> = []
-  for (const failId of FAIL_ITEM_IDS) {
+  for (const failId of targetIds) {
     const hash = hashByItemId.get(failId)
     if (!hash) {
       console.error(`ERROR: fail id not found in canon: ${failId}`)
@@ -245,7 +287,10 @@ async function main(): Promise<void> {
   }
 
   // Report the expansion plan (always — it IS the hash-diff inventory).
-  console.log('=== Targeted re-render plan (dedup expansion) ===')
+  console.log(
+    `=== Targeted re-render plan (dedup expansion) — ${targetIds.length} input id(s)` +
+      `${targetIds === FAIL_ITEM_IDS ? ' [default FAIL_ITEM_IDS]' : ' [--ids subset]'} ===`,
+  )
   for (const { failId, members } of expansionReport) {
     console.log(`\n${failId}  (${members.length} dedup member(s)):`)
     for (const m of members) console.log(`    ${m}`)
