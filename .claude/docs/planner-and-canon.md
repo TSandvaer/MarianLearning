@@ -536,6 +536,21 @@ Then diagnose the root cause (check API balance, fix the planner edit, restore n
 
 **Sequencing rule — commit planner edits BEFORE regen:** the workflow above (edit → regen → commit JSON diff) should be reordered for resilience: **(1) commit (or at least `git add`) the planner-prompt / word-list / voice-config change first**, **(2) then run regen**, **(3) then commit the JSON diff in a follow-up commit or amend**. The planner edit is the slow-to-reconstruct work; the regen is ~2 min and costs cents of Haiku. A mid-flight failure should only lose the cheap step. Recipe-level corollary of the `feedback_agent_commit_early` memory ("background agents die silently; commit after each milestone"). Confirmed failure mode 2026-05-11 (Kevin, ticket `86c9qkf2w` celebration-prosody-A1 first dispatch): agent ran `rm` on all 5 word-song level-1 JSONs, then Anthropic API hit `ConnectionRefused` mid-bake (home internet drop); agent process died at 57 tool uses with no commit, no remote backup, no canon output — orchestrator recovered via external `git status` diagnosis on the worktree + agent resume via SendMessage by UUID.
 
+### Azure TTS renders are NOT byte-deterministic across separate bake calls (2026-06-11 audit)
+
+Two utterances with the same `text` field baked in **different** `canon:regen` invocations may produce **different MP3 bytes** even when the SSML body, voice, and prosody settings are identical. This is empirically observed, not a guarantee of Azure's behaviour.
+
+**Empirical finding (2026-06-11 audit of `public/canon/**`).\*\* The committed canon set contains 1,358 raw utterances spanning 629 unique text strings and 632 unique audio hashes. Of the 629 unique texts, 3 carry more than one distinct audio hash — each divergence originates from a separate bake invocation. The remaining 626 duplicate texts (same text appearing in multiple canon files) are byte-identical within a single bake run, because the pipeline reuses renders within a run.
+
+**Implications for tooling and testing:**
+
+- **Hash identity = same render; hash divergence across bakes = normal.** Do not treat a different audio hash for the same text as a regression signal — it may simply reflect a different bake run.
+- **Within one bake run, identical text → identical bytes.** It is safe to deduplicate MP3 bytes by text within a single run; cross-bake dedup is unreliable.
+- **`text` field is the stable identity; bytes are ephemeral across bakes.** Any hash-keyed verdict store (e.g. `vqa-verdicts` keyed by utterance hash) will auto-flip affected items to `needs-retest` status after a re-bake even when no text changed — this is intended behaviour, not a bug. Re-baking changes the hash for at least some utterances.
+- **Cross-bake byte-equality is not a safe "nothing changed" signal.** A re-bake that touches a single tier can produce non-identical bytes for unchanged utterances in other tiers; use the `text` field, not byte hashes, to assert "same content."
+
+The 1,358 / 629 / 632 counts are a 2026-06-11 snapshot; they grow as new tiers ship.
+
 ### Tier-specific opener pattern (canonical)
 
 **Authoring note for the `WORD_SONG_TRACK_GUIDE` template literal in [`api/_planner.ts`](MarianLearning/api/_planner.ts)**: the entire directive block is a single tagged-template-literal string, so **backticks inside the block terminate the literal** — `` `ɪ` `` or `` `ih` `` for emphasis will produce esbuild errors like `Expected ";" but found "ɪ"`. Use straight quotes (`'ɪ'`, `"ih"`) inside the block. Confirmed authoring trip 2026-05-10 during PR #192's history-note addition.

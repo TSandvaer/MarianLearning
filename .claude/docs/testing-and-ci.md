@@ -611,6 +611,20 @@ When adding a new `SkillNode`:
 
 **Load-ordering invariant**: `withDefaultedSkillLevels` MUST run before `isProgressV1` in BOTH the `loadProgress` pipeline AND `cloudSync.ts`'s install path; same ordering as `withDefaultedSettings`. If reversed, the strict guard rejects under-keyed blobs before the defaulter can fill them.
 
+#### 4.1.5 `toHaveCount()` counts hidden DOM nodes, not visible ones (PR #363, 2026-06-11)
+
+Playwright's `locator.toHaveCount(N)` counts **every DOM node** matching the selector — including nodes hidden via the `[hidden]` attribute or `display:none`. It is a **DOM census, not a visual census**. When an implementation hides filtered-out rows rather than removing them from the DOM, `toHaveCount(1)` on a filtered list can receive the full unfiltered count.
+
+**Empirical instance (PR #363 voice-qa page cross-review, 2026-06-11).** The `voice-qa.html` page hides non-matching rows via `[hidden]`; a filter that selects one item from 654 leaves 653 hidden rows and 1 visible row in the DOM. An assertion `expect(page.locator('[data-testid^="vqa-item-"]')).toHaveCount(1)` received 654 — matching every row, hidden or not.
+
+**Fix patterns:**
+
+1. **`:visible` pseudo-class filter** — `page.locator('[data-testid^="vqa-item-"]:visible')` restricts to Playwright's own visibility definition (not `[hidden]`, not `display:none`, not zero dimensions).
+2. **`locator.filter({ visible: true })`** — `page.locator('[data-testid^="vqa-item-"]').filter({ visible: true })` — Playwright-idiomatic equivalent of the above.
+3. **`toBeVisible()` / `toBeHidden()` per row** — for count-1 cases, assert the single expected row `toBeVisible()` and spot-check a hidden sibling with `toBeHidden()` to confirm the implementation hides rather than removes.
+
+**Detection rule for authors and reviewers.** Before writing `toHaveCount(N)` on a selector that matches filterable rows, ask: does the implementation **remove** filtered rows from the DOM (safe for `toHaveCount`) or **hide** them via attribute/style (requires `:visible`)? Inspect the relevant HTML/React source for `hidden`, `display: none`, or a conditional `style` toggle. When in doubt, use `:visible` — it is a strict superset of what `toHaveCount` checks and never over-counts hidden nodes.
+
 ### 4.2 `mockClaude.ts` — `/api/claude` route handler
 
 [e2e/\_helpers/mockClaude.ts](MarianLearning/e2e/_helpers/mockClaude.ts). Routes all `/api/claude` requests away from the real Anthropic + Azure function.
@@ -702,6 +716,30 @@ PR #268 shipped the additive pattern via a `display:contents` wrapper-span:
 - Conditionally renders (so the new testid only mounts when the feature is gate-active, while the inner primitive may mount unconditionally for other consumers)
 
 **Prefer the wrapper over multiple-testid-on-one-element.** React's `data-testid` is a single string attribute; setting multiple testids on one DOM node requires composite string conventions or non-standard `data-*` proliferation. The wrapper keeps each testid on its own element with no convention overhead.
+
+### 4.4 Standalone `public/*.html` pages — a distinct e2e target class (PR #361/#362/#363, 2026-06-11)
+
+Some pages live in `public/` as standalone HTML files outside the React bundle: `letter-sounds-test.html`, `offline.html`, and `voice-qa.html` (introduced as the voice-QA audit tool in PR #361). These pages are **not part of the Vite build graph, App.tsx, or the PWA precache manifest** — they are static pages served directly by `vite preview` as-is.
+
+**The main-app helpers do NOT apply to standalone pages.** `seedLocalStorage` / `seedStorage.ts` seeds `marian-tutor:progress:v1` and `marian-tutor.session-history.v1` — keys that `App.tsx` reads at mount. Standalone pages have their own localStorage schemas; `voice-qa.html` uses `vqa-verdicts` and `vqa-secret`. `installClaudeMock` / `forceHowlerUnlock` are equally inapplicable — these pages don't load the app bundle.
+
+**Spec pattern for standalone pages.** Seed the page's own keys before navigation via `page.addInitScript`, then navigate directly to the page's URL:
+
+```ts
+await page.addInitScript(() => {
+  localStorage.setItem('vqa-secret', 'test-secret')
+  localStorage.setItem('vqa-verdicts', JSON.stringify({}))
+})
+await page.goto('/voice-qa.html')
+```
+
+Intercept the page's own endpoints (not `/api/claude`) via `page.route()` with handlers matching the page's actual fetch targets. The first precedent spec is `e2e/voice-qa-page.spec.ts` (PR #361).
+
+**Do not apply the main-app canon-serving mocks** (`installCvcWordsClaudeMock`, `installFocusAwareMathCanonClaudeMock`, etc.) to standalone-page specs — they route `/api/claude`, which these pages may not call.
+
+**WebKit needs a far larger timing budget than chromium on hash-heavy pages — and WebKit is the engine that matters.** The voice-qa page's 632-item SHA-256 hash loop exceeds Playwright's default 10 s `expect` timeout on WebKit (observed stuck at "Hashing canon — 11/23 files" at the 10 s mark, PR #361 fix cycle 2026-06-11) while chromium ran the same spec 6/6 green in 27 s. Chromium-only verification would have shipped a spec that is red on WebKit — the iPad-Safari surrogate, i.e. the actual target device engine. Any spec change touching `voice-qa.html` (or future hash-heavy standalone pages) must be verified with `--project=webkit`, never chromium-only.
+
+**Gate on the footer before any count assertion (hash-then-render race).** The voice-qa page appends rows incrementally (canon groups → Greet → Hub) and writes the footer (`data-testid="vqa-render-count"`) LAST — a bare `rows.count()` after `goto()` races the hash loop and reads 0 even on chromium. The precedent spec's `waitForPageReady()` helper (45 s budget, gates on the footer) is called after every `goto`/`reload`; reuse the pattern for any sibling QA page that hashes-then-renders.
 
 ### 4.2.1 Count-based assertions on `/api/claude` must filter by track (post 86c9pr4h9)
 
