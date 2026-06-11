@@ -717,8 +717,27 @@
       }
 
       // ── Audio playback (single active clip) ──────────────────────────────
+      // Only ONE clip plays at a time, and we keep at most ONE canon Blob URL
+      // alive: the active clip's. When a clip stops being active (ended, errored,
+      // or replaced by another play), we revoke its object URL and drop it from
+      // the cache, so the next replay re-decodes from the retained base64 (NIT 1
+      // — blobs were previously created-and-cached forever). This caps decoded-
+      // blob memory at one clip regardless of how many hundreds get played in a
+      // long iPad QA pass. Asset (greet/hub) URLs are static file paths, never
+      // object URLs, so they are never revoked.
       let currentAudio = null
       let currentBtn = null
+      let currentItemId = null
+      function releaseActiveBlob() {
+        if (currentItemId) {
+          const url = blobUrlByItem.get(currentItemId)
+          if (url) {
+            URL.revokeObjectURL(url)
+            blobUrlByItem.delete(currentItemId)
+          }
+          currentItemId = null
+        }
+      }
       function stopActive() {
         if (currentAudio) {
           currentAudio.pause()
@@ -728,10 +747,14 @@
           currentBtn.classList.remove('playing')
           currentBtn = null
         }
+        releaseActiveBlob()
       }
-      // Lazily resolve a playable URL for an item; canon blobs are decoded on
-      // first play only (memory discipline — 632 base64 strings are held, but
-      // never all decoded into Blobs at once).
+      // Lazily resolve a playable URL for an item. Canon clips are decoded to a
+      // Blob URL on play and cached only for the duration of that one playback
+      // (released by stopActive); the base64 source string is retained on the
+      // item for the page lifetime so replays can re-decode (NIT 2 — full
+      // base64 release is not feasible while replay is a core QA affordance; the
+      // single-live-blob discipline above is the memory cap that is feasible).
       function urlForItem(item) {
         if (item.source === 'asset') return item.assetUrl
         let url = blobUrlByItem.get(item.itemId)
@@ -746,9 +769,14 @@
         const audio = new Audio(urlForItem(item))
         currentAudio = audio
         currentBtn = btn
+        currentItemId = item.source === 'asset' ? null : item.itemId
         btn.classList.add('playing')
         const clear = () => {
-          if (currentBtn === btn) btn.classList.remove('playing')
+          if (currentBtn === btn) {
+            btn.classList.remove('playing')
+            // Revoke the just-played canon blob; replay re-decodes on demand.
+            if (currentAudio === audio) releaseActiveBlob()
+          }
         }
         audio.onended = clear
         audio.onerror = clear
@@ -1006,6 +1034,13 @@
           const el = document.querySelector('[data-ct="' + key + '"]')
           if (el) el.textContent = c[key]
         }
+        // "decided" = items with a verdict that still matches the current audio
+        // (passed | failed). needs-retest is deliberately EXCLUDED: its stored
+        // verdict is stale (audio changed since it was decided), so the QA pass
+        // is not yet complete for that row — it awaits a re-decision. The stale
+        // verdict is still retained and still ships in the submit payload (see
+        // submitVerdicts); excluding it here only reflects "not yet re-decided"
+        // in the progress UI, it does not drop the durable verdict.
         const decided = c.passed + c.failed
         document.getElementById('counter-decided').textContent = decided
         document.getElementById('counter-total').textContent = items.length
@@ -1072,6 +1107,14 @@
           setStatus('Submit cancelled — no secret entered.', 'err')
           return
         }
+        // Submit ALL stored verdicts, including needs-retest ones. This is
+        // intentional and consistent with the "decided" counter excluding
+        // needs-retest (see refreshCounters): a needs-retest row is awaiting a
+        // re-decision in the UI, but its last durable verdict is still a real
+        // observation worth shipping in the report (the endpoint accepts it;
+        // each verdict carries its own audioHash + decidedAt so a stale verdict
+        // is recognizable downstream). So: excluded from "decided" progress,
+        // included in the durable submitted set.
         const body = {
           secret,
           submittedAt: new Date().toISOString(),
@@ -1427,6 +1470,10 @@
           )
         }
       }
+      // Belt-and-suspenders: release the one possibly-live canon blob when the
+      // page is torn down (NIT 1). With the single-live-blob discipline above,
+      // at most one object URL is ever outstanding, so stopActive() suffices.
+      window.addEventListener('pagehide', stopActive)
       main()
     </script>
   </body>
