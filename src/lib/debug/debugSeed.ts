@@ -496,6 +496,40 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
   },
+  // Sight-words content tier smoke-test entry (ticket 86ca7xmr8 — Wave 11,
+  // the FIRST whole-word-RECOGNITION tier). Marian has fully mastered
+  // every single-vowel CVC tier (short-a, short-o, short-u, short-i,
+  // short-e) AND all three digraph tiers (sh, ch, th-voiceless), and is
+  // now practicing the sight-words tier. The picker walks
+  // WORD_SONG_NODES_IN_ORDER, sees every earlier word-song node mastered,
+  // and lands on `sight-words` — the first non-mastered node, sitting
+  // between `digraphs-th-voiceless` and `simple-sentences`. The one
+  // downstream node (`simple-sentences`) stays at its default 'locked'.
+  //
+  // Used by Thomas's iPad smoke-test for the sight-words focus session
+  // AND by QA for the deep-launch path verifying the new tier renders
+  // end-to-end (canon + planner + picker + the audio-first written-word
+  // recognition mechanic — NOT picture chips). Mirrors the
+  // `digraphs-th-voiceless` recipe with one additional mastered
+  // prerequisite (digraphs-th-voiceless). Deep-launch URL:
+  // `?debug=1&seed=sight-words`.
+  'sight-words': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      'digraphs-sh': 'mastered',
+      'digraphs-ch': 'mastered',
+      'digraphs-th-voiceless': 'mastered',
+      'sight-words': 'practicing',
+    },
+    skipGreet: true,
+  },
   // Cross-vowel mixing smoke-test entry (ticket 86c9qa0kf). Marian as
   // if all three CVC vowel tiers are mastered. The predicate
   // `crossVowelMixingActive(progress, parentSettings)` returns `true`

@@ -106,6 +106,15 @@ describe('WordPicture', () => {
     // PENDING_PICTURE_PACK, whose picture body ships in a separate ticket.
     for (const entry of ALL_WORDS) {
       if (PENDING_PICTURE_PACK.has(entry.pictureKey)) continue
+      // Sight-words tier (Wave 11, ticket 86ca7xmr8) has NO picture by
+      // design — Dave's W11-01 mechanic is audio-first WRITTEN-WORD
+      // matching (the chip renders the word as text, no picturable
+      // referent for "the"/"was"/...). These entries carry a `sight:`
+      // sentinel pictureKey and `sightWord: true`; the WordSong render
+      // branch (Devon W11-03) draws them as text, never via WordPicture.
+      // They are NOT in PENDING_PICTURE_PACK (that's for words awaiting an
+      // SVG asset); sight words will NEVER have one. Skip them here.
+      if (entry.sightWord === true) continue
       const { container, unmount } = render(
         <WordPicture pictureKey={entry.pictureKey} />,
       )

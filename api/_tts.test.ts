@@ -28,6 +28,7 @@ import {
   readAzureCredentials,
   renderFourSubjectHint,
   renderLetterNamesScratchyHint,
+  renderSightWordsInnerText,
   renderLetterSoundsInnerText,
   renderSsmlInnerText,
   synthesizeUtterance,
@@ -1634,6 +1635,85 @@ describe('cluster 5 — letter-NAMES scratchy hint (e drum-beat, O scratchy)', (
     expect(
       renderLetterNamesScratchyHint("Let's look. e.", undefined),
     ).toBeNull()
+  })
+})
+
+describe('renderSightWordsInnerText — weak-word stress (Wave 11, 86ca7xmr8)', () => {
+  // Dave's W11-01 ruling implemented via <prosody> (Olivia IGNORES
+  // <emphasis>; pitch is the stress lever per PR #384). Only the five
+  // phonologically-weak target tokens {the, a, of, in, to} get stressed,
+  // and ONLY the TARGET token — the carrier "the" in "Find the word:"
+  // stays bare.
+  const STRESS_OPEN = '<prosody pitch="+10%" rate="-10%">'
+  const STRESS_CLOSE = '</prosody>'
+
+  it('stresses ONLY the weak target token in a read line (carrier "the" stays bare)', () => {
+    expect(
+      renderSightWordsInnerText('Find the word: the.', 'sight-words'),
+    ).toBe(`Find the word: ${STRESS_OPEN}the${STRESS_CLOSE}.`)
+  })
+
+  it('stresses the weak target token in a hint line', () => {
+    expect(renderSightWordsInnerText('Look. The.', 'sight-words')).toBe(
+      `Look. ${STRESS_OPEN}The${STRESS_CLOSE}.`,
+    )
+  })
+
+  it('stresses the weak target token in a correct line', () => {
+    expect(renderSightWordsInnerText('Yes! A.', 'sight-words')).toBe(
+      `Yes! ${STRESS_OPEN}A${STRESS_CLOSE}.`,
+    )
+  })
+
+  it('covers all five weak tokens {the, a, of, in, to}', () => {
+    for (const w of ['the', 'a', 'of', 'in', 'to']) {
+      const cap = w[0]!.toUpperCase() + w.slice(1)
+      expect(
+        renderSightWordsInnerText(`Find the word: ${w}.`, 'sight-words'),
+      ).toBe(`Find the word: ${STRESS_OPEN}${w}${STRESS_CLOSE}.`)
+      // Case-insensitive token match, case-preserved in output.
+      expect(renderSightWordsInnerText(`Look. ${cap}.`, 'sight-words')).toBe(
+        `Look. ${STRESS_OPEN}${cap}${STRESS_CLOSE}.`,
+      )
+    }
+  })
+
+  it('returns null for STRONG sight-word targets (was/said/go/...) — they fall through unchanged', () => {
+    // Strong monosyllables don't de-stress to schwa; no stress fix needed,
+    // so they take the default plain-text path (byte-stable).
+    expect(
+      renderSightWordsInnerText('Find the word: was.', 'sight-words'),
+    ).toBeNull()
+    expect(renderSightWordsInnerText('Yes! Said.', 'sight-words')).toBeNull()
+    expect(renderSightWordsInnerText('Look. Go.', 'sight-words')).toBeNull()
+  })
+
+  it('returns null off the sight-words tier (wrong tier → no stress fix)', () => {
+    expect(
+      renderSightWordsInnerText('Find the word: the.', 'cvc-words'),
+    ).toBeNull()
+    expect(
+      renderSightWordsInnerText('Find the word: the.', undefined),
+    ).toBeNull()
+  })
+
+  it('does not match a non-sight-word utterance shape', () => {
+    expect(renderSightWordsInnerText('Read the cat.', 'sight-words')).toBeNull()
+    expect(
+      renderSightWordsInnerText('Hmm... try again?', 'sight-words'),
+    ).toBeNull()
+  })
+
+  it('flows through the full renderSsmlInnerText dispatch on the sight-words tier', () => {
+    // Integration: the dispatch branch in renderSsmlInnerText fires the
+    // weak-word stress on the sight-words tier, and leaves strong targets
+    // on the plain path.
+    expect(renderSsmlInnerText('Find the word: the.', 'sight-words')).toBe(
+      `Find the word: ${STRESS_OPEN}the${STRESS_CLOSE}.`,
+    )
+    expect(renderSsmlInnerText('Find the word: was.', 'sight-words')).toBe(
+      'Find the word: was.',
+    )
   })
 })
 

@@ -145,6 +145,21 @@ export interface WordSongProblemUtterances {
  *   demoted to CVC chip layout. A8b ships the parser+screen tier that
  *   lets the canon flow through end-to-end.
  *
+ * `sight-word` — whole-word RECOGNITION tier (Wave 11, ticket 86ca7xmr8).
+ *   Read line is "Find the word: <word>." where `<word>` is a
+ *   high-frequency sight word (the, a, was, said, he, ...). UNLIKE every
+ *   prior tier, sight words are NOT phonics-decoded — they are recognised
+ *   as whole shapes. The recognition mechanic is audio-first WRITTEN-WORD
+ *   matching: Emma speaks the target; Marian taps the matching WRITTEN
+ *   word from a trio (NO picture chips — these function words have no
+ *   picturable referent). Targets ARE in `wordPack.ts` (real `WordEntry`
+ *   rows carrying a `sight:` sentinel `pictureKey` + `sightWord: true`),
+ *   so the parser resolves them via `getWordEntry` like the CVC tiers —
+ *   it does NOT synthesize a sentinel entry the way letter-names /
+ *   letter-sounds do. The RENDER branch (chip text vs picture, no silent
+ *   decoding beat) is Devon's W11-03 and consumes this discriminant.
+ *   Companion canon at `public/canon/word-song/level-1/sight-words.json`.
+ *
  * The field is optional on the public type for back-compat: callers that
  * predate the widening (e.g. `STATIC_WORD_SONG_PLANS`) don't set it, and
  * downstream code treats the absence as `blending-cv`. The parser always
@@ -156,6 +171,7 @@ export type WordSongContentType =
   | 'cvc-word'
   | 'letter-names'
   | 'letter-sounds'
+  | 'sight-word'
 
 /** A single problem in the session. */
 export interface WordSongProblem {

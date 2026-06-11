@@ -102,6 +102,22 @@ export interface WordEntry {
    * `design/architecture/digraph-architecture-proposal.md` §3.
    */
   phoneme?: string
+  /**
+   * Sight-word flag (sight-words tier — Wave 11, ticket 86ca7xmr8).
+   * `true` for the 20 high-frequency sight-word targets (the, a, was,
+   * said, he, ...). These are whole-word-RECOGNITION targets, NOT
+   * phonics-decoded CVC words: they carry NO `vowel` (most are not
+   * single-short-vowel CVC) and a `sight:` sentinel `pictureKey` (no
+   * picture-pack asset — the chip renders the WRITTEN word as text per
+   * Dave's W11-01 mechanic; Devon's W11-03 owns that render branch).
+   *
+   * Default-absent === `false` (every decoding-tier entry). The flag is
+   * the data-layer discriminant the render/distractor paths key on to
+   * avoid running CVC same-vowel distractor logic (which would consult
+   * `vowel`, undefined here) against a sight word. See the
+   * `WordSongContentType` `'sight-word'` docstring in `wordSessionPlans.ts`.
+   */
+  sightWord?: boolean
 }
 
 export type WordCategory =
@@ -129,6 +145,16 @@ export type WordCategory =
   // word-list §1 final-pool table category column.
   | 'body-part'
   | 'action'
+  // 'function-word' added with the sight-words tier (Wave 11, ticket
+  // 86ca7xmr8) — articles, pronouns, prepositions, auxiliaries, and
+  // high-frequency verbs (the, a, I, was, he, for, ...) that have no
+  // picturable referent. The gentle-tier category filter in
+  // `wordDistractors.ts` is NEVER consulted for sight words (they carry
+  // `sightWord: true` + no `vowel`, and their distractor selection is
+  // whole-word visual-shape per Dave's W11-01 mechanic, not category-
+  // based), but `category` is a required field on every WordEntry, so a
+  // dedicated self-documenting bucket beats overloading 'object'.
+  | 'function-word'
 
 /**
  * The 14 target words — all CVC short-a, in Marian's likely vocabulary.
@@ -1098,6 +1124,167 @@ export const TARGET_WORDS: readonly WordEntry[] = [
     phoneme: '/θ/',
     hybridMode: true,
   },
+  // ── Sight-words tier (Wave 11, ticket 86ca7xmr8) ──────────────────────
+  // 20 high-frequency sight-word targets — Dave's W11-01 starter set
+  // (Dolch Pre-Primer + Primer subset), aligned 1:1 with
+  // `WORD_SONG_TARGET_WORDS_SIGHT` in `api/_plannerWordList.ts` and
+  // Jessica's `SIGHT_WORDS_POOL` in `e2e/sight-words-content.spec.ts`.
+  //
+  // These are whole-word RECOGNITION targets, NOT phonics-decoded CVC
+  // words. They carry NO `vowel` (most are not single-short-vowel CVC),
+  // a `sight:` sentinel `pictureKey` (no picture-pack asset — the chip
+  // renders the WRITTEN word as text per Dave's mechanic; Devon's W11-03
+  // owns that render branch), `category: 'function-word'`, and
+  // `sightWord: true` so the render/distractor paths skip CVC same-vowel
+  // logic. `getWordEntry` resolves them like any other target.
+  //
+  // Batch 1 — Pre-Primer function words.
+  {
+    word: 'the',
+    pictureKey: 'sight:the',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'a',
+    pictureKey: 'sight:a',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'i',
+    pictureKey: 'sight:i',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'is',
+    pictureKey: 'sight:is',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'it',
+    pictureKey: 'sight:it',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'in',
+    pictureKey: 'sight:in',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'to',
+    pictureKey: 'sight:to',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'go',
+    pictureKey: 'sight:go',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'no',
+    pictureKey: 'sight:no',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'do',
+    pictureKey: 'sight:do',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  // Batch 2 — Primer / Grade-1 function words + common verbs.
+  {
+    word: 'was',
+    pictureKey: 'sight:was',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'see',
+    pictureKey: 'sight:see',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'said',
+    pictureKey: 'sight:said',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'he',
+    pictureKey: 'sight:he',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'she',
+    pictureKey: 'sight:she',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'we',
+    pictureKey: 'sight:we',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'for',
+    pictureKey: 'sight:for',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'on',
+    pictureKey: 'sight:on',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'not',
+    pictureKey: 'sight:not',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  // NOTE: 'can' is INTENTIONALLY absent here. It already exists above as
+  // a short-a CVC target (`word: 'can', vowel: 'a'`), so adding a second
+  // entry would duplicate the `getWordEntry('can')` key. 'can' is
+  // dual-role (CVC target AND sight-word target — Dave's W11-01 §"Note on
+  // overlap" calls this an asset: Marian has phonics-grounded prior
+  // exposure that anchors the orthographic mapping). The sight-word RENDER
+  // is driven by the per-problem `contentType: 'sight-word'` the parser
+  // sets from the "Find the word: can." read line — NOT by an entry flag
+  // — so the existing CVC `can` entry serves both tiers. Same dual-role
+  // precedent as `sip` (short-i target reused by digraphs-ch). The other
+  // pool words (the/a/is/it/in/to/go/no/do/was/see/said/he/she/we/for/
+  // on/not) are net-new and added above; only 'can' pre-existed.
 ] as const
 
 /**
@@ -1782,6 +1969,56 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // comment.
   moth: { gentle: ['bath', 'cloth'], trap: ['thin', 'math'] }, // th-pool only; path avoided (FORBIDDEN_PAIR); spec's [thin,thick] is itself a FORBIDDEN_PAIR — see deviation note above
   cloth: { gentle: ['bath', 'math'], trap: ['thin', 'moth'] }, // th-pool only
+  // ── Sight-words tier (Wave 11, ticket 86ca7xmr8) ──────────────────────
+  // Per Dave's W11-01 §"Distractor pairing reference". GENTLE distractors
+  // (P1-3) are visually + categorically distinct from the target
+  // (different length / first letter). TRAP distractors (P4-8) are
+  // visual-shape / high-frequency confusables (was/saw-class, the/he,
+  // he/she, do/to/go/no) — forcing TRUE whole-word discrimination, the
+  // axis Dave specifies (visual-structural, NOT phonics rhyme/onset).
+  //
+  // SCOPE NOTE (Kevin → Devon W11-03): every distractor here resolves via
+  // `getWordEntry` so the `wordDistractors.test.ts` "every target has a
+  // deterministic gentle+trap pair" regression stays green. Distractors
+  // are drawn ONLY from resolvable pack words: the 20 sight-pool words +
+  // the existing CVC words `cat`/`hot`/`man`. Dave's matrix names a few
+  // out-of-pack confusables (saw, off, an, at) as the IDEAL trap chips;
+  // those are NOT pack entries, so this data-layer matrix substitutes the
+  // nearest resolvable in-pool confusable. If Devon's W11-03 visual-shape
+  // distractor model needs the true out-of-pack confusables (saw/off/an/
+  // at), they're his to add as sight-word DISTRACTOR_ONLY_WORDS rows in
+  // the render PR — flagged in the PR body. No FORBIDDEN_PAIR adjacency;
+  // all pairs distinct from target and from each other (verified).
+  the: { gentle: ['cat', 'go'], trap: ['he', 'she'] },
+  a: { gentle: ['is', 'see'], trap: ['i', 'it'] },
+  i: { gentle: ['go', 'see'], trap: ['in', 'it'] },
+  is: { gentle: ['go', 'cat'], trap: ['in', 'it'] },
+  it: { gentle: ['go', 'see'], trap: ['in', 'is'] },
+  in: { gentle: ['go', 'cat'], trap: ['it', 'is'] },
+  to: { gentle: ['cat', 'see'], trap: ['do', 'no'] },
+  go: { gentle: ['cat', 'is'], trap: ['no', 'do'] },
+  no: { gentle: ['cat', 'is'], trap: ['go', 'do'] },
+  do: { gentle: ['cat', 'is'], trap: ['go', 'no'] },
+  was: { gentle: ['cat', 'go'], trap: ['see', 'said'] },
+  see: { gentle: ['go', 'cat'], trap: ['she', 'he'] },
+  said: { gentle: ['go', 'cat'], trap: ['see', 'was'] },
+  he: { gentle: ['cat', 'go'], trap: ['she', 'the'] },
+  she: { gentle: ['cat', 'go'], trap: ['he', 'see'] },
+  we: { gentle: ['cat', 'go'], trap: ['he', 'she'] },
+  for: { gentle: ['cat', 'is'], trap: ['on', 'not'] },
+  on: { gentle: ['go', 'see'], trap: ['in', 'not'] },
+  not: { gentle: ['go', 'see'], trap: ['hot', 'man'] },
+  // NOTE: 'can' is INTENTIONALLY absent from this sight-word block. It is
+  // dual-role and its `TARGET_PAIRINGS['can']` row already exists above as
+  // the short-a CVC pairing (`gentle: ['sun','dog'], trap: ['fan','man']`)
+  // — `can` carries `vowel: 'a'`, so the CVC gentle/trap-AXIS regression
+  // tests run on it and require that CVC row. Overwriting it with a
+  // sight-word visual-shape pairing breaks the CVC axis test. The
+  // sight-word render for `can` is driven by the per-problem
+  // `contentType: 'sight-word'` (parser-set from "Find the word: can.")
+  // + Devon's W11-03 distractor model — NOT this CVC matrix lookup — so
+  // no sight-word `can` row is needed here. Same dual-role discipline as
+  // the `can` TARGET_WORDS note above.
 } as const
 
 /**

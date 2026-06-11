@@ -331,6 +331,66 @@ export const WORD_SONG_TARGET_WORDS_DIGRAPHS_TH_HYBRID: readonly string[] = [
   'cloth',
 ] as const
 
+/**
+ * The 20 target words for the sight-words tier (`sight-words`) — the
+ * FIRST whole-word-RECOGNITION tier, sitting between
+ * `digraphs-th-voiceless` and `simple-sentences` in `WordSongNode` /
+ * `LITERACY_TREE`. This is the genuine net-new Word Song content frontier
+ * (Wave 11): every prior tier is a DECODING tier (sound the word out);
+ * sight words are high-frequency irregular words the child must recognise
+ * INSTANTLY without decoding.
+ *
+ * Locked 2026-06-11 per `design/research/sight-words-sequence-marian.md`
+ * §"Which words — recommended set" (Dave, W11-01, merged PR #380). The
+ * 20-word starter set is the Dolch Pre-Primer + Primer subset filtered to
+ * three criteria: (a) appears in Marian's in-app + picture-book reading
+ * context; (b) visually distinct from other words in the same
+ * introduction batch; (c) contains phonics patterns Marian already knows
+ * or is currently learning. Two batches, ~2 new words per session over a
+ * 10-session rollout:
+ *  - Batch 1 — Pre-Primer function words (safest visual contrast):
+ *    `the, a, I, is, it, in, to, go, no, do`.
+ *  - Batch 2 — Primer / Grade-1 function words + common verbs (slight
+ *    overlap with the CVC word pool — an ASSET, not a conflict; Marian
+ *    has phonics-grounded prior exposure that anchors orthographic
+ *    mapping): `was, see, said, he, she, we, for, on, not, can`.
+ *
+ * Confusable pairs are DEFERRED out of this starter set (of/off, was/saw,
+ * the/they/then/there, where/were) — Dave §"Deferred". They appear only
+ * as TRAP-tier distractors once the target is secure (Kyle/Devon-owned
+ * `TARGET_PAIRINGS`), never as targets in this wave.
+ *
+ * STRUCTURAL DIVERGENCE FROM EVERY PRIOR TIER. Sight words are NOT
+ * phonics-decodable by design. The recognition mechanic is audio-first
+ * WHOLE-WORD matching (Emma speaks the target; Marian taps the matching
+ * WRITTEN word among 3 written-word chips) — NOT picture-chip decoding.
+ * So:
+ *  - There is NO picture-pack asset for these words (`wordPack.ts` entries
+ *    carry a `sight:` sentinel `pictureKey`, mirroring the
+ *    `letter:`/`letter-sounds:` sentinel pattern); the chips render the
+ *    written word as text.
+ *  - The `WORD_SONG_DISTRACTOR_HINTS` rhyme-family block does NOT extend
+ *    to sight words — their distractor axes are VISUAL-SHAPE / confusable
+ *    neighbours (was/saw, the/he, of/off), not phonics rhyme/onset/vowel
+ *    families. The hint block stays CVC/digraph-scoped.
+ *  - The planner directive (`WORD_SONG_TRACK_GUIDE` SIGHT-WORDS block)
+ *    must NOT instruct phonics decoding (sounding out "was" by GPC rules
+ *    yields the non-word /wæs/ — Dave §"Recognition mechanic" point 2).
+ *
+ * Note `I` is the pronoun (canonically uppercase). The pool string here
+ * is lowercased for the prompt (`i`) to stay consistent with every other
+ * word-pool entry; the client-side `wordPack.ts` + canon target encoding
+ * resolve it case-insensitively the same way every other word does.
+ *
+ * Same alignment contract as the prior tiers: the client-side
+ * `wordPack.ts` MUST carry every word here as `isTarget: true` plus a
+ * `TARGET_PAIRINGS` row. The round-trip suite in
+ * `src/screens/WordSong/plannerRoundTrip.test.ts` + the planner unit
+ * tests in `api/_planner.test.ts` enforce that.
+ */
+export const WORD_SONG_TARGET_WORDS_SIGHT =
+  'the, a, i, is, it, in, to, go, no, do, was, see, said, he, she, we, for, on, not, can'
+
 /** Hint shown to the model so it knows the broader pack — even though it
  *  isn't authoring distractors, knowing the rhyme families helps it order
  *  the gentle-vs-trap window correctly (per Kyle's distractor spec).

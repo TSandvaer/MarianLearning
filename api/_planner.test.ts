@@ -964,10 +964,10 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
 
   it('routes first-class focus nodes (blending-cv, cvc-words) verbatim; falls back untuned tiers to blending-cv (sweep)', async () => {
     // Step 2 (ticket 86c9kxu07) widened the planner to first-class
-    // emit `cvc-words` content alongside `blending-cv`. Untuned tiers
-    // (letter-sounds / sight-words / simple-sentences) fall back to
-    // blending-cv per the contract doc's §"Tier coverage today"
-    // section. This sweep pins the routing table so a future regression
+    // emit `cvc-words` content alongside `blending-cv`. After Wave 11
+    // (sight-words first-class — ticket 86ca7xmr8) the sole untuned tier
+    // (simple-sentences) falls back to blending-cv per the contract doc's
+    // §"Tier coverage today" section. This sweep pins the routing table so a future regression
     // on either side surfaces here. (PR #211: dead `digraphs` literal
     // dropped; replaced by 3 sequential sibling nodes. `digraphs-sh`
     // went FIRST-CLASS first — its content tier wired the /ʃ/ digraph
@@ -988,8 +988,8 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
       ['digraphs-sh', 'digraphs-sh'], // first-class (sh content tier)
       ['digraphs-ch', 'digraphs-ch'], // first-class (ch content tier)
       ['digraphs-th-voiceless', 'digraphs-th-voiceless'], // first-class (th content tier)
-      ['sight-words', 'blending-cv'],
-      ['simple-sentences', 'blending-cv'],
+      ['sight-words', 'sight-words'], // first-class (Wave 11 — ticket 86ca7xmr8, whole-word recognition tier)
+      ['simple-sentences', 'blending-cv'], // sole remaining stub-fallback tier
     ]
     for (const [requested, effective] of expectations) {
       const capture: { lastArgs?: unknown } = {}
@@ -1212,18 +1212,18 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
   })
 
   it('ignores isGraduationSession=true on word-song untuned tiers (stub-fallback to blending-cv)', async () => {
-    // Untuned tiers (e.g. sight-words) fall back to blending-cv content
-    // per `effectiveFocusNode`. The graduation directive is gated on the
-    // EFFECTIVE focus node being cvc-words, so an untuned-tier request
-    // with the flag set must not carry the directive — the session would
-    // otherwise emit graduation content under a non-graduation focus.
+    // Untuned tiers (e.g. simple-sentences) fall back to blending-cv
+    // content per `effectiveFocusNode`. The graduation directive is gated
+    // on the EFFECTIVE focus node being cvc-words, so an untuned-tier
+    // request with the flag set must not carry the directive — the session
+    // would otherwise emit graduation content under a non-graduation focus.
     // (PR #211: dead `digraphs` literal dropped for 3 sibling nodes;
     // `digraphs-sh`, `digraphs-ch`, and `digraphs-th-voiceless` are now
-    // ALL first-class with their own content tiers, so `sight-words` is
-    // the remaining stub-fallback example here. The first-class digraph
-    // graduation-no-leak cases have their own assertions in the
-    // digraphs-sh / digraphs-ch / digraphs-th-voiceless sibling-tier
-    // describe blocks.)
+    // ALL first-class with their own content tiers. Wave 11 made
+    // `sight-words` first-class too, so `simple-sentences` is the LAST
+    // remaining stub-fallback example here. The first-class digraph /
+    // sight-word graduation-no-leak cases have their own assertions in
+    // their sibling-tier describe blocks.)
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 
@@ -1232,7 +1232,7 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
       track: 'word-song',
       level: 1,
       childName: 'Marian',
-      focusNode: 'sight-words',
+      focusNode: 'simple-sentences',
       isGraduationSession: true,
     })
 
