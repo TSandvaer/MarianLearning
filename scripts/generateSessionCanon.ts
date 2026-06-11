@@ -278,6 +278,17 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // text is plain mnemonic ("mmm", "buh", "o", etc.) and whose audio
 // payload is the phoneme-wrapped MP3 (the substitution table fires
 // during the bake-time Azure render call).
+// Wave 11 (ticket 86ca7xmr8) added `sight-words` as the FIRST
+// whole-word-RECOGNITION tier — see
+// `design/research/sight-words-sequence-marian.md` (Dave, W11-01) +
+// `design/wave-11-sight-words-plan.md`. Unlike every prior tier, sight
+// words are NOT phonics-decodable; the directive instructs whole-word
+// recognition (audio-first written-word matching), never sounding-out.
+// The canon bake produces
+// `public/canon/word-song/level-1/sight-words.json` with sight-word
+// target words drawn from `WORD_SONG_TARGET_WORDS_SIGHT`. The remaining
+// untuned tier (`simple-sentences`) is still deliberately NOT in canon
+// — it falls back to blending-cv via the planner's `effectiveFocusNode`.
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'letter-names',
   'letter-sounds',
@@ -290,6 +301,7 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'digraphs-sh',
   'digraphs-ch',
   'digraphs-th-voiceless',
+  'sight-words',
 ]
 
 export function activeCombos(): readonly Combo[] {

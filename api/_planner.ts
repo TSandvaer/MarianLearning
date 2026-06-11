@@ -759,17 +759,28 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   'digraphs-sh',
   'digraphs-ch',
   'digraphs-th-voiceless',
+  // Wave 11 (ticket 86ca7xmr8) — `sight-words`, the FIRST whole-word-
+  // RECOGNITION tier (sits between `digraphs-th-voiceless` and
+  // `simple-sentences`). Unlike every prior tier, sight words are NOT
+  // phonics-decodable: the directive in `WORD_SONG_TRACK_GUIDE`
+  // (SIGHT-WORDS block) instructs whole-word recognition, never
+  // sounding-out. See `design/research/sight-words-sequence-marian.md`
+  // (Dave, W11-01) + `WORD_SONG_TARGET_WORDS_SIGHT` in `_plannerWordList.ts`.
+  // `simple-sentences` remains the only valid-but-untuned word-song tier
+  // that falls through to the blending-cv stub.
+  'sight-words',
 ]
 
 /**
  * Resolve the focus node the planner actually generates for. Math honours
  * caller-supplied focusNode verbatim. Word-song honours first-class nodes
  * (`letter-names`, `letter-sounds`, `blending-cv`, `cvc-words`, the four
- * short-vowel sibling tiers, `digraphs-sh`, `digraphs-ch`, and
- * `digraphs-th-voiceless`); valid-but-unsupported nodes (`sight-words`,
- * `simple-sentences`) fall back to `blending-cv` content as a stub — the
- * screen always renders, even on tiers we haven't tuned yet. See
- * `WORD_SONG_TRACK_GUIDE` for the prompt-side handling.
+ * short-vowel sibling tiers, `digraphs-sh`, `digraphs-ch`,
+ * `digraphs-th-voiceless`, and `sight-words`); the sole remaining
+ * valid-but-unsupported node (`simple-sentences`) falls back to
+ * `blending-cv` content as a stub — the screen always renders, even on
+ * tiers we haven't tuned yet. See `WORD_SONG_TRACK_GUIDE` for the
+ * prompt-side handling.
  *
  * Validation (`generateSessionPlan` above) still rejects an invalid
  * cross-track or unknown focusNode for word-song before reaching here —
