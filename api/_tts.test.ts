@@ -1501,14 +1501,19 @@ describe('cluster 2 — break after "This one is X." in the fricative giveAnswer
 })
 
 describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)', () => {
-  it('softens vvv in EVERY /v/ slot (read/correct/hint/giveAnswer all flagged)', () => {
+  it('softens vvv in EVERY /v/ slot with the STRONGER round-2 prosody + length-marked IPA (86ca7y0hj)', () => {
+    // Round-2 (86ca7y0hj): the round-1 `və` + rate-only `-12%` was not
+    // enough — Thomas re-tested the shipped bytes and still heard "very
+    // scratchy" ×4. Stronger treatment: length-marked `vːə` (sustained
+    // fricative, not a clipped burst) + a vvv-specific prosody (deeper rate
+    // `-20%` + volume cut `-12%` to tame the loud onset).
     for (const text of [
       'Which letter says vvv?',
       'Yes. V says it. vvv?',
       'It says vvv?',
     ]) {
       expect(renderSsmlInnerText(text, 'letter-sounds')).toContain(
-        '<prosody rate="-12%"><phoneme alphabet="ipa" ph="və">vvv</phoneme></prosody>',
+        '<prosody rate="-20%" volume="-12%"><phoneme alphabet="ipa" ph="vːə">vvv</phoneme></prosody>',
       )
     }
   })
@@ -1550,17 +1555,22 @@ describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)'
     expect(applyPhonemeOverrides('says vvv', 'letter-sounds')).not.toContain(
       '<prosody',
     )
+    // vvv carries the round-2 stronger per-mnemonic prosody (86ca7y0hj):
+    // deeper rate + a volume cut, distinct from the shared `-12%` vowels.
     expect(
       applyPhonemeOverrides('says vvv', 'letter-sounds', 300, true),
-    ).toContain('<prosody rate="-12%">')
+    ).toContain('<prosody rate="-20%" volume="-12%">')
   })
 })
 
 describe('cluster 4b — stress de-stressed "Four comes after three."', () => {
-  it('stresses the subject "Four" with a lead break + slowed prosody around the phoneme', () => {
+  it('stresses the subject "Four" with a pitch lift + deeper rate + lead break (round-2 stronger, 86ca7y0hj)', () => {
     // <prosody> (not <emphasis> — Olivia ignores emphasis on this voice).
+    // Round-2: pitch `+12%` is the dominant stress cue that separates the
+    // stressed "four" from the reduced "for" Thomas still heard at the
+    // round-1 rate-only `-18%`; rate deepened to `-25%`, break to 250ms.
     expect(renderSsmlInnerText('Look. Four comes after three.')).toBe(
-      'Look. <break time="200ms"/><prosody rate="-18%">' +
+      'Look. <break time="250ms"/><prosody pitch="+12%" rate="-25%">' +
         '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme>' +
         '</prosody> comes after three.',
     )
@@ -1584,16 +1594,19 @@ describe('cluster 4b — stress de-stressed "Four comes after three."', () => {
 })
 
 describe('cluster 5 — letter-NAMES scratchy hint (e drum-beat, O scratchy)', () => {
-  it('softens the flagged "Let\'s look. e." and "Let\'s look. O." hints', () => {
+  it('keeps "e" on the round-1 -12% shape but gives "O" the STRONGER round-2 prosody (86ca7y0hj)', () => {
+    // "e" GREENED at round-1 → byte-identical -12% rate-only.
     expect(
       renderLetterNamesScratchyHint("Let's look. e.", 'letter-names'),
     ).toBe(
       'Let&apos;s look.<break time="250ms"/><prosody rate="-12%">e.</prosody>',
     )
+    // "O" was "still slightly scratchy" → deeper rate -18% + volume -8% to
+    // take the edge off the harder "oh" onset (only the O letter changes).
     expect(
       renderLetterNamesScratchyHint("Let's look. O.", 'letter-names'),
     ).toBe(
-      'Let&apos;s look.<break time="250ms"/><prosody rate="-12%">O.</prosody>',
+      'Let&apos;s look.<break time="250ms"/><prosody rate="-18%" volume="-8%">O.</prosody>',
     )
   })
 
