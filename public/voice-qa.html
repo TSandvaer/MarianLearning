@@ -1,0 +1,1480 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Voice-QA — Emma render review</title>
+    <style>
+      :root {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --ink: #2a2a2a;
+        --muted: #6b6b6b;
+        --line: #ece4d6;
+        --cream: #faf7f2;
+        --green: #1b5e20;
+        --green-soft: #eaf3ea;
+        --red: #a94442;
+        --red-soft: #f9e7e7;
+        --amber: #8a6d3b;
+        --amber-soft: #fcf8e3;
+        --orange: #d9822b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1rem 0.75rem 6rem;
+        background: var(--cream);
+        color: var(--ink);
+        max-width: 920px;
+        margin-inline: auto;
+        -webkit-text-size-adjust: 100%;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.25rem;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 0.75rem;
+        line-height: 1.45;
+      }
+      .voice {
+        display: inline-block;
+        background: var(--green);
+        color: #fff;
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        vertical-align: middle;
+      }
+      .status {
+        font-size: 0.86rem;
+        color: var(--amber);
+        background: var(--amber-soft);
+        border: 1px solid #faebcc;
+        border-radius: 8px;
+        padding: 0.6rem 0.75rem;
+        margin: 0.5rem 0;
+      }
+      .status.ok {
+        color: var(--green);
+        background: var(--green-soft);
+        border-color: #cce4cc;
+      }
+      .status.err {
+        color: var(--red);
+        background: #f2dede;
+        border-color: #ebccd1;
+      }
+      /* Sticky control bar: filters + counters + submit. */
+      .bar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--cream);
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 0.75rem;
+      }
+      .filters {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.5rem;
+      }
+      button.filter {
+        appearance: none;
+        border: 1px solid #cdbfa6;
+        background: #fff;
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 0.55rem 0.85rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      button.filter[aria-pressed='true'] {
+        background: var(--green);
+        color: #fff;
+        border-color: var(--green);
+      }
+      button.filter .ct {
+        opacity: 0.75;
+        font-weight: 400;
+        margin-left: 0.25rem;
+      }
+      .counters {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      .counters strong {
+        color: var(--ink);
+      }
+      .progress-wrap {
+        flex: 1 1 8rem;
+        min-width: 7rem;
+        height: 8px;
+        background: #e6ddcf;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .progress-wrap > span {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: var(--green);
+        transition: width 0.2s ease;
+      }
+      button.submit {
+        appearance: none;
+        border: 1px solid var(--green);
+        background: var(--green);
+        color: #fff;
+        border-radius: 8px;
+        padding: 0.6rem 1.1rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      button.submit[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .group {
+        margin: 0 0 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .group > summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 0.7rem 0.85rem;
+        font-size: 1rem;
+        font-weight: 700;
+        background: #f6f0e6;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        min-height: 44px;
+      }
+      .group > summary::-webkit-details-marker {
+        display: none;
+      }
+      .group > summary::before {
+        content: '▸';
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+      .group[open] > summary::before {
+        content: '▾';
+      }
+      .group-count {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--muted);
+      }
+      .group-body {
+        padding: 0.5rem;
+      }
+      .row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.55rem;
+        padding: 0.55rem 0.5rem;
+        border-bottom: 1px solid #f1ece2;
+        flex-wrap: wrap;
+      }
+      .row:last-child {
+        border-bottom: none;
+      }
+      .row[hidden] {
+        display: none;
+      }
+      .badge {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+        align-self: center;
+      }
+      .badge.untested {
+        background: #ede7db;
+        color: var(--muted);
+      }
+      .badge.passed {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .badge.failed {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+      .badge.needs-retest {
+        background: #fdecdc;
+        color: var(--orange);
+        border: 1px solid #f0c089;
+      }
+      .badge.fixstatus {
+        background: #e7eefb;
+        color: #3a6ea5;
+        border: 1px solid #c3d4f0;
+        margin-top: 0.25rem;
+      }
+      .meta {
+        flex: 1 1 14rem;
+        min-width: 11rem;
+      }
+      .meta .text {
+        font-weight: 600;
+        font-size: 0.95rem;
+        line-height: 1.35;
+      }
+      .meta .members {
+        color: var(--muted);
+        font-size: 0.74rem;
+        margin-top: 0.2rem;
+        word-break: break-word;
+      }
+      .meta .members .dup {
+        color: var(--orange);
+      }
+      .meta .note {
+        color: var(--red);
+        font-size: 0.78rem;
+        margin-top: 0.2rem;
+        font-style: italic;
+      }
+      .actions {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      button.act {
+        appearance: none;
+        border: 1px solid #cdbfa6;
+        background: #f4ecdd;
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 0.5rem 0.7rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 44px;
+        min-width: 44px;
+      }
+      button.act:active {
+        transform: translateY(1px);
+      }
+      button.act.playing {
+        background: var(--green);
+        color: #fff;
+        border-color: var(--green);
+      }
+      button.act.pass[aria-pressed='true'] {
+        background: var(--green);
+        color: #fff;
+        border-color: var(--green);
+      }
+      button.act.fail[aria-pressed='true'] {
+        background: var(--red);
+        color: #fff;
+        border-color: var(--red);
+      }
+      /* Fail dialog */
+      dialog {
+        border: none;
+        border-radius: 12px;
+        padding: 0;
+        max-width: 26rem;
+        width: calc(100% - 2rem);
+        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+      }
+      dialog::backdrop {
+        background: rgba(0, 0, 0, 0.4);
+      }
+      .dlg-body {
+        padding: 1rem;
+      }
+      .dlg-body h3 {
+        margin: 0 0 0.25rem;
+        font-size: 1.05rem;
+      }
+      .dlg-body .dlg-text {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin: 0 0 0.75rem;
+      }
+      .cat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.4rem;
+        margin-bottom: 0.75rem;
+      }
+      button.cat {
+        appearance: none;
+        border: 1px solid #cdbfa6;
+        background: #fff;
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 0.6rem 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      button.cat[aria-pressed='true'] {
+        background: var(--red);
+        color: #fff;
+        border-color: var(--red);
+      }
+      .dlg-note {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.55rem;
+        font-size: 0.9rem;
+        font-family: inherit;
+        resize: vertical;
+        min-height: 3rem;
+      }
+      .dlg-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+      button.dlg-btn {
+        appearance: none;
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+        font-weight: 700;
+        cursor: pointer;
+        min-height: 44px;
+        border: 1px solid #cdbfa6;
+        background: #fff;
+        color: var(--ink);
+      }
+      button.dlg-btn.primary {
+        background: var(--red);
+        color: #fff;
+        border-color: var(--red);
+      }
+      footer {
+        margin-top: 1.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+      footer code {
+        background: #f0e9dc;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Voice-QA <span class="voice">Emma renders</span></h1>
+    <p class="sub">
+      Every clip below is decoded from the
+      <strong>real production canon</strong>
+      (baked through the same Azure render pipeline the app uses) plus the
+      bundled Greet and Hub MP3s. Play each render, then mark
+      <strong>Pass</strong> or <strong>Fail</strong>. A fail asks for a category
+      and an optional note. Verdicts autosave locally; <strong>Submit</strong>
+      sends the whole set (passes included) to the report endpoint. Unlinked QA
+      tooling.
+    </p>
+
+    <div id="status" class="status">Loading baked canon&hellip;</div>
+
+    <div class="bar" id="bar" hidden>
+      <div class="filters" id="filters" role="group" aria-label="Filter rows">
+        <button
+          class="filter"
+          id="vqa-filter-all"
+          data-testid="vqa-filter-all"
+          data-filter="all"
+          aria-pressed="true"
+        >
+          All <span class="ct" data-ct="all">0</span>
+        </button>
+        <button
+          class="filter"
+          id="vqa-filter-untested"
+          data-testid="vqa-filter-untested"
+          data-filter="untested"
+          aria-pressed="false"
+        >
+          Untested <span class="ct" data-ct="untested">0</span>
+        </button>
+        <button
+          class="filter"
+          id="vqa-filter-passed"
+          data-testid="vqa-filter-passed"
+          data-filter="passed"
+          aria-pressed="false"
+        >
+          Passed <span class="ct" data-ct="passed">0</span>
+        </button>
+        <button
+          class="filter"
+          id="vqa-filter-failed"
+          data-testid="vqa-filter-failed"
+          data-filter="failed"
+          aria-pressed="false"
+        >
+          Failed <span class="ct" data-ct="failed">0</span>
+        </button>
+        <button
+          class="filter"
+          id="vqa-filter-needs-retest"
+          data-testid="vqa-filter-needs-retest"
+          data-filter="needs-retest"
+          aria-pressed="false"
+        >
+          Needs re-test <span class="ct" data-ct="needs-retest">0</span>
+        </button>
+      </div>
+      <div class="counters">
+        <span
+          >Decided <strong id="counter-decided">0</strong> /
+          <strong id="counter-total">0</strong></span
+        >
+        <span class="progress-wrap"><span id="counter-bar"></span></span>
+        <button
+          class="submit"
+          id="vqa-submit"
+          data-testid="vqa-submit"
+          disabled
+        >
+          Submit verdicts
+        </button>
+      </div>
+    </div>
+
+    <div id="groups"></div>
+
+    <footer id="footer"></footer>
+
+    <!-- Fail dialog (single reused instance) -->
+    <dialog id="fail-dialog" data-testid="vqa-fail-dialog">
+      <form method="dialog" class="dlg-body" id="fail-form">
+        <h3>Mark fail</h3>
+        <p class="dlg-text" id="fail-dialog-text"></p>
+        <div
+          class="cat-grid"
+          id="fail-cats"
+          role="group"
+          aria-label="Fail category"
+        >
+          <button
+            type="button"
+            class="cat"
+            data-testid="vqa-fail-category-mispronounced"
+            data-cat="mispronounced"
+            aria-pressed="false"
+          >
+            Mispronounced
+          </button>
+          <button
+            type="button"
+            class="cat"
+            data-testid="vqa-fail-category-wrong-speed"
+            data-cat="wrong-speed"
+            aria-pressed="false"
+          >
+            Wrong speed
+          </button>
+          <button
+            type="button"
+            class="cat"
+            data-testid="vqa-fail-category-clipped"
+            data-cat="clipped"
+            aria-pressed="false"
+          >
+            Clipped
+          </button>
+          <button
+            type="button"
+            class="cat"
+            data-testid="vqa-fail-category-volume"
+            data-cat="volume"
+            aria-pressed="false"
+          >
+            Volume
+          </button>
+          <button
+            type="button"
+            class="cat"
+            data-testid="vqa-fail-category-wrong-text"
+            data-cat="wrong-text"
+            aria-pressed="false"
+          >
+            Wrong text
+          </button>
+          <button
+            type="button"
+            class="cat"
+            data-testid="vqa-fail-category-other"
+            data-cat="other"
+            aria-pressed="false"
+          >
+            Other
+          </button>
+        </div>
+        <textarea
+          class="dlg-note"
+          id="vqa-fail-note"
+          data-testid="vqa-fail-note"
+          placeholder="Optional note (what's wrong?)"
+        ></textarea>
+        <div class="dlg-actions">
+          <button type="button" class="dlg-btn" id="fail-cancel">Cancel</button>
+          <button
+            type="button"
+            class="dlg-btn primary"
+            id="vqa-fail-save"
+            data-testid="vqa-fail-save"
+          >
+            Save fail
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+      'use strict'
+
+      // ── Contract constants (shared with VQA.2 endpoint + VQA.3 e2e) ──────
+      const LS_VERDICTS = 'vqa-verdicts'
+      const LS_SECRET = 'vqa-secret'
+      const REPORT_ENDPOINT = '/api/voice-qa-report'
+      const STATUS_JSON = '/voice-qa-status.json'
+      const FAIL_CATEGORIES = [
+        'mispronounced',
+        'wrong-speed',
+        'clipped',
+        'volume',
+        'wrong-text',
+        'other',
+      ]
+
+      // Canon files — 11 math + 12 word-song. Iterated in alphabetical
+      // (group, file-stem) order so the dedup canonical-member choice is
+      // deterministic across runs.
+      const CANON_FILES = [
+        // math/level-1
+        ['math', 'add-to-10'],
+        ['math', 'add-to-20'],
+        ['math', 'mult-2-5-10'],
+        ['math', 'mult-3-4'],
+        ['math', 'mult-6-9'],
+        ['math', 'number-recog'],
+        ['math', 'skip-counting'],
+        ['math', 'sub-to-10'],
+        ['math', 'sub-to-20'],
+        ['math', 'two-digit-addsub'],
+        ['math', 'two-digit-addsub-with-regroup'],
+        // word-song/level-1
+        ['word-song', 'blending-cv'],
+        ['word-song', 'cvc-words'],
+        ['word-song', 'cvc-words-short-e'],
+        ['word-song', 'cvc-words-short-i'],
+        ['word-song', 'cvc-words-short-o'],
+        ['word-song', 'cvc-words-short-u'],
+        ['word-song', 'digraphs-ch'],
+        ['word-song', 'digraphs-sh'],
+        ['word-song', 'digraphs-th-voiceless'],
+        ['word-song', 'letter-names'],
+        ['word-song', 'letter-sounds'],
+        ['word-song', 'letter-sounds-audit'],
+      ]
+
+      // Greet + Hub MP3 manifests. Text mirrors src/lib/audio/preRecorded.ts
+      // (greet) and src/screens/Hub/hubLines.ts (hub) — static, never
+      // session-varying. Filenames are the itemId discriminant for these
+      // groups (`greet#<filename>` / `hub#<filename>`).
+      const GREET_FILES = [
+        ['greet-01-hi.mp3', 'Hi!'],
+        ['greet-02-im-emma.mp3', "I'm Emma."],
+        ['greet-03-nice-to-meet-you.mp3', "It's so nice to meet you."],
+        ['greet-04-tap-the-heart.mp3', "Tap the heart when you're ready."],
+      ]
+      const HUB_FILES = [
+        ['hub-enter-number-garden.mp3', 'Number Garden!'],
+        ['hub-enter-word-song.mp3', 'Word Song!'],
+        ['hub-welcome-back-soon-alt-1.mp3', 'Hi again!'],
+        ['hub-welcome-back-soon-alt-2.mp3', "You're back!"],
+        ['hub-welcome-back-soon.mp3', 'Back so soon!'],
+        ['hub-welcome-first-again.mp3', 'Hi again!'],
+        ['hub-welcome-pick-again.mp3', 'Pick again?'],
+        ['hub-welcome-pick-next.mp3', "Pick what's next."],
+        ['hub-welcome-try-number-garden-alt-1.mp3', 'Hi! Number Garden today?'],
+        [
+          'hub-welcome-try-number-garden-alt-2.mp3',
+          'Hello! Want some flowers?',
+        ],
+        ['hub-welcome-try-number-garden.mp3', 'Hi! Try Number Garden?'],
+        ['hub-welcome-try-word-song-alt-1.mp3', 'Hi! Word Song today?'],
+        ['hub-welcome-try-word-song-alt-2.mp3', 'Hello! Want some music?'],
+        ['hub-welcome-try-word-song.mp3', 'Hi! Try Word Song?'],
+        ['hub-welcome-what-today-alt-1.mp3', "Hi! Look who's here!"],
+        ['hub-welcome-what-today-alt-2.mp3', 'Hi! Ready?'],
+        ['hub-welcome-what-today-alt-3.mp3', 'Hello, friend!'],
+        ['hub-welcome-what-today.mp3', 'Hi! What today?'],
+      ]
+
+      // ── State ────────────────────────────────────────────────────────────
+      // items: array of render descriptors. Order = group order, then within
+      // a group the order rows are appended.
+      //   { itemId, audioHash, text, group, groupLabel, members:[{file,id}],
+      //     source: 'canon'|'asset', base64?, mime?, assetUrl? }
+      const items = []
+      const itemById = new Map()
+      const rowById = new Map() // itemId -> { row, badge, passBtn, failBtn }
+      const blobUrlByItem = new Map() // itemId -> objectURL (lazy)
+      let verdicts = loadVerdicts() // itemId -> Verdict
+      let fixStatus = null // itemId -> { pr, label } from /voice-qa-status.json
+      let activeFilter = 'all'
+
+      function loadVerdicts() {
+        try {
+          const raw = localStorage.getItem(LS_VERDICTS)
+          if (!raw) return {}
+          const parsed = JSON.parse(raw)
+          return parsed && typeof parsed === 'object' ? parsed : {}
+        } catch {
+          return {}
+        }
+      }
+      function saveVerdicts() {
+        try {
+          localStorage.setItem(LS_VERDICTS, JSON.stringify(verdicts))
+        } catch {
+          /* best-effort; quota / private mode */
+        }
+      }
+
+      function setStatus(msg, cls) {
+        const el = document.getElementById('status')
+        el.textContent = msg
+        el.className = 'status' + (cls ? ' ' + cls : '')
+      }
+
+      // SHA-256 hex via SubtleCrypto. Input is a string (canon base64) or an
+      // ArrayBuffer (greet/hub fetched bytes) per the vocabulary contract.
+      const _enc = new TextEncoder()
+      async function sha256Hex(input) {
+        const data = typeof input === 'string' ? _enc.encode(input) : input
+        const digest = await crypto.subtle.digest('SHA-256', data)
+        return [...new Uint8Array(digest)]
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+      }
+
+      function base64ToBlobUrl(base64, mime) {
+        const bin = atob(base64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        return URL.createObjectURL(
+          new Blob([bytes], { type: mime || 'audio/mpeg' }),
+        )
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+      }
+
+      // Yield to the event loop so a long hashing pass doesn't freeze the UI
+      // (AC8). Called every CHUNK items.
+      const CHUNK = 40
+      function nextTick() {
+        return new Promise((r) => setTimeout(r, 0))
+      }
+
+      // ── Audio playback (single active clip) ──────────────────────────────
+      // Only ONE clip plays at a time, and we keep at most ONE canon Blob URL
+      // alive: the active clip's. When a clip stops being active (ended, errored,
+      // or replaced by another play), we revoke its object URL and drop it from
+      // the cache, so the next replay re-decodes from the retained base64 (NIT 1
+      // — blobs were previously created-and-cached forever). This caps decoded-
+      // blob memory at one clip regardless of how many hundreds get played in a
+      // long iPad QA pass. Asset (greet/hub) URLs are static file paths, never
+      // object URLs, so they are never revoked.
+      let currentAudio = null
+      let currentBtn = null
+      let currentItemId = null
+      function releaseActiveBlob() {
+        if (currentItemId) {
+          const url = blobUrlByItem.get(currentItemId)
+          if (url) {
+            URL.revokeObjectURL(url)
+            blobUrlByItem.delete(currentItemId)
+          }
+          currentItemId = null
+        }
+      }
+      function stopActive() {
+        if (currentAudio) {
+          currentAudio.pause()
+          currentAudio = null
+        }
+        if (currentBtn) {
+          currentBtn.classList.remove('playing')
+          currentBtn = null
+        }
+        releaseActiveBlob()
+      }
+      // Lazily resolve a playable URL for an item. Canon clips are decoded to a
+      // Blob URL on play and cached only for the duration of that one playback
+      // (released by stopActive); the base64 source string is retained on the
+      // item for the page lifetime so replays can re-decode (NIT 2 — full
+      // base64 release is not feasible while replay is a core QA affordance; the
+      // single-live-blob discipline above is the memory cap that is feasible).
+      function urlForItem(item) {
+        if (item.source === 'asset') return item.assetUrl
+        let url = blobUrlByItem.get(item.itemId)
+        if (!url) {
+          url = base64ToBlobUrl(item.base64, item.mime)
+          blobUrlByItem.set(item.itemId, url)
+        }
+        return url
+      }
+      function playItem(item, btn) {
+        stopActive()
+        const audio = new Audio(urlForItem(item))
+        currentAudio = audio
+        currentBtn = btn
+        currentItemId = item.source === 'asset' ? null : item.itemId
+        btn.classList.add('playing')
+        const clear = () => {
+          if (currentBtn === btn) {
+            btn.classList.remove('playing')
+            // Revoke the just-played canon blob; replay re-decodes on demand.
+            if (currentAudio === audio) releaseActiveBlob()
+          }
+        }
+        audio.onended = clear
+        audio.onerror = clear
+        // Tap-driven; iOS plays after the gesture. No autoplay assumptions.
+        audio.play().catch(clear)
+      }
+
+      // ── Verdict state model ──────────────────────────────────────────────
+      // Display state for an item: 'untested' | 'passed' | 'failed' |
+      // 'needs-retest'. needs-retest = a stored verdict whose audioHash no
+      // longer matches the current audio (AC3).
+      function stateOf(item) {
+        const v = verdicts[item.itemId]
+        if (!v) return 'untested'
+        if (v.audioHash !== item.audioHash) return 'needs-retest'
+        return v.verdict === 'pass' ? 'passed' : 'failed'
+      }
+
+      function recordVerdict(item, verdict, category, note) {
+        verdicts[item.itemId] = {
+          itemId: item.itemId,
+          audioHash: item.audioHash,
+          verdict,
+          ...(category ? { category } : {}),
+          ...(note ? { note } : {}),
+          decidedAt: new Date().toISOString(),
+        }
+        saveVerdicts()
+        refreshRow(item)
+        refreshCounters()
+      }
+
+      // ── Rendering ────────────────────────────────────────────────────────
+      // Badge text MUST contain the lowercase state token (Jessica's e2e
+      // asserts /passed/i, /failed/i, /needs-retest/i, /untested/i on the
+      // vqa-state-<itemId> badge — PR #361). Keep the state word verbatim.
+      function badgeLabel(state) {
+        switch (state) {
+          case 'passed':
+            return 'passed'
+          case 'failed':
+            return 'failed'
+          case 'needs-retest':
+            return 'needs-retest'
+          default:
+            return 'untested'
+        }
+      }
+
+      function refreshRow(item) {
+        const ref = rowById.get(item.itemId)
+        if (!ref) return
+        const state = stateOf(item)
+        ref.badge.className = 'badge ' + state
+        ref.badge.textContent = badgeLabel(state)
+        const v = verdicts[item.itemId]
+        ref.passBtn.setAttribute('aria-pressed', String(state === 'passed'))
+        ref.failBtn.setAttribute('aria-pressed', String(state === 'failed'))
+        // Inline fail note + category.
+        if (state === 'failed' && v) {
+          const parts = []
+          if (v.category) parts.push(v.category)
+          if (v.note) parts.push(v.note)
+          ref.note.textContent = parts.length ? '✗ ' + parts.join(' — ') : ''
+          ref.note.hidden = parts.length === 0
+        } else if (state === 'needs-retest' && v) {
+          ref.note.textContent =
+            'Prior verdict: ' +
+            v.verdict +
+            (v.category ? ' (' + v.category + ')' : '') +
+            ' — audio changed, please re-test.'
+          ref.note.hidden = false
+        } else {
+          ref.note.hidden = true
+        }
+        applyFilterToRow(item)
+      }
+
+      function rowMatchesFilter(item) {
+        if (activeFilter === 'all') return true
+        return stateOf(item) === activeFilter
+      }
+      function applyFilterToRow(item) {
+        const ref = rowById.get(item.itemId)
+        if (!ref) return
+        ref.row.hidden = !rowMatchesFilter(item)
+      }
+
+      function buildRow(item) {
+        const row = document.createElement('div')
+        row.className = 'row'
+        row.id = 'vqa-item-' + item.itemId
+        row.setAttribute('data-testid', 'vqa-item-' + item.itemId)
+        // Expose the current audio hash so e2e can seed matching + stale
+        // verdicts and verify the needs-retest invalidation (PR #361 contract:
+        // data-audio-hash). Empty for an asset whose fetch failed.
+        row.setAttribute('data-audio-hash', item.audioHash || '')
+
+        const badge = document.createElement('span')
+        badge.setAttribute('data-testid', 'vqa-state-' + item.itemId)
+
+        const meta = document.createElement('div')
+        meta.className = 'meta'
+        const text = document.createElement('div')
+        text.className = 'text'
+        text.textContent = item.text || '(no text)'
+        meta.appendChild(text)
+
+        const members = document.createElement('div')
+        members.className = 'members'
+        const memList = item.members
+          .map((m) => escapeHtml(m.file + ':' + m.id))
+          .join(', ')
+        members.innerHTML =
+          item.members.length > 1
+            ? memList +
+              ' <span class="dup">(' +
+              item.members.length +
+              ' identical renders)</span>'
+            : memList
+        meta.appendChild(members)
+
+        const note = document.createElement('div')
+        note.className = 'note'
+        note.hidden = true
+        meta.appendChild(note)
+
+        // Fix-status badge (AC6), filled later when /voice-qa-status.json loads.
+        const fixBadge = document.createElement('span')
+        fixBadge.className = 'badge fixstatus'
+        fixBadge.hidden = true
+        meta.appendChild(fixBadge)
+
+        const actions = document.createElement('div')
+        actions.className = 'actions'
+
+        const playBtn = document.createElement('button')
+        playBtn.className = 'act play'
+        playBtn.setAttribute('data-testid', 'vqa-play')
+        playBtn.setAttribute('aria-label', 'Play')
+        playBtn.textContent = '▶ Play'
+        playBtn.addEventListener('click', () => playItem(item, playBtn))
+
+        const passBtn = document.createElement('button')
+        passBtn.className = 'act pass'
+        passBtn.setAttribute('data-testid', 'vqa-pass')
+        passBtn.setAttribute('aria-pressed', 'false')
+        passBtn.textContent = 'Pass'
+        passBtn.addEventListener('click', () => recordVerdict(item, 'pass'))
+
+        const failBtn = document.createElement('button')
+        failBtn.className = 'act fail'
+        failBtn.setAttribute('data-testid', 'vqa-fail')
+        failBtn.setAttribute('aria-pressed', 'false')
+        failBtn.textContent = 'Fail'
+        failBtn.addEventListener('click', () => openFailDialog(item))
+
+        actions.append(playBtn, passBtn, failBtn)
+        row.append(badge, meta, actions)
+
+        rowById.set(item.itemId, {
+          row,
+          badge,
+          passBtn,
+          failBtn,
+          note,
+          fixBadge,
+        })
+        refreshRow(item)
+        return row
+      }
+
+      // ── Fail dialog wiring ───────────────────────────────────────────────
+      const failDialog = document.getElementById('fail-dialog')
+      const failNoteEl = document.getElementById('vqa-fail-note')
+      const failCatsEl = document.getElementById('fail-cats')
+      const failDialogText = document.getElementById('fail-dialog-text')
+      let failTarget = null
+      let failCategory = null
+
+      function clearFailDialog() {
+        failCategory = null
+        failNoteEl.value = ''
+        failCatsEl
+          .querySelectorAll('.cat')
+          .forEach((b) => b.setAttribute('aria-pressed', 'false'))
+      }
+      function openFailDialog(item) {
+        failTarget = item
+        clearFailDialog()
+        // Pre-fill from an existing fail verdict, if any.
+        const v = verdicts[item.itemId]
+        if (v && v.verdict === 'fail') {
+          if (v.category) {
+            failCategory = v.category
+            const btn = failCatsEl.querySelector(
+              '[data-cat="' + v.category + '"]',
+            )
+            if (btn) btn.setAttribute('aria-pressed', 'true')
+          }
+          if (v.note) failNoteEl.value = v.note
+        }
+        failDialogText.textContent = item.text || item.itemId
+        if (typeof failDialog.showModal === 'function') failDialog.showModal()
+        else failDialog.setAttribute('open', '')
+      }
+      function closeFailDialog() {
+        if (typeof failDialog.close === 'function') failDialog.close()
+        else failDialog.removeAttribute('open')
+        failTarget = null
+      }
+      failCatsEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('.cat')
+        if (!btn) return
+        failCategory = btn.dataset.cat
+        failCatsEl
+          .querySelectorAll('.cat')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
+      })
+      document
+        .getElementById('fail-cancel')
+        .addEventListener('click', () => closeFailDialog())
+      document.getElementById('vqa-fail-save').addEventListener('click', () => {
+        if (!failTarget) return
+        recordVerdict(
+          failTarget,
+          'fail',
+          failCategory || undefined,
+          failNoteEl.value.trim() || undefined,
+        )
+        closeFailDialog()
+      })
+
+      // ── Filters + counters ───────────────────────────────────────────────
+      function countByState() {
+        const c = {
+          all: items.length,
+          untested: 0,
+          passed: 0,
+          failed: 0,
+          'needs-retest': 0,
+        }
+        for (const it of items) c[stateOf(it)]++
+        return c
+      }
+      function refreshCounters() {
+        const c = countByState()
+        for (const key of [
+          'all',
+          'untested',
+          'passed',
+          'failed',
+          'needs-retest',
+        ]) {
+          const el = document.querySelector('[data-ct="' + key + '"]')
+          if (el) el.textContent = c[key]
+        }
+        // "decided" = items with a verdict that still matches the current audio
+        // (passed | failed). needs-retest is deliberately EXCLUDED: its stored
+        // verdict is stale (audio changed since it was decided), so the QA pass
+        // is not yet complete for that row — it awaits a re-decision. The stale
+        // verdict is still retained and still ships in the submit payload (see
+        // submitVerdicts); excluding it here only reflects "not yet re-decided"
+        // in the progress UI, it does not drop the durable verdict.
+        const decided = c.passed + c.failed
+        document.getElementById('counter-decided').textContent = decided
+        document.getElementById('counter-total').textContent = items.length
+        const pct = items.length ? (decided / items.length) * 100 : 0
+        document.getElementById('counter-bar').style.width = pct + '%'
+        document.getElementById('vqa-submit').disabled = decided === 0
+        // Per-group counters.
+        document.querySelectorAll('.group').forEach((g) => {
+          const ids = JSON.parse(g.dataset.itemIds || '[]')
+          let dec = 0
+          for (const id of ids) {
+            const it = itemById.get(id)
+            if (!it) continue
+            const s = stateOf(it)
+            if (s === 'passed' || s === 'failed') dec++
+          }
+          const ce = g.querySelector('.group-count')
+          if (ce) ce.textContent = dec + ' / ' + ids.length + ' decided'
+        })
+      }
+      function setFilter(filter) {
+        activeFilter = filter
+        document
+          .querySelectorAll('.filter')
+          .forEach((b) =>
+            b.setAttribute('aria-pressed', String(b.dataset.filter === filter)),
+          )
+        for (const it of items) applyFilterToRow(it)
+        // Hide groups with no visible rows under the active filter.
+        document.querySelectorAll('.group').forEach((g) => {
+          const anyVisible = g.querySelectorAll('.row:not([hidden])').length > 0
+          g.hidden = !anyVisible
+          if (filter !== 'all' && anyVisible) g.open = true
+        })
+      }
+      document.getElementById('filters').addEventListener('click', (e) => {
+        const btn = e.target.closest('.filter')
+        if (btn) setFilter(btn.dataset.filter)
+      })
+
+      // ── Submit (AC5) ─────────────────────────────────────────────────────
+      function getSecret() {
+        let secret = ''
+        try {
+          secret = localStorage.getItem(LS_SECRET) || ''
+        } catch {
+          /* ignore */
+        }
+        if (!secret) {
+          secret = window.prompt('Enter the submit secret:') || ''
+          if (secret) {
+            try {
+              localStorage.setItem(LS_SECRET, secret)
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        return secret
+      }
+      async function submitVerdicts() {
+        const secret = getSecret()
+        if (!secret) {
+          setStatus('Submit cancelled — no secret entered.', 'err')
+          return
+        }
+        // Submit ALL stored verdicts, including needs-retest ones. This is
+        // intentional and consistent with the "decided" counter excluding
+        // needs-retest (see refreshCounters): a needs-retest row is awaiting a
+        // re-decision in the UI, but its last durable verdict is still a real
+        // observation worth shipping in the report (the endpoint accepts it;
+        // each verdict carries its own audioHash + decidedAt so a stale verdict
+        // is recognizable downstream). So: excluded from "decided" progress,
+        // included in the durable submitted set.
+        const body = {
+          secret,
+          submittedAt: new Date().toISOString(),
+          verdicts: Object.values(verdicts),
+        }
+        const btn = document.getElementById('vqa-submit')
+        btn.disabled = true
+        setStatus('Submitting ' + body.verdicts.length + ' verdicts…')
+        try {
+          const res = await fetch(REPORT_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          let data = null
+          try {
+            data = await res.json()
+          } catch {
+            /* non-JSON error body */
+          }
+          if (res.ok && data && data.ok) {
+            const url = data.issueUrl || '(no URL returned)'
+            setStatus('Submitted. Issue: ' + url, 'ok')
+            const statusEl = document.getElementById('status')
+            if (data.issueUrl) {
+              statusEl.innerHTML =
+                'Submitted ✓ Issue: <a href="' +
+                escapeHtml(data.issueUrl) +
+                '" target="_blank" rel="noopener">' +
+                escapeHtml(data.issueUrl) +
+                '</a>'
+            }
+          } else {
+            const err =
+              (data && data.error) ||
+              'HTTP ' + res.status + ' ' + res.statusText
+            // Verdicts are retained in localStorage regardless of failure.
+            setStatus('Submit failed: ' + err + ' (verdicts retained)', 'err')
+          }
+        } catch (e) {
+          setStatus(
+            'Submit failed: ' + e.message + ' (verdicts retained)',
+            'err',
+          )
+        } finally {
+          btn.disabled = Object.values(verdicts).length === 0
+        }
+      }
+      document
+        .getElementById('vqa-submit')
+        .addEventListener('click', submitVerdicts)
+
+      // ── Fix-status (AC6) ─────────────────────────────────────────────────
+      async function loadFixStatus() {
+        try {
+          const res = await fetch(STATUS_JSON, { cache: 'no-store' })
+          if (!res.ok) return // 404-tolerant
+          const data = await res.json()
+          if (!data || typeof data !== 'object') return
+          // Shape tolerated: { items: { <itemId>: { pr, label? } } } or a flat
+          // { <itemId>: { pr, label? } } map.
+          fixStatus =
+            data.items && typeof data.items === 'object' ? data.items : data
+          for (const itemId of Object.keys(fixStatus)) {
+            const ref = rowById.get(itemId)
+            if (!ref) continue
+            const info = fixStatus[itemId] || {}
+            const label =
+              info.label ||
+              (info.pr
+                ? 'fixed in PR #' + info.pr + ' — re-test'
+                : 'fixed — re-test')
+            ref.fixBadge.textContent = label
+            ref.fixBadge.hidden = false
+          }
+        } catch {
+          /* tolerate any fetch/parse error — feature is optional */
+        }
+      }
+
+      // ── Canon load + dedup (AC1, AC3, AC8) ───────────────────────────────
+      // Returns { groups: [{group,label,renders:[render]}], counts }.
+      // A "render" is a dedup group keyed by audioHash. Members collected in
+      // deterministic (file, id) order so the canonical itemId is stable.
+      async function loadCanon(onProgress) {
+        // hash -> { audioHash, text, members:[{file,id,group}], base64, mime, group }
+        const byHash = new Map()
+        let processed = 0
+        const totalFiles = CANON_FILES.length
+
+        for (let fi = 0; fi < CANON_FILES.length; fi++) {
+          const [group, stem] = CANON_FILES[fi]
+          const url = '/canon/' + group + '/level-1/' + stem + '.json'
+          let canon
+          try {
+            const res = await fetch(url)
+            if (!res.ok) throw new Error(stem + ' ' + res.status)
+            canon = await res.json()
+          } catch (e) {
+            throw new Error('canon fetch failed: ' + e.message)
+          }
+          const utts = Array.isArray(canon.utterances) ? canon.utterances : []
+          for (let ui = 0; ui < utts.length; ui++) {
+            const u = utts[ui]
+            if (!u || !u.audio || !u.audio.base64) continue
+            const audioHash = await sha256Hex(u.audio.base64)
+            let g = byHash.get(audioHash)
+            if (!g) {
+              g = {
+                audioHash,
+                text: u.text || '',
+                members: [],
+                base64: u.audio.base64,
+                mime: u.audio.mime || 'audio/mpeg',
+                group: stem,
+              }
+              byHash.set(audioHash, g)
+            }
+            g.members.push({ file: stem, id: u.id })
+            processed++
+            if (processed % CHUNK === 0) {
+              onProgress(fi + 1, totalFiles, byHash.size)
+              await nextTick()
+            }
+          }
+          onProgress(fi + 1, totalFiles, byHash.size)
+        }
+
+        // Assign itemId from the alphabetically-first (file, id) member. The
+        // dedup group's `group` (tier file) follows that canonical member so
+        // a render renders under the file that owns its itemId.
+        for (const g of byHash.values()) {
+          g.members.sort((a, b) =>
+            a.file === b.file
+              ? a.id < b.id
+                ? -1
+                : a.id > b.id
+                  ? 1
+                  : 0
+              : a.file < b.file
+                ? -1
+                : 1,
+          )
+          const first = g.members[0]
+          g.itemId = first.file + '#' + first.id
+          g.group = first.file
+        }
+        return byHash
+      }
+
+      // Group the dedup renders by their canonical tier file, preserving
+      // CANON_FILES order for groups and (file,id) order for rows within.
+      function organizeCanonGroups(byHash) {
+        const renders = [...byHash.values()]
+        const groupOrder = CANON_FILES.map(([, stem]) => stem)
+        const byGroup = new Map()
+        for (const g of renders) {
+          if (!byGroup.has(g.group)) byGroup.set(g.group, [])
+          byGroup.get(g.group).push(g)
+        }
+        const out = []
+        for (const stem of groupOrder) {
+          const list = byGroup.get(stem)
+          if (!list || list.length === 0) continue
+          list.sort((a, b) =>
+            a.itemId < b.itemId ? -1 : a.itemId > b.itemId ? 1 : 0,
+          )
+          out.push({ group: stem, label: stem, renders: list })
+        }
+        return out
+      }
+
+      // ── Greet / Hub asset groups ─────────────────────────────────────────
+      async function loadAssetGroup(prefix, basePath, manifest) {
+        const renders = []
+        for (const [filename, text] of manifest) {
+          const url = basePath + filename
+          let audioHash = ''
+          try {
+            const res = await fetch(url)
+            if (res.ok) {
+              const buf = await res.arrayBuffer()
+              audioHash = await sha256Hex(buf)
+            }
+          } catch {
+            /* leave hash empty; row still plays via direct URL */
+          }
+          renders.push({
+            itemId: prefix + '#' + filename,
+            audioHash,
+            text,
+            members: [{ file: prefix, id: filename }],
+            source: 'asset',
+            assetUrl: url,
+            group: prefix,
+          })
+        }
+        return renders
+      }
+
+      function appendGroup(label, sublabel, renders) {
+        const groupsEl = document.getElementById('groups')
+        const details = document.createElement('details')
+        details.className = 'group'
+        details.open = true
+        details.dataset.itemIds = JSON.stringify(renders.map((r) => r.itemId))
+
+        const summary = document.createElement('summary')
+        const title = document.createElement('span')
+        title.textContent = label
+        const count = document.createElement('span')
+        count.className = 'group-count'
+        summary.append(title, count)
+        if (sublabel) {
+          const sl = document.createElement('span')
+          sl.className = 'group-count'
+          sl.textContent = sublabel
+          summary.appendChild(sl)
+        }
+        details.appendChild(summary)
+
+        const body = document.createElement('div')
+        body.className = 'group-body'
+        for (const r of renders) {
+          // Register into the flat item registry.
+          const item = {
+            itemId: r.itemId,
+            audioHash: r.audioHash,
+            text: r.text,
+            members: r.members,
+            source: r.source || 'canon',
+            base64: r.base64,
+            mime: r.mime,
+            assetUrl: r.assetUrl,
+          }
+          items.push(item)
+          itemById.set(item.itemId, item)
+          body.appendChild(buildRow(item))
+        }
+        details.appendChild(body)
+        groupsEl.appendChild(details)
+      }
+
+      // ── Footer (AC: print computed unique-render count) ──────────────────
+      function renderFooter(canonUnique, rawCanon, greetCount, hubCount) {
+        const expected = 632
+        const ok = canonUnique === expected
+        const total = canonUnique + greetCount + hubCount
+        const el = document.getElementById('footer')
+        // The vqa-render-count element's FIRST number must equal the total
+        // rendered row count (Jessica's AC1 reads its first \d+ and asserts
+        // == row count, PR #361). Total = canon-unique + greet + hub, which
+        // is exactly the number of rendered vqa-item-* rows by construction.
+        el.innerHTML =
+          '<span data-testid="vqa-render-count">Rendered <strong>' +
+          total +
+          '</strong> renders</span> = <strong>' +
+          canonUnique +
+          '</strong> unique canon (deduped from ' +
+          rawCanon +
+          ' raw utterances by SHA-256 audio hash) + ' +
+          greetCount +
+          ' greet + ' +
+          hubCount +
+          ' hub. ' +
+          (ok
+            ? 'Computed unique canon count matches expected <code>632</code>. ✓'
+            : '<strong style="color:#a94442">Computed unique canon count = ' +
+              canonUnique +
+              ', expected 632 — DISCREPANCY.</strong>') +
+          ' &nbsp;·&nbsp; <code>itemId</code> = canonical member <code>&lt;file-stem&gt;#&lt;utteranceId&gt;</code>.'
+      }
+
+      // ── Boot ─────────────────────────────────────────────────────────────
+      async function main() {
+        try {
+          setStatus(
+            'Loading + hashing canon (0 / ' + CANON_FILES.length + ' files)…',
+          )
+          let rawCanon = 0
+          const byHash = await loadCanon((done, total, uniq) => {
+            setStatus(
+              'Hashing canon — ' +
+                done +
+                ' / ' +
+                total +
+                ' files, ' +
+                uniq +
+                ' unique renders so far…',
+            )
+          })
+          for (const g of byHash.values()) rawCanon += g.members.length
+
+          const canonGroups = organizeCanonGroups(byHash)
+          const canonUnique = byHash.size
+
+          // Reveal control bar before appending rows.
+          document.getElementById('bar').hidden = false
+
+          for (const g of canonGroups) {
+            appendGroup(g.label, g.renders.length + ' renders', g.renders)
+          }
+
+          setStatus('Loading Greet + Hub MP3s…')
+          const greetRenders = await loadAssetGroup(
+            'greet',
+            '/assets/audio/greet/',
+            GREET_FILES,
+          )
+          appendGroup('Greet', greetRenders.length + ' clips', greetRenders)
+          const hubRenders = await loadAssetGroup(
+            'hub',
+            '/assets/audio/hub/',
+            HUB_FILES,
+          )
+          appendGroup('Hub', hubRenders.length + ' clips', hubRenders)
+
+          renderFooter(
+            canonUnique,
+            rawCanon,
+            greetRenders.length,
+            hubRenders.length,
+          )
+          refreshCounters()
+          setFilter('all')
+
+          const mismatch =
+            canonUnique !== 632
+              ? ' ⚠ canon unique = ' + canonUnique + ' (expected 632)'
+              : ''
+          setStatus(
+            'Ready — ' +
+              items.length +
+              ' items (' +
+              canonUnique +
+              ' canon + ' +
+              greetRenders.length +
+              ' greet + ' +
+              hubRenders.length +
+              ' hub). Tap Play, then Pass / Fail.' +
+              mismatch,
+            mismatch ? '' : 'ok',
+          )
+
+          // Optional fix-status overlay (404-tolerant).
+          loadFixStatus()
+        } catch (err) {
+          setStatus(
+            'Failed to load: ' +
+              err.message +
+              '. Are the canon JSONs deployed?',
+            'err',
+          )
+        }
+      }
+      // Belt-and-suspenders: release the one possibly-live canon blob when the
+      // page is torn down (NIT 1). With the single-live-blob discipline above,
+      // at most one object URL is ever outstanding, so stopActive() suffices.
+      window.addEventListener('pagehide', stopActive)
+      main()
+    </script>
+  </body>
+</html>
