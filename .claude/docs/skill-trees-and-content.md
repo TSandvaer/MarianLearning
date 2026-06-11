@@ -102,6 +102,21 @@ The rule is asymmetric: pedagogical fit can VETO a mechanically-sufficient propo
 
 Canonical memory: `feedback_distractor_class_pedagogical_gates_mechanical.md`.
 
+### Speed-feedback UX — locked ruling (source file provenance)
+
+**The ruling.** Across all math tiers (`add-to-10`, `sub-to-10`, `sub-to-20`, `add-to-20`, and future tiers), speed-feedback UI is **locked off**:
+
+- No streak-fade-on-slow, no timer, no orange/yellow speed chip, no haptic on slow response.
+- The `slowFacts` planner directive is a **backend re-targeting tool only** — it tells Haiku to surface slow facts for extra practice, but it carries no screen-side UI signal.
+- Latency is not a promotion gate; mastery criteria index on correctness, not speed.
+- Emma reacts to correctness only. A slow-but-correct answer gets the same celebration as a fast one.
+
+This ruling is consistent across all citing specs: `design/math/sub-to-10-content.md` (lines 6, 21, 40, 373, 674), `design/math/sub-to-20-content.md` (lines 24, 47, 679), `design/math/add-to-20-content.md` (line 25), `design/research/sub-to-10-fact-sequencing-marian.md` (line 70), and `design/research/sub-to-20-pedagogical-sequence.md` (line 206). It is implemented — do not interpret the provenance note below as licence to revisit the decision.
+
+**Provenance.** All five specs cite `design/research/speed-feedback-automaticity-marian.md` as the locked authority. The original file (Dave, 2026-05-15) was never committed to git — `git log --all -- design/research/speed-feedback-automaticity-marian.md` was empty as of 2026-06-11. The ruling itself is real and was always reconstructable from cross-cites: `design/math/sub-to-10-content.md:21,40` state it directly; `design/research/sub-to-10-fact-sequencing-marian.md:163` records the op-specific slow-fact threshold calibration (≥5 s for `+`, start ≥7 s for `-`). The on-disk `design/research/speed-feedback-automaticity-marian.md` (committed 2026-06-11, branch `chore/rd-research-chain-fixes`) is a **reconstruction** — it reproduces the locked ruling faithfully and is explicitly headed as such, but the original evidence chain was lost because the file was never committed when the ruling was first authored.
+
+**Authoring rule going forward.** When a Dave research file is the sole locked authority for a UX ruling, it must be committed to git **before or with** the spec that cites it. An untracked research file is an unverifiable citation — downstream agents dispatched against tickets that cite it cannot read the evidence chain, and the ruling can appear to have no basis on a fresh checkout. The dispatch template's "Pedagogy gate" block (added 2026-06-11) enforces this for content-tier dispatches.
+
 ### Wave-3 distractor helpers — planned, not yet shipped (as of 2026-05-22)
 
 `phantomBorrowDistractor` does NOT yet exist in [`distractors.ts`](MarianLearning/src/screens/Math/distractors.ts). It is a **planned** Wave-3 helper for the two-digit-addsub tier — referenced in design docs and ticket briefs, but the function body has not been written. Any dispatch brief that references a line number inside `distractors.ts` for this helper is pointing at a future planned location, not the current file.

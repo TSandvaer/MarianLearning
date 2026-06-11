@@ -158,6 +158,21 @@ Per `[[feedback_clickup_status_sync]]` + `[[feedback_clickup_forward_only_defaul
 **Regression guard:** Name at least one test (vitest unit or Playwright e2e) that would fail if this feature broke in a future unrelated PR. If none exists, add it in this PR. The named test is the artifact a future unrelated PR's CI run flips RED against, so the regression surfaces at PR-time rather than at Marian-iPad-smoke-time.
 ```
 
+## Pedagogy gate (mandatory for content-tier / curriculum dispatches)
+
+Any dispatch that introduces or alters pedagogical content — a new content tier, a distractor class, word/fact pools, mastery or advancement thresholds, opener/hint phrasing, sequencing decisions — MUST carry an explicit pedagogy-gate line in the brief:
+
+```markdown
+**Pedagogy gate:** <satisfied — `design/research/<file>.md §N` | not-required — <one-line reason>>
+```
+
+- **Satisfied requires a COMMITTED research artifact** — a `design/research/*.md` file on main (or a ClickUp Format B comment by Dave). An untracked or never-committed research file is NOT a valid citation: if the citing spec merges before the research file, the evidence chain dies (see backstory).
+- **No grounding research → bounce to Dave first**, same bounce rule as the ticket-body hard gates above. The orchestrator dispatches Dave before the spec/impl dispatch fires.
+- **`not-required` is for dispatches with no pedagogical surface** (infra, lint, refactor, CI, audio plumbing, test-only) — one line of reason, not a silent omission.
+- Wave plans already encode this gate as track ordering (research → spec → impl, e.g. Wave 10's "W10.1 (Dave) → W10.2 (Kyle) is a hard pedagogy gate before any code"). This block is the safety net for one-off dispatches OUTSIDE a wave, which previously had no structural prompt.
+
+**Backstory (2026-06-11 R&D-sufficiency investigation):** the pedagogy gate was enforced only by wave-plan track ordering plus author-driven "pending Dave" spec markers. Two deferrals shipped unresolved that way (`design/math/add-to-20-content.md` §1 intro "Class B … pending Dave dispatch"; `design/math/two-digit-addsub-with-regroup-content.md` "30-fact pool LOCKED — pending Dave research review"), and one research file (`design/research/speed-feedback-automaticity-marian.md`) was cited as LOCKED authority in 5+ specs without ever being committed — the original evidence chain was lost and had to be reconstructed.
+
 ## Final-report shape — TIGHT (mandatory in every dispatch)
 
 ```markdown
