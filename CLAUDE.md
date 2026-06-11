@@ -92,6 +92,7 @@ For deep-dive reference, see the topic files in `.claude/docs/`:
 - [Sibling-tier widening checklist](.claude/docs/sibling-tier-checklist.md) — 14-16 places that must change when adding a new SkillNode sibling tier; extracted from PR #211 audit
 - [Emma — Character & Animation](.claude/docs/emma-character-and-animation.md) — Emma SVG asset set, EmmaPose state machine, Hub idle ↔ celebration unified AnimatePresence, speech-ribbon caption walk, "never a red X" principle
 - [Testing & CI](.claude/docs/testing-and-ci.md) — Vitest + Playwright patterns, e2e helpers (seedStorage, mockClaude, forceHowlerUnlock), canon-aware testing, CI workflows, gh pr merge 504 quirk
+- [Orchestration Concurrency](.claude/docs/orchestration-concurrency.md) — why practical concurrency diverges from the 3–5-in-flight target; structural constraints (cross-review worktree, port 4173), sponsor-gate throttle, Wave N+1 pre-staging lever, empirical PR concurrency record
 
 ## Never fabricate, never guess, never extrapolate (sub-agent inheritance surface)
 

@@ -126,6 +126,8 @@ Tests intercept at the Playwright route level (see `e2e/_helpers/mockClaude.ts`)
 
 On CI (`process.env.CI === 'true'`), `reuseExistingServer` is `false` so the second `--strictPort` bind hard-fails immediately rather than silently reusing — this collision only occurs in local multi-worktree workflows.
 
+**Dispatch-density implication:** at most one `yarn e2e` run (Jessica's spec dispatch OR a reviewer running the full suite) across all worktrees simultaneously. Vitest (`yarn test`) is port-free and unaffected — multiple vitest runs in parallel are safe. See `orchestration-concurrency.md` §1.2.
+
 ### 2.4.2 Per-role worktree gotchas
 
 Two recoverable errors surface routinely when a reviewing agent (or any second worker) needs read-only access to a branch that another worktree already has checked out. Both came up during the PR #308 cross-review setup (2026-05-22); flagging here so future setups skip the friction.
