@@ -551,6 +551,16 @@ Two utterances with the same `text` field baked in **different** `canon:regen` i
 
 The 1,358 / 629 / 632 counts are a 2026-06-11 snapshot; they grow as new tiers ship.
 
+### SSML behaviour on en-GB-OliviaNeural + targeted re-render tooling (voice-QA fix cycle, PR #375, 2026-06-11)
+
+Empirical findings from the first voice-QA fix cycle (149 targeted re-renders), each verified independently by the author (byte-diff re-renders) and the cross-reviewer:
+
+- **Olivia ignores `<emphasis>` but honours `<prosody>`.** An `<emphasis level="strong">` wrap produced byte-identical audio on re-render; switching the same fix to `<prosody rate>` changed the bytes. Same class as the earlier parked `two → /tuː/` override the voice ignored. For any stress/de-stress fix on this voice, reach for `<prosody>` (or an IPA `<phoneme>`), never `<emphasis>`.
+- **Voice-QA dedup groups split on SSML, not just text.** Identical `text` rendered through different SSML paths (e.g. the letter-sounds bake's prepend-break vs the math bake's plain render) produces different bytes → separate dedup groups on the voice-QA page. "Same text" ≠ "same group" whenever the render path differs.
+- **`letter-sounds-audit.json` renders under tierFilter `'letter-sounds'`** (per `bakeLetterSoundsPinned.ts`), not its own basename — any per-tier SSML logic keyed on tier name must special-case it or the letter-sounds mnemonic overrides silently don't fire for the audit file.
+- **`scripts/revoiceCanonTargeted.ts`** is the targeted re-render tool: give it flagged utterance ids, it expands to all dedup-group members by audio hash across the 23 canon files and re-renders ONLY those entries (with `--dry` to preview the plan). Use it for ear-test-driven fixes; full `canon:regen` re-renders the world and invalidates the entire voice-QA baseline.
+- **SSML fixes must live in `renderSsmlInnerText` (api/\_tts.ts), not in one-off scripts** — that keeps them production-coherent: a future full re-bake reproduces the fixes instead of silently reverting them.
+
 ### Tier-specific opener pattern (canonical)
 
 **Authoring note for the `WORD_SONG_TRACK_GUIDE` template literal in [`api/_planner.ts`](MarianLearning/api/_planner.ts)**: the entire directive block is a single tagged-template-literal string, so **backticks inside the block terminate the literal** — `` `ɪ` `` or `` `ih` `` for emphasis will produce esbuild errors like `Expected ";" but found "ɪ"`. Use straight quotes (`'ɪ'`, `"ih"`) inside the block. Confirmed authoring trip 2026-05-10 during PR #192's history-note addition.
