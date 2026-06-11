@@ -147,6 +147,40 @@ const GITHUB_BODY_HARD_LIMIT = 65_536
  *  text (fences, labels, summary prose) added around the JSON payload. */
 const SAFE_BODY_BUDGET = 60_000
 
+/** Hard cap on how many individual fails the issue BODY ever lists in the
+ *  human-readable per-category detail. Beyond this we show per-category
+ *  counts + the first MAX_BODY_FAIL_DETAIL fails (notes truncated) + an
+ *  "and X more" pointer to the JSON parts. This is what makes the body
+ *  bounded BY CONSTRUCTION: the detail list can never grow past a fixed
+ *  number of lines no matter how many fails the batch carries. A high-fail
+ *  batch (a bad re-bake breaking hundreds of cells) is the highest-signal
+ *  report this endpoint produces and MUST NOT be the one that 422s. */
+const MAX_BODY_FAIL_DETAIL = 40
+
+/** Hard cap on a single fail-note's length once it lands in the body detail
+ *  list. Notes are already capped at MAX_STRING_LEN (2000) on input, but
+ *  even 40 × 2000 = 80 KB would blow the body budget, so the body view
+ *  truncates each note further. The FULL untruncated note still ships in the
+ *  machine-parseable JSON (inline if it fits, else in the chunked comments). */
+const MAX_BODY_NOTE_LEN = 120
+
+/** Hard cap on itemId / audioHash length in the body detail list. Both are
+ *  input-capped at MAX_STRING_LEN (2000), but real values are short (dotted
+ *  ids, 64-hex sha256). Truncating in the body view keeps each detail line
+ *  bounded even against pathological 2000-char ids; full values stay in the
+ *  machine-parseable JSON. */
+const MAX_BODY_ID_LEN = 80
+
+/** Proven upper bound on the bounded fail summary's char length, derived from
+ *  the caps above so it tracks them automatically. Each detail line is at most
+ *  the two ids + the note + ~40 chars of fixed markdown (backticks, "(audio
+ *  )", " — ", "- ", category tag); category-count lines (≤6) + the two section
+ *  headers + the "…and X more" pointer + the leading tallies add a fixed
+ *  slack. This is the wrapper allowance `fitsInline` reserves so the inline
+ *  full-report path can never overflow once the summary is added. */
+const MAX_BODY_SUMMARY_OVERHEAD =
+  MAX_BODY_FAIL_DETAIL * (2 * MAX_BODY_ID_LEN + MAX_BODY_NOTE_LEN + 40) + 2_000
+
 // ---------------------------------------------------------------------------
 // CORS + JSON helpers (mirror api/claude.ts shape)
 // ---------------------------------------------------------------------------
@@ -306,12 +340,26 @@ export interface BuiltIssue {
  * bodies from the report.
  *
  * Title:  Voice QA report — <YYYY-MM-DD> — <failCount> fails / <total> verdicts
- * Body:   human-readable fail summary grouped by category (notes + item ids)
- *         + the FAILS-ONLY JSON in a fenced block. The fails-only payload is
- *         bounded by MAX_VERDICTS but in practice tiny (most cells pass), so
- *         the issue body comfortably clears the GitHub limit. The FULL report
- *         JSON (passes included) is too large to inline at full baseline, so
- *         it ships in `comments` (see below).
+ *
+ * Body — BOUNDED BY CONSTRUCTION, regardless of fail count:
+ *   1. Submitted + verdict tallies (fixed size).
+ *   2. Per-category fail COUNTS (≤6 lines — one per category).
+ *   3. The first MAX_BODY_FAIL_DETAIL fails as a detail list, each with its
+ *      note TRUNCATED to MAX_BODY_NOTE_LEN. When the batch has more fails than
+ *      that, an "…and X more — full data in the JSON parts below" pointer is
+ *      appended. The detail list can therefore NEVER exceed a fixed line
+ *      count × a fixed per-line length, so the body cannot grow without bound
+ *      as fails climb toward MAX_VERDICTS (2000). This is the fix for the
+ *      re-blocked overflow: a high-fail batch (a bad re-bake breaking hundreds
+ *      of cells) is the single highest-signal report this endpoint produces
+ *      and MUST NOT be the one that 422s.
+ *   4. The machine-parseable JSON. The FULL report (passes included) is
+ *      embedded inline only for small batches (`inlineFull`); otherwise it
+ *      ships across `comments`. The FAILS-ONLY JSON is inlined ONLY when it
+ *      provably fits the remaining body budget; when it would overflow, it is
+ *      omitted from the body (the full report in the comments already carries
+ *      every fail) and the body points the reader at the JSON parts.
+ *
  * Comments: when the full report JSON exceeds SAFE_BODY_BUDGET, it is split
  *         across N follow-up comments, each a single fenced ```json block
  *         labelled `<!-- voice-qa-report part i/N -->` so the orchestrator
@@ -328,9 +376,9 @@ export function buildIssue(report: VoiceQaReportRequest): BuiltIssue {
 
   // The full machine-parseable payload (passes included), secret stripped.
   const fullJson = JSON.stringify(reportWithoutSecret(report), null, 2)
-  // The fails-only payload that goes inline in the issue body. Bounded by
-  // MAX_VERDICTS but small in practice; the abuse cap on note/string length
-  // keeps even an all-fail batch under the body budget.
+  // The fails-only payload — inlined in the body ONLY when it provably fits
+  // the remaining budget (see below). Bounded by MAX_VERDICTS, but at high
+  // fail counts it is large, so we never assume it fits.
   const failsOnlyJson = JSON.stringify(
     { submittedAt: report.submittedAt, fails },
     null,
@@ -339,8 +387,9 @@ export function buildIssue(report: VoiceQaReportRequest): BuiltIssue {
 
   // Decide whether the full JSON fits inline. If it does, we still keep the
   // body within budget by embedding it directly; if not, it ships as chunked
-  // comments and the body carries only the fails-only payload + a pointer.
-  const inlineFull = fitsInline(date, failCount, total, fullJson)
+  // comments and the body carries only the bounded summary + (maybe) the
+  // fails-only payload.
+  const inlineFull = fitsInline(fullJson)
 
   const lines: string[] = []
   lines.push(`**Submitted:** ${report.submittedAt}`)
@@ -353,29 +402,7 @@ export function buildIssue(report: VoiceQaReportRequest): BuiltIssue {
   if (failCount === 0) {
     lines.push('No failures reported — all audited cells passed. 🎉')
   } else {
-    lines.push('## Failures by category')
-    lines.push('')
-
-    // Group fails by category (undefined category → 'other').
-    const byCategory = new Map<VoiceQaCategory, VoiceQaVerdict[]>()
-    for (const f of fails) {
-      const cat: VoiceQaCategory = f.category ?? 'other'
-      const bucket = byCategory.get(cat)
-      if (bucket) bucket.push(f)
-      else byCategory.set(cat, [f])
-    }
-
-    for (const cat of CATEGORY_ORDER) {
-      const bucket = byCategory.get(cat)
-      if (!bucket || bucket.length === 0) continue
-      lines.push(`### ${cat} (${bucket.length})`)
-      for (const f of bucket) {
-        const note = f.note ? sanitizeNoteForMarkdown(f.note) : ''
-        const noteSuffix = note ? ` — ${note}` : ''
-        lines.push(`- \`${f.itemId}\` (audio \`${f.audioHash}\`)${noteSuffix}`)
-      }
-      lines.push('')
-    }
+    appendBoundedFailSummary(lines, fails)
   }
 
   lines.push('---')
@@ -386,20 +413,14 @@ export function buildIssue(report: VoiceQaReportRequest): BuiltIssue {
     // Small batch: the full report fits in the issue body. No comments.
     // Fence adapts to any backtick run inside the JSON (notes can contain
     // backticks) so the block never closes prematurely.
-    const fence = '`'.repeat(Math.max(3, longestBacktickRun(fullJson) + 1))
-    lines.push(
-      '<details><summary>Full report JSON (machine-parseable)</summary>',
+    appendFencedJsonDetails(
+      lines,
+      'Full report JSON (machine-parseable)',
+      fullJson,
     )
-    lines.push('')
-    lines.push(`${fence}json`)
-    lines.push(fullJson)
-    lines.push(fence)
-    lines.push('')
-    lines.push('</details>')
   } else {
-    // Full baseline: the full report is too large to inline. Body carries
-    // the fails-only JSON; the full report is split across follow-up
-    // comments below.
+    // Large batch: the full report is too large to inline. It ships across
+    // follow-up comments below; the body stays bounded.
     comments = buildReportComments(fullJson)
     lines.push(
       `_Full report JSON (incl. passes) is too large for the issue body; ` +
@@ -407,21 +428,154 @@ export function buildIssue(report: VoiceQaReportRequest): BuiltIssue {
         `labelled \`part i/N\` for reassembly._`,
     )
     lines.push('')
-    lines.push(
-      '<details><summary>Fails-only JSON (machine-parseable)</summary>',
+
+    // Inline the fails-only JSON ONLY when it provably fits the remaining
+    // body budget. Measure the body built so far + the fenced fails-only
+    // wrapper against SAFE_BODY_BUDGET; if it would overflow, omit it — the
+    // full report in the comments already carries every fail, so no data is
+    // lost, and the body stays bounded by construction.
+    const bodySoFar = lines.join('\n').length
+    const failsBlockLen = fencedJsonDetailsLength(
+      'Fails-only JSON (machine-parseable)',
+      failsOnlyJson,
     )
-    lines.push('')
-    const failsFence = '`'.repeat(
-      Math.max(3, longestBacktickRun(failsOnlyJson) + 1),
-    )
-    lines.push(`${failsFence}json`)
-    lines.push(failsOnlyJson)
-    lines.push(failsFence)
-    lines.push('')
-    lines.push('</details>')
+    if (bodySoFar + failsBlockLen <= SAFE_BODY_BUDGET) {
+      appendFencedJsonDetails(
+        lines,
+        'Fails-only JSON (machine-parseable)',
+        failsOnlyJson,
+      )
+    } else {
+      lines.push(
+        `_Fails-only JSON omitted from the body (too large at ${failCount} ` +
+          `fails); every fail is in the full-report comment parts above._`,
+      )
+    }
   }
 
   return { title, body: lines.join('\n'), comments }
+}
+
+/**
+ * Append the BOUNDED human-readable fail summary to `lines`.
+ *
+ * Two sections, both fixed-size by construction:
+ *   - "Failures by category" — one count line per non-empty category (≤6).
+ *   - "Failure detail (first N)" — the first MAX_BODY_FAIL_DETAIL fails, each
+ *     note truncated to MAX_BODY_NOTE_LEN, plus an "…and X more" pointer when
+ *     the batch has more fails than the cap.
+ *
+ * The detail list NEVER exceeds MAX_BODY_FAIL_DETAIL lines, so the section's
+ * length is bounded regardless of fail count — this is the construction that
+ * keeps the issue body under the GitHub limit even for a 2000-verdict,
+ * hundreds-of-fails batch.
+ */
+function appendBoundedFailSummary(
+  lines: string[],
+  fails: readonly VoiceQaVerdict[],
+): void {
+  // Group fails by category (undefined category → 'other').
+  const byCategory = new Map<VoiceQaCategory, VoiceQaVerdict[]>()
+  for (const f of fails) {
+    const cat: VoiceQaCategory = f.category ?? 'other'
+    const bucket = byCategory.get(cat)
+    if (bucket) bucket.push(f)
+    else byCategory.set(cat, [f])
+  }
+
+  lines.push('## Failures by category')
+  lines.push('')
+  for (const cat of CATEGORY_ORDER) {
+    const bucket = byCategory.get(cat)
+    if (!bucket || bucket.length === 0) continue
+    lines.push(`- **${cat}**: ${bucket.length}`)
+  }
+  lines.push('')
+
+  // Bounded detail list: first MAX_BODY_FAIL_DETAIL fails in CATEGORY_ORDER,
+  // each note truncated. Iterate categories in order so the detail reads
+  // grouped, but stop hard at the cap.
+  const shown = Math.min(fails.length, MAX_BODY_FAIL_DETAIL)
+  lines.push(
+    fails.length > MAX_BODY_FAIL_DETAIL
+      ? `## Failure detail (first ${shown} of ${fails.length})`
+      : `## Failure detail (${fails.length})`,
+  )
+  lines.push('')
+  let emitted = 0
+  outer: for (const cat of CATEGORY_ORDER) {
+    const bucket = byCategory.get(cat)
+    if (!bucket || bucket.length === 0) continue
+    for (const f of bucket) {
+      if (emitted >= MAX_BODY_FAIL_DETAIL) break outer
+      const rawNote = f.note ? sanitizeNoteForMarkdown(f.note) : ''
+      const note = truncateForBody(rawNote, MAX_BODY_NOTE_LEN)
+      const noteSuffix = note ? ` — ${note}` : ''
+      // itemId / audioHash are input-capped at MAX_STRING_LEN (2000) each, so
+      // truncate them for the body view too — the full untruncated values
+      // remain in the machine-parseable JSON. Keeps every detail line a
+      // bounded length regardless of pathological input.
+      const itemId = truncateForBody(f.itemId, MAX_BODY_ID_LEN)
+      const audioHash = truncateForBody(f.audioHash, MAX_BODY_ID_LEN)
+      lines.push(
+        `- \`${cat}\` \`${itemId}\` (audio \`${audioHash}\`)${noteSuffix}`,
+      )
+      emitted += 1
+    }
+  }
+  if (fails.length > MAX_BODY_FAIL_DETAIL) {
+    lines.push('')
+    lines.push(
+      `_…and ${fails.length - MAX_BODY_FAIL_DETAIL} more — full data in the ` +
+        `JSON parts below._`,
+    )
+  }
+  lines.push('')
+}
+
+/** Truncate a single-line string to `max` chars, appending an ellipsis when
+ *  cut. Bounds each fail-detail line so the body summary cannot grow without
+ *  limit even with maximal (2000-char) notes. */
+function truncateForBody(s: string, max: number): string {
+  if (s.length <= max) return s
+  return `${s.slice(0, max)}…`
+}
+
+/** Append a `<details>`-wrapped fenced ```json block to `lines`. The fence
+ *  adapts to any backtick run inside the payload (notes can contain
+ *  backticks) so the block never closes prematurely. */
+function appendFencedJsonDetails(
+  lines: string[],
+  summary: string,
+  json: string,
+): void {
+  const fence = '`'.repeat(Math.max(3, longestBacktickRun(json) + 1))
+  lines.push(`<details><summary>${summary}</summary>`)
+  lines.push('')
+  lines.push(`${fence}json`)
+  lines.push(json)
+  lines.push(fence)
+  lines.push('')
+  lines.push('</details>')
+}
+
+/** Exact char length `appendFencedJsonDetails` would add (the joined-with-\n
+ *  delta), used to decide whether the fails-only block fits the remaining
+ *  body budget BEFORE committing it. Mirrors the lines pushed above. */
+function fencedJsonDetailsLength(summary: string, json: string): number {
+  const fence = '`'.repeat(Math.max(3, longestBacktickRun(json) + 1))
+  const parts = [
+    `<details><summary>${summary}</summary>`,
+    '',
+    `${fence}json`,
+    json,
+    fence,
+    '',
+    '</details>',
+  ]
+  // Each pushed line is preceded by a '\n' when joined onto the existing body
+  // (which is non-empty here). Sum the part lengths + one '\n' per part.
+  return parts.reduce((sum, p) => sum + p.length + 1, 0)
 }
 
 /** Strip the secret before it ever lands in the issue body JSON. */
@@ -433,23 +587,19 @@ function reportWithoutSecret(
 
 /** Does the full report JSON fit inline in the issue body within budget?
  *  Conservative: measure the wrapper-inclusive length and compare against
- *  SAFE_BODY_BUDGET. The wrapper here is an over-estimate of the real
- *  prose (summary, category groups) so a `true` answer is always safe. */
-function fitsInline(
-  date: string,
-  failCount: number,
-  total: number,
-  fullJson: string,
-): boolean {
-  // Fixed wrapper allowance for title-echo, summary prose, fenced markers,
-  // and the per-fail bullet list. 8 KB is generous headroom above the
-  // realistic worst case (MAX_VERDICTS fails × bounded note length is
-  // accounted by the JSON length itself; this is only the markdown prose).
-  const WRAPPER_ALLOWANCE = 8_000
-  void date
-  void failCount
-  void total
-  return fullJson.length + WRAPPER_ALLOWANCE <= SAFE_BODY_BUDGET
+ *  SAFE_BODY_BUDGET. The summary prose is now bounded by construction
+ *  (`appendBoundedFailSummary`), so the fixed wrapper allowance below is a
+ *  safe over-estimate of everything around the inline JSON. */
+function fitsInline(fullJson: string): boolean {
+  // Reserve the PROVEN worst-case summary overhead (derived from the body
+  // caps) plus a small fixed allowance for the fenced-JSON wrapper + tallies.
+  // Because the summary is bounded by construction, this allowance is a true
+  // upper bound — the inline full-report path can never overflow.
+  const FENCE_AND_TALLY_ALLOWANCE = 500
+  return (
+    fullJson.length + MAX_BODY_SUMMARY_OVERHEAD + FENCE_AND_TALLY_ALLOWANCE <=
+    SAFE_BODY_BUDGET
+  )
 }
 
 /**

@@ -80,6 +80,45 @@ function freshLimiter() {
   return createRateLimiter({ limit: 5, windowMs: 60 * 60_000 })
 }
 
+/**
+ * Extract the fenced ```json payload from ONE chunk comment the way a real
+ * consumer (the orchestrator) MUST: read the OPENING fence length, then match
+ * the SAME-length closing fence. A naive `/```json\n([\s\S]*?)\n```/` is
+ * structurally wrong — when the endpoint widens the fence past 3 backticks to
+ * survive a literal ``` inside a note, OR when a payload slice ends in
+ * trailing backticks adjacent to the closing fence, the non-greedy 3-backtick
+ * match closes early and corrupts reassembly (Devon's NIT). This helper reads
+ * the actual emitted fence and slices structurally, so the tests mirror real
+ * reassembly rather than a fragile shortcut.
+ *
+ * Comment shape (from the endpoint):
+ *   <!-- voice-qa-report part i/N -->\n<fence>json\n<payload>\n<fence>
+ */
+function extractFencedJsonPayload(comment: string): string {
+  // The opening fence is the first run of backticks at a line start that is
+  // immediately followed by `json\n`. Read its exact length.
+  const open = comment.match(/(^|\n)(`{3,})json\n/)
+  if (!open) {
+    throw new Error('extractFencedJsonPayload: no opening ```json fence found')
+  }
+  const fence = open[2]!
+  const payloadStart = open.index! + open[0].length
+  // The closing fence is a run of EXACTLY `fence.length` backticks on its own
+  // line: preceded by '\n', and at end-of-string or followed by '\n'. Using
+  // the captured fence length (not a fixed 3) is the structural fix — a
+  // payload ending in fewer-than-fence backticks can't be mistaken for the
+  // close, and a shorter run inside the payload is ignored.
+  const closeRe = new RegExp(`\\n(\`{${fence.length}})(?:\\n|$)`)
+  const rest = comment.slice(payloadStart)
+  const close = rest.match(closeRe)
+  if (!close) {
+    throw new Error(
+      'extractFencedJsonPayload: no matching closing fence of the opening length',
+    )
+  }
+  return rest.slice(0, close.index!)
+}
+
 const SAMPLE_VERDICTS: VoiceQaVerdict[] = [
   {
     itemId: 'math.add-to-10.p1.read',
@@ -140,6 +179,52 @@ function makeFullBaseline(total: number): VoiceQaReportRequest {
         verdict: 'fail',
         category: FAIL_CATEGORIES[i % FAIL_CATEGORIES.length]!,
         note: `cell ${i}: clipped final phoneme, sounds like it cuts at ~0.8s — re-bake`,
+        decidedAt,
+      })
+    } else {
+      verdicts.push({
+        itemId: `canon.cell.${i.toString().padStart(4, '0')}.read`,
+        audioHash: fakeAudioHash(i),
+        verdict: 'pass',
+        decidedAt,
+      })
+    }
+  }
+  return {
+    secret: SECRET,
+    submittedAt: '2026-06-11T09:05:00.000Z',
+    verdicts,
+  }
+}
+
+/**
+ * Build a HIGH-FAIL batch — the worst case for body overflow (a bad re-bake
+ * breaking hundreds of cells). `total` verdicts of which `failCount` are
+ * fails, each fail carrying a MAX_STRING_LEN-length note (input cap) so the
+ * machine-parseable JSON and the human detail are at their largest. This is
+ * the fixture that overflowed the issue body at ~130 fails before the fix.
+ */
+function makeHighFailBatch(
+  total: number,
+  failCount: number,
+): VoiceQaReportRequest {
+  if (failCount > total) throw new Error('failCount cannot exceed total')
+  // 2000-char note (the input cap MAX_STRING_LEN). Build it once; vary the
+  // head so reassembly can't dedupe-by-accident.
+  const maxNote = (i: number) =>
+    `cell ${i}: `.padEnd(2000, `x clipped tail re-bake needed `).slice(0, 2000)
+  const verdicts: VoiceQaVerdict[] = []
+  const base = Date.parse('2026-06-11T08:00:00.000Z')
+  for (let i = 0; i < total; i++) {
+    const decidedAt = new Date(base + i * 1500).toISOString()
+    const isFail = i < failCount
+    if (isFail) {
+      verdicts.push({
+        itemId: `canon.cell.${i.toString().padStart(4, '0')}.read`,
+        audioHash: fakeAudioHash(i),
+        verdict: 'fail',
+        category: FAIL_CATEGORIES[i % FAIL_CATEGORIES.length]!,
+        note: maxNote(i),
         decidedAt,
       })
     } else {
@@ -308,10 +393,13 @@ describe('buildIssue', () => {
     expect(title).toBe('Voice QA report — 2026-06-11 — 1 fails / 2 verdicts')
   })
 
-  it('groups fails by category with item ids and notes', () => {
+  it('groups fails by category with counts + item ids and notes', () => {
     const { body } = buildIssue(SAMPLE_REPORT)
+    // Per-category COUNT line (bounded summary).
     expect(body).toContain('## Failures by category')
-    expect(body).toContain('### mispronounced (1)')
+    expect(body).toContain('- **mispronounced**: 1')
+    // Bounded detail list carries the item id + note.
+    expect(body).toContain('## Failure detail')
     expect(body).toContain('`math.add-to-10.p1.read`')
     expect(body).toContain('says "for" instead of "four"')
   })
@@ -361,7 +449,8 @@ describe('buildIssue', () => {
       ],
     }
     const { body } = buildIssue(report)
-    expect(body).toContain('### other (1)')
+    expect(body).toContain('- **other**: 1')
+    expect(body).toContain('`other` `y`')
   })
 
   it('neutralises backticks and newlines in notes', () => {
@@ -413,13 +502,12 @@ describe('buildIssue — full-baseline chunking (654 verdicts)', () => {
     const { body, comments } = buildIssue(REPORT)
     expect(comments.length).toBeGreaterThan(0)
     // Body must NOT contain the full report (which includes passes) — only
-    // the fails-only payload + a pointer to the comments.
+    // the bounded summary + (here) the fails-only payload + a pointer.
     expect(body).toContain('follow-up comment')
     expect(body).toContain('Fails-only JSON')
-    // Body's inline JSON is fails-only; every entry is a fail.
-    const inline = body.match(/```json\n([\s\S]*?)\n```/)
-    expect(inline).not.toBeNull()
-    const failsOnly = JSON.parse(inline![1]!) as {
+    // Body's inline JSON is fails-only; every entry is a fail. Parse the fence
+    // structurally (Devon's NIT) — the same way a real consumer must.
+    const failsOnly = JSON.parse(extractFencedJsonPayload(body)) as {
       fails: VoiceQaVerdict[]
     }
     expect(failsOnly.fails.every((f) => f.verdict === 'fail')).toBe(true)
@@ -445,12 +533,10 @@ describe('buildIssue — full-baseline chunking (654 verdicts)', () => {
   it('reassembles the chunk payloads into the exact full-report JSON', () => {
     const { comments } = buildIssue(REPORT)
     // Extract the fenced ```json payload from each part and concatenate in
-    // order — this is exactly what the orchestrator does on reassembly.
-    const payloads = comments.map((c) => {
-      const m = c.match(/```json\n([\s\S]*?)\n```/)
-      expect(m).not.toBeNull()
-      return m![1]!
-    })
+    // order — this is exactly what the orchestrator does on reassembly. Parse
+    // the fence STRUCTURALLY (opening fence length → same-length close), not
+    // with a fragile fixed-3-backtick regex (Devon's NIT).
+    const payloads = comments.map((c) => extractFencedJsonPayload(c))
     const reassembled = payloads.join('')
     const parsed = JSON.parse(reassembled) as {
       submittedAt: string
@@ -498,6 +584,81 @@ describe('buildIssue — full-baseline chunking (654 verdicts)', () => {
   })
 })
 
+/**
+ * The RE-BLOCK fix (Devon's delta re-review): when `fitsInline` is false the
+ * issue BODY must STILL stay under GitHub's 65,536-char limit no matter how
+ * many fails the batch carries. Before the fix the body carried an UNBOUNDED
+ * per-fail bullet list + the inline fails-only JSON, so a high-fail batch
+ * (bad re-bake breaking hundreds of cells — the highest-signal report) crossed
+ * 65,536 at ~130 fails → GitHub 422 → 502 → whole batch lost. These tests
+ * exercise the worst case: 500+ fails with MAX_STRING_LEN notes, and the
+ * MAX_VERDICTS (2000) cap. They fail RED against the old unbounded body.
+ */
+describe('buildIssue — high-fail body is bounded by construction', () => {
+  it('keeps the BODY under the GitHub limit at 500 fails / 654 (max-length notes)', () => {
+    const report = makeHighFailBatch(654, 500)
+    const { body } = buildIssue(report)
+    // The body itself — the thing that 422'd — must clear the hard limit.
+    expect(body.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    // And it stays within our self-imposed SAFE budget, not just the ceiling.
+    expect(body.length).toBeLessThanOrEqual(60_000)
+  })
+
+  it('keeps the BODY under the limit at the MAX_VERDICTS cap (2000 verdicts, 1700 fails, max notes)', () => {
+    const report = makeHighFailBatch(2000, 1700)
+    const { body, comments } = buildIssue(report)
+    expect(body.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    // The full report ships across comments; each stays under the limit.
+    expect(comments.length).toBeGreaterThan(0)
+    for (const c of comments) {
+      expect(c.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    }
+  })
+
+  it('caps the body detail list at MAX_BODY_FAIL_DETAIL with an "…and X more" pointer', () => {
+    const report = makeHighFailBatch(654, 500)
+    const { body } = buildIssue(report)
+    // The detail header announces the truncation, and the pointer is present.
+    expect(body).toContain('## Failure detail (first 40 of 500)')
+    expect(body).toContain('…and 460 more')
+    // Per-category COUNTS still reflect the TRUE total (not the shown 40).
+    // 500 fails round-robin across 6 categories → 84 or 83 per category.
+    expect(body).toMatch(/- \*\*mispronounced\*\*: \d+/)
+  })
+
+  it('omits the inline fails-only JSON when it would overflow the body budget', () => {
+    const report = makeHighFailBatch(2000, 1700)
+    const { body } = buildIssue(report)
+    // At 1700 max-length-note fails the fails-only JSON is far too large to
+    // inline; the body must say so and point at the comment parts instead of
+    // embedding it (every fail is still in the full-report comments).
+    expect(body).toContain('Fails-only JSON omitted from the body')
+    expect(body).not.toContain('<summary>Fails-only JSON')
+  })
+
+  it('handler POSTs an issue body + comments all under the limit at 500 fails', async () => {
+    const report = makeHighFailBatch(654, 500)
+    const capture: { calls?: FetchCall[] } = {}
+    const fetchImpl = makeGithubSuccessFetch(undefined, capture, 777)
+    const res = await handler(makeRequest(report), {
+      fetchImpl,
+      rateLimiter: freshLimiter(),
+    })
+    expect(res.status).toBe(200)
+    const calls = capture.calls!
+    // The issue-create POST body (the one that 422'd before the fix).
+    const issueInit = calls[0]!.init as { body: string }
+    const issueBody = JSON.parse(issueInit.body).body as string
+    expect(issueBody.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    // Every comment POST body too.
+    for (const call of calls.slice(1)) {
+      const init = call.init as { body: string }
+      const postedBody = JSON.parse(init.body).body as string
+      expect(postedBody.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    }
+  })
+})
+
 describe('buildReportComments (chunk-splitter unit)', () => {
   it('returns a single comment when the JSON is small', () => {
     const comments = buildReportComments('{"x":1}')
@@ -513,8 +674,9 @@ describe('buildReportComments (chunk-splitter unit)', () => {
       expect(c.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
     }
     // Reassemble the raw payload slices — must equal the original string.
+    // Structural fence parse (Devon's NIT), not the fragile fixed-3 regex.
     const reassembled = comments
-      .map((c) => c.match(/```json\n([\s\S]*?)\n```/)![1]!)
+      .map((c) => extractFencedJsonPayload(c))
       .join('')
     expect(reassembled).toBe(big)
   })
@@ -547,6 +709,39 @@ describe('buildReportComments (chunk-splitter unit)', () => {
     )![1]!
     expect(inner).toBe(payload)
     expect(JSON.parse(inner).verdicts[0].note).toContain('``` a code fence ```')
+  })
+
+  it('parses the fence STRUCTURALLY when the payload contains a `\\n```\\n` run, where the naive fixed-3 regex breaks (Devon NIT)', () => {
+    // The genuine break case: the payload itself contains a line that is a
+    // 3-backtick run (`\n```\n`), so the endpoint WIDENS the fence to 4. A
+    // consumer that assumes a fixed 3-backtick fence — /```json\n(.*?)\n```/ —
+    // finds the "```json" substring INSIDE the 4-backtick opener, then closes
+    // at the payload's INTERNAL "\n```" run, truncating the slice. The
+    // structural parser reads the OPENING fence length (4) and matches a
+    // same-length close, so it skips the internal 3-run and recovers the exact
+    // bytes. This is the trailing/adjacent-backtick fragility the NIT flagged.
+    const payload = [
+      '{',
+      '  "note": "code:",',
+      '```',
+      'fenced',
+      '```',
+      '}',
+    ].join('\n')
+    const comments = buildReportComments(payload)
+    expect(comments).toHaveLength(1)
+    // Fence widened to 4 backticks (longest internal run is 3).
+    expect(comments[0]).toContain('`'.repeat(4) + 'json\n')
+
+    // Structural extraction reproduces the payload BYTE-EXACT.
+    const extracted = extractFencedJsonPayload(comments[0]!)
+    expect(extracted).toBe(payload)
+
+    // Prove the naive fixed-3 regex gets it WRONG here: it stops at the
+    // payload's internal "\n```", capturing a truncated slice ≠ the payload.
+    const naive = comments[0]!.match(/```json\n([\s\S]*?)\n```/)
+    expect(naive).not.toBeNull()
+    expect(naive![1]).not.toBe(payload)
   })
 })
 
