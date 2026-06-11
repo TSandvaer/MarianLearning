@@ -1,0 +1,243 @@
+{
+  "submittedAt": "2026-06-11T21:05:19.908Z",
+  "sourceIssue": 377,
+  "fails": [
+    {
+      "itemId": "number-recog#math.p6.hint",
+      "audioHash": "b3e8436ce6873d954d94e933e9f93b4c90118af32b17a5e2741fdff93e45ae86",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "it sounds like she says \"for comes after three\" not \"four comes after three\"",
+      "decidedAt": "2026-06-11T20:33:42.448Z"
+    },
+    {
+      "itemId": "letter-names#word.p5.hint",
+      "audioHash": "6f41aedd1fd239afa5a39045f904828fce20c43f12bb44fb3db9eb1570fae384",
+      "verdict": "fail",
+      "category": "other",
+      "note": "the \"O\" still sounds a little scratchy",
+      "decidedAt": "2026-06-11T20:34:14.647Z"
+    },
+    {
+      "itemId": "letter-sounds#session.end.recap.4",
+      "audioHash": "22c678d43e86209cae4c37600c0134040e91c725a3b7ab03ca1dfb9da1d6cfce",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "it sounds like she is saying \"you earned for stars\" not \"..four stars\"",
+      "decidedAt": "2026-06-11T14:34:09.077Z"
+    },
+    {
+      "itemId": "letter-sounds#session.end.streak.4",
+      "audioHash": "58e05c3d36f81d15236e67915298159c72caf646a9fb569d18ef966c3a445686",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T14:37:12.421Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.correct",
+      "audioHash": "1d7fa11f2dcbdd0a2170d2ffe4b2c323de6c5f80f6de41756877e0522323a7ba",
+      "verdict": "fail",
+      "category": "other",
+      "note": "vvv is very scratchy",
+      "decidedAt": "2026-06-11T20:35:12.033Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.giveAnswer",
+      "audioHash": "f7ee0bb047dddcf0371fa1970393b47082824457c802628fcd2d64281a017fae",
+      "verdict": "fail",
+      "category": "other",
+      "note": "vvv is still very scratchy",
+      "decidedAt": "2026-06-11T20:35:41.936Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.hint",
+      "audioHash": "38bb9519205fab218e5c034572ac80a4324ded8b73906454bee8bdfd371f96f7",
+      "verdict": "fail",
+      "category": "other",
+      "note": "vvv is still very scratchy",
+      "decidedAt": "2026-06-11T20:35:51.492Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.read",
+      "audioHash": "173a7f08398faa2dc3c3b45165c009230eef7d964170d0749b45a0253960b20a",
+      "verdict": "fail",
+      "note": "vvv is still very scratchy",
+      "decidedAt": "2026-06-11T20:36:00.125Z"
+    },
+    {
+      "itemId": "greet#greet-01-hi.mp3",
+      "audioHash": "006ba5d68f4542a589032803bf0e68be4a9d3ce52cfd3bb007901c1ae5f77fcc",
+      "verdict": "fail",
+      "category": "other",
+      "note": "child voice, should be deleted",
+      "decidedAt": "2026-06-11T14:49:00.685Z"
+    },
+    {
+      "itemId": "greet#greet-02-im-emma.mp3",
+      "audioHash": "a251907698f4dd8420d1255a8b7019bf3fec5073f2f0bbf9310570ff3020ccac",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:49:17.681Z"
+    },
+    {
+      "itemId": "greet#greet-03-nice-to-meet-you.mp3",
+      "audioHash": "cb8c0d256eee73be50f6540f796de6cd9059b5942a5da985923330d7fe5ac741",
+      "verdict": "fail",
+      "note": "child voice, delete",
+      "decidedAt": "2026-06-11T14:49:26.966Z"
+    },
+    {
+      "itemId": "greet#greet-04-tap-the-heart.mp3",
+      "audioHash": "8a22624fe39674144fa72d95a03e1b98a163d287ca508e51b0d90e5a65e0ac79",
+      "verdict": "fail",
+      "category": "other",
+      "note": "child voice, delete",
+      "decidedAt": "2026-06-11T14:49:36.673Z"
+    },
+    {
+      "itemId": "hub#hub-enter-number-garden.mp3",
+      "audioHash": "d59ec7d28dca11bc4bd605879b48c47157a9b9e16945c9836c396ff5e14619a3",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:40.223Z"
+    },
+    {
+      "itemId": "hub#hub-enter-word-song.mp3",
+      "audioHash": "d3d8369778b29b3f84e35e16e94f2508284e8bb2b2b65e97b177ead72476f20f",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:38.678Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-back-soon-alt-1.mp3",
+      "audioHash": "299ad37d1456b807302fb739f043f47b31e6ee6219a98f1aefd45d4f5526e8bb",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:36.472Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-back-soon-alt-2.mp3",
+      "audioHash": "9336be15a6fc5c132b4e22f7b16c5d502b6141f3fca4c42ae54b80b3578afed7",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:34.709Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-back-soon.mp3",
+      "audioHash": "3e8d75b87b9fcf78c0d997074d68359cb8227fcc75bb1c377e050eb5c2bf1c52",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:32.662Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-first-again.mp3",
+      "audioHash": "ebf9a68f92e50229bc67bfeb21c972e597efc06741bdca2d40ee715e94d28969",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:30.510Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-pick-again.mp3",
+      "audioHash": "d4e0c69aab0c887315aa9192ecc85177e2bc988acf1a56e4c2201fa0f83c1b98",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:28.147Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-pick-next.mp3",
+      "audioHash": "9ef90422a1aedeebbd10a7833b68f1889a88d898da8f111dcbff0e4c21b74ece",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:42.187Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-number-garden-alt-1.mp3",
+      "audioHash": "1a3b785fd0bcd9125557ec47914442c9587f92edb52f2122ded04f74441bf06e",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:47.798Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-number-garden-alt-2.mp3",
+      "audioHash": "f27024948767cefd89d2fae510059331fdc300cf36638c7ba9cdaf088e52791b",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:55.072Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-number-garden.mp3",
+      "audioHash": "76d59f6d7a5beb0814418f22c80e4979ec201256883a160645eaa3f020a58dc9",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:00.182Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-word-song-alt-1.mp3",
+      "audioHash": "3be972376a8496d665ed663ac8a87930e5f1f2da82af0a6797556d5791bd3b7f",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:04.980Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-word-song-alt-2.mp3",
+      "audioHash": "8d5115dc3c618b9df0f8501b58d327020c02350eb27d0f21da9dd1757b0dae3a",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:09.007Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-word-song.mp3",
+      "audioHash": "75dbab1d6c68b2e6fd45bc2dffc148a35721a87cdee8ad17cb24bdb0ac3ed970",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:13.291Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today-alt-1.mp3",
+      "audioHash": "06301527fc31e6fcf8ef520037f00d9537a8a902df54ae5484ad56a5aa69e5fd",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:20.685Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today-alt-2.mp3",
+      "audioHash": "06d39f4e9dcff86a28116234b10c0084bf09e6c3548fe4790cd9e885621e0806",
+      "verdict": "fail",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:26.259Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today-alt-3.mp3",
+      "audioHash": "07ceb23801a0d08a74cfe9273906abe171f9012472a864ca5ded69ceca26bde6",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:30.865Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today.mp3",
+      "audioHash": "e32a126250474943e14d22d9ddfac218fd1bd3bf9f4f311e36d80ba2f9c3c503",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:36.496Z"
+    }
+  ]
+}
