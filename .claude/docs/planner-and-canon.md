@@ -199,7 +199,7 @@ The deliberate utterance-only discipline keeps audio bytes + plan validation sym
   ```
   The `[^.]*` enforces same-sentence proximity to the qualifier (e.g. `RENDER-TIME`, `client-side`, `NOT planner-emitted`). This locks framing without forbidding the identifier.
 
-Reference implementation: `api/_planner.test.ts` "the sub-to-10 directive does NOT instruct Haiku to emit distractorClass" test (lines 3289-3332 post-PR #264). Pattern generalizes to any future render-time-only field added to `MathProblem` / `WordProblem` (e.g. hypothetical `distractorPool`, `distractorTier`).
+Reference implementation: `api/_planner.test.ts` "the sub-to-10 directive does NOT instruct Haiku to emit distractorClass" test — grep by the test NAME, not line number; the file grows fast (block was at 3289-3332 post-PR #264, verified at 4035-4078 on 2026-06-11 during the W10.4 review). Pattern generalizes to any future render-time-only field added to `MathProblem` / `WordProblem` (e.g. hypothetical `distractorPool`, `distractorTier`). Same staleness caution applies to `scripts/compositionLint.ts` line refs: the sub-to-20 path binding moved 3893 → 4917-4921; the durable greps are the exported rule/function names (`SUB_TO_TWENTY_RULES`, `lintSubToTwentyComposition`, `resolveTierBinding`).
 
 ### Canon-lint scope is text-encoding hygiene ONLY — composition rules are bake-time-only
 
