@@ -2,34 +2,7 @@
   "generated": "2026-06-11",
   "sourceIssue": 372,
   "items": {
-    "add-to-10#session.end.streak.3": {
-      "pr": 375
-    },
-    "add-to-10#session.end.streak.4": {
-      "pr": 375
-    },
-    "add-to-10#session.end.streak.5": {
-      "pr": 375
-    },
-    "add-to-10#session.end.streak.6": {
-      "pr": 375
-    },
-    "add-to-10#session.end.streak.7": {
-      "pr": 375
-    },
-    "add-to-10#session.end.streak.8": {
-      "pr": 375
-    },
-    "mult-6-9#math.p7.correct": {
-      "pr": 375
-    },
-    "mult-6-9#math.p7.giveAnswer": {
-      "pr": 375
-    },
     "number-recog#math.p6.hint": {
-      "pr": 375
-    },
-    "letter-names#word.p2.hint": {
       "pr": 375
     },
     "letter-names#word.p5.hint": {
@@ -39,21 +12,6 @@
       "pr": 375
     },
     "letter-sounds#session.end.streak.4": {
-      "pr": 375
-    },
-    "letter-sounds#word.p2.giveAnswer": {
-      "pr": 375
-    },
-    "letter-sounds#word.p4.correct": {
-      "pr": 375
-    },
-    "letter-sounds#word.p4.giveAnswer": {
-      "pr": 375
-    },
-    "letter-sounds#word.p6.correct": {
-      "pr": 375
-    },
-    "letter-sounds-audit#word.p1.giveAnswer": {
       "pr": 375
     },
     "letter-sounds-audit#word.p2.correct": {
@@ -66,9 +24,6 @@
       "pr": 375
     },
     "letter-sounds-audit#word.p2.read": {
-      "pr": 375
-    },
-    "letter-sounds-audit#word.p3.giveAnswer": {
       "pr": 375
     },
     "greet#greet-01-hi.mp3": {
