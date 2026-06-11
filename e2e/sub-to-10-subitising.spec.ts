@@ -128,6 +128,8 @@
 
 import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
@@ -389,87 +391,14 @@ function cannedSubToTenMinuendFiveAtP1() {
   ])
 }
 
-/**
- * Q1, Q2, Q3 all EASY-band sub-to-10 (`8-4`, `6-3`, `9-1`) so the
- * stickiness walk never trips an out-of-band guard mid-walk. Q4–Q8 are
- * still EASY-band (all minuends ∈ [5,10]); we only walk to Q3.
- */
-function cannedSubToTenStickyStarter() {
-  return cannedSubPlan([
-    {
-      idx: 1,
-      mW: 'Eight',
-      sW: 'four',
-      minuend: 8,
-      subtrahend: 4,
-      ans: 4,
-      ansW: 'Four',
-    },
-    {
-      idx: 2,
-      mW: 'Six',
-      sW: 'three',
-      minuend: 6,
-      subtrahend: 3,
-      ans: 3,
-      ansW: 'Three',
-    },
-    {
-      idx: 3,
-      mW: 'Nine',
-      sW: 'one',
-      minuend: 9,
-      subtrahend: 1,
-      ans: 8,
-      ansW: 'Eight',
-    },
-    {
-      idx: 4,
-      mW: 'Ten',
-      sW: 'five',
-      minuend: 10,
-      subtrahend: 5,
-      ans: 5,
-      ansW: 'Five',
-    },
-    {
-      idx: 5,
-      mW: 'Five',
-      sW: 'five',
-      minuend: 5,
-      subtrahend: 5,
-      ans: 0,
-      ansW: 'Zero',
-    },
-    {
-      idx: 6,
-      mW: 'Eight',
-      sW: 'eight',
-      minuend: 8,
-      subtrahend: 8,
-      ans: 0,
-      ansW: 'Zero',
-    },
-    {
-      idx: 7,
-      mW: 'Seven',
-      sW: 'zero',
-      minuend: 7,
-      subtrahend: 0,
-      ans: 7,
-      ansW: 'Seven',
-    },
-    {
-      idx: 8,
-      mW: 'Nine',
-      sW: 'zero',
-      minuend: 9,
-      subtrahend: 0,
-      ans: 9,
-      ansW: 'Nine',
-    },
-  ])
-}
+// NOTE: Test 4 (stickiness chip-walk) previously used a synthetic
+// `cannedSubToTenStickyStarter()` plan with the silent-MP3 placeholder.
+// That placeholder does not decode under the genuine gesture-unlock chain,
+// so the read-aloud→chip-enable gate never released and `toBeEnabled()`
+// stalled at Q1→Q2 (Kevin's review on `614d429`). Test 4 now serves the
+// real on-disk sub-to-10 canon via `installSubToTenCanonClaudeMock` per
+// testing-and-ci.md §4.1.3 rule 3 (multi-problem chip-walk = real-canon
+// bytes), so the synthetic sticky factory is removed.
 
 /**
  * Add-to-10 plan (`3 + 4` at Q1) for the regression-pin: the existing
@@ -519,6 +448,95 @@ function cannedAddToTenSmallAddendsAtP1() {
     },
     utterances,
   }
+}
+
+// ── On-disk canon mock — for Test 4 (multi-problem chip-walk) ────────────────
+//
+// Test 4 drives a chip-advance walk across Q1→Q2→Q3. Per testing-and-ci.md
+// §4.1.3 rule 3, multi-problem chip-walk specs MUST serve real-canon MP3
+// bytes — the silent-placeholder `SILENT_MP3` does NOT decode under the
+// genuine gesture-unlock chain, so the read-aloud effect never resolves
+// and chips never enable (the `toBeEnabled()` stall Kevin observed on
+// `614d429`). `forceHowlerUnlock` is NOT the fix here: its WebKit stub-ctx
+// breaks real-bytes decode → silent static add-to-10 fallback (§4.1.2
+// silent-demote caveat), which would (a) serve op:'+' problems with NO
+// sub minuend scaffold and (b) defeat the whole stickiness assertion.
+//
+// We follow the `sub-to-10-distractor-class-2.spec.ts` pattern: serve the
+// on-disk `public/canon/math/level-1/sub-to-10.json` verbatim. Its
+// Azure-rendered MP3 bytes decode cleanly in headless chromium, so the
+// read-aloud effect resolves and chips enable across the walk. Canon P1–P3
+// are `5-5`, `6-3`, `9-1` — all minuends ∈ EASY-band [5,10], so the sub
+// minuend card mounts on each, exactly what the stickiness AC needs.
+const SUB_TO_TEN_CANON_PATH = resolve(
+  process.cwd(),
+  'public/canon/math/level-1/sub-to-10.json',
+)
+
+function readMathCanon(path: string): string {
+  if (!existsSync(path)) {
+    throw new Error(
+      `[sub-to-10-subitising spec] canon not found at ${path}. ` +
+        `Test 4's chip-walk requires real-canon MP3 bytes; do NOT swap to ` +
+        `a silent-MP3 placeholder — see the on-disk-canon-mock header.`,
+    )
+  }
+  return readFileSync(path, 'utf-8')
+}
+
+/**
+ * Install a `/api/claude` mock that serves the on-disk math canon for
+ * `track === 'math'` requests (modelled on
+ * `sub-to-10-distractor-class-2.spec.ts`'s `installMathCanonClaudeMock`).
+ * Real MP3 bytes decode cleanly so the read-aloud→chip-enable gate
+ * releases across the multi-problem walk. Returns the captured requests so
+ * Test 4 can keep the same `focusNode === 'sub-to-10'` positive
+ * discriminator as Test 1. Unknown tracks 500 loudly.
+ */
+async function installSubToTenCanonClaudeMock(
+  page: Page,
+  canonBody: string,
+): Promise<{ requests: Request[] }> {
+  const requests: Request[] = []
+  await page.route('**/api/claude', async (route) => {
+    const req = route.request()
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    requests.push(req)
+    let body: Record<string, unknown>
+    try {
+      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
+    } catch {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: '{}',
+      })
+      return
+    }
+    const payload = (body.payload ?? {}) as Record<string, unknown>
+    const track = payload.track as string | undefined
+    if (track === 'math') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: canonBody,
+      })
+      return
+    }
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: false,
+        error: 'unexpected-track',
+        message: `sub-to-10-subitising chip-walk is math-only; saw track=${String(track)}`,
+      }),
+    })
+  })
+  return { requests }
 }
 
 // ── Seed builders ────────────────────────────────────────────────────────────
@@ -884,19 +902,34 @@ test.describe('sub-to-10 subitising scaffold — single-cell minuend (W10.5)', (
   //   first-encounter window (so we're truly testing the fade-mean path,
   //   not the unconditional first-encounter override).
   //
+  // Mock seam — REAL ON-DISK CANON BYTES, not silent placeholder.
+  //   This is the ONLY test in the spec that drives a multi-problem chip-
+  //   advance walk. Per testing-and-ci.md §4.1.3 rule 3, multi-problem
+  //   chip-walk specs MUST serve real-canon MP3 bytes: the silent-MP3
+  //   placeholder used by the single-problem tests does NOT decode under
+  //   the genuine gesture-unlock chain, so the read-aloud→chip-enable
+  //   gate never releases and `toBeEnabled()` stalls (the chip-disabled
+  //   failure Kevin observed on `614d429`). `forceHowlerUnlock` is the
+  //   WRONG fix (§4.1.2 silent-demote: its stub-ctx breaks real-bytes
+  //   decode → silent static add-to-10 fallback → op:'+' with no sub
+  //   scaffold → stickiness assertion unsatisfiable). On-disk canon P1–P3
+  //   are `5-5`, `6-3`, `9-1`, all minuends ∈ [5,10], so the sub card
+  //   mounts on each — exactly the sticky-on walk this AC needs.
+  //
   // Classification:
   //   - card mounts on Q1, Q2, Q3 (sticky)        → RED-on-base LEVER
   //     post-W10.3 if Devon's decision were per-problem instead of
   //     per-session; today trivially the card never renders, so the
   //     first iteration is the load-bearing RED lever (count 1 vs 0).
+  //   - captured `focusNode === 'sub-to-10'`       → REGRESSION-LOCK
+  //     (passes on base; locks that the walk runs against the sub tier).
   test('sticky-on under low sub-facts fluency: minuend card mounts on Q1, Q2, Q3', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
 
-    await installClaudeMock(page, {
-      mathResponse: cannedSubToTenStickyStarter,
-    })
+    const canonBody = readMathCanon(SUB_TO_TEN_CANON_PATH)
+    const { requests } = await installSubToTenCanonClaudeMock(page, canonBody)
     await seedLocalStorage(page, {
       progress: buildSubToTenSubitisingSeed({
         subSessionsObserved: 5, // past first-encounter → tests the mean path
@@ -908,14 +941,19 @@ test.describe('sub-to-10 subitising scaffold — single-cell minuend (W10.5)', (
     await page.goto('/')
     await navigateToMath(page)
 
-    // Confirm canon landed (Q1 = `8 - 4`).
-    await expect(page.getByTestId('math-addend-a')).toHaveText('8', {
+    // Canon-landed gate: confirm the on-disk sub-to-10 canon reached the
+    // screen (canon Q1 = `5 - 5`), NOT a silent static add-to-10 fallback.
+    await expect(page.getByTestId('math-addend-a')).toHaveText('5', {
+      timeout: 15_000,
+    })
+    await expect(page.getByTestId('math-addend-b')).toHaveText('5', {
       timeout: 15_000,
     })
 
     // Walk Q1, Q2, Q3 via the `data-problem-index` DOM gate (0-based per
     // testing-and-ci.md §4.1.3 — Q1='0', Q2='1', Q3='2'). All three are
-    // in-band sub-to-10 minuends, so the sticky card must mount on each.
+    // in-band sub-to-10 minuends (5, 6, 9), so the sticky card must mount
+    // on each.
     for (let q = 0; q < 3; q++) {
       await expect(page.getByTestId('math')).toHaveAttribute(
         'data-problem-index',
@@ -926,7 +964,8 @@ test.describe('sub-to-10 subitising scaffold — single-cell minuend (W10.5)', (
         timeout: 5_000,
       })
 
-      // Advance to the next problem unless we've hit Q3.
+      // Advance to the next problem unless we've hit Q3. Real-canon MP3
+      // bytes decode → read-aloud resolves → the correct chip enables.
       if (q < 2) {
         const correctChip = page.locator(
           '[data-testid="math-chip"][data-correct="true"]',
@@ -935,6 +974,22 @@ test.describe('sub-to-10 subitising scaffold — single-cell minuend (W10.5)', (
         await correctChip.click()
       }
     }
+
+    // ── Regression-lock — captured-request positive discriminator ─────────
+    // Defensive-pairing per testing-and-ci.md §4.1 (toBeDefined gate
+    // before destructuring postData). Proves the walk ran against the
+    // sub-to-10 tier, not a silent wrong-tier fallback.
+    const mathReq = requests.find((r) => {
+      const payload = JSON.parse(r.postData() ?? '{}') as {
+        payload?: { track?: string; progress?: { focusNode?: string } }
+      }
+      return payload.payload?.track !== 'word-song'
+    })
+    expect(mathReq).toBeDefined()
+    const payload = JSON.parse(mathReq!.postData() ?? '{}') as {
+      payload?: { progress?: { focusNode?: string } }
+    }
+    expect(payload.payload?.progress?.focusNode).toBe('sub-to-10')
   })
 
   // ── Test 5 ─────────────────────────────────────────────────────────────────
