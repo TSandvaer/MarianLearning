@@ -2848,8 +2848,20 @@ function MathScreen({
             Container testid `math-sub-minuend-card` (on the overlay) is
             distinct from the add path's `math-dot-card`, so the existing
             `sub-to-10-dot-card-suppression` spec's `math-dot-card`
-            assertions stay correct. */}
-            {currentProblem.op === '-' && (
+            assertions stay correct.
+
+            Gating: the reserved band is gated on `subMinuendInScope`
+            (focus node `sub-to-10` + scaffold-active-this-session +
+            in-band minuend) — the SAME predicate as the scaffold itself —
+            NOT on a bare `op === '-'` (ticket 86ca7nam6 / Kevin's PR #369
+            NIT 1). An `op === '-'` gate over-reserved ~80px of empty band
+            on the locked sub-to-20 / two-digit-subtraction tiers, which
+            render no minuend cell. Byte-identical on sub-to-10: the
+            22-fact sub-to-10 pool (api/_planner.ts) has every minuend in
+            `[5,10]`, so `subMinuendInScope` is true on every problem of an
+            active sub-to-10 session — the band stays reserved across all 8
+            problems and the chip-row spacing is unchanged (§13.2.3). */}
+            {subMinuendInScope && (
               <div className="relative flex min-h-[80px] items-center justify-center">
                 {showSubMinuendOverlay && subMinuendValue !== null && (
                   <SubMinuendOverlay
