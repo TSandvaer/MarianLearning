@@ -465,6 +465,33 @@ export interface Profile {
    * are first-encounter regardless of `history` length.
    */
   subitisingScaffoldSessionsObserved?: number
+  /**
+   * Sub-to-10 subitising-scaffold first-encounter counter (ticket
+   * 86ca7kdw8 — `design/math/subitising-scaffold-content.md` §13.4.1).
+   *
+   * Sibling of `subitisingScaffoldSessionsObserved` above, but keyed to
+   * the `sub-to-10` tier. SEPARATE counter, NOT a reuse: addition and
+   * subtraction automaticity develop via distinct pathways (Dave's W10.1
+   * research § Source 5, Suárez-Pellicioni et al. 2020), so the sub-to-10
+   * scaffold must fade on Marian's SUBTRACTION fluency, not her addition
+   * fluency. Reusing the add counter would put the sub scaffold in
+   * late-fade mode on day 1 of the sub-to-10 rollout — wrong (§13.4).
+   *
+   * Increments once per session where the `sub-to-10` minuend scaffold
+   * actually rendered (any in-scope problem on a `sub-to-10` session).
+   * Range `[0, SCAFFOLD_SESSIONS_OBSERVED_CAP]` (4, the shared cap). The
+   * first 3 sub-to-10 scaffold sessions are unconditional (first-encounter
+   * gate, §13.4.3); session 4+ transitions to the
+   * `easyBandSubLeitnerMeanBox`-driven fade schedule.
+   *
+   * Optional additive field — NO `schemaVersion` bump (same precedent as
+   * `subitisingScaffoldSessionsObserved`, `parentSettings`, and
+   * `lifetimeFirstEncounters`). Missing → defaulted to 0 at read time by
+   * `readSubitisingScaffoldSubSessionsObserved` in
+   * `src/screens/Math/subitisingScaffold.ts` (greenfield = first
+   * encounter = unconditional scaffold).
+   */
+  subitisingScaffoldSubSessionsObserved?: number
 }
 
 /**

@@ -63,7 +63,9 @@ import {
 } from '../../lib/progress'
 import {
   SCAFFOLD_FOCUS_NODE,
+  SUB_SCAFFOLD_FOCUS_NODE,
   bumpSubitisingScaffoldSessionsObserved,
+  bumpSubitisingScaffoldSubSessionsObserved,
 } from '../Math/subitisingScaffold'
 import type { SessionEndSurface } from './SessionEnd'
 
@@ -224,6 +226,19 @@ export interface RecordProgressInput {
    */
   subitisingScaffoldRendered?: boolean
   /**
+   * Sub-to-10 sibling of `subitisingScaffoldRendered` (ticket 86ca7kdw8
+   * / spec §13.4.1). Whether the sub-to-10 minuend scaffold rendered on
+   * the just-completed session. Math-surface only.
+   *
+   * When `true` AND `surface === 'math'` AND
+   * `focusNode === SUB_SCAFFOLD_FOCUS_NODE` ('sub-to-10'), the writer
+   * bumps `profile.subitisingScaffoldSubSessionsObserved` by 1 (capped
+   * at `SCAFFOLD_SESSIONS_OBSERVED_CAP`). When `false` / absent, that
+   * counter is unchanged. SEPARATE from the add counter — distinct
+   * add/sub fluency pathways (§13.4).
+   */
+  subitisingScaffoldSubRendered?: boolean
+  /**
    * Per-problem first-tap chip value (Kevin schema-first PR,
    * 2026-05-21). Math only. When supplied, persists onto the recorded
    * `SessionHistoryEntry.perProblemAnswerValue` field.
@@ -335,6 +350,21 @@ export function recordProgressOnSessionEnd(
         )
       : existing.profile.subitisingScaffoldSessionsObserved
 
+  // Sub-to-10 minuend-scaffold counter (ticket 86ca7kdw8 §13.4.1). Same
+  // three-condition gate as the add counter above, but keyed to the
+  // SUB-TO-10 focus node + the separate `subitisingScaffoldSubRendered`
+  // flag — distinct add/sub fluency pathways (§13.4) mean the two
+  // counters must NEVER cross-contaminate. A `sub-to-10` session bumps
+  // ONLY the sub counter; an `add-to-10` session bumps ONLY the add one.
+  const nextScaffoldSubCounter =
+    input.surface === 'math' &&
+    input.focusNode === SUB_SCAFFOLD_FOCUS_NODE &&
+    input.subitisingScaffoldSubRendered === true
+      ? bumpSubitisingScaffoldSubSessionsObserved(
+          existing.profile.subitisingScaffoldSubSessionsObserved,
+        )
+      : existing.profile.subitisingScaffoldSubSessionsObserved
+
   const next: Progress = {
     ...existing,
     profile: {
@@ -345,6 +375,7 @@ export function recordProgressOnSessionEnd(
       // carried — no observable behaviour change for non-scaffold
       // sessions. For scaffold sessions, the bumped value lands.
       subitisingScaffoldSessionsObserved: nextScaffoldCounter,
+      subitisingScaffoldSubSessionsObserved: nextScaffoldSubCounter,
     },
     history: [...existing.history, entry],
     mathFactsLeitner: nextLeitner,
