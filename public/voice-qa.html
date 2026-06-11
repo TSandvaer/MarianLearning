@@ -782,14 +782,17 @@
       }
 
       // ── Rendering ────────────────────────────────────────────────────────
+      // Badge text MUST contain the lowercase state token (Jessica's e2e
+      // asserts /passed/i, /failed/i, /needs-retest/i, /untested/i on the
+      // vqa-state-<itemId> badge — PR #361). Keep the state word verbatim.
       function badgeLabel(state) {
         switch (state) {
           case 'passed':
-            return 'PASS'
+            return 'passed'
           case 'failed':
-            return 'FAIL'
+            return 'failed'
           case 'needs-retest':
-            return 'RE-TEST'
+            return 'needs-retest'
           default:
             return 'untested'
         }
@@ -839,6 +842,10 @@
         row.className = 'row'
         row.id = 'vqa-item-' + item.itemId
         row.setAttribute('data-testid', 'vqa-item-' + item.itemId)
+        // Expose the current audio hash so e2e can seed matching + stale
+        // verdicts and verify the needs-retest invalidation (PR #361 contract:
+        // data-audio-hash). Empty for an asset whose fetch failed.
+        row.setAttribute('data-audio-hash', item.audioHash || '')
 
         const badge = document.createElement('span')
         badge.setAttribute('data-testid', 'vqa-state-' + item.itemId)
@@ -1312,22 +1319,27 @@
       function renderFooter(canonUnique, rawCanon, greetCount, hubCount) {
         const expected = 632
         const ok = canonUnique === expected
+        const total = canonUnique + greetCount + hubCount
         const el = document.getElementById('footer')
+        // The vqa-render-count element's FIRST number must equal the total
+        // rendered row count (Jessica's AC1 reads its first \d+ and asserts
+        // == row count, PR #361). Total = canon-unique + greet + hub, which
+        // is exactly the number of rendered vqa-item-* rows by construction.
         el.innerHTML =
-          'Inventory: <strong>' +
+          '<span data-testid="vqa-render-count">Rendered <strong>' +
+          total +
+          '</strong> renders</span> = <strong>' +
           canonUnique +
-          '</strong> unique canon renders (deduped from ' +
+          '</strong> unique canon (deduped from ' +
           rawCanon +
           ' raw utterances by SHA-256 audio hash) + ' +
           greetCount +
           ' greet + ' +
           hubCount +
-          ' hub = <strong>' +
-          (canonUnique + greetCount + hubCount) +
-          '</strong> items. ' +
+          ' hub. ' +
           (ok
-            ? 'Computed unique-render count matches expected <code>632</code>. ✓'
-            : '<strong style="color:#a94442">Computed unique-render count = ' +
+            ? 'Computed unique canon count matches expected <code>632</code>. ✓'
+            : '<strong style="color:#a94442">Computed unique canon count = ' +
               canonUnique +
               ', expected 632 — DISCREPANCY.</strong>') +
           ' &nbsp;·&nbsp; <code>itemId</code> = canonical member <code>&lt;file-stem&gt;#&lt;utteranceId&gt;</code>.'
