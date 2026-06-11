@@ -15,17 +15,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import voiceQaEntrypoint, {
+  addGithubIssueComment,
   assertNodeRuntime,
   buildIssue,
+  buildReportComments,
   createGithubIssue,
   handler,
   isVoiceQaReportBody,
   secretsMatch,
   type FetchLike,
+  type VoiceQaCategory,
   type VoiceQaReportRequest,
   type VoiceQaVerdict,
 } from './voice-qa-report.js'
 import { createRateLimiter } from './_rateLimit.js'
+
+/** GitHub's hard limit on an issue/comment body. Mirrors the constant in
+ *  the endpoint; the chunking guarantee is "every body we POST < this". */
+const GITHUB_BODY_HARD_LIMIT = 65_536
 
 const SECRET = 'super-secret-qa-token'
 
@@ -39,18 +46,30 @@ function makeRequest(body: unknown, init: RequestInit = {}): Request {
   })
 }
 
-/** A stub fetch that returns a successful GitHub issue-create response. */
+/** A stub fetch that returns a successful GitHub issue-create response.
+ *  Records both the LAST call (back-compat) and EVERY call (for chunked
+ *  comment assertions). Issue-create returns html_url + number; comment
+ *  POSTs return a benign 201. */
+interface FetchCall {
+  url: string
+  init?: unknown
+}
 function makeGithubSuccessFetch(
   htmlUrl = 'https://github.com/TSandvaer/MarianLearning/issues/42',
-  capture: { lastUrl?: string; lastInit?: unknown } = {},
+  capture: { lastUrl?: string; lastInit?: unknown; calls?: FetchCall[] } = {},
+  issueNumber = 42,
 ): FetchLike {
+  capture.calls = capture.calls ?? []
   return vi.fn(async (url, init) => {
     capture.lastUrl = url
     capture.lastInit = init
+    capture.calls!.push({ url, init })
+    const isCommentPost = url.endsWith('/comments')
     return {
       ok: true,
       status: 201,
-      json: async () => ({ html_url: htmlUrl }),
+      json: async () =>
+        isCommentPost ? { id: 1 } : { html_url: htmlUrl, number: issueNumber },
       text: async () => '',
     }
   })
@@ -82,6 +101,61 @@ const SAMPLE_REPORT: VoiceQaReportRequest = {
   secret: SECRET,
   submittedAt: '2026-06-11T09:05:00.000Z',
   verdicts: SAMPLE_VERDICTS,
+}
+
+/** Deterministic 64-hex audio hash for index `n` (real sha256 length). */
+function fakeAudioHash(n: number): string {
+  // 64 hex chars; vary the leading bytes by index so they're all distinct.
+  const head = (n >>> 0).toString(16).padStart(8, '0')
+  return (head + 'a3f9c1e07b2d4856').repeat(4).slice(0, 64)
+}
+
+const FAIL_CATEGORIES: VoiceQaCategory[] = [
+  'mispronounced',
+  'wrong-speed',
+  'clipped',
+  'volume',
+  'wrong-text',
+  'other',
+]
+
+/**
+ * Build a realistic full-baseline batch: `total` verdicts, every Nth a fail
+ * with a category + a human note, the rest passes. Real-length 64-hex
+ * audioHashes + ISO timestamps. Mirrors what the audition page submits
+ * (passes included) — the contract's full set is 654 (632 canon + 22
+ * greet/hub).
+ */
+function makeFullBaseline(total: number): VoiceQaReportRequest {
+  const verdicts: VoiceQaVerdict[] = []
+  const base = Date.parse('2026-06-11T08:00:00.000Z')
+  for (let i = 0; i < total; i++) {
+    const decidedAt = new Date(base + i * 1500).toISOString()
+    // ~1 in 7 fails, so a realistic minority of the batch.
+    const isFail = i % 7 === 3
+    if (isFail) {
+      verdicts.push({
+        itemId: `canon.cell.${i.toString().padStart(4, '0')}.read`,
+        audioHash: fakeAudioHash(i),
+        verdict: 'fail',
+        category: FAIL_CATEGORIES[i % FAIL_CATEGORIES.length]!,
+        note: `cell ${i}: clipped final phoneme, sounds like it cuts at ~0.8s — re-bake`,
+        decidedAt,
+      })
+    } else {
+      verdicts.push({
+        itemId: `canon.cell.${i.toString().padStart(4, '0')}.read`,
+        audioHash: fakeAudioHash(i),
+        verdict: 'pass',
+        decidedAt,
+      })
+    }
+  }
+  return {
+    secret: SECRET,
+    submittedAt: '2026-06-11T09:05:00.000Z',
+    verdicts,
+  }
 }
 
 beforeEach(() => {
@@ -151,6 +225,23 @@ describe('isVoiceQaReportBody', () => {
 
   it('rejects a missing submittedAt', () => {
     expect(isVoiceQaReportBody({ verdicts: SAMPLE_VERDICTS })).toBe(false)
+  })
+
+  it('rejects a submittedAt that does not parse as a date', () => {
+    expect(
+      isVoiceQaReportBody({
+        submittedAt: 'not-a-real-date',
+        verdicts: SAMPLE_VERDICTS,
+      }),
+    ).toBe(false)
+  })
+
+  it('accepts MAX_VERDICTS-sized batch but rejects one over (cap clears 654 baseline)', () => {
+    // 654 (the contract's full baseline) must be accepted.
+    expect(isVoiceQaReportBody(makeFullBaseline(654))).toBe(true)
+    // 2000 (the cap) is accepted; 2001 is rejected.
+    expect(isVoiceQaReportBody(makeFullBaseline(2000))).toBe(true)
+    expect(isVoiceQaReportBody(makeFullBaseline(2001))).toBe(false)
   })
 
   it('rejects an empty verdicts array', () => {
@@ -291,21 +382,191 @@ describe('buildIssue', () => {
     const { body } = buildIssue(report)
     expect(body).toContain("line one line 'two'")
   })
+
+  it('inlines the full report JSON for a small batch (no comments)', () => {
+    const { body, comments } = buildIssue(SAMPLE_REPORT)
+    expect(comments).toEqual([])
+    // The full JSON (passes included) is present inline.
+    const match = body.match(/```json\n([\s\S]*?)\n```/)
+    expect(match).not.toBeNull()
+    const parsed = JSON.parse(match![1]!)
+    expect(parsed.verdicts).toHaveLength(2)
+  })
+})
+
+/**
+ * The blocking-#2 fix: full-baseline submission (654 verdicts, passes
+ * included) must NOT overflow GitHub's 65,536-char body limit. The issue
+ * body carries only the fail summary + fails-only JSON; the FULL report
+ * ships across `part i/N` follow-up comments, each under the limit, and the
+ * chunks reassemble losslessly to the exact full-report JSON.
+ */
+describe('buildIssue — full-baseline chunking (654 verdicts)', () => {
+  const REPORT = makeFullBaseline(654)
+
+  it('keeps the issue body well under the GitHub 65,536-char limit', () => {
+    const { body } = buildIssue(REPORT)
+    expect(body.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+  })
+
+  it('ships the full report across follow-up comments, not the body', () => {
+    const { body, comments } = buildIssue(REPORT)
+    expect(comments.length).toBeGreaterThan(0)
+    // Body must NOT contain the full report (which includes passes) — only
+    // the fails-only payload + a pointer to the comments.
+    expect(body).toContain('follow-up comment')
+    expect(body).toContain('Fails-only JSON')
+    // Body's inline JSON is fails-only; every entry is a fail.
+    const inline = body.match(/```json\n([\s\S]*?)\n```/)
+    expect(inline).not.toBeNull()
+    const failsOnly = JSON.parse(inline![1]!) as {
+      fails: VoiceQaVerdict[]
+    }
+    expect(failsOnly.fails.every((f) => f.verdict === 'fail')).toBe(true)
+    expect(failsOnly.fails.length).toBeGreaterThan(0)
+    expect(failsOnly.fails.length).toBeLessThan(REPORT.verdicts.length)
+  })
+
+  it('every comment body is under the GitHub 65,536-char limit', () => {
+    const { comments } = buildIssue(REPORT)
+    for (const c of comments) {
+      expect(c.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    }
+  })
+
+  it('labels each comment part i/N in order', () => {
+    const { comments } = buildIssue(REPORT)
+    const n = comments.length
+    comments.forEach((c, idx) => {
+      expect(c).toContain(`voice-qa-report part ${idx + 1}/${n}`)
+    })
+  })
+
+  it('reassembles the chunk payloads into the exact full-report JSON', () => {
+    const { comments } = buildIssue(REPORT)
+    // Extract the fenced ```json payload from each part and concatenate in
+    // order — this is exactly what the orchestrator does on reassembly.
+    const payloads = comments.map((c) => {
+      const m = c.match(/```json\n([\s\S]*?)\n```/)
+      expect(m).not.toBeNull()
+      return m![1]!
+    })
+    const reassembled = payloads.join('')
+    const parsed = JSON.parse(reassembled) as {
+      submittedAt: string
+      verdicts: VoiceQaVerdict[]
+    }
+    expect(parsed.submittedAt).toBe(REPORT.submittedAt)
+    expect(parsed.verdicts).toHaveLength(654)
+    // Round-trips the full set incl. passes; secret absent.
+    expect((parsed as Record<string, unknown>).secret).toBeUndefined()
+    expect(
+      parsed.verdicts.filter((v) => v.verdict === 'pass').length,
+    ).toBeGreaterThan(0)
+    // And it equals the canonical full JSON the endpoint would have built.
+    const canonical = JSON.stringify(
+      { submittedAt: REPORT.submittedAt, verdicts: REPORT.verdicts },
+      null,
+      2,
+    )
+    expect(reassembled).toBe(canonical)
+  })
+
+  it('handler posts the issue + every chunk comment, all under the limit', async () => {
+    const capture: { calls?: FetchCall[] } = {}
+    const fetchImpl = makeGithubSuccessFetch(undefined, capture, 314)
+    const res = await handler(makeRequest(REPORT), {
+      fetchImpl,
+      rateLimiter: freshLimiter(),
+    })
+    expect(res.status).toBe(200)
+    const calls = capture.calls!
+    // First call creates the issue; the rest post comments to issue #314.
+    expect(calls[0]!.url).toBe(
+      'https://api.github.com/repos/TSandvaer/MarianLearning/issues',
+    )
+    const commentCalls = calls.slice(1)
+    expect(commentCalls.length).toBeGreaterThan(0)
+    for (const call of commentCalls) {
+      expect(call.url).toBe(
+        'https://api.github.com/repos/TSandvaer/MarianLearning/issues/314/comments',
+      )
+      const init = call.init as { body: string }
+      const postedBody = JSON.parse(init.body).body as string
+      expect(postedBody.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    }
+  })
+})
+
+describe('buildReportComments (chunk-splitter unit)', () => {
+  it('returns a single comment when the JSON is small', () => {
+    const comments = buildReportComments('{"x":1}')
+    expect(comments).toHaveLength(1)
+    expect(comments[0]).toContain('voice-qa-report part 1/1')
+  })
+
+  it('splits a large JSON string into multiple bounded comments', () => {
+    const big = 'x'.repeat(150_000)
+    const comments = buildReportComments(big)
+    expect(comments.length).toBeGreaterThan(1)
+    for (const c of comments) {
+      expect(c.length).toBeLessThan(GITHUB_BODY_HARD_LIMIT)
+    }
+    // Reassemble the raw payload slices — must equal the original string.
+    const reassembled = comments
+      .map((c) => c.match(/```json\n([\s\S]*?)\n```/)![1]!)
+      .join('')
+    expect(reassembled).toBe(big)
+  })
+
+  it('uses a fence longer than any backtick run so notes with ``` survive', () => {
+    // Full report containing a note with a literal triple-backtick. A fixed
+    // ```json fence would close early and corrupt reassembly; the adaptive
+    // fence (4+ backticks here) must keep the payload intact.
+    const payload = JSON.stringify({
+      submittedAt: '2026-06-11T09:05:00.000Z',
+      verdicts: [
+        {
+          itemId: 'x',
+          audioHash: 'h',
+          verdict: 'fail',
+          note: 'reviewer pasted ``` a code fence ``` into the note',
+          decidedAt: '2026-06-11T09:00:00.000Z',
+        },
+      ],
+    })
+    const comments = buildReportComments(payload)
+    expect(comments).toHaveLength(1)
+    // The fence opener must be ≥4 backticks (longest run inside is 3).
+    const fenceMatch = comments[0]!.match(/^<!--[^>]*-->\n(`{4,})json\n/)
+    expect(fenceMatch).not.toBeNull()
+    const fence = fenceMatch![1]!
+    // Reassemble using the actual fence length and confirm exact bytes.
+    const inner = comments[0]!.match(
+      new RegExp(`${fence}json\\n([\\s\\S]*?)\\n${fence}`),
+    )![1]!
+    expect(inner).toBe(payload)
+    expect(JSON.parse(inner).verdicts[0].note).toContain('``` a code fence ```')
+  })
 })
 
 describe('createGithubIssue', () => {
-  it('POSTs to the issues endpoint with the voice-qa label and returns html_url', async () => {
+  it('POSTs to the issues endpoint with the voice-qa label and returns html_url + number', async () => {
     const capture: { lastUrl?: string; lastInit?: unknown } = {}
     const fetchImpl = makeGithubSuccessFetch(
       'https://github.com/TSandvaer/MarianLearning/issues/7',
       capture,
+      7,
     )
-    const url = await createGithubIssue(
-      { title: 'T', body: 'B' },
+    const created = await createGithubIssue(
+      { title: 'T', body: 'B', comments: [] },
       'ghp_test',
       fetchImpl,
     )
-    expect(url).toBe('https://github.com/TSandvaer/MarianLearning/issues/7')
+    expect(created.htmlUrl).toBe(
+      'https://github.com/TSandvaer/MarianLearning/issues/7',
+    )
+    expect(created.number).toBe(7)
     expect(capture.lastUrl).toBe(
       'https://api.github.com/repos/TSandvaer/MarianLearning/issues',
     )
@@ -328,7 +589,11 @@ describe('createGithubIssue', () => {
       text: async () => 'Validation failed',
     }))
     await expect(
-      createGithubIssue({ title: 'T', body: 'B' }, 'ghp_test', fetchImpl),
+      createGithubIssue(
+        { title: 'T', body: 'B', comments: [] },
+        'ghp_test',
+        fetchImpl,
+      ),
     ).rejects.toThrow(/github issue create failed: 422/)
   })
 
@@ -336,12 +601,58 @@ describe('createGithubIssue', () => {
     const fetchImpl: FetchLike = vi.fn(async () => ({
       ok: true,
       status: 201,
-      json: async () => ({}),
+      json: async () => ({ number: 1 }),
       text: async () => '',
     }))
     await expect(
-      createGithubIssue({ title: 'T', body: 'B' }, 'ghp_test', fetchImpl),
+      createGithubIssue(
+        { title: 'T', body: 'B', comments: [] },
+        'ghp_test',
+        fetchImpl,
+      ),
     ).rejects.toThrow(/no html_url/)
+  })
+
+  it('throws when GitHub returns no issue number', async () => {
+    const fetchImpl: FetchLike = vi.fn(async () => ({
+      ok: true,
+      status: 201,
+      json: async () => ({ html_url: 'https://github.com/x/y/issues/1' }),
+      text: async () => '',
+    }))
+    await expect(
+      createGithubIssue(
+        { title: 'T', body: 'B', comments: [] },
+        'ghp_test',
+        fetchImpl,
+      ),
+    ).rejects.toThrow(/no issue number/)
+  })
+})
+
+describe('addGithubIssueComment', () => {
+  it('POSTs to the issue comments endpoint with the chunk body', async () => {
+    const capture: { lastUrl?: string; lastInit?: unknown } = {}
+    const fetchImpl = makeGithubSuccessFetch(undefined, capture, 9)
+    await addGithubIssueComment(9, 'chunk body', 'ghp_test', fetchImpl)
+    expect(capture.lastUrl).toBe(
+      'https://api.github.com/repos/TSandvaer/MarianLearning/issues/9/comments',
+    )
+    const init = capture.lastInit as { method: string; body: string }
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body).body).toBe('chunk body')
+  })
+
+  it('throws on a non-2xx GitHub response', async () => {
+    const fetchImpl: FetchLike = vi.fn(async () => ({
+      ok: false,
+      status: 422,
+      json: async () => ({}),
+      text: async () => 'Validation failed',
+    }))
+    await expect(
+      addGithubIssueComment(9, 'chunk body', 'ghp_test', fetchImpl),
+    ).rejects.toThrow(/github issue comment failed: 422/)
   })
 })
 
@@ -434,6 +745,20 @@ describe('handler — status contract', () => {
       { fetchImpl: makeGithubSuccessFetch(), rateLimiter: freshLimiter() },
     )
     expect(res.status).toBe(401)
+  })
+
+  it('400: authenticated but submittedAt does not parse as a date', async () => {
+    const res = await handler(
+      makeRequest({
+        secret: SECRET,
+        submittedAt: 'yesterday-ish',
+        verdicts: SAMPLE_VERDICTS,
+      }),
+      { fetchImpl: makeGithubSuccessFetch(), rateLimiter: freshLimiter() },
+    )
+    expect(res.status).toBe(400)
+    const json = (await res.json()) as { ok: boolean; error: string }
+    expect(json.error).toMatch(/malformed body/)
   })
 
   it('400: well-authenticated but malformed body (bad verdict)', async () => {
