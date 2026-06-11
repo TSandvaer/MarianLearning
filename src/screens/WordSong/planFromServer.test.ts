@@ -353,18 +353,55 @@ describe('parseReadLine — content-type discriminant routing (86c9kxp08)', () =
     expect(result.contentType).toBe('cvc-word')
   })
 
-  it('is case-insensitive on both templates', () => {
-    expect(parseReadLine('tap the bat.').contentType).toBe('blending-cv')
-    expect(parseReadLine('READ THE BAT.').contentType).toBe('cvc-word')
+  it('routes "Find the word: <word>." to contentType: sight-word (Wave 11, 86ca7xmr8)', () => {
+    // Sight-words tier whole-word-recognition template. The target
+    // resolves via the same wordPack lookup as the CVC tiers (sight words
+    // are real TARGET_WORDS entries), so the returned entry carries the
+    // sight-word data (sightWord: true, no vowel).
+    const result = parseReadLine('Find the word: the.')
+    expect(result.entry.word).toBe('the')
+    expect(result.contentType).toBe('sight-word')
+    expect(result.entry.sightWord).toBe(true)
   })
 
-  it('rejects words outside the target list on both templates', () => {
+  it('parses sight-word targets that overlap the CVC pool (dual-role: can)', () => {
+    // `can` is dual-role (short-a CVC target AND sight word). The
+    // "Find the word:" template routes it to the sight-word contentType
+    // regardless of its CVC vowel data — the per-problem contentType is
+    // the render discriminant.
+    const result = parseReadLine('Find the word: can.')
+    expect(result.entry.word).toBe('can')
+    expect(result.contentType).toBe('sight-word')
+  })
+
+  it('is case-insensitive on all word-tier templates', () => {
+    expect(parseReadLine('tap the bat.').contentType).toBe('blending-cv')
+    expect(parseReadLine('READ THE BAT.').contentType).toBe('cvc-word')
+    expect(parseReadLine('FIND THE WORD: GO.').contentType).toBe('sight-word')
+  })
+
+  it('rejects words outside the target list on all word-tier templates', () => {
     // After the short-e promotion (ticket 86c9teua2) flipped `pen` to
     // `isTarget: true`, `DISTRACTOR_ONLY_WORDS` is empty. Use `'ten'`
     // (rejected from the short-e audit §1; not in any vowel pool) as
-    // the in-shape non-target.
+    // the in-shape non-target. For sight-word, `'cat'` IS a real target
+    // but not a sight word — yet the template only checks TARGET_WORD_SET
+    // membership (cat IS a target), so use `'ten'` here too for the
+    // genuine non-target rejection.
     expect(() => parseReadLine('Tap the ten.')).toThrow(/non-target word/)
     expect(() => parseReadLine('Read the ten.')).toThrow(/non-target word/)
+    expect(() => parseReadLine('Find the word: ten.')).toThrow(
+      /non-target word/,
+    )
+  })
+
+  it('does NOT match a bare "Find the <word>." (missing the "word:" keyword)', () => {
+    // Guard the template boundary: only "Find the word: <X>." is the
+    // sight-word shape. "Find the cat." stays an unrecognised template
+    // (it must NOT be greedily captured as a sight word).
+    expect(() => parseReadLine('Find the cat.')).toThrow(
+      /did not match any known template/,
+    )
   })
 
   it('rejects unrecognised templates with a helpful message', () => {

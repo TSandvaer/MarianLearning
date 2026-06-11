@@ -333,6 +333,21 @@ const READ_LINE_TEMPLATES: ReadonlyArray<{
     pattern: /^\s*read\s+the\s+([a-z]+)\s*\.\s*$/i,
     label: '"Read the <word>."',
   },
+  {
+    contentType: 'sight-word',
+    // Sight-words tier (Wave 11, ticket 86ca7xmr8). Distinct verb
+    // ("find the word:") — no greedy-match overlap with the `tap the` /
+    // `read the` word-tier templates, so order among the word-tier
+    // templates is not load-bearing. The captured target is
+    // membership-checked against `TARGET_WORD_SET` and resolved via
+    // `getWordEntry` exactly like the CVC tiers (sight words are real
+    // `wordPack.ts` entries, NOT synthesized sentinels). Whole-word
+    // RECOGNITION, not decoding — see the `WordSongContentType` docstring
+    // in `wordSessionPlans.ts`. The colon in "Find the word:" is part of
+    // the verb phrase; `[a-z]+` captures the single target token after it.
+    pattern: /^\s*find\s+the\s+word:\s+([a-z]+)\s*\.\s*$/i,
+    label: '"Find the word: <word>."',
+  },
 ]
 
 const ACCEPTED_TEMPLATES_LABEL = READ_LINE_TEMPLATES.map((t) => t.label).join(
@@ -363,11 +378,18 @@ const ACCEPTED_TEMPLATES_LABEL = READ_LINE_TEMPLATES.map((t) => t.label).join(
  *   - "Tap the <word>." → contentType: 'blending-cv'
  *   - "Read the <word>." → contentType: 'cvc-word' (parser-only today;
  *     planner does not emit this until step 2 — see file header)
+ *   - "Find the word: <word>." → contentType: 'sight-word' (Wave 11,
+ *     ticket 86ca7xmr8). `<word>` is a high-frequency sight word
+ *     (the, a, was, said, ...) membership-checked against
+ *     `TARGET_WORD_SET` and resolved via `getWordEntry` exactly like the
+ *     CVC tiers — sight words are real `wordPack.ts` entries, NOT
+ *     synthesized sentinels. Whole-word RECOGNITION, not decoding.
  *
- * For the two word-tier templates, the word is membership-checked
- * against the wordPack target set so distractor-only entries (`bus`,
- * `sun`, etc.) cannot slip through. For the letter-tier templates the
- * pool check is tier-specific — `LETTER_GLYPH_POOL` (52-glyph ASCII set)
+ * For the three word-tier templates (blending-cv / cvc-word /
+ * sight-word), the word is membership-checked against the wordPack
+ * target set so distractor-only entries (`bus`, `sun`, etc.) cannot slip
+ * through. For the letter-tier templates the pool check is tier-specific
+ * — `LETTER_GLYPH_POOL` (52-glyph ASCII set)
  * for letter-names, `LETTER_SOUND_MNEMONIC_POOL` (19 mnemonics) for
  * letter-sounds — and the parser synthesizes a sentinel `WordEntry`
  * (no wordPack lookup; letter glyphs do not exist in `wordPack.ts`).

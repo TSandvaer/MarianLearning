@@ -675,6 +675,90 @@ export function renderFourSubjectHint(
   )
 }
 
+/**
+ * Phonologically-weak sight words that de-stress to an inaudible schwa as
+ * bare TTS tokens (Dave's W11-01 ruling, ticket 86ca7xmr8). On the iPad
+ * speaker "Find the word: the." or "Look. The." swallows the target word
+ * to near-silence unless the target token is stressed. Dave prescribed
+ * `<emphasis level="strong">` — but en-GB-OliviaNeural IGNORES `<emphasis>`
+ * (byte-identical re-render; documented in planner-and-canon.md
+ * §"SSML-on-Olivia findings" + PR #384). Olivia DOES honour `<prosody>`,
+ * so we implement Dave's INTENT via a pitch-lift + slight rate-slow on the
+ * target token — the same mechanism `renderFourSubjectHint` uses to rescue
+ * the de-stressed mid-sentence "Four". Pitch is the stress lever on this
+ * voice (PR #384).
+ */
+const SIGHT_WORDS_WEAK_TOKENS: ReadonlySet<string> = new Set([
+  'the',
+  'a',
+  'of',
+  'in',
+  'to',
+])
+
+/** Stress prosody for a weak sight-word target token. Pitch-lift restores
+ *  audible stress; the small rate-slow lengthens the vowel so the word
+ *  isn't swallowed by the carrier. Slightly stronger lift than the
+ *  question-prosody (+8% / -5%) because these tokens start from a
+ *  de-stressed schwa and need more rescue. */
+const SIGHT_WORD_STRESS_OPEN = '<prosody pitch="+10%" rate="-10%">'
+const SIGHT_WORD_STRESS_CLOSE = '</prosody>'
+
+/**
+ * Sight-words tier inner-text rendering (ticket 86ca7xmr8, Wave 11). The
+ * sight-words mechanic uses three utterance shapes whose TARGET token sits
+ * at a fixed position:
+ *   - read:    "Find the word: <word>."   → target after the colon
+ *   - hint:    "Look. <Word>."            → target after "Look."
+ *   - correct: "Yes! <Word>."             → target after "Yes!"
+ * When the target token is one of the phonologically-weak words
+ * (the/a/of/in/to) it is wrapped in the stress prosody above so it stays
+ * audible on the iPad speaker. Crucially, ONLY the TARGET token is
+ * wrapped — the carrier "the" in "Find the word:" stays bare prose, so a
+ * read line "Find the word: the." stresses only the second "the".
+ *
+ * Returns the rendered inner SSML for a matched sight-words utterance, or
+ * `null` to fall through to the default plain-text path (which handles
+ * non-weak targets — "was", "said", "go", etc. — unchanged, since those
+ * are not in SIGHT_WORDS_WEAK_TOKENS and need no stress fix).
+ *
+ * The canon utterance TEXT stays plain ("Find the word: the.") — the
+ * stress is a bake-time render detail, transparent to the browser parser
+ * (which never sees the SSML). This mirrors the letter-sounds
+ * mnemonic-wrap architecture: text plain, audio shaped.
+ */
+export function renderSightWordsInnerText(
+  text: string,
+  tierFilter?: string,
+): string | null {
+  if (tierFilter !== 'sight-words') return null
+  // Each pattern captures: group 1 = the carrier prefix (escaped as-is),
+  // group 2 = the target token, group 3 = the trailing terminal + ws.
+  const shapes: ReadonlyArray<RegExp> = [
+    /^(Find the word:\s+)([A-Za-z]+)(\.\s*)$/,
+    /^(Look\.\s+)([A-Za-z]+)(\.\s*)$/,
+    /^(Yes!\s+)([A-Za-z]+)(\.\s*)$/,
+  ]
+  for (const shape of shapes) {
+    const m = shape.exec(text)
+    if (m === null) continue
+    const prefix = m[1]!
+    const token = m[2]!
+    const tail = m[3]!
+    if (!SIGHT_WORDS_WEAK_TOKENS.has(token.toLowerCase())) {
+      // Strong-enough target (was/said/go/...) — no stress fix needed.
+      // Fall through to the default plain-text path for byte-stability.
+      return null
+    }
+    return (
+      `${escapeSsml(prefix)}` +
+      `${SIGHT_WORD_STRESS_OPEN}${escapeSsml(token)}${SIGHT_WORD_STRESS_CLOSE}` +
+      `${escapeSsml(tail)}`
+    )
+  }
+  return null
+}
+
 /** Render the inner-text region of the SSML body — the bit between
  *  `<prosody>` and `</prosody>`. Plain text is XML-escaped; if the
  *  utterance is a trailing interrogative (ends with `?`), the trailing
@@ -759,6 +843,12 @@ export function renderSsmlInnerText(text: string, tierFilter?: string): string {
   // utterance (all baseline-passing) stays byte-identical.
   const fourSubjectHint = renderFourSubjectHint(text, tierFilter)
   if (fourSubjectHint !== null) return fourSubjectHint
+  // Sight-words tier (ticket 86ca7xmr8): phonologically-weak target words
+  // (the/a/of/in/to) get a stress prosody on the TARGET token so they
+  // stay audible on the iPad speaker. Strong targets (was/said/go/...)
+  // and non-sight-words tiers return null and fall through unchanged.
+  const sightWord = renderSightWordsInnerText(text, tierFilter)
+  if (sightWord !== null) return sightWord
   // Use the original text for boundary detection (we want to operate on
   // un-escaped characters). Trailing whitespace doesn't matter for the
   // ends-in-? check.
