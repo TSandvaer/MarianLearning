@@ -49,6 +49,18 @@ const PAGE_URL = '/voice-qa.html'
 const VERDICTS_KEY = 'vqa-verdicts'
 const SECRET_KEY = 'vqa-secret'
 
+/**
+ * The page hashes all 632 canon items (SHA-256) on every load/reload, yielding
+ * to the event loop every 40 items. On the WebKit engine (the iPad-Safari
+ * surrogate) this pass is ~3-4x slower than Chromium and routinely exceeds the
+ * default 10 s `expect` timeout — empirically it sat at "Hashing canon — 11 / 23
+ * files" at the 10 s mark. The page IS correct; the rows + footer just render
+ * later. Every readiness wait therefore uses this generous budget (well under
+ * the 90 s per-test ceiling). Verified locally on WebKit: full hash + render
+ * completes comfortably inside this window.
+ */
+const PAGE_READY_TIMEOUT_MS = 45_000
+
 /** The full category union from the contract. */
 type FailCategory =
   | 'mispronounced'
@@ -132,6 +144,20 @@ async function rowAudioHash(page: Page, itemId: string): Promise<string> {
   return hash!
 }
 
+/**
+ * Block until the page has finished its async canon-hash pass and rendered the
+ * full row set. The footer (`vqa-render-count`) is written LAST — only after
+ * every canon/greet/hub row is appended to the DOM — so its visibility is the
+ * single canonical "page is ready" signal. Uses the WebKit-sized budget
+ * (`PAGE_READY_TIMEOUT_MS`) so the slower iPad engine's hash loop has room to
+ * complete. Call this after EVERY `goto`/`reload` before touching rows.
+ */
+async function waitForPageReady(page: Page): Promise<void> {
+  await expect(page.getByTestId('vqa-render-count')).toBeVisible({
+    timeout: PAGE_READY_TIMEOUT_MS,
+  })
+}
+
 test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () => {
   test('AC1 — page renders canon + Greet + Hub groups; footer shows numeric unique-render count', async ({
     page,
@@ -143,6 +169,18 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     // page. The row-count >= 1 + footer-count-equals-row-count pairing is the
     // load-bearing lever.
     await page.goto(PAGE_URL)
+
+    // The page hashes 632 canon items asynchronously on mount (status banner
+    // ticks "Hashing canon — N / 23 files…" then settles to "Ready"). Rows are
+    // appended in order — canon groups, THEN Greet, THEN Hub — and the footer
+    // `vqa-render-count` is written LAST, only after every row is in the DOM.
+    // The footer's appearance is therefore the "all rows rendered" signal: we
+    // wait for it (web-first auto-retrying assertion, WebKit-sized budget)
+    // BEFORE the one-shot row count, so `.count()` never races a partial
+    // render. A bare `.count()` immediately after `goto` reads 0 (hashing
+    // still in flight).
+    await waitForPageReady(page)
+    const footer = page.getByTestId('vqa-render-count')
 
     const rows = page.locator('[data-testid^="vqa-item-"]')
     const rowCount = await rows.count()
@@ -173,8 +211,6 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     // numeric AND equals the actual rendered row count — NOT a hardcoded 632
     // literal (the page derives the number from data; pinning 632 would break
     // the moment canon re-bakes change the dedup-group count).
-    const footer = page.getByTestId('vqa-render-count')
-    await expect(footer).toBeVisible()
     const footerText = (await footer.textContent()) ?? ''
     const match = footerText.match(/\d+/)
     expect(match, `footer "${footerText}" has no numeric count`).not.toBeNull()
@@ -193,6 +229,7 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     // `.toEqual`/`.toBe` (never `.toContain`) per the count-assertion rules.
     await seedVqaStorage(page, { secret: 'qa-secret-token' })
     await page.goto(PAGE_URL)
+    await waitForPageReady(page)
 
     const itemId = await firstItemId(page)
     const row = page.getByTestId(`vqa-item-${itemId}`)
@@ -207,8 +244,10 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     expect(Object.keys(beforeReload)).toEqual([itemId])
     expect(beforeReload[itemId].verdict).toBe('pass')
 
-    // Reload — the page must re-hydrate the verdict from localStorage.
+    // Reload — the page must re-hydrate the verdict from localStorage. The
+    // re-hash runs again on reload, so re-wait for ready before asserting.
     await page.reload()
+    await waitForPageReady(page)
     await expect(page.getByTestId(`vqa-state-${itemId}`)).toHaveText(/passed/i)
     const afterReload = await readVerdicts(page)
     expect(afterReload[itemId].verdict).toBe('pass')
@@ -224,6 +263,7 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     // equality is the load-bearing assertion.
     await seedVqaStorage(page, { secret: 'qa-secret-token' })
     await page.goto(PAGE_URL)
+    await waitForPageReady(page)
 
     const itemId = await firstItemId(page)
     const row = page.getByTestId(`vqa-item-${itemId}`)
@@ -260,7 +300,19 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     //
     // Strategy: render once with no verdicts to learn the first itemId + its
     // audioHash, seed a matching 'pass' verdict, reload, then exercise filters.
+    //
+    // IMPLEMENTATION NOTE (PR #363 cross-review, Kevin 2026-06-11): the page
+    // filters by HIDING rows via the `[hidden]` attribute (state-preserving,
+    // contract-compliant) — filtered-out rows stay in the DOM. Playwright's
+    // `toHaveCount()` counts ALL matched DOM nodes regardless of visibility, so
+    // an unfiltered `[data-testid^="vqa-item-"]` locator reports 654 even after
+    // a filter. We therefore scope every filter assertion to the VISIBLE subset
+    // via Playwright's `:visible` pseudo-class. Per-item presence/absence is
+    // asserted with `toBeVisible()` / `toBeHidden()` (NOT `toHaveCount(0)`,
+    // which would also pass if the row were absent — but the row is present-yet-
+    // hidden, so visibility is the correct contract surface).
     await page.goto(PAGE_URL)
+    await waitForPageReady(page)
     const itemId = await firstItemId(page)
     const audioHash = await rowAudioHash(page, itemId)
 
@@ -275,27 +327,31 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
       verdicts: { [itemId]: passedVerdict },
     })
     await page.reload()
+    await waitForPageReady(page)
 
-    const rows = page.locator('[data-testid^="vqa-item-"]')
+    // VISIBLE rows only — the page hides filtered rows via `[hidden]` rather
+    // than removing them, so the locator must filter to `:visible`.
+    const visibleRows = page.locator('[data-testid^="vqa-item-"]:visible')
+    const seededRow = page.getByTestId(`vqa-item-${itemId}`)
 
     // Filter: all -> baseline visible count (every row).
     await page.getByTestId('vqa-filter-all').click()
-    const totalVisible = await rows.count()
+    const totalVisible = await visibleRows.count()
     expect(totalVisible).toBeGreaterThan(0)
 
     // Filter: passed -> exactly the one seeded passed row, and it IS our item.
     await page.getByTestId('vqa-filter-passed').click()
-    await expect(rows).toHaveCount(1)
-    await expect(page.getByTestId(`vqa-item-${itemId}`)).toBeVisible()
+    await expect(visibleRows).toHaveCount(1)
+    await expect(seededRow).toBeVisible()
 
     // Filter: untested -> the passed row is excluded; visible == total - 1.
     await page.getByTestId('vqa-filter-untested').click()
-    await expect(rows).toHaveCount(totalVisible - 1)
-    await expect(page.getByTestId(`vqa-item-${itemId}`)).toHaveCount(0)
+    await expect(visibleRows).toHaveCount(totalVisible - 1)
+    await expect(seededRow).toBeHidden()
 
-    // Filter: failed -> nothing seeded as failed -> zero rows.
+    // Filter: failed -> nothing seeded as failed -> zero visible rows.
     await page.getByTestId('vqa-filter-failed').click()
-    await expect(rows).toHaveCount(0)
+    await expect(visibleRows).toHaveCount(0)
   })
 
   test('AC5 — submit posts the full verdict set; mocked endpoint surfaces the issue URL', async ({
@@ -314,6 +370,7 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     // proving the payload includes passes (per AC5: "full verdict set incl.
     // passes").
     await page.goto(PAGE_URL)
+    await waitForPageReady(page)
     const itemId = await firstItemId(page)
     const audioHash = await rowAudioHash(page, itemId)
 
@@ -341,6 +398,7 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     })
 
     await page.reload()
+    await waitForPageReady(page)
     await page.getByTestId('vqa-submit').click()
 
     // The page shows the returned issue URL (link or text).
@@ -385,6 +443,7 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
     // seed a verdict for that item with a DELIBERATELY-WRONG audioHash, reload,
     // and assert the badge reads needs-retest (NOT passed/failed).
     await page.goto(PAGE_URL)
+    await waitForPageReady(page)
     const itemId = await firstItemId(page)
     const currentHash = await rowAudioHash(page, itemId)
 
@@ -402,6 +461,7 @@ test.describe('Voice-QA page — objective invariants (VQA.3 / 86ca7eraj)', () =
       verdicts: { [itemId]: staleVerdict },
     })
     await page.reload()
+    await waitForPageReady(page)
 
     // Badge must read needs-retest because the stored hash != rendered hash.
     await expect(page.getByTestId(`vqa-state-${itemId}`)).toHaveText(
