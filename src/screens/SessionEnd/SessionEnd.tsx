@@ -113,6 +113,19 @@ export interface SessionEndPayload {
    */
   subitisingScaffoldRendered?: boolean
   /**
+   * Sub-to-10 sibling of `subitisingScaffoldRendered` (ticket 86ca7kdw8
+   * / spec §13.4.1). Whether the sub-to-10 minuend scaffold rendered for
+   * at least one in-scope problem during the just-completed math session.
+   * Math-surface only.
+   *
+   * SessionEnd forwards this into `recordProgressOnSessionEnd` so the
+   * progress writer can bump the SEPARATE
+   * `profile.subitisingScaffoldSubSessionsObserved` counter once per
+   * actual-exposure sub-to-10 session. Absent / `false` on word-song
+   * surfaces and on legacy math test fixtures.
+   */
+  subitisingScaffoldSubRendered?: boolean
+  /**
    * Per-problem first-tap chip value (math only — Kevin schema-first
    * PR pairing with Dave's PR #284 two-digit add/sub research). Each
    * entry is the literal numeric value Marian tapped on her FIRST
@@ -494,6 +507,15 @@ export default function SessionEnd({
       // bump for non-`add-to-10` sessions anyway.
       ...(p.surface === 'math' && p.subitisingScaffoldRendered === true
         ? { subitisingScaffoldRendered: true }
+        : {}),
+      // Sub-to-10 minuend-scaffold exposure flag (ticket 86ca7kdw8
+      // §13.4.1). Forwarded so the writer bumps the SEPARATE
+      // profile.subitisingScaffoldSubSessionsObserved counter once per
+      // actual-exposure sub-to-10 session. Math-surface only; the
+      // focus-node gate inside the writer skips the bump for
+      // non-`sub-to-10` sessions.
+      ...(p.surface === 'math' && p.subitisingScaffoldSubRendered === true
+        ? { subitisingScaffoldSubRendered: true }
         : {}),
       // Per-problem first-tap chip value (Kevin schema-first PR,
       // 2026-05-21, pairing with Dave's PR #284 two-digit add/sub

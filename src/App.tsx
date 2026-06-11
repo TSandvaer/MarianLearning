@@ -70,7 +70,9 @@ import {
 import {
   createSubitisingRng,
   easyBandLeitnerMeanBox,
+  easyBandSubLeitnerMeanBox,
   readSubitisingScaffoldSessionsObserved,
+  readSubitisingScaffoldSubSessionsObserved,
   shouldScaffoldThisSession,
 } from './screens/Math/subitisingScaffold'
 import { projectHubTreeProgress } from './screens/Hub/progressProjection'
@@ -635,6 +637,14 @@ export default function App() {
       ...(result.subitisingScaffoldRendered === true
         ? { subitisingScaffoldRendered: true }
         : {}),
+      // Sub-to-10 minuend-scaffold exposure (ticket 86ca7kdw8 §13.4.1).
+      // Forwarded into recordProgressOnSessionEnd so the writer bumps
+      // the SEPARATE profile.subitisingScaffoldSubSessionsObserved
+      // counter when this sub-to-10 session actually exposed Marian to
+      // the minuend cell.
+      ...(result.subitisingScaffoldSubRendered === true
+        ? { subitisingScaffoldSubRendered: true }
+        : {}),
       // Per-problem first-tap chip value (Kevin schema-first PR
       // pairing with Dave's PR #284 two-digit add/sub research).
       // Persisted on SessionHistoryEntry.perProblemAnswerValue so a
@@ -821,6 +831,36 @@ export default function App() {
     if (progress === null) return false
     const sessionsObserved = readSubitisingScaffoldSessionsObserved(progress)
     const mean = easyBandLeitnerMeanBox(progress.mathFactsLeitner)
+    const focusNode = pickFocusNode(progress, 'math')
+    const rng = createSubitisingRng(subitisingSessionStartISO, focusNode)
+    return shouldScaffoldThisSession(mean, sessionsObserved, rng)
+  }, [subitisingSessionStartISO])
+  /**
+   * Sub-to-10 minuend-scaffold per-session decision (ticket 86ca7kdw8 —
+   * `design/math/subitising-scaffold-content.md` §13.4). Sibling of
+   * `mathSubitisingScaffoldActive` above, computed ONCE per App mount,
+   * but keyed to the SUB-TO-10 fade signal:
+   *   - `subitisingScaffoldSubSessionsObserved` (the SEPARATE counter)
+   *   - `easyBandSubLeitnerMeanBox` (subtraction-facts-only Leitner mean)
+   *   - the same `createSubitisingRng(sessionStartISO, focusNode)` stream
+   *
+   * The two decisions are INDEPENDENT — distinct add/sub automaticity
+   * pathways (Dave's W10.1 research § Source 5). The sub gate reads the
+   * sub counter + sub-facts mean, so a high ADD-facts Leitner mean does
+   * NOT fade the sub scaffold (§13.4 — reusing the add signal would put
+   * the sub scaffold in late-fade on day 1, which is wrong).
+   *
+   * `shouldScaffoldThisSession` is REUSED unchanged — only the mean and
+   * the counter passed in differ (§13.4.3). The C1/S1 focus-node gate in
+   * Math.tsx (`shouldShowSubitisingSubScaffold`) rejects non-`sub-to-10`
+   * sessions, so this decision only matters when Marian is actually on
+   * the sub-to-10 tier.
+   */
+  const mathSubitisingSubScaffoldActive = useMemo<boolean>(() => {
+    const progress = loadProgress()
+    if (progress === null) return false
+    const sessionsObserved = readSubitisingScaffoldSubSessionsObserved(progress)
+    const mean = easyBandSubLeitnerMeanBox(progress.mathFactsLeitner)
     const focusNode = pickFocusNode(progress, 'math')
     const rng = createSubitisingRng(subitisingSessionStartISO, focusNode)
     return shouldScaffoldThisSession(mean, sessionsObserved, rng)
@@ -1503,6 +1543,7 @@ export default function App() {
               audioReady={mathAudioReady}
               focusNode={mathFallbackFocusNode}
               subitisingScaffoldActive={mathSubitisingScaffoldActive}
+              subitisingSubScaffoldActive={mathSubitisingSubScaffoldActive}
               onSessionComplete={handleMathComplete}
               onRequestExit={handleBackToHub}
             />

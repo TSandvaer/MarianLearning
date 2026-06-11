@@ -10,8 +10,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   shouldShowDotCard,
+  shouldShowSubMinuendCell,
+  isValidSubMinuend,
+  subMinuendFromProblem,
   MAX_PIPS_PER_CELL,
   MIN_PIPS_PER_CELL,
+  MIN_SUB_MINUEND,
+  MAX_SUB_MINUEND,
   DOT_CARD_TOTAL_MS,
   DOT_CARD_REDUCED_MOTION_TOTAL_MS,
   PIPS_TO_WORD,
@@ -199,13 +204,21 @@ describe('MAX_PIPS_PER_CELL / MIN_PIPS_PER_CELL', () => {
 })
 
 describe('PIPS_TO_WORD', () => {
-  it('exposes the spelled lowercase word for every valid pip count', () => {
+  it('exposes the spelled lowercase word for every quantity 1..10', () => {
+    // Range expanded 1..5 → 1..10 for the sub-to-10 minuend ten-frame
+    // (ticket 86ca7kdw8 / spec §13.2). The dice-pip primitive still only
+    // renders 1..5; the ten-frame minuend cell renders 6..10.
     expect(PIPS_TO_WORD).toEqual({
       1: 'one',
       2: 'two',
       3: 'three',
       4: 'four',
       5: 'five',
+      6: 'six',
+      7: 'seven',
+      8: 'eight',
+      9: 'nine',
+      10: 'ten',
     })
   })
 })
@@ -236,5 +249,74 @@ describe('Dot-card lifecycle constants', () => {
     expect(DOT_CARD_FADE_IN_SPRING.stiffness).toBe(220)
     expect(DOT_CARD_FADE_IN_SPRING.damping).toBe(22)
     expect(DOT_CARD_FADE_IN_SPRING.type).toBe('spring')
+  })
+})
+
+// ── sub-to-10 minuend scaffold (ticket 86ca7kdw8 / spec §13.3) ───────────
+
+describe('shouldShowSubMinuendCell', () => {
+  it('fires across the full EASY-band minuend envelope [5, 10]', () => {
+    // The 8 EASY-band sub-to-10 facts have minuends 5,8,7,9,10,8,6,9 —
+    // all in [5,10]. Spec §13.3 S3.
+    for (let minuend = MIN_SUB_MINUEND; minuend <= MAX_SUB_MINUEND; minuend++) {
+      expect(shouldShowSubMinuendCell(subProblem(minuend, 1))).toBe(true)
+    }
+  })
+
+  it('gates on the MINUEND only — subtrahend is irrelevant (§13.3 S4)', () => {
+    // The structural difference from shouldShowDotCard: the subtrahend
+    // can be anything; only the minuend (start-number) is subitised.
+    expect(shouldShowSubMinuendCell(subProblem(8, 0))).toBe(true)
+    expect(shouldShowSubMinuendCell(subProblem(8, 4))).toBe(true)
+    expect(shouldShowSubMinuendCell(subProblem(8, 8))).toBe(true)
+  })
+
+  it('returns false for minuends below the floor (< 5)', () => {
+    expect(shouldShowSubMinuendCell(subProblem(4, 2))).toBe(false)
+    expect(shouldShowSubMinuendCell(subProblem(3, 1))).toBe(false)
+    expect(shouldShowSubMinuendCell(subProblem(0, 0))).toBe(false)
+  })
+
+  it('returns false for minuends above the ceiling (> 10)', () => {
+    expect(shouldShowSubMinuendCell(subProblem(11, 3))).toBe(false)
+    expect(shouldShowSubMinuendCell(subProblem(15, 5))).toBe(false)
+  })
+
+  it('op-gate FIRST — addition never trips the minuend predicate', () => {
+    // Even an add problem with addendA in [5,10] must not fire (the add
+    // path has its own dot-card overlay). Spec §13.3 S2.
+    expect(shouldShowSubMinuendCell(problem(5, 3))).toBe(false)
+    expect(shouldShowSubMinuendCell(problem(8, 2))).toBe(false)
+    expect(shouldShowSubMinuendCell(problem(10, 0))).toBe(false)
+  })
+
+  it('rejects non-integer minuends defensively', () => {
+    expect(shouldShowSubMinuendCell(subProblem(7.5, 2))).toBe(false)
+  })
+})
+
+describe('isValidSubMinuend', () => {
+  it('accepts integers 5..10', () => {
+    for (let n = 5; n <= 10; n++) expect(isValidSubMinuend(n)).toBe(true)
+  })
+
+  it('rejects 4, 11, and non-integers', () => {
+    expect(isValidSubMinuend(4)).toBe(false)
+    expect(isValidSubMinuend(11)).toBe(false)
+    expect(isValidSubMinuend(7.5)).toBe(false)
+  })
+})
+
+describe('subMinuendFromProblem', () => {
+  it('returns the minuend for an in-scope subtraction problem', () => {
+    expect(subMinuendFromProblem(subProblem(8, 4))).toBe(8)
+    expect(subMinuendFromProblem(subProblem(5, 5))).toBe(5)
+    expect(subMinuendFromProblem(subProblem(10, 3))).toBe(10)
+  })
+
+  it('returns null for out-of-band minuend or addition op', () => {
+    expect(subMinuendFromProblem(subProblem(4, 1))).toBeNull()
+    expect(subMinuendFromProblem(subProblem(11, 2))).toBeNull()
+    expect(subMinuendFromProblem(problem(8, 2))).toBeNull()
   })
 })

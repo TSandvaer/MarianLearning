@@ -96,14 +96,87 @@ export function shouldShowDotCard(problem: MathProblem): boolean {
  * Spelled-out lowercase number word for ARIA labels on dot-card cells.
  * Kept inline here (vs. lifting from sessionPlans.ts's `numberWord`) so
  * the dot-card module has zero coupling to the session-plan utterance
- * builder. Range `[1, 5]` matches `MAX_PIPS_PER_CELL`.
+ * builder. Range `[1, 10]` covers both the dice-pip vocabulary (1–5) and
+ * the ten-frame vocabulary (6–10) used by the sub-to-10 minuend scaffold
+ * (`TenFrameCell`, ticket 86ca7kdw8 / spec §13.2).
  */
-export const PIPS_TO_WORD: Readonly<Record<1 | 2 | 3 | 4 | 5, string>> = {
+export const PIPS_TO_WORD: Readonly<Record<number, string>> = {
   1: 'one',
   2: 'two',
   3: 'three',
   4: 'four',
   5: 'five',
+  6: 'six',
+  7: 'seven',
+  8: 'eight',
+  9: 'nine',
+  10: 'ten',
+}
+
+// ── sub-to-10 minuend scaffold (ticket 86ca7kdw8 / spec §13) ─────────────
+
+/**
+ * Minuend pip range for the sub-to-10 subitising scaffold. The minuend
+ * is rendered as a single value-conditional cell: a die face for 5
+ * (existing `DotCardCell`) and a ten-frame for 6–10 (`TenFrameCell`).
+ * Spec §13.2.2 / §13.3 S3 — the EASY-band minuend envelope is `[5, 10]`.
+ */
+export const MIN_SUB_MINUEND = 5 as const
+export const MAX_SUB_MINUEND = 10 as const
+
+/** Minuend values the sub-to-10 minuend scaffold renders. */
+export type SubMinuendValue = 5 | 6 | 7 | 8 | 9 | 10
+
+/**
+ * Structural predicate for the sub-to-10 minuend scaffold (spec §13.3,
+ * the S2 + S3 core — focus-node-free so the render layer can reuse it).
+ *
+ * Sibling to `shouldShowDotCard` but for SUBTRACTION: fires iff
+ * `op === '-'` AND the minuend (`addendA` — the start-number for
+ * `op === '-'`, per `sessionPlans.ts`'s documented legacy-name drift) is
+ * in `[5, 10]`. The SUBTRAHEND (`addendB`) is deliberately ignored — the
+ * scaffold shows ONLY the minuend (Dave's W10.1 research § Bottom-line 1;
+ * the empty space where a second cell would sit represents the unknown
+ * remainder, §13.1).
+ *
+ * This is the structural counterpart to `shouldShowDotCard`'s
+ * "both addends ≤ 5 AND op === '+'". The op-gate is FIRST so an addition
+ * problem never trips the minuend predicate even if its `addendA` happens
+ * to be in `[5, 10]`.
+ */
+export function shouldShowSubMinuendCell(problem: MathProblem): boolean {
+  // Op-gate FIRST — addition never shows the minuend cell regardless of
+  // operand sizes (the add path has its own two-cell dot-card overlay).
+  if (problem.op !== '-') return false
+  const { addendA } = problem
+  if (!Number.isInteger(addendA)) return false
+  if (addendA < MIN_SUB_MINUEND || addendA > MAX_SUB_MINUEND) return false
+  return true
+}
+
+/**
+ * Type guard: `true` iff `n` is an integer minuend in `[5, 10]` — a value
+ * the sub-to-10 minuend scaffold can render. Sibling to `isValidPips`.
+ */
+export function isValidSubMinuend(n: number): n is SubMinuendValue {
+  return Number.isInteger(n) && n >= MIN_SUB_MINUEND && n <= MAX_SUB_MINUEND
+}
+
+/**
+ * Convenience selector — returns the minuend value from a `MathProblem`
+ * when it qualifies for the sub-to-10 minuend scaffold, `null` otherwise.
+ * Callers that have already gated on `shouldShowSubMinuendCell(problem)`
+ * can rely on the non-null result. The redundancy lets TypeScript narrow
+ * the value to `SubMinuendValue` for the overlay's `minuend` prop without
+ * a non-null assertion at the call site.
+ */
+export function subMinuendFromProblem(
+  problem: MathProblem,
+): SubMinuendValue | null {
+  if (problem.op !== '-') return null
+  const { addendA } = problem
+  if (!isValidSubMinuend(addendA)) return null
+  return addendA
 }
 
 /**

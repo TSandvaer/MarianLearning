@@ -39,9 +39,17 @@ import {
   type MathSessionPlan,
   type MathProblem,
 } from './sessionPlans'
-import { shouldShowDotCard, pipsFromProblem } from './dotCard'
+import {
+  shouldShowDotCard,
+  pipsFromProblem,
+  subMinuendFromProblem,
+} from './dotCard'
 import { DotCardOverlay } from './DotCardOverlay'
-import { shouldShowSubitisingScaffold } from './subitisingScaffold'
+import { SubMinuendOverlay } from './SubMinuendOverlay'
+import {
+  shouldShowSubitisingScaffold,
+  shouldShowSubitisingSubScaffold,
+} from './subitisingScaffold'
 import type { SkillNode } from '../../lib/progress'
 import {
   ADVANCE_AFTER_CORRECT_MS,
@@ -254,6 +262,20 @@ export interface MathSessionResult {
    * App.tsx is the parent and pipes through the production plumbing.
    */
   subitisingScaffoldRendered: boolean
+  /**
+   * Sub-to-10 sibling of `subitisingScaffoldRendered` (ticket 86ca7kdw8
+   * / spec §13.4.1). Whether the sub-to-10 minuend scaffold actually
+   * rendered for at least one in-scope problem during the session.
+   *
+   * Used by `recordProgressOnSessionEnd` to decide whether to bump
+   * `profile.subitisingScaffoldSubSessionsObserved` (the SEPARATE
+   * sub-to-10 first-encounter counter). `false` when the minuend
+   * scaffold never rendered (out-of-band minuend, disabled by the
+   * per-session sub decision, or wrong focus node). Always `false` on
+   * legacy callers that don't pass `focusNode` /
+   * `subitisingSubScaffoldActive`.
+   */
+  subitisingScaffoldSubRendered: boolean
   /**
    * Per-problem FIRST-tap chip value, indexed 0..N-1 (parallel to
    * `plan.problems`). Records the literal numeric value Marian
@@ -514,6 +536,28 @@ export interface MathProps {
    */
   subitisingScaffoldActive?: boolean
   /**
+   * Per-session SUB-TO-10 minuend-scaffold decision (ticket 86ca7kdw8 /
+   * spec §13.4). Sibling to `subitisingScaffoldActive` but for the
+   * sub-to-10 tier: computed ONCE upstream by App.tsx via
+   * `shouldScaffoldThisSession(easyBandSubLeitnerMeanBox,
+   * subitisingScaffoldSubSessionsObserved, rng)` and passed through
+   * frozen for the session's duration.
+   *
+   * When `true`, the single minuend cell is allowed to fire on every
+   * in-scope `op === '-'` problem this session; when `false`, NO problem
+   * mounts it (per-session all-or-nothing — §13.4.3). When undefined
+   * (legacy callers), the sub-to-10 minuend scaffold never fires
+   * (subtraction simply shows no subitising visual, the pre-W10
+   * behaviour).
+   *
+   * The sub gate is INDEPENDENT of the add gate — distinct add/sub
+   * fluency pathways (Dave's W10.1 research § Source 5). A session can
+   * have `subitisingScaffoldActive === false` (add faded) while
+   * `subitisingSubScaffoldActive === true` (sub still in first-encounter
+   * window), and vice versa.
+   */
+  subitisingSubScaffoldActive?: boolean
+  /**
    * Test seam ONLY — when `true`, the subitising dot-card overlay's
    * lifecycle is FROZEN: phase stays at its initial value
    * (`fadingIn` or, under reduced-motion, `holding`), no timers are
@@ -632,6 +676,7 @@ function MathScreen({
   getHowlerRunning,
   focusNode,
   subitisingScaffoldActive,
+  subitisingSubScaffoldActive,
   __testInitiallyAudioUnlocked = false,
   __testDisableDotCard = false,
 }: MathProps) {
@@ -786,6 +831,28 @@ function MathScreen({
    * actually rendered."
    */
   const subitisingScaffoldRenderedRef = useRef(false)
+
+  /**
+   * Sub-to-10 sibling of `subitisingScaffoldRenderedRef` (ticket
+   * 86ca7kdw8). Flipped to `true` once the single minuend cell renders
+   * for at least one in-scope `op === '-'` problem this session — drives
+   * `MathSessionResult.subitisingScaffoldSubRendered` → the
+   * `profile.subitisingScaffoldSubSessionsObserved` counter bump.
+   */
+  const subitisingScaffoldSubRenderedRef = useRef(false)
+
+  /**
+   * Per-problem dismiss index for the SUB-TO-10 minuend overlay (ticket
+   * 86ca7kdw8). Sibling to `activeDismissForIndex` (the add path) — kept
+   * SEPARATE so the two overlays' lifecycles never cross-clear each
+   * other. Same index-comparison pattern: the minuend cell is dismissed
+   * for the current problem iff `subMinuendDismissForIndex ===
+   * problemIndex`; it auto-resets on advance because the comparison
+   * stops matching when `problemIndex` changes.
+   */
+  const [subMinuendDismissForIndex, setSubMinuendDismissForIndex] = useState<
+    number | null
+  >(null)
 
   /** Per-problem state — resets on advance via setProblemState(FRESH). */
   const [problemState, setProblemState] =
@@ -1672,6 +1739,12 @@ function MathScreen({
         // mounts (no scaffold mode); see MathProps.focusNode +
         // MathProps.subitisingScaffoldActive for the gate.
         subitisingScaffoldRendered: subitisingScaffoldRenderedRef.current,
+        // Sub-to-10 minuend-scaffold exposure (ticket 86ca7kdw8 §13.4.1).
+        // True iff the single minuend cell rendered for at least one
+        // in-scope `op === '-'` problem this session in sub-scaffold
+        // mode — drives the SEPARATE
+        // profile.subitisingScaffoldSubSessionsObserved counter bump.
+        subitisingScaffoldSubRendered: subitisingScaffoldSubRenderedRef.current,
       })
     }
   }, [problemIndex, plan.problems.length, onSessionComplete, storage, now])
@@ -2306,6 +2379,53 @@ function MathScreen({
     }
   }, [useScaffoldGate, showDotCardOverlay])
 
+  /**
+   * Sub-to-10 minuend-scaffold decision for the current problem (ticket
+   * 86ca7kdw8 / spec §13.3). Independent of the add-path decision above.
+   *
+   * Gate path: when App.tsx supplies `focusNode` AND
+   * `subitisingSubScaffoldActive`, run `shouldShowSubitisingSubScaffold`
+   * — which combines S1 (focus node `sub-to-10`), S5 (per-session
+   * decision), and the structural minuend rule (S2 op `'-'` + S3 minuend
+   * `addendA ∈ [5,10]`). When `subitisingSubScaffoldActive` is undefined
+   * (legacy callers), the sub scaffold never fires — subtraction shows no
+   * subitising visual, the pre-W10 behaviour.
+   */
+  const useSubScaffoldGate =
+    focusNode !== undefined && subitisingSubScaffoldActive !== undefined
+  const subMinuendInScope = useSubScaffoldGate
+    ? shouldShowSubitisingSubScaffold(
+        focusNode,
+        currentProblem,
+        subitisingSubScaffoldActive,
+      )
+    : false
+  const subMinuendValue = subMinuendInScope
+    ? subMinuendFromProblem(currentProblem)
+    : null
+  /**
+   * Sticky per-problem dismiss for the minuend cell — mirrors
+   * `dotCardDismissed`. Out-of-scope problems are treated as already-
+   * dismissed; in-scope problems are dismissed iff the overlay's
+   * onComplete fired for the CURRENT problem index. Auto-resets on
+   * advance (index comparison stops matching).
+   */
+  const subMinuendDismissed =
+    !subMinuendInScope || subMinuendDismissForIndex === problemIndex
+  const showSubMinuendOverlay =
+    subMinuendInScope && !subMinuendDismissed && subMinuendValue !== null
+
+  // Sticky session-level flag for the sub-to-10 minuend scaffold
+  // (ticket 86ca7kdw8 §13.4.1). Same post-commit useLayoutEffect
+  // pattern as the add path above; SEPARATE ref so the two counters
+  // never cross-contaminate. Only flips when the sub-scaffold gate is
+  // active (App.tsx is the parent) AND the minuend cell actually shows.
+  useLayoutEffect(() => {
+    if (useSubScaffoldGate && showSubMinuendOverlay) {
+      subitisingScaffoldSubRenderedRef.current = true
+    }
+  }, [useSubScaffoldGate, showSubMinuendOverlay])
+
   return (
     <m.main
       data-testid="math"
@@ -2704,6 +2824,48 @@ function MathScreen({
                       __testSkipLifecycle={__testDisableDotCard}
                     />
                   ))}
+              </div>
+            )}
+
+            {/* Sub-to-10 single-cell minuend subitising scaffold (ticket
+            86ca7kdw8 / spec §13.1). Renders ONLY on `op === '-'`
+            problems — sibling to the `op === '+'` visual-groups block
+            above, NOT a modification of it (AC4 — the add path is
+            untouched).
+
+            Subtraction has no flower row (per Kyle's spec §3 / Dave's
+            W10.1 research §2 — two flower bouquets with a `−` between
+            them are visually nonsensical), so this block reserves a
+            fixed-height band (matching the ~80pt cell footprint) and
+            overlays a single absolutely-positioned minuend cell on it.
+            The reserved band keeps the symbolic-row → chip-row spacing
+            identical across problems so the chip row never shifts when
+            the cell mounts / dismisses (§13.2.3 layout-stability).
+
+            The cell is value-conditional: a die-5 face for minuend 5,
+            a ten-frame for 6–10 (§13.2.2). The subtrahend is NOT shown
+            — the empty space represents the unknown remainder (§13.1).
+            Container testid `math-sub-minuend-card` (on the overlay) is
+            distinct from the add path's `math-dot-card`, so the existing
+            `sub-to-10-dot-card-suppression` spec's `math-dot-card`
+            assertions stay correct. */}
+            {currentProblem.op === '-' && (
+              <div className="relative flex min-h-[80px] items-center justify-center">
+                {showSubMinuendOverlay && subMinuendValue !== null && (
+                  <SubMinuendOverlay
+                    // `key` per problemIndex resets the overlay's phase
+                    // machine cleanly on advance — same rationale as the
+                    // add path's DotCardOverlay key.
+                    key={problemIndex}
+                    minuend={subMinuendValue}
+                    pageHidden={pageHidden}
+                    reducedMotion={reducedMotion}
+                    onComplete={() =>
+                      setSubMinuendDismissForIndex(problemIndex)
+                    }
+                    __testSkipLifecycle={__testDisableDotCard}
+                  />
+                )}
               </div>
             )}
           </div>

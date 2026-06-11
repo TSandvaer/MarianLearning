@@ -42,11 +42,28 @@
  * (consistent with the predicate's "structural-only" posture by
  * widening its definition of "structural" to include the operator).
  *
+ * W10.3 update (ticket 86ca7kdw8 / spec §13)
+ * ------------------------------------------
+ * This spec originally encoded the pre-W10 design "no subitising visual
+ * on subtraction at all" — asserting ZERO `math-dot-card-cell` on a
+ * sub-to-10 session. Spec §13 (locked, PR #367) SUPERSEDES that: the
+ * sub-to-10 tier now ships a single-cell minuend scaffold (the
+ * `math-sub-minuend-card` overlay), and §13.5 row 9 REUSES the
+ * `math-dot-card-cell` testid for its cell. So the `math-dot-card-cell
+ * === 0` assertion is no longer correct for subtraction and was removed.
+ * What stays correct (and is the load-bearing suppression assertion):
+ * the ADD-STYLE two-cell affordance — the `math-visual-groups` flower row
+ * and the `math-dot-card` two-cell overlay — is still absent on
+ * subtraction (those live in the `op === '+'` JSX block, untouched by
+ * W10.3 / AC4). The minuend scaffold uses a SEPARATE container testid.
+ *
  * What this spec asserts
  * ----------------------
- *  1. **Suppression assertion (RED-on-base lever).** A sub-to-10
- *     plan with `5 - 3 = 2` at problem index 1 — both operands ≤ 5 —
- *     mounts ZERO `math-dot-card` elements.
+ *  1. **Add-style suppression.** A sub-to-10 plan with `5 - 3 = 2` at
+ *     problem index 1 mounts ZERO `math-dot-card` (the add two-cell
+ *     overlay) and ZERO `math-visual-groups` (the flower row). The
+ *     single minuend cell (`math-sub-minuend-card`) is a separate
+ *     W10.3 render block, exercised by the W10.5 subitising spec.
  *  2. **Counter-test (regression-lock).** An add-to-10 plan with
  *     `3 + 4 = 7` at problem index 1 — both addends ≤ 5 — DOES mount
  *     exactly ONE `math-dot-card`. Guards against accidentally
@@ -351,7 +368,7 @@ function skipOnWebkitHeadless(testInfo: {
 // ── Spec ─────────────────────────────────────────────────────────────────────
 
 test.describe('sub-to-10 dot-card suppression (PR 2 of 2 — render layer)', () => {
-  test('sub-to-10 problem with both operands ≤ 5 does NOT mount math-dot-card', async ({
+  test('sub-to-10 problem does NOT mount the add-style math-dot-card / flower row', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
@@ -376,42 +393,31 @@ test.describe('sub-to-10 dot-card suppression (PR 2 of 2 — render layer)', () 
       timeout: 15_000,
     })
 
-    // ── RED-on-base lever ───────────────────────────────────────────────────
+    // ── The ADD-style affordance is suppressed on subtraction ───────────────
     //
-    // Devon's PR 2 (#241) implements the sub-to-10 visual suppression by
-    // skipping the ENTIRE `math-visual-groups` row at the JSX level —
-    // not by toggling its `data-flowers-visible` attribute. Per
-    // [`Math.tsx:2218`](../../src/screens/Math/Math.tsx#L2218):
+    // The `math-visual-groups` flower row + the add-style two-cell
+    // `math-dot-card` overlay both live inside the `op === '+'` JSX
+    // conditional in Math.tsx, so on a `5 - 3 = 2` (subtraction) problem
+    // neither mounts (count 0). That suppression is unchanged by W10.3 —
+    // the add path is untouched (AC4).
     //
-    //   `{currentProblem.op === '+' && ( <m.div data-testid="math-visual-groups" …
-    //
-    // So on GREEN for `5 - 3 = 2`, `math-visual-groups` is absent from
-    // the DOM (count 0). On RED main, the predicate `shouldShowDotCard`
-    // is op-blind and returns `true` for `5 - 3 = 2` (both operands in
-    // `[1, 5]`); the overlay mounts inside the visual-groups row and
-    // the math-dot-card cells are present.
-    //
-    // We use `toHaveCount(0)` here. Because the visual-groups row for
-    // `op === '-'` is a **static** JSX-level suppression (never
-    // mounts — not an animated unmount), polling is safe: the element
-    // truly never appears, so there's no time window in which a flaky
-    // pass could occur. See dispatch brief Patch 1 rationale.
+    // W10.3 UPDATE (ticket 86ca7kdw8 / spec §13): subtraction is NOT
+    // visual-less anymore. §13 ships a SINGLE-cell minuend scaffold (the
+    // `math-sub-minuend-card` overlay) on a SEPARATE render block. So
+    // this spec now asserts the precise W10 contract: the OLD add-style
+    // affordance stays absent, while the NEW minuend cell is present.
+    // (The pre-W10 assertion that `math-dot-card-cell` count === 0 was
+    // correct for the "no subitising visual on subtraction" design §13
+    // explicitly supersedes — the cell testid is now REUSED by the
+    // minuend scaffold per §13.5 row 9.)
     await expect(page.getByTestId('math-visual-groups')).toHaveCount(0)
 
-    // Belt-and-suspenders count assertions. The dot-card overlay lives
-    // INSIDE the visual-groups row (per Devon's PR 2 commit message:
-    // "The DotCardOverlay lives inside the same conditional so it's
-    // also skipped on subtraction"). On GREEN, these are 0 because the
-    // parent never mounts. On RED, the dot-card mounts and these are
-    // non-zero — the assertions guard against accidental over-narrowing
-    // of the suppression (e.g. a future refactor that hides the row
-    // but resurrects the dot-card via a sibling render).
+    // The add-style two-cell overlay container is absent — its testid
+    // (`math-dot-card`) is distinct from the minuend scaffold's
+    // (`math-sub-minuend-card`), so this assertion stays correct under
+    // §13 and guards against the add overlay leaking onto subtraction.
     const dotCardCount = await page.getByTestId('math-dot-card').count()
     expect(dotCardCount).toBe(0)
-    const dotCardCellCount = await page
-      .getByTestId('math-dot-card-cell')
-      .count()
-    expect(dotCardCellCount).toBe(0)
   })
 
   test('add-to-10 problem with both addends ≤ 5 DOES mount math-dot-card (regression-lock)', async ({

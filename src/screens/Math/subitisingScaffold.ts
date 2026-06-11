@@ -66,7 +66,7 @@
 
 import type { MathProblem } from './sessionPlans'
 import type { LeitnerBox, MathFact, Progress } from '../../lib/progress'
-import { shouldShowDotCard } from './dotCard'
+import { shouldShowDotCard, shouldShowSubMinuendCell } from './dotCard'
 
 // ── Constants (LOCKED, spec §2.3 + §6.5) ────────────────────────────────
 
@@ -141,6 +141,47 @@ export const EASY_BAND_FACTS: readonly Readonly<MathFact>[] = [
   { a: 4, b: 1, op: '+' },
   { a: 2, b: 3, op: '+' },
   { a: 3, b: 2, op: '+' },
+]
+
+// ── sub-to-10 scaffold constants (LOCKED, spec §13.4 / §13.5) ────────────
+
+/**
+ * The focus node the sub-to-10 minuend scaffold targets. Spec §13.5 #2 /
+ * §13.4.2 — sibling to `SCAFFOLD_FOCUS_NODE = 'add-to-10'`. Locking this
+ * as a constant (rather than inlining the string) keeps the §13.8 /
+ * §8.2 cross-tier-aggregation follow-up a single-edit change here.
+ */
+export const SUB_SCAFFOLD_FOCUS_NODE = 'sub-to-10' as const
+
+/**
+ * The 8 EASY-band facts for `sub-to-10` — the denominator set for the
+ * sub-to-10 fluency-fade signal (`easyBandSubLeitnerMeanBox`). Spec
+ * §13.4.2 / §13.5 #3. These are exactly the `easy` band (#1–8) from
+ * `sub-to-10-content.md` §1.1 (minuends 5,8,7,9,10,8,6,9 — all in
+ * `[5,10]`), keyed `{ a, b, op: '-' }` to match the Leitner
+ * `mathFactKey = ${a}${op}${b}`.
+ *
+ * **Only `op === '-'` facts** — NEVER add facts. Addition and subtraction
+ * automaticity develop via distinct pathways (Dave's W10.1 research
+ * § Source 5), so the sub-to-10 fade must source SUBTRACTION evidence
+ * only; an add-facts mean would put the sub scaffold in late-fade on day
+ * 1 of the rollout (§13.4). Pinned as a frozen list so a future planner
+ * pool drift can't silently change the fade-signal denominator — a change
+ * here is a deliberate edit a drift-guard test catches.
+ *
+ * Order is canonical (the §1.1 easy-band order — subtract-self, then
+ * subtract-zero, then doubles-halving, then subtract-one) so the test
+ * fixtures stay readable.
+ */
+export const SUB_EASY_BAND_FACTS: readonly Readonly<MathFact>[] = [
+  { a: 5, b: 5, op: '-' }, // 5−5=0  subtract-self
+  { a: 8, b: 8, op: '-' }, // 8−8=0  subtract-self
+  { a: 7, b: 0, op: '-' }, // 7−0=7  subtract-zero
+  { a: 9, b: 0, op: '-' }, // 9−0=9  subtract-zero
+  { a: 10, b: 5, op: '-' }, // 10−5=5 doubles-halving
+  { a: 8, b: 4, op: '-' }, // 8−4=4  doubles-halving
+  { a: 6, b: 3, op: '-' }, // 6−3=3  doubles-halving
+  { a: 9, b: 1, op: '-' }, // 9−1=8  subtract-one
 ]
 
 // ── Per-session decision (called once at session-start) ──────────────────
@@ -231,6 +272,36 @@ export function shouldShowSubitisingScaffold(
   return shouldShowDotCard(problem)
 }
 
+/**
+ * Per-render gate for the SUB-TO-10 minuend scaffold (spec §13.3 / §13.5
+ * #5). Sibling to `shouldShowSubitisingScaffold` but for subtraction:
+ * combines S1 (focus node `sub-to-10`), the frozen per-session decision
+ * (S5), and the structural minuend rule (S2 op `'-'` + S3 minuend
+ * `addendA ∈ [5,10]`).
+ *
+ * The structural rule is `shouldShowSubMinuendCell` (in `dotCard.ts`) —
+ * which gates on the MINUEND only, NOT "both operands ≤ 5". This is the
+ * load-bearing structural difference from the add path: the subitised
+ * quantity is the start-number; the subtrahend is irrelevant to the
+ * visual (§13.3 S4).
+ *
+ * Returns FALSE if any of:
+ *   - The focus node is not `sub-to-10` (S1 fails).
+ *   - The per-session decision was negative (S5 — fluency-fade /
+ *     first-encounter resolved once at session-start).
+ *   - The problem's op / minuend don't qualify (S2 / S3 via
+ *     `shouldShowSubMinuendCell`).
+ */
+export function shouldShowSubitisingSubScaffold(
+  focusNode: string,
+  problem: MathProblem,
+  scaffoldActiveThisSession: boolean,
+): boolean {
+  if (focusNode !== SUB_SCAFFOLD_FOCUS_NODE) return false
+  if (!scaffoldActiveThisSession) return false
+  return shouldShowSubMinuendCell(problem)
+}
+
 // ── Leitner-mean signal (spec §2.3 formula) ──────────────────────────────
 
 /**
@@ -293,6 +364,46 @@ export function easyBandLeitnerMeanBox(
     // < FADE_THRESHOLD_FULL so the conservative branch fires.
     return 0
   }
+  return sum / count
+}
+
+/**
+ * Sub-to-10 sibling of `easyBandLeitnerMeanBox` (spec §13.4.2 / §13.5
+ * #4). Computes the EASY-band Leitner mean over **subtraction facts
+ * only** (`SUB_EASY_BAND_FACTS`) — the fade signal that drives the §13.4.3
+ * schedule for the sub-to-10 minuend scaffold.
+ *
+ * Identical mechanics to the add helper — partial-band rule (unseen
+ * facts excluded from the mean), `0` sentinel on an empty seen-set
+ * (keeps the scaffold ON) — the ONLY difference is the denominator set
+ * (`SUB_EASY_BAND_FACTS`, all `op === '-'`). This op-asymmetry is the
+ * whole point: the sub scaffold must NOT fade on Marian's ADDITION
+ * fluency (Dave's W10.1 research § Source 5 — distinct add/sub pathways).
+ *
+ * NB: kept as a separate function rather than collapsing
+ * `easyBandLeitnerMeanBox(box, facts)` to avoid touching the live
+ * add-to-10 helper signature this wave (AC4 — no add-path refactor). The
+ * op-parameterised de-dup is tracked as the §13.8c low-priority cleanup
+ * for when a 3rd subitising tier makes the duplication costly.
+ */
+export function easyBandSubLeitnerMeanBox(
+  mathFactsLeitner: LeitnerBox<MathFact>,
+): number {
+  const seen = new Map<string, number>()
+  for (const entry of mathFactsLeitner.items) {
+    seen.set(mathFactKey(entry.item), entry.box)
+  }
+
+  let sum = 0
+  let count = 0
+  for (const fact of SUB_EASY_BAND_FACTS) {
+    const box = seen.get(mathFactKey(fact))
+    if (box === undefined) continue
+    sum += box
+    count += 1
+  }
+
+  if (count === 0) return 0
   return sum / count
 }
 
@@ -395,6 +506,28 @@ export function bumpSubitisingScaffoldSessionsObserved(
   return Math.min(start + 1, SCAFFOLD_SESSIONS_OBSERVED_CAP)
 }
 
+/**
+ * Sub-to-10 sibling of `bumpSubitisingScaffoldSessionsObserved` (spec
+ * §13.5 #8). Bumps `profile.subitisingScaffoldSubSessionsObserved` by 1,
+ * capped at the shared `SCAFFOLD_SESSIONS_OBSERVED_CAP` (4). Returns the
+ * new value.
+ *
+ * Pure — same defensive defaulting as the add helper. Called from
+ * `recordProgressOnSessionEnd` when the just-completed session is a math
+ * session on the `SUB_SCAFFOLD_FOCUS_NODE` AND the sub-to-10 minuend
+ * scaffold actually rendered. "Actually rendered" matters: the counter
+ * measures EXPOSURE to the scaffold, not eligibility (§13.4.1).
+ */
+export function bumpSubitisingScaffoldSubSessionsObserved(
+  current: number | undefined,
+): number {
+  const start =
+    typeof current === 'number' && Number.isFinite(current) && current >= 0
+      ? Math.floor(current)
+      : 0
+  return Math.min(start + 1, SCAFFOLD_SESSIONS_OBSERVED_CAP)
+}
+
 // ── internals ────────────────────────────────────────────────────────────
 
 /** Stable string key for a math fact — matches `progressHistory.ts`. */
@@ -413,6 +546,23 @@ export function readSubitisingScaffoldSessionsObserved(
   progress: Progress,
 ): number {
   const raw = progress.profile.subitisingScaffoldSessionsObserved
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return 0
+  return Math.min(Math.floor(raw), SCAFFOLD_SESSIONS_OBSERVED_CAP)
+}
+
+/**
+ * Sub-to-10 sibling of `readSubitisingScaffoldSessionsObserved` (spec
+ * §13.4.1). Clamps any persisted `subitisingScaffoldSubSessionsObserved`
+ * value to the legal `[0, SCAFFOLD_SESSIONS_OBSERVED_CAP]` range,
+ * defaulting to 0 on absent / malformed input. The read-path defaulter
+ * for the sub counter (no storage-side `withDefaulted*` pass needed —
+ * same precedent as the add field, which defaults at this consumer-read
+ * site rather than in `storage.ts`).
+ */
+export function readSubitisingScaffoldSubSessionsObserved(
+  progress: Progress,
+): number {
+  const raw = progress.profile.subitisingScaffoldSubSessionsObserved
   if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return 0
   return Math.min(Math.floor(raw), SCAFFOLD_SESSIONS_OBSERVED_CAP)
 }

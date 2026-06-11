@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest'
 import type { LeitnerBox, MathFact } from '../../lib/progress'
 import {
   EASY_BAND_FACTS,
+  SUB_EASY_BAND_FACTS,
   FADE_PROB_LOW,
   FADE_PROB_MEDIUM,
   FADE_THRESHOLD_FULL,
@@ -24,14 +25,20 @@ import {
   FADE_THRESHOLD_OFF,
   FIRST_ENCOUNTER_SESSIONS,
   SCAFFOLD_FOCUS_NODE,
+  SUB_SCAFFOLD_FOCUS_NODE,
   SCAFFOLD_SESSIONS_OBSERVED_CAP,
   bumpSubitisingScaffoldSessionsObserved,
+  bumpSubitisingScaffoldSubSessionsObserved,
   createSubitisingRng,
   easyBandLeitnerMeanBox,
+  easyBandSubLeitnerMeanBox,
   readSubitisingScaffoldSessionsObserved,
+  readSubitisingScaffoldSubSessionsObserved,
   shouldScaffoldThisSession,
   shouldShowSubitisingScaffold,
+  shouldShowSubitisingSubScaffold,
 } from './subitisingScaffold'
+import type { Progress } from '../../lib/progress'
 import type { MathProblem } from './sessionPlans'
 
 // ── Test fixtures ────────────────────────────────────────────────────────
@@ -499,5 +506,239 @@ describe('fluency-fade schedule constants (spec §6.5)', () => {
       expect(fact.b).toBeGreaterThanOrEqual(1)
       expect(fact.op).toBe('+')
     }
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════
+// sub-to-10 scaffold (ticket 86ca7kdw8 / spec §13)
+// ════════════════════════════════════════════════════════════════════════
+
+// ── shouldShowSubitisingSubScaffold — spec §13.3 ─────────────────────────
+
+describe('shouldShowSubitisingSubScaffold (spec §13.3)', () => {
+  it('S1: rejects non-sub-to-10 focus nodes even if op/minuend qualify', () => {
+    expect(
+      shouldShowSubitisingSubScaffold('add-to-10', problem(8, 4, '-'), true),
+    ).toBe(false)
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-20', problem(8, 4, '-'), true),
+    ).toBe(false)
+  })
+
+  it('S5: rejects when the per-session decision is false', () => {
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-10', problem(8, 4, '-'), false),
+    ).toBe(false)
+  })
+
+  it('S2/S3: fires on an in-scope sub-to-10 problem (op - + minuend ∈ [5,10])', () => {
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-10', problem(8, 4, '-'), true),
+    ).toBe(true)
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-10', problem(5, 5, '-'), true),
+    ).toBe(true)
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-10', problem(10, 3, '-'), true),
+    ).toBe(true)
+  })
+
+  it('S2: rejects addition problems on the sub-to-10 focus (op-gate)', () => {
+    // Defends if a future mixed-op session lands on sub-to-10 — the
+    // minuend scaffold is subtraction-only (§13.3 S2).
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-10', problem(8, 2, '+'), true),
+    ).toBe(false)
+  })
+
+  it('S3: rejects out-of-band minuends (< 5 or > 10)', () => {
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-10', problem(4, 1, '-'), true),
+    ).toBe(false)
+    expect(
+      shouldShowSubitisingSubScaffold('sub-to-10', problem(11, 3, '-'), true),
+    ).toBe(false)
+  })
+
+  it('S4: subtrahend does NOT gate the scaffold (minuend-only)', () => {
+    // Same minuend (8), wildly different subtrahends — all fire.
+    for (const subtrahend of [0, 1, 4, 8]) {
+      expect(
+        shouldShowSubitisingSubScaffold(
+          'sub-to-10',
+          problem(8, subtrahend, '-'),
+          true,
+        ),
+      ).toBe(true)
+    }
+  })
+})
+
+// ── easyBandSubLeitnerMeanBox — spec §13.4.2 ─────────────────────────────
+
+describe('easyBandSubLeitnerMeanBox (spec §13.4.2)', () => {
+  it('returns the 0 sentinel on an empty box (no sub facts seen)', () => {
+    expect(easyBandSubLeitnerMeanBox(box([]))).toBe(0)
+  })
+
+  it('returns a single sub fact box index when one is seen', () => {
+    expect(
+      easyBandSubLeitnerMeanBox(
+        box([{ fact: { a: 8, b: 4, op: '-' }, box: 3 }]),
+      ),
+    ).toBe(3)
+  })
+
+  it('averages over the SEEN subset only (partial band)', () => {
+    // 2 of the 8 sub EASY-band facts seen, boxes 2 and 4 → mean 3.
+    const mean = easyBandSubLeitnerMeanBox(
+      box([
+        { fact: { a: 8, b: 4, op: '-' }, box: 2 },
+        { fact: { a: 6, b: 3, op: '-' }, box: 4 },
+      ]),
+    )
+    expect(mean).toBe(3)
+  })
+
+  it('CROSS-OPERATION ISOLATION: a high ADD-facts mean does NOT raise the sub mean', () => {
+    // The single most important property (Dave's W10.1 research §Source 5):
+    // addition fluency must not fade the sub scaffold. A box full of
+    // maxed-out ADD facts but with NO sub facts → sub mean is the 0
+    // sentinel (scaffold stays ON), NOT box 5.
+    const addHeavyBox = box([
+      { fact: { a: 1, b: 2, op: '+' }, box: 5 },
+      { fact: { a: 2, b: 3, op: '+' }, box: 5 },
+      { fact: { a: 4, b: 1, op: '+' }, box: 5 },
+    ])
+    expect(easyBandSubLeitnerMeanBox(addHeavyBox)).toBe(0)
+    // And the add helper sees them at box 5 — proving the two helpers
+    // read genuinely different denominator sets off the SAME box.
+    expect(easyBandLeitnerMeanBox(addHeavyBox)).toBe(5)
+  })
+
+  it('ignores add facts even when keyed identically by value (op discriminates)', () => {
+    // 8+4 (add) and 8-4 (sub) have different mathFactKeys (8+4 vs 8-4),
+    // so an add fact never contributes to the sub mean.
+    const mixed = box([
+      { fact: { a: 8, b: 4, op: '+' }, box: 5 }, // add — ignored by sub helper
+      { fact: { a: 8, b: 4, op: '-' }, box: 1 }, // sub — counted
+    ])
+    expect(easyBandSubLeitnerMeanBox(mixed)).toBe(1)
+  })
+})
+
+// ── bumpSubitisingScaffoldSubSessionsObserved — spec §13.5 #8 ────────────
+
+describe('bumpSubitisingScaffoldSubSessionsObserved', () => {
+  it('increments by 1 from undefined / 0', () => {
+    expect(bumpSubitisingScaffoldSubSessionsObserved(undefined)).toBe(1)
+    expect(bumpSubitisingScaffoldSubSessionsObserved(0)).toBe(1)
+  })
+
+  it('caps at SCAFFOLD_SESSIONS_OBSERVED_CAP', () => {
+    expect(
+      bumpSubitisingScaffoldSubSessionsObserved(SCAFFOLD_SESSIONS_OBSERVED_CAP),
+    ).toBe(SCAFFOLD_SESSIONS_OBSERVED_CAP)
+    expect(bumpSubitisingScaffoldSubSessionsObserved(99)).toBe(
+      SCAFFOLD_SESSIONS_OBSERVED_CAP,
+    )
+  })
+
+  it('floors / defends against malformed inputs', () => {
+    expect(bumpSubitisingScaffoldSubSessionsObserved(-1)).toBe(1)
+    expect(bumpSubitisingScaffoldSubSessionsObserved(NaN)).toBe(1)
+    expect(bumpSubitisingScaffoldSubSessionsObserved(1.7)).toBe(2)
+  })
+})
+
+// ── readSubitisingScaffoldSubSessionsObserved — read-path defaulter ──────
+
+describe('readSubitisingScaffoldSubSessionsObserved', () => {
+  function progressWith(counter: number | undefined): Progress {
+    return {
+      schemaVersion: 1 as const,
+      profile: {
+        childName: 'Marian',
+        character: 'melody' as const,
+        lastPlayedISO: null,
+        subitisingScaffoldSubSessionsObserved: counter,
+      },
+    } as unknown as Progress
+  }
+
+  it('returns 0 when the field is undefined (pre-W10.3 blob)', () => {
+    expect(
+      readSubitisingScaffoldSubSessionsObserved(progressWith(undefined)),
+    ).toBe(0)
+  })
+
+  it('returns the persisted value when valid and within range', () => {
+    expect(readSubitisingScaffoldSubSessionsObserved(progressWith(2))).toBe(2)
+  })
+
+  it('clamps past the cap and defends against malformed values', () => {
+    expect(readSubitisingScaffoldSubSessionsObserved(progressWith(99))).toBe(
+      SCAFFOLD_SESSIONS_OBSERVED_CAP,
+    )
+    expect(readSubitisingScaffoldSubSessionsObserved(progressWith(-1))).toBe(0)
+    expect(readSubitisingScaffoldSubSessionsObserved(progressWith(NaN))).toBe(0)
+  })
+
+  it('reads INDEPENDENTLY of the add counter on the same profile', () => {
+    // A profile with a maxed add counter but an absent sub counter →
+    // sub reader returns 0 (first-encounter), proving no cross-read.
+    const p = {
+      schemaVersion: 1 as const,
+      profile: {
+        childName: 'Marian',
+        character: 'melody' as const,
+        lastPlayedISO: null,
+        subitisingScaffoldSessionsObserved: SCAFFOLD_SESSIONS_OBSERVED_CAP,
+        // subitisingScaffoldSubSessionsObserved intentionally absent
+      },
+    } as unknown as Progress
+    expect(readSubitisingScaffoldSubSessionsObserved(p)).toBe(0)
+    expect(readSubitisingScaffoldSessionsObserved(p)).toBe(
+      SCAFFOLD_SESSIONS_OBSERVED_CAP,
+    )
+  })
+})
+
+// ── §13.5 drift-guards — pin the sub vocabulary contract ─────────────────
+
+describe('sub-to-10 vocabulary contract (spec §13.5 drift-guards)', () => {
+  it('SUB_SCAFFOLD_FOCUS_NODE = "sub-to-10"', () => {
+    expect(SUB_SCAFFOLD_FOCUS_NODE).toBe('sub-to-10')
+  })
+
+  it('SUB_EASY_BAND_FACTS contains exactly 8 facts (§13.4.2)', () => {
+    expect(SUB_EASY_BAND_FACTS).toHaveLength(8)
+  })
+
+  it('every SUB_EASY_BAND_FACTS entry is op "-" with minuend ∈ [5,10]', () => {
+    for (const fact of SUB_EASY_BAND_FACTS) {
+      expect(fact.op).toBe('-')
+      expect(fact.a).toBeGreaterThanOrEqual(5)
+      expect(fact.a).toBeLessThanOrEqual(10)
+    }
+  })
+
+  it('SUB_EASY_BAND_FACTS exactly matches the §1.1 easy band', () => {
+    // Pinned verbatim so a future planner-pool drift can't silently
+    // change the fade-signal denominator (§13.4.2 / §13.6 drift-guard).
+    expect(SUB_EASY_BAND_FACTS).toEqual([
+      { a: 5, b: 5, op: '-' },
+      { a: 8, b: 8, op: '-' },
+      { a: 7, b: 0, op: '-' },
+      { a: 9, b: 0, op: '-' },
+      { a: 10, b: 5, op: '-' },
+      { a: 8, b: 4, op: '-' },
+      { a: 6, b: 3, op: '-' },
+      { a: 9, b: 1, op: '-' },
+    ])
+  })
+
+  it('contains NO addition facts (op-isolation drift-guard)', () => {
+    expect(SUB_EASY_BAND_FACTS.some((f) => f.op === '+')).toBe(false)
   })
 })

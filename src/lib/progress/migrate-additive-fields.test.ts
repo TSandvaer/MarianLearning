@@ -491,4 +491,54 @@ describe('Progress — additive-no-bump field migrations', () => {
     ])
     expect(isProgressV1(loaded)).toBe(true)
   })
+
+  // -------------------------------------------------------------------------
+  // subitisingScaffoldSubSessionsObserved (ticket 86ca7kdw8 / spec §13.4.1)
+  // -------------------------------------------------------------------------
+
+  it('pre-W10.3 payload (no subitisingScaffoldSubSessionsObserved) round-trips with the field absent', () => {
+    // A blob written before the sub-to-10 scaffold counter shipped has
+    // no `subitisingScaffoldSubSessionsObserved`. The guard accepts the
+    // absent field (additive-optional, no schema bump) and the read path
+    // does NOT fabricate one — absence means "greenfield / first
+    // encounter," resolved at the consumer read site by
+    // `readSubitisingScaffoldSubSessionsObserved`.
+    const seed = defaultProgress('Marian')
+    const blob: Record<string, unknown> = { ...seed }
+    // defaultProgress() does not set the field, but be explicit.
+    delete (blob.profile as Record<string, unknown>)
+      .subitisingScaffoldSubSessionsObserved
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(
+      loaded?.profile.subitisingScaffoldSubSessionsObserved,
+    ).toBeUndefined()
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('a set subitisingScaffoldSubSessionsObserved survives round-trip verbatim', () => {
+    const seed = defaultProgress('Marian')
+    const blob: Progress = {
+      ...seed,
+      profile: { ...seed.profile, subitisingScaffoldSubSessionsObserved: 2 },
+    }
+    saveProgress(blob)
+
+    const loaded = loadProgress()
+    expect(loaded?.profile.subitisingScaffoldSubSessionsObserved).toBe(2)
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('rejects a malformed subitisingScaffoldSubSessionsObserved (negative) at the guard', () => {
+    const seed = defaultProgress('Marian')
+    const blob = {
+      ...seed,
+      profile: { ...seed.profile, subitisingScaffoldSubSessionsObserved: -1 },
+    }
+    // The guard rejects it; loadProgress falls back to defaults rather
+    // than carrying a corrupted counter forward.
+    expect(isProgressV1(blob)).toBe(false)
+  })
 })

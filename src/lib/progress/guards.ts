@@ -358,6 +358,26 @@ export function isProgressV1(v: unknown): v is Progress {
     const n = v.profile.subitisingScaffoldSessionsObserved
     if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return false
   }
+  // subitisingScaffoldSubSessionsObserved (ticket 86ca7kdw8) is the
+  // sub-to-10 sibling of the field above — an OPTIONAL additive field on
+  // `Profile`. Pre-W10.3 blobs predate it; absent is the normal greenfield
+  // state and the read-path defaulter
+  // (`readSubitisingScaffoldSubSessionsObserved` in
+  // `src/screens/Math/subitisingScaffold.ts`) treats missing as 0. When
+  // present, must be a non-negative finite number — non-integer / negative
+  // / NaN values are rejected so the loader falls back to defaults rather
+  // than carrying a corrupted counter forward. This single gate covers
+  // BOTH the local load path AND the cloud-install path
+  // (`cloudSync.ts:installCloudBlob` calls `isProgressV1`), so no separate
+  // cloudSync mirror is needed (same precedent as the add field — the
+  // counter rides through `installCloudBlob`'s spread-through unchanged).
+  if (
+    'subitisingScaffoldSubSessionsObserved' in v.profile &&
+    v.profile.subitisingScaffoldSubSessionsObserved !== undefined
+  ) {
+    const n = v.profile.subitisingScaffoldSubSessionsObserved
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return false
+  }
   if (!isSkillLevels(v.skillLevels)) return false
   if (!isLeitnerBox(v.mathFactsLeitner)) return false
   if (!Array.isArray(v.history)) return false

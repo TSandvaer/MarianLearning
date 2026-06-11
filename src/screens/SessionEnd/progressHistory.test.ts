@@ -1322,6 +1322,103 @@ describe('recordProgressOnSessionEnd', () => {
     })
   })
 
+  // ── Sub-to-10 minuend-scaffold counter (ticket 86ca7kdw8 §13.4.1) ──────
+  // Bumps profile.subitisingScaffoldSubSessionsObserved by 1 per session
+  // where the sub-to-10 minuend scaffold rendered. Gated on three
+  // conditions: surface=math, focusNode=sub-to-10,
+  // subitisingScaffoldSubRendered=true. SEPARATE counter from the add one.
+  describe('subitisingScaffoldSubSessionsObserved counter (ticket 86ca7kdw8)', () => {
+    it('bumps to 1 on the first sub-to-10 scaffold-exposure session', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-06-11T18:00:00.000Z',
+        focusNode: 'sub-to-10',
+        subitisingScaffoldSubRendered: true,
+      })
+
+      const loaded = loadProgress()!
+      expect(loaded.profile.subitisingScaffoldSubSessionsObserved).toBe(1)
+    })
+
+    it('caps at 4 across successive bumps', () => {
+      const baseISO = '2026-06-11T1'
+      for (let i = 0; i < 6; i++) {
+        recordProgressOnSessionEnd({
+          surface: 'math',
+          totalCorrect: 6,
+          dateISO: `${baseISO}${i}:00.000Z`,
+          focusNode: 'sub-to-10',
+          subitisingScaffoldSubRendered: true,
+        })
+      }
+      const loaded = loadProgress()!
+      expect(loaded.profile.subitisingScaffoldSubSessionsObserved).toBe(4)
+    })
+
+    it('does NOT bump when subitisingScaffoldSubRendered is false / absent', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-06-11T18:00:00.000Z',
+        focusNode: 'sub-to-10',
+        subitisingScaffoldSubRendered: false,
+      })
+      const loaded = loadProgress()!
+      const counter = loaded.profile.subitisingScaffoldSubSessionsObserved
+      expect(counter === undefined || counter === 0).toBe(true)
+    })
+
+    it('does NOT bump on the add-to-10 focus node (focus-node gate)', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-06-11T18:00:00.000Z',
+        focusNode: 'add-to-10',
+        subitisingScaffoldSubRendered: true,
+      })
+      const loaded = loadProgress()!
+      const counter = loaded.profile.subitisingScaffoldSubSessionsObserved
+      expect(counter === undefined || counter === 0).toBe(true)
+    })
+
+    it('CROSS-OPERATION ISOLATION: sub session bumps ONLY the sub counter, not the add counter', () => {
+      // A sub-to-10 scaffold session must leave the add counter alone —
+      // the two counters track distinct add/sub fluency pathways (§13.4).
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-06-11T18:00:00.000Z',
+        focusNode: 'sub-to-10',
+        subitisingScaffoldSubRendered: true,
+      })
+      const loaded = loadProgress()!
+      expect(loaded.profile.subitisingScaffoldSubSessionsObserved).toBe(1)
+      const addCounter = loaded.profile.subitisingScaffoldSessionsObserved
+      expect(addCounter === undefined || addCounter === 0).toBe(true)
+    })
+
+    it('the two counters advance independently across an add + sub session pair', () => {
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-06-11T18:00:00.000Z',
+        focusNode: 'add-to-10',
+        subitisingScaffoldRendered: true,
+      })
+      recordProgressOnSessionEnd({
+        surface: 'math',
+        totalCorrect: 6,
+        dateISO: '2026-06-11T19:00:00.000Z',
+        focusNode: 'sub-to-10',
+        subitisingScaffoldSubRendered: true,
+      })
+      const loaded = loadProgress()!
+      expect(loaded.profile.subitisingScaffoldSessionsObserved).toBe(1)
+      expect(loaded.profile.subitisingScaffoldSubSessionsObserved).toBe(1)
+    })
+  })
+
   // ── currentTargetVowel write path (Wave 9 W9.3 — ticket 86c9ya3m6) ──────
   describe('currentTargetVowel capture', () => {
     it('writes currentTargetVowel onto a letter-sounds entry', () => {
