@@ -332,6 +332,42 @@ Conservative posture: better to miss the scaffolding once on a Marian who's been
 
 Per Dave's PR #173 §4 recommendation. Future cross-vowel mixing (#86c9m3aek) won't accidentally re-fire when a short-u word surfaces in a mixed-vowel session: the gate keys on `focusNode`, which is set once-per-session at session-start fetch time. A short-u target that appears in a short-a (`focusNode === 'cvc-words'`) trio under cross-vowel mixing would NOT re-fire short-u scaffolding — the focus node is `cvc-words`, which is not in the gated set.
 
+## Per-vowel letter-sounds sub-mastery (Wave 9 — PRs #357 / #358 / #359)
+
+Tracks independent mastery for each short vowel on the `letter-sounds` tier. Layers _under_ the composite `skillLevels['letter-sounds']` without changing any downstream contract (focus-picker / Hub unlock / planner-first-class all still read the composite). Closest precedent is the [Lifetime-first-encounter gate](#lifetime-first-encounter-gate-ticket-86c9q9ben) — additive optional field + read-path defaulter + cloudSync parity.
+
+### Field shape
+
+`Progress.literacy?.letterSoundsVowelStates` — additive optional, **no `schemaVersion` bump**.
+
+```ts
+type LetterSoundsVowel = '/o/' | '/u/' | '/i/' | '/e/' // slash-LETTER notation
+type LetterSoundsVowelState = 'intro' | 'practicing' | 'mastered'
+// progress.literacy.letterSoundsVowelStates: Record<LetterSoundsVowel, LetterSoundsVowelState>
+```
+
+Four vowels per `phonics-sequence-marian.md` §Q1 (`/o/ → /u/ → /i/ → /e/`); `/a/` excluded (mastered at diagnostic baseline). Greenfield default is all-four-`'intro'`.
+
+### Read-path defaulter ordering — load-bearing
+
+`storage.ts:withDefaultedLetterSoundsVowelStates` runs **after `withDefaultedSkillLevels`, before `isProgressV1`** inside `loadProgress()`: `migrate → withDefaultedSkillLevels → withDefaultedLetterSoundsVowelStates → isProgressV1 → withDefaultedSettings`. If it ran after the guard, `isProgressV1` would reject pre-W9 blobs before the field could be filled (same failure mode as the original `withDefaultedSkillLevels` ordering).
+
+### Hand-mirror hazard (adding a 5th vowel)
+
+`DEFAULT_LETTER_SOUNDS_VOWEL_STATES` (frozen literal) and `LETTER_SOUNDS_VOWELS` (set) in `guards.ts`, plus the `cloudSync.ts:installCloudBlob` defaulter mirror, are **hand-mirrored** — NOT derived from the type union, so TypeScript won't catch a gap. Adding a vowel means manually extending all three. The `cloudSync.test.ts` `letterSoundsVowelStates parity` test guards storage↔cloudSync drift.
+
+### Activation gate — supersedes composite when active (W9.3)
+
+`perVowelTrackingActive(progress)` is true only when **BOTH** hold: (1) `literacy.letterSoundsVowelStates` is present, AND (2) at least one `SessionHistoryEntry` carries `currentTargetVowel`. When active, `applyMasteryRule` **skips `letter-sounds` in the standard 90/3 `qualifies()` walk** and promotes the composite only via an **AND-of-four-vowels gate** (all four `'mastered'` → `skillLevels['letter-sounds']='mastered'` → `pendingPromotion`). Either condition missing → unchanged Wave-7 composite 90/3 fallback. The all-intro defaulter alone does NOT activate it — a `currentTargetVowel`-tagged session must have been played first.
+
+### `SessionHistoryEntry.currentTargetVowel`
+
+Additive optional `LetterSoundsVowel`; written by `recordProgressOnSessionEnd` **only when `focusNode === 'letter-sounds'`**. Its presence is the detection signal for activation condition (2). Per-vowel promotion filters history by `currentTargetVowel === <vowel>` (cross-day-deduped, same as per-node) — a `/o/`-tagged session never counts toward `/u/`'s 90/3.
+
+### Current-target derivation (§1.4 walk)
+
+Walk `/o/ → /u/ → /i/ → /e/`: first `'practicing'` vowel is the target; all-mastered → next unintroduced. **`/e/` gate:** if `/e/` would be picked but `/i/` is not yet `'mastered'`, skip to a `'mastered'` vowel for review (`/e/`≈`/i/` acoustically — don't introduce `/e/` before `/i/` is consolidated). The planner derives this server-side; see `planner-and-canon.md` § "Per-vowel letter-sounds bypass" for the slash-LETTER↔bare-IPA bridge and the canon/cache bypass shape.
+
 ## Mastery rule (M3)
 
 [`mastery.ts`](MarianLearning/src/lib/progress/mastery.ts). The first PR where the app actually changes Marian's curriculum based on her performance. Pure module; the single public entry point is `applyMasteryRule(progress) → Progress`, which returns a NEW document (no mutation).

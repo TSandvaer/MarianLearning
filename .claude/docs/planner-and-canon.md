@@ -615,6 +615,20 @@ Initial-audit finding (2026-05-10): one shipped corrupt utterance — `cvc-words
 
 When `isGraduationSession === true`, both canon AND in-memory cache are bypassed ([api/claude.ts:568](MarianLearning/api/claude.ts#L568) and [api/claude.ts:606](MarianLearning/api/claude.ts#L606)). Graduation runs need fresh planner output (the directive supplies an additional novel-pool the canon JSON doesn't carry); caching a graduation response under the standard key would leak novel words into a non-graduation session and shred the dual-gate accounting.
 
+### Per-vowel letter-sounds bypass (Wave 9 — PR #359)
+
+**Two vowel vocabularies — do not conflate.** The planner directive (Haiku-facing user message) uses **bare-IPA** (`ɒ ʌ ɪ ɛ`); the progress field, canon `bakeMetadata`, response envelope, and `SessionHistoryEntry.currentTargetVowel` all use **slash-LETTER** (`/o/ /u/ /i/ /e/`). Two maps in `api/_planner.ts` bridge them: `SLASH_VOWEL_TO_IPA` (progress→directive) and `IPA_TO_LETTER_VOWEL` (the `CURRENT TARGET VOWEL: /<vowel>/` envelope line → history stamp). The envelope field is slash-LETTER so the browser stamps `currentTargetVowel` **verbatim**, closing the session-end write loop with no client-side IPA table. Mixing the two forms is a silent bug — both are valid strings, no type error.
+
+**Bypass predicate keys on non-fallback state, not field-presence.** Unlike `leitner`/`slowFacts` (bypass on non-empty), letter-sounds bypasses canon + cache only when `letterSoundsVowelStates` is **beyond all-`'intro'`**. All-intro derives `/o/` = the baked default, so it stays canon-served — preserving the cost ceiling on the first-ever letter-sounds session. Bypass fires only once a vowel has advanced, forcing a live Haiku run that can target the specific vowel.
+
+| Signal                    | Bypass trigger                                  |
+| ------------------------- | ----------------------------------------------- |
+| `isGraduationSession`     | flag true                                       |
+| `leitner` / `slowFacts`   | array non-empty                                 |
+| `letterSoundsVowelStates` | **any vowel beyond all-`intro`** (not presence) |
+
+**Canon `bakeMetadata.perVowelTrackingActive: true`** was added to `letter-sounds.json` as a one-line additive field (W9.3) — metadata only, no utterance/audio re-bake. Runtime behaviour is driven by `progress`, not this flag.
+
 ## Rate limiter
 
 [api/\_rateLimit.ts](MarianLearning/api/_rateLimit.ts) — sliding-window deque, per-IP, in-memory.
