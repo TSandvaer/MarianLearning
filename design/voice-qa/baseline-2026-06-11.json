@@ -1,0 +1,4016 @@
+{
+  "source": "github issue #372",
+  "submittedAt": "2026-06-11T14:51:55.074Z",
+  "verdicts": [
+    {
+      "itemId": "add-to-10#math.p1.correct",
+      "audioHash": "0a0fe9e2f1e76c140a01710e59541769e67024b7f4385b6973a640178b5e0f63",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:08:51.154Z"
+    },
+    {
+      "itemId": "add-to-10#math.p1.giveAnswer",
+      "audioHash": "d348aa2037b6cf1dec54c236207920d592d8da086f9ba224e043fb0c8973062c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:09.912Z"
+    },
+    {
+      "itemId": "add-to-10#math.p1.hint",
+      "audioHash": "32e74befd64479a20fe712e0e5fb624a262839e36da41faafd5b3abdfaae6cd5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:18.537Z"
+    },
+    {
+      "itemId": "add-to-10#math.p1.read",
+      "audioHash": "2f17870c508e37438637533ac9eccbc3547a8b3c010fbe1d10b82cb2dc66efd7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:23.878Z"
+    },
+    {
+      "itemId": "add-to-10#math.p1.reprompt",
+      "audioHash": "a1559d5b569a23e58208a46921118e229aa5b4214d96d4c3b79c9a35a70ebd67",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:30.005Z"
+    },
+    {
+      "itemId": "add-to-10#math.p2.correct",
+      "audioHash": "dd4b257bd4fcda1c199b5b03c7bb010bdd91850f8c5965447bcd507205eab1b1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:34.716Z"
+    },
+    {
+      "itemId": "add-to-10#math.p2.giveAnswer",
+      "audioHash": "bf079ce19004f30f66749579dd5a605c146d2564a89983da9f41cf3c0964bc0e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:37.798Z"
+    },
+    {
+      "itemId": "add-to-10#math.p2.hint",
+      "audioHash": "d1f12726502fba4251a154d3e0d6f40cd26807108947714932d0af95cb27fd59",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:43.678Z"
+    },
+    {
+      "itemId": "add-to-10#math.p2.read",
+      "audioHash": "fe85cc53fc59d5bb25b483418f333693a2e6e624fc257bc7bdd012657a4fd1cf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:47.519Z"
+    },
+    {
+      "itemId": "add-to-10#math.p3.correct",
+      "audioHash": "81088ebb54afcf05856c7e5a3f783a29bb22c28e9a2d1eeb47f094d28333bddb",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:50.376Z"
+    },
+    {
+      "itemId": "add-to-10#math.p3.giveAnswer",
+      "audioHash": "495403975bd388534c60697a9a59e059e96ee40ec065ea390398d6a2201555b2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:53.114Z"
+    },
+    {
+      "itemId": "add-to-10#math.p3.hint",
+      "audioHash": "8c58b61234591627820ed5f90f6b9e78072fa49d1b9c04a5ac3b46ac2642ea49",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:09:55.941Z"
+    },
+    {
+      "itemId": "add-to-10#math.p3.read",
+      "audioHash": "63d6e1d298886182c3c5856d262f7e77f7d46bbb66fb5507e06cb8607f7ed609",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:03.666Z"
+    },
+    {
+      "itemId": "add-to-10#math.p4.correct",
+      "audioHash": "d43622b823c42bce1c9639221741734d2c8ff3b81318fa3d036175205fb6577d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:06.794Z"
+    },
+    {
+      "itemId": "add-to-10#math.p4.giveAnswer",
+      "audioHash": "5212a48da2ef8c0b89b093426d044acdb3196dfd77adb0c923e46e5131858445",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:09.696Z"
+    },
+    {
+      "itemId": "add-to-10#math.p4.hint",
+      "audioHash": "f5c27a352b6fce8fcbbefb167a2c7712c951efbbd2c73f934152d441e0e4414b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:16.192Z"
+    },
+    {
+      "itemId": "add-to-10#math.p4.read",
+      "audioHash": "10b5470bbd5bdb00938c236f7b9ed907ecaf31f539052cf4008d79dfe4e6323e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:20.325Z"
+    },
+    {
+      "itemId": "add-to-10#math.p5.correct",
+      "audioHash": "c1c693f0b46e5f943c27f3518fe8115d0b8817b39fa056fa389456de8f073a60",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:23.714Z"
+    },
+    {
+      "itemId": "add-to-10#math.p5.giveAnswer",
+      "audioHash": "03c8a10ddffe0569c6c50aff478133c8d5b4d1960d8aacb3f3cc05741de60ce9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:27.661Z"
+    },
+    {
+      "itemId": "add-to-10#math.p5.hint",
+      "audioHash": "1d01d2d48e49412fcfa876ec40e769de80765c2bb2a396bb0ad56a361bcb52ac",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:33.263Z"
+    },
+    {
+      "itemId": "add-to-10#math.p5.read",
+      "audioHash": "729bdcc809b256257d21e9e808f014618f5db8622971615d7fdbf88b48597183",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:38.422Z"
+    },
+    {
+      "itemId": "add-to-10#math.p6.correct",
+      "audioHash": "311e6b2fad21b58afcfc77e6f3b4e72cb60451a4e3aba04a640c197845f30413",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:47.010Z"
+    },
+    {
+      "itemId": "add-to-10#math.p6.giveAnswer",
+      "audioHash": "c520509cc13513fb40dbfa65e85be4b4729ea23144ae99643d3e5579da2e97bc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:50.475Z"
+    },
+    {
+      "itemId": "add-to-10#math.p6.hint",
+      "audioHash": "02af3dce03117e14d2d88fcea2976af226b69d1da4819f8714592fc82fccd6ad",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:10:53.431Z"
+    },
+    {
+      "itemId": "add-to-10#math.p6.read",
+      "audioHash": "f44b69624acd872cf84a52364d080188b164e6e831223893107c6f4d3d2d30a5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:05.491Z"
+    },
+    {
+      "itemId": "add-to-10#math.p7.hint",
+      "audioHash": "58965576138b9241d02b020972061e4fe526629d0afada12811a23d65f04b25f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:10.315Z"
+    },
+    {
+      "itemId": "add-to-10#math.p7.read",
+      "audioHash": "e8d7a9681f7503948dc09a1976591909cf11fa7a9b57bac0f4e27b6912d37c4a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:15.204Z"
+    },
+    {
+      "itemId": "add-to-10#math.p8.correct",
+      "audioHash": "189162c2cf1991062db453401613bfeb3afd164be98c419140546020c17aac48",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:18.841Z"
+    },
+    {
+      "itemId": "add-to-10#math.p8.giveAnswer",
+      "audioHash": "5d6c94be652a67c3f9869d0e7134cbeb2124723f85c95fb215a0c91781d1f61f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:21.736Z"
+    },
+    {
+      "itemId": "add-to-10#math.p8.hint",
+      "audioHash": "75fbac4b497771501a89da0559ad3662f7830cffd0d6a51f6f79a6729dabf594",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:29.013Z"
+    },
+    {
+      "itemId": "add-to-10#math.p8.read",
+      "audioHash": "84295aaf16a4b4473f440da69c0d03801c8617f8d004e19b16a1c7cfa5c0c377",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:33.828Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.goodbye",
+      "audioHash": "3ef31de73ee9ec8fb15c79181f5b973adcfe40e4070ded931691d3b2e213fe2b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:38.890Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.opener",
+      "audioHash": "fb156a03b388faaa4e768db7cb2318fb1a1a46dacdfde0aa10375bde9615b498",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:11:45.251Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.1",
+      "audioHash": "28fb467610ef910f954cfe9731fbea8d8d75947cf58cc441cf158879cc169ec7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:12:06.050Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.10",
+      "audioHash": "fd8215008dc8554d37bcccece83fa28a05da09b192ad80ef77d3cac60861e7b9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:12:14.561Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.11",
+      "audioHash": "3df3a92d207c3be8da6a367be2468c09f52b08b385c31c1c4783bf608b88e4db",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:12:28.377Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.2",
+      "audioHash": "a04874f2d0cb950133ece54b2d31a34412c378531ea881bb7217dc0be8a4e327",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:13:08.150Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.3",
+      "audioHash": "264ce739afe62cab63ddeeeb9fa6bef15c9dbc0f9e1b17d3f9e074173e25ed05",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:13:15.289Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.4",
+      "audioHash": "9f75cb2dba04245caf26bba904de3efd32f5911ede738a6bce2b0cff4cd5bf17",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:13:20.570Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.5",
+      "audioHash": "cbf08c8edf0bc3e36d048fb95458dec4b7a3683a95f6dcc4ff5f16082fc0a1ef",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:13:25.988Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.6",
+      "audioHash": "83fa082102c92fe1c1b8818307ed439cddbf218162cd29812365d8f9c8d59d73",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:13:29.976Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.7",
+      "audioHash": "8abbcc49e97288ad3b99c518cbc696f6841ca62853b99d85ed360e1eb3c98af7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:13:33.651Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.8",
+      "audioHash": "874860e5e188da68d69d774ae298c3ca462630ada9103382bb9a04ee62da76da",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:14:02.211Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.recap.9",
+      "audioHash": "9d70ae79f0873a378e057733a4d75b24acba75f46894d9be78ff5cd86ea771d1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:14:05.654Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.streak.3",
+      "audioHash": "b437f2dd27efbd6b229cb28b73a484ab73f31e9da05089db926c1bfe7e84f992",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T10:31:07.640Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.streak.4",
+      "audioHash": "d53cb80f3e0235439979d6f59c3516c8fb84b34811d9a3b7f58efc7144dbc64e",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T10:37:02.154Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.streak.5",
+      "audioHash": "f67accfe7e4530597d2153bd385fad63e030a96221c6d78c60dfe680f884babe",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T10:37:07.614Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.streak.6",
+      "audioHash": "9a1b7748f09762fb155621cbc536f9098d592bba1bf8c95340d1801c889d02db",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T10:37:12.587Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.streak.7",
+      "audioHash": "aac85d90b28fbe48c258cd9f6822e0ef9c0d7d9161b6c9f1b6f4d1d29dd2f2b8",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T10:37:16.224Z"
+    },
+    {
+      "itemId": "add-to-10#session.end.streak.8",
+      "audioHash": "36165790d3232dd80e482b6f5ffbbc34bec2971ab3e459f22f70aa5e0b2d343f",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T14:36:53.056Z"
+    },
+    {
+      "itemId": "add-to-20#math.p1.correct",
+      "audioHash": "eb8ba6c8c5e4f208b1b562a3876a03296ba6c162e2fec45ab38ae52d9815fa3a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:37:30.041Z"
+    },
+    {
+      "itemId": "add-to-20#math.p1.giveAnswer",
+      "audioHash": "eab23479c26234d8a9bfff4a68e706f6939cafe7a64986afe2f8f745c8dc41ea",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:37:32.747Z"
+    },
+    {
+      "itemId": "add-to-20#math.p1.hint",
+      "audioHash": "58af736534c3711d68b80d8757c3fa826f6385f5a36db15e4742569438f81bff",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:37:38.927Z"
+    },
+    {
+      "itemId": "add-to-20#math.p1.read",
+      "audioHash": "4130ceb08c119d5dd76df850f4f75906d35d1e05159eae34f916164b485333e4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T10:37:43.211Z"
+    },
+    {
+      "itemId": "add-to-20#math.p2.hint",
+      "audioHash": "0d0121711a308e2d51f2821327db07e71cafb1fd76430ce901ac6c4134afe995",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:16.476Z"
+    },
+    {
+      "itemId": "add-to-20#math.p2.read",
+      "audioHash": "d3e52ba7523693ac94f5e132a872c43ac0d13f3fa56e63219d209ce2772b6c7b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:21.081Z"
+    },
+    {
+      "itemId": "add-to-20#math.p3.correct",
+      "audioHash": "3b09a6bbe5583b747fe8cd6b5f446b8734f03e5ba0d1da6eacda0fa3c007a60b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:24.073Z"
+    },
+    {
+      "itemId": "add-to-20#math.p3.giveAnswer",
+      "audioHash": "dccdbb7d62729988422d8c1daf819934dcec67c511d949468bb69b25f775486d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:27.072Z"
+    },
+    {
+      "itemId": "add-to-20#math.p3.hint",
+      "audioHash": "314c186670d262496a321ea69b18c627635bcf46a576d32396e91a5be650b574",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:30.156Z"
+    },
+    {
+      "itemId": "add-to-20#math.p3.read",
+      "audioHash": "0b98f84ad602c606daa2c70051fd91245482a1304060f727e69ab2ec402ae580",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:34.911Z"
+    },
+    {
+      "itemId": "add-to-20#math.p4.correct",
+      "audioHash": "09004aca25f4a1360cb6055e007b1784f89b7db288b78d90c1a193a3af9200dc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:39.104Z"
+    },
+    {
+      "itemId": "add-to-20#math.p4.giveAnswer",
+      "audioHash": "7ab27a567977ab4afd7dd747ed38aac9b2fc37f3840ca0d37336ccf9342381b0",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:41.684Z"
+    },
+    {
+      "itemId": "add-to-20#math.p4.hint",
+      "audioHash": "c6105b360d396a10732d1c66a8a124a78aad639354e1161123785fa6b25c99f4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:46.597Z"
+    },
+    {
+      "itemId": "add-to-20#math.p4.read",
+      "audioHash": "ea3dac12005a1658780ecddc2acf5d0b1ae0da99384f44553e16df1f03c06ba2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:50.033Z"
+    },
+    {
+      "itemId": "add-to-20#math.p5.hint",
+      "audioHash": "e65e276fef54d2d0bd3e8ee5755b72b28f42350f4ac8a2398383c0018e5347e7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:11:56.415Z"
+    },
+    {
+      "itemId": "add-to-20#math.p5.read",
+      "audioHash": "4dabdfc6160dfe2f8ce2c51ddb3275fc6f645c306e6414e9ae7239ac1a1bdbc3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:02.251Z"
+    },
+    {
+      "itemId": "add-to-20#math.p6.hint",
+      "audioHash": "715afabd71d2a3fc122708f43f8c588ddeb3986617fdbe17f48e482ff7ff8a60",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:08.115Z"
+    },
+    {
+      "itemId": "add-to-20#math.p6.read",
+      "audioHash": "79d89b4b4150df35f0de014f5166bc419956888e1f4bfe517a45e3981218a9c4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:12.570Z"
+    },
+    {
+      "itemId": "add-to-20#math.p7.correct",
+      "audioHash": "7c5f0ad806429dd48bb961c81d158a269bad125c3e676557861007daf1a70985",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:16.314Z"
+    },
+    {
+      "itemId": "add-to-20#math.p7.giveAnswer",
+      "audioHash": "65c7f2b1a5209f0f38d538c870dbbc063d547515a9d33ac6f0f49b1cfef57b44",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:19.095Z"
+    },
+    {
+      "itemId": "add-to-20#math.p7.hint",
+      "audioHash": "e69d2792c63d0209015ff5eefb3eca1ee79498210b82e6ec5ff9449a28d053c1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:24.795Z"
+    },
+    {
+      "itemId": "add-to-20#math.p7.read",
+      "audioHash": "eb75f903fd0ca536d12dccbf68abea3727c427e54eff951e7a9001b34c11c842",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:29.040Z"
+    },
+    {
+      "itemId": "add-to-20#math.p8.correct",
+      "audioHash": "fb32e2def8ae5aabc1a779bd298e3ac3cc9ad3db96727f8314606de09f144ff9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:32.295Z"
+    },
+    {
+      "itemId": "add-to-20#math.p8.giveAnswer",
+      "audioHash": "a5209dd3f357ee28882264a61c4a9736238dde67fecafb51d1137a0a89e54858",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:36.472Z"
+    },
+    {
+      "itemId": "add-to-20#math.p8.hint",
+      "audioHash": "0401a5ad1a2d75276b922f308f0e07dbd711a9f7a47aed6438fbd1066d0c2246",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:39.937Z"
+    },
+    {
+      "itemId": "add-to-20#math.p8.read",
+      "audioHash": "584c429d039a9d393d9d60a215b0875e9c0fe6b939490a9dc749504be0c46902",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:42.427Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p1.hint",
+      "audioHash": "bcc8c571e261f7ea165db7e04d160aca736f811c0cc543016811f5bdbe4484ed",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:48.158Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p1.read",
+      "audioHash": "1484c14b47e7d22921fc84aea05b238f901ddd339c8d44018e239f1d77a0c822",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:53.055Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p2.hint",
+      "audioHash": "c2a86f9a82eac157f16c8940b84de8fbcd6a460236301c2418ef6bac057ca01a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:12:57.525Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p2.read",
+      "audioHash": "d16f743f76cca5f7608ae622ec25ade6f57436ae1e9a1163eface064d3d2f59b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:01.740Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p3.hint",
+      "audioHash": "ba1adb16ad959147a6fae6f4d622eeb95f08eccd52736f22f0e0260030e4e611",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:06.166Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p3.read",
+      "audioHash": "66e6fa578d379af77413484718129da76321391846a68a63ea712db982daeafd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:10.561Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p4.hint",
+      "audioHash": "25392313abff07fc0a14c1eb7521a318e08ed39d69edfa56884b9f1a16eab083",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:20.535Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p4.read",
+      "audioHash": "fad78775b6cfd97c38ba6db1b6417d6094fcb04b48fac3ac7904d0b6ce899430",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:24.834Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p5.hint",
+      "audioHash": "d25e8155aa2b54521f4505eb11ff8ff576953fd594a2532e9c58b19de063c627",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:29.790Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p5.read",
+      "audioHash": "953a4bb1e558d12895be7813d27e85916dac81e8bb846fb804dd23c796dd29a2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:33.474Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p6.hint",
+      "audioHash": "8d8b71656f7430756cfb9c3d466eccc75bd2a3553d5cf8f08e33fc65cf25f2a8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:37.718Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p6.read",
+      "audioHash": "00a56128e9c23fe4450a8e597479384a377ab08db29880d679b889bc2e8071ff",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:41.725Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p7.correct",
+      "audioHash": "2d686a2685d2dc040778ff2e1d45de961cb9b5901b8fa1524ba59a06462e7c69",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:44.492Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p7.giveAnswer",
+      "audioHash": "20dec4340c0abd2754cf8c244df0da598f467d2b4b7eccc42e5631bc6e6e8c80",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:46.840Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p7.hint",
+      "audioHash": "f57b8ea3b7a3a3fa3256ce36bd5d77eac238627dee0bf3d033c9ac32445d5254",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:50.253Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p7.read",
+      "audioHash": "2f39c8b6e48ba283411fe5caa7fc1105b62eabbffcada40d554abb9abf69d779",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:13:53.207Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p8.hint",
+      "audioHash": "e3386344b5089d521fe4a16a0a219ad832be228b9d580ce77effdd192d97e74c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:01.352Z"
+    },
+    {
+      "itemId": "mult-2-5-10#math.p8.read",
+      "audioHash": "1ce9c647ac6bb0b099981a486e8702563dab7ff12c7f202dc951970172d27a06",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:04.870Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p1.hint",
+      "audioHash": "7589a68a0a0c28d0ccb38603af5178a38f73bfaf76bc9580d71bf28b6aef2e4b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:10.600Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p2.hint",
+      "audioHash": "738dfad19cecac0b6db3a2d7a3422baea23b5c51bc5288db91cca5cfa0a8c119",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:19.855Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p2.read",
+      "audioHash": "e71f29ece3752001c60d57d5d4d14313ced28e5a6ef5c5df0d3b4a61ae6e3c2f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:23.358Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p3.hint",
+      "audioHash": "a013c89609a12b1cf7668ffce43fb191214423247dfd37eb2df8afb3c858bf71",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:29.598Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p3.read",
+      "audioHash": "18f1598fccf41c19866abb9b3265bb8c73ee4612696f68e615f8b742c9e12f15",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:32.859Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p4.hint",
+      "audioHash": "46645331160413e7c14bdef9a6953e2514c869bc52b6c68c6eaf8f842a6cc412",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:43.421Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p4.read",
+      "audioHash": "d236e787449fc99a511041be9c82c77b243aee2b28c97e2e5fc2a0638a1511b8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:46.766Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p5.hint",
+      "audioHash": "5f7f1cd9963c34c897a4f70cad64f96289ddf793ef64652251c51d619979b276",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:50.471Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p5.read",
+      "audioHash": "ca6f77495e309cd92c704a3a819a9a6ac304b15f1d73daec0153e146aa2e4d0f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:52.916Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p6.hint",
+      "audioHash": "7e28db468bc07afadb8a09dd4099a1d7f4be3e80a5180b8ced468e18e68c96c2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:57.431Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p6.read",
+      "audioHash": "a91c56f87cb18ff967666222a7520db6d9c99f47f73d24d78405c335f4944ff1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:14:59.502Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p7.hint",
+      "audioHash": "40aa19ea65ad3baf0e03e520b19eb523f2b0baf3eb0ad55d04264b405b7c8d11",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:15:03.357Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p7.read",
+      "audioHash": "478369783b0b8239c20530d0f5574d1b287c1305d4521dd8b3930110201092b8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:15:06.349Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p8.correct",
+      "audioHash": "631d92162fd3418eaf30d1a1eae8effa07483a5c2eeb190fdab490ac68e1e11e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:15:19.850Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p8.giveAnswer",
+      "audioHash": "6eb73f4b6623aaa5fd0f3cd47bc31ada03b7122bccc3acce5e4ae11a4e51389b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:15:24.778Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p8.hint",
+      "audioHash": "f57376fbd8c2f3e7b3b864beca020734a4e9508c555a996db76489a8f4b4beed",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:15:29.668Z"
+    },
+    {
+      "itemId": "mult-3-4#math.p8.read",
+      "audioHash": "fa9a0cb4371c9aa30e4ec9b8100e85e5f554d66bbd9d4485db32d61e44da64c0",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:15:32.331Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p1.read",
+      "audioHash": "c882e61c0bbaf84029f127a022aac5b51b1ca2a66099ace7ff30d18bbab893c7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:15:49.754Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p2.correct",
+      "audioHash": "de2ee17ce602986163d530174059896773f98467d8fa3eae915a2125a76617b3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:17:22.247Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p2.giveAnswer",
+      "audioHash": "bacfac6f0bc9a2ec470eb8eea95d20ff8df23899fc024cd7c410a9e36a83adab",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:17:25.450Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p2.hint",
+      "audioHash": "5f6cdb482cfb6c2eab3a84135bfa7d03ad66953b413aab2cb9cedcc9f60f11fd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:17:29.673Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p2.read",
+      "audioHash": "101aff3bae59fec7ee36cd8057a106233624ba7f5d5b5abd43adecbb172d594d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:17:34.316Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p3.hint",
+      "audioHash": "c0bbce9ea93f08e7f6564691d560bfebc19ad6e177463946fe67ec223382fb95",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:17:40.383Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p3.read",
+      "audioHash": "57927569824f5666a77744686a89dab557cb3c769116ee6bcc46e22462b69c6f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:24:41.076Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p4.correct",
+      "audioHash": "96d9708086f8aa90b772bc0a3c8d50d25bd6479310b581ecde13496e849de1ad",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:24:48.441Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p4.giveAnswer",
+      "audioHash": "6c70dd7b0e10c4a23df282ddcdb54820690104754c28fa7c8a81e2b713786574",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:27.646Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p4.hint",
+      "audioHash": "1f878a0eb4d4873b6cab2c886a2ed8b15b31289829841727fac1f0f83b0f7e96",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:32.379Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p4.read",
+      "audioHash": "0c1e5dd9835a4fa52a633794022dc868b56ff1dd7103c343151244cc77219a8b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:36.197Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p5.correct",
+      "audioHash": "865704e1e06123ebd739be89125d808f2d7b6d5032b0f343d2389df9b375d3d0",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:39.489Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p5.giveAnswer",
+      "audioHash": "6f7f735face2f64d5e05be3874ec3eb09e1d01437f321cb6992afc5514bdeada",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:44.416Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p5.hint",
+      "audioHash": "700f750438edf3a42dd3889667e2a134c8b9f468c0bf0f46f33757c548d902ca",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:49.779Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p5.read",
+      "audioHash": "627dfad967254b8c1d6a82a2adc4e94283f00e14926f2d8ee413ed91cbc5b3d8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:53.507Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p6.hint",
+      "audioHash": "e1e610351d7be8bf5332bd763111b5a883ff86168fefecf5a253eef92e7936bf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:26:57.257Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p6.read",
+      "audioHash": "7d2973f0be911e10a8355c31963d5aaf94562009a0bfdca1dfaed34bf5a58686",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:27:00.137Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p7.correct",
+      "audioHash": "d7c0861152fe77c26e6370daa0bd3e733cb9176db5a278de07122c6800c5be91",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "there is too long gap between she says twenty and four",
+      "decidedAt": "2026-06-11T12:28:05.682Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p7.giveAnswer",
+      "audioHash": "1f742ac6e41e8069035ce3aaceb10eb8da1d46e2d111026c58dfdbd910279959",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "there is too long gap between she says twenty and four",
+      "decidedAt": "2026-06-11T12:28:14.262Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p7.hint",
+      "audioHash": "b497a9197a1ebedf3caa59baf56e73c4d558cf6834491b9bb8fbf6959f97b4df",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:21.096Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p7.read",
+      "audioHash": "b6c2bdc2df00d3ee587ad1f1cc9ca1c216286e7aae1587c9666134cad08ea808",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:24.418Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p8.correct",
+      "audioHash": "76672e5460e21e08c273fad3ee30bd6f187accec53a8c2200c01faa77f164ed8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:28.529Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p8.giveAnswer",
+      "audioHash": "cd603b7ace9b8d21fccef6fa71d74c9dc14c2884773f3e4ebe131a23be16d129",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:31.469Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p8.hint",
+      "audioHash": "ac5a967164b70fa884ac5158a0961bb174e4dce3b6a8f3b8ba31d3f0c5902ad7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:36.988Z"
+    },
+    {
+      "itemId": "mult-6-9#math.p8.read",
+      "audioHash": "9c7d35a6f2158b44e9a3d44bf6519a7d34e9c1e14dd651dc5d396bd11f5dcc75",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:39.831Z"
+    },
+    {
+      "itemId": "number-recog#math.p1.correct",
+      "audioHash": "a7c74cc3a98e22feba1c88cbf71a6f2ed6e4d082c263b1e2806d2c9188071e48",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:43.078Z"
+    },
+    {
+      "itemId": "number-recog#math.p1.giveAnswer",
+      "audioHash": "8390a56fb4fff337ab0d028fa61787d863d9e0bbda29be7758947b1a905b56a9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:45.450Z"
+    },
+    {
+      "itemId": "number-recog#math.p1.hint",
+      "audioHash": "9b9eed2d2f214957eae87e05cb677ea85e282ac8f3cfa00ef113364d2a585935",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:49.116Z"
+    },
+    {
+      "itemId": "number-recog#math.p1.read",
+      "audioHash": "7908f96aa6ee5a338677a6a4defe493b2bc98851ac7307c697aaa6e4e9b3759b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:51.607Z"
+    },
+    {
+      "itemId": "number-recog#math.p2.hint",
+      "audioHash": "9b8c51f85827c4077acd970d8b39c73f67be42b0b2d5823d8ac766c2012e115e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:55.454Z"
+    },
+    {
+      "itemId": "number-recog#math.p2.read",
+      "audioHash": "bad2c637a13e627f6ba69559a21eab46dc0507801a9ce66c2134ee0bba140117",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:28:57.644Z"
+    },
+    {
+      "itemId": "number-recog#math.p3.hint",
+      "audioHash": "8687b6ae27777aad78a600c1ffdc12b0154881b1a24c8af28a9a0dcb17cbdeaa",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:01.326Z"
+    },
+    {
+      "itemId": "number-recog#math.p3.read",
+      "audioHash": "af1a7fd05ef5f18898e2852ad580da7d52979fcdde3629bc88457c47859892b4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:03.487Z"
+    },
+    {
+      "itemId": "number-recog#math.p4.correct",
+      "audioHash": "743d3d74c85c0ecdf485cf84d0c07743734143a8ffe67aae3f4587ebeb30d284",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:07.447Z"
+    },
+    {
+      "itemId": "number-recog#math.p4.giveAnswer",
+      "audioHash": "5caee0d0f759baaceeb25507bade55abf66c5c9ca97db57f279bb1df4fb89df8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:10.642Z"
+    },
+    {
+      "itemId": "number-recog#math.p4.hint",
+      "audioHash": "90dfc5fdd20d5404b8bd26df2d4370d02ba6adf2d2d14b482eed7c2170fbef86",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:14.513Z"
+    },
+    {
+      "itemId": "number-recog#math.p4.read",
+      "audioHash": "a78e8e11904de25c1c6ff260e85707e7dac52deb052664d49b3221e22f4fa67f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:17.151Z"
+    },
+    {
+      "itemId": "number-recog#math.p5.correct",
+      "audioHash": "666e0511ae594727c15f8290420bab225f1f49e46a5427ba905675cf8d015ff2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:20.220Z"
+    },
+    {
+      "itemId": "number-recog#math.p5.giveAnswer",
+      "audioHash": "ba2ff135bb7b9a91853e117c6762a93722e77c351c8af76e19e4550bd63cc5bf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:23.902Z"
+    },
+    {
+      "itemId": "number-recog#math.p5.hint",
+      "audioHash": "26d87e89f5d0446ed3becbae05c30526894a25ed343b9d0b183887c5251c2f70",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:29.039Z"
+    },
+    {
+      "itemId": "number-recog#math.p5.read",
+      "audioHash": "e2fe1f1879b3ad7f75d9047cb6e7f80f04cc362c846409460819dc99b57e5d23",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:29:31.177Z"
+    },
+    {
+      "itemId": "number-recog#math.p6.hint",
+      "audioHash": "ae5b71ef8ba05077ec7ac9a7530e3dadb69e0814551789e466c7cb5fe4ae82a1",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "it sounds like she says \"for comes after three\" not \"four comes after three\"",
+      "decidedAt": "2026-06-11T12:30:13.015Z"
+    },
+    {
+      "itemId": "number-recog#math.p6.read",
+      "audioHash": "480b6bbbfe8427b157d58eccd7f458828a64afca6ad3f7cd04c75c9ce18a9c31",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T12:30:17.716Z"
+    },
+    {
+      "itemId": "number-recog#math.p7.hint",
+      "audioHash": "4288bfceec1651b5276ef4e918daae6fa03d187f1ae070ede6c5416cd8d3b4c8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:25:45.953Z"
+    },
+    {
+      "itemId": "number-recog#math.p7.read",
+      "audioHash": "877f50e6a6646427b76be1a1f718a446789270d45f5073d0884c5230c210fc45",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:25:48.367Z"
+    },
+    {
+      "itemId": "number-recog#math.p8.hint",
+      "audioHash": "7b05c190241fe1b37e5a60613b261449562b9123c8de9186f9a3c9fa6f9e1284",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:25:52.125Z"
+    },
+    {
+      "itemId": "number-recog#math.p8.read",
+      "audioHash": "9ae5bbf4fab0086143db8a4c64856d759a1096c35faecc68d232430898a059d3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:25:56.707Z"
+    },
+    {
+      "itemId": "skip-counting#math.p1.hint",
+      "audioHash": "8fde416e8ee25751a898e2e8f2b69c5479cdbaf27a349991a17a37ca183ef07a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:05.993Z"
+    },
+    {
+      "itemId": "skip-counting#math.p1.read",
+      "audioHash": "0cbd7923fb203654d7e71140bd18991d9f1db0449b41b53aedb156a7c7c392ab",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:12.901Z"
+    },
+    {
+      "itemId": "skip-counting#math.p2.hint",
+      "audioHash": "dd5623badc65d2d09b47e10c8a7274fae75c1da2aef58d2426c3ed2f92db622e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:21.053Z"
+    },
+    {
+      "itemId": "skip-counting#math.p2.read",
+      "audioHash": "496a251c29c45c7fc885e69dd408f2645fc96d8cb2b9458e4ed87ab6de6ba52b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:25.846Z"
+    },
+    {
+      "itemId": "skip-counting#math.p3.correct",
+      "audioHash": "3122fb3d1d985e98cc118f9728ce0fb61e1faa10065344bd5a690ea710488ca3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:29.236Z"
+    },
+    {
+      "itemId": "skip-counting#math.p3.giveAnswer",
+      "audioHash": "fbf71dcde5fec7eec7cd6214ee78f2f4e9dbb1d3d4f61be967a6947065b26fe0",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:32.641Z"
+    },
+    {
+      "itemId": "skip-counting#math.p3.hint",
+      "audioHash": "5e5063bae632ffdcaa65ff789e845b0226a7e4d13b4dd197b41194de55d2b3c6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:38.725Z"
+    },
+    {
+      "itemId": "skip-counting#math.p3.read",
+      "audioHash": "98ac1db34907eccf1f3306cab64c1d066ab048ee8a9fa75d19f6354232883f39",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:42.392Z"
+    },
+    {
+      "itemId": "skip-counting#math.p4.hint",
+      "audioHash": "4929772842d5a400fd6517328b6bb3963031750747e2e815a20199600399691c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:49.293Z"
+    },
+    {
+      "itemId": "skip-counting#math.p4.read",
+      "audioHash": "3f8083a17351e0ffc7a246673ca1e6153f78930e3024f8972a8de014a2337fa7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:54.971Z"
+    },
+    {
+      "itemId": "skip-counting#math.p5.correct",
+      "audioHash": "7f0e3c4758259226501f5974037d482e7046184e5e74b0a5328c842b417dcea5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:26:57.656Z"
+    },
+    {
+      "itemId": "skip-counting#math.p5.giveAnswer",
+      "audioHash": "1826e033e918da5cb7bfe09deffb10923dc7e86bf1bfb8752cc7c0ec5cbdc998",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:00.304Z"
+    },
+    {
+      "itemId": "skip-counting#math.p5.hint",
+      "audioHash": "ca410d704989bc5e072417718da83dcee320daa7e2fd2cfb832c20df3f2f3e32",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:06.934Z"
+    },
+    {
+      "itemId": "skip-counting#math.p5.read",
+      "audioHash": "422684944cb5220ddd810c6340785f088604773bb029eda0558f34c58cdec623",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:15.319Z"
+    },
+    {
+      "itemId": "skip-counting#math.p6.correct",
+      "audioHash": "c41783d68a335b680a18c27158b91c19b963e308a82ad1f301f47e198fbd6ddb",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:20.951Z"
+    },
+    {
+      "itemId": "skip-counting#math.p6.giveAnswer",
+      "audioHash": "dbd785daf7192b42fb242233af95554f97b0a5a00a40985ca8a776f9790ede36",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:23.486Z"
+    },
+    {
+      "itemId": "skip-counting#math.p6.hint",
+      "audioHash": "f71ad9197977fc75d4beb959fc62d102991ae3ca85576ab0542da1a379e05d27",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:27.124Z"
+    },
+    {
+      "itemId": "skip-counting#math.p6.read",
+      "audioHash": "ca64fb3809d746826f41b52f81a967ed8b2955238022d10fc039503363aede0a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:45.260Z"
+    },
+    {
+      "itemId": "skip-counting#math.p7.hint",
+      "audioHash": "5a61bd774b3600e436150372ddd91fb0cac43644bdd9eeae23c18ce012f6c689",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:27:53.061Z"
+    },
+    {
+      "itemId": "skip-counting#math.p7.read",
+      "audioHash": "f1d165e3c2eb35e484c79ac21abf5e309980947ba30a6acb17d41fb38a9ff996",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:19.724Z"
+    },
+    {
+      "itemId": "skip-counting#math.p8.correct",
+      "audioHash": "8c6af440388356090e6a42942db9bb8415d415405bb0a7899625f5552128f1ac",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:23.602Z"
+    },
+    {
+      "itemId": "skip-counting#math.p8.giveAnswer",
+      "audioHash": "ec01496a0a54fdbaa4b20877ae95dc819ec29007c9a9ec0c448b97fb70be8e9d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:28.109Z"
+    },
+    {
+      "itemId": "skip-counting#math.p8.hint",
+      "audioHash": "436790af431063fa9e2cb96d7eeee42f3e0968b99fea306a3bfd905c7283422e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:35.085Z"
+    },
+    {
+      "itemId": "skip-counting#math.p8.read",
+      "audioHash": "a3061f03427266c022fd9729bc9d38c0c57c5f64f573f0bf70f1c11e59337413",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:45.307Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p1.correct",
+      "audioHash": "74e0a854bd0b24c068bec4686b329a7226d35271eddfe067f8bfd537f962475c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:49.891Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p1.giveAnswer",
+      "audioHash": "1daa6a6531edce97003613723facf7218e66953e707c22ef9404d1deddef5b6f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:52.672Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p1.hint",
+      "audioHash": "aa29607a6b0ab5c8503ff85732e545290ef4a774633d274a5bed5fbd996f4825",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:28:58.680Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p1.read",
+      "audioHash": "7c48e32f2fe2119997ab536c438df5227f9193dd1f5bace93b97c094ef61e5a1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:21.525Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p2.hint",
+      "audioHash": "8eda5a3cc1d94f1fa12229014ad5c0eefce3a633ffa9cf9ab13dd40b869224c6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:28.336Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p2.read",
+      "audioHash": "1124da2a5a8bb1f17224397c79047e1eda6fdfdb457ac729770aea53c06106ec",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:32.746Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p3.hint",
+      "audioHash": "99e2a30c6d9be6a92552b906ba57e1ee068c363de6e7600d1f32af934e5ed1b6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:36.271Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p3.read",
+      "audioHash": "7ee054858abf71fb54675d45657fb1919878facf6877cbcbdcf2b648cdea2191",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:39.923Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p4.hint",
+      "audioHash": "25d44dc5ac62e26def09ac078116b50ebd201913475facb69b67b71f4fa7919f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:46.082Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p4.read",
+      "audioHash": "c99bdbbcfea73420dffed9ef36c02a041a32678ff60756191da30dd16b228fc3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:49.960Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p5.hint",
+      "audioHash": "b570af902de102d9c90201bc3dd096f0afab4c3f858f1d4ceb2a3c812bef443c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:54.730Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p5.read",
+      "audioHash": "e0a1565f9f6bab7c616c6e862ed813ae165c1ebcee62e6163e1d287f0824dc8f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:29:58.180Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p6.hint",
+      "audioHash": "7bf7be82d63f9d511a4a774c3040cfbbd5e2b516d2af67d32837e623d7ed8f10",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:02.815Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p6.read",
+      "audioHash": "db669a1e4bab7414dffe3c623eba6bbc240367573d6313b0cb380cd465075c4b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:07.570Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p7.hint",
+      "audioHash": "b783d9595b7329853d945499df6b63edffb60d8936eaa7287151d6c14cd130d2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:13.660Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p7.read",
+      "audioHash": "9cb7eced26c77b1bb855ad443ffc5dde0fab5acf9397c12b2b112a272f30a2bc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:17.748Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p8.hint",
+      "audioHash": "202ba8233cc0175d472ce3062dc8aa7b8e22d4ad7e8ed79468b7cdfe44ea9416",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:22.518Z"
+    },
+    {
+      "itemId": "sub-to-10#math.p8.read",
+      "audioHash": "4d1667ea2d9a2971476e28d1e3b6977b3691ea738ee69497a8278bd1f892394f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:26.523Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p1.hint",
+      "audioHash": "e371c89b323768bb83e5c6478c8d3dff6e7125c5ea15630885b8d50f5c4af9ad",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:33.597Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p1.read",
+      "audioHash": "983b7ae4a7a7d2b51660f5350e7be53321c0a1ee95204df08f7bb868272f517f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:36.988Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p2.hint",
+      "audioHash": "2f31f620dc41c841184a1b8bf7ee90535128f4958905be374f47fef684aced87",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:43.004Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p2.read",
+      "audioHash": "c82c8aba9061af6aca311dedb910227941a5269d9728a1132411e6f913035fd9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:46.798Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p3.hint",
+      "audioHash": "0eb7b8f499bd3ab3a57fbe1f20a8076f79ba3ae13010f26553964b804c5b7ebd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:51.403Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p3.read",
+      "audioHash": "778424a35a1ce69eaa4d918108eeaef26b552a208394e44abcf71c1de4bc6d39",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:30:55.835Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p4.hint",
+      "audioHash": "8e377728e6fa520d56868477b4e074e5c5a7ececb98e4085d777a30d316c4d5b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:00.433Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p4.read",
+      "audioHash": "75ba774579bf03e59478360bcc2c589e99cb2251aae43831d5de199e89ef441e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:04.701Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p5.hint",
+      "audioHash": "edcc94a4014837c1706bb98a9f17ed6c0f5efed554f0c40dd429c6745b6bf5b7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:11.008Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p5.read",
+      "audioHash": "011c8c1ec75b098c30dc46d92ed80be96b9c062f67bf5301e2e7bc404c46d03a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:16.018Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p6.hint",
+      "audioHash": "a29e988ee691c50e031c57d781460855b959ae13055c1477a65d87f87733226a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:23.608Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p6.read",
+      "audioHash": "33c84915af1c952dd884d8b00e7594443200addb436687f583edd9ea344e4011",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:28.657Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p7.hint",
+      "audioHash": "ead3775d5baa442bf0cd7da30635a27662a2f5fc6334c7d1133f84abdf647fe6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:33.411Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p7.read",
+      "audioHash": "3956d3bec5499ea3297bf821d7c62367ff824f2b9b2118cb381ae2d9be498830",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:38.174Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p8.hint",
+      "audioHash": "e8728da19b8988e2e4d7216dfac93482b9ea95419e5e0bd236cfc118ad103ef9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:46.881Z"
+    },
+    {
+      "itemId": "sub-to-20#math.p8.read",
+      "audioHash": "bcd6bb0987029a067138d98a6c62181229fd7864fb81bb6b5b6107240c054c9d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:31:51.210Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p1.correct",
+      "audioHash": "e75bf7673d49c6ddd04c5350b4b14fd8a24549559df06b8b7718f1dd4ff5610a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:01.439Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p1.giveAnswer",
+      "audioHash": "625409961ad22ab195065c343bee7c24a055139d1054585d8400e2aef8786323",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:04.124Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p1.hint",
+      "audioHash": "2c03bcdbee697df0cd1769080b33668d2a51a2e38ad6eacc7aa87bb21965fba5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:08.474Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p1.read",
+      "audioHash": "df13557af7a7955a0a2df00939bf6c0ee27f951d5ef6a31d8ab04388781bde29",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:12.277Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p2.hint",
+      "audioHash": "abff089af472674b248a833780c978ef212aa90a06ca8f2507eda030a967a2a7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:18.090Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p2.read",
+      "audioHash": "77498bef1d1e52767b71471f394acdf94d2567d4a5f798d3e083fd8d00accb32",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:22.312Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p4.hint",
+      "audioHash": "c44107e57d7379421aa50eb0473899967d9052784e50061d215aeed3846980ef",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:28.995Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p4.read",
+      "audioHash": "a4866de1a6b7d4cd5b16799e172d0dcbcbb2b338b35e05ee9ac862b1c88f9df2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:34.177Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p5.correct",
+      "audioHash": "b02df25d01e070028aed5f1e4b3e17e4e09daa90c0f3880617155bffa94c048a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:37.838Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p5.giveAnswer",
+      "audioHash": "99a7abf719b2c7899cbdcfca9c82ae71c5ec2f10238152732da145e67c9f1c57",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:40.583Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p5.hint",
+      "audioHash": "3da8b746b2ad9298d31b4d7e7e075c6046179d7b564b839b97d42f78af215e86",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:45.308Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p5.read",
+      "audioHash": "1f0f9e4343896e72ad62c9f14ed3b3ee781fffe90978cda3730febcd59bac97d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:49.607Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p6.correct",
+      "audioHash": "cd65dc2ccb138a62bcd7e5a205105c1b025e55e04b292db9de57829c0d210187",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:54.422Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p6.giveAnswer",
+      "audioHash": "369d6e81bcaa55e01b94d642e24ca00d384be1bef4aa46f5e6ce1dfa3b6b88d9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:32:57.580Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p6.hint",
+      "audioHash": "07bb885253077c2d140b5ca8bd5735439ba885a7bc343882c8d4fa4231ded9f3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:04.465Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p6.read",
+      "audioHash": "cdf4f6e955bf57d448460f961534b2f4e06bf7d3ec8d64b14b46338bd0f3ae95",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:11.230Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p7.correct",
+      "audioHash": "6382a0347d05ca7976bb3b8404a46ce5b2dd53808a4e0c76f6d8038a006664b3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:16.420Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p7.giveAnswer",
+      "audioHash": "9eb3ecbe12581a85bcf8c2ca0b6a31a1a104c67853f868736e76eb97a0203787",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:19.795Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p7.hint",
+      "audioHash": "0e44c45c86ffd6b109662e8c0d0a65031670212fca02ea13e5d74a7eb0a02021",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:25.255Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p7.read",
+      "audioHash": "f4829e17b739d8c9dd83ffec4f895ca99b9182cf7420f9bfd4c9adba7674de32",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:30.004Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p8.correct",
+      "audioHash": "19ecc238f88a5298e3c139d8c014fecd9274ca22eb4cb483d018fedbdcb114fe",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:33.686Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p8.giveAnswer",
+      "audioHash": "e0345372534e781e04ae3e435f5c28be5a574b3d624ded9ac28714cc88465a73",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:36.663Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p8.hint",
+      "audioHash": "87ac67c8f783f10333173d2db671ecfd7e0bffef39e572bf12062135c91a1866",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:42.978Z"
+    },
+    {
+      "itemId": "two-digit-addsub#math.p8.read",
+      "audioHash": "3fba9f71403ea19207285f95107e09bc1a00a16ba19b258e70170ba70ee3d581",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:47.006Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p1.hint",
+      "audioHash": "4a3ffa03045315ba459866c0ac68353cb309781619e3d08822dffd8eebf10c87",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:55.025Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p1.read",
+      "audioHash": "aeadfd4a2d8c12eeba273dfe7c778f772f378881b32775b8143ed54bcfec823f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:33:59.824Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p2.hint",
+      "audioHash": "86a5c11fa7c634ae9503a5b0b24184f0cd012d59bf3495b515367f59191871a1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:04.887Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p2.read",
+      "audioHash": "afd626e56796b50ae0cfdddab187360587d5812f868e26f9193daf781f16648d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:10.395Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p3.hint",
+      "audioHash": "f13d0117e84225e2cd0a19fa52a967ccb7767a5f8ee336685c47122f94a71186",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:15.268Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p3.read",
+      "audioHash": "166f4b6c4d50cf4ae1ae6b45ee7eb1cac1c54a3eb44f407fa19bf3d4032f62d5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:26.907Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p4.correct",
+      "audioHash": "baa2b9d7ff365a505f7890159966144118225da7c5ee23e5e946d5472bb0ea37",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:30.433Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p4.giveAnswer",
+      "audioHash": "f8e9ee7db5e0cf57a1efe2e23df2edc8c263d3027836aa62e885187994904ea5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:33.921Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p4.hint",
+      "audioHash": "2494a9a9948084a0f66019e07989ecfcd0b24380f4fb14e90ad6f3b46935e944",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:40.454Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p4.read",
+      "audioHash": "31e68cd9033713da811589eba66323735a71f979d528fbe9cfef112bd53d9f2a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:43.544Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p5.hint",
+      "audioHash": "a9b5548118c9a82d328dc6b08a5846bfd72ca2dbaad4eb0056746935735f7e23",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:50.144Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p5.read",
+      "audioHash": "b43e6255922b2e1335801ae65768561a3addae87324c8390830ec114d45decca",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:34:53.100Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p6.hint",
+      "audioHash": "ead59bc0223ca814bea6db66ae9e5fc83a6be569cd6105927ede52daeaf5a3d9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:35:00.787Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p6.read",
+      "audioHash": "0cbbbddf07353fda304ce7b5ec115b0b2d5490ea8c3601c7ec830fae12a05ccf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:35:04.073Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p7.correct",
+      "audioHash": "b9e946abcb35d4dc9ac1ba1d840e37393968d0afefa8e98355499da7bfa33ec5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:35:11.107Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p7.giveAnswer",
+      "audioHash": "9ad417307e5852133cb013688acdbd6a636b31f7e49ebbd00518821a89cb142a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:35:14.107Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p7.hint",
+      "audioHash": "63a1d2d7b6f7401c59f55e694a46de70853f8fd2a6adb364380d5d9f1f52c70a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:35:20.445Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p7.read",
+      "audioHash": "9125deddd9cdcc2d937ce6f20534f581d3885abe42c7f48037686b4aed1ab59c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:35:23.476Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p8.correct",
+      "audioHash": "94422d5b581cb117f4a124da1baba02b8e03ed3a38721fbfff692756475e73cc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T13:35:28.223Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p8.giveAnswer",
+      "audioHash": "a58680e37dd5fa597c8636c6058b4ec7cc48d6c736065549004c37968a1cae3d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:08:35.949Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p8.hint",
+      "audioHash": "a0997daecb12c89506f9bbc1be3ca2f67e9187bce2ef8a2e3dc84f481e26e571",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:08:39.766Z"
+    },
+    {
+      "itemId": "two-digit-addsub-with-regroup#math.p8.read",
+      "audioHash": "fb676831cf023fcfe1458517a5051bff1dee487a8cdbe245dcdf2f2c51f71562",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:08:44.423Z"
+    },
+    {
+      "itemId": "blending-cv#word.p1.correct",
+      "audioHash": "0d9444d0bd754079c4a4b357aec587b92e8ffec2829c7998cfdfc86b62705d83",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:08:49.050Z"
+    },
+    {
+      "itemId": "blending-cv#word.p1.giveAnswer",
+      "audioHash": "2de587007f3d0452cdc5d3c253005362793e7d42b9eb233992eff484d8453d17",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:08:51.698Z"
+    },
+    {
+      "itemId": "blending-cv#word.p1.hint",
+      "audioHash": "ce080b212c55a3f383be953da852c0b83b0b0a567afbc9a00960e7c1dbcb6887",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:08:56.356Z"
+    },
+    {
+      "itemId": "blending-cv#word.p1.read",
+      "audioHash": "996d4b350589d16f54968c347fbc3e63c7467292fa5126b7ed26b73881977019",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:08:59.214Z"
+    },
+    {
+      "itemId": "blending-cv#word.p2.correct",
+      "audioHash": "2daa950b8223201f0114d50d1767d22e950c35c8dc191541ecacda42ff8dea4a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:02.416Z"
+    },
+    {
+      "itemId": "blending-cv#word.p2.giveAnswer",
+      "audioHash": "7c2c820c37e4e6f54838eaa3edfda0b505d705227abbdc4c0f6e666ac946cfbb",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:04.943Z"
+    },
+    {
+      "itemId": "blending-cv#word.p2.hint",
+      "audioHash": "e73cc98c8394464cf4e1488ce9340f4a18fb5623f296fc6f4749224f762b9a22",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:07.996Z"
+    },
+    {
+      "itemId": "blending-cv#word.p2.read",
+      "audioHash": "b713eed2cde33bd3890cf61153e5b04e514898242801535a115c88b60c071e49",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:10.224Z"
+    },
+    {
+      "itemId": "blending-cv#word.p3.correct",
+      "audioHash": "457f1ab4aa1444b6e0cd715ea1504c4cc405bc5e56a4f0d929a38ebbb1f68562",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:13.067Z"
+    },
+    {
+      "itemId": "blending-cv#word.p3.giveAnswer",
+      "audioHash": "d2ad48a1abc7c68ed2ae3cc254941dc149bb81360517ad148a187c19321750ea",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:15.077Z"
+    },
+    {
+      "itemId": "blending-cv#word.p3.hint",
+      "audioHash": "c9204bcb1fdd7d91b9f1a84e01ba42cd81e8a13e5e3ac630122b06ef6976772a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:18.024Z"
+    },
+    {
+      "itemId": "blending-cv#word.p3.read",
+      "audioHash": "d87a6ddf4b52fa9f174f7e347a11c324b47ce5413c9d5cf0252f6533e1948462",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:19.915Z"
+    },
+    {
+      "itemId": "blending-cv#word.p4.correct",
+      "audioHash": "ff5fe759e916e37205732fa6e0f0f4ef33818067ac9f95dbb60ce062354232ce",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:22.862Z"
+    },
+    {
+      "itemId": "blending-cv#word.p4.giveAnswer",
+      "audioHash": "e4568d5021fcc3b19ca4c375ed94cc2b75a92133ac6d1117172049717b2f459d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:25.270Z"
+    },
+    {
+      "itemId": "blending-cv#word.p4.hint",
+      "audioHash": "625dcc126c6402bf6ba622b25089cb235d2d1a4372b19d61ec16682b74feb488",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:28.068Z"
+    },
+    {
+      "itemId": "blending-cv#word.p4.read",
+      "audioHash": "b91541477ca3f54e36c8b8fed9b2bfe03f446fab968ac3012751b8e7d8a0da24",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:30.146Z"
+    },
+    {
+      "itemId": "blending-cv#word.p5.correct",
+      "audioHash": "a03b3f8c61c33be7520e04091448adf2f9f8ba3dd26ad111b10332336f987420",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:33.573Z"
+    },
+    {
+      "itemId": "blending-cv#word.p5.giveAnswer",
+      "audioHash": "0f75125ee843da4bf8e5621f07f357c0320a3be2a11dc15ba62f770a08a927a7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:36.086Z"
+    },
+    {
+      "itemId": "blending-cv#word.p5.hint",
+      "audioHash": "91b886fe02bfc9297539da6959b81a54e30bbd87dc8f4460c5e36b7bf94ddcfd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:39.041Z"
+    },
+    {
+      "itemId": "blending-cv#word.p5.read",
+      "audioHash": "888ace38cc4d8f33be8f15b31346a6e68b9cf824053209ffb314c9e3f89dde7e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:41.246Z"
+    },
+    {
+      "itemId": "blending-cv#word.p6.correct",
+      "audioHash": "8f72e37c7ef8d0da84f90668ad0934a99d25f962f6c03fac04f72b2818422418",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:44.538Z"
+    },
+    {
+      "itemId": "blending-cv#word.p6.giveAnswer",
+      "audioHash": "98c19c43a3bb49958a3019b18fc1a7557e599c9e50243a2fa8bd2a403cb8d1e9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:46.886Z"
+    },
+    {
+      "itemId": "blending-cv#word.p6.hint",
+      "audioHash": "81abed48c9901658a3a4357b5f09901a6600e08f2757aa396a8dba547d9b16ae",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:47.868Z"
+    },
+    {
+      "itemId": "blending-cv#word.p6.read",
+      "audioHash": "e1974ee8120c8f1ea4ea700114185b0d6ed0c6249dd2e935a035031c5e5cc87b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:51.093Z"
+    },
+    {
+      "itemId": "blending-cv#word.p7.correct",
+      "audioHash": "6ba0dbd50a90bc64e30139468e8115f3af9e84f18c104c87f39001850ec5ec50",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:52.864Z"
+    },
+    {
+      "itemId": "blending-cv#word.p7.giveAnswer",
+      "audioHash": "1f787772d51e4d4db03af2711acfa113b4e255184186a47ff3ed1236eaeeea40",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:54.708Z"
+    },
+    {
+      "itemId": "blending-cv#word.p7.hint",
+      "audioHash": "f61a33a95c27b8a6b36e190aabf933fa12e98d5c655a728b4a34cd68fefd81ce",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:57.033Z"
+    },
+    {
+      "itemId": "blending-cv#word.p7.read",
+      "audioHash": "9b93f981dfab1873a3f8a5ba73904d4837f5696e32ba7c16fcebcfad35b78eea",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:09:59.486Z"
+    },
+    {
+      "itemId": "blending-cv#word.p8.correct",
+      "audioHash": "1013281785bf90e4c614eea5dea82a2fd0e534c9b277191e20a35c4419bf383d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:01.443Z"
+    },
+    {
+      "itemId": "blending-cv#word.p8.giveAnswer",
+      "audioHash": "9ad531a7d6f30694cd407d1ff02bf77ad0602765ed98ce9602a1c30b9ded4137",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:06.192Z"
+    },
+    {
+      "itemId": "blending-cv#word.p8.hint",
+      "audioHash": "965e151081f45aa6718896487e73fd985ce053010961a9e13e09fadcc51a38af",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:09.416Z"
+    },
+    {
+      "itemId": "blending-cv#word.p8.read",
+      "audioHash": "712c1d3d3f60a9f3360092a5f99a08b75c803f2404a8b96a1429f90351d398c5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:12.071Z"
+    },
+    {
+      "itemId": "cvc-words#word.p1.read",
+      "audioHash": "c12b43a23e3e6d321c7a1ce43cd6f73d3d2c2ac27af3e419a7ea0bae80fb3c45",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:14.201Z"
+    },
+    {
+      "itemId": "cvc-words#word.p2.read",
+      "audioHash": "4b912c0eb9fec592639f9f5e42e1127cd06d082d4c9fafc23cdb7d9504fdb31b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:15.821Z"
+    },
+    {
+      "itemId": "cvc-words#word.p3.read",
+      "audioHash": "ba926b97360d55abac71ee9bfa8dab7be427d332fb829f99e85329ca812864dc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:17.628Z"
+    },
+    {
+      "itemId": "cvc-words#word.p4.read",
+      "audioHash": "ddf5d5f4e1fb413ed47aa3a8bd97e203d3fedf86959d499f2f7ed7ed0750c919",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:19.255Z"
+    },
+    {
+      "itemId": "cvc-words#word.p5.read",
+      "audioHash": "82ec1e130f4b7459cc851a912dd7bddd1b23dbfe9c3d55f1e0d620f4a37e3e4d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:20.878Z"
+    },
+    {
+      "itemId": "cvc-words#word.p6.correct",
+      "audioHash": "664f09151cf2eac02f22710ad4f5b4517a9c3fffdda5521765e8c392dd83e04b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:22.233Z"
+    },
+    {
+      "itemId": "cvc-words#word.p6.giveAnswer",
+      "audioHash": "a8b16ad5640ab87665a6a3fb53984953b060969c8103ca642de564d666e5faaa",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:25.766Z"
+    },
+    {
+      "itemId": "cvc-words#word.p6.hint",
+      "audioHash": "1fbe609ddf33dcb186a0d6c21fb781f4308af250b5b41e3bcc2d7c3e58cdc121",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:27.888Z"
+    },
+    {
+      "itemId": "cvc-words#word.p6.read",
+      "audioHash": "c159d9dc77f076d94cb2bb908ee3f4b15153822163e89ef0273e0f3f17fa19b1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:29.847Z"
+    },
+    {
+      "itemId": "cvc-words#word.p7.correct",
+      "audioHash": "ba54f9dd9cb4c2b3fac4001f2ad1dc74804f655a02ca4103a78b6735b1b92b48",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:33.071Z"
+    },
+    {
+      "itemId": "cvc-words#word.p7.giveAnswer",
+      "audioHash": "da5bb0857208b84047108d9f2cd35bdcdc122325100013495fa52300214791e6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:38.239Z"
+    },
+    {
+      "itemId": "cvc-words#word.p7.hint",
+      "audioHash": "e0e270b534d349863be2a09007cfec70516d8eff00906fd273e69eaa880f2ae3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:40.407Z"
+    },
+    {
+      "itemId": "cvc-words#word.p7.read",
+      "audioHash": "b3faa4db566ce643b855b0c73d1161b6403ffd14effb7992ffeb7594b0ec3e9b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:42.741Z"
+    },
+    {
+      "itemId": "cvc-words#word.p8.read",
+      "audioHash": "c6741741fb5e3d7e27f778f13dc0354c7c59a4d34c331c2a8cb6e8a60e097b76",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:45.117Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p1.correct",
+      "audioHash": "edbebbf5dc440aa235b7469bd1cc946f6e4a0decb43642e2c41a4f2a51916c40",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:47.113Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p1.giveAnswer",
+      "audioHash": "9815f3f4d51b1dbead708b466e5717267da7e94c20b136eea45524a83617117d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:49.505Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p1.hint",
+      "audioHash": "f30bd48be39a2940344bd2973ab6dd41022cd797e6e3dd2e6bad51221d327afa",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:51.066Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p1.read",
+      "audioHash": "873d380daa0c6270c270de286360166561a3a8d606b5fc1147c577fd8429fb3a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:53.187Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p2.correct",
+      "audioHash": "7ff1ffdada80160127f0677efe777cbb3ff70fbbbb37a9786845a87565b574f4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:55.077Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p2.giveAnswer",
+      "audioHash": "5580ee58d78e2cc11538a4f2e0b6d14187c12a34bfd6543e95dbb4c89b87a124",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:57.552Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p2.hint",
+      "audioHash": "3af5090b5e8657161ebe32414cf2086efa895f6ba0de552e4555d9dd343e8c44",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:10:59.292Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p2.read",
+      "audioHash": "9e98544cd2a660e30d7ed756f0c38ea348314c9a1acf5655ce8b09c6d43987c6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:01.753Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p3.correct",
+      "audioHash": "d9503c00be8fedee59bb1f09fbe7b3ad56c46b14045879f822261a2beab0461a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:06.253Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p3.giveAnswer",
+      "audioHash": "4ed38006fa23670f24818784c9c4f517182c0c2104db87130d3dd2664677abd7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:09.237Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p3.hint",
+      "audioHash": "d8fe773618b1c40d075ff59d8e7dabaa5d34d43420fd85799f0826f372ce07f6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:11.698Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p3.read",
+      "audioHash": "ce9372abb2ccaaca2ac8b942e5b812efb03c2b0d673e5fe639da4b18622eb212",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:14.180Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p4.correct",
+      "audioHash": "3e9d9561b8930f4747ba60a971ad13cbdb5ea598166643c84bbfffcebdbfea90",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:16.250Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p4.giveAnswer",
+      "audioHash": "dfade056437a463c0976e9792833550b990964101a715b305e3e673157f5d293",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:18.815Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p4.hint",
+      "audioHash": "6374fb71e206758d43132f59ed95e3b439cd91176a651e6d7488de2cec868171",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:20.060Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p4.read",
+      "audioHash": "f8a0b10fdd639af826c0b694bcea914b2c04be2894516d70852b50a0d7761db6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:22.745Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p5.correct",
+      "audioHash": "2e9c5ea7805b89891f74feefe24ce4adde2017d81e338438053ba216992de0b7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:24.860Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p5.giveAnswer",
+      "audioHash": "246b6695e87c05ccfb8cba4e69827c2f139410ead5e5f0f22c0aca83e2e90a0b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:27.224Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p5.hint",
+      "audioHash": "27b70898d029b856af65f74704665347af46088384cce9e44bce23302c746e06",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:29.721Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p5.read",
+      "audioHash": "deafce70b59c00580917605ed6559321ec5e19664ea5c1b783be793fa4216050",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:31.034Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p6.correct",
+      "audioHash": "660d09540ca4706612caafd1e33869ae33c74ab4f862d2a293938515975bc114",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:36.538Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p6.giveAnswer",
+      "audioHash": "93292e7b0f512aa76427800b28d1e194a807e8b039f448405d1400609d5b8a6f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:38.969Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p6.hint",
+      "audioHash": "811d73baf9055bec67c886f9d0d8dcc172ca4d933d651b9cbe20b41126389013",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:40.093Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p6.read",
+      "audioHash": "cb34a371ae1686cf9a095cc0c81960a3b9eee1bdb17101727589e9151d6a10e7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:42.315Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p7.correct",
+      "audioHash": "cd0a6fbf2845779312282899c404d689627c2c10a084e4cea61c3abd7cf96907",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:44.272Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p7.giveAnswer",
+      "audioHash": "e85e714fb66861005c20fb3fdaa85459203df688a8c49084c0f12286d6b4b620",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:46.851Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p7.hint",
+      "audioHash": "8329f2fdc24b7115a0675926788e8db7ba5da3fe72c7e50ea29eb426a12a40c0",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:49.050Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p7.read",
+      "audioHash": "9bdc11b18056b80dc74e2a48885d2aa61e75e000fea2f961453d027725ee0e7b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:51.201Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p8.correct",
+      "audioHash": "54fd1f9c25a4d01f29899de79958f88e8b204aceb67dfc36c52c708299d8aac1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:52.777Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p8.giveAnswer",
+      "audioHash": "6dc54170abc465a2bd264df01b0cd5f29035580c13820d1c6cec6d9b6aaa0189",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:54.794Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p8.hint",
+      "audioHash": "c8adb8fb99295c06616d842fbccbdce1c1d22ce5a4aba46ddd25b3e21b2236cd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:56.490Z"
+    },
+    {
+      "itemId": "cvc-words-short-e#word.p8.read",
+      "audioHash": "7c9a3e44df77c6106214d216caf9ae8d950359d170d5e0c2e1cbd1d8588911ab",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:11:58.770Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p1.correct",
+      "audioHash": "05a57e6b57fef66ca01bd45460fade889233d6153884ca3e582f826b36a32ffd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:00.606Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p1.giveAnswer",
+      "audioHash": "79110b8a2d5f1dfa5b9904e9759e8ed2e3941261b7c7d2170eb31e53aec48d54",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:02.826Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p1.hint",
+      "audioHash": "2cebd1b70fc0a04d49274ce7804aa89e8dcd6ab7272745160433a0c14a84877a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:04.416Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p1.read",
+      "audioHash": "da4c4b1a7ce6748cb95abde99102bf31e09556b2269cd5c73c8de8a8220b90ca",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:06.764Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p2.correct",
+      "audioHash": "41071755b0039fdc3e31b8f349edc013ddfeb9e67197fd0d14ca218f387b3671",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:08.519Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p2.giveAnswer",
+      "audioHash": "78521ec169495a2c8fabb9a3a9474e66ff798309bc4e24d583c9210e5bbf937f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:11.775Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p2.hint",
+      "audioHash": "4e889435e70be097a675ec95ebbd9cd007fb9c0c75828a5102286732894f1cb4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:13.553Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p2.read",
+      "audioHash": "d586b533bd717e70c1cd3fe4de0289663f1384f13e1f91fab95a6ec83b7fb9dc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:16.313Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p3.correct",
+      "audioHash": "28fac61c3f4cff005d99e84bea67f8a1a91818064a1cbb2ef4ff7ec5fb2ccf4c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:18.413Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p3.giveAnswer",
+      "audioHash": "c0103343376859d18010b67b012872ef83faf257e9c9ebc854eed3cf3dbfce58",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:21.046Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p3.hint",
+      "audioHash": "e791cf4d6541356f9dac32c774927cd05ee09aa75435d9724fe9f5a90f9801a1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:22.711Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p3.read",
+      "audioHash": "49e676e6a8972dd757b608f223c6b2c500f50d590a411f72c6cfdb1faafa0b03",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:25.462Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p4.correct",
+      "audioHash": "3764a963082ff412cf54144fa32666d839132b6cc37dc7fbf59be210185d9bfc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:27.571Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p4.giveAnswer",
+      "audioHash": "fdf17bb5d11b2e5b8b56d099e177afda4a8f3526da92ecc35d3c7c7395344b82",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:30.016Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p4.hint",
+      "audioHash": "02d3eb4db984108c1fc9409447bd303dd33f9f8bf6d2bcc81bcef972bd1d51fb",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:31.426Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p4.read",
+      "audioHash": "db964a5ff1a238a714b5c9a2906a0dbac80cb718b12dbcb5c6225d4a7f6393d1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:34.269Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p5.correct",
+      "audioHash": "b884a2f84917c40c336cf37e536f09c20cab90f7e6e454344e45710590da2ee1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:38.364Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p5.giveAnswer",
+      "audioHash": "a224a0029453e7cf2ac2c7aa2bfead0228804eebb674a5013b3e879a09be65e3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:39.294Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p5.hint",
+      "audioHash": "8b517456dadb7c256dc62afda916699161dc5b422717d680ac378679c266c22b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:41.326Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p5.read",
+      "audioHash": "ad8491055d2a69296a2027c976a585496a49244d1fd7c78fe0c0c965bc70d5d1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:43.936Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p6.correct",
+      "audioHash": "195dbd830169ca5e553953cc49a44a6b9aa3cbbad18d486982eb868886415667",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:45.714Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p6.giveAnswer",
+      "audioHash": "f6091462081a8d96ad859aece3151440ad34ce3a99bf70f887a927c106e06d84",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:48.399Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p6.hint",
+      "audioHash": "cc59c7d938950c969c63a6796d655cd1c9beb0bffeda9c6677e8eaadba848da5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:50.342Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p6.read",
+      "audioHash": "21889d0eddcf818fccdd5bfc98635833b817bf1a049748185d8f958f09219914",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:52.899Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p7.correct",
+      "audioHash": "345cd7f096b267aa0f84ea30ff9d00821c054a0cf60bb91256622058f7bb0e67",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:54.594Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p7.giveAnswer",
+      "audioHash": "297e5f395220f8f8bb07dac08d69dfaec4fdb400656948b5da15a8c68475440c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:57.272Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p7.hint",
+      "audioHash": "73fad958ebc69c889c730ddfe26eb7da8e9f82526e9f8d956727728896e62b68",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:12:59.147Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p7.read",
+      "audioHash": "f5261bf11535c95953304502d7a1f0d2f2c3b55e69b4e85f94f8398ad5eb4433",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:01.622Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p8.correct",
+      "audioHash": "758da0a5932358143c178b50d154aa649c31ec4d6c9be022d08948c951535965",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:03.279Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p8.giveAnswer",
+      "audioHash": "6f09043ecf7c3cc2b871f10580997160425b7dafe5ad49ca7bc7e6c511fafad0",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:06.752Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p8.hint",
+      "audioHash": "cd1065a0ca197560ea42a73b1a7d09cc4983fe5807c089482c77f4af5fa34329",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:09.333Z"
+    },
+    {
+      "itemId": "cvc-words-short-i#word.p8.read",
+      "audioHash": "b7d677f9d55995476e7db594bfc05209003cbc40ba046cff7dc9af3e04f825ff",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:12.176Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p1.correct",
+      "audioHash": "2cf1615f763c04a23d8d4cc213688b6b8d7594dfa0eef17c40a791ddc1ccbf72",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:18.557Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p1.giveAnswer",
+      "audioHash": "d20f9f81802a32fb8a6fc6097d49a3726134e762c3516d2aa97c8293506b6e00",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:19.756Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p1.hint",
+      "audioHash": "684686a3271be7332e720102d5475dd05345ed045e97a6141eef4614299c5e4b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:21.595Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p1.read",
+      "audioHash": "5eaf4f5220e980b403284ea772d88a8020430a77c6baa95734a44bdeed8210db",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:24.400Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p2.correct",
+      "audioHash": "eec15b6a6ad0780d4b8a595619aabe05b2e7bcf7da1a06822f51e8b70af3d749",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:26.635Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p2.giveAnswer",
+      "audioHash": "1f77401b9cc95df8abd3f4f5890f894fc95d20164bf1f9ef86022c1f2b6adc4e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:29.140Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p2.hint",
+      "audioHash": "fece4aecb1daae86d514ab4ece45edc02ade7a256e063728cbf7a439fad461cf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:31.187Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p2.read",
+      "audioHash": "df612bfd59d477ee5e2480b67e01090b6a31dac18d8446e9337e8f5e517d99ad",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:34.112Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p3.correct",
+      "audioHash": "a7394e10e114c028fbebc4658f577f1aa32985f6d6eca1ab3888550e38ed0d92",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:35.755Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p3.giveAnswer",
+      "audioHash": "a93e91f7541b01381270c54cf1ffb2bad65d02dda05afcfd65fa853ea671807a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:38.215Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p3.hint",
+      "audioHash": "49c677ebfbf45d420468bcefd37dbb8cf86c9189893b2c23edf5ac2ad4ffbfe9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:40.757Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p3.read",
+      "audioHash": "edfe384448759694d84581d7a80e3ed3ab2e662596c1704a9d0ff9faa44716db",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:43.307Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p4.correct",
+      "audioHash": "5f5b652a49815843f8c67880660a040faa9056c990066ae91c68255d26664581",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:45.993Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p4.giveAnswer",
+      "audioHash": "0dfb519f36bcbede5f2ee0d1013b7ce74c7a73c34e19141e6c1e0e86eeb96d43",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:49.234Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p4.hint",
+      "audioHash": "6787e8fd92fb9320c147a9a92dbf578368945ca9816e67d8d77469d023837c9e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:51.207Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p4.read",
+      "audioHash": "1a431bdee6e1696c552efb6cdf5521258d33bebaac1c21bc1740d41db2ae1545",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:53.605Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p5.correct",
+      "audioHash": "a2f39e52ef0067cefa1b718994eddf721b4a8ff2b722d214a62a3c3309457bce",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:55.203Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p5.giveAnswer",
+      "audioHash": "eb9959f2115286db592a165f2babbdd8a66dd44530fd3247671d2bb00a7dfe93",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:13:58.030Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p5.hint",
+      "audioHash": "645a8dcdf1b5c5861b8bb89ca16f64705ef74b7919692bcbbe32c17ff166b5aa",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:00.205Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p5.read",
+      "audioHash": "338a48cbe3c3212aa2ab1aa31f5638ef002ff2e2546ff3786475449b6be73c81",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:02.793Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p6.correct",
+      "audioHash": "cac9f3a1c4148e8a36d11e1b65602dbde1b375612d0a7bb8e4e160c0359cebda",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:04.451Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p6.giveAnswer",
+      "audioHash": "62f599ad0e8616441061090180d617b6d7902e17bf52fdfd84a0068c58a65ed4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:06.881Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p6.hint",
+      "audioHash": "91b4f4a77b26bc1109921785914347696694acd1d076f40969b8cd621c25539f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:09.626Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p6.read",
+      "audioHash": "fccaf751b2b2f9f8e84599dc49457a6fabe70e4316006f67e410c433196687a6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:12.716Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p7.correct",
+      "audioHash": "01f6b11dbbd7c0ace52e2f29c66c812f0814115a102eb9252e0d862972075861",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:17.457Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p7.giveAnswer",
+      "audioHash": "4f42666cc021064ea892683b86bcc99d7adb1ac06c3784460861c541b879f36a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:19.653Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p7.hint",
+      "audioHash": "4a5442bf89df155c1821910dd5cc9cd75dd07baf3f4a89f9929ee9f1ea0546f8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:21.588Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p7.read",
+      "audioHash": "991a5e7209b6e76d32485adf002f4e28f667e22faf56d3161f84002f428f806a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:24.537Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p8.correct",
+      "audioHash": "174614a4ca18dec40d271db33b3d3704adb5927e77adae5ea9bb20486ae83a94",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:27.386Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p8.giveAnswer",
+      "audioHash": "9af00b5c89e6e0ad323691ba4980be1adfddfadd1421c64cfabefd107cccdf0f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:30.124Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p8.hint",
+      "audioHash": "c1f1b49899747cc4fe02652c1fe292bf821556d82e0b47d486dabe15d39e3b47",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:32.261Z"
+    },
+    {
+      "itemId": "cvc-words-short-o#word.p8.read",
+      "audioHash": "4764d23ac8b7c000572e04c6a4b9fd78cb6e39e9a45cce4e8c5463abec856675",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:34.647Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p1.correct",
+      "audioHash": "e4e2a4c70835dc163720826a0399edfefbc38610581ac48ab1223dd7aaf55df4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:37.143Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p1.giveAnswer",
+      "audioHash": "d0c46b9c2417fe2a8eb299d8a7f6f6f6eed7fc8ae4266ad7810fbae8a2008ae9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:39.979Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p1.hint",
+      "audioHash": "9dfd262e88e6fc678f433825877198e8ac9700e0dc2df16b2e8b71cce35be2a7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:42.229Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p1.read",
+      "audioHash": "aeac5ef9ee7bd8bbcecfeacef8b7a41e5c368d7dc46fd61af7e97a94da23cc61",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:45.521Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p2.correct",
+      "audioHash": "42369d9e3766ebcd5022496bb1c05c1970d56943422ff85176be6b4ac64eb2ff",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:47.428Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p2.giveAnswer",
+      "audioHash": "286ea65bef59d38d81a0da6bab4a1e671a94b3e2a04519d80e36c5e2f04a9a1a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:51.410Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p2.hint",
+      "audioHash": "e128a968b55a473ad3afc701b581621a150165602eb773c64f84c60b6db6f243",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:54.064Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p2.read",
+      "audioHash": "57372cd2a48ef000e8a41a48ec7457df11c8ff8da0d860714db8488dc8f776a9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:56.810Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p3.correct",
+      "audioHash": "53ef6a25b641947a1c2d2ee287c5a1e12db7b1801e53ae2985e3879fab117a66",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:14:58.445Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p3.giveAnswer",
+      "audioHash": "88ffeed9ad62ffd03e8eadbb08bafaf543b743ac18ba4c331b31c32fbf5a21e2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:01.302Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p3.hint",
+      "audioHash": "8ff6a7aba9452d7521e4326b3f922c81e6ae56eda518ba8a2e0b79729b4ef06c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:03.199Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p3.read",
+      "audioHash": "9d230f024893f3abe7938897412b242a5c583cc044b8aab7c302751beaad31bb",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:04.009Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p4.correct",
+      "audioHash": "6ccb330e005d47cc23bd9d855af7d9ea51800c0cb5b0bae365f56d1db5e456f8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:06.537Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p4.giveAnswer",
+      "audioHash": "e795e27a8b6fcd24f67bbe7a48d825799dcd5a6853a0086679a378691b5811ba",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:08.907Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p4.hint",
+      "audioHash": "ecf5e446f8ec5cc8018d6288c519aca6df76687c6ef88f3bb9278a3062b7a842",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:09.215Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p4.read",
+      "audioHash": "5dad00c0a51bb5e17b6af0531dc25ec1a967b7bbd4addcff7160db1b28229d13",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:11.142Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p5.correct",
+      "audioHash": "a48a8aadd56a52fa541f56e851afdd34de632c6ecebbaf4af89abc9b541b2458",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:13.714Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p5.giveAnswer",
+      "audioHash": "e8e892c9ec41440faee538f14516dc32b35a1e71df609a064d4a958554055658",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:16.024Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p5.hint",
+      "audioHash": "67d8200b4015b5fecba243adaf20834df8f6266e034c65ce1c86593d19fff2ec",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:16.340Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p5.read",
+      "audioHash": "d84dc94bb7aea9e1d9e76daf1c2afd04e4e3dbf68d60418b67eff03924d27b5a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:17.518Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p6.correct",
+      "audioHash": "6dc3cd328201d3ef6d1f82d618aa6a59ee4d94ddf724ee45718efae13e0e87d4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:19.851Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p6.giveAnswer",
+      "audioHash": "884427d4859e717227aa820c456fa81d84127c1959c48622e3595f0f8928e109",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:23.479Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p6.hint",
+      "audioHash": "ba1e5f386855d5cc1b66009d65c9715312b2fe48c5af3397233e02361397fd94",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:24.634Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p6.read",
+      "audioHash": "36d07a022877d9562bc37b1ee9e5114831925063804f12143214c87098795e36",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:27.486Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p7.correct",
+      "audioHash": "3beb0eebf28dcdac50c7f44e101f5cf74b4bdf1a070b907f15cab89294e9d8ed",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:29.323Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p7.giveAnswer",
+      "audioHash": "78be374954ded00b2c682ea2e41341c12edee1013fdca2afb6ac6868669fb80d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:32.016Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p7.hint",
+      "audioHash": "a825f7784b760d6c85e97562bf1686fac887e25d32172f0203b5d594fb2273e5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:32.721Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p7.read",
+      "audioHash": "4cb20c0f7ac58ba215d1f08681b02b8e302ff10ba5ec4103bda3115cb34c8849",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:35.706Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p8.correct",
+      "audioHash": "6e26a2ebb67f1459b571bc8ea214a1f898d64870ddec76fb84ebc5c4e6c6c58b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:37.597Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p8.giveAnswer",
+      "audioHash": "bbd48d6eb4efcf904d5822ba3089fd94b1bad62fe7d3ebde424bb4a51d00c796",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:39.284Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p8.hint",
+      "audioHash": "fe63171ad175d6906fdb28d2ba4c6cab7bcf07036a8b7dff2dfbd7f8d308708f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:39.771Z"
+    },
+    {
+      "itemId": "cvc-words-short-u#word.p8.read",
+      "audioHash": "4423e3e5de25bed7b7c90e5b6f7cdc0a83ed0df197f258b19cd1410123959ae2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:40.693Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p1.correct",
+      "audioHash": "c4d0bd774068ceb4f016db0fc1b902c40f98a2c869a811f7ee06612862b6d17b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:43.012Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p1.giveAnswer",
+      "audioHash": "18688d5079964bc37dd9a56213f32b0250c70227922dd1e48dcc1afa53114c40",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:45.576Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p1.hint",
+      "audioHash": "a489b40c3cc69ca59ff42a722657e04d39547bdc58e56c2bd96a6521c2b51664",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:47.122Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p1.read",
+      "audioHash": "5eafbf7ef0fc11da5bde149dc82b39a62619caecd6bf784e39ea3d13a072801a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:48.208Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p2.correct",
+      "audioHash": "579959346c71ddc8bad1f6b35c6b09d0d994440d11d4e66cfbb79ddad86a7c68",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:50.023Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p2.giveAnswer",
+      "audioHash": "45a7104e5c5ff83107d404adfe3d364437022d0c55e1ed4930f782ca5aefaba1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:52.828Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p2.hint",
+      "audioHash": "3d6f575f2c0f161a80436d4272dbe87060e9d0e7b6f24e8b1987810810f03bd3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:54.006Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p2.read",
+      "audioHash": "d15d46c2f23cabfcb7a6925e532f7b823975e243fb080b505df073e29728c111",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:55.942Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p3.correct",
+      "audioHash": "144fdc31d0b26a947620f7bb573af213ba0dc69fb1078a67cbcd524b300aff50",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:15:58.837Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p3.giveAnswer",
+      "audioHash": "c8a1b8317981add8b525ec7ad2b708b06c6fa526aef8cc1d479e8cce1b2b503c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:24:48.699Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p3.hint",
+      "audioHash": "67c91f91a1f611c6fdbccfcbd0d0772a0effd9df559522dec8b71077dec72265",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:24:52.066Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p3.read",
+      "audioHash": "ec49cbd49f2095cd8c9ca074670b928eb7884a478367b34f1e4efe176ca63d4d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:24:53.116Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p4.correct",
+      "audioHash": "94ab67bbc0505adb68780461d3eb042d2bdb8350b9f35a919cc2acacd3af7133",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:24:55.284Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p4.giveAnswer",
+      "audioHash": "cd3fb6fde22be086257782883d04e33e287fe0e956d8c649426d20dcecc9032d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:24:57.939Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p4.hint",
+      "audioHash": "4ef744d3fbdadb0e9a41e4ec59b7590517c62f71660d645d76927a2316f996a9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:00.091Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p4.read",
+      "audioHash": "bfa24af35731c49887287651eaac5b6d7ed5ec06d7a8c18881b2c9d742199a18",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:02.596Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p5.correct",
+      "audioHash": "2a6f5d4a84f613b9f028c091d6d23190ac55eb9a44624c41185e962dd7373961",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:04.464Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p5.giveAnswer",
+      "audioHash": "f634b5e82740927813d2e3733ce49d9dc9953842f1fa199bc04c014dabf9fbea",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:07.824Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p5.hint",
+      "audioHash": "d1bceac872bc8bb524fe48191d9cbafd5484633eee21be87bcd94ea104d38d16",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:10.202Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p5.read",
+      "audioHash": "abda261411f119b1099afc0e0244eb40c9c9c453f505c9de0d2d69d828789f13",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:12.617Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p6.correct",
+      "audioHash": "15cbaae5e2729d5fb8bef7cefa23608012b316e86dd76f78342801e7da5e9085",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:14.967Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p6.giveAnswer",
+      "audioHash": "84b8d943cafd20fb27470bf377cf8be6aa09136b55f7fa46401a3b1f8e463f70",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:27.453Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p6.hint",
+      "audioHash": "cf88356719f1f182f32fe2664caee0c6d4fcfd410de4c39bd07909dfb81d9cb9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:30.190Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p6.read",
+      "audioHash": "b9681318fdc6cadd42f75bcd6d3d52f245287206711490592c72e51569d0d040",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:32.140Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p7.correct",
+      "audioHash": "6fab80ae30ba0f8ab178d7d9f8774859873d978703b223c71eea7c0613e1657a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:36.124Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p7.giveAnswer",
+      "audioHash": "e4db7e21638c952cb6aa52d9a04f5b36c07466ccf1423f590aef9a6045795a3b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:40.588Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p7.hint",
+      "audioHash": "486646ff77a1a1eca9780c7c62a6c7d8db1534c13a4e3bdb5ebb2c1784606d0c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:25:58.699Z"
+    },
+    {
+      "itemId": "digraphs-ch#word.p7.read",
+      "audioHash": "00b0b550b84950d9fc1f2457c3272e9924d6e41b34ba870a3c99495e9cd5b938",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:00.940Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p1.correct",
+      "audioHash": "649bbea5b0bf136d70b519881dfc3d953f0725efd4f40a3af26748e4e5508458",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:06.469Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p1.giveAnswer",
+      "audioHash": "c4fa3f8860ffacc3861bb251bd47c6f48c1c351892f7e60cc88095088190a274",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:08.801Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p1.hint",
+      "audioHash": "d2db8970e0695bd9425554b02a5d290e013e4ae1d7ce7d2e20122bc4c91945f1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:09.873Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p1.read",
+      "audioHash": "62884262c514f43ddcca4d62e72461439a4c80911571c927fde272ef38f82f60",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:13.063Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p2.correct",
+      "audioHash": "c925290ea40c1ba8448d663f0934d27d7b1f7ffcfb1022369b96cadaa2f8da0d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:19.969Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p2.giveAnswer",
+      "audioHash": "5d558b7b43df577f6bcdd59d9776e1d184c0e2f3f4cb2819e7a170f641b90ca6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:23.471Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p2.hint",
+      "audioHash": "0dfda5c88077c0f38f0d5a1277e69252f355baf7e32df4d4e9441ea69efe4ea0",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:25.468Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p2.read",
+      "audioHash": "b1b60731fd2aa616405931fa71f9e110f3a0b223ba1ee80f1be6b3a97558c0f4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:27.551Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p3.correct",
+      "audioHash": "47c98f9255e57ac461d42eaa50e3cf6f4397ff9a627a55ccbf4ceb665b8e262e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:30.356Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p3.giveAnswer",
+      "audioHash": "87ea257d2389ba2c293a3912b29ac6e4cae7c3b48a03659f3ad9acf270de4754",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:32.231Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p3.hint",
+      "audioHash": "2802350c03283d88dc8215745aae360b3ec8d23b6e419415713b0ed0edf4d426",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:33.604Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p3.read",
+      "audioHash": "e648a739bf75a79b864182b8dcea66ea5cf6fd40c3f9c6034f864e52d2b91cca",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:36.148Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p4.correct",
+      "audioHash": "3693f3cf5a2fd955720fc7923b46038361cad3dbc985bca6722c28b0f816cacd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:38.360Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p4.giveAnswer",
+      "audioHash": "aedc441df8b0c1fc9213a12caea33cd6a813e44a181e54d5a5fae68cccebf10d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:43.541Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p4.hint",
+      "audioHash": "5abfd03ed2933f4d455e67450b579930e0643db66c36ec1094d11980a98f8a67",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:45.281Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p4.read",
+      "audioHash": "18fc8b216f00b3aee14fc96d694e30693dc3d3668ab4e23d1e6f6e4d869eb91f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:48.214Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p5.correct",
+      "audioHash": "fe75a90df17eb6b6d4c713737e38aa22afa034e1453518fe400f03244bb8ba56",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:50.149Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p5.giveAnswer",
+      "audioHash": "fd4e6061a02f1c9659e2c3d0547b20aec609496ce74a0a8c2b981286ade3aeff",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:52.542Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p5.hint",
+      "audioHash": "c1de4dfe59bec708ee974e4451cef34888f7aa83fcf0c55c97ca95f29773b16a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:53.937Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p5.read",
+      "audioHash": "3bc194798aa8de378cfd261ba90af79933d08adc90fb502f5f99ee324022be3b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:56.666Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p6.correct",
+      "audioHash": "0a1c7633e16122725e3e753f1c545f4ea2d5dabe1fbb876135d25e86285cb14c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:26:58.550Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p6.giveAnswer",
+      "audioHash": "dcb693472b078468af2f587ebf53a44bc6b2576014cd0a447551916056da89cc",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:00.913Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p6.hint",
+      "audioHash": "a255d4dd4953ee1b06be75a8062ed8fa8b71e084e5fb9bfa8e1b2f0e41908a48",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:02.570Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p6.read",
+      "audioHash": "32307ffb5267119884492205f34a819214f79304fee1888d655a9bc994fef867",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:04.999Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p7.correct",
+      "audioHash": "df45f2b42dc4cad9b0cf28a41e3975b429550fcf02d5fe7b1349acc4bc84cd82",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:07.017Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p7.giveAnswer",
+      "audioHash": "49ee86f26dd562ee36c7b4c7d9b2f82f8077531a4c0d69747636a2511b8c2494",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:10.400Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p7.hint",
+      "audioHash": "089028bed2b367be6789f6b16d3fe29e895fbe3e2e9df3c632abb3e877a55821",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:12.545Z"
+    },
+    {
+      "itemId": "digraphs-sh#word.p7.read",
+      "audioHash": "7039239fe09981f3acc0f8d9fa07c79b93c67b7ac8ab46bda3eac1f8a06310a7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:16.288Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p1.correct",
+      "audioHash": "8c994efb10ccedebe7da8f62f7ad45e3214fc85cdc1c43374ff5b87c9e3d3dbb",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:18.868Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p1.giveAnswer",
+      "audioHash": "a102d5443bd0d886fb9df8ee9c2f74839fc0aa34a866235fc843814c63d3eb23",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:21.643Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p1.hint",
+      "audioHash": "043c6da6c02f4ead00f1a0dff9b464c86bd47cf60a8b99ae2132ad934f56969c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:27:23.773Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p1.read",
+      "audioHash": "8d74a6bd4ddbea05979ff1255a077e69591c1683e1e856bbb9ca97d61f5d5d40",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:07.348Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p2.correct",
+      "audioHash": "a4560f72049985357d4fd1b03749674bb910ae3ab1749fbe225e4964f567f88f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:10.813Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p2.giveAnswer",
+      "audioHash": "d237321fbedc106f9db1e2f5bb1e0cfa63c24157a2ce711087781a8b2bbe2380",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:13.168Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p2.hint",
+      "audioHash": "4f87c12beae19901f6764fb90da5a135b23c0c9e00510e6d115e15f28777f0ee",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:14.699Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p2.read",
+      "audioHash": "d3bdd492b29c8b3a7978d45188431945a2592998ead640956b152f265510f873",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:17.038Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p3.correct",
+      "audioHash": "eaa94989ad6d5e7c828944ef77b7ad904aff0747fc82f952112c3a76d16f532b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:19.078Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p3.giveAnswer",
+      "audioHash": "d876fefaa3ef0f6fd3f0dc3a960ac0127b0798e835eed3abfedee7d47a0de317",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:21.823Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p3.hint",
+      "audioHash": "93b4224260b5e7ab44162cd0ac4584f537ecb390f995cc1984ae259234203ae9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:23.916Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p3.read",
+      "audioHash": "d95e64dae56631919114ca60bf7cba3a8afc54c4f6ce1f932e2983f4f7e7ba95",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:35.092Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p4.correct",
+      "audioHash": "7f8ade4b11d659b51f537048bc15087ec5b8a7624593786430070d860d7e090b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:37.072Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p4.giveAnswer",
+      "audioHash": "a8da1858e3db5f82b99f3c47dae96b5c70d840aaf247f220bc1f7eee6bb3324e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:40.072Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p4.hint",
+      "audioHash": "65cf9226d03ca8d33d029c874acb3d32936ee9a28deb73194df2aa3ab15d905a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:41.864Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p4.read",
+      "audioHash": "fb7196a4d5e3d3b8b51157f1ff8264fe97d15b39a652a8d3fe0e2ef0d0ae0962",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:44.407Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p5.correct",
+      "audioHash": "44eee1327711d237cb9044a92882e901b0a08ead31edba80d7a2d38df5affa59",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:46.469Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p5.giveAnswer",
+      "audioHash": "d1e9a46eefc01f6b64434954e93e146e681a52037ac15a981980fc8ed1d35028",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:48.742Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p5.hint",
+      "audioHash": "3af2e5a6bdf138046915c42f1dbe5e828214f39698f902df6a149a0a6401f47a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:50.714Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p5.read",
+      "audioHash": "0aeb91ea159a126a0506efecbcbe8cef33fef526cd77dcb79ae0bdc861a11ca6",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:54.344Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p6.correct",
+      "audioHash": "f6a53bdadb2e038a5de133e5ca7a8a7233cd61be5f24c79452d05a8d03557b78",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:56.474Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p6.giveAnswer",
+      "audioHash": "b3ca49f4b5f921e13159f65f13054d606c7536d6685e2711ac8ebdebb0448a99",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:28:59.519Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p6.hint",
+      "audioHash": "3bcb74837cf9be85191680c00251b31920e0fb9dcc13db568652a050654ddbc7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:01.724Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p6.read",
+      "audioHash": "9ae0cfa615382e982e0d2b6589bc7c0e00b0ff1b3f1914032ece59088a45fd43",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:07.404Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p7.correct",
+      "audioHash": "5b898880893ff1f30ae147ecd41fd14943c91ac5f48ba4bdccedf20fe929e2a1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:10.319Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p7.giveAnswer",
+      "audioHash": "e178ad8183ec25a74bbe0d24dfb460e95579ffbfe75900dbfef9173a985428fe",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:12.997Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p7.hint",
+      "audioHash": "475ef68cfa3f2cd909ce511e3c2a3acccc701a1af1ba1c23ab405b26d86d555c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:27.150Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p7.read",
+      "audioHash": "1ef2995e5b398b277bb5becf895969b944569a62259dc2235fc42475b0c3c412",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:29.671Z"
+    },
+    {
+      "itemId": "digraphs-th-voiceless#word.p8.hint",
+      "audioHash": "22e6325c8f65d8e7fdbb152b8555a7c2521f53896fda8f365343dda3ed0e7a05",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:31.575Z"
+    },
+    {
+      "itemId": "letter-names#word.p1.correct",
+      "audioHash": "e67e784cbabb1ef423d5855b6ef82899169eeb81e98399aaa3400695ebfeb356",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:40.833Z"
+    },
+    {
+      "itemId": "letter-names#word.p1.giveAnswer",
+      "audioHash": "6de3688f473286173efea92fc24c405447898c65d297e1ec332a097df625fdbd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:43.584Z"
+    },
+    {
+      "itemId": "letter-names#word.p1.hint",
+      "audioHash": "983e6eabdaca49422d6a32e3408a8019abf38f15f97041f6a84e4ae06335c81a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:46.508Z"
+    },
+    {
+      "itemId": "letter-names#word.p1.read",
+      "audioHash": "0aeac5231d66d19d8cc3ff725b7e2282682002818d56d4cb060cf8a14207dec7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:49.523Z"
+    },
+    {
+      "itemId": "letter-names#word.p2.correct",
+      "audioHash": "429f32608c1fae1bd4b64792ace2549ca2a62e44b5ddc404733dad421ad014f1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:52.959Z"
+    },
+    {
+      "itemId": "letter-names#word.p2.giveAnswer",
+      "audioHash": "e8fb94ea1bddbf4b8db4f249a1ee48f8a52d1478e40f36bb26480eae09d360ff",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:29:54.879Z"
+    },
+    {
+      "itemId": "letter-names#word.p2.hint",
+      "audioHash": "754c7e5f8587d69007b3886272c461887409f0c10e97ac00cb05d2b94f51c49c",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "there is a weird preasure on the \"e\" making it almost sound like a drum beat.",
+      "decidedAt": "2026-06-11T14:30:54.896Z"
+    },
+    {
+      "itemId": "letter-names#word.p2.read",
+      "audioHash": "b45f092430bbcaadb8932344800a0401fd54961821b47ae9d5fd5ed3dd4c413b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:30:59.763Z"
+    },
+    {
+      "itemId": "letter-names#word.p3.correct",
+      "audioHash": "2fe274f61c7241cdf337387ae8f1cbed43dabcfb7d76b53a1cff1b85fe3cffcf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:26.846Z"
+    },
+    {
+      "itemId": "letter-names#word.p3.giveAnswer",
+      "audioHash": "99da9940de5d12cefaf8302559a49fa7173e406cc722186c4538223d04f164ac",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:30.424Z"
+    },
+    {
+      "itemId": "letter-names#word.p3.hint",
+      "audioHash": "57c7f4ee2fadad2ebd8a96e8ac1d0eb42d1d299624a888ac56c74694470c101c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:35.074Z"
+    },
+    {
+      "itemId": "letter-names#word.p3.read",
+      "audioHash": "f73e7661048f6320f42d98a39b5e0acadd4b245f5fc3fae0a9704b7291b4fdd3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:38.788Z"
+    },
+    {
+      "itemId": "letter-names#word.p4.correct",
+      "audioHash": "5003b989552ab188a9e8c6acb0db1680184d6a81bf01dae89efebdb274d70c15",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:42.867Z"
+    },
+    {
+      "itemId": "letter-names#word.p4.giveAnswer",
+      "audioHash": "25243014543015ee60c9145378bde96ea38d94a1bc1285d592b2601655a9c6a1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:45.282Z"
+    },
+    {
+      "itemId": "letter-names#word.p4.hint",
+      "audioHash": "0fd0eb933919d67c5e29ddcdd52adad44b27ff975c26bc6df2496d6fa296a03a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:48.964Z"
+    },
+    {
+      "itemId": "letter-names#word.p4.read",
+      "audioHash": "2d69639731a31430347133217dbc08626bb8e29b8e824bb92a53ade0301eca86",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:52.430Z"
+    },
+    {
+      "itemId": "letter-names#word.p5.correct",
+      "audioHash": "20d96bf9a8590383af60c71cca298a8459595e8c7f40aff2b74755ddb8d2faaf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:56.121Z"
+    },
+    {
+      "itemId": "letter-names#word.p5.giveAnswer",
+      "audioHash": "71aabd14e2b1f3cf9e04496607265a6b8af4b2d4a0739954a0a5e8126537a698",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:31:59.022Z"
+    },
+    {
+      "itemId": "letter-names#word.p5.hint",
+      "audioHash": "3a93bf01ef37c6a56b6a95cf4cd982dcd688f215f3191ec44ee9d5fba9ea0089",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "the \"O\" sounds a bit scratchy",
+      "decidedAt": "2026-06-11T14:32:23.212Z"
+    },
+    {
+      "itemId": "letter-names#word.p5.read",
+      "audioHash": "f72a03ff09e471e371eea5bbef35aeffb4bcd3882f6f205dffdb3ef34b649a1e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:28.033Z"
+    },
+    {
+      "itemId": "letter-names#word.p6.correct",
+      "audioHash": "a87de3502a2caa5c62d7f7640682e67d7aa535b602ffae4472b73ac3707e5957",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:31.394Z"
+    },
+    {
+      "itemId": "letter-names#word.p6.giveAnswer",
+      "audioHash": "aed3b16b4d7f98732ca1dbdc39dd9c7c7f8e4e381495a9274f2d74eb4265b87d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:34.498Z"
+    },
+    {
+      "itemId": "letter-names#word.p6.hint",
+      "audioHash": "c0c8b6ffbdb67c42855dd32fc843252f16efe5c1f5dd0cad8f00187e2524676f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:37.679Z"
+    },
+    {
+      "itemId": "letter-names#word.p6.read",
+      "audioHash": "ec5969a26256f0de2118d9bc9eb6d8545a5ab2b294471a9455c22134ac77f46e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:40.244Z"
+    },
+    {
+      "itemId": "letter-names#word.p7.correct",
+      "audioHash": "3e43ae263e404a40be5f1310b141304abaa0522577229910948bd849f7a8e28b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:45.796Z"
+    },
+    {
+      "itemId": "letter-names#word.p7.giveAnswer",
+      "audioHash": "463dc8fca248e777d7b8522db65cdaa730485545f8223d60cd115a89385b70d9",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:50.399Z"
+    },
+    {
+      "itemId": "letter-names#word.p7.hint",
+      "audioHash": "ec1fd2959e3f1df6ce6529f381497e57aa4e0811595279d104b12a3b82ea0b70",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:54.111Z"
+    },
+    {
+      "itemId": "letter-names#word.p7.read",
+      "audioHash": "4a8d705175780f5210a6a89a14339d9e2dd6730743d0b22682c4386fa7308434",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:32:57.276Z"
+    },
+    {
+      "itemId": "letter-names#word.p8.correct",
+      "audioHash": "2e95ead477156a400e2d0a503d354a6ade98e12761632a8d637272bf44b00839",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:33:04.995Z"
+    },
+    {
+      "itemId": "letter-names#word.p8.giveAnswer",
+      "audioHash": "3bc2022400400ee8b5c47075dd9acd9483088705be722c7da4525517b4a26884",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:33:08.078Z"
+    },
+    {
+      "itemId": "letter-names#word.p8.hint",
+      "audioHash": "d33b8782356521494ecf06d793afd495b8e8933d3506d47d821cbadf25f8f0c1",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:33:11.738Z"
+    },
+    {
+      "itemId": "letter-names#word.p8.read",
+      "audioHash": "45f48d55d811fc585df21100de90c75bb0fa33039f7170903e4fa733f68365ce",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:33:28.424Z"
+    },
+    {
+      "itemId": "letter-sounds#session.end.recap.4",
+      "audioHash": "22c678d43e86209cae4c37600c0134040e91c725a3b7ab03ca1dfb9da1d6cfce",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "it sounds like she is saying \"you earned for stars\" not \"..four stars\"",
+      "decidedAt": "2026-06-11T14:34:09.077Z"
+    },
+    {
+      "itemId": "letter-sounds#session.end.streak.4",
+      "audioHash": "58e05c3d36f81d15236e67915298159c72caf646a9fb569d18ef966c3a445686",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T14:37:12.421Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p1.correct",
+      "audioHash": "64d58af5f03aa722acdc29fcc4c406bdc6f9933926678e5641ea71496d0b83b7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:37:23.875Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p1.giveAnswer",
+      "audioHash": "1438da16caf3491a1f52430be4da182e9d7cf473b64ad2b9970ba29a6a45cd54",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:37:27.557Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p1.hint",
+      "audioHash": "18ac7c2018540afb55224a36e24a5e7b9d1530a5c7e1fdcf819f17a2ac744027",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:37:31.082Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p1.read",
+      "audioHash": "af4e01ae1aba0e34c9bc51855cbb650e4df8b1cd2deb213ef88c54737309944f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:37:35.627Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p1.reprompt",
+      "audioHash": "703a9008d8e5fc6afb0af720f23a5911711113ebad348b3500c046e311b0569d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:37:40.584Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p2.correct",
+      "audioHash": "8b26f5874d9766f3af47cc8f1bd1263b343adb967f16a67350ee765bfef881bf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:37:52.982Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p2.giveAnswer",
+      "audioHash": "d580eb0d5bf58a1b219a645b168b193d8ccf5091e1832db8ad1ff4a3e48fa210",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "need break after \"This one is S.\" ..... right now there is no break even though there is a period after S",
+      "decidedAt": "2026-06-11T14:40:02.436Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p2.hint",
+      "audioHash": "e750c4855c6bf27949a905a49f711077f1d026bc6b8d95cf7013de92db1922e5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:38:58.324Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p2.read",
+      "audioHash": "5989bb84ea63913cbc0ffb1eeac410fe45c65cf0176e4fb6607d9b270a12ee62",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:40:10.694Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p3.correct",
+      "audioHash": "91f49145398a6ba5fff949131d30ea7a2bcfbc5529aafd27dfb6feefd3eadc42",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:40:14.978Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p3.giveAnswer",
+      "audioHash": "7cd4903229b566e52a7f32608a077ecf41d2bbf6017c2c03d210bddde7914c34",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:40:24.157Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p3.hint",
+      "audioHash": "70f5a1c8402e03c1fe4dea27dcbad2d37d6b05e9574435e900d0de0b57166f14",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:40:27.157Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p3.read",
+      "audioHash": "51cfa11c51cc8653b907d2769d9830dc8a67d7033544c13a0c8ff96f6cc377d7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:40:31.043Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p4.correct",
+      "audioHash": "a88e40edae7e6205deeaef3e961af45f8a2d341e9060c7d10ffd6c891653a40d",
+      "verdict": "fail",
+      "category": "other",
+      "note": "A and aaa is scratchy",
+      "decidedAt": "2026-06-11T14:40:58.688Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p4.giveAnswer",
+      "audioHash": "24d5cf36854ca478eda633e3b1cc71c5799a189affb04b217a47747fa9d17081",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "need a little break after \"This one is\"",
+      "decidedAt": "2026-06-11T14:41:28.015Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p4.hint",
+      "audioHash": "12379f4304fa8ebf366780a6370ad9c7792a32987dde8dafcbd2cb3aeb4e8158",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:41:32.770Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p4.read",
+      "audioHash": "a2bbaff6db38cf0cc1e8a38f5cab6ccbbb5ee738507961f33c691fc066ba3ff4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:41:36.564Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p5.correct",
+      "audioHash": "2d73877b66205ecff8cabe236a42d7ee1e73b51ae834be4b68b6660faa523b58",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:41:40.728Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p5.giveAnswer",
+      "audioHash": "886129ea474e70607aa3eafdf440fccfce16efcbb8fb5df5a643a4e8223f4173",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:41:44.560Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p5.hint",
+      "audioHash": "6a422066b3f125b1662f1496320d3343e28fde6b400ff80d431663133a8731cb",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:42:08.950Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p5.read",
+      "audioHash": "8426ca751a774777430adabebf9ce164b916b44a4ad395a69824f91b721e7f09",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:42:12.528Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p6.correct",
+      "audioHash": "f00d0f4921fb05b88b38d35d2d71b2180911d213e286ba272a2c17910ef07a47",
+      "verdict": "fail",
+      "category": "other",
+      "note": "O. is very scratchy",
+      "decidedAt": "2026-06-11T14:42:36.701Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p6.giveAnswer",
+      "audioHash": "788474990282ba82521a07d66e93a95aadab19fed4643472eff09a56c7cbde17",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:42:42.071Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p6.hint",
+      "audioHash": "20bba1e94ce68190ade76aabffdc19c75f27a0be2708bae52897c3a109675d93",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:42:45.582Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p6.read",
+      "audioHash": "9b35aedfd5461d28cad9a1d3cd58154a31828ad7b82ef7f23f1b97af0d857acd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:42:49.220Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p7.correct",
+      "audioHash": "db79e6f7cf0b799d1aedbdc262971d0d41bbdc78710cfc79e5c7eafc8359b5c2",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:42:54.830Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p7.giveAnswer",
+      "audioHash": "eb8d9e13a49b9144351936b707741d1fabe6d8dcde1219937bb0ee18501f5621",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:42:58.265Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p7.hint",
+      "audioHash": "ef406d1db0691ebbc960247fc8d2524911a64cbc317542f7a917f523f0a63ddd",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:43:01.611Z"
+    },
+    {
+      "itemId": "letter-sounds#word.p7.read",
+      "audioHash": "70ef0d1c601183ae9fce388f7a65de21120fa6bbeb84958758d78d95446ce40a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:43:05.337Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p1.correct",
+      "audioHash": "800fa148b3dc409b8d8b7e895d8cd7be99f9768b0ca4acbd3211c48a36dbb812",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:43:12.770Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p1.giveAnswer",
+      "audioHash": "db4d44ec643170f7414e5b05c7ff7185329e9eaf5c303db825915cfad7b45592",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "need break after \"This one is F.\"",
+      "decidedAt": "2026-06-11T14:43:39.152Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p1.hint",
+      "audioHash": "abebee610c869fbf6d3c98178010ba993d77dec548e688c7c36ba9d28e7b3687",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:43:46.454Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p1.read",
+      "audioHash": "c484e4dd8d76832265430a698ab79856d593dddc29e42932028ef75bc24ec386",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:43:49.687Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p10.correct",
+      "audioHash": "2eee78eda7b44a1438fc41c52540969ae26e386d48fa4f10ba4fa083687f0d1a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:43:55.442Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p10.giveAnswer",
+      "audioHash": "085d66e243071c335bf7ab5f4750f518ea14e872b4d140326ca4802870d0ea94",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:00.487Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p10.hint",
+      "audioHash": "f2130ed92161c6caf5d1cb571657a42e7cbef6dd2112d7bf1b45a348e0a80fc7",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:05.535Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p10.read",
+      "audioHash": "e7350bfdd4dec11e19011a9bebd1df8025ce2b270237bbb81bac2cd9855484af",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:11.063Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p11.correct",
+      "audioHash": "142a22c02fd25ba95048170f3770e01cd568b04340e301c4ff7ed733771a5834",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:17.235Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p11.giveAnswer",
+      "audioHash": "e9c2c07afd92b37cc08ca3fd4d84ba11760cbd2f7ad3ba7739ff0d5c8d3ceaf5",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:21.976Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p11.hint",
+      "audioHash": "22cfb628da77c151ff7dce20037100e222133dcb839b33eebc91deb0550edcab",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:26.558Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p11.read",
+      "audioHash": "a4f59bf5b00c41a5675e70f398e6bd195fc56437266d682c9b42bf1c31cb805a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:30.811Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p12.correct",
+      "audioHash": "af048004dcac35f1fd637815384aeac0e51892c68bb3f06adba551c869543214",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:35.866Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p12.giveAnswer",
+      "audioHash": "048e74cbef03a6758df51ccd7660d3db345ad9f2573b798d175dd7cbb900a8d4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:39.849Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p12.hint",
+      "audioHash": "1ef354ddf0773c2e8564bcf140a1686563acd6b0cb16fbfaa8a51e8adc2b5c19",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:42.796Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p12.read",
+      "audioHash": "f37c89eade9d21dc091c5924e98f071c0d76dc6bcbe96d666591ad46df7dd27b",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:44:46.239Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.correct",
+      "audioHash": "f584fd0911c1bf8a9b8c504e47d097efe6610d2ab68c291396d75b8cafbf8ba2",
+      "verdict": "fail",
+      "note": "vvv is very scratchy",
+      "decidedAt": "2026-06-11T14:45:11.111Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.giveAnswer",
+      "audioHash": "e54dcaaa925365f4aede06940962e39398ae57984706654787fcc87afbb6992c",
+      "verdict": "fail",
+      "category": "other",
+      "note": "need break after \"This one is V.\" and vvv is very scratchy",
+      "decidedAt": "2026-06-11T14:45:40.144Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.hint",
+      "audioHash": "15a5599a58def3fefdbb03f33ca90eb9d15c16ca9a7b60ac4a3426016b99a90e",
+      "verdict": "fail",
+      "category": "other",
+      "note": "vvv is very scratchy",
+      "decidedAt": "2026-06-11T14:45:52.062Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.read",
+      "audioHash": "710d0b215c3ac153fd3ab1dad229ffccbe0685004c432c1a57f89928e9662ec4",
+      "verdict": "fail",
+      "note": "vvv is very scratchy",
+      "decidedAt": "2026-06-11T14:46:03.125Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p3.correct",
+      "audioHash": "a2fa38fcafacf52c59373132690dfbcf398209e22247caa43b71434cedcc281d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:46:09.306Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p3.giveAnswer",
+      "audioHash": "0398cb3c33180277ae3d447485d0aff135900497a50ee35a39853d0d70a6a055",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "need break after \"This one is H.\"",
+      "decidedAt": "2026-06-11T14:46:31.723Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p3.hint",
+      "audioHash": "7468087fa9c0e99ba1cc6853e5324da97e41569fa110afe891f8c8326ebab21c",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:46:35.631Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p3.read",
+      "audioHash": "1980a0f8c3d5aeb324976d2cdfe53cb4e7f11b6fa9f6477cfd3a01e23386d06d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:46:39.579Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p4.correct",
+      "audioHash": "a76eef6488fcd18fb6951762af5a9eaf5d6316026862c4360fe8d8bad7c699bf",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:46:57.622Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p4.giveAnswer",
+      "audioHash": "ca0274b153659ab7dac29dda0438ef41516eb5ee813b383f28c2d52a2fbb324f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:02.031Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p4.hint",
+      "audioHash": "69876441945b58d4b3c94927494a67483a5f871aed020f63b5d50a549aea9001",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:06.771Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p4.read",
+      "audioHash": "0ae21362f6d45dce72d4c88fb26f8f64f000cc5bec276b5c32507d6ae5027ded",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:12.164Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p5.correct",
+      "audioHash": "c0536df669fe763597bf1efd99eb44abf50387e97b4ae81ba19cf5dbd06f195a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:16.762Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p5.giveAnswer",
+      "audioHash": "c667aa50a9de05cc4e339d52aaf0bd2fc919b855b36e81b6b495608d470ad884",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:20.752Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p5.hint",
+      "audioHash": "8ace187490f964d912fe8e55052457d3966e04e90102f33c44e504964010c35e",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:24.141Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p5.read",
+      "audioHash": "93c80a5ade85ebbfe5719aeadcd6133780426e7613a58df16e60e815c5364eee",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:27.944Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p6.correct",
+      "audioHash": "8f76114d0da8498b6922f80485257ca6d5f36ce487ecd0dcae5b0d1a8d4118b4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:31.515Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p6.giveAnswer",
+      "audioHash": "9647ab8ea2d0d5b27d6bc0265213b21f8492abe512bf9f7e7556b8fe3a1e987a",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:34.988Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p6.hint",
+      "audioHash": "4d2714f2f194555d9afa7ebab204ae51f5f6f552ab7b4cf55d0ca92aef9d71e8",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:38.595Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p6.read",
+      "audioHash": "929eb1e56a7fb8a719d7bf69e553a6884eb92f60799fe865bcabbbcab8602a27",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:42.104Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p7.correct",
+      "audioHash": "369315651893762229def5c5cca19c11c10dcdef5754ba33ea1a81a91cf02e68",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:46.762Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p7.giveAnswer",
+      "audioHash": "fdaf930a01a9b9f23f52ad9bf7b74fe73124a62d2c46de5ced255492e2a45919",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:50.611Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p7.hint",
+      "audioHash": "3a9fb56625304a85682c9d4aa7b73231143192c7291cf12d1a51cc743797334f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:54.571Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p7.read",
+      "audioHash": "a00e39210bbc3a184e0b325091e91039d0892836a772def2b7c6b58cdf931c85",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:47:59.152Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p8.correct",
+      "audioHash": "409814626b6ce1429bc0db0840b8e21ba033f896d5f91e40f0625bce649329da",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:03.510Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p8.giveAnswer",
+      "audioHash": "8eebadf38ef93fb0041e97861196a7479f13a4482542f672a7671f58e80e0977",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:06.818Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p8.hint",
+      "audioHash": "b7152d289e449f97a3e251bcff6362cde27df0f986a4c8b68cf9106a67d15c11",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:10.840Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p8.read",
+      "audioHash": "4b58503b7f9ccd6c232b72db91e5645e560b3f89db80e157100a9f0038af6d18",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:14.168Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p9.correct",
+      "audioHash": "3bfc4bb92167094b899b8dc561925eb9c76fad9992aa774ba903bc0ec345b16f",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:17.956Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p9.giveAnswer",
+      "audioHash": "52bd5b99c418b33d69241dab0e3a7dbe9627f91fa8fe4b7fe74f38b2c541f56d",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:21.212Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p9.hint",
+      "audioHash": "7cac3186020ff6ca9bd9ed6bdc2f8289166b96fbd2c6d09f93d7f52623bbfdd3",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:24.160Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p9.read",
+      "audioHash": "c66eed605342e2616dbe028e7af4bb1d09956fc8154263434917741589d01ad4",
+      "verdict": "pass",
+      "decidedAt": "2026-06-11T14:48:27.482Z"
+    },
+    {
+      "itemId": "greet#greet-01-hi.mp3",
+      "audioHash": "006ba5d68f4542a589032803bf0e68be4a9d3ce52cfd3bb007901c1ae5f77fcc",
+      "verdict": "fail",
+      "category": "other",
+      "note": "child voice, should be deleted",
+      "decidedAt": "2026-06-11T14:49:00.685Z"
+    },
+    {
+      "itemId": "greet#greet-02-im-emma.mp3",
+      "audioHash": "a251907698f4dd8420d1255a8b7019bf3fec5073f2f0bbf9310570ff3020ccac",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:49:17.681Z"
+    },
+    {
+      "itemId": "greet#greet-03-nice-to-meet-you.mp3",
+      "audioHash": "cb8c0d256eee73be50f6540f796de6cd9059b5942a5da985923330d7fe5ac741",
+      "verdict": "fail",
+      "note": "child voice, delete",
+      "decidedAt": "2026-06-11T14:49:26.966Z"
+    },
+    {
+      "itemId": "greet#greet-04-tap-the-heart.mp3",
+      "audioHash": "8a22624fe39674144fa72d95a03e1b98a163d287ca508e51b0d90e5a65e0ac79",
+      "verdict": "fail",
+      "category": "other",
+      "note": "child voice, delete",
+      "decidedAt": "2026-06-11T14:49:36.673Z"
+    },
+    {
+      "itemId": "hub#hub-enter-number-garden.mp3",
+      "audioHash": "d59ec7d28dca11bc4bd605879b48c47157a9b9e16945c9836c396ff5e14619a3",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:40.223Z"
+    },
+    {
+      "itemId": "hub#hub-enter-word-song.mp3",
+      "audioHash": "d3d8369778b29b3f84e35e16e94f2508284e8bb2b2b65e97b177ead72476f20f",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:38.678Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-back-soon-alt-1.mp3",
+      "audioHash": "299ad37d1456b807302fb739f043f47b31e6ee6219a98f1aefd45d4f5526e8bb",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:36.472Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-back-soon-alt-2.mp3",
+      "audioHash": "9336be15a6fc5c132b4e22f7b16c5d502b6141f3fca4c42ae54b80b3578afed7",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:34.709Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-back-soon.mp3",
+      "audioHash": "3e8d75b87b9fcf78c0d997074d68359cb8227fcc75bb1c377e050eb5c2bf1c52",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:32.662Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-first-again.mp3",
+      "audioHash": "ebf9a68f92e50229bc67bfeb21c972e597efc06741bdca2d40ee715e94d28969",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:30.510Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-pick-again.mp3",
+      "audioHash": "d4e0c69aab0c887315aa9192ecc85177e2bc988acf1a56e4c2201fa0f83c1b98",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:28.147Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-pick-next.mp3",
+      "audioHash": "9ef90422a1aedeebbd10a7833b68f1889a88d898da8f111dcbff0e4c21b74ece",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:42.187Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-number-garden-alt-1.mp3",
+      "audioHash": "1a3b785fd0bcd9125557ec47914442c9587f92edb52f2122ded04f74441bf06e",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:47.798Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-number-garden-alt-2.mp3",
+      "audioHash": "f27024948767cefd89d2fae510059331fdc300cf36638c7ba9cdaf088e52791b",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:50:55.072Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-number-garden.mp3",
+      "audioHash": "76d59f6d7a5beb0814418f22c80e4979ec201256883a160645eaa3f020a58dc9",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:00.182Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-word-song-alt-1.mp3",
+      "audioHash": "3be972376a8496d665ed663ac8a87930e5f1f2da82af0a6797556d5791bd3b7f",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:04.980Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-word-song-alt-2.mp3",
+      "audioHash": "8d5115dc3c618b9df0f8501b58d327020c02350eb27d0f21da9dd1757b0dae3a",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:09.007Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-try-word-song.mp3",
+      "audioHash": "75dbab1d6c68b2e6fd45bc2dffc148a35721a87cdee8ad17cb24bdb0ac3ed970",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:13.291Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today-alt-1.mp3",
+      "audioHash": "06301527fc31e6fcf8ef520037f00d9537a8a902df54ae5484ad56a5aa69e5fd",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:20.685Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today-alt-2.mp3",
+      "audioHash": "06d39f4e9dcff86a28116234b10c0084bf09e6c3548fe4790cd9e885621e0806",
+      "verdict": "fail",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:26.259Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today-alt-3.mp3",
+      "audioHash": "07ceb23801a0d08a74cfe9273906abe171f9012472a864ca5ded69ceca26bde6",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:30.865Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today.mp3",
+      "audioHash": "e32a126250474943e14d22d9ddfac218fd1bd3bf9f4f311e36d80ba2f9c3c503",
+      "verdict": "fail",
+      "category": "other",
+      "note": "old emma voice, delete",
+      "decidedAt": "2026-06-11T14:51:36.496Z"
+    }
+  ]
+}
