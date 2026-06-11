@@ -49,6 +49,26 @@ Pin the agent's allowed file scope + role boundary so they don't blind-resolve i
 
 Replace placeholders with the task-specific scope. Skip the block only for trivial idle-tick state PRs.
 
+## Vocabulary contract (parallel dispatches sharing a NEW concept)
+
+When dispatching two or more agents in parallel where both will reference a NEW shared concept — a new TypeScript type / union member, a new content-type discriminant, a new SkillNode-adjacent constant, a new event/payload shape, a new exported helper — shape-contracts alone let each agent invent divergent names → non-mergeable sibling PRs (ClaudeTeam M3-10 precedent: `PersonaGroup` vs `CollapsedPersonaGroup`, reconciliation re-dispatch). Imported from RandomGame 2026-06-11; mirrors the user-global vocabulary discipline (sub-agents don't inherit user-global rules — this section is their inheritance surface).
+
+**Default = Pattern A (sequence).** Dispatch the type-author first — typically Kevin for planner/types/wordPack data shapes, Devon for render/component types, Kyle for design-spec constants. Merge their PR. THEN dispatch the consumer(s) against the merged-on-main vocabulary. Costs one merge cycle; eliminates divergence by construction. (Wave 11 precedent: Kevin authors the sight-word content-type discriminant in W11-02; Devon's W11-03 render dispatch waits for the merge.)
+
+**Pattern B (parallel with contract)** only when all names are confidently known upfront AND parallelism is load-bearing. Both briefs MUST carry this block verbatim:
+
+```markdown
+**Vocabulary contract (both author + reviewer read identical names — divergence = REQUEST_CHANGES, not NIT):**
+
+- **Type name(s):** `<ExactName>` (e.g. `SightWordEntry`)
+- **Union alias / discriminator value(s):** `<exact strings>` (e.g. contentType `'sight-word'`)
+- **Type-guard function (if any):** `<exactName>` returning `entry is <Type>`
+- **Defining file (export site):** `<exact path>` — consumers import from there
+- **Cross-file consumers:** list each path that references the identifier
+```
+
+**Cross-review check.** When peer-reviewing a PR parallel to another in-flight PR sharing a concept, grep the sibling branch for the identifier names and verify they match. Vocabulary divergence is mergeability-blocking — `REQUEST_CHANGES`, not `APPROVE_WITH_NITS`.
+
 ## Worktree state (mandatory in every dispatch)
 
 Per `[[feedback_per_role_persistent_worktrees]]`.
@@ -251,12 +271,24 @@ Per `[[feedback_pr_review_routing]]` (2026-05-22 hard-gate update) + `[[referenc
 Since you can't `gh pr review --approve` your own author's PR (and the harness identity = your persona may collide), deliver your verdict via `gh pr comment <PR#> --body` with this exact header pattern:
 ```
 
-## REVIEW VERDICT: APPROVE | REQUEST_CHANGES | APPROVE WITH NITS
+## REVIEW VERDICT: APPROVE | REQUEST_CHANGES | APPROVE_WITH_NITS
 
 ```
 
 Followed by per-finding details. The orchestrator parses this header to decide merge action.
 ```
+
+### Three-verdict semantics (imported from RandomGame 2026-06-11)
+
+All three verdicts are load-bearing — pick the right one; don't downgrade or upgrade out of conflict-avoidance.
+
+- **APPROVE** — ships as-is, nothing to flag beyond LGTM. Cite the evidence per focus point (file:line, CI state on commit SHA, what you independently re-ran).
+- **APPROVE_WITH_NITS** — the mergeable-with-followup verdict. PR meets all ACs and SHIPS as-is; the reviewer lists non-blocking quality issues as a NUMBERED list with file:line refs. The orchestrator then either auto-files a `chore(...): PR-#N NITs follow-up` ticket scoped to the comment text (auto-decide class when scope is mechanically derivable), or absorbs the NITs into an overlapping already-scheduled downstream PR and notes the absorption on both. Does NOT apply if any NIT is flagged "needs discussion" or scope-expanding — that escalates.
+  - Do NOT downgrade to APPROVE — silently dropped NITs regress on the next PR touching the surface.
+  - Do NOT upgrade to REQUEST_CHANGES — it incorrectly blocks a shippable PR.
+- **REQUEST_CHANGES** — PR does not merge until resolved. Reserved for: AC not met, test gap on the failure mode, vocabulary divergence with a parallel PR (see Vocabulary contract), claim-fidelity violation in the Self-Test Report, missing regression guard on a production-code change. List required changes numbered with file:line.
+
+**Reviewer self-discipline:** tempted to APPROVE to avoid friction but you have NITs → use APPROVE_WITH_NITS. Tempted to REQUEST_CHANGES over something suboptimal that doesn't block ACs → use APPROVE_WITH_NITS. The middle lane exists to prevent the binary "ship clean or block" trap.
 
 ## Done clause (mandatory in every dispatch)
 
@@ -276,6 +308,27 @@ After a PR merges, the local-branch-delete may fail with `cannot delete branch '
 - Force-overwrite via `cd <worktree-path> && git fetch origin && git checkout -B <new-branch> origin/main`.
 
 ---
+
+## Pre-dispatch checklist (orchestrator-side; imported from RandomGame 2026-06-11)
+
+Run BEFORE firing each `Agent` call. Catches missing brief blocks when fixing them is a one-line edit — not after the agent burned cycles on an under-specified task.
+
+- [ ] **Worktree-concurrency check** — scan in-flight Agent tasks for any in the target persona's worktree (`MarianLearning-<role>-wt`). Occupied → queue or reassign; never stack.
+- [ ] **Fresh `origin/main`** — Step 0 force-creates the branch from `origin/main`; confirm a fetch happens (the standard Step 0 includes it).
+- [ ] **Ticket body reachable** — personas WITH ClickUp read tools (Kevin, Devon, Dave, Matt) get a routing slip + ticket ID; personas WITHOUT (Jessica, Kyle) get the body inline verbatim.
+- [ ] **Ticket hard gates** — explicit Out-of-scope list + named success-test present; missing → flesh out before dispatch (auto-decide class when context suffices).
+- [ ] **Branch name** — `<role>/<ticket-id>-<slug>`.
+- [ ] **Scoped contract block** present; tempting adjacent files NAMED in OOS.
+- [ ] **Reviewer named** per routing: Devon reviews Kevin/Kyle/Jessica; Kevin reviews Devon; Dave research merges direct; markdown-only plan/spec/research PRs merge on fast-gate per precedent.
+- [ ] **Pedagogy gate** (content-tier / curriculum dispatches) — committed research citation named, or explicit not-required line.
+- [ ] **Port-4173 rule** — at most ONE `yarn e2e` runner across all worktrees; tell other concurrent agents vitest-only.
+- [ ] **Azure credential routing** — bake / re-render work goes to a worktree with `.env.local` (kevin-wt, devon-wt) or carries compensating analysis.
+- [ ] **ClickUp lifecycle** — flip to IN PROGRESS at dispatch (this-session tickets; older tickets skip to IN-REVIEW at PR-open per classifier precedent).
+- [ ] **Final-report contract** — terse, cite-able evidence, real values only (no fabricated PR numbers/SHAs; "the creating turn is never the referencing turn").
+- [ ] **Doc preload preamble** ("read `.claude/docs/*.md` first") + **non-obvious-findings postamble** present.
+- [ ] **Vocabulary contract OR Pattern A** chosen when parallel dispatches share a NEW concept.
+- [ ] **Self-Test Report block** when the PR is UX-visible.
+- [ ] **`run_in_background: true` + `name:`** set on the Agent call.
 
 ## When NOT to use this template
 

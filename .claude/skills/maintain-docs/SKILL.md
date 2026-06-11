@@ -26,8 +26,13 @@ Skip the rest of the skill and end silently if this turn was:
 - A routine edit with no surprise, constraint, or design decision surfaced
 - Tool-only exploration (reads/greps) where nothing new was concluded
 - A task that simply repeats patterns already covered in existing `.claude/docs/`
+- An orchestration tick (heartbeat, dispatch announcement, CI sweep, ticket-status flip, PR merge mechanics) without a code/architecture change — the orchestrator's own activity log is captured by memory + session state, not docs
 
 The bar is high: most turns fail this filter. Only continue when the turn produced a non-obvious insight, a new feature area, a gotcha, or a validated pattern future Claude would benefit from knowing cold.
+
+**Unmerged-API defer rule (imported from RandomGame 2026-06-11; their Drew PR #318 finding).** Even if the early-exit filter doesn't fire, captures that would cite a function / API / file / commit only present on an UNMERGED feature branch should DEFER until the parent PR merges — or carry an explicit "pending PR #N merge" tag so reviewers know the cite cannot be verified against `main` yet. The consolidator (Step 4) should reject proposals that violate this rule unless the tag is present.
+
+**Durable-cite preference (imported from RandomGame 2026-06-11; their Tess PR #321 finding).** When a capture cites a source artifact, prefer cite shapes durable in `git log`: ClickUp ticket IDs, PR numbers, commit SHAs, file:line@commit. AVOID paths to uncommitted scratch `.md` files — they vanish on branch switch and aren't retrievable by future readers.
 
 ## Step 2: Inventory + conversation brief
 
