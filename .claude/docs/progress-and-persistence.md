@@ -368,6 +368,12 @@ Additive optional `LetterSoundsVowel`; written by `recordProgressOnSessionEnd` *
 
 Walk `/o/ → /u/ → /i/ → /e/`: first `'practicing'` vowel is the target; all-mastered → next unintroduced. **`/e/` gate:** if `/e/` would be picked but `/i/` is not yet `'mastered'`, skip to a `'mastered'` vowel for review (`/e/`≈`/i/` acoustically — don't introduce `/e/` before `/i/` is consolidated). The planner derives this server-side; see `planner-and-canon.md` § "Per-vowel letter-sounds bypass" for the slash-LETTER↔bare-IPA bridge and the canon/cache bypass shape.
 
+## Subitising-scaffold counters — default-at-consumer-read-site (deliberate divergence)
+
+`Profile.subitisingScaffoldSessionsObserved` (add-to-10) and `Profile.subitisingScaffoldSubSessionsObserved` (sub-to-10, Wave 10 PR #369) deliberately do NOT follow the heavier per-vowel pattern above: they appear in **no** `defaults.ts` seed, **no** storage-side `withDefaulted*` defaulter, and **no** cloudSync mirror. They ride through as additive-optional fields validated inline by `isProgressV1` (one gate covers both the local-load and `installCloudBlob` paths, which spread unknown fields through) and **default at the consumer read sites** (`readSubitising…` helpers).
+
+**Why this matters for reviewers:** the absence of these fields from `defaults.ts` / `seedStorage.ts` / the cloudSync mirror is NOT a gap against the sibling-tier checklist — it is the established precedent for scaffold counters (verified in the W10.3 cross-review, PR #369, 2026-06-11). E2e specs seed them by raw-spreading onto `profile`; per `testing-and-ci.md` §4.1.1c, a third raw-spread adopter triggers the `SeedProgressOptions` widening follow-up (2 adopters as of Wave 10).
+
 ## Mastery rule (M3)
 
 [`mastery.ts`](MarianLearning/src/lib/progress/mastery.ts). The first PR where the app actually changes Marian's curriculum based on her performance. Pure module; the single public entry point is `applyMasteryRule(progress) → Progress`, which returns a NEW document (no mutation).

@@ -625,6 +625,19 @@ Playwright's `locator.toHaveCount(N)` counts **every DOM node** matching the sel
 
 **Detection rule for authors and reviewers.** Before writing `toHaveCount(N)` on a selector that matches filterable rows, ask: does the implementation **remove** filtered rows from the DOM (safe for `toHaveCount`) or **hide** them via attribute/style (requires `:visible`)? Inspect the relevant HTML/React source for `hidden`, `display: none`, or a conditional `style` toggle. When in doubt, use `:visible` — it is a strict superset of what `toHaveCount` checks and never over-counts hidden nodes.
 
+#### 4.1.6 Multi-problem chip-walk specs need REAL canon bytes — not `forceHowlerUnlock` (W10.5, PR #368, 2026-06-11)
+
+**The seam split.** In chromium headless, tests that assert only on the **first problem (Q1)** run fine with silent-MP3 mocks — they never depend on audio completing. Any test that **crosses a problem boundary via a chip tap** depends on the read-aloud→chip-enable audio gate releasing, which requires audio that actually decodes and ends. The deciding question is "does this test advance past Q1 via a chip tap?", not "what feature is under test?" — one spec can legitimately mix both mock strategies (W10.5's Tests 1/2/3/5/6 use silent-MP3; only Test 4's Q1→Q2→Q3 walk uses real canon).
+
+**The correct seam:** serve the real on-disk canon JSON verbatim (e.g. `installSubToTenCanonClaudeMock` returning `public/canon/math/level-1/sub-to-10.json` — the `sub-to-10-distractor-class-2.spec.ts` pattern). Real Azure-rendered MP3s decode cleanly in headless chromium, so the chip gate releases naturally across the walk.
+
+**`forceHowlerUnlock` is the WRONG seam here** (empirically hit in the W10.5 fix cycle): its stubbed ctx breaks real-bytes decode → silent demote to the static add-to-10 (`op:'+'`) fallback → the feature under test never mounts → the assertion is structurally unsatisfiable. See §4.1.2's silent-demote caveat. Symptom signature: the feature's Q1 assertion passes but the walk stalls at `toBeEnabled()` with chips stuck `disabled`.
+
+**Mechanical hygiene from the same cycle:**
+
+- **Overlay-and-restore leaves untracked files.** The "overlay another branch's `src/` into this worktree, build, run, restore" workflow (`git checkout origin/<branch> -- src/` … `git checkout -- src/`) restores tracked files only — the other branch's NEW files survive as untracked cruft and need an explicit `rm`. Always end with `git status` and verify only the intended file is in the commit.
+- **`netstat` TIME_WAIT entries on :4173 are not a live server.** Only a `LISTENING` bind blocks `vite preview --strictPort`; post-run TIME_WAIT drain is harmless. Filter for `LISTENING` when running the §2.4.1 stale-preview check.
+
 ### 4.2 `mockClaude.ts` — `/api/claude` route handler
 
 [e2e/\_helpers/mockClaude.ts](MarianLearning/e2e/_helpers/mockClaude.ts). Routes all `/api/claude` requests away from the real Anthropic + Azure function.
