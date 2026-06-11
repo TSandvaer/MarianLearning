@@ -1210,7 +1210,10 @@
           const url = '/canon/' + group + '/level-1/' + stem + '.json'
           let canon
           try {
-            const res = await fetch(url)
+            // no-store: always ear-test live canon bytes. Workbox precaches
+            // these JSONs; an SW that predates a canon re-render (VQA-FIX.1)
+            // would otherwise serve stale bytes and hash a phantom verdict.
+            const res = await fetch(url, { cache: 'no-store' })
             if (!res.ok) throw new Error(stem + ' ' + res.status)
             canon = await res.json()
           } catch (e) {
@@ -1288,13 +1291,22 @@
       }
 
       // ── Greet / Hub asset groups ─────────────────────────────────────────
+      // Cache-bust token, evaluated once per page load. Appended to every
+      // greet/hub asset URL so BOTH the hash fetch AND the <audio> playback
+      // (which reads assetUrl directly — see urlForItem) retrieve live bytes.
+      // Workbox precaches every *.mp3; without this, an SW that predates a
+      // re-render (e.g. PR #356's British-voice swap) serves stale bytes — the
+      // page hashes the phantom and the ear-test plays the wrong voice. The
+      // itemId stays the bare filename so stored verdicts still key correctly
+      // and the audioHash auto-flip-to-needs-retest contract is preserved.
+      const VQA_CACHE_BUST = String(Date.now())
       async function loadAssetGroup(prefix, basePath, manifest) {
         const renders = []
         for (const [filename, text] of manifest) {
-          const url = basePath + filename
+          const url = basePath + filename + '?v=' + VQA_CACHE_BUST
           let audioHash = ''
           try {
-            const res = await fetch(url)
+            const res = await fetch(url, { cache: 'no-store' })
             if (res.ok) {
               const buf = await res.arrayBuffer()
               audioHash = await sha256Hex(buf)
