@@ -1,0 +1,141 @@
+{
+  "generated": "2026-06-11",
+  "sourceIssue": 372,
+  "items": {
+    "add-to-10#session.end.streak.3": {
+      "pr": 375
+    },
+    "add-to-10#session.end.streak.4": {
+      "pr": 375
+    },
+    "add-to-10#session.end.streak.5": {
+      "pr": 375
+    },
+    "add-to-10#session.end.streak.6": {
+      "pr": 375
+    },
+    "add-to-10#session.end.streak.7": {
+      "pr": 375
+    },
+    "add-to-10#session.end.streak.8": {
+      "pr": 375
+    },
+    "mult-6-9#math.p7.correct": {
+      "pr": 375
+    },
+    "mult-6-9#math.p7.giveAnswer": {
+      "pr": 375
+    },
+    "number-recog#math.p6.hint": {
+      "pr": 375
+    },
+    "letter-names#word.p2.hint": {
+      "pr": 375
+    },
+    "letter-names#word.p5.hint": {
+      "pr": 375
+    },
+    "letter-sounds#session.end.recap.4": {
+      "pr": 375
+    },
+    "letter-sounds#session.end.streak.4": {
+      "pr": 375
+    },
+    "letter-sounds#word.p2.giveAnswer": {
+      "pr": 375
+    },
+    "letter-sounds#word.p4.correct": {
+      "pr": 375
+    },
+    "letter-sounds#word.p4.giveAnswer": {
+      "pr": 375
+    },
+    "letter-sounds#word.p6.correct": {
+      "pr": 375
+    },
+    "letter-sounds-audit#word.p1.giveAnswer": {
+      "pr": 375
+    },
+    "letter-sounds-audit#word.p2.correct": {
+      "pr": 375
+    },
+    "letter-sounds-audit#word.p2.giveAnswer": {
+      "pr": 375
+    },
+    "letter-sounds-audit#word.p2.hint": {
+      "pr": 375
+    },
+    "letter-sounds-audit#word.p2.read": {
+      "pr": 375
+    },
+    "letter-sounds-audit#word.p3.giveAnswer": {
+      "pr": 375
+    },
+    "greet#greet-01-hi.mp3": {
+      "pr": 373
+    },
+    "greet#greet-02-im-emma.mp3": {
+      "pr": 373
+    },
+    "greet#greet-03-nice-to-meet-you.mp3": {
+      "pr": 373
+    },
+    "greet#greet-04-tap-the-heart.mp3": {
+      "pr": 373
+    },
+    "hub#hub-enter-number-garden.mp3": {
+      "pr": 373
+    },
+    "hub#hub-enter-word-song.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-back-soon-alt-1.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-back-soon-alt-2.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-back-soon.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-first-again.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-pick-again.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-pick-next.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-try-number-garden-alt-1.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-try-number-garden-alt-2.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-try-number-garden.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-try-word-song-alt-1.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-try-word-song-alt-2.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-try-word-song.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-what-today-alt-1.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-what-today-alt-2.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-what-today-alt-3.mp3": {
+      "pr": 373
+    },
+    "hub#hub-welcome-what-today.mp3": {
+      "pr": 373
+    }
+  }
+}
