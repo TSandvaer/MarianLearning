@@ -35,6 +35,9 @@ import {
   type LetterSoundsVowelStatesHint,
   type PlannerAnthropicClient,
 } from './_planner.js'
+// W12-03: the round-trip test proves a planner-emitted three-hint plan
+// parses through W12-01's widened math parser. Pure module, no DOM deps.
+import { mathSessionPlanFromServer } from '../src/screens/Math/planFromServer.js'
 
 /**
  * Factory for a mock Anthropic client. The SDK exposes `client.messages.create`
@@ -395,6 +398,151 @@ describe('generateSessionPlan — Session-End utterance schema (ticket 86c9kj2u6
     expect(prompt).toContain('session.end.streak.3')
     expect(prompt).toContain('session.end.streak.8')
     expect(prompt).toContain('session.end.goodbye')
+  })
+})
+
+describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca8702v)', () => {
+  // Wave 12 splits the single math `hint` utterance into three escalating
+  // sub-steps (hint1/hint2/hint3). These tests pin two contracts:
+  //   AC #3 — round-trip: a planner-emitted three-hint plan parses through
+  //           W12-01's widened math parser with three hint ids per problem.
+  //   AC #4 — drift-guard: the system prompt carries the header-shaped
+  //           THREE-HINT SLOT DIRECTIVE so a future "simplify this prompt"
+  //           edit cannot silently collapse the triple back to one hint.
+
+  /** Build a full three-hint math wire plan (8 problems × 7 slots + 19
+   *  session-end) as the JSON string a Haiku response would carry. */
+  function makeThreeHintMathPlan(): string {
+    const addends = [
+      ['one', 'one', 'two'],
+      ['two', 'one', 'three'],
+      ['two', 'two', 'four'],
+      ['three', 'two', 'five'],
+      ['four', 'two', 'six'],
+      ['three', 'four', 'seven'],
+      ['four', 'four', 'eight'],
+      ['five', 'four', 'nine'],
+    ] as const
+    const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1)
+    const problemUtterances = addends.flatMap(([a, b, sum], i) => {
+      const n = i + 1
+      return [
+        { id: `math.p${n}.read`, text: `${cap(a)} plus ${b}. How many?` },
+        { id: `math.p${n}.correct`, text: `Yes! ${cap(sum)}!` },
+        { id: `math.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `math.p${n}.hint1`, text: 'Look at the flowers.' },
+        { id: `math.p${n}.hint2`, text: `${cap(a)} flowers.` },
+        { id: `math.p${n}.hint3`, text: `And ${b} more. How many now?` },
+        { id: `math.p${n}.giveAnswer`, text: `This one is ${sum}.` },
+      ]
+    })
+    const sessionEnd = [
+      { id: 'session.end.opener', text: 'You did it!' },
+      ...Array.from({ length: 11 }, (_, i) => ({
+        id: `session.end.recap.${i + 1}`,
+        text: i === 0 ? 'You earned one star!' : 'You earned two stars!',
+      })),
+      ...Array.from({ length: 6 }, (_, i) => ({
+        id: `session.end.streak.${i + 3}`,
+        text: 'Three in a row! Wow!',
+      })),
+      { id: 'session.end.goodbye', text: 'See you soon.' },
+    ]
+    return JSON.stringify({
+      id: 'sums-three-hint',
+      label: 'three-hint round-trip',
+      utterances: [...problemUtterances, ...sessionEnd],
+    })
+  }
+
+  it('AC#3 — a generated three-hint plan parses through the W12-01 parser with three hint ids per problem', async () => {
+    const client = makeMockClient(makeThreeHintMathPlan())
+    const plan = await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+
+    // The planner round-trips the wire shape unchanged; feed it straight
+    // into the browser parser that Math.tsx consumes.
+    const session = mathSessionPlanFromServer(plan)
+    expect(session.problems).toHaveLength(8)
+    for (const problem of session.problems) {
+      // Every problem carries the full hint triple…
+      expect(typeof problem.utterances.hint1).toBe('string')
+      expect(typeof problem.utterances.hint2).toBe('string')
+      expect(typeof problem.utterances.hint3).toBe('string')
+      // …and NO legacy single hint.
+      expect(problem.utterances.hint).toBeUndefined()
+    }
+    // Spot-check P1's per-step wording maps to the three sub-steps.
+    const p1 = session.problems[0]!
+    expect(p1.utterances.hint1).toBe('Look at the flowers.')
+    expect(p1.utterances.hint2).toBe('One flowers.')
+    expect(p1.utterances.hint3).toBe('And one more. How many now?')
+  })
+
+  it('AC#4 — the math system prompt carries the THREE-HINT SLOT DIRECTIVE header and a confirming self-check', async () => {
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeThreeHintMathPlan(), { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+
+    // Header-shaped drift-guard (uniquely-titled block — won't trip on
+    // documentary prose; mirrors the DISTRACTOR-CLASS HINT / GRADUATION
+    // SESSION ban convention).
+    expect(systemText).toContain('THREE-HINT SLOT DIRECTIVE')
+    // The directive must name all three sub-step ids explicitly.
+    expect(systemText).toContain('math.p<N>.hint1')
+    expect(systemText).toContain('math.p<N>.hint2')
+    expect(systemText).toContain('math.p<N>.hint3')
+    // And forbid the collapse back to a single hint.
+    expect(systemText).toMatch(/NEVER emit a single "math\.p<N>\.hint" id/)
+    // The SYSTEM_PREAMBLE math slot list must enumerate the seven slots.
+    expect(systemText).toContain(
+      'read, correct, reprompt, hint1, hint2, hint3, giveAnswer',
+    )
+  })
+
+  it('AC#1 — the SYSTEM_PREAMBLE keeps word-song at 5 slots (single hint) — Wave 12 is math-only', async () => {
+    // The slot-count language is track-shared in SYSTEM_PREAMBLE; the
+    // word-song slot set must NOT widen (no word-song three-hint in v1).
+    const wordPlan = JSON.stringify({
+      id: 'cvc-warm',
+      label: 'cvc',
+      utterances: [
+        { id: 'word.p1.read', text: 'Tap the cat.' },
+        { id: 'word.p1.correct', text: 'Yes! Cat.' },
+        { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+        { id: 'word.p1.hint', text: "Let's look. Cat." },
+        { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+      ],
+    })
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(wordPlan, { capture })
+    await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+    expect(systemText).toContain(
+      'WORD-SONG track — exactly 5 utterances with these slot names: read, correct, reprompt, hint, giveAnswer',
+    )
+    // The math count math is also present (75 entries) but the word-song
+    // count (59) must survive for the word-song flat array.
+    expect(systemText).toContain('8 × 5 + 19 = 59 entries for the WORD-SONG')
   })
 })
 
@@ -929,6 +1077,13 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
     expect(prompt).not.toMatch(/letter-sounds:.*Tap the letter that says/i)
     expect(prompt).not.toMatch(/letter-names:.*Tap the letter <Letter>/i)
     expect(prompt).not.toMatch(/sight-words:.*Tap the word/i)
+    // Mode-count drift-guard (batched ticket 86ca7yg0r): the in-prompt
+    // first-class-content-modes header count must match the 12 actual
+    // bullets (letter-names, letter-sounds, blending-cv, cvc-words +4
+    // vowel siblings, 3 digraph tiers, sight-words). The stale "Ten" was
+    // fixed alongside W12-03; this pin stops it regressing.
+    expect(prompt).toContain('Twelve first-class content modes today')
+    expect(prompt).not.toContain('Ten first-class content modes today')
   })
 
   it('routes focusNode "letter-sounds" verbatim as a FIRST-CLASS tier in the user message (Wave 7 Track A7 — ticket 86c9y49cd)', async () => {
@@ -4183,7 +4338,18 @@ describe('generateSessionPlan — sub-to-10 prompt content (Kyle spec §4.1, Dav
     // Each slot's example carries the "are left" / "Take away" form.
     expect(systemText).toContain('"Yes! <answer>!"')
     expect(systemText).toContain('"Hmm... try again?"')
-    expect(systemText).toContain('Look. Ten. Take away two. How many now?')
+    // Wave 12 (ticket 86ca8702v) split the single sub-to-10 hint into the
+    // hint1/hint2/hint3 triple; the "Take away" scaffold framing now lives
+    // in hint3. Pin the three sub-step examples.
+    expect(systemText).toContain(
+      'hint1 (attention-direction): "Look at the flowers."',
+    )
+    expect(systemText).toContain(
+      'hint2 (quantity-A): "<minuend> flowers." e.g. "Ten flowers."',
+    )
+    expect(systemText).toContain(
+      'hint3 (take away + question): "Take away <subtrahend>. How many now?" e.g. "Take away two. How many now?"',
+    )
     // correct=0 forms — Emma must spell "zero" in both correct and
     // giveAnswer slots.
     expect(systemText).toContain('"Yes! Zero!"')
@@ -4361,9 +4527,11 @@ describe('generateSessionPlan — sub-to-20 prompt content (Kyle spec §1.1/§4.
     expect(block).toContain('DO NOT substitute "take away" here')
     // The "take away" string DOES appear in the block — but only in the
     // hint scaffold, never as the read-line template. Confirm the hint
-    // carries it (so we're guarding the right surface, not a typo).
+    // carries it (so we're guarding the right surface, not a typo). Wave 12
+    // (ticket 86ca8702v) split the single hint into hint1/hint2/hint3; the
+    // "take away" framing now lives in hint3.
     expect(block).toContain(
-      'Look. <minuend>. Take away <subtrahend>. How many now?',
+      'hint3 (take away + question): "Take away <subtrahend>. How many now?"',
     )
   })
 
