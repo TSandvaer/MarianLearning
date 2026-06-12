@@ -42,6 +42,18 @@
  *   3. The 18 MP3s land in `public/assets/audio/hub/`, overwriting any
  *      prior bake.
  *   4. Pass `--dry-run` to print the SSML bodies without calling Azure.
+ *   5. Pass `--only <file.mp3>` (repeatable) to re-render ONLY the named
+ *      file(s) and leave every other MP3 byte-identical. Used for targeted
+ *      voice-QA fixes where a whole-set re-bake would needlessly churn the
+ *      Thomas-approved bytes (Azure is not byte-deterministic across runs).
+ *
+ * Per-line SSML override
+ * ----------------------
+ * A LINES entry may carry an optional `ssml` string — the INNER-text SSML
+ * used verbatim (no escaping) in place of `escapeSsml(text)`. This lets a
+ * single line carry a hand-tuned break/prosody (e.g. tightening the comma
+ * pause in "Hello, friend!") without changing the displayed caption `text`
+ * (which the browser still reads from `HUB_LINES`).
  *
  * Cost
  * ----
@@ -87,6 +99,18 @@ const DRY_RUN = process.argv.includes('--dry-run')
 const AZURE_KEY = process.env.AZURE_SPEECH_KEY
 const AZURE_REGION = process.env.AZURE_SPEECH_REGION || 'westeurope'
 
+// `--only a.mp3 --only b.mp3` (or `--only=a.mp3`) → render just those files.
+// Empty set means "render all" (the default whole-set bake).
+const ONLY_FILES = new Set()
+for (let i = 0; i < process.argv.length; i++) {
+  const arg = process.argv[i]
+  if (arg === '--only' && i + 1 < process.argv.length) {
+    ONLY_FILES.add(process.argv[i + 1])
+  } else if (arg.startsWith('--only=')) {
+    ONLY_FILES.add(arg.slice('--only='.length))
+  }
+}
+
 if (!AZURE_KEY && !DRY_RUN) {
   console.error(
     '\nERROR: AZURE_SPEECH_KEY is not set.\n' +
@@ -123,7 +147,16 @@ const LINES = [
   // Rotation variants — what-today
   { file: 'hub-welcome-what-today-alt-1.mp3', text: "Hi! Look who's here!" },
   { file: 'hub-welcome-what-today-alt-2.mp3', text: 'Hi! Ready?' },
-  { file: 'hub-welcome-what-today-alt-3.mp3', text: 'Hello, friend!' },
+  {
+    file: 'hub-welcome-what-today-alt-3.mp3',
+    text: 'Hello, friend!',
+    // Voice-QA round-5 (issue #417, ticket 86ca8c3t7): "there is too much
+    // gap between hello and friend". The comma in the plain text makes Azure
+    // insert a long prosodic pause. Drop the comma in the SSML and pin a
+    // short 120ms break so "Hello" flows into "friend!". The displayed
+    // caption `text` stays "Hello, friend!" (the browser reads HUB_LINES).
+    ssml: 'Hello<break time="120ms"/> friend!',
+  },
   // Rotation variants — try-number-garden
   {
     file: 'hub-welcome-try-number-garden-alt-1.mp3',
@@ -158,12 +191,14 @@ function escapeSsml(text) {
     .replace(/'/g, '&apos;')
 }
 
-function buildSsml(text) {
+// `inner` is the pre-built inner-text SSML; callers pass either
+// `escapeSsml(text)` (plain) or a line's hand-tuned `ssml` override.
+function buildSsml(inner) {
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">` +
     `<voice name="${escapeSsml(VOICE)}">` +
     `<prosody pitch="${escapeSsml(PITCH)}" rate="${escapeSsml(RATE)}" volume="${escapeSsml(VOLUME)}">` +
-    `${escapeSsml(text)}` +
+    `${inner}` +
     `</prosody></voice></speak>`
   )
 }
@@ -213,9 +248,26 @@ async function main() {
   if (DRY_RUN) console.log('(--dry-run — no Azure calls)')
   console.log('')
 
+  const selected =
+    ONLY_FILES.size > 0 ? LINES.filter((l) => ONLY_FILES.has(l.file)) : LINES
+  if (ONLY_FILES.size > 0) {
+    console.log(
+      `(--only) rendering ${selected.length}/${LINES.length}: ${[...ONLY_FILES].join(', ')}`,
+    )
+    const missing = [...ONLY_FILES].filter(
+      (f) => !LINES.some((l) => l.file === f),
+    )
+    if (missing.length > 0) {
+      console.error(
+        `ERROR: --only file(s) not in manifest: ${missing.join(', ')}`,
+      )
+      process.exit(1)
+    }
+  }
+
   let totalBytes = 0
-  for (const line of LINES) {
-    const ssml = buildSsml(line.text)
+  for (const line of selected) {
+    const ssml = buildSsml(line.ssml ?? escapeSsml(line.text))
     if (DRY_RUN) {
       console.log(`=== ${line.file} ===`)
       console.log(`text: ${line.text}`)
@@ -238,7 +290,7 @@ async function main() {
 
   if (!DRY_RUN) {
     console.log('')
-    console.log(`Total: ${LINES.length} files, ${totalBytes}B`)
+    console.log(`Total: ${selected.length} file(s), ${totalBytes}B`)
   }
 }
 
