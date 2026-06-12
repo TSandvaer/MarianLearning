@@ -8,6 +8,14 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 
 <!-- Real entries below this line. Newest at top. -->
 
+## 2026-06-12 1430 UTC — W12-04 split-bake decision: derivable-6 tiers bake now, Dave authors templates for the generic-5, single PR + single ear-test
+
+- **Decided:** Kevin's W12-04 STEP-2 blocker (only 6 of 11 math tiers have deterministic hint-text derivation; the 5 generic tiers — number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9, 120 clips — have only a loose directive shape and bespoke legacy prose) resolves as: (a) Kevin proceeds NOW with the 144 derivable clips on his branch; (b) Dave dispatched in parallel to author deterministic 3-beat templates for the generic-5 (content design, his locked wave framework); (c) Kevin incorporates Dave's templates + bakes the remaining 120 on the SAME branch → ONE PR, ONE Thomas ear-test of all baked clips. NOT chosen: fabricating content (forbidden), Haiku re-plan (byte-preservation + billing), or shipping the partial as final (would silently halve the wave deliverable).
+- **Foundation:** W12-01's back-compat predicate + W12-02's legacy fallback explicitly support mixed canon (per-problem EITHER legacy hint OR triple) — a transition state is safe by design at every point. Kevin's analysis grounded (parseReadOperands verified on all 48 derivable-tier problems; generic-shape directive lines cited at \_planner.ts:1841-1844). Pedagogy-gates-content convention: generic-tier hint templates are Dave's domain, not Kevin's to invent. Single-ear-test packaging per feedback_audio_audition_page_pattern (one-pass A/B beats serial passes).
+- **Alternative:** Surface to Thomas (sequencing question, not scope-cut — the 264-clip target stays alive in-wave; Dave is idle so the deferral costs ~minutes not days); or bake 144 and ship with a follow-up ticket for 120 (two ear-tests — worse for Thomas).
+- **Reversibility:** 1 PR, unmerged until Thomas's ear-test regardless; if Dave RE-DEFERs any tier, ship the partial with the remainder ticketed.
+- **Status:** pending review
+
 ## 2026-06-12 1230 UTC — Granted Kevin's W12-01 scope amendment (Math.tsx 1-line compile-keep)
 
 - **Decided:** Accepted `src/screens/Math/Math.tsx` into W12-01 (ticket 86ca86zyq / PR #407) scope for exactly one line: `speak(... .hint ?? '')` at the hint-speak site, required because making `hint` optional (the honest type for the EITHER/OR back-compat predicate) breaks Math.tsx's typecheck. Kept Kevin's optional-`hint` design over the required-`hint` "boundary type-lie" alternative he offered — the optional type gives W12-02's author a typecheck nudge when reading `utterances.hint` on a three-hint plan (boundary-loose, producer-strict).
