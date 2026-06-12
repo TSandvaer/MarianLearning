@@ -3520,6 +3520,294 @@ describe('Math (Number Garden) screen', () => {
     }, 30_000)
   })
 
+  /*
+   * ════════════════════════════════════════════════════════════════════
+   * Latency anchor re-targeting (M4 — ticket 86ca862ex)
+   * ════════════════════════════════════════════════════════════════════
+   *
+   * design/research/m4-latency-anchor-decision.md verdict (a): the M4
+   * latency window now starts at chip-gate-open, with the anchor site
+   * splitting by HOW the gate opened:
+   *
+   *   - `via === 'tts-start'`: anchored synchronously in `openChipGate`
+   *     at TTS START (Howler `onPlay`). A fast tap landing during the
+   *     read-aloud TAIL (after START, before completion) now records a
+   *     REAL latency — pre-86ca862ex it hit the completion anchor as
+   *     `null` and recorded the `-1` "not measured" sentinel, silently
+   *     dropping the fastest answerers from the M4.x slow-fact dataset.
+   *
+   *   - `via === 'fallback'` (watchdog / speech-error): NOT anchored at
+   *     gate-open — the watchdog fire time is not TTS start. The
+   *     `useLayoutEffect([readAloudPlayed])` block keeps anchoring on
+   *     read-aloud COMPLETION, the pre-86ca862ex semantics, so silent-
+   *     audio sessions don't drift their anchor to the 2 s watchdog tick.
+   *
+   * These two tests pin both paths. The existing
+   * `latency capture invariants (ticket 86c9q5au3)` suite above continues
+   * to exercise the (now-TTS-START) happy-path floor/ceiling/isolation
+   * invariants — `makePlayHarness` fires `onPlay` synchronously, so its
+   * anchor lands on the `'tts-start'` path within the same drain.
+   */
+  describe('latency anchor re-targeting (ticket 86ca862ex)', () => {
+    it('tts-start anchor: a fast tap during the read-aloud TAIL records a REAL latency, not the -1 sentinel', async () => {
+      // The core AC. We need a harness where the problem-0 READ-ALOUD
+      // ("Three plus two. How many?") fires onPlay (gate opens via
+      // tts-start + anchor captured) but stays PENDING — so chips are
+      // tappable while `readAloudPlayed` is still false — while every
+      // OTHER utterance (the "Yes! Five!" celebration that gates the
+      // auto-advance, and later problems' reads) resolves normally so the
+      // session can walk to completion. Pre-86ca862ex the only anchor
+      // lived in useLayoutEffect([readAloudPlayed]); a tap over the tail
+      // (read-aloud not yet complete) recorded -1. Post-fix the anchor is
+      // set at onPlay, so a ~400 ms tail tap records a real ~400 ms value.
+      const READ_ALOUD_P0 = 'Three plus two. How many?'
+      let releaseP0Read: (() => void) | null = null
+      const tailPlay: PlayMathUtteranceFn = vi.fn(async (text, playOpts) => {
+        return await new Promise<void>((resolve) => {
+          // Fire onPlay synchronously (opens the gate via tts-start; for
+          // the read-aloud this also captures the latency anchor).
+          playOpts?.onPlay?.()
+          const words = text.split(/\s+/).filter(Boolean)
+          for (let i = 0; i < words.length; i++) playOpts?.onWordTick?.(i)
+          if (text === READ_ALOUD_P0 && releaseP0Read === null) {
+            // Hold ONLY problem 0's read-aloud pending so we can tap over
+            // its tail. `setReadAloudPlayed(true)` won't fire until release.
+            releaseP0Read = resolve
+          } else {
+            // Everything else (celebration utterances, later reads)
+            // resolves on the microtask queue so onPlay observers settle
+            // and the auto-advance gate (which waits on the celebration
+            // speak's onend) can fire.
+            Promise.resolve().then(() => resolve())
+          }
+        })
+      })
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={tailPlay}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Drain the cold-mount microtask chain → read-aloud effect fires
+      // speak(read) → onPlay (synchronous) → gate opens via tts-start and
+      // the latency anchor is captured NOW. The read-aloud promise is held.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      const chipsRow = screen.getByTestId('math-chips')
+      expect(chipsRow).toHaveAttribute('data-chip-gate', 'open')
+      expect(chipsRow).toHaveAttribute('data-chip-gate-via', 'tts-start')
+      // Read-aloud has NOT completed — we are tapping over the tail.
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-read-aloud-played',
+        'false',
+      )
+
+      // Sleep ~400 ms (above LATENCY_FLOOR_MS = 250) so the captured
+      // value is in-band and persisted as a real number, not folded to -1.
+      const TAIL_TAP_DELAY_MS = 400
+      await new Promise((resolve) => setTimeout(resolve, TAIL_TAP_DELAY_MS))
+
+      const chipsP0 = screen.getAllByTestId('math-chip')
+      const correctChip = chipsP0.find(
+        (c) => c.getAttribute('data-value') === '5',
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+
+      // Release problem 0's held read-aloud so any teardown settles, then
+      // walk through the remaining problems to completion. We only assert
+      // on problem 0's tail-tap measurement.
+      await act(async () => {
+        releaseP0Read?.()
+        await Promise.resolve()
+      })
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1400))
+      })
+      for (let i = 1; i < 8; i++) {
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        const chipsNext = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const next = chipsNext.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(next)
+          await Promise.resolve()
+        })
+        await act(async () => {
+          await new Promise((resolve) => setTimeout(resolve, 1400))
+        })
+      }
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // THE LOAD-BEARING ASSERTION: the tail tap recorded a REAL latency
+      // (≈400 ms), NOT the -1 "not measured" sentinel. This is the exact
+      // regression Kevin flagged on PR #402 NIT 2 and the bug verdict (a)
+      // fixes — the fastest-over-the-tail answers no longer vanish.
+      expect(arg.latencyMs[0]).not.toBe(-1)
+      expect(arg.latencyMs[0]).toBeGreaterThanOrEqual(TAIL_TAP_DELAY_MS * 0.8)
+      expect(arg.latencyMs[0]).toBeLessThan(TAIL_TAP_DELAY_MS * 2)
+    }, 30_000)
+
+    it('fallback anchor: gate opened via the watchdog does NOT anchor at the watchdog tick — completion stays the anchor', async () => {
+      // On the fallback path (no onPlay; gate opens via the 2 s watchdog),
+      // `openChipGate('fallback')` deliberately does NOT set the latency
+      // anchor — the watchdog tick is not TTS start. So a tap landing
+      // AFTER the fallback gate opens but BEFORE read-aloud completion
+      // sees `chipReadyAtRef === null` and records the -1 "not measured"
+      // sentinel — NOT a value derived from the watchdog tick. This is the
+      // exact discriminator for the `via === 'tts-start'`-only guard: were
+      // the guard absent (anchor on every openChipGate), this tap would
+      // record a real (~0 ms, sub-floor → also -1, OR a watchdog-relative)
+      // value instead of cleanly proving the anchor never moved to the
+      // fallback open. The companion completion anchor (which DOES fire on
+      // resolve) is covered by the existing 86c9q5au3 suite via
+      // makePlayHarness's synchronous onPlay path; here we pin that the
+      // FALLBACK open itself is anchor-neutral.
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      // Fallback harness: the READ-ALOUD utterances ("... How many?") fire
+      // NO onPlay and stay PENDING — so each problem's gate can open ONLY
+      // via its 2 s watchdog (via=fallback) and the read-aloud never
+      // completes (no completion anchor). Every OTHER utterance (the
+      // "Yes! N!" celebration that gates auto-advance, hints, etc.) fires
+      // onPlay + resolves on a microtask so the session walks to
+      // completion at the normal ~1.2 s advance cadence (not the 4 s
+      // hard-ceiling). The read-aloud is detected by its "How many?" tail.
+      const fallbackPlay: PlayMathUtteranceFn = vi.fn(
+        async (text, playOpts) => {
+          const isRead = /how many/i.test(text)
+          return await new Promise<void>((resolve) => {
+            const words = text.split(/\s+/).filter(Boolean)
+            for (let i = 0; i < words.length; i++) playOpts?.onWordTick?.(i)
+            if (isRead) {
+              // No onPlay, never resolve → gate opens via watchdog only,
+              // readAloudPlayed never flips, completion anchor never fires.
+              return
+            }
+            // Non-read utterance: behave like makePlayHarness's happy path.
+            playOpts?.onPlay?.()
+            Promise.resolve().then(() => resolve())
+          })
+        },
+      )
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={fallbackPlay}
+            storage={makeMemoryStorage()}
+            onSessionComplete={onSessionComplete}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Cold-mount drain: read-aloud kicked, watchdog armed, NO onPlay.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('math-chips')).toHaveAttribute(
+        'data-chip-gate',
+        'closed',
+      )
+
+      // Cross the 2 s watchdog → gate opens fail-open via=fallback. The
+      // anchor is NOT captured here (the whole point of the path split).
+      // `readAloudPlayed` is still false → completion anchor unset →
+      // chipReadyAtRef stays null.
+      await act(async () => {
+        vi.advanceTimersByTime(2001)
+        await Promise.resolve()
+      })
+      const chipsRow = screen.getByTestId('math-chips')
+      expect(chipsRow).toHaveAttribute('data-chip-gate', 'open')
+      expect(chipsRow).toHaveAttribute('data-chip-gate-via', 'fallback')
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-read-aloud-played',
+        'false',
+      )
+
+      // Tap the correct chip now — the gate is open, but no anchor was set
+      // (no tts-start, no completion). The capture path skips because
+      // `chipReadyAtRef.current === null`, leaving the -1 sentinel.
+      const chipsP0 = screen.getAllByTestId('math-chip')
+      const correctChip = chipsP0.find(
+        (c) => c.getAttribute('data-value') === '5',
+      )!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+      // Walk the rest to completion. Each subsequent problem's gate opens
+      // via its own watchdog (via=fallback) and the read-aloud never
+      // completes → all latencies stay -1; the celebration utterances
+      // resolve so advance fires at the ~1.2 s cadence.
+      for (let i = 1; i < 8; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(1400)
+          await Promise.resolve()
+        })
+        await act(async () => {
+          vi.advanceTimersByTime(2001)
+          await Promise.resolve()
+        })
+        const chipsNext = screen.getAllByTestId('math-chip')
+        const correctValue = fixedPlan().problems[i].correct
+        const next = chipsNext.find(
+          (c) => Number(c.getAttribute('data-value')) === correctValue,
+        )!
+        await act(async () => {
+          fireEvent.click(next)
+          await Promise.resolve()
+        })
+      }
+      await act(async () => {
+        vi.advanceTimersByTime(1400)
+        await Promise.resolve()
+      })
+
+      expect(onSessionComplete).toHaveBeenCalledTimes(1)
+      const arg = onSessionComplete.mock.calls[0][0]
+
+      // THE LOAD-BEARING ASSERTION: the fallback gate-open did NOT anchor.
+      // problem 0's tap (post-fallback-open, pre-completion) recorded the
+      // -1 "not measured" sentinel — genuinely unmeasured, NOT a value
+      // derived from the 2 s watchdog tick. This proves the
+      // `via === 'tts-start'` guard in openChipGate holds.
+      expect(arg.latencyMs[0]).toBe(-1)
+      // Every problem ran read-aloud-silent → genuinely unmeasured. -1 is
+      // the correct sentinel for all 8.
+      for (let i = 0; i < 8; i++) {
+        expect(arg.latencyMs[i]).toBe(-1)
+      }
+    }, 30_000)
+  })
+
   // ─── per-problem first-tap chip value (Kevin schema-first PR, ──────────
   // pairing with Dave's PR #284 two-digit add/sub research) ───────────────
   describe('per-problem first-tap chip value capture', () => {
@@ -4413,11 +4701,10 @@ describe('Math (Number Garden) screen', () => {
     })
 
     it('a pre-gate chip tap does NOT register as an answer (no dot-strip advance, no stardust delta)', async () => {
-      // autoResolve:false + a harness whose onPlay we suppress would be
-      // ideal, but the cleanest "gate is closed" state is the silent
-      // harness (no onPlay, pending forever) on the cold-mount path. The
-      // very first tap is the audio-unlock gesture; a SECOND pre-gate tap
-      // is the one that must not score.
+      // The silent harness (no onPlay, pending forever) holds the gate
+      // closed on the cold-mount path. On the Howler-running fast path
+      // `audioUnlocked` auto-mirrors, so the single tap below goes
+      // straight to the `!chipGateOpenRef.current` gate and must not score.
       vi.useFakeTimers({
         toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
       })
