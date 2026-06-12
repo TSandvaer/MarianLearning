@@ -166,7 +166,12 @@ interface VariantRecord {
   mechanism: string
   /** The full SSML body sent to Azure (for the inventory table). */
   ssml: string
-  /** SHA-256 of the rendered MP3 bytes, or null if render failed. */
+  /**
+   * SHA-256 of the base64-encoded MP3 STRING (not the decoded MP3 bytes),
+   * or null if render failed. Matches the page-side hash recipe for canon
+   * items, which also hashes the base64 string — keeping the two recipes
+   * consistent. See the `createHash('sha256').update(base64)` call below.
+   */
   audioHash: string | null
   /** base64 MP3, or null if render failed. */
   base64: string | null
