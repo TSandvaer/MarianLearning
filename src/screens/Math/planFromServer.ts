@@ -30,8 +30,11 @@
  * The audio is rendered from those texts; mismatch between caption and
  * computed `correct` is a soft issue (Marian sees the picked sum on
  * screen and hears Emma's voice — both come from the model). The hard
- * invariant is structural: 8 problems × 5 slots, every utterance id
- * matches the `math.p<N>.<slot>` template.
+ * invariant is structural: 8 problems, every utterance id matches the
+ * `math.p<N>.<slot>` template, and each problem carries the four
+ * always-present slots (read, correct, reprompt, giveAnswer) plus EITHER
+ * the legacy single `hint` OR the full `hint1`/`hint2`/`hint3` triple
+ * (the W12-01 back-compat predicate — a partial triple is rejected).
  *
  * Out-of-namespace ids (skip-not-throw)
  * -------------------------------------
@@ -59,12 +62,24 @@ import {
   type MathUtteranceSlot,
 } from './sessionPlans'
 
-const ALL_SLOTS: readonly MathUtteranceSlot[] = [
+/**
+ * Slots required on EVERY problem regardless of hint shape. The hint
+ * slot(s) are validated separately by {@link assertHintShape} because a
+ * problem carries EITHER the legacy `hint` OR the `hint1`/`hint2`/`hint3`
+ * triple — the back-compat predicate (W12-01, ticket 86ca86zyq).
+ */
+const NON_HINT_SLOTS: readonly MathUtteranceSlot[] = [
   'read',
   'correct',
   'reprompt',
-  'hint',
   'giveAnswer',
+]
+
+/** The three escalating hint sub-step slots (W12-01). */
+const HINT_TRIPLE_SLOTS: readonly MathUtteranceSlot[] = [
+  'hint1',
+  'hint2',
+  'hint3',
 ]
 
 /** Single-token number words 0..20 — and decade names 30..90. Tens 21..99
@@ -225,13 +240,14 @@ export function mathSessionPlanFromServer(
         `server plan missing problem index ${index}`,
       )
     }
-    for (const slot of ALL_SLOTS) {
+    for (const slot of NON_HINT_SLOTS) {
       if (typeof bucket[slot] !== 'string') {
         throw new PlanFromServerError(
           `server plan problem ${index} missing slot "${slot}"`,
         )
       }
     }
+    assertHintShape(bucket, index)
     const utterances = bucket as MathProblemUtterances
     const { addendA, addendB, op } = parseReadOperands(utterances.read)
     const correct = op === '-' ? addendA - addendB : addendA + addendB
@@ -348,14 +364,68 @@ function decodeOperands(
   return { addendA: a, addendB: b, op }
 }
 
-/** Parse a `math.p<N>.<slot>` utterance id. Returns null on miss. */
+/**
+ * Validate a problem's hint shape against the back-compat predicate
+ * (W12-01, ticket 86ca86zyq). A problem is valid iff it carries EITHER the
+ * legacy single `hint` OR the complete `hint1`/`hint2`/`hint3` triple —
+ * never a partial triple, never neither.
+ *
+ * Throws `PlanFromServerError` with a clear missing-slot message when:
+ *   - no hint slot is present at all, OR
+ *   - the triple is partial (e.g. `hint1` without `hint2`/`hint3`).
+ *
+ * A partial triple is the dangerous case (wave-12-plan §8 risk 3): a loose
+ * predicate that accepted `hint1` alone would silently render a broken hint
+ * sequence. We reject it loudly so the App's silent-fallback path fires
+ * instead of shipping a half-built scaffold.
+ */
+function assertHintShape(
+  bucket: Partial<MathProblemUtterances>,
+  index: number,
+): void {
+  const hasLegacy = typeof bucket.hint === 'string'
+  const presentTripleSlots = HINT_TRIPLE_SLOTS.filter(
+    (s) => typeof bucket[s] === 'string',
+  )
+  const hasFullTriple = presentTripleSlots.length === HINT_TRIPLE_SLOTS.length
+
+  if (hasLegacy || hasFullTriple) return
+
+  // Partial triple → name the missing triple slot(s) for a clear error.
+  if (presentTripleSlots.length > 0) {
+    const missing = HINT_TRIPLE_SLOTS.filter(
+      (s) => typeof bucket[s] !== 'string',
+    )
+    throw new PlanFromServerError(
+      `server plan problem ${index} has a partial hint triple ` +
+        `(present: ${presentTripleSlots.join(', ')}; ` +
+        `missing slot "${missing[0]}") — a problem must carry EITHER the ` +
+        `legacy "hint" OR all of hint1/hint2/hint3, not a partial triple.`,
+    )
+  }
+
+  // No hint of any shape.
+  throw new PlanFromServerError(
+    `server plan problem ${index} missing slot "hint" ` +
+      `(no legacy "hint" and no hint1/hint2/hint3 triple present).`,
+  )
+}
+
+/** Parse a `math.p<N>.<slot>` utterance id. Returns null on miss.
+ *
+ *  Accepts both the legacy single `hint` slot AND the three-hint sub-step
+ *  slots `hint1` / `hint2` / `hint3` (W12-01, ticket 86ca86zyq) so committed
+ *  legacy canon and the post-W12-04 re-baked three-hint canon both parse.
+ *  The `hint` alternative is listed BEFORE `hint1|hint2|hint3` and the regex
+ *  is fully anchored (`$`), so `hint` matches `math.pN.hint` exactly and
+ *  never the prefix of `math.pN.hint1`. */
 function parseUtteranceId(
   id: string,
 ): { index: number; slot: MathUtteranceSlot } | null {
   // Anchored to the canonical template; rejects nested dots / extra
   // segments / empty slot names.
   const match = id.match(
-    /^math\.p(\d+)\.(read|correct|reprompt|hint|giveAnswer)$/,
+    /^math\.p(\d+)\.(read|correct|reprompt|hint|hint1|hint2|hint3|giveAnswer)$/,
   )
   if (!match) return null
   const index = Number.parseInt(match[1]!, 10)

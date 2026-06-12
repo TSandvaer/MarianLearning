@@ -2062,7 +2062,14 @@ function MathScreen({
           hintTimerRef.current = setTimeout(() => {
             hintTimerRef.current = null
             setProblemState((prev) => ({ ...prev, hintPlayed: true }))
-            void speak(problem.utterances.hint).then(() => {
+            // W12-01 compile-keep: `hint` is now optional on
+            // MathProblemUtterances (the back-compat predicate allows EITHER
+            // legacy `hint` OR the hint1/hint2/hint3 triple). Committed canon
+            // today always carries the legacy `hint`, so `?? ''` never fires
+            // — behaviour is identical. W12-02 replaces this single speak()
+            // with the three-beat hint1→hint2→hint3 sequence and removes
+            // this fallback.
+            void speak(problem.utterances.hint ?? '').then(() => {
               poseTimerRef.current = setTimeout(() => {
                 setPose('idle')
                 poseTimerRef.current = null
