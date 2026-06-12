@@ -163,6 +163,33 @@ const LATENCY_FLOOR_MS = 250
  */
 const LATENCY_CEILING_MS = 60_000
 
+/**
+ * Thinking-time chip tap-gate fail-open watchdog (ticket 86ca84ukt;
+ * spec design/screen-3-math.md §"Thinking-time chip tap-gate (gated on
+ * TTS START)" → "Offline / audio-failure edge cases — the gate MUST fail
+ * OPEN").
+ *
+ * The chip tap-gate opens on the `math.p{N}.read` TTS START event
+ * (Howler `onPlay` → `gate.reportSpeechStart()`), NOT on read-aloud
+ * completion. If that start event never fires — Path A silent fallback,
+ * `loaderror`/`playerror`, iPad audio context never resumes, or a
+ * WebKit-headless run with no `AudioContext` — an audio-keyed gate would
+ * soft-lock the screen forever. This watchdog is the safety net: armed
+ * when a problem's read-aloud effect fires, it opens the gate anyway
+ * after 2 s so chips become tappable rather than the screen going dead.
+ *
+ * Why 2000ms (Dave's ruling, spec §"Why 2000ms"): it must comfortably
+ * clear a normal-but-slow real read-aloud start (so the watchdog never
+ * pre-empts audio that's simply taking its time) without being so long
+ * that a genuinely silent problem strands Marian on sleepy chips. On the
+ * happy path `onPlay` lands first (sub-second; cf. `ONPLAY_WATCHDOG_MS =
+ * 800` in sessionAudio.ts) and the gate opens on the real event — the
+ * watchdog never fires. An explicit `reportSpeechError()` opens the gate
+ * IMMEDIATELY, without waiting out the watchdog (a hard error is
+ * unambiguous).
+ */
+const CHIP_GATE_FALLBACK_MS = 2000
+
 // ── Public types ----------------------------------------------------------
 
 /** Shape the screen invokes when problem 8 finishes. Out-of-screen handler. */
@@ -487,17 +514,19 @@ export interface MathProps {
    */
   getHowlerRunning?: () => boolean
   /**
-   * Test seam ONLY — pre-arms `audioUnlocked` and `readAloudPlayed` so the
-   * chips render enabled on first paint and tests can `fireEvent.click`
-   * without first having to bypass the `disabled` DOM attribute.
+   * Test seam ONLY — pre-arms `audioUnlocked`, `readAloudPlayed`, AND the
+   * thinking-time chip tap-gate (`chipGateOpen`) so chips render enabled
+   * on first paint and tests can `fireEvent.click` without first having
+   * to bypass the `disabled` DOM attribute.
    *
    * Production must NEVER pass this. The Session-1 audio-unlock contract
-   * (first chip tap unlocks audio + queues read-aloud; chips stay disabled
-   * until read-aloud completes) is what ticket 86c9guh4y added in PR #83
-   * to close the audio race; this seam exists purely so the unit-test
-   * suite can assert behaviour AT and AFTER that point without trying to
-   * dispatch click events on `<button disabled>` (which jsdom + React 19
-   * silently swallow). See ticket 86c9guh4y test fix-forward.
+   * (first chip tap unlocks audio + queues read-aloud) is what ticket
+   * 86c9guh4y added in PR #83 to close the audio race; the chip gate was
+   * re-targeted to TTS START in ticket 86ca84ukt. This seam exists purely
+   * so the unit-test suite can assert behaviour AT and AFTER the gate
+   * opens without trying to dispatch click events on `<button disabled>`
+   * (which jsdom + React 19 silently swallow). See ticket 86c9guh4y test
+   * fix-forward.
    */
   __testInitiallyAudioUnlocked?: boolean
   /**
@@ -1082,22 +1111,96 @@ function MathScreen({
   )
 
   /**
-   * True once the per-problem read-aloud has completed. Chips are disabled
-   * until this flips to `true` so Marian cannot tap a chip before hearing
-   * the question — fixing the Session-2+ race where the deferred
-   * `audioUnlocked` effect queued the read-aloud AFTER the user had
-   * already tapped a chip and heard the result utterance.
+   * True once the per-problem read-aloud has COMPLETED (the `speak(...)
+   * .then(...)` resolved). This is a completion signal only — it is NOT
+   * the chip tap-gate. Chip tappability is now governed by `chipGateOpen`
+   * (TTS START), see below.
    *
-   * Reset to `false` on every problem advance. The ref mirror
-   * (`readAloudPlayedRef`) is the synchronous gate read in `onChipTap`;
-   * the React state drives the visual `disabled` prop on chips.
+   * Retained because:
+   *   - It anchors the M4 latency-window via the `useLayoutEffect(
+   *     [readAloudPlayed])` block (ticket 86c9q5au3) — left on completion
+   *     semantics so the slow-fact latency capture is unchanged.
+   *   - It backs the `data-read-aloud-played` attribute the existing
+   *     cold-mount / first-problem-audio-race regression tests assert on
+   *     (tickets 86c9hf4ef / 86c9hjnn8).
    *
-   * See ticket 86c9guh4y.
+   * Reset to `false` on every problem advance.
+   *
+   * History: pre-86ca84ukt this WAS the chip tap-gate (chips disabled
+   * until read-aloud completion). Dave's MODIFY ruling on 86ca7urvk
+   * re-targeted the chip gate to TTS START — see `chipGateOpen`.
+   * See tickets 86c9guh4y (original gate) + 86ca84ukt (re-target).
    */
   const [readAloudPlayed, setReadAloudPlayed] = useState(
     __testInitiallyAudioUnlocked,
   )
   const readAloudPlayedRef = useRef(__testInitiallyAudioUnlocked)
+
+  /**
+   * Thinking-time chip tap-gate (ticket 86ca84ukt; spec
+   * design/screen-3-math.md §"Thinking-time chip tap-gate (gated on TTS
+   * START)"). `true` once chips are tappable for the current problem.
+   *
+   * Opens on the EARLIEST of:
+   *   1. TTS START — Howler `onPlay` for `math.p{N}.read` fires (the same
+   *      tick as `gate.reportSpeechStart()`). The normal, happy path.
+   *   2. `gate.reportSpeechError()` — explicit `loaderror`/`playerror`;
+   *      opens IMMEDIATELY (no reason to make Marian wait the watchdog).
+   *   3. The `CHIP_GATE_FALLBACK_MS = 2000` watchdog — fail-open safety
+   *      net if neither start nor error ever fires (silent fallback, no
+   *      `AudioContext`, OS audio session lost). The screen MUST never
+   *      soft-lock.
+   *
+   * Re-arms per problem (back to `false`) on advance. The ref mirror
+   * (`chipGateOpenRef`) is the synchronous gate read in `onChipTap`; the
+   * React state drives the chip `disabled` / `opacity-60` / `whileTap`
+   * visual state.
+   *
+   * Why a separate signal from `readAloudPlayed`: Dave's ruling protects
+   * the pre-speech retrieval window only — chips become live the instant
+   * Emma BEGINS reading (so Marian can answer over the read-aloud tail),
+   * not after she finishes. `readAloudPlayed` stays on completion for the
+   * latency anchor + the existing regression-test attribute.
+   */
+  const [chipGateOpen, setChipGateOpen] = useState(__testInitiallyAudioUnlocked)
+  const chipGateOpenRef = useRef(__testInitiallyAudioUnlocked)
+
+  /**
+   * Diagnostic: HOW the chip gate last opened — `'tts-start'` on the
+   * normal `onPlay` path, `'fallback'` when the watchdog (or an explicit
+   * speech error) opened it without a real TTS start. Surfaced as
+   * `data-chip-gate-via` on the `math-chips` container so the e2e spec
+   * (and iPad QA logs) can prove the watchdog path specifically. `null`
+   * while the gate is closed / pre-open.
+   */
+  const chipGateViaRef = useRef<'tts-start' | 'fallback' | null>(null)
+  const [chipGateVia, setChipGateVia] = useState<
+    'tts-start' | 'fallback' | null
+  >(__testInitiallyAudioUnlocked ? 'tts-start' : null)
+
+  /** Per-problem fail-open watchdog timer for the chip tap-gate. */
+  const chipGateWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  /**
+   * Synchronous helper: open the chip tap-gate. Idempotent — a second
+   * call (e.g. watchdog firing right after a real `onPlay`) is a no-op
+   * so the `via` reason recorded is the FIRST opener (the real TTS start
+   * wins over a racing watchdog). Clears the watchdog timer on open.
+   *
+   * `via` is recorded only on the first (gate-opening) call; subsequent
+   * calls don't overwrite it.
+   */
+  const openChipGate = useCallback((via: 'tts-start' | 'fallback') => {
+    if (chipGateWatchdogRef.current !== null) {
+      clearTimeout(chipGateWatchdogRef.current)
+      chipGateWatchdogRef.current = null
+    }
+    if (chipGateOpenRef.current) return
+    chipGateOpenRef.current = true
+    chipGateViaRef.current = via
+    setChipGateOpen(true)
+    setChipGateVia(via)
+  }, [])
 
   /**
    * Synchronous "we already kicked off speak() for this problem" latch.
@@ -1301,6 +1404,10 @@ function MathScreen({
       poseTimerRef,
       streakFadeTimerRef,
       chimeTimerRef,
+      // Fail-open chip-gate watchdog (ticket 86ca84ukt) — cleared on
+      // unmount alongside the other per-screen timers so a screen-exit
+      // mid-read-aloud doesn't leak a deferred gate-open onto nothing.
+      chipGateWatchdogRef,
     ]) {
       if (ref.current !== null) {
         clearTimeout(ref.current)
@@ -1350,9 +1457,16 @@ function MathScreen({
    *
    * Returns the playback promise so callers that want to chain (hint →
    * after) can await it.
+   *
+   * `isReadAloud` (ticket 86ca84ukt): set ONLY by the per-problem
+   * read-aloud effect. When true, the chip tap-gate opens on this
+   * utterance's TTS START (`onPlay`) and on its `reportSpeechError`. The
+   * result/reprompt/hint/giveAnswer utterances pass `false` (default) so
+   * their `onPlay`/error never touches the chip gate — only the `read`
+   * utterance gates chips.
    */
   const speak = useCallback(
-    async (text: string): Promise<void> => {
+    async (text: string, isReadAloud = false): Promise<void> => {
       setCaptionText(text)
       setCaptionRevealed(0)
       setCaptionVisible(false)
@@ -1363,6 +1477,11 @@ function MathScreen({
         onPlay: () => {
           setCaptionVisible(true)
           gate.reportSpeechStart()
+          // Thinking-time chip tap-gate (ticket 86ca84ukt): TTS START is
+          // the gate-open trigger. Only the per-problem `read` utterance
+          // gates chips — result/reprompt/hint utterances pass through
+          // `speak` with isReadAloud=false and never touch the gate.
+          if (isReadAloud) openChipGate('tts-start')
         },
         onWordTick: (wordIndex) => {
           setCaptionRevealed((prev) => Math.max(prev, wordIndex + 1))
@@ -1385,6 +1504,14 @@ function MathScreen({
         // and continue.
         gate.reportSpeechError()
 
+        // Thinking-time chip tap-gate fail-open (ticket 86ca84ukt): an
+        // explicit load/play failure on the `read` utterance opens the
+        // gate IMMEDIATELY — no reason to make Marian wait out the
+        // watchdog when audio has definitively failed. Visually identical
+        // to a normal gate-open; she still gets a fully playable problem
+        // (numerals legible, caption walks at 165 wpm), just without voice.
+        if (isReadAloud) openChipGate('fallback')
+
         console.warn(
           `[Math] playUtterance rejected for "${text}":`,
           err instanceof Error ? err.message : err,
@@ -1395,7 +1522,7 @@ function MathScreen({
         setCaptionRevealed(words.length)
       }
     },
-    [gate, playUtterance],
+    [gate, playUtterance, openChipGate],
   )
 
   // ── Audio-unlock gate-state mirror (ticket 86c9hf4ef) ------------------
@@ -1569,10 +1696,29 @@ function MathScreen({
       // first speak() resolves. The chip-tap path's `if (!audioUnlocked)`
       // early-return reads this; flipping it now means a chip tap that
       // arrives mid-read-aloud falls through to the
-      // `!readAloudPlayedRef.current` gate (correct behaviour) rather
+      // `!chipGateOpenRef.current` gate (correct behaviour) rather
       // than re-firing the unlock branch.
       if (howlerRunning) setAudioUnlocked(true)
-      void speak(problem.utterances.read).then(() => {
+
+      // Arm the fail-open chip-gate watchdog (ticket 86ca84ukt). We're
+      // committed to speaking this problem's read-aloud now; if its TTS
+      // START (`onPlay`) never fires — silent fallback, no AudioContext,
+      // OS audio session lost — open the chip gate anyway after
+      // CHIP_GATE_FALLBACK_MS so the screen never soft-locks. `onPlay`
+      // (or an explicit speech error) clears this timer via `openChipGate`
+      // on the happy/error paths, so the watchdog only fires when audio
+      // is genuinely silent. Skipped if the gate is already open (e.g. a
+      // same-problem effect re-run after the gate opened).
+      if (!chipGateOpenRef.current && chipGateWatchdogRef.current === null) {
+        chipGateWatchdogRef.current = setTimeout(() => {
+          chipGateWatchdogRef.current = null
+          if (unmountedRef.current) return
+          if (problemIndexRef.current !== myProblemIndex) return
+          openChipGate('fallback')
+        }, CHIP_GATE_FALLBACK_MS)
+      }
+
+      void speak(problem.utterances.read, /* isReadAloud */ true).then(() => {
         // Bail ONLY if the component unmounted, or we've moved on to a
         // new problem (the new problem's read-aloud owns
         // `setReadAloudPlayed`). Do NOT bail just because the effect
@@ -1672,10 +1818,23 @@ function MathScreen({
       wrongCountRef.current = 0
       hintPlayedRef.current = false
       guidedPlayedRef.current = false
-      // Reset the read-aloud gate so chips are disabled until the next
-      // problem's read-aloud completes. See ticket 86c9guh4y.
+      // Reset the read-aloud completion signal (latency anchor + the
+      // data-read-aloud-played attribute). See ticket 86c9guh4y.
       readAloudPlayedRef.current = false
       setReadAloudPlayed(false)
+      // Re-arm the thinking-time chip tap-gate for the next problem
+      // (ticket 86ca84ukt). Chips return to the closed/opacity-60 state
+      // until problem N+1's own `read` TTS START fires (or its watchdog).
+      // Clear any in-flight watchdog from this problem so it can't open
+      // the next problem's gate early.
+      if (chipGateWatchdogRef.current !== null) {
+        clearTimeout(chipGateWatchdogRef.current)
+        chipGateWatchdogRef.current = null
+      }
+      chipGateOpenRef.current = false
+      chipGateViaRef.current = null
+      setChipGateOpen(false)
+      setChipGateVia(null)
       // Reset the synchronous double-speak latch so the next problem's
       // read-aloud effect can fire. See ticket 86c9hf4ef.
       spokeReadAloudRef.current = false
@@ -2188,19 +2347,25 @@ function MathScreen({
       // First-tap audio unlock: the very first user gesture sets
       // `audioUnlocked` which triggers the read-aloud effect. We
       // return immediately WITHOUT dispatching the correct/wrong
-      // handler — chips stay disabled until the read-aloud completes
-      // and flips `readAloudPlayed`. This closes the Session-2+ race
-      // where a chip tap could fire before the question was read aloud,
-      // producing overlapping audio. See ticket 86c9guh4y.
+      // handler — the chip tap-gate is still closed (it opens on TTS
+      // START, see `chipGateOpen`), and a pre-gate tap is never an
+      // answer. Its ONLY role is to unlock audio + start the read-aloud
+      // (the spec's "advances / starts TTS playback" outcome). It still
+      // does not score. See ticket 86c9guh4y (unlock) + 86ca84ukt (gate).
       if (!audioUnlocked) {
         setAudioUnlocked(true)
         return
       }
 
-      // Read-aloud gate: block taps until the per-problem read-aloud
-      // has completed. The read-aloud effect flips this ref after
-      // speak() resolves. See ticket 86c9guh4y.
-      if (!readAloudPlayedRef.current) return
+      // Thinking-time chip tap-gate (ticket 86ca84ukt; spec §"Thinking-
+      // time chip tap-gate (gated on TTS START)"). Block taps until the
+      // per-problem read-aloud has STARTED (Howler `onPlay`), not until
+      // it completes — Marian can answer over the read-aloud tail. The
+      // gate also fails open via a 2 s watchdog / on an explicit speech
+      // error, so a silent / failed read-aloud never soft-locks the
+      // screen. A pre-gate tap is a silent no-op here: it does NOT score,
+      // does NOT consume a wrong attempt, does NOT start hint/guided.
+      if (!chipGateOpenRef.current) return
 
       // First-tap capture for the current problem (ticket 86c9pwgc8 —
       // M4 Leitner wiring; sanity bounds added 86c9q5au3). Records
@@ -2885,6 +3050,14 @@ function MathScreen({
           {/* Answer chips */}
           <div
             data-testid="math-chips"
+            // Thinking-time chip tap-gate state (ticket 86ca84ukt). The
+            // single machine-readable signal the e2e spec keys on —
+            // `disabled` is overloaded (also true on `resolved` /
+            // `dimForGuided`) and cannot isolate the gate dimension.
+            // `data-chip-gate-via` records HOW it opened (real TTS start
+            // vs fail-open watchdog/error) for the watchdog-path assertion.
+            data-chip-gate={chipGateOpen ? 'open' : 'closed'}
+            data-chip-gate-via={chipGateVia ?? undefined}
             className="
           mb-8 flex w-full items-center justify-center gap-8 px-4
         "
@@ -2904,17 +3077,24 @@ function MathScreen({
                   data-shaking={isShaking ? 'true' : 'false'}
                   aria-label={`Answer ${value}`}
                   onClick={() => onChipTap(value)}
+                  // Chip availability keys on `chipGateOpen` (TTS START),
+                  // NOT `readAloudPlayed` (completion). Pre-gate the chip
+                  // is `opacity-60`, no `whileTap`, `disabled` — "in a
+                  // moment", never "wrong / broken". On gate-open it
+                  // animates opacity 0.6 → 1.0 over 200ms (no SFX, no
+                  // spring — the calm opacity tween is the right register).
+                  // Ticket 86ca84ukt; spec §"Pre-gate chip visual state".
                   disabled={
-                    problemState.resolved || dimForGuided || !readAloudPlayed
+                    problemState.resolved || dimForGuided || !chipGateOpen
                   }
                   className={`
                 relative flex select-none items-center justify-center
                 rounded-3xl border-[3px] border-my-pink bg-white
                 font-display text-5xl text-ink
-                transition-opacity
+                transition-opacity duration-200 ease-out
                 disabled:cursor-default
                 touch-manipulation
-                ${dimForGuided || !readAloudPlayed ? 'opacity-60' : 'opacity-100'}
+                ${dimForGuided || !chipGateOpen ? 'opacity-60' : 'opacity-100'}
                 ${guidedShimmer ? 'shadow-[0_0_24px_rgba(244,143,177,0.85)]' : 'shadow-[0_4px_12px_rgba(244,143,177,0.18)]'}
               `}
                   style={{
@@ -2923,7 +3103,7 @@ function MathScreen({
                     minWidth: '60px',
                     minHeight: '60px',
                     cursor:
-                      problemState.resolved || dimForGuided || !readAloudPlayed
+                      problemState.resolved || dimForGuided || !chipGateOpen
                         ? 'default'
                         : 'pointer',
                     touchAction: 'manipulation',
@@ -2937,12 +3117,12 @@ function MathScreen({
                         : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1 }
                       : {
                           scale: 1,
-                          opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
+                          opacity: dimForGuided || !chipGateOpen ? 0.6 : 1,
                           x: 0,
                         }
                   }
                   whileTap={
-                    problemState.resolved || dimForGuided || !readAloudPlayed
+                    problemState.resolved || dimForGuided || !chipGateOpen
                       ? undefined
                       : { scale: 0.92 }
                   }
@@ -2951,7 +3131,15 @@ function MathScreen({
                       ? reducedMotion
                         ? { duration: WRONG_SHAKE_MS / 1000 }
                         : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
-                      : CHIP_TAP_SPRING
+                      : {
+                          // Scale / position stay on the house chip spring;
+                          // opacity uses a calm 200ms ease-out tween so the
+                          // gate-open lift (0.6 → 1.0) is understated, not
+                          // poppy. Spec §"Gate-open transition" (86ca84ukt):
+                          // "do NOT introduce a new spring here."
+                          ...CHIP_TAP_SPRING,
+                          opacity: { duration: 0.2, ease: 'easeOut' },
+                        }
                   }
                 >
                   {value}

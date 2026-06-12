@@ -4225,4 +4225,332 @@ describe('Math (Number Garden) screen', () => {
       expect(values).toEqual([0, 2, 10])
     })
   })
+
+  /*
+   * ╔══════════════════════════════════════════════════════════════════════╗
+   * ║ THINKING-TIME CHIP TAP-GATE (gated on TTS START) — ticket 86ca84ukt  ║
+   * ║                                                                      ║
+   * ║ Dave's MODIFY ruling on 86ca7urvk re-targets the chip gate from      ║
+   * ║ read-aloud COMPLETION to read-aloud START (Howler `onPlay`). Chips    ║
+   * ║ are inert in the pre-speech window only; they become live the        ║
+   * ║ instant Emma begins reading, so Marian can answer over the tail.     ║
+   * ║                                                                      ║
+   * ║ The gate MUST fail open: a `CHIP_GATE_FALLBACK_MS = 2000` watchdog    ║
+   * ║ opens it if `onPlay` never fires (silent fallback / no AudioContext), ║
+   * ║ and an explicit `reportSpeechError` opens it immediately. The screen  ║
+   * ║ must NEVER soft-lock. Spec: design/screen-3-math.md §"Thinking-time   ║
+   * ║ chip tap-gate (gated on TTS START)".                                 ║
+   * ║                                                                      ║
+   * ║ These tests deliberately do NOT pass `__testInitiallyAudioUnlocked`  ║
+   * ║ — that seam pre-arms the gate open, which is exactly the state under  ║
+   * ║ test. They drive the real cold-mount path via `getHowlerRunning`.    ║
+   * ╚══════════════════════════════════════════════════════════════════════╝
+   */
+  describe('thinking-time chip tap-gate (TTS START) — ticket 86ca84ukt', () => {
+    /**
+     * Harness that NEVER fires `onPlay` and (by default) never resolves —
+     * models a silent Path A fallback / a WebKit-headless run with no
+     * AudioContext. Used to prove the fail-open watchdog opens the gate.
+     */
+    function makeSilentHarness(opts: { reject?: boolean } = {}) {
+      const calls: Array<{ text: string }> = []
+      const playUtterance: PlayMathUtteranceFn = vi.fn(async (text) => {
+        calls.push({ text })
+        return await new Promise<void>((_resolve, reject) => {
+          // No onPlay, no word ticks — silent.
+          if (opts.reject) {
+            // Reject on a macrotask so the screen's catch (and its
+            // openChipGate('fallback')) fires after mount settles.
+            setTimeout(
+              () => reject(new Error('[test] silent Path A failure')),
+              0,
+            )
+          }
+          // Otherwise the promise stays pending forever (never resolves).
+        })
+      })
+      return { playUtterance, spoken: () => calls.map((c) => c.text) }
+    }
+
+    it('gate opens on TTS START (onPlay), not on completion — chips become tappable while the read-aloud is still playing', async () => {
+      // autoResolve:false keeps the read-aloud promise PENDING after onPlay
+      // fires. Pre-86ca84ukt the gate was tied to completion, so chips
+      // would stay disabled here; post-fix they open on the onPlay event.
+      const harness = makePlayHarness({ autoResolve: false })
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Pre-tick: gate closed, chips disabled.
+      expect(screen.getByTestId('math-chips')).toHaveAttribute(
+        'data-chip-gate',
+        'closed',
+      )
+
+      // Drain the cold-mount microtask chain so the read-aloud effect
+      // fires speak(read) → onPlay (synchronous in makePlayHarness).
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+
+      // onPlay fired → gate OPEN via the real TTS-start path, even though
+      // the speak() promise is STILL pending (read-aloud not complete).
+      const chipsRow = screen.getByTestId('math-chips')
+      expect(chipsRow).toHaveAttribute('data-chip-gate', 'open')
+      expect(chipsRow).toHaveAttribute('data-chip-gate-via', 'tts-start')
+      // Completion signal stayed false — chips opened on START, not end.
+      expect(screen.getByTestId('math')).toHaveAttribute(
+        'data-read-aloud-played',
+        'false',
+      )
+      for (const chip of screen.getAllByTestId('math-chip')) {
+        expect(chip).not.toBeDisabled()
+      }
+    })
+
+    it('fail-open watchdog: when onPlay never fires, the gate opens after CHIP_GATE_FALLBACK_MS (2000ms) — screen never soft-locks', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makeSilentHarness()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Let the cold-mount microtask chain run (arms the watchdog, kicks
+      // the silent read-aloud). Use queued microtasks since timers are faked.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // The silent read-aloud was kicked off but onPlay never fired → gate
+      // still closed just before the watchdog deadline.
+      expect(harness.spoken()).toEqual(['Three plus two. How many?'])
+      await act(async () => {
+        vi.advanceTimersByTime(1999)
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('math-chips')).toHaveAttribute(
+        'data-chip-gate',
+        'closed',
+      )
+
+      // Cross the 2000ms deadline → watchdog fires, gate opens fail-open.
+      await act(async () => {
+        vi.advanceTimersByTime(2)
+        await Promise.resolve()
+      })
+      const chipsRow = screen.getByTestId('math-chips')
+      expect(chipsRow).toHaveAttribute('data-chip-gate', 'open')
+      // `via=fallback` proves the watchdog path specifically (not a real start).
+      expect(chipsRow).toHaveAttribute('data-chip-gate-via', 'fallback')
+      for (const chip of screen.getAllByTestId('math-chip')) {
+        expect(chip).not.toBeDisabled()
+      }
+    })
+
+    it('error fail-open: an explicit reportSpeechError opens the gate IMMEDIATELY, without waiting out the watchdog', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      // Silent harness that REJECTS the read-aloud on a macrotask (mirrors
+      // a Howler loaderror/playerror surfaced through prepareMathPathA).
+      const harness = makeSilentHarness({ reject: true })
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Drain the cold-mount chain so the read-aloud effect fires + the
+      // reject's setTimeout(0) is queued.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // Fire the rejection macrotask (well before the 2000ms watchdog).
+      await act(async () => {
+        vi.advanceTimersByTime(1)
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+
+      // Gate opened immediately on the error — far short of 2000ms.
+      const chipsRow = screen.getByTestId('math-chips')
+      expect(chipsRow).toHaveAttribute('data-chip-gate', 'open')
+      expect(chipsRow).toHaveAttribute('data-chip-gate-via', 'fallback')
+      for (const chip of screen.getAllByTestId('math-chip')) {
+        expect(chip).not.toBeDisabled()
+      }
+    })
+
+    it('a pre-gate chip tap does NOT register as an answer (no dot-strip advance, no stardust delta)', async () => {
+      // autoResolve:false + a harness whose onPlay we suppress would be
+      // ideal, but the cleanest "gate is closed" state is the silent
+      // harness (no onPlay, pending forever) on the cold-mount path. The
+      // very first tap is the audio-unlock gesture; a SECOND pre-gate tap
+      // is the one that must not score.
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makeSilentHarness()
+      const onSessionComplete = vi.fn()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+            onSessionComplete={onSessionComplete}
+          />,
+        ),
+      )
+
+      // Cold-mount: read-aloud effect fires (audioUnlocked auto-mirrors on
+      // the Howler-running fast path), but onPlay never fires → gate closed.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('math-chips')).toHaveAttribute(
+        'data-chip-gate',
+        'closed',
+      )
+
+      // The stardust counter starts at 0.
+      expect(screen.getByTestId('math-stardust')).toHaveAttribute(
+        'data-total',
+        '0',
+      )
+
+      // Tap the CORRECT chip while the gate is closed. jsdom swallows
+      // clicks on disabled buttons, which is itself the gate — but assert
+      // the OUTCOME state is unchanged either way: still problem 1, still
+      // 0 stardust, session not completed.
+      const correct = fixedPlan().problems[0].correct
+      const correctChip = screen
+        .getAllByTestId('math-chip')
+        .find((c) => Number(c.getAttribute('data-value')) === correct)!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(1500)
+        await Promise.resolve()
+      })
+
+      // No answer registered: still 0 stardust, problem unchanged, session
+      // not advanced/completed.
+      expect(screen.getByTestId('math-stardust')).toHaveAttribute(
+        'data-total',
+        '0',
+      )
+      expect(
+        within(screen.getByTestId('math-symbolic')).getByTestId(
+          'math-addend-a',
+        ),
+      ).toHaveTextContent('3')
+      expect(onSessionComplete).not.toHaveBeenCalled()
+    })
+
+    it('re-arms per problem: gate returns to closed on advance until problem N+1 own read-aloud starts', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      // makePlayHarness fires onPlay synchronously, so the gate opens
+      // immediately for every problem's read-aloud. We assert the gate
+      // CLOSES on advance and re-OPENS for the next problem.
+      const harness = makePlayHarness()
+      const getHowlerRunning = vi.fn(() => true)
+
+      render(
+        withMotion(
+          <MathScreen
+            plan={fixedPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // Problem 1: read-aloud fires → onPlay → gate open. Drain the
+      // cold-mount microtask chain via repeated microtask yields (fake
+      // timers are active, so a real setTimeout(0) would never fire).
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(screen.getByTestId('math-chips')).toHaveAttribute(
+        'data-chip-gate',
+        'open',
+      )
+
+      // Tap correct on P1 and advance.
+      const correctP1 = fixedPlan().problems[0].correct
+      const correctChipP1 = screen
+        .getAllByTestId('math-chip')
+        .find((c) => Number(c.getAttribute('data-value')) === correctP1)!
+      await act(async () => {
+        fireEvent.click(correctChipP1)
+        await Promise.resolve()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(1200)
+        await Promise.resolve()
+      })
+
+      // Now on problem 2. The advance re-armed the gate; its own read-aloud
+      // effect fires synchronously (harness onPlay) so it re-opens. The
+      // load-bearing assertion is `via=tts-start` again (fresh open), not
+      // a stale open leaked from P1.
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      const chipsRow = screen.getByTestId('math-chips')
+      expect(chipsRow).toHaveAttribute('data-chip-gate', 'open')
+      expect(chipsRow).toHaveAttribute('data-chip-gate-via', 'tts-start')
+      // Confirm we actually advanced to problem 2 (1 + 4).
+      expect(
+        within(screen.getByTestId('math-symbolic')).getByTestId(
+          'math-addend-a',
+        ),
+      ).toHaveTextContent('1')
+    })
+  })
 })
