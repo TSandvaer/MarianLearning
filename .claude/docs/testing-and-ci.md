@@ -578,6 +578,8 @@ Pairs with the §6 corollary ("the GREEN-side mock must serve real tier canon, n
 
 **Decision rule:** if your spec asserts a per-problem field that's written at the chip-tap site (latency, answer value, answer word, first-tap correct) and NOT pinned to canon-specific content (specific addends, specific words, specific utterance text), reach for `failNetwork: true` + `forceHowlerUnlock`. If your spec needs canon-specific content, you're in the canon-bytes-mock class — see the rule above this one.
 
+**`forceHowlerUnlock` is poison for CANON-SERVED WordSong content specs (W11-03 finding, PR #390 review cycle, 2026-06-12).** When a WordSong spec serves real canon (not `failNetwork`), `forceHowlerUnlock` races the eager 59-howl `buildHowls` in `sessionAudio.ts` and throws `Failed to execute 'connect' on 'AudioNode'` → `prepareWordSongPathA` throws → App silently falls back to the CVC static plan. The spec then asserts against the WRONG render (picture card instead of the tier's real content) and fails for a phantom reason. The passing canon-served content specs (`digraphs-sh-content.spec.ts` test 3 etc.) deliberately omit `forceHowlerUnlock` — follow that pattern. Diagnostic fingerprint: a `connect()` console error + a CVC-fallback render in a spec that expected tier-specific content. Related trap: a payload-only assertion (request body + on-disk canon) stays GREEN through this silent demote — only a rendered-plan assertion (`data-target-word` / content-type on the DOM) catches it.
+
 **Distinct from `failNetwork`-silent-path content-agnostic specs.** Those (the audit-9 listed above) happen to use `failNetwork` because they assert on rendered DOM derivation, not on canon-tap-side captures. The schema-plumbing class is narrower: it specifically asserts on `SessionHistoryEntry` shape after a session. Both classes are content-agnostic; only one is gesture-driven.
 
 #### 4.1.3 Spec-authoring lessons — absence assertions, chip-walk constraints, sub-to-10 DOM seams
@@ -755,6 +757,52 @@ Intercept the page's own endpoints (not `/api/claude`) via `page.route()` with h
 **WebKit needs a far larger timing budget than chromium on hash-heavy pages — and WebKit is the engine that matters.** The voice-qa page's 632-item SHA-256 hash loop exceeds Playwright's default 10 s `expect` timeout on WebKit (observed stuck at "Hashing canon — 11/23 files" at the 10 s mark, PR #361 fix cycle 2026-06-11) while chromium ran the same spec 6/6 green in 27 s. Chromium-only verification would have shipped a spec that is red on WebKit — the iPad-Safari surrogate, i.e. the actual target device engine. Any spec change touching `voice-qa.html` (or future hash-heavy standalone pages) must be verified with `--project=webkit`, never chromium-only.
 
 **Gate on the footer before any count assertion (hash-then-render race).** The voice-qa page appends rows incrementally (canon groups → Greet → Hub) and writes the footer (`data-testid="vqa-render-count"`) LAST — a bare `rows.count()` after `goto()` races the hash loop and reads 0 even on chromium. The precedent spec's `waitForPageReady()` helper (45 s budget, gates on the footer) is called after every `goto`/`reload`; reuse the pattern for any sibling QA page that hashes-then-renders.
+
+#### 4.4.1 Service-worker bypass for voice-QA (`bypassServiceWorker`, PR #382, 2026-06-12)
+
+**Root cause of SW-staleness on voice-qa.html.** Workbox `precacheAndRoute` in the app's SW strips query parameters from request URLs before matching the precache manifest. Adding `?v=<hash>` or `Cache-Control: no-store` to a fetch defeats the HTTP cache but not the SW precache — the SW intercepts the request, strips the query param, and serves the precached (stale) entry regardless. Canon JSON files are **not** in the SW precache manifest (only `**/*.{js,css,html,png,svg,webmanifest,woff,woff2,ico,mp3}` per `vite.config.ts`), so a stale-MP3 + fresh-canon split is the SW staleness signature: canon content is always fresh (SW never caches it); MP3 bytes served by the SW can be stale even after a deploy.
+
+**The bypass mechanism** (in `public/voice-qa.html`):
+
+1. `bypassServiceWorker()` runs before `main()` — unregisters all SW registrations, deletes all caches.
+2. Sets `sessionStorage['vqa-sw-bypassed'] = '1'` BEFORE triggering the reload — the reloaded page reads this flag and skips straight to `main()`, avoiding a bypass loop.
+3. `hadSomethingToClear` early-out: if there are no registrations, no cache keys, and no active SW controller, returns `false` (no reload) so a clean browser load is not penalised with a wasted round-trip.
+4. After reload, `main()` runs without an active SW; all fetches hit the network and receive fresh bytes.
+
+The bypass is scoped to the voice-QA page tab session only. The app's SW re-registers normally on the app's own next load (`voice-qa.html` and the main app are on different navigation contexts).
+
+**Bootstrapping limitation (proven round-3, issue #387, 2026-06-11).** `voice-qa.html` is itself in the SW precache manifest (`html` is in `globPatterns`), so a device whose SW predates the bypass serves the OLD page — without the bypass code — and the bypass never runs. The fix cannot deploy through the very SW it is meant to clear. Round-3 evidence: the 24 MP3-backed verdicts carried round-1 `decidedAt` timestamps and round-1 hashes even after #382 deployed. Recovery on an already-stale device: open the QA page in a **private/incognito tab** (no SW controls it), or close-and-reopen the standalone PWA twice (browser updates the SW script in the background on navigation; the new precache activates on the following launch). Once one fresh page load executes the bypass, the device self-heals for subsequent normal loads.
+
+**Spec:** `e2e/voice-qa-sw-bypass.spec.ts` covers the bypass flow end-to-end.
+
+#### 4.4.2 Round-N stale-verdict triage method
+
+Voice-QA "fail" items from round N may be **phantom fails** — verdicts recorded against bytes that are no longer what production serves (stale SW-served audio, or a verdict that predates the fix entirely).
+
+**Triage signal — two fields to compare per fail item:**
+
+| Field                 | Where it lives                       | Test                                                                                                                               |
+| --------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `decidedAt`           | verdict object in the round-N report | Earlier than the fix-PR merge time? → verdict tested pre-fix bytes → phantom                                                       |
+| `audioHash` (verdict) | same verdict object                  | Matches current-main hash for that utterance? → genuine fail against current bytes; does NOT match → phantom (re-test, no new fix) |
+
+A verdict is a genuine regression only when BOTH signals are clear: decided after the fix merged AND hash-matching current-main bytes.
+
+**Round-2 empirical result (issue #377, 2026-06-11):** 24 of 30 round-2 "fails" were phantoms — their verdicts were decided 14:34–14:51Z against pre-fix bytes (the SW-precache staleness in §4.4.1 was the amplifier). Only 6 were genuine current-byte failures, fixed in PR #384. Run this triage BEFORE filing fix tickets; round 2's original tickets were both re-scoped after the triage.
+
+#### 4.4.3 Static-HTML verification gotchas
+
+Two gotchas discovered during the voice-QA round-2 fix cycle:
+
+1. **`WebFetch` drops inline `<script>` content.** When fetching a static HTML page via the `WebFetch` tool, inline script blocks are stripped from the returned content — only the HTML skeleton survives. To verify inline JS behaviour (e.g. whether `bypassServiceWorker` runs before `main()`), use `curl` against the raw file and grep the bytes directly:
+
+   ```sh
+   curl -s http://localhost:4173/voice-qa.html | grep -c 'bypassServiceWorker'
+   ```
+
+   `WebFetch` is suitable for verifying HTML structure and attribute presence; not for verifying inline JS logic.
+
+2. **Vercel injects `vercel.live/feedback/feedback.js` into preview HTML.** PR preview builds receive exactly one extra `<script>` tag injected by Vercel's feedback widget. A byte-hash of the HTML will never match the local or production build. Expect exactly one extra line (the injected script tag) when diffing preview HTML against the canonical source (normalise with `tr -d '\r'`) — this is not a build error.
 
 ### 4.2.1 Count-based assertions on `/api/claude` must filter by track (post 86c9pr4h9)
 

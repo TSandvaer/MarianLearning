@@ -41,7 +41,17 @@ Source: [`types.ts:30`](MarianLearning/src/lib/progress/types.ts#L30) `WordSongN
 
 Untuned tier coverage today: `letter-sounds`, `digraphs` (the generic stub parent node), `sight-words`, `simple-sentences` produce stub plans (planner falls back to blending-cv content with a non-error log). The stub fallback is what makes it safe to surface those nodes from the picker in v1.
 
-**Digraph tier status (post-2026-05-14):** `digraphs-sh` is **first-class** — its own 7-word pool, planner directive in `WORD_SONG_TRACK_GUIDE`, committed canon JSON, and regression spec (PR #220 wordPack + #223 planner/canon). The parent node `digraphs` remains the generic stub; `digraphs-sh` is the specific sibling carrying real content, mirroring how `cvc-words` preceded `cvc-words-short-o`/`-short-u`/etc. Future digraph tiers (`digraphs-ch`, `digraphs-th-voiceless`) are expected to follow the same sibling-node pattern.
+**Digraph tier status (updated 2026-06-11):** all three first-class digraph tiers are **fully shipped** — own word pool, planner directive in `WORD_SONG_TRACK_GUIDE`, committed canon JSON, wordPack render, e2e content spec, lint/regression:
+
+| Tier                    | Word-pack PR | Planner/canon PR | Re-voiced |
+| ----------------------- | ------------ | ---------------- | --------- |
+| `digraphs-sh`           | #220         | #223             | #356      |
+| `digraphs-ch`           | #226         | #227             | #356      |
+| `digraphs-th-voiceless` | #230         | #230             | #356      |
+
+The parent node `digraphs` remains the generic stub; the specific siblings carry the real content, mirroring how `cvc-words` preceded `cvc-words-short-o`/`-short-u`/etc. Ground-truth audit: `design/wave-11-plan.md` (PR #376).
+
+**Stale-framing hazard:** an earlier version of this paragraph called `digraphs-ch`/`digraphs-th-voiceless` "expected future" tiers; that framing propagated into the Wave 10 retro defer-list and nearly caused Wave 11 to file build-tickets for already-merged work. Before treating any tier as unbuilt, verify on-disk: `git ls-files public/canon/word-song/level-1/`. The genuinely-unbuilt Word Song tiers as of 2026-06-11 are `sight-words` (Wave 11, in flight) and `simple-sentences`.
 
 **Cross-tier review — spec vs implementation.** The digraphs-sh word-list spec describes a "2–3 new + 5–6 review" session model where a session draws mostly from the current tier but also reviews prior-tier words. This has **no planner implementation** as of 2026-05-14 — every word-song tier emits 8 problems exclusively from its own pool. Cross-tier review is design intent, not shipped behaviour; treat spec prose about it as aspirational, and any PR claiming to implement it must add a round-trip test pinning cross-tier word distribution.
 
