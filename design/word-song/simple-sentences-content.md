@@ -25,14 +25,15 @@ Marian arrives from Hub (word-song tile) into `route === 'literacy'` with `focus
 
 Per the parallel-shared-concept rule (user-global `CLAUDE.md`): the parser author (Kevin), the planner directive (Kevin), and the render branch (Devon) MUST use these exact identifiers. Do not paraphrase, re-case, or re-derive.
 
-| Concept                                      | Verbatim value                                                                        | Notes                                                                                                                                                                                                                                                                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`WordSongContentType` value**              | `'simple-sentence'`                                                                   | New member added to the union in `src/screens/WordSong/wordSessionPlans.ts` (`WordSongContentType`). Singular, hyphenated, matches the `cvc-word` / `sight-word` casing precedent.                                                                                                                                 |
-| **Read-line template (parser discriminant)** | `"Finish the sentence: <sentence>."`                                                  | `<sentence>` is the full sentence **with the gap word replaced by the literal gap token** (below). The verb phrase `Finish the sentence:` is the discriminant — distinct from `Tap the` / `Read the` / `Find the word:` so template-match order is NOT load-bearing (same property the `sight-word` template has). |
-| **Gap token (in-template, written form)**    | `___` (exactly three ASCII underscores, U+005F ×3)                                    | Appears once inside `<sentence>` at the gap position. The parser locates the gap by this literal. Example read line: `"Finish the sentence: The cat ___ the mat."` On-screen this renders as a styled blank underline (§3.2); the underscores are the data carrier, not the visual.                                |
-| **Gap token (spoken form)**                  | Emma speaks the word **`blank`** at the gap position                                  | Dave §9: one syllable, confirmed within Emma's ~200-word cap. The TTS read line the planner emits substitutes `blank` for the `___` token so Azure renders natural prosody: `"Finish the sentence: The cat blank the mat."` See §4 for the read/display split.                                                     |
-| **Target word (the answer)**                 | The word that fills `___`                                                             | Carried as the problem's `target.word` — a real `wordPack.ts` `WordEntry`, resolved via `getWordEntry` exactly like the `sight-word` and CVC tiers (NOT a synthesized sentinel).                                                                                                                                   |
-| **Sentence-frame field**                     | `target.sentenceFrame: string` (new optional `WordEntry`-adjacent carrier — see §1.1) | The full sentence with `___` preserved, for display. The chips do NOT carry the frame; only the read line + this field do.                                                                                                                                                                                         |
+| Concept                                      | Verbatim value                                                             | Notes                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`WordSongContentType` value**              | `'simple-sentence'`                                                        | New member added to the union in `src/screens/WordSong/wordSessionPlans.ts` (`WordSongContentType`). Singular, hyphenated, matches the `cvc-word` / `sight-word` casing precedent.                                                                                                                                                         |
+| **Read-line template (parser discriminant)** | `"Finish the sentence: <sentence>."`                                       | `<sentence>` is the full sentence **with the gap word replaced by the literal gap token** (below). The verb phrase `Finish the sentence:` is the discriminant — distinct from `Tap the` / `Read the` / `Find the word:` so template-match order is NOT load-bearing (same property the `sight-word` template has).                         |
+| **Gap token (in-template, written form)**    | `___` (exactly three ASCII underscores, U+005F ×3)                         | Appears once inside `<sentence>` at the gap position. The parser locates the gap by this literal. Example read line: `"Finish the sentence: The cat ___ the mat."` On-screen this renders as a styled blank underline (§3.2); the underscores are the data carrier, not the visual.                                                        |
+| **Gap token (spoken form)**                  | Emma speaks the word **`blank`** at the gap position                       | Dave §9: one syllable, confirmed within Emma's ~200-word cap. The TTS read line the planner emits substitutes `blank` for the `___` token so Azure renders natural prosody: `"Finish the sentence: The cat blank the mat."` See §4 for the read/display split.                                                                             |
+| **Target word (the answer)**                 | The word that fills `___`                                                  | Carried as the problem's `target.word` — a real `wordPack.ts` `WordEntry`, resolved via `getWordEntry` exactly like the `sight-word` and CVC tiers (NOT a synthesized sentinel).                                                                                                                                                           |
+| **Sentence-frame field**                     | `WordSongProblem.sentenceFrame?: string` (new optional carrier — see §1.1) | The full sentence with `___` preserved, for display. The chips do NOT carry the frame; only the read line + this field do.                                                                                                                                                                                                                 |
+| **Scene-id field**                           | `WordSongProblem.sceneId?: string` (new optional carrier — see §1.3)       | The gentle-phase scene asset key. Planner emits it; parser carries it onto the problem (mirrors `sentenceFrame`); Devon's render looks the asset up via `SCENE_PICTURES[sceneId]`. Filename: `public/assets/scenes/scene-<sceneId>.svg`. Present only on gentle problems (1–3); `undefined` on trap problems and every other content type. |
 
 ### 1.1 Where the sentence frame lives — parser carries it, NOT `WordEntry`
 
@@ -55,6 +56,17 @@ The target word is therefore carried by the **`correct` utterance**, which alrea
 - **Validation invariant:** the read line MUST contain exactly one `___` token. Zero or two+ → throw `PlanFromServerError` (the planner emitted a malformed cloze; better a clean throw than a silent wrong render). Pin this in Kevin's parser unit tests.
 
 This target-from-`correct` resolution is the load-bearing parser divergence. Name it explicitly in the Kevin dispatch brief so it is not missed.
+
+### 1.3 Scene-id ↔ problem coupling — how the render finds its scene asset
+
+The gentle-phase scene illustration (§3.2, §8) is **per-problem** (which scene shows depends on which sentence this problem is), so the render needs the problem to carry its scene key. The shared `WordEntry` cannot hold it (the same target word appears in problems with different scenes), so — exactly like `sentenceFrame` — it lives on `WordSongProblem`:
+
+- **Field (verbatim, Kevin + Devon consume identically):** `WordSongProblem.sceneId?: string`.
+- **Planner emission (Kevin):** the planner emits the `sceneId` per gentle problem from `WORD_SONG_SIMPLE_SENTENCES` (each pool sentence carries its stable `sceneId`, e.g. `cat-sat-mat`). Trap problems (4–8) carry NO `sceneId` (`undefined`) — they are text-only by Dave's ruling.
+- **How it reaches the render:** the parser sets `problem.sceneId` from the planner's emission, the same way it sets `sentenceFrame`. (If the wire shape cannot carry a non-utterance per-problem field, Kevin derives `sceneId` deterministically from the frame's content words at parse time — but the parser MUST set the field either way so Devon reads ONE name. The emit-vs-derive choice is Kevin's; the field name on `WordSongProblem` is fixed.)
+- **Render lookup (Devon):** `SCENE_PICTURES[problem.sceneId]` resolves to `public/assets/scenes/scene-<sceneId>.svg`. A `sceneId` of `undefined` (trap problem) OR a missing registry entry → no scene rendered (graceful text-only fallback, §8.2). So `sceneId` absence is both the trap-phase signal AND the missing-asset fallback — one predicate, no special-casing.
+
+`sceneId` and the §8.2 filename `scene-<sentence-id>.svg` use the SAME identifier: `<sentence-id>` IS `sceneId`. The §8.5 brief table's `scene-id` column is the literal `sceneId` value per row.
 
 ---
 
@@ -138,6 +150,27 @@ Portrait iPad, thumb-safe. The sentence panel is the new reading surface; chips 
 - Sentence panel + scene occupy the upper-middle (reading happens above the thumb). Chips stay in the thumb-reachable lower third — primary action is thumb-native, portrait-first.
 - Emma stays upper-left ~30vh perch (unchanged from all WordSong tiers).
 - Back-arrow (mid-skill exit) unchanged, top-left, outside the reading flow.
+
+### 3.5 Gentle/trap split + function-word introduction ordering (Dave dosage)
+
+Per Dave §"Dosage and session structure" — the 8-problem session splits gentle/trap exactly like every word-song tier, and the render/foil/scene state keys on the phase:
+
+| Problems | Phase  | Scene (§8) | Foil class                                                                                | Sentence templates                                                                      |
+| -------- | ------ | ---------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1–3      | Gentle | Present    | Wrong part-of-speech (class foils — wrong-class chips, eliminated by the slot constraint) | Templates A/B only (SV / SVO — safest for Tagalog-L1 SVO learning)                      |
+| 4–8      | Trap   | Absent     | Same class, wrong meaning (semantic foils — correct part-of-speech, wrong meaning)        | All templates; deferral (Template D) + is/was-adjective (Template E) prioritised in 5–8 |
+
+**Function-word introduction ordering (AC4 — encode explicitly, it does NOT fall out of the pool listing).** The five inherited Wave-11 deferrals are introduced in this exact order (Dave research rec #10, line 317; risk #4, line 283 — highest-frequency + lowest syntactic complexity first):
+
+> **they → there → where → were → then**
+
+Sequencing rules (Dave §"Dosage note on the deferrals" + §"Gentle → trap progression"):
+
+- Deferrals do NOT appear until **session 4 or later** (sessions 1–3 are Templates A/B only, no deferral gap words).
+- When a deferral first appears, it appears in the **gentle phase first** (scene present + wrong-class foil) before moving to the trap phase.
+- Once the tier is underway (session 4+), deferrals should fill **≥3 of the 8 problems per session** — they are the highest-priority content for this tier (they are precisely the words that need sentence context, which this tier supplies).
+
+**Implementation lane:** this ordering + dosage is a **planner/word-list concern (Kevin)** — `WORD_SONG_SIMPLE_SENTENCES` and the `WORD_SONG_TRACK_GUIDE` directive block encode the `they → there → where → were → then` sequence and the session-4+ / gentle-first / ≥3-per-session dosage rules explicitly (Dave rec #4 routes the dosage rule there; do NOT leave it for Haiku to infer). The render (Devon) is dosage-agnostic — it renders whatever phase/foil/scene state the served problem carries. This spec states the ordering so it is a deliberate hand-off, not a silent omission.
 
 ---
 
@@ -270,7 +303,9 @@ Kevin's `WORD_SONG_SIMPLE_SENTENCES` pool finalizes the exact gentle-phase sente
 - [ ] Wrong tap: `puzzled-tilt` pose + poof SFX, NO red X / error icon, chip stays tappable.
 - [ ] Exactly ONE `hint` utterance per problem (no three-slot hint); hint speaks the full sentence with the answer.
 - [ ] Gentle problems (1–3) render a scene illustration above the sentence panel; trap problems (4–8) render NO scene.
-- [ ] A missing scene asset falls back to text-only (no broken-image, no crash).
+- [ ] Each gentle problem carries a `sceneId` on `WordSongProblem`; the render resolves `SCENE_PICTURES[sceneId]` → `scene-<sceneId>.svg`; trap problems carry `sceneId === undefined`.
+- [ ] A missing scene asset (or `undefined` `sceneId`) falls back to text-only (no broken-image, no crash).
+- [ ] Function-word deferrals are introduced in `they → there → where → were → then` order, session 4+, gentle-phase-first (planner/word-list assertion — Kevin's `WORD_SONG_SIMPLE_SENTENCES` + directive encode the sequence; round-trip test pins it).
 - [ ] All touch targets ≥ 44pt; chips ≥ 96pt and thumb-reachable in portrait.
 - [ ] `prefers-reduced-motion`: springs collapse to fades; word reveal still functions.
 
