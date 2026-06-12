@@ -386,6 +386,227 @@ t=1500ms  : caption full; Melody cross-fade puzzled → idle
 
 ---
 
+## Thinking-time chip tap-gate (gated on TTS START)
+
+> **Persona-owner:** Kyle (UX). **Ticket:** `86ca7urvk` — Dave→Kyle polish-audit rec (a).
+> **Pedagogy authority:** Dave's MODIFY ruling on `86ca7urvk` (developmental-psych audit rec
+> `design/audits/2026-05-02-polish/dave-developmental-psych.md:135`). **Scope:** Math screen ONLY.
+> **Status:** Spec — implementation pending (Kevin/Devon).
+
+### Why this exists
+
+Dave's polish audit (line 135) flagged that an 8-year-old who is still concrete-counting (Marian:
+100% finger reliance on sums to 10 per diagnostic) needs the **retrieval-attempt window** protected.
+If a chip is tappable the instant a problem paints — before Emma has even started reading it aloud —
+the optimal strategy degrades into **guess-and-verify**: tap a chip, listen to whether the "poof"
+or the "Yes!" comes back, repeat. That trains tapping-speed, not arithmetic. The gate makes the
+chips inert until Emma's read-aloud has actually begun, so the first thing Marian does each problem
+is **listen to the question**, not race the UI.
+
+### Dave's binding ruling (gate on START, not a timer)
+
+The original audit rec proposed a fixed **500ms minimum timer** plus a **parent-settings knob**.
+Dave's MODIFY ruling overrides both:
+
+1. **Gate on the TTS START event of the `math.p{N}.read` utterance — NOT a fixed 500ms timer.**
+   Registration opens the moment Emma's read-aloud actually begins playing (Howler's `onPlay`
+   fires). A wall-clock timer is wrong because read-aloud start is itself variable (cold-cache
+   Path A fetch, iPad audio-context resume can take 0.5–4 s) — a 500ms timer would open the gate
+   while Emma is still silent on a slow start, defeating the whole point; and would needlessly
+   delay on a fast start. The audio-start event is the correct, self-calibrating anchor.
+2. **No parent-settings knob.** There is NO `thinkingTimeMs` setting. The gate is structural and
+   invariant — it cannot be tuned down or off. (Parent Settings already has its locked v1 row set;
+   do not add one.)
+3. **Math screen only.** Word Song is explicitly out of scope (see §Out of scope).
+4. Never-a-red-X, the 3-problem gentle ramp, and the correct / reprompt / hint / guided-completion
+   flows are all **unchanged** by this gate.
+
+### Relationship to the CURRENT gate (this is a relaxation, read carefully)
+
+This is **not a new gate bolted on** — it is a **re-targeting of the gate that already exists**.
+
+Today the chips are `disabled` until `readAloudPlayed` flips, and `readAloudPlayed` flips
+**after the read-aloud COMPLETES** (the `speak(...).then(...)` resolves once the whole line has
+finished playing). So today chips are inert for the _entire_ duration of "Three plus two. How
+many?" and only become tappable once Emma stops talking.
+
+Dave's ruling moves the gate-open point **earlier** — from read-aloud **completion** to read-aloud
+**START**. After this change, chips become tappable the instant Emma _begins_ speaking, so Marian
+can answer over the tail of the read-aloud (a fast, confident "five!" mid-sentence is fine and
+developmentally healthy). What's blocked is only the **pre-speech** window — the dead air between
+the problem painting and Emma's voice starting.
+
+The signal already exists in code: `gate.reportSpeechStart()` is called inside `speak`'s `onPlay`
+callback (the Howler `onPlay` event for `math.p{N}.read`). The implementation task is to drive chip
+tap-registration off **that** event instead of off the read-aloud-completion `.then()`.
+
+> **Resolves an existing spec/impl divergence.** The current Acceptance criterion "Chips remain
+> tappable during TTS playback (no UI lock on audio)" (this file, §Acceptance criteria → Touch)
+> has been false since the completion-gate shipped — chips are locked for the whole read-aloud
+> today. This ticket makes the START-gate the real contract and the AC has been reworded to match
+> (chips tappable from TTS-start onward, inert only before it).
+
+### Pre-gate chip visual state — "not yet", never "wrong" or "broken"
+
+The audit prose is "chips visible but not tappable" pre-gate. The hard constraint (never-a-red-X,
+no error vibes): an 8-year-old must read the pre-gate state as **"in a moment"**, never as
+**"disabled / greyed-out / something's wrong / you can't"**. Concretely:
+
+| Property          | Pre-gate (before TTS start)                          | Post-gate (TTS started → resolved) |
+| ----------------- | ---------------------------------------------------- | ---------------------------------- |
+| Chips rendered    | Yes — all 3 (or 4) chips painted in place, full size | Yes                                |
+| Numerals legible  | Yes — full ink-colour numerals, fully readable       | Yes                                |
+| Opacity           | `opacity-60` (gentle softness, the SAME value the    | `opacity-100`                      |
+|                   | screen already uses) — soft, NOT a hard grey-out     |                                    |
+| Border / fill     | Unchanged — pink border, white fill (NO grey, NO     | Unchanged                          |
+|                   | red, NO strike, NO lock glyph, NO desaturate)        |                                    |
+| `whileTap` spring | none (no `scale: 0.92` press feedback)               | `{ scale: 0.92 }`                  |
+| Cursor            | `default`                                            | `pointer`                          |
+| `disabled` attr   | `true`                                               | `false`                            |
+
+The 60% opacity is deliberately the **same softening the screen already applies** — there is no new
+"disabled look" to design or to mis-read. The chips simply look _a touch sleepy_ for the half-second
+of dead air, then "wake up" to full opacity the instant Emma starts talking. There is **no** padlock
+icon, **no** grey overlay, **no** countdown ring, **no** "wait" text, **no** spinner. The cue that
+"it's time now" is carried by the audio (Emma's voice starting) reinforced by the opacity bump to
+100% — multi-modal, matching the app's audio-first principle. No reading required.
+
+### What a pre-gate tap does — explicit ruling
+
+The audit prose suggests a pre-gate tap should "advance / start TTS playback rather than register as
+an answer." **Ruling, made explicit so there is no ambiguity for the implementer:**
+
+- A tap on a chip **before the gate opens does NOT register as an answer.** It does not score, does
+  not trigger correct/reprompt, does not consume a wrong-attempt, does not start a guided/hint
+  count. The retrieval window is protected exactly as Dave intends.
+- A pre-gate tap **is still a valid audio-unlock gesture** and must keep its existing unlock role.
+  On the Session-2+ entry path Math is the first audible screen, and the **first** chip tap is what
+  unlocks the iPad audio context and kicks off the read-aloud (today's `if (!audioUnlocked) { … }`
+  early-return path in `onChipTap`). That behaviour is **preserved**: the very first pre-gate tap
+  still unlocks audio + queues the `read` utterance — i.e. it _starts_ the read-aloud, which is the
+  "advances / starts TTS playback" outcome the audit prose describes. It just never counts as an
+  answer.
+- A pre-gate tap on the cold-mount real-flow path (Splash → Greet → Math, where Howler is already
+  unlocked and the read-aloud auto-fires) is a **silent no-op** — the read-aloud is already starting
+  on its own; the tap does nothing visible and does not register.
+
+Net: a pre-gate tap can only ever _help_ (unlock audio / start the read), never _harm_ (mis-score).
+There is no punishing feedback for an early tap — consistent with never-a-red-X.
+
+### Gate-open transition (affordance change)
+
+When `math.p{N}.read`'s `onPlay` fires (TTS start):
+
+- Chips animate `opacity 0.6 → 1.0` over **200ms ease-out** (matches the existing chip
+  `transition-opacity` / the screen's 0.2s opacity tween — do NOT introduce a new spring here; the
+  opacity tween is the right register, calm not poppy).
+- `whileTap={{ scale: 0.92 }}` becomes active, `disabled` flips to `false`, cursor → `pointer`.
+- No SFX on gate-open. The "it's your turn" signal is Emma's voice + the opacity lift; adding a
+  chime here would clutter the read-aloud and risk reading as a separate reward beat. (Correct/
+  reprompt SFX are unchanged and fire only on a _real_ tap post-gate.)
+
+The transition is intentionally understated — the chips were always there; they just become live.
+
+### Per-problem re-arming
+
+The gate re-arms for **every** problem, not just problem 1. On advance to problem N+1 the chips
+return to the pre-gate state (`opacity-60`, inert) until that problem's own `read` utterance starts.
+This is already the shape of the current per-problem read-aloud lifecycle (the read-aloud effect
+re-runs per `problemIndex` and the gate ref resets on advance) — the START-gate inherits it. So the
+thinking-time protection applies to all 8 retrieval attempts, not only the first.
+
+### Offline / audio-failure edge cases — the gate MUST fail OPEN
+
+The danger with any audio-keyed gate: **if the `read` utterance never starts, the gate never opens
+and the screen soft-locks** — chips stay inert forever and Marian is stuck on a problem she can't
+answer. This is unacceptable. The gate must **fail open** after a bounded fallback so a missing /
+failed / silent read-aloud degrades to "chips are tappable" rather than "screen is dead."
+
+**Failure modes that must fail open:**
+
+| Failure mode                                          | Detection                                  |
+| ----------------------------------------------------- | ------------------------------------------ |
+| Path A fetch failed → silent-fallback `playUtterance` | `onPlay` never fires (silent caption-walk) |
+| Howler `loaderror` / `playerror` on the `read` howl   | `gate.reportSpeechError()` fires           |
+| iPad audio context never resumes / OS session lost    | `onPlay` never fires within the watchdog   |
+| WebKit-headless / no `AudioContext` (test + edge)     | `onPlay` never fires                       |
+
+**Fail-open fallback (chosen): a `CHIP_GATE_FALLBACK_MS = 2000` watchdog.**
+
+When a problem's read-aloud is initiated (the read-aloud effect fires for problem N), arm a 2000ms
+watchdog. If `onPlay` (TTS start) has **not** fired by the deadline, **open the gate anyway** — flip
+chips to the tappable state exactly as if TTS had started. On `gate.reportSpeechError()` (an explicit
+load/play failure) open the gate **immediately**, without waiting out the watchdog — a hard error is
+unambiguous, no reason to make Marian wait the full 2 s.
+
+**Why 2000ms (not the audio-unlock watchdog's 5000ms, not 500ms):**
+
+- It must comfortably clear a normal-but-slow real read-aloud start so the watchdog does NOT pre-empt
+  a read-aloud that's simply taking its time (cold-cache Path A + iPad ctx resume is documented at
+  3–4 s for the _unlock_ gate, but that 5 s watchdog covers context-unlock, a strictly earlier and
+  slower event; once Howler is running, `onPlay` for an already-decoded blob is sub-second). 2 s is
+  the ceiling on "audio is going to start any moment now" without being so long that a genuinely
+  silent problem leaves Marian staring at sleepy chips.
+- On the happy path the watchdog never fires — `onPlay` lands first (typically < 800ms; cf.
+  `ONPLAY_WATCHDOG_MS = 800` in `sessionAudio.ts`) and the gate opens on the real event. The
+  watchdog is a safety net, not the primary path.
+- The fail-open state is **visually identical** to the normal gate-open (opacity → 1.0, tappable).
+  Marian never sees a different "audio failed" surface — consistent with the soft-fail-to-caption
+  philosophy everywhere else in the audio system. If audio is silent, she still gets a fully
+  playable problem (she can read the numerals; the caption ribbon still walks at 165 wpm on the
+  silent fallback), just without Emma's voice.
+
+**Interaction with the existing `audioReady` render gate:** when `audioReady === false` the entire
+problem area is held off-DOM (existing behaviour, ticket `86c9kxb5q`), so there are no chips to gate
+yet. The chip tap-gate's watchdog should be armed only once the problem area is mounted (i.e. the
+read-aloud effect has actually fired for the problem) — it does not run while `audioReady === false`.
+
+### data-testid / selector contract (for the e2e spec that follows)
+
+Jessica's e2e spec will assert the gate. Stable selectors (no Math.tsx line-number coupling):
+
+- **Chip row:** existing `data-testid="math-chips"`.
+- **Individual chip:** existing `data-testid="math-chip"` with `data-value` + `data-correct`.
+- **Gate state on the chip row:** add a new attribute **`data-chip-gate="closed" | "open"`** on the
+  `math-chips` container. `"closed"` pre-gate (before TTS start / before fallback), `"open"` once the
+  gate has opened (TTS started OR fallback fired). This is the single machine-readable signal the
+  spec keys on — it avoids asserting against `disabled`, which is overloaded (also `true` on
+  `resolved` and on `dimForGuided`).
+- **Why a dedicated attribute, not `disabled`:** the chip `disabled` attribute is the union
+  `resolved || dimForGuided || !gateOpen`, so reading `disabled` alone can't distinguish "gate not
+  yet open" from "already answered" from "dimmed for guided completion." `data-chip-gate` isolates
+  exactly the gate dimension for testability. Keep it on the container (one read), not per-chip.
+- **Fallback-fired marker (optional, diagnostic):** `data-chip-gate-via="tts-start" | "fallback"`
+  on the same container records HOW the gate opened, so the spec (and iPad QA logs) can prove the
+  watchdog path specifically. Not required for the core gate assertion; include if cheap.
+
+**Spec acceptance shape Jessica can build on:**
+
+- Pre-gate: `math-chips` has `data-chip-gate="closed"`; tapping a `math-chip` does NOT advance
+  problem state (no correct/reprompt, dot strip unchanged, no stardust delta) — except the
+  Session-2+ first-tap audio-unlock case, which is a separate assertion.
+- On TTS start (mock `read` `onPlay`): `data-chip-gate` flips to `"open"`; a chip tap now registers
+  normally.
+- Fail-open: with `read` audio forced to never start (silent fallback / `failNetwork`), `data-chip-gate`
+  is `"closed"` then flips to `"open"` within `CHIP_GATE_FALLBACK_MS + headroom`; a post-fallback tap
+  registers normally. (Note the `failNetwork` tier-asymmetry caveat in `testing-and-ci.md` §4.2 when
+  choosing the focus node / mock.)
+
+### Out of scope (this ticket)
+
+- **Word Song.** The CVC "Read the <word>." / "Tap the <word>." flow is explicitly NOT gated by this
+  ticket. Word Song already has its own `SILENT_TEXT_WINDOW_MS = 1500` decoding-beat mechanic for
+  `cvc-word` problems; whether a START-gate belongs there is a separate Dave call, not this spec.
+- **Parent settings.** No `thinkingTimeMs` knob, no toggle, no preset. The gate is invariant.
+- **The hint / guided-completion flow.** Untouched. The gate governs only the _initial_ per-problem
+  retrieval window (pre-first-tap). After the first registered answer, the existing wrong/hint/guided
+  state machine owns chip availability exactly as today.
+- **A fixed-duration timer.** Dave's ruling rejects the 500ms-timer framing entirely; do not
+  implement any minimum-think timer. The audio-start event is the only gate trigger (with the
+  fail-open watchdog as the safety net, NOT as a minimum-think floor).
+
+---
+
 ## States
 
 ### Idle (per-problem)
@@ -695,6 +916,17 @@ Audio:
 - [ ] After 3 wrong, guided-completion TTS (`math.p{N}.giveAnswer`) plays + correct chip is highlighted
 - [ ] All TTS routed through `sessionAudio.playUtterance`, never `lib/tts.speak()`
 
+Thinking-time chip tap-gate (per §"Thinking-time chip tap-gate (gated on TTS START)"):
+
+- [ ] Pre-gate (before `math.p{N}.read` TTS start): `math-chips` has `data-chip-gate="closed"`; chips render at `opacity-60`, `disabled`, no `whileTap` press
+- [ ] A pre-gate chip tap does NOT register as an answer (no correct/reprompt, no stardust delta, no dot-strip change, no wrong-attempt consumed)
+- [ ] Session-2+ first-tap exception: the first pre-gate tap still unlocks audio + starts the read-aloud (preserves existing `audioUnlocked` behaviour) — and still does not score
+- [ ] On `read` `onPlay` (TTS start): `data-chip-gate` flips to `"open"`, chips animate `opacity 0.6 → 1.0` over 200ms, become tappable; a tap now registers normally
+- [ ] No SFX fires on gate-open (only on a real post-gate correct/reprompt tap)
+- [ ] Gate re-arms per problem: chips return to the closed/`opacity-60` state on advance until problem N+1's own `read` starts
+- [ ] Fail-open: if `read` never starts (silent fallback / `loaderror` / no `AudioContext`), the gate opens anyway within `CHIP_GATE_FALLBACK_MS = 2000` (immediately on `reportSpeechError`); chips become tappable and a tap registers — screen never soft-locks
+- [ ] No `thinkingTimeMs` parent setting exists; gate is invariant (Math only — Word Song unaffected)
+
 Anti-dark-pattern:
 
 - [ ] No red colour appears anywhere on a wrong answer
@@ -709,7 +941,7 @@ Touch + accessibility:
 
 - [ ] All touch targets ≥ 60pt in smallest dimension; chips at 88pt
 - [ ] Chip-to-chip spacing ≥ 16pt (we ship 32pt)
-- [ ] Chips remain tappable during TTS playback (no UI lock on audio)
+- [ ] Chips become tappable from `math.p{N}.read` TTS-start onward (so Marian can answer over the read-aloud tail); they are inert ONLY in the pre-speech window per the thinking-time tap-gate — see §"Thinking-time chip tap-gate (gated on TTS START)". (Supersedes the prior "tappable during TTS playback / no UI lock" wording, which never matched the shipped completion-gate.)
 - [ ] With Reduce Motion: sparkle particles don't drift, chip shake collapses to opacity flash, Melody pose-swap is direct (no cross-fade), HUD pop is opacity-only
 
 iPad PWA:
