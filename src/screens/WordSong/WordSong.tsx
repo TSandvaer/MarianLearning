@@ -895,10 +895,19 @@ function WordSongScreen({
 
     // Silent-text window for `cvc-word` problems (ticket 86c9m3ae6).
     // The word text is already on screen — only the read-aloud is
-    // delayed. `blending-cv` (and any future content type that lacks the
+    // delayed so Marian gets a decoding beat to sound the word out.
+    // `blending-cv` (and any future content type that lacks the
     // discriminant) keeps the legacy immediate-fire behaviour. `contentType`
     // is optional on the public type for back-compat with hand-built static
     // plans, hence the explicit equality check.
+    //
+    // `sight-word` (Wave 11 W11-03, ticket 86ca7xmvz) deliberately stays
+    // OUT of this gate — sight words are whole-word RECOGNITION, not
+    // decoding. A silent "sound it out" beat is actively WRONG here:
+    // applying GPC rules to "was" yields the non-word /wæs/ (Dave's W11-01
+    // §"Recognition mechanic" point 2). Sight-word read-aloud must fire
+    // immediately, which the `!isCvcWord` branch below already does. Do
+    // NOT widen `isCvcWord` to include `sight-word`.
     const isCvcWord = problem.contentType === 'cvc-word'
 
     if (!isCvcWord) {
@@ -1702,9 +1711,18 @@ function WordSongScreen({
           assessment in full via letter glyphs. Per Kyle's A1 spec §4
           "Visual / render contract (no picture pack)" (which A5 §4
           adopts): letter glyphs are the chip content; no picture-pack
-          asset, no letters-of-the-word breakdown beneath. */}
+          asset, no letters-of-the-word breakdown beneath.
+
+          Sight-words tier (Wave 11 W11-03, ticket 86ca7xmvz) ALSO skips
+          this card. Sight words are whole-word RECOGNITION, not phonics
+          decoding — "the"/"was"/"said" have no picturable referent
+          (Dave's W11-01 §"Recognition mechanic" point 1; E4 Conners 2012
+          shows pictures actively SLOW non-picturable word learning). The
+          written word IS the chip; there is no picture meaning-anchor and
+          no letters-of-the-word decode breakdown. */}
           {currentProblem.contentType !== 'letter-names' &&
-            currentProblem.contentType !== 'letter-sounds' && (
+            currentProblem.contentType !== 'letter-sounds' &&
+            currentProblem.contentType !== 'sight-word' && (
               <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
                 <div
                   data-testid="word-song-word-card"
@@ -1887,6 +1905,13 @@ function WordSongScreen({
               const isLetterSounds =
                 currentProblem.contentType === 'letter-sounds'
               const isLetterTier = isLetterNames || isLetterSounds
+              // Sight-words tier (Wave 11 W11-03): the chip presents the
+              // WRITTEN word as text (no picture), per Dave's W11-01
+              // audio-first whole-word-matching mechanic. The chip FRAME
+              // (size, border, spring, hit area, shake) is identical to the
+              // CVC chips — only the CONTENT swaps from <WordPicture> to a
+              // text glyph, the same seam the letter tiers use.
+              const isSightWord = currentProblem.contentType === 'sight-word'
               return (
                 <m.button
                   key={entry.word}
@@ -1899,7 +1924,9 @@ function WordSongScreen({
                   aria-label={
                     isLetterTier
                       ? `Letter ${entry.word}`
-                      : `Picture of ${entry.word}`
+                      : isSightWord
+                        ? `Word ${entry.word}`
+                        : `Picture of ${entry.word}`
                   }
                   onClick={() => onChipTap(entry.word)}
                   disabled={
@@ -1967,6 +1994,29 @@ function WordSongScreen({
                       }
                       style={{
                         fontSize: '64px',
+                        lineHeight: 1,
+                        fontWeight: 700,
+                        color: '#1F2937',
+                        fontFamily:
+                          'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                        userSelect: 'none',
+                      }}
+                    >
+                      {entry.word}
+                    </span>
+                  ) : isSightWord ? (
+                    /* Sight-word chip — the WRITTEN word as text, the chip
+                       target itself (Dave's W11-01 mechanic). 36px keeps the
+                       longest starter-pool word ("said", 4 letters) inside
+                       the 96pt chip's ~80pt content box without clipping;
+                       letters use 64px because a single glyph has the room.
+                       The rendered text IS the chip's accessible/visible word
+                       (Jessica W11-04 test 3 asserts chip innerText contains
+                       data-word). */
+                    <span
+                      data-testid="word-song-chip-sight-word"
+                      style={{
+                        fontSize: '36px',
                         lineHeight: 1,
                         fontWeight: 700,
                         color: '#1F2937',
