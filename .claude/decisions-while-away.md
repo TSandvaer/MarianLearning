@@ -14,7 +14,7 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 - **Foundation:** The dispatch brief explicitly authorized "only keep it compiling against the widened types — do NOT make Math.tsx consume the triple"; the Files-in-play list simply omitted the file the narrative authorized. Precedent: W11-02 scope amendment (same mechanical-boundary class), audited **accepted by Thomas 2026-06-12**. Devon reviews PR #407 including this line; Devon's in-flight W12-02 rewrites that exact line anyway (he rebases as planned second-mover).
 - **Alternative:** Require Kevin to re-push with a required-`hint` type (hides the back-compat truth from the type system) or queue for Thomas (idles the wave's root PR on a 1-line mechanical call).
 - **Reversibility:** 1 line, rewritten by W12-02 regardless; revert trivial.
-- **Status:** pending review
+- **Status:** accepted by Thomas 2026-06-12 (sponsor-questions-walkthrough #3)
 
 ## 2026-06-11 2240 UTC — Granted Kevin's W11-02 scope amendment (parser + content-type files added to Files-in-play)
 
