@@ -38,6 +38,11 @@ const ALL_DERIVABLE_TIERS = [
   'sub-to-20',
   'two-digit-addsub',
   'two-digit-addsub-with-regroup',
+  'number-recog',
+  'skip-counting',
+  'mult-2-5-10',
+  'mult-3-4',
+  'mult-6-9',
 ]
 
 interface SkeletonUtterance {

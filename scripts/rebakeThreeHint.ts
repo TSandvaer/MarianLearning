@@ -159,16 +159,21 @@ function extractOperands(read: string): Operands {
 
 // ── per-tier hint1/2/3 templates (faithful to W12-03 directive) ──────────
 type HintTriple = { hint1: string; hint2: string; hint3: string }
-type TierStyle = 'flowers' | 'place-value'
+type TierStyle =
+  | 'flowers' // add-to-10/20 + sub-to-10/20
+  | 'place-value' // two-digit-addsub(+with-regroup)
+  | 'number-recog'
+  | 'skip-counting'
+  | 'mult'
 interface TierRule {
   style: TierStyle
 }
 
-/** The 6 deterministically-derivable tiers + their hint style.
- *  - 'flowers'      → add-to-10/20 + sub-to-10/20: hint1 "Look at the
- *                     flowers.", hint2 "<A> flower(s).", hint3 op-specific.
- *  - 'place-value'  → two-digit-addsub(+with-regroup): hint1 "Look.",
- *                     hint2 "<A>." (no flowers), hint3 op-specific. */
+/** All 11 deterministically-derivable tiers + their hint style.
+ *  Arithmetic tiers (flowers / place-value) derive from {A, B, op}; the
+ *  generic tiers (number-recog / skip-counting / mult) derive per Dave's
+ *  W12 generic-tier templates (design/research/w12-generic-tier-hint-
+ *  templates.md), now also encoded in the W12-03 directive's generic block. */
 const TIER_RULES: Record<string, TierRule> = {
   'add-to-10': { style: 'flowers' },
   'add-to-20': { style: 'flowers' },
@@ -176,37 +181,179 @@ const TIER_RULES: Record<string, TierRule> = {
   'sub-to-20': { style: 'flowers' },
   'two-digit-addsub': { style: 'place-value' },
   'two-digit-addsub-with-regroup': { style: 'place-value' },
+  'number-recog': { style: 'number-recog' },
+  'skip-counting': { style: 'skip-counting' },
+  'mult-2-5-10': { style: 'mult' },
+  'mult-3-4': { style: 'mult' },
+  'mult-6-9': { style: 'mult' },
 }
 const DERIVABLE_TIERS = Object.keys(TIER_RULES)
 
+// number-recog hint2 topological-fact lookup (verbatim, NOT computed —
+// encodes numeral topology that no formula derives). Keyed on the target.
+const NUMBER_RECOG_TOPOLOGY: Record<number, string> = {
+  1: 'One is the smallest.',
+  2: 'Two comes right after one.',
+  3: 'Three comes after two.',
+  4: 'Four comes after three.',
+  5: 'Five is in the middle.',
+  6: 'Six comes after five.',
+  7: 'Seven is bigger than five.',
+  8: 'Eight comes after seven.',
+  9: 'Nine is close to ten.',
+  10: 'Ten is the biggest.',
+}
+
+/** Build the mult hint2 repeated-addition chain, case-split on factor-b
+ *  (number of copies; read-line operand order, NO commutative flip). */
+function multChain(factorAWord: string, factorB: number): string {
+  const a = factorAWord // already lowercase from the read line
+  switch (factorB) {
+    case 1:
+      return `One group of ${a}.`
+    case 2:
+      return `${capitalize(a)} and ${a} more.`
+    case 3:
+      return `${capitalize(a)}, then ${a}, then ${a}.`
+    case 4:
+      return `${capitalize(a)}, ${a}, ${a}, ${a}.`
+    case 5:
+      return `${capitalize(a)}, ${a}, ${a}, ${a}, ${a}.`
+    default:
+      throw new Error(`mult factor-b ${factorB} out of supported range [1,5]`)
+  }
+}
+
+/** Parse "Tap the <number-word>." → the target word. */
+function parseNumberRecogRead(read: string): { word: string; value: number } {
+  const m = read.match(/^\s*tap\s+the\s+([a-z-]+)\s*\.\s*$/i)
+  if (!m)
+    throw new Error(`number-recog read did not match "Tap the X.": ${read}`)
+  const word = m[1]!
+  const value = wordToNumber(word)
+  if (value === undefined) {
+    throw new Error(
+      `could not decode number-recog target "${word}" in "${read}"`,
+    )
+  }
+  return { word, value }
+}
+
+/** Parse "<t1>, <t2>[, ...]. What is next?" → step (t2-t1) + last-term word. */
+function parseSkipCountingRead(read: string): {
+  stepWord: string
+  lastTermWord: string
+} {
+  const m = read.match(/^\s*(.+?)\s*\.\s*what\s+is\s+next\s*\?\s*$/i)
+  if (!m) {
+    throw new Error(
+      `skip-counting read did not match "<seq>. What is next?": ${read}`,
+    )
+  }
+  const terms = m[1]!.split(',').map((t) => t.trim())
+  if (terms.length < 2) {
+    throw new Error(`skip-counting sequence too short to derive step: ${read}`)
+  }
+  const v1 = wordToNumber(terms[0]!)
+  const v2 = wordToNumber(terms[1]!)
+  if (v1 === undefined || v2 === undefined) {
+    throw new Error(`could not decode skip-counting terms in "${read}"`)
+  }
+  const step = v2 - v1
+  const stepWord = NUMBER_TO_WORD[step]
+  if (stepWord === undefined) {
+    throw new Error(
+      `skip-counting step ${step} has no word form (read "${read}")`,
+    )
+  }
+  return { stepWord, lastTermWord: lower(terms[terms.length - 1]!) }
+}
+
+// Minimal int→word table for the step value (only 2/5/10 occur; cover 1-10
+// for safety). The hint TEXT for operands always reuses the verbatim read
+// word; this table only spells the COMPUTED step, which is never in the read
+// line as a standalone token.
+const NUMBER_TO_WORD: Record<number, string> = {
+  1: 'one',
+  2: 'two',
+  3: 'three',
+  4: 'four',
+  5: 'five',
+  6: 'six',
+  7: 'seven',
+  8: 'eight',
+  9: 'nine',
+  10: 'ten',
+}
+
 /** Derive the three hint utterance texts for one problem. */
 function deriveHints(read: string, rule: TierRule): HintTriple {
-  const { aWord, bWord, op } = extractOperands(read)
-  const aValue = wordToNumber(aWord)
-  if (aValue === undefined) {
-    throw new Error(`could not decode operand-A word "${aWord}" in "${read}"`)
-  }
-
-  // hint3 is op-specific and shared across both styles.
-  const hint3 =
-    op === '+'
-      ? `And ${lower(bWord)} more. How many now?`
-      : `Take away ${lower(bWord)}. How many now?`
-
-  if (rule.style === 'flowers') {
-    // Singular noun when operand-A is exactly 1 (Devon NIT-1 rule).
-    const noun = aValue === 1 ? 'flower' : 'flowers'
-    return {
-      hint1: 'Look at the flowers.',
-      hint2: `${capitalize(aWord)} ${noun}.`,
-      hint3,
+  switch (rule.style) {
+    case 'flowers':
+    case 'place-value': {
+      const { aWord, bWord, op } = extractOperands(read)
+      const aValue = wordToNumber(aWord)
+      if (aValue === undefined) {
+        throw new Error(
+          `could not decode operand-A word "${aWord}" in "${read}"`,
+        )
+      }
+      const hint3 =
+        op === '+'
+          ? `And ${lower(bWord)} more. How many now?`
+          : `Take away ${lower(bWord)}. How many now?`
+      if (rule.style === 'flowers') {
+        // Singular noun when operand-A is exactly 1 (Devon NIT-1 rule).
+        const noun = aValue === 1 ? 'flower' : 'flowers'
+        return {
+          hint1: 'Look at the flowers.',
+          hint2: `${capitalize(aWord)} ${noun}.`,
+          hint3,
+        }
+      }
+      // place-value (two-digit): no "flowers" — name the operand alone.
+      return { hint1: 'Look.', hint2: `${capitalize(aWord)}.`, hint3 }
     }
-  }
-  // place-value (two-digit): no "flowers" wording — name the operand alone.
-  return {
-    hint1: 'Look.',
-    hint2: `${capitalize(aWord)}.`,
-    hint3,
+    case 'number-recog': {
+      const { word, value } = parseNumberRecogRead(read)
+      const fact = NUMBER_RECOG_TOPOLOGY[value]
+      if (fact === undefined) {
+        throw new Error(`no topological fact for number-recog target ${value}`)
+      }
+      return {
+        hint1: 'Look at the numbers.',
+        hint2: fact,
+        hint3: `Which one is ${lower(word)}?`,
+      }
+    }
+    case 'skip-counting': {
+      const { stepWord, lastTermWord } = parseSkipCountingRead(read)
+      return {
+        hint1: 'Look at the numbers.',
+        hint2: `We add ${stepWord} each time.`,
+        hint3: `${capitalize(lastTermWord)} and ${stepWord} more is what?`,
+      }
+    }
+    case 'mult': {
+      const m = read.match(
+        /^\s*([a-z-]+)\s+times\s+([a-z-]+)\s*\.\s*how\s+many\s*\?\s*$/i,
+      )
+      if (!m) {
+        throw new Error(
+          `mult read did not match "<A> times <B>. How many?": ${read}`,
+        )
+      }
+      const factorAWord = lower(m[1]!)
+      const factorB = wordToNumber(m[2]!)
+      if (factorB === undefined) {
+        throw new Error(`could not decode mult factor-b "${m[2]}" in "${read}"`)
+      }
+      return {
+        hint1: 'Look at the groups.',
+        hint2: multChain(factorAWord, factorB),
+        hint3: 'How many?',
+      }
+    }
   }
 }
 
