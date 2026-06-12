@@ -1039,37 +1039,51 @@ function MathScreen({
   const latencyMsByProblemRef = useRef<number[]>(plan.problems.map(() => -1))
 
   /**
-   * Wall-clock timestamp captured when chips first become actually
-   * tappable for the current problem (ticket 86c9pwgc8 — M4; anchor
-   * moved to React-commit boundary in 86c9q5au3).
+   * Wall-clock timestamp marking the START of the M4 latency window for
+   * the current problem (ticket 86c9pwgc8 — M4; React-commit boundary
+   * 86c9q5au3; re-anchored to the chip tap-gate in 86ca862ex).
    *
-   * Set inside a `useLayoutEffect` keyed on `[readAloudPlayed]`
-   * — runs synchronously AFTER React commits the render that flips
-   * the chip's `disabled` to `false`, but BEFORE the browser paints.
-   * This is as close as JS can get to "the moment Marian sees a
-   * tappable chip." Reset to `null` on problem advance and on the
-   * `readAloudPlayed=false` re-render that the new problem's read-
-   * aloud effect triggers.
+   * **Anchored at chip-gate-open, by path** (verdict (a),
+   * design/research/m4-latency-anchor-decision.md). The latency window
+   * starts when chips become tappable — i.e. when `openChipGate` fires —
+   * because that is when the question is cognitively available to Marian
+   * (RT clocks from stimulus availability, NOT from read-aloud
+   * completion). The anchor site depends on HOW the gate opened:
    *
-   * **Why not inside `speak().then()` (the original site)?** The
-   * .then() callback runs before React schedules the
-   * `setReadAloudPlayed(true)` commit — anchoring there leaks the
-   * (.then()-entry → commit) gap into the latency calculation in the
-   * wrong direction. On iPad, where touchstart events can be queued
-   * against a `<button disabled>` and dispatch their click handler
-   * the moment the `disabled` attribute flips, the resulting click-
-   * handler `performance.now()` reads a value microseconds later than
-   * the .then()-entry timestamp — producing the sub-reaction-time
-   * 9 / 69 / 178 ms values observed in production 2026-05-08.
-   * Anchoring in `useLayoutEffect` puts the start of the measurement
-   * window AFTER the disabled-flip commit, so any tap captured here
-   * is by definition a real reaction to the chip-paint event.
+   *   - `via === 'tts-start'` (happy path): captured synchronously inside
+   *     `openChipGate` at Howler `onPlay` — the moment Emma begins reading
+   *     and chips go live. Marian can answer over the read-aloud tail; a
+   *     fast tap during that tail records a REAL latency, not a `-1`.
    *
-   * The first chip tap that passes the read-aloud gate computes
+   *   - `via === 'fallback'` (silent-audio / speech-error / watchdog):
+   *     NOT anchored in `openChipGate` — the watchdog fire time is not
+   *     TTS start. Instead the `useLayoutEffect([readAloudPlayed])` block
+   *     below anchors on read-aloud COMPLETION, the same semantics this
+   *     ref carried before 86ca862ex. This keeps a valid (if noisier)
+   *     measurement on silent sessions without TTS-start-drift.
+   *
+   * The `useLayoutEffect([readAloudPlayed])` set-branch is guarded by a
+   * `chipReadyAtRef.current === null` check, so on the `'tts-start'` path
+   * (where the ref is already set) it is a no-op — it only fires on the
+   * `'fallback'` path. Reset to `null` on problem advance and on the
+   * `readAloudPlayed=false` re-render that the new problem's read-aloud
+   * effect triggers.
+   *
+   * **Why the gate-open anchor and not `useLayoutEffect`-on-completion
+   * for the happy path?** The prior completion anchor inflated every
+   * latency by the full TTS audio duration (~2–4 s) and dropped the
+   * fastest responders — a tap during the read-aloud tail recorded `-1`
+   * because the completion anchor wasn't set yet, silently discarding the
+   * facts nearest to automatic retrieval. See the decision file for the
+   * construct-validity argument.
+   *
+   * The first chip tap that passes the chip gate computes
    * `performance.now() - chipReadyAtRef.current` and writes the
-   * sanity-bounded result into `latencyMsByProblemRef`. Production
-   * uses `performance.now()` (monotonic clock) — immune to wall-
-   * clock skew during a session.
+   * sanity-bounded result into `latencyMsByProblemRef`. The
+   * `LATENCY_FLOOR_MS` floor still guards against the iPad touchstart-
+   * pre-queued sub-reaction-time race (9 / 69 / 178 ms values observed
+   * 2026-05-08) — a sub-floor delta collapses to `-1`. Production uses
+   * `performance.now()` (monotonic clock) — immune to wall-clock skew.
    */
   const chipReadyAtRef = useRef<number | null>(null)
 
@@ -1189,6 +1203,19 @@ function MathScreen({
    *
    * `via` is recorded only on the first (gate-opening) call; subsequent
    * calls don't overwrite it.
+   *
+   * M4 latency anchor (ticket 86ca862ex; research design/research/
+   * m4-latency-anchor-decision.md verdict (a)): on the `'tts-start'`
+   * path ONLY, capture `chipReadyAtRef` here at TTS START — the moment
+   * Emma begins reading and chips become tappable. This is the latency-
+   * window start that matches the automaticity construct (RT clocks from
+   * stimulus availability, not from read-aloud completion). On the
+   * `'fallback'` path we deliberately do NOT anchor here — the watchdog
+   * fire time is not TTS start, so the fallback path keeps anchoring on
+   * read-aloud COMPLETION via the `useLayoutEffect([readAloudPlayed])`
+   * block below (avoids anchor drift on silent-audio sessions). The set
+   * is placed AFTER the idempotency guard so only the FIRST (gate-
+   * opening) `'tts-start'` call anchors; a racing watchdog can't re-anchor.
    */
   const openChipGate = useCallback((via: 'tts-start' | 'fallback') => {
     if (chipGateWatchdogRef.current !== null) {
@@ -1198,6 +1225,9 @@ function MathScreen({
     if (chipGateOpenRef.current) return
     chipGateOpenRef.current = true
     chipGateViaRef.current = via
+    if (via === 'tts-start' && chipReadyAtRef.current === null) {
+      chipReadyAtRef.current = performance.now()
+    }
     setChipGateOpen(true)
     setChipGateVia(via)
   }, [])
@@ -1726,14 +1756,15 @@ function MathScreen({
         // race the production bug fix removed (ticket 86c9hf4ef round 2).
         if (unmountedRef.current) return
         if (problemIndexRef.current !== myProblemIndex) return
-        // Flip the read-aloud gate so chips become tappable. The
-        // companion `chipReadyAtRef` capture (latency anchor) NO
-        // LONGER lives here — it now runs in a useLayoutEffect keyed
-        // on [readAloudPlayed === true], which lands AFTER React's
-        // commit of this state change. See the `chipReadyAtRef`
-        // declaration above and ticket 86c9q5au3 for the rationale
-        // (touchstart-pre-queued race on iPad produced sub-reaction-
-        // time values when the anchor lived here).
+        // Flip `readAloudPlayed` — the read-aloud COMPLETION signal.
+        // Post-86ca84ukt this does NOT gate chip taps (that is
+        // `chipGateOpen`, opened at TTS START); it backs the
+        // `data-read-aloud-played` regression attribute and the
+        // FALLBACK-path M4 latency anchor. The happy-path latency
+        // anchor (`chipReadyAtRef`) was moved to `openChipGate`
+        // (TTS START) in 86ca862ex; on the `'fallback'` path the
+        // `useLayoutEffect([readAloudPlayed])` block below anchors here
+        // at completion instead. See the `chipReadyAtRef` declaration.
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
       })
@@ -1762,36 +1793,41 @@ function MathScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemIndex, audioUnlocked, audioReady])
 
-  // ── M4 latency-anchor commit (ticket 86c9q5au3) ────────────────────────
+  // ── M4 latency-anchor: FALLBACK path + re-arm (tickets 86c9q5au3,
+  //    86ca862ex) ──────────────────────────────────────────────────────────
   //
-  // Capture `chipReadyAtRef.current` at the moment React commits the
-  // render that flips `readAloudPlayed` to `true` — i.e. the moment
-  // the chip's `disabled` attribute flips to `false` in the DOM. This
-  // is the latency-window START.
+  // Post-86ca862ex this block is the FALLBACK-path anchor + the universal
+  // re-arm. The happy path (`via === 'tts-start'`) anchors `chipReadyAtRef`
+  // synchronously inside `openChipGate` at TTS START; on that path the
+  // ref is already non-null by the time `readAloudPlayed` flips true, so
+  // the set-branch below short-circuits (the `=== null` guard) and is a
+  // no-op. The set-branch fires ONLY on the `'fallback'` path (silent
+  // audio / speech-error / watchdog), where `openChipGate('fallback')`
+  // deliberately did NOT anchor — so completion is the best available
+  // latency-window start. See the `chipReadyAtRef` declaration above and
+  // design/research/m4-latency-anchor-decision.md for the path split.
   //
   // Why `useLayoutEffect` and not `useEffect`: layout effects run
   // synchronously after DOM mutation but BEFORE the browser paints.
   // On iPad Safari, touchstart events queued during the disabled→
   // enabled transition can dispatch their click handler within
-  // microseconds of the disabled flip — so we want the anchor as
+  // microseconds of the disabled flip — so we want the fallback anchor as
   // close to the DOM mutation as possible. A regular useEffect runs
   // AFTER paint, which means a fast iPad tap could land BETWEEN the
   // commit and the effect, capturing a sub-zero / near-zero gap.
   //
   // The reset branch (`readAloudPlayed === false` → null the ref) is
-  // load-bearing: when `advanceToNext` queues `setReadAloudPlayed(false)`
-  // for the next problem, this effect re-runs and clears the anchor
-  // BEFORE the new problem's read-aloud has set it. Otherwise a
-  // chip-tap that lands during the new problem's read-aloud window
-  // (blocked at the read-aloud-played gate, but the latency math
-  // would still see a stale chip-ready value if the gate were ever
-  // bypassed) would attribute a stale anchor.
+  // load-bearing on BOTH paths: when `advanceToNext` queues
+  // `setReadAloudPlayed(false)` for the next problem, this effect re-runs
+  // and clears the anchor BEFORE the new problem's gate opens. Otherwise
+  // a stale chip-ready value could leak into the next problem's latency
+  // math.
   useLayoutEffect(() => {
     if (readAloudPlayed) {
-      // Set only if not already set for this problem — defensive
-      // against StrictMode double-invocation in dev (ticket 86c9q5au3
-      // AC4(b)). Production runs each effect once per render, so the
-      // null-check is a no-op in normal flow.
+      // Fallback-path anchor: set only if the `'tts-start'` path didn't
+      // already anchor in `openChipGate`. The `=== null` guard makes this
+      // a no-op on the happy path and also stays defensive against
+      // StrictMode double-invocation in dev (ticket 86c9q5au3 AC4(b)).
       if (chipReadyAtRef.current === null) {
         chipReadyAtRef.current = performance.now()
       }
