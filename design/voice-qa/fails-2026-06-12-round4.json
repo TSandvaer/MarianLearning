@@ -1,0 +1,77 @@
+{
+  "submittedAt": "2026-06-12T05:22:56.979Z",
+  "sourceIssue": 391,
+  "fails": [
+    {
+      "itemId": "number-recog#math.p6.hint",
+      "audioHash": "e64dce342eb2cd3e43cc9f9c1b020457e962e14a04380a1d431a4d934f590c98",
+      "verdict": "fail",
+      "category": "other",
+      "note": "its still sounds like she says \"for comes after three\" not \"four comes after three\"",
+      "decidedAt": "2026-06-11T23:00:00.583Z"
+    },
+    {
+      "itemId": "letter-names#word.p5.hint",
+      "audioHash": "0e467187f3c77e8b0ebefa712fa700caa7e2ac05d806bf504b6bc45d831c5a0d",
+      "verdict": "fail",
+      "category": "other",
+      "note": "the \"O\" still sounds a little scratchy. there is a weird preasure on \"O\"",
+      "decidedAt": "2026-06-11T23:00:36.157Z"
+    },
+    {
+      "itemId": "letter-sounds#session.end.recap.4",
+      "audioHash": "22c678d43e86209cae4c37600c0134040e91c725a3b7ab03ca1dfb9da1d6cfce",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "it sounds like she is saying \"you earned for stars\" not \"..four stars\"",
+      "decidedAt": "2026-06-11T14:34:09.077Z"
+    },
+    {
+      "itemId": "letter-sounds#session.end.streak.4",
+      "audioHash": "58e05c3d36f81d15236e67915298159c72caf646a9fb569d18ef966c3a445686",
+      "verdict": "fail",
+      "category": "mispronounced",
+      "note": "Emma should say \"Rou\" like a line of something. But she says \"Rau\" as in an argument.",
+      "decidedAt": "2026-06-11T14:37:12.421Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.correct",
+      "audioHash": "fbcefc7a713dad526850b276619d8a454dfd24eb426f17ce3ee06833e1386045",
+      "verdict": "fail",
+      "category": "other",
+      "note": "vvv is very scratchy",
+      "decidedAt": "2026-06-11T23:00:48.795Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.giveAnswer",
+      "audioHash": "998c46207acd14b85313bfe27351075023be76e823c35026dbe87513c10c7e14",
+      "verdict": "fail",
+      "category": "other",
+      "note": "vvv is still very scratchy",
+      "decidedAt": "2026-06-11T23:00:56.333Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.hint",
+      "audioHash": "ab8f9f684aca6e2a0f80c72221587bf4b4e37be2abdf97d95b1b9f4b59500b7f",
+      "verdict": "fail",
+      "category": "other",
+      "note": "vvv is still very scratchy",
+      "decidedAt": "2026-06-11T23:01:02.378Z"
+    },
+    {
+      "itemId": "letter-sounds-audit#word.p2.read",
+      "audioHash": "cc95e89d1252eb1f937365cbca890136a4bf97c7f7ef1a3296a79d320c5ab20e",
+      "verdict": "fail",
+      "note": "vvv is still very scratchy",
+      "decidedAt": "2026-06-11T23:01:07.531Z"
+    },
+    {
+      "itemId": "hub#hub-welcome-what-today-alt-3.mp3",
+      "audioHash": "32d9daad4369602c6a300f35b754d96420886f3b58f302ac7a82c26bfc3adb04",
+      "verdict": "fail",
+      "category": "wrong-speed",
+      "note": "there is too much gap between hello and friend",
+      "decidedAt": "2026-06-12T05:22:49.876Z"
+    }
+  ]
+}
