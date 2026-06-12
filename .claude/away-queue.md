@@ -15,6 +15,8 @@ The re-baked sub-to-10 canon (`76a1dfc`) has P4=10-2, P5=10-3, P8=10-7 — all m
 
 Source: Kevin's NOF #3 from PR #244 fix-up dispatch (2026-05-16).
 
+**RESOLVED (Thomas, 2026-06-12, sponsor-questions-walkthrough): (a) no change** — directive correct as-is; same-minuend clustering allowed (Kevin's make-10 read). Consistent with Wave 10's "canon at pedagogical ceiling, do NOT re-bake" ruling + voice-QA baseline protection.
+
 ---
 
 ## 2026-05-16 — Session arc summary (drain-complete)

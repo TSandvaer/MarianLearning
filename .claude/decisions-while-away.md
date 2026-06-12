@@ -14,7 +14,7 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 - **Foundation:** [[project_planner_parser_contract]] (widen browser parser BEFORE planner — bundling caused the PR #117→#118 word-song P0); cvc-word/letter-names/letter-sounds tier precedents shipped type+parser with the content half; Pattern A type-author role (Kevin authors the `'sight-word'` discriminant, per the Wave 11 plan + vocabulary-contract discipline). Ticket-flesh-out auto-decide class covers mechanical scope completion when the orchestrator has context.
 - **Alternative:** Surface to Thomas, or bounce to Matt for a plan revision. Rejected: the boundary question is mechanical (which files implement a documented contract), not strategic; waiting idles the wave's critical path.
 - **Reversibility:** 1 PR — the added files are reviewed by Devon in cross-review regardless; scope can be re-narrowed at review.
-- **Status:** pending review
+- **Status:** accepted by Thomas 2026-06-12 (sponsor-questions-walkthrough)
 
 ## 2026-05-23 1030 UTC — Picked option (c) for Matt's dropped `add_task_dependency` tool gap (revise workflow to drop blocker-relationship pattern)
 
