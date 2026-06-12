@@ -167,7 +167,7 @@ describe('renderSsmlInnerText (interrogative prosody hint, ticket 86c9gxup4)', (
     // The exact utterance from sessionPlans.ts that the ticket targets.
     // "two" is NOT wrapped — Thomas's iPad listening pass on PR #115
     // showed the en-US-EmmaMultilingualNeural voice does not honour
-    // /tuː/ for the cardinal "two" the same way it honours /fɔːr/ for
+    // /tuː/ for the cardinal "two" the same way it honours /fɔə/ for
     // "four". The "two" override is parked for a follow-up ticket;
     // here "two" passes through plain. "How many now?" still gets the
     // trailing-clause prosody hint from 86c9gxup4.
@@ -218,7 +218,7 @@ describe('renderSsmlInnerText (interrogative prosody hint, ticket 86c9gxup4)', (
     // in the override table. Pin that the trailing-question prosody
     // wrap composes correctly with the phoneme injection.
     expect(renderSsmlInnerText('Three plus four. How many?')).toBe(
-      'Three plus <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
+      'Three plus <phoneme alphabet="ipa" ph="fɔə">four</phoneme>. <break time="250ms"/><prosody pitch="+8%" rate="-5%">How many?</prosody>',
     )
   })
 })
@@ -236,16 +236,16 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     expect(applyPhonemeOverrides('A & B < C.')).toBe('A &amp; B &lt; C.')
   })
 
-  it('wraps "four" in <phoneme alphabet="ipa" ph="fɔːr">', () => {
+  it('wraps "four" in <phoneme alphabet="ipa" ph="fɔə">', () => {
     expect(applyPhonemeOverrides('I want four apples.')).toBe(
-      'I want <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> apples.',
+      'I want <phoneme alphabet="ipa" ph="fɔə">four</phoneme> apples.',
     )
   })
 
   it('passes "two" through unchanged (override parked for follow-up; voice did not honour /tuː/)', () => {
     // Listening test on PR #115 showed Azure's
     // en-US-EmmaMultilingualNeural voice did NOT honour /tuː/ for
-    // "two" the way it honoured /fɔːr/ for "four". "two" is therefore
+    // "two" the way it honoured /fɔə/ for "four". "two" is therefore
     // not in PHONEME_OVERRIDES (yet) — it passes through plain and
     // the rest of the pipeline (XML-escape, prosody) handles it
     // unchanged. This test is the contract guard: do not re-add "two"
@@ -257,10 +257,10 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
 
   it('preserves original casing inside the tag (Four stays Four)', () => {
     expect(applyPhonemeOverrides('Four cats.')).toBe(
-      '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme> cats.',
+      '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme> cats.',
     )
     expect(applyPhonemeOverrides('FOUR cats.')).toBe(
-      '<phoneme alphabet="ipa" ph="fɔːr">FOUR</phoneme> cats.',
+      '<phoneme alphabet="ipa" ph="fɔə">FOUR</phoneme> cats.',
     )
   })
 
@@ -305,19 +305,19 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
     expect(out).toBe('Two plus two. How many?')
   })
 
-  it('emits exactly one <phoneme ph="fɔːr"> for a single "four" in a multi-word utterance', () => {
+  it('emits exactly one <phoneme ph="fɔə"> for a single "four" in a multi-word utterance', () => {
     const out = applyPhonemeOverrides('Two plus four. How many?')
-    const fourMatches = out.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    const fourMatches = out.match(/<phoneme alphabet="ipa" ph="fɔə">/g) ?? []
     expect(fourMatches).toHaveLength(1)
     // "two" passes through plain; pin the full string for clarity.
     expect(out).toBe(
-      'Two plus <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>. How many?',
+      'Two plus <phoneme alphabet="ipa" ph="fɔə">four</phoneme>. How many?',
     )
   })
 
-  it('emits exactly two <phoneme ph="fɔːr"> for "Four plus four"', () => {
+  it('emits exactly two <phoneme ph="fɔə"> for "Four plus four"', () => {
     const out = applyPhonemeOverrides('Four plus four. How many?')
-    const fourMatches = out.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    const fourMatches = out.match(/<phoneme alphabet="ipa" ph="fɔə">/g) ?? []
     expect(fourMatches).toHaveLength(2)
     // No bare "four" tokens outside the phoneme wrap. Strip the tags
     // and assert — the same shape the original count-based test used
@@ -328,7 +328,7 @@ describe('applyPhonemeOverrides (ticket 86c9kj2um)', () => {
 
   it('XML-escapes plain segments around the phoneme tag', () => {
     expect(applyPhonemeOverrides(`A & four B.`)).toBe(
-      'A &amp; <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> B.',
+      'A &amp; <phoneme alphabet="ipa" ph="fɔə">four</phoneme> B.',
     )
   })
 })
@@ -352,15 +352,15 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     // No tier passed — pre-Wave-7 shape. Global entries (no `tiers`
     // field on the entry) must fire; tier-scoped entries do not.
     expect(applyPhonemeOverrides('We have four cats.')).toBe(
-      'We have <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> cats.',
+      'We have <phoneme alphabet="ipa" ph="fɔə">four</phoneme> cats.',
     )
     // letter-sounds tier — `four` is global, still fires.
     expect(applyPhonemeOverrides('We have four cats.', 'letter-sounds')).toBe(
-      'We have <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> cats.',
+      'We have <phoneme alphabet="ipa" ph="fɔə">four</phoneme> cats.',
     )
     // cvc-words tier — `four` is global, still fires.
     expect(applyPhonemeOverrides('We have four cats.', 'cvc-words')).toBe(
-      'We have <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> cats.',
+      'We have <phoneme alphabet="ipa" ph="fɔə">four</phoneme> cats.',
     )
   })
 
@@ -477,7 +477,7 @@ describe('applyPhonemeOverrides tier-filter (Wave 7 Track A7 — Amendment 1, ti
     // vice versa.)
     const out = applyPhonemeOverrides('Hear mmm before four.', 'letter-sounds')
     expect(out).toContain('<phoneme alphabet="ipa" ph="m">mmm</phoneme>')
-    expect(out).toContain('<phoneme alphabet="ipa" ph="fɔːr">four</phoneme>')
+    expect(out).toContain('<phoneme alphabet="ipa" ph="fɔə">four</phoneme>')
   })
 
   it('buildSsmlBody passes TtsRequest.tier through to applyPhonemeOverrides (end-to-end Amendment-1 wiring)', () => {
@@ -535,10 +535,10 @@ describe('letter-sounds SSML treatment (British-voice rollout, 2026-06-06)', () 
   it('does NOT inject a break for non-letter-sounds callers (back-compat)', () => {
     // No prependBreakMs → no break, even when a global entry wraps.
     expect(applyPhonemeOverrides('Hear four.', 'cvc-words')).toBe(
-      'Hear <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+      'Hear <phoneme alphabet="ipa" ph="fɔə">four</phoneme>.',
     )
     expect(applyPhonemeOverrides('Hear four.')).toBe(
-      'Hear <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+      'Hear <phoneme alphabet="ipa" ph="fɔə">four</phoneme>.',
     )
   })
 
@@ -682,24 +682,24 @@ describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () =>
     )
   })
 
-  it('emits exactly one <phoneme ph="fɔːr"> for "Two plus four. How many?" ("two" passes through plain)', () => {
+  it('emits exactly one <phoneme ph="fɔə"> for "Two plus four. How many?" ("two" passes through plain)', () => {
     const body = buildSsmlBody({
       ...baseReq,
       text: 'Two plus four. How many?',
     })
-    const fourMatches = body.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    const fourMatches = body.match(/<phoneme alphabet="ipa" ph="fɔə">/g) ?? []
     expect(fourMatches).toHaveLength(1)
-    expect(body).toContain('<phoneme alphabet="ipa" ph="fɔːr">four</phoneme>')
+    expect(body).toContain('<phoneme alphabet="ipa" ph="fɔə">four</phoneme>')
     // "Two" is plain — no phoneme wrap on it.
     expect(body).not.toContain('<phoneme alphabet="ipa" ph="tuː">')
   })
 
-  it('emits two <phoneme ph="fɔːr"> tags for "Four plus four. How many?"', () => {
+  it('emits two <phoneme ph="fɔə"> tags for "Four plus four. How many?"', () => {
     const body = buildSsmlBody({
       ...baseReq,
       text: 'Four plus four. How many?',
     })
-    const fourMatches = body.match(/<phoneme alphabet="ipa" ph="fɔːr">/g) ?? []
+    const fourMatches = body.match(/<phoneme alphabet="ipa" ph="fɔə">/g) ?? []
     expect(fourMatches).toHaveLength(2)
     // No bare "four" tokens leak past the phoneme wrap.
     const stripped = body.replace(/<phoneme[^>]*>[^<]*<\/phoneme>/g, '')
@@ -735,7 +735,7 @@ describe('buildSsmlBody (phoneme override integration, ticket 86c9kj2um)', () =>
     expect(body).toContain('xml:lang="en-US"')
     expect(body).toContain('<voice name="en-US-EmmaMultilingualNeural">')
     expect(body).toContain('<prosody pitch="+0Hz" rate="-10%" volume="+0%">')
-    expect(body).toContain('<phoneme alphabet="ipa" ph="fɔːr">')
+    expect(body).toContain('<phoneme alphabet="ipa" ph="fɔə">')
     expect(body).toMatch(/<\/prosody><\/voice><\/speak>$/)
   })
 })
@@ -1399,7 +1399,7 @@ describe('cluster 1 — "row" homophone (rəʊ not raʊ)', () => {
 
   it('co-fires with "four" on "Four in a row! Wow!" — both wrapped, no break (math tier)', () => {
     expect(renderSsmlInnerText('Four in a row! Wow!')).toBe(
-      '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme> in a ' +
+      '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme> in a ' +
         '<phoneme alphabet="ipa" ph="rəʊ">row</phoneme>! Wow!',
     )
   })
@@ -1415,7 +1415,7 @@ describe('cluster 3 — "twenty-four" spoken as a unit (hyphen boundary)', () =>
 
   it('still wraps a STANDALONE "four" (hyphen guard does not break the base case)', () => {
     expect(applyPhonemeOverrides('I want four.')).toBe(
-      'I want <phoneme alphabet="ipa" ph="fɔːr">four</phoneme>.',
+      'I want <phoneme alphabet="ipa" ph="fɔə">four</phoneme>.',
     )
   })
 
@@ -1438,7 +1438,7 @@ describe('cluster 3 — "twenty-four" spoken as a unit (hyphen boundary)', () =>
 describe('cluster 4a — no break before "four" on the letter-sounds path', () => {
   it('letter-sounds recap.4 wraps "four" WITHOUT a leading break (global word, not a mnemonic)', () => {
     expect(renderSsmlInnerText('You earned four stars!', 'letter-sounds')).toBe(
-      'You earned <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> stars!',
+      'You earned <phoneme alphabet="ipa" ph="fɔə">four</phoneme> stars!',
     )
   })
 
@@ -1502,19 +1502,19 @@ describe('cluster 2 — break after "This one is X." in the fricative giveAnswer
 })
 
 describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)', () => {
-  it('softens vvv in EVERY /v/ slot with the STRONGER round-2 prosody + length-marked IPA (86ca7y0hj)', () => {
-    // Round-2 (86ca7y0hj): the round-1 `və` + rate-only `-12%` was not
-    // enough — Thomas re-tested the shipped bytes and still heard "very
-    // scratchy" ×4. Stronger treatment: length-marked `vːə` (sustained
-    // fricative, not a clipped burst) + a vvv-specific prosody (deeper rate
-    // `-20%` + volume cut `-12%` to tame the loud onset).
+  it('softens vvv in EVERY /v/ slot with the round-5 audition-winner v2 prosody + schwa-tail IPA (86ca8c3t7)', () => {
+    // Round-5 audition winner v2 ("Pitch-lowered"): rounds 1 (`və` rate-12%)
+    // and 2 (`vːə` rate-20%/vol-12%) were both rejected ×4 for a hard buzzy
+    // ONSET. The winning lever is PITCH (`-3st`) — a lower f0 fricative
+    // buzzes less — on the bare schwa-tail phoneme `və` (NO length mark),
+    // with rate `-15%` + volume `-20%`. Attribute order pitch→rate→volume.
     for (const text of [
       'Which letter says vvv?',
       'Yes. V says it. vvv?',
       'It says vvv?',
     ]) {
       expect(renderSsmlInnerText(text, 'letter-sounds')).toContain(
-        '<prosody rate="-20%" volume="-12%"><phoneme alphabet="ipa" ph="vːə">vvv</phoneme></prosody>',
+        '<prosody pitch="-3st" rate="-15%" volume="-20%"><phoneme alphabet="ipa" ph="və">vvv</phoneme></prosody>',
       )
     }
   })
@@ -1556,23 +1556,35 @@ describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)'
     expect(applyPhonemeOverrides('says vvv', 'letter-sounds')).not.toContain(
       '<prosody',
     )
-    // vvv carries the round-2 stronger per-mnemonic prosody (86ca7y0hj):
-    // deeper rate + a volume cut, distinct from the shared `-12%` vowels.
+    // vvv carries the round-5 audition-winner v2 per-mnemonic prosody
+    // (86ca8c3t7): pitch-lowered + rate + volume, distinct from the shared
+    // `-12%` rate-only vowels.
     expect(
       applyPhonemeOverrides('says vvv', 'letter-sounds', 300, true),
-    ).toContain('<prosody rate="-20%" volume="-12%">')
+    ).toContain('<prosody pitch="-3st" rate="-15%" volume="-20%">')
   })
 })
 
-describe('cluster 4b — stress de-stressed "Four comes after three."', () => {
-  it('stresses the subject "Four" with a pitch lift + deeper rate + lead break (round-2 stronger, 86ca7y0hj)', () => {
-    // <prosody> (not <emphasis> — Olivia ignores emphasis on this voice).
-    // Round-2: pitch `+12%` is the dominant stress cue that separates the
-    // stressed "four" from the reduced "for" Thomas still heard at the
-    // round-1 rate-only `-18%`; rate deepened to `-25%`, break to 250ms.
+describe('cluster 4b — stress de-stressed "Four comes after three." (round-5 audition winner f2, 86ca8c3t7)', () => {
+  it('stresses the sentence-initial subject "Four" with the f2 centring-diphthong + pitch lift (live text, no "Look." carrier)', () => {
+    // Round-5 audition winner f2: the global `four` override now carries the
+    // centring diphthong `fɔə` (non-rhotic, more vowel body — distinct from
+    // "for"); the only extra work here is the f2 stress lift `pitch="+8%"`
+    // (NOT the rejected round-2 `+12%`/rate-25%). The live canon text is
+    // "Four comes after three." (math.p6.hint2 — sentence-INITIAL "Four", no
+    // "Look." carrier; legacy math.p6.hint removed in #413), so there is no
+    // lead break.
+    expect(renderSsmlInnerText('Four comes after three.')).toBe(
+      '<prosody pitch="+8%">' +
+        '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme>' +
+        '</prosody> comes after three.',
+    )
+  })
+
+  it('still matches the legacy "Look."-prefixed text defensively with the f2 lead-break shape', () => {
     expect(renderSsmlInnerText('Look. Four comes after three.')).toBe(
-      'Look. <break time="250ms"/><prosody pitch="+12%" rate="-25%">' +
-        '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme>' +
+      'Look. <break time="200ms"/><prosody pitch="+8%">' +
+        '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme>' +
         '</prosody> comes after three.',
     )
   })
@@ -1580,7 +1592,7 @@ describe('cluster 4b — stress de-stressed "Four comes after three."', () => {
   it('is text-shape gated — other "four" math utterances stay on the plain override', () => {
     // Sentence-final fours (baseline-passing) keep the un-emphasised wrap.
     expect(renderSsmlInnerText('You earned four stars!')).toBe(
-      'You earned <phoneme alphabet="ipa" ph="fɔːr">four</phoneme> stars!',
+      'You earned <phoneme alphabet="ipa" ph="fɔə">four</phoneme> stars!',
     )
     expect(
       renderFourSubjectHint('You earned four stars!', undefined),
@@ -1589,25 +1601,29 @@ describe('cluster 4b — stress de-stressed "Four comes after three."', () => {
 
   it('does not fire on a word-song tier (tierFilter set → null)', () => {
     expect(
-      renderFourSubjectHint('Look. Four comes after three.', 'cvc-words'),
+      renderFourSubjectHint('Four comes after three.', 'cvc-words'),
     ).toBeNull()
   })
 })
 
 describe('cluster 5 — letter-NAMES scratchy hint (e drum-beat, O scratchy)', () => {
-  it('keeps "e" on the round-1 -12% shape but gives "O" the STRONGER round-2 prosody (86ca7y0hj)', () => {
-    // "e" GREENED at round-1 → byte-identical -12% rate-only.
+  it('keeps "e" on the round-1 -12% shape but gives "O" the round-5 audition-winner o3 shape (86ca8c3t7)', () => {
+    // "e" GREENED at round-1 → byte-identical -12% rate-only (period inside
+    // the prosody, no space after "look.", 250ms break).
     expect(
       renderLetterNamesScratchyHint("Let's look. e.", 'letter-names'),
     ).toBe(
       'Let&apos;s look.<break time="250ms"/><prosody rate="-12%">e.</prosody>',
     )
-    // "O" was "still slightly scratchy" → deeper rate -18% + volume -8% to
-    // take the edge off the harder "oh" onset (only the O letter changes).
+    // "O" — round-5 audition winner o3 ("Lower pitch + soft"): rounds 1
+    // (-12%) and 2 (-18%/vol-8%) were rejected for "weird pressure" (the
+    // rate-slow over-articulated the onset). o3 DROPS the rate, lowers PITCH
+    // (-2st) at natural rate + vol-12%, with a shorter 200ms break. Structure
+    // differs from "e": space after "look.", period OUTSIDE the prosody.
     expect(
       renderLetterNamesScratchyHint("Let's look. O.", 'letter-names'),
     ).toBe(
-      'Let&apos;s look.<break time="250ms"/><prosody rate="-18%" volume="-8%">O.</prosody>',
+      'Let&apos;s look. <break time="200ms"/><prosody pitch="-2st" volume="-12%">O</prosody>.',
     )
   })
 
