@@ -1,70 +1,58 @@
 /**
- * E2E spec — W12-05: Math three-hint scaffolding (failing-first).
+ * E2E spec — W12-05: Math three-hint scaffolding.
  *
- * Ticket: 86ca87067 (Wave 12 — three-hint utterances). The test IS the
- * spec: authored RED on `origin/main` BEFORE the W12-01/02/03/04 dev
- * tickets land. Paired with:
- *   - W12-01 (Kevin): parser + `MathUtteranceSlot` widening (hint1/2/3).
- *   - W12-02 (Devon): Math.tsx consumer + three-beat choreography.
- *   - W12-04 (Kevin): targeted canon re-bake (88 hint → 264 hint1/2/3).
+ * Ticket: 86ca87067 (Wave 12 — three-hint utterances). Authored failing-first
+ * (RED on `origin/main` before the W12 stack), now rebased GREEN onto the
+ * merged consumer stack:
+ *   - W12-01 (PR #407): parser + `MathUtteranceSlot` widening (hint1/2/3).
+ *   - W12-02 (PR #409): Math.tsx consumer + three-beat choreography (the
+ *     sequential `speak(hint1) → speak(hint2) → speak(hint3)` at ~Math.tsx
+ *     :2116).
+ *   - W12-03 (PR #411): planner directive + the canonical three-hint fixture
+ *     builder `canonicalMathThreeHintSessionResponse()` this spec consumes.
+ * W12-04 (targeted canon re-bake) adds LIVE-canon coverage for production but
+ * is NOT required for this spec — the mock serves the three-hint envelope
+ * directly, so the parser (W12-01) + sequential consumer (W12-02) are the
+ * load-bearing activators that flip the lever GREEN.
  *
  * WHAT THIS SPEC ASSERTS
  * ----------------------
- * Test 1 (RED-on-base lever): a math session served the THREE-HINT canon
- *   envelope, driven to 2 wrong taps on problem 1, plays three discrete
- *   hint utterances `hint1 → hint2 → hint3` IN ORDER. Observed via the
- *   `math-caption` text sequence (each hint replaces the caption as it
- *   plays; a MutationObserver records every distinct caption value so the
- *   ordered subsequence is captured race-free).
+ * Test 1 (the lever — was RED on base, now GREEN): a math session served the
+ *   THREE-HINT envelope, driven to 2 wrong taps on problem 1, plays three
+ *   discrete hint utterances `hint1 → hint2 → hint3` IN ORDER. Observed via
+ *   the `math-caption` text sequence (each `speak()` replaces the caption; an
+ *   in-page 50 ms poll records every distinct caption value so the ordered
+ *   subsequence is captured race-free).
  *
- * Test 2 (back-compat regression-lock): the LEGACY single-`hint` canon
- *   envelope, same 2-wrong drive, plays EXACTLY ONE hint utterance with
- *   the legacy composite text. GREEN today; must STAY green after
- *   W12-01's parser widening (W12-01 AC#4 mandates legacy back-compat).
+ * Test 2 (back-compat regression-lock): the LEGACY single-`hint` envelope,
+ *   same 2-wrong drive, plays EXACTLY ONE hint utterance with the legacy
+ *   composite text. GREEN before AND after W12-01's parser widening (W12-01
+ *   retains the legacy single-hint path).
  *
  * ASSERTION CLASSIFICATION (per .claude/docs/testing-and-ci.md §4.1.1)
  * --------------------------------------------------------------------
- * Test 1 — RED-on-base lever. On `origin/main` the served three-hint
- *   envelope carries `math.p1.hint1/hint2/hint3` ids. The current parser
- *   regex (`src/screens/Math/planFromServer.ts`:
- *   `/^math\.p(\d+)\.(read|correct|reprompt|hint|giveAnswer)$/`) does NOT
- *   accept `hint1/2/3` → `mathSessionPlanFromServer` throws
- *   `PlanFromServerError` → `prepareMathPathA` rejects → the screen falls
- *   back to `pickStaticSessionPlan()` (single composite hint). After 2
- *   wrongs ONE composite hint caption appears — so "three distinct hint
- *   texts in order" is UNSATISFIABLE → RED. This is the contract's
- *   explicitly-acceptable "fixture fails to PARSE on main" RED shape
- *   (W12-05 ticket: parse rejection is acceptable as long as the spec can
- *   go green post-stack without edits).
+ * Test 1 — was the RED-on-base lever; now the load-bearing GREEN assertion.
+ *   On the pre-stack base the three-hint envelope (`math.p1.hint1/2/3`) was
+ *   rejected by the narrow parser regex → `prepareMathPathA` rejected →
+ *   static fallback (single composite hint) → "three distinct hint texts in
+ *   order" was UNSATISFIABLE (RED). With W12-01's widened parser the envelope
+ *   PARSES and with W12-02's sequential consumer all three hint texts render
+ *   in order (GREEN). The assertion is satisfiable ONLY when both landed —
+ *   neither the static fallback nor a single-hint render can produce three
+ *   distinct ordered hint texts, so it remains a true discriminator.
  *
- *   HOW IT FLIPS GREEN (no spec edits):
- *     - W12-01 widens the parser regex + `MathUtteranceSlot` to accept
- *       hint1/2/3 → the three-hint envelope now PARSES (no demote).
- *     - W12-02 wires the Math.tsx consumer to play hint1 → hint2 → hint3
- *       sequentially after 2 wrongs (replacing the single
- *       `speak(problem.utterances.hint)` call) → three distinct caption
- *       texts appear in order.
- *   W12-04 (the canon re-bake) is NOT required for THIS spec to go green —
- *   the spec serves its own three-hint envelope via the mock, so the
- *   parser + consumer (W12-01 + W12-02) are the load-bearing activators.
- *   W12-04 ships the on-disk three-hint canon for production; the spec
- *   proves the end-to-end render path independently of the bake.
- *
- * Test 2 — Regression-lock. The legacy single-hint envelope PARSES on
- *   today's main → ONE composite hint after 2 wrongs → GREEN today. It
- *   must keep parsing after W12-01 (back-compat) → stays GREEN. Codifies
- *   existing behaviour; defends against a W12-02 refactor that breaks the
- *   single-hint path.
+ * Test 2 — Regression-lock. The legacy single-hint envelope parses and renders
+ *   ONE composite hint after 2 wrongs. Defends against a W12-02 refactor
+ *   breaking the back-compat single-hint path.
  *
  * NO TRIVIALLY-GREEN TRAP (§4.1.1d/e/f)
  * -------------------------------------
  * This spec does NOT use `failNetwork: true`. Both tests serve a POSITIVE
- * canon envelope (the served-canon-envelope positive discriminator) and
- * capture the outgoing `/api/claude` request to confirm a real math
- * session-start fired (not a static-fallback no-op). Test 1's load-bearing
- * assertion (three distinct hint texts in order) is satisfiable ONLY when
- * the three-hint envelope parsed AND the sequential consumer rendered —
- * neither the static fallback nor a single-hint render can produce it.
+ * canon envelope (Kevin's W12-03 builders) and capture the outgoing
+ * `/api/claude` request to confirm a real math session-start fired (not a
+ * static-fallback no-op). Test 1's load-bearing assertion (three distinct
+ * hint texts in order) is satisfiable ONLY when the three-hint envelope
+ * parsed AND the sequential consumer rendered.
  *
  * AUDIO / `forceHowlerUnlock` (§4.1.2)
  * ------------------------------------
@@ -73,19 +61,20 @@
  * stub `AudioContext` would break MP3 decode → silent demote to the static
  * plan → wrong (single composite) hint text → the assertion would be
  * unsatisfiable for the wrong reason (§4.1.2 "poison for canon-served
- * content specs"). Instead we serve REAL on-disk add-to-10 canon MP3 bytes
- * (injected into the fixtures), drive the genuine gesture-unlock chain (Hub
- * node tap → Math), and gate the wrong-tap drive on `data-read-aloud-played
- * === 'true'`. WebKit headless has no AudioContext, so the spec is
- * chromium-only (`skipOnWebkitHeadless`).
+ * content specs"). Kevin's builders stamp the shared silent-MP3 placeholder;
+ * we post-process each served envelope through `withRealAudio()` to swap in
+ * REAL on-disk add-to-10 canon MP3 bytes (ids + texts + structure stay
+ * Kevin's), drive the genuine gesture-unlock chain (Hub node tap → Math), and
+ * gate the wrong-tap drive on `data-read-aloud-played === 'true'`. WebKit
+ * headless has no AudioContext, so the spec is chromium-only
+ * (`skipOnWebkitHeadless`).
  *
  * TIMEOUT (§4.1.1b)
  * -----------------
  * Single-problem flow (no multi-session walk): Splash→Hub→Math (~few s) +
  * read-aloud gate + 2 wrong taps + 3 sequential hint plays on the silent-
  * caption-walk fallback (~165 wpm). Budgeted at 120 s per test — generous
- * headroom over the ~30-40 s realistic walk, well within the per-spec
- * margin for slow CI runners.
+ * headroom over the ~30-40 s realistic walk.
  *
  * Out of scope: implementation (W12-01/02/03/04); word-song three-hint
  * (math-track only per the Wave 12 plan).
@@ -96,16 +85,78 @@ import type { Page, Request } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
-  threeHintMathSessionResponse,
-  legacyHintMathSessionResponse,
-  THREE_HINT_TEXTS_P1,
-  LEGACY_HINT_TEXT_P1,
+  canonicalMathThreeHintSessionResponse,
+  canonicalMathSessionResponse,
 } from './fixtures/canonicalSessionResponses'
+import type { SessionStartResponse } from '../api/_types'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
   seedLocalStorage,
 } from './_helpers/seedStorage'
+
+// ── Consume Kevin's merged W12-03 fixture builders (single source of truth) ─
+//
+// `canonicalMathThreeHintSessionResponse()` (W12-03, PR #411) is the canonical
+// three-hint envelope: P1 carries `math.p1.hint1/hint2/hint3` with the exact
+// texts Haiku is directed to emit. We serve it verbatim and DERIVE the
+// expected hint texts from it (below) so the spec can never drift from the
+// builder's vocabulary. The legacy single-hint envelope is the existing
+// `canonicalMathSessionResponse()` (back-compat path W12-01's parser retains).
+//
+// AUDIO — load-bearing. Both builders stamp the shared silent-MP3 placeholder.
+// This spec drives the GENUINE gesture-unlock chain (no `forceHowlerUnlock`)
+// and gates on `data-read-aloud-played === 'true'`, which needs audio that
+// decodes. We post-process each served envelope through `withRealAudio()` to
+// swap in REAL Azure-rendered bytes from the on-disk add-to-10 canon — the
+// texts/ids/structure stay Kevin's; only the audio bytes change so the
+// read-aloud gate opens under a real chromium AudioContext. (See
+// `.claude/docs/testing-and-ci.md` §4.1.2 — silent placeholders mask decode;
+// real canon bytes decode cleanly.)
+
+/** Stamp real on-disk canon MP3 bytes onto every utterance of a served
+ *  envelope, preserving Kevin's ids + texts + plan shape verbatim. */
+function withRealAudio(env: SessionStartResponse): SessionStartResponse {
+  const b = realCanonAudioBytes()
+  return {
+    ...env,
+    utterances: env.utterances.map((u) => ({
+      ...u,
+      audio: { kind: 'inline', base64: b, mime: 'audio/mpeg' },
+    })),
+  }
+}
+
+/** Pull the P1 hint texts (hint1/hint2/hint3) out of Kevin's three-hint
+ *  envelope so the expected sequence is derived, never hardcoded. */
+function threeHintTextsP1(): [string, string, string] {
+  const env = canonicalMathThreeHintSessionResponse()
+  const find = (slot: string): string => {
+    const u = env.utterances.find((x) => x.id === `math.p1.${slot}`)
+    if (!u) {
+      throw new Error(
+        `[math-three-hint spec] canonicalMathThreeHintSessionResponse() ` +
+          `is missing math.p1.${slot} — builder vocabulary changed; ` +
+          `update is structural, not a spec defect.`,
+      )
+    }
+    return u.text
+  }
+  return [find('hint1'), find('hint2'), find('hint3')]
+}
+
+/** Pull the P1 legacy composite hint text out of the legacy envelope. */
+function legacyHintTextP1(): string {
+  const env = canonicalMathSessionResponse()
+  const u = env.utterances.find((x) => x.id === 'math.p1.hint')
+  if (!u) {
+    throw new Error(
+      `[math-three-hint spec] canonicalMathSessionResponse() is missing ` +
+        `math.p1.hint — legacy builder changed.`,
+    )
+  }
+  return u.text
+}
 
 // ── WebKit-headless skip ─────────────────────────────────────────────────
 function skipOnWebkitHeadless(testInfo: {
@@ -328,15 +379,16 @@ async function tapWrongChip(page: Page): Promise<void> {
   await wrongChip.click()
 }
 
-test.describe('W12-05 — math three-hint scaffolding (failing-first)', () => {
-  test('1. three-hint envelope: after 2 wrongs on P1, hint1 → hint2 → hint3 play in order [RED-on-base lever]', async ({
+test.describe('W12-05 — math three-hint scaffolding', () => {
+  test('1. three-hint envelope: after 2 wrongs on P1, hint1 → hint2 → hint3 play in order [GREEN on the merged W12-01+W12-02 stack]', async ({
     page,
   }, testInfo) => {
     skipOnWebkitHeadless(testInfo)
     test.setTimeout(120_000)
 
+    const threeHintTexts = threeHintTextsP1()
     const { requests } = await installMathEnvelopeMock(page, () =>
-      threeHintMathSessionResponse(realCanonAudioBytes),
+      withRealAudio(canonicalMathThreeHintSessionResponse()),
     )
     await seedLocalStorage(page, {
       progress: buildMathSeed(),
@@ -371,27 +423,27 @@ test.describe('W12-05 — math three-hint scaffolding (failing-first)', () => {
     await tapWrongChip(page)
 
     // ── LOAD-BEARING: three distinct hint texts appear IN ORDER. ─────────
-    // On RED main the three-hint envelope is parser-rejected → static
-    // fallback → only ONE composite hint caption ever appears, so hint2's
-    // text never shows and this wait times out = RED for the right reason.
-    // Post W12-01 (parser) + W12-02 (sequential consumer) all three appear.
+    // Pre-stack this was UNSATISFIABLE (parser-rejected three-hint envelope
+    // → static fallback → single composite hint). With W12-01's widened
+    // parser + W12-02's sequential consumer the three hint captions render
+    // hint1 → hint2 → hint3 in order. Only that stack can satisfy this.
     await expect
       .poll(
         async () => {
           const log = await readCaptionLog(page)
-          const i1 = indexOfText(log, THREE_HINT_TEXTS_P1[0])
+          const i1 = indexOfText(log, threeHintTexts[0])
           if (i1 < 0) return 0
-          const i2 = indexOfText(log, THREE_HINT_TEXTS_P1[1], i1 + 1)
+          const i2 = indexOfText(log, threeHintTexts[1], i1 + 1)
           if (i2 < 0) return 1
-          const i3 = indexOfText(log, THREE_HINT_TEXTS_P1[2], i2 + 1)
+          const i3 = indexOfText(log, threeHintTexts[2], i2 + 1)
           if (i3 < 0) return 2
           return 3
         },
         {
           timeout: 30_000,
           message:
-            'expected hint1 → hint2 → hint3 caption texts in order; ' +
-            'fewer appeared (RED on base: single composite hint only)',
+            'expected hint1 → hint2 → hint3 caption texts in order ' +
+            `(${JSON.stringify(threeHintTexts)})`,
         },
       )
       .toBe(3)
@@ -400,9 +452,9 @@ test.describe('W12-05 — math three-hint scaffolding (failing-first)', () => {
     // diff (count-based per feedback_count_assertions_on_regression_tests:
     // each hint text appears, and the indices are strictly increasing).
     const finalLog = await readCaptionLog(page)
-    const i1 = indexOfText(finalLog, THREE_HINT_TEXTS_P1[0])
-    const i2 = indexOfText(finalLog, THREE_HINT_TEXTS_P1[1])
-    const i3 = indexOfText(finalLog, THREE_HINT_TEXTS_P1[2])
+    const i1 = indexOfText(finalLog, threeHintTexts[0])
+    const i2 = indexOfText(finalLog, threeHintTexts[1])
+    const i3 = indexOfText(finalLog, threeHintTexts[2])
     expect(i1, 'hint1 text present').toBeGreaterThanOrEqual(0)
     expect(i2, 'hint2 after hint1').toBeGreaterThan(i1)
     expect(i3, 'hint3 after hint2').toBeGreaterThan(i2)
@@ -414,8 +466,10 @@ test.describe('W12-05 — math three-hint scaffolding (failing-first)', () => {
     skipOnWebkitHeadless(testInfo)
     test.setTimeout(120_000)
 
+    const legacyText = legacyHintTextP1()
+    const threeHintTexts = threeHintTextsP1()
     const { requests } = await installMathEnvelopeMock(page, () =>
-      legacyHintMathSessionResponse(realCanonAudioBytes),
+      withRealAudio(canonicalMathSessionResponse()),
     )
     await seedLocalStorage(page, {
       progress: buildMathSeed(),
@@ -440,36 +494,34 @@ test.describe('W12-05 — math three-hint scaffolding (failing-first)', () => {
     await tapWrongChip(page)
     await tapWrongChip(page)
 
-    // The legacy composite hint must appear (GREEN today; stays green
-    // after W12-01 widens the parser while preserving back-compat).
+    // The legacy composite hint must appear (W12-01 retains the single-hint
+    // back-compat path; W12-02's consumer falls back to it when no triple).
     await expect
       .poll(
         async () => {
           const log = await readCaptionLog(page)
-          return indexOfText(log, LEGACY_HINT_TEXT_P1) >= 0
+          return indexOfText(log, legacyText) >= 0
         },
         {
           timeout: 30_000,
           message:
             'expected the legacy composite hint caption to appear after 2 ' +
-            'wrongs (back-compat single-hint path)',
+            `wrongs (back-compat single-hint path): ${JSON.stringify(legacyText)}`,
         },
       )
       .toBe(true)
 
     // Counter-assert: the three-hint texts must NOT appear on the legacy
-    // path (the legacy fixture carries no hint1/2/3). This is a
-    // trivially-green counter-test today (the texts simply do not exist in
-    // the legacy envelope) but becomes a real guard post-W12-02 — it
-    // proves a legacy plan does NOT accidentally fire the three-beat
-    // sequence once the consumer can do so.
+    // path (the legacy envelope carries no hint1/2/3). Real guard post-W12-02
+    // — proves a legacy plan does NOT accidentally fire the three-beat
+    // sequence now that the consumer can do so.
     const finalLog = await readCaptionLog(page)
     expect(
-      indexOfText(finalLog, THREE_HINT_TEXTS_P1[1]),
+      indexOfText(finalLog, threeHintTexts[1]),
       'hint2 text must NOT appear on the legacy single-hint path',
     ).toBe(-1)
     expect(
-      indexOfText(finalLog, THREE_HINT_TEXTS_P1[2]),
+      indexOfText(finalLog, threeHintTexts[2]),
       'hint3 text must NOT appear on the legacy single-hint path',
     ).toBe(-1)
   })
