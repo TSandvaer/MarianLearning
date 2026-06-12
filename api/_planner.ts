@@ -1380,7 +1380,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - correct: "Yes! <answer>!" e.g. "Yes! Eight!"
   - reprompt: "Hmm... try again?" (verbatim)
   - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every add-to-10 problem; directs attention to the flower groups before naming any quantity)
-  - hint2 (quantity-A): "<addend-A> flowers." e.g. "Five flowers." (names the first group's count only)
+  - hint2 (quantity-A): "<addend-A> flowers." e.g. "Five flowers." (names the first group's count only). SINGULAR-PLURAL RULE: when addend-A is exactly 1, the noun MUST be singular — emit "One flower." (NOT "One flowers."). For addend-A >= 2 use the plural "flowers". Worked example: addend-A 1 -> "One flower." ; addend-A 3 -> "Three flowers."
   - hint3 (add + question): "And <addend-B> more. How many now?" e.g. "And three more. How many now?" (introduces the second group and poses the question)
   - giveAnswer: "This one is <answer>." e.g. "This one is eight."
 
@@ -1521,7 +1521,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - reprompt: "Hmm... try again?" (verbatim)
   THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Use "take away" framing in hint3 regardless of the read-line variant — the hint is a scaffold, not a primary read.
   - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every sub-to-10 problem; directs attention to the flower group before naming any quantity)
-  - hint2 (quantity-A): "<minuend> flowers." e.g. "Ten flowers." (names the starting count only)
+  - hint2 (quantity-A): "<minuend> flowers." e.g. "Ten flowers." (names the starting count only). SINGULAR-PLURAL RULE: when the minuend is exactly 1, the noun MUST be singular — emit "One flower." (NOT "One flowers."). For minuend >= 2 use the plural "flowers". Worked example: minuend 1 -> "One flower." ; minuend 7 -> "Seven flowers."
   - hint3 (take away + question): "Take away <subtrahend>. How many now?" e.g. "Take away two. How many now?" (removes the subtrahend and poses the question)
   - giveAnswer: "This one is <answer>." e.g. "This one is eight." (for correct=0 → "This one is zero.")
 
@@ -1838,10 +1838,24 @@ Per-problem utterance template (any focus node):
 - read: see the focus-node-specific shape above.
 - correct: "Yes! <answer>!" e.g. "Yes! Five!"
 - reprompt: "Hmm... try again?"  (verbatim)
-THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY math problem, NOT one — emit all three. Each ramps one cognitive sub-step at a time: hint1 directs attention, hint2 names the first quantity/cue, hint3 completes the operation and poses the question. Focus nodes WITH a dedicated PER-PROBLEM SHAPE block above (add-to-10, add-to-20, sub-to-10, sub-to-20, two-digit-addsub-no-regroup, two-digit-addsub-with-regroup) use THAT block's hint1/hint2/hint3 templates. For the remaining math nodes (number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9), use this generic three-step shape:
-- hint1 (attention-direction): "Look." (verbatim — directs attention before the scaffold)
-- hint2 (first cue): "<the first scaffold step>." e.g. for skip-counting — "We added two each time."; for mult — "Two groups of five."
-- hint3 (complete + question): "<the completing step + question>." e.g. for skip-counting — "What comes next?"; for mult — "How many in all?"
+THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY math problem, NOT one — emit all three. Each ramps one cognitive sub-step at a time: hint1 directs attention, hint2 names the first quantity/cue, hint3 completes the operation and poses the question. Focus nodes WITH a dedicated PER-PROBLEM SHAPE block above (add-to-10, add-to-20, sub-to-10, sub-to-20, two-digit-addsub-no-regroup, two-digit-addsub-with-regroup) use THAT block's hint1/hint2/hint3 templates. For the remaining math nodes (number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9), use the per-tier DETERMINISTIC templates below (Wave 12, ticket 86ca8704f — Dave's generic-tier hint templates, design/research/w12-generic-tier-hint-templates.md). Each is a pure function of the problem's read-line operands; do NOT improvise scaffold prose.
+
+  GENERIC-TIER HINT TEMPLATES (number-recog / skip-counting / mult-*):
+
+  · number-recog (read "Tap the <number-word>."):
+    - hint1: "Look at the numbers." (verbatim)
+    - hint2: a topological fact keyed on the target number — LOOKUP TABLE (verbatim, NOT computed): 1 -> "One is the smallest." ; 2 -> "Two comes right after one." ; 3 -> "Three comes after two." ; 4 -> "Four comes after three." ; 5 -> "Five is in the middle." ; 6 -> "Six comes after five." ; 7 -> "Seven is bigger than five." ; 8 -> "Eight comes after seven." ; 9 -> "Nine is close to ten." ; 10 -> "Ten is the biggest."
+    - hint3: "Which one is <number-word>?" e.g. "Which one is five?" (the read line is declarative, so hint3 converts it to an interrogative — the only tier where hint3 is not a verbatim read-line question echo)
+
+  · skip-counting (read "<sequence-terms>. What is next?"):
+    - hint1: "Look at the numbers." (verbatim)
+    - hint2: "We add <step-word> each time." where step-word is the common difference (second term minus first term) spelled as a word — "two" / "five" / "ten"
+    - hint3: "<last-term-word> and <step-word> more is what?" where last-term-word is the final number word in the sequence before ". What is next?" e.g. "Fourteen and two more is what?"
+
+  · mult-2-5-10 / mult-3-4 / mult-6-9 (read "<factor-a-word> times <factor-b-word>. How many?"):
+    - hint1: "Look at the groups." (verbatim)
+    - hint2: a repeated-addition chain, CASE-SPLIT on factor-b (the number of copies; read-line operand order — factor-b copies of factor-a, NO commutative flip): factor-b 1 -> "One group of <factor-a-word>." ; factor-b 2 -> "<factor-a-word> and <factor-a-word> more." ; factor-b 3 -> "<factor-a-word>, then <factor-a-word>, then <factor-a-word>." ; factor-b 4 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>." ; factor-b 5 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>."
+    - hint3: "How many?" (verbatim — the read-line question clause)
 - giveAnswer: "This one is <answer>." e.g. "This one is five."
 
 Pick exactly 8 distinct problems for the focus node, ordered easier → slightly harder across problems 1-8. Spell numbers as words (one, two, ... ten, eleven, ... twenty), not digits. Capitalize the first word of each sentence. The "recent score" hint in the user message guides easier-vs-harder mix: low score → mostly the easiest end of the slice; high score → push the harder end.`

@@ -424,6 +424,12 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
       ['five', 'four', 'nine'],
     ] as const
     const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1)
+    // hint2 names the first group's count; the noun is singular when that
+    // count is exactly 1 ("One flower.", not "One flowers.") — the
+    // SINGULAR-PLURAL RULE the add-to-10 directive carries (Devon NIT-1,
+    // ticket 86ca8704f). Mirror it here so the round-trip fixture models
+    // grammatical canon.
+    const flowers = (word: string) => (word === 'one' ? 'flower' : 'flowers')
     const problemUtterances = addends.flatMap(([a, b, sum], i) => {
       const n = i + 1
       return [
@@ -431,7 +437,7 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
         { id: `math.p${n}.correct`, text: `Yes! ${cap(sum)}!` },
         { id: `math.p${n}.reprompt`, text: 'Hmm... try again?' },
         { id: `math.p${n}.hint1`, text: 'Look at the flowers.' },
-        { id: `math.p${n}.hint2`, text: `${cap(a)} flowers.` },
+        { id: `math.p${n}.hint2`, text: `${cap(a)} ${flowers(a)}.` },
         { id: `math.p${n}.hint3`, text: `And ${b} more. How many now?` },
         { id: `math.p${n}.giveAnswer`, text: `This one is ${sum}.` },
       ]
@@ -477,10 +483,12 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
       // …and NO legacy single hint.
       expect(problem.utterances.hint).toBeUndefined()
     }
-    // Spot-check P1's per-step wording maps to the three sub-steps.
+    // Spot-check P1's per-step wording maps to the three sub-steps. P1's
+    // addend-A is 1, so hint2 uses the SINGULAR noun ("One flower.") per the
+    // directive's SINGULAR-PLURAL RULE (Devon NIT-1, ticket 86ca8704f).
     const p1 = session.problems[0]!
     expect(p1.utterances.hint1).toBe('Look at the flowers.')
-    expect(p1.utterances.hint2).toBe('One flowers.')
+    expect(p1.utterances.hint2).toBe('One flower.')
     expect(p1.utterances.hint3).toBe('And one more. How many now?')
   })
 
@@ -511,6 +519,38 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
     expect(systemText).toContain(
       'read, correct, reprompt, hint1, hint2, hint3, giveAnswer',
     )
+  })
+
+  it('the add-to-10 and sub-to-10 hint2 templates carry the SINGULAR-PLURAL RULE (Devon NIT-1, ticket 86ca8704f)', async () => {
+    // The hint2 quantity template "<X> flowers." bakes ungrammatical
+    // "One flowers." when the first operand is 1 (REAL in live add-to-10
+    // canon: P1 "One plus two"). The directive must instruct the singular
+    // "One flower." form at the two exposed tiers (add-to-10 + sub-to-10).
+    // Drift-guard so a future prompt-simplification can't silently drop it.
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeThreeHintMathPlan(), { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+
+    // The block-header-shaped rule must be present and must name the
+    // singular noun form explicitly.
+    expect(systemText).toContain('SINGULAR-PLURAL RULE')
+    expect(systemText).toContain('One flower.')
+    // And it must forbid the ungrammatical plural with operand 1.
+    expect(systemText).toMatch(/NOT "One flowers\."/)
+    // Both exposed tiers carry the rule — count must be >= 2 (add-to-10 +
+    // sub-to-10). add-to-20/sub-to-20/two-digit are not exposed (operand-A
+    // is never 1 by their range rules), so the rule is intentionally only
+    // at the two exposed sites.
+    const occurrences = systemText.split('SINGULAR-PLURAL RULE').length - 1
+    expect(occurrences).toBe(2)
   })
 
   it('AC#1 — the SYSTEM_PREAMBLE keeps word-song at 5 slots (single hint) — Wave 12 is math-only', async () => {
