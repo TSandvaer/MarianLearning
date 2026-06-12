@@ -95,7 +95,6 @@ import { resolve } from 'node:path'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
-  forceHowlerUnlock,
   seedLocalStorage,
 } from './_helpers/seedStorage'
 
@@ -589,8 +588,17 @@ test.describe('sight-words content round-trip + recognition mechanic (W11-04)', 
     // the failing-first RED signal (pre-navigation, clean message).
     await installSightWordsClaudeMock(page, readSightWordsCanon().raw)
     await page.goto('/')
-    await forceHowlerUnlock(page)
-
+    // NOTE: do NOT call forceHowlerUnlock here. This test serves real
+    // on-disk canon MP3 bytes; forceHowlerUnlock's stubbed AudioContext
+    // breaks the MP3 decode → prepareWordSongPathA throws → the App
+    // silently demotes to the static blending-cv plan (picture card +
+    // <WordPicture> chips render), making the render assertions below
+    // unsatisfiable for the WRONG reason (audio-race, not missing
+    // render). The canon-bytes + real-gesture-unlock chain + the
+    // `data-read-aloud-played` gate below is the correct mechanism —
+    // mirrors `digraphs-sh-content.spec.ts` test 3, which omits
+    // forceHowlerUnlock for exactly this reason (testing-and-ci.md
+    // §4.1.2 silent-demote caveat + §4.1.6).
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="word-song"]')
