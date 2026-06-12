@@ -1,6 +1,6 @@
 {
-  "generated": "2026-06-11",
-  "sourceIssue": 372,
+  "generated": "2026-06-12",
+  "sourceIssue": 391,
   "items": {
     "number-recog#math.p6.hint": {
       "pr": 384
@@ -28,91 +28,7 @@
     "letter-sounds-audit#word.p2.read": {
       "pr": 384
     },
-    "greet#greet-01-hi.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "greet#greet-02-im-emma.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "greet#greet-03-nice-to-meet-you.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "greet#greet-04-tap-the-heart.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-enter-number-garden.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-enter-word-song.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-back-soon-alt-1.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-back-soon-alt-2.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-back-soon.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-first-again.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-pick-again.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-pick-next.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-try-number-garden-alt-1.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-try-number-garden-alt-2.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-try-number-garden.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-try-word-song-alt-1.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-try-word-song-alt-2.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-try-word-song.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-what-today-alt-1.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-what-today-alt-2.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
     "hub#hub-welcome-what-today-alt-3.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
-    },
-    "hub#hub-welcome-what-today.mp3": {
       "pr": 382,
       "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
     }
