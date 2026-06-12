@@ -1380,7 +1380,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - correct: "Yes! <answer>!" e.g. "Yes! Eight!"
   - reprompt: "Hmm... try again?" (verbatim)
   - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every add-to-10 problem; directs attention to the flower groups before naming any quantity)
-  - hint2 (quantity-A): "<addend-A> flowers." e.g. "Five flowers." (names the first group's count only)
+  - hint2 (quantity-A): "<addend-A> flowers." e.g. "Five flowers." (names the first group's count only). SINGULAR-PLURAL RULE: when addend-A is exactly 1, the noun MUST be singular — emit "One flower." (NOT "One flowers."). For addend-A >= 2 use the plural "flowers". Worked example: addend-A 1 -> "One flower." ; addend-A 3 -> "Three flowers."
   - hint3 (add + question): "And <addend-B> more. How many now?" e.g. "And three more. How many now?" (introduces the second group and poses the question)
   - giveAnswer: "This one is <answer>." e.g. "This one is eight."
 
@@ -1521,7 +1521,7 @@ The user message names a focus skill node. Generate problems specifically for th
   - reprompt: "Hmm... try again?" (verbatim)
   THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Use "take away" framing in hint3 regardless of the read-line variant — the hint is a scaffold, not a primary read.
   - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every sub-to-10 problem; directs attention to the flower group before naming any quantity)
-  - hint2 (quantity-A): "<minuend> flowers." e.g. "Ten flowers." (names the starting count only)
+  - hint2 (quantity-A): "<minuend> flowers." e.g. "Ten flowers." (names the starting count only). SINGULAR-PLURAL RULE: when the minuend is exactly 1, the noun MUST be singular — emit "One flower." (NOT "One flowers."). For minuend >= 2 use the plural "flowers". Worked example: minuend 1 -> "One flower." ; minuend 7 -> "Seven flowers."
   - hint3 (take away + question): "Take away <subtrahend>. How many now?" e.g. "Take away two. How many now?" (removes the subtrahend and poses the question)
   - giveAnswer: "This one is <answer>." e.g. "This one is eight." (for correct=0 → "This one is zero.")
 
