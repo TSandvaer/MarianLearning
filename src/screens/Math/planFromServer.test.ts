@@ -778,3 +778,190 @@ describe('mathSessionPlanFromServer — two-digit-addsub canon integration (PR #
     })
   })
 })
+
+// ─── Three-hint slot widening (W12-01, ticket 86ca86zyq) ────────────────────
+//
+// The math hint scaffold is being split from a single `hint` utterance into
+// three escalating sub-step utterances `hint1`/`hint2`/`hint3`. Per the
+// planner↔parser contract (parser-first), the parser must accept BOTH the
+// legacy single-hint canon (committed today) AND the post-W12-04 three-hint
+// canon — but must REJECT a partial triple, which would silently render a
+// broken hint sequence (wave-12-plan §8 risk 3). These tests pin the
+// back-compat predicate: a problem is valid iff it has read+correct+reprompt+
+// giveAnswer AND (hint OR all of hint1/hint2/hint3).
+describe('mathSessionPlanFromServer — three-hint slot widening (W12-01)', () => {
+  /** Build an 8-problem addition wire where each problem's hint shape is
+   *  chosen by `hintFor(problemIndex)` → a list of `{ slot, text }` rows.
+   *  Lets each test express exactly which hint slots a problem carries
+   *  (legacy `hint`, the full triple, a partial triple, or none). */
+  function buildWire(
+    hintFor: (p: number) => ReadonlyArray<{ slot: string; text: string }>,
+  ) {
+    const reads: ReadonlyArray<{ a: number; b: number }> = [
+      { a: 3, b: 2 },
+      { a: 1, b: 4 },
+      { a: 4, b: 2 },
+      { a: 5, b: 3 },
+      { a: 2, b: 5 },
+      { a: 6, b: 3 },
+      { a: 4, b: 4 },
+      { a: 5, b: 5 },
+    ]
+    const word = (n: number) =>
+      [
+        'zero',
+        'one',
+        'two',
+        'three',
+        'four',
+        'five',
+        'six',
+        'seven',
+        'eight',
+        'nine',
+        'ten',
+      ][n]!
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+    const utterances: { id: string; text: string }[] = []
+    reads.forEach((r, i) => {
+      const p = i + 1
+      utterances.push({
+        id: `math.p${p}.read`,
+        text: `${cap(word(r.a))} plus ${word(r.b)}. How many?`,
+      })
+      utterances.push({
+        id: `math.p${p}.correct`,
+        text: `Yes! ${cap(word(r.a + r.b))}!`,
+      })
+      utterances.push({ id: `math.p${p}.reprompt`, text: 'Hmm... try again?' })
+      for (const h of hintFor(p)) {
+        utterances.push({ id: `math.p${p}.${h.slot}`, text: h.text })
+      }
+      utterances.push({
+        id: `math.p${p}.giveAnswer`,
+        text: `This one is ${word(r.a + r.b)}.`,
+      })
+    })
+    return { id: 'three-hint-test', label: 'Three-hint test', utterances }
+  }
+
+  const legacyHint = () => [
+    { slot: 'hint', text: 'Look. And more. How many now?' },
+  ]
+  const fullTriple = () => [
+    { slot: 'hint1', text: 'Look at the flowers.' },
+    { slot: 'hint2', text: 'Three flowers.' },
+    { slot: 'hint3', text: 'And two more. How many?' },
+  ]
+
+  it('parses a legacy single-hint canon (back-compat — committed canon today)', () => {
+    const rebuilt = mathSessionPlanFromServer(buildWire(legacyHint))
+    expect(rebuilt.problems).toHaveLength(8)
+    // Legacy hint round-trips; the triple fields stay absent.
+    const p1 = rebuilt.problems[0]!
+    expect(p1.utterances.hint).toBe('Look. And more. How many now?')
+    expect(p1.utterances.hint1).toBeUndefined()
+    expect(p1.utterances.hint2).toBeUndefined()
+    expect(p1.utterances.hint3).toBeUndefined()
+  })
+
+  it('parses a three-hint canon (hint1/hint2/hint3 per problem, no legacy hint)', () => {
+    const rebuilt = mathSessionPlanFromServer(buildWire(fullTriple))
+    expect(rebuilt.problems).toHaveLength(8)
+    const p1 = rebuilt.problems[0]!
+    expect(p1.utterances.hint1).toBe('Look at the flowers.')
+    expect(p1.utterances.hint2).toBe('Three flowers.')
+    expect(p1.utterances.hint3).toBe('And two more. How many?')
+    // No legacy hint on a three-hint problem.
+    expect(p1.utterances.hint).toBeUndefined()
+    // Addends still parse off the read line.
+    expect(p1).toMatchObject({ addendA: 3, addendB: 2, correct: 5, op: '+' })
+  })
+
+  it('parses a plan that mixes legacy-hint and three-hint problems (each independent)', () => {
+    // The back-compat predicate is per-problem: a transitional plan could
+    // carry some legacy problems and some three-hint problems. Each must be
+    // validated on its own.
+    const rebuilt = mathSessionPlanFromServer(
+      buildWire((p) => (p % 2 === 1 ? legacyHint() : fullTriple())),
+    )
+    expect(rebuilt.problems).toHaveLength(8)
+    expect(rebuilt.problems[0]!.utterances.hint).toBe(
+      'Look. And more. How many now?',
+    )
+    expect(rebuilt.problems[1]!.utterances.hint1).toBe('Look at the flowers.')
+    expect(rebuilt.problems[1]!.utterances.hint).toBeUndefined()
+  })
+
+  it('throws a clear error on a partial triple (hint1 only, no hint2/hint3)', () => {
+    const wire = buildWire((p) =>
+      p === 4
+        ? [{ slot: 'hint1', text: 'Look at the flowers.' }]
+        : fullTriple(),
+    )
+    expect(() => mathSessionPlanFromServer(wire)).toThrow(PlanFromServerError)
+    expect(() => mathSessionPlanFromServer(wire)).toThrow(
+      /problem 4 has a partial hint triple/,
+    )
+    // Names the first missing slot so the error points at the gap.
+    expect(() => mathSessionPlanFromServer(wire)).toThrow(
+      /missing slot "hint2"/,
+    )
+  })
+
+  it('throws on a partial triple missing only hint3 (hint1+hint2 present)', () => {
+    const wire = buildWire((p) =>
+      p === 2
+        ? [
+            { slot: 'hint1', text: 'Look at the flowers.' },
+            { slot: 'hint2', text: 'Three flowers.' },
+          ]
+        : legacyHint(),
+    )
+    expect(() => mathSessionPlanFromServer(wire)).toThrow(
+      /problem 2 has a partial hint triple/,
+    )
+    expect(() => mathSessionPlanFromServer(wire)).toThrow(
+      /missing slot "hint3"/,
+    )
+  })
+
+  it('throws when a problem carries NO hint of any shape', () => {
+    const wire = buildWire((p) => (p === 5 ? [] : legacyHint()))
+    expect(() => mathSessionPlanFromServer(wire)).toThrow(PlanFromServerError)
+    expect(() => mathSessionPlanFromServer(wire)).toThrow(
+      /problem 5 missing slot "hint"/,
+    )
+  })
+
+  it('still validates the always-present slots independently of hint shape', () => {
+    // Drop a non-hint slot on a three-hint problem — must still throw the
+    // existing missing-slot error, proving the hint predicate didn't loosen
+    // the read/correct/reprompt/giveAnswer requirement.
+    const wire = buildWire(fullTriple)
+    const broken = {
+      ...wire,
+      utterances: wire.utterances.filter((u) => u.id !== 'math.p3.correct'),
+    }
+    expect(() => mathSessionPlanFromServer(broken)).toThrow(
+      /problem 3 missing slot "correct"/,
+    )
+  })
+
+  it('still skips out-of-namespace ids alongside three-hint problems', () => {
+    // The skip-not-throw contract (86c9kj2u6) is unchanged by the hint
+    // widening — session.end.* ids are ignored, the three-hint plan parses.
+    const wire = buildWire(fullTriple)
+    const additive = {
+      ...wire,
+      utterances: [
+        ...wire.utterances,
+        { id: 'session.end.opener', text: 'You did it!' },
+        { id: 'session.end.goodbye', text: 'See you soon.' },
+      ],
+    }
+    const rebuilt = mathSessionPlanFromServer(additive)
+    expect(rebuilt.problems).toHaveLength(8)
+    expect(rebuilt.problems[0]!.utterances.hint1).toBe('Look at the flowers.')
+  })
+})

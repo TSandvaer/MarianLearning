@@ -91,12 +91,27 @@ export interface MathUtteranceSource {
   text: string
 }
 
-/** Slot names matching the per-problem utterance set. */
+/**
+ * Slot names matching the per-problem utterance set.
+ *
+ * Three-hint widening (W12-01, ticket 86ca86zyq): the single legacy `hint`
+ * slot is being split into three escalating sub-step utterances
+ * `hint1` / `hint2` / `hint3` so the after-2-wrong scaffold ramps one
+ * cognitive step at a time (Dave's developmental ruling, wave-12-plan §2).
+ * Per the planner↔parser contract (parser-first), this slot type + the
+ * parser accept BOTH shapes through the transition; committed legacy canon
+ * keeps working until the targeted re-bake (W12-04) replaces `hint` with
+ * the triple. See {@link MathProblemUtterances} for the back-compat
+ * predicate that governs which combination is structurally valid.
+ */
 export type MathUtteranceSlot =
   | 'read'
   | 'correct'
   | 'reprompt'
   | 'hint'
+  | 'hint1'
+  | 'hint2'
+  | 'hint3'
   | 'giveAnswer'
 
 /**
@@ -117,16 +132,84 @@ export function mathUtteranceId(
   return `math.p${problemIndex}.${slot}`
 }
 
-/** Slots emitted in canonical render order — matches the spec's bundle layout. */
-const ALL_SLOTS: readonly MathUtteranceSlot[] = [
-  'read',
-  'correct',
-  'reprompt',
-  'hint',
-  'giveAnswer',
+/** The three escalating hint sub-step slots (W12-01). A three-hint problem
+ *  carries all three; a legacy problem carries the single `hint` instead. */
+const HINT_TRIPLE_SLOTS: readonly MathUtteranceSlot[] = [
+  'hint1',
+  'hint2',
+  'hint3',
 ]
 
-/** Per-problem audio set. Lines map 1:1 to Kyle's spec §Audio integration. */
+/**
+ * Resolve the hint slots actually present on a problem's utterance set.
+ * Returns the legacy `['hint']` when the single field is present, or the
+ * `['hint1','hint2','hint3']` triple when all three are present. This is the
+ * shared source of truth for which hint slots the wire adapters flatten /
+ * rehydrate — it never emits or requires a partial triple.
+ *
+ * Precedence: legacy `hint` wins if both are somehow present (which the
+ * back-compat predicate forbids, but defends the adapter against malformed
+ * input). Throws nothing — callers that need validation use
+ * {@link mathSessionPlanFromServer}'s structural check.
+ */
+function presentHintSlots(
+  utterances: Partial<MathProblemUtterances>,
+): readonly MathUtteranceSlot[] {
+  if (typeof utterances.hint === 'string') return ['hint']
+  if (HINT_TRIPLE_SLOTS.every((s) => typeof utterances[s] === 'string')) {
+    return HINT_TRIPLE_SLOTS
+  }
+  // No complete hint shape present — emit nothing rather than a partial
+  // triple. The structural validators (mathSessionPlanFromServer) are the
+  // gate that rejects this; the flatten adapter is best-effort.
+  return []
+}
+
+/**
+ * The per-problem slots in canonical render order, given the problem's hint
+ * shape. The hint slot(s) sit BETWEEN `reprompt` and `giveAnswer` so the
+ * bundle layout matches the spec — legacy plans flatten to
+ * `read,correct,reprompt,hint,giveAnswer` (5); three-hint plans to
+ * `read,correct,reprompt,hint1,hint2,hint3,giveAnswer` (7).
+ */
+function orderedSlots(
+  utterances: Partial<MathProblemUtterances>,
+): readonly MathUtteranceSlot[] {
+  return [
+    'read',
+    'correct',
+    'reprompt',
+    ...presentHintSlots(utterances),
+    'giveAnswer',
+  ]
+}
+
+/**
+ * Per-problem audio set. Lines map 1:1 to Kyle's spec §Audio integration.
+ *
+ * Hint shape — back-compat predicate (W12-01, ticket 86ca86zyq)
+ * ------------------------------------------------------------
+ * The hint scaffold exists in TWO mutually-exclusive shapes, and a problem
+ * is structurally valid only when it carries exactly one of them:
+ *
+ *   - **Legacy single hint** — the `hint` field is present (committed canon
+ *     today; static fallback plans).
+ *   - **Three escalating hints** — all of `hint1`, `hint2`, `hint3` are
+ *     present (post-W12-04 targeted re-bake).
+ *
+ * A problem is valid iff it has `read + correct + reprompt + giveAnswer`
+ * AND (`hint` OR all of `hint1`/`hint2`/`hint3`). A *partial* triple
+ * (e.g. `hint1` without `hint2`) is INVALID — `mathSessionPlanFromServer`
+ * throws a clear missing-slot error rather than silently rendering a broken
+ * sequence (wave-12-plan §8 risk 3).
+ *
+ * All four hint fields are typed optional because either side of the OR may
+ * be absent at the type level; the *runtime* back-compat predicate (in the
+ * parser) is the binding constraint, not the static interface. This mirrors
+ * the project's producer-strict / boundary-loose discipline
+ * (progress-and-persistence.md). The three-beat consumer wiring is W12-02 —
+ * W12-01 only widens the type + parser so committed canon keeps working.
+ */
 export interface MathProblemUtterances {
   /** "Three plus two. How many?" — read on problem reveal. */
   read: string
@@ -134,8 +217,20 @@ export interface MathProblemUtterances {
   correct: string
   /** "Hmm... try again?" — fired on wrong tap (1st or 2nd attempt). */
   reprompt: string
-  /** "Look. Three. And two more. How many now?" — fires after 2 wrongs. */
-  hint: string
+  /** Legacy single composite hint, "Look. Three. And two more. How many
+   *  now?" — fires after 2 wrongs. Present on committed canon + static
+   *  fallback plans; absent once W12-04 re-bakes to the three-hint triple.
+   *  Optional under the back-compat predicate above. */
+  hint?: string
+  /** Hint sub-step 1 (attention-direction, e.g. "Look at the flowers.").
+   *  Present only on three-hint plans (post-W12-04). Optional. */
+  hint1?: string
+  /** Hint sub-step 2 (quantity-A, e.g. "Three flowers."). Three-hint plans
+   *  only. Optional. */
+  hint2?: string
+  /** Hint sub-step 3 (add + question, e.g. "And two more. How many?").
+   *  Three-hint plans only. Optional. */
+  hint3?: string
   /** "This one is five." — fires after 3 wrongs (guided completion). */
   giveAnswer: string
 }
@@ -509,10 +604,17 @@ export function mathSessionPlanToUtteranceSources(
 ): MathUtteranceSource[] {
   const out: MathUtteranceSource[] = []
   for (const problem of plan.problems) {
-    for (const slot of ALL_SLOTS) {
+    // Emit slots in canonical render order, with whichever hint shape the
+    // problem actually carries (legacy single `hint` OR the hint1/2/3
+    // triple) sitting between reprompt and giveAnswer. Legacy plans flatten
+    // to 5 utterances/problem, three-hint plans to 7 — never an absent
+    // slot's `undefined` text.
+    for (const slot of orderedSlots(problem.utterances)) {
+      const text = problem.utterances[slot]
+      if (typeof text !== 'string') continue
       out.push({
         id: mathUtteranceId(problem.index, slot),
-        text: problem.utterances[slot],
+        text,
       })
     }
   }
@@ -551,8 +653,13 @@ export function mathSessionPlanFromWire(
   for (const u of utterances) byId.set(u.id, u)
 
   const rebuiltProblems: MathProblem[] = skeleton.problems.map((problem) => {
+    // Rehydrate the slots the skeleton declares, in canonical render order —
+    // the always-present set plus whichever hint shape (legacy `hint` OR the
+    // hint1/2/3 triple) the skeleton problem carries. The skeleton is the
+    // source of truth for which hint slots to expect, so a legacy skeleton
+    // requires `hint` and a three-hint skeleton requires the full triple.
     const slotTexts: Partial<MathProblemUtterances> = {}
-    for (const slot of ALL_SLOTS) {
+    for (const slot of orderedSlots(problem.utterances)) {
       const id = mathUtteranceId(problem.index, slot)
       const u = byId.get(id)
       if (!u) {

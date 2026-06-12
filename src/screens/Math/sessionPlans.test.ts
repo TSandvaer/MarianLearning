@@ -517,3 +517,88 @@ describe('pickStaticSessionPlan focus-node dispatch (ticket 86c9q5q13)', () => {
     )
   })
 })
+
+// ── Three-hint slot widening — wire adapters (W12-01, ticket 86ca86zyq) ──────
+//
+// The wire adapters must flatten / rehydrate EITHER hint shape: a legacy
+// problem (single `hint`) flattens to 5 utterances; a three-hint problem
+// (hint1/hint2/hint3) flattens to 7. Neither emits an absent slot's
+// undefined text, and rehydration follows the skeleton's declared shape.
+describe('wire adapters — three-hint shape (W12-01)', () => {
+  /** A minimal one-problem plan whose single problem carries the three-hint
+   *  triple instead of the legacy `hint`. */
+  function threeHintPlan(): MathSessionPlan {
+    return {
+      id: 'three-hint-A',
+      label: 'Three-hint test plan',
+      problems: [
+        {
+          index: 1,
+          addendA: 3,
+          addendB: 2,
+          correct: 5,
+          op: '+',
+          utterances: {
+            read: 'Three plus two. How many?',
+            correct: 'Yes! Five!',
+            reprompt: 'Hmm... try again?',
+            hint1: 'Look at the flowers.',
+            hint2: 'Three flowers.',
+            hint3: 'And two more. How many?',
+            giveAnswer: 'This one is five.',
+          },
+        },
+      ],
+    }
+  }
+
+  it('flattens a three-hint problem to 7 utterances in canonical order', () => {
+    const sources = mathSessionPlanToUtteranceSources(threeHintPlan())
+    expect(sources.map((s) => s.id)).toEqual([
+      'math.p1.read',
+      'math.p1.correct',
+      'math.p1.reprompt',
+      'math.p1.hint1',
+      'math.p1.hint2',
+      'math.p1.hint3',
+      'math.p1.giveAnswer',
+    ])
+    // No legacy hint id leaks in.
+    expect(sources.map((s) => s.id)).not.toContain('math.p1.hint')
+  })
+
+  it('flattens a legacy problem to 5 utterances (single hint, no triple)', () => {
+    const plan = STATIC_SESSION_PLANS[0]!
+    const sources = mathSessionPlanToUtteranceSources(plan)
+    // 8 problems × 5 slots — unchanged from pre-W12-01.
+    expect(sources).toHaveLength(8 * 5)
+    expect(sources.slice(0, 5).map((s) => s.id)).toEqual([
+      'math.p1.read',
+      'math.p1.correct',
+      'math.p1.reprompt',
+      'math.p1.hint',
+      'math.p1.giveAnswer',
+    ])
+    // No triple ids on legacy plans.
+    expect(sources.map((s) => s.id)).not.toContain('math.p1.hint1')
+  })
+
+  it('round-trips a three-hint plan: flatten → rehydrate is structurally equal', () => {
+    const skeleton = threeHintPlan()
+    const sources = mathSessionPlanToUtteranceSources(skeleton)
+    const utterances = sources.map((s) => fakeUtterance(s.id, s.text))
+    const rehydrated = mathSessionPlanFromWire(skeleton, utterances)
+    expect(JSON.stringify(rehydrated)).toBe(JSON.stringify(skeleton))
+  })
+
+  it('rehydrate throws when a three-hint sub-step is missing from the wire', () => {
+    const skeleton = threeHintPlan()
+    const sources = mathSessionPlanToUtteranceSources(skeleton)
+    const incomplete = sources
+      .filter((s) => s.id !== 'math.p1.hint2')
+      .map((s) => fakeUtterance(s.id, s.text))
+    expect(() => mathSessionPlanFromWire(skeleton, incomplete)).toThrow(
+      /missing utterance "math\.p1\.hint2"/,
+    )
+  })
+})
