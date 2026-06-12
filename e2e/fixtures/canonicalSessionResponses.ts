@@ -118,6 +118,37 @@ function mathUtterances(): Utterance[] {
   return out
 }
 
+/**
+ * Math problem utterances in the Wave-12 THREE-HINT shape: the single
+ * legacy `hint` slot is replaced by the `hint1`/`hint2`/`hint3` triple
+ * (ticket 86ca8702v). Same read/correct/reprompt/giveAnswer text as the
+ * legacy fixture — only the hint slot widens. Used by the W12-03 planner
+ * round-trip test and (via {@link canonicalMathThreeHintSessionResponse})
+ * by the W12-05 three-beat E2E spec.
+ *
+ * The legacy {@link mathUtterances} builder is intentionally retained so
+ * the existing sub-to-10 / Leitner / distractor-class specs keep
+ * exercising the back-compat single-hint path that W12-01's parser still
+ * accepts.
+ */
+function mathThreeHintUtterances(): Utterance[] {
+  const out: Utterance[] = []
+  for (const p of MATH_PROBLEMS) {
+    const aCap = capitalize(p.addendAWord)
+    const sumCap = capitalize(p.sumWord)
+    out.push(
+      utt(`math.p${p.index}.read`, `${aCap} plus ${p.addendBWord}. How many?`),
+      utt(`math.p${p.index}.correct`, `Yes! ${sumCap}!`),
+      utt(`math.p${p.index}.reprompt`, 'Hmm... try again?'),
+      utt(`math.p${p.index}.hint1`, 'Look at the flowers.'),
+      utt(`math.p${p.index}.hint2`, `${aCap} flowers.`),
+      utt(`math.p${p.index}.hint3`, `And ${p.addendBWord} more. How many now?`),
+      utt(`math.p${p.index}.giveAnswer`, `This one is ${p.sumWord}.`),
+    )
+  }
+  return out
+}
+
 // ── Word-song problems — CVC short-a "Tap the <word>." ────────────────────
 
 const WORD_SONG_PROBLEMS: ReadonlyArray<{ index: number; word: string }> = [
@@ -202,6 +233,31 @@ export function canonicalMathSessionResponse(): SessionStartResponse {
     plan: {
       id: 'sums-to-10-warm-up',
       label: 'Sums to 10 — warm up',
+      utterances: [
+        ...problemUtterances.map((u) => ({ id: u.id, text: u.text })),
+        ...sessionEndUtterances().map((u) => ({ id: u.id, text: u.text })),
+      ],
+    },
+    utterances: [...problemUtterances, ...sessionEndUtterances()],
+  }
+}
+
+/**
+ * Wave-12 three-hint variant of {@link canonicalMathSessionResponse}: each
+ * math problem carries `math.p<N>.hint1`/`hint2`/`hint3` instead of the
+ * single legacy `math.p<N>.hint` (ticket 86ca8702v). Read/correct/reprompt/
+ * giveAnswer + session-end utterances are byte-identical to the legacy
+ * fixture. Feeds the W12-05 three-beat E2E spec and the W12-03 round-trip
+ * test that proves a three-hint plan parses through W12-01's widened parser.
+ */
+export function canonicalMathThreeHintSessionResponse(): SessionStartResponse {
+  const problemUtterances = mathThreeHintUtterances()
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: {
+      id: 'sums-to-10-warm-up-three-hint',
+      label: 'Sums to 10 — warm up (three-hint)',
       utterances: [
         ...problemUtterances.map((u) => ({ id: u.id, text: u.text })),
         ...sessionEndUtterances().map((u) => ({ id: u.id, text: u.text })),

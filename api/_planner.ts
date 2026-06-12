@@ -464,17 +464,25 @@ export async function generateSessionPlan(
   try {
     response = await args.client.messages.create({
       model: PLANNER_MODEL_ID,
-      // 8 problems × 5 utterance slots + 19 Session-End utterances = 59
-      // utterances. At ~12 tokens per line plus JSON structural overhead
-      // and Haiku's tendency to wrap in a markdown fence, a generous
-      // upper bound is ~1500 tokens. We use 4000 to leave headroom for
+      // Worst-case output sizing. WORD-SONG: 8 problems × 5 slots + 19
+      // Session-End = 59 utterances. MATH (post Wave-12 three-hint split,
+      // ticket 86ca8702v): 8 problems × 7 slots + 19 = 75 utterances —
+      // the read/correct/reprompt/giveAnswer lines are unchanged and the
+      // three new hint sub-steps (hint1/hint2/hint3) are SHORT fragments
+      // ("Look." / "Fifty-three." / "And nine more. How many now?"), each
+      // shorter than the old single composite hint, so the +16 utterance
+      // count adds little token weight. Empirical worst case (full
+      // two-digit-with-regroup tier, 75 utterances): ~1276 tokens compact,
+      // ~1874 tokens even if Haiku pretty-prints with a markdown fence —
+      // both far below 4000. We keep 4000 to leave headroom for
       // longer utterance content (e.g. `two-digit-addsub` problems
       // spell out two-digit numbers, "Twenty-three plus four. How many?"
       // is ~14 tokens by itself; baking that combo with max_tokens=2000
       // truncated the response and surfaced as `invalid-response` —
       // see ticket 86c9kwhbc PR notes). 4000 is still far below Haiku's
       // 64K streamable cap, so no streaming needed; the higher cap only
-      // affects truncation-prone combos and is otherwise free.
+      // affects truncation-prone combos and is otherwise free. The
+      // Wave-12 slot widening was verified to NOT need a bump.
       max_tokens: 4000,
       system,
       messages: [{ role: 'user', content: user }],
@@ -1284,23 +1292,27 @@ You MUST return a single JSON object — no prose, no code fences, no commentary
 
 Rules:
 - Exactly 8 problems per plan.
-- Each problem has exactly 5 utterances with these slot names: read, correct, reprompt, hint, giveAnswer.
-- Utterance ids follow the pattern "<track>.p<N>.<slot>" — e.g. "math.p1.read", "math.p1.correct", "word.p1.read", etc. The N is the 1-based problem index.
+- Each problem's utterance slots depend on the track (the track-specific guide below is authoritative):
+  · MATH track — exactly 7 utterances with these slot names: read, correct, reprompt, hint1, hint2, hint3, giveAnswer. The single hint is split into three escalating sub-step utterances (hint1 -> hint2 -> hint3); see the MATH track guide's per-slot templates for the per-tier hint1/hint2/hint3 wording.
+  · WORD-SONG track — exactly 5 utterances with these slot names: read, correct, reprompt, hint, giveAnswer.
+- Utterance ids follow the pattern "<track>.p<N>.<slot>" — e.g. "math.p1.read", "math.p1.hint1", "math.p1.hint2", "math.p1.hint3", "word.p1.read", "word.p1.hint", etc. The N is the 1-based problem index.
 - Lines are spoken aloud by Emma's TTS voice. Keep them short (1 short sentence is ideal; 2 if needed for the hint). No abbreviations Emma can't read aloud naturally. No emoji. No exclamation marks beyond one per line.
 - The "reprompt" line for every problem should be "Hmm... try again?" verbatim — that's the spec wording, intentionally repeated for cache locality.
 - Never write "wrong", "incorrect", "X", or anything shaming.
 
 Session-End utterances (REQUIRED — append to the same flat utterances array):
-After the 8 × 5 problem utterances, append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
+After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
 
-Total Session-End utterances: 1 opener + 11 recap + 6 streak + 1 goodbye = 19. The full flat utterances array therefore has 8 × 5 + 19 = 59 entries. Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
+Total Session-End utterances: 1 opener + 11 recap + 6 streak + 1 goodbye = 19. The full flat utterances array therefore has 8 × 7 + 19 = 75 entries for the MATH track, or 8 × 5 + 19 = 59 entries for the WORD-SONG track. Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
 
 export const MATH_TRACK_GUIDE = `Track: Math.
+
+THREE-HINT SLOT DIRECTIVE (Wave 12 — ticket 86ca8702v) <rule band="hard">applies to EVERY math problem in EVERY tier</rule>: each problem carries THREE escalating hint utterances — hint1, hint2, hint3 — NOT a single "hint". The ids are "math.p<N>.hint1", "math.p<N>.hint2", "math.p<N>.hint3". The three ramp one cognitive sub-step at a time so the after-2-wrong scaffold delivers one beat per audio clip instead of all three in a single burst: hint1 = attention-direction, hint2 = first quantity / cue, hint3 = complete the operation + pose the question. Per-tier hint1/hint2/hint3 wording lives in each tier's PER-PROBLEM SHAPE block below; tiers without a dedicated block use the generic three-step shape at the end of this guide. NEVER emit a single "math.p<N>.hint" id and NEVER collapse the three beats into one utterance. <self-check>For every problem P1-P8, after composing the utterances, CONFIRM exactly three hint ids are present — math.pN.hint1, math.pN.hint2, math.pN.hint3 — and that NO "math.pN.hint" (no numeric suffix) id was emitted. If a single "hint" id is present, or any of hint1/hint2/hint3 is missing, REJECT and re-emit the full triple.</self-check>
 
 The user message names a focus skill node. Generate problems specifically for that node. The full math focus-node menu is:
 
@@ -1363,11 +1375,13 @@ The user message names a focus skill node. Generate problems specifically for th
   - MEDIUM (sum 6-8): allowed at P4-P8.
   - HARD (sum 9-10): allowed at P5-P8 only.
 
-  PER-PROBLEM SHAPE for add-to-10: every problem MUST emit op: "+" on the wire. Utterance ids MUST use the literal "math." prefix (NOT "add-to-10."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". Per-slot utterance templates:
+  PER-PROBLEM SHAPE for add-to-10: every problem MUST emit op: "+" on the wire. Utterance ids MUST use the literal "math." prefix (NOT "add-to-10."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". The hint is THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Per-slot utterance templates:
   - read: "<addend-A> plus <addend-B>. How many?" e.g. "Five plus three. How many?"
   - correct: "Yes! <answer>!" e.g. "Yes! Eight!"
   - reprompt: "Hmm... try again?" (verbatim)
-  - hint: "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Five. And three more. How many now?"
+  - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every add-to-10 problem; directs attention to the flower groups before naming any quantity)
+  - hint2 (quantity-A): "<addend-A> flowers." e.g. "Five flowers." (names the first group's count only)
+  - hint3 (add + question): "And <addend-B> more. How many now?" e.g. "And three more. How many now?" (introduces the second group and poses the question)
   - giveAnswer: "This one is <answer>." e.g. "This one is eight."
 
   PROSODY: numbers are spelled out as words ("one", "two", ... "ten"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10%; no SSML overrides required for any value in [1, 10].
@@ -1442,11 +1456,13 @@ The user message names a focus skill node. Generate problems specifically for th
 
   DISTRACTOR-COVERAGE SELF-CHECK (for problems 4-8): the render pipeline (src/screens/Math/Math.tsx) uses Class 1 (off-by-one) for every op:'+' P4-P8 problem and does NOT apply a Class 2 (wrong-op) or Class B (dropped-carry) trap — see design/math/add-to-20-content.md §3.3 and §3.4. No coverage self-check needed for distractor classes; the high-leverage coverage rule (Rule 5 above) carries the pedagogical-coverage burden for this tier.
 
-  PER-PROBLEM SHAPE for add-to-20: every problem MUST emit op: "+" on the wire. Utterance ids MUST use the literal "math." prefix (NOT "add-to-20."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". Per-slot utterance templates:
+  PER-PROBLEM SHAPE for add-to-20: every problem MUST emit op: "+" on the wire. Utterance ids MUST use the literal "math." prefix (NOT "add-to-20."): "math.p1.read", "math.p1.correct", ..., "math.p8.giveAnswer". The hint is THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Per-slot utterance templates:
   - read: "<addend-A> plus <addend-B>. How many?" e.g. "Eight plus five. How many?"
   - correct: "Yes! <answer>!" e.g. "Yes! Thirteen!"
   - reprompt: "Hmm... try again?" (verbatim)
-  - hint: "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Eight. And five more. How many now?"
+  - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every add-to-20 problem)
+  - hint2 (quantity-A): "<addend-A> flowers." e.g. "Eight flowers."
+  - hint3 (add + question): "And <addend-B> more. How many now?" e.g. "And five more. How many now?"
   - giveAnswer: "This one is <answer>." e.g. "This one is thirteen."
 
   PROSODY: numbers are spelled out as words ("one", "two", ... "nine", "ten", "eleven", ... "eighteen"). Capitalize the first word of each sentence. The "plus" template renders cleanly on en-GB-OliviaNeural rate -10% for all values in [1, 18]; no SSML overrides required (validated by sub-to-20 §4 for the same teen-number range). Do NOT verbally decompose the addends (e.g. do NOT say "eight plus two plus three" instead of "eight plus five") — per Dave § 2 (L2 context note, sub-to-20 research), verbal decomposition adds L2 cognitive load without pedagogical benefit. The decomposition IS the mental work Marian does to bridge; it stays internal.
@@ -1503,7 +1519,10 @@ The user message names a focus skill node. Generate problems specifically for th
   - read: use the SESSION-LEVEL chosen template (see FIRST-SESSION READ-LINE above) across all 8 problems — either "<minuend> minus <subtrahend>. How many are left?" OR the first-session "<minuend> take away <subtrahend>. How many are left?" variant. Do NOT switch templates mid-session.
   - correct: "Yes! <answer>!" e.g. "Yes! Eight!" (for correct=0 → "Yes! Zero!")
   - reprompt: "Hmm... try again?" (verbatim)
-  - hint: "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Ten. Take away two. How many now?" (use "take away" framing in the hint regardless of read-line variant — the hint is a scaffold, not a primary read)
+  THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Use "take away" framing in hint3 regardless of the read-line variant — the hint is a scaffold, not a primary read.
+  - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every sub-to-10 problem; directs attention to the flower group before naming any quantity)
+  - hint2 (quantity-A): "<minuend> flowers." e.g. "Ten flowers." (names the starting count only)
+  - hint3 (take away + question): "Take away <subtrahend>. How many now?" e.g. "Take away two. How many now?" (removes the subtrahend and poses the question)
   - giveAnswer: "This one is <answer>." e.g. "This one is eight." (for correct=0 → "This one is zero.")
 
   PROSODY: numbers are spelled out as words ("zero", "one", "two", ... "ten"). Capitalize the first word of each sentence. The "minus" / "take away" template renders cleanly on en-GB-OliviaNeural rate -10%; no SSML overrides required for any value in [0, 10].
@@ -1579,7 +1598,10 @@ The user message names a focus skill node. Generate problems specifically for th
     READ-LINE NEGATIVE ANCHOR: the read-line MUST use the word "minus" verbatim — DO NOT substitute "take away" here. The "take away" phrasing belongs in the hint scaffold ONLY (see below). Emitting "Eleven take away one. How many are left?" as a read-line is a hard rule violation; the spec uses "minus" from session 1 onwards for sub-to-20 (see design/math/sub-to-20-content.md §4.3 + §7.2 — no first-session take-away variant for this tier). Every "math.pN.read" utterance text MUST match the pattern: capitalised teen number word, then " minus ", then a lowercased number word, then ". How many are left?".
   - correct: "Yes! <answer>!" e.g. "Yes! Twelve!"
   - reprompt: "Hmm... try again?" (verbatim)
-  - hint: "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Fifteen. Take away three. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
+  THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Use "take away" framing in hint3 regardless of the "minus" read-line — the hint is a scaffold, not a primary read.
+  - hint1 (attention-direction): "Look at the flowers." (verbatim — the same for every sub-to-20 problem)
+  - hint2 (quantity-A): "<minuend> flowers." e.g. "Fifteen flowers."
+  - hint3 (take away + question): "Take away <subtrahend>. How many now?" e.g. "Take away three. How many now?"
   - giveAnswer: "This one is <answer>." e.g. "This one is twelve."
 
   PROSODY: numbers are spelled out as words ("ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"). Capitalize the first word of each sentence. The "minus" template renders cleanly on en-GB-OliviaNeural rate -10% for all teen values; no SSML overrides required. Do NOT verbally decompose the minuend (e.g. do NOT say "ten and seven, minus five" or "ten plus seven minus five") — per Dave § 2 (L2 context note), verbal decomposition adds L2 cognitive load without pedagogical benefit. Emma says the numeral name plainly.
@@ -1690,8 +1712,10 @@ The user message names a focus skill node. Generate problems specifically for th
     READ-LINE NEGATIVE ANCHOR ("-" only): the read-line MUST use the word "minus" verbatim AND end with the phrase "How many are left?" — DO NOT substitute "take away" for "minus", and DO NOT shorten the trailing phrase to "How many?". The "take away" phrasing belongs in the hint scaffold ONLY (see below). Emitting "Forty-eight minus seven. How many?" as a "-" read-line is a HARD RULE VIOLATION — the browser parser rejects that shape and the canon falls into silent static. Every "math.pN.read" utterance for an op:"-" problem MUST match the pattern: capitalised first-operand quantity word (possibly hyphenated), then " minus ", then a lowercased subtrahend word, then ". How many are left?". The "+" read-line uses "How many?" (NOT "How many are left?") — the trailing phrase distinguishes addition from subtraction in the wire-side parser.
   - correct: "Yes! <answer>!" e.g. "Yes! Twenty-seven!"
   - reprompt: "Hmm... try again?" (verbatim)
-  - hint (+): "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Twenty-three. And four more. How many now?"
-  - hint (-): "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Forty-eight. Take away seven. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
+  THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Count-on framing only (the STRATEGY PROHIBITION below forbids verbal regroup/decompose scaffolding); "take away" framing in hint3 for op:"-" problems. Do NOT use "flowers" wording at this tier — these are place-value problems, not flower-group counting.
+  - hint1 (attention-direction): "Look." (verbatim — directs attention before naming the operand)
+  - hint2 (quantity-A): "<addend-A>." for "+" e.g. "Twenty-three." / "<minuend>." for "-" e.g. "Forty-eight." (names the first operand only — the quantity word, NOT digit-by-digit)
+  - hint3 (op + question): "And <addend-B> more. How many now?" for "+" e.g. "And four more. How many now?" / "Take away <subtrahend>. How many now?" for "-" e.g. "Take away seven. How many now?" (use "take away" framing for "-" regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
   - giveAnswer: "This one is <answer>." e.g. "This one is twenty-seven."
 
   PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-three", "forty-five", "sixty-nine") — Emma renders these on en-GB-OliviaNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", ... "ninety") are NOT hyphenated when emitted alone (e.g. "Twenty plus three", not "Twenty-zero plus three").
@@ -1792,8 +1816,10 @@ The user message names a focus skill node. Generate problems specifically for th
     READ-LINE NEGATIVE ANCHOR ("-" only) <rule band="hard">: the read-line MUST use the word "minus" verbatim AND end with the phrase "How many are left?" — DO NOT substitute "take away" for "minus", and DO NOT shorten the trailing phrase to "How many?". The "take away" phrasing belongs in the hint scaffold ONLY (see below). Emitting "Thirty-two minus five. How many?" as a "-" read-line is a HARD RULE VIOLATION — the browser parser rejects that shape and the canon falls into silent static. Every "math.pN.read" utterance for an op:"-" problem MUST match the pattern: capitalised first-operand quantity word (possibly hyphenated), then " minus ", then a lowercased subtrahend word, then ". How many are left?". The "+" read-line uses "How many?" (NOT "How many are left?") — the trailing phrase distinguishes addition from subtraction in the wire-side parser.
   - correct: "Yes! <answer>!" e.g. "Yes! Thirty-three!"
   - reprompt: "Hmm... try again?" (verbatim)
-  - hint (+): "Look. <addend-A>. And <addend-B> more. How many now?" e.g. "Look. Twenty-seven. And six more. How many now?"
-  - hint (-): "Look. <minuend>. Take away <subtrahend>. How many now?" e.g. "Look. Thirty-two. Take away five. How many now?" (use "take away" framing in the hint regardless of the "minus" read-line — the hint is a scaffold, not a primary read)
+  THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3), NOT one — emit all three. Count-on framing only (the STRATEGY PROHIBITION below forbids verbal regroup/decompose scaffolding — the hint MUST NOT pre-execute the carry/borrow); "take away" framing in hint3 for op:"-" problems. Do NOT use "flowers" wording at this tier — these are place-value problems.
+  - hint1 (attention-direction): "Look." (verbatim — directs attention before naming the operand)
+  - hint2 (quantity-A): "<addend-A>." for "+" e.g. "Twenty-seven." / "<minuend>." for "-" e.g. "Thirty-two." (names the first operand only — the quantity word, NOT digit-by-digit; do NOT decompose it)
+  - hint3 (op + question): "And <addend-B> more. How many now?" for "+" e.g. "And six more. How many now?" / "Take away <subtrahend>. How many now?" for "-" e.g. "Take away five. How many now?" (use "take away" framing for "-" regardless of the "minus" read-line; do NOT verbalise the carry/borrow)
   - giveAnswer: "This one is <answer>." e.g. "This one is thirty-three."
 
   PROSODY: numbers are spelled out as QUANTITY WORDS, not digit-by-digit. Two-digit numbers use the hyphenated quantity form ("twenty-seven", "thirty-three", "forty-two", "fifty-three", "sixty-four") — Emma renders these on en-GB-OliviaNeural rate -10% cleanly. Capitalize the first word of each sentence. Decade names ("twenty", "thirty", "forty", "fifty", "sixty") are NOT hyphenated when emitted alone (e.g. "Thirty minus four", not "Thirty-zero minus four").
@@ -1812,7 +1838,10 @@ Per-problem utterance template (any focus node):
 - read: see the focus-node-specific shape above.
 - correct: "Yes! <answer>!" e.g. "Yes! Five!"
 - reprompt: "Hmm... try again?"  (verbatim)
-- hint: "Look. <gentle scaffold>." e.g. for add-to-10 — "Look. Three. And two more. How many now?"; for skip-counting — "Look. We added two each time."
+THE HINT IS THREE escalating sub-step utterances (hint1/hint2/hint3) for EVERY math problem, NOT one — emit all three. Each ramps one cognitive sub-step at a time: hint1 directs attention, hint2 names the first quantity/cue, hint3 completes the operation and poses the question. Focus nodes WITH a dedicated PER-PROBLEM SHAPE block above (add-to-10, add-to-20, sub-to-10, sub-to-20, two-digit-addsub-no-regroup, two-digit-addsub-with-regroup) use THAT block's hint1/hint2/hint3 templates. For the remaining math nodes (number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9), use this generic three-step shape:
+- hint1 (attention-direction): "Look." (verbatim — directs attention before the scaffold)
+- hint2 (first cue): "<the first scaffold step>." e.g. for skip-counting — "We added two each time."; for mult — "Two groups of five."
+- hint3 (complete + question): "<the completing step + question>." e.g. for skip-counting — "What comes next?"; for mult — "How many in all?"
 - giveAnswer: "This one is <answer>." e.g. "This one is five."
 
 Pick exactly 8 distinct problems for the focus node, ordered easier → slightly harder across problems 1-8. Spell numbers as words (one, two, ... ten, eleven, ... twenty), not digits. Capitalize the first word of each sentence. The "recent score" hint in the user message guides easier-vs-harder mix: low score → mostly the easiest end of the slice; high score → push the harder end.`
@@ -1824,7 +1853,13 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 // tier — final single-vowel tier) + the digraphs-sh content tier (FIRST
 // digraph tier) + the digraphs-ch content tier (SECOND digraph tier) +
 // the digraphs-th content tier (THIRD and final digraph tier).
-// Nine first-class content modes today:
+// Ten first-class read-line-template-dispatched content modes today
+// (this list's scope is the word/decode/recognition tiers gated by the
+// browser parser's read-line template; it excludes the letter-glyph
+// tiers letter-names / letter-sounds, which are first-class but use a
+// letter-chip discipline — those are counted in the in-prompt
+// "first-class content modes" list below, whose scope is ALL emitted
+// content modes):
 //
 //   - blending-cv          → "Tap the <word>." (match-picture-to-spoken-word)
 //   - cvc-words            → "Read the <word>." (decode-printed-word, short-a)
@@ -1835,13 +1870,14 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 //   - digraphs-sh          → "Read the <word>." (decode /ʃ/-digraph words)
 //   - digraphs-ch          → "Read the <word>." (decode /tʃ/-digraph words)
 //   - digraphs-th-voiceless → "Read the <word>." (decode voiceless /θ/-digraph words)
+//   - sight-words          → "Find the word: <word>." (whole-word recognition, Wave 11)
 //
 // All gated by the browser parser (PR #132 widened it to dispatch on
-// the read-line template). Other valid focus nodes (letter-sounds,
-// sight-words, simple-sentences) reach this prompt as `blending-cv`
-// after `effectiveFocusNode`'s stub-fallback — the user message will
-// name `blending-cv` for those. This is the "always render something"
-// posture from the contract doc.
+// the read-line template; the sight-words "Find the word:" template was
+// added in Wave 11). Other valid focus nodes (simple-sentences) reach
+// this prompt as `blending-cv` after `effectiveFocusNode`'s
+// stub-fallback — the user message will name `blending-cv` for those.
+// This is the "always render something" posture from the contract doc.
 //
 // Utterance ids ALWAYS use the "word." prefix regardless of content mode.
 // The P0 incident (PR #117 → #118) was caused by `cvc.*` prefixes — the
@@ -1942,7 +1978,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Ten first-class content modes today:
+matching that node. Twelve first-class content modes today:
 
   - letter-names: "Tap the letter <NAME>." problems. Marian sees a
     trio of LETTER GLYPHS (the alphabet, uppercase + lowercase — no
