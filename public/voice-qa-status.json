@@ -3,823 +3,820 @@
   "sourceIssue": 391,
   "items": {
     "letter-names#word.p5.hint": {
-      "pr": 384
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "letter-sounds#session.end.recap.4": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "letter-sounds#session.end.streak.4": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "letter-sounds-audit#word.p2.correct": {
-      "pr": 384
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "letter-sounds-audit#word.p2.giveAnswer": {
-      "pr": 384
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "letter-sounds-audit#word.p2.hint": {
-      "pr": 384
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "letter-sounds-audit#word.p2.read": {
-      "pr": 384
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "hub#hub-welcome-what-today-alt-3.mp3": {
-      "pr": 382,
-      "label": "round-3 re-test against fresh bytes (SW-bypass PR #382)"
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "add-to-10#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-10#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "add-to-20#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-2-5-10#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-3-4#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "mult-6-9#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
     },
     "number-recog#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "skip-counting#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-10#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "sub-to-20#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub-with-regroup#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p1.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p1.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p1.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p2.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p2.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p2.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p3.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p3.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p3.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p4.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p4.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p4.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p5.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p5.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p5.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p6.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p6.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p6.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p7.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p7.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p7.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p8.hint1": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p8.hint2": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "two-digit-addsub#math.p8.hint3": {
-      "label": "W12-04 three-hint re-bake \u2014 new hint clip, ear-test"
+      "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     }
   }
 }
