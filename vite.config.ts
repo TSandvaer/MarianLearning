@@ -117,19 +117,22 @@ export default defineConfig({
         // pay the precache budget on every install. Excluded from
         // both the SW manifest and the offline runtime cache.
         //
-        // voice-qa.html + voice-audition.html are standalone ear-test
-        // QA surfaces (not part of Marian's app shell). They match the
-        // `**/*.html` precache glob above and would otherwise enter the
-        // SW precache manifest — which is the exact round-3 bootstrapping
-        // trap: a stale SW serves a stale QA page, so the page's own
-        // fixes can never deploy through it (testing-and-ci.md §4.4.1).
-        // Excluded so these pages are always network-served (PR #389 NIT,
-        // ticket 86ca7yqur). offline.html is intentionally NOT ignored —
-        // it's the app shell's offline fallback and must stay precached.
+        // voice-qa.html + voice-audition.html + letter-sounds-test.html
+        // are standalone ear-test / QA surfaces (not part of Marian's app
+        // shell). They match the `**/*.html` precache glob above and would
+        // otherwise enter the SW precache manifest — which is the exact
+        // round-3 bootstrapping trap: a stale SW serves a stale QA page, so
+        // the page's own fixes can never deploy through it
+        // (testing-and-ci.md §4.4.1). Excluded so these pages are always
+        // network-served (PR #389 NIT, ticket 86ca7yqur; letter-sounds-test
+        // follow-up ticket 86ca7zjxz). offline.html is intentionally NOT
+        // ignored — it's the app shell's offline fallback and must stay
+        // precached.
         globIgnores: [
           'audio-samples/**',
           'voice-qa.html',
           'voice-audition.html',
+          'letter-sounds-test.html',
         ],
       },
       devOptions: {
