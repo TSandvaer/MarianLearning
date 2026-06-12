@@ -3,11 +3,12 @@
 **Status:** SPEC — draft for Thomas review. Implementation blocked on this PR merging. Kevin/Devon pick up impl after spec approval.
 **Ticket:** TBD — orchestrator to file in ClickUp `list_id: 901523003843`. Kyle's MCP scope is read-only on ClickUp; ticket creation routed via orchestrator (per `[[feedback_clickup_forward_only_default]]`).
 **Authority chain.**
+
 - Pedagogical baseline: [`design/research/sub-to-20-pedagogical-sequence.md`](../research/sub-to-20-pedagogical-sequence.md) (Dave, 2026-05-16, PR #267) — § 1.2 establishes add-to-20 ↔ sub-to-20 as **parallel acquisition targets** per Illustrative Mathematics K–5, McNeil et al. 2025, Fuson & Kwon 1992; § 2 establishes the L2 Tagalog teen-number transparency note that also applies here.
 - Predecessor research: [`design/research/add-to-10-counting-to-recall.md`](../research/add-to-10-counting-to-recall.md) (Dave, 2026-04-29) — Marian's finger-counting profile, doubles + sums-to-10 anchors. add-to-10 mastery is the strategy substrate for add-to-20's make-ten / doubles-plus-N derivations.
 - Distractor baseline: [`design/research/math-distractor-and-streak-decisions.md`](../research/math-distractor-and-streak-decisions.md) (Dave, 2026-04-25) — gentle/off-by-one cutoff at problem 3; streak `[3, 5, 8]`.
 - Doubles-prior correction: `.claude/docs/planner-and-canon.md` § "Haiku doubles prior" (Kevin's NOF #1 from PR #266) — confirmed by the current `add-to-20.json` canon (`6+6, 7+7, 8+8, 9+9, 6+7, 7+8, 8+9, 5+9` is doubles-saturated 4-of-8). This spec sharpens directive-side to break that bias.
-**Predecessor content specs (structural template):**
+  **Predecessor content specs (structural template):**
 - [`design/math/sub-to-20-content.md`](./sub-to-20-content.md) (Kyle, 2026-05-17, PR #269) — section-for-section parallel; deviations called out inline. Same §0–§9 shape.
 - [`design/math/add-to-10-content.md`](./add-to-10-content.md) (Kyle, 2026-05-15 / amended 2026-05-16) — the 44-fact factory pool + 5 category caps precedent; this spec adopts the same `sums-to-10 → doubles → plus-one → near-doubles → general` priority pattern, re-anchored on the cross-10-bridge surface.
 
@@ -70,32 +71,33 @@ Each fact is annotated with strategy category (the mental-arithmetic pathway Mar
 - `near-ten` — `min(a, b) == 1 AND a+b ≥ 11` (count-on-one from a teen-anchor; trivial). 2 pool facts (`9+2` lives in `make-ten-bridge` per priority; `8+3` similarly).
 - `general` — everything else (cross-10 facts with no single dominant strategy). 4 pool facts.
 
-| #   | Fact          | Band   | Category           | Teaching note                                                                                                                                                       |
-| --- | ------------- | ------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `9 + 2 = 11`  | easy   | make-ten-bridge    | Smallest cross-10-bridge. Marian decomposes 2 as 1 + 1: `9 + 1 + 1 = 10 + 1 = 11`. Lowest WM load in the tier. (Sub-to-20 § 4.2 EASY analog: `11-1=10` opens.)       |
-| 2   | `2 + 9 = 11`  | easy   | make-ten-bridge    | Commutative pair. Marian may flip to `9 + 2` mentally (commutativity is well-internalised by the time she reaches add-to-20). Reinforces order-irrelevance.         |
-| 3   | `8 + 3 = 11`  | easy   | make-ten-bridge    | Decompose 3 as 2 + 1: `8 + 2 + 1 = 10 + 1 = 11`. The canonical "bridge-through-10" model with 8 as the anchor (one of the highest-leverage anchors per Dave § 1.2).  |
-| 4   | `3 + 8 = 11`  | easy   | make-ten-bridge    | Commutative pair.                                                                                                                                                   |
-| 5   | `9 + 3 = 12`  | easy   | make-ten-bridge    | Decompose 3 as 1 + 2: `9 + 1 + 2 = 10 + 2 = 12`. Bridges to 12, the doubles `6+6` partner — pedagogically connects make-ten-bridge to doubles.                       |
-| 6   | `6 + 6 = 12`  | easy   | doubles            | Smallest teen-doubles. Marian retrieves; doesn't decompose. Anchor for `near-doubles` derivations (`6+7 = 6+6+1`).                                                  |
-| 7   | `9 + 4 = 13`  | medium | make-ten-bridge    | Decompose 4 as 1 + 3: `9 + 1 + 3 = 10 + 3 = 13`. Canonical cross-10 with 9 as anchor (smallest decomposition step). High pedagogical priority.                       |
-| 8   | `4 + 9 = 13`  | medium | make-ten-bridge    | Commutative pair.                                                                                                                                                   |
-| 9   | `8 + 5 = 13`  | medium | make-ten-bridge    | Decompose 5 as 2 + 3: `8 + 2 + 3 = 10 + 3 = 13`. The canonical worked example in Dave § 1.2; iconic cross-10-bridge teaching fact.                                  |
-| 10  | `5 + 8 = 13`  | medium | make-ten-bridge    | Commutative pair.                                                                                                                                                   |
-| 11  | `6 + 7 = 13`  | medium | near-doubles       | Doubles-plus-one: `6 + 6 = 12, + 1 = 13`. Derives from #6 (which appears in EASY); high-leverage if doubles is retrieved.                                           |
-| 12  | `7 + 6 = 13`  | medium | near-doubles       | Commutative pair.                                                                                                                                                   |
-| 13  | `7 + 7 = 14`  | medium | doubles            | Teen-double anchor; retrieved not derived. Doubles cap is 2; this is the only MEDIUM-band double.                                                                   |
-| 14  | `9 + 5 = 14`  | medium | make-ten-bridge    | Decompose 5 as 1 + 4: `9 + 1 + 4 = 10 + 4 = 14`. Bridges to 14, the `7+7` partner.                                                                                  |
-| 15  | `7 + 8 = 15`  | hard   | near-doubles       | Doubles-plus-one: `7 + 7 = 14, + 1 = 15`. The 7-double anchor (#13) carries this; high-leverage derivation.                                                          |
-| 16  | `8 + 7 = 15`  | hard   | near-doubles       | Commutative pair.                                                                                                                                                   |
-| 17  | `9 + 6 = 15`  | hard   | make-ten-bridge    | Decompose 6 as 1 + 5: `9 + 1 + 5 = 10 + 5 = 15`. Bridges to 15, sums-to-15 anchor.                                                                                  |
-| 18  | `9 + 7 = 16`  | hard   | make-ten-bridge    | Decompose 7 as 1 + 6: `9 + 1 + 6 = 10 + 6 = 16`. Cross-10 with 9 as anchor; commutes with `7+9`.                                                                    |
-| 19  | `8 + 8 = 16`  | hard   | doubles            | Teen-double anchor; retrieved. Doubles cap is 2; co-occurs with #6 OR #13 OR #20 but never more than 2 across the session.                                          |
-| 20  | `9 + 8 = 17`  | hard   | make-ten-bridge    | Decompose 8 as 1 + 7: `9 + 1 + 7 = 10 + 7 = 17`. Largest cross-10 with 9 as anchor.                                                                                 |
-| 21  | `8 + 9 = 17`  | hard   | near-doubles       | Doubles-plus-one from `8+8=16`: derivation chain (#19 → #21). Commutes with #20 conceptually but the *strategy* differs — make-ten-bridge vs near-doubles.            |
-| 22  | `9 + 9 = 18`  | hard   | doubles            | Highest teen-double. Anchor for the future `9+10=19` mental model. Retrieved.                                                                                       |
+| #   | Fact         | Band   | Category        | Teaching note                                                                                                                                                       |
+| --- | ------------ | ------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `9 + 2 = 11` | easy   | make-ten-bridge | Smallest cross-10-bridge. Marian decomposes 2 as 1 + 1: `9 + 1 + 1 = 10 + 1 = 11`. Lowest WM load in the tier. (Sub-to-20 § 4.2 EASY analog: `11-1=10` opens.)      |
+| 2   | `2 + 9 = 11` | easy   | make-ten-bridge | Commutative pair. Marian may flip to `9 + 2` mentally (commutativity is well-internalised by the time she reaches add-to-20). Reinforces order-irrelevance.         |
+| 3   | `8 + 3 = 11` | easy   | make-ten-bridge | Decompose 3 as 2 + 1: `8 + 2 + 1 = 10 + 1 = 11`. The canonical "bridge-through-10" model with 8 as the anchor (one of the highest-leverage anchors per Dave § 1.2). |
+| 4   | `3 + 8 = 11` | easy   | make-ten-bridge | Commutative pair.                                                                                                                                                   |
+| 5   | `9 + 3 = 12` | easy   | make-ten-bridge | Decompose 3 as 1 + 2: `9 + 1 + 2 = 10 + 2 = 12`. Bridges to 12, the doubles `6+6` partner — pedagogically connects make-ten-bridge to doubles.                      |
+| 6   | `6 + 6 = 12` | easy   | doubles         | Smallest teen-doubles. Marian retrieves; doesn't decompose. Anchor for `near-doubles` derivations (`6+7 = 6+6+1`).                                                  |
+| 7   | `9 + 4 = 13` | medium | make-ten-bridge | Decompose 4 as 1 + 3: `9 + 1 + 3 = 10 + 3 = 13`. Canonical cross-10 with 9 as anchor (smallest decomposition step). High pedagogical priority.                      |
+| 8   | `4 + 9 = 13` | medium | make-ten-bridge | Commutative pair.                                                                                                                                                   |
+| 9   | `8 + 5 = 13` | medium | make-ten-bridge | Decompose 5 as 2 + 3: `8 + 2 + 3 = 10 + 3 = 13`. The canonical worked example in Dave § 1.2; iconic cross-10-bridge teaching fact.                                  |
+| 10  | `5 + 8 = 13` | medium | make-ten-bridge | Commutative pair.                                                                                                                                                   |
+| 11  | `6 + 7 = 13` | medium | near-doubles    | Doubles-plus-one: `6 + 6 = 12, + 1 = 13`. Derives from #6 (which appears in EASY); high-leverage if doubles is retrieved.                                           |
+| 12  | `7 + 6 = 13` | medium | near-doubles    | Commutative pair.                                                                                                                                                   |
+| 13  | `7 + 7 = 14` | medium | doubles         | Teen-double anchor; retrieved not derived. Doubles cap is 2; this is the only MEDIUM-band double.                                                                   |
+| 14  | `9 + 5 = 14` | medium | make-ten-bridge | Decompose 5 as 1 + 4: `9 + 1 + 4 = 10 + 4 = 14`. Bridges to 14, the `7+7` partner.                                                                                  |
+| 15  | `7 + 8 = 15` | hard   | near-doubles    | Doubles-plus-one: `7 + 7 = 14, + 1 = 15`. The 7-double anchor (#13) carries this; high-leverage derivation.                                                         |
+| 16  | `8 + 7 = 15` | hard   | near-doubles    | Commutative pair.                                                                                                                                                   |
+| 17  | `9 + 6 = 15` | hard   | make-ten-bridge | Decompose 6 as 1 + 5: `9 + 1 + 5 = 10 + 5 = 15`. Bridges to 15, sums-to-15 anchor.                                                                                  |
+| 18  | `9 + 7 = 16` | hard   | make-ten-bridge | Decompose 7 as 1 + 6: `9 + 1 + 6 = 10 + 6 = 16`. Cross-10 with 9 as anchor; commutes with `7+9`.                                                                    |
+| 19  | `8 + 8 = 16` | hard   | doubles         | Teen-double anchor; retrieved. Doubles cap is 2; co-occurs with #6 OR #13 OR #20 but never more than 2 across the session.                                          |
+| 20  | `9 + 8 = 17` | hard   | make-ten-bridge | Decompose 8 as 1 + 7: `9 + 1 + 7 = 10 + 7 = 17`. Largest cross-10 with 9 as anchor.                                                                                 |
+| 21  | `8 + 9 = 17` | hard   | near-doubles    | Doubles-plus-one from `8+8=16`: derivation chain (#19 → #21). Commutes with #20 conceptually but the _strategy_ differs — make-ten-bridge vs near-doubles.          |
+| 22  | `9 + 9 = 18` | hard   | doubles         | Highest teen-double. Anchor for the future `9+10=19` mental model. Retrieved.                                                                                       |
 
 **Band counts:**
+
 - `easy` — 6 facts (#1–6): make-ten-bridge ×5 (#1, #2, #3, #4, #5), doubles ×1 (#6).
 - `medium` — 8 facts (#7–14): make-ten-bridge ×5 (#7, #8, #9, #10, #14), near-doubles ×2 (#11, #12), doubles ×1 (#13).
 - `hard` — 8 facts (#15–22): make-ten-bridge ×3 (#17, #18, #20), near-doubles ×3 (#15, #16, #21), doubles ×2 (#19, #22).
@@ -155,15 +157,15 @@ The session is 8 problems, drawn from the 22-fact pool above. Identical structur
 
 ### 2.1 Per-problem index mix
 
-| Problem index | Tier         | Band source             | Distractor class (§3)                      | Why                                                                                                                                                          |
-| ------------- | ------------ | ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| P1            | gentle       | `easy` band only        | Class 0 — gentle (≥2 away, range extremes) | Session opener. Same posture as add-to-10 / sub-to-20. `GENTLE_RAMP_THROUGH = 3` cutoff preserved verbatim (Dave's 2026-04-25 anxiety-window evidence).      |
-| P2            | gentle       | `easy` band only        | Class 0 — gentle                           | Calibration continues. Make-ten-bridge anchored from session start (5 of 6 EASY facts are make-ten-bridge).                                                  |
-| P3            | gentle       | `easy` band only        | Class 0 — gentle                           | Three successful experiences before discriminate trap distractors arrive.                                                                                    |
-| P4            | discriminate | `medium` band only      | Class 1 — off-by-one                       | First diagnostic. MEDIUM-band entry; HARD-band forbidden at P4 (mirrors add-to-10 §2.1).                                                                     |
-| P5            | discriminate | `medium` or `hard` band | Class 1 — off-by-one                       | HARD-band first-permitted slot.                                                                                                                              |
-| P6            | discriminate | `medium` or `hard` band | Class 1 — off-by-one                       | "                                                                                                                                                            |
-| P7            | discriminate | `medium` or `hard` band | Class 1 — off-by-one                       | "                                                                                                                                                            |
+| Problem index | Tier         | Band source             | Distractor class (§3)                      | Why                                                                                                                                                                                 |
+| ------------- | ------------ | ----------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1            | gentle       | `easy` band only        | Class 0 — gentle (≥2 away, range extremes) | Session opener. Same posture as add-to-10 / sub-to-20. `GENTLE_RAMP_THROUGH = 3` cutoff preserved verbatim (Dave's 2026-04-25 anxiety-window evidence).                             |
+| P2            | gentle       | `easy` band only        | Class 0 — gentle                           | Calibration continues. Make-ten-bridge anchored from session start (5 of 6 EASY facts are make-ten-bridge).                                                                         |
+| P3            | gentle       | `easy` band only        | Class 0 — gentle                           | Three successful experiences before discriminate trap distractors arrive.                                                                                                           |
+| P4            | discriminate | `medium` band only      | Class 1 — off-by-one                       | First diagnostic. MEDIUM-band entry; HARD-band forbidden at P4 (mirrors add-to-10 §2.1).                                                                                            |
+| P5            | discriminate | `medium` or `hard` band | Class 1 — off-by-one                       | HARD-band first-permitted slot.                                                                                                                                                     |
+| P6            | discriminate | `medium` or `hard` band | Class 1 — off-by-one                       | "                                                                                                                                                                                   |
+| P7            | discriminate | `medium` or `hard` band | Class 1 — off-by-one                       | "                                                                                                                                                                                   |
 | P8            | discriminate | `medium` or `hard` band | Class 1 — off-by-one                       | Closer. Full discriminative pressure. At least ONE make-ten-bridge fact MUST appear in P5–P8 per §2.4 (the high-leverage coverage rule, analog of `add-to-10` sums-to-10 coverage). |
 
 **Band-by-slot rule (LOCKED, mirrors `add-to-10` §2.1 + `sub-to-20` §2.1):**
@@ -176,12 +178,12 @@ The session is 8 problems, drawn from the 22-fact pool above. Identical structur
 
 Across the 8-problem set:
 
-| Category          | Cap | Rationale                                                                                                                                                                                                                                                                                                                                |
-| ----------------- | --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `doubles`         | 2   | Pool has 4 doubles facts (`6+6, 7+7, 8+8, 9+9`); cap at 2 cuts the current canon's 4-of-8 saturation in half. This is the **doubles-prior correction lever**. Marian retrieves doubles fluently from `add-to-10`; teen-doubles are extensions, not new conceptual ground.                                                                |
-| `near-doubles`    | 2   | Pool has 5 near-doubles. Cap at 2 prevents the discriminate tier from over-relying on doubles-plus-one derivations (which require `doubles` to be retrieved first — chained dependency). Two per session is the calibration anchor.                                                                                                       |
+| Category          | Cap | Rationale                                                                                                                                                                                                                                                                                                                                   |
+| ----------------- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doubles`         | 2   | Pool has 4 doubles facts (`6+6, 7+7, 8+8, 9+9`); cap at 2 cuts the current canon's 4-of-8 saturation in half. This is the **doubles-prior correction lever**. Marian retrieves doubles fluently from `add-to-10`; teen-doubles are extensions, not new conceptual ground.                                                                   |
+| `near-doubles`    | 2   | Pool has 5 near-doubles. Cap at 2 prevents the discriminate tier from over-relying on doubles-plus-one derivations (which require `doubles` to be retrieved first — chained dependency). Two per session is the calibration anchor.                                                                                                         |
 | `make-ten-bridge` | 5   | Pool has 13 make-ten-bridge facts (largest category). Cap at 5 is **deliberately generous** — make-ten-bridge IS the tier's learning target. A typical session under recent-score-mid will contain 4–5 make-ten-bridge facts (P1–P3 EASY are mostly make-ten-bridge; P4–P8 will pull 1–2 more). Cap binds only on doubles-leaning sessions. |
-| `general`         | 0   | No `general` facts in v1 pool (§1.4). The cap is structurally zero; included for forward-compat with §8 pool widening.                                                                                                                                                                                                                   |
+| `general`         | 0   | No `general` facts in v1 pool (§1.4). The cap is structurally zero; included for forward-compat with §8 pool widening.                                                                                                                                                                                                                      |
 
 **Caps are mutually exclusive** (each fact maps to exactly one category per the §1.1 priority pattern). A single 8-problem session sums to at most `2 + 2 + 5 = 9` permits, which comfortably accommodates the 8-slot session.
 
@@ -198,6 +200,7 @@ Per `_planner.ts:buildUserMessage`, the user message ships a `recentSuccessRate`
 > **At least one `make-ten-bridge` fact MUST appear in P5–P8.**
 
 This is the analog of:
+
 - `add-to-10` §2.4 "≥1 sums-to-10 fact in P4–P8" (the make-10 mental model for add-to-10),
 - `sub-to-20` §2.3 "≥1 take-to-decade fact in P4–P8" (the take-from-decade strategy for sub-to-20),
 - `sub-to-10` §2.3 "≥1 take-from-10 fact in P4–P8" (the take-from-10 strategy for sub-to-10).
@@ -235,6 +238,7 @@ Algorithm: `[correct − 1, correct + 1]` clamped to `[minAnswer, maxAnswer]`. A
 ### 3.3 No Class 2 wrong-operation distractor for `add-to-20`
 
 Same rationale as `add-to-10-content.md` §3.2: wrong-op (`a − b`) on `op === '+'` is pedagogically inert because:
+
 - Addition-direction confusion is not a documented error pattern in 7–9 year olds the way subtract-direction confusion is.
 - For `a + b ∈ [11, 20]`, `a − b` is in `[−8, 8]` — half the trap values are negative (out of chip range entirely); the other half overlap with off-by-one neighbours in many pool facts.
 
@@ -244,7 +248,7 @@ Same rationale as `add-to-10-content.md` §3.2: wrong-op (`a − b`) on `op === 
 
 The dispatch brief flagged "dropped-carry" as a candidate Class B distractor (e.g. `8 + 5 = 12` instead of `13` — child carries the +5 but drops the +1 from the bridge decomposition `8 + 2 + 3 = 13`).
 
-**This spec does NOT include Class B.** Rationale in §7.4: the error pattern is real for *written multi-digit addition* but is not well-documented for *mental cross-10-bridge errors* in 7–9 year olds. The likely error mode at this tier is off-by-one in the bridge step (`8 + 5 = 12` or `8 + 5 = 14`), which is already covered by Class 1. Adding Class B would (a) target a thinly-documented error pattern and (b) overlap with Class 1 in many pool facts. Dave's research has not yet weighed this specific class; recommendation is REJECT pending Dave dispatch. See §7.4 + §7.6.
+**This spec does NOT include Class B.** Rationale in §7.4: the error pattern is real for _written multi-digit addition_ but is not well-documented for _mental cross-10-bridge errors_ in 7–9 year olds. The likely error mode at this tier is off-by-one in the bridge step (`8 + 5 = 12` or `8 + 5 = 14`), which is already covered by Class 1. Adding Class B would (a) target a thinly-documented error pattern and (b) overlap with Class 1 in many pool facts. Dave's research has not yet weighed this specific class; recommendation is REJECT pending Dave dispatch. See §7.4 + §7.6.
 
 ### 3.5 Distractor-class field — render-side ONLY (continues sub-to-10 / sub-to-20 pattern)
 
@@ -317,13 +321,13 @@ Replace the current single-line-with-FORBIDDEN-guards directive at [`api/_planne
 
 ### 4.2 Per-slot utterance templates
 
-| Slot         | Template                                                          | Example for `8 + 5 = 13`                              | Notes                                                                                                                                                  |
-| ------------ | ----------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `read`       | `"<addend-A> plus <addend-B>. How many?"`                         | `"Eight plus five. How many?"`                        | Same template as `add-to-10`; commutative pairs read distinctly.                                                                                       |
-| `correct`    | `"Yes! <answer>!"`                                                | `"Yes! Thirteen!"`                                    | Number-celebration template; teen numbers render cleanly (validated for sub-to-20).                                                                    |
-| `reprompt`   | `"Hmm... try again?"` (verbatim)                                  | `"Hmm... try again?"`                                 | Locked phrasing — do NOT vary.                                                                                                                         |
-| `hint`       | `"Look. <addend-A>. And <addend-B> more. How many now?"`          | `"Look. Eight. And five more. How many now?"`         | Mirrors `add-to-10` hint structure. "And N more" framing is the count-on scaffold; the make-ten-bridge decomposition is left to Marian's mental work.  |
-| `giveAnswer` | `"This one is <answer>."`                                         | `"This one is thirteen."`                             | Locked.                                                                                                                                                |
+| Slot         | Template                                                 | Example for `8 + 5 = 13`                      | Notes                                                                                                                                                 |
+| ------------ | -------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read`       | `"<addend-A> plus <addend-B>. How many?"`                | `"Eight plus five. How many?"`                | Same template as `add-to-10`; commutative pairs read distinctly.                                                                                      |
+| `correct`    | `"Yes! <answer>!"`                                       | `"Yes! Thirteen!"`                            | Number-celebration template; teen numbers render cleanly (validated for sub-to-20).                                                                   |
+| `reprompt`   | `"Hmm... try again?"` (verbatim)                         | `"Hmm... try again?"`                         | Locked phrasing — do NOT vary.                                                                                                                        |
+| `hint`       | `"Look. <addend-A>. And <addend-B> more. How many now?"` | `"Look. Eight. And five more. How many now?"` | Mirrors `add-to-10` hint structure. "And N more" framing is the count-on scaffold; the make-ten-bridge decomposition is left to Marian's mental work. |
+| `giveAnswer` | `"This one is <answer>."`                                | `"This one is thirteen."`                     | Locked.                                                                                                                                               |
 
 **Teen-number prosody.** All results land in `[11, 18]`. The Azure Emma multilingual voice renders "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen" cleanly at rate −10% (validated for `sub-to-20` and the existing add-to-20 canon). No SSML overrides required.
 
@@ -521,11 +525,12 @@ These are decision-stack items the spec cannot self-resolve. Orchestrator routes
 
 ### 7.1 The `addend ≤ 9` ban and 2-digit-plus-1-digit scope — strict or loose?
 
-**The tension.** The current directive at `_planner.ts:964` already FORBIDS `10 + n` ("ten-plus-single is pedagogically easier than cross-10-bridge"). This spec preserves and *extends* the ban to `11 + n, 12 + n, …, 19 + n` — any `addend ≥ 10` is FORBIDDEN.
+**The tension.** The current directive at `_planner.ts:964` already FORBIDS `10 + n` ("ten-plus-single is pedagogically easier than cross-10-bridge"). This spec preserves and _extends_ the ban to `11 + n, 12 + n, …, 19 + n` — any `addend ≥ 10` is FORBIDDEN.
 
 The pedagogical question: are facts like `12 + 5 = 17` part of `add-to-20`'s teaching surface, or do they belong in `two-digit-addsub`?
 
 **This spec's default.** EXTEND the ban. `addend ∈ [1, 9]` for both addends. Rationale:
+
 - `12 + 5 = 17` is conceptually 2-digit-plus-1-digit; the child reads the 12 as a teen number and adds 5 directly (no cross-10-bridge work). The mental strategy is different from `8 + 5 = 13`. Conflating them in one tier muddies the learning target.
 - Place-value reasoning (recognising "12 = ten + two, so 12 + 5 = ten + 7 = 17") is a separate skill that the `two-digit-addsub` tier teaches deliberately.
 - Marian has the foundation but has not been drilled on 2-digit-plus-1-digit; including these facts here would conflate two pedagogical jobs.
@@ -548,7 +553,7 @@ The pedagogical question: are facts like `12 + 5 = 17` part of `add-to-20`'s tea
 - **Option A (this spec's default):** Pool maxes at sum = 18. Accept that "add-to-20" is colloquial; the actual sum ceiling is 18 because `9 + 9` is the largest fact with both addends ≤ 9. Re-name the tier? (Possibly. Out of scope; the tier name is locked via skill-tree taxonomy.)
 - **Option B (re-open §7.1):** Widen `addend ≤ 10` to allow `9 + 10 = 19` and `10 + 10 = 20`. Adds 3 facts (`9+10, 10+9, 10+10`). Re-introduces the "pedagogically easier than cross-10-bridge" tension the current directive correctly identifies and FORBIDS. **Same as §7.1.**
 
-**Recommendation.** Option A. The "add-to-20" tier name refers to the sum *target range* (up to 20), not the requirement that 20 itself be in the pool. Mirrors how "sub-to-20" pool maxes at result = 18 by no-borrow constraint, not at 19 or 20.
+**Recommendation.** Option A. The "add-to-20" tier name refers to the sum _target range_ (up to 20), not the requirement that 20 itself be in the pool. Mirrors how "sub-to-20" pool maxes at result = 18 by no-borrow constraint, not at 19 or 20.
 
 ### 7.3 Parallel-sequencing — should `add-to-20` and `sub-to-20` unlock together from `add-to-10` mastery?
 
@@ -574,15 +579,18 @@ Under this order, Marian completes `add-to-20` BEFORE starting `sub-to-10`. But 
 
 **Pedagogical fit per `[[feedback_distractor_class_pedagogical_gates_mechanical]]`.**
 
-- **Documented error pattern?** Sketchy. The dropped-carry error is well-documented for *written multi-digit addition* (the child writes the units digit but forgets to carry the tens). For *mental cross-10-bridge* in 7–9 year olds, the literature describes errors as **off-by-one in the bridge step** ("8 + 5 = 12" or "8 + 5 = 14" — child counts one too few or one too many across the decade boundary). These off-by-one errors are already covered by Class 1.
-- **Dave's research?** Sub-to-20 § 3 (sub-to-20 research) introduces the analog "decade-anchor miss" (Class B) for subtraction across the decade boundary. The mechanism is the same — child anchors at 10 and miscounts the remaining steps — but for *subtraction*, the error mode is "stops counting back at 10 instead of continuing to the result." For *addition cross-10-bridge*, the analog would be "stops at 10 after the bridge step and forgets to add the remainder." Is this a documented error or speculative? **Dave has not weighed this for the add-to-20 surface.** See §7.6 for the explicit Dave-research gap.
-- **Mechanical fit?** Distractor value would be `10` for any cross-10-bridge fact. For `8 + 5 = 13`, chip `{10, 13, 14}` (Class 1 secondary on opposite side). For `9 + 2 = 11`, chip `{10, 11, 12}` — but `10` is `correct - 1` (degenerate; aliases Class 1). For `9 + 9 = 18`, chip `{10, 17, 18}` — but `10` is 8 away from correct, *too distant* to be a plausible trap (children don't drop 8 in a carry). **Mechanical fit is patchy** — only the EASY/medium make-ten-bridge facts (sum ≤ 13) would carry plausible dropped-carry traps.
+- **Documented error pattern?** Sketchy. The dropped-carry error is well-documented for _written multi-digit addition_ (the child writes the units digit but forgets to carry the tens). For _mental cross-10-bridge_ in 7–9 year olds, the literature describes errors as **off-by-one in the bridge step** ("8 + 5 = 12" or "8 + 5 = 14" — child counts one too few or one too many across the decade boundary). These off-by-one errors are already covered by Class 1.
+- **Dave's research?** Sub-to-20 § 3 (sub-to-20 research) introduces the analog "decade-anchor miss" (Class B) for subtraction across the decade boundary. The mechanism is the same — child anchors at 10 and miscounts the remaining steps — but for _subtraction_, the error mode is "stops counting back at 10 instead of continuing to the result." For _addition cross-10-bridge_, the analog would be "stops at 10 after the bridge step and forgets to add the remainder." Is this a documented error or speculative? **Dave has not weighed this for the add-to-20 surface.** See §7.6 for the explicit Dave-research gap.
+- **Mechanical fit?** Distractor value would be `10` for any cross-10-bridge fact. For `8 + 5 = 13`, chip `{10, 13, 14}` (Class 1 secondary on opposite side). For `9 + 2 = 11`, chip `{10, 11, 12}` — but `10` is `correct - 1` (degenerate; aliases Class 1). For `9 + 9 = 18`, chip `{10, 17, 18}` — but `10` is 8 away from correct, _too distant_ to be a plausible trap (children don't drop 8 in a carry). **Mechanical fit is patchy** — only the EASY/medium make-ten-bridge facts (sum ≤ 13) would carry plausible dropped-carry traps.
 
 **Recommendation.** REJECT for v1. Two reasons:
+
 1. The error pattern is not yet documented for mental cross-10-bridge in 7–9 year olds (Dave gap, §7.6).
 2. Mechanical fit is patchy (only ~5 of 22 facts produce a plausible Class B trap, and those overlap with Class 1 in 2 cases).
 
 If Thomas wants to re-open, the dispatch path is: dispatch Dave for an `add-to-20-cross-10-bridge-errors-marian.md` research note (mirror sub-to-20 § 3). Until that note exists, this spec's recommendation is REJECT. See §7.6.
+
+**Resolved (2026-06-12).** The Dave-research note is no longer pending — `design/research/add-to-20-class-b-distractor.md` weighs the Class B "dropped-carry" surface and **confirms REJECT** with evidence (Siegler 1987; Shrager & Siegler 1998; Fuson 1992; Wright et al. 2006): the dropped-carry/decade-anchor-stop error is documented for _written_ multi-digit addition only, not for mental cross-10-bridge in 7–9 year olds, where errors are off-by-one (already covered by Class 1). No spec change to §3.4 or §7.4 needed.
 
 ### 7.5 First-encounter "and" → "plus" framing — should `add-to-20` inherit `sub-to-10`'s first-session variant?
 
@@ -590,25 +598,34 @@ If Thomas wants to re-open, the dispatch path is: dispatch Dave for an `add-to-2
 
 **The candidate.** First-session `add-to-20` "and" warmup: `"Eight and five. How many?"` flipping to `"Eight plus five. How many?"` on session 2+. Same shape as sub-to-10's "take away" → "minus" gate.
 
-**Pedagogical argument for variant.** Cross-10-bridge is *conceptually* new for `add-to-20` (Marian has not bridged across 10 before). The "and" framing (concrete combination) might feel less arithmetic-symbolic than "plus" — easing the cognitive overhead of the bridge work.
+**Pedagogical argument for variant.** Cross-10-bridge is _conceptually_ new for `add-to-20` (Marian has not bridged across 10 before). The "and" framing (concrete combination) might feel less arithmetic-symbolic than "plus" — easing the cognitive overhead of the bridge work.
 
-**Pedagogical argument against variant.** By the time Marian reaches `add-to-20`, she has run dozens of `add-to-10` sessions where every problem used "plus." She has internalised the framing. Introducing "and" at `add-to-20` onset re-litigates the same cognitive-load tradeoff and *adds* novelty to a tier whose conceptual newness (cross-10-bridge) is already the main load. Two new things at once is worse than one.
+**Pedagogical argument against variant.** By the time Marian reaches `add-to-20`, she has run dozens of `add-to-10` sessions where every problem used "plus." She has internalised the framing. Introducing "and" at `add-to-20` onset re-litigates the same cognitive-load tradeoff and _adds_ novelty to a tier whose conceptual newness (cross-10-bridge) is already the main load. Two new things at once is worse than one.
 
 **Recommendation.** No variant. Inherit sub-to-20 §7.2's posture: Marian's "plus" model is well-anchored from `add-to-10`; the cross-10-bridge novelty is enough. Re-open at the post-v1 ear-test stage if real-Marian iPad data shows hesitation on the first `add-to-20` session.
 
 ### 7.6 Dave-research gap — cross-10-bridge error patterns in 7–9 year olds
 
 This spec INFERS Marian's likely error patterns on `add-to-20` cross-10-bridge from:
+
 - Dave's `add-to-10-counting-to-recall.md` (the finger-counting profile and doubles-anchor reasoning).
 - Dave's `sub-to-20-pedagogical-sequence.md` (the parallel-acquisition framing and the L2 Tagalog note).
 - Off-by-one as the catch-all error mode (Robinson et al. 2013 — for subtraction; the addition analog is inferential).
 
 **The gap.** Dave has NOT yet researched:
+
 1. **Add-to-20-specific cross-10-bridge error patterns** — what are the documented error modes for a 7-9-year-old doing mental `8 + 5`? Is "stops at 10" (the dropped-carry candidate in §7.4) a real error, or is the literature dominated by off-by-one in the bridge step?
 2. **Doubles-saturation effect** — does drilling doubles excessively (the current canon's failure mode) actually harm cross-10-bridge acquisition, or does it just waste pool real-estate? The "doubles prior" correction in §1.4 assumes the former; Dave could confirm.
 3. **Order-irrelevance for commutative pairs** — Marian's `add-to-10` commutativity is well-internalised, but does that carry through to the cross-10-bridge surface? Or does she perceive `8 + 5` (large + small, retrieve the large then count) as easier than `5 + 8` (small + large, must decompose the 5 mentally)?
 
-**This spec's recommendation to Matt / orchestrator.** Dispatch Dave for an `add-to-20-cross-10-bridge-errors-marian.md` research note BEFORE Kevin lands the directive + canon rebake. The note would:
+**Resolved (2026-06-12) — all three gaps closed by `design/research/add-to-20-class-b-distractor.md`:**
+
+1. **Cross-10-bridge error patterns / Class B → REJECT.** The "stops at 10" dropped-carry error is documented for _written_ multi-digit addition only; mental cross-10-bridge errors at ages 7–9 are off-by-one in the bridge step (already covered by Class 1). The §3.4 / §7.4 REJECT verdict is now evidence-backed.
+2. **Doubles-saturation effect → no action.** No literature supports a harmful saturation effect at this age — doubles are an efficient scaffold whose fast retrieval _reduces_ bridge-step load. The §1.4 doubles-cap-at-2 correction stands (it corrects pool real-estate, not a learning harm); no further change warranted.
+3. **Commutativity transfer → confirmed, no action.** Children transfer commutativity to bridge facts once they understand the principle (Baroody & Gannon 1984, _JRME_ 15(5), 351–356). The §1.1 commutative-pairs-as-distinct-facts handling is consistent with the evidence.
+
+**This spec's recommendation to Matt / orchestrator.** ~~Dispatch Dave~~ (superseded — see Resolved note above; `design/research/add-to-20-class-b-distractor.md` discharges this gap). Original recommendation, retained for provenance: dispatch Dave for an `add-to-20-cross-10-bridge-errors-marian.md` research note BEFORE Kevin lands the directive + canon rebake. The note would:
+
 - Confirm (or revise) the §1.4 doubles-prior correction (caps at 2).
 - Confirm (or revise) the §3.4 Class B rejection.
 - Confirm (or revise) the §1.3 (re: §1.1) commutative-pairs-as-distinct-facts choice.
@@ -623,6 +640,7 @@ This spec INFERS Marian's likely error patterns on `add-to-20` cross-10-bridge f
 The pool is deliberately smaller than `add-to-10`'s 44 facts (22/8 = 2.75× soak vs 44/8 = 5.5× soak). Rationale (§1.3): each `add-to-20` fact carries higher per-fact pedagogical weight (it represents a deliberate cross-10 strategy moment, not a fact-family closure exercise).
 
 **The question.** Is 22 the right number? Two candidate alternatives:
+
 - **18 facts** — drop 4 redundant commutative pairs (e.g. keep `8 + 5` and drop `5 + 8`). Cuts the soak factor to 2.25×. Risk: under-drilling.
 - **30 facts** — widen to include the deferred `4+7, 7+4, 5+6, 6+5, 4+8, 8+4` secondary bridge facts. Soak factor 3.75×. Risk: dilutes the high-leverage focus.
 
