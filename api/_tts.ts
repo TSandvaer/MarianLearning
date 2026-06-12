@@ -253,12 +253,21 @@ export interface PhonemeOverrideEntry {
 }
 
 const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
-  // Pre-Wave-7 entry — global (no `tiers`). Original ticket
-  // 86c9kj2um docstring above explains the `four → /fɔːr/` rationale.
-  // Stays back-compat under the widened shape: `tiers === undefined`
-  // means "activate on every tier", which is exactly what the bare-
-  // string `Record<string, string>` shape produced before.
-  four: { ipa: 'fɔːr' },
+  // Global (no `tiers`). Original ticket 86c9kj2um introduced `four → /fɔːr/`
+  // (rhotic long-O) to defeat the "for" homophone on the US Emma voice.
+  //
+  // ROUND-5 AUDITION WINNER (variant f2 "Centring diphthong", ticket
+  // 86ca8c3t7): on en-GB-OliviaNeural (NON-rhotic) the rhotic `/r/` in
+  // `fɔːr` is not realised as a consonant, and the bare long-O still
+  // collapsed toward the reduced "for" in de-stressed positions (issue
+  // #417: "four stars" → "for stars"; "Four comes after three" → "for…").
+  // The audition page proved the centring diphthong `/fɔə/` gives the vowel
+  // more body and reads distinct from "for" — Thomas's f2 pick. Switching
+  // the GLOBAL override to `fɔə` makes EVERY "four" inherit the diphthong
+  // (recap "four stars", streak "Four in a row", math reads), so the fix is
+  // structural, not per-utterance. The mid-sentence de-stress case still
+  // needs a stress lift on top — see renderFourSubjectHint.
+  four: { ipa: 'fɔə' },
 
   // "row" — global (no `tiers`). Voice-QA baseline fix (ticket
   // 86ca7u3gr, GitHub issue #372, cluster 1). en-GB-OliviaNeural reads
@@ -291,19 +300,18 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   // stay bare — they get their run-up from the flowing "says it" text
   // lead-in instead.
   //
-  // ROUND-2 STRONGER (ticket 86ca7y0hj): the schwa tail (`və`) was not
-  // enough — Thomas re-tested the current bytes and still heard "vvv is
-  // still very scratchy" across all four /v/ slots (read/correct/hint/
-  // giveAnswer). The residual scratch is the HARD ONSET: Olivia attacks a
-  // bare /v/ as a loud, clipped buzz. A length mark on the fricative
-  // (`vːə`) makes Olivia SUSTAIN the voiced labiodental into a smooth run
-  // rather than a clipped burst, so the energy is spread over time instead
-  // of front-loaded into a buzzy attack. Paired with the vvv-specific
-  // softening prosody below (deeper rate + reduced volume) which tames the
-  // loudness of the onset directly. Length-marked consonants are valid W3C
-  // IPA and Olivia honours `<phoneme>` (the voice that ignores `<emphasis>`
-  // still respects phoneme + prosody — see this file's history).
-  vvv: { ipa: 'vːə', tiers: ['letter-sounds'] },
+  // ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
+  // rounds 1 (`və` + rate-12%) and 2 (`vːə` + rate-20%/vol-12%) were BOTH
+  // rejected ×4 — the residual was a hard, buzzy ONSET on the voiced
+  // labiodental. The voice-audition page (scripts/voiceAuditionVariants.ts)
+  // explored several mechanisms; Thomas picked v2: the bare schwa-tail
+  // phoneme `və` (NO length mark) paired with a PITCH-LOWERED prosody
+  // (`pitch="-3st"`). A lower f0 voiced fricative buzzes less harshly — the
+  // length-mark sustain (round-2) attacked duration but not the onset
+  // harshness; dropping the pitch attacks the buzz directly. Rate `-15%` +
+  // volume `-20%` complete the softening. IPA reverts to `və`; the per-
+  // mnemonic prosody below carries the pitch/rate/volume.
+  vvv: { ipa: 'və', tiers: ['letter-sounds'] },
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
@@ -442,19 +450,21 @@ const SCRATCHY_MNEMONICS = new Set(['vvv', 'aaa', 'ooo'])
 const SCRATCHY_PROSODY_RATE = '-12%'
 
 /**
- * Per-mnemonic scratchy-softening prosody (ticket 86ca7y0hj — round-2
- * stronger). Round-1 (86ca7u3gr) wrapped EVERY scratchy mnemonic in a
- * single shared `<prosody rate="-12%">`. That GREENED aaa/ooo to Thomas's
- * ear but the /v/ slots were re-tested against the shipped bytes and STILL
- * came back "very scratchy" ×4. The /v/ scratch is louder/harder than the
- * vowel scratch (a voiced fricative attacks as a buzz, a vowel just needs
- * gentle slowing), so vvv needs a STRONGER prosody than the vowels:
+ * Per-mnemonic scratchy-softening prosody. Round-1 (86ca7u3gr) wrapped
+ * EVERY scratchy mnemonic in a single shared `<prosody rate="-12%">`. That
+ * GREENED aaa/ooo but the /v/ slots stayed "very scratchy" ×4 through two
+ * more rounds.
  *
- *   • deeper rate (`-20%` vs `-12%`) — stretches the sustained `vːə` run
- *     so the smoothed onset has room to ramp instead of bursting.
- *   • reduced volume (`-12%`) — directly tames the loud buzzy attack that
- *     is the residual scratch; Olivia honours `<prosody volume>` (same
- *     attribute the top-level EMMA_VOICE_CONFIG sets at the speak root).
+ * ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
+ * the residual /v/ scratch is a hard, buzzy ONSET, not a duration problem.
+ * Round-2's deeper rate + volume cut on a length-marked `vːə` did not move
+ * it. The winning lever is PITCH: a lower f0 voiced fricative buzzes less.
+ *
+ *   • pitch (`-3st`) — the NEW dominant cue; drops the f0 of the buzz so
+ *     the onset reads soft instead of harsh. Olivia honours `<prosody
+ *     pitch>` (it drives the question-prosody + four-stress paths).
+ *   • rate (`-15%`) — gentle slowing, lighter than round-2's `-20%`.
+ *   • volume (`-20%`) — tames the loud attack directly.
  *
  * aaa/ooo are LEFT on the `-12%`-rate / no-volume treatment so their
  * Thomas-approved (round-1 GREEN) bytes are preserved byte-for-byte — only
@@ -462,13 +472,15 @@ const SCRATCHY_PROSODY_RATE = '-12%'
  * shared rate-only prosody.
  */
 interface ScratchyProsody {
+  /** Optional `<prosody pitch>`; omitted → no pitch attribute. */
+  pitch?: string
   rate: string
   /** Optional `<prosody volume>`; omitted → no volume attribute (the
    *  round-1 aaa/ooo shape, kept byte-identical). */
   volume?: string
 }
 const SCRATCHY_PROSODY_BY_MNEMONIC: Record<string, ScratchyProsody> = {
-  vvv: { rate: '-20%', volume: '-12%' },
+  vvv: { pitch: '-3st', rate: '-15%', volume: '-20%' },
 }
 
 export function applyPhonemeOverrides(
@@ -560,9 +572,12 @@ export function applyPhonemeOverrides(
       const p = SCRATCHY_PROSODY_BY_MNEMONIC[lower] ?? {
         rate: SCRATCHY_PROSODY_RATE,
       }
+      // Attribute ORDER is pitch → rate → volume (mirrors the speak-root
+      // EMMA_VOICE_CONFIG prosody order) so emitted SSML reads consistently.
+      const pitchAttr = p.pitch !== undefined ? ` pitch="${p.pitch}"` : ''
       const volAttr = p.volume !== undefined ? ` volume="${p.volume}"` : ''
       out.push(
-        `${breakTag}<prosody rate="${p.rate}"${volAttr}>${phonemeTag}</prosody>`,
+        `${breakTag}<prosody${pitchAttr} rate="${p.rate}"${volAttr}>${phonemeTag}</prosody>`,
       )
     } else {
       out.push(`${breakTag}${phonemeTag}`)
@@ -671,24 +686,23 @@ export function renderLetterSoundsInnerText(
  * spoken a touch slower and softer. The letter glyph stays bare prose
  * so Azure still voices it as its NAME ("ee", "oh"), not a phoneme.
  *
- * ROUND-2 STRONGER (ticket 86ca7y0hj): on a re-test of the shipped bytes,
- * "e" GREENED at the round-1 `-12%` rate but "O" came back "still slightly
- * scratchy". The O letter-name ("oh") has a harder onset than "e" ("ee"),
- * so it needs a stronger softening: a deeper rate (`-18%`) plus a small
- * volume cut (`-8%`) to take the edge off the onset (Olivia honours
- * `<prosody volume>`). "e" is LEFT on the round-1 `-12%`-rate / no-volume
- * shape so its Thomas-approved bytes stay byte-for-byte identical — the
- * stronger treatment is gated to the O letter only.
+ * ROUND-2 STRONGER (ticket 86ca7y0hj): "e" GREENED at the round-1 `-12%`
+ * rate but "O" came back "still slightly scratchy"; round-2 deepened O's
+ * rate to `-18%` + a `-8%` volume cut. Thomas re-tested and STILL heard
+ * "weird pressure on O" (issue #417) — the rate-slow was OVER-articulating
+ * the onset.
+ *
+ * ROUND-5 AUDITION WINNER (variant o3 "Lower pitch + soft", ticket
+ * 86ca8c3t7): the voice-audition page proved the "pressure" was an f0
+ * prominence artefact of the rate-slow, not duration. The winning o3
+ * treatment DROPS the rate change entirely and instead lowers PITCH
+ * (`-2st`) at a natural rate, with a `-12%` volume cut and a shorter 200ms
+ * lead break. Because o3 changes the prosody structure (no rate attr, the
+ * period sits OUTSIDE the prosody, 200ms break), the O branch is emitted
+ * separately from the "e" branch — "e" keeps its Thomas-approved round-1
+ * shape byte-for-byte (250ms break, rate `-12%`, period inside).
  */
-const LETTER_NAMES_SCRATCHY_PROSODY: Record<
-  string,
-  { rate: string; volume?: string }
-> = {
-  // Lowercase-keyed; "e" keeps the round-1 rate-only shape (byte-identical),
-  // "O" gets the stronger round-2 rate + volume.
-  e: { rate: '-12%' },
-  o: { rate: '-18%', volume: '-8%' },
-}
+const LETTER_E_SCRATCHY_RATE = '-12%'
 export function renderLetterNamesScratchyHint(
   text: string,
   tierFilter?: string,
@@ -702,14 +716,24 @@ export function renderLetterNamesScratchyHint(
   if (!m) return null
   const lead = m[1]! // "Let's look."
   const letter = m[2]! // "e" or "O"
-  const p = LETTER_NAMES_SCRATCHY_PROSODY[letter.toLowerCase()] ?? {
-    rate: '-12%',
+  if (letter === 'O') {
+    // Round-5 audition winner o3 — break OUTSIDE the lead-space, pitch-drop
+    // prosody around the bare letter, period OUTSIDE the prosody. Matches
+    // scripts/voiceAuditionVariants.ts `O_LETTER` variant o3 exactly so the
+    // baked bytes reproduce Thomas's approved audition render.
+    return (
+      `${escapeSsml(lead)} ` +
+      `<break time="200ms"/>` +
+      `<prosody pitch="-2st" volume="-12%">O</prosody>` +
+      `${escapeSsml('.')}`
+    )
   }
-  const volAttr = p.volume !== undefined ? ` volume="${p.volume}"` : ''
+  // "e" — unchanged round-1 shape (byte-identical to the Thomas-approved
+  // render): no space, 250ms break, rate-only prosody, period inside.
   return (
     `${escapeSsml(lead)}` +
     `<break time="250ms"/>` +
-    `<prosody rate="${p.rate}"${volAttr}>${escapeSsml(letter)}.</prosody>`
+    `<prosody rate="${LETTER_E_SCRATCHY_RATE}">${escapeSsml(letter)}.</prosody>`
   )
 }
 
@@ -725,43 +749,60 @@ export function renderLetterNamesScratchyHint(
  * this voice (it drives the question-prosody + scratchy-soften paths), so
  * we stress "Four" with prosody instead of emphasis.
  *
- * ROUND-2 STRONGER (ticket 86ca7y0hj): round-1 used rate `-18%` + a 200ms
- * lead break + the `fɔːr` phoneme. Thomas re-tested the shipped bytes and
- * still heard "for comes after three" — the override IS applying, but the
- * de-stressed mid-sentence position keeps collapsing the vowel toward the
- * reduced "for". Rate-slowing alone lengthens the vowel but does NOT
- * restore the PROMINENCE that distinguishes a stressed "four" from a
- * reduced "for". The acoustic correlate of lexical stress is primarily
- * PITCH (f0) prominence — so round-2 adds a pitch lift on the word, the
- * lever that actually separates stressed from reduced:
+ * ROUND-2 STRONGER (ticket 86ca7y0hj): round-1 (`fɔːr` + rate-18%) and
+ * round-2 (`fɔːr` + pitch+12% + rate-25% + 250ms break) were BOTH rejected
+ * — Thomas still heard "for comes after three". The rhotic `fɔːr` leans on
+ * an `/r/` consonant en-GB-OliviaNeural does not realise, and pitch/rate
+ * alone did not separate the de-stressed vowel from the reduced "for".
  *
- *   • pitch `+12%` — the dominant cue; lifts "Four" out of the
- *     carrier's flat de-stressed contour (Olivia honours `<prosody pitch>`
- *     — it drives the question-prosody path's `pitch="+8%"`).
- *   • rate `-25%` (deeper than round-1's -18%) — lengthens the long open-O
- *     so `fɔːr` reads as a full long vowel, not a clipped reduced one.
- *   • break `250ms` (up from 200ms) — fully isolates "Four" from the
- *     de-stressing "Look." carrier so the prosody reset lands cleanly.
+ * ROUND-5 AUDITION WINNER (variant f2 "Centring diphthong", ticket
+ * 86ca8c3t7): the voice-audition page proved the fix is the VOWEL SHAPE.
+ * The centring diphthong `/fɔə/` (non-rhotic — the actual en-GB
+ * realisation) gives "Four" more body and is audibly distinct from "for".
+ * The global `four` override now carries `fɔə` (see PHONEME_OVERRIDES), so
+ * the only extra work here is the stress lift that rescues the mid-sentence
+ * de-stress: a light `pitch="+8%"` (the f2 audition value, NOT the rejected
+ * `+12%`). No rate change — the diphthong itself carries the length.
  *
- * Text-shape-gated to this exact hint string so every other
- * (baseline-passing) "four" utterance renders unchanged. Returns the
- * full inner SSML for the match, or `null` to fall through.
+ * LIVE-TEXT NOTE: the canon hint text is now "Four comes after three."
+ * (sentence-INITIAL "Four", no "Look." carrier — the legacy
+ * "Look. Four comes after three." / math.p6.hint was removed in #413, this
+ * is math.p6.hint2). Sentence-initial "Four" needs no lead break (nothing
+ * precedes it to reset from). The legacy "Look."-prefixed string is still
+ * matched defensively (harmless; emits the audition's break+lead shape).
+ *
+ * Text-shape-gated to these exact hint strings so every other
+ * (baseline-passing) "four" utterance renders on the plain global `fɔə`
+ * override. Returns the full inner SSML for the match, or `null`.
  */
 export function renderFourSubjectHint(
   text: string,
   tierFilter?: string,
 ): string | null {
-  // Math tier only (tierFilter undefined). Match the exact hint text.
+  // Math tier only (tierFilter undefined).
   if (tierFilter !== undefined) return null
-  if (text !== 'Look. Four comes after three.') return null
-  return (
-    'Look. ' +
-    '<break time="250ms"/>' +
-    '<prosody pitch="+12%" rate="-25%">' +
-    '<phoneme alphabet="ipa" ph="fɔːr">Four</phoneme>' +
-    '</prosody>' +
-    ' comes after three.'
-  )
+  // Live text (math.p6.hint2): sentence-initial "Four", no lead carrier.
+  if (text === 'Four comes after three.') {
+    return (
+      '<prosody pitch="+8%">' +
+      '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme>' +
+      '</prosody>' +
+      ' comes after three.'
+    )
+  }
+  // Legacy "Look."-prefixed text (removed from canon in #413) — matched
+  // defensively with the f2 audition's lead-break shape.
+  if (text === 'Look. Four comes after three.') {
+    return (
+      'Look. ' +
+      '<break time="200ms"/>' +
+      '<prosody pitch="+8%">' +
+      '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme>' +
+      '</prosody>' +
+      ' comes after three.'
+    )
+  }
+  return null
 }
 
 /**
