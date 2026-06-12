@@ -841,6 +841,8 @@ Two checks fire on every commit:
 
 The hook does NOT run `vitest` or e2e — those are author/dispatcher responsibility (see §1.3).
 
+**Gotcha — `prettier --write` rewrites the WHOLE staged file, inflating markdown diffs.** Several `design/` docs are prettier-dirty on `main` (emphasis style, table alignment). Touch one line of such a file and the hook normalizes the entire file at commit time — a 9-line hand-edit can land as a 73/55 diff (observed: PR #401, `design/math/add-to-20-content.md`, 2026-06-12). Reviewers and the orchestrator's diff eyeballing must not read diff size as scope on markdown PRs — verify the intended lines via a targeted grep of the diff instead (e.g. `gh pr diff <n> | grep '^+' | grep <distinctive-token>`). The normalization is one-time per file; once committed, the file stays `prettier --check` clean.
+
 **Never skip hooks** — `--no-verify` is forbidden by the orchestrator's git-safety protocol unless the user explicitly requests it. If a hook fails, fix the underlying issue and create a NEW commit; never `--amend` after a failure.
 
 **Gotcha — `'tsc' is not recognized` on a commit in the main worktree.** After heavy per-ticket worktree usage, the _main_ worktree's `node_modules` can be left incomplete (worktrees get their own `yarn install`; the main checkout is easy to forget). The pre-commit hook then fails on `yarn typecheck` with `'tsc' is not recognized as an internal or external command` — even for a docs-only commit, because the hook runs `tsc` unconditionally. Fix: `yarn install --frozen-lockfile` in the main worktree, then re-commit. This bit a `design/research/*.md` commit on 2026-05-14.
