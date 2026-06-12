@@ -193,6 +193,55 @@ function fixedPlan(): MathSessionPlan {
   }
 }
 
+/**
+ * A two-problem plan whose problems carry the three-beat hint triple
+ * (hint1/hint2/hint3) and NO legacy `hint` — exercises the W12-02
+ * three-beat choreography path. Problem 1 is `3 + 2 = 5` (correct chip = 5),
+ * matching `fixedPlan()`'s first problem so the wrong-chip selection logic
+ * is identical. Problem 2 (`1 + 4 = 5`) carries DISTINCT hint texts so a
+ * cross-problem leak (a P1 hint firing on P2) is detectable by text.
+ */
+function threeHintPlan(): MathSessionPlan {
+  return {
+    id: 'test-plan-three-hint',
+    label: 'Three-hint test plan',
+    problems: [
+      {
+        index: 1,
+        addendA: 3,
+        addendB: 2,
+        correct: 5,
+        op: '+',
+        utterances: {
+          read: 'Three plus two. How many?',
+          correct: 'Yes! Five!',
+          reprompt: 'Hmm... try again?',
+          hint1: 'Look. Three...',
+          hint2: 'Three flowers.',
+          hint3: 'And two more. How many?',
+          giveAnswer: 'This one is five.',
+        },
+      },
+      {
+        index: 2,
+        addendA: 1,
+        addendB: 4,
+        correct: 5,
+        op: '+',
+        utterances: {
+          read: 'One plus four. How many?',
+          correct: 'Yes! Five!',
+          reprompt: 'Hmm... try again?',
+          hint1: 'Look. One...',
+          hint2: 'One flower.',
+          hint3: 'And four more. How many?',
+          giveAnswer: 'This one is five.',
+        },
+      },
+    ],
+  }
+}
+
 function makeMemoryStorage(): StorageAdapter {
   const map = new Map<string, string>()
   return {
@@ -443,6 +492,276 @@ describe('Math (Number Garden) screen', () => {
     expect(harness.spoken()).toContain(
       'Look. Three. And two more. How many now?',
     )
+  })
+
+  // ── W12-02: three-beat hint choreography (ticket 86ca8700d) ────────────
+
+  it('three-beat hint: after 2 wrongs, hint1 → hint2 → hint3 fire in order', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={threeHintPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const chips = screen.getAllByTestId('math-chip')
+    const wrongChips = chips.filter((c) => c.getAttribute('data-value') !== '5')
+
+    // Two wrong taps cross the 2-wrong hint threshold.
+    await act(async () => {
+      fireEvent.click(wrongChips[0])
+      await Promise.resolve()
+    })
+    await act(async () => {
+      fireEvent.click(wrongChips[1] ?? wrongChips[0])
+      await Promise.resolve()
+    })
+
+    // Fast-forward past the HINT_DELAY beat and drain the sequential awaits
+    // (each beat's speak resolves on a microtask before the next fires).
+    await act(async () => {
+      vi.advanceTimersByTime(700)
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+
+    const spoken = harness.spoken()
+    // All three hint sub-step utterances were spoken.
+    expect(spoken).toContain('Look. Three...')
+    expect(spoken).toContain('Three flowers.')
+    expect(spoken).toContain('And two more. How many?')
+
+    // …and strictly in order hint1 → hint2 → hint3.
+    const i1 = spoken.indexOf('Look. Three...')
+    const i2 = spoken.indexOf('Three flowers.')
+    const i3 = spoken.indexOf('And two more. How many?')
+    expect(i1).toBeGreaterThanOrEqual(0)
+    expect(i2).toBeGreaterThan(i1)
+    expect(i3).toBeGreaterThan(i2)
+
+    // The legacy single-hint composite text is NEVER spoken on a three-beat
+    // problem (back-compat path is not taken).
+    expect(spoken).not.toContain('Look. Three. And two more. How many now?')
+  })
+
+  it('three-beat hint: flower-group pulse choreography syncs to the sub-steps', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    // Pause playback so we can observe the beat state mid-sequence.
+    const harness = makePlayHarness({ autoResolve: false })
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={threeHintPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const visualGroups = screen.getByTestId('math-visual-groups')
+    // At rest, no hint beat is active.
+    expect(visualGroups).toHaveAttribute('data-hint-beat', 'none')
+
+    const chips = screen.getAllByTestId('math-chip')
+    const wrongChips = chips.filter((c) => c.getAttribute('data-value') !== '5')
+
+    await act(async () => {
+      fireEvent.click(wrongChips[0])
+      await Promise.resolve()
+    })
+    await act(async () => {
+      fireEvent.click(wrongChips[1] ?? wrongChips[0])
+      await Promise.resolve()
+    })
+
+    // Fire the reprompt's pending playback so the hint timer can be armed.
+    await act(async () => {
+      harness.resolveAll()
+      await Promise.resolve()
+    })
+    // Trip the HINT_DELAY beat — hint1 dispatches and group-A starts pulsing.
+    await act(async () => {
+      vi.advanceTimersByTime(700)
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+
+    // hint1 is in flight (paused) → group-A bouquet (left, addendA=3) pulses.
+    expect(screen.getByTestId('math-visual-groups')).toHaveAttribute(
+      'data-hint-beat',
+      'group-a',
+    )
+    const groupsDuringA = screen.getAllByTestId('math-flower-group')
+    expect(groupsDuringA[0]).toHaveAttribute('data-count', '3')
+    expect(groupsDuringA[0]).toHaveAttribute('data-pulsing', 'true')
+    expect(groupsDuringA[1]).toHaveAttribute('data-pulsing', 'false')
+
+    // Resolve hint1 → hint2 dispatches; group-A still pulses (quantity beat).
+    await act(async () => {
+      harness.resolveAll()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    expect(screen.getByTestId('math-visual-groups')).toHaveAttribute(
+      'data-hint-beat',
+      'group-a',
+    )
+
+    // Resolve hint2 → hint3 dispatches; the beat flips to group-B (right
+    // bouquet, addendB=2).
+    await act(async () => {
+      harness.resolveAll()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    expect(screen.getByTestId('math-visual-groups')).toHaveAttribute(
+      'data-hint-beat',
+      'group-b',
+    )
+    const groupsDuringB = screen.getAllByTestId('math-flower-group')
+    expect(groupsDuringB[1]).toHaveAttribute('data-count', '2')
+    expect(groupsDuringB[1]).toHaveAttribute('data-pulsing', 'true')
+    expect(groupsDuringB[0]).toHaveAttribute('data-pulsing', 'false')
+
+    // Resolve hint3 → sequence complete; beat clears back to rest.
+    await act(async () => {
+      harness.resolveAll()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    expect(screen.getByTestId('math-visual-groups')).toHaveAttribute(
+      'data-hint-beat',
+      'none',
+    )
+  })
+
+  it('back-compat: a legacy-hint-only problem still plays a single hint', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={fixedPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const chips = screen.getAllByTestId('math-chip')
+    const wrongChips = chips.filter((c) => c.getAttribute('data-value') !== '5')
+
+    await act(async () => {
+      fireEvent.click(wrongChips[0])
+      await Promise.resolve()
+    })
+    await act(async () => {
+      fireEvent.click(wrongChips[1] ?? wrongChips[0])
+      await Promise.resolve()
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(700)
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+
+    const spoken = harness.spoken()
+    // Exactly the single legacy composite hint — no sub-step utterances.
+    const legacyCount = spoken.filter(
+      (t) => t === 'Look. Three. And two more. How many now?',
+    ).length
+    expect(legacyCount).toBe(1)
+    expect(spoken).not.toContain('Three flowers.')
+    // No beat choreography on the legacy path.
+    expect(screen.getByTestId('math-visual-groups')).toHaveAttribute(
+      'data-hint-beat',
+      'none',
+    )
+  })
+
+  it('hint timer is cancelled on advance: a correct tap within the HINT_DELAY window leaks no beat onto the next problem (Kevin finding 1)', async () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    })
+    const harness = makePlayHarness()
+    render(
+      withMotion(
+        <MathScreen
+          __testInitiallyAudioUnlocked
+          plan={threeHintPlan()}
+          playUtterance={harness.playUtterance}
+          storage={makeMemoryStorage()}
+        />,
+      ),
+    )
+
+    const chips = screen.getAllByTestId('math-chip')
+    const wrongChips = chips.filter((c) => c.getAttribute('data-value') !== '5')
+
+    // Two wrong taps arm the hint timer (600ms HINT_DELAY_AFTER_WRONG_MS).
+    await act(async () => {
+      fireEvent.click(wrongChips[0])
+      await Promise.resolve()
+    })
+    await act(async () => {
+      fireEvent.click(wrongChips[1] ?? wrongChips[0])
+      await Promise.resolve()
+    })
+
+    // Correct tap WHILE the hint timer is still pending (we have NOT advanced
+    // timers past the 600ms window). The hint timer is now in flight.
+    const correctChip = screen
+      .getAllByTestId('math-chip')
+      .find((c) => c.getAttribute('data-value') === '5')!
+    await act(async () => {
+      fireEvent.click(correctChip)
+      await Promise.resolve()
+    })
+
+    // Auto-advance fires (ADVANCE_AFTER_CORRECT_MS = 1200ms). advanceToNext()
+    // must clear the pending hint timer.
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    // Now on problem 2.
+    expect(screen.getByTestId('math')).toHaveAttribute(
+      'data-problem-index',
+      '1',
+    )
+
+    // Drain any time past the original 600ms hint window + a full hint
+    // sequence's worth — the cancelled timer must NOT fire.
+    await act(async () => {
+      vi.advanceTimersByTime(1000)
+      for (let i = 0; i < 10; i++) await Promise.resolve()
+    })
+
+    const spoken = harness.spoken()
+    // No P1 hint sub-step ever fired (the leak symptom was a stray hint1
+    // clip — "Look. Three..." — playing on problem 2).
+    expect(spoken).not.toContain('Look. Three...')
+    expect(spoken).not.toContain('Three flowers.')
+    expect(spoken).not.toContain('And two more. How many?')
+    // …and no P2 hint either (we never went 2-wrong on P2).
+    expect(spoken).not.toContain('Look. One...')
+    // Problem 2's flower groups paint at rest — no group-a pulse-flash leak.
+    expect(screen.getByTestId('math-visual-groups')).toHaveAttribute(
+      'data-hint-beat',
+      'none',
+    )
+    const groups = screen.getAllByTestId('math-flower-group')
+    for (const g of groups) {
+      expect(g).toHaveAttribute('data-pulsing', 'false')
+    }
   })
 
   it('streak threshold [3, 5, 8] grants a bonus stardust at problem 3', async () => {

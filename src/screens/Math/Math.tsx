@@ -654,6 +654,38 @@ const defaultPlayUtterance: PlayMathUtteranceFn = (text, opts) => {
   })
 }
 
+// ── Three-beat hint choreography (W12-02, ticket 86ca8700d) ──────────────
+
+/**
+ * Per-flower pulse duration (ms). Spec design/screen-3-math.md:299 — each
+ * flower scales `1 → 1.1 → 1` in sequence, 150ms each. The group-level
+ * pulse staggers its children by this interval so the flowers ripple in
+ * order rather than pulsing as one block.
+ */
+const HINT_FLOWER_PULSE_MS = 150
+
+/**
+ * The resolved three-beat hint text, or `null` when the problem carries
+ * only the legacy single `hint` (back-compat path). A problem qualifies
+ * for the three-beat choreography iff it carries all three of
+ * `hint1`/`hint2`/`hint3`. A partial triple (e.g. hint1 without hint2) is
+ * treated as NOT-a-triple and falls back to the legacy single hint — the
+ * parser (W12-01) rejects partial triples at load time, so this branch is
+ * a belt-and-suspenders guard, never the live path on valid canon.
+ */
+function resolveHintTriple(
+  u: MathProblem['utterances'],
+): { hint1: string; hint2: string; hint3: string } | null {
+  if (
+    typeof u.hint1 === 'string' &&
+    typeof u.hint2 === 'string' &&
+    typeof u.hint3 === 'string'
+  ) {
+    return { hint1: u.hint1, hint2: u.hint2, hint3: u.hint3 }
+  }
+  return null
+}
+
 // ── Component -------------------------------------------------------------
 
 // Phase 3b (ticket 86c9jccp7): the inlined `MelodyPose = 'idle' | 'happy'
@@ -1258,6 +1290,23 @@ function MathScreen({
   /** Emma's current pose. Driven by tap outcomes + the auto-return timer. */
   const [pose, setPose] = useState<EmmaPose>('idle')
 
+  /**
+   * Active three-beat hint choreography beat (W12-02, ticket 86ca8700d).
+   *
+   * `null` while no hint sequence is running. During the after-2-wrongs
+   * three-beat hint, this flips through:
+   *   - `'group-a'` while hint1 (attention) AND hint2 (group-A quantity
+   *     highlight) play — the left flower group (`addendA`) pulses.
+   *   - `'group-b'` while hint3 (addition + question) plays — the right
+   *     flower group (`addendB`) pulses.
+   * Legacy single-hint problems (no hint1/2/3 triple) never set this; the
+   * choreography is a no-op and behaviour is identical to pre-W12.
+   *
+   * Surfaced as `data-hint-beat` on `math-visual-groups` for the E2E/
+   * component choreography-sync assertions (W12-05 / Math.test.tsx).
+   */
+  const [hintBeat, setHintBeat] = useState<'group-a' | 'group-b' | null>(null)
+
   /** Chip currently shaking (after a wrong tap) — set to its value while
    *  the shake animation plays so we can target the keyframe. */
   const [shakingChip, setShakingChip] = useState<number | null>(null)
@@ -1845,6 +1894,16 @@ function MathScreen({
     if (problemIndex < plan.problems.length - 1) {
       setProblemIndex((i) => i + 1)
       setProblemState(FRESH_PROBLEM_STATE)
+      // Clear any lingering hint-beat choreography state so the next
+      // problem's flower groups paint at rest (W12-02, ticket 86ca8700d).
+      setHintBeat(null)
+      // Cancel a pending hint timer (belt-and-suspenders for any non-correct
+      // advance — the primary cancel is in handleCorrectTap, since the 600ms
+      // hint timer fires before the 1200ms auto-advance). Kevin finding 1.
+      if (hintTimerRef.current !== null) {
+        clearTimeout(hintTimerRef.current)
+        hintTimerRef.current = null
+      }
       // Reset the synchronous gates alongside the React state reset —
       // otherwise the new problem's first taps would see the previous
       // problem's latched ref values (resolved=true / hintPlayed=true /
@@ -1994,6 +2053,81 @@ function MathScreen({
   )
 
   /**
+   * Play the after-2-wrongs hint (W12-02, ticket 86ca8700d).
+   *
+   * Two paths, chosen per-problem on the presence of the hint1/2/3 triple:
+   *
+   *  - **Three-beat (new):** play hint1 → hint2 → hint3 strictly in order,
+   *    each gated on the prior `speak()` resolving (sequential, never
+   *    overlapping). The flower-group pulse choreography is synced to the
+   *    sub-step utterances (spec design/screen-3-math.md:297-303):
+   *      hint1 (attention) + hint2 (group-A quantity) → group-A pulses;
+   *      hint3 (addition + question)                  → group-B pulses.
+   *    Closes the spec/planner inconsistency (wave plan §2 / AC #2).
+   *
+   *  - **Legacy (back-compat):** a problem carrying only the single `hint`
+   *    plays exactly one utterance with no beat choreography — byte-for-
+   *    byte the pre-W12 behaviour (AC #3).
+   *
+   * Pose returns to idle on completion in both paths. Stale-guarded against
+   * unmount and problem-advance: if the screen unmounted or the user
+   * advanced past this problem while a beat's audio was in flight, the
+   * remaining beats and the pose/clear side-effects are skipped.
+   */
+  const runHintSequence = useCallback(
+    async (problem: MathProblem) => {
+      // Capture the 0-based plan index this sequence belongs to. NOTE:
+      // `problemIndexRef` mirrors the 0-based `problemIndex` state, NOT the
+      // 1-based `problem.index` field — so we compare against the closure's
+      // `problemIndex`, not `problem.index`.
+      const myIndex = problemIndex
+      // True iff we're still on THIS problem and mounted — the gate every
+      // awaited beat re-checks before continuing (mirrors the read-aloud
+      // effect's stale-resolution guard, ticket 86c9guh4y).
+      const stillLive = () =>
+        !unmountedRef.current && problemIndexRef.current === myIndex
+
+      const returnToIdle = () => {
+        if (!stillLive()) return
+        setHintBeat(null)
+        poseTimerRef.current = setTimeout(() => {
+          setPose('idle')
+          poseTimerRef.current = null
+        }, 0)
+      }
+
+      const triple = resolveHintTriple(problem.utterances)
+
+      if (triple === null) {
+        // Legacy single-hint path — unchanged from pre-W12.
+        const legacy = problem.utterances.hint
+        if (typeof legacy === 'string') {
+          await speak(legacy)
+        }
+        returnToIdle()
+        return
+      }
+
+      // Three-beat path. group-A flowers pulse across hint1 AND hint2; the
+      // beat only changes to group-B for hint3. Each beat is awaited so the
+      // next never overlaps it. (No redundant re-set of 'group-a' before
+      // hint2 — Kevin review finding 4, PR #409.)
+      setHintBeat('group-a')
+      await speak(triple.hint1)
+      if (!stillLive()) return
+
+      await speak(triple.hint2)
+      if (!stillLive()) return
+
+      setHintBeat('group-b')
+      await speak(triple.hint3)
+
+      returnToIdle()
+    },
+    [speak, problemIndex],
+  )
+
+  /**
    * Handle a wrong tap. Sequenced per spec §Audio dispatch (wrong path):
    * shake the chip, swap Emma to puzzled-tilt, fire SFX + reprompt utterance,
    * then either schedule the hint (after 2 wrongs) or return to idle.
@@ -2095,22 +2229,12 @@ function MathScreen({
           })
         } else if (didScheduleHint) {
           // Schedule the hint after a 600ms beat (spec §Wrong path note).
+          // HINT_DELAY_AFTER_WRONG_MS is preserved before the FIRST hint
+          // beat regardless of legacy-vs-three-beat (W12-02 AC #1).
           hintTimerRef.current = setTimeout(() => {
             hintTimerRef.current = null
             setProblemState((prev) => ({ ...prev, hintPlayed: true }))
-            // W12-01 compile-keep: `hint` is now optional on
-            // MathProblemUtterances (the back-compat predicate allows EITHER
-            // legacy `hint` OR the hint1/hint2/hint3 triple). Committed canon
-            // today always carries the legacy `hint`, so `?? ''` never fires
-            // — behaviour is identical. W12-02 replaces this single speak()
-            // with the three-beat hint1→hint2→hint3 sequence and removes
-            // this fallback.
-            void speak(problem.utterances.hint ?? '').then(() => {
-              poseTimerRef.current = setTimeout(() => {
-                setPose('idle')
-                poseTimerRef.current = null
-              }, 0)
-            })
+            void runHintSequence(problem)
           }, HINT_DELAY_AFTER_WRONG_MS)
         }
       })
@@ -2118,7 +2242,7 @@ function MathScreen({
     // problemState.{wrongCount,hintPlayed,guidedPlayed} intentionally
     // omitted from deps — the gates read the synchronous refs instead.
     // See ref declarations for the rage-tap rationale (ticket 86c9gy7ju).
-    [poofInstance, speak, streak],
+    [poofInstance, speak, streak, runHintSequence],
   )
 
   /**
@@ -2141,6 +2265,19 @@ function MathScreen({
       // reward path from compounding.
       resolvedRef.current = true
       setProblemState((prev) => ({ ...prev, resolved: true }))
+
+      // Cancel a pending hint armed by a prior wrong tap on THIS problem.
+      // The 600ms HINT_DELAY_AFTER_WRONG_MS timer fires BEFORE the 1200ms
+      // auto-advance, so clearing it only in `advanceToNext` is too late —
+      // the hint sequence would already have spoken hint1 + flashed group-a
+      // on its way out. A correct answer makes the hint moot, so cancel it
+      // here the instant the correct tap registers. (Kevin review finding 1,
+      // PR #409 — the actual leak fix; the advanceToNext clear is the
+      // belt-and-suspenders backstop for any non-correct-tap advance.)
+      if (hintTimerRef.current !== null) {
+        clearTimeout(hintTimerRef.current)
+        hintTimerRef.current = null
+      }
 
       // Stardust + streak. Spec line 162-164: stardust is awarded even after
       // 1-or-2 wrongs; ONLY the guided-completion path withholds it.
@@ -2936,6 +3073,12 @@ function MathScreen({
                     currentProblem.addendB,
                   ).toFixed(2)}
                   data-flowers-visible={flowersVisible ? 'true' : 'false'}
+                  /* Three-beat hint choreography seam (W12-02, ticket
+                     86ca8700d). `none` at rest; `group-a` while hint1/hint2
+                     play (left bouquet pulses); `group-b` while hint3 plays
+                     (right bouquet pulses). The E2E/component sync assertions
+                     read this. */
+                  data-hint-beat={hintBeat ?? 'none'}
                   aria-hidden
                   className="flex items-center gap-6"
                   style={{
@@ -2965,9 +3108,17 @@ function MathScreen({
                     ease: 'easeOut',
                   }}
                 >
-                  <FlowerGroup count={currentProblem.addendA} />
+                  <FlowerGroup
+                    count={currentProblem.addendA}
+                    pulsing={hintBeat === 'group-a'}
+                    reducedMotion={reducedMotion}
+                  />
                   <span>+</span>
-                  <FlowerGroup count={currentProblem.addendB} />
+                  <FlowerGroup
+                    count={currentProblem.addendB}
+                    pulsing={hintBeat === 'group-b'}
+                    reducedMotion={reducedMotion}
+                  />
                 </m.div>
                 {showDotCardOverlay &&
                   dotCardPips !== null &&
@@ -3255,18 +3406,51 @@ function SparkleGlyph() {
 }
 
 /** Inline flower-glyph fallback while `flower-glyph.svg` is on assets-todo.md.
- *  Rendered N times for the visual-groups row. */
-function FlowerGroup({ count }: { count: number }) {
+ *  Rendered N times for the visual-groups row.
+ *
+ *  `pulsing` (W12-02, ticket 86ca8700d): when true, each flower scales
+ *  `1 → 1.1 → 1` in sequence (HINT_FLOWER_PULSE_MS per flower, staggered)
+ *  so the bouquet ripples in time with the hint narration beat. Spec
+ *  design/screen-3-math.md:299. Honours reduce-motion: the pulse collapses
+ *  to no scaling, leaving the flowers static (the data-pulsing seam still
+ *  reflects intent for QA / tests). */
+function FlowerGroup({
+  count,
+  pulsing = false,
+  reducedMotion = false,
+}: {
+  count: number
+  pulsing?: boolean
+  reducedMotion?: boolean
+}) {
   return (
     <span
       data-testid="math-flower-group"
       data-count={count}
+      data-pulsing={pulsing ? 'true' : 'false'}
       className="inline-flex items-center gap-1"
     >
       {Array.from({ length: count }).map((_, i) => (
-        <span key={i} role="presentation" aria-hidden>
+        <m.span
+          key={i}
+          role="presentation"
+          aria-hidden
+          style={{ display: 'inline-flex' }}
+          animate={
+            pulsing && !reducedMotion ? { scale: [1, 1.1, 1] } : { scale: 1 }
+          }
+          transition={
+            pulsing && !reducedMotion
+              ? {
+                  duration: (HINT_FLOWER_PULSE_MS * 2) / 1000,
+                  delay: (HINT_FLOWER_PULSE_MS * i) / 1000,
+                  ease: 'easeInOut',
+                }
+              : { duration: 0 }
+          }
+        >
           <FlowerGlyph />
-        </span>
+        </m.span>
       ))}
     </span>
   )
