@@ -8,6 +8,14 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 
 <!-- Real entries below this line. Newest at top. -->
 
+## 2026-06-12 1230 UTC — Granted Kevin's W12-01 scope amendment (Math.tsx 1-line compile-keep)
+
+- **Decided:** Accepted `src/screens/Math/Math.tsx` into W12-01 (ticket 86ca86zyq / PR #407) scope for exactly one line: `speak(... .hint ?? '')` at the hint-speak site, required because making `hint` optional (the honest type for the EITHER/OR back-compat predicate) breaks Math.tsx's typecheck. Kept Kevin's optional-`hint` design over the required-`hint` "boundary type-lie" alternative he offered — the optional type gives W12-02's author a typecheck nudge when reading `utterances.hint` on a three-hint plan (boundary-loose, producer-strict).
+- **Foundation:** The dispatch brief explicitly authorized "only keep it compiling against the widened types — do NOT make Math.tsx consume the triple"; the Files-in-play list simply omitted the file the narrative authorized. Precedent: W11-02 scope amendment (same mechanical-boundary class), audited **accepted by Thomas 2026-06-12**. Devon reviews PR #407 including this line; Devon's in-flight W12-02 rewrites that exact line anyway (he rebases as planned second-mover).
+- **Alternative:** Require Kevin to re-push with a required-`hint` type (hides the back-compat truth from the type system) or queue for Thomas (idles the wave's root PR on a 1-line mechanical call).
+- **Reversibility:** 1 line, rewritten by W12-02 regardless; revert trivial.
+- **Status:** pending review
+
 ## 2026-06-11 2240 UTC — Granted Kevin's W11-02 scope amendment (parser + content-type files added to Files-in-play)
 
 - **Decided:** Added `src/screens/WordSong/wordSessionPlans.ts`, `src/screens/WordSong/planFromServer.ts`, `src/screens/WordSong/planFromServer.test.ts` to ticket 86ca7xmr8's Files-in-play (Kevin's scope-amendment request, his ticket comment 90150232662835). `WordSong.tsx` render branch stays Devon's W11-03. NOT auto-decided alongside it: Kevin's proposed uniform read-line shape ("Find the word: <word>." for all 8) deviates from Dave's carrier-sentence/bare-word two-shape mechanic — routed to Dave for a pedagogy ruling before the canon bake.

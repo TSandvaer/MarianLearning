@@ -578,6 +578,20 @@ Pairs with the §6 corollary ("the GREEN-side mock must serve real tier canon, n
 
 **Decision rule:** if your spec asserts a per-problem field that's written at the chip-tap site (latency, answer value, answer word, first-tap correct) and NOT pinned to canon-specific content (specific addends, specific words, specific utterance text), reach for `failNetwork: true` + `forceHowlerUnlock`. If your spec needs canon-specific content, you're in the canon-bytes-mock class — see the rule above this one.
 
+#### 4.1.2a Chip-gate DOM seam — `data-chip-gate` vs `data-read-aloud-played` (PRs #399 / #402 / #406)
+
+Since PR #402, Math chips become tappable on TTS **start** (`onPlay` of the `read` utterance), not on read-aloud completion. The attributes are decoupled:
+
+| Attribute                | Set when                                                | Semantics                               |
+| ------------------------ | ------------------------------------------------------- | --------------------------------------- |
+| `data-chip-gate`         | gate flips open (`chipGateOpen === true`)               | Chip interaction gate — the e2e key     |
+| `data-chip-gate-via`     | gate open: `'tts-start'` or `'fallback'`                | Diagnostic — which path opened it       |
+| `data-read-aloud-played` | read-aloud audio COMPLETES (`readAloudPlayed === true`) | Completion anchor; ~20 regression tests |
+
+**E2e rule:** gate "chips are now tappable" assertions on `data-chip-gate="open"` — NOT on `data-read-aloud-played` (that fires later, at completion) and NOT on the `disabled` prop (overloaded: `resolved || dimForGuided || !readAloudPlayed`). Waiting for `data-read-aloud-played` before tapping still works (strictly later than gate-open) but adds dead time and doesn't exercise the gate. To drive the `'fallback'` path deliberately, use `failNetwork: true` (audio never decodes → `onPlay` never fires → 2000 ms watchdog opens the gate).
+
+**Vitest seams:** `makePlayHarness` in `Math.test.tsx` fires `onPlay` synchronously (it anticipated the gate) — gate opens in the same tick as `speak()`; assert closed-state BEFORE injecting the speak call. `vi.useFakeTimers()` does NOT fake `performance.now()`, so latency tests assert the `-1` sentinel invariant rather than fake-advanced values. Auto-advance is independent of the chip gate — it rides the CELEBRATION utterance's `onend` (`correctSpeakResolvedRef`) or `ADVANCE_HARD_CEILING_MS = 4000`; a harness that holds the read-aloud pending must still resolve non-read utterances or each advance stalls 4 s.
+
 **`forceHowlerUnlock` is poison for CANON-SERVED WordSong content specs (W11-03 finding, PR #390 review cycle, 2026-06-12).** When a WordSong spec serves real canon (not `failNetwork`), `forceHowlerUnlock` races the eager 59-howl `buildHowls` in `sessionAudio.ts` and throws `Failed to execute 'connect' on 'AudioNode'` → `prepareWordSongPathA` throws → App silently falls back to the CVC static plan. The spec then asserts against the WRONG render (picture card instead of the tier's real content) and fails for a phantom reason. The passing canon-served content specs (`digraphs-sh-content.spec.ts` test 3 etc.) deliberately omit `forceHowlerUnlock` — follow that pattern. Diagnostic fingerprint: a `connect()` console error + a CVC-fallback render in a spec that expected tier-specific content. Related trap: a payload-only assertion (request body + on-disk canon) stays GREEN through this silent demote — only a rendered-plan assertion (`data-target-word` / content-type on the DOM) catches it.
 
 **Distinct from `failNetwork`-silent-path content-agnostic specs.** Those (the audit-9 listed above) happen to use `failNetwork` because they assert on rendered DOM derivation, not on canon-tap-side captures. The schema-plumbing class is narrower: it specifically asserts on `SessionHistoryEntry` shape after a session. Both classes are content-agnostic; only one is gesture-driven.
