@@ -284,6 +284,213 @@ export function canonicalWordSongSessionResponse(): SessionStartResponse {
   }
 }
 
+// ── Three-hint (W12) fixtures — math hint scaffolding split ───────────────
+//
+// Wave 12 splits the single `math.p<N>.hint` utterance into three escalating
+// utterances `hint1` / `hint2` / `hint3`. These builders produce the served
+// `/api/claude` envelope for the W12-05 failing-first spec
+// (`e2e/math-three-hint.spec.ts`).
+//
+// AUDIO-BYTES INJECTION — load-bearing. The default `SILENT_MP3_BASE64`
+// placeholder above does NOT decode under a real chromium `AudioContext`
+// reliably; specs that drive a real gesture-unlock chain (no
+// `forceHowlerUnlock`) and assert on canon-specific caption text need REAL
+// Azure-rendered MP3 bytes so `prepareMathPathA` does not reject and silently
+// demote to the static fallback plan (see `.claude/docs/testing-and-ci.md`
+// §4.1.2). Rather than hardcode ~25 KB of base64 here, the builders accept an
+// `audioBytes` provider so the spec can inject bytes read from the on-disk
+// math canon (`public/canon/math/level-1/<focus>.json`) at test time. The
+// fixture text is what the spec asserts on; the bytes only have to decode.
+
+/** A function returning the inline-MP3 base64 to stamp onto every utterance
+ *  in a W12 fixture. Spec injects real on-disk canon bytes here. */
+export type AudioBytesProvider = () => string
+
+function uttWithBytes(id: string, text: string, base64: string): Utterance {
+  return { id, text, audio: { kind: 'inline', base64, mime: 'audio/mpeg' } }
+}
+
+/**
+ * The single math problem the three-hint spec drives. add-to-10 P1 is
+ * `1 + 2 = 3` (matches the on-disk add-to-10 canon P1) so the spec can seed
+ * Marian's default `add-to-10: 'practicing'` focus and land on this problem
+ * without any chip-walk. Only P1 is exercised (2 wrong taps → hint sequence),
+ * so a one-problem plan is sufficient — the screen never advances past P1.
+ *
+ * NOTE: a real session ships 8 problems + 19 session-end utterances. The
+ * three-hint spec only taps P1 and never completes the session, so the plan
+ * needs only P1's utterances plus session-end (kept for parser symmetry —
+ * out-of-namespace ids are skipped, not required). Eight problems are emitted
+ * so the focus-node-keyed planner contract is realistic and the read-aloud
+ * gate behaves identically to production.
+ */
+const THREE_HINT_PROBLEM = {
+  index: 1,
+  aWord: 'One',
+  bWord: 'two',
+  sumWord: 'three',
+  sumCap: 'Three',
+  sum: 3,
+} as const
+
+/** The three escalating hint texts for the W12 add-to-10 P1 problem.
+ *  Mirrors the W12-03 planner directive's per-step split
+ *  (attention → quantity-A → add + question). Exported so the spec can pin
+ *  the exact expected caption sequence. */
+export const THREE_HINT_TEXTS_P1: readonly [string, string, string] = [
+  'Look at the flowers.',
+  'One flower.',
+  'And two more. How many?',
+]
+
+/** The legacy composite single-hint text for the same problem (matches the
+ *  on-disk add-to-10 canon's `math.p1.hint`). Back-compat regression-lock. */
+export const LEGACY_HINT_TEXT_P1 = 'Look. One. And two more. How many now?'
+
+function threeHintProblemUtterances(base64: string): Utterance[] {
+  const p = THREE_HINT_PROBLEM
+  return [
+    uttWithBytes(
+      `math.p${p.index}.read`,
+      `${p.aWord} plus ${p.bWord}. How many?`,
+      base64,
+    ),
+    uttWithBytes(`math.p${p.index}.correct`, `Yes! ${p.sumCap}!`, base64),
+    uttWithBytes(`math.p${p.index}.reprompt`, 'Hmm... try again?', base64),
+    uttWithBytes(`math.p${p.index}.hint1`, THREE_HINT_TEXTS_P1[0], base64),
+    uttWithBytes(`math.p${p.index}.hint2`, THREE_HINT_TEXTS_P1[1], base64),
+    uttWithBytes(`math.p${p.index}.hint3`, THREE_HINT_TEXTS_P1[2], base64),
+    uttWithBytes(
+      `math.p${p.index}.giveAnswer`,
+      `This one is ${p.sumWord}.`,
+      base64,
+    ),
+  ]
+}
+
+function legacyHintProblemUtterances(base64: string): Utterance[] {
+  const p = THREE_HINT_PROBLEM
+  return [
+    uttWithBytes(
+      `math.p${p.index}.read`,
+      `${p.aWord} plus ${p.bWord}. How many?`,
+      base64,
+    ),
+    uttWithBytes(`math.p${p.index}.correct`, `Yes! ${p.sumCap}!`, base64),
+    uttWithBytes(`math.p${p.index}.reprompt`, 'Hmm... try again?', base64),
+    uttWithBytes(`math.p${p.index}.hint`, LEGACY_HINT_TEXT_P1, base64),
+    uttWithBytes(
+      `math.p${p.index}.giveAnswer`,
+      `This one is ${p.sumWord}.`,
+      base64,
+    ),
+  ]
+}
+
+/**
+ * Build the remaining P2..P8 utterances (legacy single-hint shape) so the
+ * served plan is a realistic 8-problem session. The spec only taps P1, so
+ * P2..P8 never render — they exist purely so the plan parses as a full
+ * session and the focus-node contract is honoured. Reuses the canonical
+ * MATH_PROBLEMS table for P2..P8.
+ */
+function tailProblemUtterances(base64: string): Utterance[] {
+  const out: Utterance[] = []
+  for (const p of MATH_PROBLEMS) {
+    if (p.index === 1) continue // P1 is supplied by the W12 builders above
+    const aCap = capitalize(p.addendAWord)
+    const sumCap = capitalize(p.sumWord)
+    out.push(
+      uttWithBytes(
+        `math.p${p.index}.read`,
+        `${aCap} plus ${p.addendBWord}. How many?`,
+        base64,
+      ),
+      uttWithBytes(`math.p${p.index}.correct`, `Yes! ${sumCap}!`, base64),
+      uttWithBytes(`math.p${p.index}.reprompt`, 'Hmm... try again?', base64),
+      uttWithBytes(
+        `math.p${p.index}.hint`,
+        `Look. ${aCap}. And ${p.addendBWord} more. How many now?`,
+        base64,
+      ),
+      uttWithBytes(
+        `math.p${p.index}.giveAnswer`,
+        `This one is ${p.sumWord}.`,
+        base64,
+      ),
+    )
+  }
+  return out
+}
+
+function sessionEndUtterancesWithBytes(base64: string): Utterance[] {
+  return sessionEndUtterances().map((u) => uttWithBytes(u.id, u.text, base64))
+}
+
+/**
+ * THREE-HINT positive-discriminator fixture. P1 carries `hint1/hint2/hint3`
+ * (the W12 shape); P2..P8 carry legacy single `hint` (irrelevant — never
+ * rendered). On today's `main` the parser regex rejects `hint1/2/3`
+ * → `mathSessionPlanFromServer` throws → static fallback (single hint). After
+ * W12-01 widens the parser this fixture parses; after W12-02 wires sequential
+ * playback the three hints fire in order. The injected `audioBytes` (real
+ * on-disk canon bytes) decode so the genuine gesture-unlock chain enables
+ * chips without `forceHowlerUnlock`.
+ */
+export function threeHintMathSessionResponse(
+  audioBytes: AudioBytesProvider,
+): SessionStartResponse {
+  const b = audioBytes()
+  const problemUtterances = [
+    ...threeHintProblemUtterances(b),
+    ...tailProblemUtterances(b),
+  ]
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: {
+      id: 'add-to-10-three-hint',
+      label: 'Sums to 10 — three-hint scaffolding',
+      utterances: [
+        ...problemUtterances.map((u) => ({ id: u.id, text: u.text })),
+        ...sessionEndUtterances().map((u) => ({ id: u.id, text: u.text })),
+      ],
+    },
+    utterances: [...problemUtterances, ...sessionEndUtterancesWithBytes(b)],
+  }
+}
+
+/**
+ * LEGACY single-hint back-compat fixture. P1 carries a single `math.p1.hint`
+ * with the composite text. This parses on today's `main` AND must keep
+ * parsing after W12-01 widens the parser (W12-01 AC#4 mandates back-compat).
+ * The regression-lock: after 2 wrongs exactly ONE hint caption text appears.
+ * GREEN today, stays green post-stack. Frozen inline — independent of the
+ * W12-04 canon re-bake so it cannot drift to three hints.
+ */
+export function legacyHintMathSessionResponse(
+  audioBytes: AudioBytesProvider,
+): SessionStartResponse {
+  const b = audioBytes()
+  const problemUtterances = [
+    ...legacyHintProblemUtterances(b),
+    ...tailProblemUtterances(b),
+  ]
+  return {
+    ok: true,
+    kind: 'session-start',
+    plan: {
+      id: 'add-to-10-legacy-hint',
+      label: 'Sums to 10 — legacy single hint',
+      utterances: [
+        ...problemUtterances.map((u) => ({ id: u.id, text: u.text })),
+        ...sessionEndUtterances().map((u) => ({ id: u.id, text: u.text })),
+      ],
+    },
+    utterances: [...problemUtterances, ...sessionEndUtterancesWithBytes(b)],
+  }
+}
+
 /** Per-problem correct answers indexed by problem index (0-based). Tests
  *  use this to drive the math chip-tap sequence deterministically. */
 export const MATH_CORRECT_ANSWERS: ReadonlyArray<number> = MATH_PROBLEMS.map(
