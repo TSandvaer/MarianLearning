@@ -112,6 +112,41 @@ function cvcWordPlan(): WordSongSessionPlan {
   }
 }
 
+/**
+ * A `sight-word` content-type plan for the Wave 11 sight-words render
+ * tests (W11-03, ticket 86ca7xmvz). Every problem carries
+ * `contentType: 'sight-word'` and draws its target from the sight-words
+ * pool (real `WordEntry` rows Kevin shipped in W11-02 / PR #386 — they
+ * resolve via `getWordEntry` and have `TARGET_PAIRINGS` rows, so the
+ * distractor trio builds without a dedicated picker). The read line uses
+ * Dave's "Find the word: <word>." carrier; the `correct` slot uses the
+ * stable "Yes! <Word>." encoding the canon shares.
+ */
+function sightWordPlan(): WordSongSessionPlan {
+  // First 8 of Dave's Batch-1 starter pool. All have TARGET_PAIRINGS rows.
+  const words = ['the', 'a', 'is', 'it', 'go', 'no', 'to', 'do']
+  return {
+    id: 'test-plan-sight-word',
+    label: 'Test plan (sight-word)',
+    problems: words.map((word, i) => {
+      const target = getWordEntry(word)
+      const Word = word[0].toUpperCase() + word.slice(1)
+      return {
+        index: i + 1,
+        target,
+        contentType: 'sight-word',
+        utterances: {
+          read: `Find the word: ${word}.`,
+          correct: `Yes! ${Word}.`,
+          reprompt: 'Hmm... try again?',
+          hint: `Look. ${Word}.`,
+          giveAnswer: `This one is ${word}.`,
+        },
+      }
+    }),
+  }
+}
+
 function makeMemoryStorage(): StorageAdapter {
   const map = new Map<string, string>()
   return {
@@ -2051,6 +2086,176 @@ describe('Word Song screen', () => {
           delete (document as unknown as { hidden?: boolean }).hidden
         }
       }
+    })
+  })
+
+  // ── Sight-words recognition mechanic (Wave 11 W11-03, 86ca7xmvz) ────────
+
+  describe('sight-words content type (audio-first written-word matching)', () => {
+    /**
+     * Mechanic assertion A — NO picture card for sight words. The
+     * CVC/blending-cv tiers always render `word-song-word-picture` (the
+     * 180pt meaning-anchor); sight words have no picturable referent
+     * (Dave W11-01 §"Recognition mechanic" point 1) so the card must be
+     * absent. This mirrors Jessica's W11-04 test 3 assertion A. The
+     * letters-of-the-word decode breakdown (`word-song-letters`) is also
+     * absent — sight words are recognised whole, not decoded.
+     */
+    it('renders NO picture card and NO letter breakdown (whole-word recognition)', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={sightWordPlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      expect(
+        screen.queryByTestId('word-song-word-picture'),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByTestId('word-song-word-card'),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('word-song-letters')).not.toBeInTheDocument()
+    })
+
+    /**
+     * Mechanic assertion B — each chip presents the WRITTEN word as
+     * visible text (no `<WordPicture>` SVG). Each chip's text content
+     * contains its `data-word`. Mirrors Jessica's W11-04 test 3
+     * assertion B (chip innerText contains data-word).
+     */
+    it('renders 3 written-word text chips; each chip text contains its data-word', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={sightWordPlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const chips = screen.getAllByTestId('word-song-chip')
+      expect(chips).toHaveLength(3)
+
+      // No picture SVG in any chip; a written-word glyph in each.
+      expect(screen.queryAllByTestId('word-picture')).toHaveLength(0)
+      expect(screen.getAllByTestId('word-song-chip-sight-word')).toHaveLength(3)
+
+      for (const chip of chips) {
+        const word = chip.getAttribute('data-word')
+        expect(word).not.toBeNull()
+        // The written word is the chip's visible text content.
+        expect((chip.textContent ?? '').trim().toLowerCase()).toContain(
+          (word as string).toLowerCase(),
+        )
+      }
+    })
+
+    /**
+     * Exactly one chip is the correct (target) chip, and its word is the
+     * problem's target — a sight-words-pool word. Mirrors Jessica's
+     * W11-04 test 3 correct-chip assertion.
+     */
+    it('marks exactly one chip data-correct=true and it carries the target sight word', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={sightWordPlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const correctChips = screen
+        .getAllByTestId('word-song-chip')
+        .filter((c) => c.getAttribute('data-correct') === 'true')
+      expect(correctChips).toHaveLength(1)
+      // Problem 1 target is 'the' per sightWordPlan().
+      expect(correctChips[0].getAttribute('data-word')).toBe('the')
+    })
+
+    /**
+     * No decoding beat for sight words — the read-aloud fires immediately
+     * on mount (NOT after the 1500ms silent window). A "sound it out" beat
+     * is wrong for whole-word recognition: GPC on "was" yields the
+     * non-word /wæs/ (Dave W11-01 §"Recognition mechanic" point 2). This
+     * guards against a future widening of the `isCvcWord` gate to include
+     * `sight-word`. Companion to the `blending-cv` immediate-fire test
+     * above — same no-fake-timer microtask-drain shape.
+     */
+    it('fires read-aloud immediately on mount (no silent decoding beat)', async () => {
+      const harness = makePlayHarness()
+      const getHowlerRunning = vi.fn(() => true)
+      render(
+        withMotion(
+          <WordSong
+            plan={sightWordPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      // No fake-timer advance — only a microtask drain. If sight-word were
+      // (wrongly) gated into the silent window this would still be empty
+      // here and only fire after a 1500ms advance.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(harness.spoken()).toEqual(['Find the word: the.'])
+    })
+
+    /**
+     * "Never a red X" preserved — a wrong tap swaps Emma to the
+     * puzzled-tilt pose and the wrong chip stays tappable (no disable, no
+     * error chime, no red X). Same invariant the CVC tiers hold; sight
+     * words inherit it through the shared chip-frame code path.
+     */
+    it('never a red X — wrong tap leaves chips tappable and shows puzzled-tilt', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={sightWordPlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const wrongChip = screen
+        .getAllByTestId('word-song-chip')
+        .find((c) => c.getAttribute('data-correct') === 'false')
+      expect(wrongChip).toBeDefined()
+
+      act(() => {
+        fireEvent.click(wrongChip!)
+      })
+
+      // Emma reacts in character — puzzled-tilt, not a red X. During the
+      // AnimatePresence pose swap the exiting idle Emma can still be in the
+      // DOM alongside the entering puzzled-tilt one, so assert the new pose
+      // is PRESENT among the rendered Emmas rather than expecting a single
+      // element.
+      const poses = screen
+        .getAllByTestId('word-song-emma')
+        .map((el) => el.getAttribute('data-pose'))
+      expect(poses).toContain('puzzled-tilt')
+      // The wrong chip is still tappable (retry stays open).
+      expect(wrongChip!).not.toBeDisabled()
     })
   })
 
