@@ -8,6 +8,14 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 
 <!-- Real entries below this line. Newest at top. -->
 
+## 2026-06-11 2240 UTC — Granted Kevin's W11-02 scope amendment (parser + content-type files added to Files-in-play)
+
+- **Decided:** Added `src/screens/WordSong/wordSessionPlans.ts`, `src/screens/WordSong/planFromServer.ts`, `src/screens/WordSong/planFromServer.test.ts` to ticket 86ca7xmr8's Files-in-play (Kevin's scope-amendment request, his ticket comment 90150232662835). `WordSong.tsx` render branch stays Devon's W11-03. NOT auto-decided alongside it: Kevin's proposed uniform read-line shape ("Find the word: <word>." for all 8) deviates from Dave's carrier-sentence/bare-word two-shape mechanic — routed to Dave for a pedagogy ruling before the canon bake.
+- **Foundation:** [[project_planner_parser_contract]] (widen browser parser BEFORE planner — bundling caused the PR #117→#118 word-song P0); cvc-word/letter-names/letter-sounds tier precedents shipped type+parser with the content half; Pattern A type-author role (Kevin authors the `'sight-word'` discriminant, per the Wave 11 plan + vocabulary-contract discipline). Ticket-flesh-out auto-decide class covers mechanical scope completion when the orchestrator has context.
+- **Alternative:** Surface to Thomas, or bounce to Matt for a plan revision. Rejected: the boundary question is mechanical (which files implement a documented contract), not strategic; waiting idles the wave's critical path.
+- **Reversibility:** 1 PR — the added files are reviewed by Devon in cross-review regardless; scope can be re-narrowed at review.
+- **Status:** pending review
+
 ## 2026-05-23 1030 UTC — Picked option (c) for Matt's dropped `add_task_dependency` tool gap (revise workflow to drop blocker-relationship pattern)
 
 - **Decided:** Edited `matt.md` line 34 to drop the structured-blocker-relationship pattern in favor of dependency notation in ticket descriptions + brief sequencing. Old text: "If a task needs two disciplines, split it into separate ClickUp tasks with a blocker relationship." New text: split into separate tasks, note `depends on <id>` / `blocks <id>` in each ticket description, dispatch upstream first, re-cite the upstream + link the merged PR in the downstream brief. Parenthetical notes the MCP tool gap explicitly so future re-readers know why the pattern reads differently than the prior structured-blocker convention.

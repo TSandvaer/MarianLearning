@@ -9,7 +9,7 @@ Audio is "Howler + MP3s, never `speechSynthesis`":
 - **Bundled MP3s** — Greet's 4 fixed lines and 18 Hub welcome variants ship in `public/assets/audio/`. Howler plays them as static assets.
 - **Per-session MP3s** — Math + Word Song problem audio is rendered by Azure TTS on the server at session-start, base64-embedded in the JSON response, decoded into Blob URLs in the browser, and played by Howler.
 - **Howler is the single audio engine.** Web Speech (`speechSynthesis`) was retired in PR #25 after five rounds of iPad first-speak failures (see `MarianLearning/design/audio-architecture.md` for the journey).
-- **Voice config** — `en-US-EmmaMultilingualNeural`, rate `-10%`, pitch `+0Hz`, volume `+0%`. Defined server-side in [api/\_session.ts:54](MarianLearning/api/_session.ts#L54) (`EMMA_VOICE_CONFIG`); the browser never sees the config — it consumes already-rendered bytes.
+- **Voice config** — `en-GB-OliviaNeural`, rate `-10%`, pitch `+0Hz`, volume `+0%`. Swapped from `en-US-EmmaMultilingualNeural` in PR #356 (2026-06-07) after the US voice mangled isolated short-vowel phonemes. Defined server-side in [api/\_session.ts:66](MarianLearning/api/_session.ts#L66) (`EMMA_VOICE_CONFIG`); the browser never sees the config — it consumes already-rendered bytes. Changing it re-renders TWO surfaces — see "Two-surface rule" under §Asset pipeline.
 
 ## Howler context lifecycle
 
@@ -46,6 +46,17 @@ iPad WebKit's `speechSynthesis.speak()` silently drops the first utterance on mo
 ### Asset pipeline
 
 `scripts/render-greet-mp3s.mjs` and `scripts/render-hub-mp3s.mjs` regenerate the bundled MP3s from the canonical SSML. They read `.env.local` for `AZURE_SPEECH_KEY`/`AZURE_SPEECH_REGION` and call the same Azure REST endpoint the runtime planner uses. Re-render whenever the voice config or line text changes (Phase 3a re-baked all four Greet lines for the Ana → Emma swap, 2026-04-28). Asset budget: ~56 KB total across the four Greet lines.
+
+#### Two-surface rule for voice / prosody changes
+
+Emma's voice has two **independent** render surfaces:
+
+| Surface     | Files                                                                                    | Render tooling                                                                  |
+| ----------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Baked canon | 23 JSON files under `public/canon/`                                                      | `scripts/revoiceCanon.ts` (full) / `scripts/revoiceCanonTargeted.ts` (targeted) |
+| Static MP3s | 4 Greet + 18 Hub files under `public/assets/audio/greet/` and `public/assets/audio/hub/` | `scripts/render-greet-mp3s.mjs`, `scripts/render-hub-mp3s.mjs`                  |
+
+**Rule: any PR claiming "voice swap complete" must enumerate both surfaces in its ACs and ship both artifact sets.** The `revoiceCanon*` path touches only canon JSON — it silently leaves the static MP3s on the old voice. This bit for real: PR #356's en-GB-OliviaNeural rollout re-voiced baked canon only; voice-QA round-2 (issue #377, 2026-06-11) found all 22 static greet/hub files still on the old voice (HASH-SAME verdicts after PR #373's cache-bust proved live bytes were being ear-tested). Re-render tracked in ticket `86ca7y0gw`.
 
 ## Per-session MP3s — sessionAudio
 

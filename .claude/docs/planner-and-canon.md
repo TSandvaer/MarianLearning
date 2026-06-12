@@ -561,6 +561,30 @@ Empirical findings from the first voice-QA fix cycle (149 targeted re-renders), 
 - **`scripts/revoiceCanonTargeted.ts`** is the targeted re-render tool: give it flagged utterance ids, it expands to all dedup-group members by audio hash across the 23 canon files and re-renders ONLY those entries (with `--dry` to preview the plan). Use it for ear-test-driven fixes; full `canon:regen` re-renders the world and invalidates the entire voice-QA baseline.
 - **SSML fixes must live in `renderSsmlInnerText` (api/\_tts.ts), not in one-off scripts** — that keeps them production-coherent: a future full re-bake reproduces the fixes instead of silently reverting them.
 
+#### Round-2 SSML refinements (PR #382 + #384, 2026-06-12)
+
+Empirical findings from the round-2 fix cycle (6 genuine fails after phantom triage; see round-N triage in `testing-and-ci.md` §4.4.2):
+
+- **Length-marked IPA consonants are honoured by Olivia.** `vːə` (long-V onset) was accepted; the IPA length mark `ː` is a reliable lever for consonant extension on `en-GB-OliviaNeural`.
+- **`vvv` scratchiness is onset loudness, not voicing.** The percept is an abrupt amplitude peak on the /v/ onset, not a voicing artefact. Fix: `SCRATCHY_PROSODY_BY_MNEMONIC['vvv']` in `api/_tts.ts` uses `{ rate: '-20%', volume: '-12%' }` — slower onset + volume reduction. The shared `SCRATCHY_PROSODY_RATE = '-12%'` (rate-only) covers `aaa`/`ooo` (round-1 shape, kept byte-identical); per-mnemonic entries in `SCRATCHY_PROSODY_BY_MNEMONIC` override when present.
+- **Prosody `pitch` is the stress-restoration lever.** Raising pitch restores the word-stress contour when a `<prosody rate>` wrap inadvertently de-stresses. Confirmed on `"four"` / `"for"` — pitch `+12%` restored natural stress; `"four"` was already clear in sentence-final position and only needed pitch help mid-sentence.
+- **`<emphasis>` has no effect on this voice** (round-1 finding, re-confirmed round-2). Reach for `<prosody>` or `<phoneme>` exclusively.
+
+#### `revoiceCanonTargeted.ts` — `--ids` subset flag
+
+`scripts/revoiceCanonTargeted.ts` accepts `--ids a#b,c#d` (space-separated value) or `--ids=x,y` (equals form) to override the default `FAIL_ITEM_IDS` constant with an explicit subset of utterance ids. Combine with `--dry` to preview the dedup-expansion plan (which canon files + how many entries would be re-rendered) before spending Azure budget.
+
+**Blast-radius discipline:** same-day re-renders of utterances whose SSML is unchanged produce byte-identical MP3s within one bake run. However, cross-bake byte-identity is not guaranteed. Omit `--ids` only when re-rendering the full `FAIL_ITEM_IDS` baseline; for targeted round-N fixes, always pass `--ids` with only the genuinely-changed utterance ids to minimize voice-QA hash churn on unchanged items.
+
+### Voice-QA chunked-report JSON reassembly
+
+Voice-QA round reports arrive as a series of comments on the report's GitHub issue, each headed `<!-- voice-qa-report part i/N -->` and wrapping a slice of one JSON document in a fenced code block. Two traps, both hit live on issue #377 (2026-06-11):
+
+1. **Adaptive fence length.** The fence is sized to exceed any backtick run in the payload — read the opening fence's length and match the same length on close. Never hardcode three backticks.
+2. **Chunks split at fixed ~60 KB byte offsets, NOT line boundaries.** The split can land mid-string (observed: inside an `audioHash` value — `SyntaxError: Bad control character in string literal at position 59950`).
+
+**Reassembly algorithm (validated round-2):** per chunk, strip the header line + opening/closing fence lines, strip at most ONE trailing `\r`, then concatenate chunks in part order with an **empty separator** — never `'\n'`. A newline join inserts a control character into whichever string literal straddles the boundary; an empty join byte-exactly reconstructs the producer's serialisation. Parse the result as one JSON document.
+
 ### Tier-specific opener pattern (canonical)
 
 **Authoring note for the `WORD_SONG_TRACK_GUIDE` template literal in [`api/_planner.ts`](MarianLearning/api/_planner.ts)**: the entire directive block is a single tagged-template-literal string, so **backticks inside the block terminate the literal** — `` `ɪ` `` or `` `ih` `` for emphasis will produce esbuild errors like `Expected ";" but found "ɪ"`. Use straight quotes (`'ɪ'`, `"ih"`) inside the block. Confirmed authoring trip 2026-05-10 during PR #192's history-note addition.
