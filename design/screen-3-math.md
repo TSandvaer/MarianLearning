@@ -294,13 +294,20 @@ correction." For Marian — at 100% finger reliance and still consolidating addi
 chance to notice her own miscount and re-tap is the high-value moment. Hint after 2 protects that
 moment; hint after 1 short-circuits it. **Do not lower this threshold without a fresh Dave consult.**
 
-Same as Session-1 Screen 3 (lines 323–330). Flower groups pulse one at a time with TTS narration:
+Same as Session-1 Screen 3 (lines 323–330). Flower groups pulse one at a time, each beat synced to
+a discrete hint utterance (`hint1` / `hint2` / `hint3`, Wave 12 / ticket 86ca8700d — see the audio
+contract table). The three utterances play strictly in order, each gated on the prior resolving:
 
-- "Look. Three..." (3-flower group pulses, each flower scales `1 → 1.1 → 1` in sequence, 150ms each)
-- "...and two more." (2-flower group pulses)
-- "How many now?"
+- **`hint1`** — "Look. Three..." (group-A, the 3-flower bouquet, pulses; each flower scales
+  `1 → 1.1 → 1` in sequence, 150ms each)
+- **`hint2`** — "Three flowers." (group-A quantity highlight; group-A pulses again)
+- **`hint3`** — "And two more. How many?" (group-B, the 2-flower bouquet, pulses)
 
-After hint plays, all chips remain tappable.
+After the hint sequence plays, all chips remain tappable.
+
+**Back-compat:** a problem carrying only the legacy single `math.p{N}.hint` clip plays one
+utterance with no beat choreography (pre-W12 behaviour). The screen chooses the path per-problem on
+whether the `hint1`/`hint2`/`hint3` triple is present.
 
 **After 3 wrong attempts (hint didn't land):**
 
@@ -321,14 +328,31 @@ Every utterance Math needs at session-start, listed so the Vercel function pre-r
 `design/audio-architecture.md` §"Voice configuration" — `en-US-AnaNeural`, rate `-10%`, default
 pitch, MP3 mono 24kHz ~48kbps. Do not deviate per-utterance.
 
-**Per-problem utterances (8 problems × 4 lines = 32 audio assets per session):**
+**Per-problem utterances** — post the Wave-12 three-hint split (ticket 86ca8700d), the
+required baseline is **6 lines per problem** (`read`, `correct`, `reprompt`, `hint1`, `hint2`,
+`hint3`) = **48 audio assets** across 8 problems, +8 if the optional `giveAnswer` is always
+pre-rendered (recommended). Until the W12-04 targeted re-bake lands, committed canon still ships a
+single legacy `math.p{N}.hint` (4 lines/problem = 32) and the consumer runs the back-compat path:
 
-| `id` template        | Sample text (problem `3 + 2 = 5`)          | When played                            | SSML rate | SSML pitch | Notes                                                                                                                                                                                                                                              |
-| -------------------- | ------------------------------------------ | -------------------------------------- | --------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `math.p{N}.read`     | "Three plus two. How many?"                | Screen entry / problem reveal complete | `-10%`    | default    | The problem read-aloud. `{N}` is 1–8.                                                                                                                                                                                                              |
-| `math.p{N}.correct`  | "Yes! Five!"                               | Correct chip tapped                    | `-10%`    | default    | Number is the actual answer. Generated per-problem; do not template at runtime.                                                                                                                                                                    |
-| `math.p{N}.reprompt` | "Hmm... try again?"                        | Wrong chip tapped (1st or 2nd attempt) | `-10%`    | default    | Same text every problem — but render per-problem so each problem's bundle is self-contained. Reuse via `LINE_TEXT_TO_KEY`-style map if Devon prefers, but the bundle ships all 8 for cache-locality and to dodge any "missing utterance" dropouts. |
-| `math.p{N}.hint`     | "Look. Three. And two more. How many now?" | After 2 wrong attempts on this problem | `-12%`    | default    | Slightly slower for the hint. Generated with the actual numerals for this problem.                                                                                                                                                                 |
+| `id` template        | Sample text (problem `3 + 2 = 5`) | When played                            | SSML rate | SSML pitch | Notes                                                                                                                                                                                                                                              |
+| -------------------- | --------------------------------- | -------------------------------------- | --------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `math.p{N}.read`     | "Three plus two. How many?"       | Screen entry / problem reveal complete | `-10%`    | default    | The problem read-aloud. `{N}` is 1–8.                                                                                                                                                                                                              |
+| `math.p{N}.correct`  | "Yes! Five!"                      | Correct chip tapped                    | `-10%`    | default    | Number is the actual answer. Generated per-problem; do not template at runtime.                                                                                                                                                                    |
+| `math.p{N}.reprompt` | "Hmm... try again?"               | Wrong chip tapped (1st or 2nd attempt) | `-10%`    | default    | Same text every problem — but render per-problem so each problem's bundle is self-contained. Reuse via `LINE_TEXT_TO_KEY`-style map if Devon prefers, but the bundle ships all 8 for cache-locality and to dodge any "missing utterance" dropouts. |
+| `math.p{N}.hint1`    | "Look. Three..."                  | After 2 wrong attempts — beat 1        | `-12%`    | default    | Three-beat hint, step 1 (attention + group-A). Synced to the **group-A** flower-group pulse. Generated with the actual left addend.                                                                                                                |
+| `math.p{N}.hint2`    | "Three flowers."                  | After 2 wrong attempts — beat 2        | `-12%`    | default    | Three-beat hint, step 2 (group-A quantity highlight). Synced to the **group-A** pulse. Plays only after `hint1` resolves.                                                                                                                          |
+| `math.p{N}.hint3`    | "And two more. How many?"         | After 2 wrong attempts — beat 3        | `-12%`    | default    | Three-beat hint, step 3 (addition + question). Synced to the **group-B** pulse. Plays only after `hint2` resolves.                                                                                                                                 |
+
+> **Three-beat hint (Wave 12, ticket 86ca8700d).** The hint is three discrete utterances —
+> `hint1` / `hint2` / `hint3` — played strictly in order, each gated on the prior resolving, with
+> the flower-group pulse choreography synced to the sub-steps (see §"After 2 wrong attempts — hint
+> state"). This closes the spec/planner inconsistency where the choreography (three narration beats)
+> had only a single audio clip to anchor to. **Back-compat:** the legacy single `math.p{N}.hint`
+> clip ("Look. Three. And two more. How many now?", `-12%`) is still accepted by the parser and the
+> consumer — a problem carrying only the single `hint` plays one utterance with no beat
+> choreography (pre-W12 behaviour). Committed canon stays on the single `hint` until the W12-04
+> targeted re-bake replaces it with the triple. A problem carries EITHER the single `hint` OR the
+> full `hint1`/`hint2`/`hint3` triple; a partial triple is rejected at parse time.
 
 **Optional — only if 3rd-strike guided completion fires:**
 
@@ -336,10 +360,12 @@ pitch, MP3 mono 24kHz ~48kbps. Do not deviate per-utterance.
 | ---------------------- | ------------------- | ---------------------- | --------- | ---------- |
 | `math.p{N}.giveAnswer` | "This one is five." | After 3 wrong attempts | `-10%`    | default    |
 
-**Total per-problem audio:** 4 lines × 8 problems = **32 utterances** baseline, +8 if we always
-pre-render the giveAnswer fallback (recommend yes — predictable bundle size, ~120 KB extra at
-~15 KB/utterance). **Total Math audio per session: ~40 utterances ≈ 600 KB inline base64.** Within
-the 4.5 MB Vercel response cap budget noted in audio-architecture.md.
+**Total per-problem audio (post W12-04 three-hint re-bake):** 6 lines × 8 problems = **48
+utterances** baseline, +8 if we always pre-render the giveAnswer fallback (recommend yes —
+predictable bundle size, ~120 KB extra at ~15 KB/utterance). **Total Math audio per session: ~56
+utterances ≈ 840 KB inline base64.** Still within the 4.5 MB Vercel response cap budget noted in
+audio-architecture.md. (Pre-re-bake / legacy back-compat: 4 lines × 8 = 32 baseline, ~40 total —
+the figure that holds until W12-04 lands.)
 
 **SFX (NOT pre-rendered via TTS — these are static MP3s on disk, played via Howler):**
 
@@ -641,8 +667,10 @@ Per §Wrong-answer policy. Streak break (if active) per §"Streak break" subsect
 
 ### Hint state (after 2 wrong)
 
-Per §Wrong-answer policy. Plays the `math.p{N}.hint` utterance with the flower-group pulse
-choreography. After hint, return to Idle (chips tappable, no auto-advance).
+Per §Wrong-answer policy. Plays the three-beat hint (`math.p{N}.hint1` → `hint2` → `hint3`,
+sequential) with the flower-group pulse choreography synced to each beat — or the legacy single
+`math.p{N}.hint` clip for back-compat problems. After the hint sequence, return to Idle (chips
+tappable, no auto-advance).
 
 ### Guided completion (after 3 wrong)
 
@@ -912,7 +940,7 @@ Audio:
 - [ ] Caption ribbon mirrors TTS word-by-word via Path A `onWordTick`
 - [ ] Correct chip tap triggers `math.p{N}.correct` synchronously inside the tap handler
 - [ ] Wrong chip tap triggers `math.p{N}.reprompt` synchronously inside the tap handler
-- [ ] After 2 wrong on same problem, hint TTS (`math.p{N}.hint`) plays with flower-group pulse choreography
+- [ ] After 2 wrong on same problem, the three-beat hint TTS (`math.p{N}.hint1` → `hint2` → `hint3`, sequential) plays with the flower-group pulse choreography synced to each beat (legacy single `math.p{N}.hint` still supported for back-compat)
 - [ ] After 3 wrong, guided-completion TTS (`math.p{N}.giveAnswer`) plays + correct chip is highlighted
 - [ ] All TTS routed through `sessionAudio.playUtterance`, never `lib/tts.speak()`
 
