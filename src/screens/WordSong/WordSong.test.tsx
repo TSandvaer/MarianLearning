@@ -162,7 +162,16 @@ function simpleSentencePlan(): WordSongSessionPlan {
     target: string
     sceneId?: string
   }> = [
-    { frame: 'The cat ___ the mat.', target: 'sat', sceneId: 'cat-sat-mat' },
+    // Grammatical gentle scene row mirroring the real `cat-sat-prep` pool
+    // entry ("The cat sat there.", target `there`). NOT the `cat-sat-mat`
+    // row: its real target `bit` is a sight-word with NO `TARGET_PAIRINGS`
+    // row (its chip foils come from the planner-side distractor table, never
+    // `pickDistractors`), so it cannot drive this hand-mock's render path,
+    // which resolves chips via `buildChipOrder`→`pickDistractors`. Using a
+    // pairings-bearing target keeps the render-contract fixture valid while
+    // staying grammatical (#429: the old "The cat ___ the mat." → "sat"
+    // hand-mock was ungrammatical and is removed here).
+    { frame: 'The cat sat ___.', target: 'there', sceneId: 'cat-sat-prep' },
     { frame: 'The dog ___.', target: 'ran', sceneId: 'dog-ran' },
     { frame: 'I see the ___.', target: 'dog', sceneId: 'see-dog' },
     { frame: 'The sun is ___.', target: 'hot' },
@@ -2585,8 +2594,8 @@ describe('Word Song screen', () => {
 
     /**
      * The correct chip carries the target resolved from the `correct`
-     * line, NOT the gapped read. Problem 1 frame "The cat ___ the mat."
-     * gaps "sat" (the read says "blank"); the correct chip's word is "sat".
+     * line, NOT the gapped read. Problem 1 frame "The cat sat ___."
+     * gaps "there" (the read says "blank"); the correct chip's word is "there".
      */
     it('marks exactly one chip data-correct=true carrying the correct-derived target', () => {
       render(
@@ -2605,8 +2614,8 @@ describe('Word Song screen', () => {
         .getAllByTestId('word-song-chip')
         .filter((c) => c.getAttribute('data-correct') === 'true')
       expect(correctChips).toHaveLength(1)
-      // Problem 1 target is 'sat' (resolved from "Yes! Sat.").
-      expect(correctChips[0].getAttribute('data-word')).toBe('sat')
+      // Problem 1 target is 'there' (resolved from "Yes! There.").
+      expect(correctChips[0].getAttribute('data-word')).toBe('there')
     })
 
     /**
@@ -2645,7 +2654,7 @@ describe('Word Song screen', () => {
       // Gap is now filled with the target word in place.
       const gap = screen.getByTestId('word-song-sentence-gap')
       expect(gap.getAttribute('data-gap-filled')).toBe('true')
-      expect(gap.textContent?.toLowerCase()).toContain('sat')
+      expect(gap.textContent?.toLowerCase()).toContain('there')
     })
 
     /**

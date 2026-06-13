@@ -22,7 +22,7 @@
  *   - sentence-frame field:         WordSongProblem.sentenceFrame?: string
  *       (the full sentence WITH `___` preserved, for display).
  *   - target resolution:            from the `correct` utterance
- *       ("Yes! Sat." → `sat`), NOT from the gapped read line (§1.2).
+ *       ("Yes! There." → `there`), NOT from the gapped read line (§1.2).
  *
  * WHAT THIS SPEC PINS — three RED-on-base levers + counter-test + guard
  * --------------------------------------------------------------------
@@ -385,7 +385,14 @@ function gapTokenCount(read: string): number {
  * is what the parser splits on).
  */
 const HAND_MOCK_SENTENCES: ReadonlyArray<{ frame: string; target: string }> = [
-  { frame: `The cat ${GAP_TOKEN} the mat.`, target: 'sat' },
+  // Grammatical gentle cat scene mirroring the real `cat-sat-prep` pool row
+  // ("The cat sat there."). NOT the `cat-sat-mat` row: its real target `bit`
+  // is a sight-word with no `TARGET_PAIRINGS` row (its chip foils come from
+  // the planner-side distractor table), so mounting it would throw in the
+  // screen's `buildChipOrder`→`pickDistractors` path. This keeps the wire
+  // fixture grammatical (#429 removed the old "The cat ___ the mat." → "sat")
+  // and renderable.
+  { frame: `The cat sat ${GAP_TOKEN}.`, target: 'there' },
   { frame: `The dog ${GAP_TOKEN}.`, target: 'ran' },
   { frame: `The sun is ${GAP_TOKEN}.`, target: 'hot' },
   { frame: `I see the ${GAP_TOKEN}.`, target: 'dog' },
