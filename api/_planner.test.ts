@@ -1117,12 +1117,14 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
     expect(prompt).not.toMatch(/letter-sounds:.*Tap the letter that says/i)
     expect(prompt).not.toMatch(/letter-names:.*Tap the letter <Letter>/i)
     expect(prompt).not.toMatch(/sight-words:.*Tap the word/i)
-    // Mode-count drift-guard (batched ticket 86ca7yg0r): the in-prompt
-    // first-class-content-modes header count must match the 12 actual
-    // bullets (letter-names, letter-sounds, blending-cv, cvc-words +4
-    // vowel siblings, 3 digraph tiers, sight-words). The stale "Ten" was
-    // fixed alongside W12-03; this pin stops it regressing.
-    expect(prompt).toContain('Twelve first-class content modes today')
+    // Mode-count drift-guard (batched ticket 86ca7yg0r; Wave 13 → 13):
+    // the in-prompt first-class-content-modes header count must match the
+    // 13 actual bullets (letter-names, letter-sounds, blending-cv,
+    // cvc-words +4 vowel siblings, 3 digraph tiers, sight-words,
+    // simple-sentences). The stale "Ten"/"Twelve" were fixed alongside
+    // W12-03 / W13-03; this pin stops it regressing.
+    expect(prompt).toContain('Thirteen first-class content modes today')
+    expect(prompt).not.toContain('Twelve first-class content modes today')
     expect(prompt).not.toContain('Ten first-class content modes today')
   })
 
@@ -1184,7 +1186,7 @@ describe('generateSessionPlan — word-song P0 regression + step-2 widening (86c
       ['digraphs-ch', 'digraphs-ch'], // first-class (ch content tier)
       ['digraphs-th-voiceless', 'digraphs-th-voiceless'], // first-class (th content tier)
       ['sight-words', 'sight-words'], // first-class (Wave 11 — ticket 86ca7xmr8, whole-word recognition tier)
-      ['simple-sentences', 'blending-cv'], // sole remaining stub-fallback tier
+      ['simple-sentences', 'simple-sentences'], // first-class (Wave 13 — ticket 86ca8e6fr, sentence-completion cloze tier; LAST word-song tier)
     ]
     for (const [requested, effective] of expectations) {
       const capture: { lastArgs?: unknown } = {}
@@ -1406,19 +1408,16 @@ describe('generateSessionPlan — graduation-session directive (ticket 86c9m3aec
     expect(args.messages[0]!.content).not.toContain('GRADUATION SESSION')
   })
 
-  it('ignores isGraduationSession=true on word-song untuned tiers (stub-fallback to blending-cv)', async () => {
-    // Untuned tiers (e.g. simple-sentences) fall back to blending-cv
-    // content per `effectiveFocusNode`. The graduation directive is gated
-    // on the EFFECTIVE focus node being cvc-words, so an untuned-tier
-    // request with the flag set must not carry the directive — the session
-    // would otherwise emit graduation content under a non-graduation focus.
-    // (PR #211: dead `digraphs` literal dropped for 3 sibling nodes;
-    // `digraphs-sh`, `digraphs-ch`, and `digraphs-th-voiceless` are now
-    // ALL first-class with their own content tiers. Wave 11 made
-    // `sight-words` first-class too, so `simple-sentences` is the LAST
-    // remaining stub-fallback example here. The first-class digraph /
-    // sight-word graduation-no-leak cases have their own assertions in
-    // their sibling-tier describe blocks.)
+  it('ignores isGraduationSession=true on non-cvc-words word-song tiers (graduation is cvc-words-gated)', async () => {
+    // The graduation directive is gated on the EFFECTIVE focus node being
+    // cvc-words (the only tier with a novel-pool probe), so a request on
+    // ANY other word-song tier with the flag set must not carry the
+    // directive — the session would otherwise emit graduation content
+    // under a non-graduation focus. simple-sentences is used here as a
+    // representative non-cvc-words tier. (Wave 13 made simple-sentences
+    // first-class — the LAST word-song tier; EVERY word-song node is now
+    // first-class. The gate is still cvc-words-only, so this assertion
+    // holds: first-class != graduation-eligible.)
     const capture: { lastArgs?: unknown } = {}
     const client = makeMockClient(VALID_WORD_RESPONSE, { capture })
 

@@ -286,9 +286,17 @@ const MATH_FOCUS_NODES: readonly string[] = [
 // recognition (audio-first written-word matching), never sounding-out.
 // The canon bake produces
 // `public/canon/word-song/level-1/sight-words.json` with sight-word
-// target words drawn from `WORD_SONG_TARGET_WORDS_SIGHT`. The remaining
-// untuned tier (`simple-sentences`) is still deliberately NOT in canon
-// — it falls back to blending-cv via the planner's `effectiveFocusNode`.
+// target words drawn from `WORD_SONG_TARGET_WORDS_SIGHT`.
+// Wave 13 (ticket 86ca8e6fr) added `simple-sentences` as the LAST Word
+// Song content tier — the sentence-COMPLETION (cloze) tier (terminal node
+// of WORD_SONG_NODES_IN_ORDER). See
+// `design/research/simple-sentences-sequence-marian.md` (Dave, W13-01) +
+// `design/word-song/simple-sentences-content.md` (Kyle, W13-02) +
+// `WORD_SONG_SIMPLE_SENTENCES` in `_plannerWordList.ts`. The canon bake
+// produces `public/canon/word-song/level-1/simple-sentences.json` whose
+// read text carries the "Finish the sentence: ... blank ..." cloze form
+// and whose answer lives only in the `correct` line. After this tier,
+// EVERY word-song node is first-class — no remaining untuned tiers.
 const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'letter-names',
   'letter-sounds',
@@ -302,6 +310,7 @@ const WORD_SONG_FOCUS_NODES: readonly string[] = [
   'digraphs-ch',
   'digraphs-th-voiceless',
   'sight-words',
+  'simple-sentences',
 ]
 
 export function activeCombos(): readonly Combo[] {

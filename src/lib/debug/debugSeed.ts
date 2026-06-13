@@ -530,6 +530,40 @@ const SEEDS: Readonly<Record<string, SeedRecipe>> = {
     },
     skipGreet: true,
   },
+  // Simple-sentences content tier smoke-test entry (ticket 86ca8e6fr —
+  // Wave 13, the sentence-COMPLETION cloze tier and the LAST Word Song
+  // content tier — terminal node of WORD_SONG_NODES_IN_ORDER). Marian has
+  // fully mastered every prior word-song tier (the 5 single-vowel CVC
+  // tiers, all 3 digraph tiers, AND sight-words), and is now practicing
+  // simple-sentences. The picker walks WORD_SONG_NODES_IN_ORDER, sees every
+  // earlier node mastered, and lands on `simple-sentences` — the terminal
+  // node (`nextNode → null`). There is NO downstream node to unlock.
+  //
+  // Used by Thomas's iPad smoke-test for the simple-sentences focus session
+  // AND by QA for the deep-launch path verifying the cloze mechanic renders
+  // end-to-end (canon + planner + parser + the sentence-completion render:
+  // sentence panel + styled gap + written-word chips + gentle-phase scene,
+  // NOT picture chips). Mirrors the `sight-words` recipe with one additional
+  // mastered prerequisite (sight-words). Deep-launch URL:
+  // `?debug=1&seed=simple-sentences`.
+  'simple-sentences': {
+    skillLevels: {
+      'letter-names': 'mastered',
+      'letter-sounds': 'mastered',
+      'blending-cv': 'mastered',
+      'cvc-words': 'mastered',
+      'cvc-words-short-o': 'mastered',
+      'cvc-words-short-u': 'mastered',
+      'cvc-words-short-i': 'mastered',
+      'cvc-words-short-e': 'mastered',
+      'digraphs-sh': 'mastered',
+      'digraphs-ch': 'mastered',
+      'digraphs-th-voiceless': 'mastered',
+      'sight-words': 'mastered',
+      'simple-sentences': 'practicing',
+    },
+    skipGreet: true,
+  },
   // Cross-vowel mixing smoke-test entry (ticket 86c9qa0kf). Marian as
   // if all three CVC vowel tiers are mastered. The predicate
   // `crossVowelMixingActive(progress, parentSettings)` returns `true`

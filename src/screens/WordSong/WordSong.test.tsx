@@ -147,6 +147,54 @@ function sightWordPlan(): WordSongSessionPlan {
   }
 }
 
+/**
+ * A `simple-sentence` content-type plan for the Wave 13 simple-sentences
+ * render tests (W13-03/04, ticket 86ca8e6fr). Every problem carries
+ * `contentType: 'simple-sentence'`, a `sentenceFrame` with the `___` gap,
+ * and a `sceneId` on the gentle problems. The target is resolved from the
+ * `correct` line ("Yes! <Word>.") — never the gapped read. Mirrors the
+ * wire shape Kevin's W13-03 canon produces.
+ */
+function simpleSentencePlan(): WordSongSessionPlan {
+  // 3 gentle (scene-bearing) + 5 trap, matching Dave's gentle/trap split.
+  const rows: ReadonlyArray<{
+    frame: string
+    target: string
+    sceneId?: string
+  }> = [
+    { frame: 'The cat ___ the mat.', target: 'sat', sceneId: 'cat-sat-mat' },
+    { frame: 'The dog ___.', target: 'ran', sceneId: 'dog-ran' },
+    { frame: 'I see the ___.', target: 'dog', sceneId: 'see-dog' },
+    { frame: 'The sun is ___.', target: 'hot' },
+    { frame: '___ are in the van.', target: 'they' },
+    { frame: 'Put it ___ the mat.', target: 'on' },
+    { frame: 'The mat is ___.', target: 'red' },
+    { frame: 'We can go ___.', target: 'there' },
+  ]
+  return {
+    id: 'test-plan-simple-sentence',
+    label: 'Test plan (simple-sentence)',
+    problems: rows.map(({ frame, target, sceneId }, i) => {
+      const entry = getWordEntry(target)
+      const Word = target[0].toUpperCase() + target.slice(1)
+      return {
+        index: i + 1,
+        target: entry,
+        contentType: 'simple-sentence' as const,
+        sentenceFrame: frame,
+        sceneId,
+        utterances: {
+          read: `Finish the sentence: ${frame.replace('___', 'blank')}`,
+          correct: `Yes! ${Word}.`,
+          reprompt: 'Hmm... try again?',
+          hint: `Listen. ${frame.replace('___', target)}`,
+          giveAnswer: `This one is ${target}.`,
+        },
+      }
+    }),
+  }
+}
+
 function makeMemoryStorage(): StorageAdapter {
   const map = new Map<string, string>()
   return {
@@ -2386,6 +2434,240 @@ describe('Word Song screen', () => {
         .map((c) => c.getAttribute('data-word'))
 
       expect(after).toEqual(before)
+    })
+  })
+
+  describe('simple-sentences content type (sentence-completion cloze)', () => {
+    /**
+     * Mechanic assertion A — NO picture card for simple sentences. The
+     * reading surface is the SENTENCE PANEL, not a single-word picture
+     * card. Mirrors Jessica's W13-05 test 3 assertion A
+     * (`word-song-word-picture` count = 0).
+     */
+    it('renders NO picture card and NO letter breakdown (cloze reading surface)', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={simpleSentencePlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      expect(
+        screen.queryByTestId('word-song-word-picture'),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByTestId('word-song-word-card'),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('word-song-letters')).not.toBeInTheDocument()
+    })
+
+    /**
+     * Mechanic assertion B — the net-new sentence panel is present with a
+     * styled blank gap. Mirrors Jessica's W13-05 test 3 panel assertions
+     * (`word-song-sentence-panel` count = 1, `word-song-sentence-gap`
+     * count = 1, `data-gap-filled="false"` before the correct tap).
+     */
+    it('renders the sentence panel with exactly one styled gap (unfilled before correct)', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={simpleSentencePlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      expect(screen.getAllByTestId('word-song-sentence-panel')).toHaveLength(1)
+      const gaps = screen.getAllByTestId('word-song-sentence-gap')
+      expect(gaps).toHaveLength(1)
+      expect(gaps[0].getAttribute('data-gap-filled')).toBe('false')
+    })
+
+    /**
+     * Regression — the gap token may carry ATTACHED punctuation when it
+     * sits at a clause edge ("The dog ___." → token "___."). A naive
+     * `token === '___'` equality misses that and renders the literal
+     * "___." as plain text with no styled gap (Jessica's W13-05 test 3
+     * caught this). The render must detect the "___" substring and peel
+     * the punctuation. This plan's problem 2 is "The dog ___." — exactly
+     * the attached-period shape.
+     */
+    it('renders the styled gap even when punctuation is attached to the gap token', () => {
+      // A single-problem plan whose ONLY problem has an attached-period gap.
+      const plan: WordSongSessionPlan = {
+        id: 'test-attached-gap',
+        label: 'attached-gap',
+        problems: Array.from({ length: 8 }, (_, i) => {
+          const entry = getWordEntry('ran')
+          return {
+            index: i + 1,
+            target: entry,
+            contentType: 'simple-sentence' as const,
+            sentenceFrame: 'The dog ___.', // gap carries the trailing period
+            utterances: {
+              read: 'Finish the sentence: The dog ___.',
+              correct: 'Yes! Ran.',
+              reprompt: 'Hmm... try again?',
+              hint: 'Listen. The dog ran.',
+              giveAnswer: 'This one is ran.',
+            },
+          }
+        }),
+      }
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={plan}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // The styled gap is present (not swallowed into a plain "___." word).
+      const gaps = screen.getAllByTestId('word-song-sentence-gap')
+      expect(gaps).toHaveLength(1)
+      // The literal "___" never reaches the DOM as visible text.
+      expect(
+        screen.getByTestId('word-song-sentence-panel').textContent,
+      ).not.toContain('___')
+    })
+
+    /**
+     * Mechanic assertion C — chips render as written-word text (no
+     * picture SVG), reusing the sight-words chip shape (Kyle §3.3 / §7 Q5).
+     * 3 chips; each chip's text contains its data-word.
+     */
+    it('renders 3 written-word text chips; each chip text contains its data-word', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={simpleSentencePlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const chips = screen.getAllByTestId('word-song-chip')
+      expect(chips).toHaveLength(3)
+      expect(screen.queryAllByTestId('word-picture')).toHaveLength(0)
+      expect(screen.getAllByTestId('word-song-chip-sight-word')).toHaveLength(3)
+
+      for (const chip of chips) {
+        const word = chip.getAttribute('data-word')
+        expect(word).not.toBeNull()
+        expect((chip.textContent ?? '').trim().toLowerCase()).toContain(
+          (word as string).toLowerCase(),
+        )
+      }
+    })
+
+    /**
+     * The correct chip carries the target resolved from the `correct`
+     * line, NOT the gapped read. Problem 1 frame "The cat ___ the mat."
+     * gaps "sat" (the read says "blank"); the correct chip's word is "sat".
+     */
+    it('marks exactly one chip data-correct=true carrying the correct-derived target', () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={simpleSentencePlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const correctChips = screen
+        .getAllByTestId('word-song-chip')
+        .filter((c) => c.getAttribute('data-correct') === 'true')
+      expect(correctChips).toHaveLength(1)
+      // Problem 1 target is 'sat' (resolved from "Yes! Sat.").
+      expect(correctChips[0].getAttribute('data-word')).toBe('sat')
+    })
+
+    /**
+     * Fill-on-correct closure beat (Kyle §3.2 / sponsor Q2): tapping the
+     * correct chip fills the gap with the target word in place
+     * (`data-gap-filled="true"`).
+     */
+    it('fills the gap with the target word on a correct tap (closure beat)', async () => {
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={simpleSentencePlan()}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // Gap starts unfilled.
+      expect(
+        screen
+          .getByTestId('word-song-sentence-gap')
+          .getAttribute('data-gap-filled'),
+      ).toBe('false')
+
+      const correctChip = screen
+        .getAllByTestId('word-song-chip')
+        .find((c) => c.getAttribute('data-correct') === 'true')!
+      await act(async () => {
+        fireEvent.click(correctChip)
+        await Promise.resolve()
+      })
+
+      // Gap is now filled with the target word in place.
+      const gap = screen.getByTestId('word-song-sentence-gap')
+      expect(gap.getAttribute('data-gap-filled')).toBe('true')
+      expect(gap.textContent?.toLowerCase()).toContain('sat')
+    })
+
+    /**
+     * No decoding beat — the read-aloud fires immediately on mount (NOT
+     * after the 1500ms silent CVC window). The cloze task is syntactic
+     * prediction, not phonics; `isCvcWord` must NOT widen to include
+     * `simple-sentence` (Kyle §2). Mirrors the sight-words immediate-fire
+     * guard.
+     */
+    it('fires read-aloud immediately on mount (no silent decoding beat)', async () => {
+      const harness = makePlayHarness()
+      const getHowlerRunning = vi.fn(() => true)
+      render(
+        withMotion(
+          <WordSong
+            plan={simpleSentencePlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+            getHowlerRunning={getHowlerRunning}
+          />,
+        ),
+      )
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      // The read line fired without any fake-timer advance.
+      expect(harness.calls.length).toBeGreaterThan(0)
+      expect(harness.calls[0].text).toContain('Finish the sentence:')
     })
   })
 })

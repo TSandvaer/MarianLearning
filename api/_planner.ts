@@ -69,6 +69,8 @@ import {
   WORD_SONG_TARGET_WORDS_SIGHT,
   WORD_SONG_DISTRACTOR_HINTS,
   WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT,
+  WORD_SONG_SIMPLE_SENTENCES_GENTLE_FOR_PROMPT,
+  WORD_SONG_SIMPLE_SENTENCES_TRAP_FOR_PROMPT,
 } from './_plannerWordList.js'
 import { renderSessionAudio, type RenderSessionOptions } from './_session.js'
 import type { SessionStartResponse } from './_types.js'
@@ -775,9 +777,18 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   // (SIGHT-WORDS block) instructs whole-word recognition, never
   // sounding-out. See `design/research/sight-words-sequence-marian.md`
   // (Dave, W11-01) + `WORD_SONG_TARGET_WORDS_SIGHT` in `_plannerWordList.ts`.
-  // `simple-sentences` remains the only valid-but-untuned word-song tier
-  // that falls through to the blending-cv stub.
   'sight-words',
+  // Wave 13 (ticket 86ca8e6fr) — `simple-sentences`, the sentence-
+  // COMPLETION (cloze) tier and the LAST Word Song content tier (terminal
+  // node of WORD_SONG_NODES_IN_ORDER). Emma reads a 3–4 word sentence with
+  // one word gapped ("Finish the sentence: The cat ___ the mat."); Marian
+  // taps the written-word chip that fills the gap. The target is carried
+  // in the `correct` line ("Yes! Sat.") NOT the gapped read — Emma never
+  // speaks the answer (cloze). See the SIMPLE-SENTENCES block in
+  // `WORD_SONG_TRACK_GUIDE` + `WORD_SONG_SIMPLE_SENTENCES` in
+  // `_plannerWordList.ts`. After this tier, EVERY word-song node is
+  // first-class — no remaining stub-fallback tiers.
+  'simple-sentences',
 ]
 
 /**
@@ -785,11 +796,11 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
  * caller-supplied focusNode verbatim. Word-song honours first-class nodes
  * (`letter-names`, `letter-sounds`, `blending-cv`, `cvc-words`, the four
  * short-vowel sibling tiers, `digraphs-sh`, `digraphs-ch`,
- * `digraphs-th-voiceless`, and `sight-words`); the sole remaining
- * valid-but-unsupported node (`simple-sentences`) falls back to
- * `blending-cv` content as a stub — the screen always renders, even on
- * tiers we haven't tuned yet. See `WORD_SONG_TRACK_GUIDE` for the
- * prompt-side handling.
+ * `digraphs-th-voiceless`, `sight-words`, and `simple-sentences`). As of
+ * Wave 13 EVERY word-song tier is first-class — the stub-fallback path
+ * (which routed untuned tiers to `blending-cv`) is retained for forward
+ * compatibility but no current tier exercises it. See
+ * `WORD_SONG_TRACK_GUIDE` for the prompt-side handling.
  *
  * Validation (`generateSessionPlan` above) still rejects an invalid
  * cross-track or unknown focusNode for word-song before reaching here —
@@ -1992,7 +2003,7 @@ Pick exactly 8 distinct problems for the focus node, ordered easier → slightly
 const WORD_SONG_TRACK_GUIDE = `Track: Word Song.
 
 The user message names a focus skill node. The planner emits content
-matching that node. Twelve first-class content modes today:
+matching that node. Thirteen first-class content modes today:
 
   - letter-names: "Tap the letter <NAME>." problems. Marian sees a
     trio of LETTER GLYPHS (the alphabet, uppercase + lowercase — no
@@ -2091,19 +2102,42 @@ matching that node. Twelve first-class content modes today:
     words: sounding out "was" by letter rules gives the wrong non-word
     sound. See the SIGHT-WORDS RECOGNITION block below for the
     whole-word framing and the per-slot template overrides.
+  - simple-sentences: "Finish the sentence: <sentence>." problems where
+    <sentence> is a 3–4 word sentence with ONE word replaced by the gap
+    token "___" (three underscores), e.g. "Finish the sentence: The cat
+    ___ the mat." This is the sentence-COMPLETION (cloze) tier and the
+    LAST whole-Word-Song tier — Marian arrives here after she's mastered
+    sight-words. CRITICAL DISTINCTION from EVERY prior tier: Emma must
+    NEVER speak the answer word (that defeats the cloze). The answer lives
+    in the "correct" line ("Yes! Sat.") and is NEVER in the read line —
+    the read line carries the literal "___" gap token at the gap (the
+    audio render speaks "blank" there). Marian reads the gapped
+    sentence, hears Emma read it (Emma says "blank" at the gap), and taps
+    the WRITTEN-WORD chip that fills the gap (written-word chips, same as
+    sight-words — NO pictures). You MUST NOT instruct decoding /
+    sounding-out: the task is syntactic-slot prediction at the sentence
+    level, not phonics. See the SIMPLE-SENTENCES block below for the
+    sentence pool, the gap-token rule, and the per-slot template
+    overrides.
 
 Pick 8 distinct target items from the focus-node-specific pool below
 (do not invent new entries, do not use a target more than once).
 "Items" are WORDS for blending-cv / cvc-words / cvc-words-short-* /
-digraphs-* / sight-words tiers, LETTER GLYPHS for letter-names, and
-SOUND→LETTER PAIRS for letter-sounds. The letter-names tier composition
+digraphs-* / sight-words tiers, LETTER GLYPHS for letter-names,
+SOUND→LETTER PAIRS for letter-sounds, and SENTENCE ROWS for
+simple-sentences. The letter-names tier composition
 has its own additional case-mix + confusion-band caps — see the
 LETTER-NAMES SESSION COMPOSITION RULES block below. The letter-sounds
 tier composition has its own additional category-mix budget and
 vowel-ladder gating — see the LETTER-SOUNDS SESSION COMPOSITION RULES
 block below. The sight-words tier is whole-word RECOGNITION (NOT
 decoding) and uses its own read + correct templates — see the
-SIGHT-WORDS RECOGNITION block below.
+SIGHT-WORDS RECOGNITION block below. The simple-sentences tier is
+sentence COMPLETION (cloze): "items" are whole SENTENCE ROWS (pick 8
+DISTINCT rows; the same answer word MAY recur across two different
+rows since rows are the unit, but never pick the same row twice) — and
+it uses its own read + correct + hint templates; see the SIMPLE-SENTENCES
+COMPLETION block below.
 
 EXCEPTION for digraphs-sh, digraphs-ch AND digraphs-th-voiceless: each
 digraph-tier pool has only 7 words, so 8 distinct words is impossible.
@@ -2171,6 +2205,16 @@ ${WORD_SONG_TARGET_WORDS_DIGRAPHS_TH}
 
 Pool for sight-words (20 high-frequency sight words):
 ${WORD_SONG_TARGET_WORDS_SIGHT}
+
+Pool for simple-sentences (cloze sentences — pick whole rows, do NOT
+compose new sentences; emit each chosen row's frame verbatim with the
+literal "___" gap token preserved in the read text). Each row is
+"[id] frame → answer". The answer is NEVER in the read line (it is gapped
+with "___"); it appears ONLY in the "correct" line. GENTLE rows
+(problems 1–3 ONLY — Templates A/B, scene present):
+${WORD_SONG_SIMPLE_SENTENCES_GENTLE_FOR_PROMPT}
+TRAP rows (problems 4–8 ONLY — all templates, no scene):
+${WORD_SONG_SIMPLE_SENTENCES_TRAP_FOR_PROMPT}
 
 Pool for letter-sounds (16 active sounds per session — 14 mastered
 consonants + 1 mastered vowel + 1 current-target vowel). Each sound
@@ -2369,6 +2413,88 @@ distributes grammatical function differently, so words like "the", "a",
 translate them — just have Emma name and celebrate the word. Keep every
 utterance in natural spoken English; no phonetic notation, no slashes,
 no IPA.
+
+SIMPLE-SENTENCES COMPLETION (simple-sentences tier ONLY; OVERRIDES the
+default word-tier read + correct + hint templates — apply these instead).
+The simple-sentences tier is a sentence-COMPLETION (cloze) tier — the
+LAST Word Song tier. Marian reads a 3–4 word sentence with one word
+gapped and taps the written-word chip that fills the gap. The teaching
+goal is syntactic-slot prediction at the sentence level, NOT phonics
+decoding (every word in every sentence is already taught). So:
+
+(1) PICK WHOLE ROWS FROM THE POOL — do NOT compose new sentences. The
+"Pool for simple-sentences" block above lists GENTLE rows and TRAP rows,
+each as "[id] frame → answer". Choose 8 distinct rows and emit each
+chosen row's frame VERBATIM (with the "___" gap token preserved in the
+read line's data form — see template (2)). Do NOT invent sentences, do
+NOT reword a row, do NOT change which word is gapped. Every word in
+every sentence is already in Marian's taught vocabulary precisely
+because the pool is curated; an invented sentence risks an untaught word.
+
+(2) Read-line template (ALL 8 problems): "Finish the sentence:
+<sentence>." where <sentence> is the chosen row's frame emitted VERBATIM,
+INCLUDING the literal "___" gap token (three underscores) at the gap
+position. E.g. for row [cat-sat-mat] "The cat ___ the mat." emit the read
+text EXACTLY: "Finish the sentence: The cat ___ the mat." Keep the three
+underscores in the read text — do NOT replace them with the answer word,
+and do NOT replace them with the word "blank" (the audio render
+substitutes the spoken word "blank" for the underscores automatically at
+synthesize time; the stored text keeps "___" so the screen can show the
+styled blank). Emma speaks "blank" at the gap; she must NEVER speak the
+answer word. Use "Finish the sentence:" verbatim for every read line; do
+not vary the verb.
+
+(3) THE ANSWER IS NEVER IN THE READ LINE. This is the single most
+important rule for this tier. The read line gaps the answer (Emma says
+"blank"). The answer appears ONLY in the "correct" line. If you put the
+answer word in the read line, you defeat the cloze — Marian would hear
+the answer before she taps. Re-read every read line you emit and confirm
+the answer word does NOT appear in it.
+
+(4) correct-slot template (simple-sentences ONLY): "Yes! <Word>." —
+capitalised answer word from the chosen row, trailing PERIOD, NO article.
+E.g. for [cat-sat-mat] (answer "sat"): "Yes! Sat." For [they-in-van]
+(answer "they"): "Yes! They." Do NOT use the article-led "Yes! That's a
+<word>." default and do NOT use the bang fallback. The browser RESOLVES
+THE TARGET WORD FROM THIS LINE (the read line gaps it), so the "Yes!
+<Word>." shape is load-bearing — emit it exactly.
+
+(5) hint-slot template (simple-sentences ONLY): "Listen. <full sentence
+spoken WITH the answer>." — Emma reads the COMPLETE sentence so Marian
+hears the answer word in its syntactic slot. E.g. for [cat-sat-mat]:
+"Listen. The cat sat the mat." This is the cloze scaffold — hearing the
+target in context is the resolver. (This is the ONE place Emma speaks the
+answer — in the hint, after Marian has already struggled, never in the
+read.)
+
+(6) giveAnswer-slot template (simple-sentences ONLY): "This one is
+<word>." — lowercase answer, same as the default giveAnswer (stated for
+completeness).
+
+(7) reprompt is "Hmm... try again?" verbatim, same as every other tier.
+
+(8) GENTLE / TRAP SEQUENCING. Problems 1–3 (gentle): pick rows from the
+GENTLE pool list ONLY (Templates A/B — subject+verb / subject+verb+object,
+the safest for Tagalog-L1 SVO learning). Problems 4–8 (trap): pick rows
+from the TRAP pool list ONLY (all templates). Do NOT place a TRAP row at
+P1–P3 or a GENTLE row at P4–P8.
+
+(9) DEFERRAL ORDERING + DOSAGE. The five inherited Wave-11 deferrals
+(they, there, where, were, then) are the highest-priority content for
+this tier. When you include deferral rows, introduce them in this exact
+priority order — they → there → where → were → then (highest-frequency,
+lowest syntactic complexity first). Include AT LEAST 3 deferral-target
+rows among the 8 problems (the deferrals are precisely the words that
+need sentence context, which this tier supplies). All deferral rows live
+in the TRAP pool, so they land at P4–P8.
+
+(10) L2 note: same as sight-words — Marian's first language (Tagalog) is
+predicate-initial and has no articles, so English SVO word order and the
+function-word glue ("the", "on", "there") are learned, not instinctive.
+The sentence frame gives her the structure; the gap asks her to predict
+one slot. Keep every utterance in natural spoken English; no phonetic
+notation, no slashes, no IPA. The word "blank" (spoken at the gap) is
+within Marian's vocabulary cap.
 
 LETTER-NAMES SESSION COMPOSITION RULES (letter-names tier ONLY; apply
 IN ORDER, AFTER the CONFUSION-CLASS BUDGET block immediately below).
@@ -3066,13 +3192,21 @@ all other slots are content-mode-agnostic:
     - sight-words: "Find the word: <word>." e.g. "Find the word: the."
       (whole-word recognition — see SIGHT-WORDS RECOGNITION block above;
       NOT a decoding "Read"/"Tap" template).
+    - simple-sentences: "Finish the sentence: <sentence>." where
+      <sentence> is the chosen pool row's frame emitted VERBATIM with the
+      literal "___" gap token, e.g. "Finish the sentence: The cat ___ the
+      mat." (the audio render speaks "blank" at the underscores; the
+      stored text keeps "___"). The answer is NEVER in the read line — see
+      the SIMPLE-SENTENCES COMPLETION block above. NOT a decoding
+      "Read"/"Tap" template.
   For non-letter-names / non-letter-sounds tiers: use lowercase target
   word; one short sentence; ends with a period. Use the EXACT verb for
   the focus node — "Tap" for blending-cv AND letter-names, "Which
   letter says" for letter-sounds, "Read" for cvc-words /
   cvc-words-short-o / cvc-words-short-u / cvc-words-short-i /
   cvc-words-short-e / digraphs-sh / digraphs-ch /
-  digraphs-th-voiceless, "Find the word:" for sight-words.
+  digraphs-th-voiceless, "Find the word:" for sight-words, "Finish the
+  sentence:" for simple-sentences.
   Do not mix templates within a single plan.
 - correct (letter-names tier): "Yes! That's the letter <NAME>." e.g.
   "Yes! That's the letter M." — uses the SAME case-preserved
@@ -3092,6 +3226,13 @@ all other slots are content-mode-agnostic:
   "Yes! That's a the." is ungrammatical), and NEVER the bang fallback
   "Yes! <Word>!" — the period form is required for this tier. See the
   SIGHT-WORDS RECOGNITION block above.
+- correct (simple-sentences tier): "Yes! <Word>." — capitalised ANSWER
+  word from the chosen pool row, trailing PERIOD, NO article. E.g.
+  "Yes! Sat." / "Yes! They." / "Yes! Hot." This line is LOAD-BEARING:
+  the browser resolves the target word from it (the read line gaps the
+  answer), so emit the "Yes! <Word>." shape EXACTLY. NEVER the article-led
+  "Yes! That's a <word>." default and NEVER the bang fallback. See the
+  SIMPLE-SENTENCES COMPLETION block above.
 - correct (all other word-song tiers): default template is "Yes! That's a <word>." (lowercase target
   after the article) e.g. "Yes! That's a cat."
   EXCEPTION — chip words that cannot take an indefinite article
@@ -3131,6 +3272,12 @@ all other slots are content-mode-agnostic:
   — see LETTER-SOUNDS UTTERANCE TEMPLATE block above.
 - hint (sight-words tier): "Look. <Word>." — capitalised target, e.g.
   "Look. The." Whole-word only; do NOT hint by sounding out letters.
+- hint (simple-sentences tier): "Listen. <full sentence WITH the answer
+  word spoken in place of the gap>." e.g. for [cat-sat-mat]: "Listen.
+  The cat sat the mat." Emma reads the COMPLETE sentence so Marian hears
+  the answer in its slot — the cloze scaffold. This is the ONE place the
+  answer is spoken (in the hint, after a struggle), NEVER in the read.
+  See the SIMPLE-SENTENCES COMPLETION block above.
 - hint (all other word-song tiers): "Let's look. <Word>." e.g.
   "Let's look. Cat."
 - giveAnswer (letter-names tier): "This one is the letter <NAME>."

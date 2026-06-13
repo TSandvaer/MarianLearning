@@ -155,6 +155,14 @@ export type WordCategory =
   // based), but `category` is a required field on every WordEntry, so a
   // dedicated self-documenting bucket beats overloading 'object'.
   | 'function-word'
+  // 'attribute' added with the simple-sentences tier (Wave 13, ticket
+  // 86ca8e6fr) — adjectives used as cloze gap targets (big, red, sad,
+  // mad, fat, hot) that render as WRITTEN-WORD chips (no picturable
+  // single-subject referent in this tier). Like 'function-word', the
+  // category is never consulted for written-word chips (these carry
+  // `sightWord: true`), but a self-documenting bucket beats overloading
+  // 'object'. Per `design/word-song/simple-sentences-content.md` §3.3.
+  | 'attribute'
 
 /**
  * The 14 target words — all CVC short-a, in Marian's likely vocabulary.
@@ -1285,6 +1293,114 @@ export const TARGET_WORDS: readonly WordEntry[] = [
   // precedent as `sip` (short-i target reused by digraphs-ch). The other
   // pool words (the/a/is/it/in/to/go/no/do/was/see/said/he/she/we/for/
   // on/not) are net-new and added above; only 'can' pre-existed.
+  //
+  // ── Simple-sentences tier targets (Wave 13, ticket 86ca8e6fr) ───────
+  // The cloze gap-target words that are NOT already in the pack. The
+  // simple-sentences tier renders ALL chips as WRITTEN-WORD text (no
+  // picture — Kyle spec §3.3, the sight-words written-word chip transfers
+  // verbatim), so these all carry `sightWord: true` (drives the
+  // written-word render branch + skips CVC same-vowel distractor logic)
+  // and NO `vowel` (so the CVC gentle/trap-AXIS regression tests in
+  // `wordDistractors.test.ts` auto-exclude them via the existing
+  // `w.vowel !== undefined` filter — same posture as the 20 sight words).
+  // `getWordEntry` resolves them so the parser's target-from-`correct`
+  // resolution (Kyle §1.2) succeeds.
+  //
+  // Two groups: the 5 inherited Wave-11 DEFERRALS (they/there/where/were/
+  // then — held back from sight-words precisely because they need
+  // sentence context, per `design/research/sight-words-sequence-marian.md`
+  // and now first-class here), and the content words used as gap targets
+  // (ran/run verbs; big/red/sad/mad/fat adjectives). Targets already in
+  // the pack (sat, dog, bag, in, it, on, to, hot, see, go, ship, shed,
+  // shop, chip) are NOT re-added — they resolve via their existing rows.
+  //
+  // Inherited Wave-11 deferrals (function words):
+  {
+    word: 'they',
+    pictureKey: 'sight:they',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'there',
+    pictureKey: 'sight:there',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'where',
+    pictureKey: 'sight:where',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'were',
+    pictureKey: 'sight:were',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'then',
+    pictureKey: 'sight:then',
+    category: 'function-word',
+    isTarget: true,
+    sightWord: true,
+  },
+  // Content-word gap targets (verbs):
+  {
+    word: 'ran',
+    pictureKey: 'sight:ran',
+    category: 'action',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'run',
+    pictureKey: 'sight:run',
+    category: 'action',
+    isTarget: true,
+    sightWord: true,
+  },
+  // Content-word gap targets (adjectives):
+  {
+    word: 'big',
+    pictureKey: 'sight:big',
+    category: 'attribute',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'red',
+    pictureKey: 'sight:red',
+    category: 'attribute',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'sad',
+    pictureKey: 'sight:sad',
+    category: 'attribute',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'mad',
+    pictureKey: 'sight:mad',
+    category: 'attribute',
+    isTarget: true,
+    sightWord: true,
+  },
+  {
+    word: 'fat',
+    pictureKey: 'sight:fat',
+    category: 'attribute',
+    isTarget: true,
+    sightWord: true,
+  },
 ] as const
 
 /**
@@ -2019,6 +2135,46 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // + Devon's W11-03 distractor model — NOT this CVC matrix lookup — so
   // no sight-word `can` row is needed here. Same dual-role discipline as
   // the `can` TARGET_WORDS note above.
+  //
+  // ── Simple-sentences tier pairings (Wave 13, ticket 86ca8e6fr) ──────
+  // Every TARGET_WORDS entry needs a TARGET_PAIRINGS row so the
+  // `wordDistractors.test.ts` "every target has a deterministic
+  // gentle+trap pair" regression stays green. These rows exist for that
+  // contract ONLY — the simple-sentences RENDER does NOT consult this
+  // CVC matrix (chips come from Devon's W13-04 written-word picker, which
+  // transfers from the sight-words chip render and is driven by Dave's
+  // grammatical-class / semantic-foil model per sentence frame, NOT by a
+  // per-target lookup). Distractors are drawn ONLY from resolvable pack
+  // words and mirror Dave's W13-01 deferral foil table §"Distractor
+  // reference table for inherited deferrals" where the ideal foils
+  // resolve; out-of-pack confusables (are/saw) are substituted with the
+  // nearest resolvable in-pool word. All pairs distinct from target and
+  // each other; no FORBIDDEN_PAIR adjacency (written-word chips have no
+  // silhouette collision). The 13 already-present targets (dog/bag/in/it/
+  // on/to/hot/see/go/ship/shed/shop/chip) keep their existing CVC /
+  // sight-word rows; only `sat` (distractor-only in its home tier, with NO
+  // existing row) needs a fresh row below alongside the 12 net-new words.
+  //
+  // Content-verb gap target `sat` — distractor-only in its home tier (a
+  // digraphs-ch `chat` minimal-pair distractor) but a first-class gap
+  // target here (wrong-class gentle, same-class trap). All distractors
+  // resolve via getWordEntry.
+  sat: { gentle: ['on', 'the'], trap: ['ran', 'see'] },
+  // Inherited deferrals (Dave §"Distractor reference table"):
+  they: { gentle: ['the', 'on'], trap: ['there', 'we'] },
+  there: { gentle: ['cat', 'is'], trap: ['they', 'where'] },
+  where: { gentle: ['cat', 'sat'], trap: ['were', 'there'] },
+  were: { gentle: ['big', 'on'], trap: ['was', 'where'] },
+  then: { gentle: ['the', 'big'], trap: ['there', 'they'] },
+  // Content-word gap targets (verbs — wrong-class gentle, same-class trap):
+  ran: { gentle: ['cat', 'the'], trap: ['sat', 'run'] },
+  run: { gentle: ['the', 'on'], trap: ['ran', 'see'] },
+  // Content-word gap targets (adjectives — wrong-class gentle, same-class trap):
+  big: { gentle: ['on', 'ran'], trap: ['red', 'hot'] },
+  red: { gentle: ['on', 'sat'], trap: ['big', 'hot'] },
+  sad: { gentle: ['on', 'sat'], trap: ['mad', 'big'] },
+  mad: { gentle: ['on', 'sat'], trap: ['sad', 'fat'] },
+  fat: { gentle: ['on', 'ran'], trap: ['big', 'mad'] },
 } as const
 
 /**
@@ -2133,4 +2289,123 @@ export function getWordEntry(word: string): WordEntry {
   throw new Error(
     `[wordPack] No entry for word "${word}" — must be in TARGET_WORDS or DISTRACTOR_ONLY_WORDS`,
   )
+}
+
+// ── Simple-sentences scene registry (Wave 13, ticket 86ca8e6fr) ─────────
+//
+// The gentle-phase scene illustration (Kyle spec §3.2, §8 / Dave §"Picture
+// role") is per-PROBLEM — which scene shows depends on which sentence the
+// problem carries. The wire is utterance-only (planner-and-canon.md "Wire
+// shape is utterance-only — invariant"), so the parser cannot read a
+// `sceneId` off the wire; it DERIVES it from the displayed `sentenceFrame`
+// at parse time (Kyle §1.3 — "Kevin derives sceneId deterministically from
+// the frame at parse time"). This registry is the derivation table.
+//
+// Keyed on the NORMALIZED frame (lowercased, gap-token elided, whitespace
+// collapsed — see `normalizeSentenceFrame`) so a frame's exact id is
+// stable across capitalization / spacing. Only GENTLE-phase sentences are
+// registered (the trap phase is text-only by Dave's ruling). A frame
+// absent from this map → `sceneId === undefined` → text-only render. So
+// `sceneId` absence is BOTH the trap-phase signal AND the missing-asset
+// fallback (one predicate, no special-casing — Kyle §1.3).
+//
+// The id values are the stable scene-asset keys: Thomas's MJ pack ships
+// `public/assets/scenes/scene-<id>.svg` and Devon's `SCENE_PICTURES`
+// registry (W13-04 render) looks them up. The set MUST stay aligned with
+// the canonical pool `WORD_SONG_SIMPLE_SENTENCES` (gentle rows) in
+// `api/_plannerWordList.ts` — locked by `plannerRoundTrip.test.ts`.
+//
+// NOTE on `?`-terminated frames: a couple of pool frames are questions
+// ("Where is the cat?"). The normalizer strips the gap token but keeps the
+// terminal punctuation so two frames differing only at the gap (declarative
+// vs interrogative) never collide. Gentle-phase frames are all declarative
+// Template-A/B sentences, so this is belt-and-suspenders.
+
+/**
+ * The simple-sentences gap-target words (Wave 13, ticket 86ca8e6fr) — the
+ * membership set the parser checks the `correct`-resolved target against,
+ * so a drifted / stub-leaked correct line is rejected rather than silently
+ * rendered. UNLIKE the CVC tiers' `TARGET_WORD_SET` (built from
+ * `TARGET_WORDS.isTarget` rows), the simple-sentences pool legitimately
+ * includes words that are `isTarget: false` distractor-only pack entries
+ * in their HOME tier but ARE valid gap targets here — e.g. `sat` (a
+ * digraphs-ch `chat` distractor) and `dog`/`shop`/`shed`/`chip`/`ship`
+ * (resolvable pack words). Membership here is by SIMPLE-SENTENCE POOL, not
+ * by the CVC target flag.
+ *
+ * Source of truth is the canonical pool `WORD_SONG_SIMPLE_SENTENCES`
+ * (targets) in `api/_plannerWordList.ts`; this browser-side mirror exists
+ * because the parser (src/) cannot import the server-only `api/` module.
+ * `plannerRoundTrip.test.ts` asserts the two agree (every canonical pool
+ * target is in this set and resolves via `getWordEntry`) so they never
+ * drift.
+ */
+export const SIMPLE_SENTENCE_TARGET_SET: ReadonlySet<string> = new Set([
+  // Verbs
+  'sat',
+  'ran',
+  'run',
+  'see',
+  'go',
+  // Adjectives
+  'big',
+  'red',
+  'hot',
+  'sad',
+  'mad',
+  'fat',
+  // Content nouns (CVC + digraph)
+  'dog',
+  'bag',
+  'ship',
+  'shed',
+  'shop',
+  'chip',
+  // Prepositions / function words
+  'in',
+  'on',
+  'to',
+  'it',
+  // Inherited Wave-11 deferrals
+  'they',
+  'there',
+  'where',
+  'were',
+  'then',
+])
+
+/** Normalize a `sentenceFrame` for stable scene-registry lookup: lowercase,
+ *  elide the `___` gap token, collapse whitespace, trim. Pure. */
+export function normalizeSentenceFrame(frame: string): string {
+  return frame.toLowerCase().replace(/_{3}/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * Gentle-phase scene registry: normalized-frame → stable sceneId.
+ *
+ * Source of truth for the FRAMES is the canonical pool
+ * `WORD_SONG_SIMPLE_SENTENCES` (gentle rows) in `api/_plannerWordList.ts`;
+ * this browser-side mirror exists because the parser (src/) cannot import
+ * the server-only `api/` module. `plannerRoundTrip.test.ts` asserts the two
+ * agree (every gentle pool row's normalized frame is a key here mapping to
+ * that row's id, and vice versa) so they never drift.
+ */
+export const SIMPLE_SENTENCE_SCENES: Readonly<Record<string, string>> = {
+  [normalizeSentenceFrame('The cat ___ the mat.')]: 'cat-sat-mat',
+  [normalizeSentenceFrame('The dog ___.')]: 'dog-ran',
+  [normalizeSentenceFrame('The man ___.')]: 'man-ran',
+  [normalizeSentenceFrame('I see the ___.')]: 'see-dog',
+  [normalizeSentenceFrame('She has the ___.')]: 'she-has-bag',
+  [normalizeSentenceFrame('The cat sat ___.')]: 'cat-sat-prep',
+  [normalizeSentenceFrame('The dog ran ___.')]: 'dog-ran-in',
+  [normalizeSentenceFrame('He can see ___.')]: 'he-can-see',
+}
+
+/**
+ * Resolve the gentle-phase `sceneId` for a displayed `sentenceFrame`, or
+ * `undefined` if the frame is not a registered gentle scene (trap phase OR
+ * an unregistered frame → text-only render). Pure.
+ */
+export function sceneIdForFrame(frame: string): string | undefined {
+  return SIMPLE_SENTENCE_SCENES[normalizeSentenceFrame(frame)]
 }
