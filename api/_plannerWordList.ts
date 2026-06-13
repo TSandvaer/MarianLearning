@@ -481,3 +481,386 @@ export const WORD_SONG_NOVEL_PROBE_WORDS: readonly string[] = [
  *  list explicitly so Haiku knows which words count as "novel". */
 export const WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT =
   WORD_SONG_NOVEL_PROBE_WORDS.join(', ')
+
+/**
+ * One entry in the verified simple-sentences pool (`simple-sentences`
+ * tier — Wave 13, ticket 86ca8e6fr). The LAST Word Song content tier.
+ *
+ * Source of truth: `design/research/simple-sentences-sequence-marian.md`
+ * §"Verified sentence pool" (Dave, W13-01) — 40 sentences built strictly
+ * from taught vocabulary (CVC pool + 20 Dolch sight words + the 5
+ * inherited Wave 11 deferrals: they / then / there / where / were). No
+ * net-new vocabulary. Render contract:
+ * `design/word-song/simple-sentences-content.md` (Kyle, W13-02).
+ *
+ * Field semantics:
+ *  - `id` — stable sentence identifier (lowercase, hyphenated, derived
+ *    from the sentence's content words). Used as the scene asset key
+ *    (`sceneId`) for gentle-phase sentences: the scene SVG ships at
+ *    `public/assets/scenes/scene-<id>.svg` (Kyle §8.2). Stable across
+ *    re-bakes so Thomas's MJ scene pack keys on it.
+ *  - `frame` — the displayed sentence WITH the literal `___` gap token
+ *    (three ASCII underscores) at the gap position, e.g.
+ *    `"The cat ___ the mat."`. The browser parser derives
+ *    `WordSongProblem.sentenceFrame` from this verbatim.
+ *  - `target` — the lowercase word that fills `___` (the answer). Carried
+ *    in the `correct` utterance as `"Yes! <Word>."`; the parser resolves
+ *    the target from THAT line, never the gapped read line (Kyle §1.2).
+ *  - `phase` — `'gentle'` (problems 1–3: Templates A/B, scene present,
+ *    wrong-class foils) or `'trap'` (problems 4–8: all templates, NO
+ *    scene, same-class foils). Per Dave §"Dosage and session structure".
+ *    Only `'gentle'` rows carry a scene; trap rows render text-only.
+ *  - `template` — Dave's syntactic template letter (A–G), for directive
+ *    composition + audit. Not wire-carried.
+ *
+ * Function-word deferral ordering (Kyle §3.5 / Dave rec #10): the five
+ * inherited deferrals appear in this exact order across the tier —
+ * they → there → where → were → then. The directive in
+ * `WORD_SONG_TRACK_GUIDE` (SIMPLE-SENTENCES block) encodes this so the
+ * sequencing is deliberate, not left to Haiku to infer.
+ *
+ * Alignment contract (mirrors the sight-words pool): every `target`
+ * here MUST exist in `src/screens/WordSong/wordPack.ts` as a resolvable
+ * `WordEntry`, and every gentle-phase `id`/`frame` pair MUST be present
+ * in the browser-side scene registry `SIMPLE_SENTENCE_SCENES`
+ * (`wordPack.ts`) so the parser derives the same `sceneId`. Locked by
+ * `src/screens/WordSong/plannerRoundTrip.test.ts`.
+ */
+export interface SimpleSentenceEntry {
+  id: string
+  frame: string
+  target: string
+  phase: 'gentle' | 'trap'
+  template: 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G'
+}
+
+/** The literal gap token (three ASCII underscores) used in every
+ *  simple-sentence `frame`. The displayed sentence carries this verbatim;
+ *  the TTS read substitutes the spoken word "blank" for it (Kyle §1, §4). */
+export const SIMPLE_SENTENCE_GAP_TOKEN = '___'
+
+/**
+ * The verified 40-sentence simple-sentences pool. Gentle-phase rows
+ * (Templates A/B, scene-bearing) come first; trap-phase rows follow.
+ * The ~20 gentle rows each carry a stable `id` that doubles as the
+ * scene asset key. Trap rows render text-only (no scene).
+ *
+ * The Haiku planner draws the 8-problem session from this pool per the
+ * SIMPLE-SENTENCES directive (gentle 1–3 / trap 4–8, deferral ordering,
+ * ≥3 deferrals per session once underway). The pool is intentionally
+ * larger than one session so successive sessions vary.
+ */
+export const WORD_SONG_SIMPLE_SENTENCES: readonly SimpleSentenceEntry[] = [
+  // ── Gentle phase (Templates A/B — SV / SVO; scene present) ──────────
+  {
+    id: 'cat-sat-mat',
+    frame: `The cat ${SIMPLE_SENTENCE_GAP_TOKEN} the mat.`,
+    target: 'sat',
+    phase: 'gentle',
+    template: 'B',
+  },
+  {
+    id: 'dog-ran',
+    frame: `The dog ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'ran',
+    phase: 'gentle',
+    template: 'A',
+  },
+  {
+    id: 'man-ran',
+    frame: `The man ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'ran',
+    phase: 'gentle',
+    template: 'A',
+  },
+  {
+    id: 'see-dog',
+    frame: `I see the ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'dog',
+    phase: 'gentle',
+    template: 'B',
+  },
+  {
+    id: 'she-has-bag',
+    frame: `She has the ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'bag',
+    phase: 'gentle',
+    template: 'B',
+  },
+  {
+    id: 'cat-sat-prep',
+    frame: `The cat sat ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'there',
+    phase: 'gentle',
+    template: 'B',
+  },
+  {
+    id: 'dog-ran-in',
+    frame: `The dog ran ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'in',
+    phase: 'gentle',
+    template: 'B',
+  },
+  {
+    id: 'he-can-see',
+    frame: `He can see ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'it',
+    phase: 'gentle',
+    template: 'B',
+  },
+  // ── Trap phase (all templates; NO scene) ────────────────────────────
+  // Template C — preposition / locative gap
+  {
+    id: 'cat-on-mat',
+    frame: `The cat sat ${SIMPLE_SENTENCE_GAP_TOKEN} the mat.`,
+    target: 'on',
+    phase: 'trap',
+    template: 'C',
+  },
+  {
+    id: 'dog-in',
+    frame: `The dog is ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'in',
+    phase: 'trap',
+    template: 'C',
+  },
+  {
+    id: 'put-on-mat',
+    frame: `Put it ${SIMPLE_SENTENCE_GAP_TOKEN} the mat.`,
+    target: 'on',
+    phase: 'trap',
+    template: 'C',
+  },
+  {
+    id: 'bag-in-van',
+    frame: `The bag is ${SIMPLE_SENTENCE_GAP_TOKEN} the van.`,
+    target: 'in',
+    phase: 'trap',
+    template: 'C',
+  },
+  {
+    id: 'cat-ran-shed',
+    frame: `The cat ran ${SIMPLE_SENTENCE_GAP_TOKEN} the shed.`,
+    target: 'to',
+    phase: 'trap',
+    template: 'C',
+  },
+  {
+    id: 'she-in-shop',
+    frame: `She was ${SIMPLE_SENTENCE_GAP_TOKEN} the shop.`,
+    target: 'in',
+    phase: 'trap',
+    template: 'C',
+  },
+  // Template D — inherited deferrals (they → there → where → were → then)
+  {
+    id: 'they-in-van',
+    frame: `${SIMPLE_SENTENCE_GAP_TOKEN} are in the van.`,
+    target: 'they',
+    phase: 'trap',
+    template: 'D',
+  },
+  {
+    id: 'where-cat',
+    frame: `${SIMPLE_SENTENCE_GAP_TOKEN} is the cat?`,
+    target: 'where',
+    phase: 'trap',
+    template: 'D',
+  },
+  {
+    id: 'dog-ran-there',
+    frame: `The dog ran ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'there',
+    phase: 'trap',
+    template: 'D',
+  },
+  {
+    id: 'sat-then-went',
+    frame: `We sat ${SIMPLE_SENTENCE_GAP_TOKEN} went.`,
+    target: 'then',
+    phase: 'trap',
+    template: 'D',
+  },
+  {
+    id: 'cats-were-shed',
+    frame: `The cats ${SIMPLE_SENTENCE_GAP_TOKEN} in the shed.`,
+    target: 'were',
+    phase: 'trap',
+    template: 'D',
+  },
+  {
+    id: 'where-man-go',
+    frame: `${SIMPLE_SENTENCE_GAP_TOKEN} did the man go?`,
+    target: 'where',
+    phase: 'trap',
+    template: 'D',
+  },
+  // Template E — subject + is/was + adjective
+  {
+    id: 'cat-is-big',
+    frame: `The cat is ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'big',
+    phase: 'trap',
+    template: 'E',
+  },
+  {
+    id: 'mat-is-red',
+    frame: `The mat is ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'red',
+    phase: 'trap',
+    template: 'E',
+  },
+  {
+    id: 'sun-is-hot',
+    frame: `The sun is ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'hot',
+    phase: 'trap',
+    template: 'E',
+  },
+  {
+    id: 'he-was-sad',
+    frame: `He was ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'sad',
+    phase: 'trap',
+    template: 'E',
+  },
+  {
+    id: 'she-is-mad',
+    frame: `She is ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'mad',
+    phase: 'trap',
+    template: 'E',
+  },
+  {
+    id: 'dog-was-fat',
+    frame: `The dog was ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'fat',
+    phase: 'trap',
+    template: 'E',
+  },
+  // Template F — subject + verb (common verb sight words)
+  {
+    id: 'man-can-run',
+    frame: `The man can ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'run',
+    phase: 'trap',
+    template: 'F',
+  },
+  {
+    id: 'we-can-see',
+    frame: `We can ${SIMPLE_SENTENCE_GAP_TOKEN} the dog.`,
+    target: 'see',
+    phase: 'trap',
+    template: 'F',
+  },
+  {
+    id: 'go-there',
+    frame: `I can go ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'there',
+    phase: 'trap',
+    template: 'F',
+  },
+  {
+    id: 'do-not-run',
+    frame: `Do not ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'run',
+    phase: 'trap',
+    template: 'F',
+  },
+  {
+    id: 'she-did-not-go',
+    frame: `She did not ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'go',
+    phase: 'trap',
+    template: 'F',
+  },
+  {
+    id: 'we-can-go-there',
+    frame: `We can go ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'there',
+    phase: 'trap',
+    template: 'F',
+  },
+  // Template G — digraph words as content nouns
+  {
+    id: 'see-ship',
+    frame: `I see a ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'ship',
+    phase: 'trap',
+    template: 'G',
+  },
+  {
+    id: 'cat-ran-to-shed',
+    frame: `The cat ran to the ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'shed',
+    phase: 'trap',
+    template: 'G',
+  },
+  {
+    id: 'she-in-shop-noun',
+    frame: `She is in the ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'shop',
+    phase: 'trap',
+    template: 'G',
+  },
+  {
+    id: 'he-has-chip',
+    frame: `He has a ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'chip',
+    phase: 'trap',
+    template: 'G',
+  },
+  // Template A/E extras to round the pool to 40
+  {
+    id: 'cat-sat',
+    frame: `The cat ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'sat',
+    phase: 'trap',
+    template: 'A',
+  },
+  {
+    id: 'she-ran',
+    frame: `She ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'ran',
+    phase: 'trap',
+    template: 'A',
+  },
+  {
+    id: 'he-sat',
+    frame: `He ${SIMPLE_SENTENCE_GAP_TOKEN}.`,
+    target: 'sat',
+    phase: 'trap',
+    template: 'A',
+  },
+  {
+    id: 'dog-ran-out-there',
+    frame: `We can go ${SIMPLE_SENTENCE_GAP_TOKEN} then.`,
+    target: 'there',
+    phase: 'trap',
+    template: 'D',
+  },
+] as const
+
+/** The 8 gentle-phase sentence ids (scene-bearing) — the source list for
+ *  Thomas's MJ scene pack (`scene-<id>.svg`) and the browser-side
+ *  `SIMPLE_SENTENCE_SCENES` registry the parser uses to derive `sceneId`.
+ *  Computed from the pool so the two never drift. */
+export const WORD_SONG_SIMPLE_SENTENCE_SCENE_IDS: readonly string[] =
+  WORD_SONG_SIMPLE_SENTENCES.filter((s) => s.phase === 'gentle').map(
+    (s) => s.id,
+  )
+
+/** Gentle-phase sentences formatted for the planner directive — one
+ *  bullet per sentence with its id + frame + target. The directive names
+ *  these as the ONLY problems-1–3 candidates (Templates A/B). */
+export const WORD_SONG_SIMPLE_SENTENCES_GENTLE_FOR_PROMPT =
+  WORD_SONG_SIMPLE_SENTENCES.filter((s) => s.phase === 'gentle')
+    .map((s) => `  - [${s.id}] "${s.frame}" → ${s.target}`)
+    .join('\n')
+
+/** Trap-phase sentences formatted for the planner directive — one bullet
+ *  per sentence. The directive draws problems 4–8 from these. */
+export const WORD_SONG_SIMPLE_SENTENCES_TRAP_FOR_PROMPT =
+  WORD_SONG_SIMPLE_SENTENCES.filter((s) => s.phase === 'trap')
+    .map((s) => `  - [${s.id}] "${s.frame}" → ${s.target}`)
+    .join('\n')

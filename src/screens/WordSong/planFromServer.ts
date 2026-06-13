@@ -59,7 +59,13 @@ import {
   type WordSongSessionPlan,
   type WordSongUtteranceSlot,
 } from './wordSessionPlans'
-import { TARGET_WORDS, getWordEntry, type WordEntry } from './wordPack'
+import {
+  SIMPLE_SENTENCE_TARGET_SET,
+  TARGET_WORDS,
+  getWordEntry,
+  sceneIdForFrame,
+  type WordEntry,
+} from './wordPack'
 import {
   LETTER_SOUND_MNEMONIC_POOL,
   LETTER_SOUND_MNEMONIC_TO_LETTER,
@@ -159,6 +165,136 @@ const ALL_SLOTS: readonly WordSongUtteranceSlot[] = [
   'giveAnswer',
 ]
 
+/**
+ * Simple-sentences tier (Wave 13, ticket 86ca8e6fr) — the LAST Word Song
+ * content tier. THIS TIER BREAKS THE "capture the read token, look it up"
+ * pattern every prior tier uses (Kyle spec §1.2 — the HIGH-RISK SEAM).
+ *
+ * The read line is `"Finish the sentence: <sentence>."` where `<sentence>`
+ * carries the gap word replaced by the literal token `___` (three ASCII
+ * underscores). Emma must NOT say the answer aloud (cloze), so the read
+ * line does NOT carry the target — it carries `___` at the gap. The target
+ * is therefore resolved from the `correct` utterance (`"Yes! <Word>."`),
+ * mirroring every tier's stable target encoding.
+ *
+ * So unlike `parseReadLine` (which returns `{entry, contentType}` from the
+ * read alone), the simple-sentence path needs BOTH the `read` (for the
+ * `Finish the sentence:` discriminant + the `sentenceFrame` + the derived
+ * `sceneId`) AND the `correct` (for the target word). It runs at the
+ * per-problem assembly level where both slots are in hand.
+ */
+
+/** Discriminant: matches `"Finish the sentence: <sentence>."`. Group 1 is
+ *  the full `<sentence>` (gap token preserved). The verb phrase
+ *  `Finish the sentence:` is distinct from `Tap the` / `Read the` /
+ *  `Which letter says` / `Find the word:`, so dispatch order is NOT
+ *  load-bearing — same property the `sight-word` template has. The
+ *  sentence may end in `.` or `?` (Template-D question frames). */
+const SIMPLE_SENTENCE_READ_PATTERN =
+  /^\s*finish\s+the\s+sentence:\s+(.+?[.?])\s*$/i
+
+/** Discriminant: matches the `correct` template `"Yes! <Word>."` — the
+ *  capitalised target with a trailing period (identical shape to the
+ *  sight-words / CVC `correct`). Group 1 is the target word. */
+const SIMPLE_SENTENCE_CORRECT_PATTERN = /^\s*yes!\s+([a-z]+)\.?\s*$/i
+
+/** The literal gap token in the displayed `sentenceFrame` (three ASCII
+ *  underscores). The cloze invariant (Kyle §1.2) is EXACTLY ONE per
+ *  sentence; zero or two+ is a malformed cloze → throw. */
+const SIMPLE_SENTENCE_GAP_TOKEN = '___'
+
+/** Count `___` gap-token occurrences in a sentence frame. */
+function countGapTokens(frame: string): number {
+  return frame.split(SIMPLE_SENTENCE_GAP_TOKEN).length - 1
+}
+
+/**
+ * The parsed result of a simple-sentence problem: the target entry
+ * (resolved from `correct`), plus the per-problem display carriers
+ * (`sentenceFrame` with `___` preserved, derived `sceneId`).
+ */
+interface ParsedSimpleSentence {
+  entry: WordEntry
+  sentenceFrame: string
+  sceneId: string | undefined
+}
+
+/**
+ * Parse a simple-sentence problem from its `read` + `correct` slots.
+ *
+ * @throws {PlanFromServerError} if the read isn't a `Finish the sentence:`
+ *   line, the frame doesn't carry EXACTLY ONE `___` gap, the `correct`
+ *   isn't a `Yes! <Word>.` line, or the target word isn't a known wordPack
+ *   target.
+ */
+function parseSimpleSentenceProblem(
+  read: string,
+  correct: string,
+): ParsedSimpleSentence {
+  const readMatch = read.match(SIMPLE_SENTENCE_READ_PATTERN)
+  if (!readMatch) {
+    throw new PlanFromServerError(
+      `word-song simple-sentence read line "${read}" did not match the ` +
+        `"Finish the sentence: <sentence>." template`,
+    )
+  }
+  const sentenceFrame = readMatch[1]!.trim()
+
+  // Cloze invariant — EXACTLY ONE gap token. A blending-cv stub read
+  // ("Tap the cat.") carries ZERO; a malformed double-gap carries 2+.
+  const gapCount = countGapTokens(sentenceFrame)
+  if (gapCount !== 1) {
+    throw new PlanFromServerError(
+      `word-song simple-sentence frame "${sentenceFrame}" must contain ` +
+        `exactly one "${SIMPLE_SENTENCE_GAP_TOKEN}" gap token, found ${gapCount}`,
+    )
+  }
+
+  // Target resolution — from `correct`, NEVER the gapped read line
+  // (Kyle §1.2). This is the load-bearing parser divergence.
+  const correctMatch = correct.match(SIMPLE_SENTENCE_CORRECT_PATTERN)
+  if (!correctMatch) {
+    throw new PlanFromServerError(
+      `word-song simple-sentence correct line "${correct}" did not match ` +
+        `the "Yes! <Word>." template — the target word is resolved from ` +
+        `correct (the read line gaps the answer), so this is required`,
+    )
+  }
+  const word = correctMatch[1]!.toLowerCase()
+  // Membership is by the SIMPLE-SENTENCE pool, NOT the CVC `TARGET_WORD_SET`
+  // — several valid gap targets (e.g. `sat`) are distractor-only entries in
+  // their home tier but legitimate targets here (Kyle §1.2, wordPack note).
+  if (!SIMPLE_SENTENCE_TARGET_SET.has(word)) {
+    throw new PlanFromServerError(
+      `word-song simple-sentence correct line "${correct}" yielded ` +
+        `non-target word "${word}"`,
+    )
+  }
+  let entry: WordEntry
+  try {
+    entry = getWordEntry(word)
+  } catch (err) {
+    throw new PlanFromServerError(
+      `word-song simple-sentence wordPack lookup failed for "${word}": ` +
+        `${err instanceof Error ? err.message : String(err)}`,
+    )
+  }
+
+  // Derive the gentle-phase sceneId from the frame (Kyle §1.3 — the wire
+  // is utterance-only, so the parser derives it). Absent → undefined →
+  // text-only render (trap phase OR missing scene — one predicate).
+  const sceneId = sceneIdForFrame(sentenceFrame)
+
+  return { entry, sentenceFrame, sceneId }
+}
+
+/** Does a read line carry the `Finish the sentence:` discriminant? Used at
+ *  the assembly level to route to the simple-sentence path before the
+ *  generic `parseReadLine`. */
+function isSimpleSentenceRead(read: string): boolean {
+  return SIMPLE_SENTENCE_READ_PATTERN.test(read)
+}
+
 /** The 14 target words for level 1, lower-cased keyed for fast membership
  *  test. Mirrors `api/_plannerWordList.ts` and the `isTarget: true` rows
  *  in `wordPack.ts`. We cross-check against this set rather than against
@@ -231,6 +367,27 @@ export function wordSongSessionPlanFromServer(
       }
     }
     const utterances = bucket as WordSongProblemUtterances
+
+    // Simple-sentence tier (Wave 13) breaks the read-only target pattern:
+    // the read gaps the answer, so the target comes from `correct` and the
+    // frame + sceneId are derived from the read. Route to the dedicated
+    // path before the generic `parseReadLine` (Kyle spec §1.2).
+    if (isSimpleSentenceRead(utterances.read)) {
+      const { entry, sentenceFrame, sceneId } = parseSimpleSentenceProblem(
+        utterances.read,
+        utterances.correct,
+      )
+      problems.push({
+        index,
+        target: entry,
+        utterances,
+        contentType: 'simple-sentence',
+        sentenceFrame,
+        sceneId,
+      })
+      continue
+    }
+
     const { entry: target, contentType } = parseReadLine(utterances.read)
     problems.push({
       index,

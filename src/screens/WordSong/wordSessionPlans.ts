@@ -160,6 +160,38 @@ export interface WordSongProblemUtterances {
  *   decoding beat) is Devon's W11-03 and consumes this discriminant.
  *   Companion canon at `public/canon/word-song/level-1/sight-words.json`.
  *
+ * `simple-sentence` — sentence-COMPLETION (cloze) tier (Wave 13, ticket
+ *   86ca8e6fr). The LAST Word Song content tier — terminal node of
+ *   `WORD_SONG_NODES_IN_ORDER`. Read line is "Finish the sentence:
+ *   <sentence>." where `<sentence>` carries the gap word replaced by the
+ *   literal token `___` (three ASCII underscores), e.g. "Finish the
+ *   sentence: The cat ___ the mat." Emma reads the gapped sentence aloud
+ *   (the TTS substitutes the spoken word "blank" for `___` so Azure
+ *   renders natural prosody — the canon read text carries the "blank"
+ *   form, the displayed `sentenceFrame` carries `___`). Marian taps the
+ *   written-word chip that fills the gap (written-word chips, same shape
+ *   as `sight-word` — NO picture, NO decoding beat).
+ *
+ *   STRUCTURAL DIVERGENCE — target resolution. UNLIKE every prior tier,
+ *   the read line does NOT carry the answer (Emma must not speak the
+ *   answer aloud — that would defeat the cloze). The target word is
+ *   resolved from the `correct` utterance ("Yes! Sat." → `sat`), NOT
+ *   from the gapped read line (Kyle spec §1.2). The read line is parsed
+ *   only to (a) confirm the `Finish the sentence:` discriminant and (b)
+ *   extract the `sentenceFrame` with `___` preserved. See
+ *   `planFromServer.ts` `parseSimpleSentenceProblem` for the seam.
+ *
+ *   Two net-new per-problem carriers — `sentenceFrame` (the full sentence
+ *   with `___`, for display) and `sceneId` (the gentle-phase scene asset
+ *   key). Both live on `WordSongProblem`, NOT `WordEntry` (the same target
+ *   word appears in many different frames / scenes — per-problem, not
+ *   per-word). The wire stays utterance-only (planner-and-canon.md "Wire
+ *   shape is utterance-only — invariant"): the parser DERIVES both from
+ *   the read line at parse time (`sentenceFrame` is the stripped read
+ *   text; `sceneId` is looked up from the gentle-phase sentence registry
+ *   in `wordPack.ts` keyed on the frame). Companion canon at
+ *   `public/canon/word-song/level-1/simple-sentences.json`.
+ *
  * The field is optional on the public type for back-compat: callers that
  * predate the widening (e.g. `STATIC_WORD_SONG_PLANS`) don't set it, and
  * downstream code treats the absence as `blending-cv`. The parser always
@@ -172,6 +204,7 @@ export type WordSongContentType =
   | 'letter-names'
   | 'letter-sounds'
   | 'sight-word'
+  | 'simple-sentence'
 
 /** A single problem in the session. */
 export interface WordSongProblem {
@@ -187,6 +220,30 @@ export interface WordSongProblem {
    * sets it explicitly.
    */
   contentType?: WordSongContentType
+  /**
+   * The full gapped sentence with the `___` token preserved, for display
+   * (`simple-sentence` tier ONLY — Wave 13, ticket 86ca8e6fr). e.g.
+   * `"The cat ___ the mat."`. The render (Devon's W13-04 branch) shows
+   * this in the sentence panel with the `___` rendered as a styled blank
+   * underline. `undefined` for every other content type (back-compat —
+   * same posture as `contentType?`). Lives on the problem, NOT
+   * `WordEntry` (the frame is per-problem; the same target word appears
+   * in many frames). See Kyle spec §1.1.
+   */
+  sentenceFrame?: string
+  /**
+   * The gentle-phase scene asset key (`simple-sentence` tier ONLY —
+   * Wave 13). Devon's render resolves it via `SCENE_PICTURES[sceneId]`
+   * → `public/assets/scenes/scene-<sceneId>.svg`, with a graceful
+   * text-only fallback when the asset is absent. Present only on
+   * gentle-phase problems (the scene-registered sentences); `undefined`
+   * on trap-phase problems and every other content type — so `sceneId`
+   * absence is BOTH the trap-phase signal AND the missing-asset fallback
+   * (one predicate, no special-casing). The parser DERIVES it from the
+   * frame via the gentle-phase sentence registry in `wordPack.ts` (the
+   * wire is utterance-only). See Kyle spec §1.3.
+   */
+  sceneId?: string
 }
 
 /** A full Word Song session plan — exactly 8 problems, all short-a CVC. */

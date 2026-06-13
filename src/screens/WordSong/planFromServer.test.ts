@@ -1401,3 +1401,184 @@ describe('parseReadLine — letter-sounds template does NOT shadow word-tier tem
     expect(parseReadTarget('Tap the bat.').word).toBe('bat')
   })
 })
+
+/**
+ * Simple-sentences tier (Wave 13, ticket 86ca8e6fr) — the HIGH-RISK SEAM.
+ *
+ * This tier breaks the "capture the read token, look it up" pattern: the
+ * read line gaps the answer with `___`, so the target is resolved from the
+ * `correct` line ("Yes! <Word>.") NOT the read (Kyle spec §1.2). These
+ * tests pin: (a) the discriminant fires `contentType: 'simple-sentence'`,
+ * (b) `sentenceFrame` carries `___` verbatim, (c) target resolves from
+ * `correct`, (d) the single-gap cloze invariant throws on 0 / 2+ gaps,
+ * (e) `sceneId` derives for gentle frames and is `undefined` for trap.
+ */
+describe('wordSongSessionPlanFromServer — simple-sentence tier (W13, 86ca8e6fr)', () => {
+  /** Build an 8-problem simple-sentence wire response from frame/target
+   *  pairs. The `read` carries the `___` data token (the canon stores the
+   *  spoken-"blank" form for TTS, but the parser pins the `___` data form;
+   *  this fixture uses `___` to exercise the parser contract). */
+  function buildSimpleSentenceWire(
+    pairs: ReadonlyArray<{ frame: string; target: string }>,
+  ) {
+    return {
+      id: 'simple-sentences-warm-up',
+      label: 'Simple sentences — warm up',
+      utterances: pairs.flatMap(({ frame, target }, i) => {
+        const n = i + 1
+        const cap = target.charAt(0).toUpperCase() + target.slice(1)
+        return [
+          { id: `word.p${n}.read`, text: `Finish the sentence: ${frame}` },
+          { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          {
+            id: `word.p${n}.hint`,
+            text: `Listen. ${frame.replace('___', target)}`,
+          },
+          { id: `word.p${n}.giveAnswer`, text: `This one is ${target}.` },
+        ]
+      }),
+    }
+  }
+
+  const EIGHT_PAIRS: ReadonlyArray<{ frame: string; target: string }> = [
+    { frame: 'The cat ___ the mat.', target: 'sat' }, // gentle scene
+    { frame: 'The dog ___.', target: 'ran' }, // gentle scene
+    { frame: 'I see the ___.', target: 'dog' }, // gentle scene
+    { frame: 'The sun is ___.', target: 'hot' }, // trap (no scene)
+    { frame: '___ are in the van.', target: 'they' }, // trap, leading gap
+    { frame: 'Put it ___ the mat.', target: 'on' }, // trap
+    { frame: 'The mat is ___.', target: 'red' }, // trap
+    { frame: 'We can go ___.', target: 'there' }, // trap
+  ]
+
+  it('routes "Finish the sentence:" to contentType: simple-sentence with the frame preserved', () => {
+    const plan = wordSongSessionPlanFromServer(
+      buildSimpleSentenceWire(EIGHT_PAIRS),
+    )
+    expect(plan.problems).toHaveLength(8)
+    for (const problem of plan.problems) {
+      expect(problem.contentType).toBe('simple-sentence')
+    }
+    // Frame carries the `___` gap token verbatim (for the styled-blank
+    // render), NOT the spoken "blank" substitution.
+    expect(plan.problems[0]!.sentenceFrame).toBe('The cat ___ the mat.')
+    expect(plan.problems[4]!.sentenceFrame).toBe('___ are in the van.')
+  })
+
+  it('resolves the target from the `correct` line, NOT the gapped read line (Kyle §1.2)', () => {
+    const plan = wordSongSessionPlanFromServer(
+      buildSimpleSentenceWire(EIGHT_PAIRS),
+    )
+    // The read line carries `___` at the gap — the answer is never spoken.
+    // The target MUST come from "Yes! Sat." → sat.
+    expect(plan.problems[0]!.target.word).toBe('sat')
+    expect(plan.problems[1]!.target.word).toBe('ran')
+    expect(plan.problems[4]!.target.word).toBe('they')
+    // Every resolved target is a real wordPack entry (no synthesized
+    // sentinel — sight-word precedent).
+    for (const problem of plan.problems) {
+      expect(problem.target.word).toBe(problem.target.word.toLowerCase())
+    }
+  })
+
+  it('derives sceneId for gentle-phase frames and undefined for trap frames (Kyle §1.3)', () => {
+    const plan = wordSongSessionPlanFromServer(
+      buildSimpleSentenceWire(EIGHT_PAIRS),
+    )
+    // Gentle scenes — sceneId resolves from the frame registry.
+    expect(plan.problems[0]!.sceneId).toBe('cat-sat-mat')
+    expect(plan.problems[1]!.sceneId).toBe('dog-ran')
+    expect(plan.problems[2]!.sceneId).toBe('see-dog')
+    // Trap frames — no scene registered → undefined (text-only render).
+    expect(plan.problems[3]!.sceneId).toBeUndefined()
+    expect(plan.problems[4]!.sceneId).toBeUndefined()
+    expect(plan.problems[7]!.sceneId).toBeUndefined()
+  })
+
+  it('throws when a frame carries ZERO gap tokens (blending-cv stub leak)', () => {
+    // A blending-cv stub read ("Tap the cat.") would never match the
+    // discriminant, but a malformed planner emission of "Finish the
+    // sentence: The cat sat." (no gap) must throw, not silently render.
+    const bad = buildSimpleSentenceWire([
+      { frame: 'The cat sat.', target: 'sat' }, // ZERO gaps
+      ...EIGHT_PAIRS.slice(1),
+    ])
+    expect(() => wordSongSessionPlanFromServer(bad)).toThrow(
+      /exactly one "___" gap token, found 0/,
+    )
+  })
+
+  it('throws when a frame carries TWO gap tokens (malformed double cloze)', () => {
+    const bad = buildSimpleSentenceWire([
+      { frame: 'The ___ sat ___.', target: 'cat' }, // TWO gaps
+      ...EIGHT_PAIRS.slice(1),
+    ])
+    expect(() => wordSongSessionPlanFromServer(bad)).toThrow(
+      /exactly one "___" gap token, found 2/,
+    )
+  })
+
+  it('throws when the `correct` line is off-template (cannot resolve target)', () => {
+    const wire = buildSimpleSentenceWire(EIGHT_PAIRS)
+    const broken = {
+      ...wire,
+      utterances: wire.utterances.map((u) =>
+        u.id === 'word.p1.correct'
+          ? { ...u, text: "Yes! That's a cat." } // article-led, off-template
+          : u,
+      ),
+    }
+    expect(() => wordSongSessionPlanFromServer(broken)).toThrow(
+      /did not match the "Yes! <Word>." template/,
+    )
+  })
+
+  it('throws when the `correct` line names a non-target word', () => {
+    const bad = buildSimpleSentenceWire([
+      { frame: 'The cat ___ the mat.', target: 'zzz' }, // not a pack target
+      ...EIGHT_PAIRS.slice(1),
+    ])
+    expect(() => wordSongSessionPlanFromServer(bad)).toThrow(
+      /yielded non-target word "zzz"/,
+    )
+  })
+
+  it('parses a question-form deferral frame (Template D — ends with ?)', () => {
+    const plan = wordSongSessionPlanFromServer(
+      buildSimpleSentenceWire([
+        { frame: '___ is the cat?', target: 'where' },
+        ...EIGHT_PAIRS.slice(1),
+      ]),
+    )
+    expect(plan.problems[0]!.contentType).toBe('simple-sentence')
+    expect(plan.problems[0]!.sentenceFrame).toBe('___ is the cat?')
+    expect(plan.problems[0]!.target.word).toBe('where')
+  })
+
+  it('resolves all 5 inherited deferrals (they/there/where/were/then) as targets', () => {
+    const deferrals: ReadonlyArray<{ frame: string; target: string }> = [
+      { frame: '___ are in the van.', target: 'they' },
+      { frame: 'The dog ran ___.', target: 'there' },
+      { frame: '___ is the cat?', target: 'where' },
+      { frame: 'The cats ___ in the shed.', target: 'were' },
+      { frame: 'We sat ___ went.', target: 'then' },
+      { frame: 'The cat ___ the mat.', target: 'sat' },
+      { frame: 'The sun is ___.', target: 'hot' },
+      { frame: 'The mat is ___.', target: 'red' },
+    ]
+    const plan = wordSongSessionPlanFromServer(
+      buildSimpleSentenceWire(deferrals),
+    )
+    expect(plan.problems.map((p) => p.target.word)).toEqual([
+      'they',
+      'there',
+      'where',
+      'were',
+      'then',
+      'sat',
+      'hot',
+      'red',
+    ])
+  })
+})
