@@ -2196,8 +2196,15 @@ function SentencePanel({
   filled: boolean
   reducedMotion: boolean
 }) {
-  // Split the frame into whitespace tokens, keeping the gap token as one
-  // unit. e.g. "The cat ___ the mat." → ["The","cat","___","the","mat."].
+  // Split the frame into whitespace tokens. The gap token "___" may carry
+  // ATTACHED punctuation when it sits at a clause edge — e.g. "The dog ___."
+  // → ["The","dog","___."] (trailing period) or a question frame's gap may
+  // carry a trailing "?". Splitting only on whitespace keeps each visual
+  // word as one token; the per-token render below detects the "___"
+  // SUBSTRING and peels the surrounding punctuation off so the styled blank
+  // renders with the punctuation as plain text beside it. (A naive
+  // `token === '___'` equality misses "___." — the bug Jessica's W13-05
+  // test 3 catches.)
   const tokens = frame.split(/\s+/).filter(Boolean)
   return (
     <m.div
@@ -2224,9 +2231,15 @@ function SentencePanel({
       >
         {tokens.map((token, i) => {
           const revealed = i < revealedCount
-          const isGap = token === SENTENCE_GAP_TOKEN
+          const gapAt = token.indexOf(SENTENCE_GAP_TOKEN)
+          const isGap = gapAt !== -1
           const marginRight = i === tokens.length - 1 ? 0 : '0.3em'
           if (isGap) {
+            // Peel any punctuation attached to the gap token (e.g. the
+            // trailing "." in "___." or "?" in "___?") so the styled blank
+            // renders, then the punctuation as plain text after it.
+            const before = token.slice(0, gapAt)
+            const after = token.slice(gapAt + SENTENCE_GAP_TOKEN.length)
             return (
               <m.span
                 key={`gap-${i}`}
@@ -2238,6 +2251,7 @@ function SentencePanel({
                 animate={{ opacity: revealed ? 1 : 0 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
               >
+                {before}
                 {filled ? (
                   /* Gap fills with the target word in place — the closure
                      beat (Kyle §3.2). Same ink weight as the rest of the
@@ -2272,6 +2286,7 @@ function SentencePanel({
                     {' '}
                   </span>
                 )}
+                {after}
               </m.span>
             )
           }

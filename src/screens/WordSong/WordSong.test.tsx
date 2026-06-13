@@ -2492,6 +2492,58 @@ describe('Word Song screen', () => {
     })
 
     /**
+     * Regression — the gap token may carry ATTACHED punctuation when it
+     * sits at a clause edge ("The dog ___." → token "___."). A naive
+     * `token === '___'` equality misses that and renders the literal
+     * "___." as plain text with no styled gap (Jessica's W13-05 test 3
+     * caught this). The render must detect the "___" substring and peel
+     * the punctuation. This plan's problem 2 is "The dog ___." — exactly
+     * the attached-period shape.
+     */
+    it('renders the styled gap even when punctuation is attached to the gap token', () => {
+      // A single-problem plan whose ONLY problem has an attached-period gap.
+      const plan: WordSongSessionPlan = {
+        id: 'test-attached-gap',
+        label: 'attached-gap',
+        problems: Array.from({ length: 8 }, (_, i) => {
+          const entry = getWordEntry('ran')
+          return {
+            index: i + 1,
+            target: entry,
+            contentType: 'simple-sentence' as const,
+            sentenceFrame: 'The dog ___.', // gap carries the trailing period
+            utterances: {
+              read: 'Finish the sentence: The dog ___.',
+              correct: 'Yes! Ran.',
+              reprompt: 'Hmm... try again?',
+              hint: 'Listen. The dog ran.',
+              giveAnswer: 'This one is ran.',
+            },
+          }
+        }),
+      }
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={plan}
+            playUtterance={makePlayHarness().playUtterance}
+            audioReady={true}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      // The styled gap is present (not swallowed into a plain "___." word).
+      const gaps = screen.getAllByTestId('word-song-sentence-gap')
+      expect(gaps).toHaveLength(1)
+      // The literal "___" never reaches the DOM as visible text.
+      expect(
+        screen.getByTestId('word-song-sentence-panel').textContent,
+      ).not.toContain('___')
+    })
+
+    /**
      * Mechanic assertion C — chips render as written-word text (no
      * picture SVG), reusing the sight-words chip shape (Kyle §3.3 / §7 Q5).
      * 3 chips; each chip's text contains its data-word.
