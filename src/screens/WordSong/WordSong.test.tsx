@@ -2271,7 +2271,7 @@ describe('Word Song screen', () => {
      * error chime, no red X). Same invariant the CVC tiers hold; sight
      * words inherit it through the shared chip-frame code path.
      */
-    it('never a red X — wrong tap leaves chips tappable and shows puzzled-tilt', () => {
+    it('never a red X — wrong tap leaves chips tappable and shows puzzled-tilt', async () => {
       render(
         withMotion(
           <WordSong
@@ -2289,8 +2289,16 @@ describe('Word Song screen', () => {
         .find((c) => c.getAttribute('data-correct') === 'false')
       expect(wrongChip).toBeDefined()
 
-      act(() => {
+      // The wrong tap kicks the reprompt utterance, whose onPlay + microtask
+      // resolution drives the puzzled-tilt pose swap. That state update lands
+      // asynchronously, so an async act() with a microtask drain is needed to
+      // keep it inside the act boundary — a synchronous act() lets the pose
+      // swap escape and emits a React act(...) warning. Mirrors the
+      // await-act + Promise.resolve() pattern used by every other chip-tap
+      // test in this file.
+      await act(async () => {
         fireEvent.click(wrongChip!)
+        await Promise.resolve()
       })
 
       // Emma reacts in character — puzzled-tilt, not a red X. During the
