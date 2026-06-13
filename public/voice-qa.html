@@ -579,9 +579,10 @@
         'other',
       ]
 
-      // Canon files — 11 math + 12 word-song. Iterated in alphabetical
+      // Canon files — 11 math + 14 word-song. Iterated in alphabetical
       // (group, file-stem) order so the dedup canonical-member choice is
-      // deterministic across runs.
+      // deterministic across runs. word-song order also matches
+      // WORD_SONG_NODES_IN_ORDER (sight-words then simple-sentences last).
       const CANON_FILES = [
         // math/level-1
         ['math', 'add-to-10'],
@@ -608,6 +609,8 @@
         ['word-song', 'letter-names'],
         ['word-song', 'letter-sounds'],
         ['word-song', 'letter-sounds-audit'],
+        ['word-song', 'sight-words'],
+        ['word-song', 'simple-sentences'],
       ]
 
       // Greet + Hub MP3 manifests. Text mirrors src/lib/audio/preRecorded.ts
