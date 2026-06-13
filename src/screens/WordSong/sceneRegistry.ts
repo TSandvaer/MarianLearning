@@ -9,19 +9,21 @@
  */
 
 /**
- * sceneId → on-disk scene SVG URL. EMPTY until Thomas's MJ scene pack
- * ships (the gentle-phase scenes are an asset dispatch, not code). Add one
- * row per gentle `sceneId` as assets land, e.g.:
- *
- *   'cat-sat-mat': '/assets/scenes/scene-cat-sat-mat.svg',
- *
- * The 8 gentle `sceneId`s the parser may emit (per the gentle rows of
- * `WORD_SONG_SIMPLE_SENTENCES`): cat-sat-mat, dog-ran, man-ran, see-dog,
- * she-has-bag, cat-sat-prep, dog-ran-in, he-can-see. A `sceneId` absent
- * here → text-only render (graceful fallback).
+ * sceneId → on-disk scene SVG URL. Populated with Thomas's Wave-13
+ * gentle-phase scene pack (8 scenes; PNG-in-SVG embeds via the picture-pack
+ * pipeline). One row per gentle `sceneId` the parser may emit (per the
+ * gentle rows of `WORD_SONG_SIMPLE_SENTENCES`). A `sceneId` absent here →
+ * text-only render (graceful fallback).
  */
 export const SCENE_PICTURES: Readonly<Record<string, string>> = {
-  // (intentionally empty — populated as Thomas's MJ scene pack lands)
+  'cat-sat-mat': '/assets/scenes/scene-cat-sat-mat.svg',
+  'dog-ran': '/assets/scenes/scene-dog-ran.svg',
+  'man-ran': '/assets/scenes/scene-man-ran.svg',
+  'see-dog': '/assets/scenes/scene-see-dog.svg',
+  'she-has-bag': '/assets/scenes/scene-she-has-bag.svg',
+  'cat-sat-prep': '/assets/scenes/scene-cat-sat-prep.svg',
+  'dog-ran-in': '/assets/scenes/scene-dog-ran-in.svg',
+  'he-can-see': '/assets/scenes/scene-he-can-see.svg',
 }
 
 /**
