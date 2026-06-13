@@ -553,9 +553,15 @@ export const SIMPLE_SENTENCE_GAP_TOKEN = '___'
 export const WORD_SONG_SIMPLE_SENTENCES: readonly SimpleSentenceEntry[] = [
   // ── Gentle phase (Templates A/B — SV / SVO; scene present) ──────────
   {
+    // sceneId retained as `cat-sat-mat` (stable MJ-pack key) even though
+    // the frame/target changed: the original "The cat ___ the mat." → "sat"
+    // completed to the UNGRAMMATICAL "The cat sat the mat" (sat is
+    // intransitive). Reframed to a transitive SVO that keeps Template B
+    // grammatical — "The cat bit the bag." (Dave-ruled, Thomas-approved,
+    // ear-test GH issue #429). The scene asset rename is OUT of scope.
     id: 'cat-sat-mat',
-    frame: `The cat ${SIMPLE_SENTENCE_GAP_TOKEN} the mat.`,
-    target: 'sat',
+    frame: `The cat ${SIMPLE_SENTENCE_GAP_TOKEN} the bag.`,
+    target: 'bit',
     phase: 'gentle',
     template: 'B',
   },

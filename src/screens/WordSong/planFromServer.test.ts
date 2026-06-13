@@ -1442,7 +1442,7 @@ describe('wordSongSessionPlanFromServer — simple-sentence tier (W13, 86ca8e6fr
   }
 
   const EIGHT_PAIRS: ReadonlyArray<{ frame: string; target: string }> = [
-    { frame: 'The cat ___ the mat.', target: 'sat' }, // gentle scene
+    { frame: 'The cat ___ the bag.', target: 'bit' }, // gentle scene (cat-sat-mat sceneId; #429 grammar fix)
     { frame: 'The dog ___.', target: 'ran' }, // gentle scene
     { frame: 'I see the ___.', target: 'dog' }, // gentle scene
     { frame: 'The sun is ___.', target: 'hot' }, // trap (no scene)
@@ -1462,7 +1462,7 @@ describe('wordSongSessionPlanFromServer — simple-sentence tier (W13, 86ca8e6fr
     }
     // Frame carries the `___` gap token verbatim (for the styled-blank
     // render), NOT the spoken "blank" substitution.
-    expect(plan.problems[0]!.sentenceFrame).toBe('The cat ___ the mat.')
+    expect(plan.problems[0]!.sentenceFrame).toBe('The cat ___ the bag.')
     expect(plan.problems[4]!.sentenceFrame).toBe('___ are in the van.')
   })
 
@@ -1471,8 +1471,8 @@ describe('wordSongSessionPlanFromServer — simple-sentence tier (W13, 86ca8e6fr
       buildSimpleSentenceWire(EIGHT_PAIRS),
     )
     // The read line carries `___` at the gap — the answer is never spoken.
-    // The target MUST come from "Yes! Sat." → sat.
-    expect(plan.problems[0]!.target.word).toBe('sat')
+    // The target MUST come from "Yes! Bit." → bit.
+    expect(plan.problems[0]!.target.word).toBe('bit')
     expect(plan.problems[1]!.target.word).toBe('ran')
     expect(plan.problems[4]!.target.word).toBe('they')
     // Every resolved target is a real wordPack entry (no synthesized
@@ -1536,7 +1536,7 @@ describe('wordSongSessionPlanFromServer — simple-sentence tier (W13, 86ca8e6fr
 
   it('throws when the `correct` line names a non-target word', () => {
     const bad = buildSimpleSentenceWire([
-      { frame: 'The cat ___ the mat.', target: 'zzz' }, // not a pack target
+      { frame: 'The cat ___ the bag.', target: 'zzz' }, // not a pack target
       ...EIGHT_PAIRS.slice(1),
     ])
     expect(() => wordSongSessionPlanFromServer(bad)).toThrow(
@@ -1563,7 +1563,7 @@ describe('wordSongSessionPlanFromServer — simple-sentence tier (W13, 86ca8e6fr
       { frame: '___ is the cat?', target: 'where' },
       { frame: 'The cats ___ in the shed.', target: 'were' },
       { frame: 'We sat ___ went.', target: 'then' },
-      { frame: 'The cat ___ the mat.', target: 'sat' },
+      { frame: 'The cat ___.', target: 'sat' }, // grammatical Template A ("The cat sat.")
       { frame: 'The sun is ___.', target: 'hot' },
       { frame: 'The mat is ___.', target: 'red' },
     ]
