@@ -781,9 +781,9 @@ const WORD_SONG_FIRST_CLASS_FOCUS_NODES: readonly string[] = [
   // Wave 13 (ticket 86ca8e6fr) — `simple-sentences`, the sentence-
   // COMPLETION (cloze) tier and the LAST Word Song content tier (terminal
   // node of WORD_SONG_NODES_IN_ORDER). Emma reads a 3–4 word sentence with
-  // one word gapped ("Finish the sentence: The cat ___ the mat."); Marian
+  // one word gapped ("Finish the sentence: The cat ___ the bag."); Marian
   // taps the written-word chip that fills the gap. The target is carried
-  // in the `correct` line ("Yes! Sat.") NOT the gapped read — Emma never
+  // in the `correct` line ("Yes! Bit.") NOT the gapped read — Emma never
   // speaks the answer (cloze). See the SIMPLE-SENTENCES block in
   // `WORD_SONG_TRACK_GUIDE` + `WORD_SONG_SIMPLE_SENTENCES` in
   // `_plannerWordList.ts`. After this tier, EVERY word-song node is
@@ -2105,7 +2105,7 @@ matching that node. Thirteen first-class content modes today:
   - simple-sentences: "Finish the sentence: <sentence>." problems where
     <sentence> is a 3–4 word sentence with ONE word replaced by the gap
     token "___" (three underscores), e.g. "Finish the sentence: The cat
-    ___ the mat." This is the sentence-COMPLETION (cloze) tier and the
+    ___ the bag." This is the sentence-COMPLETION (cloze) tier and the
     LAST whole-Word-Song tier — Marian arrives here after she's mastered
     sight-words. CRITICAL DISTINCTION from EVERY prior tier: Emma must
     NEVER speak the answer word (that defeats the cloze). The answer lives
@@ -2434,8 +2434,8 @@ because the pool is curated; an invented sentence risks an untaught word.
 (2) Read-line template (ALL 8 problems): "Finish the sentence:
 <sentence>." where <sentence> is the chosen row's frame emitted VERBATIM,
 INCLUDING the literal "___" gap token (three underscores) at the gap
-position. E.g. for row [cat-sat-mat] "The cat ___ the mat." emit the read
-text EXACTLY: "Finish the sentence: The cat ___ the mat." Keep the three
+position. E.g. for row [cat-sat-mat] "The cat ___ the bag." emit the read
+text EXACTLY: "Finish the sentence: The cat ___ the bag." Keep the three
 underscores in the read text — do NOT replace them with the answer word,
 and do NOT replace them with the word "blank" (the audio render
 substitutes the spoken word "blank" for the underscores automatically at
@@ -2453,7 +2453,7 @@ the answer word does NOT appear in it.
 
 (4) correct-slot template (simple-sentences ONLY): "Yes! <Word>." —
 capitalised answer word from the chosen row, trailing PERIOD, NO article.
-E.g. for [cat-sat-mat] (answer "sat"): "Yes! Sat." For [they-in-van]
+E.g. for [cat-sat-mat] (answer "bit"): "Yes! Bit." For [they-in-van]
 (answer "they"): "Yes! They." Do NOT use the article-led "Yes! That's a
 <word>." default and do NOT use the bang fallback. The browser RESOLVES
 THE TARGET WORD FROM THIS LINE (the read line gaps it), so the "Yes!
@@ -2462,7 +2462,7 @@ THE TARGET WORD FROM THIS LINE (the read line gaps it), so the "Yes!
 (5) hint-slot template (simple-sentences ONLY): "Listen. <full sentence
 spoken WITH the answer>." — Emma reads the COMPLETE sentence so Marian
 hears the answer word in its syntactic slot. E.g. for [cat-sat-mat]:
-"Listen. The cat sat the mat." This is the cloze scaffold — hearing the
+"Listen. The cat bit the bag." This is the cloze scaffold — hearing the
 target in context is the resolver. (This is the ONE place Emma speaks the
 answer — in the hint, after Marian has already struggled, never in the
 read.)
@@ -3274,7 +3274,7 @@ all other slots are content-mode-agnostic:
   "Look. The." Whole-word only; do NOT hint by sounding out letters.
 - hint (simple-sentences tier): "Listen. <full sentence WITH the answer
   word spoken in place of the gap>." e.g. for [cat-sat-mat]: "Listen.
-  The cat sat the mat." Emma reads the COMPLETE sentence so Marian hears
+  The cat bit the bag." Emma reads the COMPLETE sentence so Marian hears
   the answer in its slot — the cloze scaffold. This is the ONE place the
   answer is spoken (in the hint, after a struggle), NEVER in the read.
   See the SIMPLE-SENTENCES COMPLETION block above.

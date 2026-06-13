@@ -1591,6 +1591,27 @@ export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
     // distractor-only entries (spec §3 — `picture-pat.svg` is a new
     // distractor-only asset).
   },
+  {
+    // `bit` — simple-sentences content-verb gap target for the
+    // `cat-sat-mat` row reframed to "The cat ___ the bag." (ear-test GH
+    // issue #429; the original "The cat ___ the mat." → "sat" completed
+    // to the ungrammatical "The cat sat the mat" since `sat` is
+    // intransitive — a transitive verb keeps Template B's SVO
+    // grammatical). Lives here distractor-only (`isTarget: false`) so it
+    // resolves via `getWordEntry` + `SIMPLE_SENTENCE_TARGET_SET` WITHOUT
+    // joining the CVC `TARGET_WORDS` exhaustiveness scans (no
+    // `TARGET_PAIRINGS` row needed) — exactly the posture `sat` itself
+    // takes as a simple-sentence target. `sightWord: true` + the `sight:`
+    // sentinel pictureKey keep it out of the picture-pack body check; the
+    // simple-sentences chip foils come from the planner-side distractor
+    // table, never from `TARGET_PAIRINGS`. Appended LAST so the digraph
+    // distractor-only grouping (sh/ch/th) stays contiguous.
+    word: 'bit',
+    pictureKey: 'sight:bit',
+    category: 'action',
+    isTarget: false,
+    sightWord: true,
+  },
 ] as const
 
 /** All entries (targets + distractor-only), the full pool for distractor picking. */
@@ -2342,7 +2363,8 @@ export function getWordEntry(word: string): WordEntry {
  */
 export const SIMPLE_SENTENCE_TARGET_SET: ReadonlySet<string> = new Set([
   // Verbs
-  'sat',
+  'sat', // still a target in the `cat-sat` + `he-sat` trap rows
+  'bit', // `cat-sat-mat` gentle frame reframed to "The cat ___ the bag." (#429)
   'ran',
   'run',
   'see',
@@ -2391,7 +2413,11 @@ export function normalizeSentenceFrame(frame: string): string {
  * that row's id, and vice versa) so they never drift.
  */
 export const SIMPLE_SENTENCE_SCENES: Readonly<Record<string, string>> = {
-  [normalizeSentenceFrame('The cat ___ the mat.')]: 'cat-sat-mat',
+  // sceneId stays `cat-sat-mat` (stable MJ-pack key); the frame changed
+  // from "The cat ___ the mat." (target "sat" → ungrammatical "The cat sat
+  // the mat") to the grammatical transitive "The cat ___ the bag." (target
+  // "bit"). Ear-test GH issue #429; Dave-ruled, Thomas-approved.
+  [normalizeSentenceFrame('The cat ___ the bag.')]: 'cat-sat-mat',
   [normalizeSentenceFrame('The dog ___.')]: 'dog-ran',
   [normalizeSentenceFrame('The man ___.')]: 'man-ran',
   [normalizeSentenceFrame('I see the ___.')]: 'see-dog',

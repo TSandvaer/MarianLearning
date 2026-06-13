@@ -379,6 +379,7 @@ describe('digraphs-sh tier — wordPack rows', () => {
       'tin',
       'tick',
       'pat',
+      'bit', // simple-sentences `cat-sat-mat` grammar-fix target (#429)
     ])
   })
 
@@ -627,6 +628,7 @@ describe('digraphs-ch tier — wordPack rows', () => {
       'tin',
       'tick',
       'pat',
+      'bit', // simple-sentences `cat-sat-mat` grammar-fix target (#429)
     ])
   })
 
@@ -897,6 +899,7 @@ describe('digraphs-th tier — wordPack rows', () => {
       'tin',
       'tick',
       'pat',
+      'bit', // simple-sentences `cat-sat-mat` grammar-fix target (#429)
     ])
   })
 

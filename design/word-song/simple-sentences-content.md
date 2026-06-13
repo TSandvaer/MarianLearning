@@ -29,7 +29,7 @@ Per the parallel-shared-concept rule (user-global `CLAUDE.md`): the parser autho
 | -------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **`WordSongContentType` value**              | `'simple-sentence'`                                                        | New member added to the union in `src/screens/WordSong/wordSessionPlans.ts` (`WordSongContentType`). Singular, hyphenated, matches the `cvc-word` / `sight-word` casing precedent.                                                                                                                                                         |
 | **Read-line template (parser discriminant)** | `"Finish the sentence: <sentence>."`                                       | `<sentence>` is the full sentence **with the gap word replaced by the literal gap token** (below). The verb phrase `Finish the sentence:` is the discriminant — distinct from `Tap the` / `Read the` / `Find the word:` so template-match order is NOT load-bearing (same property the `sight-word` template has).                         |
-| **Gap token (in-template, written form)**    | `___` (exactly three ASCII underscores, U+005F ×3)                         | Appears once inside `<sentence>` at the gap position. The parser locates the gap by this literal. Example read line: `"Finish the sentence: The cat ___ the mat."` On-screen this renders as a styled blank underline (§3.2); the underscores are the data carrier, not the visual.                                                        |
+| **Gap token (in-template, written form)**    | `___` (exactly three ASCII underscores, U+005F ×3)                         | Appears once inside `<sentence>` at the gap position. The parser locates the gap by this literal. Example read line: `"Finish the sentence: The cat ___ the bag."` On-screen this renders as a styled blank underline (§3.2); the underscores are the data carrier, not the visual.                                                        |
 | **Gap token (spoken form)**                  | Emma speaks the word **`blank`** at the gap position                       | Dave §9: one syllable, confirmed within Emma's ~200-word cap. The TTS read line the planner emits substitutes `blank` for the `___` token so Azure renders natural prosody: `"Finish the sentence: The cat blank the mat."` See §4 for the read/display split.                                                                             |
 | **Target word (the answer)**                 | The word that fills `___`                                                  | Carried as the problem's `target.word` — a real `wordPack.ts` `WordEntry`, resolved via `getWordEntry` exactly like the `sight-word` and CVC tiers (NOT a synthesized sentinel).                                                                                                                                                           |
 | **Sentence-frame field**                     | `WordSongProblem.sentenceFrame?: string` (new optional carrier — see §1.1) | The full sentence with `___` preserved, for display. The chips do NOT carry the frame; only the read line + this field do.                                                                                                                                                                                                                 |
@@ -39,7 +39,7 @@ Per the parallel-shared-concept rule (user-global `CLAUDE.md`): the parser autho
 
 The displayed sentence ("The cat \_\_\_ the mat.") is **per-problem**, not per-word — the same target word (`sat`) appears in many different frames. So the frame canNOT live on the shared `WordEntry` (which is per-word and reused across problems). It lives on the **problem**, parsed out of the read line:
 
-- Add an optional field to `WordSongProblem` (`src/screens/WordSong/wordSessionPlans.ts`): **`sentenceFrame?: string`** — the full sentence with the `___` gap token preserved, e.g. `"The cat ___ the mat."`
+- Add an optional field to `WordSongProblem` (`src/screens/WordSong/wordSessionPlans.ts`): **`sentenceFrame?: string`** — the full sentence with the `___` gap token preserved, e.g. `"The cat ___ the bag."`
 - The parser (`planFromServer.ts`) extracts it: strip the `Finish the sentence: ` prefix and the trailing `.` from the read line, keep the `___` token in place. The target word is resolved separately (see §1.2).
 - `sentenceFrame` is `undefined` for every other content type (back-compat — same posture as `contentType?`). Devon's render branch reads it only when `contentType === 'simple-sentence'`.
 
@@ -49,7 +49,7 @@ This is the one genuinely new wire-carried datum this tier adds. Everything else
 
 **Critical for Kevin — this tier breaks the "capture the token, look it up" pattern.** Every prior template captures the target token directly from a fixed slot (`"Tap the <word>."` → `<word>` is the target). Here the read line carries `___` at the gap, NOT the answer word — Emma must not say the answer aloud (that would defeat the cloze). So the parser cannot get the target from the read line's gap.
 
-The target word is therefore carried by the **`correct` utterance**, which already names the answer in every tier (`"Yes! Sat."`). The parser resolves the target from the `correct` line's word, not from the `read` line:
+The target word is therefore carried by the **`correct` utterance**, which already names the answer in every tier (`"Yes! Bit."`). The parser resolves the target from the `correct` line's word, not from the `read` line:
 
 - `correct` template for this tier: **`"Yes! <Word>."`** (capitalized target — identical shape to sight-words/CVC `correct`). Parser captures `<Word>`, lowercases, resolves via `getWordEntry`, membership-checks against `TARGET_WORD_SET`.
 - The `read` line is parsed only to (a) confirm the `Finish the sentence:` discriminant fires `contentType: 'simple-sentence'`, and (b) extract `sentenceFrame` (the sentence with `___` preserved).
@@ -178,14 +178,14 @@ Sequencing rules (Dave §"Dosage note on the deferrals" + §"Gentle → trap pro
 
 Emma reads the gapped sentence; she speaks `blank` at the gap (never the answer). Within the ~200-word cap.
 
-| Slot                   | Template                                               | Example (problem with target `sat`, frame `"The cat ___ the mat."`) | Timing                                                                                                           |
+| Slot                   | Template                                               | Example (problem with target `bit`, frame `"The cat ___ the bag."`) | Timing                                                                                                           |
 | ---------------------- | ------------------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `read` (TTS)           | `"Finish the sentence: <sentence-with-blank-spoken>."` | "Finish the sentence: The cat blank the mat."                       | On problem mount (no decoding window). Sentence panel reveals word-by-word against this read.                    |
-| `read` (display frame) | carried separately as `sentenceFrame` with `___`       | "The cat \_\_\_ the mat." (renders as styled blank, §3.2)           | —                                                                                                                |
-| `correct`              | `"Yes! <Word>."`                                       | "Yes! Sat."                                                         | On correct tap. Gap fills with the word; ear-wiggle pose + chime + sparkles (§5 motion).                         |
+| `read` (TTS)           | `"Finish the sentence: <sentence-with-blank-spoken>."` | "Finish the sentence: The cat blank the bag."                       | On problem mount (no decoding window). Sentence panel reveals word-by-word against this read.                    |
+| `read` (display frame) | carried separately as `sentenceFrame` with `___`       | "The cat \_\_\_ the bag." (renders as styled blank, §3.2)           | —                                                                                                                |
+| `correct`              | `"Yes! <Word>."`                                       | "Yes! Bit."                                                         | On correct tap. Gap fills with the word; ear-wiggle pose + chime + sparkles (§5 motion).                         |
 | `reprompt`             | `"Hmm... try again?"`                                  | "Hmm... try again?"                                                 | On wrong tap — puzzled-tilt, no red X (§6).                                                                      |
-| `hint`                 | `"Listen. <full sentence spoken with the answer>."`    | "Listen. The cat sat the mat."                                      | After 2nd wrong (single hint — see §6). Emma reads the COMPLETE sentence so Marian hears the target in its slot. |
-| `giveAnswer`           | `"This one is <word>."`                                | "This one is sat."                                                  | After 3rd wrong. The correct chip then auto-highlights and the gap fills.                                        |
+| `hint`                 | `"Listen. <full sentence spoken with the answer>."`    | "Listen. The cat bit the bag."                                      | After 2nd wrong (single hint — see §6). Emma reads the COMPLETE sentence so Marian hears the target in its slot. |
+| `giveAnswer`           | `"This one is <word>."`                                | "This one is bit."                                                  | After 3rd wrong. The correct chip then auto-highlights and the gap fills.                                        |
 
 **Read/display split is load-bearing.** The TTS `read` substitutes `blank` for `___` (natural prosody); the display uses `sentenceFrame` with the styled underline. Same string, two renderings — keep them in lockstep. The planner emits BOTH derivable from one source sentence; the parser splits them (the `read` is what gets TTS'd; `sentenceFrame` is what displays). See §1.1.
 
@@ -275,7 +275,7 @@ Kevin's `WORD_SONG_SIMPLE_SENTENCES` pool finalizes the exact gentle-phase sente
 
 | scene-id       | Scene description                      | Sentence it contexts                 |
 | -------------- | -------------------------------------- | ------------------------------------ |
-| `cat-sat-mat`  | a small cat sitting on a woven mat     | "The cat sat on the mat."            |
+| `cat-sat-mat`  | a cat biting a bag                     | "The cat bit the bag."               |
 | `dog-ran`      | a happy dog running                    | "The dog ran."                       |
 | `cat-on-mat`   | a cat resting on a mat (locative)      | "The cat sat on the mat." (prep gap) |
 | `dog-in-box`   | a dog sitting inside an open box       | "The dog is in the box."             |
@@ -293,8 +293,8 @@ Kevin's `WORD_SONG_SIMPLE_SENTENCES` pool finalizes the exact gentle-phase sente
 ## Acceptance criteria (Jessica W13-05 keys on these)
 
 - [ ] `WordSongContentType` includes `'simple-sentence'`; the parser sets it when the read line matches `"Finish the sentence: <sentence>."`.
-- [ ] A `"Finish the sentence: The cat ___ the mat."` read line parses to `contentType: 'simple-sentence'` with `sentenceFrame === "The cat ___ the mat."`.
-- [ ] The target word is resolved from the `correct` utterance (`"Yes! Sat."` → `sat`), NOT from the gapped read line.
+- [ ] A `"Finish the sentence: The cat ___ the bag."` read line parses to `contentType: 'simple-sentence'` with `sentenceFrame === "The cat ___ the bag."`.
+- [ ] The target word is resolved from the `correct` utterance (`"Yes! Bit."` → `bit`), NOT from the gapped read line.
 - [ ] A read line with zero `___` tokens or two+ `___` tokens throws `PlanFromServerError`.
 - [ ] The sentence panel (`word-song-sentence-panel`) renders the frame with a styled blank underline (`word-song-sentence-gap`, `data-gap-filled="false"`) at the gap position.
 - [ ] Chips render as written-word text glyphs (no picture, no word card) — 3 chips.
