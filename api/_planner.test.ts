@@ -553,6 +553,84 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
     expect(occurrences).toBe(2)
   })
 
+  it('the GENERIC-TIER HINT TEMPLATES block pins number-recog / skip-counting / mult-* templates (PR #413 NIT, ticket 86ca8a8h6)', async () => {
+    // The W12-03 directive carries per-operand hint templates for the 6
+    // arithmetic tiers; the GENERIC-TIER block carries the remaining 5
+    // (number-recog lookup table, skip-counting step template, mult-*
+    // case-split). These templates trace to Dave's authoritative note
+    // design/research/w12-generic-tier-hint-templates.md and were baked
+    // into the generic-tier canon. The existing W12 drift-guards covered
+    // only the THREE-HINT SLOT and SINGULAR-PLURAL rules — this block had
+    // no header-shaped guard, so a future prompt-simplification could
+    // silently diverge the directive from the canon the templates baked.
+    // Header-shaped per the SELF-CHECK convention (planner-and-canon.md
+    // § "Drift-guard shape for these locks" — uniquely-titled tokens that
+    // won't trip on documentary prose).
+    const capture: { lastArgs?: unknown } = {}
+    const client = makeMockClient(makeThreeHintMathPlan(), { capture })
+    await generateSessionPlan({
+      client,
+      track: 'math',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'add-to-10',
+    })
+    const args = capture.lastArgs as { system: Array<{ text: string }> }
+    const systemText = args.system.map((b) => b.text).join('\n')
+
+    // Block header (uniquely-titled) + Dave's source-note pointer.
+    expect(systemText).toContain('GENERIC-TIER HINT TEMPLATES')
+    expect(systemText).toContain(
+      'design/research/w12-generic-tier-hint-templates.md',
+    )
+
+    // number-recog — hint1 verbatim + hint3 interrogative form + every
+    // entry of the 10-row topological-fact LOOKUP TABLE (Dave §Tier 1:
+    // semantic topology Haiku cannot derive; must be embedded verbatim).
+    expect(systemText).toContain('Look at the numbers.')
+    expect(systemText).toContain('Which one is <number-word>?')
+    expect(systemText).toContain('1 -> "One is the smallest."')
+    expect(systemText).toContain('2 -> "Two comes right after one."')
+    expect(systemText).toContain('3 -> "Three comes after two."')
+    expect(systemText).toContain('4 -> "Four comes after three."')
+    expect(systemText).toContain('5 -> "Five is in the middle."')
+    expect(systemText).toContain('6 -> "Six comes after five."')
+    expect(systemText).toContain('7 -> "Seven is bigger than five."')
+    expect(systemText).toContain('8 -> "Eight comes after seven."')
+    expect(systemText).toContain('9 -> "Nine is close to ten."')
+    expect(systemText).toContain('10 -> "Ten is the biggest."')
+
+    // skip-counting — hint2 step template + hint3 last-term restate.
+    expect(systemText).toContain('We add <step-word> each time.')
+    expect(systemText).toContain(
+      '"<last-term-word> and <step-word> more is what?"',
+    )
+
+    // mult-* — hint1 verbatim + every factor-b case-split form + hint3.
+    // The case-split follows read-line operand order (factor-b copies of
+    // factor-a, NO commutative flip — Dave §Tier 3 P6 ruling).
+    expect(systemText).toContain('Look at the groups.')
+    expect(systemText).toContain(
+      'factor-b 1 -> "One group of <factor-a-word>."',
+    )
+    expect(systemText).toContain(
+      'factor-b 2 -> "<factor-a-word> and <factor-a-word> more."',
+    )
+    expect(systemText).toContain(
+      'factor-b 3 -> "<factor-a-word>, then <factor-a-word>, then <factor-a-word>."',
+    )
+    expect(systemText).toContain(
+      'factor-b 4 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>."',
+    )
+    expect(systemText).toContain(
+      'factor-b 5 -> "<factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>, <factor-a-word>."',
+    )
+    // mult hint3 is the verbatim read-line question clause; assert the
+    // NO-commutative-flip guard prose so a future "natural grouping" reword
+    // can't silently re-enable the commuted form Dave rejected.
+    expect(systemText).toMatch(/NO commutative flip/i)
+  })
+
   it('AC#1 — the SYSTEM_PREAMBLE keeps word-song at 5 slots (single hint) — Wave 12 is math-only', async () => {
     // The slot-count language is track-shared in SYSTEM_PREAMBLE; the
     // word-song slot set must NOT widen (no word-song three-hint in v1).
