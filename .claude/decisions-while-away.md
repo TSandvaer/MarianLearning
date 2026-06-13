@@ -15,7 +15,7 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 - **Alternative:** Hold #423 at a pre-merge ear-test on the Vercel preview (blank-slate origin), then merge on PASS — slower, and contradicts the plan default Thomas already approved.
 - **Reversibility:** 1 revert PR restores main (removes simple-sentences.json + the surface wiring); ear-test fails fix forward via a targeted re-bake either way.
 - **Executed:** merged 2026-06-13 (4a7b364) on both CI gates green + Devon APPROVE; no classifier denial (plan-default authorization was sufficient). 86ca8e6fr + anchor 86ca8cp4z COMPLETE.
-- **Status:** pending review
+- **Status:** accepted by Thomas 2026-06-13 (sponsor-questions-walkthrough; confirms byte-proof-merge-first as the standing default for byte-preservation-proven canon PRs)
 
 ## 2026-06-12 2055 UTC — Dispatched W13-01 (Dave pedagogy research) ahead of wave-13 plan-PR approval
 

@@ -51,6 +51,10 @@ Source: Kevin's NOF #3 from PR #244 fix-up dispatch (2026-05-16).
 
 (Add new items below this line as away-mode generates them.)
 
+## 2026-06-13 — Wave 14 = DEFERRED (Thomas, walkthrough)
+
+Thomas chose to **hold Wave 14 dispatch until Wave 13's tail closes** — i.e. until (a) the 59-clip simple-sentences ear-test passes on production voice-qa.html, and (b) the MJ scene pack lands. Dev team stays idle until then; do NOT dispatch a new wave. Re-open the Wave 14 direction question (candidates: M4.x slow-fact analysis, stop-for-now affordance 86ca7urx1, polish backlog) AFTER the tail closes. Cleanest-sequencing call; not a throughput problem (the tail is sponsor-side work, not dev work).
+
 ## 2026-06-12 — Round-6 ear-test (post-#418 merge)
 
 **Context:** PR #418 (voice-QA round-5 fixes — your audition winners v2/o3/f2, "row" re-render, alt-3 gap) merged `e1ada4a`, sponsor-authorized in tonight's walkthrough. Production deploy live.
