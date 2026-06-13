@@ -501,7 +501,7 @@ export const WORD_SONG_NOVEL_PROBE_WORDS_FOR_PROMPT =
  *    re-bakes so Thomas's MJ scene pack keys on it.
  *  - `frame` — the displayed sentence WITH the literal `___` gap token
  *    (three ASCII underscores) at the gap position, e.g.
- *    `"The cat ___ the mat."`. The browser parser derives
+ *    `"The cat ___ the bag."`. The browser parser derives
  *    `WordSongProblem.sentenceFrame` from this verbatim.
  *  - `target` — the lowercase word that fills `___` (the answer). Carried
  *    in the `correct` utterance as `"Yes! <Word>."`; the parser resolves
