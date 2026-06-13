@@ -173,6 +173,10 @@ The Phase-2/4/5 audio-context-resume helpers from `preRecorded.ts` are intention
 
 The id ↔ src mapping lives in `src/screens/Hub/hubLines.ts` (`HUB_LINES`, `HUB_LINE_WORD_COUNTS`).
 
+### Re-rendering hub lines — always target, never full-run
+
+`scripts/render-hub-mp3s.mjs` historically rendered **all 18 lines unconditionally** per run. Azure renders are not byte-deterministic across bake calls, so a full run churns the bytes of every Thomas-approved MP3 and flips them to needs-retest on the voice-QA page. PR #418 (pending merge) adds `--only <filename>` (single-line re-render) and an optional per-line `ssml` inner-text override (caption text stays plain) — the hub-side equivalent of `revoiceCanonTargeted.ts --ids`. For any single-line hub fix, use `--only`; a full re-render is only correct when intentionally re-baselining all 18.
+
 ## SFX
 
 [src/lib/sfx/sfx.ts](MarianLearning/src/lib/sfx/sfx.ts) — defensive Howler wrapper for short sound effects.

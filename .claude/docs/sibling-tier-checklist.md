@@ -46,6 +46,7 @@ The checklist is for the **node-shape contract** — adding a new tier to the cu
 - **`api/_firstEncounterGate.ts FIRST_ENCOUNTER_GATED_NODES`** — only edit if the new tier ships first-encounter scaffolding (a tier-specific opener line). Most tiers don't.
 - **`WORD_SONG_GRADUATION_GATED_NODES`** in `mastery.ts` — explicitly does NOT widen for new tiers. Per `progress-and-persistence.md` § "Graduation gate", the set stays at `{ 'cvc-words' }` only; new sibling tiers are vocabulary-extension, not decoding-acquisition gates.
 - **`CVC_CROSS_VOWEL_NODES`** in `mastery.ts` — widening happens in a separate cross-vowel-mix PR (see `cross-vowel-mix-spec.md`). Coordinate with the matrix-author when extending.
+- **`substituteSentenceGap` (or any TTS-time text transform in `api/_tts.ts`)** — only for a "don't-say-the-answer" / display-only-token tier (cloze, fill-in). When the canon `read` carries a token that must NOT be voiced verbatim (e.g. `___`), the substitution lives in `_tts.ts` and is gated on `tierFilter === '<new-tier>'`. **Coupled to first-class membership (#14):** the transform only fires when `effectiveFocusNode` resolves to the new tier via `WORD_SONG_FIRST_CLASS_FOCUS_NODES`, so a tier missing from that set silently loses its audio transform with no error. There is no automated guard — the only catch is Thomas's ear-test. `simple-sentences` (PR #423) is the canonical reference; standard word-tap tiers don't need this.
 
 ## Sibling-spec audit (post-PR-#190 lesson, "Place 8" in the old contract)
 

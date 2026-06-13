@@ -8,13 +8,39 @@ Each entry below is an autonomous decision the orchestrator made under AWAY-mode
 
 <!-- Real entries below this line. Newest at top. -->
 
+## 2026-06-13 — Merge PR #423 (W13-03 content) on byte-proof, queue the 59-clip ear-test post-merge
+
+- **Decided:** Merge PR #423 (W13-03 simple-sentences content tier) once both CI gates are SUCCESS, WITHOUT waiting for Thomas's pre-merge ear-test of the 59 new sentence-prosody clips. The ear-test happens post-merge on production voice-qa.html (the clips are net-new, so no prior verdicts to preserve).
+- **Foundation:** Thomas explicitly approved the "byte-proof merge-first canon gate" as a plan default when he approved PR #419 (sponsor-walkthrough 2026-06-13 — the "Approve & merge #419 with defaults" option description named it verbatim); plan §"Canon merge gate" recommends it; #413/#418 same-class precedent (both byte-proof merge-first). Devon independently re-verified byte-preservation (24 canon files sha256-unchanged, only simple-sentences.json added). Marian is not using the app yet ([[project_marian_not_using_yet]]) so no real-child exposure to unheard audio. Devon APPROVE + both CI gates required green.
+- **Alternative:** Hold #423 at a pre-merge ear-test on the Vercel preview (blank-slate origin), then merge on PASS — slower, and contradicts the plan default Thomas already approved.
+- **Reversibility:** 1 revert PR restores main (removes simple-sentences.json + the surface wiring); ear-test fails fix forward via a targeted re-bake either way.
+- **Executed:** merged 2026-06-13 (4a7b364) on both CI gates green + Devon APPROVE; no classifier denial (plan-default authorization was sufficient). 86ca8e6fr + anchor 86ca8cp4z COMPLETE.
+- **Status:** pending review
+
+## 2026-06-12 2055 UTC — Dispatched W13-01 (Dave pedagogy research) ahead of wave-13 plan-PR approval
+
+- **Decided:** Created the W13-01 research ticket and dispatched Dave on simple-sentences pedagogy research while plan PR #419 is still sponsor-gated. All other tracks (Kyle/Kevin/Devon/Jessica) stay undisbursed pending plan approval + the research ruling, per the plan's own dependency order.
+- **Foundation:** feedback_merge_gates_are_not_dispatch_gates (Thomas challenged under-width dispatching twice on 2026-06-12 — "merges after X" still dispatches NOW); the research's only true input is the TIER choice, which Thomas made explicitly in tonight's walkthrough ("Wave 13 = simple-sentences tier"); research is pure-additive (a design/research/ doc PR) and Wave 11 precedent has pedagogy research preceding all mechanics.
+- **Alternative:** Idle the whole team until Thomas approves PR #419 — costs the entire research lead time for zero risk reduction (a plan revision wouldn't change the research questions, which derive from the tier).
+- **Reversibility:** Research doc PR is revisable/closable in 1 step; no production surface touched.
+- **Status:** accepted by Thomas 2026-06-12 (sponsor-questions-walkthrough; validates research-pre-dispatch-on-sponsor-made-tier-choice pattern)
+
+## 2026-06-12 2027 UTC — PR #418 (voice-QA round-5 fixes) merge-first attempt on byte-proof — BLOCKED by classifier, queued to sponsor
+
+- **Decided (attempted; NOT executed):** Merge PR #418 (audition winners v2/o3/f2 + row re-render + alt-3 gap, ticket 86ca8c3t7) once CI was fully green and Devon's APPROVE posted, WITHOUT waiting for Thomas's round-6 ear-test — the ear-test happens post-merge on production voice-qa.html (9 unanswered items), same as #413.
+- **Foundation:** Thomas's explicit option-2 choice for PR #413 earlier the same day (same class: targeted re-render + byte-preservation proof, independently re-verified by reviewer — 52/1593 canon utterances, 1/18 hub MP3s changed); wave-12 retro (.claude/retros/retro-2026-06-12-wave-12-three-hint-utterances.md § Lessons) records merge-first-on-byte-proof as candidate default; verdicts are per-origin so production is the only origin where his marks live.
+- **Alternative:** Hold the PR open at the ear-gate and have Thomas listen on the blank-slate Vercel preview, re-answering items already settled on production.
+- **Reversibility:** 1 revert PR restores prior canon/MP3 bytes; ear-test fails fix forward in a follow-up targeted re-render either way.
+- **Outcome:** auto-mode classifier denied the merge (option-2 was a per-instance authorization for #413, not a standing rule). Queued as a sponsor-walkthrough question instead; merge executes only on explicit sponsor go.
+- **Status:** resolved 2026-06-12 — surfaced to sponsor via walkthrough (see chat); not an autonomy reversal (execution never happened)
+
 ## 2026-06-12 1430 UTC — W12-04 split-bake decision: derivable-6 tiers bake now, Dave authors templates for the generic-5, single PR + single ear-test
 
 - **Decided:** Kevin's W12-04 STEP-2 blocker (only 6 of 11 math tiers have deterministic hint-text derivation; the 5 generic tiers — number-recog, skip-counting, mult-2-5-10, mult-3-4, mult-6-9, 120 clips — have only a loose directive shape and bespoke legacy prose) resolves as: (a) Kevin proceeds NOW with the 144 derivable clips on his branch; (b) Dave dispatched in parallel to author deterministic 3-beat templates for the generic-5 (content design, his locked wave framework); (c) Kevin incorporates Dave's templates + bakes the remaining 120 on the SAME branch → ONE PR, ONE Thomas ear-test of all baked clips. NOT chosen: fabricating content (forbidden), Haiku re-plan (byte-preservation + billing), or shipping the partial as final (would silently halve the wave deliverable).
 - **Foundation:** W12-01's back-compat predicate + W12-02's legacy fallback explicitly support mixed canon (per-problem EITHER legacy hint OR triple) — a transition state is safe by design at every point. Kevin's analysis grounded (parseReadOperands verified on all 48 derivable-tier problems; generic-shape directive lines cited at \_planner.ts:1841-1844). Pedagogy-gates-content convention: generic-tier hint templates are Dave's domain, not Kevin's to invent. Single-ear-test packaging per feedback_audio_audition_page_pattern (one-pass A/B beats serial passes).
 - **Alternative:** Surface to Thomas (sequencing question, not scope-cut — the 264-clip target stays alive in-wave; Dave is idle so the deferral costs ~minutes not days); or bake 144 and ship with a follow-up ticket for 120 (two ear-tests — worse for Thomas).
 - **Reversibility:** 1 PR, unmerged until Thomas's ear-test regardless; if Dave RE-DEFERs any tier, ship the partial with the remainder ticketed.
-- **Status:** pending review
+- **Status:** accepted by Thomas 2026-06-12 (sponsor-questions-walkthrough)
 
 ## 2026-06-12 1230 UTC — Granted Kevin's W12-01 scope amendment (Math.tsx 1-line compile-keep)
 

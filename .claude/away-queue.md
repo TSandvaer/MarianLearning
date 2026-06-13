@@ -50,3 +50,40 @@ Source: Kevin's NOF #3 from PR #244 fix-up dispatch (2026-05-16).
 ---
 
 (Add new items below this line as away-mode generates them.)
+
+## 2026-06-12 — Round-6 ear-test (post-#418 merge)
+
+**Context:** PR #418 (voice-QA round-5 fixes — your audition winners v2/o3/f2, "row" re-render, alt-3 gap) merged `e1ada4a`, sponsor-authorized in tonight's walkthrough. Production deploy live.
+
+**Action for Thomas:** Ear-test the **9 unanswered items** on https://marian-learning.vercel.app/voice-qa.html — the four/O/vvv/row re-rendered clips + the alt-3 hub line. PASS → issue #417 closes and voice-QA is fully green. FAIL items → report in chat; targeted fix-forward round.
+
+**RESOLVED (Thomas, 2026-06-12, walkthrough #2):** Plan #419 approved & merged with defaults; Q2 = SCENES IN V1 (Thomas produces the MJ pack); dave-wt full cleanup authorized & done; W13-01 pre-dispatch accepted. Round-6 ear-test still standing.
+
+## 2026-06-12 — Wave 13 plan PR #419 approval
+
+**Context:** You picked simple-sentences as Wave 13 in the walkthrough. Matt's plan is open as **PR #419** (design/wave-13-simple-sentences-plan.md; anchor ticket 86ca8cp4z). Sponsor-gated — away-mode will NOT merge it. The plan carries **7 walkthrough-ready open questions** (§Open questions) with recommended defaults — the big one is Q1 (sentence mechanic), which Dave's research will rule on first.
+
+**Action for Thomas:** Review/approve PR #419 (a walkthrough pass over the 7 questions works well). Dave's W13-01 research (ticket 86ca8cpe6) was pre-dispatched per merge-gates≠dispatch-gates — logged in decisions-while-away.md; all other tracks stay gated on your plan approval + Dave's ruling.
+
+**UPDATE — Dave's research landed (PR #420):** verdict **PROCEED-SENTENCE-COMPLETION** (sentence ordering rejected on Tagalog PSO→SVO transfer risk; 40-sentence pool, no net-new vocabulary). Two of the plan's 7 questions now have Dave's evidence behind them: **Q1** (mechanic) = ratify sentence-completion; **Q2** (scene illustration) — Dave rules scenes LOAD-BEARING for the gentle phase (overrides sight-words' text-only precedent, which was word-recognition-specific), but flags the asset-production risk vs the August deadline — he explicitly wants this to be YOUR call, not a timeline default. Research PR #420 merges direct on green CI per convention.
+
+## 2026-06-12 — Kyle's W13-02 spec §7: 5 open questions (PR #421)
+
+**Context:** Kyle's simple-sentences spec (PR #421, Devon review in flight) collects 5 open questions with recommended defaults in its §7 — same walkthrough-ready shape as his prior specs. Kevin's W13-03 content dispatch consumes the spec after merge; §7 answers may adjust details but the vocabulary contract ('simple-sentence' / "Finish the sentence: <sentence>." / \_\_\_ / sentenceFrame) is binding for the Pattern-B parallel work already in flight (Jessica W13-05).
+
+**RESOLVED (Thomas, walkthrough 2026-06-13):** all 5 §7 answered (Q1 per-template ~20 scenes, Q2 fill-gap-on-correct, Q4 leading blanks OK; Q3 32px + Q5 reuse-selector auto-decided). PR #421 MERGED (3cd633d). Kevin dispatched on W13-03 content (86ca8e6fr). Resolutions logged as a ticket comment on 86ca8cujn.
+
+**YOUR remaining Wave 13 task — the MJ scene pack:** Kyle's spec §8 has your generation worklist — ~20 gentle-phase scenes, per-template, filename scene-<sentence-id>.svg, style brief in §8.4 (extends the picture-pack anchor), per-scene table in §8.5. Kevin assigns the final sentence-ids in his pool; generate against those once W13-03 lands. Pipeline: MJ → bgclear.ai → SVG-embed (scenes work cleanly with bgclear, unlike the Emma face-crops).
+
+**UPDATE 2026-06-13 — W13-03 MERGED (4a7b364), tier is LIVE.** simple-sentences content shipped end-to-end (6 surfaces, W13-04 collapsed in, Devon APPROVE, byte-proof PASS). Anchor 86ca8cp4z + 86ca8e6fr COMPLETE. The final sentence-ids + the SIMPLE_SENTENCE_SCENES registry are now on main in src/screens/WordSong/sceneRegistry.ts (SCENE_PICTURES intentionally empty → graceful text-only fallback until your SVGs land). Generate the ~20 scenes against those ids → drop into public/assets/scenes/scene-<sentence-id>.svg. TWO sponsor gates now live:
+
+1. **59-clip sentence-prosody ear-test** — production https://marian-learning.vercel.app/voice-qa.html. Highest-risk audio class (sentence reads, non-deterministic prosody). Your gate. Fails → targeted re-bake.
+2. **MJ scene pack** — above; until it lands the tier renders text-only (no brick).
+
+**Wave 13 state at queue-time:** Jessica's failing-first spec is OPEN as intentionally-RED PR #422 (5 tests; stays open until W13-03 lands — drain must not merge/close it). Jessica flags: the eventual W13-03 canon (~59 sentence-prosody clips, the highest-risk audio class yet) goes to your ear-test on production voice-qa post-merge, same flow as today's rounds.
+
+## 2026-06-12 — dave-wt left in stash-pop conflict state (cleanup queued)
+
+**Context:** dave-wt had stray uncommitted WIP from an old session (e2e/sub-to-10-progression-mastery.spec.ts modification, plus 6 old stash entries). My blanket `git stash` + `pop` during W13-01 git ops left a UU conflict on that file; the classifier (correctly) blocked discarding it without your say-so. W13-01 was routed through the main repo instead (PR #420) — nothing lost. Old WIP preserved in dave-wt stash@{0}.
+
+**Action for Thomas:** OK to discard the conflicted working-tree state in dave-wt (`git checkout -- e2e/sub-to-10-progression-mastery.spec.ts`; the WIP stays recoverable in stash@{0})? Also: the 6 accumulated stashes there look like dead-session leftovers — say the word and I'll triage them (squash-merge branch-triage method) or drop them wholesale.

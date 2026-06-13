@@ -826,6 +826,21 @@ Two gotchas discovered during the voice-QA round-2 fix cycle:
 
 2. **Vercel injects `vercel.live/feedback/feedback.js` into preview HTML.** PR preview builds receive exactly one extra `<script>` tag injected by Vercel's feedback widget. A byte-hash of the HTML will never match the local or production build. Expect exactly one extra line (the injected script tag) when diffing preview HTML against the canonical source (normalise with `tr -d '\r'`) — this is not a build error.
 
+#### 4.4.4 `vqa-verdicts` are per-origin — PR previews always start blank; merge-first pattern for byte-preservation PRs
+
+`voice-qa.html` stores verdicts under the `vqa-verdicts` localStorage key, scoped to the page **origin**. A Vercel PR preview is a distinct origin from production (`https://marian-learning.vercel.app`), so a preview always shows a blank verdict slate — it is NOT evidence that verdicts were lost, and ear-testing there forces the sponsor to re-answer items already settled on production.
+
+**Preferred pattern for byte-preservation PRs (adopted for PR #413, 2026-06-12):** when a PR re-renders only specific clips AND carries a byte-preservation proof for everything else (quoted command output in the PR body, independently re-run by the reviewer), merge first and ear-test on production: prior verdicts carry over by hash-match, and the changed/new clips are the only unanswered items. Reserve the PR-preview ear-test for changes without a byte-preservation proof or where pre-merge A/B against old bytes is the explicit goal.
+
+#### 4.4.5 Dedup-expansion blast radius — run `--dry` before re-rendering
+
+A single fail id on `voice-qa.html` expands to **every canon file sharing that audio hash** under `scripts/revoiceCanonTargeted.ts`'s dedup model. Session-end ids are the high-blast case: all non-audit tiers ship byte-identical session-end audio, so one `session.end.recap.4` fail expands to ~23 files (round 5: 8 fail ids → 52 utterances across 24 files). The expansion is correct — one logical render per id — but "N target clips" in a ticket undercounts the cross-tier fan-out, and a reviewer comparing file count to clip count will mis-read it as scope creep.
+
+Two disciplines (voice-QA round 5, PR #418, 2026-06-12):
+
+- **Always run `revoiceCanonTargeted.ts --ids <ids> --dry` first** — it prints the dedup-expansion plan (members per fail id + totals) before any Azure spend.
+- **`git diff --stat` proves nothing on single-line JSON canon files** — every touched file shows `1 1` regardless of how many utterances changed. The only reliable scope check is a per-`audio.base64` sha256 comparison against `origin/main` (the byte-preservation script's approach).
+
 ### 4.2.1 Count-based assertions on `/api/claude` must filter by track (post 86c9pr4h9)
 
 After PR #162 (ticket `86c9pr4h9`) added the Word Song pre-warm at Hub mount, **Hub mount fires BOTH math and word-song POSTs to `/api/claude`** (math from the existing greet-or-math kick effect that was already running pre-Hub; word-song from the new Hub-anchored kick effect). Any unit/component test that counts `/api/claude` calls across a Hub-touching flow MUST filter on `JSON.parse(init.body).payload.track` to avoid silently double-counting.
