@@ -220,8 +220,22 @@ interface ParsedSimpleSentence {
 }
 
 /**
+ * The number of gentle-phase problems at the head of a simple-sentences
+ * session (Dave's dosage: problems 1–3 are gentle — Templates A/B, scene
+ * present; problems 4–8 are trap — no scene). Mirrors `GENTLE_RAMP_THROUGH`
+ * in `wordDistractors.ts`.
+ */
+const SIMPLE_SENTENCE_GENTLE_THROUGH = 3
+
+/**
  * Parse a simple-sentence problem from its `read` + `correct` slots.
  *
+ * @param index 1-based problem index — gates the gentle-phase scene
+ *   derivation (only problems 1–3 carry a scene, Dave's ruling). A trap
+ *   problem (4–8) whose frame happens to match a gentle scene's frame
+ *   (some frames recur across phases with different gaps) MUST NOT inherit
+ *   that scene — the index gate is the disambiguator the frame alone can't
+ *   provide.
  * @throws {PlanFromServerError} if the read isn't a `Finish the sentence:`
  *   line, the frame doesn't carry EXACTLY ONE `___` gap, the `correct`
  *   isn't a `Yes! <Word>.` line, or the target word isn't a known wordPack
@@ -230,6 +244,7 @@ interface ParsedSimpleSentence {
 function parseSimpleSentenceProblem(
   read: string,
   correct: string,
+  index: number,
 ): ParsedSimpleSentence {
   const readMatch = read.match(SIMPLE_SENTENCE_READ_PATTERN)
   if (!readMatch) {
@@ -281,9 +296,19 @@ function parseSimpleSentenceProblem(
   }
 
   // Derive the gentle-phase sceneId from the frame (Kyle §1.3 — the wire
-  // is utterance-only, so the parser derives it). Absent → undefined →
-  // text-only render (trap phase OR missing scene — one predicate).
-  const sceneId = sceneIdForFrame(sentenceFrame)
+  // is utterance-only, so the parser derives it). ONLY problems 1–3 (the
+  // gentle window) carry a scene; trap problems (4–8) are text-only by
+  // Dave's ruling. The index gate is load-bearing: some frames recur
+  // across phases with a different gap (e.g. "The dog ran ___." is gentle
+  // with gap "in" but also a trap row with gap "there"), so a frame-only
+  // lookup would wrongly attach the gentle scene to the trap problem. A
+  // scene is derived only when BOTH the problem is gentle AND the frame is
+  // registered; otherwise undefined → text-only (trap phase OR missing
+  // scene — one predicate downstream).
+  const sceneId =
+    index <= SIMPLE_SENTENCE_GENTLE_THROUGH
+      ? sceneIdForFrame(sentenceFrame)
+      : undefined
 
   return { entry, sentenceFrame, sceneId }
 }
@@ -376,6 +401,7 @@ export function wordSongSessionPlanFromServer(
       const { entry, sentenceFrame, sceneId } = parseSimpleSentenceProblem(
         utterances.read,
         utterances.correct,
+        index,
       )
       problems.push({
         index,

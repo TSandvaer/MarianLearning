@@ -933,7 +933,49 @@ export function renderSightWordsInnerText(
  *  today: greetings, problem reads, correct/reprompt/giveAnswer lines)
  *  are unchanged on the wire. The only utterances affected are those
  *  ending with `?` — that is the bug class. */
+/**
+ * Simple-sentences tier (Wave 13, ticket 86ca8e6fr) — gap-token render
+ * substitution. The canon read TEXT carries the literal `___` gap token
+ * (three ASCII underscores) so the browser parser can split it out to
+ * build the displayed `sentenceFrame` (Kyle §1.2, §4). But Azure must
+ * SPEAK the word "blank" at the gap (it cannot vocalise underscores). So
+ * at synthesize time we substitute `___` → "blank" — text-plain, audio
+ * shaped, exactly the letter-sounds / sight-words bake-time pattern (the
+ * stored canon text is unaffected; only the SSML the voice reads changes).
+ *
+ * Returns the gap-substituted text (for the simple-sentences tier) so the
+ * caller continues through the normal prosody/escape path — the
+ * substitution is purely a token swap on the un-escaped text. For any
+ * other tier returns the text unchanged.
+ */
+export function substituteSentenceGap(
+  text: string,
+  tierFilter?: string,
+): string {
+  if (tierFilter !== 'simple-sentences') return text
+  // Replace every run of EXACTLY three underscores with the spoken word
+  // "blank", padded so it sits as its own word in the flow. The canon
+  // invariant is one gap per read line, but replaceAll is defensive.
+  return text.replace(/_{3}/g, 'blank')
+}
+
 export function renderSsmlInnerText(text: string, tierFilter?: string): string {
+  // Simple-sentences tier (Wave 13, ticket 86ca8e6fr): the canon read text
+  // carries the `___` gap token (so the browser parser can build the
+  // displayed `sentenceFrame`); substitute it to the spoken word "blank"
+  // BEFORE any prosody/escape processing so Azure voices "blank" at the
+  // gap, never "underscore underscore underscore". The `?`-terminated
+  // deferral frames ("___ is the cat?") still get the question-prosody
+  // wrapper via the fall-through below. Text-plain, audio-shaped — same
+  // bake-time pattern as letter-sounds mnemonic-wrap + sight-words stress.
+  if (tierFilter === 'simple-sentences') {
+    text = substituteSentenceGap(text, tierFilter)
+    // Fall through to the normal path with the gap-substituted text (the
+    // tier filter is intentionally NOT re-passed below to avoid re-entry;
+    // simple-sentences has no PHONEME_OVERRIDES entries, so the plain /
+    // question-prosody path is correct from here).
+    tierFilter = undefined
+  }
   // Letter-sounds tier (British-voice rollout): the question-prosody
   // wrapper (`<break/><prosody pitch="+8%" rate="-5%">`) is DELIBERATELY
   // NOT applied here, even when the read line ends with `?`. Per the

@@ -2110,7 +2110,8 @@ matching that node. Thirteen first-class content modes today:
     sight-words. CRITICAL DISTINCTION from EVERY prior tier: Emma must
     NEVER speak the answer word (that defeats the cloze). The answer lives
     in the "correct" line ("Yes! Sat.") and is NEVER in the read line —
-    the read line carries "___" at the gap. Marian reads the gapped
+    the read line carries the literal "___" gap token at the gap (the
+    audio render speaks "blank" there). Marian reads the gapped
     sentence, hears Emma read it (Emma says "blank" at the gap), and taps
     the WRITTEN-WORD chip that fills the gap (written-word chips, same as
     sight-words — NO pictures). You MUST NOT instruct decoding /
@@ -2207,10 +2208,10 @@ ${WORD_SONG_TARGET_WORDS_SIGHT}
 
 Pool for simple-sentences (cloze sentences — pick whole rows, do NOT
 compose new sentences; emit each chosen row's frame verbatim with the
-"___" gap preserved). Each row is "[id] frame → answer". The answer is
-NEVER spoken in the read line (it is gapped); it appears ONLY in the
-"correct" line. GENTLE rows (problems 1–3 ONLY — Templates A/B, scene
-present):
+literal "___" gap token preserved in the read text). Each row is
+"[id] frame → answer". The answer is NEVER in the read line (it is gapped
+with "___"); it appears ONLY in the "correct" line. GENTLE rows
+(problems 1–3 ONLY — Templates A/B, scene present):
 ${WORD_SONG_SIMPLE_SENTENCES_GENTLE_FOR_PROMPT}
 TRAP rows (problems 4–8 ONLY — all templates, no scene):
 ${WORD_SONG_SIMPLE_SENTENCES_TRAP_FOR_PROMPT}
@@ -2431,13 +2432,17 @@ every sentence is already in Marian's taught vocabulary precisely
 because the pool is curated; an invented sentence risks an untaught word.
 
 (2) Read-line template (ALL 8 problems): "Finish the sentence:
-<sentence>." where <sentence> is the chosen row's frame BUT with the
-"___" gap token REPLACED BY THE SPOKEN WORD "blank" so Azure renders
-natural prosody. E.g. for row [cat-sat-mat] "The cat ___ the mat." emit
-the read text "Finish the sentence: The cat blank the mat." Emma speaks
-"blank" at the gap; she must NEVER speak the answer word. The browser
-substitutes the styled blank underline back in for display. Use "Finish
-the sentence:" verbatim for every read line; do not vary the verb.
+<sentence>." where <sentence> is the chosen row's frame emitted VERBATIM,
+INCLUDING the literal "___" gap token (three underscores) at the gap
+position. E.g. for row [cat-sat-mat] "The cat ___ the mat." emit the read
+text EXACTLY: "Finish the sentence: The cat ___ the mat." Keep the three
+underscores in the read text — do NOT replace them with the answer word,
+and do NOT replace them with the word "blank" (the audio render
+substitutes the spoken word "blank" for the underscores automatically at
+synthesize time; the stored text keeps "___" so the screen can show the
+styled blank). Emma speaks "blank" at the gap; she must NEVER speak the
+answer word. Use "Finish the sentence:" verbatim for every read line; do
+not vary the verb.
 
 (3) THE ANSWER IS NEVER IN THE READ LINE. This is the single most
 important rule for this tier. The read line gaps the answer (Emma says
@@ -3188,10 +3193,12 @@ all other slots are content-mode-agnostic:
       (whole-word recognition — see SIGHT-WORDS RECOGNITION block above;
       NOT a decoding "Read"/"Tap" template).
     - simple-sentences: "Finish the sentence: <sentence>." where
-      <sentence> is the chosen pool row's frame with the gap spoken as
-      "blank", e.g. "Finish the sentence: The cat blank the mat." The
-      answer is NEVER in the read line — see the SIMPLE-SENTENCES
-      COMPLETION block above. NOT a decoding "Read"/"Tap" template.
+      <sentence> is the chosen pool row's frame emitted VERBATIM with the
+      literal "___" gap token, e.g. "Finish the sentence: The cat ___ the
+      mat." (the audio render speaks "blank" at the underscores; the
+      stored text keeps "___"). The answer is NEVER in the read line — see
+      the SIMPLE-SENTENCES COMPLETION block above. NOT a decoding
+      "Read"/"Tap" template.
   For non-letter-names / non-letter-sounds tiers: use lowercase target
   word; one short sentence; ends with a period. Use the EXACT verb for
   the focus node — "Tap" for blending-cv AND letter-names, "Which

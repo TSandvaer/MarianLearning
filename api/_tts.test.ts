@@ -31,6 +31,7 @@ import {
   renderSightWordsInnerText,
   renderLetterSoundsInnerText,
   renderSsmlInnerText,
+  substituteSentenceGap,
   synthesizeUtterance,
   uint8ToBase64,
 } from './_tts.js'
@@ -1943,6 +1944,57 @@ describe('synthesizeUtterance unicode-punctuation round-trip (86c9qhr91)', () =>
     }
     // No CP1252-shaped mojibake on the wire.
     expect(indexOfBytes(wireBytes, new Uint8Array([0xc3, 0xa2]))).toBe(-1)
+  })
+})
+
+describe('substituteSentenceGap (simple-sentences gap render, ticket 86ca8e6fr)', () => {
+  it('replaces the ___ gap token with the spoken word "blank" on the simple-sentences tier', () => {
+    expect(
+      substituteSentenceGap(
+        'Finish the sentence: The cat ___ the mat.',
+        'simple-sentences',
+      ),
+    ).toBe('Finish the sentence: The cat blank the mat.')
+  })
+
+  it('handles a leading-gap deferral frame', () => {
+    expect(
+      substituteSentenceGap(
+        'Finish the sentence: ___ are in the van.',
+        'simple-sentences',
+      ),
+    ).toBe('Finish the sentence: blank are in the van.')
+  })
+
+  it('is a no-op on every other tier (the ___ stays literal)', () => {
+    const text = 'Finish the sentence: The cat ___ the mat.'
+    expect(substituteSentenceGap(text, 'sight-words')).toBe(text)
+    expect(substituteSentenceGap(text, undefined)).toBe(text)
+    expect(substituteSentenceGap('Read the cat.', 'simple-sentences')).toBe(
+      'Read the cat.',
+    )
+  })
+
+  it('renderSsmlInnerText speaks "blank" (not underscores) for a simple-sentences read', () => {
+    // Declarative frame — plain path. The ___ must NOT survive into the SSML.
+    const ssml = renderSsmlInnerText(
+      'Finish the sentence: The cat ___ the mat.',
+      'simple-sentences',
+    )
+    expect(ssml).toContain('blank')
+    expect(ssml).not.toContain('___')
+  })
+
+  it('renderSsmlInnerText keeps the question-prosody wrapper on a ?-terminated deferral frame', () => {
+    // "___ is the cat?" → "blank is the cat?" with the question prosody.
+    const ssml = renderSsmlInnerText(
+      'Finish the sentence: ___ is the cat?',
+      'simple-sentences',
+    )
+    expect(ssml).toContain('blank')
+    expect(ssml).not.toContain('___')
+    // The trailing interrogative clause gets the pitch-raise wrapper.
+    expect(ssml).toContain('<prosody pitch="+8%"')
   })
 })
 
