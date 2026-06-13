@@ -34,10 +34,18 @@ import {
   generateSessionPlan,
   type PlannerAnthropicClient,
 } from '../../../api/_planner'
-import { WORD_SONG_NOVEL_PROBE_WORDS } from '../../../api/_plannerWordList'
+import {
+  WORD_SONG_NOVEL_PROBE_WORDS,
+  WORD_SONG_SIMPLE_SENTENCES,
+} from '../../../api/_plannerWordList'
 import { wordSongSessionPlanFromServer } from './planFromServer'
 import { pickDistractors } from './wordDistractors'
-import { getWordEntry } from './wordPack'
+import {
+  SIMPLE_SENTENCE_SCENES,
+  SIMPLE_SENTENCE_TARGET_SET,
+  getWordEntry,
+  normalizeSentenceFrame,
+} from './wordPack'
 import {
   defaultProgress,
   isGraduationSessionPending,
@@ -1146,3 +1154,134 @@ function makeGraduationWirePlan(
     }),
   }
 }
+
+// ── Simple-sentences tier alignment + round-trip (Wave 13, 86ca8e6fr) ──
+//
+// The canonical sentence pool lives server-side (`WORD_SONG_SIMPLE_SENTENCES`
+// in `api/_plannerWordList.ts`); the parser (src/) cannot import it, so it
+// relies on two browser-side mirrors in `wordPack.ts`:
+//   - `SIMPLE_SENTENCE_TARGET_SET` (membership the parser checks the
+//     `correct`-resolved target against), and
+//   - `SIMPLE_SENTENCE_SCENES` (gentle-frame → sceneId derivation table).
+// These tests lock the mirrors against the canonical pool so they never
+// drift. This file is the right home (src/ may import api/, but api/ may
+// not import src/ — one-directional, same as every other round-trip lock).
+describe('simple-sentences tier — canonical pool ↔ browser-mirror alignment (W13, 86ca8e6fr)', () => {
+  it('every canonical pool target is in SIMPLE_SENTENCE_TARGET_SET and resolves via getWordEntry', () => {
+    const offSet: string[] = []
+    const unresolved: string[] = []
+    for (const row of WORD_SONG_SIMPLE_SENTENCES) {
+      if (!SIMPLE_SENTENCE_TARGET_SET.has(row.target)) offSet.push(row.target)
+      try {
+        getWordEntry(row.target)
+      } catch {
+        unresolved.push(row.target)
+      }
+    }
+    // Count-based — the failure names exactly which targets drifted.
+    expect(offSet).toEqual([])
+    expect(unresolved).toEqual([])
+  })
+
+  it('SIMPLE_SENTENCE_TARGET_SET contains no word absent from the canonical pool', () => {
+    const poolTargets = new Set(WORD_SONG_SIMPLE_SENTENCES.map((r) => r.target))
+    const orphans = [...SIMPLE_SENTENCE_TARGET_SET].filter(
+      (w) => !poolTargets.has(w),
+    )
+    expect(orphans).toEqual([])
+  })
+
+  it('every gentle-phase pool row maps to its id in SIMPLE_SENTENCE_SCENES (and vice versa)', () => {
+    const gentle = WORD_SONG_SIMPLE_SENTENCES.filter(
+      (r) => r.phase === 'gentle',
+    )
+    // Forward: each gentle row's normalized frame → its id in the registry.
+    for (const row of gentle) {
+      const key = normalizeSentenceFrame(row.frame)
+      expect(SIMPLE_SENTENCE_SCENES[key]).toBe(row.id)
+    }
+    // Reverse: the registry has exactly the gentle rows — no extra, none missing.
+    const registryIds = Object.values(SIMPLE_SENTENCE_SCENES).sort()
+    const gentleIds = gentle.map((r) => r.id).sort()
+    expect(registryIds).toEqual(gentleIds)
+  })
+
+  it('trap-phase pool rows are NOT in the scene registry (text-only render)', () => {
+    const trap = WORD_SONG_SIMPLE_SENTENCES.filter((r) => r.phase === 'trap')
+    const leaked = trap.filter(
+      (r) =>
+        SIMPLE_SENTENCE_SCENES[normalizeSentenceFrame(r.frame)] !== undefined,
+    )
+    // Some trap frames intentionally share a surface shape with a gentle
+    // frame (e.g. "The dog ___." appears in both phases with different
+    // gaps) — but the gentle one OWNS the normalized key. Assert no trap
+    // frame whose normalized key is NOT also a gentle frame leaks a scene.
+    const gentleKeys = new Set(
+      WORD_SONG_SIMPLE_SENTENCES.filter((r) => r.phase === 'gentle').map((r) =>
+        normalizeSentenceFrame(r.frame),
+      ),
+    )
+    const trueLeaks = leaked.filter(
+      (r) => !gentleKeys.has(normalizeSentenceFrame(r.frame)),
+    )
+    expect(trueLeaks).toEqual([])
+  })
+
+  it('a Haiku-mocked simple-sentences plan round-trips: target-from-correct, frame, sceneId', async () => {
+    // Mirror the canon wire shape: read carries "blank" (TTS form); the
+    // parser splits on the displayed ___ frame — but the PLANNER emits the
+    // ___ data form in the read for the browser to render the styled gap.
+    // Here we emit the ___ form (what the canon stores) so the parser
+    // exercise matches production. Pick 3 gentle + 5 trap rows.
+    const gentle = WORD_SONG_SIMPLE_SENTENCES.filter(
+      (r) => r.phase === 'gentle',
+    ).slice(0, 3)
+    const trap = WORD_SONG_SIMPLE_SENTENCES.filter(
+      (r) => r.phase === 'trap',
+    ).slice(0, 5)
+    const rows = [...gentle, ...trap]
+    const response = JSON.stringify({
+      id: 'haiku-simple-sentences-roundtrip-001',
+      label: 'simple-sentences roundtrip fixture',
+      utterances: rows.flatMap((row, i) => {
+        const n = i + 1
+        const cap = row.target.charAt(0).toUpperCase() + row.target.slice(1)
+        return [
+          { id: `word.p${n}.read`, text: `Finish the sentence: ${row.frame}` },
+          { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+          { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+          {
+            id: `word.p${n}.hint`,
+            text: `Listen. ${row.frame.replace('___', row.target)}`,
+          },
+          { id: `word.p${n}.giveAnswer`, text: `This one is ${row.target}.` },
+        ]
+      }),
+    })
+
+    const plan = await generateSessionPlan({
+      client: makeMockClient(response),
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'simple-sentences',
+    })
+
+    const parsed = wordSongSessionPlanFromServer(plan)
+    expect(parsed.problems).toHaveLength(8)
+    parsed.problems.forEach((problem, i) => {
+      const row = rows[i]!
+      expect(problem.contentType).toBe('simple-sentence')
+      // Target resolved from `correct`, NOT the gapped read.
+      expect(problem.target.word).toBe(row.target)
+      // Frame carries ___ verbatim.
+      expect(problem.sentenceFrame).toBe(row.frame)
+      // sceneId derives for gentle rows, undefined for trap.
+      if (row.phase === 'gentle') {
+        expect(problem.sceneId).toBe(row.id)
+      } else {
+        expect(problem.sceneId).toBeUndefined()
+      }
+    })
+  })
+})
