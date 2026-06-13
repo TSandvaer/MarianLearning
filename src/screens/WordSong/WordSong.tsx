@@ -43,6 +43,7 @@ import {
   WRONG_SHAKE_MS,
 } from '../_shared/gameplayConstants'
 import { WordPicture } from './wordPictures'
+import { ScenePanel } from './scenePictures'
 import type { WordEntry } from './wordPack'
 import { LETTER_SOUNDS_POOL } from './letterSoundsPool'
 import type { SkillLevel } from '../../lib/progress'
@@ -1719,10 +1720,19 @@ function WordSongScreen({
           (Dave's W11-01 §"Recognition mechanic" point 1; E4 Conners 2012
           shows pictures actively SLOW non-picturable word learning). The
           written word IS the chip; there is no picture meaning-anchor and
-          no letters-of-the-word decode breakdown. */}
+          no letters-of-the-word decode breakdown.
+
+          Simple-sentences tier (Wave 13 W13-03/04, ticket 86ca8e6fr) ALSO
+          skips this card. The reading surface is the SENTENCE PANEL (below)
+          — a full gapped sentence, not a single word card. The gentle-phase
+          SCENE panel (also below) carries comprehension context. There is
+          no single-word picture card and no per-word decode breakdown
+          (Kyle §3.2 — the cloze mechanic transfers the sight-words
+          written-word chip, NOT the CVC picture card). */}
           {currentProblem.contentType !== 'letter-names' &&
             currentProblem.contentType !== 'letter-sounds' &&
-            currentProblem.contentType !== 'sight-word' && (
+            currentProblem.contentType !== 'sight-word' &&
+            currentProblem.contentType !== 'simple-sentence' && (
               <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
                 <div
                   data-testid="word-song-word-card"
@@ -1882,6 +1892,40 @@ function WordSongScreen({
             </div>
           )}
 
+          {/* Simple-sentences reading surface (Wave 13 W13-03/04, ticket
+          86ca8e6fr): a gentle-phase SCENE illustration above the SENTENCE
+          PANEL (the net-new center-stage gapped-sentence card). The scene
+          renders only when a scene asset is registered for the problem's
+          `sceneId` (gentle phase + asset shipped) — otherwise it renders
+          nothing (trap phase OR not-yet-shipped MJ asset → graceful
+          text-only fallback, Kyle §1.3 / §8.2). The sentence panel always
+          renders for this tier; its words reveal word-by-word synced to
+          Emma's read (same `captionRevealed` tick as the caption ribbon),
+          and the gap fills with the target word once the problem resolves
+          (the closure beat, Kyle §3.2 / sponsor Q2). */}
+          {currentProblem.contentType === 'simple-sentence' && (
+            <div className="mt-2 flex flex-1 flex-col items-center justify-start gap-3 px-4">
+              <ScenePanel
+                sceneId={currentProblem.sceneId}
+                ariaLabel={
+                  currentProblem.sentenceFrame?.replace(
+                    SENTENCE_GAP_TOKEN,
+                    currentProblem.target.word,
+                  ) ?? currentProblem.target.word
+                }
+              />
+              {currentProblem.sentenceFrame !== undefined && (
+                <SentencePanel
+                  frame={currentProblem.sentenceFrame}
+                  targetWord={currentProblem.target.word}
+                  revealedCount={captionRevealed}
+                  filled={problemState.resolved}
+                  reducedMotion={reducedMotion}
+                />
+              )}
+            </div>
+          )}
+
           {/* Picture chips — 3 chips, 96×96pt with 24pt gaps per spec line 143.
           For `letter-names` and `letter-sounds` the chip CONTENT swaps
           from `<WordPicture>` to a centered letter glyph; the chip FRAME
@@ -1912,6 +1956,14 @@ function WordSongScreen({
               // CVC chips — only the CONTENT swaps from <WordPicture> to a
               // text glyph, the same seam the letter tiers use.
               const isSightWord = currentProblem.contentType === 'sight-word'
+              // Simple-sentences tier (Wave 13 W13-03/04): the chip is the
+              // WRITTEN word as text — the EXACT sight-words written-word
+              // chip (Kyle §3.3, "reuse the isSightWord text-glyph chip").
+              // Same frame, same 36px text; only the gate widens. Render
+              // dispatch keys on this combined predicate so both tiers
+              // share one branch.
+              const isWrittenWordChip =
+                isSightWord || currentProblem.contentType === 'simple-sentence'
               return (
                 <m.button
                   key={entry.word}
@@ -1924,7 +1976,7 @@ function WordSongScreen({
                   aria-label={
                     isLetterTier
                       ? `Letter ${entry.word}`
-                      : isSightWord
+                      : isWrittenWordChip
                         ? `Word ${entry.word}`
                         : `Picture of ${entry.word}`
                   }
@@ -2004,19 +2056,25 @@ function WordSongScreen({
                     >
                       {entry.word}
                     </span>
-                  ) : isSightWord ? (
-                    /* Sight-word chip — the WRITTEN word as text, the chip
-                       target itself (Dave's W11-01 mechanic). 36px keeps the
-                       longest starter-pool word ("said", 4 letters) inside
-                       the 96pt chip's ~80pt content box without clipping;
-                       letters use 64px because a single glyph has the room.
-                       The rendered text IS the chip's accessible/visible word
-                       (Jessica W11-04 test 3 asserts chip innerText contains
-                       data-word). */
+                  ) : isWrittenWordChip ? (
+                    /* Written-word chip — the WRITTEN word as text, the chip
+                       target itself. Shared by the sight-words tier (Dave's
+                       W11-01 mechanic) AND the simple-sentences cloze tier
+                       (Kyle W13-02 §3.3 — the sight-words chip transfers
+                       verbatim). 36px is the sight-words default; for
+                       simple-sentences it keeps the longest deferral word
+                       ("there"/"where", 5 letters) inside the 96pt chip's
+                       ~80pt content box (Kyle §7 Q3 — drop to 32px if a
+                       5-letter word clips; 36px measured clear here). The
+                       rendered text IS the chip's accessible/visible word
+                       (Jessica W11-04 / W13-05 test 3 assert chip innerText
+                       contains data-word). The shared `word-song-chip-sight-word`
+                       testid is retained (it names the chip SHAPE, not the
+                       tier — Kyle §7 Q5). */
                     <span
                       data-testid="word-song-chip-sight-word"
                       style={{
-                        fontSize: '36px',
+                        fontSize: entry.word.length >= 5 ? '32px' : '36px',
                         lineHeight: 1,
                         fontWeight: 700,
                         color: '#1F2937',
@@ -2105,6 +2163,137 @@ function renderCaption(text: string, revealedCount: number) {
       {word}
     </m.span>
   ))
+}
+
+/** The literal gap token in a simple-sentence `sentenceFrame`. */
+const SENTENCE_GAP_TOKEN = '___'
+
+/**
+ * Sentence panel for the simple-sentences cloze tier (Wave 13 W13-03/04,
+ * Kyle §3.2 — NET-NEW component). Renders the gapped sentence as a
+ * prominent center-stage card above the chips. The `___` gap token renders
+ * as a styled blank underline (`word-song-sentence-gap`); the surrounding
+ * words reveal word-by-word synced to Emma's read (the same `captionRevealed`
+ * tick the caption ribbon uses). On `filled`, the blank fills IN PLACE with
+ * the target word (spring scale-in) so Marian SEES the completed sentence
+ * before advancing — the closure beat (Kyle §3.2 / sponsor Q2).
+ *
+ * Reveal model: the frame is split into tokens; the gap counts as one
+ * token for reveal sequencing. `revealedCount` words (incl. the gap) are
+ * visible. When `filled`, the gap shows `targetWord` instead of the blank
+ * underline and `data-gap-filled="true"`.
+ */
+function SentencePanel({
+  frame,
+  targetWord,
+  revealedCount,
+  filled,
+  reducedMotion,
+}: {
+  frame: string
+  targetWord: string
+  revealedCount: number
+  filled: boolean
+  reducedMotion: boolean
+}) {
+  // Split the frame into whitespace tokens, keeping the gap token as one
+  // unit. e.g. "The cat ___ the mat." → ["The","cat","___","the","mat."].
+  const tokens = frame.split(/\s+/).filter(Boolean)
+  return (
+    <m.div
+      data-testid="word-song-sentence-panel"
+      role="status"
+      aria-live="polite"
+      className="
+        mx-auto mt-2 max-w-[90%]
+        rounded-2xl border-[3px] border-my-pink bg-white
+        px-6 py-4 text-center
+        shadow-[0_8px_24px_rgba(244,143,177,0.18)]
+      "
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={
+        reducedMotion
+          ? { duration: 0.2 }
+          : { type: 'spring', stiffness: 260, damping: 20 }
+      }
+    >
+      <p
+        className="font-display text-[2rem] leading-relaxed text-ink"
+        style={{ wordSpacing: '0.1em' }}
+      >
+        {tokens.map((token, i) => {
+          const revealed = i < revealedCount
+          const isGap = token === SENTENCE_GAP_TOKEN
+          const marginRight = i === tokens.length - 1 ? 0 : '0.3em'
+          if (isGap) {
+            return (
+              <m.span
+                key={`gap-${i}`}
+                data-testid="word-song-sentence-gap"
+                data-gap-filled={filled ? 'true' : 'false'}
+                className="inline-block"
+                style={{ marginRight }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: revealed ? 1 : 0 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+              >
+                {filled ? (
+                  /* Gap fills with the target word in place — the closure
+                     beat (Kyle §3.2). Same ink weight as the rest of the
+                     sentence (it is now part of the sentence, not a chip). */
+                  <m.span
+                    data-testid="word-song-sentence-word"
+                    data-revealed="true"
+                    data-word={targetWord}
+                    className="inline-block text-ink"
+                    initial={
+                      reducedMotion ? { opacity: 0 } : { scale: 0, opacity: 0 }
+                    }
+                    animate={
+                      reducedMotion ? { opacity: 1 } : { scale: 1, opacity: 1 }
+                    }
+                    transition={
+                      reducedMotion
+                        ? { duration: 0.2 }
+                        : { type: 'spring', stiffness: 260, damping: 16 }
+                    }
+                  >
+                    {targetWord}
+                  </m.span>
+                ) : (
+                  /* Styled blank underline — NOT the literal "___" (Kyle
+                     §3.2: "a blank underline inside the sentence text"). */
+                  <span
+                    className="inline-block border-b-[3px] border-ink align-baseline"
+                    style={{ width: '3.5ch' }}
+                    aria-label="blank"
+                  >
+                    {' '}
+                  </span>
+                )}
+              </m.span>
+            )
+          }
+          return (
+            <m.span
+              key={`${i}-${token}`}
+              data-testid="word-song-sentence-word"
+              data-revealed={revealed ? 'true' : 'false'}
+              data-word={token}
+              className="inline-block"
+              style={{ marginRight }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: revealed ? 1 : 0 }}
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+            >
+              {token}
+            </m.span>
+          )
+        })}
+      </p>
+    </m.div>
+  )
 }
 
 /** A single letter on the word card. Letter taps pulse + shift colour but

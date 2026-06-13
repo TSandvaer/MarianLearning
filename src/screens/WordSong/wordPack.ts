@@ -2150,9 +2150,16 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   // resolve; out-of-pack confusables (are/saw) are substituted with the
   // nearest resolvable in-pool word. All pairs distinct from target and
   // each other; no FORBIDDEN_PAIR adjacency (written-word chips have no
-  // silhouette collision). The 14 already-present targets (sat/dog/bag/
-  // in/it/on/to/hot/see/go/ship/shed/shop/chip) keep their existing rows.
+  // silhouette collision). The 13 already-present targets (dog/bag/in/it/
+  // on/to/hot/see/go/ship/shed/shop/chip) keep their existing CVC /
+  // sight-word rows; only `sat` (distractor-only in its home tier, with NO
+  // existing row) needs a fresh row below alongside the 12 net-new words.
   //
+  // Content-verb gap target `sat` — distractor-only in its home tier (a
+  // digraphs-ch `chat` minimal-pair distractor) but a first-class gap
+  // target here (wrong-class gentle, same-class trap). All distractors
+  // resolve via getWordEntry.
+  sat: { gentle: ['on', 'the'], trap: ['ran', 'see'] },
   // Inherited deferrals (Dave §"Distractor reference table"):
   they: { gentle: ['the', 'on'], trap: ['there', 'we'] },
   there: { gentle: ['cat', 'is'], trap: ['they', 'where'] },
