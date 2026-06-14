@@ -51,6 +51,7 @@ import {
   buildLeitnerSessionHint,
   buildSlowFactSessionHint,
   crossVowelMixingActive,
+  dueLeitnerItems,
   getOrCreateDeviceId,
   getSettings,
   isGraduationSessionPending,
@@ -233,9 +234,23 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   // wire field is omitted entirely and the canon-served path stays
   // free; non-empty box → an array sorted box-ascending the planner
   // weights toward problems 4-8.
+  //
+  // 86c9kmwf8 (M4 residual delta — spaced-review schedule): filter the
+  // box through `dueLeitnerItems(box, now)` FIRST so only facts whose
+  // box-derived review interval has elapsed since `lastSeen` ship. This
+  // is the time dimension PR #164 didn't carry — previously every box
+  // fact shipped into every session ("weighted review"), now a fact is
+  // only resurfaced once it is actually due ("spaced review"). The
+  // filter is applied at the caller (not inside `buildLeitnerSessionHint`)
+  // so the hint builder stays a pure box→wire flatten with no clock
+  // dependency, and the empty-box / cap / sort contract is unchanged —
+  // the due-filter just feeds it a (possibly smaller) box. When the
+  // filtered subset is empty (nothing due yet), the field is omitted and
+  // the canon-served free path is preserved exactly as before.
   let leitner: LeitnerSessionHintItem[] | undefined = undefined
   if (track === 'math') {
-    const hint = buildLeitnerSessionHint(progress.mathFactsLeitner)
+    const due = dueLeitnerItems(progress.mathFactsLeitner, Date.now())
+    const hint = buildLeitnerSessionHint(due)
     if (hint.length > 0) {
       leitner = hint
     }
