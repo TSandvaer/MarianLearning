@@ -11,11 +11,16 @@
  *    cloud-blob-rejected (validation fail keeps local)
  *  - withDefaultedSkillLevels parity: cloud blob missing a key gets
  *    healed before install (mirrors T1)
+ *  - mergeSessionHistories: union-dedupe-sort of two history arrays
+ *    (ticket 86c9qa6na — P1 data-loss fix)
+ *  - reconcile cloud-newer history merge: local sessions survive a
+ *    cloud-wins install instead of being clobbered (the regression)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   fetchProgressFromCloud,
+  mergeSessionHistories,
   pushProgressToCloud,
   reconcileWithCloud,
   type FetchResult,
@@ -23,7 +28,7 @@ import {
 } from './cloudSync'
 import { defaultProgress } from './defaults'
 import { isProgressV1 } from './guards'
-import type { Progress, SkillLevels } from './types'
+import type { Progress, SessionHistoryEntry, SkillLevels } from './types'
 
 const VALID_UUID = '11111111-2222-4333-8444-555555555555'
 const SECRET = 'test-secret'
@@ -638,5 +643,242 @@ describe('reconcileWithCloud', () => {
     })
     expect(outcome.kind).toBe('installed-from-cloud')
     expect(installed).toHaveLength(1)
+  })
+
+  // -------------------------------------------------------------------------
+  // History merge under cloud-wins (ticket 86c9qa6na — P1 data-loss fix).
+  //
+  // THE REGRESSION: before this fix, a cloud-newer reconcile clobbered
+  // local `history` wholesale. A session Marian played on the slower-clock
+  // (losing) device — present in `local.history`, absent from the cloud
+  // blob — disappeared on install. These tests pin that the install path
+  // now UNION-MERGES the two histories so no local session is lost.
+  // -------------------------------------------------------------------------
+
+  it('cloud newer → local-only history entries survive the install (no data loss)', async () => {
+    // Local (losing device) carries a session the cloud blob never saw.
+    const localOnly: SessionHistoryEntry = {
+      dateISO: '2026-05-09T07:30:00.000Z',
+      skillFocus: ['cvc-words'],
+      successRate: 0.75,
+    }
+    const shared: SessionHistoryEntry = {
+      dateISO: '2026-05-09T09:00:00.000Z',
+      skillFocus: ['cvc-words'],
+      successRate: 0.875,
+    }
+    const cloudOnly: SessionHistoryEntry = {
+      dateISO: '2026-05-09T10:30:00.000Z',
+      skillFocus: ['cvc-words'],
+      successRate: 1.0,
+    }
+    const local: Progress = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-05-09T09:00:00.000Z',
+      },
+      history: [localOnly, shared],
+    }
+    const cloudBlob = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-05-09T11:00:00.000Z',
+      },
+      // Cloud has the shared session + its own later one; it does NOT
+      // carry `localOnly`.
+      history: [shared, cloudOnly],
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-05-09T11:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    // Union of {localOnly, shared} ∪ {shared, cloudOnly}, deduped to 3,
+    // sorted ascending by dateISO. The load-bearing assertion: the
+    // local-only session SURVIVED rather than being clobbered.
+    expect(installed[0]!.history).toEqual([localOnly, shared, cloudOnly])
+  })
+
+  it('cloud newer → other cloud fields still win last-write-wins; only history merges', async () => {
+    const localEntry: SessionHistoryEntry = {
+      dateISO: '2026-05-09T07:00:00.000Z',
+      skillFocus: ['cvc-words'],
+      successRate: 0.5,
+    }
+    const cloudEntry: SessionHistoryEntry = {
+      dateISO: '2026-05-09T10:00:00.000Z',
+      skillFocus: ['cvc-words'],
+      successRate: 1.0,
+    }
+    const local: Progress = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-05-09T08:00:00.000Z',
+      },
+      skillLevels: { ...defaultProgress().skillLevels, 'cvc-words': 'intro' },
+      history: [localEntry],
+    }
+    const cloudBlob = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-05-09T11:00:00.000Z',
+      },
+      // Cloud advanced cvc-words to 'mastered' — that state must WIN
+      // last-write-wins; only `history` is union-merged.
+      skillLevels: {
+        ...defaultProgress().skillLevels,
+        'cvc-words': 'mastered',
+      },
+      history: [cloudEntry],
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-05-09T11:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    // AC2: skillLevels stays last-write-wins — cloud's 'mastered' won.
+    expect(installed[0]!.skillLevels['cvc-words']).toBe('mastered')
+    // History union-merged both sessions.
+    expect(installed[0]!.history).toEqual([localEntry, cloudEntry])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// mergeSessionHistories (ticket 86c9qa6na — P1 data-loss fix)
+//
+// AC3: 5+ tests pinning the merge logic — empty-on-empty,
+// empty-on-populated, populated-on-populated-no-overlap,
+// populated-on-populated-with-overlap (dedupe fires),
+// populated-on-populated-with-stale-stamps (no time travel — output is
+// sorted ascending regardless of input order). Count-based assertions
+// via `.toEqual` on the merged array; never `.toContain`.
+// ---------------------------------------------------------------------------
+
+describe('mergeSessionHistories', () => {
+  function entry(
+    dateISO: string,
+    successRate: number,
+    skillFocus: SessionHistoryEntry['skillFocus'] = ['cvc-words'],
+  ): SessionHistoryEntry {
+    return { dateISO, skillFocus, successRate }
+  }
+
+  it('empty ∪ empty → empty', () => {
+    expect(mergeSessionHistories([], [])).toEqual([])
+  })
+
+  it('empty local ∪ populated cloud → cloud entries, sorted', () => {
+    const a = entry('2026-05-09T09:00:00.000Z', 0.875)
+    const b = entry('2026-05-09T10:00:00.000Z', 1.0)
+    // Cloud given OUT of order to prove the sort runs.
+    expect(mergeSessionHistories([], [b, a])).toEqual([a, b])
+  })
+
+  it('populated local ∪ empty cloud → local entries, sorted', () => {
+    const a = entry('2026-05-09T08:00:00.000Z', 0.5)
+    const b = entry('2026-05-09T12:00:00.000Z', 0.75)
+    expect(mergeSessionHistories([b, a], [])).toEqual([a, b])
+  })
+
+  it('no-overlap → full union of both, deduped count == sum, sorted ascending', () => {
+    const l1 = entry('2026-05-09T07:00:00.000Z', 0.5)
+    const l2 = entry('2026-05-09T11:00:00.000Z', 0.875)
+    const c1 = entry('2026-05-09T08:30:00.000Z', 0.625)
+    const c2 = entry('2026-05-09T13:00:00.000Z', 1.0)
+    const merged = mergeSessionHistories([l1, l2], [c1, c2])
+    // No shared keys → all 4 survive.
+    expect(merged).toHaveLength(4)
+    expect(merged).toEqual([l1, c1, l2, c2])
+  })
+
+  it('with-overlap → the shared session dedupes (local copy kept), distinct ones survive', () => {
+    const shared = entry('2026-05-09T09:00:00.000Z', 0.875)
+    const localOnly = entry('2026-05-09T07:00:00.000Z', 0.5)
+    const cloudOnly = entry('2026-05-09T11:00:00.000Z', 1.0)
+    // `shared` present on BOTH sides — must appear exactly ONCE.
+    const merged = mergeSessionHistories(
+      [localOnly, shared],
+      [shared, cloudOnly],
+    )
+    expect(merged).toHaveLength(3)
+    expect(merged).toEqual([localOnly, shared, cloudOnly])
+  })
+
+  it('distinct sessions sharing a dateISO but differing on successRate are BOTH kept', () => {
+    // Same millisecond start is implausible across real sessions, but the
+    // key includes successRate + skillFocus so a genuine collision-free
+    // pair is never falsely merged.
+    const a = entry('2026-05-09T09:00:00.000Z', 0.5)
+    const b = entry('2026-05-09T09:00:00.000Z', 1.0)
+    const merged = mergeSessionHistories([a], [b])
+    expect(merged).toHaveLength(2)
+    // Stable sort preserves insertion order on equal dateISO.
+    expect(merged).toEqual([a, b])
+  })
+
+  it('distinct sessions sharing dateISO + successRate but differing skillFocus are BOTH kept', () => {
+    const a = entry('2026-05-09T09:00:00.000Z', 0.875, ['cvc-words'])
+    const b = entry('2026-05-09T09:00:00.000Z', 0.875, ['add-to-10'])
+    const merged = mergeSessionHistories([a], [b])
+    expect(merged).toHaveLength(2)
+    expect(merged).toEqual([a, b])
+  })
+
+  it('stale stamps → output is sorted ascending regardless of either side ordering (no time travel)', () => {
+    // Cloud carries an OLDER session than local's newest; local carries an
+    // OLDER session than cloud's newest. Inputs are deliberately unsorted.
+    // Output must be globally ascending by dateISO.
+    const oldest = entry('2026-05-08T06:00:00.000Z', 0.375)
+    const mid = entry('2026-05-09T09:00:00.000Z', 0.75)
+    const newest = entry('2026-05-09T18:00:00.000Z', 1.0)
+    const merged = mergeSessionHistories([newest, oldest], [mid])
+    expect(merged).toEqual([oldest, mid, newest])
+  })
+
+  it('does not mutate either input array', () => {
+    const l = [entry('2026-05-09T11:00:00.000Z', 1.0)]
+    const c = [entry('2026-05-09T08:00:00.000Z', 0.5)]
+    const lSnapshot = [...l]
+    const cSnapshot = [...c]
+    mergeSessionHistories(l, c)
+    expect(l).toEqual(lSnapshot)
+    expect(c).toEqual(cSnapshot)
+  })
+
+  it('preserves optional fields (latencyMs / novelPoolSuccessRate) on surviving entries', () => {
+    const rich: SessionHistoryEntry = {
+      dateISO: '2026-05-09T09:00:00.000Z',
+      skillFocus: ['cvc-words'],
+      successRate: 0.875,
+      novelPoolSuccessRate: 0.8,
+      latencyMs: [1200, 900, 1500],
+    }
+    const merged = mergeSessionHistories([rich], [])
+    expect(merged).toEqual([rich])
+    // Identity of the optional fields preserved verbatim.
+    expect(merged[0]!.novelPoolSuccessRate).toBe(0.8)
+    expect(merged[0]!.latencyMs).toEqual([1200, 900, 1500])
   })
 })
