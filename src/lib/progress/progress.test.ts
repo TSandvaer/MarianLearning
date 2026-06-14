@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CURRENT_SCHEMA_VERSION,
+  LEITNER_DUE_PER_SESSION_CAP,
   LEITNER_HINT_MAX_ITEMS,
   LEITNER_REVIEW_INTERVAL_DAYS,
   MAX_SESSION_HISTORY,
@@ -256,19 +257,54 @@ describe('buildLeitnerSessionHint', () => {
         { item: { a: 4, b: 4, op: '+' }, box: 1, lastSeen: 0 },
       ],
     }
-    const out = buildLeitnerSessionHint(box)
+    // Explicit high cap to exercise the sort over all 4 items (the default
+    // per-session cap of 3 is asserted separately).
+    const out = buildLeitnerSessionHint(box, 60)
     expect(out.map((i) => i.box)).toEqual([1, 1, 2, 4])
   })
 
-  it('caps at LEITNER_HINT_MAX_ITEMS entries', () => {
-    // Synthesize a box with twice the cap to verify truncation.
+  it('defaults to the per-session cap (LEITNER_DUE_PER_SESSION_CAP = 3)', () => {
+    // Ten all-box-1 facts; the default call caps the wire output at 3.
+    const items = Array.from({ length: 10 }, (_, i) => ({
+      item: { a: i, b: i + 1, op: '+' as const },
+      box: 1 as const,
+      lastSeen: 0,
+    }))
+    const out = buildLeitnerSessionHint({ items })
+    expect(out).toHaveLength(LEITNER_DUE_PER_SESSION_CAP)
+    expect(LEITNER_DUE_PER_SESSION_CAP).toBe(3)
+  })
+
+  it('caps the lowest-box facts when more than 3 are due (ordering preserved)', () => {
+    // Mixed boxes. After the box-ascending sort the survivors must be the
+    // three lowest-box facts (most fragile), not whichever came first.
+    const box: LeitnerBox<MathFact> = {
+      items: [
+        { item: { a: 9, b: 1, op: '+' }, box: 5, lastSeen: 0 },
+        { item: { a: 2, b: 2, op: '+' }, box: 2, lastSeen: 0 },
+        { item: { a: 8, b: 1, op: '+' }, box: 4, lastSeen: 0 },
+        { item: { a: 1, b: 1, op: '+' }, box: 1, lastSeen: 0 },
+        { item: { a: 3, b: 3, op: '+' }, box: 3, lastSeen: 0 },
+      ],
+    }
+    const out = buildLeitnerSessionHint(box)
+    expect(out).toHaveLength(3)
+    // Lowest-box-first within the cap: box 1, then 2, then 3.
+    expect(out.map((i) => i.box)).toEqual([1, 2, 3])
+    expect(out.map((i) => `${i.a}+${i.b}`)).toEqual(['1+1', '2+2', '3+3'])
+  })
+
+  it('keeps LEITNER_HINT_MAX_ITEMS (60) as the outer brake under an explicit higher cap', () => {
+    // The per-session cap is the tight pedagogical bound; 60 is the separate
+    // outer request-body brake. Overriding the per-session cap above 60
+    // proves the 60-item brake still binds independently.
     const overflow = LEITNER_HINT_MAX_ITEMS + 5
     const items = Array.from({ length: overflow }, (_, i) => ({
       item: { a: i, b: i + 1, op: '+' as const },
       box: 1 as const,
       lastSeen: 0,
     }))
-    const out = buildLeitnerSessionHint({ items })
+    const out = buildLeitnerSessionHint({ items }, overflow)
     expect(out).toHaveLength(LEITNER_HINT_MAX_ITEMS)
   })
 
@@ -314,21 +350,29 @@ describe('dueLeitnerItems (spaced-review schedule — 86c9kmwf8)', () => {
     expect(dueLeitnerItems(box2, NOW).items).toHaveLength(1)
   })
 
-  it('box-3 fact is NOT due before 4 days, IS due at/after 4 days', () => {
-    // Seen 3 days ago → not yet due (box-3 interval is 4 days).
-    const notYet = boxAt(3, NOW - 3 * MS_PER_DAY)
+  it('box-2 fact is NOT due before 1 day, IS due at/after 1 day (tuned 2→1)', () => {
+    // box2 tightened from 2→1 day (Backhaus overnight-consolidation window,
+    // research #450). Seen 23 h ago → not yet due.
+    const notYet = boxAt(2, NOW - (MS_PER_DAY - 3_600_000))
     expect(dueLeitnerItems(notYet, NOW).items).toHaveLength(0)
-    // Seen 5 days ago → comfortably due.
-    const overdue = boxAt(3, NOW - 5 * MS_PER_DAY)
-    expect(dueLeitnerItems(overdue, NOW).items).toHaveLength(1)
+    // Seen exactly 1 day ago → due (>= boundary).
+    const exact = boxAt(2, NOW - 1 * MS_PER_DAY)
+    expect(dueLeitnerItems(exact, NOW).items).toHaveLength(1)
+    // One ms short of 1 day → not due.
+    const justShort = boxAt(2, NOW - 1 * MS_PER_DAY + 1)
+    expect(dueLeitnerItems(justShort, NOW).items).toHaveLength(0)
   })
 
-  it('is due exactly AT the interval boundary (>= comparison)', () => {
-    // Box-2 interval is 2 days. lastSeen exactly 2 days ago → due.
-    const exact = boxAt(2, NOW - 2 * MS_PER_DAY)
+  it('box-3 fact is NOT due before 3 days, IS due at/after 3 days (tuned 4→3)', () => {
+    // box3 tightened from 4→3 days (Cepeda 20% ratio, research #450).
+    // Seen 2 days ago → not yet due.
+    const notYet = boxAt(3, NOW - 2 * MS_PER_DAY)
+    expect(dueLeitnerItems(notYet, NOW).items).toHaveLength(0)
+    // Seen exactly 3 days ago → due (>= boundary).
+    const exact = boxAt(3, NOW - 3 * MS_PER_DAY)
     expect(dueLeitnerItems(exact, NOW).items).toHaveLength(1)
-    // One ms short of 2 days → not due.
-    const justShort = boxAt(2, NOW - 2 * MS_PER_DAY + 1)
+    // One ms short of 3 days → not due.
+    const justShort = boxAt(3, NOW - 3 * MS_PER_DAY + 1)
     expect(dueLeitnerItems(justShort, NOW).items).toHaveLength(0)
   })
 
@@ -400,6 +444,55 @@ describe('dueLeitnerItems (spaced-review schedule — 86c9kmwf8)', () => {
     }
     const hint = buildLeitnerSessionHint(dueLeitnerItems(box, NOW))
     expect(hint).toEqual([{ a: 7, b: 2, op: '+', box: 3 }])
+  })
+
+  it('integration: a flood of >3 due facts is capped to the 3 lowest-box facts', () => {
+    // Overdue-flood protection (research #450 §6 — cap overdue items per
+    // session regardless of how many have elapsed). Six facts, all overdue
+    // for their box, mixed boxes. Through the real App seam
+    // (dueLeitnerItems → buildLeitnerSessionHint) only the 3 lowest-box
+    // (most-fragile) facts reach the planner, in box-ascending order.
+    const box: LeitnerBox<MathFact> = {
+      items: [
+        {
+          item: { a: 4, b: 4, op: '+' },
+          box: 4,
+          lastSeen: NOW - 30 * MS_PER_DAY,
+        },
+        {
+          item: { a: 1, b: 1, op: '+' },
+          box: 1,
+          lastSeen: NOW - 30 * MS_PER_DAY,
+        },
+        {
+          item: { a: 3, b: 3, op: '+' },
+          box: 3,
+          lastSeen: NOW - 30 * MS_PER_DAY,
+        },
+        {
+          item: { a: 5, b: 5, op: '+' },
+          box: 5,
+          lastSeen: NOW - 30 * MS_PER_DAY,
+        },
+        {
+          item: { a: 2, b: 2, op: '+' },
+          box: 2,
+          lastSeen: NOW - 30 * MS_PER_DAY,
+        },
+        {
+          item: { a: 6, b: 4, op: '+' },
+          box: 2,
+          lastSeen: NOW - 30 * MS_PER_DAY,
+        },
+      ],
+    }
+    // All six are overdue, so dueLeitnerItems returns all six...
+    expect(dueLeitnerItems(box, NOW).items).toHaveLength(6)
+    // ...but the per-session cap trims to the 3 lowest-box facts.
+    const hint = buildLeitnerSessionHint(dueLeitnerItems(box, NOW))
+    expect(hint).toHaveLength(LEITNER_DUE_PER_SESSION_CAP)
+    expect(hint.map((i) => i.box)).toEqual([1, 2, 2])
+    expect(hint.map((i) => `${i.a}+${i.b}`)).toEqual(['1+1', '2+2', '6+4'])
   })
 })
 

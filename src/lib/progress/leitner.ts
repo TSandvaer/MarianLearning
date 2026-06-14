@@ -91,14 +91,24 @@ export function emptyLeitner<T>(): LeitnerBox<T> {
 //
 // Box → interval (calendar days):
 //   box 1 → 0   (always due — least familiar, review every session)
-//   box 2 → 2
-//   box 3 → 4
+//   box 2 → 1
+//   box 3 → 3
 //   box 4 → 7
 //   box 5 → 14  (most familiar — long review cadence)
 //
-// These values are a starting guess per the ticket's OOS ("tuning the
-// box-schedule constants is deferred"); they live in one named const so a
-// future tuning pass is a single-line edit.
+// PR #447 shipped a "starting guess" schedule (0, 2, 4, 7, 14). This is the
+// tuning pass (ticket 86c9kmwf8 follow-up) backed by Dave's research
+// `design/research/leitner-interval-tuning-marian.md` (#450, Thomas-approved):
+//   - box2 2→1: the first post-acquisition review is most effective after ONE
+//     night of sleep. Children (ages 7-12) consolidate declarative memory far
+//     more efficiently overnight than adults (Backhaus et al. 2020,
+//     PMC7305149: F1,60 = 18.45, p = 0.00003 children vs. adults in the sleep
+//     condition). A 2-day gap lets the critical 24-h consolidation window
+//     pass; 1 day aligns the review with the post-consolidation retrieval
+//     event that most efficiently strengthens the trace.
+//   - box3 4→3: small tightening toward Cepeda et al. 2008's ~20%
+//     gap-to-retention-interval ratio for a ~2-week review horizon.
+//   - box1 / box4 / box5 hold (research says they are correct as-is).
 // --------------------------------------------------------------------------
 
 /** Milliseconds in one calendar day. */
@@ -117,8 +127,8 @@ export const LEITNER_REVIEW_INTERVAL_DAYS: Readonly<
   Record<LeitnerBoxIndex, number>
 > = {
   1: 0,
-  2: 2,
-  3: 4,
+  2: 1,
+  3: 3,
   4: 7,
   5: 14,
 }
@@ -127,7 +137,7 @@ export const LEITNER_REVIEW_INTERVAL_DAYS: Readonly<
  * Filter a Leitner box down to the items that are DUE for review at
  * `now`. An item is due when the time elapsed since `lastSeen` is at
  * least its box's review interval. Box-1 items (interval 0) are always
- * due; a freshly-promoted box-2 item is NOT due again until 2 days pass.
+ * due; a freshly-promoted box-2 item is NOT due again until 1 day passes.
  *
  * Pure: returns a new box; never mutates input. Item order is preserved,
  * so a downstream `buildLeitnerSessionHint` still sorts box-ascending
@@ -191,10 +201,39 @@ export interface LeitnerSessionHintItem {
 export const LEITNER_HINT_MAX_ITEMS = 60
 
 /**
+ * Per-session cap on how many DUE review facts actually reach the planner.
+ *
+ * `LEITNER_HINT_MAX_ITEMS` (60) is a forward-compat brake on request-body
+ * size; this is the much tighter pedagogical cap. On non-daily attendance a
+ * few skipped days let the due set balloon — a box-2 item (now 1-day
+ * interval) and several box-3 items (3-day interval) all age past their
+ * windows at once and would otherwise flood an 8-problem session, crowding
+ * out new focus-node content. Dave's research
+ * `design/research/leitner-interval-tuning-marian.md` (#450) §6 calls for
+ * capping overdue Leitner items "per session (suggestion: 2-3 maximum)
+ * regardless of how many have elapsed"; we take the top of that range, 3.
+ *
+ * The cap is applied AFTER the box-ascending sort, so the 3 facts that ship
+ * are always the lowest-box (most-fragile) ones — the items that most need
+ * re-exposure. The outer 60-item brake still bounds the array first; in
+ * practice 3 < 60 always wins, but the two caps are independent so a future
+ * tuning pass can raise one without disturbing the other.
+ */
+export const LEITNER_DUE_PER_SESSION_CAP = 3
+
+/**
  * Flatten a `LeitnerBox<MathFact>` into the wire-shape hint, sorted
  * box-ascending (least familiar first). Empty box returns an empty
  * array — the caller is expected to OMIT the field on the wire entirely
  * when length is 0 so the canon-served path stays free of charge.
+ *
+ * Two caps apply, both AFTER the sort so the survivors are the
+ * lowest-box (most-fragile) facts:
+ *   1. `LEITNER_HINT_MAX_ITEMS` (60) — the outer request-body brake.
+ *   2. `perSessionCap` (default `LEITNER_DUE_PER_SESSION_CAP` = 3) — the
+ *      tight pedagogical cap so a backlog of overdue facts can't flood the
+ *      session. Exposed as a parameter so a future tuning pass (or a test
+ *      asserting the outer brake) can override it without an App.tsx change.
  *
  * `Array.prototype.sort` is stable in every JS engine we target
  * (ES2019+), so within a box level the input order is preserved —
@@ -202,6 +241,7 @@ export const LEITNER_HINT_MAX_ITEMS = 60
  */
 export function buildLeitnerSessionHint(
   box: LeitnerBox<{ a: number; b: number; op: '+' | '-' | '*' }>,
+  perSessionCap: number = LEITNER_DUE_PER_SESSION_CAP,
 ): LeitnerSessionHintItem[] {
   const out: LeitnerSessionHintItem[] = box.items.map((entry) => ({
     a: entry.item.a,
@@ -210,8 +250,11 @@ export function buildLeitnerSessionHint(
     box: entry.box,
   }))
   out.sort((x, y) => x.box - y.box)
-  if (out.length > LEITNER_HINT_MAX_ITEMS) {
-    out.length = LEITNER_HINT_MAX_ITEMS
+  // Outer request-body brake first, then the tight per-session cap. Both
+  // truncate from the tail, so the lowest-box facts survive either way.
+  const limit = Math.min(LEITNER_HINT_MAX_ITEMS, perSessionCap)
+  if (out.length > limit) {
+    out.length = limit
   }
   return out
 }
