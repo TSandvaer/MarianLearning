@@ -253,7 +253,7 @@ export interface SessionEndProps {
 
 type Phase =
   | 'opener' // t=0: "You did it!" + sparkle burst
-  | 'focus-recap' // t~1100: "You worked on <friendly-name> today!" (M5)
+  | 'focus-recap' // t~1100: "You worked on <friendly-name> today!" (M5). SKIPPED entirely (never entered) when the `session.end.recap.focus` utterance is unavailable/rejects — see the focus-recap block in the TTS sequence effect (M5 #451 graceful skip).
   | 'recap' // t~2500: stardust count-up + "You earned N stars!"
   | 'streak' // t~4500: streak band (if finalStreak >= 3)
   | 'goodbye' // t~6100: "See you soon."
@@ -653,37 +653,69 @@ export default function SessionEnd({
       // t=1100: Focus recap -- "You worked on <friendly-name> today!" (M5,
       // ticket 86c9kmwh0). One new spoken beat, surface-independent.
       //
-      // Audio id `session.end.recap.focus` is NOT in the committed canon
-      // bundle yet (the planner directive that emits it ships in this PR;
-      // re-baking all tiers is M5-out-of-scope). Until a re-bake lands, the
-      // id misses the howl-map and `playUtterance`'s silent fallback fires
-      // `onWordTick(0)` once — the caption still reveals word-by-word, so the
-      // line is VISIBLE now and becomes AUDIBLE after the next canon re-bake
-      // with zero further code change. Same graceful-degradation pattern the
-      // `session.end.recap.wordsong-completion` id already relies on.
+      // GRACEFUL SKIP (Thomas-approved, M5 #451 follow-up to Jessica's #453
+      // P1). Audio id `session.end.recap.focus` is NOT in the committed canon
+      // bundle yet (the planner directive that emits it ships separately;
+      // re-baking all tiers is M5-out-of-scope). On a real device pre-bake the
+      // id misses the howl-map and the singleton `playSessionUtterance`
+      // REJECTS without ever firing `onPlay`/`onWordTick` — so we must NOT
+      // commit the `focus-recap` phase up front: doing so leaves a dead pause
+      // (phase delay, no audio, no caption) for the whole inter-beat gap,
+      // which Jessica's #453 caught. A captioned-but-silent line would also
+      // violate audio-first.
+      //
+      // So we attempt the utterance FIRST and only enter the `focus-recap`
+      // phase + reveal the caption REACTIVELY, from inside `onPlay`/
+      // `onWordTick` — i.e. only when the utterance actually engages. If it
+      // rejects (unbaked id on a real device), we skip the phase entirely:
+      // no phase flip, no caption, no dwell. The sequence collapses cleanly
+      // to the next beat with no dead pause. Once the clip is baked, the
+      // utterance plays and the beat engages normally with audio + caption,
+      // with zero further code change.
+      //
+      // Note: the unit-test "silent fallback fires onWordTick(0)" path only
+      // runs when `playUtteranceFn === undefined` (the internal shim) — it
+      // does NOT mask the production reject. See the reject-path unit test in
+      // SessionEnd.test.tsx.
       //
       // Copy is client-supplied (`focusRecapCopy`, derived from the session
       // focus node) so the caption is correct independent of audio state.
-      try {
-        setPhase('focus-recap')
-        await new Promise<void>((resolve) => {
-          addTimer(() => {
-            playUtterance('session.end.recap.focus', {
-              onWordTick: (wordIndex) => {
-                setCaptionText(focusRecapCopy)
-                setCaptionRevealed(wordIndex + 1)
-              },
+      //
+      // Timing collapse: on the SKIP path the promise resolves immediately at
+      // ~opener-end, and the recap beat below schedules at
+      // `RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS` (1400ms) — which lands recap
+      // one standard inter-beat gap after the opener, exactly the pre-M5
+      // cadence. So removing the focus-recap beat removes precisely its added
+      // time with no dead pause and no special-casing of the recap delay.
+      await new Promise<void>((resolve) => {
+        addTimer(() => {
+          playUtterance('session.end.recap.focus', {
+            onPlay: () => {
+              // Engine fired the audio: commit the phase. Caption is set by
+              // `onWordTick`.
+              setPhase('focus-recap')
+            },
+            onWordTick: (wordIndex) => {
+              // First tick is the commit point for engines that don't fire a
+              // separate `onPlay` (the internal silent shim ticks word 0
+              // without an `onPlay`). Set the phase here too so the engaged
+              // path is robust regardless of which callback fires first.
+              setPhase('focus-recap')
+              setCaptionText(focusRecapCopy)
+              setCaptionRevealed(wordIndex + 1)
+            },
+          })
+            .then(resolve)
+            .catch((err) => {
+              // Reject = id unavailable (unbaked) OR a real play error. Skip
+              // the beat: no phase, no caption, no dwell. Resolve immediately
+              // so the recap beat fires one standard inter-beat gap later
+              // instead of holding the full focus-recap window silent.
+              console.warn('[SessionEnd] focus-recap utterance skipped:', err)
+              resolve()
             })
-              .then(resolve)
-              .catch((err) => {
-                console.warn('[SessionEnd] focus-recap utterance failed:', err)
-                resolve()
-              })
-          }, FOCUS_RECAP_DELAY_MS - OPENER_DELAY_MS)
-        })
-      } catch {
-        // Swallow -- continue sequence
-      }
+        }, FOCUS_RECAP_DELAY_MS - OPENER_DELAY_MS)
+      })
 
       // t=2500: Recap -- copy is surface-dependent.
       //
