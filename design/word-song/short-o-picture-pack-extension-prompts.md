@@ -2,8 +2,10 @@
 
 **Audience:** Thomas (Midjourney operator, Phase 2 — uses MJ Web workflow per `user_midjourney_web` memory). Devon (PNG-embed integration, Phase 3 via `yarn embed-pictures`).
 **Author:** Marian Tutor design persona.
-**Status:** Phase 1 prompt sheet — paste-ready.
+**Status:** Phase 1 prompt sheet — paste-ready (v6-era authoring shape; see banner).
 **Predecessor specs:** [`design/word-song/short-o-pool-extension.md`](./short-o-pool-extension.md) (this PR — defines the 3-word extension + picture-pack scope), [`design/word-song/short-o-picture-pack-prompts.md`](./short-o-picture-pack-prompts.md) (sibling MJ prompt sheet — original 4 wholly-new short-o words; this file mirrors its structure exactly), [`design/word-song/picture-pack-style-anchor.md`](./picture-pack-style-anchor.md) (style frame, locked), [`design/word-song/short-u-picture-pack-prompts.md`](./short-u-picture-pack-prompts.md) (most-recent MJ prompt sheet, format precedent), [`design/word-song/picture-pack-iteration-plan.md`](./picture-pack-iteration-plan.md) (workflow + drift table — inherited).
+
+> **⚠️ v6-era spec — new packs use the v7 template.** This prompt sheet carries the retired v6 parameter stack (`--cref`/`--sref`/`--cw 80` + `--v 6 --style raw --s 250` + `--ar 1:1` + the universal `--no` block). It is **kept as-is for provenance** — do not re-author from it. For any NEW pack, use the v7 default in [`picture-pack-iteration-plan.md`](./picture-pack-iteration-plan.md) §2 (four-pattern template) + §3 (per-word `--no` recipe); the v6 stack is documented as retired in that plan's §10. The v7-distilled paste-ready version of THIS pack is [`mj-prompts-paste-ready-2026-05-10.md`](./mj-prompts-paste-ready-2026-05-10.md) (PR #189) — prefer it for the actual generation session.
 
 ---
 
@@ -114,7 +116,7 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
   - Filename: `public/assets/pictures/picture-cot.svg` via `yarn embed-pictures`.
   - Source PNG: ≥1024×1024 from MJ; transparent-PNG export at ~512×512 via remove.bg "Regular" output size.
   - Final SVG file size: target **~50–100 KB** (PNG-in-SVG embed; per `.claude/docs/skill-trees-and-content.md` §"Path 2").
-- **Notes:** Vocab-stretch entry — Tagalog primary is *kuna* (crib) / *kama* (bed). The picture-grounds-the-meaning rule applies (same logical move as `hot`, `mom`, `jam` in prior packs). The pillow is the load-bearing recognition cue at 96pt — without it, the silhouette could read as a bench / stool / low-table. If Phase 2 generates a cot without a clearly-visible pillow, regenerate with the pillow emphasised.
+- **Notes:** Vocab-stretch entry — Tagalog primary is _kuna_ (crib) / _kama_ (bed). The picture-grounds-the-meaning rule applies (same logical move as `hot`, `mom`, `jam` in prior packs). The pillow is the load-bearing recognition cue at 96pt — without it, the silhouette could read as a bench / stool / low-table. If Phase 2 generates a cot without a clearly-visible pillow, regenerate with the pillow emphasised.
 
 ---
 
@@ -215,7 +217,7 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
   - Filename: `public/assets/pictures/picture-cob.svg` via `yarn embed-pictures`.
   - Source PNG: ≥1024×1024 → transparent ~512×512 via remove.bg.
   - Final SVG file size: target **~50–100 KB**.
-- **Notes:** **Standby entry — only generate if `pop` Phase 2 review fails.** Pool-extension spec §3 audit had `cob` rejected for vocab-stretch (Tagalog *mais*) but the picture grounds the meaning. If Devon's Phase 3 step fires the substitution, the pool-extension spec is amended in a follow-up PR to swap `pop → cob`. The substitution is documented in pool-extension spec §10 Q3 — Thomas's confirmation is requested before Kevin's impl ticket dispatches.
+- **Notes:** **Standby entry — only generate if `pop` Phase 2 review fails.** Pool-extension spec §3 audit had `cob` rejected for vocab-stretch (Tagalog _mais_) but the picture grounds the meaning. If Devon's Phase 3 step fires the substitution, the pool-extension spec is amended in a follow-up PR to swap `pop → cob`. The substitution is documented in pool-extension spec §10 Q3 — Thomas's confirmation is requested before Kevin's impl ticket dispatches.
 
 ---
 
@@ -251,12 +253,14 @@ yarn embed-pictures design/references/picture-pack/transparent public/assets/pic
 ```
 
 The script wraps each PNG into an `<svg><image href="data:image/png;base64,...">` shell at the canonical filename `picture-{word}.svg`. Per `.claude/docs/skill-trees-and-content.md` §"Two embed-pipeline gotchas":
+
 1. **Worktree drift on `transparent/` source PNGs** — Devon's PR is authored in the impl-ticket's worktree, not the canonical main-repo path. Before running `yarn embed-pictures`, md5-check the source PNG against the canonical main-repo path OR explicitly `cp` the canonical PNG into the worktree's same path as a first step.
 2. **Embed script auto-emits ALL PNGs in the input dir** — make sure the `transparent/` directory contains ONLY the 3 (or 4 with fallback) target PNGs at the time of the run; out-of-scope source PNGs (e.g., a future short-i candidate) WILL produce unintended SVG output. Best practice: empty the `transparent/` directory before placing the new pack's PNGs.
 
 `wordPictures.tsx` requires NO change — the existing shared switch arm (`<image href="/assets/pictures/picture-${pictureKey}.svg">`) handles the new keys automatically per `.claude/docs/skill-trees-and-content.md` §"Coverage state (post-PR #157)."
 
 If Phase 2 fallback to `cob` fires, the substitution requires:
+
 - `wordPack.ts TARGET_WORDS` swap `pop` → `cob` (re-typed `vowel: 'o'`, `pictureKey: 'cob'`, `category: 'food'`).
 - `wordPack.ts TARGET_PAIRINGS` swap `pop`'s row → `cob`'s row with same-vowel-only short-o distractors.
 - `api/_plannerWordList.ts WORD_SONG_TARGET_WORDS_SHORT_O` swap `'pop'` → `'cob'`.

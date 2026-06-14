@@ -7,6 +7,8 @@
 
 This is the **style preamble** that goes into every Midjourney prompt for the v1 picture pack, byte-for-byte. The per-word prompts in `picture-pack-prompts.md` append subject-specific fragments to this preamble. Variation in this block across prompts is the #1 cause of pack-wide style drift — copy it; do not paraphrase it.
 
+> **MJ parameters live in the iteration plan, not here.** This file is the style-attribute frame (palette, line weight, framing, anti-references) only. The MJ v7 prompt structure — the four-pattern template, the per-word `--no` recipe, and the retired v6 `--cref`/`--sref`/`--v 6`/`--style raw`/`--s 250`/`--ar` stack — lives in [`picture-pack-iteration-plan.md`](./picture-pack-iteration-plan.md) §2–§3 and §10. When distilling the §2 preamble below into a paste-ready v7 prompt, swap the cultural style cues (`Korean manhwa / webtoon`, `Studio Ghibli`) for generic English cues (`soft pastel children's picture-book style`) per the moderator-sensitivity constraint in the iteration plan §2; both describe the same target look.
+
 ---
 
 ## 1. Goal
@@ -52,15 +54,15 @@ These are non-negotiables. If a generation drifts on any one of these, regenerat
 
 The world palette is already locked in `tailwind.config.js`. The picture pack extends it without introducing new families.
 
-| Token / hex | Use in pictures |
-| ----------- | --------------- |
-| `#FFF6EE` (Emma cream) | Background plate (keyed transparent in phase 3) |
-| `#FFB7C5` (`--my-rose`) | Soft pink fills — bow accents, jam jar contents, tag base, cap surface |
-| `#F0CDB8` (Emma cardigan peach) | Warm peach fills — secondary palette for clothing/object surfaces |
-| `#F5DCC9` (Emma skin) | Skin tone for `man` / `dad` figures, neutral cream for non-pink objects |
-| `#5C3F31` (Emma hair) | Hair, fur (warm-brown animals), wood (log, wand), darker contour |
-| `#3E2818` (Emma eye) | Eye fills, deepest contour — never pure black |
-| `#C77A7A` (Emma mouth) | Mouth fills, soft red accents (jam contents, tag string) — never bright red |
+| Token / hex                        | Use in pictures                                                                                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#FFF6EE` (Emma cream)             | Background plate (keyed transparent in phase 3)                                                                                                       |
+| `#FFB7C5` (`--my-rose`)            | Soft pink fills — bow accents, jam jar contents, tag base, cap surface                                                                                |
+| `#F0CDB8` (Emma cardigan peach)    | Warm peach fills — secondary palette for clothing/object surfaces                                                                                     |
+| `#F5DCC9` (Emma skin)              | Skin tone for `man` / `dad` figures, neutral cream for non-pink objects                                                                               |
+| `#5C3F31` (Emma hair)              | Hair, fur (warm-brown animals), wood (log, wand), darker contour                                                                                      |
+| `#3E2818` (Emma eye)               | Eye fills, deepest contour — never pure black                                                                                                         |
+| `#C77A7A` (Emma mouth)             | Mouth fills, soft red accents (jam contents, tag string) — never bright red                                                                           |
 | Object-specific desaturated colors | yellow `#F4D89B` (sun, school bus), soft blue `#A5C4D8` (van, water), soft green `#A8C8A0` (leaf accents on log), soft grey `#C8C2BD` (pan, can, pot) |
 
 **Anti-palette (regenerate if any of these appear):**
@@ -89,18 +91,18 @@ The world palette is already locked in `tailwind.config.js`. The picture pack ex
 
 ### 3.6 Framing per category
 
-| Subject category | Framing |
-| ---------------- | ------- |
-| Animals (cat, bat, dog, fox) | Sitting upright, three-quarter view, friendly forward-facing expression, eyes open, warm. |
-| Vehicles (bus, van) | Three-quarter front-side view (the "pretty side" — front + side both visible), ground line implied not drawn. |
-| Kitchen items (pan, pot) | Three-quarter from above (slight perspective so handles visible), centered. |
-| Household objects (mat, fan) | Three-quarter view; mat slightly tilted in perspective; fan as pedestal-fan three-quarter front. |
-| Clothing / accessories (hat, cap, bag) | Three-quarter view as if hanging or worn; hat = wide-brim sun hat; cap = baseball cap with visible peak. |
-| Containers (cup, can, jam jar) | Three-quarter, eye-level or slight-above, ring-pull / lid / contents-through-glass visible per row. |
-| Food / packaging (jam) | Three-quarter view of jar; contents visible through glass. |
-| People (man, dad) | Stylised silhouette-figure with minimal facial detail (eyes as small dots, mouth as soft line, no nose detail), front or three-quarter, warm posture. **`dad` is two-figure (parent + child); `man` is one-figure standalone.** |
-| Tools / props (pen, log, tag) | Side or three-quarter view; pen with visible cap and clip; log horizontal with bark texture lines; tag with visible string loop. |
-| Celestial (sun) | Round disc with simple radiating rays, no face, soft yellow with rose tint. |
+| Subject category                       | Framing                                                                                                                                                                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Animals (cat, bat, dog, fox)           | Sitting upright, three-quarter view, friendly forward-facing expression, eyes open, warm.                                                                                                                                       |
+| Vehicles (bus, van)                    | Three-quarter front-side view (the "pretty side" — front + side both visible), ground line implied not drawn.                                                                                                                   |
+| Kitchen items (pan, pot)               | Three-quarter from above (slight perspective so handles visible), centered.                                                                                                                                                     |
+| Household objects (mat, fan)           | Three-quarter view; mat slightly tilted in perspective; fan as pedestal-fan three-quarter front.                                                                                                                                |
+| Clothing / accessories (hat, cap, bag) | Three-quarter view as if hanging or worn; hat = wide-brim sun hat; cap = baseball cap with visible peak.                                                                                                                        |
+| Containers (cup, can, jam jar)         | Three-quarter, eye-level or slight-above, ring-pull / lid / contents-through-glass visible per row.                                                                                                                             |
+| Food / packaging (jam)                 | Three-quarter view of jar; contents visible through glass.                                                                                                                                                                      |
+| People (man, dad)                      | Stylised silhouette-figure with minimal facial detail (eyes as small dots, mouth as soft line, no nose detail), front or three-quarter, warm posture. **`dad` is two-figure (parent + child); `man` is one-figure standalone.** |
+| Tools / props (pen, log, tag)          | Side or three-quarter view; pen with visible cap and clip; log horizontal with bark texture lines; tag with visible string loop.                                                                                                |
+| Celestial (sun)                        | Round disc with simple radiating rays, no face, soft yellow with rose tint.                                                                                                                                                     |
 
 ### 3.7 Subject-specific anti-conventions
 
@@ -116,19 +118,19 @@ The world palette is already locked in `tailwind.config.js`. The picture pack ex
 
 Inherited from `design/character/reference-styles.md` §"What we're NOT aiming for", adapted for object/animal subjects.
 
-| Style | Why excluded |
-| ----- | ------------ |
-| **Anime / shonen** (sharp lines, dynamic angles, action poses) | Lines too sharp, mood too intense, palette tendency toward saturated. |
-| **Chibi / super-deformed** | Infantilising; reads as toy/mascot, not real-world vocabulary anchor. |
-| **Disney 3D / Pixar** | Wrong medium (we're SVG-2D-bound). Wrong tonal register (Pixar facial proportions slide toward "appealing/marketable" attractor). |
-| **Realistic 3D-rendered or photorealistic** | Style mismatch with Emma; phase 3 SVG trace would lose all the rendering subtlety anyway. |
-| **The Noun Project / Material Icons / abstract icon-set** | Too low information for picture-as-meaning role. Marian needs a recognisable cat, not a cat-glyph. |
-| **Eric Carle collage / Sandra Boynton thick-line** | Lovely children's-book traditions, but tonal mismatch with Emma's clean digital line. |
-| **Sanrio-derivative cute** (Hello Kitty / My Melody / Cinnamoroll style) | Project explicitly dropped Sanrio IP on 2026-04-28; drifting back here re-introduces the IP risk that motivated the Emma pivot. **Exception scoped tightly:** `bat` may be "Sanrio-Kuromi-style friendly bat" — but ONLY in the no-fangs-big-eyes-cute sense; not in the trademark-character-likeness sense. |
-| **Stock children's-book illustration with a different illustrator's hand** | Style mismatch within the pack would split the visual world. |
-| **Emoji-style flat icons** (Apple emoji, Twemoji) | Too low information at chip size; emotional valence wrong (emoji are designed to convey feelings, not anchor vocabulary). |
-| **Romantic / shoujo-with-stars** | Wrong context (subject pictures, not character work). |
-| **Stylised "kawaii everything" with sparkles and decorative stars** | Sparkles belong to Melody-world's reward feedback (`sparkle-particle.svg`), not to the chip pictures. The picture is the noun; sparkles are reward. Don't mix. |
+| Style                                                                      | Why excluded                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Anime / shonen** (sharp lines, dynamic angles, action poses)             | Lines too sharp, mood too intense, palette tendency toward saturated.                                                                                                                                                                                                                                        |
+| **Chibi / super-deformed**                                                 | Infantilising; reads as toy/mascot, not real-world vocabulary anchor.                                                                                                                                                                                                                                        |
+| **Disney 3D / Pixar**                                                      | Wrong medium (we're SVG-2D-bound). Wrong tonal register (Pixar facial proportions slide toward "appealing/marketable" attractor).                                                                                                                                                                            |
+| **Realistic 3D-rendered or photorealistic**                                | Style mismatch with Emma; phase 3 SVG trace would lose all the rendering subtlety anyway.                                                                                                                                                                                                                    |
+| **The Noun Project / Material Icons / abstract icon-set**                  | Too low information for picture-as-meaning role. Marian needs a recognisable cat, not a cat-glyph.                                                                                                                                                                                                           |
+| **Eric Carle collage / Sandra Boynton thick-line**                         | Lovely children's-book traditions, but tonal mismatch with Emma's clean digital line.                                                                                                                                                                                                                        |
+| **Sanrio-derivative cute** (Hello Kitty / My Melody / Cinnamoroll style)   | Project explicitly dropped Sanrio IP on 2026-04-28; drifting back here re-introduces the IP risk that motivated the Emma pivot. **Exception scoped tightly:** `bat` may be "Sanrio-Kuromi-style friendly bat" — but ONLY in the no-fangs-big-eyes-cute sense; not in the trademark-character-likeness sense. |
+| **Stock children's-book illustration with a different illustrator's hand** | Style mismatch within the pack would split the visual world.                                                                                                                                                                                                                                                 |
+| **Emoji-style flat icons** (Apple emoji, Twemoji)                          | Too low information at chip size; emotional valence wrong (emoji are designed to convey feelings, not anchor vocabulary).                                                                                                                                                                                    |
+| **Romantic / shoujo-with-stars**                                           | Wrong context (subject pictures, not character work).                                                                                                                                                                                                                                                        |
+| **Stylised "kawaii everything" with sparkles and decorative stars**        | Sparkles belong to Melody-world's reward feedback (`sparkle-particle.svg`), not to the chip pictures. The picture is the noun; sparkles are reward. Don't mix.                                                                                                                                               |
 
 ---
 
