@@ -879,6 +879,12 @@ function WordSongScreen({
       // for the long-form rationale.
       if (spokeReadAloudRef.current) return
       spokeReadAloudRef.current = true
+      // Emma adopts the `listening` pose for the read-aloud / speaking beat
+      // (Wave 14 Track B, ticket 86ca8kq7r). POSE_HOLD_MS.listening is
+      // `null`, so it never auto-returns — the speak() onEnd `.then()` below
+      // clears it back to `idle`. Reduce-motion is handled entirely by the
+      // shared EmmaCharacter (SVG swap, no tilt) — no screen branch needed.
+      setPose('listening')
       // Mirror `audioUnlocked` inside the microtask so the setState lands
       // outside the effect body (react-hooks/set-state-in-effect).
       if (howlerRunning) setAudioUnlocked(true)
@@ -891,6 +897,12 @@ function WordSongScreen({
         if (problemIndexRef.current !== myProblemIndex) return
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
+        // Clear the `listening` pose on the read-aloud onEnd (Wave 14
+        // Track B). Guard against clobbering a reaction that fired while
+        // the read-aloud was in flight (chip tap mid-read-aloud could have
+        // already set `celebration` / `puzzled-tilt`); only return to idle
+        // if Emma is still `listening`.
+        setPose((current) => (current === 'listening' ? 'idle' : current))
       })
     }
 
@@ -1170,6 +1182,11 @@ function WordSongScreen({
             hintTimerRef.current = setTimeout(() => {
               hintTimerRef.current = null
               setProblemState((prev) => ({ ...prev, hintPlayed: true }))
+              // Emma adopts the `attentive-pointing` pose for the hint beat
+              // (Wave 14 Track B, ticket 86ca8kq7r). The wand carries the
+              // direction (tilt 0°); POSE_HOLD_MS['attentive-pointing'] is
+              // `null`, so the hint TTS onEnd `.then()` below clears it.
+              setPose('attentive-pointing')
               void speak(problem.utterances.hint).then(() => {
                 poseTimerRef.current = setTimeout(() => {
                   setPose('idle')

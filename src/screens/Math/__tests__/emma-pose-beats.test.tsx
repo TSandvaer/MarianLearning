@@ -171,16 +171,29 @@ function makePlayHarness(opts: { autoResolve?: boolean } = {}) {
 }
 
 /**
- * Read the CURRENT pose. EmmaCharacter wraps its `<m.img>` in
- * `<AnimatePresence>`; during a pose transition the exiting img and the
- * entering img both carry the same testid for one commit (the exit
- * animation hasn't unmounted yet under jsdom). AnimatePresence mounts the
- * new child LAST in document order, so the final matching element is the
- * live pose. Returns `data-pose` of that element.
+ * Read the CURRENT LIVE pose from the SCREEN ROOT (`data-testid="math"`,
+ * which mirrors `data-pose={pose}` straight off React state — see
+ * Math.tsx). The screen root is the single source of truth and reflects
+ * exactly the committed `pose` state, with no AnimatePresence lifecycle in
+ * the way. This file's header comment lists it as an equally-valid
+ * `data-pose` source.
+ *
+ * Why NOT read `math-emma` (`getAllByTestId('math-emma').at(-1)`): the
+ * EmmaCharacter `<m.img>` is wrapped in `<AnimatePresence>` with a 0.15s
+ * exit. When a pose RETURNS to a previously-used key (listening → idle,
+ * attentive-pointing → idle), Framer revives the original `idle` element in
+ * its ORIGINAL slot (first) and the exiting non-idle img lingers as the
+ * LAST DOM node — its exit never completes under fake timers, ~150ms under
+ * real timers. `.at(-1)` then returns the STALE exiting pose, not the live
+ * one, so every "clears to idle" assertion would read the lingering
+ * `listening` / `attentive-pointing`. The screen-root selector sidesteps
+ * the AnimatePresence lifecycle entirely and reads true React state.
+ * `emmaEl` below still reads `math-emma` for `src` / `data-wiggling`
+ * attribute checks, which only assert on the single freshly-mounted
+ * non-idle element.
  */
-const POSE = (testid = 'math-emma') => {
-  const all = screen.getAllByTestId(testid)
-  return all[all.length - 1].getAttribute('data-pose')
+const POSE = (testid = 'math') => {
+  return screen.getByTestId(testid).getAttribute('data-pose')
 }
 /** Read the live EmmaCharacter element (newest mount) for attribute checks. */
 const emmaEl = (testid = 'math-emma') => {
@@ -310,6 +323,13 @@ describe('Math — Emma pose beats (Wave 14 Track B)', () => {
     // Resolve the hint speak() (its onEnd) → pose returns to idle.
     await act(async () => {
       harness.resolveByText('Look. Three. And two more. How many now?')
+      // Drain the await-chain microtasks (speak()'s finally → the
+      // `await speak(legacy)` continuation in runHintSequence → returnToIdle)
+      // so the setTimeout(0) idle-clear is SCHEDULED before we advance the
+      // fake clock. A single flush lands between the two hops and would
+      // advance the timer before the clear is queued.
+      await Promise.resolve()
+      await Promise.resolve()
       await Promise.resolve()
       // returnToIdle uses a setTimeout(0) to clear the pose.
       vi.advanceTimersByTime(0)
@@ -322,8 +342,16 @@ describe('Math — Emma pose beats (Wave 14 Track B)', () => {
   // ── Regression-lock: puzzled-tilt still fires on a wrong tap ────────────
   // Passes on base today; must STILL pass after the pose-beat wiring lands
   // (the new beats must not clobber the wrong-answer reaction).
+  //
+  // The reprompt speak() is held pending (autoResolve:false) so puzzled-tilt
+  // is the LIVE committed `pose` state at assertion time — faithful to
+  // production, where the reprompt TTS runs ~2s before the pose returns to
+  // idle. (With an auto-resolving reprompt the pose would clear to idle on
+  // the reprompt's setTimeout(0) onEnd before we read, and only a lingering
+  // AnimatePresence exit element would still carry the pose.) POSE reads the
+  // screen-root `data-pose` = true React state — see the POSE helper above.
   it('regression-lock: wrong tap still swaps Emma to `puzzled-tilt`', async () => {
-    const harness = makePlayHarness()
+    const harness = makePlayHarness({ autoResolve: false })
     render(
       withMotion(
         <MathScreen

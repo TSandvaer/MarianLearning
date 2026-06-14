@@ -1771,6 +1771,12 @@ function MathScreen({
       // this role because it only flips after `speak()` resolves.
       if (spokeReadAloudRef.current) return
       spokeReadAloudRef.current = true
+      // Emma adopts the `listening` pose for the read-aloud / speaking beat
+      // (Wave 14 Track B, ticket 86ca8kq7r). POSE_HOLD_MS.listening is
+      // `null`, so it never auto-returns — the speak() onEnd `.then()` below
+      // clears it back to `idle`. Reduce-motion is handled entirely by the
+      // shared EmmaCharacter (SVG swap, no tilt) — no screen branch needed.
+      setPose('listening')
       // Mirror `audioUnlocked` for downstream consistency BEFORE the
       // first speak() resolves. The chip-tap path's `if (!audioUnlocked)`
       // early-return reads this; flipping it now means a chip tap that
@@ -1816,6 +1822,12 @@ function MathScreen({
         // at completion instead. See the `chipReadyAtRef` declaration.
         readAloudPlayedRef.current = true
         setReadAloudPlayed(true)
+        // Clear the `listening` pose on the read-aloud onEnd (Wave 14
+        // Track B). Guard against clobbering a reaction that fired while
+        // the read-aloud was in flight — a chip tap mid-read-aloud could
+        // have already set `celebration` / `puzzled-tilt`; only return to
+        // idle if Emma is still `listening`.
+        setPose((current) => (current === 'listening' ? 'idle' : current))
       })
     })
     // We don't include `speak` because it's stable enough — and including
@@ -2095,6 +2107,13 @@ function MathScreen({
           poseTimerRef.current = null
         }, 0)
       }
+
+      // Emma adopts the `attentive-pointing` pose for the hint beat
+      // (Wave 14 Track B, ticket 86ca8kq7r). The wand carries the
+      // direction (tilt 0°); POSE_HOLD_MS['attentive-pointing'] is `null`,
+      // so `returnToIdle()` clears it on the hint TTS onEnd in both the
+      // legacy single-hint and three-beat paths.
+      setPose('attentive-pointing')
 
       const triple = resolveHintTriple(problem.utterances)
 
