@@ -466,9 +466,10 @@ export async function generateSessionPlan(
   try {
     response = await args.client.messages.create({
       model: PLANNER_MODEL_ID,
-      // Worst-case output sizing. WORD-SONG: 8 problems × 5 slots + 19
-      // Session-End = 59 utterances. MATH (post Wave-12 three-hint split,
-      // ticket 86ca8702v): 8 problems × 7 slots + 19 = 75 utterances —
+      // Worst-case output sizing. WORD-SONG: 8 problems × 5 slots + 20
+      // Session-End = 60 utterances. MATH (post Wave-12 three-hint split,
+      // ticket 86ca8702v): 8 problems × 7 slots + 20 = 76 utterances —
+      // the +1 Session-End line is the M5 focus-recap (86c9kmwh0).
       // the read/correct/reprompt/giveAnswer lines are unchanged and the
       // three new hint sub-steps (hint1/hint2/hint3) are SHORT fragments
       // ("Look." / "Fifty-three." / "And nine more. How many now?"), each
@@ -1315,11 +1316,12 @@ Session-End utterances (REQUIRED — append to the same flat utterances array):
 After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
+  - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 -> "counting in groups"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, and sight-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
   - "session.end.recap.1" through "session.end.recap.11" — one entry per N in 1..11. The N=1 line is "You earned one star!"; for N >= 2 the line is "You earned <number-word> stars!" with the number spelled out (one, two, three, four, five, six, seven, eight, nine, ten, eleven). Never use digits; never use "stars" with N=1.
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
 
-Total Session-End utterances: 1 opener + 11 recap + 6 streak + 1 goodbye = 19. The full flat utterances array therefore has 8 × 7 + 19 = 75 entries for the MATH track, or 8 × 5 + 19 = 59 entries for the WORD-SONG track. Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
+Total Session-End utterances: 1 opener + 1 focus-recap + 11 recap + 6 streak + 1 goodbye = 20. The full flat utterances array therefore has 8 × 7 + 20 = 76 entries for the MATH track, or 8 × 5 + 20 = 60 entries for the WORD-SONG track. Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
 
 export const MATH_TRACK_GUIDE = `Track: Math.
 

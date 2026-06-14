@@ -769,8 +769,8 @@ describe('SessionEnd', () => {
         ),
       )
 
-      // Drain the full sequence: opener (t=0), recap (t=1400), streak
-      // (t=3400), goodbye (t=5000), CTA (t=6200).
+      // Drain the full sequence: opener (t=0), focus-recap (t=1100), recap
+      // (t=2500), streak (t=4500), goodbye (t=6100), CTA (t=7300).
       await advanceSequence(8000)
 
       // Count-based assertion per `feedback_count_assertions_on_regression_tests`:
@@ -778,6 +778,7 @@ describe('SessionEnd', () => {
       // test loudly.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.9',
         'session.end.streak.5',
         'session.end.goodbye',
@@ -808,11 +809,13 @@ describe('SessionEnd', () => {
 
       await advanceSequence(8000)
 
-      // No recap.* call when stardust is zero (matches the
-      // SessionEnd.tsx `if (p.totalStardust > 0)` gate). Streak still
+      // No recap.<N> call when stardust is zero (matches the
+      // SessionEnd.tsx `if (p.totalStardust > 0)` gate). The focus-recap
+      // line (M5) is NOT stardust-gated, so it still fires. Streak still
       // fires because finalStreak >= 3.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.streak.4',
         'session.end.goodbye',
       ])
@@ -844,6 +847,7 @@ describe('SessionEnd', () => {
 
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.4',
         'session.end.goodbye',
       ])
@@ -873,10 +877,12 @@ describe('SessionEnd', () => {
 
       // Goodbye text is the LAST caption to render before the CTA replaces
       // the ribbon. We sample the caption right at the goodbye phase
-      // (5000ms in) and verify the LAST word of "See you soon." is
-      // revealed — the silent-fallback shim only ticks word 0 ("See")
-      // and the caption would be stuck there.
-      await advanceSequence(5500)
+      // (6100ms in post-M5 focus-recap shift, was 5000ms pre-M5) and verify
+      // the LAST word of "See you soon." is revealed — the silent-fallback
+      // shim only ticks word 0 ("See") and the caption would be stuck there.
+      // 6500ms is past goodbye (6100) but before the CTA clears the caption
+      // (7300).
+      await advanceSequence(6500)
 
       // Capture the words and their reveal state. SessionEnd renders one
       // <span data-testid="session-end-caption-word"> per word with a
@@ -928,6 +934,7 @@ describe('SessionEnd', () => {
       // recorded so the diagnostic surface (console.warn) fires too.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.9',
         'session.end.streak.5',
         'session.end.goodbye',
@@ -1047,11 +1054,13 @@ describe('SessionEnd', () => {
 
       await advanceSequence(8000)
 
-      // Streak is below 3 → streak utterance is skipped. Recap id is the
-      // new word-song-specific id. Count-based equality per the project
+      // Streak is below 3 → streak utterance is skipped. The focus-recap
+      // line (M5) fires after the opener; the stardust recap id is the
+      // word-song-specific id. Count-based equality per the project
       // regression-test convention.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.wordsong-completion',
         'session.end.goodbye',
       ])
