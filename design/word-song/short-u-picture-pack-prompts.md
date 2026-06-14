@@ -2,8 +2,10 @@
 
 **Audience:** Thomas (Midjourney operator, Phase 2 — uses MJ Web workflow per `user_midjourney_web` memory). Devon (PNG-embed integration, Phase 3 via `yarn embed-pictures`).
 **Author:** Marian Tutor design persona.
-**Status:** Phase 1 prompt sheet — paste-ready.
+**Status:** Phase 1 prompt sheet — paste-ready (v6-era authoring shape; see banner).
 **Predecessor specs:** `design/word-song/short-u-pool-expansion.md` (this PR — defines the 11-word pool and the picture-pack scope), `design/word-song/picture-pack-style-anchor.md` (style frame, locked), `design/word-song/short-o-picture-pack-prompts.md` (sibling MJ prompt sheet — this file mirrors its structure exactly), `design/word-song/picture-pack-iteration-plan.md` (workflow + drift table — inherited).
+
+> **⚠️ v6-era spec — new packs use the v7 template.** This prompt sheet carries the retired v6 parameter stack (`--cref`/`--sref`/`--cw 80` + `--v 6 --style raw --s 250` + `--ar 1:1` + the universal `--no` block). It is **kept as-is for provenance** — do not re-author from it. For any NEW pack, use the v7 default in [`picture-pack-iteration-plan.md`](./picture-pack-iteration-plan.md) §2 (four-pattern template) + §3 (per-word `--no` recipe); the v6 stack is documented as retired in that plan's §10.
 
 ---
 

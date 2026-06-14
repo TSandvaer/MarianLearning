@@ -2,8 +2,10 @@
 
 **Audience:** Thomas (Midjourney operator, Phase 2 — uses MJ Web workflow per `user_midjourney_web` memory). Devon (PNG-embed integration, Phase 3 via `yarn embed-pictures`).
 **Author:** Marian Tutor design persona.
-**Status:** Phase 1 prompt sheet — paste-ready.
+**Status:** Phase 1 prompt sheet — paste-ready (v6-era authoring shape; see banner).
 **Predecessor specs:** `design/word-song/short-i-pool-expansion.md` (this PR — defines the 11-word recommended pool and the picture-pack scope), `design/word-song/picture-pack-style-anchor.md` (style frame, locked), `design/word-song/short-u-picture-pack-prompts.md` (sibling MJ prompt sheet — this file mirrors its structure exactly), `design/word-song/short-o-picture-pack-prompts.md` (predecessor MJ sheet — short-o + short-u + short-i are visual siblings), `design/word-song/picture-pack-iteration-plan.md` (workflow + drift table — inherited).
+
+> **⚠️ v6-era spec — new packs use the v7 template.** This prompt sheet carries the retired v6 parameter stack (`--cref`/`--sref`/`--cw 80` + `--v 6 --style raw --s 250` + `--ar 1:1` + the universal `--no` block). It is **kept as-is for provenance** — do not re-author from it. For any NEW pack, use the v7 default in [`picture-pack-iteration-plan.md`](./picture-pack-iteration-plan.md) §2 (four-pattern template) + §3 (per-word `--no` recipe); the v6 stack is documented as retired in that plan's §10. The four-pattern gotchas this template encodes (lead-with-noun, mechanism-over-recognition, clothing/textile defenses, drop-shadow negation) were first distilled from THIS pack's `bib` batch — see `.claude/docs/skill-trees-and-content.md` § "MJ prompt-engineering gotchas".
 
 ---
 
@@ -25,6 +27,7 @@ This pack covers **all 11 short-i targets** so they are visually cohesive within
 If Thomas opts to bundle this pack with future short-e generation in one MJ session ("50+ images one-time deal" per the dispatch brief), insert these eleven into the bundle. Cross-pack visual cohesion is the goal — same `--cref` / `--sref` to short-a `dog` pose-zero across all packs.
 
 **Phase 2 fallback drops (per pool spec §10 Q3 priority order):**
+
 1. `sip` (highest probability — multi-subject picture-chip)
 2. `hip` (vocab-stretch + rosehip-vs-anatomy disambiguation)
 3. `rim` (vocab-stretch + wheel-vs-bracelet disambiguation)
@@ -429,19 +432,19 @@ For now, this section is reserved for Thomas's decision per §10 Q1 lock.
 
 ## 3. Quick reference — pack index
 
-| #   | Word | Type                                                    | Pack neighbour requiring discrimination                                          | Picture-side discriminator                                                |
-| --- | ---- | ------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 1   | pig  | new short-i target (animal)                             | `dog`/`cat`/`fox`/`rat`/`bug` (animal pack); FORBIDDEN_PAIR `[pig, dog]`/`[pig, cat]` proposed | snout + curly tail (vs. dog's muzzle + non-curly; cat's whiskers; etc.)   |
-| 2   | pin  | new short-i target (object)                             | `bin` (pack neighbour /ɪn/)                                                      | head + thin shaft (vs. bin's rectangular + lid)                           |
-| 3   | bin  | new short-i target (household)                          | **`box` (cross-vowel — closed cuboid vs. partially-open lid)**, `tub`/`pot`/`can` | partially-open hinged lid + rectangular footprint                         |
-| 4   | wig  | new short-i target (object)                             | none in-pack; `fan` (cross-vowel — radiating shapes)                            | hair on featureless face-form (vs. fan blades or person's face)           |
-| 5   | bib  | new short-i target (clothing)                           | `mat` (cross-vowel — fabric); `cap` (wearable)                                  | neck-opening + tie-strings (vs. plain rectangular fabric)                 |
-| 6   | fig  | new short-i target (food)                               | **`bun` (cross-vowel — both round food, FORBIDDEN_PAIR `[fig, bun]` proposed)**, `nut` (oval food cross-vowel) | stem + leaf-cap on top (vertical) (vs. bun's horizontal score + nut's vertical seam) |
-| 7   | lid  | new short-i target — Phase 2 review-required            | **`mat` (cross-vowel — IF lid renders rectangular, FORBIDDEN_PAIR `[lid, mat]` CONDITIONAL)**, `pan`/`cup` | central handle + non-circular footprint (vs. plate / pan / handled vessel) |
-| 8   | hip  | new short-i target — Phase 2 review-required, vocab-stretch | **anatomical hip (negative-prompt)**, `fig` (pack neighbour fruit), `nut` (oval food) | crown-of-sepals (calyx) at one end (vs. anatomical body-part)             |
-| 9   | rim  | new short-i target — Phase 2 review-required, vocab-stretch | `fan` (cross-vowel — radiating shapes); generic ring / wedding ring             | thin straight spokes radiating to small hub (vs. fan's curved blades)     |
-| 10  | sip  | new short-i target — Phase 2 review-required, HIGHEST-drop-probability | `cup` / `jug` (short-u vessels)                                                  | glass + striped straw composite (vs. handled cup / spouted jug)           |
-| 11  | _OPEN_ | per §10 Q1 — default ship 10                          | n/a                                                                              | n/a                                                                       |
+| #   | Word   | Type                                                                   | Pack neighbour requiring discrimination                                                                        | Picture-side discriminator                                                           |
+| --- | ------ | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1   | pig    | new short-i target (animal)                                            | `dog`/`cat`/`fox`/`rat`/`bug` (animal pack); FORBIDDEN_PAIR `[pig, dog]`/`[pig, cat]` proposed                 | snout + curly tail (vs. dog's muzzle + non-curly; cat's whiskers; etc.)              |
+| 2   | pin    | new short-i target (object)                                            | `bin` (pack neighbour /ɪn/)                                                                                    | head + thin shaft (vs. bin's rectangular + lid)                                      |
+| 3   | bin    | new short-i target (household)                                         | **`box` (cross-vowel — closed cuboid vs. partially-open lid)**, `tub`/`pot`/`can`                              | partially-open hinged lid + rectangular footprint                                    |
+| 4   | wig    | new short-i target (object)                                            | none in-pack; `fan` (cross-vowel — radiating shapes)                                                           | hair on featureless face-form (vs. fan blades or person's face)                      |
+| 5   | bib    | new short-i target (clothing)                                          | `mat` (cross-vowel — fabric); `cap` (wearable)                                                                 | neck-opening + tie-strings (vs. plain rectangular fabric)                            |
+| 6   | fig    | new short-i target (food)                                              | **`bun` (cross-vowel — both round food, FORBIDDEN_PAIR `[fig, bun]` proposed)**, `nut` (oval food cross-vowel) | stem + leaf-cap on top (vertical) (vs. bun's horizontal score + nut's vertical seam) |
+| 7   | lid    | new short-i target — Phase 2 review-required                           | **`mat` (cross-vowel — IF lid renders rectangular, FORBIDDEN_PAIR `[lid, mat]` CONDITIONAL)**, `pan`/`cup`     | central handle + non-circular footprint (vs. plate / pan / handled vessel)           |
+| 8   | hip    | new short-i target — Phase 2 review-required, vocab-stretch            | **anatomical hip (negative-prompt)**, `fig` (pack neighbour fruit), `nut` (oval food)                          | crown-of-sepals (calyx) at one end (vs. anatomical body-part)                        |
+| 9   | rim    | new short-i target — Phase 2 review-required, vocab-stretch            | `fan` (cross-vowel — radiating shapes); generic ring / wedding ring                                            | thin straight spokes radiating to small hub (vs. fan's curved blades)                |
+| 10  | sip    | new short-i target — Phase 2 review-required, HIGHEST-drop-probability | `cup` / `jug` (short-u vessels)                                                                                | glass + striped straw composite (vs. handled cup / spouted jug)                      |
+| 11  | _OPEN_ | per §10 Q1 — default ship 10                                           | n/a                                                                                                            | n/a                                                                                  |
 
 **Highest-distinctness-risk pair in this pack: `pig` ↔ `dog`** (cross-pack; cross-vowel, FORBIDDEN_PAIR proposed). Both four-legged mammals. The snout + curly tail of pig vs. muzzle + non-curly tail of dog must hold at 96pt. Phase 2 pair-review at chip size is mandatory.
 

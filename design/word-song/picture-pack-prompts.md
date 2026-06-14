@@ -3,7 +3,9 @@
 **Audience:** Thomas (Midjourney operator, phase 2).
 **Author:** Marian Tutor design persona.
 **Ticket:** `86c9kww0h`.
-**Status:** Locked prompt sheet — paste-ready.
+**Status:** Locked prompt sheet — paste-ready (v6-era authoring shape; see banner).
+
+> **⚠️ v6-era spec — new packs use the v7 template.** This prompt sheet was authored against the retired v6 parameter stack (`--cref`/`--sref`/`--cw 80` + `--v 6 --style raw --s 250` + `--ar 1:1` + the universal `--no` block). It is **kept as-is for provenance** — do not regenerate the short-a pack from it. For any NEW pack, author from the v7 default in [`picture-pack-iteration-plan.md`](./picture-pack-iteration-plan.md) §2 (four-pattern template) + §3 (per-word `--no` recipe). The v6 stack this sheet carries is documented as retired in that plan's §10 appendix. Worked v7 distillation example: [`mj-prompts-paste-ready-2026-05-10.md`](./mj-prompts-paste-ready-2026-05-10.md) (PR #189).
 
 This is the row-per-word prompt sheet for the v1 picture pack. **22 pictures total** — 14 CVC short-a target words + 8 distractor-only pictures. Each row is a paste-ready Midjourney prompt that combines the locked style preamble (`picture-pack-style-anchor.md` §2) with subject-specific content.
 
@@ -341,30 +343,30 @@ These pictures appear only as distractors, never as the target word. Same style 
 
 ## 3. Quick reference — full prompt index
 
-| # | Word | Type | Rhyme family | Forbidden-pair partner |
-| --- | --- | --- | --- | --- |
-| 1 | cat | target | /æt/ | dog |
-| 2 | hat | target | /æt/ | cap |
-| 3 | bat | target | /æt/ | — |
-| 4 | mat | target | /æt/ | — |
-| 5 | bag | target | /æg/ | — |
-| 6 | fan | target | /æn/ | — |
-| 7 | man | target | /æn/ | dad |
-| 8 | pan | target | /æn/ | pot |
-| 9 | cap | target | /æp/ | hat |
-| 10 | can | target | /æn/ | — |
-| 11 | tag | target | /æg/ | — |
-| 12 | dad | target | /æd/ | man |
-| 13 | jam | target | /æm/ | — |
-| 14 | van | target | /æn/ | bus |
-| 15 | bus | distractor | /ʌs/ | van |
-| 16 | sun | distractor | /ʌn/ | — |
-| 17 | dog | distractor | /ɔ/ | cat |
-| 18 | fox | distractor | /ɔ/ | — |
-| 19 | cup | distractor | /ʌp/ | — |
-| 20 | pen | distractor | /ɛn/ | — |
-| 21 | log | distractor | /ɔ/ | — |
-| 22 | pot | distractor | /ɔ/ | pan |
+| #   | Word | Type       | Rhyme family | Forbidden-pair partner |
+| --- | ---- | ---------- | ------------ | ---------------------- |
+| 1   | cat  | target     | /æt/         | dog                    |
+| 2   | hat  | target     | /æt/         | cap                    |
+| 3   | bat  | target     | /æt/         | —                      |
+| 4   | mat  | target     | /æt/         | —                      |
+| 5   | bag  | target     | /æg/         | —                      |
+| 6   | fan  | target     | /æn/         | —                      |
+| 7   | man  | target     | /æn/         | dad                    |
+| 8   | pan  | target     | /æn/         | pot                    |
+| 9   | cap  | target     | /æp/         | hat                    |
+| 10  | can  | target     | /æn/         | —                      |
+| 11  | tag  | target     | /æg/         | —                      |
+| 12  | dad  | target     | /æd/         | man                    |
+| 13  | jam  | target     | /æm/         | —                      |
+| 14  | van  | target     | /æn/         | bus                    |
+| 15  | bus  | distractor | /ʌs/         | van                    |
+| 16  | sun  | distractor | /ʌn/         | —                      |
+| 17  | dog  | distractor | /ɔ/          | cat                    |
+| 18  | fox  | distractor | /ɔ/          | —                      |
+| 19  | cup  | distractor | /ʌp/         | —                      |
+| 20  | pen  | distractor | /ɛn/         | —                      |
+| 21  | log  | distractor | /ɔ/          | —                      |
+| 22  | pot  | distractor | /ɔ/          | pan                    |
 
 ---
 

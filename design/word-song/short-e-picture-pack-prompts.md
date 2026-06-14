@@ -2,8 +2,10 @@
 
 **Audience:** Thomas (Midjourney operator, Phase 2 — uses MJ Web workflow per `user_midjourney_web` memory). Devon (PNG-embed integration, Phase 3 via `yarn embed-pictures`).
 **Author:** Marian Tutor design persona.
-**Status:** Phase 1 prompt sheet — paste-ready.
+**Status:** Phase 1 prompt sheet — paste-ready (v6-era authoring shape; see banner).
 **Predecessor specs:** `design/word-song/short-e-pool-expansion.md` (this PR — defines the 9-word pool and the picture-pack scope), `design/word-song/picture-pack-style-anchor.md` (style frame, locked), `design/word-song/short-u-picture-pack-prompts.md` (sibling MJ prompt sheet — this file mirrors its structure exactly), `design/word-song/short-o-picture-pack-prompts.md` (additional template reference), `design/word-song/picture-pack-iteration-plan.md` (workflow + drift table — inherited).
+
+> **⚠️ v6-era spec — new packs use the v7 template.** This prompt sheet carries the retired v6 parameter stack (`--cref`/`--sref`/`--cw 80` + `--v 6 --style raw --s 250` + `--ar 1:1` + the universal `--no` block). It is **kept as-is for provenance** — do not re-author from it. For any NEW pack, use the v7 default in [`picture-pack-iteration-plan.md`](./picture-pack-iteration-plan.md) §2 (four-pattern template) + §3 (per-word `--no` recipe); the v6 stack is documented as retired in that plan's §10. The v7-distilled paste-ready version of THIS pack is [`mj-prompts-paste-ready-2026-05-10.md`](./mj-prompts-paste-ready-2026-05-10.md) (PR #189) — prefer it for the actual generation session.
 
 ---
 
@@ -364,17 +366,17 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
 
 ## 3. Quick reference — pack index
 
-| #   | Word | Type                              | Pack neighbour requiring discrimination                        | Picture-side discriminator                                     |
-| --- | ---- | --------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------- |
-| 1   | bed  | new short-e target                | `bag` (cross-vowel — both fabric)                              | rectangular furniture + pillow + legs vs. soft tote with handle |
-| 2   | leg  | new short-e target                | `log` (short-o — elongated cylinder)                           | vertical chair-leg + chair-context vs. horizontal wood log     |
-| 3   | hen  | new short-e target                | `bug`/`rat`/`cat`/`dog`/`fox` (animals across packs)           | bird (2 legs + comb + beak) vs. mammal/insect classes          |
-| 4   | pen  | conditional re-trace short-e target (Q2 pending) | `tag` (cross-vowel — small flat objects)         | nib + clip + cylinder vs. paper-card + string-loop             |
-| 5   | web  | new short-e target                | `net` (pack neighbour — both mesh-like)                        | concentric-radial pattern (no handle) vs. orthogonal mesh-grid + handle |
-| 6   | net  | new short-e target                | **`bag` (cross-vowel — FORBIDDEN_PAIR added)**                 | mesh-with-frame + handle vs. solid fabric + handle             |
-| 7   | jet  | new short-e target                | `bus`/`van` (cross-vowel — vehicles)                           | aircraft (wings + tail + cockpit, in flight) vs. ground vehicle (wheels + windows, on ground) |
-| 8   | gem  | new short-e target                | none in-pack; `gum` (cross-vowel — both small handheld objects) | geometric crystal with facets vs. wrapped rectangular package |
-| 9   | egg  | new short-e target (Phase 2 fallback drops if unstable) | **`nut` and `bun` (cross-vowel — FORBIDDEN_PAIRS added)** + cream background (low-contrast risk) | smooth-ovoid (no marks) vs. oval-with-vertical-seam vs. round-with-horizontal-score |
+| #   | Word | Type                                                    | Pack neighbour requiring discrimination                                                          | Picture-side discriminator                                                                    |
+| --- | ---- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 1   | bed  | new short-e target                                      | `bag` (cross-vowel — both fabric)                                                                | rectangular furniture + pillow + legs vs. soft tote with handle                               |
+| 2   | leg  | new short-e target                                      | `log` (short-o — elongated cylinder)                                                             | vertical chair-leg + chair-context vs. horizontal wood log                                    |
+| 3   | hen  | new short-e target                                      | `bug`/`rat`/`cat`/`dog`/`fox` (animals across packs)                                             | bird (2 legs + comb + beak) vs. mammal/insect classes                                         |
+| 4   | pen  | conditional re-trace short-e target (Q2 pending)        | `tag` (cross-vowel — small flat objects)                                                         | nib + clip + cylinder vs. paper-card + string-loop                                            |
+| 5   | web  | new short-e target                                      | `net` (pack neighbour — both mesh-like)                                                          | concentric-radial pattern (no handle) vs. orthogonal mesh-grid + handle                       |
+| 6   | net  | new short-e target                                      | **`bag` (cross-vowel — FORBIDDEN_PAIR added)**                                                   | mesh-with-frame + handle vs. solid fabric + handle                                            |
+| 7   | jet  | new short-e target                                      | `bus`/`van` (cross-vowel — vehicles)                                                             | aircraft (wings + tail + cockpit, in flight) vs. ground vehicle (wheels + windows, on ground) |
+| 8   | gem  | new short-e target                                      | none in-pack; `gum` (cross-vowel — both small handheld objects)                                  | geometric crystal with facets vs. wrapped rectangular package                                 |
+| 9   | egg  | new short-e target (Phase 2 fallback drops if unstable) | **`nut` and `bun` (cross-vowel — FORBIDDEN_PAIRS added)** + cream background (low-contrast risk) | smooth-ovoid (no marks) vs. oval-with-vertical-seam vs. round-with-horizontal-score           |
 
 **Highest-distinctness-risk pair in this pack: `net` ↔ `bag` (cross-pack).** Both fabric-with-handle objects. The mesh-vs-solid-surface discriminator is what makes them readable as different words at 96pt. Phase 2 review at chip size IS mandatory for this pair before acceptance — see pool spec §3 + §6. **NEW FORBIDDEN_PAIR `[net, bag]` is the cross-pack guard.**
 
@@ -483,7 +485,7 @@ If any of the following appear, regenerate (do not proceed to embed):
 - **PWA cache budget:** `reference_pwa_asset_size_limits` memory — 4 MiB cache cap; ~50–150 KB per SVG fits comfortably for this pack but cumulative budget across all packs needs review per pool spec §3 §Cumulative budget.
 - **MJ Web UI workflow:** `user_midjourney_web` memory — Thomas operates MJ via Web UI (prompt-box + drag-drop upload), not Discord slash-commands. Prompt sheet copy is paste-ready for the Web UI's prompt input.
 - **Locked memories:**
-  - `project_pic_dog_svg` (SVG vector for all CVC pictures — this pack uses PNG-in-SVG embed per the established Phase 3 path; the lock holds because the wrapper IS still SVG, the *content* is the source PNG embedded as data URI).
+  - `project_pic_dog_svg` (SVG vector for all CVC pictures — this pack uses PNG-in-SVG embed per the established Phase 3 path; the lock holds because the wrapper IS still SVG, the _content_ is the source PNG embedded as data URI).
   - `project_spec_drift_decisions` K (Sanrio-style friendly bat → applies forward to friendly hen here).
   - `project_planner_parser_contract` (no parser change here; picture-pack only).
   - `feedback_mj_workflow_explicit_removebg` — never imply MJ outputs are transparent; remove.bg is its own discrete step.
