@@ -771,6 +771,21 @@ export function renderLetterNamesScratchyHint(
  * precedes it to reset from). The legacy "Look."-prefixed string is still
  * matched defensively (harmless; emits the audition's break+lead shape).
  *
+ * ROUND-6 STRONGER (GitHub issue #446): round-5's f2 winner
+ * (`fɔə` + pitch+8%) was re-tested on the LIVE bytes and STILL read as "for
+ * comes after three" — the round-5 audition was run on the OLD "Look."-
+ * prefixed text, but the live canon is the sentence-initial "Four comes after
+ * three." (changed in #413), where "Four" runs straight into "comes" with no
+ * carrier-break before it and is swallowed into the connected-speech onset.
+ * Diagnosis (probed via ssml_probe): the override IS emitting `fɔə`+pitch into
+ * the baked SSML; the IPA/pitch values just aren't separating the word from
+ * "for" in this connected position. Round-6 adds the audition's untested
+ * stronger levers together: (a) a LENGTHENED diphthong `fɔːə` for more vowel
+ * body, (b) a steeper pitch lift (+12%) + slight rate-slow (-12%) to give the
+ * word its own stress island, and (c) a 120ms break AFTER "Four" so the word
+ * decays before "comes" instead of being clipped into it. Still text-shape-
+ * gated; every baseline-passing "four" stays on the plain global `fɔə`.
+ *
  * Text-shape-gated to these exact hint strings so every other
  * (baseline-passing) "four" utterance renders on the plain global `fɔə`
  * override. Returns the full inner SSML for the match, or `null`.
@@ -784,9 +799,10 @@ export function renderFourSubjectHint(
   // Live text (math.p6.hint2): sentence-initial "Four", no lead carrier.
   if (text === 'Four comes after three.') {
     return (
-      '<prosody pitch="+8%">' +
-      '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme>' +
+      '<prosody pitch="+12%" rate="-12%">' +
+      '<phoneme alphabet="ipa" ph="fɔːə">Four</phoneme>' +
       '</prosody>' +
+      '<break time="120ms"/>' +
       ' comes after three.'
     )
   }
@@ -803,6 +819,80 @@ export function renderFourSubjectHint(
     )
   }
   return null
+}
+
+/**
+ * Session-end recap-4 line "You earned four stars!" (GitHub issue #446 —
+ * `wrong-speed` + de-stress collapse).
+ *
+ * Thomas's ear: "it sounds like she is saying 'you earned for stars' not
+ * '..four stars'". Two coupled defects on this ONE line:
+ *   1. De-stress collapse — mid-sentence "four" between "earned" and "stars"
+ *      reduces to "for" on non-rhotic Olivia, exactly like the math
+ *      "Four comes after three." case. The global `fɔə` override alone (the
+ *      only thing this line gets today) does not separate it.
+ *   2. `wrong-speed` — the line reads rushed. There is no per-line rate
+ *      treatment on session-end recaps today; the whole line rides the
+ *      default rate-10%.
+ *
+ * Both are fixed in one wrap: stress-lift + lengthened diphthong on "four"
+ * (the math-hint mechanism), nested inside a whole-line rate-slow that
+ * un-rushes the delivery. The line is short and celebratory, so a -10%
+ * line-level slow on top of the global -10% reads as warm, not sluggish.
+ *
+ * Text-shape-gated to the exact recap-4 string. The other recap lines
+ * (recap.1 "You earned one star!" … recap.11) are NOT touched — they passed
+ * Thomas's baseline and stay byte-identical on the global path.
+ */
+export function renderRecapFourStars(text: string): string | null {
+  // Session-end utterances render with tierFilter = the owning file stem
+  // for word-song tiers (e.g. 'letter-sounds') and undefined for math.
+  // The recap line is byte-shared across all 24 tier files, so it can
+  // arrive under ANY tierFilter. Gate on the text only.
+  if (text !== 'You earned four stars!') return null
+  return (
+    '<prosody rate="-10%">' +
+    'You earned ' +
+    '<prosody pitch="+12%">' +
+    '<phoneme alphabet="ipa" ph="fɔːə">four</phoneme>' +
+    '</prosody>' +
+    ' stars!' +
+    '</prosody>'
+  )
+}
+
+/**
+ * Session-end streak-4 line "Four in a row! Wow!" (GitHub issue #446 —
+ * `mispronounced` "row").
+ *
+ * Thomas's ear: "Emma should say 'Rou' like a line of something. But she says
+ * 'Rau' as in an argument." This is the GOAT-vs-MOUTH split: "row" (a line)
+ * is /rəʊ/, "row" (a quarrel) is /raʊ/. The global `row → rəʊ` override
+ * (added round-4, ticket 86ca7u3gr) IS emitting into the baked SSML
+ * (verified via ssml_probe: `<phoneme ph="rəʊ">row</phoneme>`) — but Olivia
+ * is STILL landing the /aʊ/ realisation. The bare schwa-onset diphthong isn't
+ * pulling her far enough toward GOAT.
+ *
+ * Round-6 strengthens the GOAT realisation specifically on this line: the IPA
+ * uses the fuller GOAT nucleus `əʊ` with a lengthened offglide `əʊː` plus a
+ * light stress-lift so the diphthong is articulated rather than reduced, and
+ * the "Four" gets the same lengthened-diphthong rescue as the other two clips
+ * (it shares the de-stress risk in sentence-initial position before "in").
+ *
+ * The global `row → rəʊ` override stays in PHONEME_OVERRIDES for every OTHER
+ * "row" context; this helper is text-shape-gated to the streak-4 line only,
+ * so the other streak lines (streak.3/5/6/7/8) stay byte-identical.
+ */
+export function renderStreakFourRow(text: string): string | null {
+  if (text !== 'Four in a row! Wow!') return null
+  return (
+    '<phoneme alphabet="ipa" ph="fɔːə">Four</phoneme>' +
+    ' in a ' +
+    '<prosody pitch="+6%" rate="-10%">' +
+    '<phoneme alphabet="ipa" ph="ɹəʊː">row</phoneme>' +
+    '</prosody>' +
+    '! Wow!'
+  )
 }
 
 /**
@@ -960,6 +1050,22 @@ export function substituteSentenceGap(
 }
 
 export function renderSsmlInnerText(text: string, tierFilter?: string): string {
+  // Session-end recap-4 / streak-4 lines (GitHub issue #446). These two
+  // utterances are byte-SHARED across all 24 tier files
+  // (every track ends with the same SessionEnd sequence), so the failing
+  // itemId is owned by whichever file sorts first in the voice-QA dedup —
+  // `letter-sounds#session.end.recap.4` / `.streak.4`. That means they
+  // render under `tierFilter === 'letter-sounds'`, which hits the
+  // letter-sounds EARLY-RETURN below before any "four"/"row" fix could run.
+  // They are text-shape-gated and tier-agnostic, so they MUST be checked
+  // FIRST — before the simple-sentences gap-substitution and the
+  // letter-sounds early-return — or the fix never reaches the flagged
+  // bytes. Both helpers return null for every other utterance, so this is
+  // a no-op for the entire rest of the canon.
+  const recapFour = renderRecapFourStars(text)
+  if (recapFour !== null) return recapFour
+  const streakFour = renderStreakFourRow(text)
+  if (streakFour !== null) return streakFour
   // Simple-sentences tier (Wave 13, ticket 86ca8e6fr): the canon read text
   // carries the `___` gap token (so the browser parser can build the
   // displayed `sentenceFrame`); substitute it to the spoken word "blank"
