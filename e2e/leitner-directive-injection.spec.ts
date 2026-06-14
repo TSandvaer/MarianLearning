@@ -73,9 +73,12 @@ import {
 import { IPAD_PORTRAIT_VIEWPORT } from './_helpers/iPadViewport'
 import {
   buildMathFactsLeitner,
+  buildSpacedReviewLeitner,
   expectedWireFacts,
   MIXED_BOX_FIXTURE,
   ALL_MASTERED_FIXTURE,
+  SPACED_REVIEW_RECENT_FACT,
+  SPACED_REVIEW_STALE_FACT,
   type LeitnerFactSpec,
 } from './_helpers/leitnerFixtures'
 
@@ -174,6 +177,13 @@ async function installLeitnerMathMock(
  */
 function buildLeitnerSeededProgress(
   facts: ReadonlyArray<LeitnerFactSpec>,
+  /**
+   * Optional pre-built `mathFactsLeitner` blob. When supplied it wins
+   * over `facts` — used by the spaced-review test (86c9kmwf8) which needs
+   * per-item `lastSeen` recencies resolved against the wall clock, not a
+   * static spec list.
+   */
+  mathFactsLeitnerOverride?: ReturnType<typeof buildMathFactsLeitner>,
 ): unknown {
   return {
     schemaVersion: 1,
@@ -210,7 +220,7 @@ function buildLeitnerSeededProgress(
       'sight-words': 'intro',
       'simple-sentences': 'locked',
     },
-    mathFactsLeitner: buildMathFactsLeitner(facts),
+    mathFactsLeitner: mathFactsLeitnerOverride ?? buildMathFactsLeitner(facts),
     history: [],
     parentSettings: {
       autoPromote: true,
@@ -529,5 +539,71 @@ test.describe('Leitner directive injection on /api/claude payload', () => {
     }
     // If progressBlock IS undefined, the assertion is satisfied
     // trivially — nothing further to check.
+  })
+
+  test('6. spaced-review schedule (86c9kmwf8) → a recently-seen box-3 fact is FILTERED OUT, only the stale (due) fact ships', async ({
+    page,
+  }) => {
+    // Two box-3 facts at different recencies:
+    //   - 7+2 seen 1 day ago  → box-3 interval is 4 days → NOT due → ABSENT.
+    //   - 6+3 seen 10 days ago → past the 4-day interval → due → PRESENT.
+    // This is the whole point of the M4 residual delta: the App now filters
+    // the box through `dueLeitnerItems(box, Date.now())` BEFORE building the
+    // hint, so non-due facts no longer ship into every session. Without the
+    // filter, BOTH facts would ship (the old PR #164 "weighted review"
+    // behaviour) and this test would fail on the count.
+    const now = Date.now()
+    const { requests } = await installLeitnerMathMock(page)
+    await seedLocalStorage(page, {
+      progress: buildLeitnerSeededProgress([], buildSpacedReviewLeitner(now)),
+      sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
+    })
+
+    await page.goto('/')
+    await forceHowlerUnlock(page)
+
+    await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+    await page
+      .locator('[data-testid="hub-tree-node"][data-tree="number-garden"]')
+      .click()
+    await expect(page.getByTestId('math')).toBeVisible({ timeout: 10_000 })
+
+    await expect
+      .poll(() => mathRequests(requests).length, { timeout: 10_000 })
+      .toBeGreaterThanOrEqual(1)
+
+    const mathReqs = mathRequests(requests)
+    expect(mathReqs).toHaveLength(1)
+
+    const leitner = readLeitnerFromRequest(mathReqs[0]!)
+    expect(leitner, 'payload.progress.leitner must be present').toEqual(
+      expect.any(Array),
+    )
+
+    // Exact-shape: ONLY the stale (due) fact ships. The recent fact is
+    // filtered out by the spaced-review schedule.
+    expect(leitner).toEqual([
+      {
+        a: SPACED_REVIEW_STALE_FACT.a,
+        b: SPACED_REVIEW_STALE_FACT.b,
+        op: '+',
+        box: 3,
+      },
+    ])
+
+    // Explicit count + absence assertions (per
+    // feedback_count_assertions_on_regression_tests.md — never .toContain).
+    const arr = leitner as ReadonlyArray<{ a: number; b: number; op: string }>
+    expect(arr).toHaveLength(1)
+    const recentPresent = arr.filter(
+      (f) =>
+        f.a === SPACED_REVIEW_RECENT_FACT.a &&
+        f.b === SPACED_REVIEW_RECENT_FACT.b &&
+        f.op === SPACED_REVIEW_RECENT_FACT.op,
+    )
+    expect(
+      recentPresent,
+      'recently-seen (not-due) box-3 fact must be filtered out of the wire',
+    ).toHaveLength(0)
   })
 })

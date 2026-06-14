@@ -81,6 +81,77 @@ export function emptyLeitner<T>(): LeitnerBox<T> {
 }
 
 // --------------------------------------------------------------------------
+// Spaced-review schedule (ticket 86c9kmwf8 — M4 residual delta).
+//
+// PR #164 (86c9pwgc8) wired the Leitner box into session generation, but
+// every box fact shipped into EVERY math session regardless of recency —
+// "weighted review," not "spaced review." This adds the time dimension:
+// a fact is only DUE for review once its box-derived interval has elapsed
+// since it was last seen.
+//
+// Box → interval (calendar days):
+//   box 1 → 0   (always due — least familiar, review every session)
+//   box 2 → 2
+//   box 3 → 4
+//   box 4 → 7
+//   box 5 → 14  (most familiar — long review cadence)
+//
+// These values are a starting guess per the ticket's OOS ("tuning the
+// box-schedule constants is deferred"); they live in one named const so a
+// future tuning pass is a single-line edit.
+// --------------------------------------------------------------------------
+
+/** Milliseconds in one calendar day. */
+const MS_PER_DAY = 86_400_000
+
+/**
+ * Per-box review interval in calendar days, keyed by box index. Box 1 is
+ * `0` so freshly-added (and freshly-demoted) facts — which carry
+ * `lastSeen` near `now` or `0` — are immediately due. Higher boxes back
+ * off geometrically-ish toward a 14-day long-review cadence.
+ *
+ * Named + exported so the spaced-review schedule is tunable in one place
+ * (ticket OOS: schedule values are a starting guess, tune later).
+ */
+export const LEITNER_REVIEW_INTERVAL_DAYS: Readonly<
+  Record<LeitnerBoxIndex, number>
+> = {
+  1: 0,
+  2: 2,
+  3: 4,
+  4: 7,
+  5: 14,
+}
+
+/**
+ * Filter a Leitner box down to the items that are DUE for review at
+ * `now`. An item is due when the time elapsed since `lastSeen` is at
+ * least its box's review interval. Box-1 items (interval 0) are always
+ * due; a freshly-promoted box-2 item is NOT due again until 2 days pass.
+ *
+ * Pure: returns a new box; never mutates input. Item order is preserved,
+ * so a downstream `buildLeitnerSessionHint` still sorts box-ascending
+ * deterministically.
+ *
+ * `schedule` defaults to `LEITNER_REVIEW_INTERVAL_DAYS`; the parameter
+ * exists so tests can pin custom intervals without depending on the
+ * production constant.
+ */
+export function dueLeitnerItems<T>(
+  box: LeitnerBox<T>,
+  now: number,
+  schedule: Readonly<
+    Record<LeitnerBoxIndex, number>
+  > = LEITNER_REVIEW_INTERVAL_DAYS,
+): LeitnerBox<T> {
+  const items = box.items.filter((entry) => {
+    const intervalMs = schedule[entry.box] * MS_PER_DAY
+    return now - entry.lastSeen >= intervalMs
+  })
+  return { items }
+}
+
+// --------------------------------------------------------------------------
 // Session-generation hint (ticket 86c9pwgc8 — M4 Leitner wiring).
 //
 // The shape below is what App.tsx ships in its `/api/claude` payload's

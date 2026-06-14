@@ -38,9 +38,11 @@ export { CURRENT_SCHEMA_VERSION } from './types'
 
 export {
   LEITNER_HINT_MAX_ITEMS,
+  LEITNER_REVIEW_INTERVAL_DAYS,
   addItem,
   buildLeitnerSessionHint,
   demote,
+  dueLeitnerItems,
   emptyLeitner,
   findItem,
   promote,

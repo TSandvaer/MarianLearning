@@ -102,6 +102,46 @@ export const ALL_MASTERED_FIXTURE: ReadonlyArray<LeitnerFactSpec> = [
 ]
 
 /**
+ * Spaced-review fixture (ticket 86c9kmwf8). Two box-3 facts at different
+ * recencies, used to assert the App applies `dueLeitnerItems` BEFORE
+ * `buildLeitnerSessionHint`:
+ *
+ *   - `7+2` was last seen RECENTLY (well inside the box-3 4-day interval)
+ *     → NOT due → must be ABSENT from the wire.
+ *   - `6+3` was last seen STALE (far past the box-3 interval) → due →
+ *     must be PRESENT on the wire.
+ *
+ * `lastSeen` is expressed as a "days ago" offset resolved against
+ * `Date.now()` at seed-build time by `buildSpacedReviewLeitner` so the
+ * fixture stays valid regardless of when the test runs.
+ */
+export const SPACED_REVIEW_RECENT_FACT: {
+  a: number
+  b: number
+  op: LeitnerOp
+} = { a: 7, b: 2, op: '+' }
+export const SPACED_REVIEW_STALE_FACT: { a: number; b: number; op: LeitnerOp } =
+  { a: 6, b: 3, op: '+' }
+
+/**
+ * Build a `mathFactsLeitner` blob with one recently-seen box-3 fact
+ * (not due) and one stale box-3 fact (due). Resolves the relative
+ * recencies against the supplied `now` so the not-due / due split is
+ * deterministic at the test's wall-clock.
+ */
+export function buildSpacedReviewLeitner(
+  now: number,
+): ReturnType<typeof buildMathFactsLeitner> {
+  const MS_PER_DAY = 86_400_000
+  return buildMathFactsLeitner([
+    // box-3 interval is 4 days; seen 1 day ago → NOT due.
+    { ...SPACED_REVIEW_RECENT_FACT, box: 3, lastSeen: now - 1 * MS_PER_DAY },
+    // box-3 interval is 4 days; seen 10 days ago → due.
+    { ...SPACED_REVIEW_STALE_FACT, box: 3, lastSeen: now - 10 * MS_PER_DAY },
+  ])
+}
+
+/**
  * The fact strings the wire ships for a given fixture, in box-ascending
  * order. Tests assert this list against the captured request body so a
  * future bug that swaps operands (3+4 vs 4+3 — different fact) or drops

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CURRENT_SCHEMA_VERSION,
   LEITNER_HINT_MAX_ITEMS,
+  LEITNER_REVIEW_INTERVAL_DAYS,
   MAX_SESSION_HISTORY,
   STORAGE_KEY,
   addItem,
@@ -9,6 +10,7 @@ import {
   clearProgress,
   defaultProgress,
   demote,
+  dueLeitnerItems,
   emptyLeitner,
   findItem,
   isLiteracyProgress,
@@ -280,6 +282,124 @@ describe('buildLeitnerSessionHint', () => {
     const snapshot = JSON.stringify(original)
     buildLeitnerSessionHint(original)
     expect(JSON.stringify(original)).toBe(snapshot)
+  })
+})
+
+describe('dueLeitnerItems (spaced-review schedule — 86c9kmwf8)', () => {
+  const MS_PER_DAY = 86_400_000
+  // Fixed "now" so day-arithmetic is exact and timezone-free.
+  const NOW = 1_700_000_000_000
+
+  /** Build a single-item box at a given box index + lastSeen offset. */
+  function boxAt(
+    boxIndex: 1 | 2 | 3 | 4 | 5,
+    lastSeen: number,
+    fact: MathFact = { a: 3, b: 4, op: '+' },
+  ): LeitnerBox<MathFact> {
+    return { items: [{ item: fact, box: boxIndex, lastSeen }] }
+  }
+
+  it('returns an empty box (not null/undefined) on an empty input', () => {
+    expect(dueLeitnerItems(emptyLeitner<MathFact>(), NOW)).toEqual({
+      items: [],
+    })
+  })
+
+  it('box-1 facts are ALWAYS due regardless of lastSeen (interval 0)', () => {
+    // Just-promoted box-1 fact (lastSeen === now) is still due.
+    const box = boxAt(1, NOW)
+    expect(dueLeitnerItems(box, NOW).items).toHaveLength(1)
+    // And a box-1 fact seen a microsecond from the future-ish edge.
+    const box2 = boxAt(1, NOW - 1)
+    expect(dueLeitnerItems(box2, NOW).items).toHaveLength(1)
+  })
+
+  it('box-3 fact is NOT due before 4 days, IS due at/after 4 days', () => {
+    // Seen 3 days ago → not yet due (box-3 interval is 4 days).
+    const notYet = boxAt(3, NOW - 3 * MS_PER_DAY)
+    expect(dueLeitnerItems(notYet, NOW).items).toHaveLength(0)
+    // Seen 5 days ago → comfortably due.
+    const overdue = boxAt(3, NOW - 5 * MS_PER_DAY)
+    expect(dueLeitnerItems(overdue, NOW).items).toHaveLength(1)
+  })
+
+  it('is due exactly AT the interval boundary (>= comparison)', () => {
+    // Box-2 interval is 2 days. lastSeen exactly 2 days ago → due.
+    const exact = boxAt(2, NOW - 2 * MS_PER_DAY)
+    expect(dueLeitnerItems(exact, NOW).items).toHaveLength(1)
+    // One ms short of 2 days → not due.
+    const justShort = boxAt(2, NOW - 2 * MS_PER_DAY + 1)
+    expect(dueLeitnerItems(justShort, NOW).items).toHaveLength(0)
+  })
+
+  it('honours the full per-box schedule (box 4 → 7d, box 5 → 14d)', () => {
+    expect(dueLeitnerItems(boxAt(4, NOW - 6 * MS_PER_DAY), NOW).items).toEqual(
+      [],
+    )
+    expect(
+      dueLeitnerItems(boxAt(4, NOW - 7 * MS_PER_DAY), NOW).items,
+    ).toHaveLength(1)
+    expect(dueLeitnerItems(boxAt(5, NOW - 13 * MS_PER_DAY), NOW).items).toEqual(
+      [],
+    )
+    expect(
+      dueLeitnerItems(boxAt(5, NOW - 14 * MS_PER_DAY), NOW).items,
+    ).toHaveLength(1)
+  })
+
+  it('preserves item order so a downstream sort stays deterministic', () => {
+    // Mixed box state, all due; order in → order out (filter is stable).
+    const box: LeitnerBox<MathFact> = {
+      items: [
+        { item: { a: 5, b: 5, op: '+' }, box: 1, lastSeen: NOW },
+        { item: { a: 3, b: 3, op: '+' }, box: 1, lastSeen: NOW },
+        {
+          item: { a: 2, b: 2, op: '+' },
+          box: 2,
+          lastSeen: NOW - 3 * MS_PER_DAY,
+        },
+      ],
+    }
+    const due = dueLeitnerItems(box, NOW)
+    expect(due.items.map((i) => i.item)).toEqual([
+      { a: 5, b: 5, op: '+' },
+      { a: 3, b: 3, op: '+' },
+      { a: 2, b: 2, op: '+' },
+    ])
+  })
+
+  it('accepts a custom schedule override (tests do not depend on prod consts)', () => {
+    // Make box-1 require 1 day; a just-seen box-1 fact is then NOT due.
+    const custom = { ...LEITNER_REVIEW_INTERVAL_DAYS, 1: 1 }
+    const box = boxAt(1, NOW)
+    expect(dueLeitnerItems(box, NOW, custom).items).toHaveLength(0)
+    expect(
+      dueLeitnerItems(boxAt(1, NOW - 1 * MS_PER_DAY), NOW, custom).items,
+    ).toHaveLength(1)
+  })
+
+  it('does not mutate the input box', () => {
+    const original = boxAt(3, NOW - 1 * MS_PER_DAY)
+    const snapshot = JSON.stringify(original)
+    dueLeitnerItems(original, NOW)
+    expect(JSON.stringify(original)).toBe(snapshot)
+  })
+
+  it('integration: a recently-promoted fact is EXCLUDED from buildLeitnerSessionHint, a stale one is INCLUDED', () => {
+    // The end-to-end spaced-review contract the App relies on: filter the
+    // box through dueLeitnerItems BEFORE buildLeitnerSessionHint. A box-3
+    // fact promoted today (lastSeen === now) is not due for 4 days; a
+    // box-3 fact last seen 5 days ago is overdue. Only the stale one ships.
+    const recent: MathFact = { a: 6, b: 3, op: '+' } // promoted today
+    const stale: MathFact = { a: 7, b: 2, op: '+' } // 5 days idle
+    const box: LeitnerBox<MathFact> = {
+      items: [
+        { item: recent, box: 3, lastSeen: NOW },
+        { item: stale, box: 3, lastSeen: NOW - 5 * MS_PER_DAY },
+      ],
+    }
+    const hint = buildLeitnerSessionHint(dueLeitnerItems(box, NOW))
+    expect(hint).toEqual([{ a: 7, b: 2, op: '+', box: 3 }])
   })
 })
 
