@@ -419,13 +419,16 @@ function readMathCanon(path: string): string {
 
 /**
  * Install a `/api/claude` mock that serves the on-disk two-digit-addsub
- * canon for `track === 'math'` requests. Modelled on
- * `installAddToTwentyCanonClaudeMock` in `e2e/add-to-20.spec.ts` (PR #283).
+ * canon for `track === 'math'` requests. Same single-canon shape as the
+ * shared `installMathCanonClaudeMock` (`e2e/_helpers/mockClaude.ts`,
+ * promoted in ticket 86c9y490t). This spec keeps a private clone for
+ * now because it was outside that ticket's named 3-spec scope; a
+ * follow-up can migrate this callsite to the shared helper.
  *
  * Single-canon (not focus-aware) — per `[[testing-and-ci.md §4.2.3]]`
- * the focus-aware multi-canon pattern only earns helper-promotion at
- * adopter #3. This spec doesn't span a cross-tier focus-switch so
- * single-canon is the correct level of abstraction.
+ * the focus-aware multi-canon pattern is a different abstraction. This
+ * spec doesn't span a cross-tier focus-switch so single-canon is the
+ * correct level.
  *
  * Behaviour:
  *   - `track === 'math'` → serve `two-digit-addsub.json` regardless of

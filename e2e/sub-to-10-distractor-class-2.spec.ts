@@ -64,8 +64,8 @@
 
 import { test, expect } from '@playwright/test'
 import type { Page, Request } from '@playwright/test'
-import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { installMathCanonClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
   seedLocalStorage,
@@ -284,74 +284,13 @@ const ADD_TO_TEN_CANON_PATH = resolve(
   'public/canon/math/level-1/add-to-10.json',
 )
 
-function readMathCanon(path: string): string {
-  if (!existsSync(path)) {
-    throw new Error(
-      `[sub-to-10-distractor-class-2 spec] canon not found at ${path}. ` +
-        `This canon is required for chip-walk tests; do NOT swap to a ` +
-        `silent-MP3 placeholder — see file header.`,
-    )
-  }
-  return readFileSync(path, 'utf-8')
-}
-
-/**
- * Install a `/api/claude` mock that serves the on-disk math canon for
- * `track === 'math'` requests. Modelled on `installDigraphsChClaudeMock`
- * (`digraphs-ch-content.spec.ts`). Real Azure-rendered MP3 bytes decode
- * cleanly in headless chromium, so the read-aloud effect resolves and
- * chips enable across the multi-problem walk — the required pattern per
- * `.claude/docs/testing-and-ci.md` §4.1.3.
- *
- * `canonBody` is the raw JSON string read from disk; we serve it
- * verbatim as the `track === 'math'` response. Unknown tracks return
- * 500 loudly so an unintended live hit cannot pass silently.
- */
-async function installMathCanonClaudeMock(
-  page: Page,
-  canonBody: string,
-): Promise<{ requests: Request[] }> {
-  const requests: Request[] = []
-  await page.route('**/api/claude', async (route) => {
-    const req = route.request()
-    if (req.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, body: '' })
-      return
-    }
-    requests.push(req)
-    let body: Record<string, unknown>
-    try {
-      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
-    } catch {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: '{}',
-      })
-      return
-    }
-    const payload = (body.payload ?? {}) as Record<string, unknown>
-    const track = payload.track as string | undefined
-    if (track === 'math') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: canonBody,
-      })
-      return
-    }
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: false,
-        error: 'unexpected-track',
-        message: `distractor-class-2 spec is math-only; saw track=${String(track)}`,
-      }),
-    })
-  })
-  return { requests }
-}
+// The canon-bytes mock is the shared `installMathCanonClaudeMock`
+// (`e2e/_helpers/mockClaude.ts`) — promoted from this spec's former
+// private clone in ticket 86c9y490t. It reads the canon bytes itself
+// from the supplied path and throws loudly if the file is missing
+// (the chip-walk tests require real Azure-rendered MP3 bytes — a
+// silent-MP3 placeholder fails decode and masks the regression; see
+// `.claude/docs/testing-and-ci.md` §4.1.2/§4.1.3/§4.2.3).
 
 // ── Mock factory — math-only, response is per-test ───────────────────────────
 
@@ -527,8 +466,7 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     // then read chips. Bump test timeout for safety on slow CI runners.
     test.setTimeout(120_000)
 
-    const canonBody = readMathCanon(SUB_TO_TEN_CANON_PATH)
-    await installMathCanonClaudeMock(page, canonBody)
+    await installMathCanonClaudeMock(page, SUB_TO_TEN_CANON_PATH)
     await seedLocalStorage(page, {
       progress: buildSubToTenSeedProgress(),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
@@ -652,8 +590,7 @@ test.describe('sub-to-10 distractor Class 2 (wrong-operation)', () => {
     skipOnWebkitHeadless(testInfo)
     test.setTimeout(120_000)
 
-    const canonBody = readMathCanon(ADD_TO_TEN_CANON_PATH)
-    await installMathCanonClaudeMock(page, canonBody)
+    await installMathCanonClaudeMock(page, ADD_TO_TEN_CANON_PATH)
     await seedLocalStorage(page, {
       progress: buildAddToTenSeedProgress(),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),

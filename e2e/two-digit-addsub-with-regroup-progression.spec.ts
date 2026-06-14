@@ -241,10 +241,12 @@
  */
 
 import { test, expect } from '@playwright/test'
-import type { Page, Route } from '@playwright/test'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { installClaudeMock } from './_helpers/mockClaude'
+import {
+  installClaudeMock,
+  installMathCanonClaudeMock,
+} from './_helpers/mockClaude'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
@@ -291,86 +293,23 @@ const TWO_DIGIT_ADDSUB_WITH_REGROUP_CANON_PATH = resolve(
 // ── Canon-bytes mock (Wave 6D — for Test 2 only) ────────────────────────
 //
 // Test 2's mock was upgraded from `installClaudeMock(failNetwork: true)`
-// to this canon-bytes pattern (per `[[feedback_failing_first_must_prove_
-// green]]` + Kevin's PR #318 NOF). Modelled on `installAddToTwentyCanon
-// ClaudeMock` in `e2e/add-to-20.spec.ts` (PR #283).
-//
-// Behaviour:
-//   - `track === 'math'` → serve `two-digit-addsub-with-regroup.json`
-//     verbatim (regardless of `focusNode`). Test 2's seed lands the
-//     picker on `'two-digit-addsub-with-regroup'` so the canon shape
-//     matches the request.
-//   - `track === 'word-song'` → 500 loudly. App.tsx catches and
-//     falls through to silent caption-walk on Hub's pre-warm fetch —
-//     same behaviour the production word-song path takes on any
-//     outage, and doesn't affect Hub → Math navigation.
-//   - `OPTIONS` preflight → 204.
+// to a canon-bytes pattern (per `[[feedback_failing_first_must_prove_
+// green]]` + Kevin's PR #318 NOF). The former private clone here was
+// promoted to the shared `installMathCanonClaudeMock`
+// (`e2e/_helpers/mockClaude.ts`) in ticket 86c9y490t once the pattern
+// crossed the third-adopter threshold. The shared helper reads the
+// canon bytes from the supplied path, serves them verbatim for
+// `track === 'math'` (regardless of `focusNode`), 500s loudly on
+// word-song/unknown tracks, and throws at install time if the canon
+// file is missing (a silent-MP3 placeholder would fail decode and
+// mask the regression — see `.claude/docs/testing-and-ci.md`
+// §4.1.2/§4.1.3/§4.2.3).
 //
 // Tests 1, 3, 4 deliberately keep `installClaudeMock(page,
 // { failNetwork: true })` — their assertions are structural (canon-
 // existence, persisted-progress shape, history attribution) and do
 // NOT depend on the served-canon codepath running. The canon-bytes
 // upgrade applies to Test 2 alone.
-function readMathCanon(path: string): string {
-  if (!existsSync(path)) {
-    throw new Error(
-      `[with-regroup spec] canon not found at ${path}. ` +
-        `This canon is required for the Test 2 canon-bytes mock; do ` +
-        `NOT swap to a silent-MP3 placeholder — per testing-and-ci.md ` +
-        `§4.1.2 + §4.1.3 rule 3 the placeholder also fails decode under ` +
-        `the stub-ctx, falls back to the static add-to-10 rotation, and ` +
-        `silently masks the regression. Wave 6C (PR #318) bakes this ` +
-        `file; if the file is missing here, base-branch state has ` +
-        `regressed.`,
-    )
-  }
-  return readFileSync(path, 'utf-8')
-}
-
-async function installWithRegroupCanonClaudeMock(page: Page): Promise<void> {
-  const canonBody = readMathCanon(TWO_DIGIT_ADDSUB_WITH_REGROUP_CANON_PATH)
-  await page.route('**/api/claude', async (route: Route) => {
-    const req = route.request()
-    if (req.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, body: '' })
-      return
-    }
-    let body: Record<string, unknown>
-    try {
-      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
-    } catch {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: '{}',
-      })
-      return
-    }
-    const payload = (body.payload ?? {}) as Record<string, unknown>
-    const track = payload.track as string | undefined
-    if (track === 'math') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: canonBody,
-      })
-      return
-    }
-    // word-song or unknown track — 500 loudly. App.tsx catches and
-    // falls through to silent caption-walk; doesn't affect Hub → Math.
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: false,
-        error: 'unexpected-track',
-        message:
-          `with-regroup Test 2 canon-bytes mock is math-only; saw ` +
-          `track=${String(track)}`,
-      }),
-    })
-  })
-}
 
 // ── Helpers (math session walk, picker seed) ────────────────────────────
 
@@ -521,15 +460,14 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
   // baked the canon on disk, the test could not turn GREEN under
   // failNetwork. Test 2 was marked `.fixme` mid-merge-cascade.
   //
-  // **Wave 6D fix (this PR, ticket `86c9y3xu0`):** swap the mock from
-  // `installClaudeMock(failNetwork: true)` to
-  // `installWithRegroupCanonClaudeMock(page)` — a canon-bytes mock
-  // that reads `public/canon/math/level-1/two-digit-addsub-with-
-  // regroup.json` and serves it verbatim for `track === 'math'`
-  // requests, modelled on add-to-20 PR #283's
-  // `installAddToTwentyCanonClaudeMock`. The mock now exercises the
-  // served-canon codepath, so the operand-range assertion is grounded
-  // in real canon content.
+  // **Wave 6D fix (ticket `86c9y3xu0`):** swap the mock from
+  // `installClaudeMock(failNetwork: true)` to the shared canon-bytes
+  // helper `installMathCanonClaudeMock(page, path)` (promoted from the
+  // former private clone in ticket `86c9y490t`) — it reads
+  // `public/canon/math/level-1/two-digit-addsub-with-regroup.json` and
+  // serves it verbatim for `track === 'math'` requests. The mock now
+  // exercises the served-canon codepath, so the operand-range
+  // assertion is grounded in real canon content.
   //
   // **`forceHowlerUnlock` intentionally NOT called** — per
   // `[[testing-and-ci.md §4.1.2]]` + `[[feedback_force_howler_unlock_
@@ -572,7 +510,10 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
     // canon-rendered MP3 decoding (see Test 4).
     test.setTimeout(240_000)
 
-    await installWithRegroupCanonClaudeMock(page)
+    await installMathCanonClaudeMock(
+      page,
+      TWO_DIGIT_ADDSUB_WITH_REGROUP_CANON_PATH,
+    )
     await seedLocalStorage(page, {
       progress: buildWithRegroupSeedProgress(),
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
@@ -661,7 +602,7 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
     // on the persisted Progress doc (skillFocus attribution / successRate /
     // history length). No two-digit operand content is pinned, so the §4.2
     // tier-asymmetry never bites. (Test 2, which DOES pin addend-a ≥ 10,
-    // uses installWithRegroupCanonClaudeMock — not failNetwork.)
+    // uses installMathCanonClaudeMock — not failNetwork.)
     await installClaudeMock(page, { failNetwork: true })
     await seedLocalStorage(page, {
       progress: buildWithRegroupSeedProgress(),

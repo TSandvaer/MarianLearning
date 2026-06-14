@@ -8,7 +8,8 @@
  * loudly so an unintended live hit cannot pass silently.
  */
 
-import type { Page, Route } from '@playwright/test'
+import type { Page, Request, Route } from '@playwright/test'
+import { existsSync, readFileSync } from 'node:fs'
 import {
   canonicalMathSessionResponse,
   canonicalWordSongSessionResponse,
@@ -130,4 +131,100 @@ export async function installClaudeMock(
       body: JSON.stringify(responseBody),
     })
   })
+}
+
+/**
+ * Install a `/api/claude` mock that serves the on-disk math canon JSON
+ * (read verbatim from `canonPath`) for `track === 'math'` requests.
+ *
+ * Ticket 86c9y490t — promoted to this shared helper after the
+ * copy-paste-adapted canon-bytes pattern crossed the third-adopter
+ * threshold (Wave 6D): `add-to-20.spec.ts`,
+ * `sub-to-10-distractor-class-2.spec.ts`, and
+ * `two-digit-addsub-with-regroup-progression.spec.ts` each carried a
+ * private clone diverging only in canon path + error-message string.
+ *
+ * Why real canon bytes, not `forceHowlerUnlock`: real Azure-rendered
+ * MP3 bytes decode cleanly in headless chromium, so the
+ * read-aloud→chip-enable gate releases across a multi-problem walk.
+ * `forceHowlerUnlock`'s stubbed ctx breaks real-bytes decode → silent
+ * demote to the static add-to-10 fallback → the feature under test
+ * never mounts. See `.claude/docs/testing-and-ci.md` §4.1.6 + §4.2.3.
+ *
+ * Behaviour:
+ *   - `canonPath` missing on disk → throws loudly at install time
+ *     (canon is required for chip-walk tests; a silent-MP3 placeholder
+ *     also fails decode and masks the regression — see §4.1.2/§4.1.3).
+ *   - `track === 'math'` → 200 with the canon bytes verbatim,
+ *     regardless of `focusNode`. Tests assert against the served
+ *     canon's structural envelope; a non-matching seeded focus fails
+ *     loudly (correct behaviour).
+ *   - `track === 'word-song'` or unknown → 500 loudly. App.tsx catches
+ *     and falls through to the silent caption-walk on Hub's pre-warm
+ *     fetch — same as the production word-song path on any outage,
+ *     and doesn't affect Hub → Math navigation.
+ *   - `OPTIONS` preflight → 204.
+ *
+ * Returns `{ requests }` so specs can assert the planner contract on
+ * the captured request bodies (e.g. focusNode as a positive
+ * discriminator per `[[testing-and-ci.md §4.1.1e]]`). Callers that
+ * don't need capture can ignore the return value.
+ */
+export async function installMathCanonClaudeMock(
+  page: Page,
+  canonPath: string,
+): Promise<{ requests: Request[] }> {
+  if (!existsSync(canonPath)) {
+    throw new Error(
+      `[installMathCanonClaudeMock] canon not found at ${canonPath}. ` +
+        `This canon is required for the canon-bytes mock; do NOT swap ` +
+        `to a silent-MP3 placeholder — per testing-and-ci.md ` +
+        `§4.1.2 + §4.1.3 the placeholder also fails decode under the ` +
+        `stub-ctx, falls back to the static add-to-10 rotation, and ` +
+        `silently masks the regression.`,
+    )
+  }
+  const canonBody = readFileSync(canonPath, 'utf-8')
+  const requests: Request[] = []
+  await page.route('**/api/claude', async (route: Route) => {
+    const req = route.request()
+    if (req.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    requests.push(req)
+    let body: Record<string, unknown>
+    try {
+      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
+    } catch {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: '{}',
+      })
+      return
+    }
+    const payload = (body.payload ?? {}) as Record<string, unknown>
+    const track = payload.track as string | undefined
+    if (track === 'math') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: canonBody,
+      })
+      return
+    }
+    // word-song or unknown track — 500 loudly. App.tsx catches and
+    // falls through to silent caption-walk; doesn't affect Hub → Math.
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: false,
+        error: 'unexpected-track',
+        message: `installMathCanonClaudeMock is math-only; saw track=${String(track)}`,
+      }),
+    })
+  })
+  return { requests }
 }
