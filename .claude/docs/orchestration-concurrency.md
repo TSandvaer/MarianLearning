@@ -14,11 +14,25 @@ Every code/spec/test PR by Kevin, Devon, Kyle, or Jessica requires a mandatory c
 
 Adding tracks outside the Kevin↔Devon loop is how count reaches 3–5: Kyle (design/spec), Jessica (E2E), and Dave (directive/research) each own a separate worktree and are not bound by the Kevin↔Devon review pairing. Pre-staging their work in parallel raises concurrency without deepening the review bottleneck.
 
+**Checkout gotcha — the reviewer cannot `gh pr checkout <N>` when the author's worktree still holds the branch.** Each persona's branch stays checked out in the _author's_ worktree until the PR merges. So when a reviewer (or the orchestrator) tries `gh pr checkout <N>` in a different worktree, git refuses with `fatal: '<branch>' is already used by worktree at '...'`. The workaround is to materialize a private local review branch tracking the origin ref instead:
+
+```bash
+cd <reviewer-wt> && git fetch origin \
+  && PR_BRANCH=$(gh pr view <N> --json headRefName -q .headRefName) \
+  && git checkout -B <reviewer>/review-<N> origin/$PR_BRANCH
+```
+
+This is the standard Step 0 for any cross-persona review dispatch (Devon hit the bare-`gh pr checkout` wall on #433; Kevin's #434 review used the workaround). The leftover `<reviewer>/review-<N>` branch is harmless (clean tree, same SHA as the PR head) and is swept back to `<reviewer>/idle` during cleanup.
+
+**Same root cause at merge time — `gh pr merge --delete-branch` prints an alarming error but the merge still succeeded.** Because the author's worktree still holds the head branch, `gh pr merge <N> --squash --delete-branch` emits `failed to delete local branch '<branch>': ... cannot delete branch '<branch>' used by worktree at '...'`. Do NOT panic or retry — the squash-merge and the _remote_ branch deletion both completed; only the worktree-held _local_ branch couldn't be deleted (it's swept to idle during cleanup). Always confirm with `gh pr view <N> --json state,mergedAt` (trust `mergedAt`, not the command exit code — same discipline as the gh-pr-merge-504 quirk).
+
 ### 1.2 Playwright port 4173 — at most one e2e run across all worktrees
 
 `playwright.config.ts` hard-pins port 4173 with `--strictPort`. Two concurrent `yarn e2e` runs (e.g. Jessica's spec dispatch + a reviewer running the full suite) race on the port. The second run silently reuses the first worktree's server; when that server exits, tests 4+ hit `ERR_CONNECTION_REFUSED`. Full failure mode documented in `testing-and-ci.md` §2.4.1.
 
 **Dispatch implication:** at most one `yarn e2e` run (Jessica's spec dispatch OR a cross-reviewer running the full suite) across all worktrees simultaneously. Vitest is port-free and unaffected — multiple `yarn test` runs are safe in parallel.
+
+**Orphaned-preview gotcha (observed 2026-06-14, Jessica PR #440).** The 4173 hazard is not only _concurrent_ runs — a `vite preview` server from a PRIOR e2e run can be left **orphaned** (still LISTENING on 4173) after that run exits, and because the port is machine-global it then blocks a DIFFERENT worktree's next e2e with `Port 4173 already in use`, even when "no e2e is in flight." Jessica hit this when an orphaned preview (PID 28188) from `kevin-wt` survived a prior Kevin run. **Recovery:** find + kill the stale LISTENING PID — `npx kill-port 4173` (cross-platform) or on Windows `netstat -ano | findstr :4173` → `taskkill /PID <pid> /F` — the preview holds no state, so killing it is reversible; then re-run. **Treat a "free" 4173 as unverified** — a stale orphan, not just a live sibling run, can hold it; a stale-preview sweep between e2e dispatches avoids the false-start.
 
 ### 1.3 GH Actions free-tier queue tail
 
