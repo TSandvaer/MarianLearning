@@ -3,6 +3,7 @@
 For Thomas's batched MJ session. Each word's prompt is a single fenced block ready to copy into the MJ Web UI prompt box. Aspect ratio set in GUI dropdown (1:1). All four short-i-walkthrough gotchas baked in per `.claude/docs/skill-trees-and-content.md` § "MJ prompt-engineering gotchas for picture-pack words".
 
 **Source specs:**
+
 - short-e: [`design/word-song/short-e-picture-pack-prompts.md`](./short-e-picture-pack-prompts.md), [`design/word-song/short-e-pool-expansion.md`](./short-e-pool-expansion.md)
 - short-o-ext: [`design/word-song/short-o-picture-pack-extension-prompts.md`](./short-o-picture-pack-extension-prompts.md), [`design/word-song/short-o-pool-extension.md`](./short-o-pool-extension.md)
 
@@ -20,21 +21,21 @@ For Thomas's batched MJ session. Each word's prompt is a single fenced block rea
 
 Cross-checked both pools against Thomas's drop heuristic (he didn't know "rosehip" → Marian definitely won't; same for "wheel rim"). 8yo Manila-context Filipino L2 learner.
 
-| Word        | Pool        | Verdict                | Rationale |
-| ----------- | ----------- | ---------------------- | --------- |
-| **bed**     | short-e     | SHIP                   | Universal, Marian uses one nightly. |
-| **leg**     | short-e     | SHIP                   | Body-part vocab is universal; chair-leg framing avoids body-fragmentation per pool spec §10 Q3. |
-| **hen**     | short-e     | SHIP                   | "Chicken" is universal in Manila; "hen" specifically is the female term but the picture carries it (same picture-grounds-meaning pattern as `mom`, `jam`, `hot`). |
-| **pen**     | short-e     | SHIP (re-trace)        | Universal; this is the conditional re-trace per pool spec Q2. Re-trace recommended for tier visual cohesion. |
-| **web**     | short-e     | SHIP                   | "Spider web" is universal in early-reader books; the spider absence is the recognition cue. |
-| **net**     | short-e     | SHIP                   | Filipino fishing villages + butterfly nets in early-reader books. Universal. |
-| **jet**     | short-e     | SHIP                   | "Jet plane" universal in early-reader books; Manila kids see planes overhead frequently. |
-| **gem**     | short-e     | **BORDERLINE — pre-discuss with Thomas** | Per task brief, `gem` was flagged for vocab-check. "Gem" specifically is less common than "diamond" or "jewel" for an 8yo — it's a vocab-stretch picture-grounded word. Source-spec audit (§1) called it borderline. Recommended ship with the picture grounding the meaning (same logical move as `cot`, `hot`, `mom`); Thomas can drop if he wants to be conservative. **If dropped, pool falls to 8 — same as short-o pre-extension; cross-vowel-mode gate would still need 11.** Recommend ship. |
-| **egg**     | short-e     | SHIP (with Phase 2 fallback) | Universal food. The Phase 2 fallback (drop if cream-on-cream contrast collapses) is documented in pool spec §10 Q1. |
-| **cot**     | short-o-ext | SHIP                   | Vocab-stretch (Tagalog primary is *kuna* / *kama*); picture-grounds-the-meaning pattern. Source spec §3.5 confirmed in the Q1 lock. |
-| **top**     | short-o-ext | SHIP                   | Spinning-top toys are universal in international picture books and Filipino kids see them via media. The winder-knob is the load-bearing disambiguator from "ice-cream cone" or "party hat". |
-| **pop**     | short-o-ext | **AMBIGUITY-FLAG — Thomas already knew about this; reconfirm referent at MJ time** | Per task brief, `pop` is the known ambiguity case (lollipop vs soda vs popping action). Source spec commits to lollipop (sphere-on-stick); Phase 2 fallback to `cob` if 96pt review fails. **Reconfirm before generating: stick visibility at 96pt is the ENTIRE mitigation.** |
-| **cob**     | short-o-ext | STANDBY only           | Phase 2 fallback for `pop`; only generate if `pop` lollipop chip's stick collapses at 96pt. Vocab risk (Tagalog *mais*) — but picture-grounds-the-meaning. |
+| Word    | Pool        | Verdict                                                                            | Rationale                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------- | ----------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **bed** | short-e     | SHIP                                                                               | Universal, Marian uses one nightly.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **leg** | short-e     | SHIP                                                                               | Body-part vocab is universal; chair-leg framing avoids body-fragmentation per pool spec §10 Q3.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **hen** | short-e     | SHIP                                                                               | "Chicken" is universal in Manila; "hen" specifically is the female term but the picture carries it (same picture-grounds-meaning pattern as `mom`, `jam`, `hot`).                                                                                                                                                                                                                                                                                                                                    |
+| **pen** | short-e     | SHIP (re-trace)                                                                    | Universal; this is the conditional re-trace per pool spec Q2. Re-trace recommended for tier visual cohesion.                                                                                                                                                                                                                                                                                                                                                                                         |
+| **web** | short-e     | SHIP                                                                               | "Spider web" is universal in early-reader books; the spider absence is the recognition cue.                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **net** | short-e     | SHIP                                                                               | Filipino fishing villages + butterfly nets in early-reader books. Universal.                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **jet** | short-e     | SHIP                                                                               | "Jet plane" universal in early-reader books; Manila kids see planes overhead frequently.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **gem** | short-e     | **BORDERLINE — pre-discuss with Thomas**                                           | Per task brief, `gem` was flagged for vocab-check. "Gem" specifically is less common than "diamond" or "jewel" for an 8yo — it's a vocab-stretch picture-grounded word. Source-spec audit (§1) called it borderline. Recommended ship with the picture grounding the meaning (same logical move as `cot`, `hot`, `mom`); Thomas can drop if he wants to be conservative. **If dropped, pool falls to 8 — same as short-o pre-extension; cross-vowel-mode gate would still need 11.** Recommend ship. |
+| **egg** | short-e     | SHIP (with Phase 2 fallback)                                                       | Universal food. The Phase 2 fallback (drop if cream-on-cream contrast collapses) is documented in pool spec §10 Q1.                                                                                                                                                                                                                                                                                                                                                                                  |
+| **cot** | short-o-ext | SHIP                                                                               | Vocab-stretch (Tagalog primary is _kuna_ / _kama_); picture-grounds-the-meaning pattern. Source spec §3.5 confirmed in the Q1 lock.                                                                                                                                                                                                                                                                                                                                                                  |
+| **top** | short-o-ext | SHIP                                                                               | Spinning-top toys are universal in international picture books and Filipino kids see them via media. The winder-knob is the load-bearing disambiguator from "ice-cream cone" or "party hat".                                                                                                                                                                                                                                                                                                         |
+| **pop** | short-o-ext | **AMBIGUITY-FLAG — Thomas already knew about this; reconfirm referent at MJ time** | Per task brief, `pop` is the known ambiguity case (lollipop vs soda vs popping action). Source spec commits to lollipop (sphere-on-stick); Phase 2 fallback to `cob` if 96pt review fails. **Reconfirm before generating: stick visibility at 96pt is the ENTIRE mitigation.**                                                                                                                                                                                                                       |
+| **cob** | short-o-ext | STANDBY only                                                                       | Phase 2 fallback for `pop`; only generate if `pop` lollipop chip's stick collapses at 96pt. Vocab risk (Tagalog _mais_) — but picture-grounds-the-meaning.                                                                                                                                                                                                                                                                                                                                           |
 
 **Net recommendation:** ship `gem` and `pop` with the source-spec mitigations baked into the prompts below. Drop `gem` and pool drops to 8 — neither short-e nor short-o-ext would be cross-vowel-mode-ready (need 11 each). Material risk on dropping; recommend ship.
 
@@ -54,13 +55,14 @@ Cross-checked both pools against Thomas's drop heuristic (he didn't know "rosehi
 
 ## short-e (9 words)
 
-### 1. net   *— generate FIRST (highest cross-pack discrimination risk vs. `bag`)*
+### 1. net _— generate FIRST (highest cross-pack discrimination risk vs. `bag`)_
 
 ```
 A flat illustrated cartoon DRAWING of a simple butterfly net with a clear round wooden frame holding a visible open-grid mesh of about 6 by 6 wide-spaced thin cream-colored cord cells, attached to a long warm-brown wooden handle extending diagonally, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no environment --no photo, product photography, fish, butterfly, smiling net, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - Open mesh holes are CLEARLY VISIBLE between the cord strands at 96pt — the mesh-vs-solid is the load-bearing discriminator vs. `bag`.
 - Round/oval rigid frame is present (not just a free-floating mesh; that would collapse to `web`).
 - Long handle extends from the frame, ~1.5x the frame diameter.
@@ -71,13 +73,14 @@ A flat illustrated cartoon DRAWING of a simple butterfly net with a clear round 
 
 ---
 
-### 2. egg   *— generate SECOND (cream-on-cream contrast risk + FORBIDDEN_PAIR vs. `nut` + `bun`)*
+### 2. egg _— generate SECOND (cream-on-cream contrast risk + FORBIDDEN_PAIR vs. `nut` + `bun`)_
 
 ```
 A flat illustrated cartoon DRAWING of a single smooth chicken egg with a warm-tan #E8D4B5 shell and gentle soft cel-shading on the right side, completely smooth surface with no seam line, no score mark, no cracks, no speckles, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, slice-of-life Korean webtoon look, single subject --no photorealistic, 3d render, seam line, score mark, cracks, smiling egg, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - Shell color reads warm-tan AGAINST the cream background — pure-white or pale-cream egg dissolves into background once remove.bg keys it.
 - Smooth ovoid silhouette — broader at bottom, narrower at top.
 - **NO seam line down the middle** (would collapse vs. `nut`).
@@ -88,13 +91,14 @@ A flat illustrated cartoon DRAWING of a single smooth chicken egg with a warm-ta
 
 ---
 
-### 3. hen   *— generate THIRD (animal-class discrimination vs. `bug`/`rat`/`cat`/`dog`/`fox`)*
+### 3. hen _— generate THIRD (animal-class discrimination vs. `bug`/`rat`/`cat`/`dog`/`fox`)_
 
 ```
 A flat illustrated cartoon DRAWING of a friendly cartoon hen viewed in three-quarter side perspective, plump rounded body in soft warm-cream feathers, small warm-yellow beak, prominent soft rose-pink comb on top of the head, two thin warm-yellow legs visible below the body, two large round friendly eyes, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no eggs visible --no photo, photorealistic, 3d render, eggs, chicken coop, rooster, smiling hen with cartoon eyebrows, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - Comb on top of head is CLEARLY VISIBLE (load-bearing recognition feature; without it the silhouette reads as a generic round bird or duck).
 - Beak + 2 legs + plump body — bird-class identifiers.
 - Soft rose-pink comb (not saturated primary red).
@@ -105,13 +109,14 @@ A flat illustrated cartoon DRAWING of a friendly cartoon hen viewed in three-qua
 
 ---
 
-### 4. leg   *— generate FOURTH (chair-leg framing mandatory; body-leg is a content concern)*
+### 4. leg _— generate FOURTH (chair-leg framing mandatory; body-leg is a content concern)_
 
 ```
 A flat illustrated cartoon DRAWING of a single wooden chair leg shown vertically in the center, with a small portion of the chair seat corner visible at the top of the frame providing furniture context, the leg is a gently-tapered turned-wood shape in warm-brown wood color, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, no human or animal body part anywhere --no photo, photorealistic, 3d render, body part, human leg, animal leg, severed limb, shoe, foot, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - **CHAIR-LEG framing — small chair-context portion at top showing leg-to-seat junction** (~20% chair, ~80% leg).
 - **NOT a body-leg / animal-leg / disembodied limb / shoe / foot** — content concern; mandatory regenerate if violated.
 - Warm-brown wood color, gently tapered or turned shape.
@@ -122,13 +127,14 @@ A flat illustrated cartoon DRAWING of a single wooden chair leg shown vertically
 
 ---
 
-### 5. web   *— generate FIFTH (thin-line geometry survival risk)*
+### 5. web _— generate FIFTH (thin-line geometry survival risk)_
 
 ```
 A flat illustrated cartoon DRAWING of a simple spider web shown front-on as a flat near-circular pattern, with about 6 concentric ring circles spiraling outward from a center point and about 10 evenly distributed radial spokes connecting all the rings, very thin soft mauve thread lines suggesting silk, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, slice-of-life Korean webtoon look, single subject, no spider visible --no photo, photorealistic, 3d render, spider, insect, halloween, dark background, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - Concentric-rings + radial-spokes pattern is CLEAR and SYMMETRIC at 96pt.
 - Thread lines contrast against cream background — push toward soft mauve or soft warm-grey if cream-on-cream collapse risk.
 - **NO spider visible** (the absence is the recognition cue; spider would introduce content + second subject).
@@ -139,13 +145,14 @@ A flat illustrated cartoon DRAWING of a simple spider web shown front-on as a fl
 
 ---
 
-### 6. jet   *— generate SIXTH (low risk; standard aircraft category)*
+### 6. jet _— generate SIXTH (low risk; standard aircraft category)_
 
 ```
 A flat illustrated cartoon DRAWING of a simple sleek passenger jet plane viewed in three-quarter perspective from below-front showing two main wings extending outward, a vertical tail fin at the back, a clear cockpit window at the front, and four to six small round passenger windows along the side, soft warm-blue body with gentle cel-shading, in flight not on a runway, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, sky, clouds, runway, contrails, smiling jet, eyes for headlights, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - Wings + tail fin + cockpit all clearly visible — aircraft-class identifiers.
 - In flight (NOT on runway, no ground line, no airport).
 - Warm-pastel palette — desaturated soft warm-blue body, not pure airline-white (collapses into cream background).
@@ -156,7 +163,7 @@ A flat illustrated cartoon DRAWING of a simple sleek passenger jet plane viewed 
 
 ---
 
-### 7. bed   *— generate SEVENTH (low risk; standard furniture)*
+### 7. bed _— generate SEVENTH (low risk; standard furniture)_
 
 > **Mechanism-over-recognition gotcha applies (gotcha #2):** modern adjustable / hospital beds are MJ's default attractor. Description commits to a simple cot-style children's-book bed; `--no` includes the modern mechanisms.
 
@@ -165,6 +172,7 @@ A flat illustrated cartoon DRAWING of a simple single bed viewed in three-quarte
 ```
 
 **Selection criteria when variants land:**
+
 - Pillow at one end is clearly visible (load-bearing — without it the silhouette reads as "table" or "platform").
 - Four legs visible at corners.
 - Single mattress, single pillow.
@@ -176,13 +184,14 @@ A flat illustrated cartoon DRAWING of a simple single bed viewed in three-quarte
 
 ---
 
-### 8. gem   *— generate EIGHTH (low risk; geometric simplicity)*
+### 8. gem _— generate EIGHTH (low risk; geometric simplicity)_
 
 ```
 A flat illustrated cartoon DRAWING of a simple cut gemstone in three-quarter perspective showing a clear diamond-cut shape with about 5 visible flat angular facets, soft warm-rose color with subtle cel-shading variations between adjacent facets, the brightest facet on the upper-left, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, ring setting, jewelry, crown, sparkle rays, smiling gem, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - Visible angular facets (4-6 flat polygonal faces) — the geometric cut is the recognition cue.
 - Warm-pastel palette — soft warm-rose, soft warm-mauve, or soft sage-green; NOT saturated primary jewel-tones.
 - **NO sparkle-rays radiating outward** (would conflict with `sun` recognition pattern from a future pack).
@@ -193,7 +202,7 @@ A flat illustrated cartoon DRAWING of a simple cut gemstone in three-quarter per
 
 ---
 
-### 9. pen   *— generate LAST (CONDITIONAL re-trace per pool spec Q2; pair-review against PR #157)*
+### 9. pen _— generate LAST (CONDITIONAL re-trace per pool spec Q2; pair-review against PR #157)_
 
 > **Mechanism-over-recognition gotcha applies (gotcha #2):** ballpoint vs. fountain vs. pencil. Description commits to a simple ballpoint with visible nib + clip (the children's-book prototype). `--no` includes pencil and quill.
 
@@ -202,6 +211,7 @@ A flat illustrated cartoon DRAWING of a simple ballpoint pen viewed diagonally i
 ```
 
 **Selection criteria when variants land:**
+
 - Nib at writing-tip end CLEARLY VISIBLE (without it the silhouette reads as "stick" or "marker").
 - Clip on the upper body CLEARLY VISIBLE (second disambiguator from generic-cylinder).
 - Slim elongated cylinder.
@@ -214,7 +224,7 @@ A flat illustrated cartoon DRAWING of a simple ballpoint pen viewed diagonally i
 
 ## short-o-extension (3-4 words)
 
-### 1. cot   *— generate FIRST (lowest risk; geometric simplicity)*
+### 1. cot _— generate FIRST (lowest risk; geometric simplicity)_
 
 > **Mechanism-over-recognition gotcha applies (gotcha #2):** modern hospital / adjustable / military cots are attractors. Description commits to a simple traditional children's-book cot; `--no` includes hospital and military.
 
@@ -223,6 +233,7 @@ A flat illustrated cartoon DRAWING of a simple small portable single-bed cot in 
 ```
 
 **Selection criteria when variants land:**
+
 - Pillow at one end is CLEARLY VISIBLE (load-bearing — without it silhouette could read as "bench" or "stool").
 - Low rectangular frame with four short legs.
 - Thin mattress visible on top of frame.
@@ -234,13 +245,14 @@ A flat illustrated cartoon DRAWING of a simple small portable single-bed cot in 
 
 ---
 
-### 2. top   *— generate SECOND (motion-blur attractor is severe)*
+### 2. top _— generate SECOND (motion-blur attractor is severe)_
 
 ```
-A flat illustrated cartoon DRAWING of a classic wooden spinning-toy top at REST in three-quarter perspective, an inverted cone shape with a wider rounded crown at the top and a single small pointed tip at the bottom resting on the surface, a small round winder-knob centered on the top-flat face of the crown, body in soft warm-rose color with one or two simple warm-peach decorative stripe bands wrapping horizontally around the crown, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, NOT spinning --no photo, photorealistic, 3d render, motion blur, spinning blur, motion trail, ice cream cone, party hat, beyblade, smiling top, shadow, drop shadow, ground shadow
+A flat illustrated cartoon DRAWING of a classic wooden spinning-toy top at REST in three-quarter perspective, an inverted cone shape with a wider rounded crown at the top and a single small pointed tip at the bottom resting on the surface, a small round winder-knob centered on the top-flat face of the crown, body in soft warm-rose color with one or two simple warm-peach decorative stripe bands wrapping horizontally around the crown, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject, NOT spinning --no photo, photorealistic, 3d render, motion blur, spinning blur, motion trail, ice cream cone, party hat, plastic spinning disc top, smiling top, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - **NO motion-blur, NO spinning lines, NO motion-trail** — the top is at REST. (Mandatory regenerate trigger.)
 - Pointed tip at the BOTTOM (load-bearing recognition cue; rests on implied surface).
 - Winder-knob centered on top-flat crown face (disambiguator from ice-cream cone, party hat).
@@ -252,7 +264,7 @@ A flat illustrated cartoon DRAWING of a classic wooden spinning-toy top at REST 
 
 ---
 
-### 3. pop   *— generate THIRD (after `top` is locked; A/B at 96pt)*
+### 3. pop _— generate THIRD (after `top` is locked; A/B at 96pt)_
 
 > **The stick is the load-bearing disambiguator vs. `cup` and `bun`.** If at 96pt the stick collapses (cropped by remove.bg, rendered too thin, merged into sphere), trigger Phase 2 fallback to `cob` (next prompt block).
 
@@ -261,6 +273,7 @@ A flat illustrated cartoon DRAWING of a simple round lollipop candy on a stick i
 ```
 
 **Selection criteria when variants land:**
+
 - **STICK CLEARLY VISIBLE at full length** at the bottom of the sphere — load-bearing disambiguator.
 - Single round sphere on top of stick — soft warm-rose, NOT saturated primary red.
 - No wrapper (twisted cellophane introduces visual noise).
@@ -272,13 +285,14 @@ A flat illustrated cartoon DRAWING of a simple round lollipop candy on a stick i
 
 ---
 
-### 4. cob   *— STANDBY only; generate ONLY if `pop` Phase 2 review fails*
+### 4. cob _— STANDBY only; generate ONLY if `pop` Phase 2 review fails_
 
 ```
 A flat illustrated cartoon DRAWING of a single corn-on-the-cob in three-quarter perspective showing the long yellow cylinder body covered in regular rows of soft-oval kernels in soft warm-yellow color, with a partial green husk peeled back at the bottom end revealing the kernels above, the husk in soft sage-green with a slightly darker shadow companion, soft pastel children's picture-book style, solid soft cream #FFF6EE background, warm-pastel palette, soft cel-shading, slice-of-life Korean webtoon look, single subject --no photo, photorealistic, 3d render, butter, cooking pot, plate, multiple cobs, popcorn, smiling cob, shadow, drop shadow, ground shadow
 ```
 
 **Selection criteria when variants land:**
+
 - **Kernel rows VISIBLE on the cylinder** — load-bearing recognition cue.
 - Yellow cylinder body, NOT saturated primary yellow (warm-pastel only).
 - Partial green husk peeled back at one end (sage-green, not saturated primary green).
