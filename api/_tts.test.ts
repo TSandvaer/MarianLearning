@@ -28,7 +28,9 @@ import {
   readAzureCredentials,
   renderFourSubjectHint,
   renderLetterNamesScratchyHint,
+  renderRecapFourStars,
   renderSightWordsInnerText,
+  renderStreakFourRow,
   renderLetterSoundsInnerText,
   renderSsmlInnerText,
   substituteSentenceGap,
@@ -1398,11 +1400,14 @@ describe('cluster 1 — "row" homophone (rəʊ not raʊ)', () => {
     expect(applyPhonemeOverrides('They grow.')).not.toContain('<phoneme')
   })
 
-  it('co-fires with "four" on "Four in a row! Wow!" — both wrapped, no break (math tier)', () => {
-    expect(renderSsmlInnerText('Four in a row! Wow!')).toBe(
-      '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme> in a ' +
-        '<phoneme alphabet="ipa" ph="rəʊ">row</phoneme>! Wow!',
-    )
+  it('still fires the global rəʊ override on the OTHER streak counts (3/5/6/7/8) — round-6 streak.4 helper is scoped to the 4-line only', () => {
+    // streak.4 ("Four in a row!") gets the round-6 stronger GOAT helper
+    // (see cluster 4c below); every other count stays on the global rəʊ.
+    for (const n of ['Three', 'Five', 'Six', 'Seven', 'Eight']) {
+      expect(renderSsmlInnerText(`${n} in a row! Wow!`)).toBe(
+        `${n} in a <phoneme alphabet="ipa" ph="rəʊ">row</phoneme>! Wow!`,
+      )
+    }
   })
 })
 
@@ -1436,10 +1441,22 @@ describe('cluster 3 — "twenty-four" spoken as a unit (hyphen boundary)', () =>
   })
 })
 
-describe('cluster 4a — no break before "four" on the letter-sounds path', () => {
-  it('letter-sounds recap.4 wraps "four" WITHOUT a leading break (global word, not a mnemonic)', () => {
-    expect(renderSsmlInnerText('You earned four stars!', 'letter-sounds')).toBe(
-      'You earned <phoneme alphabet="ipa" ph="fɔə">four</phoneme> stars!',
+describe('cluster 4a — session-end recap.4 / streak.4 render identically across tiers (round-6, issue #446)', () => {
+  it('letter-sounds recap.4 gets the SAME round-6 stress+rate treatment as the math tier (text-gated, tier-agnostic)', () => {
+    // The recap-4 line is byte-shared across all 24 tier files; the round-6
+    // helper runs BEFORE the letter-sounds early-return so the fix reaches
+    // the letter-sounds-owned dedup itemId. Both tiers must produce the same
+    // bytes (the dedup-collapse invariant).
+    const math = renderSsmlInnerText('You earned four stars!')
+    const letterSounds = renderSsmlInnerText(
+      'You earned four stars!',
+      'letter-sounds',
+    )
+    expect(letterSounds).toBe(math)
+    expect(letterSounds).toBe(
+      '<prosody rate="-10%">You earned ' +
+        '<prosody pitch="+12%"><phoneme alphabet="ipa" ph="fɔːə">four</phoneme></prosody>' +
+        ' stars!</prosody>',
     )
   })
 
@@ -1566,19 +1583,18 @@ describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)'
   })
 })
 
-describe('cluster 4b — stress de-stressed "Four comes after three." (round-5 audition winner f2, 86ca8c3t7)', () => {
-  it('stresses the sentence-initial subject "Four" with the f2 centring-diphthong + pitch lift (live text, no "Look." carrier)', () => {
-    // Round-5 audition winner f2: the global `four` override now carries the
-    // centring diphthong `fɔə` (non-rhotic, more vowel body — distinct from
-    // "for"); the only extra work here is the f2 stress lift `pitch="+8%"`
-    // (NOT the rejected round-2 `+12%`/rate-25%). The live canon text is
-    // "Four comes after three." (math.p6.hint2 — sentence-INITIAL "Four", no
-    // "Look." carrier; legacy math.p6.hint removed in #413), so there is no
-    // lead break.
+describe('cluster 4b — stress de-stressed "Four comes after three." (round-6 stronger, issue #446)', () => {
+  it('stresses the sentence-initial subject "Four" with the round-6 lengthened diphthong + steeper lift + trailing break', () => {
+    // Round-5's f2 winner (`fɔə` + pitch+8%) was re-tested on the LIVE
+    // sentence-initial text and STILL read as "for comes after three"
+    // (issue #446). Round-6 adds the audition's untested stronger levers:
+    // a LENGTHENED diphthong `fɔːə`, a steeper pitch lift (+12%) + slight
+    // rate-slow (-12%), and a 120ms break AFTER "Four" so it decays before
+    // "comes" instead of being clipped into it.
     expect(renderSsmlInnerText('Four comes after three.')).toBe(
-      '<prosody pitch="+8%">' +
-        '<phoneme alphabet="ipa" ph="fɔə">Four</phoneme>' +
-        '</prosody> comes after three.',
+      '<prosody pitch="+12%" rate="-12%">' +
+        '<phoneme alphabet="ipa" ph="fɔːə">Four</phoneme>' +
+        '</prosody><break time="120ms"/> comes after three.',
     )
   })
 
@@ -1590,20 +1606,50 @@ describe('cluster 4b — stress de-stressed "Four comes after three." (round-5 a
     )
   })
 
-  it('is text-shape gated — other "four" math utterances stay on the plain override', () => {
-    // Sentence-final fours (baseline-passing) keep the un-emphasised wrap.
-    expect(renderSsmlInnerText('You earned four stars!')).toBe(
-      'You earned <phoneme alphabet="ipa" ph="fɔə">four</phoneme> stars!',
-    )
-    expect(
-      renderFourSubjectHint('You earned four stars!', undefined),
-    ).toBeNull()
-  })
-
   it('does not fire on a word-song tier (tierFilter set → null)', () => {
     expect(
       renderFourSubjectHint('Four comes after three.', 'cvc-words'),
     ).toBeNull()
+  })
+})
+
+describe('cluster 4c — round-6 session-end recap.4 + streak.4 (issue #446)', () => {
+  it('recap.4 "You earned four stars!" gets stress-lift + lengthened diphthong on "four" inside a whole-line rate-slow', () => {
+    // Thomas's ear (#446): "for stars" (de-stress collapse) + wrong-speed
+    // (rushed). The whole-line rate-slow un-rushes; the inner stress-lift +
+    // `fɔːə` separates "four" from "for".
+    expect(renderRecapFourStars('You earned four stars!')).toBe(
+      '<prosody rate="-10%">You earned ' +
+        '<prosody pitch="+12%"><phoneme alphabet="ipa" ph="fɔːə">four</phoneme></prosody>' +
+        ' stars!</prosody>',
+    )
+  })
+
+  it('streak.4 "Four in a row! Wow!" forces the GOAT realisation of "row" (ɹəʊː) + stress-lift', () => {
+    // Thomas's ear (#446): "Rau" (argument /raʊ/) not "Rou" (a line /rəʊ/),
+    // despite the global rəʊ override. Round-6 uses the fuller GOAT nucleus
+    // with a lengthened offglide + a stress-lift so it is articulated.
+    expect(renderStreakFourRow('Four in a row! Wow!')).toBe(
+      '<phoneme alphabet="ipa" ph="fɔːə">Four</phoneme> in a ' +
+        '<prosody pitch="+6%" rate="-10%"><phoneme alphabet="ipa" ph="ɹəʊː">row</phoneme></prosody>' +
+        '! Wow!',
+    )
+  })
+
+  it('both helpers are text-shape gated — they return null for every other line', () => {
+    // recap.1 / recap.5 and streak.3 / streak.5 must stay byte-identical on
+    // the global path.
+    expect(renderRecapFourStars('You earned one star!')).toBeNull()
+    expect(renderRecapFourStars('You earned five stars!')).toBeNull()
+    expect(renderStreakFourRow('Three in a row! Wow!')).toBeNull()
+    expect(renderStreakFourRow('Five in a row! Wow!')).toBeNull()
+    // recap.1 / streak.5 keep their plain-/global-override renders end-to-end.
+    expect(renderSsmlInnerText('You earned one star!', 'letter-sounds')).toBe(
+      'You earned one star!',
+    )
+    expect(renderSsmlInnerText('Five in a row! Wow!', 'letter-sounds')).toBe(
+      'Five in a <phoneme alphabet="ipa" ph="rəʊ">row</phoneme>! Wow!',
+    )
   })
 })
 

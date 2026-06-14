@@ -1,27 +1,27 @@
 {
-  "generated": "2026-06-12",
-  "sourceIssue": 391,
+  "generated": "2026-06-15",
+  "sourceIssue": 446,
   "items": {
     "letter-names#word.p5.hint": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "ACCEPTED model-floor (#446) — scratchy O is the en-GB-Olivia voice floor; NOT re-baked"
     },
     "letter-sounds#session.end.recap.4": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "round-6 fix (#446) — 'four stars' stress-lift + line rate-slow; re-test"
     },
     "letter-sounds#session.end.streak.4": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "round-6 fix (#446) — 'row' GOAT realisation (ɹəʊː) + stress-lift; re-test"
     },
     "letter-sounds-audit#word.p2.correct": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
     },
     "letter-sounds-audit#word.p2.giveAnswer": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
     },
     "letter-sounds-audit#word.p2.hint": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
     },
     "letter-sounds-audit#word.p2.read": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
     },
     "hub#hub-welcome-what-today-alt-3.mp3": {
       "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
@@ -435,7 +435,7 @@
       "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
     },
     "number-recog#math.p6.hint2": {
-      "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
+      "label": "round-6 fix (#446) — 'Four comes after three' lengthened diphthong fɔːə + +12% lift + trailing break; re-test"
     },
     "number-recog#math.p6.hint3": {
       "label": "W12-04 three-hint re-bake — new hint clip, ear-test"
