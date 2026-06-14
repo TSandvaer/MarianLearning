@@ -1,12 +1,28 @@
 // One-shot embed helper for the 2026-05-14 Emma asset refresh.
 //
-// Re-embeds the bgclear.ai transparent re-cuts (8 poses, 1024x1024 RGBA)
+// Re-embeds the bgclear.ai transparent re-cuts (poses, 1024x1024 RGBA)
 // and the remove.bg "Emma Tutor" medallion (500x500 RGBA) into their
 // public/assets/emma-*.svg wrappers.
 //
 // Not part of the build pipeline — run manually with `node scripts/embed-emma-assets.mjs`
 // when the transparent/ source PNGs change. Kept in the tree as the
 // reproducible record of how the SVGs were produced.
+//
+// ╔═══════════════════════════════════════════════════════════════════════╗
+// ║  REGRESSION TRAP — READ BEFORE RUNNING (ticket 86ca8kq42, vector       ║
+// ║  re-trace pilot).                                                      ║
+// ║                                                                       ║
+// ║  emma-idle.svg is now HAND-AUTHORED TRUE VECTOR (re-traced via         ║
+// ║  tools/emma-vectorize/), NOT a PNG-in-SVG embed. Re-running this       ║
+// ║  script would OVERWRITE that vector geometry with a fresh PNG embed —  ║
+// ║  a silent regression that un-does the re-trace.                        ║
+// ║                                                                       ║
+// ║  GUARD: 'idle' is intentionally OMITTED from the POSES loop below      ║
+// ║  (see VECTOR_RETRACED + the runtime skip + assertion). Do NOT add it   ║
+// ║  back. The remaining 7 poses are still PNG-in-SVG and re-embed         ║
+// ║  normally until their own vector re-trace lands (Track A all-7 PR);    ║
+// ║  as each pose is vectorised, add it to VECTOR_RETRACED below.          ║
+// ╚═══════════════════════════════════════════════════════════════════════╝
 
 import { readFileSync, writeFileSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -26,14 +42,21 @@ function dataUri(pngPath) {
   return 'data:image/png;base64,' + readFileSync(pngPath).toString('base64')
 }
 
-// --- 8-pose family ---------------------------------------------------------
+// --- pose family -----------------------------------------------------------
 // Drop-in re-embeds: same square framing, same character. The runtime
 // viewBox stays 0 0 2000 2000 (the wrapper coordinate system EmmaCharacter
 // renders against); the embedded <image> spans it fully. The new PNGs are
 // 1024x1024 — a smaller raster than the prior background-baked embeds, so
 // the resulting SVG files shrink.
+//
+// Poses that have been re-traced to TRUE VECTOR (tools/emma-vectorize/) MUST
+// NOT be re-embedded here — doing so silently reverts the re-trace. They are
+// listed in VECTOR_RETRACED and asserted out of POSES at runtime.
+const VECTOR_RETRACED = ['idle'] // emma-idle.svg is hand-authored vector (86ca8kq42)
+
 const POSES = [
-  'idle',
+  // 'idle' — OMITTED: now true-vector, see VECTOR_RETRACED + the regression
+  //          trap banner at the top of this file. Do NOT re-add.
   'celebration',
   'cheering',
   'listening',
@@ -42,6 +65,19 @@ const POSES = [
   'attentive-pointing',
   'waving',
 ]
+
+// Belt-and-suspenders: if anyone re-adds a vector-retraced pose to POSES, fail
+// loudly rather than silently overwriting its vector geometry.
+for (const guarded of VECTOR_RETRACED) {
+  if (POSES.includes(guarded)) {
+    throw new Error(
+      `[embed-emma-assets] REFUSING TO RUN: '${guarded}' is a hand-authored ` +
+        `vector pose (VECTOR_RETRACED) but appears in POSES. Re-embedding it ` +
+        `would overwrite the vector geometry. Remove it from POSES. See the ` +
+        `regression-trap banner at the top of this file (ticket 86ca8kq42).`,
+    )
+  }
+}
 
 function poseSvg(pose) {
   const uri = dataUri(join(transparentDir, `emma-${pose}.png`))

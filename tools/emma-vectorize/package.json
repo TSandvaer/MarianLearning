@@ -1,0 +1,10 @@
+{
+  "name": "emma-vectorize",
+  "private": true,
+  "type": "module",
+  "description": "One-off tooling to re-trace Emma pose PNGs to true vector SVG. NOT an app runtime dependency.",
+  "devDependencies": {
+    "@neplex/vectorizer": "0.1.0",
+    "svgo": "4.0.1"
+  }
+}
