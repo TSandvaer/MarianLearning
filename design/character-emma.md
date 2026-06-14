@@ -22,7 +22,7 @@ Replace the bunny mascot with an original human teacher whose visual identity ca
 
 **Visual age 25–30.** Old enough that "teacher" reads on first look; young enough that "older sister you'd want to spend a Saturday with" reads on second. Marian (8) should feel looked-up-to, never monitored.
 
-**Voice register:** warm, calm, encouraging, never saccharine. Short clear sentences within the 200-word vocab cap. Questions over imperatives ("Try Word Song?" not "Do Word Song."). Acknowledges effort, not performance ("Let's look at this one." not "You got it wrong."). Never apologises *for* Marian, never apologises *to* Marian unprompted.
+**Voice register:** warm, calm, encouraging, never saccharine. Short clear sentences within the 200-word vocab cap. Questions over imperatives ("Try Word Song?" not "Do Word Song."). Acknowledges effort, not performance ("Let's look at this one." not "You got it wrong."). Never apologises _for_ Marian, never apologises _to_ Marian unprompted.
 
 **Voice she is NOT:** chirpy mascot, drill-sergeant, fawning, longing.
 
@@ -30,13 +30,13 @@ Replace the bunny mascot with an original human teacher whose visual identity ca
 
 **In-character vs out-of-character (asset-author + Dave reference, NOT a copy deck):**
 
-| In-character | Out-of-character |
-| --- | --- |
-| "Hi! What today?" | "Hey there, learner!" |
-| "Try Word Song?" | "You should really do Word Song." |
-| "Hmm... try again?" | "That's not right." |
-| "Yes! Five!" | "GREAT JOB! You're a genius!" |
-| "Bye for now!" | "Don't leave me!" |
+| In-character        | Out-of-character                  |
+| ------------------- | --------------------------------- |
+| "Hi! What today?"   | "Hey there, learner!"             |
+| "Try Word Song?"    | "You should really do Word Song." |
+| "Hmm... try again?" | "That's not right."               |
+| "Yes! Five!"        | "GREAT JOB! You're a genius!"     |
+| "Bye for now!"      | "Don't leave me!"                 |
 
 The pattern: short, present-tense, declarative or gently interrogative, never emotionally weighted toward Marian's effort. Canonical copy decks live in each screen spec; this section is tone reference only.
 
@@ -60,19 +60,19 @@ The world palette (`--my-rose`, `--my-pink-50`, `--my-cream`, etc.) and all `bg-
 
 New tokens to add to `tailwind.config.js` + `index.css`:
 
-| Token | Hex | Use |
-| --- | --- | --- |
-| `--emma-skin` | `#F5DCC9` | Face, hands, neck |
-| `--emma-skin-shadow` | `#E8C4A8` | Cheek/jaw shadow (one-stop, no gradient stack) |
-| `--emma-hair` | `#5C3F31` | Soft dark brown |
-| `--emma-hair-highlight` | `#8B6650` | Single highlight band on crown |
-| `--emma-cardigan` | `#F0CDB8` | Peach cardigan main fill |
-| `--emma-cardigan-shadow` | `#D9AC93` | Cardigan shadow side |
-| `--emma-skirt` | `#C8AAB8` | Soft mauve-pink skirt (alt: jeans `#9DA8B8`) |
-| `--emma-blouse` | `#FFF6EE` | Cream undershirt |
-| `--emma-blush` | `#F4A8A8` | Cheek blush — celebration pose only |
-| `--emma-eye` | `#3E2818` | Iris (warm dark brown — NOT black; black reads anime) |
-| `--emma-mouth` | `#C77A7A` | Mouth fill (soft rose, NOT bright red) |
+| Token                    | Hex       | Use                                                                                                                                                      |
+| ------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--emma-skin`            | `#F5DCC9` | Face, hands, neck                                                                                                                                        |
+| `--emma-skin-shadow`     | `#E8C4A8` | Cheek/jaw shadow (one-stop, no gradient stack)                                                                                                           |
+| `--emma-hair`            | `#5C3F31` | Soft dark brown                                                                                                                                          |
+| `--emma-hair-highlight`  | `#8B6650` | Single highlight band on crown                                                                                                                           |
+| `--emma-cardigan`        | `#F0CDB8` | Peach cardigan main fill                                                                                                                                 |
+| `--emma-cardigan-shadow` | `#D9AC93` | Cardigan shadow side                                                                                                                                     |
+| `--emma-skirt`           | `#d1805c` | Warm terracotta skirt — **canonical per shipped render** (was mauve `#C8AAB8` until 2026-06-14; reconciled to shipped per Thomas) (alt: jeans `#9DA8B8`) |
+| `--emma-blouse`          | `#FFF6EE` | Cream undershirt                                                                                                                                         |
+| `--emma-blush`           | `#F4A8A8` | Cheek blush — celebration pose only                                                                                                                      |
+| `--emma-eye`             | `#3E2818` | Iris (warm dark brown — NOT black; black reads anime)                                                                                                    |
+| `--emma-mouth`           | `#C77A7A` | Mouth fill (soft rose, NOT bright red)                                                                                                                   |
 
 **SVG-friendly shading rule.** Each colour zone has its base + at most one shadow companion. No multi-stop linear gradients except the optional hair-highlight band. Codebase ships SVG-only per `project_pic_dog_svg.md`; respect that.
 
@@ -129,16 +129,16 @@ Manhwa carries 90% of emotion at the face. Locked attributes (Thomas):
 
 ### 2.5 Expression beats — 6 mandatory + 2 optional
 
-| # | Filename | Use | Visual delta from idle | Replaces |
-| --- | --- | --- | --- | --- |
-| 1 | `emma-idle.svg` | Default / breathing | Baseline. Eyes neutral. Closed-mouth parabola. Wand vertical at L hand. | `melody-idle.svg` |
-| 2 | `emma-listening.svg` | Mid-caption-reveal (Marian listening to TTS) | Top lid drops 1pt; mouth narrower; slight 2° head turn toward viewer. | NEW (no Melody equivalent) |
-| 3 | `emma-celebration.svg` | Correct-answer reaction | Eyes brighter (catchlight 1.2×). Mouth open soft "o" + 3 upper teeth. Cheek blush ~6pt. R hand raised palm-up at shoulder, small "yes!" gesture. Head tilted ~5°. | `melody-happy.svg` |
-| 4 | `emma-puzzled-tilt.svg` | Wrong-answer reaction | **Both** brows raised ~3pt in curiosity (not one-up-asymmetric). Mouth open small "oh" (~6×4pt oval, no teeth). R hand to chin (loose fist, thumb against jaw). Head tilted **sideways** ~10° (NOT down — downward tilt is forbidden per Dave §6). **Eyes track the problem area, NOT the viewer** (gaze direction set by where the problem renders relative to Emma; on Math/Word Song where Emma sits upper-left, gaze drops 8–12° down-right toward the problem chips). | `melody-puzzled.svg` |
-| 5 | `emma-attentive-pointing.svg` | Hint state (Math/Word Song after 2 wrong) | Idle face but L wand-pointer raised to ~45° toward right of frame. Eyes tracking wand tip. Slight forward lean. | NEW — Melody had no equivalent |
-| 6 | `emma-sleepy.svg` | End-of-session / Sleep splash | Eyes closed (single arc per eye). Closed-mouth gentle smile. Head tilted ~8° to side, ~10° forward. Wand lowered/held loosely. | `melody-sleepy.svg` (was deferred per `assets-todo.md`; never authored) |
-| 7 *(opt)* | `emma-cheering.svg` | Session-End big celebration only — NOT per-problem | BOTH hands raised palms-out at shoulder height, mouth fully open soft smile, head straight, catchlight 1.5×. | `melody-cheering.svg` |
-| 8 *(opt)* | `emma-waving.svg` | Session-End "Bye for now!" wave | R hand raised to head-height palm-out, fingers spread; mouth gentle smile. | (Melody re-used `melody-happy.svg` for waves) |
+| #         | Filename                      | Use                                                | Visual delta from idle                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Replaces                                                                |
+| --------- | ----------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 1         | `emma-idle.svg`               | Default / breathing                                | Baseline. Eyes neutral. Closed-mouth parabola. Wand vertical at L hand.                                                                                                                                                                                                                                                                                                                                                                                                    | `melody-idle.svg`                                                       |
+| 2         | `emma-listening.svg`          | Mid-caption-reveal (Marian listening to TTS)       | Top lid drops 1pt; mouth narrower; slight 2° head turn toward viewer.                                                                                                                                                                                                                                                                                                                                                                                                      | NEW (no Melody equivalent)                                              |
+| 3         | `emma-celebration.svg`        | Correct-answer reaction                            | Eyes brighter (catchlight 1.2×). Mouth open soft "o" + 3 upper teeth. Cheek blush ~6pt. R hand raised palm-up at shoulder, small "yes!" gesture. Head tilted ~5°.                                                                                                                                                                                                                                                                                                          | `melody-happy.svg`                                                      |
+| 4         | `emma-puzzled-tilt.svg`       | Wrong-answer reaction                              | **Both** brows raised ~3pt in curiosity (not one-up-asymmetric). Mouth open small "oh" (~6×4pt oval, no teeth). R hand to chin (loose fist, thumb against jaw). Head tilted **sideways** ~10° (NOT down — downward tilt is forbidden per Dave §6). **Eyes track the problem area, NOT the viewer** (gaze direction set by where the problem renders relative to Emma; on Math/Word Song where Emma sits upper-left, gaze drops 8–12° down-right toward the problem chips). | `melody-puzzled.svg`                                                    |
+| 5         | `emma-attentive-pointing.svg` | Hint state (Math/Word Song after 2 wrong)          | Idle face but L wand-pointer raised to ~45° toward right of frame. Eyes tracking wand tip. Slight forward lean.                                                                                                                                                                                                                                                                                                                                                            | NEW — Melody had no equivalent                                          |
+| 6         | `emma-sleepy.svg`             | End-of-session / Sleep splash                      | Eyes closed (single arc per eye). Closed-mouth gentle smile. Head tilted ~8° to side, ~10° forward. Wand lowered/held loosely.                                                                                                                                                                                                                                                                                                                                             | `melody-sleepy.svg` (was deferred per `assets-todo.md`; never authored) |
+| 7 _(opt)_ | `emma-cheering.svg`           | Session-End big celebration only — NOT per-problem | BOTH hands raised palms-out at shoulder height, mouth fully open soft smile, head straight, catchlight 1.5×.                                                                                                                                                                                                                                                                                                                                                               | `melody-cheering.svg`                                                   |
+| 8 _(opt)_ | `emma-waving.svg`             | Session-End "Bye for now!" wave                    | R hand raised to head-height palm-out, fingers spread; mouth gentle smile.                                                                                                                                                                                                                                                                                                                                                                                                 | (Melody re-used `melody-happy.svg` for waves)                           |
 
 **Asset author note on #5.** The wand becomes the literal pointer for Math's hint-state flower-group pulse — strictly stronger than Melody's "sit there in idle" hint posture.
 
@@ -231,16 +231,16 @@ All filenames final. Devon renames per §7; asset author authors content under t
 
 ### 4.1 Character SVGs
 
-| Filename | viewBox | File-size budget |
-| --- | --- | --- |
-| `emma-idle.svg` | 240×360 | 8 KB |
-| `emma-listening.svg` | 240×360 | 8 KB |
-| `emma-celebration.svg` | 240×360 | 9 KB (+hand+blush detail) |
-| `emma-puzzled-tilt.svg` | 240×360 | 9 KB (+hand-on-chin) |
-| `emma-attentive-pointing.svg` | 240×360 | 9 KB (+wand at 45°) |
-| `emma-sleepy.svg` | 240×360 | 8 KB |
-| `emma-cheering.svg` *(optional)* | 240×360 | 9 KB |
-| `emma-waving.svg` *(optional)* | 240×360 | 8 KB |
+| Filename                         | viewBox | File-size budget          |
+| -------------------------------- | ------- | ------------------------- |
+| `emma-idle.svg`                  | 240×360 | 8 KB                      |
+| `emma-listening.svg`             | 240×360 | 8 KB                      |
+| `emma-celebration.svg`           | 240×360 | 9 KB (+hand+blush detail) |
+| `emma-puzzled-tilt.svg`          | 240×360 | 9 KB (+hand-on-chin)      |
+| `emma-attentive-pointing.svg`    | 240×360 | 9 KB (+wand at 45°)       |
+| `emma-sleepy.svg`                | 240×360 | 8 KB                      |
+| `emma-cheering.svg` _(optional)_ | 240×360 | 9 KB                      |
+| `emma-waving.svg` _(optional)_   | 240×360 | 8 KB                      |
 
 Budget rationale: Melody SVGs ship at 6 KB; Emma is more complex (human face vs simple bunny) — +2 KB headroom per asset. Run through SVGO with codebase default config.
 
@@ -254,21 +254,21 @@ Budget rationale: Melody SVGs ship at 6 KB; Emma is more complex (human face vs 
 
 `screen-hub.md` §"Assets required" lists **12 distinct SVGs** (1 bg + 1 frame + 2 node visuals + 1 arrow + 7 stage icons), not 19 (the brief miscounts; see Open Q #3). All 12 are world-art / glyph-icons — none are character-art. **The Hub queue is not blocked on Emma's character style** — author in parallel.
 
-| Filename | Use | Style |
-| --- | --- | --- |
-| `bg-meadow.svg` | Hub background | Pastel sky + meadow horizon. Style-agnostic. |
-| `node-card-frame.svg` | Skill-tree node card chrome | Soft-rounded card outline. Style-agnostic. |
-| `node-flowers.svg` | Number Garden node signature | 3 flower glyphs in `--my-rose` family. Style-agnostic. |
-| `node-music-notes.svg` | Word Song node signature | 3 music notes (♪ ♫ ♬). Style-agnostic. |
-| `arrow-back.svg` | Mid-skill back affordance | 28pt left arrow. Style-agnostic. |
-| `stage-icon-add.svg` | Math path-strip "add" | Small `+`. |
-| `stage-icon-subtract.svg` | Math path-strip "subtract" | Small `−`. |
-| `stage-icon-multiply.svg` | Math path-strip "multiply" | Small `×`. |
-| `stage-icon-letter.svg` | Word Song path-strip "letter sounds" | Small `Aa`. |
-| `stage-icon-blend.svg` | Word Song path-strip "blending" | Small "Ca". |
-| `stage-icon-cvc.svg` | Word Song path-strip "CVC" | Small "Cat". |
-| `stage-icon-checkmark.svg` | Path-strip "mastered" | 28pt checkmark. |
-| `stage-icon-padlock.svg` | Path-strip "locked" | 28pt padlock. |
+| Filename                   | Use                                  | Style                                                  |
+| -------------------------- | ------------------------------------ | ------------------------------------------------------ |
+| `bg-meadow.svg`            | Hub background                       | Pastel sky + meadow horizon. Style-agnostic.           |
+| `node-card-frame.svg`      | Skill-tree node card chrome          | Soft-rounded card outline. Style-agnostic.             |
+| `node-flowers.svg`         | Number Garden node signature         | 3 flower glyphs in `--my-rose` family. Style-agnostic. |
+| `node-music-notes.svg`     | Word Song node signature             | 3 music notes (♪ ♫ ♬). Style-agnostic.                 |
+| `arrow-back.svg`           | Mid-skill back affordance            | 28pt left arrow. Style-agnostic.                       |
+| `stage-icon-add.svg`       | Math path-strip "add"                | Small `+`.                                             |
+| `stage-icon-subtract.svg`  | Math path-strip "subtract"           | Small `−`.                                             |
+| `stage-icon-multiply.svg`  | Math path-strip "multiply"           | Small `×`.                                             |
+| `stage-icon-letter.svg`    | Word Song path-strip "letter sounds" | Small `Aa`.                                            |
+| `stage-icon-blend.svg`     | Word Song path-strip "blending"      | Small "Ca".                                            |
+| `stage-icon-cvc.svg`       | Word Song path-strip "CVC"           | Small "Cat".                                           |
+| `stage-icon-checkmark.svg` | Path-strip "mastered"                | 28pt checkmark.                                        |
+| `stage-icon-padlock.svg`   | Path-strip "locked"                  | 28pt padlock.                                          |
 
 (13 above — Open Q #3 reconciles against the brief's "12" or "19" framing.)
 
@@ -300,22 +300,27 @@ Same shape as Math.tsx today (line 263).
 
 ```typescript
 type EmmaPose =
-  | 'idle' | 'listening' | 'celebration' | 'puzzled'
-  | 'attentive-pointing' | 'sleepy'
-  | 'cheering' | 'waving'    // optional, Session-End only
+  | 'idle'
+  | 'listening'
+  | 'celebration'
+  | 'puzzled'
+  | 'attentive-pointing'
+  | 'sleepy'
+  | 'cheering'
+  | 'waving' // optional, Session-End only
 
 const [pose, setPose] = useState<EmmaPose>('idle')
 ```
 
 Per-screen allowed subsets:
 
-| Screen | Allowed poses |
-| --- | --- |
-| Splash | (no character — wordmark only) |
-| Greet | `idle`, `celebration` (on "Hi!" word boundary), `waving` (transition out) |
-| Math, Word Song | `idle`, `listening`, `celebration`, `puzzled`, `attentive-pointing` |
-| Hub | `idle`, `celebration` (first-ever line first-word boundary) |
-| Session-End | `idle`, `cheering`, `waving`, `sleepy` |
+| Screen          | Allowed poses                                                             |
+| --------------- | ------------------------------------------------------------------------- |
+| Splash          | (no character — wordmark only)                                            |
+| Greet           | `idle`, `celebration` (on "Hi!" word boundary), `waving` (transition out) |
+| Math, Word Song | `idle`, `listening`, `celebration`, `puzzled`, `attentive-pointing`       |
+| Hub             | `idle`, `celebration` (first-ever line first-word boundary)               |
+| Session-End     | `idle`, `cheering`, `waving`, `sleepy`                                    |
 
 ### 5.2 Tilt + hold mappings
 
@@ -324,24 +329,24 @@ Devon imports from a shared `src/lib/character/emmaPose.ts`:
 ```typescript
 export const TILT_BY_POSE: Record<EmmaPose, number> = {
   idle: 0,
-  listening: 2,                  // tiny lean toward ribbon
-  celebration: -6,               // tilt LEFT
-  puzzled: 10,                   // tilt RIGHT
-  'attentive-pointing': 0,       // wand carries direction
-  sleepy: 8,                     // gentle forward-and-down
+  listening: 2, // tiny lean toward ribbon
+  celebration: -6, // tilt LEFT
+  puzzled: 10, // tilt RIGHT
+  'attentive-pointing': 0, // wand carries direction
+  sleepy: 8, // gentle forward-and-down
   cheering: 0,
   waving: 0,
 }
 
 export const POSE_HOLD_MS: Record<EmmaPose, number | null> = {
-  idle: null,                    // never auto-returns
-  listening: null,               // returns on audio onEnd
-  celebration: 600,              // matches existing ear-wiggle window
-  puzzled: 1500,                 // matches existing puzzled hold
-  'attentive-pointing': null,    // returns on hint TTS onEnd
-  sleepy: null,                  // sticky on Session-End
-  cheering: 1200,                // "you did it!" line duration
-  waving: 1500,                  // "Bye for now!" line duration
+  idle: null, // never auto-returns
+  listening: null, // returns on audio onEnd
+  celebration: 600, // matches existing ear-wiggle window
+  puzzled: 1500, // matches existing puzzled hold
+  'attentive-pointing': null, // returns on hint TTS onEnd
+  sleepy: null, // sticky on Session-End
+  cheering: 1200, // "you did it!" line duration
+  waving: 1500, // "Bye for now!" line duration
 }
 ```
 
@@ -423,14 +428,14 @@ emma-waving.svg                                                 (optional)
 
 There is **no `src/components/Melody.tsx`** — Melody is rendered inline in each screen as `<m.img src={\`/assets/melody-${pose}.svg\`}>`. The brief's component-rename framing doesn't apply directly. Devon updates inline templates per file:
 
-| File | Changes |
-| --- | --- |
-| `src/screens/Greet.tsx` | `melody-${pose}` → `emma-${pose}`; `alt="Melody"` → `alt="Emma"`; `layoutId="melody"` → `layoutId="emma"`; `data-testid` updates per §7.5 |
-| `src/screens/Math/Math.tsx` | Same; also rename `MelodyPose` type → `EmmaPose` (Math.tsx:263) |
-| `src/screens/WordSong/WordSong.tsx` | Same |
-| `src/screens/SessionEnd/SessionEnd.tsx` | Same; `melody-cheering.svg` → `emma-cheering.svg` (line 505) |
-| `src/screens/SessionEnd/SleepSplash.tsx` | Same |
-| `src/screens/Splash.tsx` | If references `melody-logo.svg`, update to `emma-logo.svg` (Phase 3a may handle; verify) |
+| File                                     | Changes                                                                                                                                   |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/screens/Greet.tsx`                  | `melody-${pose}` → `emma-${pose}`; `alt="Melody"` → `alt="Emma"`; `layoutId="melody"` → `layoutId="emma"`; `data-testid` updates per §7.5 |
+| `src/screens/Math/Math.tsx`              | Same; also rename `MelodyPose` type → `EmmaPose` (Math.tsx:263)                                                                           |
+| `src/screens/WordSong/WordSong.tsx`      | Same                                                                                                                                      |
+| `src/screens/SessionEnd/SessionEnd.tsx`  | Same; `melody-cheering.svg` → `emma-cheering.svg` (line 505)                                                                              |
+| `src/screens/SessionEnd/SleepSplash.tsx` | Same                                                                                                                                      |
+| `src/screens/Splash.tsx`                 | If references `melody-logo.svg`, update to `emma-logo.svg` (Phase 3a may handle; verify)                                                  |
 
 **Pose-name remap.** Existing `MelodyPose = 'idle' | 'happy' | 'puzzled'`. Migrate to full `EmmaPose` per §5.1. Every existing `setPose('happy')` → `setPose('celebration')`. `setPose('puzzled')` stays. New poses are net-additions — existing call sites don't reference them yet.
 
@@ -446,12 +451,12 @@ Devon creates `src/lib/character/emmaPose.ts` exporting `TILT_BY_POSE` + `POSE_H
 
 Tests assert specific `data-testid` strings. Find/replace per file:
 
-| File | Old testid | New testid |
-| --- | --- | --- |
-| `src/screens/Greet.test.tsx` | `greet-melody-slot` | `greet-emma-slot` |
-| `src/screens/Greet.test.tsx` | `greet-melody` | `greet-emma` |
-| `src/screens/Math/Math.test.tsx` | `math-melody` | `math-emma` |
-| `src/screens/WordSong/WordSong.test.tsx` | `word-song-melody` | `word-song-emma` |
+| File                                         | Old testid           | New testid         |
+| -------------------------------------------- | -------------------- | ------------------ |
+| `src/screens/Greet.test.tsx`                 | `greet-melody-slot`  | `greet-emma-slot`  |
+| `src/screens/Greet.test.tsx`                 | `greet-melody`       | `greet-emma`       |
+| `src/screens/Math/Math.test.tsx`             | `math-melody`        | `math-emma`        |
+| `src/screens/WordSong/WordSong.test.tsx`     | `word-song-melody`   | `word-song-emma`   |
 | `src/screens/SessionEnd/SessionEnd.test.tsx` | `session-end-melody` | `session-end-emma` |
 
 **`alt="Melody"` text:** no test currently asserts via `getByAltText` containing "melody" (verified by grep). One-direction code change.
@@ -591,4 +596,3 @@ Owned by other tickets / specs:
 ### Stale `CLAUDE.md` line
 
 The project root `CLAUDE.md` includes the line "_Phase 3b (visual pivot to manhwa-style art) is in design via Kyle and will land separately. Until Phase 3b, the character visually remains the bunny — audio + text say "Emma" while visuals still show Melody. This mismatch is temporary and known._" This is **stale** as of 2026-04-29 — the bunny is gone visually. Recommend Matt routes a one-line `CLAUDE.md` edit through Thomas to drop that paragraph. Tracked in `design/character/README.md` §"Outstanding decisions for Thomas".
-
