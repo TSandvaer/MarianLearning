@@ -276,9 +276,9 @@
  */
 
 import { test, expect } from '@playwright/test'
-import type { Page, Request, Route } from '@playwright/test'
-import { existsSync, readFileSync } from 'node:fs'
+import type { Page } from '@playwright/test'
 import { resolve } from 'node:path'
+import { installMathCanonClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
@@ -403,95 +403,19 @@ const TWO_DIGIT_ADDSUB_CANON_PATH = resolve(
   'public/canon/math/level-1/two-digit-addsub.json',
 )
 
-function readMathCanon(path: string): string {
-  if (!existsSync(path)) {
-    throw new Error(
-      `[two-digit-addsub spec] canon not found at ${path}. ` +
-        `This canon is required for the canon-bytes mock; do NOT swap ` +
-        `to a silent-MP3 placeholder — per testing-and-ci.md §4.1.2 + ` +
-        `§4.1.3 rule 3 the placeholder also fails decode under the ` +
-        `stub-ctx, falls back to the static add-to-10 rotation, and ` +
-        `silently masks the regression. See the file header.`,
-    )
-  }
-  return readFileSync(path, 'utf-8')
-}
-
-/**
- * Install a `/api/claude` mock that serves the on-disk two-digit-addsub
- * canon for `track === 'math'` requests. Same single-canon shape as the
- * shared `installMathCanonClaudeMock` (`e2e/_helpers/mockClaude.ts`,
- * promoted in ticket 86c9y490t). This spec keeps a private clone for
- * now because it was outside that ticket's named 3-spec scope; a
- * follow-up can migrate this callsite to the shared helper.
- *
- * Single-canon (not focus-aware) — per `[[testing-and-ci.md §4.2.3]]`
- * the focus-aware multi-canon pattern is a different abstraction. This
- * spec doesn't span a cross-tier focus-switch so single-canon is the
- * correct level.
- *
- * Behaviour:
- *   - `track === 'math'` → serve `two-digit-addsub.json` regardless of
- *     `focusNode`. Tests assert against the served canon's structural
- *     envelope; if a test seeded a non-two-digit-addsub focus, the
- *     assertion would fail loudly (correct behaviour).
- *   - `track === 'word-song'` → 500 loudly. App.tsx catches and falls
- *     through to silent caption-walk on Hub's pre-warm fetch — this
- *     is the same behaviour the production word-song path takes on
- *     any outage, and doesn't affect Hub → Math navigation.
- *   - `OPTIONS` preflight → 204.
- *
- * Returns `{ requests }` for tests that want to inspect captured
- * request bodies (Tests 7 + 8 — fixme'd — would use this as a positive
- * discriminator per `[[testing-and-ci.md §4.1.1e]]`).
- */
-async function installTwoDigitAddsubCanonClaudeMock(
-  page: Page,
-): Promise<{ requests: Request[] }> {
-  const canonBody = readMathCanon(TWO_DIGIT_ADDSUB_CANON_PATH)
-  const requests: Request[] = []
-  await page.route('**/api/claude', async (route: Route) => {
-    const req = route.request()
-    if (req.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, body: '' })
-      return
-    }
-    requests.push(req)
-    let body: Record<string, unknown>
-    try {
-      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
-    } catch {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: '{}',
-      })
-      return
-    }
-    const payload = (body.payload ?? {}) as Record<string, unknown>
-    const track = payload.track as string | undefined
-    if (track === 'math') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: canonBody,
-      })
-      return
-    }
-    // word-song or unknown track — 500 loudly. App.tsx catches and
-    // falls through to silent caption-walk; doesn't affect Hub→Math.
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: false,
-        error: 'unexpected-track',
-        message: `two-digit-addsub spec is math-only; saw track=${String(track)}`,
-      }),
-    })
-  })
-  return { requests }
-}
+// The canon-bytes mock is now the shared
+// `installMathCanonClaudeMock(page, canonPath)` from
+// `e2e/_helpers/mockClaude.ts` (promoted in ticket 86c9y490t). This
+// spec was the 4th, out-of-scope private clone flagged in PR #440;
+// migrated to the shared helper in ticket 86ca8ncay. The shared helper
+// performs the same loud `existsSync` throw on a missing canon, serves
+// the canon bytes verbatim for `track === 'math'`, 500s loudly on
+// word-song / unknown track, 204s the OPTIONS preflight, and returns
+// `{ requests }` for the captured-request positive-discriminator used
+// by Tests 7 + 8. Single-canon (not focus-aware) is the correct level
+// here — this spec seeds `two-digit-addsub` focus exclusively and does
+// not span a cross-tier focus-switch (per `[[testing-and-ci.md
+// §4.2.3]]`).
 
 // ── Seed builder ─────────────────────────────────────────────────────────
 
@@ -658,7 +582,7 @@ test.describe('two-digit-addsub — pool envelope + op-mix + round-ten cap + nea
     // plan, masking the very regression these tests guard. Real Azure-
     // rendered MP3 bytes decode cleanly under the genuine gesture-
     // unlock chain in headless chromium.
-    await installTwoDigitAddsubCanonClaudeMock(page)
+    await installMathCanonClaudeMock(page, TWO_DIGIT_ADDSUB_CANON_PATH)
   })
 
   // ── Test 1 ─────────────────────────────────────────────────────────
@@ -1173,7 +1097,10 @@ test.describe('two-digit-addsub — pool envelope + op-mix + round-ten cap + nea
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 
-    const { requests } = await installTwoDigitAddsubCanonClaudeMock(page)
+    const { requests } = await installMathCanonClaudeMock(
+      page,
+      TWO_DIGIT_ADDSUB_CANON_PATH,
+    )
 
     await page.goto('/')
 
@@ -1307,7 +1234,10 @@ test.describe('two-digit-addsub — pool envelope + op-mix + round-ten cap + nea
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
 
-    const { requests } = await installTwoDigitAddsubCanonClaudeMock(page)
+    const { requests } = await installMathCanonClaudeMock(
+      page,
+      TWO_DIGIT_ADDSUB_CANON_PATH,
+    )
 
     await page.goto('/')
 
