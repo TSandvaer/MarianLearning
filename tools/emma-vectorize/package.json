@@ -5,6 +5,7 @@
   "description": "One-off tooling to re-trace Emma pose PNGs to true vector SVG. NOT an app runtime dependency.",
   "devDependencies": {
     "@neplex/vectorizer": "0.1.0",
+    "sharp": "0.33.5",
     "svgo": "4.0.1"
   }
 }
