@@ -1598,14 +1598,22 @@ export const DISTRACTOR_ONLY_WORDS: readonly WordEntry[] = [
     // to the ungrammatical "The cat sat the mat" since `sat` is
     // intransitive — a transitive verb keeps Template B's SVO
     // grammatical). Lives here distractor-only (`isTarget: false`) so it
-    // resolves via `getWordEntry` + `SIMPLE_SENTENCE_TARGET_SET` WITHOUT
-    // joining the CVC `TARGET_WORDS` exhaustiveness scans (no
-    // `TARGET_PAIRINGS` row needed) — exactly the posture `sat` itself
-    // takes as a simple-sentence target. `sightWord: true` + the `sight:`
-    // sentinel pictureKey keep it out of the picture-pack body check; the
-    // simple-sentences chip foils come from the planner-side distractor
-    // table, never from `TARGET_PAIRINGS`. Appended LAST so the digraph
-    // distractor-only grouping (sh/ch/th) stays contiguous.
+    // stays out of the CVC `TARGET_WORDS` exhaustiveness scans while still
+    // resolving via `getWordEntry` + `SIMPLE_SENTENCE_TARGET_SET` — the
+    // same posture `sat` itself takes as a simple-sentence target.
+    // `sightWord: true` + the `sight:` sentinel pictureKey keep it out of
+    // the picture-pack body check.
+    //
+    // INVARIANT (see #439): simple-sentence chip foils are NOT sourced from
+    // any planner-side foil table — there is no such short-circuit in
+    // `WordSong.tsx`. Chips always come from
+    // `buildChipOrder → pickDistractors → TARGET_PAIRINGS`, so any word in
+    // `SIMPLE_SENTENCE_TARGET_SET` needs a `TARGET_PAIRINGS` row regardless
+    // of `isTarget` — otherwise `pickDistractors` throws ("no pairing matrix
+    // entry") at mount. `bit`'s row lives in `TARGET_PAIRINGS` (added in
+    // #439); the earlier "no row needed" assumption here is what masked that
+    // mount throw. Appended LAST so the digraph distractor-only grouping
+    // (sh/ch/th) stays contiguous.
     word: 'bit',
     pictureKey: 'sight:bit',
     category: 'action',
