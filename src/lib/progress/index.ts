@@ -112,6 +112,7 @@ export {
 } from './deviceId'
 export {
   fetchProgressFromCloud,
+  mergeSessionHistories,
   pushProgressToCloud,
   reconcileWithCloud,
 } from './cloudSync'

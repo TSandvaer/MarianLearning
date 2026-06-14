@@ -901,13 +901,36 @@ App.tsx fires `reconcileWithCloud` once per app mount in a `useEffect` (right af
    - Cloud's `lastModifiedISO` > local's `profile.lastPlayedISO` → cloud wins (install).
    - Local's `lastPlayedISO` > cloud's `lastModifiedISO` → local wins (push).
    - Equal → no-op.
-4. On cloud-wins install: blob runs through `withDefaultedSkillLevels` (T1 read-path defaulter) BEFORE `isProgressV1`. This heals older-schema cloud blobs (e.g. one device on schema with `cvc-words-short-o`, the other not yet) before install. Validation-fail ⇒ `cloud-blob-rejected`, local kept.
+4. On cloud-wins install: blob runs through `withDefaultedSkillLevels` (T1 read-path defaulter) BEFORE `isProgressV1`. This heals older-schema cloud blobs (e.g. one device on schema with `cvc-words-short-o`, the other not yet) before install. Validation-fail ⇒ `cloud-blob-rejected`, local kept. **`progress.history` is then union-merged with local — see § "Cloud sync conflict resolution" below.**
 
 The reconcile NEVER blocks UI — the entire React tree boots in parallel and the worst case is a delayed install AFTER Splash → Greet/Hub. App.tsx refreshes `hubProgressSnapshot` post-install so any active Hub render re-projects.
 
+### Cloud sync conflict resolution (ticket 86c9qa6na — P1 data-loss fix)
+
+When the cloud blob wins (cloud strictly newer), the install is **last-write-wins on every field EXCEPT `progress.history`**, which is **union-merged** with the local history. Before this fix, a cloud-wins install clobbered local `history` wholesale: a session Marian played on the slower-clock (losing) device — present in `local.history`, absent from the cloud blob — disappeared silently. That was the P1 data-loss surface Jessica flagged in PR #182. Per Thomas's "data is never lost" priority, history now merges.
+
+| Field                                                                                                                     | Conflict policy              |
+| ------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `progress.history`                                                                                                        | **union-merge** (this fix)   |
+| `skillLevels`, `parentSettings`, `lifetimeFirstEncounters`, `mathFactsLeitner`, `literacy`, `pendingPromotion`, `profile` | last-write-wins (cloud wins) |
+
+`skillLevels` et al. stay last-write-wins deliberately: they are **most-recent-state** fields, not append-only logs. A per-key merge of `skillLevels` could resurrect a stale `'practicing'` over a newer `'mastered'` (time-travel). Only `history` — an append-only session log where each entry is an immutable record — benefits from union semantics.
+
+**Merge algorithm** (`mergeSessionHistories(local, cloud)` in [`cloudSync.ts`](MarianLearning/src/lib/progress/cloudSync.ts), exported + unit-pinned):
+
+1. **Concat** `local` then `cloud`.
+2. **Dedupe** by a stable key, FIRST-occurrence wins (so a session present on both devices keeps the local copy's bytes — they are expected to be identical; first-wins is a deterministic tiebreak, not a semantic preference).
+3. **Sort** ascending by `dateISO` (lexicographic compare is correct for ISO-8601 Zulu strings; V8's stable sort preserves insertion order on equal stamps).
+
+**Stable dedupe key:** `` `${dateISO}|${skillFocus.join(',')}|${successRate}` ``. The ticket's suggested key (`startedAtISO + skillFocus + problemCount`) referenced fields that **do not exist** on `SessionHistoryEntry` (real always-present fields are `dateISO`, `skillFocus`, `successRate` — see `types.ts:227`). No schema field (session-id) was added: `dateISO` is the session-start timestamp at millisecond precision, so two genuinely-distinct sessions cannot share it on one device's clock; combined with `skillFocus` + exact `successRate` a false-merge is vanishingly unlikely and benign (the dropped entry would be byte-identical to the kept one). Adding a session-id would cost a v1 read-path defaulter + a cloudSync parity mirror + every fixture — not justified when existing fields already key uniquely.
+
+**MAX_SESSION_HISTORY interaction:** the merged array can exceed `MAX_SESSION_HISTORY` (30) in pathological multi-device cases; `saveProgress` (the install sink) trims oldest-first as it always has. The merge itself does not trim — trimming is the storage adapter's job, applied uniformly to local-write and cloud-install paths.
+
+Pinned by `cloudSync.test.ts` (`mergeSessionHistories` unit block + two cloud-wins reconcile integration tests) and `e2e/cloud-sync-conflict.spec.ts` test 1.
+
 ### Source-of-truth invariant
 
-localStorage is authoritative; cloud is a backup. A failed cloud op NEVER blocks Marian. Concurrent writes are last-write-wins on the cloud side — that's safe because the cloud is a backup, not the operative state.
+localStorage is authoritative; cloud is a backup. A failed cloud op NEVER blocks Marian. On a cloud-wins reconcile, every field is last-write-wins EXCEPT `history`, which union-merges so no local session is lost (see § "Cloud sync conflict resolution" above).
 
 ### Schema floor at install time
 
@@ -935,7 +958,7 @@ Server:
 Browser:
 
 - [`MarianLearning/src/lib/progress/deviceId.ts`](MarianLearning/src/lib/progress/deviceId.ts) + `.test.ts` (10 tests).
-- [`MarianLearning/src/lib/progress/cloudSync.ts`](MarianLearning/src/lib/progress/cloudSync.ts) + `.test.ts` (22 tests).
+- [`MarianLearning/src/lib/progress/cloudSync.ts`](MarianLearning/src/lib/progress/cloudSync.ts) + `.test.ts` (38 tests).
 - [`MarianLearning/src/App.tsx`](MarianLearning/src/App.tsx) — boot-time reconcile effect.
 - [`MarianLearning/src/screens/SessionEnd/progressHistory.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.ts) — fire-and-forget after save.
 - [`MarianLearning/src/screens/ParentSettings/ParentSettings.tsx`](MarianLearning/src/screens/ParentSettings/ParentSettings.tsx) — Cloud Backup section + 8 new tests.

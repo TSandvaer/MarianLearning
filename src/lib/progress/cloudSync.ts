@@ -51,6 +51,7 @@ import { saveProgress } from './storage'
 import type {
   LetterSoundsVowel,
   Progress,
+  SessionHistoryEntry,
   SkillLevels,
   VowelSubMasteryState,
 } from './types'
@@ -375,9 +376,14 @@ export async function reconcileWithCloud(
     return { kind: 'cloud-blob-rejected' }
   }
 
-  // Cloud strictly newer — install.
+  // Cloud strictly newer — install. The cloud blob wins last-write-wins
+  // on EVERY field EXCEPT `progress.history`, which is union-merged with
+  // the local history so genuinely-novel sessions on the losing (slower-
+  // clock) device are never clobbered (ticket 86c9qa6na — P1 data-loss
+  // fix). `currentLocal?.history` is threaded in so the merge can run;
+  // when there's no local blob it's a plain cloud install.
   if (cloudTimeMs > localTimeMs) {
-    const validated = installCloudBlob(fetched.blob)
+    const validated = installCloudBlob(fetched.blob, currentLocal?.history)
     if (validated === null) {
       return { kind: 'cloud-blob-rejected' }
     }
@@ -421,7 +427,10 @@ export async function reconcileWithCloud(
  * supposed to prevent. Add a regression test that pins them together
  * if a future change touches one.
  */
-function installCloudBlob(blob: unknown): Progress | null {
+function installCloudBlob(
+  blob: unknown,
+  localHistory?: SessionHistoryEntry[],
+): Progress | null {
   // Pre-guard defaulters, in the SAME order as storage.ts:loadProgress —
   // skill-level floor first, then the W9.2 per-vowel letter-sounds
   // defaulter (ticket 86c9ya3gd), then the strict guard.
@@ -429,6 +438,23 @@ function installCloudBlob(blob: unknown): Progress | null {
     withDefaultedSkillLevels(blob),
   )
   if (!isProgressV1(defaulted)) return null
+
+  // History merge (ticket 86c9qa6na — P1 data-loss fix). The cloud blob
+  // wins last-write-wins on every field EXCEPT `history`. Under plain
+  // last-write-wins the slower-clock device's `history` array was
+  // clobbered wholesale, silently dropping any session Marian played on
+  // the losing device that the cloud blob doesn't carry. We union-merge
+  // instead: concat local + cloud, dedupe by stable key, sort ascending.
+  // `localHistory` is undefined when there's no local blob (genuine
+  // first-launch install) — nothing to merge, the cloud history stands.
+  const merged: Progress =
+    localHistory === undefined
+      ? defaulted
+      : {
+          ...defaulted,
+          history: mergeSessionHistories(localHistory, defaulted.history),
+        }
+
   // Mirror of `storage.ts:withDefaultedLifetimeFirstEncounters`. A
   // cloud blob written by an older device that doesn't know about
   // `lifetimeFirstEncounters` (ticket 86c9q9ben) gets the field
@@ -438,14 +464,77 @@ function installCloudBlob(blob: unknown): Progress | null {
   // blob and the locally-loaded blob would default different lists,
   // which is exactly the parity hazard the cloudSync.test.ts tests
   // pin against.
-  if (defaulted.lifetimeFirstEncounters === undefined) {
+  if (merged.lifetimeFirstEncounters === undefined) {
     return {
-      ...defaulted,
-      lifetimeFirstEncounters:
-        inferLifetimeFirstEncountersFromProgress(defaulted),
+      ...merged,
+      lifetimeFirstEncounters: inferLifetimeFirstEncountersFromProgress(merged),
     }
   }
-  return defaulted
+  return merged
+}
+
+/**
+ * Stable dedupe key for a `SessionHistoryEntry` (ticket 86c9qa6na).
+ *
+ * The ticket's suggested key (`startedAtISO + skillFocus + problemCount`)
+ * references fields that DO NOT exist on `SessionHistoryEntry` — see the
+ * type at `types.ts:227`. The real always-present identity fields are
+ * `dateISO`, `skillFocus`, and `successRate`; the key is built from those.
+ *
+ * Collision analysis: `dateISO` is the session START timestamp at
+ * millisecond precision. Two genuinely-distinct sessions cannot share a
+ * millisecond-precise start on a single device's clock; combined with
+ * `skillFocus` (the focus-node set) and the exact `successRate`, a
+ * false-merge would require two real sessions identical on all three —
+ * vanishingly unlikely, and benign if it ever happened (the surviving
+ * entry is byte-identical to the one dropped, since the two devices that
+ * synced the SAME session carry the SAME entry bytes).
+ *
+ * No `SessionHistoryEntry` schema field is added — the additive-field
+ * cost (a v1 read-path defaulter + a cloudSync parity mirror + every
+ * fixture) is not justified when the existing fields already key uniquely.
+ */
+function historyEntryKey(entry: SessionHistoryEntry): string {
+  return `${entry.dateISO}|${entry.skillFocus.join(',')}|${entry.successRate}`
+}
+
+/**
+ * Union-merge two `SessionHistory` arrays for cloud-sync conflict
+ * resolution (ticket 86c9qa6na — P1 data-loss fix).
+ *
+ * Semantics:
+ *  - Concatenate `local` then `cloud`.
+ *  - Dedupe by `historyEntryKey` — FIRST occurrence wins, so a session
+ *    present on BOTH devices keeps the LOCAL copy's bytes (the two are
+ *    expected to be identical; "first wins" is a stable, deterministic
+ *    tiebreak rather than a semantic preference).
+ *  - Sort ascending by `dateISO` (lexicographic compare is correct for
+ *    ISO-8601 Zulu strings; equal timestamps preserve insertion order
+ *    via a stable sort, which V8's `Array.prototype.sort` guarantees).
+ *
+ * No `successRate`-based "last-write-wins per entry" is applied — entries
+ * are dedicated session records, not mutable per-key state. Two entries
+ * with the same key are the same session; there is no per-entry conflict
+ * to resolve.
+ *
+ * Pure: returns a fresh array, mutates neither input. Exported for direct
+ * unit coverage (count-based assertions on the merged array).
+ */
+export function mergeSessionHistories(
+  local: readonly SessionHistoryEntry[],
+  cloud: readonly SessionHistoryEntry[],
+): SessionHistoryEntry[] {
+  const seen = new Set<string>()
+  const deduped: SessionHistoryEntry[] = []
+  for (const entry of [...local, ...cloud]) {
+    const key = historyEntryKey(entry)
+    if (seen.has(key)) continue
+    seen.add(key)
+    deduped.push(entry)
+  }
+  return deduped.sort((a, b) =>
+    a.dateISO < b.dateISO ? -1 : a.dateISO > b.dateISO ? 1 : 0,
+  )
 }
 
 /**

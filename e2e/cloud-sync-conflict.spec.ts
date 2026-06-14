@@ -12,25 +12,29 @@
  *
  * The risk: a future refactor of `reconcileWithCloud`'s call site in
  * App.tsx (or a change to how the App reads localStorage at boot)
- * could silently change the merge shape from "last-write-wins on the
- * whole blob" to a partial / field-level merge — or vice versa. This
- * spec pins the CURRENT documented behaviour from `cloudSync.ts`:
+ * could silently change the merge shape. This spec pins the CURRENT
+ * documented behaviour from `cloudSync.ts`:
  *
- *   - Cloud strictly newer → install cloud blob ENTIRELY (replaces
- *     skillLevels, history, lifetimeFirstEncounters, leitner box).
+ *   - Cloud strictly newer → install cloud blob, last-write-wins on
+ *     every field EXCEPT `history`, which is UNION-MERGED with local
+ *     (concat + dedupe-by-stable-key + sort ascending). skillLevels /
+ *     parentSettings / lifetimeFirstEncounters / leitner box stay
+ *     last-write-wins (cloud wins).
  *   - Local strictly newer → push local ENTIRELY to cloud.
  *   - Equal timestamps → noop (next saveProgress will sync naturally).
  *   - Cloud 404 + local present → push local (first-launch backup).
  *   - Cloud 5xx → cloud-error result, local kept, no push attempted.
  *
- * The merge shape is "last-write-wins on whole blob," NOT a per-field
- * merge. This is the locked design per `cloudSync.ts` documentation
- * and the unit tests in `cloudSync.test.ts`. If the design ever moves
- * to per-field reconciliation (history-array concat-and-dedupe, etc.),
- * the assertions here MUST update. **Until then, the data-loss risk
- * is documented but not test.fixme'd**: the behavior is intentional,
- * not broken — see the report-back at the bottom of the brief for the
- * P1 risk flag.
+ * History-array merge (ticket 86c9qa6na — P1 data-loss fix)
+ * --------------------------------------------------------
+ * Test 1 below was previously a "whole-blob replacement" pin that
+ * asserted the cloud history CLOBBERED local. Jessica flagged this as a
+ * P1 data-loss surface (PR #182): a session Marian played on the
+ * slower-clock (losing) device was silently dropped on a cloud-wins
+ * install. The merge now unions the two histories so no local session
+ * is lost. Test 1 asserts the MERGE shape; tests 2-5 are unchanged
+ * (they exercise the push / noop / reject paths where history is not
+ * merged).
  *
  * Mock strategy
  * -------------
@@ -96,11 +100,12 @@ test.describe('cloud-sync conflict resolution (boot reconcile)', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test 1 — Cloud strictly newer: cloud blob clobbers local skillLevels +
-  //          history (whole-blob replacement, not per-field merge).
+  // Test 1 — Cloud strictly newer: cloud wins last-write-wins on
+  //          skillLevels, but `history` UNION-MERGES with local so no
+  //          local session is lost (ticket 86c9qa6na — P1 data-loss fix).
   // -------------------------------------------------------------------------
 
-  test('cloud newer → cloud blob replaces local entirely (skillLevels + history both clobbered)', async ({
+  test('cloud newer → skillLevels clobbered (LWW) but history union-merges (no local session lost)', async ({
     page,
   }) => {
     // Local seed: laptop side, cvc-words: practicing, history len 6.
@@ -203,24 +208,45 @@ test.describe('cloud-sync conflict resolution (boot reconcile)', () => {
     expect(mock.gets).toHaveLength(1)
     expect(mock.posts).toHaveLength(0)
 
-    // localStorage now reflects the cloud blob's state — whole-blob
-    // replacement, NOT a per-field merge.
+    // localStorage now reflects the merge: skillLevels last-write-wins
+    // (cloud), history union-merged (local + cloud).
     const installed = (await readProgressFromPage(page)) as {
       skillLevels: Record<string, string>
       history: ReadonlyArray<{ dateISO: string; successRate: number }>
       lifetimeFirstEncounters: string[]
     }
     expect(installed).not.toBeNull()
-    // Cloud skill levels won — local 'practicing' was clobbered to
-    // 'mastered'.
+    // AC2: cloud skill levels won — local 'practicing' was clobbered to
+    // 'mastered' (last-write-wins is correct for skillLevels).
     expect(installed.skillLevels['cvc-words']).toBe('mastered')
     expect(installed.skillLevels['cvc-words-short-o']).toBe('intro')
-    // Cloud history won — local 6 entries were REPLACED by cloud's 5
-    // (NOT concatenated, NOT deduped, NOT merged). This is the
-    // load-bearing assertion that pins "last-write-wins on whole blob."
-    expect(installed.history).toHaveLength(5)
-    expect(installed.history[0]?.successRate).toBe(1.0)
-    expect(installed.history[4]?.successRate).toBe(0.875)
+    // AC1 — the load-bearing data-loss assertion: local's 6 sessions are
+    // NOT clobbered. Merged = local(6) ∪ cloud(5), no dateISO overlap, so
+    // 11 entries sorted ascending by dateISO. Marian's losing-device
+    // sessions survive.
+    expect(installed.history).toHaveLength(11)
+    // First entry is the earliest local session (2026-05-08T08:00).
+    expect(installed.history[0]?.dateISO).toBe('2026-05-08T08:00:00.000Z')
+    expect(installed.history[0]?.successRate).toBe(0.5)
+    // Last entry is the latest cloud session (2026-05-09T11:00, rate 0.875).
+    expect(installed.history[10]?.dateISO).toBe('2026-05-09T11:00:00.000Z')
+    expect(installed.history[10]?.successRate).toBe(0.875)
+    // The local-only sessions (cloud never carried these dates) survived.
+    const dates = installed.history.map((h) => h.dateISO)
+    expect(dates).toEqual([
+      '2026-05-08T08:00:00.000Z',
+      '2026-05-08T10:00:00.000Z',
+      '2026-05-08T12:00:00.000Z',
+      '2026-05-08T14:00:00.000Z',
+      '2026-05-08T16:00:00.000Z',
+      '2026-05-09T09:00:00.000Z',
+      '2026-05-09T10:00:00.000Z',
+      '2026-05-09T10:30:00.000Z',
+      '2026-05-09T10:45:00.000Z',
+      '2026-05-09T11:00:00.000Z',
+      '2026-05-09T11:00:00.000Z',
+    ])
+    // AC2: lifetimeFirstEncounters stays last-write-wins (cloud won).
     expect(installed.lifetimeFirstEncounters).toEqual([
       'letter-names',
       'letter-sounds',
