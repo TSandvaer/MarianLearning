@@ -144,7 +144,7 @@ Each "full prompt" is paste-ready — the style preamble from §1.1 is inlined v
   - Photorealistic wood-grain or polished-paint rendering.
   - Saturated primary red / yellow / blue (palette stays warm-pastel).
   - Top-with-face anthropomorphism.
-  - Beyblade / modern-spinner ring (overly detailed — keep classic-toy simple).
+  - Plastic spinning disc top / modern-spinner ring (overly detailed — keep classic-toy simple).
   - Sharp angular cone (corners stay slightly softened).
 - **Asset spec output (Phase 3):**
   - Filename: `public/assets/pictures/picture-top.svg` via `yarn embed-pictures`.
