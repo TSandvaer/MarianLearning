@@ -2188,6 +2188,16 @@ export const TARGET_PAIRINGS: Readonly<Record<string, TargetPairings>> = {
   were: { gentle: ['big', 'on'], trap: ['was', 'where'] },
   then: { gentle: ['the', 'big'], trap: ['there', 'they'] },
   // Content-word gap targets (verbs — wrong-class gentle, same-class trap):
+  // `bit` — the transitive gap verb for the `cat-sat-mat` frame reframed
+  // to "The cat ___ the bag." (#429). Unlike the other content verbs it
+  // lives in `DISTRACTOR_ONLY_WORDS` (isTarget:false, sightWord:true), so
+  // the `TARGET_WORDS` exhaustiveness scan never reached it — but it IS a
+  // renderable gap target, so `buildChipOrder → pickDistractors(bit)` runs
+  // at WordSong mount and needs this row or the screen throws (ticket
+  // 86ca8jdt6). Foils mirror `sat`/`ran` posture: wrong-class gentle
+  // (function/preposition words), same-class trap (verbs). All resolve via
+  // getWordEntry; no FORBIDDEN_PAIR adjacency (written-word chips anyway).
+  bit: { gentle: ['on', 'the'], trap: ['sat', 'ran'] },
   ran: { gentle: ['cat', 'the'], trap: ['sat', 'run'] },
   run: { gentle: ['the', 'on'], trap: ['ran', 'see'] },
   // Content-word gap targets (adjectives — wrong-class gentle, same-class trap):

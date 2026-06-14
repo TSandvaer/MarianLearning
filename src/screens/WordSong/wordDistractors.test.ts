@@ -8,6 +8,7 @@ import {
 import {
   DISTRACTOR_ONLY_WORDS,
   FORBIDDEN_PAIRS,
+  SIMPLE_SENTENCE_TARGET_SET,
   TARGET_PAIRINGS,
   TARGET_PAIRINGS_CROSSVOWEL,
   TARGET_WORDS,
@@ -279,6 +280,48 @@ describe('pickDistractors', () => {
     // distractor resolves," not "exactly N distractors."
     expect(lookupCount).toBeGreaterThanOrEqual(26 * 4)
     expect(failedLookups).toEqual([])
+  })
+
+  // ── Regression: simple-sentence gap targets must not throw at render ──
+  //
+  // `WordSong.tsx`'s `buildChipOrder` calls `pickDistractors(target, …)`
+  // UNCONDITIONALLY for every non-letter tier — including `simple-sentence`
+  // (and `sight-word`). The chips rendered by the simple-sentence branch
+  // come straight from this `chipOrder`, NOT from any planner-side foil
+  // table (the `wordPack.ts` comment claiming otherwise is aspirational —
+  // no such short-circuit exists in the render path). So every word the
+  // planner can emit as a simple-sentence gap target — i.e. every member
+  // of `SIMPLE_SENTENCE_TARGET_SET` — reaches `pickDistractors` at mount
+  // and MUST have a `TARGET_PAIRINGS` row, or the WordSong mount throws
+  // `no pairing matrix entry for target "<word>"`.
+  //
+  // This is the blind spot the `TARGET_WORDS`-only exhaustiveness scan
+  // above misses: `bit` lives in `DISTRACTOR_ONLY_WORDS` (isTarget:false,
+  // sightWord:true), so it never joins the `TARGET_WORDS` walk — yet it IS
+  // a renderable gap target (the `cat-sat-mat` frame "The cat ___ the
+  // bag.", #429). Ticket 86ca8jdt6.
+  //
+  // Count-based per feedback_count_assertions_on_regression_tests: collect
+  // every gap target that (a) has no matrix row or (b) makes a real
+  // `pickDistractors` call throw, then assert both lists are exactly empty.
+  it('every SIMPLE_SENTENCE_TARGET_SET gap target has a matrix row and renders chips without throwing', () => {
+    const missingRow: string[] = []
+    const threwAtRender: string[] = []
+    for (const word of SIMPLE_SENTENCE_TARGET_SET) {
+      if (TARGET_PAIRINGS[word] === undefined) missingRow.push(word)
+      const target = getWordEntry(word)
+      // Exercise both tiers — gentle (problem 1) and trap (problem 4) —
+      // since a row could in principle carry one tier but not the other.
+      for (const problemIndex of [1, 4]) {
+        try {
+          pickDistractors(target, problemIndex)
+        } catch {
+          threwAtRender.push(`${word}@${problemIndex}`)
+        }
+      }
+    }
+    expect(missingRow).toEqual([])
+    expect(threwAtRender).toEqual([])
   })
 })
 
