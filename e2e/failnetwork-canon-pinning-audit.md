@@ -110,8 +110,9 @@ comment at each non-add-to-10/20 call site (see "Comments added" below).
   `installFocusAwareMathCanonClaudeMock` (PR #275 follow-up). No active `failNetwork`
   call site remains (only documentary mentions).
 - `two-digit-addsub-with-regroup-progression.spec.ts` Test 2 — pinned addend-a ≥ 10;
-  migrated to `installWithRegroupCanonClaudeMock` (Wave 6D). Ticket explicitly lists
-  this as out of scope.
+  migrated to the canon-bytes mock (Wave 6D). The canon-bytes mock was later promoted
+  to the shared `installMathCanonClaudeMock` (ticket 86c9y490t); the failNetwork-pinning
+  audit itself lists Test 2 as out of scope.
 
 The `installFocusAwareMathCanonClaudeMock` / `installMathCanonClaudeMock` families and
 the already-fixed `sub-to-20` / with-regroup Test 2 are all out of scope per the ticket.

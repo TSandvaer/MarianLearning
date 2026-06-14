@@ -211,9 +211,9 @@
  */
 
 import { test, expect } from '@playwright/test'
-import type { Page, Request, Route } from '@playwright/test'
-import { existsSync, readFileSync } from 'node:fs'
+import type { Page } from '@playwright/test'
 import { resolve } from 'node:path'
+import { installMathCanonClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,
@@ -320,94 +320,6 @@ const ADD_TO_TWENTY_CANON_PATH = resolve(
   process.cwd(),
   'public/canon/math/level-1/add-to-20.json',
 )
-
-function readMathCanon(path: string): string {
-  if (!existsSync(path)) {
-    throw new Error(
-      `[add-to-20 spec] canon not found at ${path}. ` +
-        `This canon is required for canon-bytes mock; do NOT swap to ` +
-        `a silent-MP3 placeholder — per testing-and-ci.md §4.1.2 + ` +
-        `§4.1.3 rule 3 the placeholder also fails decode under the ` +
-        `stub-ctx, falls back to the static add-to-10 rotation, and ` +
-        `silently masks the regression. See the file header.`,
-    )
-  }
-  return readFileSync(path, 'utf-8')
-}
-
-/**
- * Install a `/api/claude` mock that serves the on-disk add-to-20
- * canon for `track === 'math'` requests. Modelled on
- * `installMathCanonClaudeMock` in
- * `e2e/sub-to-10-distractor-class-2.spec.ts`.
- *
- * Single-canon (not focus-aware) — per `[[testing-and-ci.md §4.2.3]]`
- * the focus-aware multi-canon pattern only earns helper-promotion at
- * adopter #3. This spec doesn't span a cross-tier focus-switch so
- * single-canon is the correct level of abstraction.
- *
- * Behaviour:
- *   - `track === 'math'` → serve `add-to-20.json` regardless of
- *     `focusNode`. Tests assert against the served canon's
- *     structural envelope; if a test seeded a non-add-to-20 focus,
- *     the assertion would fail loudly (correct behaviour).
- *   - `track === 'word-song'` → 500 loudly. App.tsx catches and
- *     falls through to silent caption-walk on Hub's pre-warm fetch —
- *     this is the same behaviour the production word-song path takes
- *     on any outage, and doesn't affect Hub → Math navigation.
- *   - `OPTIONS` preflight → 204.
- *
- * Returns `{ requests }` for tests that want to inspect captured
- * request bodies (Test 4 uses this as a positive discriminator per
- * `[[testing-and-ci.md §4.1.1e]]`).
- */
-async function installAddToTwentyCanonClaudeMock(
-  page: Page,
-): Promise<{ requests: Request[] }> {
-  const canonBody = readMathCanon(ADD_TO_TWENTY_CANON_PATH)
-  const requests: Request[] = []
-  await page.route('**/api/claude', async (route: Route) => {
-    const req = route.request()
-    if (req.method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, body: '' })
-      return
-    }
-    requests.push(req)
-    let body: Record<string, unknown>
-    try {
-      body = JSON.parse(req.postData() ?? '{}') as Record<string, unknown>
-    } catch {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: '{}',
-      })
-      return
-    }
-    const payload = (body.payload ?? {}) as Record<string, unknown>
-    const track = payload.track as string | undefined
-    if (track === 'math') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: canonBody,
-      })
-      return
-    }
-    // word-song or unknown track — 500 loudly. App.tsx catches and
-    // falls through to silent caption-walk; doesn't affect Hub→Math.
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ok: false,
-        error: 'unexpected-track',
-        message: `add-to-20 spec is math-only; saw track=${String(track)}`,
-      }),
-    })
-  })
-  return { requests }
-}
 
 // ── Seed builder ─────────────────────────────────────────────────────────
 
@@ -548,7 +460,7 @@ test.describe('add-to-20 — pool envelope + doubles cap + MTB coverage + Class 
     // very regression these tests guard. Real Azure-rendered MP3
     // bytes decode cleanly under the genuine gesture-unlock chain
     // in headless chromium.
-    await installAddToTwentyCanonClaudeMock(page)
+    await installMathCanonClaudeMock(page, ADD_TO_TWENTY_CANON_PATH)
   })
 
   // ── Test 1 ─────────────────────────────────────────────────────────
@@ -802,9 +714,12 @@ test.describe('add-to-20 — pool envelope + doubles cap + MTB coverage + Class 
     // Capture requests so we can assert focusNode (positive
     // discriminator per §4.1.1e). The mock helper already returns
     // `requests`; re-install here to bind to this test's `requests`
-    // ref via the `installAddToTwentyCanonClaudeMock` first-match-
-    // wins pattern per `[[testing-and-ci.md §4.2.2]]`.
-    const { requests } = await installAddToTwentyCanonClaudeMock(page)
+    // ref via the `installMathCanonClaudeMock` first-match-wins
+    // pattern per `[[testing-and-ci.md §4.2.2]]`.
+    const { requests } = await installMathCanonClaudeMock(
+      page,
+      ADD_TO_TWENTY_CANON_PATH,
+    )
 
     await page.goto('/')
 
