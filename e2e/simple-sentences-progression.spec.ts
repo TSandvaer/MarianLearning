@@ -268,6 +268,14 @@ test.describe('simple-sentences TERMINAL progression — mastery with NO downstr
     // 3 sessions × ~50s + 30s headroom (testing-and-ci.md §4.1.1b).
     test.setTimeout(180_000)
 
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE.
+    // Focus is `simple-sentences` (non-add-to-10/20) → static word-song
+    // stub plan, but Test 1 asserts only on the persisted Progress doc
+    // (skillLevels mastery transition / changed-node set / skillFocus /
+    // history). No sentence content is pinned, so the §4.2 tier-asymmetry
+    // never bites. (Test 2, the picker-payload assertion, deliberately
+    // serves a 200 CVC fixture rather than failNetwork so it can capture
+    // the outgoing request body — see its docstring.)
     await installClaudeMock(page, { failNetwork: true })
     await seedLocalStorage(page, {
       progress: buildTerminalSeed(),

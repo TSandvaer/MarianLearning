@@ -194,6 +194,12 @@ async function runOneWordSongSession(
 
 test.describe('Progression loop — digraphs-sh (intro → practicing → mastered; unlocks digraphs-ch)', () => {
   test.beforeEach(async ({ page }) => {
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE.
+    // Focus is `digraphs-sh` (non-add-to-10/20) → static word-song
+    // fallback emits wrong-tier (blending-cv stub) content, but every
+    // assertion reads the persisted Progress doc (skillLevels /
+    // skillFocus attribution / history). No sh-pool word content is
+    // pinned, so the §4.2 tier-asymmetry never bites.
     await installClaudeMock(page, { failNetwork: true })
 
     // Seed: every word-song node UP TO AND INCLUDING `cvc-words-short-e`

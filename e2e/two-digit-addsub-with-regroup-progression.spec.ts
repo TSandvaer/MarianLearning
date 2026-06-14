@@ -655,6 +655,13 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
     skipOnWebkitHeadless(testInfo)
     test.setTimeout(180_000)
 
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE here.
+    // Focus is `two-digit-addsub-with-regroup` (non-add-to-10/20) → static
+    // fallback serves wrong-tier add-to-10 content, but Test 3 asserts only
+    // on the persisted Progress doc (skillFocus attribution / successRate /
+    // history length). No two-digit operand content is pinned, so the §4.2
+    // tier-asymmetry never bites. (Test 2, which DOES pin addend-a ≥ 10,
+    // uses installWithRegroupCanonClaudeMock — not failNetwork.)
     await installClaudeMock(page, { failNetwork: true })
     await seedLocalStorage(page, {
       progress: buildWithRegroupSeedProgress(),
@@ -707,6 +714,12 @@ test.describe('two-digit-addsub-with-regroup — Wave 6 progression (failing-fir
     skipOnWebkitHeadless(testInfo)
     test.setTimeout(240_000)
 
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE here.
+    // Focus is `two-digit-addsub-with-regroup` (non-add-to-10/20) → static
+    // fallback serves wrong-tier add-to-10 content, but Test 4 asserts only
+    // on the persisted Progress doc (skillLevels mastery transition /
+    // downstream unlock / skillFocus / history). No two-digit operand
+    // content is pinned, so the §4.2 tier-asymmetry never bites.
     await installClaudeMock(page, { failNetwork: true })
     await seedLocalStorage(page, {
       progress: buildWithRegroupSeedProgress(),

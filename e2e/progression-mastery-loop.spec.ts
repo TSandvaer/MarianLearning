@@ -183,6 +183,13 @@ async function runOneWordSongSession(
 
 test.describe('Progression loop — cvc-words (intro → practicing, graduation-gated)', () => {
   test.beforeEach(async ({ page }) => {
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE.
+    // Focus is `cvc-words` (non-add-to-10/20) but every assertion reads
+    // the persisted Progress doc (skillLevels / skillFocus attribution /
+    // successRate / history length) — content-agnostic. The static
+    // word-song fallback emits wrong-tier (blending-cv stub) content, but
+    // no assertion pins addends / words / utterance text, so the
+    // §4.2 failNetwork tier-asymmetry never bites.
     await installClaudeMock(page, { failNetwork: true })
 
     // Seed: all word-song prerequisites mastered so pickFocusNode lands on
@@ -284,6 +291,13 @@ test.describe('Progression loop — cvc-words (intro → practicing, graduation-
 
 test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
   test.beforeEach(async ({ page }) => {
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE.
+    // Focus is `sub-to-20` (non-add-to-10/20) and the static fallback
+    // serves the wrong-tier add-to-10 rotation — but every assertion
+    // reads the persisted Progress doc (skillLevels / skillFocus /
+    // history), never the rendered addends/op. Content-agnostic; the
+    // §4.2 tier-asymmetry never bites. (Contrast sub-to-20.spec.ts, which
+    // DID pin teen-operand content and was migrated to a canon-bytes mock.)
     await installClaudeMock(page, { failNetwork: true })
 
     const progress = buildSeedProgress({
@@ -375,6 +389,12 @@ test.describe('Progression loop — sub-to-20 (intro → mastered)', () => {
 
 test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
   test.beforeEach(async ({ page }) => {
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE.
+    // Focus is `mult-2-5-10` (non-add-to-10/20) → static fallback serves
+    // wrong-tier add-to-10 content, but every assertion reads the
+    // persisted Progress doc (skillLevels / skillFocus / history). No
+    // multiplication operand/×-glyph content is pinned, so the §4.2
+    // tier-asymmetry never bites.
     await installClaudeMock(page, { failNetwork: true })
 
     const progress = buildSeedProgress({
@@ -545,6 +565,12 @@ test.describe('Progression loop — mult-2-5-10 (intro → mastered)', () => {
 
 test.describe('Progression loop — cvc-words-short-e (intro → practicing → mastered)', () => {
   test.beforeEach(async ({ page }) => {
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE.
+    // Focus is `cvc-words-short-e` (non-add-to-10/20) → static word-song
+    // fallback emits wrong-tier (blending-cv stub) content, but every
+    // assertion reads the persisted Progress doc (skillLevels /
+    // skillFocus / history). No short-e word/picture content is pinned,
+    // so the §4.2 tier-asymmetry never bites.
     await installClaudeMock(page, { failNetwork: true })
 
     // Seed: every word-song node UP TO AND INCLUDING `cvc-words-short-i`
@@ -712,6 +738,11 @@ test.describe('Progression loop — cvc-words-short-e (intro → practicing → 
 
 test.describe('Progression loop — sight-words (intro → mastered)', () => {
   test.beforeEach(async ({ page }) => {
+    // failNetwork-canon-pinning audit (86c9y49bu): STRUCTURALLY SAFE.
+    // Focus is `sight-words` (non-add-to-10/20) → static word-song
+    // fallback emits wrong-tier content, but every assertion reads the
+    // persisted Progress doc (skillLevels / skillFocus / history). No
+    // sight-word content is pinned, so the §4.2 tier-asymmetry never bites.
     await installClaudeMock(page, { failNetwork: true })
 
     // Seed: all word-song prerequisites mastered (including the three
