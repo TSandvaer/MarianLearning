@@ -389,3 +389,19 @@ These items hit the never-auto-decide list and are surfaced for your sign-off on
 - **Recommendation:** Read §7 first (6 open Qs with Kyle's recommended defaults), then §0 / §1 / §2 for scope + visual + trigger. Kyle's NOF #1 flags an existing related spec at `design/screen-math-subitising-prompt.md` that pairs with this one (screen-layer + content-tier — not redundant).
 - **Blockers downstream:** Implementation PR (Kevin/Devon) is blocked on spec landing. Subitising affects Marian's active tier so the scaffold ships once spec is approved.
 - **Status:** resolved 2026-05-16 — all 6 §7 Kyle defaults accepted; PR #260 merged
+
+## 2026-06-13T21:48:06Z — Merge PR #431 (simple-sentences scene pack)
+
+- **Decided:** merged #431 — 8 gentle scene SVGs + SCENE_PICTURES wired; simple-sentences tier renders scenes (was text-only fallback).
+- **Foundation:** routine-PR-merge auto-decide (CLAUDE.md orchestrator-autonomy rule 6) — Kevin APPROVE verdict + fast-gate SUCCESS + e2e SUCCESS on sha a041c55f0474dfef0d6158f2b5c34b40a808a3eb.
+- **Alternative:** queue for Thomas — unnecessary, no infra/strategic scope.
+- **Reversibility:** git revert, ~1 PR.
+- **Status:** accepted by Thomas 2026-06-14 (sponsor-questions-walkthrough)
+
+## 2026-06-13T22:25:26Z — Merge PR #432 (cat-sat-mat NITs fixture sweep)
+
+- **Decided:** merged #432 — swept stale "The cat \_\_\_ the mat." refs from hand-mock fixtures/docstrings (#430 NITs, ticket 86ca8fvm7).
+- **Foundation:** routine-PR-merge auto-decide (CLAUDE.md orchestrator-autonomy rule 6) — Devon APPROVE verdict + fast-gate SUCCESS + e2e SUCCESS on sha 3a11bffa1ecbfef8d6e0b2a47902f4aa2a96e549.
+- **Alternative:** queue for Thomas — unnecessary, mechanical fixture-only cleanup.
+- **Reversibility:** git revert, ~1 PR.
+- **Status:** accepted by Thomas 2026-06-14 (sponsor-questions-walkthrough)

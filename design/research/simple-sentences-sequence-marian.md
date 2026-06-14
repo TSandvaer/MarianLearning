@@ -45,7 +45,7 @@ Children aged 7–9 with stronger syntactic awareness had better reading compreh
 Meta-analysis across multiple languages and developmental stages. Syntactic skills are a significant predictor of reading comprehension at ages 6–10, over and above decoding. The effect size is **larger for L2 learners** than L1 (because L2 learners must consciously map L2 syntax they cannot rely on implicit knowledge for). This directly supports prioritising syntactic-slot tasks (mechanic (a)) over phonics-extension tasks at this tier. **Evidence strength: strong** (meta-analytic; most recent synthesis of this literature as of 2025).
 
 **E4 — Koda, K. (2007). Reading and language learning: Cross-linguistic constraints on second language reading development. _Language Learning_, 57(Supplement 1), 1–44.** [https://onlinelibrary.wiley.com/doi/10.1111/0023-8333.101997010](https://onlinelibrary.wiley.com/doi/10.1111/0023-8333.101997010)  
-Cross-linguistic reading development review. Tagalog is predicate-initial (Verb-Subject-Object is the canonical surface order; Agent-initial is a learner preference). English is Subject-Verb-Object. Children learning to read English as L2 with Tagalog as L1 must override a core word-order assumption: in Tagalog, the first major constituent often marks the focused topic, not the agent/doer as in English. A sentence-completion task that presents "The cat \_\_\_ the mat." (with the verb gapped) targets precisely this word-order mapping — it forces Marian to track the English SVO structure as a constraint on slot prediction. Sentence ordering (mechanic (b)) exacerbates the same Tagalog-L1 word-order transfer problem: a child unsure of English SVO will reconstruct a PSO-like order under cognitive load. **Evidence strength: moderate** (large-scale expert review; Tagalog-specific inference is mine — direct Tagalog-English child reading data is thin).
+Cross-linguistic reading development review. Tagalog is predicate-initial (Verb-Subject-Object is the canonical surface order; Agent-initial is a learner preference). English is Subject-Verb-Object. Children learning to read English as L2 with Tagalog as L1 must override a core word-order assumption: in Tagalog, the first major constituent often marks the focused topic, not the agent/doer as in English. A sentence-completion task that presents "The cat \_\_\_ the bag." (gap = verb, "the bag" as object) targets precisely this word-order mapping — it forces Marian to track the English SVO structure as a constraint on slot prediction. The canonical nursery-rhyme phrasing "the cat sat on the mat" illustrates the locative PP construction (Template C), but the Template B SVO word-order drill requires a genuinely transitive verb + noun object — "sat" is intransitive and cannot take a direct object. The canonical gentle `cat-sat-mat` scene uses "The cat \_\_\_ the bag." (gap = "bit") for precisely this reason. Sentence ordering (mechanic (b)) exacerbates the same Tagalog-L1 word-order transfer problem: a child unsure of English SVO will reconstruct a PSO-like order under cognitive load. **Evidence strength: moderate** (large-scale expert review; Tagalog-specific inference is mine — direct Tagalog-English child reading data is thin).
 
 **E5 — Nielsen, A.M., et al. (2025). Syntactic Comprehension — A Separate Source of Individual Variance in Middle-School Children's Reading Comprehension. _Reading Research Quarterly_.** [https://ila.onlinelibrary.wiley.com/doi/full/10.1002/rrq.70003](https://ila.onlinelibrary.wiley.com/doi/full/10.1002/rrq.70003)  
 Syntactic comprehension — distinct from vocabulary and decoding — accounts for independent variance in reading comprehension from early grades. The sentence-completion task is the earliest practical drill for this skill layer. Sentence ordering requires simultaneously tracking token identity, positional grammar, and semantic plausibility — all three at once. At age 8, for an emergent L2 reader, this is beyond single-session working-memory capacity for 8 consecutive problems. **Evidence strength: moderate** (large observational study; inference about mechanic (b) load is mine from the broader WM literature).
@@ -54,7 +54,7 @@ Syntactic comprehension — distinct from vocabulary and decoding — accounts f
 Practitioner synthesis of the syntax-reading evidence. Sentence scrambles are recommended for grades K-3 but the guidance is clear: **introduce with 3–4 words maximum** before expanding. This caps our own sentence length ceiling at the same level. Cloze tasks (fill-in-blank / sentence completion) are identified as the activity most directly building syntactic awareness: the child must predict part-of-speech from context, the core skill. **Evidence strength: moderate** (practitioner synthesis drawing on structured-literacy evidence base; not a primary RCT).
 
 **E7 — Frontiers in Education / Lao & Krashen-adjacent literature on dual-language learners + scene illustration.** Frontiers in Education (2022): Digital Picture Books for Young Dual Language Learners: Effects of Reading in the Second Language. [https://www.frontiersin.org/journals/education/articles/10.3389/feduc.2022.901060/full](https://www.frontiersin.org/journals/education/articles/10.3389/feduc.2022.901060/full)  
-L2 children learning from digital texts benefit significantly from illustrations that contextualise the sentence meaning (not just the target word). At the **sentence level**, a scene that shows "the dog sat on the mat" provides scaffolding that helps Marian map the English sentence onto a real-world situation — compensating for her limited English vocabulary and the absence of Tagalog-equivalent articles. This justifies the scene-illustration ruling for the gentle phase. Note: the E4 sight-words ruling (pictures are harmful for word recognition) does NOT apply here because the task is sentence-comprehension, not word-recognition. **Evidence strength: moderate** (empirical; not a direct RCT on cloze tasks with scenes specifically).
+L2 children learning from digital texts benefit significantly from illustrations that contextualise the sentence meaning (not just the target word). At the **sentence level**, a scene that shows "the cat bit the bag" provides scaffolding that helps Marian map the English sentence onto a real-world situation — compensating for her limited English vocabulary and the absence of Tagalog-equivalent articles. This justifies the scene-illustration ruling for the gentle phase. Note: the E4 sight-words ruling (pictures are harmful for word recognition) does NOT apply here because the task is sentence-comprehension, not word-recognition. **Evidence strength: moderate** (empirical; not a direct RCT on cloze tasks with scenes specifically).
 
 **E8 — Cowan, N. (2001). The magical number 4 in short-term memory: A reconsideration of mental storage capacity. _Behavioral and Brain Sciences_, 24(1), 87–114.** [https://www.cambridge.org/core/journals/behavioral-and-brain-sciences/article/magical-number-4-in-shortterm-memory-a-reconsideration-of-mental-storage-capacity/44023F1147D4A1D44BDE0773C3C80680](https://www.cambridge.org/core/journals/behavioral-and-brain-sciences/article/magical-number-4-in-shortterm-memory-a-reconsideration-of-mental-storage-capacity/44023F1147D4A1D44BDE0773C3C80680)  
 Working memory chunk capacity is approximately 4 ± 1 items in adults; in 8-year-olds, the effective capacity is closer to 3–4 items for processing-and-storage tasks (not just storage). A sentence with a gap forces both storage (hold the sentence frame) and processing (evaluate each chip option against the frame). A 5-word gapped sentence ("The cat sat on the **_") asks an 8-year-old to hold 4 active tokens while evaluating a 3-chip row — borderline overload. A 4-word sentence ("The cat sat _**") asks for 3 active tokens — within range. A 3-word sentence ("The cat \_\_\_") is the safest gentle ramp. **Evidence strength: strong** (foundational WM research; age-band extrapolation to 8-year-olds is well-established practice but involves inference from adult data).
@@ -129,12 +129,15 @@ Organised by syntactic template. Every sentence is 3 or 4 words total (including
 
 #### Template B: Subject + verb + object/complement (4 words, gap = object or complement)
 
-"The cat sat **_." — Chips: [there / ran / we]  
+**Locked gentle-phase entry (sceneId `cat-sat-mat`):**
+"The cat **\_** the bag." — Chips: [bit / sat / on]  
+Rationale: the Template B SVO word-order drill requires a transitive verb. "sat" is intransitive and cannot take "the mat" (or any noun) as a direct object — "The cat sat the mat" is ungrammatical. "bit" (past tense of bite; short-i CVC, shipped pool) is transitive and takes "the bag" naturally. The cat+mat scene was used as the session-1 gentle entry in canon but the completed sentence it produced was grammatically wrong; Thomas's ear-test (GitHub issue #429) confirmed the failure. The canonical gentle SVO entry is now "The cat bit the bag." Scene: a cat biting or mouthing a bag. This locked ruling supersedes any earlier mention of "The cat \_\_\_ the mat." in this template.
+
 "I see the _**." — Chips: [dog / sat / the]  
 "She has the **_." — Chips: [bag / is / go]  
 "He can see _**." — Chips: [it / sat / the]  
 "The dog ran **_." — Chips: [in / cat / was]  
-"The man is _**." — Chips: [big / ran / we]  
+"The man is \_\*\*." — Chips: [big / ran / we]  
 "We can go \_\_\_." — Chips: [there / cat / the]
 
 #### Template C: Subject + verb + preposition (4 words, gap = preposition/locative)
@@ -251,10 +254,10 @@ Once Marian has context, removing the scene forces her to use the written senten
 
 ### Session structure (8 problems per session, as per all WordSong tiers)
 
-| Problems | Phase  | Scene   | Foil class                | Sentence source                                                                         |
-| -------- | ------ | ------- | ------------------------- | --------------------------------------------------------------------------------------- |
-| 1–3      | Gentle | Present | Wrong part-of-speech      | Template A or B only (SV or SVO — safest for Tagalog L1 SVO learning)                   |
-| 4–8      | Trap   | Absent  | Same class, wrong meaning | All templates; Templates D (deferrals) and E (is/was + adj) prioritised in problems 5–8 |
+| Problems | Phase  | Scene   | Foil class                | Sentence source                                                                                                                                                                     |
+| -------- | ------ | ------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1–3      | Gentle | Present | Wrong part-of-speech      | Template A or B only (SV or SVO — safest for Tagalog L1 SVO learning; Template B SVO requires a transitive verb — never use intransitive verbs like "sat"/"ran" with a noun object) |
+| 4–8      | Trap   | Absent  | Same class, wrong meaning | All templates; Templates D (deferrals) and E (is/was + adj) prioritised in problems 5–8                                                                                             |
 
 ### Gentle → trap progression within the tier (across sessions)
 
@@ -297,6 +300,21 @@ The 5 inherited deferrals (they / then / there / where / were) are the highest-p
 3. **Literacy Leitner box: still SEPARATE downstream.** Nothing in the Wave 13 evidence changes this deferral. The 40-sentence pool + 8 problems per session is sufficient for the first wave. File the literacy Leitner ticket after Wave 13 ships; cite this note's §Dosage footnote (#5) as the motivation.
 
 4. **Inherited deferral sequencing must be explicit in Kevin's word list.** The pool-validity rules above specify that they / then / there / where / were must appear in the gentle phase first, in sessions 4+. Kevin's `WORD_SONG_SIMPLE_SENTENCES` list and the planner directive block should encode this sequencing rule explicitly — not leave it to Haiku to infer.
+
+### Grammar ruling — locked gentle pool entry (Wave 13 tail-closure)
+
+**Locked 2026-06-13.** The canonical gentle `cat-sat-mat` entry is:
+
+- **frame:** "The cat \_\_\_ the bag."
+- **target:** "bit"
+- **template:** B (SVO — subject + transitive verb + object)
+- **scene (sceneId `cat-sat-mat`):** a cat biting or mouthing a bag
+
+This replaces the earlier frame "The cat \_\_\_ the mat." (target: "sat") which produced the ungrammatical completed sentence "The cat sat the mat." — "sat" (past tense of "sit") is intransitive and cannot take a noun phrase as a direct object in English. Thomas's ear-test on session-1 clip (GitHub issue #429) confirmed the grammar failure.
+
+Foil set: [bit / sat / on] — "sat" is a wrong-class foil (different construction: SV, intransitive), "on" is a wrong-class foil (preposition). This foil set is intentionally transparent about the intransitive/transitive distinction, which is exactly the syntactic-awareness skill the gentle phase targets.
+
+**Intransitivity rule for Template B (generalised):** any Template B SVO frame where the gap is the verb position MUST use a transitive verb. Verbs in the shipped CVC pool that are intransitive and therefore FORBIDDEN in a "Subject \_\_\_ Object" frame: sat/sit (intransitive, locative), ran/run (intransitive unless taking a path/course complement, which is not SVO). Verbs that ARE transitive and permitted: bit/bite, hit (if added to pool), see/saw, has/have (if added to pool). Kevin's planner content must verify transitivity before composing any new Template B verb-gap sentence.
 
 ### For Kyle (design spec — Track 1b)
 
