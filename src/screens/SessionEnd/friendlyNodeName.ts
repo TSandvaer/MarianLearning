@@ -48,7 +48,13 @@ import type { SkillNode } from '../../lib/progress'
  */
 export const FRIENDLY_NODE_NAME_FALLBACK = 'your learning'
 
-const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
+/**
+ * Spoken child-facing phrase per `SkillNode`. Exported so the bake-side copy
+ * mirror (`scripts/recapFocusCopy.ts`) can be drift-guarded against it in
+ * `recapFocusBakeMirror.test.ts` — the bake must voice exactly what the caption
+ * shows.
+ */
+export const FRIENDLY_NODE_NAMES: Record<SkillNode, string> = {
   // ── Number Garden (math) ──────────────────────────────────────────────
   'number-recog': 'your numbers',
   'add-to-10': 'adding to ten',
