@@ -351,6 +351,8 @@ The body has three layers, all wrapped by `buildSsmlBody`:
 
 Per ticket `86c9kj2um` notes: `two → /tuː/` was tried for symmetry but Emma multilingual ignored that IPA value, so it stays out. Defensive wrapping of words the voice handles correctly can degrade pronunciation — see `project_audio_phoneme_overrides.md` memory.
 
+**Per-line render fixes + the early-return trap (voice-QA #446 / PR #448).** On top of the two general transforms above, specific session-end utterances get bespoke per-line renders matched by exact text shape — `renderRecapFourStars` ("You earned four stars!") and `renderStreakFourRow` ("Four in a row! Wow!") apply a stress-lift + `fɔːə` / `ɹəʊ` IPA inside a whole-line rate envelope (fixing en-GB-Olivia's de-stressed "four" and the /raʊ/-argument vs /roʊ/-line homograph on "row"). **The trap:** `renderSsmlInnerText` early-returns per `tierFilter` (there's a `letter-sounds` branch). Session-end `recap.*` / `streak.*` lines are **byte-shared across all 24 tier files**, and their voice-QA itemId is owned by whichever tier sorts first in the dedup — `letter-sounds` — so those bytes render under `tierFilter='letter-sounds'`. Any text-shape-gated fix for them MUST run **before** the `letter-sounds` early-return, or it never reaches the flagged bytes; the obvious placement (after the early-return, next to the other render helpers) silently misses.
+
 `escapeSsml` ([\_tts.ts:117](MarianLearning/api/_tts.ts#L117)) escapes the five XML metacharacters; applied to all four prosody attributes (defense in depth — today they come from the hardcoded config) and to plain text segments outside phoneme markup.
 
 ### Retry / backoff
