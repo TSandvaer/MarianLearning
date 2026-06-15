@@ -673,6 +673,12 @@ Playwright's `locator.toHaveCount(N)` counts **every DOM node** matching the sel
 
 **The correct seam:** serve the real on-disk canon JSON verbatim (e.g. `installSubToTenCanonClaudeMock` returning `public/canon/math/level-1/sub-to-10.json` — the `sub-to-10-distractor-class-2.spec.ts` pattern). Real Azure-rendered MP3s decode cleanly in headless chromium, so the chip gate releases naturally across the walk.
 
+#### 4.1.7 `scripts/` files can't import app code — cross-tsconfig constants need a zero-import copy module (PR #460, 2026-06-15)
+
+`scripts/` (bake / codegen) compiles under the **api tsconfig** (`lib: ["ES2023"]`, no DOM). Importing an app constant from a `src/lib/...` barrel drags DOM/Vite-typed runtime values into that tsconfig and **breaks `tsc -b`**. (Hit twice: `rebakeThreeHint.ts` needed `NUMBER_WORDS`; `bakeRecapFocus.ts` needed `friendlyNodeName`'s map.)
+
+**The pattern:** when a `scripts/` bake needs a constant that also lives in app code, create a **zero-import `scripts/<name>Copy.ts`** holding the literal, plus a **drift-guard vitest test under the _app_ tsconfig** (which CAN import both sources) asserting `copy === source`. Never direct-import app code from `scripts/`. (e.g. `scripts/recapFocusCopy.ts` mirrors `FRIENDLY_NODE_NAMES`, pinned by `recapFocusBakeMirror.test.ts`.)
+
 **`forceHowlerUnlock` is the WRONG seam here** (empirically hit in the W10.5 fix cycle): its stubbed ctx breaks real-bytes decode → silent demote to the static add-to-10 (`op:'+'`) fallback → the feature under test never mounts → the assertion is structurally unsatisfiable. See §4.1.2's silent-demote caveat. Symptom signature: the feature's Q1 assertion passes but the walk stalls at `toBeEnabled()` with chips stuck `disabled`.
 
 **Mechanical hygiene from the same cycle:**

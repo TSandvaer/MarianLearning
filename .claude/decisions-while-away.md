@@ -405,3 +405,211 @@ These items hit the never-auto-decide list and are surfaced for your sign-off on
 - **Alternative:** queue for Thomas — unnecessary, mechanical fixture-only cleanup.
 - **Reversibility:** git revert, ~1 PR.
 - **Status:** accepted by Thomas 2026-06-14 (sponsor-questions-walkthrough)
+
+## 2026-06-14 1147 UTC — Away tick: route #437 review to Devon + file #439 NIT follow-up
+
+- **Decided:** (a) Dispatched Devon to code-review PR #437 (Kyle picture-pack v7) now he is free from the #439 review. (b) Filing a chore ticket for the stale/wrong comment at wordPack.ts:1606-1607 (Devon #439 NIT — it asserts a planner-side foil table that does not exist, the false premise that masked the bit-throw bug).
+- **Foundation:** review-routing auto-decide (Kyle PR -> Devon reviewer) + NITs-ticket-from-APPROVE_WITH_NITS, both orchestrator-autonomy rule 6.
+- **Alternative:** hold #437 review until sponsor returns (idles Devon, delays merge).
+- **Reversibility:** review is read-only + a PR comment; NIT ticket is a backlog entry. Both trivial.
+- **Status:** pending review
+
+## 2026-06-14 1154 UTC — Away tick: merge 3 gate-cleared PRs
+
+- **Decided:** Merged #436 (Dave phonetic-v2 research, merge-direct), #438 (Jessica failNetwork audit, merge-direct), #437 (Kyle picture-pack v7, Devon APPROVE_WITH_NITS). All three: fast-gate + Playwright SUCCESS.
+- **Foundation:** research/audit merge-direct routing + peer-review-APPROVE merge auto-decide (orchestrator-autonomy rule 6); both CI gates verified green this tick.
+- **Alternative:** hold all merges for sponsor return (no benefit; gates fully met).
+- **Reversibility:** each squash-merge revertable in 1 PR.
+- **Status:** pending review
+
+## 2026-06-14 1206 UTC — Away tick: merge #439 + dispatch Jessica on mock-helper consolidation
+
+- **Decided:** (a) Merged #439 (Kevin bit-throw fix, ticket 86ca8jdt6) — Devon APPROVE_WITH_NITS + fast-gate + Playwright SUCCESS. (b) Dispatched Jessica on 86c9y490t (promote canon-bytes mock helper to e2e/\_helpers/mockClaude.ts; 3rd-adopter threshold crossed; mechanical tech-debt refactor).
+- **Foundation:** peer-review-APPROVE merge auto-decide (rule 6) + CI green; mock-helper is a foundation-backed reversible refactor (testing-and-ci.md 4.2.3 promotion rule, threshold met), lane-matched to Jessica (e2e), NOT a feature direction.
+- **Alternative:** hold both for sponsor return (no benefit; gates met / mechanical).
+- **Reversibility:** each revertable in 1 PR.
+- **Status:** pending review
+
+## 2026-06-14 1222 UTC — Away tick: Jessica #440 done -> route review to Kevin + file two-digit-addsub follow-up
+
+- **Decided:** (a) Jessica completed mock-helper consolidation (PR #440, ticket 86c9y490t); dispatching Kevin to code-review (e2e test-infra refactor; 3 specs pass, grep success-test clean). (b) Filing a follow-up ticket to migrate the 4th clone installTwoDigitAddsubCanonClaudeMock in two-digit-addsub.spec.ts to the shared helper (Jessica finding #2 - 5 instances exist, not 3; left out of scope this PR).
+- **Foundation:** review-routing auto-decide (Jessica e2e PR -> Kevin/Devon dev reviewer); follow-up-ticket-from-finding (mechanical, foundation-backed by Jessica report).
+- **Alternative:** hold review for sponsor (idles PR, delays merge); skip follow-up (loses 4th-clone debt).
+- **Reversibility:** review read-only + comment; ticket is a backlog entry.
+- **Status:** pending review
+- **Surface to sponsor:** port-4173 hygiene - Jessica e2e was blocked by an orphaned vite preview (PID 28188) from kevin-wt; she killed it + re-ran green. Recurring cross-worktree cleanup gap (orchestration-concurrency.md 1.2). Worth a stale-preview sweep between e2e dispatches.
+
+## 2026-06-14 1306 UTC — Away tick: merge #440 + dispatch 4th-clone follow-up
+
+- **Decided:** (a) Merged #440 (Jessica mock-helper consolidation, ticket 86c9y490t) — Kevin APPROVE + fast-gate + Playwright SUCCESS (e2e ran long ~33min but completed green, not a hang). (b) Dispatching Jessica on the now-unblocked follow-up 86ca8ncay (migrate 4th clone installTwoDigitAddsubCanonClaudeMock to the shared helper).
+- **Foundation:** peer-review-APPROVE merge auto-decide (rule 6) + CI green; follow-up is mechanical, foundation-backed (Jessica #440 finding), unblocked by #440 on main.
+- **Alternative:** hold for sponsor (no benefit; gates met / mechanical).
+- **Reversibility:** each revertable in 1 PR.
+- **Status:** pending review
+
+## 2026-06-14 1315 UTC — Away tick: Jessica #441 done -> Kevin reviews #441 + Devon fixes wordPack NIT
+
+- **Decided:** (a) Jessica completed 4th-clone migration (PR #441, ticket 86ca8ncay); dispatching Kevin to review (mechanically identical to #440 he already reviewed). (b) Dispatching Devon on 86ca8n7mm - correct the stale/wrong wordPack.ts:1606 comment (the false "foils never from TARGET_PAIRINGS" premise that masked the bit-throw bug); comment-only.
+- **Foundation:** review-routing auto-decide (Jessica e2e PR -> Kevin); NIT-fix foundation-backed (Devon #439 review NIT + documented invariant in skill-trees-and-content.md).
+- **Alternative:** hold for sponsor (idles 4 personas; minor NITs drain autonomously via away cycle).
+- **Reversibility:** review read-only; comment fix revertable in 1 PR.
+- **Status:** pending review
+
+## 2026-06-14 1323 UTC — Away tick: Devon #442 done -> Kevin reviews; doc-commit gap flagged
+
+- **Decided:** Devon completed wordPack-comment NIT (PR #442, ticket 86ca8n7mm; comment-only, vitest green); dispatching Kevin to review; flipping 86ca8n7mm -> IN REVIEW.
+- **Foundation:** review-routing auto-decide (Devon PR -> Kevin reviewer).
+- **Alternative:** hold for sponsor (idles Kevin; trivial review).
+- **Reversibility:** review read-only.
+- **Status:** pending review
+- **SURFACE TO SPONSOR (process gap, NOT auto-decided):** All maintain-docs .claude/docs edits this session (emma-character-and-animation re-trace/park lessons; orchestration-concurrency checkout-gotcha + orphaned-preview; skill-trees-and-content DISTRACTOR_ONLY_WORDS invariant) are UNCOMMITTED in the main working tree - maintain-docs never commits by design, so theyre not on origin/main and personas off main dont see them (Devon hit this on #442). Matches pre-session state (files already M at session start). Not auto-committing - landing accumulated .claude/docs edits (PR vs direct-push) is your call; recommend a docs(.claude) capture commit on return.
+
+## 2026-06-14 1406 UTC — Away tick: merge #441 + #442 (both Kevin-approved, e2e green)
+
+- **Decided:** Merged #441 (Jessica 4th-clone migration, ticket 86ca8ncay) + #442 (Devon wordPack comment fix, ticket 86ca8n7mm). Both: Kevin APPROVE + fast-gate + e2e SUCCESS (e2e ran ~40min slow, not hung).
+- **Foundation:** peer-review-APPROVE merge auto-decide (rule 6) + CI green.
+- **Alternative:** hold for sponsor (no benefit; gates met).
+- **Reversibility:** each revertable in 1 PR.
+- **Status:** pending review
+
+## 2026-06-14 1451 UTC — Away tick (quiescent): draft session retro
+
+- **Decided:** Board quiescent (0 PRs, 0 agents). Drafting a lean retro at .claude/retros/retro-2026-06-14-away-cleanup.md for the 7-PR cluster (#436-#442; #435 parked) per the retro convention.
+- **Foundation:** retro-post-merge convention (draft once >=3 merged PRs cluster); 7 merged this session. Reversible doc, not sponsor-gated, not a feature direction. Good use of quiescent away-time.
+- **Alternative:** leave for sponsor/next session (loses fresh-context synthesis).
+- **Reversibility:** doc; trivially revertable. Uncommitted on main like other session docs (see doc-commit gap).
+- **Status:** pending review
+
+## 2026-06-14 1730 UTC — SPONSOR DECISION (walkthrough): next direction = cloudSync P1
+
+- **Decided (Thomas):** Next work = cloudSync history-merge P1 data-loss fix (ticket 86c9qa6na). Dispatch on walkthrough close.
+- **Status:** accepted
+
+## 2026-06-14 1730 UTC — SPONSOR DECISION (walkthrough): doc-commit = docs PR
+
+- **Decided (Thomas):** Land this session uncommitted .claude/docs edits + the retro as a docs(.claude) session-capture PR (CI-gated, merge on green). Open on walkthrough close.
+- **Status:** accepted
+
+## 2026-06-14 1733 UTC — SPONSOR DEFERRED (walkthrough): skirt-color needs a visual
+
+- **Decided (Thomas, verbatim):** "I need to see it to judge, my head dont translate hex codes"
+- **Action:** orchestrator building a terracotta-vs-mauve skirt swatch for visual judgment; skirt-color canon decision deferred until Thomas sees it.
+- **Status:** deferred-pending-visual
+
+## 2026-06-14 1739 UTC — SPONSOR DECISION (walkthrough): skirt = terracotta canonical
+
+- **Decided (Thomas):** Keep terracotta #d1805c as canonical; UPDATE the bible --emma-skirt token #C8AAB8 -> #d1805c (no asset change). Decided after viewing the rendered swatch.
+- **Action:** bible token edit + emma §12 note resolution folded into the docs-capture PR.
+- **Status:** accepted
+
+## 2026-06-14 1754 UTC — Away tick: Devon #444 (cloudSync P1) done -> Kevin reviews
+
+- **Decided:** Devon completed cloudSync data-loss fix (PR #444, ticket 86c9qa6na); dispatching Kevin to review. KEY review point: validate the mergeSessionHistories dedupe key (dateISO|skillFocus|successRate) is correct - Devon found the ticket-proposed fields (startedAtISO/problemCount) do not exist; a too-loose key would wrongly dedupe distinct sessions (still data-loss). Kevins data-correctness call.
+- **Foundation:** review-routing (Devon PR -> Kevin) + Devon explicitly flagged the dedupe-key question for Kevin.
+- **Alternative:** hold for sponsor (its a P1 + has a real correctness question; Kevin is the right gate, not Thomas).
+- **Reversibility:** review read-only.
+- **Status:** pending review
+
+## 2026-06-14 1835 UTC — Away tick: merge #443 (docs) + #444 (cloudSync P1)
+
+- **Decided:** Merged #443 (docs-capture, sponsor-authorized via walkthrough) + #444 (cloudSync P1 data-loss fix, ticket 86c9qa6na, Kevin APPROVE). Both fast-gate + e2e SUCCESS (e2e ran ~45-55min slow, not hung).
+- **Foundation:** sponsor-authorized docs + peer-review-APPROVE merge (rule 6) + CI green.
+- **Alternative:** none (gates fully met).
+- **Reversibility:** each revertable in 1 PR.
+- **Status:** pending review
+
+## 2026-06-14 1851 UTC — Away tick: dispatch beyblade IP-scrub (last clean item)
+
+- **Decided:** Board drained after cloudSync; dispatching Kyle on the deferred beyblade IP-scrub (mj-prompts-paste-ready-2026-05-10.md ~L240 top --no block) to fully clear the board. Untickered sub-threshold NIT; Devon reviews.
+- **Foundation:** Devon #437 review NIT + Kyle own #437 finding (beyblade flagged borderline-IP). Reversible doc edit, not a feature direction, auto-decidable (4 gates pass).
+- **Alternative:** keep deferring (leaves a known IP-rule violation in a committed prompt artifact).
+- **Reversibility:** doc edit, 1 PR.
+- **Status:** pending review
+
+## 2026-06-14 1854 UTC — Away tick: Kyle #445 (beyblade scrub) done -> Devon reviews
+
+- **Decided:** Kyle completed the beyblade IP-scrub (PR #445; 3 instances de-branded, grep-zero); dispatching Devon to review. Trivial docs/prompt scrub.
+- **Foundation:** review-routing (Kyle PR -> Devon).
+- **Reversibility:** review read-only.
+- **Status:** pending review
+
+## 2026-06-14 1935 UTC — Away tick: merge #445 (beyblade scrub)
+
+- **Decided:** Merged #445 (Kyle beyblade IP-scrub, Devon APPROVE, fast-gate + e2e SUCCESS). Untickered NIT, no ticket flip. Board now 100% clean.
+- **Foundation:** peer-review-APPROVE merge (rule 6) + CI green.
+- **Status:** pending review
+
+## 2026-06-14 2317 UTC — Away-mode armed; first orchestration pass
+
+- **Decided:** Armed auto-status AWAY (cron d18a9c59, 15-min). Dispatched Kevin to cross-review Devon's Leitner tuning PR #452 (box2 2->1, box3 4->3, LEITNER_DUE_PER_SESSION_CAP=3).
+- **Foundation:** cross-review routing (Kevin reviews Devon) per feedback_pr_review_routing; tuning was Thomas-approved via AskUserQuestion this session.
+- **Alternative:** hold #452 review until Thomas returns — rejected; review is reversible and merge-gated.
+- **Reversibility:** unmerged PR; no merge without green CI + APPROVE. ~0 effort to halt.
+- **Status:** pending review
+
+### Pending Thomas sign-offs (queued this session, NOT auto-decided)
+
+- **Voice-QA ear-test** — 3 round-6 clips (recap.4, number-recog#math.p6.hint, streak.4) on https://marian-learning.vercel.app/voice-qa.html (#448 merged to prod). 5 timbre clips accepted as model-floor. If any of the 3 miss -> A/B audition (FOUR scaffold), not blind round-7.
+- **Wave-16 direction** — Leitner wave (M4 #447 / M5 #451 / tuning #452) closing; candidates: two-digit-regroup WITH-regroup (86c9xwjtr), CVC review-mode (86c9qa6n3).
+- **Kyle Emma-polish** (breathing-loop / rotateZ tilt) — off current direction, held.
+- **Dave Wave-16 pre-research** — offered, held.
+
+## 2026-06-14 2333 UTC — Away: M5 recap-beat P1 (Jessica QA #453) — #451 HELD for Thomas
+
+- **Finding (Jessica QA, PR #453, evidence-backed P1):** the M5 session-end focus-recap line is SILENT + INVISIBLE on a real device pre-bake. SessionEnd's "silent fallback fires onWordTick(0)" only runs when playUtteranceFn is undefined (unit-test path). The running App supplies the real playSessionUtterance, which REJECTS on the unbaked `session.end.recap.focus` id (sessionAudio.ts:472); SessionEnd swallows it -> phase delay with no audio + no caption (a dead pause). Unit tests miss it because createFakePlayUtterance fires onWordTick for any id.
+- **Decision (HELD, NOT auto-fixed):** #451 (M5) held from merge — real QA P1, and #451 was not yet e2e-green anyway so holding costs nothing. The fix DIRECTION is a design call (touches the audio-first principle + the #453 e2e contract), so queued for Thomas rather than auto-dispatched.
+- **Recommendation (one team rec):** BAKE `session.end.recap.focus` (M5 already emits the planner directive for it) so the recap line has AUDIO (audio-first-aligned), then ear-test. For the pre-bake interim, have Devon make the recap beat gracefully SKIP when the utterance id is unavailable (no dead pause; avoids a silent caption, which would itself violate audio-first). NB: graceful-skip makes Jessica's #453 "phase appears" assertion fail pre-bake, so #453 gets gated on the baked clip. Net: one Devon fix-PR (graceful-skip + adjust #453) + one canon bake (Thomas ear-test).
+- **Independent of this:** #452 (tuning, Kevin APPROVE) and #450 (research, direct) still merge on green CI — NOT blocked by the recap issue.
+- **Status:** ACCEPTED (Thomas 2026-06-14) — bake audio + graceful-skip interim. Devon dispatched on the skip-fix (amends #451); recap-audio bake is the follow-up (depends on #451; per-node-vs-assembled is a dev call; Thomas ear-tests the new clip). See the walkthrough-resolutions entry below.
+
+## 2026-06-14 2342 UTC — Sponsor walkthrough + /whip resolutions
+
+- **M5 recap-beat fix:** Thomas chose bake-audio + graceful-skip interim. Devon dispatched (graceful-skip on #451); recap-audio bake = follow-up (post-#451-merge; per-node-vs-assembled is a dev call).
+- **Wave-16 direction:** CVC review-mode (86c9qa6n3). Dave dispatched on the approach research (dave/cvc-review-research).
+- **Kyle Emma-polish:** KEEP DEFERRED (Thomas). Kyle's next work is the CVC review-mode UI (after Dave's research lands). Emma breathing-loop / rotateZ-tilt polish stays backlogged.
+- **Voice-QA ear-test:** still pending Thomas's ACTION — 3 round-6 clips on https://marian-learning.vercel.app/voice-qa.html (5 timbre clips accepted as model-floor).
+
+## 2026-06-14 2353 UTC — CVC review-mode build: MVP greenlit (phoneme-blend prompt)
+
+- **Decided (Thomas, AskUserQuestion):** Build CVC review-mode (86c9qa6n3) MVP-first = Dave's phoneme-blend prompt on the 2nd wrong tap (highest-value element). Full design (incremental-rehearsal composition / per-word tiering / distractor gating) deferred to a later expansion.
+- **Action:** Kyle dispatched on the phoneme-blend prompt UX design brief (kyle/cvc-phoneme-blend-prompt-design). Devon/Kevin implement after Kyle's design + once the M5 fix lands; new Emma blend audio -> bake + Thomas ear-test.
+- **Foundation:** Dave's research #454; Thomas's CVC direction + MVP-first picks (this session).
+
+## 2026-06-15 0130 UTC — Wave fully drained; CVC MVP code build dispatched
+
+- **Merged (board now 0 open PRs):** #447 (M4 spaced-schedule), #448 (voice-QA), #450 (Leitner research), #451 (M5), #452 (Leitner tuning), #454 (CVC research), #455 (CVC design), #449 (reset-e2e), #453 (recap-e2e graceful-skip lock). Full Leitner + M5 + CVC-research/design wave is on main.
+- **Decided (away):** Dispatched Devon on the CVC phoneme-blend MVP **code** build (86c9qa6n3, branch devon/86c9qa6n3-cvc-phoneme-blend). Foundation: Thomas greenlit MVP-first + Kyle's #455 spec (merged); Kyle confirmed his 3 audio questions are NOT implementation blockers, so the code is safe to build in away mode. Audio bake + the 3 questions stay Thomas-gated. Reversibility: unmerged PR.
+- **QUEUED for Thomas (audio/ear gates — NOT auto-decided):**
+  1. **Voice-QA ear-test** — 3 round-6 clips on https://marian-learning.vercel.app/voice-qa.html (still pending his ear).
+  2. **CVC blend audio bake** + Kyle's 3 questions (soft lead-in "Listen."; em-dash iPad render; `/ks/` phoneme ear-test) — after Devon's code build lands.
+  3. **Recap-audio bake** (`session.end.recap.focus`) — M5's recap is silent pre-bake (graceful-skip); needs the per-node-vs-assembled dev call + bake + ear-test.
+
+## 2026-06-15 0218 UTC — CVC blend consumer pipeline shipped (#456); follow-ups queued
+
+- **Devon's CVC blend MVP consumer pipeline → PR #456** (slot + parser + \_tts `renderBlendInnerText` + WordSong 2nd-wrong-tap wiring + graceful-skip-to-hint + LetterGlyph highlight; vitest 3298 pass, e2e green). Dispatched Kevin to review. Code-complete but INERT until blend is "lit up" (below).
+- **Blocked invariant (Devon):** the 6th `blend` slot collides with `SYSTEM_PREAMBLE` "exactly 5 utterances" + "8×5+20=60 entries" (drift-guarded by `_planner.test.ts` AC#1). Lighting up blend needs a coordinated planner-directive + preamble + ids-contract + max_tokens change (Kevin task) + the Thomas-gated canon bake. QUEUED as the next CVC sub-phase.
+- **QUEUED for Thomas/Kyle:**
+  - Devon's Q2: canon text stored ASCII-7 (`c - a - t ... cat`) instead of Kyle's spec em-dash/ellipsis — `canonLint` forbids non-ASCII (PR #192 mojibake rule). Transform/highlight accept the unicode form defensively. Needs Kyle/Thomas sign-off that ASCII-7-stored (+ optional caption prettify) is acceptable.
+  - The blend audio bake (`word.p1..p8.blend`, text shape `c - a - t ... cat`) — after the planner light-up; Thomas ear-test.
+- **Mechanical follow-up ticket:** pre-existing reprompt-overlap race (2nd wrong tap during an in-flight reprompt can bail the hint/blend schedule) — Devon finding #3, not introduced by #456.
+
+## 2026-06-15 0221 UTC — TICKET MISMATCH (orchestrator error): #456 is NOT 86c9qa6n3
+
+- **My error:** I ran Dave-research → Kyle-design → Devon-build (#456, the phoneme-blend prompt) under ticket 86c9qa6n3 WITHOUT reading the ticket body first (violated feedback_inject_ticket_body on the Wave-16 pick). 86c9qa6n3 is actually a DIFFERENT feature: "CVC review mode — make cross-vowel mix fire (post-mastery picker revisit)" — a `pickCvcReviewNode` session-picker change (focusNode.ts / mastery.ts / App.tsx) with an ALREADY-LOCKED mechanic (Option C-then-B; researched in the EXISTING design/research/cvc-review-mode-mechanic.md). Dave's NEW research (#454, cvc-review-mode-marian.md) is within-tier consolidation — Dave himself flagged the two as "complementary, not duplicative," which I missed.
+- **What IS true:** Thomas affirmatively clicked "MVP: phoneme-blend prompt first" in the Wave-16 popup, so the phoneme-blend feature IS wanted — it was just mis-presented as 86c9qa6n3's scope.
+- **Correction (away):** Reverted 86c9qa6n3 -> TO DO (its cross-vowel-firing work is UNBUILT; mechanic ready). #456 (phoneme-blend) is good, reviewed-clean work but MIS-TICKETED — merge HELD pending Thomas. Kevin's review continues (still useful).
+- **QUEUED for Thomas (decide on return):**
+  1. Re-ticket #456 (phoneme-blend prompt) under its own ticket + merge it? (You approved the feature; it just needs a correct ticket — not 86c9qa6n3.)
+  2. The ACTUAL 86c9qa6n3 (cross-vowel-mix-firing, pickCvcReviewNode, mechanic locked/ready) — build it next?
+- **Process fix:** ALWAYS fetch + read the ClickUp ticket body before dispatching research/design/build. Skipped it on the Wave-16 pick → built the wrong feature.
+
+## 2026-06-15 0527 UTC — Thomas back (walkthrough): CVC = ship the phoneme-blend
+
+- **Thomas (AskUserQuestion):** CVC plan = "re-ticket #456 + ship the phoneme-blend." Merged #456 (consumer pipeline). New ticket being created to re-home it (was mis-ticketed under 86c9qa6n3). The real 86c9qa6n3 (cross-vowel-firing) STAYS in TO DO.
+- **Follow-up (queued):** light up the blend = planner SYSTEM_PREAMBLE 5->6 utterances + ids-contract + max_tokens change (Kevin) + the blend audio bake (Thomas ear-test) + Kyle's Q2 (ASCII-7 canon text vs em-dash spec). The merged consumer pipeline is inert until this lands.
+
+## 2026-06-15 0532 UTC — Walkthrough closure: recap-bake + blend light-up dispatched
+
+- **Q1 (CVC) DONE:** #456 merged; re-homed under new ticket 86ca8t8xx (in progress). Dispatched Kevin on the phoneme-blend light-up (planner SYSTEM_PREAMBLE 5->6 for cvc-word + emit blend slot + bake, ASCII-7 canon). 86c9qa6n3 (cross-vowel-firing) stays TO DO.
+- **Q2 (recap bake) DONE:** Thomas approved; dispatched Devon to bake session.end.recap.focus (per-node-vs-assembled = his architecture call) — Thomas ear-tests on prod after merge.
+- **Still Thomas's ear (reminders):** voice-QA 3 round-6 clips on prod; the recap voicing (post-bake); the blend clips (post-bake — "Listen.", /ks/, em-dash render).
