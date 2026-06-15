@@ -2077,42 +2077,61 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
     })
   })
 
-  describe('renderBlendInnerText', () => {
-    it('wraps each grapheme in a phoneme tag and voices the whole word naturally', () => {
+  describe('renderBlendInnerText (candidate f — lightly-released stops)', () => {
+    it('releases STOP graphemes with a clipped ə and voices the whole word naturally', () => {
       const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')
       expect(ssml).not.toBeNull()
-      // Each grapheme is a phoneme: c → /k/, a → /æ/, t → /t/.
-      expect(ssml).toContain('<phoneme alphabet="ipa" ph="k">c</phoneme>')
+      // Stop graphemes c (/k/) + t (/t/) get the clipped <stop>ə release.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="kə">c</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="tə">t</phoneme>')
+      // The vowel a (/æ/) is a continuant-class payload — stays BARE.
       expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
-      expect(ssml).toContain('<phoneme alphabet="ipa" ph="t">t</phoneme>')
       // The whole word is NOT phoneme-wrapped (voiced naturally).
       expect(ssml).not.toContain('>cat</phoneme>')
       expect(ssml).toContain('cat')
     })
 
-    it('injects breaks between graphemes and a longer break before the whole word', () => {
+    it('leaves CONTINUANT consonants bare (no ə release)', () => {
+      // van: v (/v/ continuant) stays bare; n (/n/ continuant) stays bare;
+      // a (/æ/ vowel) stays bare. No grapheme here is a stop.
+      const ssml = renderBlendInnerText('v - a - n ... van', 'cvc-words')!
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="v">v</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="n">n</phoneme>')
+      // Nothing gets a trailing ə on this all-continuant word.
+      expect(ssml).not.toContain('ə')
+    })
+
+    it('injects a break AFTER each grapheme and a longer break before the whole word', () => {
       const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')!
-      // Inter-grapheme break (250ms) appears before each phoneme.
-      expect(ssml).toContain('<break time="250ms"/>')
+      // Inter-grapheme break (250ms) appears AFTER each phoneme — the stop
+      // releases into the silence (candidate-f placement).
+      expect(ssml).toContain('</phoneme><break time="250ms"/>')
       // Whole-word break (450ms) before the blended word.
       expect(ssml).toContain('<break time="450ms"/>')
       // The whole-word break sits right before the bare word.
       expect(ssml).toContain('<break time="450ms"/>cat')
     })
 
-    it('slows the whole line to rate -12% ("sound it out" register)', () => {
+    it('does NOT wrap the line in a <prosody rate> — renders at the house rate', () => {
       const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')!
-      expect(ssml.startsWith('<prosody rate="-12%">')).toBe(true)
-      expect(ssml.endsWith('</prosody>')).toBe(true)
+      // Candidate f drops the -12% rate-slow (it over-articulated the onset);
+      // the speak-root house rate (-10%) governs.
+      expect(ssml).not.toContain('<prosody rate=')
+      expect(ssml.startsWith('<phoneme')).toBe(true)
     })
 
-    it('voices the /ks/ grapheme (box) as the cluster <phoneme ph="ks">', () => {
+    it('voices the /ks/ grapheme (box) as the cluster <phoneme ph="ks"> BARE (no ə)', () => {
       const ssml = renderBlendInnerText(
         'b - o - x ... box',
         'cvc-words-short-o',
       )!
+      // x = /ks/ is a cluster ending in a stop but is left BARE (the /s/ tail
+      // self-releases; a `ksə` would read as "kss-uh").
       expect(ssml).toContain('<phoneme alphabet="ipa" ph="ks">x</phoneme>')
-      // Short-o grapheme uses /ɒ/.
+      // Leading stop b (/b/) gets the clipped release.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="bə">b</phoneme>')
+      // Short-o grapheme /ɒ/ is a vowel — stays bare.
       expect(ssml).toContain('<phoneme alphabet="ipa" ph="ɒ">o</phoneme>')
       // The whole word is natural.
       expect(ssml).toContain('<break time="450ms"/>box')
@@ -2154,14 +2173,16 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
   describe('renderSsmlInnerText dispatch', () => {
     it('renders a CVC blend line through the blend transform', () => {
       const ssml = renderSsmlInnerText('c - a - t ... cat', 'cvc-words')
-      expect(ssml).toContain('<phoneme alphabet="ipa" ph="k">c</phoneme>')
-      expect(ssml.startsWith('<prosody rate="-12%">')).toBe(true)
+      // Candidate-f release on the leading stop, rendered at the house rate
+      // (no -12% prosody wrap).
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="kə">c</phoneme>')
+      expect(ssml.startsWith('<phoneme')).toBe(true)
     })
 
     it('does NOT alter a normal CVC read line (no blend hijack)', () => {
       const ssml = renderSsmlInnerText('Read the cat.', 'cvc-words')
-      // Plain path — no blend prosody wrapper, no phoneme wraps on the word.
-      expect(ssml).not.toContain('<prosody rate="-12%">')
+      // Plain path — no phoneme wraps on the word.
+      expect(ssml).not.toContain('<phoneme')
       expect(ssml).toContain('Read the cat.')
     })
   })
