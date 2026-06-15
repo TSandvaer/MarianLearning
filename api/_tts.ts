@@ -1049,6 +1049,167 @@ export function substituteSentenceGap(
   return text.replace(/_{3}/g, 'blank')
 }
 
+// ── CVC phoneme-blend prompt render (ticket 86c9qa6n3) ──────────────────────
+//
+// The `blend` utterance (CVC tiers only — the 6th word-song slot) sounds the
+// word out grapheme-by-grapheme, then says it whole: "c — a — t … cat". The
+// stored canon `text` is the human-readable segmented form; this transform
+// segments it, voices each grapheme as its PHONEME (IPA `<phoneme>` wrap —
+// the same machinery the letter-sounds tier uses), injects `<break>`s between
+// graphemes and before the whole word, voices the whole word NATURALLY (no
+// phoneme wrap — Marian hears the blended target), and slows the whole line
+// to rate -12% ("let's slow down and sound it out").
+//
+// CANON-TEXT SEPARATOR — ASCII-7, NOT em-dash. Kyle's spec §"Blend-audio
+// utterances" / Q2 proposes em-dash `—` + ellipsis `…` separators. But
+// `scripts/canonLint.ts` rejects ALL non-ASCII codepoints in canon `text`
+// (em-dash U+2014, ellipsis U+2026 both trip `RE_NON_ASCII`; see
+// `.claude/docs/planner-and-canon.md` §"Stick to ASCII-7 punctuation" — the
+// PR #192 em-dash mojibake). So the canonical STORED form is ASCII-7:
+//
+//     <g1> - <g2> - <g3> ... <word>    e.g.  "c - a - t ... cat"
+//
+// (space-hyphen-space between graphemes; space-3dots-space before the whole
+// word). This transform splits on EITHER the ASCII form OR Kyle's em-dash
+// form defensively, so a future canon that ships the em-dash form still
+// renders — but the lint-clean ASCII form is the one to bake. Flagged back to
+// Kyle/Thomas as the Q2 resolution (the caption-ribbon display is a separate
+// presentation concern — WordSong can prettify ` - ` → ` — ` at render time
+// without touching the lint-gated canon text).
+//
+// `/ks/` GRAPHEME — `box`/`fox` decode `x` as the cluster /ks/ as ONE grapheme
+// token. The blend canon text carries `b - o - x ... box`; the synth wraps the
+// `x` grapheme in `<phoneme ph="ks">`. Token count stays wordLength+1 (4).
+//
+// Grapheme → IPA. CVC graphemes only. Short vowels use the en-GB realisations
+// the letter-sounds tier settled on (a→æ, o→ɒ; the central/lax u/i/e use the
+// same lexical-set picks as `PHONEME_OVERRIDES`'s uuu/iii/eee). Consonants
+// map to their bare IPA; `x` is the /ks/ cluster. A grapheme absent from the
+// map is voiced bare (defensive — should never happen for CVC content).
+const BLEND_GRAPHEME_IPA: Record<string, string> = {
+  // short vowels (mirror PHONEME_OVERRIDES aaa/ooo/uuu/iii/eee)
+  a: 'æ',
+  o: 'ɒ',
+  u: 'ə',
+  i: 'ɘ',
+  e: 'e',
+  // consonants (bare IPA; voiced/voiceless as the letter-sounds tier voices
+  // isolated phonemes)
+  b: 'b',
+  c: 'k',
+  d: 'd',
+  f: 'f',
+  g: 'ɡ',
+  h: 'h',
+  j: 'dʒ',
+  k: 'k',
+  l: 'l',
+  m: 'm',
+  n: 'n',
+  p: 'p',
+  r: 'r',
+  s: 's',
+  t: 't',
+  v: 'v',
+  w: 'w',
+  y: 'j',
+  z: 'z',
+  // two-phoneme grapheme — x decodes as the cluster /ks/ (box, fox)
+  x: 'ks',
+}
+
+/** Inter-grapheme pause (ms) — short beat between each sounded phoneme. */
+const BLEND_GRAPHEME_BREAK_MS = 250
+/** Pre-whole-word pause (ms) — the "…" beat where the blend resolves. */
+const BLEND_WHOLE_WORD_BREAK_MS = 450
+/** "Let's slow down and sound it out" register — slightly slower than the
+ *  -10% house rate (matches the hint slot's slower feel per Kyle §Voicing 4). */
+const BLEND_RATE = '-12%'
+
+/**
+ * Parse a stored blend canon text into `{ graphemes, word }`, or `null` if
+ * the text isn't blend-shaped. Accepts BOTH the lint-clean ASCII form
+ * (`"c - a - t ... cat"`) and Kyle's em-dash/ellipsis form
+ * (`"c — a — t … cat"`) defensively. The grapheme/word split:
+ *   - segments are separated by ` - ` (ASCII) or ` — ` (em-dash);
+ *   - the whole word follows ` ... ` (ASCII) or ` … ` (ellipsis).
+ * Returns the leading graphemes (each a 1-char grapheme except the `x`
+ * cluster which stays one token) and the trailing whole word.
+ */
+export function parseBlendText(
+  text: string,
+): { graphemes: string[]; word: string } | null {
+  const trimmed = text.trim()
+  // Split off the whole word on the ellipsis separator (ASCII "..." or "…").
+  const wholeWordSplit = trimmed.split(/\s*(?:\.\.\.|…)\s*/)
+  if (wholeWordSplit.length !== 2) return null
+  const [segmentPart, word] = wholeWordSplit
+  if (!segmentPart || !word || /\s/.test(word.trim())) return null
+  // Split the grapheme segment on the inter-grapheme separator (" - " or
+  // " — "). A bare single grapheme (no separator) is still valid (degenerate).
+  const graphemes = segmentPart
+    .split(/\s*(?:-|—)\s*/)
+    .map((g) => g.trim())
+    .filter(Boolean)
+  if (graphemes.length === 0) return null
+  return { graphemes, word: word.trim() }
+}
+
+/** CVC tiers whose `blend` utterances get the phoneme-segmented render. The
+ *  set is the CVC-words family (short-a through short-e) — `effectiveFocusNode`
+ *  passes these as the `tierFilter`. Digraph / non-CVC tiers never emit a
+ *  `blend` slot, so they never reach this transform. */
+const BLEND_CVC_TIERS: ReadonlySet<string> = new Set([
+  'cvc-words',
+  'cvc-words-short-o',
+  'cvc-words-short-u',
+  'cvc-words-short-i',
+  'cvc-words-short-e',
+])
+
+/**
+ * Render a CVC phoneme-blend prompt to SSML inner-text, or `null` if the
+ * text isn't a blend line (so the caller falls through to the normal path).
+ * Each grapheme is voiced as its IPA phoneme with a `<break>` before it; the
+ * whole word is voiced naturally after a longer break; the whole line is
+ * wrapped in `<prosody rate="-12%">`.
+ *
+ * Gated by tier (the CVC tiers) so a CVC `read`/`correct`/`hint` line that
+ * happens to contain a hyphen or ellipsis never accidentally renders as a
+ * blend — `parseBlendText` only matches the segmented `<g> ... <word>` shape,
+ * and the caller additionally gates on the utterance being the `blend` slot
+ * via the tier filter + the shape match.
+ */
+export function renderBlendInnerText(
+  text: string,
+  tierFilter?: string,
+): string | null {
+  if (tierFilter === undefined || !BLEND_CVC_TIERS.has(tierFilter)) return null
+  const parsed = parseBlendText(text)
+  if (parsed === null) return null
+
+  const parts: string[] = []
+  for (const grapheme of parsed.graphemes) {
+    parts.push(`<break time="${BLEND_GRAPHEME_BREAK_MS}ms"/>`)
+    const ipa = BLEND_GRAPHEME_IPA[grapheme.toLowerCase()]
+    if (ipa !== undefined) {
+      // The grapheme glyph is visible inside the tag; Azure uses `ph=`.
+      parts.push(
+        `<phoneme alphabet="ipa" ph="${escapeSsml(ipa)}">${escapeSsml(grapheme)}</phoneme>`,
+      )
+    } else {
+      // Defensive: an unmapped grapheme is voiced bare (escaped).
+      parts.push(escapeSsml(grapheme))
+    }
+  }
+  // The whole word: a longer break, then the word voiced NATURALLY (no
+  // phoneme wrap) so Marian hears the blended target as one word.
+  parts.push(`<break time="${BLEND_WHOLE_WORD_BREAK_MS}ms"/>`)
+  parts.push(escapeSsml(parsed.word))
+
+  return `<prosody rate="${escapeSsml(BLEND_RATE)}">${parts.join('')}</prosody>`
+}
+
 export function renderSsmlInnerText(text: string, tierFilter?: string): string {
   // Session-end recap-4 / streak-4 lines (GitHub issue #446). These two
   // utterances are byte-SHARED across all 24 tier files
@@ -1082,6 +1243,15 @@ export function renderSsmlInnerText(text: string, tierFilter?: string): string {
     // question-prosody path is correct from here).
     tierFilter = undefined
   }
+  // CVC phoneme-blend prompt (ticket 86c9qa6n3): the `blend` slot's text is
+  // the segmented "c - a - t ... cat" form. `renderBlendInnerText` returns
+  // the phoneme-wrapped, break-injected, rate-slowed render for a CVC-tier
+  // blend line, or `null` for every OTHER CVC utterance (read/correct/
+  // reprompt/hint/giveAnswer never match `parseBlendText`'s segmented shape),
+  // so the normal CVC path is unaffected. Checked here (after simple-sentences,
+  // before letter-sounds) so the blend render owns the line whole.
+  const blend = renderBlendInnerText(text, tierFilter)
+  if (blend !== null) return blend
   // Letter-sounds tier (British-voice rollout): the question-prosody
   // wrapper (`<break/><prosody pitch="+8%" rate="-5%">`) is DELIBERATELY
   // NOT applied here, even when the read line ends with `?`. Per the

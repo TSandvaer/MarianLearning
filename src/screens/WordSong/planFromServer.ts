@@ -662,12 +662,16 @@ export function parseReadTarget(read: string): WordEntry {
   return parseReadLine(read).entry
 }
 
-/** Parse a `word.p<N>.<slot>` utterance id. */
+/** Parse a `word.p<N>.<slot>` utterance id. `blend` (ticket 86c9qa6n3) is
+ *  in-namespace so it is CARRIED (bucketed), not skipped — but it is NOT
+ *  in {@link ALL_SLOTS}, so the per-problem completeness check never
+ *  requires it. A bundle without `blend` (every tier pre-bake) rehydrates
+ *  cleanly; the 2nd-wrong beat graceful-skips to the existing `hint`. */
 function parseUtteranceId(
   id: string,
 ): { index: number; slot: WordSongUtteranceSlot } | null {
   const match = id.match(
-    /^word\.p(\d+)\.(read|correct|reprompt|hint|giveAnswer)$/,
+    /^word\.p(\d+)\.(read|correct|reprompt|hint|giveAnswer|blend)$/,
   )
   if (!match) return null
   const index = Number.parseInt(match[1]!, 10)

@@ -47,13 +47,24 @@ export interface WordSongUtteranceSource {
 }
 
 /** Slot names matching the per-problem utterance set. Matches Kyle's spec
- *  §"Audio integration contract" → "Per-problem utterances". */
+ *  §"Audio integration contract" → "Per-problem utterances".
+ *
+ *  `blend` (the 6th slot — CVC phoneme-blend prompt, ticket 86c9qa6n3) is
+ *  OPTIONAL and CVC-only. It is deliberately NOT a member of the required
+ *  {@link ALL_SLOTS} completeness set: a session bundle that does not carry
+ *  a `word.p{N}.blend` utterance (every tier today, until the canon is
+ *  re-baked with the planner directive — bake is a follow-up) must still
+ *  rehydrate cleanly. The blend prompt graceful-skips to the existing
+ *  2nd-wrong `hint` beat when the slot is absent (audio-first; no dead
+ *  beat), mirroring SessionEnd's M5 focus-recap graceful-skip. See
+ *  `design/word-song/cvc-phoneme-blend-prompt.md`. */
 export type WordSongUtteranceSlot =
   | 'read'
   | 'correct'
   | 'reprompt'
   | 'hint'
   | 'giveAnswer'
+  | 'blend'
 
 /**
  * Build the canonical utterance id for a problem + slot.
@@ -68,7 +79,12 @@ export function wordSongUtteranceId(
   return `word.p${problemIndex}.${slot}`
 }
 
-/** Slots emitted in canonical render order. */
+/** Slots emitted in canonical render order. These are the REQUIRED slots —
+ *  every problem in a session bundle MUST carry all five (the wire-rehydrate
+ *  and the server-plan parser both throw on a missing one). The optional
+ *  `blend` slot ({@link BLEND_SLOT}) is intentionally absent here: it is
+ *  CVC-only + may be missing pre-bake, so requiring it would make every
+ *  non-CVC tier (and pre-bake CVC) fail rehydration and silently demote. */
 const ALL_SLOTS: readonly WordSongUtteranceSlot[] = [
   'read',
   'correct',
@@ -76,6 +92,10 @@ const ALL_SLOTS: readonly WordSongUtteranceSlot[] = [
   'hint',
   'giveAnswer',
 ]
+
+/** The optional 6th slot — CVC phoneme-blend prompt (ticket 86c9qa6n3).
+ *  Carried-if-present, never required. See {@link WordSongUtteranceSlot}. */
+export const BLEND_SLOT: WordSongUtteranceSlot = 'blend'
 
 /** Per-problem audio set — lines map 1:1 to spec §Audio integration. */
 export interface WordSongProblemUtterances {
@@ -89,6 +109,19 @@ export interface WordSongProblemUtterances {
   hint: string
   /** "This one is cat." — fires after 3 wrongs (guided completion). */
   giveAnswer: string
+  /**
+   * "c — a — t … cat" — the CVC phoneme-blend prompt (ticket 86c9qa6n3).
+   * OPTIONAL + CVC-only. Stored as the human-readable em-dash/ellipsis
+   * segmented form; the TTS synth (`api/_tts.ts substituteBlendSegments`)
+   * splits on `—`/`…`, IPA-wraps each grapheme as its phoneme, injects
+   * `<break>`, and voices the whole word naturally. `undefined` for every
+   * non-CVC tier AND for CVC tiers until the canon is re-baked with the
+   * planner directive (bake is a follow-up) — in which case the 2nd-wrong
+   * beat graceful-skips to the existing `hint` line. See Kyle's spec
+   * `design/word-song/cvc-phoneme-blend-prompt.md` §"Emma's blend modeling"
+   * + §"Blend-audio utterances".
+   */
+  blend?: string
 }
 
 /**
@@ -391,7 +424,17 @@ export function wordSongSessionPlanToUtteranceSources(
     for (const slot of ALL_SLOTS) {
       out.push({
         id: wordSongUtteranceId(problem.index, slot),
-        text: problem.utterances[slot],
+        text: problem.utterances[slot]!,
+      })
+    }
+    // Emit the optional `blend` source IF this problem carries one
+    // (CVC-only, post-bake). Static plans never set it, so this is a
+    // no-op until the canon ships the slot. See `BLEND_SLOT`.
+    const blendText = problem.utterances.blend
+    if (typeof blendText === 'string') {
+      out.push({
+        id: wordSongUtteranceId(problem.index, BLEND_SLOT),
+        text: blendText,
       })
     }
   }
@@ -427,6 +470,15 @@ export function wordSongSessionPlanFromWire(
           )
         }
         slotTexts[slot] = u.text
+      }
+      // Carry the optional `blend` slot IF the wire supplies it (CVC-only,
+      // post-bake). Absent → leave undefined so the 2nd-wrong beat
+      // graceful-skips to the existing `hint` line. NOT required.
+      const blendUtterance = byId.get(
+        wordSongUtteranceId(problem.index, BLEND_SLOT),
+      )
+      if (blendUtterance) {
+        slotTexts.blend = blendUtterance.text
       }
       return {
         ...problem,
