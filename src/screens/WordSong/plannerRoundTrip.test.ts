@@ -889,6 +889,138 @@ describe('planner → parser round-trip — cvc-words-short-e (ticket 86c9teua2)
   })
 })
 
+/**
+ * CVC phoneme-blend slot round-trip (ticket 86ca8t8xx — the light-up).
+ *
+ * The planner now emits a 6th OPTIONAL `blend` utterance on every
+ * cvc-word problem (`word.p<N>.blend`). The browser parser carries it
+ * through in-namespace (NOT required — see `planFromServer.ts`
+ * `parseUtteranceId`). This suite pins the AC the canon layer owns:
+ *
+ *   - Every cvc-word problem in a baked session carries a `blend`
+ *     utterance.
+ *   - The `blend` text tokenizes to EXACTLY `target.word.length + 1`
+ *     tokens (graphemes + whole word). `box`/`fox` still tokenize to 4
+ *     because `x` is ONE grapheme token (the /ks/ cluster), not two.
+ *   - Non-cvc-word tiers do NOT carry a `blend` slot.
+ *
+ * Tokenization verifies the `wordLength + 1` content-token invariant:
+ * split the stored text on whitespace and drop the ` - ` / ` ... `
+ * ASCII-7 separators — the remaining tokens are `[g1, g2, ..., word]`.
+ */
+describe('planner → parser round-trip — cvc-word blend slot (ticket 86ca8t8xx)', () => {
+  /** Tokenize a stored blend canon text the way the caption walk does:
+   *  whitespace-split, then drop the `-` and `...` separator tokens. */
+  function tokenizeBlend(text: string): string[] {
+    return text
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t !== '-' && t !== '...')
+  }
+
+  /** Build a cvc-word wire plan that ALSO emits the blend slot per
+   *  problem — mirrors what the live planner directive now instructs
+   *  Haiku to emit. `x` words (box/fox) keep `x` as one grapheme token. */
+  function makeCvcWordPlanWithBlend(words: readonly string[]): string {
+    if (words.length !== 8) {
+      throw new Error(
+        `[plannerRoundTrip test] cvc-word blend plan needs 8 words; got ${words.length}`,
+      )
+    }
+    const utterances = words.flatMap((word, i) => {
+      const n = i + 1
+      const cap = word.charAt(0).toUpperCase() + word.slice(1)
+      // ASCII-7 segmented form: graphemes joined by " - ", then " ... ",
+      // then the whole word. CVC words are 3 single-letter graphemes.
+      const blend = `${word.split('').join(' - ')} ... ${word}`
+      return [
+        { id: `word.p${n}.read`, text: `Read the ${word}.` },
+        { id: `word.p${n}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${n}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${n}.hint`, text: `Let's look. ${cap}.` },
+        { id: `word.p${n}.giveAnswer`, text: `This one is ${word}.` },
+        { id: `word.p${n}.blend`, text: blend },
+      ]
+    })
+    return JSON.stringify({
+      id: 'haiku-word-cvc-blend-001',
+      label: 'CVC blend roundtrip fixture',
+      utterances,
+    })
+  }
+
+  it('every cvc-word problem carries a blend whose text tokenizes to word.length + 1', async () => {
+    const words = ['cat', 'hat', 'bag', 'man', 'jam', 'van', 'dog', 'mop']
+    const client = makeMockClient(makeCvcWordPlanWithBlend(words))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    expect(rebuilt.problems).toHaveLength(8)
+    for (const problem of rebuilt.problems) {
+      const blend = problem.utterances.blend
+      // The blend slot is carried through the parser.
+      expect(typeof blend).toBe('string')
+      const tokens = tokenizeBlend(blend!)
+      // graphemes + whole word = word.length + 1.
+      expect(tokens).toHaveLength(problem.target.word.length + 1)
+      // Last token is the whole word; leading tokens are the graphemes.
+      expect(tokens[tokens.length - 1]).toBe(problem.target.word)
+      expect(tokens.slice(0, -1).join('')).toBe(problem.target.word)
+    }
+  })
+
+  it('box/fox keep x as ONE grapheme token — blend still tokenizes to 4 (the /ks/ exception)', async () => {
+    // box/fox decode `x` as the cluster /ks/ but stay ONE grapheme token,
+    // so the count is wordLength + 1 = 4, NOT 5. The directive forbids
+    // splitting `x` into `k - s`.
+    const words = ['box', 'fox', 'dog', 'mop', 'log', 'pot', 'hot', 'mom']
+    const client = makeMockClient(makeCvcWordPlanWithBlend(words))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-o',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    for (const problem of rebuilt.problems) {
+      const tokens = tokenizeBlend(problem.utterances.blend!)
+      // Every short-o word here is 3 letters → 4 tokens, x counts as one.
+      expect(tokens).toHaveLength(4)
+      expect(tokens[tokens.length - 1]).toBe(problem.target.word)
+    }
+  })
+
+  it('a non-cvc-word tier (blending-cv) carries NO blend slot', async () => {
+    // blending-cv must stay at the 5 required slots — the planner directive
+    // scopes blend to cvc-word tiers only. The fixture (SAMPLE_CV_BLEND_PLAN)
+    // emits no blend lines, mirroring the directive.
+    const client = makeMockClient(JSON.stringify(SAMPLE_CV_BLEND_PLAN))
+
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'blending-cv',
+    })
+
+    const rebuilt = wordSongSessionPlanFromServer(plan)
+    for (const problem of rebuilt.problems) {
+      expect(problem.utterances.blend).toBeUndefined()
+    }
+  })
+})
+
 describe('planner → parser round-trip — untuned tier stub fallback (step 2 ticket 86c9kxu07)', () => {
   it('a digraphs-sh-requested call falls back to blending-cv content (the stub-fallback contract)', async () => {
     // Per `effectiveFocusNode` in api/_planner.ts: untuned tiers
