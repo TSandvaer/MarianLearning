@@ -673,3 +673,135 @@ describe('pickFocusNode — CVC review mode integration (ticket 86c9qa6n3)', () 
     expect(pick.node).toBe('mult-6-9')
   })
 })
+
+/**
+ * Regression: the e2e-failure class on PR #471 (ticket 86c9qa6n3). The
+ * graduation latch is UNSET (falsy) for any child who has not yet had her
+ * one-shot graduation review — which is the actual state of every forward
+ * learner who has NOT yet completed the whole word-song tree. The unit
+ * tests above default the latch to `true` (a convenience for the
+ * forward-walk suite), which MASKED this bug: with the latch falsy, the
+ * original `pickCvcReviewNode` consult (gated only on "all CVC mastered")
+ * hijacked the wire `focusNode` to `cvc-words-short-u` for any seed with
+ * the three cross-vowel CVC tiers mastered + a later tier in progress —
+ * short-i / short-e / digraphs / sight-words / simple-sentences — exactly
+ * the ~30 e2e failures.
+ *
+ * The fix anchors the review consult to "the forward walk found NO
+ * non-mastered node" — i.e. review only fires once the whole tree is
+ * mastered (the standing maintenance layer), never overriding an
+ * actively-progressing forward tier. This matches the established e2e
+ * contract:
+ *   - `cvc-cross-vowel-mix-regression.spec.ts` test 1 (digraphs-sh
+ *     `'practicing'`, latch unset) asserts wire focusNode === digraphs-sh.
+ *   - `progression-mastery-loop.spec.ts` short-e walk asserts the boundary
+ *     session (digraphs-sh just unlocked, latch unset) runs on digraphs-sh.
+ *
+ * These tests pin BOTH sides of the gate with the latch falsy (the real
+ * production / e2e seed shape, NOT the latch-true convenience default).
+ */
+describe('pickFocusNode — CVC review does NOT override forward progression (PR #471 regression, latch falsy)', () => {
+  /**
+   * Mirror the e2e regression-spec seeds: every word-song node up to the
+   * named tier mastered, that tier `practicing`, graduation latch UNSET,
+   * everything downstream at its default. `sessionCount: 5` matches the
+   * seeds' `buildSeedSessionHistory` AND lands on the CVC review period —
+   * the worst case for a hijack.
+   */
+  function forwardTierSeed(practicing: string): Progress {
+    const base = defaultProgress()
+    const levels = { ...base.skillLevels }
+    // Master everything up to (but not including) the practicing tier.
+    for (const node of WORD_SONG_NODES_IN_ORDER) {
+      if (node === practicing) break
+      levels[node] = 'mastered'
+    }
+    levels[practicing as keyof typeof levels] = 'practicing'
+    return {
+      ...base,
+      skillLevels: levels,
+      // Latch UNSET — the state a real forward learner is in before her
+      // one-shot graduation review. This is what the convenience default
+      // of `true` in `buildProgress` was masking.
+      cvcGraduationSessionFired: undefined,
+    }
+  }
+
+  // Every forward tier past the three cross-vowel CVC tiers — whether a
+  // later CVC sibling (short-i / short-e) OR a non-CVC tier (digraphs /
+  // sight-words / simple-sentences) — must hold focus when it is the
+  // actively-progressing tier. With all three cross-vowel tiers mastered
+  // (so `cvcReviewEligible` is true) AND the latch unset AND sessionCount
+  // on a review period, the pre-fix code returned `cvc-words-short-u`; the
+  // fix returns the forward tier.
+  it.each([
+    'cvc-words-short-i',
+    'cvc-words-short-e',
+    'digraphs-sh',
+    'digraphs-ch',
+    'digraphs-th-voiceless',
+    'sight-words',
+    'simple-sentences',
+  ])(
+    'returns %s as a forward pick — review does NOT override active progression',
+    (tier) => {
+      const pick = pickFocusNode(forwardTierSeed(tier), 'word-song', 5)
+      expect(pick).toEqual({ node: tier, mode: 'forward' })
+    },
+  )
+
+  // The exact wire shape the e2e specs assert: a short-i forward learner's
+  // session-start payload must carry focusNode === 'cvc-words-short-i', NOT
+  // the review tier. This is the assertion that was RED on the e2e run.
+  it('forward short-i learner exposes focusNode === cvc-words-short-i on the wire (was cvc-words-short-u)', () => {
+    const { node } = pickFocusNode(
+      forwardTierSeed('cvc-words-short-i'),
+      'word-song',
+      5,
+    )
+    expect(node).toBe('cvc-words-short-i')
+  })
+
+  // The boundary session: short-e just mastered, digraphs-sh just unlocked
+  // to 'intro', latch unset (mirrors `progression-mastery-loop.spec.ts`
+  // session 4). Forward progression on digraphs-sh wins — the graduation
+  // review does NOT pre-empt the first digraphs-sh session.
+  it('runs digraphs-sh forward at the CVC→digraphs boundary (digraphs-sh intro, latch unset)', () => {
+    const base = defaultProgress()
+    const levels = { ...base.skillLevels }
+    for (const node of WORD_SONG_NODES_IN_ORDER) {
+      if (node === 'digraphs-sh') break
+      levels[node] = 'mastered'
+    }
+    levels['digraphs-sh'] = 'intro'
+    const progress: Progress = {
+      ...base,
+      skillLevels: levels,
+      cvcGraduationSessionFired: undefined,
+    }
+    expect(pickFocusNode(progress, 'word-song', 5)).toEqual({
+      node: 'digraphs-sh',
+      mode: 'forward',
+    })
+  })
+
+  // Once the WHOLE tree is mastered (no forward progress left) and the
+  // latch is unset, CVC review DOES take over as the maintenance layer —
+  // this is the path that makes cross-vowel mixing fire. The graduation
+  // pick is short-u regardless of sessionCount.
+  it('enters CVC review only when the whole tree is mastered (latch unset → graduation short-u)', () => {
+    const base = defaultProgress()
+    const allMastered = Object.fromEntries(
+      Object.keys(base.skillLevels).map((k) => [k, 'mastered']),
+    ) as typeof base.skillLevels
+    const progress: Progress = {
+      ...base,
+      skillLevels: allMastered,
+      cvcGraduationSessionFired: undefined,
+    }
+    expect(pickFocusNode(progress, 'word-song', 3)).toEqual({
+      node: 'cvc-words-short-u',
+      mode: 'cvc-review',
+    })
+  })
+})

@@ -171,29 +171,52 @@ export function pickFocusNode(
   track: ProgressTrack,
   sessionCount = 0,
 ): FocusPick {
-  // CVC review mode (ticket 86c9qa6n3) — word-song track only. When every
-  // CVC tier is mastered the forward walk below would always land on a
-  // non-CVC node, so the PR #181 cross-vowel-mixing infrastructure would
-  // never fire. The review picker periodically re-surfaces a mastered CVC
-  // tier (graduation-once-then-round-robin) so the mix actually fires.
-  // A null result means "no review this session — fall through to the
-  // forward walk."
-  if (track === 'word-song') {
+  const order =
+    track === 'math' ? MATH_NODES_IN_ORDER : WORD_SONG_NODES_IN_ORDER
+
+  // Forward walk: the first non-mastered node in declaration order. This is
+  // the ordinary-progression pick and the historical default.
+  // `hasForwardProgress` records whether there is any non-mastered node
+  // left to learn — it gates CVC review (below).
+  let forwardNode: SkillNode = order[order.length - 1]!
+  let hasForwardProgress = false
+  for (const node of order) {
+    if (progress.skillLevels[node] !== 'mastered') {
+      forwardNode = node
+      hasForwardProgress = true
+      break
+    }
+  }
+
+  // CVC review mode (ticket 86c9qa6n3) — word-song track only, and ONLY
+  // when the forward walk found NO non-mastered node, i.e. Marian has
+  // genuinely completed every word-song tier through simple-sentences and
+  // there is nothing left to forward-progress. In that maintenance state
+  // the review picker re-surfaces a mastered CVC tier so the PR #181
+  // cross-vowel-mixing infrastructure actually fires.
+  //
+  // Why "no forward progress left" rather than "forward node is non-CVC":
+  // the established e2e contract (predating this ticket) is that a session
+  // on ANY actively-progressing tier targets THAT tier — including the
+  // first session on a freshly-unlocked non-CVC node. Concretely:
+  //   - `cvc-cross-vowel-mix-regression.spec.ts` test 1 seeds digraphs-sh
+  //     `'practicing'` + all CVC mastered and asserts the wire focusNode is
+  //     `digraphs-sh` (NOT a CVC review pick) — cross-vowel routing is
+  //     deliberately NOT threaded there.
+  //   - `progression-mastery-loop.spec.ts` walks short-e to mastery and
+  //     asserts session 4 (the boundary session, digraphs-sh just unlocked
+  //     to `'intro'`, latch unset) runs on `digraphs-sh`, not on a
+  //     graduation review.
+  // Both are forward-progress sessions, so review must defer to them. Only
+  // once the whole tree is mastered does review take over as the standing
+  // maintenance layer. A null result from the picker still means "no review
+  // this session — use the (last-node) forward pick."
+  if (track === 'word-song' && !hasForwardProgress) {
     const reviewNode = pickCvcReviewNode(progress, sessionCount)
     if (reviewNode !== null) return { node: reviewNode, mode: 'cvc-review' }
   }
 
-  const order =
-    track === 'math' ? MATH_NODES_IN_ORDER : WORD_SONG_NODES_IN_ORDER
-  for (const node of order) {
-    if (progress.skillLevels[node] !== 'mastered') {
-      return { node, mode: 'forward' }
-    }
-  }
-  // Defensive fallback — every node mastered. Won't happen in v1; the
-  // adaptive engine M3+ will move children past this point and pick up new
-  // tracks. Until then, return the last node so the caller has a string.
-  return { node: order[order.length - 1]!, mode: 'forward' }
+  return { node: forwardNode, mode: 'forward' }
 }
 
 /**
