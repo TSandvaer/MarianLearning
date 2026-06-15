@@ -1110,18 +1110,31 @@
           setStatus('Submit cancelled — no secret entered.', 'err')
           return
         }
-        // Submit ALL stored verdicts, including needs-retest ones. This is
-        // intentional and consistent with the "decided" counter excluding
-        // needs-retest (see refreshCounters): a needs-retest row is awaiting a
-        // re-decision in the UI, but its last durable verdict is still a real
-        // observation worth shipping in the report (the endpoint accepts it;
-        // each verdict carries its own audioHash + decidedAt so a stale verdict
-        // is recognizable downstream). So: excluded from "decided" progress,
-        // included in the durable submitted set.
+        // Submit ONLY verdicts that are a confirmed observation of a
+        // CURRENTLY-RENDERED row's CURRENT audioHash. A stored verdict ships iff
+        // its itemId still maps to a live item AND stateOf(item) is 'passed' or
+        // 'failed' — i.e. the stored audioHash matches the live row's hash.
+        //
+        // This drops two stale classes that previously rode along when we
+        // shipped Object.values(verdicts) wholesale (report #458 regression):
+        //   (a) stale-hash verdicts — the live row reads 'needs-retest' because
+        //       the audio was re-baked since the verdict was decided; and
+        //   (b) dead-id verdicts — the itemId no longer has a live row at all
+        //       (e.g. number-recog#math.p6.hint, renamed by W12-04), so it can
+        //       never flip to needs-retest yet was still being submitted.
+        // Both carry stale audioHash + decidedAt that read downstream as a fresh
+        // observation of the current bytes — they are not. The verdicts stay in
+        // localStorage (durable); they are merely excluded from the POST.
+        const liveSubmittable = Object.values(verdicts).filter((v) => {
+          const item = itemById.get(v.itemId)
+          if (!item) return false // dead-id: no live row
+          const state = stateOf(item)
+          return state === 'passed' || state === 'failed' // drops needs-retest
+        })
         const body = {
           secret,
           submittedAt: new Date().toISOString(),
-          verdicts: Object.values(verdicts),
+          verdicts: liveSubmittable,
         }
         const btn = document.getElementById('vqa-submit')
         btn.disabled = true
