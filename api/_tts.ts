@@ -1118,13 +1118,30 @@ const BLEND_GRAPHEME_IPA: Record<string, string> = {
   x: 'ks',
 }
 
-/** Inter-grapheme pause (ms) — short beat between each sounded phoneme. */
+/** Inter-grapheme pause (ms) — short beat AFTER each sounded phoneme (the stop
+ *  releases into this silence rather than being preceded by a dead gap that
+ *  forces an unreleased, scratchy onset). Candidate-f placement. */
 const BLEND_GRAPHEME_BREAK_MS = 250
 /** Pre-whole-word pause (ms) — the "…" beat where the blend resolves. */
 const BLEND_WHOLE_WORD_BREAK_MS = 450
-/** "Let's slow down and sound it out" register — slightly slower than the
- *  -10% house rate (matches the hint slot's slower feel per Kyle §Voicing 4). */
-const BLEND_RATE = '-12%'
+
+/** Stop consonants — the graphemes whose isolated phoneme is unreleased and
+ *  scratches on Azure neural. These are the ONLY graphemes that get the clipped
+ *  `<stop>ə` release (candidate f, Thomas-approved 2026-06-15, voice-QA #463);
+ *  every other grapheme (continuant consonant or vowel) stays bare IPA.
+ *  `c`/`k` both decode to /k/; `x`=/ks/ ends in a stop but is a cluster — left
+ *  BARE (the cluster's /s/ tail releases it naturally, and a `ksə` would read
+ *  as "kss-uh"). The trailing `ə` is an INAUDIBLE coarticulation release a real
+ *  en-GB synthetic-phonics teacher uses, NOT a full "kuh" syllable. */
+const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
+  'b',
+  'c',
+  'd',
+  'g',
+  'k',
+  'p',
+  't',
+])
 
 /**
  * Parse a stored blend canon text into `{ graphemes, word }`, or `null` if
@@ -1170,9 +1187,21 @@ const BLEND_CVC_TIERS: ReadonlySet<string> = new Set([
 /**
  * Render a CVC phoneme-blend prompt to SSML inner-text, or `null` if the
  * text isn't a blend line (so the caller falls through to the normal path).
- * Each grapheme is voiced as its IPA phoneme with a `<break>` before it; the
- * whole word is voiced naturally after a longer break; the whole line is
- * wrapped in `<prosody rate="-12%">`.
+ *
+ * Treatment = candidate f, "lightly-released stops" (Thomas-approved across
+ * ALL words, 2026-06-15; voice-QA #463 fixed the ~37/40 bare-unreleased-stop
+ * scratch). For each grapheme:
+ *   • STOP consonants (b/c/k/d/g/p/t) get a clipped `<stop>ə` IPA release —
+ *     INAUDIBLE as a syllable, NOT "kuh"; it gives Azure neural the
+ *     coarticulation it needs to voice an isolated stop without scratching.
+ *   • CONTINUANTS (f/v/s/m/n/l/r/w/y/z/h/j) and VOWELS stay BARE IPA — they
+ *     sustain in isolation and need no release.
+ *   • `x` = /ks/ cluster stays BARE (its /s/ tail self-releases).
+ * The `<break>` is placed AFTER each phoneme so the stop releases into the
+ * silence (candidate f), and there is NO whole-line `<prosody rate>` wrap —
+ * the round-5 audition found the rate-slow OVER-articulates the onset; the
+ * house rate (-10%) on the speak-root prosody is correct. The whole word is
+ * voiced naturally after a longer break so Marian hears the blended target.
  *
  * Gated by tier (the CVC tiers) so a CVC `read`/`correct`/`hint` line that
  * happens to contain a hyphen or ellipsis never accidentally renders as a
@@ -1190,24 +1219,30 @@ export function renderBlendInnerText(
 
   const parts: string[] = []
   for (const grapheme of parsed.graphemes) {
-    parts.push(`<break time="${BLEND_GRAPHEME_BREAK_MS}ms"/>`)
-    const ipa = BLEND_GRAPHEME_IPA[grapheme.toLowerCase()]
+    const g = grapheme.toLowerCase()
+    const ipa = BLEND_GRAPHEME_IPA[g]
     if (ipa !== undefined) {
-      // The grapheme glyph is visible inside the tag; Azure uses `ph=`.
+      // STOP graphemes get the clipped `<stop>ə` release; continuants + vowels
+      // stay bare. The grapheme glyph is visible inside the tag; Azure uses `ph=`.
+      const released = BLEND_STOP_GRAPHEMES.has(g) ? `${ipa}ə` : ipa
       parts.push(
-        `<phoneme alphabet="ipa" ph="${escapeSsml(ipa)}">${escapeSsml(grapheme)}</phoneme>`,
+        `<phoneme alphabet="ipa" ph="${escapeSsml(released)}">${escapeSsml(grapheme)}</phoneme>`,
       )
     } else {
       // Defensive: an unmapped grapheme is voiced bare (escaped).
       parts.push(escapeSsml(grapheme))
     }
+    // Break AFTER each phoneme (candidate f) — the stop releases into the pause.
+    parts.push(`<break time="${BLEND_GRAPHEME_BREAK_MS}ms"/>`)
   }
   // The whole word: a longer break, then the word voiced NATURALLY (no
   // phoneme wrap) so Marian hears the blended target as one word.
   parts.push(`<break time="${BLEND_WHOLE_WORD_BREAK_MS}ms"/>`)
   parts.push(escapeSsml(parsed.word))
 
-  return `<prosody rate="${escapeSsml(BLEND_RATE)}">${parts.join('')}</prosody>`
+  // No whole-line <prosody rate> wrap — candidate f renders at the speak-root
+  // house rate (-10%); the -12% rate-slow over-articulated the onset.
+  return parts.join('')
 }
 
 export function renderSsmlInnerText(text: string, tierFilter?: string): string {
