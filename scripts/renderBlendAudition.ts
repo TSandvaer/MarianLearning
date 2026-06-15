@@ -4,9 +4,11 @@
  * ⚠️  NOT PRODUCTION CODE. Audition tooling only.  ⚠️
  * --------------------------------------------------------------------------
  * Renders the candidate blend SSML treatments defined in
- * `blendAuditionVariants.ts` for 5 representative CVC words (cat / dog / big /
- * box / van), each spanning a hard phoneme case. Writes a self-contained
- * manifest (`public/blend-audition-data.json`) that the standalone
+ * `blendAuditionVariants.ts`. PASS 2 audits the now-failing CONTINUANT /
+ * GLIDE / AFFRICATE classes (fricatives h/f/s/v, glide w, affricate j=/dʒ/ —
+ * voice-QA #467) that candidate-f left bare; stops stay candidate-f and are
+ * carried only as a `cat` control. Each candidate × word pair is rendered;
+ * the manifest (`public/blend-audition-data.json`) feeds the standalone
  * `public/blend-audition.html` page reads — base64 MP3 + the exact SSML body
  * + a SHA-256 hash per (word × candidate).
  *
@@ -120,6 +122,8 @@ async function renderRawSsml(body: string): Promise<Uint8Array> {
 interface CandidateRecord {
   id: string
   label: string
+  /** Which failing phoneme class this candidate targets (page grouping). */
+  targetClass: BlendCandidate['targetClass']
   mechanism: string
   /** The full SSML body sent to Azure (for the inventory table). */
   ssml: string
@@ -153,6 +157,7 @@ async function renderCandidate(
     return {
       id: candidate.id,
       label: candidate.label,
+      targetClass: candidate.targetClass,
       mechanism: candidate.mechanism,
       ssml: body,
       audioHash: null,
@@ -168,6 +173,7 @@ async function renderCandidate(
     return {
       id: candidate.id,
       label: candidate.label,
+      targetClass: candidate.targetClass,
       mechanism: candidate.mechanism,
       ssml: body,
       audioHash,
@@ -179,6 +185,7 @@ async function renderCandidate(
     return {
       id: candidate.id,
       label: candidate.label,
+      targetClass: candidate.targetClass,
       mechanism: candidate.mechanism,
       ssml: body,
       audioHash: null,

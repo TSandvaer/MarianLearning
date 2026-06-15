@@ -154,6 +154,14 @@
         background: #f2dede;
         color: #a94442;
       }
+      .tag.ctrl {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .tag.cls {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
       .meta .mech {
         color: var(--muted);
         font-size: 0.78rem;
@@ -243,30 +251,43 @@
     </style>
   </head>
   <body>
-    <h1>Blend audition <span class="voice">Olivia renders</span></h1>
+    <h1>Blend audition — pass 2 <span class="voice">Olivia renders</span></h1>
     <p class="sub">
       The CVC phoneme-blend (<code>blend</code> slot) sounds out a word
       letter-by-letter then says the whole word —
-      <code>c&#8202;…&#8202;a&#8202;…&#8202;t&#8202;…&#8202;cat</code>. The
-      current render scratches on the isolated stop consonants (~37/40 baked
-      clips ear-tested FAIL). Each row below is a candidate SSML treatment
-      rendered through the real Azure pipeline (same voice config the app uses:
-      <code>en-GB-OliviaNeural</code>, rate <code>-10%</code>).
-      <strong>Candidate a</strong> is the current live render (the rejected one)
-      — your A/B anchor. <strong>Candidate f</strong> (Dave's top pick) gives
-      each stop a clipped release — the key listen there is
+      <code>c&#8202;…&#8202;a&#8202;…&#8202;t&#8202;…&#8202;cat</code>. Pass 1
+      (candidate f) <strong>fixed the stop consonants</strong>, but it left the
+      <strong>fricatives, the glide, and the affricate BARE</strong> — and those
+      now scratch (voice-QA #467, 14 fails): <em>h</em> (hat/hen/hot),
+      <em>f</em> (fan/fig/fox), <em>s</em> (sip/sun), the affricate
+      <em>j /dʒ/</em> (jam), and the glide <em>w</em> (web/wig — heard as "U not
+      W"). Each row below is a candidate SSML treatment rendered through the
+      real Azure pipeline (<code>en-GB-OliviaNeural</code>, rate
+      <code>-10%</code>). <strong>Candidate a</strong> is the current live
+      render (candidate f) — your A/B anchor and the BROKEN control;
+      <strong><code>cat</code> is the stop-control</strong> (already good —
+      every candidate must keep it clean, stops are NOT being re-auditioned).
+      The other candidates are ONE LEAD per failing class, aligned to Dave's
+      pass-2 phonics note: <strong>fric-elong</strong> (<code>fff/sss/hhh</code>
+      orthographic elongation @ -20% — the lead for f/s/h) with
+      <strong>fric-rel</strong> (<code>hə/fə/sə</code> minimal vowel-support,
+      the /h/ fallback); <strong>j-clip</strong> (clipped <code>dʒə</code> "juh"
+      + pitch-down — the affricate treated as a stop);
+      <strong>w-support</strong> (<code>wə</code>
+      "wuh" vowel-support + pitch-down — correct for a glide).
+      <strong><code>van</code> is FLOORED</strong> — Dave: /v/ is an
+      en-GB-Olivia floor + absent from Tagalog, so it renders whole-word-only on
+      every candidate (confirm the floor on the page). The key listen on any
+      <em>release</em> candidate:
       <em
-        >does the release stay inaudible as a syllable, or drift toward
-        "kuh-a-tuh"?</em
+        >does the ə stay inaudible as a syllable, or drift toward
+        "fuh"/"suh"?</em
       >
-      <strong>Candidate g</strong> is the same as the baseline but at a tighter
-      research-backed pacing (150ms gaps), so you can A/B the pacing too. Play
-      each, then tap <strong>Pick</strong> on the best per word; once you hear a
-      clear winner across words, report the candidate letter in chat or the
-      issue. The winner gets ported into <code>renderBlendInnerText</code> +
-      re-baked in a follow-up PR. Unlinked audition tooling —
-      <strong>open in a private tab</strong> to dodge any stale service-worker
-      cache.
+      Play each, then tap <strong>Pick</strong> on the best per word; report ONE
+      winner per failing class in chat or the issue. The winners get ported into
+      <code>renderBlendInnerText</code> + re-baked in a follow-up PR. Unlinked
+      audition tooling — <strong>open in a private tab</strong> to dodge any
+      stale service-worker cache.
     </p>
 
     <div id="status" class="status">Loading blend renders&hellip;</div>
@@ -440,11 +461,22 @@
 
           const label = document.createElement('div')
           label.className = 'label'
-          label.innerHTML =
-            escapeHtml(c.label) +
-            (isBaseline
-              ? ' <span class="tag base">baseline</span><span class="tag rej">rejected</span>'
-              : '')
+          // Class tag: baseline gets baseline/rejected; per-class candidates get
+          // their failing-class tag so Thomas can scan coverage at a glance.
+          let tags = ''
+          if (isBaseline) {
+            tags =
+              ' <span class="tag base">baseline</span><span class="tag rej">rejected</span>'
+          } else if (c.targetClass && c.targetClass !== 'baseline') {
+            const cls = c.targetClass === 'stop-control' ? 'ctrl' : 'cls'
+            tags =
+              ' <span class="tag ' +
+              cls +
+              '">' +
+              escapeHtml(c.targetClass) +
+              '</span>'
+          }
+          label.innerHTML = escapeHtml(c.label) + tags
           meta.appendChild(label)
 
           const mech = document.createElement('div')
