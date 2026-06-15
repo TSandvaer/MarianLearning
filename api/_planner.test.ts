@@ -635,9 +635,15 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
     expect(systemText).toMatch(/NO commutative flip/i)
   })
 
-  it('AC#1 — the SYSTEM_PREAMBLE keeps word-song at 5 slots (single hint) — Wave 12 is math-only', async () => {
-    // The slot-count language is track-shared in SYSTEM_PREAMBLE; the
-    // word-song slot set must NOT widen (no word-song three-hint in v1).
+  it('AC#1 — the SYSTEM_PREAMBLE keeps word-song at 5 REQUIRED slots + the optional cvc-word-only blend slot — Wave 12 three-hint stays math-only', async () => {
+    // The slot-count language is track-shared in SYSTEM_PREAMBLE. The
+    // word-song REQUIRED slot set must NOT widen (no word-song three-hint
+    // in v1). The ONLY word-song widening is the optional 6th `blend`
+    // slot, and it is scoped to cvc-word tiers ONLY (ticket 86ca8t8xx) —
+    // every other tier stays at exactly 5. This drift-guard pins both the
+    // "5 REQUIRED" wording AND the cvc-word-only blend scoping so a future
+    // edit can't (a) re-widen the required set or (b) leak the blend slot
+    // onto a non-cvc-word tier.
     const wordPlan = JSON.stringify({
       id: 'cvc-warm',
       label: 'cvc',
@@ -659,14 +665,24 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
     })
     const args = capture.lastArgs as { system: Array<{ text: string }> }
     const systemText = args.system.map((b) => b.text).join('\n')
+    // The 5 REQUIRED slots are unchanged.
     expect(systemText).toContain(
-      'WORD-SONG track — exactly 5 utterances with these slot names: read, correct, reprompt, hint, giveAnswer',
+      'WORD-SONG track — exactly 5 REQUIRED utterances with these slot names: read, correct, reprompt, hint, giveAnswer',
+    )
+    // The blend slot is the optional 6th, scoped to cvc-word tiers only.
+    expect(systemText).toMatch(
+      /6th OPTIONAL slot[\s\S]*cvc-word problems[\s\S]*"blend" utterance/,
+    )
+    // Non-cvc-word tiers must be explicitly told to stay at 5 (no blend).
+    expect(systemText).toMatch(
+      /Every OTHER word-song tier[\s\S]*stays at exactly 5[\s\S]*NEVER emit a "blend" slot/,
     )
     // The math count math is also present (76 entries) but the word-song
-    // count (60) must survive for the word-song flat array. The +1 over the
-    // pre-M5 count is the focus-recap line (session.end.recap.focus,
-    // ticket 86c9kmwh0).
+    // count (60 for non-cvc-word, 68 for cvc-word) must survive for the
+    // word-song flat array. The +1 over the pre-M5 count is the
+    // focus-recap line (session.end.recap.focus, ticket 86c9kmwh0).
     expect(systemText).toContain('8 × 5 + 20 = 60 entries for the WORD-SONG')
+    expect(systemText).toContain('8 × 6 + 20 = 68 on the cvc-word tier')
   })
 })
 

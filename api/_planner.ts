@@ -467,7 +467,10 @@ export async function generateSessionPlan(
     response = await args.client.messages.create({
       model: PLANNER_MODEL_ID,
       // Worst-case output sizing. WORD-SONG: 8 problems × 5 slots + 20
-      // Session-End = 60 utterances. MATH (post Wave-12 three-hint split,
+      // Session-End = 60 utterances (68 on the cvc-word tier, which adds
+      // the optional 6th "blend" slot per problem — ticket 86ca8t8xx; each
+      // blend line is a short segmented form like "c - a - t ... cat",
+      // ~6-8 tokens, so the +8 lines add little weight). MATH (post Wave-12 three-hint split,
       // ticket 86ca8702v): 8 problems × 7 slots + 20 = 76 utterances —
       // the +1 Session-End line is the M5 focus-recap (86c9kmwh0).
       // the read/correct/reprompt/giveAnswer lines are unchanged and the
@@ -1306,14 +1309,14 @@ Rules:
 - Exactly 8 problems per plan.
 - Each problem's utterance slots depend on the track (the track-specific guide below is authoritative):
   · MATH track — exactly 7 utterances with these slot names: read, correct, reprompt, hint1, hint2, hint3, giveAnswer. The single hint is split into three escalating sub-step utterances (hint1 -> hint2 -> hint3); see the MATH track guide's per-slot templates for the per-tier hint1/hint2/hint3 wording.
-  · WORD-SONG track — exactly 5 utterances with these slot names: read, correct, reprompt, hint, giveAnswer.
-- Utterance ids follow the pattern "<track>.p<N>.<slot>" — e.g. "math.p1.read", "math.p1.hint1", "math.p1.hint2", "math.p1.hint3", "word.p1.read", "word.p1.hint", etc. The N is the 1-based problem index.
+  · WORD-SONG track — exactly 5 REQUIRED utterances with these slot names: read, correct, reprompt, hint, giveAnswer. ONE tier — and only one — carries a 6th OPTIONAL slot: for cvc-word problems (read line "Read the <word>." drawn from a cvc-words / cvc-words-short-* pool) ALSO emit a "blend" utterance, making 6 utterances for each cvc-word problem. Every OTHER word-song tier (letter-names, letter-sounds, blending-cv, digraphs-*, sight-words, simple-sentences) stays at exactly 5 — NEVER emit a "blend" slot on those. See the BLEND slot directive in the WORD-SONG track guide for the exact blend-line shape.
+- Utterance ids follow the pattern "<track>.p<N>.<slot>" — e.g. "math.p1.read", "math.p1.hint1", "math.p1.hint2", "math.p1.hint3", "word.p1.read", "word.p1.hint", "word.p1.blend" (cvc-word only), etc. The N is the 1-based problem index.
 - Lines are spoken aloud by Emma's TTS voice. Keep them short (1 short sentence is ideal; 2 if needed for the hint). No abbreviations Emma can't read aloud naturally. No emoji. No exclamation marks beyond one per line.
 - The "reprompt" line for every problem should be "Hmm... try again?" verbatim — that's the spec wording, intentionally repeated for cache locality.
 - Never write "wrong", "incorrect", "X", or anything shaming.
 
 Session-End utterances (REQUIRED — append to the same flat utterances array):
-After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
+After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SONG — or 8 × 6 = 48 on the cvc-word tier, which adds the optional "blend" slot per problem), append the following Session-End utterances. The Session-End screen looks them up by exact id at runtime and degrades gracefully on a miss, but every id below MUST be emitted so the celebration never falls back to silent captions.
 
   - "session.end.opener" — text: "You did it!"
   - "session.end.recap.focus" — text: "You worked on <spoken-focus-name> today!" where <spoken-focus-name> is a short, warm, CHILD-FACING phrase for the focus skill node named in the user message. Spell any numbers out as words and drop curriculum jargon — Emma is speaking to an 8-year-old, not a parent. Use exactly these phrases per focus node: add-to-10 -> "adding to ten"; add-to-20 -> "adding to twenty"; sub-to-10 -> "taking away to ten"; sub-to-20 -> "taking away to twenty"; number-recog -> "your numbers"; two-digit-addsub-no-regroup / two-digit-addsub-with-regroup -> "bigger numbers"; skip-counting -> "skip counting"; mult-2-5-10 / mult-3-4 / mult-6-9 -> "counting in groups"; letter-names -> "your letters"; letter-sounds -> "letter sounds"; blending-cv -> "blending sounds"; any cvc-words* tier, any digraphs* tier, and sight-words -> "reading words"; simple-sentences -> "reading sentences". Exactly one line; never use digits; one exclamation mark.
@@ -1321,7 +1324,7 @@ After the per-problem utterances (8 × 7 = 56 for MATH, 8 × 5 = 40 for WORD-SON
   - "session.end.streak.3" through "session.end.streak.8" — one entry per N in 3..8. Each line is "<number-word> in a row! Wow!" with the number spelled out (three, four, five, six, seven, eight). Capitalise the leading word.
   - "session.end.goodbye" — text: "See you soon."
 
-Total Session-End utterances: 1 opener + 1 focus-recap + 11 recap + 6 streak + 1 goodbye = 20. The full flat utterances array therefore has 8 × 7 + 20 = 76 entries for the MATH track, or 8 × 5 + 20 = 60 entries for the WORD-SONG track. Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
+Total Session-End utterances: 1 opener + 1 focus-recap + 11 recap + 6 streak + 1 goodbye = 20. The full flat utterances array therefore has 8 × 7 + 20 = 76 entries for the MATH track, or 8 × 5 + 20 = 60 entries for the WORD-SONG track (8 × 6 + 20 = 68 on the cvc-word tier, which carries the optional "blend" slot per problem). Do not invent extra Session-End ids; do not skip any of the listed Session-End ids.`
 
 export const MATH_TRACK_GUIDE = `Track: Math.
 
@@ -3290,12 +3293,53 @@ all other slots are content-mode-agnostic:
 - giveAnswer (all other word-song tiers): "This one is <word>."
   e.g. "This one is cat."
 
+BLEND slot (cvc-word tiers ONLY — ticket 86ca8t8xx): for EVERY problem
+on a cvc-words / cvc-words-short-o / cvc-words-short-u /
+cvc-words-short-i / cvc-words-short-e session, ALSO emit a 6th utterance
+with slot id "word.p<N>.blend". This is the phoneme-blend prompt Emma
+sounds out on the 2nd wrong tap so Marian re-decodes the word herself.
+DO NOT emit a blend slot on ANY other tier (blending-cv, letter-names,
+letter-sounds, digraphs-sh, digraphs-ch, digraphs-th-voiceless,
+sight-words, simple-sentences) — those carry exactly the 5 slots above.
+  Text shape — the target word segmented grapheme-by-grapheme, then the
+  whole word, using ASCII-7 punctuation ONLY (space-hyphen-space between
+  graphemes, space-three-dots-space before the whole word). NEVER use an
+  em-dash, en-dash, or unicode ellipsis — the canon text is ASCII-only
+  (lint-gated). General shape:
+      <g1> - <g2> - <g3> ... <word>
+  One grapheme token per LETTER of the word, in spelling order, lowercase,
+  followed by " ... " then the whole word lowercase. Examples:
+      cat -> "c - a - t ... cat"
+      hat -> "h - a - t ... hat"
+      bag -> "b - a - g ... bag"
+      man -> "m - a - n ... man"
+      dog -> "d - o - g ... dog"
+      mop -> "m - o - p ... mop"
+      pot -> "p - o - t ... pot"
+      sun -> "s - u - n ... sun"
+      pig -> "p - i - g ... pig"
+      bed -> "b - e - d ... bed"
+  /ks/ EXCEPTION — box / fox: the letter "x" is ONE grapheme token (it
+  decodes as the cluster /ks/, voiced at render time). Do NOT split it
+  into "k - s". So:
+      box -> "b - o - x ... box"
+      fox -> "f - o - x ... fox"
+  TOKEN-COUNT SELF-CHECK: split the blend text on whitespace, dropping the
+  "-" and "..." separators — the remaining tokens are exactly the
+  graphemes followed by the whole word, so the count is wordLength + 1
+  (CVC = 4; box/fox stay 4 because "x" is one grapheme). If your blend
+  text does not tokenize to wordLength + 1, REJECT and re-emit it.
+  Use the SAME target word as that problem's "Read the <word>." line — the
+  blend MUST match its own problem's target, in spelling order.
+
 Utterance ids — REQUIRED:
 Word-song problem utterance ids ALWAYS use the literal prefix "word.",
 regardless of the focus node mentioned in the user message. Pattern:
 "word.p<N>.<slot>" where N is the 1-based problem index (1..8) and <slot>
-is one of read | correct | reprompt | hint | giveAnswer. Examples:
-"word.p1.read", "word.p1.correct", "word.p2.read". Do NOT use "cvc.",
+is one of read | correct | reprompt | hint | giveAnswer (plus the
+optional "blend" slot on cvc-word tiers — see the BLEND slot directive
+above). Examples: "word.p1.read", "word.p1.correct", "word.p2.read",
+"word.p1.blend" (cvc-word only). Do NOT use "cvc.",
 "blending.", "letter.", or any other prefix for problem utterances —
 those will be rejected by the browser parser and the audio will fail to
 play. The content-type discriminant lives on the read-line template, NOT
