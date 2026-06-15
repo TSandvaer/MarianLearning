@@ -259,5 +259,11 @@ export function defaultProgress(childName = 'Marian'): Progress {
     literacy: {
       letterSoundsVowelStates: defaultLetterSoundsVowelStates(),
     },
+    // CVC graduation-review latch (ticket 86c9qa6n3). Greenfield Marian
+    // has not fired the one-shot CVC graduation review yet. Additive +
+    // optional on the persisted shape; include it on fresh defaults and
+    // rely on `withDefaultedCvcGraduationSessionFired` to fill it for any
+    // blob that predates the field. See types.ts comment.
+    cvcGraduationSessionFired: false,
   }
 }

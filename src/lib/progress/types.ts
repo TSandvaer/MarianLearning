@@ -700,6 +700,32 @@ export interface Progress {
    * sits inert and the Wave 7 composite-tier path stays active.
    */
   literacy?: LiteracyProgress
+  /**
+   * CVC-graduation-review one-shot latch (ticket 86c9qa6n3 — CVC review
+   * mode, the firing layer for PR #181 cross-vowel mixing).
+   *
+   * `true` once the celebratory "graduation review" CVC session has
+   * fired — the one-time `cvc-words-short-u` review that runs right after
+   * the 3rd CVC tier (`cvc-words-short-u`) reaches `'mastered'`. Short-u
+   * is chosen for the graduation session because `/ʌ/` has no Tagalog
+   * equivalent and is the highest-L1-interference vowel for Marian (Dave's
+   * research `design/research/cvc-review-mode-mechanic.md`).
+   *
+   * `pickCvcReviewNode` (in `focusNode.ts`) reads this latch: while it is
+   * falsy AND all three CVC tiers are mastered, the picker returns
+   * `cvc-words-short-u` for the graduation review; once the session
+   * completes, `recordProgressOnSessionEnd` sets the latch to `true` so
+   * the graduation review fires exactly once. Subsequent CVC review
+   * sessions are driven by the periodic round-robin (Option C-then-B).
+   *
+   * Absent / `false` are equivalent ("graduation review has not fired
+   * yet"). Optional + additive — pre-86c9qa6n3 blobs predate it; the
+   * read-path defaulter (`storage.ts:withDefaultedCvcGraduationSessionFired`)
+   * normalises missing → `false` at load time. NO `schemaVersion` bump —
+   * same precedent as `parentSettings`, `pendingPromotion`,
+   * `lifetimeFirstEncounters`, and `literacy`.
+   */
+  cvcGraduationSessionFired?: boolean
 }
 
 export const CURRENT_SCHEMA_VERSION = 1 as const

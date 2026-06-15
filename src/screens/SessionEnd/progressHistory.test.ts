@@ -1476,3 +1476,83 @@ describe('recordProgressOnSessionEnd', () => {
     })
   })
 })
+
+describe('recordProgressOnSessionEnd — CVC graduation latch (ticket 86c9qa6n3)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  /** Seed an eligible-state Progress: all three CVC tiers mastered, latch
+   *  controllable. Persisted so `recordProgressOnSessionEnd` reads it. */
+  function seedEligible(cvcGraduationSessionFired: boolean): void {
+    const base = defaultProgress('Marian')
+    const eligible: Progress = {
+      ...base,
+      skillLevels: {
+        ...base.skillLevels,
+        'cvc-words': 'mastered',
+        'cvc-words-short-o': 'mastered',
+        'cvc-words-short-u': 'mastered',
+      },
+      cvcGraduationSessionFired,
+    }
+    saveProgress(eligible)
+  }
+
+  it('latches cvcGraduationSessionFired = true after a cvc-review session (graduation)', () => {
+    seedEligible(false)
+    recordProgressOnSessionEnd({
+      surface: 'word-song',
+      totalCorrect: 7,
+      dateISO: '2026-06-15T18:00:00.000Z',
+      focusNode: 'cvc-words-short-u',
+      focusMode: 'cvc-review',
+    })
+    expect(loadProgress()?.cvcGraduationSessionFired).toBe(true)
+  })
+
+  it('does NOT set the latch on a forward (non-review) session', () => {
+    seedEligible(false)
+    recordProgressOnSessionEnd({
+      surface: 'word-song',
+      totalCorrect: 8,
+      dateISO: '2026-06-15T18:00:00.000Z',
+      focusNode: 'digraphs-sh',
+      focusMode: 'forward',
+    })
+    expect(loadProgress()?.cvcGraduationSessionFired).toBe(false)
+  })
+
+  it('leaves an already-true latch untouched on a periodic cvc-review session (idempotent)', () => {
+    seedEligible(true)
+    recordProgressOnSessionEnd({
+      surface: 'word-song',
+      totalCorrect: 6,
+      dateISO: '2026-06-20T18:00:00.000Z',
+      focusNode: 'cvc-words-short-o',
+      focusMode: 'cvc-review',
+    })
+    // Still true — and no re-fire signal. The picker, not this write,
+    // distinguishes graduation from periodic; the write only ever flips
+    // false → true, never true → false.
+    expect(loadProgress()?.cvcGraduationSessionFired).toBe(true)
+  })
+
+  it('does not crash or set the latch when focusMode is omitted (back-compat)', () => {
+    seedEligible(false)
+    recordProgressOnSessionEnd({
+      surface: 'word-song',
+      totalCorrect: 5,
+      dateISO: '2026-06-15T18:00:00.000Z',
+      focusNode: 'cvc-words',
+      // focusMode omitted — pre-86c9qa6n3 callers / math sessions.
+    })
+    expect(loadProgress()?.cvcGraduationSessionFired).toBe(false)
+  })
+})

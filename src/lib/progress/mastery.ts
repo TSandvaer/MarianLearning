@@ -896,6 +896,42 @@ export function crossVowelMixingActive(
   return true
 }
 
+/**
+ * CVC-review-eligible predicate (ticket 86c9qa6n3, AC1) — true iff ALL
+ * three CVC tiers (`cvc-words`, `cvc-words-short-o`, `cvc-words-short-u`)
+ * are `'mastered'`.
+ *
+ * This is the gate for "CVC review mode" — the firing layer that makes
+ * the PR #181 cross-vowel-mixing infrastructure actually surface during
+ * regular play. Once every CVC tier is mastered, `pickFocusNode` walks
+ * past all of them and lands on a non-CVC node, so cross-vowel chips
+ * never appear (the forward-compat paradox Kevin flagged in PR #181).
+ * When this predicate is true, `pickCvcReviewNode` in `focusNode.ts`
+ * periodically re-surfaces a mastered CVC tier so the mix can fire.
+ *
+ * Deliberately distinct from `crossVowelMixingActive` above:
+ *   - This predicate gates the PICKER (does the engine surface a CVC
+ *     review session at all?). It does NOT read `parentSettings` — the
+ *     review session should be offered regardless of the mixing toggle,
+ *     because the toggle only governs whether the distractors mix vowels.
+ *   - `crossVowelMixingActive` gates the DISTRACTOR MATRIX (when a CVC
+ *     session does run, does it pull cross-vowel distractors?) and DOES
+ *     read `parentSettings.crossVowelMixingEnabled`.
+ *
+ * With the toggle off, a CVC review session still fires but renders
+ * same-vowel distractors — a graceful, parent-controllable degradation.
+ *
+ * O(1): three `skillLevels` reads, no history traversal. Mirrors the
+ * `crossVowelMixingActive` shape.
+ */
+export function cvcReviewEligible(progress: Progress): boolean {
+  const sl = progress.skillLevels
+  for (const node of CVC_CROSS_VOWEL_NODES) {
+    if (sl[node] !== 'mastered') return false
+  }
+  return true
+}
+
 export function isGraduationSessionPending(
   progress: Progress,
   node: SkillNode,

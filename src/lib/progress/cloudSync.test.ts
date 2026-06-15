@@ -527,6 +527,67 @@ describe('reconcileWithCloud', () => {
     expect(installed[0]!.lifetimeFirstEncounters).toEqual(['cvc-words-short-u'])
   })
 
+  it('cvcGraduationSessionFired parity — cloud blob without the field (pre-86c9qa6n3 device) → defaulted to false at install time', async () => {
+    // T1 parity for the CVC-review-mode latch defaulter (ticket
+    // 86c9qa6n3). A cloud blob written by a device predating CVC review
+    // mode comes in with `cvcGraduationSessionFired` absent. The
+    // cloudSync install path must normalise it to `false`, matching
+    // storage.ts:withDefaultedCvcGraduationSessionFired, so a Marian who
+    // already mastered all three CVC tiers on the old device still gets
+    // her one-shot graduation review on the next eligible session.
+    const seed = defaultProgress()
+    const cloudBlob: Record<string, unknown> = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-15T10:00:00.000Z' },
+    }
+    delete cloudBlob.cvcGraduationSessionFired
+    const local = defaultProgress()
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-15T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.cvcGraduationSessionFired).toBe(false)
+    expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
+  it('cvcGraduationSessionFired parity — cloud blob with the latch true preserves it verbatim across install', async () => {
+    // Round-trip pin: a cloud blob that already fired the graduation
+    // review (latch true) must NOT have it reset to false by the
+    // defaulter — that would re-fire the one-shot graduation session.
+    const cloudBlob: Progress = {
+      ...defaultProgress(),
+      profile: {
+        ...defaultProgress().profile,
+        lastPlayedISO: '2026-06-15T10:00:00.000Z',
+      },
+      cvcGraduationSessionFired: true,
+    }
+    const local = defaultProgress()
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-15T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.cvcGraduationSessionFired).toBe(true)
+  })
+
   it('letterSoundsVowelStates parity — cloud blob without literacy (pre-W9.2 device) → field defaulted at install time', async () => {
     // T1 parity for the W9.2 letterSoundsVowelStates defaulter (ticket
     // 86c9ya3gd). A cloud blob written by a device on an older bundle

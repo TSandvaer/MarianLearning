@@ -1189,10 +1189,10 @@ describe('graduation-session round-trip — cvc-words generalization check (tick
     expect(after.skillLevels['cvc-words']).toBe('mastered')
     expect(after.skillLevels['cvc-words-short-o']).toBe('intro')
     expect(after.skillLevels['digraphs-sh']).toBe('locked')
-    expect(pickFocusNode(after, 'word-song')).not.toBe('cvc-words')
+    expect(pickFocusNode(after, 'word-song').node).not.toBe('cvc-words')
     // Picker walks past cvc-words and lands on cvc-words-short-o (the
     // next word-song node, now at 'intro' so non-mastered).
-    expect(pickFocusNode(after, 'word-song')).toBe('cvc-words-short-o')
+    expect(pickFocusNode(after, 'word-song').node).toBe('cvc-words-short-o')
   })
 
   it('AC#4 part 3: graduation session with novel words at 50% does NOT promote; focus stays on cvc-words', () => {
@@ -1220,7 +1220,7 @@ describe('graduation-session round-trip — cvc-words generalization check (tick
     // Downstream stays locked.
     expect(after.skillLevels['digraphs-sh']).toBe('locked')
     // Picker stays on cvc-words.
-    expect(pickFocusNode(after, 'word-song')).toBe('cvc-words')
+    expect(pickFocusNode(after, 'word-song').node).toBe('cvc-words')
     // ALSO: per the AC contract, the next session is a regular
     // cvc-words session — NOT a re-graduation. The detector reads
     // false because the most recent entry has novelPoolSuccessRate

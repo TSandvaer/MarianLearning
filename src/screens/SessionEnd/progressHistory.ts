@@ -53,6 +53,7 @@ import {
   pushProgressToCloud,
   saveProgress,
   WORD_SONG_NODES_IN_ORDER,
+  type FocusMode,
   type LeitnerBox,
   type LetterSoundsVowel,
   type MathFact,
@@ -151,6 +152,19 @@ export interface RecordProgressInput {
    * knows its focus node," not "problems report their nodes."
    */
   focusNode: SkillNode
+  /**
+   * The mode the focus picker selected `focusNode` under (ticket
+   * 86c9qa6n3 — CVC review mode). `'cvc-review'` means a mastered CVC
+   * tier was deliberately re-surfaced for a cross-vowel review session.
+   *
+   * Used solely to latch the one-shot graduation review: when this is
+   * `'cvc-review'` AND `cvcGraduationSessionFired` is still falsy, the
+   * just-completed session WAS the graduation review (the only review
+   * that fires while the latch is false), so the writer flips the latch
+   * to `true`. Optional + additive — callers that don't ship it (every
+   * surface before this ticket) leave the latch untouched.
+   */
+  focusMode?: FocusMode
   /**
    * Graduation-session split (ticket 86c9m3aec). Present ONLY when
    * the just-completed session was a graduation run for cvc-words —
@@ -365,6 +379,20 @@ export function recordProgressOnSessionEnd(
         )
       : existing.profile.subitisingScaffoldSubSessionsObserved
 
+  // CVC graduation-review latch (ticket 86c9qa6n3). When the
+  // just-completed session was the one-shot CVC graduation review
+  // (`focusMode === 'cvc-review'` with the latch still false), flip
+  // `cvcGraduationSessionFired` to `true` so the graduation review never
+  // fires again — subsequent CVC reviews are the periodic round-robin.
+  // The `!== true` guard makes this idempotent: a periodic review
+  // (which also carries `focusMode === 'cvc-review'` but runs AFTER the
+  // latch is already true) leaves the latch untouched.
+  const nextCvcGraduationSessionFired =
+    input.focusMode === 'cvc-review' &&
+    existing.cvcGraduationSessionFired !== true
+      ? true
+      : existing.cvcGraduationSessionFired
+
   const next: Progress = {
     ...existing,
     profile: {
@@ -379,6 +407,7 @@ export function recordProgressOnSessionEnd(
     },
     history: [...existing.history, entry],
     mathFactsLeitner: nextLeitner,
+    cvcGraduationSessionFired: nextCvcGraduationSessionFired,
   }
 
   // 86c9q9ben (AC9f): mark the just-completed session's focus node as

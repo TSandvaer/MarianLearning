@@ -380,7 +380,9 @@ export default function SessionEnd({
   const [focusRecapCopy] = useState<string>(() => {
     const progressForFocus = loadProgress() ?? defaultProgress()
     const track = trackForSurface(payload?.surface ?? 'math')
-    return focusRecapLine(pickFocusNode(progressForFocus, track))
+    // `.node` — the recap copy only needs the focus node, not the
+    // forward/cvc-review mode (ticket 86c9qa6n3 widened the return shape).
+    return focusRecapLine(pickFocusNode(progressForFocus, track).node)
   })
 
   // ── SFX instances (lazy-init, one per mount) ----------------------------
@@ -468,7 +470,18 @@ export default function SessionEnd({
     // `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` P0.2).
     const progressForFocus = loadProgress() ?? defaultProgress()
     const track = trackForSurface(p.surface)
-    const focusNode = pickFocusNode(progressForFocus, track)
+    // ticket 86c9qa6n3 widened the picker to `{ node, mode }`. `mode` is
+    // re-derived here (sessionCount omitted) ONLY to detect the one-shot
+    // CVC graduation review — that branch is sessionCount-independent and
+    // fires whenever `cvcGraduationSessionFired` is still false at the
+    // session-end write (which it is, until this very write sets it). The
+    // writer uses `focusMode` to latch `cvcGraduationSessionFired = true`
+    // exactly once. `focusNode` keeps the existing P0.2 re-derivation
+    // semantics for `skillFocus` / recap.
+    const { node: focusNode, mode: focusMode } = pickFocusNode(
+      progressForFocus,
+      track,
+    )
     // 86c9m3aec: graduation-session split computation. Lives at the
     // session-end persistence boundary because:
     //   1. We need to read `loadProgress()` at the same instant we
@@ -510,6 +523,11 @@ export default function SessionEnd({
       totalCorrect: p.totalCorrect,
       dateISO,
       focusNode,
+      // ticket 86c9qa6n3: thread the focus MODE so the writer can latch
+      // `cvcGraduationSessionFired = true` once the CVC graduation review
+      // has fired. `'cvc-review'` here (with the latch still false) means
+      // this session WAS the graduation review.
+      focusMode,
       ...(graduationSplit !== null ? { graduationSplit } : {}),
       ...(leitnerOutcomes !== undefined ? { leitnerOutcomes } : {}),
       // Latency persistence (ticket 86c9pwgc8 — M4). Math only;
