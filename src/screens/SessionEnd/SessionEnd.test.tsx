@@ -769,8 +769,8 @@ describe('SessionEnd', () => {
         ),
       )
 
-      // Drain the full sequence: opener (t=0), recap (t=1400), streak
-      // (t=3400), goodbye (t=5000), CTA (t=6200).
+      // Drain the full sequence: opener (t=0), focus-recap (t=1100), recap
+      // (t=2500), streak (t=4500), goodbye (t=6100), CTA (t=7300).
       await advanceSequence(8000)
 
       // Count-based assertion per `feedback_count_assertions_on_regression_tests`:
@@ -778,6 +778,7 @@ describe('SessionEnd', () => {
       // test loudly.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.9',
         'session.end.streak.5',
         'session.end.goodbye',
@@ -808,11 +809,13 @@ describe('SessionEnd', () => {
 
       await advanceSequence(8000)
 
-      // No recap.* call when stardust is zero (matches the
-      // SessionEnd.tsx `if (p.totalStardust > 0)` gate). Streak still
+      // No recap.<N> call when stardust is zero (matches the
+      // SessionEnd.tsx `if (p.totalStardust > 0)` gate). The focus-recap
+      // line (M5) is NOT stardust-gated, so it still fires. Streak still
       // fires because finalStreak >= 3.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.streak.4',
         'session.end.goodbye',
       ])
@@ -844,6 +847,7 @@ describe('SessionEnd', () => {
 
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.4',
         'session.end.goodbye',
       ])
@@ -873,10 +877,12 @@ describe('SessionEnd', () => {
 
       // Goodbye text is the LAST caption to render before the CTA replaces
       // the ribbon. We sample the caption right at the goodbye phase
-      // (5000ms in) and verify the LAST word of "See you soon." is
-      // revealed — the silent-fallback shim only ticks word 0 ("See")
-      // and the caption would be stuck there.
-      await advanceSequence(5500)
+      // (6100ms in post-M5 focus-recap shift, was 5000ms pre-M5) and verify
+      // the LAST word of "See you soon." is revealed — the silent-fallback
+      // shim only ticks word 0 ("See") and the caption would be stuck there.
+      // 6500ms is past goodbye (6100) but before the CTA clears the caption
+      // (7300).
+      await advanceSequence(6500)
 
       // Capture the words and their reveal state. SessionEnd renders one
       // <span data-testid="session-end-caption-word"> per word with a
@@ -928,6 +934,7 @@ describe('SessionEnd', () => {
       // recorded so the diagnostic surface (console.warn) fires too.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.9',
         'session.end.streak.5',
         'session.end.goodbye',
@@ -935,6 +942,209 @@ describe('SessionEnd', () => {
 
       // CTA appears regardless of the streak miss.
       expect(screen.getByTestId('session-end-cta')).toBeInTheDocument()
+    })
+  })
+
+  /**
+   * Focus-recap graceful SKIP on the REAL reject path (M5 #451, Thomas-
+   * approved interim for Jessica's #453 P1).
+   *
+   * The `session.end.recap.focus` audio id is NOT in the committed canon
+   * bundle yet. On a real device pre-bake the singleton
+   * `playSessionUtterance` REJECTS the unbaked id WITHOUT firing
+   * `onPlay`/`onWordTick` (`sessionAudio.ts` `!entry → reject`). The screen
+   * must gracefully SKIP the focus-recap beat entirely in that case — NOT
+   * enter the `focus-recap` phase at all — so there is no dead pause (phase
+   * delay, no audio, no caption) and no audio-first-violating silent caption.
+   *
+   * IMPORTANT — these tests must drive the REAL reject path, NOT
+   * `createFakePlayUtterance` (which fires `onWordTick` for ANY id and so
+   * MASKS the bug; per Jessica's #453 finding). `createMissingIdPlayUtterance`
+   * mirrors production: it rejects for the supplied prefix without ticking,
+   * exactly like the singleton missing-howl-map path.
+   */
+  describe('focus-recap graceful skip on reject (M5 #451)', () => {
+    const FOCUS_RECAP_COPY = 'You worked on adding to ten today!'
+
+    it('NEVER enters the focus-recap phase when the utterance rejects (no dead pause)', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 9)
+      // localStorage is cleared in beforeEach → loadProgress() is null →
+      // defaultProgress() → math focus node is `add-to-10`. The REAL reject
+      // path: focus-recap id rejects without firing onPlay/onWordTick.
+      const playUtterance = createMissingIdPlayUtterance(
+        'session.end.recap.focus',
+      )
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...MATH_PAYLOAD, totalStardust: 9, finalStreak: 5 }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      // Sample data-phase across the whole pre-recap window in fine steps so
+      // a transient `focus-recap` flip cannot slip between samples. The bug
+      // shape is: phase sits in `focus-recap` for the inter-beat gap with no
+      // audio + no caption. The fix: phase goes opener → recap, never
+      // passing through focus-recap.
+      const observedPhases = new Set<string>()
+      const root = screen.getByTestId('session-end')
+      for (let elapsed = 0; elapsed < 2800; elapsed += 100) {
+        observedPhases.add(root.getAttribute('data-phase') ?? '')
+        await act(async () => {
+          vi.advanceTimersByTime(100)
+        })
+        await act(async () => {
+          await Promise.resolve()
+        })
+      }
+      observedPhases.add(root.getAttribute('data-phase') ?? '')
+
+      // The phase machine moves opener → recap with no focus-recap stop.
+      expect(observedPhases.has('focus-recap')).toBe(false)
+      expect(observedPhases.has('opener')).toBe(true)
+      expect(observedPhases.has('recap')).toBe(true)
+    })
+
+    it('NEVER renders the focus-recap caption when the utterance rejects (no silent caption)', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 9)
+      const playUtterance = createMissingIdPlayUtterance(
+        'session.end.recap.focus',
+      )
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...MATH_PAYLOAD, totalStardust: 9, finalStreak: 5 }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      // Walk across the focus-recap window and assert the focus-recap copy
+      // never appears in the ribbon at any sampled instant. A captioned-but-
+      // silent line would violate audio-first; the skip path renders no
+      // caption for this beat at all. We join the per-word caption spans with
+      // a space (the ribbon renders one <span> per word, so `textContent`
+      // alone concatenates without spaces).
+      for (let elapsed = 0; elapsed < 2800; elapsed += 100) {
+        const caption = screen
+          .queryAllByTestId('session-end-caption-word')
+          .map((el) => el.textContent)
+          .join(' ')
+        expect(caption).not.toBe(FOCUS_RECAP_COPY)
+        await act(async () => {
+          vi.advanceTimersByTime(100)
+        })
+        await act(async () => {
+          await Promise.resolve()
+        })
+      }
+    })
+
+    it('collapses timing cleanly — recap + goodbye still fire and the CTA appears (no brick)', async () => {
+      const storage = createMemoryStorage()
+      seedStardust(storage, 9)
+      const playUtterance = createMissingIdPlayUtterance(
+        'session.end.recap.focus',
+      )
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...MATH_PAYLOAD, totalStardust: 9, finalStreak: 5 }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      await advanceSequence(8000)
+
+      // focus-recap was ATTEMPTED (so the bake-later path stays wired) but
+      // its REJECTION did not stop the sequence: recap (9), streak (5) and
+      // goodbye all fire, and the CTA reveals. Count-based equality per the
+      // project regression-test convention.
+      expect(playUtterance.calls).toEqual([
+        'session.end.opener',
+        'session.end.recap.focus',
+        'session.end.recap.9',
+        'session.end.streak.5',
+        'session.end.goodbye',
+      ])
+      expect(screen.getByTestId('session-end-cta')).toBeInTheDocument()
+    })
+
+    it('STILL engages the beat (phase + caption) once the id is bakeable (resolve path)', async () => {
+      // Forward-proof: when the clip is baked, the utterance resolves AND
+      // ticks, so the beat engages normally — phase flips to focus-recap and
+      // the caption reveals. This fake ticks the focus-recap word AND DEFERS
+      // its resolve to the next macrotask, so the `focus-recap` phase commits
+      // to the DOM before the recap block's own `setPhase('recap')` runs
+      // (a synchronously-resolving fake would batch the two setPhase calls in
+      // one React flush and the transient focus-recap phase would never paint
+      // — a test artifact, not a product behaviour).
+      const storage = createMemoryStorage()
+      seedStardust(storage, 9)
+      const calls: string[] = []
+      const playUtterance = ((
+        utteranceId: string,
+        opts?: {
+          onPlay?: () => void
+          onWordTick?: (wordIndex: number) => void
+        },
+      ) => {
+        calls.push(utteranceId)
+        opts?.onPlay?.()
+        opts?.onWordTick?.(0)
+        if (utteranceId === 'session.end.recap.focus') {
+          // Defer resolve so the engaged focus-recap phase paints first.
+          return new Promise<void>((resolve) => setTimeout(resolve, 0))
+        }
+        return Promise.resolve()
+      }) as PlayUtteranceFn
+
+      render(
+        withMotion(
+          <SessionEnd
+            payload={{ ...MATH_PAYLOAD, totalStardust: 9, finalStreak: 5 }}
+            playUtteranceFn={playUtterance}
+            chime={createFakeSfx()}
+            sparkle={createFakeSfx()}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+
+      // Drive just past the 1100ms focus-recap delay. On the engaged path the
+      // phase IS `focus-recap` and the focus-recap copy DOES render — the
+      // mirror image of the reject-path tests above.
+      await advanceSequence(1300)
+
+      const root = screen.getByTestId('session-end')
+      expect(root).toHaveAttribute('data-phase', 'focus-recap')
+      const caption = screen
+        .queryAllByTestId('session-end-caption-word')
+        .map((el) => el.textContent)
+        .join(' ')
+      expect(caption).toBe(FOCUS_RECAP_COPY)
+      expect(calls).toContain('session.end.recap.focus')
     })
   })
 
@@ -1047,11 +1257,13 @@ describe('SessionEnd', () => {
 
       await advanceSequence(8000)
 
-      // Streak is below 3 → streak utterance is skipped. Recap id is the
-      // new word-song-specific id. Count-based equality per the project
+      // Streak is below 3 → streak utterance is skipped. The focus-recap
+      // line (M5) fires after the opener; the stardust recap id is the
+      // word-song-specific id. Count-based equality per the project
       // regression-test convention.
       expect(playUtterance.calls).toEqual([
         'session.end.opener',
+        'session.end.recap.focus',
         'session.end.recap.wordsong-completion',
         'session.end.goodbye',
       ])

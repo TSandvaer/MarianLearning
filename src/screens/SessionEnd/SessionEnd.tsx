@@ -33,6 +33,7 @@ import StreakBand from './StreakBand'
 import SleepSplash from './SleepSplash'
 import { recordSessionEnd } from './sessionHistory'
 import { recordProgressOnSessionEnd } from './progressHistory'
+import { focusRecapLine } from './friendlyNodeName'
 import {
   defaultProgress,
   isGraduationSessionPending,
@@ -252,20 +253,29 @@ export interface SessionEndProps {
 
 type Phase =
   | 'opener' // t=0: "You did it!" + sparkle burst
-  | 'recap' // t~1400: stardust count-up + "You earned N stars!"
-  | 'streak' // t~3400: streak band (if finalStreak >= 3)
-  | 'goodbye' // t~5000: "See you soon."
-  | 'settled' // t~6200: CTA visible, idle
+  | 'focus-recap' // t~1100: "You worked on <friendly-name> today!" (M5). SKIPPED entirely (never entered) when the `session.end.recap.focus` utterance is unavailable/rejects — see the focus-recap block in the TTS sequence effect (M5 #451 graceful skip).
+  | 'recap' // t~2500: stardust count-up + "You earned N stars!"
+  | 'streak' // t~4500: streak band (if finalStreak >= 3)
+  | 'goodbye' // t~6100: "See you soon."
+  | 'settled' // t~7300: CTA visible, idle
   | 'sleep-splash' // post-CTA-tap
 
 // ── Timing constants (spec section "Audio dispatch sequence") ---------------
 
 const OPENER_DELAY_MS = 0
-const RECAP_DELAY_MS = 1400
-const STREAK_DELAY_MS = 3400
-const GOODBYE_DELAY_MS = 5000
-const CTA_DELAY_MS = 6200
-const FALLBACK_CTA_DELAY_MS = 4000
+// M5 (ticket 86c9kmwh0): the focus-recap beat ("You worked on … today!")
+// lands between the opener and the stardust recap. The downstream beats
+// (recap / streak / goodbye / CTA) each shift +1100ms to keep the same
+// ~1.4-2s breathing room between spoken lines that the pre-M5 sequence had.
+const FOCUS_RECAP_DELAY_MS = 1100
+const RECAP_DELAY_MS = 2500
+const STREAK_DELAY_MS = 4500
+const GOODBYE_DELAY_MS = 6100
+const CTA_DELAY_MS = 7300
+// Fallback CTA reveal if all audio fails. Bumped +1100ms in lockstep with
+// the focus-recap shift so the silent-audio path still settles AFTER the
+// last spoken beat would have, never before it.
+const FALLBACK_CTA_DELAY_MS = 5100
 
 // ── Spring presets (spec section "Motion") ----------------------------------
 
@@ -355,6 +365,23 @@ export default function SessionEnd({
   const displayedTotalStardust = p.totalStardust + wordSongCompletionGrant
   const displayedEarnedThisSession =
     p.surface === 'word-song' ? wordSongCompletionGrant : p.earnedThisSession
+
+  /**
+   * Focus-recap copy (M5, ticket 86c9kmwh0): "You worked on <friendly-name>
+   * today!". The friendly name is derived from the session's focus node —
+   * the SAME `pickFocusNode(loadProgress() ?? defaultProgress(), track)`
+   * derivation the mount-persistence effect uses below. Computed once via a
+   * lazy initializer so it reflects the focus node as it was at SESSION-
+   * START: `applyMasteryRule()` (which could shift `skillLevels`) only runs
+   * INSIDE `recordProgressOnSessionEnd` in the mount effect, which has not
+   * fired yet at first render — so this read sees exactly what the planner
+   * saw, matching the P0.2 invariant documented on the mount effect.
+   */
+  const [focusRecapCopy] = useState<string>(() => {
+    const progressForFocus = loadProgress() ?? defaultProgress()
+    const track = trackForSurface(payload?.surface ?? 'math')
+    return focusRecapLine(pickFocusNode(progressForFocus, track))
+  })
 
   // ── SFX instances (lazy-init, one per mount) ----------------------------
 
@@ -623,7 +650,74 @@ export default function SessionEnd({
         audioFailedRef.current = true
       }
 
-      // t=1400: Recap -- copy is surface-dependent.
+      // t=1100: Focus recap -- "You worked on <friendly-name> today!" (M5,
+      // ticket 86c9kmwh0). One new spoken beat, surface-independent.
+      //
+      // GRACEFUL SKIP (Thomas-approved, M5 #451 follow-up to Jessica's #453
+      // P1). Audio id `session.end.recap.focus` is NOT in the committed canon
+      // bundle yet (the planner directive that emits it ships separately;
+      // re-baking all tiers is M5-out-of-scope). On a real device pre-bake the
+      // id misses the howl-map and the singleton `playSessionUtterance`
+      // REJECTS without ever firing `onPlay`/`onWordTick` — so we must NOT
+      // commit the `focus-recap` phase up front: doing so leaves a dead pause
+      // (phase delay, no audio, no caption) for the whole inter-beat gap,
+      // which Jessica's #453 caught. A captioned-but-silent line would also
+      // violate audio-first.
+      //
+      // So we attempt the utterance FIRST and only enter the `focus-recap`
+      // phase + reveal the caption REACTIVELY, from inside `onPlay`/
+      // `onWordTick` — i.e. only when the utterance actually engages. If it
+      // rejects (unbaked id on a real device), we skip the phase entirely:
+      // no phase flip, no caption, no dwell. The sequence collapses cleanly
+      // to the next beat with no dead pause. Once the clip is baked, the
+      // utterance plays and the beat engages normally with audio + caption,
+      // with zero further code change.
+      //
+      // Note: the unit-test "silent fallback fires onWordTick(0)" path only
+      // runs when `playUtteranceFn === undefined` (the internal shim) — it
+      // does NOT mask the production reject. See the reject-path unit test in
+      // SessionEnd.test.tsx.
+      //
+      // Copy is client-supplied (`focusRecapCopy`, derived from the session
+      // focus node) so the caption is correct independent of audio state.
+      //
+      // Timing collapse: on the SKIP path the promise resolves immediately at
+      // ~opener-end, and the recap beat below schedules at
+      // `RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS` (1400ms) — which lands recap
+      // one standard inter-beat gap after the opener, exactly the pre-M5
+      // cadence. So removing the focus-recap beat removes precisely its added
+      // time with no dead pause and no special-casing of the recap delay.
+      await new Promise<void>((resolve) => {
+        addTimer(() => {
+          playUtterance('session.end.recap.focus', {
+            onPlay: () => {
+              // Engine fired the audio: commit the phase. Caption is set by
+              // `onWordTick`.
+              setPhase('focus-recap')
+            },
+            onWordTick: (wordIndex) => {
+              // First tick is the commit point for engines that don't fire a
+              // separate `onPlay` (the internal silent shim ticks word 0
+              // without an `onPlay`). Set the phase here too so the engaged
+              // path is robust regardless of which callback fires first.
+              setPhase('focus-recap')
+              setCaptionText(focusRecapCopy)
+              setCaptionRevealed(wordIndex + 1)
+            },
+          })
+            .then(resolve)
+            .catch((err) => {
+              // Reject = id unavailable (unbaked) OR a real play error. Skip
+              // the beat: no phase, no caption, no dwell. Resolve immediately
+              // so the recap beat fires one standard inter-beat gap later
+              // instead of holding the full focus-recap window silent.
+              console.warn('[SessionEnd] focus-recap utterance skipped:', err)
+              resolve()
+            })
+        }, FOCUS_RECAP_DELAY_MS - OPENER_DELAY_MS)
+      })
+
+      // t=2500: Recap -- copy is surface-dependent.
       //
       //   - math: "You earned N stars!" where N = totalStardust (unchanged).
       //     Utterance id `session.end.recap.<N>` is in the planner bundle.
@@ -643,60 +737,54 @@ export default function SessionEnd({
 
         if (p.surface === 'word-song') {
           await new Promise<void>((resolve) => {
-            addTimer(
-              () => {
-                const recapId = 'session.end.recap.wordsong-completion'
-                const copy = `You earned ${numberToWord(WORDSONG_SESSION_END_BONUS)} stars for finishing!`
-                playUtterance(recapId, {
-                  onWordTick: (wordIndex) => {
-                    setCaptionText(copy)
-                    setCaptionRevealed(wordIndex + 1)
-                  },
+            addTimer(() => {
+              const recapId = 'session.end.recap.wordsong-completion'
+              const copy = `You earned ${numberToWord(WORDSONG_SESSION_END_BONUS)} stars for finishing!`
+              playUtterance(recapId, {
+                onWordTick: (wordIndex) => {
+                  setCaptionText(copy)
+                  setCaptionRevealed(wordIndex + 1)
+                },
+              })
+                .then(resolve)
+                .catch((err) => {
+                  console.warn('[SessionEnd] recap utterance failed:', err)
+                  resolve()
                 })
-                  .then(resolve)
-                  .catch((err) => {
-                    console.warn('[SessionEnd] recap utterance failed:', err)
-                    resolve()
-                  })
-              },
-              RECAP_DELAY_MS - (OPENER_DELAY_MS > 0 ? OPENER_DELAY_MS : 0),
-            )
+            }, RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS)
           })
         } else if (p.totalStardust > 0) {
           await new Promise<void>((resolve) => {
-            addTimer(
-              () => {
-                const recapId = `session.end.recap.${p.totalStardust}`
-                playUtterance(recapId, {
-                  onWordTick: (wordIndex) => {
-                    const starWord =
-                      p.totalStardust === 1
-                        ? `You earned one star!`
-                        : `You earned ${numberToWord(p.totalStardust)} stars!`
-                    setCaptionText(starWord)
-                    setCaptionRevealed(wordIndex + 1)
-                  },
+            addTimer(() => {
+              const recapId = `session.end.recap.${p.totalStardust}`
+              playUtterance(recapId, {
+                onWordTick: (wordIndex) => {
+                  const starWord =
+                    p.totalStardust === 1
+                      ? `You earned one star!`
+                      : `You earned ${numberToWord(p.totalStardust)} stars!`
+                  setCaptionText(starWord)
+                  setCaptionRevealed(wordIndex + 1)
+                },
+              })
+                .then(resolve)
+                .catch((err) => {
+                  console.warn('[SessionEnd] recap utterance failed:', err)
+                  resolve()
                 })
-                  .then(resolve)
-                  .catch((err) => {
-                    console.warn('[SessionEnd] recap utterance failed:', err)
-                    resolve()
-                  })
-              },
-              RECAP_DELAY_MS - (OPENER_DELAY_MS > 0 ? OPENER_DELAY_MS : 0),
-            )
+            }, RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS)
           })
         } else {
           // Zero stardust on math: skip the recap line but wait the gap.
           await new Promise<void>((resolve) => {
-            addTimer(resolve, RECAP_DELAY_MS)
+            addTimer(resolve, RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS)
           })
         }
       } catch {
         // Swallow -- continue sequence
       }
 
-      // t=3400: Streak -- "N in a row! Wow!" (only if finalStreak >= 3)
+      // t=4500: Streak -- "N in a row! Wow!" (only if finalStreak >= 3)
       if (p.finalStreak >= 3) {
         try {
           setPhase('streak')
@@ -723,7 +811,7 @@ export default function SessionEnd({
         }
       }
 
-      // t=5000: Goodbye -- "See you soon."
+      // t=6100: Goodbye -- "See you soon."
       try {
         setPhase('goodbye')
         await new Promise<void>((resolve) => {
@@ -753,7 +841,7 @@ export default function SessionEnd({
         // Swallow
       }
 
-      // t=6200: CTA appears
+      // t=7300: CTA appears
       const settledDelay = CTA_DELAY_MS - GOODBYE_DELAY_MS
       addTimer(() => {
         setPhase('settled')

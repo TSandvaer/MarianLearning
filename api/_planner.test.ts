@@ -393,6 +393,10 @@ describe('generateSessionPlan — Session-End utterance schema (ticket 86c9kj2u6
     }
     const prompt = args.system.map((b) => b.text).join('\n')
     expect(prompt).toContain('session.end.opener')
+    // M5 focus-recap line (ticket 86c9kmwh0). Drift-guard: a future
+    // "simplify the prompt" edit must not silently drop the directive that
+    // teaches Haiku to emit the per-focus-node recap line.
+    expect(prompt).toContain('session.end.recap.focus')
     expect(prompt).toContain('session.end.recap.1')
     expect(prompt).toContain('session.end.recap.11')
     expect(prompt).toContain('session.end.streak.3')
@@ -658,9 +662,11 @@ describe('generateSessionPlan — Wave 12 three-hint math directive (ticket 86ca
     expect(systemText).toContain(
       'WORD-SONG track — exactly 5 utterances with these slot names: read, correct, reprompt, hint, giveAnswer',
     )
-    // The math count math is also present (75 entries) but the word-song
-    // count (59) must survive for the word-song flat array.
-    expect(systemText).toContain('8 × 5 + 19 = 59 entries for the WORD-SONG')
+    // The math count math is also present (76 entries) but the word-song
+    // count (60) must survive for the word-song flat array. The +1 over the
+    // pre-M5 count is the focus-recap line (session.end.recap.focus,
+    // ticket 86c9kmwh0).
+    expect(systemText).toContain('8 × 5 + 20 = 60 entries for the WORD-SONG')
   })
 })
 

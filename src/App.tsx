@@ -25,11 +25,14 @@ import SessionEnd from './screens/SessionEnd'
 import type { PlayUtteranceFn, SessionEndPayload } from './screens/SessionEnd'
 import ParentSettings from './screens/ParentSettings'
 import {
+  SESSION_HISTORY_KEY,
   markTreeTouched,
   readSessionHistory,
   writeSessionHistory,
   type SkillTreeId,
 } from './screens/SessionEnd/sessionHistory'
+import { HUB_LAST_UNMOUNT_KEY } from './screens/Hub/useRapidRemountSuppression'
+import { STARDUST_STORAGE_KEY } from './screens/_shared/stardust'
 import {
   DebugOverlay,
   activateAudioContextProbe,
@@ -50,6 +53,7 @@ import {
 import {
   buildLeitnerSessionHint,
   buildSlowFactSessionHint,
+  clearProgress,
   crossVowelMixingActive,
   dueLeitnerItems,
   getOrCreateDeviceId,
@@ -125,6 +129,73 @@ disableHowlerAutoSuspend()
  * `src/lib/debug/debugSeed.ts` for recognized seed values + rationale.
  */
 maybeApplyDebugSeed()
+
+/**
+ * QA reset affordance — `?reset=1` (M5, ticket 86c9kmwh0).
+ *
+ * Clears Marian's local learning state on app boot so Thomas/QA can
+ * replay the first-launch flow on a real iPad without manually editing
+ * DevTools storage. This is a QA tool, NOT a Marian-facing control — there
+ * is no UI; the only feedback is a single `console.log` line.
+ *
+ * Module-load timing is essential (same rationale as `maybeApplyDebugSeed`
+ * above): the clears must land BEFORE any React `useState(loadProgress)` /
+ * `getInitialRoute()` / `nextAfterSplash()` initializer reads storage, so
+ * the very first render sees a fresh blank slate and routes Splash → Greet
+ * (first-launch) rather than Splash → Hub. A `useEffect` would land a
+ * microtask too late, after the first render already read the stale keys.
+ *
+ * Scope of the wipe (the four "learning state" keys):
+ *   - `marian-tutor:progress:v1`        — the Progress doc (AC: clearProgress()).
+ *   - `marian-tutor.session-history.v1` — sessionCount/day-streak. REQUIRED
+ *     for the first-launch observable: `nextAfterSplash()` branches on
+ *     `sessionCount`, which lives here, NOT in the Progress doc. Clearing
+ *     Progress alone would leave a returning user on the Splash → Hub branch.
+ *   - `marian-tutor.stardust.v1`        — cumulative stardust (a reset that
+ *     kept the star total would confuse a QA replay).
+ *   - `marian-tutor.hub.lastUnmountAt`  — transient rapid-remount suppressor.
+ *
+ * Deliberately PRESERVED:
+ *   - `marian-tutor.backup`    — the ParentSettings manual-recovery export.
+ *     Wiping the safety net on a reset would defeat its purpose.
+ *   - `marian-tutor:device-id` — cloud-sync identity. Not "progress"; a new
+ *     id could fork cloud state.
+ */
+function maybeApplyResetParam(): void {
+  if (typeof window === 'undefined') return
+  let isReset: boolean
+  try {
+    isReset = new URLSearchParams(window.location.search).get('reset') === '1'
+  } catch {
+    // URLSearchParams should not throw on a string, but be defensive.
+    return
+  }
+  if (!isReset) return
+
+  clearProgress() // marian-tutor:progress:v1
+
+  // The remaining three keys have no dedicated clear helper and their
+  // owning adapters don't expose removeItem; remove them directly,
+  // wrapped defensively (private mode / locked-down iframe never crashes
+  // boot — same posture as storage.ts's safeRemoveItem).
+  for (const key of [
+    SESSION_HISTORY_KEY,
+    STARDUST_STORAGE_KEY,
+    HUB_LAST_UNMOUNT_KEY,
+  ]) {
+    try {
+      window.localStorage?.removeItem(key)
+    } catch {
+      // ignore — best-effort.
+    }
+  }
+
+  console.log(
+    '[reset] ?reset=1 — cleared progress, session-history, stardust, and hub state. App will boot into first-launch (Greet).',
+  )
+}
+
+maybeApplyResetParam()
 
 /**
  * Optional initial-route override via `?route=literacy` etc. Used for
