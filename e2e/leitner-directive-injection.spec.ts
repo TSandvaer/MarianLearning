@@ -75,6 +75,7 @@ import {
   buildMathFactsLeitner,
   buildSpacedReviewLeitner,
   expectedWireFacts,
+  EXPECTED_DUE_PER_SESSION_CAP,
   MIXED_BOX_FIXTURE,
   ALL_MASTERED_FIXTURE,
   SPACED_REVIEW_RECENT_FACT,
@@ -320,16 +321,20 @@ test.describe('Leitner directive injection on /api/claude payload', () => {
       expect.any(Array),
     )
 
-    // Shape-exact: the seeded fixture flattened and sorted box-
-    // ascending. `expectedWireFacts` is a deterministic stable sort,
-    // mirroring `buildLeitnerSessionHint`'s contract.
+    // Shape-exact: the seeded fixture flattened, sorted box-ascending,
+    // and truncated to the per-session due-fact cap. `expectedWireFacts`
+    // mirrors `buildLeitnerSessionHint`'s sort+cap contract (the cap is
+    // applied AFTER the sort, so the 3 lowest-box facts survive). For
+    // `MIXED_BOX_FIXTURE` (4 box-1 + 1 box-2 + 2 box-3 + 1 box-5, all due
+    // at `lastSeen: 0`) the wire ships the first 3 box-1 facts:
+    // 3+4, 5+2, 6+3.
     expect(leitner).toEqual(expectedWireFacts(MIXED_BOX_FIXTURE))
 
-    // Count: `MIXED_BOX_FIXTURE` is 8 facts spanning boxes 1, 2, 3, 5.
-    expect((leitner as unknown[]).length).toBe(MIXED_BOX_FIXTURE.length)
+    // Count: the cap trims the 8-fact fixture down to the lowest-box 3.
+    expect((leitner as unknown[]).length).toBe(EXPECTED_DUE_PER_SESSION_CAP)
   })
 
-  test('2. all-mastered fixture (every fact at box 5) still ships the directive — mastered facts are NOT dropped', async ({
+  test('2. all-mastered fixture (every fact at box 5) still ships the directive — mastered facts are reviewed, NOT silently emptied (capped at 3)', async ({
     page,
   }) => {
     const { requests } = await installLeitnerMathMock(page)
@@ -355,14 +360,24 @@ test.describe('Leitner directive injection on /api/claude payload', () => {
     expect(mathReqs).toHaveLength(1)
 
     const leitner = readLeitnerFromRequest(mathReqs[0]!)
+
+    // Shape-exact: all-box-5 facts, sorted (no-op — single box level),
+    // then truncated to the per-session due-fact cap. The key invariant
+    // this test defends: mastered facts are STILL reviewed — the cap
+    // trims the set to 3 but does NOT empty it. A regression that dropped
+    // mastered (box-5) facts entirely would ship `[]` here and fail.
     expect(leitner).toEqual(expectedWireFacts(ALL_MASTERED_FIXTURE))
 
-    // Every entry has box === 5. Confirm directly so a future bug that
-    // silently demotes high-box facts to box 1 (e.g. a forgotten clamp)
-    // surfaces here with a count rather than a `.toContain` smell.
+    // The directive is non-empty (mastered facts NOT dropped to zero) AND
+    // every shipped entry is still box 5 — a future bug that silently
+    // demotes high-box facts to box 1 (e.g. a forgotten clamp) surfaces
+    // here with a count rather than a `.toContain` smell. The cap trims
+    // the 4-fact fixture to the lowest-box (all box 5) first 3.
     const arr = leitner as ReadonlyArray<{ box: number }>
+    expect(arr.length).toBeGreaterThan(0)
+    expect(arr.length).toBe(EXPECTED_DUE_PER_SESSION_CAP)
     const boxFiveCount = arr.filter((f) => f.box === 5).length
-    expect(boxFiveCount).toBe(ALL_MASTERED_FIXTURE.length)
+    expect(boxFiveCount).toBe(EXPECTED_DUE_PER_SESSION_CAP)
   })
 
   test('3. wire shape preserves operand order and operator — 3+4 ships as {a:3,b:4,op:"+"}, not {a:4,b:3} or with op dropped', async ({
@@ -373,6 +388,13 @@ test.describe('Leitner directive injection on /api/claude payload', () => {
     // Leitner box (the box keys on the literal `{a,b,op}` triple). A
     // bug that normalises to "smaller addend first" before serialising
     // would silently merge them; this spec catches that class.
+    //
+    // The fixture deliberately keeps both order-sensitive facts (3+4 box-1,
+    // 4+3 box-2) and 7+2 box-1 inside the per-session due-fact cap of 3.
+    // After box-ascending sort the order is [3+4(1), 7+2(1), 4+3(2), 2+7(3)];
+    // the cap trims the tail box-3 fact (2+7), leaving the operand-order
+    // and operator assertions on 3+4 / 4+3 fully exercised within the ≤3
+    // cap.
     const ORDER_SENSITIVE_FIXTURE: ReadonlyArray<LeitnerFactSpec> = [
       { a: 3, b: 4, op: '+', box: 1 },
       { a: 4, b: 3, op: '+', box: 2 },
@@ -404,11 +426,13 @@ test.describe('Leitner directive injection on /api/claude payload', () => {
     const leitner = readLeitnerFromRequest(mathReqs[0]!)
 
     // Exact-shape: each `{a,b,op,box}` quadruple matches the seeded
-    // fixture. Sorted box-ascending; within a box level the input
-    // order is preserved (Array.sort is stable in ES2019+).
+    // fixture, sorted box-ascending then truncated to the per-session
+    // due-fact cap. Within a box level the input order is preserved
+    // (Array.sort is stable in ES2019+).
     expect(leitner).toEqual(expectedWireFacts(ORDER_SENSITIVE_FIXTURE))
 
-    // Spot-check: 3+4 is a separate fact from 4+3. Both ship.
+    // Spot-check: 3+4 is a separate fact from 4+3. Both survive the cap
+    // (3+4 is box-1, 4+3 is box-2 — both in the lowest-box 3) and ship.
     const arr = leitner as ReadonlyArray<{ a: number; b: number; op: string }>
     const threePlusFour = arr.filter(
       (f) => f.a === 3 && f.b === 4 && f.op === '+',
@@ -418,8 +442,9 @@ test.describe('Leitner directive injection on /api/claude payload', () => {
       (f) => f.a === 4 && f.b === 3 && f.op === '+',
     )
     expect(fourPlusThree).toHaveLength(1)
-    // Total count assertion catches any silent merge / dedupe.
-    expect(arr).toHaveLength(ORDER_SENSITIVE_FIXTURE.length)
+    // Total count assertion catches any silent merge / dedupe: the cap
+    // trims the 4-fact fixture to the lowest-box 3.
+    expect(arr).toHaveLength(EXPECTED_DUE_PER_SESSION_CAP)
   })
 
   test('4. empty mathFactsLeitner → payload.progress.leitner is OMITTED entirely (empty-array gate, canon-served free path)', async ({
@@ -545,8 +570,8 @@ test.describe('Leitner directive injection on /api/claude payload', () => {
     page,
   }) => {
     // Two box-3 facts at different recencies:
-    //   - 7+2 seen 1 day ago  → box-3 interval is 4 days → NOT due → ABSENT.
-    //   - 6+3 seen 10 days ago → past the 4-day interval → due → PRESENT.
+    //   - 7+2 seen 1 day ago  → box-3 interval is 3 days → NOT due → ABSENT.
+    //   - 6+3 seen 10 days ago → past the 3-day interval → due → PRESENT.
     // This is the whole point of the M4 residual delta: the App now filters
     // the box through `dueLeitnerItems(box, Date.now())` BEFORE building the
     // hint, so non-due facts no longer ship into every session. Without the

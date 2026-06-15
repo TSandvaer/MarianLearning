@@ -106,7 +106,7 @@ export const ALL_MASTERED_FIXTURE: ReadonlyArray<LeitnerFactSpec> = [
  * recencies, used to assert the App applies `dueLeitnerItems` BEFORE
  * `buildLeitnerSessionHint`:
  *
- *   - `7+2` was last seen RECENTLY (well inside the box-3 4-day interval)
+ *   - `7+2` was last seen RECENTLY (well inside the box-3 3-day interval)
  *     → NOT due → must be ABSENT from the wire.
  *   - `6+3` was last seen STALE (far past the box-3 interval) → due →
  *     must be PRESENT on the wire.
@@ -134,21 +134,39 @@ export function buildSpacedReviewLeitner(
 ): ReturnType<typeof buildMathFactsLeitner> {
   const MS_PER_DAY = 86_400_000
   return buildMathFactsLeitner([
-    // box-3 interval is 4 days; seen 1 day ago → NOT due.
+    // box-3 interval is 3 days; seen 1 day ago → NOT due.
     { ...SPACED_REVIEW_RECENT_FACT, box: 3, lastSeen: now - 1 * MS_PER_DAY },
-    // box-3 interval is 4 days; seen 10 days ago → due.
+    // box-3 interval is 3 days; seen 10 days ago → due.
     { ...SPACED_REVIEW_STALE_FACT, box: 3, lastSeen: now - 10 * MS_PER_DAY },
   ])
 }
 
 /**
+ * Per-session due-fact cap mirrored from `LEITNER_DUE_PER_SESSION_CAP`
+ * in `src/lib/progress/leitner.ts`. The production `buildLeitnerSessionHint`
+ * truncates the box-ascending-sorted hint to this many facts AFTER the sort,
+ * so only the lowest-box (most-fragile) facts survive. This module mirrors
+ * the constant rather than importing it because the e2e tsconfig builds
+ * independently from src/ — keep the two in sync (Thomas-approved tuning,
+ * #452 / Dave's research #450 §6).
+ */
+export const EXPECTED_DUE_PER_SESSION_CAP = 3
+
+/**
  * The fact strings the wire ships for a given fixture, in box-ascending
- * order. Tests assert this list against the captured request body so a
- * future bug that swaps operands (3+4 vs 4+3 — different fact) or drops
- * the operator surfaces as a count-based assertion failure.
+ * order, AFTER the per-session due-fact cap. Tests assert this list against
+ * the captured request body so a future bug that swaps operands (3+4 vs 4+3
+ * — different fact), drops the operator, or mis-caps the due subset surfaces
+ * as a shape-exact assertion failure.
+ *
+ * The cap is applied AFTER the stable box-ascending sort — exactly matching
+ * `buildLeitnerSessionHint`. With more than `EXPECTED_DUE_PER_SESSION_CAP`
+ * facts in the fixture, the lowest-box facts (insertion-order-preserved
+ * within a box level) are the ones that ship.
  */
 export function expectedWireFacts(
   fixture: ReadonlyArray<LeitnerFactSpec>,
+  cap: number = EXPECTED_DUE_PER_SESSION_CAP,
 ): Array<{ a: number; b: number; op: LeitnerOp; box: LeitnerBoxIndex }> {
   // Stable sort by box ascending; preserves insertion order within a
   // box level — same contract as `buildLeitnerSessionHint` documents.
@@ -159,5 +177,10 @@ export function expectedWireFacts(
     box: f.box,
   }))
   out.sort((x, y) => x.box - y.box)
+  // Truncate from the tail so the lowest-box facts survive — mirrors the
+  // per-session cap in `buildLeitnerSessionHint`.
+  if (out.length > cap) {
+    out.length = cap
+  }
   return out
 }
