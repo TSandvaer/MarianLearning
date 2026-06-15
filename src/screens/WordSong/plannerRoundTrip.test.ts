@@ -904,10 +904,9 @@ describe('planner → parser round-trip — cvc-words-short-e (ticket 86c9teua2)
  *     because `x` is ONE grapheme token (the /ks/ cluster), not two.
  *   - Non-cvc-word tiers do NOT carry a `blend` slot.
  *
- * Tokenization mirrors the screen-side caption walk (Kyle spec
- * §"Letter-highlight timing"): split the stored text on whitespace and
- * drop the ` - ` / ` ... ` ASCII-7 separators — the remaining tokens are
- * `[g1, g2, ..., word]`.
+ * Tokenization verifies the `wordLength + 1` content-token invariant:
+ * split the stored text on whitespace and drop the ` - ` / ` ... `
+ * ASCII-7 separators — the remaining tokens are `[g1, g2, ..., word]`.
  */
 describe('planner → parser round-trip — cvc-word blend slot (ticket 86ca8t8xx)', () => {
   /** Tokenize a stored blend canon text the way the caption walk does:
