@@ -169,7 +169,9 @@ The single key is `STORAGE_KEY = 'marian-tutor:progress:v1'` ([`storage.ts:17`](
 
 `saveProgress(p)` trims `history` to `MAX_SESSION_HISTORY = 30` entries (oldest dropped) and persists. Storage failures (quota, private mode) are silently swallowed — progress is best-effort, never a blocker for play. See [`storage.ts:83`](MarianLearning/src/lib/progress/storage.ts#L83).
 
-`clearProgress()` removes the key. Used by reset flows and tests.
+`clearProgress()` removes ONLY the progress key (`marian-tutor:progress:v1`). Used by reset flows and tests.
+
+**Reset trap (M5 / #451):** `clearProgress()` alone is NOT a "fresh install." The first-launch branch `nextAfterSplash()` routes on `sessionCount`, which lives in the SEPARATE `marian-tutor.session-history.v1` blob (see § storage-key distinction below), not in Progress — so clearing only Progress leaves a returning user on the Hub with default Progress (a confusing half-reset, not first-launch). M5's `?reset=1` boot affordance (`App.tsx` `maybeApplyResetParam`, QA-only) clears BOTH blobs (+ stardust + the transient hub key) and PRESERVES the ParentSettings backup export + cloud device-id, so the app actually reaches Splash→Greet. Any future "reset" / "fresh-state" work must clear both keys.
 
 Every localStorage touch goes through `safeGetItem` / `safeSetItem` / `safeRemoveItem` so SSR and private-mode browsers don't crash boot.
 
@@ -520,6 +522,12 @@ The browser ships a compact Leitner hint on the `/api/claude` payload, the plann
 3. **Server directive**: `/api/claude` extracts + soft-validates the field via `parseLeitnerHint` (any malformed item drops the whole array). Non-empty leitner BYPASSES BOTH canon AND the in-memory cache (mirrors graduation-session bypass), forcing a live Haiku run that emits a directive into the user message — `LEITNER PRIORITY DIRECTIVE` lists facts grouped by box-level ascending and tells Haiku to forbid box-1 facts from problems 1-3 (gentle ramp) and lean into them on problems 4-8.
 
 Active scope (v1): math + add-to-10 only. Misrouted leitner on word-song / other math nodes is silently ignored at the planner. The constraint mirrors v1's only Leitner box (math facts) and the focus node Marian is on today.
+
+### Spaced-review time filter (ticket 86c9kmwf8 / #447 — shipped)
+
+The session-gen hint above is now **time-filtered before it ships**, turning "weighted review" into true _spaced_ review. `dueLeitnerItems(box, now, schedule?)` ([`leitner.ts`](MarianLearning/src/lib/progress/leitner.ts)) returns only the box items whose box-derived interval has elapsed since `lastSeen`; `App.tsx` runs `mathFactsLeitner` through it BEFORE `buildLeitnerSessionHint`. So **`progress.leitner` on the wire is the DUE subset, not the full box** — a fact promoted recently is withheld until its interval lapses.
+
+Schedule (named const `LEITNER_REVIEW_INTERVAL_DAYS`, calendar days, deliberately tunable): box 1 → 0 (every session), 2 → 2, 3 → 4, 4 → 7, 5 → 14. Due when `now - lastSeen >= intervalDays[box] * 86_400_000` (`>=`, so an exact-interval fact is due). `addItem` sets `lastSeen: 0`, so brand-new box-1 facts are immediately due. No separate `leitnerDue` payload field was added and no `_planner.ts` change was needed — the canonical wire field stays `progress.leitner` (this reconciled the original M4 ticket's separate-field spec against the already-shipped 86c9pwgc8 design). The `0/2/4/7/14` values are a starting guess flagged for later tuning.
 
 ### Session-end promotion
 

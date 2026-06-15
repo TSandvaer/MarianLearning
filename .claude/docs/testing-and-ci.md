@@ -55,6 +55,14 @@ Baseline on `main` post-Wave 4: **2597 passed / 5 todo / 1 skipped** (87 test fi
 
 [src/test/setup.ts](MarianLearning/src/test/setup.ts) wires the standard testing-library matchers, jsdom polyfills, and `fake-indexeddb` for localStorage / IndexedDB-adjacent code paths. `@testing-library/react` + `@testing-library/user-event` + `@testing-library/jest-dom` are the core component-test API.
 
+### 1.5 Emma pose-beat component-test gotchas (Wave 14 Track B — Jessica failing-first + Devon impl, PR #434 / ticket 86ca8kq7r)
+
+Pinning Emma's pose at screen beats (Math/WordSong `emma-pose-beats.test.tsx`) surfaced several non-obvious traps:
+
+- **Read the live pose from the screen-root `data-pose`, NOT `getAllByTestId('*-emma').at(-1)`.** [EmmaCharacter.tsx:163](MarianLearning/src/components/EmmaCharacter.tsx#L163) wraps the pose `<m.img>` in `<AnimatePresence initial={false}>`, so during a transition two nodes share the per-screen `data-testid` (`math-emma`/`word-song-emma`). The `.at(-1)` idiom _happens_ to work for transitions INTO a non-idle pose, but it is a **trap on return-to-idle** (X→idle): Framer revives the idle slot at DOM position 0 while the exiting non-idle `<m.img>` lingers LAST (its exit never completes under fake timers — ~150ms real), so `.at(-1)` returns the **stale exiting pose**. The reliable "live pose" selector is the **screen-root `data-pose`** (`data-testid="math"` / `"word-song"`), which mirrors React state directly. Opacity is not a usable discriminator (entering nodes start at `opacity:0`; fake timers freeze the animation). (Verified: Devon PR #434, correcting the original `.at(-1)` helper.)
+- **A pose-clear via `setTimeout(0)` behind 2+ `await`/`.then` hops needs the test to drain microtasks BEFORE `advanceTimersByTime(0)`** — otherwise the fake clock advances before the clear is even scheduled (silent fake-timer ordering trap). (Devon PR #434)
+- **`__testInitiallyAudioUnlocked` pre-arms `spokeReadAloudRef = true`, which short-circuits the read-aloud `speak()` entirely** — so the `listening` beat never fires under that seam. To drive/hold the read-aloud (or any Emma-speaking beat), use `getHowlerRunning={() => true}` + `autoResolve:false` on the speak mock instead of the audio-unlock seam. (Jessica, failing-first authoring)
+
 ---
 
 ## 2. Playwright — e2e browser tests
@@ -360,6 +368,8 @@ Failing-first specs that exercise a full progression flow are systematically vul
 
 **Sizing rule.** For any E2E spec that exercises a full progression flow (multiple complete sessions through mastery), estimate `sessions × wall_time + ≥30s headroom` at authoring time and call `test.setTimeout(<estimate>_000)` in the spec head. Per-session wall time on the silent-caption-walk fallback path (CI's default for chip-enablement) is ~30–50s — measure on one full GREEN run if available, otherwise default to 60s × sessions as a conservative ceiling.
 
+**Stacked failing-first spec — rebase gotcha (M5 #449/#453, 2026-06-15).** When a failing-first e2e spec is branched off an _impl_ dev branch (not `main`) so it can test the in-flight feature, and that impl branch later merges to `main` carrying a NEWER fix than the spec's base, a plain `git rebase origin/main` on the spec branch CONFLICTS — the spec still carries the OLD impl commit and `main` now has the newer version. A naive conflict resolution that keeps the branch's side silently REVERTS the merged fix. Correct fix: `git rebase --onto origin/main <old-impl-commit>` to drop the redundant impl commit entirely, leaving only the spec commit on top of `main`. (Concrete: #453's recap-e2e was cut from Devon's M5 dev branch carrying the pre-graceful-skip `setPhase('focus-recap')` commit `c62ba5d`; `main` had the newer graceful-skip, so `git rebase --onto origin/main c62ba5d` dropped the stale impl commit cleanly. Its sibling #449 carried only the spec commit, so a plain rebase was conflict-free — the gotcha only bites when the spec branch carries impl commits.)
+
 #### 4.1.1c `buildSeedProgress.history` carries the full `SessionHistoryEntry` shape (ticket 86c9xaybc, 2026-05-22)
 
 `SeedProgressOptions.history` accepts a properly-typed `SessionHistoryEntry`-shaped entry. Every additive optional field on the production schema is supported natively:
@@ -390,6 +400,12 @@ const progress = buildSeedProgress({
 Arrays are deep-copied on the way in, so `as const` and frozen inputs round-trip safely. The helper-side type uses `ReadonlyArray<>` on every array field for the same reason.
 
 **For other Progress-level fields** (e.g. `profile.subitisingScaffoldSessionsObserved`, custom-shaped `mathFactsLeitner.items`, `lifetimeFirstEncounters` non-trivial overrides, `pendingPromotion`), the raw-spread workaround pattern still applies as a stopgap until that field gets the same treatment — file a follow-up ticket once 2+ specs hit the same raw-spread shape on a Progress-level field. The 3-precedent threshold (latencyMs / mathFacts / perProblemAnswerValue+Word) that triggered the `history` widening is the canonical pattern.
+
+#### 4.1.1c Leitner spaced-review fixtures — `lastSeen: 0` is always-due (2026-06-15)
+
+When seeding `mathFactsLeitner.items` for a spaced-review test, watch the `lastSeen` field. `lastSeen: 0` (the `addItem` default / epoch) means the fact is _decades_ overdue, so the recency filter (`dueLeitnerItems`, shipped #447) always treats it as due. The pre-existing 86c9pwgc8 Leitner fixtures all use `lastSeen: 0`, so they stay green by construction even after the spaced filter landed — they don't exercise it at all.
+
+A test that means to verify spacing MUST seed a **real `now`-relative `lastSeen`** (e.g. `now - 1*DAY` for not-due vs. `now - 10*DAY` for due), or it's a no-op that would still pass if the filter were deleted. The helper `buildSpacedReviewLeitner(now)` in [`e2e/_helpers/leitnerFixtures.ts`](MarianLearning/e2e/_helpers/leitnerFixtures.ts) does this correctly; prove RED→GREEN by mutating the filter's `>=` to `>` (fails the exact-boundary case).
 
 **Historical context (pre-widening).** The raw-spread workaround originally read:
 
