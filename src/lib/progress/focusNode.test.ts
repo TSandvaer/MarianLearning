@@ -6,16 +6,30 @@
 import { describe, expect, it } from 'vitest'
 import { defaultProgress } from './defaults'
 import {
+  CVC_REVIEW_PERIOD_SESSIONS,
+  CVC_TIERS,
   MATH_NODES_IN_ORDER,
   WORD_SONG_NODES_IN_ORDER,
+  pickCvcReviewNode,
   pickFocusNode,
   pickRecentSuccessRate,
 } from './focusNode'
 import type { Progress, SkillLevels } from './types'
 
-/** Build a Progress with all skills set to `mastered`, then layer overrides
- *  on top. Tests that need a specific shape spell out only the deltas. */
-function buildProgress(overrides: Partial<SkillLevels> = {}): Progress {
+/**
+ * Build a Progress with all skills set to `mastered`, then layer overrides
+ * on top. Tests that need a specific shape spell out only the deltas.
+ *
+ * `cvcGraduationSessionFired` defaults to `true` so forward-progression
+ * tests (which seed all CVC tiers mastered to exercise the walk PAST them)
+ * are not hijacked by the CVC graduation review (ticket 86c9qa6n3). The
+ * CVC-review-specific tests pass `{ cvcGraduationSessionFired: false }` (or
+ * other top-level fields) via the second argument to opt INTO review mode.
+ */
+function buildProgress(
+  overrides: Partial<SkillLevels> = {},
+  progressOverrides: Partial<Progress> = {},
+): Progress {
   const base = defaultProgress()
   const allMastered: SkillLevels = Object.fromEntries(
     Object.keys(base.skillLevels).map((k) => [k, 'mastered']),
@@ -23,6 +37,8 @@ function buildProgress(overrides: Partial<SkillLevels> = {}): Progress {
   return {
     ...base,
     skillLevels: { ...allMastered, ...overrides },
+    cvcGraduationSessionFired: true,
+    ...progressOverrides,
   }
 }
 
@@ -80,7 +96,7 @@ describe('pickFocusNode — math', () => {
       'add-to-10': 'practicing',
       'add-to-20': 'locked',
     })
-    expect(pickFocusNode(progress, 'math')).toBe('add-to-10')
+    expect(pickFocusNode(progress, 'math').node).toBe('add-to-10')
   })
 
   it('returns the lowest non-mastered node — skips mastered nodes', () => {
@@ -89,7 +105,7 @@ describe('pickFocusNode — math', () => {
       'add-to-10': 'mastered',
       'add-to-20': 'practicing',
     })
-    expect(pickFocusNode(progress, 'math')).toBe('add-to-20')
+    expect(pickFocusNode(progress, 'math').node).toBe('add-to-20')
   })
 
   it("treats 'intro' as non-mastered", () => {
@@ -105,7 +121,7 @@ describe('pickFocusNode — math', () => {
       'skip-counting': 'mastered',
       'mult-2-5-10': 'intro',
     })
-    expect(pickFocusNode(progress, 'math')).toBe('mult-2-5-10')
+    expect(pickFocusNode(progress, 'math').node).toBe('mult-2-5-10')
   })
 
   it("treats 'locked' as non-mastered (the walker doesn't try to leapfrog)", () => {
@@ -116,12 +132,12 @@ describe('pickFocusNode — math', () => {
       'number-recog': 'mastered',
       'add-to-10': 'locked',
     })
-    expect(pickFocusNode(progress, 'math')).toBe('add-to-10')
+    expect(pickFocusNode(progress, 'math').node).toBe('add-to-10')
   })
 
   it('falls back to the last math node when every node is mastered (defensive)', () => {
     const progress = buildProgress() // every level → mastered via helper
-    expect(pickFocusNode(progress, 'math')).toBe('mult-6-9')
+    expect(pickFocusNode(progress, 'math').node).toBe('mult-6-9')
   })
 
   it('walks the default Progress doc — Marian lands on add-to-10 (matches diagnostic)', () => {
@@ -130,7 +146,7 @@ describe('pickFocusNode — math', () => {
     // Pin the integration so a future tweak to defaults can't silently
     // shift focus to a node Marian isn't ready for.
     const progress = defaultProgress()
-    expect(pickFocusNode(progress, 'math')).toBe('add-to-10')
+    expect(pickFocusNode(progress, 'math').node).toBe('add-to-10')
   })
 
   // ── Wave 5 sibling-tier split (ticket 86c9y0bvc) ─────────────────
@@ -148,7 +164,9 @@ describe('pickFocusNode — math', () => {
       'two-digit-addsub-no-regroup': 'practicing',
       'two-digit-addsub-with-regroup': 'locked',
     })
-    expect(pickFocusNode(progress, 'math')).toBe('two-digit-addsub-no-regroup')
+    expect(pickFocusNode(progress, 'math').node).toBe(
+      'two-digit-addsub-no-regroup',
+    )
   })
 
   it('returns two-digit-addsub-with-regroup when no-regroup is mastered and with-regroup is practicing', () => {
@@ -164,7 +182,7 @@ describe('pickFocusNode — math', () => {
       'two-digit-addsub-no-regroup': 'mastered',
       'two-digit-addsub-with-regroup': 'practicing',
     })
-    expect(pickFocusNode(progress, 'math')).toBe(
+    expect(pickFocusNode(progress, 'math').node).toBe(
       'two-digit-addsub-with-regroup',
     )
   })
@@ -184,7 +202,7 @@ describe('pickFocusNode — math', () => {
       'two-digit-addsub-with-regroup': 'mastered',
       'skip-counting': 'practicing',
     })
-    expect(pickFocusNode(progress, 'math')).toBe('skip-counting')
+    expect(pickFocusNode(progress, 'math').node).toBe('skip-counting')
   })
 })
 
@@ -204,7 +222,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
     // letter-sounds. The planner stub-fallback handles letter-sounds by
     // emitting blending-cv content, so the picker can surface it safely.
     const progress = defaultProgress()
-    expect(pickFocusNode(progress, 'word-song')).toBe('letter-sounds')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('letter-sounds')
   })
 
   it('returns blending-cv when blending-cv is practicing (AC #1.a)', () => {
@@ -214,7 +232,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'letter-sounds': 'mastered',
       'blending-cv': 'practicing',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('blending-cv')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('blending-cv')
   })
 
   it('returns cvc-words when blending-cv is mastered + cvc-words is practicing (AC #1.b — the August unblock)', () => {
@@ -228,7 +246,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'blending-cv': 'mastered',
       'cvc-words': 'practicing',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('cvc-words')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('cvc-words')
   })
 
   it('returns letter-names when every literacy node is locked (AC #1.c — first non-locked up the tree)', () => {
@@ -250,7 +268,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'sight-words': 'locked',
       'simple-sentences': 'locked',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('letter-names')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('letter-names')
   })
 
   it("treats 'intro' as non-mastered (mirrors the math walker contract)", () => {
@@ -266,7 +284,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       // First digraph sibling at 'intro' — picker lands there.
       'digraphs-sh': 'intro',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('digraphs-sh')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('digraphs-sh')
   })
 
   it('skips mastered nodes and lands on the first non-mastered', () => {
@@ -288,13 +306,13 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
       'digraphs-th-voiceless': 'mastered',
       'sight-words': 'practicing',
     })
-    expect(pickFocusNode(progress, 'word-song')).toBe('sight-words')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('sight-words')
   })
 
   it('falls back to the last word-song node when every node is mastered (defensive)', () => {
     // Mirrors the math fallback at the end of MATH_NODES_IN_ORDER.
     const progress = buildProgress() // every level → mastered via helper
-    expect(pickFocusNode(progress, 'word-song')).toBe('simple-sentences')
+    expect(pickFocusNode(progress, 'word-song').node).toBe('simple-sentences')
   })
 
   it('returns the lowest non-mastered across a sweep of progress shapes', () => {
@@ -370,7 +388,7 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
     ]
     for (const [overrides, expected] of shapes) {
       const progress = buildProgress(overrides)
-      expect(pickFocusNode(progress, 'word-song')).toBe(expected)
+      expect(pickFocusNode(progress, 'word-song').node).toBe(expected)
     }
   })
 })
@@ -452,5 +470,206 @@ describe('pickRecentSuccessRate', () => {
       { skillFocus: ['add-to-10'], successRate: 0 },
     ])
     expect(pickRecentSuccessRate(progress, 'math')).toBe(0)
+  })
+})
+
+// ── CVC review mode (ticket 86c9qa6n3) ──────────────────────────────────
+//
+// The firing layer for PR #181 cross-vowel mixing. When all three CVC
+// tiers are mastered, the forward picker walks past them onto a non-CVC
+// node, so cross-vowel chips never surface. `pickCvcReviewNode` re-surfaces
+// a mastered CVC tier on a graduation-once-then-round-robin cadence.
+//
+// All three CVC tiers (`cvc-words`, `cvc-words-short-o`,
+// `cvc-words-short-u`) are mastered by the `buildProgress()` default; the
+// helper's default `cvcGraduationSessionFired: true` is OVERRIDDEN to
+// `false` here to test the graduation path, and back to `true` to test the
+// periodic path. The intermediate vowel tiers (`-short-i`, `-short-e`) are
+// NOT part of the cross-vowel set — only the original three.
+
+describe('pickCvcReviewNode (ticket 86c9qa6n3)', () => {
+  /** All three CVC tiers mastered + latch state + the graduation default. */
+  function reviewEligibleProgress(
+    progressOverrides: Partial<Progress> = {},
+  ): Progress {
+    // buildProgress() already masters every node; we just control the
+    // latch via progressOverrides. The three CVC tiers are mastered by
+    // construction, so `cvcReviewEligible` is true.
+    return buildProgress({}, progressOverrides)
+  }
+
+  describe('eligibility gate', () => {
+    it('returns null when not all three CVC tiers are mastered (§4.4)', () => {
+      // Only two of three CVC tiers mastered — review mode is premature
+      // because the forward picker still has a non-mastered CVC node to
+      // land on. sessionCount is irrelevant; the gate short-circuits.
+      const progress = buildProgress(
+        { 'cvc-words-short-u': 'practicing' },
+        { cvcGraduationSessionFired: false },
+      )
+      expect(pickCvcReviewNode(progress, 5)).toBeNull()
+    })
+
+    it('returns null when only cvc-words is mastered (rest practicing)', () => {
+      const progress = buildProgress(
+        {
+          'cvc-words': 'mastered',
+          'cvc-words-short-o': 'practicing',
+          'cvc-words-short-u': 'practicing',
+        },
+        { cvcGraduationSessionFired: false },
+      )
+      expect(pickCvcReviewNode(progress, 0)).toBeNull()
+      expect(pickCvcReviewNode(progress, 5)).toBeNull()
+    })
+  })
+
+  describe('graduation review (Option C — once)', () => {
+    it('returns cvc-words-short-u on the first eligible session (latch falsy)', () => {
+      // Short-u is the graduation target — /ʌ/ has no Tagalog equivalent
+      // and is the highest-L1-interference vowel. sessionCount does NOT
+      // matter for the graduation branch.
+      const progress = reviewEligibleProgress({
+        cvcGraduationSessionFired: false,
+      })
+      expect(pickCvcReviewNode(progress, 0)).toBe('cvc-words-short-u')
+      expect(pickCvcReviewNode(progress, 3)).toBe('cvc-words-short-u')
+      expect(pickCvcReviewNode(progress, 7)).toBe('cvc-words-short-u')
+    })
+
+    it('treats absent cvcGraduationSessionFired as not-yet-fired (§4.5 — old blobs)', () => {
+      // An old blob predating the field reads `undefined`; the picker must
+      // treat that as "graduation not yet fired" so a pre-existing Marian
+      // still gets her one-shot graduation review.
+      const progress = reviewEligibleProgress({
+        cvcGraduationSessionFired: undefined,
+      })
+      expect(pickCvcReviewNode(progress, 0)).toBe('cvc-words-short-u')
+    })
+
+    it('does NOT re-fire graduation once the latch is true', () => {
+      // Latch true → graduation branch skipped. On a non-period session
+      // the picker returns null (forward picker takes over).
+      const progress = reviewEligibleProgress({
+        cvcGraduationSessionFired: true,
+      })
+      // sessionCount 3 is not a multiple of the period → null.
+      expect(pickCvcReviewNode(progress, 3)).toBeNull()
+    })
+  })
+
+  describe('periodic revisit (Option B — round-robin every N sessions)', () => {
+    it('returns null on non-period sessions post-graduation', () => {
+      const progress = reviewEligibleProgress({
+        cvcGraduationSessionFired: true,
+      })
+      // 1..4 and 6..9 are not multiples of the 5-session period.
+      for (const n of [1, 2, 3, 4, 6, 7, 8, 9]) {
+        expect(pickCvcReviewNode(progress, n)).toBeNull()
+      }
+    })
+
+    it('round-robins across the three CVC tiers on each Nth session', () => {
+      const progress = reviewEligibleProgress({
+        cvcGraduationSessionFired: true,
+      })
+      const period = CVC_REVIEW_PERIOD_SESSIONS // 5
+      // session 5 → floor(5/5)%3 = 1 → CVC_TIERS[1]
+      // session 10 → floor(10/5)%3 = 2 → CVC_TIERS[2]
+      // session 15 → floor(15/5)%3 = 0 → CVC_TIERS[0]
+      // session 20 → floor(20/5)%3 = 1 → CVC_TIERS[1] (cycle repeats)
+      expect(pickCvcReviewNode(progress, period * 1)).toBe(CVC_TIERS[1])
+      expect(pickCvcReviewNode(progress, period * 2)).toBe(CVC_TIERS[2])
+      expect(pickCvcReviewNode(progress, period * 3)).toBe(CVC_TIERS[0])
+      expect(pickCvcReviewNode(progress, period * 4)).toBe(CVC_TIERS[1])
+    })
+
+    it('covers all three tiers across a full round-robin cycle', () => {
+      const progress = reviewEligibleProgress({
+        cvcGraduationSessionFired: true,
+      })
+      const seen = new Set<string>()
+      for (let k = 1; k <= CVC_TIERS.length; k++) {
+        const node = pickCvcReviewNode(progress, CVC_REVIEW_PERIOD_SESSIONS * k)
+        expect(node).not.toBeNull()
+        seen.add(node!)
+      }
+      // Every CVC tier surfaces exactly once across one full cycle.
+      expect(seen).toEqual(new Set(CVC_TIERS))
+    })
+
+    it('does not fire a periodic review on session 0 (sessionCount > 0 guard)', () => {
+      // 0 % N === 0, but session 0 is the first-ever launch — guard it.
+      const progress = reviewEligibleProgress({
+        cvcGraduationSessionFired: true,
+      })
+      expect(pickCvcReviewNode(progress, 0)).toBeNull()
+    })
+  })
+})
+
+describe('pickFocusNode — CVC review mode integration (ticket 86c9qa6n3)', () => {
+  function buildReviewProgress(
+    progressOverrides: Partial<Progress> = {},
+  ): Progress {
+    return buildProgress({}, progressOverrides)
+  }
+
+  it('tags forward picks with mode "forward"', () => {
+    const progress = defaultProgress()
+    expect(pickFocusNode(progress, 'word-song')).toEqual({
+      node: 'letter-sounds',
+      mode: 'forward',
+    })
+    expect(pickFocusNode(progress, 'math')).toEqual({
+      node: 'add-to-10',
+      mode: 'forward',
+    })
+  })
+
+  it('returns the graduation CVC review with mode "cvc-review" on the first eligible word-song session', () => {
+    const progress = buildReviewProgress({
+      cvcGraduationSessionFired: false,
+    })
+    // Forward picker would have landed on the first non-mastered node
+    // (everything mastered → simple-sentences); review mode overrides it.
+    expect(pickFocusNode(progress, 'word-song', 0)).toEqual({
+      node: 'cvc-words-short-u',
+      mode: 'cvc-review',
+    })
+  })
+
+  it('returns a periodic CVC review with mode "cvc-review" on an Nth post-graduation session', () => {
+    const progress = buildReviewProgress({
+      cvcGraduationSessionFired: true,
+    })
+    expect(
+      pickFocusNode(progress, 'word-song', CVC_REVIEW_PERIOD_SESSIONS),
+    ).toEqual({ node: CVC_TIERS[1], mode: 'cvc-review' })
+  })
+
+  it('falls through to the forward walk (mode "forward") on a non-review session', () => {
+    // All CVC mastered, latch true, non-period session → forward picker
+    // lands on the next non-mastered node (digraphs-sh here).
+    const progress = buildProgress(
+      { 'digraphs-sh': 'practicing' },
+      { cvcGraduationSessionFired: true },
+    )
+    expect(pickFocusNode(progress, 'word-song', 3)).toEqual({
+      node: 'digraphs-sh',
+      mode: 'forward',
+    })
+  })
+
+  it('never enters CVC review on the math track even when CVC tiers are mastered', () => {
+    // CVC review is word-song-only. A math-track call must always be
+    // forward, regardless of CVC mastery / latch / sessionCount.
+    const progress = buildReviewProgress({
+      cvcGraduationSessionFired: false,
+    })
+    const pick = pickFocusNode(progress, 'math', CVC_REVIEW_PERIOD_SESSIONS)
+    expect(pick.mode).toBe('forward')
+    // Every math node mastered → defensive fallback to the last node.
+    expect(pick.node).toBe('mult-6-9')
   })
 })

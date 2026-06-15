@@ -464,13 +464,27 @@ function installCloudBlob(
   // blob and the locally-loaded blob would default different lists,
   // which is exactly the parity hazard the cloudSync.test.ts tests
   // pin against.
-  if (merged.lifetimeFirstEncounters === undefined) {
-    return {
-      ...merged,
-      lifetimeFirstEncounters: inferLifetimeFirstEncountersFromProgress(merged),
-    }
+  const withFirstEncounters: Progress =
+    merged.lifetimeFirstEncounters === undefined
+      ? {
+          ...merged,
+          lifetimeFirstEncounters:
+            inferLifetimeFirstEncountersFromProgress(merged),
+        }
+      : merged
+
+  // Mirror of `storage.ts:withDefaultedCvcGraduationSessionFired` (ticket
+  // 86c9qa6n3). A cloud blob written by a device predating the CVC review
+  // mode carries no `cvcGraduationSessionFired`; normalise missing →
+  // `false` at install time so the cloud-installed blob and the
+  // locally-loaded blob default the field identically (parity hazard the
+  // cloudSync.test.ts `cvcGraduationSessionFired parity` test pins). The
+  // picker tolerates `undefined` as `false` either way, but keeping the
+  // two read paths byte-identical avoids future drift.
+  if (withFirstEncounters.cvcGraduationSessionFired === undefined) {
+    return { ...withFirstEncounters, cvcGraduationSessionFired: false }
   }
-  return merged
+  return withFirstEncounters
 }
 
 /**

@@ -72,15 +72,17 @@ export function loadProgress(): Progress | null {
     // blob is fine but whose presence is preferred by downstream
     // consumers (the planner-side gate doesn't have to short-circuit
     // a missing list when the field is always set after load).
-    return withDefaultedLifetimeFirstEncounters(
-      withDefaultedSettings(defaulted),
+    return withDefaultedCvcGraduationSessionFired(
+      withDefaultedLifetimeFirstEncounters(withDefaultedSettings(defaulted)),
     )
   }
 
   // Different version (older or newer) — route through migrate.
   const migrated = migrate(parsed)
   if (migrated === null) return null
-  return withDefaultedLifetimeFirstEncounters(withDefaultedSettings(migrated))
+  return withDefaultedCvcGraduationSessionFired(
+    withDefaultedLifetimeFirstEncounters(withDefaultedSettings(migrated)),
+  )
 }
 
 /**
@@ -368,6 +370,30 @@ function withDefaultedLifetimeFirstEncounters(p: Progress): Progress {
     ...p,
     lifetimeFirstEncounters: inferLifetimeFirstEncountersFromProgress(p),
   }
+}
+
+/**
+ * Inject the default for `cvcGraduationSessionFired` post-parse (ticket
+ * 86c9qa6n3 — CVC review mode; additive, no schemaVersion bump).
+ *
+ * The field is OPTIONAL on the persisted shape — pre-86c9qa6n3 blobs
+ * predate it. We layer the defaulter at the read path so every caller of
+ * `loadProgress()` sees a concrete boolean and the picker
+ * (`pickCvcReviewNode`) doesn't have to treat missing and `false`
+ * differently.
+ *
+ * Default is `false` ("graduation review has not fired yet"). This is the
+ * correct semantic for ANY pre-existing user when the feature ships: a
+ * Marian who already mastered all three CVC tiers before this code landed
+ * should still get her one-shot graduation review on the next eligible
+ * session, not have it silently skipped. Mirrors
+ * `withDefaultedLifetimeFirstEncounters` in shape; idempotent (a blob that
+ * already carries the field — `true` OR `false` — passes through
+ * untouched).
+ */
+function withDefaultedCvcGraduationSessionFired(p: Progress): Progress {
+  if (p.cvcGraduationSessionFired !== undefined) return p
+  return { ...p, cvcGraduationSessionFired: false }
 }
 
 /**

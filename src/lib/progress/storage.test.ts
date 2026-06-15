@@ -511,3 +511,51 @@ describe('loadProgress — letterSoundsVowelStates defaulter (Wave 9 W9.2 — ti
     expect(loadProgress()).toBeNull()
   })
 })
+
+describe('loadProgress — cvcGraduationSessionFired defaulter (ticket 86c9qa6n3)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  afterEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('defaults a missing cvcGraduationSessionFired to false (pre-86c9qa6n3 blob)', () => {
+    // A blob written before CVC review mode shipped carries no
+    // `cvcGraduationSessionFired`. The defaulter must add it as `false`
+    // so a Marian who already mastered all three CVC tiers still gets her
+    // one-shot graduation review on the next eligible session.
+    const seed = defaultProgress('Marian')
+    const blob: Record<string, unknown> = { ...seed }
+    delete blob.cvcGraduationSessionFired
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(loaded?.cvcGraduationSessionFired).toBe(false)
+    expect(isProgressV1(loaded)).toBe(true)
+  })
+
+  it('preserves cvcGraduationSessionFired: true verbatim (defaulter never resets a fired latch)', () => {
+    // The defaulter is a fill, not a reset. A latch already at `true`
+    // must round-trip — resetting it to false would re-fire the one-shot
+    // graduation review.
+    const seed = defaultProgress('Marian')
+    const blob = { ...seed, cvcGraduationSessionFired: true }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    expect(loaded?.cvcGraduationSessionFired).toBe(true)
+  })
+
+  it('rejects a blob where cvcGraduationSessionFired is a non-boolean (defaulter does not coerce bad values)', () => {
+    // A present-but-invalid value is a corruption signal — the strict
+    // guard rejects the whole blob rather than carrying a bad latch.
+    const seed = defaultProgress('Marian')
+    const blob = { ...seed, cvcGraduationSessionFired: 'yes' }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    expect(loadProgress()).toBeNull()
+  })
+})

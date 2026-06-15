@@ -103,7 +103,7 @@ describe('maybeApplyDebugSeed', () => {
       maybeApplyDebugSeed()
       const progress = loadProgress()
       expect(progress).not.toBeNull()
-      expect(pickFocusNode(progress!, 'word-song')).toBe('cvc-words')
+      expect(pickFocusNode(progress!, 'word-song').node).toBe('cvc-words')
     })
 
     it('preserves any pre-existing skillLevels not in the patch', () => {
@@ -208,7 +208,7 @@ describe('maybeApplyDebugSeed', () => {
       maybeApplyDebugSeed()
       const progress = loadProgress()
       expect(progress).not.toBeNull()
-      expect(pickFocusNode(progress!, 'word-song')).toBe('letter-names')
+      expect(pickFocusNode(progress!, 'word-song').node).toBe('letter-names')
     })
 
     it('bumps session-history sessionCount to 1 (skips Greet on next mount)', () => {
@@ -247,7 +247,7 @@ describe('maybeApplyDebugSeed', () => {
       maybeApplyDebugSeed()
       const progress = loadProgress()
       expect(progress).not.toBeNull()
-      expect(pickFocusNode(progress!, 'word-song')).toBe('letter-sounds')
+      expect(pickFocusNode(progress!, 'word-song').node).toBe('letter-sounds')
     })
 
     it('bumps session-history sessionCount to 1 (skips Greet on next mount)', () => {
@@ -287,7 +287,9 @@ describe('maybeApplyDebugSeed', () => {
       maybeApplyDebugSeed()
       const progress = loadProgress()
       expect(progress).not.toBeNull()
-      expect(pickFocusNode(progress!, 'word-song')).toBe('cvc-words-short-o')
+      expect(pickFocusNode(progress!, 'word-song').node).toBe(
+        'cvc-words-short-o',
+      )
     })
 
     it('bumps session-history sessionCount to 1 (skips Greet on next mount)', () => {
@@ -319,7 +321,7 @@ describe('maybeApplyDebugSeed', () => {
       maybeApplyDebugSeed()
       const progress = loadProgress()
       expect(progress).not.toBeNull()
-      expect(pickFocusNode(progress!, 'math')).toBe('add-to-20')
+      expect(pickFocusNode(progress!, 'math').node).toBe('add-to-20')
     })
 
     it('leaves mathFactsLeitner empty (per AC #6 — fresh box for the new tier)', () => {

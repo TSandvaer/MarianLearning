@@ -427,6 +427,19 @@ export function isProgressV1(v: unknown): v is Progress {
   if ('literacy' in v && v.literacy !== undefined) {
     if (!isLiteracyProgress(v.literacy)) return false
   }
+  // cvcGraduationSessionFired is optional (ticket 86c9qa6n3 — CVC review
+  // mode; additive, no schemaVersion bump). When present + not undefined
+  // it must be a boolean — a non-boolean value is corruption and rejects
+  // the whole blob so the loader falls back to defaults rather than
+  // carrying a bad latch forward. Absent is the normal pre-86c9qa6n3 state;
+  // the read-path defaulter (`storage.ts:withDefaultedCvcGraduationSessionFired`)
+  // normalises missing → `false` at load time.
+  if (
+    'cvcGraduationSessionFired' in v &&
+    v.cvcGraduationSessionFired !== undefined
+  ) {
+    if (typeof v.cvcGraduationSessionFired !== 'boolean') return false
+  }
   return true
 }
 

@@ -63,6 +63,7 @@ import {
   pickFocusNode,
   pickRecentSuccessRate,
   reconcileWithCloud,
+  type FocusMode,
   type LeitnerSessionHintItem,
   type LetterSoundsVowel,
   type Progress,
@@ -269,6 +270,15 @@ function nextAfterSplash(): Route {
  */
 function readProgressHintsForTrack(track: ProgressTrack): {
   focusNode: string | undefined
+  /**
+   * The mode the focus picker selected `focusNode` under (ticket
+   * 86c9qa6n3). `'cvc-review'` means a MASTERED CVC tier was deliberately
+   * re-surfaced for a cross-vowel review session — the word-song
+   * kick-effect's `focusIsCvcTier` gate reads this to let cross-vowel
+   * mixing through even though the node is mastered. `undefined` on the
+   * no-progress path.
+   */
+  focusMode: FocusMode | undefined
   recentSuccessRate: number | null | undefined
   isGraduationSession: boolean | undefined
   leitner: LeitnerSessionHintItem[] | undefined
@@ -282,6 +292,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   if (progress === null) {
     return {
       focusNode: undefined,
+      focusMode: undefined,
       recentSuccessRate: undefined,
       isGraduationSession: undefined,
       leitner: undefined,
@@ -290,7 +301,16 @@ function readProgressHintsForTrack(track: ProgressTrack): {
       letterSoundsVowelStates: undefined,
     }
   }
-  const focusNode = pickFocusNode(progress, track)
+  // CVC review mode (ticket 86c9qa6n3) reads the session count from the
+  // SEPARATE session-history blob (`marian-tutor.session-history.v1`) —
+  // it does not live on the Progress doc. The picker uses it to drive the
+  // post-graduation periodic round-robin. Math track ignores sessionCount.
+  const sessionCount = readSessionHistory().sessionCount
+  const { node: focusNode, mode: focusMode } = pickFocusNode(
+    progress,
+    track,
+    sessionCount,
+  )
   // 86c9m3aec: graduation-session hint piggy-backs on the same hint
   // read. Only word-song carries graduation-gated nodes today; the
   // helper itself returns false for non-gated nodes / wrong tracks,
@@ -368,6 +388,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   }
   return {
     focusNode,
+    focusMode,
     recentSuccessRate: pickRecentSuccessRate(progress, track),
     isGraduationSession,
     leitner,
@@ -872,7 +893,9 @@ export default function App() {
   const mathFallbackFocusNode = useMemo<SkillNode | undefined>(() => {
     const progress = loadProgress()
     if (progress === null) return undefined
-    return pickFocusNode(progress, 'math')
+    // Math track never enters CVC review — `.node` is always the forward
+    // pick. sessionCount is irrelevant here (omitted → 0).
+    return pickFocusNode(progress, 'math').node
   }, [])
   const mathFallbackPlan = useMemo<MathSessionPlan>(
     () => pickStaticSessionPlan(undefined, mathFallbackFocusNode),
@@ -917,7 +940,7 @@ export default function App() {
     if (progress === null) return false
     const sessionsObserved = readSubitisingScaffoldSessionsObserved(progress)
     const mean = easyBandLeitnerMeanBox(progress.mathFactsLeitner)
-    const focusNode = pickFocusNode(progress, 'math')
+    const focusNode = pickFocusNode(progress, 'math').node
     const rng = createSubitisingRng(subitisingSessionStartISO, focusNode)
     return shouldScaffoldThisSession(mean, sessionsObserved, rng)
   }, [subitisingSessionStartISO])
@@ -947,7 +970,7 @@ export default function App() {
     if (progress === null) return false
     const sessionsObserved = readSubitisingScaffoldSubSessionsObserved(progress)
     const mean = easyBandSubLeitnerMeanBox(progress.mathFactsLeitner)
-    const focusNode = pickFocusNode(progress, 'math')
+    const focusNode = pickFocusNode(progress, 'math').node
     const rng = createSubitisingRng(subitisingSessionStartISO, focusNode)
     return shouldScaffoldThisSession(mean, sessionsObserved, rng)
   }, [subitisingSessionStartISO])
@@ -1428,15 +1451,25 @@ export default function App() {
     const sessionId = `word-song-${wordSongFallbackPlan.id}-${Date.now()}`
     const wordSongHints = readProgressHintsForTrack('word-song')
 
-    // Cross-vowel mix mode (ticket 86c9qa0kf — cross-vowel mix v1
-    // impl). Compute once at session-start kick-time:
-    //   - All three CVC tiers must be `'mastered'`
+    // Cross-vowel mix mode (ticket 86c9qa0kf — cross-vowel mix v1 impl;
+    // ticket 86c9qa6n3 — CVC review firing layer). Compute once at
+    // session-start kick-time:
     //   - parentSettings.crossVowelMixingEnabled must be `true`
-    //   - The picked focusNode must be a CVC tier (caller-side gate
-    //     per spec §2 condition 1).
-    // Frozen on the `<WordSong>` prop for the session's lifetime.
-    // The session is uniformly cross-vowel or uniformly same-vowel —
-    // never half-and-half (per spec §4 "uniform per session" rule).
+    //   - All three CVC tiers must be `'mastered'` (crossVowelMixingActive)
+    //   - The picked focusNode must be a CVC tier — satisfied either by
+    //     forward progression on a CVC tier OR (post-mastery) by the
+    //     CVC-review picker re-surfacing a mastered CVC tier
+    //     (`focusMode === 'cvc-review'`, ticket 86c9qa6n3 AC4).
+    //
+    // The `focusMode === 'cvc-review'` arm is the fix for the PR #181
+    // forward-compat paradox: once every CVC tier is mastered the forward
+    // picker walks past them onto `digraphs-sh`, so cross-vowel could never
+    // fire in regular play. The review picker now lands focus back on a
+    // mastered CVC tier, and this gate lets the mode through.
+    //
+    // Frozen on the `<WordSong>` prop for the session's lifetime. The
+    // session is uniformly cross-vowel or uniformly same-vowel — never
+    // half-and-half (per spec §4 "uniform per session" rule).
     let nextCrossVowel = false
     {
       const wordSongProgress = loadProgress()
@@ -1447,8 +1480,15 @@ export default function App() {
           focus === 'cvc-words' ||
           focus === 'cvc-words-short-o' ||
           focus === 'cvc-words-short-u'
+        // A CVC-review pick always lands on a CVC tier, so `focusIsCvcTier`
+        // is already true for it; the explicit `|| cvc-review` arm makes
+        // the AC4 intent legible and robust if the picker's node choice
+        // ever widens beyond the three CVC tiers.
+        const focusEligibleForCrossVowel =
+          focusIsCvcTier || wordSongHints.focusMode === 'cvc-review'
         nextCrossVowel =
-          focusIsCvcTier && crossVowelMixingActive(wordSongProgress, settings)
+          focusEligibleForCrossVowel &&
+          crossVowelMixingActive(wordSongProgress, settings)
       }
     }
     setWordSongCrossVowel(nextCrossVowel)

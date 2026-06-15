@@ -27,6 +27,7 @@
  * test pins the sequences against the type so a silent drift fails CI.
  */
 
+import { CVC_CROSS_VOWEL_NODES, cvcReviewEligible } from './mastery'
 import type {
   NumberGardenNode,
   Progress,
@@ -35,6 +36,38 @@ import type {
 } from './types'
 
 export type ProgressTrack = 'math' | 'word-song'
+
+/**
+ * The mode the focus picker selected the node under (ticket 86c9qa6n3).
+ *
+ * - `'forward'`: ordinary curriculum progression — the first non-mastered
+ *   node in the track. The historical-and-still-default behaviour.
+ * - `'cvc-review'`: a MASTERED CVC tier deliberately re-surfaced for a
+ *   cross-vowel review session. The caller (App.tsx) uses this to allow
+ *   cross-vowel mode through its `focusIsCvcTier` gate even though the
+ *   node is mastered (which the forward picker would have walked past).
+ */
+export type FocusMode = 'forward' | 'cvc-review'
+
+/**
+ * The focus picker's result (ticket 86c9qa6n3). Widened from a bare
+ * `SkillNode` so the caller can distinguish a forward-progression pick
+ * from a CVC-review pick — the latter intentionally lands on a MASTERED
+ * node, which App.tsx's `focusIsCvcTier` gate must let through so
+ * cross-vowel distractor mixing actually fires.
+ */
+export interface FocusPick {
+  node: SkillNode
+  mode: FocusMode
+}
+
+/**
+ * The three CVC tiers eligible for review-mode round-robin, in vowel
+ * order (a → o → u). Re-exported from the cross-vowel source of truth in
+ * `mastery.ts` so the picker and the distractor-matrix scope can never
+ * drift apart.
+ */
+export const CVC_TIERS: readonly WordSongNode[] = CVC_CROSS_VOWEL_NODES
 
 /**
  * The math track in declaration order. First entry is the lowest-level
@@ -136,16 +169,99 @@ export const WORD_SONG_NODES_IN_ORDER: readonly WordSongNode[] = [
 export function pickFocusNode(
   progress: Progress,
   track: ProgressTrack,
-): SkillNode {
+  sessionCount = 0,
+): FocusPick {
+  // CVC review mode (ticket 86c9qa6n3) — word-song track only. When every
+  // CVC tier is mastered the forward walk below would always land on a
+  // non-CVC node, so the PR #181 cross-vowel-mixing infrastructure would
+  // never fire. The review picker periodically re-surfaces a mastered CVC
+  // tier (graduation-once-then-round-robin) so the mix actually fires.
+  // A null result means "no review this session — fall through to the
+  // forward walk."
+  if (track === 'word-song') {
+    const reviewNode = pickCvcReviewNode(progress, sessionCount)
+    if (reviewNode !== null) return { node: reviewNode, mode: 'cvc-review' }
+  }
+
   const order =
     track === 'math' ? MATH_NODES_IN_ORDER : WORD_SONG_NODES_IN_ORDER
   for (const node of order) {
-    if (progress.skillLevels[node] !== 'mastered') return node
+    if (progress.skillLevels[node] !== 'mastered') {
+      return { node, mode: 'forward' }
+    }
   }
   // Defensive fallback — every node mastered. Won't happen in v1; the
   // adaptive engine M3+ will move children past this point and pick up new
   // tracks. Until then, return the last node so the caller has a string.
-  return order[order.length - 1]!
+  return { node: order[order.length - 1]!, mode: 'forward' }
+}
+
+/**
+ * Periods (in sessions) between post-mastery CVC review sessions
+ * (ticket 86c9qa6n3, Option B revisit cadence). Review fires when
+ * `sessionCount` is a positive multiple of this value.
+ */
+export const CVC_REVIEW_PERIOD_SESSIONS = 5
+
+/**
+ * Pick a mastered CVC tier to re-surface for a cross-vowel review session,
+ * or `null` to defer to the forward picker (ticket 86c9qa6n3, AC3).
+ *
+ * Mechanic (Dave's `design/research/cvc-review-mode-mechanic.md` verdict —
+ * Option C-then-B):
+ *
+ *   1. GRADUATION REVIEW (Option C, once). The first time the picker runs
+ *      with all three CVC tiers mastered AND `cvcGraduationSessionFired`
+ *      still falsy, return `'cvc-words-short-u'` — a one-shot celebratory
+ *      cross-vowel session. Short-u is chosen because `/ʌ/` has no Tagalog
+ *      equivalent and is Marian's highest-L1-interference vowel. The
+ *      session-end write path latches `cvcGraduationSessionFired = true`
+ *      so this never repeats.
+ *
+ *   2. PERIODIC REVISIT (Option B). After graduation, every
+ *      `CVC_REVIEW_PERIOD_SESSIONS`-th session re-surfaces a CVC tier on a
+ *      round-robin: `CVC_TIERS[floor(sessionCount / period) % 3]`. The
+ *      round-robin walks a → o → u → a … across review sessions so no
+ *      single vowel monopolises review practice.
+ *
+ *   3. Otherwise `null` — the forward picker takes over (lands on the next
+ *      non-mastered node, e.g. `digraphs-sh`).
+ *
+ * Guard order matters: the graduation latch is checked BEFORE the periodic
+ * branch so the very first eligible session is always the short-u
+ * graduation review, regardless of where `sessionCount` falls in the
+ * period cycle.
+ *
+ * Pure read of `progress` + `sessionCount`; no mutation, no history walk.
+ * Returns `null` immediately when the CVC tiers are not all mastered, so
+ * the common (pre-graduation) case is O(1) with no review overhead.
+ */
+export function pickCvcReviewNode(
+  progress: Progress,
+  sessionCount: number,
+): WordSongNode | null {
+  // Not eligible until all three CVC tiers are mastered — the forward
+  // picker still has a non-mastered CVC node to land on, so review mode
+  // would be premature.
+  if (!cvcReviewEligible(progress)) return null
+
+  // 1. Graduation review — fire short-u exactly once.
+  if (progress.cvcGraduationSessionFired !== true) {
+    return 'cvc-words-short-u'
+  }
+
+  // 2. Periodic revisit — every Nth session, round-robin across the tiers.
+  // `sessionCount > 0` guards against a session-0 trigger (0 % N === 0);
+  // session 0 is the first-ever launch and can never be CVC-eligible
+  // anyway, but the guard keeps the intent explicit.
+  if (sessionCount > 0 && sessionCount % CVC_REVIEW_PERIOD_SESSIONS === 0) {
+    const index =
+      Math.floor(sessionCount / CVC_REVIEW_PERIOD_SESSIONS) % CVC_TIERS.length
+    return CVC_TIERS[index]!
+  }
+
+  // 3. No review this session.
+  return null
 }
 
 /**

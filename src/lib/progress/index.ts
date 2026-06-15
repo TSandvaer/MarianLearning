@@ -84,12 +84,15 @@ export {
 } from './storage'
 
 export {
+  CVC_REVIEW_PERIOD_SESSIONS,
+  CVC_TIERS,
   MATH_NODES_IN_ORDER,
   WORD_SONG_NODES_IN_ORDER,
+  pickCvcReviewNode,
   pickFocusNode,
   pickRecentSuccessRate,
 } from './focusNode'
-export type { ProgressTrack } from './focusNode'
+export type { FocusMode, FocusPick, ProgressTrack } from './focusNode'
 
 export {
   CVC_CROSS_VOWEL_NODES,
@@ -100,6 +103,7 @@ export {
   WORD_SONG_GRADUATION_GATED_NODES,
   applyMasteryRule,
   crossVowelMixingActive,
+  cvcReviewEligible,
   isGraduationSessionPending,
   nextNode,
 } from './mastery'
