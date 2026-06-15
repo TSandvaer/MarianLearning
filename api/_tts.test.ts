@@ -24,8 +24,10 @@ import {
   describeAzureFailure,
   escapeSsml,
   fetchWithBackoff,
+  parseBlendText,
   parseRetryAfterMs,
   readAzureCredentials,
+  renderBlendInnerText,
   renderFourSubjectHint,
   renderLetterNamesScratchyHint,
   renderRecapFourStars,
@@ -2041,6 +2043,127 @@ describe('substituteSentenceGap (simple-sentences gap render, ticket 86ca8e6fr)'
     expect(ssml).not.toContain('___')
     // The trailing interrogative clause gets the pitch-raise wrapper.
     expect(ssml).toContain('<prosody pitch="+8%"')
+  })
+})
+
+describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
+  describe('parseBlendText', () => {
+    it('parses the ASCII-7 stored form "c - a - t ... cat"', () => {
+      expect(parseBlendText('c - a - t ... cat')).toEqual({
+        graphemes: ['c', 'a', 't'],
+        word: 'cat',
+      })
+    })
+
+    it('parses Kyle’s em-dash/ellipsis spec form "c — a — t … cat" defensively', () => {
+      expect(parseBlendText('c — a — t … cat')).toEqual({
+        graphemes: ['c', 'a', 't'],
+        word: 'cat',
+      })
+    })
+
+    it('parses the /ks/ word "b - o - x ... box" (3 graphemes, x is one token)', () => {
+      expect(parseBlendText('b - o - x ... box')).toEqual({
+        graphemes: ['b', 'o', 'x'],
+        word: 'box',
+      })
+    })
+
+    it('returns null for a non-blend line (no whole-word ellipsis split)', () => {
+      expect(parseBlendText('Read the cat.')).toBeNull()
+      expect(parseBlendText('Yes! Cat.')).toBeNull()
+      expect(parseBlendText("Let's look. Cat.")).toBeNull()
+      expect(parseBlendText('Hmm... try again?')).toBeNull()
+    })
+  })
+
+  describe('renderBlendInnerText', () => {
+    it('wraps each grapheme in a phoneme tag and voices the whole word naturally', () => {
+      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')
+      expect(ssml).not.toBeNull()
+      // Each grapheme is a phoneme: c → /k/, a → /æ/, t → /t/.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="k">c</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="t">t</phoneme>')
+      // The whole word is NOT phoneme-wrapped (voiced naturally).
+      expect(ssml).not.toContain('>cat</phoneme>')
+      expect(ssml).toContain('cat')
+    })
+
+    it('injects breaks between graphemes and a longer break before the whole word', () => {
+      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')!
+      // Inter-grapheme break (250ms) appears before each phoneme.
+      expect(ssml).toContain('<break time="250ms"/>')
+      // Whole-word break (450ms) before the blended word.
+      expect(ssml).toContain('<break time="450ms"/>')
+      // The whole-word break sits right before the bare word.
+      expect(ssml).toContain('<break time="450ms"/>cat')
+    })
+
+    it('slows the whole line to rate -12% ("sound it out" register)', () => {
+      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')!
+      expect(ssml.startsWith('<prosody rate="-12%">')).toBe(true)
+      expect(ssml.endsWith('</prosody>')).toBe(true)
+    })
+
+    it('voices the /ks/ grapheme (box) as the cluster <phoneme ph="ks">', () => {
+      const ssml = renderBlendInnerText(
+        'b - o - x ... box',
+        'cvc-words-short-o',
+      )!
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="ks">x</phoneme>')
+      // Short-o grapheme uses /ɒ/.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="ɒ">o</phoneme>')
+      // The whole word is natural.
+      expect(ssml).toContain('<break time="450ms"/>box')
+    })
+
+    it('fires on every CVC vowel tier', () => {
+      for (const tier of [
+        'cvc-words',
+        'cvc-words-short-o',
+        'cvc-words-short-u',
+        'cvc-words-short-i',
+        'cvc-words-short-e',
+      ]) {
+        expect(renderBlendInnerText('d - o - g ... dog', tier)).not.toBeNull()
+      }
+    })
+
+    it('returns null for a non-CVC tier (digraphs / letter-sounds / undefined)', () => {
+      expect(
+        renderBlendInnerText('c - a - t ... cat', 'digraphs-sh'),
+      ).toBeNull()
+      expect(
+        renderBlendInnerText('c - a - t ... cat', 'letter-sounds'),
+      ).toBeNull()
+      expect(renderBlendInnerText('c - a - t ... cat', undefined)).toBeNull()
+    })
+
+    it('returns null for a NON-blend CVC line (read/correct/hint pass through unchanged)', () => {
+      // The whole point: the blend render must NOT hijack the normal CVC
+      // utterances. None of them match parseBlendText's segmented shape.
+      expect(renderBlendInnerText('Read the cat.', 'cvc-words')).toBeNull()
+      expect(renderBlendInnerText('Yes! Cat.', 'cvc-words')).toBeNull()
+      expect(renderBlendInnerText("Let's look. Cat.", 'cvc-words')).toBeNull()
+      expect(renderBlendInnerText('This one is cat.', 'cvc-words')).toBeNull()
+      expect(renderBlendInnerText('Hmm... try again?', 'cvc-words')).toBeNull()
+    })
+  })
+
+  describe('renderSsmlInnerText dispatch', () => {
+    it('renders a CVC blend line through the blend transform', () => {
+      const ssml = renderSsmlInnerText('c - a - t ... cat', 'cvc-words')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="k">c</phoneme>')
+      expect(ssml.startsWith('<prosody rate="-12%">')).toBe(true)
+    })
+
+    it('does NOT alter a normal CVC read line (no blend hijack)', () => {
+      const ssml = renderSsmlInnerText('Read the cat.', 'cvc-words')
+      // Plain path — no blend prosody wrapper, no phoneme wraps on the word.
+      expect(ssml).not.toContain('<prosody rate="-12%">')
+      expect(ssml).toContain('Read the cat.')
+    })
   })
 })
 

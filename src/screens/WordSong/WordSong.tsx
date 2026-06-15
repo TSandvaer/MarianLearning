@@ -19,6 +19,7 @@ import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { pickDistractors } from './wordDistractors'
+import { buildBlendHighlightSteps } from './blendHighlight'
 import {
   loadStardust,
   writeStardust,
@@ -657,6 +658,26 @@ function WordSongScreen({
 
   const [pose, setPose] = useState<EmmaPose>('idle')
   const [shakingChip, setShakingChip] = useState<string | null>(null)
+  /**
+   * CVC phoneme-blend prompt (ticket 86c9qa6n3): which `LetterGlyph` is
+   * highlighted during the 2nd-wrong blend sound-out, driven off the blend
+   * utterance's own `onWordTick` events. `null` = no highlight (default /
+   * not in a blend). Indices `0..wordLength-1` highlight that letter; index
+   * `wordLength` (the whole-word token) clears the per-letter highlight and
+   * pulses ALL letters together once (the "blended" beat). Reset to `null`
+   * on the blend's onEnd and on problem advance. See Kyle's spec
+   * §"Letter-highlight timing".
+   */
+  const [blendActiveLetterIndex, setBlendActiveLetterIndex] = useState<
+    number | null
+  >(null)
+  /** Synchronous 2nd-wrong blend latch (ticket 86c9qa6n3). The
+   *  rename/repurpose of the 2nd-wrong beat — reuses `hintPlayedRef`'s gate
+   *  (one latch, set synchronously when the 2nd wrong tap is counted) so 5
+   *  rapid finger-mashes queue exactly ONE blend prompt. NO parallel ref —
+   *  the blend fires inside the same `didScheduleHint` branch that the hint
+   *  used. See Kyle's spec §"Where this slots into the existing state
+   *  machine" → "State definition". */
   const [captionText, setCaptionText] = useState('')
   const [captionRevealed, setCaptionRevealed] = useState(0)
   const [captionVisible, setCaptionVisible] = useState(false)
@@ -765,7 +786,15 @@ function WordSongScreen({
   // ── Audio playback wrapper --------------------------------------------
 
   const speak = useCallback(
-    async (text: string): Promise<void> => {
+    async (
+      text: string,
+      hooks?: {
+        /** Per-call extra word-tick hook (CVC blend prompt drives the
+         *  per-letter highlight off this). Fires in addition to the caption
+         *  reveal, with the same `wordIndex` the caption uses. */
+        onWordTick?: (wordIndex: number) => void
+      },
+    ): Promise<void> => {
       setCaptionText(text)
       setCaptionRevealed(0)
       setCaptionVisible(false)
@@ -779,6 +808,7 @@ function WordSongScreen({
         },
         onWordTick: (wordIndex) => {
           setCaptionRevealed((prev) => Math.max(prev, wordIndex + 1))
+          hooks?.onWordTick?.(wordIndex)
         },
       }
 
@@ -1018,6 +1048,11 @@ function WordSongScreen({
       // `perProblemAnswerWordRef`.
       firstTapRecordedRef.current = false
       setShakingChip(null)
+      // Clear the CVC blend prompt's per-letter highlight on advance
+      // (ticket 86c9qa6n3) — the `blendPlayedRef` equivalent is the reused
+      // `hintPlayedRef`, already reset above. See Kyle's spec §States →
+      // "Transition in/out".
+      setBlendActiveLetterIndex(null)
       setPose('idle')
       setGuidedActive(false)
       setStreakFadingOut(false)
@@ -1182,17 +1217,57 @@ function WordSongScreen({
             hintTimerRef.current = setTimeout(() => {
               hintTimerRef.current = null
               setProblemState((prev) => ({ ...prev, hintPlayed: true }))
-              // Emma adopts the `attentive-pointing` pose for the hint beat
-              // (Wave 14 Track B, ticket 86ca8kq7r). The wand carries the
-              // direction (tilt 0°); POSE_HOLD_MS['attentive-pointing'] is
-              // `null`, so the hint TTS onEnd `.then()` below clears it.
+              // Emma adopts the `attentive-pointing` pose for the 2nd-wrong
+              // beat (Wave 14 Track B, ticket 86ca8kq7r). The wand carries
+              // the direction (tilt 0°); POSE_HOLD_MS['attentive-pointing']
+              // is `null`, so the TTS onEnd `.then()` below clears it.
               setPose('attentive-pointing')
-              void speak(problem.utterances.hint).then(() => {
-                poseTimerRef.current = setTimeout(() => {
-                  setPose('idle')
-                  poseTimerRef.current = null
-                }, 0)
-              })
+
+              // CVC phoneme-blend prompt (ticket 86c9qa6n3) — the MVP
+              // REPLACES the empty 2nd-wrong `hint` beat with a real
+              // sound-out for `cvc-word` problems that carry a baked
+              // `blend` utterance. GRACEFUL-SKIP: when the blend slot is
+              // absent (every tier pre-bake, every non-CVC tier), fall
+              // back to the existing `hint` line — no silent/dead beat,
+              // audio-first. See Kyle's spec §"Where this slots in" + §GRACEFUL-SKIP.
+              const blendText =
+                problem.contentType === 'cvc-word'
+                  ? problem.utterances.blend
+                  : undefined
+
+              if (blendText !== undefined) {
+                // Build the raw-token-index → letter-highlight-index map so
+                // the per-letter reveal sequences over the grapheme tokens
+                // (positions 0..n-1) and the whole-word token pulses ALL
+                // letters once (index === word.length). Tokenizer-robust:
+                // the ASCII separators (`-`, `...`) are their own tokens.
+                const highlightSteps = buildBlendHighlightSteps(
+                  blendText,
+                  problem.target.word,
+                )
+                void speak(blendText, {
+                  onWordTick: (wordIndex) => {
+                    const next = highlightSteps[wordIndex]
+                    if (next !== undefined) setBlendActiveLetterIndex(next)
+                  },
+                }).then(() => {
+                  // Blend onEnd: clear the per-letter highlight, return Emma
+                  // to idle (functional-updater guarded so a mid-blend
+                  // correct/wrong tap that set celebration/puzzled-tilt is
+                  // never clobbered — mirrors the read-aloud onEnd guard).
+                  setBlendActiveLetterIndex(null)
+                  setPose((current) =>
+                    current === 'attentive-pointing' ? 'idle' : current,
+                  )
+                })
+              } else {
+                void speak(problem.utterances.hint).then(() => {
+                  poseTimerRef.current = setTimeout(() => {
+                    setPose('idle')
+                    poseTimerRef.current = null
+                  }, 0)
+                })
+              }
             }, HINT_DELAY_AFTER_WRONG_MS)
           }
         })
@@ -1783,10 +1858,11 @@ function WordSongScreen({
 
                   {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
                 phoneme playback per spec §"Audio dispatch sequence on letter
-                tap". v1 keeps letter taps as visual-only (no phoneme audio
-                authored yet — phoneme files are pending Matt's pipeline call,
-                see spec §"Phoneme audio"). The letter pulse + colour shift
-                still fires so the affordance is visible to Marian. */}
+                tap". v1 keeps letter taps as visual-only. During the CVC
+                phoneme-blend prompt (ticket 86c9qa6n3) the letters are driven
+                instead by `highlighted` off `blendActiveLetterIndex`: index i
+                highlights letter[i] as its phoneme plays; the whole-word beat
+                (index === word.length) pulses ALL letters together once. */}
                   <div
                     data-testid="word-song-letters"
                     className="flex items-center"
@@ -1798,6 +1874,14 @@ function WordSongScreen({
                         letter={letter}
                         index={i}
                         reducedMotion={reducedMotion}
+                        // Per-letter highlight during the blend: this letter
+                        // when its index is active, OR every letter on the
+                        // whole-word beat (active index === word length).
+                        highlighted={
+                          blendActiveLetterIndex === i ||
+                          blendActiveLetterIndex ===
+                            currentProblem.target.word.length
+                        }
                       />
                     ))}
                   </div>
@@ -2337,10 +2421,20 @@ function LetterGlyph({
   letter,
   index,
   reducedMotion,
+  highlighted = false,
 }: {
   letter: string
   index: number
   reducedMotion: boolean
+  /**
+   * Driven highlight for the CVC phoneme-blend prompt (ticket 86c9qa6n3).
+   * When true, the glyph shows the same rose pulse the tap affordance uses
+   * (colour shift `#FFB7C5` + `scale [1,1.2,1]`), but driven by the prop
+   * (the blend's `onWordTick`) instead of a local tap. Reduce-motion:
+   * colour-only, no scale pulse. Default false (back-compat — the
+   * letter-tap affordance still works via local `tapped` state).
+   */
+  highlighted?: boolean
 }) {
   const [tapped, setTapped] = useState(false)
 
@@ -2351,12 +2445,26 @@ function LetterGlyph({
     window.setTimeout(() => setTapped(false), 400)
   }, [])
 
+  // The glyph reads as "active" (rose colour + pulse) when EITHER the local
+  // tap fired OR the blend prompt is highlighting it. The two share the
+  // exact same visual so Marian sees a pulse she has seen before (Kyle spec
+  // §"Letter-highlight timing").
+  const active = tapped || highlighted
+  const animate =
+    active && !reducedMotion
+      ? { scale: [1, 1.2, 1], opacity: 1 }
+      : { scale: 1, opacity: 1 }
+
   return (
     <m.button
       type="button"
       data-testid="word-song-letter"
       data-letter={letter}
       data-index={index}
+      // Expose the blend-driven highlight for e2e/unit assertions (Kyle's
+      // AC: "data-highlighted='true' walks index 0→1→2 in step with
+      // onWordTick"). Only reflects the blend-driven prop, NOT the local tap.
+      data-highlighted={highlighted ? 'true' : 'false'}
       aria-label={`Letter ${letter}`}
       onClick={handleTap}
       className="
@@ -2366,18 +2474,14 @@ function LetterGlyph({
       "
       style={{
         padding: '8px 4px',
-        color: tapped ? '#FFB7C5' : '#3B3B3B',
+        color: active ? '#FFB7C5' : '#3B3B3B',
         WebkitTapHighlightColor: 'transparent',
         touchAction: 'manipulation',
       }}
       initial={{ scale: 0, opacity: 0 }}
-      animate={
-        tapped && !reducedMotion
-          ? { scale: [1, 1.2, 1], opacity: 1 }
-          : { scale: 1, opacity: 1 }
-      }
+      animate={animate}
       transition={
-        tapped
+        active
           ? { duration: 0.4, ease: 'easeOut' }
           : reducedMotion
             ? { duration: 0.15 }

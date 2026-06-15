@@ -93,6 +93,50 @@ describe('wordSongSessionPlanFromServer — happy path', () => {
   })
 })
 
+describe('wordSongSessionPlanFromServer — optional blend slot (ticket 86c9qa6n3)', () => {
+  it('CARRIES a word.p<N>.blend utterance when the wire supplies it (post-bake)', () => {
+    const wire = {
+      ...SAMPLE_CVC_WORD_PLAN,
+      utterances: [
+        ...SAMPLE_CVC_WORD_PLAN.utterances,
+        // Add a blend line for problem 1 (cat).
+        { id: 'word.p1.blend', text: 'c - a - t ... cat' },
+      ],
+    }
+    const rebuilt = wordSongSessionPlanFromServer(wire)
+    expect(rebuilt.problems[0]!.contentType).toBe('cvc-word')
+    expect(rebuilt.problems[0]!.utterances.blend).toBe('c - a - t ... cat')
+    // Problems WITHOUT a blend line keep it undefined.
+    expect(rebuilt.problems[1]!.utterances.blend).toBeUndefined()
+  })
+
+  it('does NOT require the blend slot — a bundle without it rehydrates cleanly (graceful-skip, pre-bake)', () => {
+    // The whole graceful-skip contract: every tier today omits `blend`,
+    // and the parser must NOT throw. The 5 required slots are still
+    // enforced; `blend` is purely additive.
+    const rebuilt = wordSongSessionPlanFromServer(SAMPLE_CVC_WORD_PLAN)
+    expect(rebuilt.problems).toHaveLength(8)
+    for (const problem of rebuilt.problems) {
+      expect(problem.utterances.blend).toBeUndefined()
+    }
+  })
+
+  it('skips a malformed blend id but does NOT fail (blend is optional)', () => {
+    // A `word.p1.blend` with extra cruft (`word.p1.blendX`) is NOT in the
+    // id namespace → skipped like any other out-of-namespace id; the 5
+    // required slots are intact, so rehydration succeeds.
+    const wire = {
+      ...SAMPLE_CVC_WORD_PLAN,
+      utterances: [
+        ...SAMPLE_CVC_WORD_PLAN.utterances,
+        { id: 'word.p1.blendX', text: 'noise' },
+      ],
+    }
+    const rebuilt = wordSongSessionPlanFromServer(wire)
+    expect(rebuilt.problems[0]!.utterances.blend).toBeUndefined()
+  })
+})
+
 describe('wordSongSessionPlanFromServer — failure paths', () => {
   it('throws when the blob is the wrong shape', () => {
     expect(() => wordSongSessionPlanFromServer(null)).toThrow(

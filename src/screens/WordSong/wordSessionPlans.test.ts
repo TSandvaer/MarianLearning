@@ -191,6 +191,70 @@ describe('wordSongSessionPlanFromWire', () => {
   })
 })
 
+// ── Optional `blend` slot (CVC phoneme-blend prompt, ticket 86c9qa6n3) ──────
+describe('optional blend slot (ticket 86c9qa6n3)', () => {
+  /** A wire-shape blend utterance for a given problem index + word. */
+  function blendUtterance(index: number, word: string): Utterance {
+    const segmented = `${word.split('').join(' - ')} ... ${word}`
+    return fakeUtterance(wordSongUtteranceId(index, 'blend'), segmented)
+  }
+
+  it('toUtteranceSources OMITS the blend source when no problem carries one (static plans)', () => {
+    // Static plans never set `blend` → the 8×5 baseline is unchanged.
+    const plan = STATIC_WORD_SONG_PLANS[0]
+    const sources = wordSongSessionPlanToUtteranceSources(plan)
+    expect(sources).toHaveLength(8 * 5)
+    expect(sources.some((s) => s.id.endsWith('.blend'))).toBe(false)
+  })
+
+  it('toUtteranceSources EMITS the blend source when a problem carries one', () => {
+    const base = STATIC_WORD_SONG_PLANS[0]
+    const plan: WordSongSessionPlan = {
+      ...base,
+      problems: base.problems.map((p, i) =>
+        i === 0
+          ? {
+              ...p,
+              utterances: { ...p.utterances, blend: 'c - a - t ... cat' },
+            }
+          : p,
+      ),
+    }
+    const sources = wordSongSessionPlanToUtteranceSources(plan)
+    // 40 required + 1 blend.
+    expect(sources).toHaveLength(8 * 5 + 1)
+    const blend = sources.find((s) => s.id === 'word.p1.blend')
+    expect(blend?.text).toBe('c - a - t ... cat')
+  })
+
+  it('fromWire CARRIES the blend text when the wire supplies it', () => {
+    const skeleton = STATIC_WORD_SONG_PLANS[0]
+    const sources = wordSongSessionPlanToUtteranceSources(skeleton)
+    const utterances = [
+      ...sources.map((s) => fakeUtterance(s.id, s.text)),
+      blendUtterance(1, skeleton.problems[0].target.word),
+    ]
+    const rebuilt = wordSongSessionPlanFromWire(skeleton, utterances)
+    expect(rebuilt.problems[0].utterances.blend).toBeDefined()
+    expect(rebuilt.problems[0].utterances.blend).toContain(
+      skeleton.problems[0].target.word,
+    )
+  })
+
+  it('fromWire does NOT require the blend slot — absence leaves it undefined, no throw (graceful-skip)', () => {
+    // The whole graceful-skip contract: every tier pre-bake omits `blend`,
+    // and rehydration must NOT throw. The 5 required slots still throw if
+    // missing (covered above); `blend` is purely additive.
+    const skeleton = STATIC_WORD_SONG_PLANS[0]
+    const sources = wordSongSessionPlanToUtteranceSources(skeleton)
+    const utterances = sources.map((s) => fakeUtterance(s.id, s.text))
+    const rebuilt = wordSongSessionPlanFromWire(skeleton, utterances)
+    for (const problem of rebuilt.problems) {
+      expect(problem.utterances.blend).toBeUndefined()
+    }
+  })
+})
+
 // Smoke: every plan in the rotation can be flattened + rebuilt.
 describe('round-trip every static plan', () => {
   for (const plan of STATIC_WORD_SONG_PLANS) {

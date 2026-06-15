@@ -113,6 +113,30 @@ function cvcWordPlan(): WordSongSessionPlan {
 }
 
 /**
+ * A `cvc-word` plan that ALSO carries a `blend` utterance per problem
+ * (ticket 86c9qa6n3 — the post-bake shape). Used to exercise the 2nd-wrong
+ * phoneme-blend prompt + per-letter highlight. The blend text is the
+ * ASCII-7 stored form ("c - a - t ... cat").
+ */
+function cvcWordBlendPlan(): WordSongSessionPlan {
+  const base = cvcWordPlan()
+  return {
+    ...base,
+    id: 'test-plan-cvc-word-blend',
+    problems: base.problems.map((p) => {
+      const word = p.target.word
+      return {
+        ...p,
+        utterances: {
+          ...p.utterances,
+          blend: `${word.split('').join(' - ')} ... ${word}`,
+        },
+      }
+    }),
+  }
+}
+
+/**
  * A `sight-word` content-type plan for the Wave 11 sight-words render
  * tests (W11-03, ticket 86ca7xmvz). Every problem carries
  * `contentType: 'sight-word'` and draws its target from the sight-words
@@ -2685,6 +2709,258 @@ describe('Word Song screen', () => {
       // The read line fired without any fake-timer advance.
       expect(harness.calls.length).toBeGreaterThan(0)
       expect(harness.calls[0].text).toContain('Finish the sentence:')
+    })
+  })
+
+  // ── CVC phoneme-blend prompt (2nd-wrong tap, ticket 86c9qa6n3) ──────────
+  describe('CVC phoneme-blend prompt (ticket 86c9qa6n3)', () => {
+    /** Drive two wrong taps on the current problem, then advance past the
+     *  600ms 2nd-wrong delay so the blend (or hint) fires. */
+    async function tapWrongTwiceAndSettle(targetWord: string): Promise<void> {
+      const chips = screen.getAllByTestId('word-song-chip')
+      const wrongChips = chips.filter(
+        (c) => c.getAttribute('data-word') !== targetWord,
+      )
+      await act(async () => {
+        fireEvent.click(wrongChips[0])
+        await Promise.resolve()
+      })
+      await act(async () => {
+        fireEvent.click(wrongChips[1] ?? wrongChips[0])
+        await Promise.resolve()
+      })
+      // 2nd-wrong delay (HINT_DELAY_AFTER_WRONG_MS = 600ms).
+      await act(async () => {
+        vi.advanceTimersByTime(700)
+        await Promise.resolve()
+      })
+    }
+
+    it('fires the blend prompt (not the plain hint) on the 2nd wrong tap of a cvc-word with a baked blend', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={cvcWordBlendPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      await tapWrongTwiceAndSettle('cat')
+
+      // The BLEND utterance plays — not the generic "Let's look. Cat." hint.
+      expect(harness.spoken()).toContain('c - a - t ... cat')
+      expect(harness.spoken()).not.toContain("Let's look. Cat.")
+      // Emma adopts the attentive-pointing pose for the blend beat. (Use
+      // getAllByTestId — AnimatePresence may briefly keep the outgoing
+      // puzzled-tilt Emma in the DOM during the cross-fade; assert at least
+      // one Emma carries the attentive-pointing pose.)
+      const poses = screen
+        .getAllByTestId('word-song-emma')
+        .map((el) => el.getAttribute('data-pose'))
+      expect(poses).toContain('attentive-pointing')
+    })
+
+    it('graceful-skips to the existing hint when the cvc-word has NO blend slot (pre-bake)', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      // cvcWordPlan() carries NO blend slot — the every-tier-today shape.
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={cvcWordPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      await tapWrongTwiceAndSettle('cat')
+
+      // No blend → the existing hint fires (no silent/dead beat).
+      expect(harness.spoken()).toContain("Let's look. Cat.")
+      expect(harness.spoken().some((t) => t.includes(' ... '))).toBe(false)
+    })
+
+    it('does NOT fire the blend on the 1st wrong tap (only reprompt)', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={cvcWordBlendPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const chips = screen.getAllByTestId('word-song-chip')
+      const wrongChip = chips.find(
+        (c) => c.getAttribute('data-word') !== 'cat',
+      )!
+      await act(async () => {
+        fireEvent.click(wrongChip)
+        await Promise.resolve()
+      })
+      await act(async () => {
+        vi.advanceTimersByTime(700)
+        await Promise.resolve()
+      })
+
+      // 1st wrong → reprompt only, no blend, no letter highlight.
+      expect(harness.spoken()).toContain('Hmm... try again?')
+      expect(harness.spoken()).not.toContain('c - a - t ... cat')
+      const highlighted = screen
+        .getAllByTestId('word-song-letter')
+        .filter((el) => el.getAttribute('data-highlighted') === 'true')
+      expect(highlighted).toHaveLength(0)
+    })
+
+    it('walks the per-letter highlight in step with the blend onWordTick, then pulses all on the whole-word beat', async () => {
+      // We drive the blend's onWordTick MANUALLY, one tick at a time, with a
+      // React flush between each, so each `setBlendActiveLetterIndex` lands
+      // in the DOM before the next tick's snapshot (the production flow ticks
+      // on real audio word-boundary events, naturally one per turn). A
+      // synchronous all-ticks-in-one-microtask harness would batch every
+      // setState and only the last would render.
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      let blendTick: ((i: number) => void) | null = null
+      const playUtterance: PlayWordSongUtteranceFn = vi.fn(
+        async (text, playOpts) => {
+          playOpts?.onPlay?.()
+          if (text.includes(' ... ')) {
+            // Capture the blend's tick fn so the test can drive it; do NOT
+            // auto-tick. (Resolve immediately — the .then() onEnd clearing
+            // is exercised by a separate test.)
+            blendTick = (i: number) => playOpts?.onWordTick?.(i)
+            return
+          }
+          // Non-blend lines (read/reprompt) auto-tick + resolve as usual.
+          const words = text.split(/\s+/).filter(Boolean)
+          for (let i = 0; i < words.length; i++) playOpts?.onWordTick?.(i)
+        },
+      )
+
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={cvcWordBlendPlan()}
+            playUtterance={playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      await tapWrongTwiceAndSettle('cat')
+      expect(blendTick).not.toBeNull()
+
+      const litLetters = (): string[] =>
+        screen
+          .getAllByTestId('word-song-letter')
+          .filter((el) => el.getAttribute('data-highlighted') === 'true')
+          .map((el) => el.getAttribute('data-letter')!)
+
+      // Raw tokens of "c - a - t ... cat": [c,-,a,-,t,...,cat] → ticks 0..6.
+      // Grapheme ticks (0/2/4) light c/a/t individually; the whole-word tick
+      // (6) lights ALL. Separator ticks (1/3/5) leave the highlight unchanged.
+      async function tickTo(i: number): Promise<void> {
+        await act(async () => {
+          blendTick!(i)
+          await Promise.resolve()
+        })
+      }
+
+      await tickTo(0)
+      expect(litLetters()).toEqual(['c'])
+      await tickTo(2)
+      expect(litLetters()).toEqual(['a'])
+      await tickTo(4)
+      expect(litLetters()).toEqual(['t'])
+      await tickTo(6)
+      expect(litLetters().sort()).toEqual(['a', 'c', 't'])
+    })
+
+    it('clears the per-letter highlight after the blend onEnd', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={cvcWordBlendPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      await tapWrongTwiceAndSettle('cat')
+      // Resolve the blend promise so the onEnd clears the highlight.
+      await act(async () => {
+        harness.resolveAll()
+        await Promise.resolve()
+      })
+
+      const highlighted = screen
+        .getAllByTestId('word-song-letter')
+        .filter((el) => el.getAttribute('data-highlighted') === 'true')
+      expect(highlighted).toHaveLength(0)
+    })
+
+    it('queues exactly ONE blend for 5 rapid wrong taps (rage-tap latch)', async () => {
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      const harness = makePlayHarness()
+      render(
+        withMotion(
+          <WordSong
+            __testInitiallyAudioUnlocked
+            plan={cvcWordBlendPlan()}
+            playUtterance={harness.playUtterance}
+            storage={makeMemoryStorage()}
+          />,
+        ),
+      )
+
+      const chips = screen.getAllByTestId('word-song-chip')
+      const wrongChip = chips.find(
+        (c) => c.getAttribute('data-word') !== 'cat',
+      )!
+      // 5 rapid mashes on the same wrong chip.
+      for (let i = 0; i < 5; i++) {
+        await act(async () => {
+          fireEvent.click(wrongChip)
+          await Promise.resolve()
+        })
+      }
+      await act(async () => {
+        vi.advanceTimersByTime(700)
+        await Promise.resolve()
+      })
+
+      const blendCount = harness
+        .spoken()
+        .filter((t) => t === 'c - a - t ... cat').length
+      expect(blendCount).toBe(1)
     })
   })
 })
