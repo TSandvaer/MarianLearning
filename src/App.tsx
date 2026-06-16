@@ -269,7 +269,13 @@ function nextAfterSplash(): Route {
  * would otherwise serve stale hints.
  */
 function readProgressHintsForTrack(track: ProgressTrack): {
-  focusNode: string | undefined
+  // `SkillNode | undefined` — `pickFocusNode().node` is strict-typed
+  // (producer-strict / boundary-loose, per progress-and-persistence.md).
+  // Was `string | undefined`; narrowed (ticket 86ca9atqh) so the frozen
+  // session-focus identity threaded to SessionEnd carries the strict node
+  // type without a cast. The wire payload (`focusNode?: string`) accepts
+  // the subtype transparently.
+  focusNode: SkillNode | undefined
   /**
    * The mode the focus picker selected `focusNode` under (ticket
    * 86c9qa6n3). `'cvc-review'` means a MASTERED CVC tier was deliberately
@@ -671,6 +677,27 @@ export default function App() {
   const activeMathPlanRef = useRef<MathSessionPlan | null>(null)
 
   /**
+   * The picked session focus IDENTITY (`{ node, mode }`) for the active
+   * math session (ticket 86ca9atqh). Frozen at session-start kick-time from
+   * the SAME `pickFocusNode(progress, 'math', sessionCount)` call (via
+   * `readProgressHintsForTrack`) that drives the `/api/claude` request, and
+   * forwarded into the SessionEnd payload at session-complete.
+   *
+   * The math track is forward-only (CVC review is word-song-only), so its
+   * session-end re-derivation already agrees with the kick-effect — threading
+   * the identity here is for contract uniformity with word-song and to remove
+   * the re-derivation class entirely on the math path. `null` on the
+   * no-progress path → SessionEnd's back-compat re-derivation applies. The
+   * math kick-effect has no per-session teardown ref to reset against (it
+   * re-freezes on every greet/math kick), so the ref is simply overwritten at
+   * the next session-start.
+   */
+  const mathSessionFocusRef = useRef<{
+    node: SkillNode
+    mode: FocusMode
+  } | null>(null)
+
+  /**
    * Session-End "All done!" → Hub. Wired into SessionEnd via the new
    * `onAllDone` prop (slice 6 ties the route flip; spec calls for a
    * one-line change in SessionEnd.tsx, this orchestrator-side handler
@@ -762,6 +789,15 @@ export default function App() {
       // ticket 86c9y1p99). Persisted on
       // SessionHistoryEntry.perProblemDistractorClass.
       perProblemDistractorClass: result.perProblemDistractorClass,
+      // ticket 86ca9atqh: thread the picked session focus identity frozen
+      // at session-start. Math is forward-only so this matches the
+      // re-derivation, but it keeps the contract uniform with word-song and
+      // removes the re-derivation class on the math path. `null` on the
+      // no-progress path → omit so SessionEnd's back-compat re-derivation
+      // applies.
+      ...(mathSessionFocusRef.current !== null
+        ? { sessionFocus: mathSessionFocusRef.current }
+        : {}),
     })
     setRoute('session-end')
   }, [])
@@ -793,6 +829,16 @@ export default function App() {
         // gates on the re-derived focus node being `letter-sounds`.
         ...(wordSongCurrentTargetVowelRef.current !== null
           ? { currentTargetVowel: wordSongCurrentTargetVowelRef.current }
+          : {}),
+        // ticket 86ca9atqh: the picked session focus identity frozen at
+        // session-start kick-time (the SAME sessionCount-aware
+        // `pickFocusNode` call that drove the `/api/claude` request). Thread
+        // it so SessionEnd records the ACTUAL focus — fixing the periodic
+        // CVC-review skillFocus mislabel. `null` on the no-progress path →
+        // omit so SessionEnd's back-compat re-derivation applies (correct
+        // for that greenfield state).
+        ...(wordSongSessionFocusRef.current !== null
+          ? { sessionFocus: wordSongSessionFocusRef.current }
           : {}),
       })
       setRoute('session-end')
@@ -1089,6 +1135,18 @@ export default function App() {
     // own default (add-to-10).
     const sessionId = `math-${mathFallbackPlan.id}-${Date.now()}`
     const mathHints = readProgressHintsForTrack('math')
+
+    // ticket 86ca9atqh: capture the picked session focus identity for this
+    // math session (same posture as the word-song kick-effect). Math is
+    // forward-only so the re-derivation already agrees, but threading keeps
+    // the contract uniform across surfaces. `undefined` on the no-progress
+    // path → store null; SessionEnd's back-compat re-derivation handles it.
+    // Assigned in the settle handlers (not the effect body) to satisfy
+    // React 19's `react-hooks/immutability` rule.
+    const mathSessionFocus: { node: SkillNode; mode: FocusMode } | null =
+      mathHints.focusNode !== undefined && mathHints.focusMode !== undefined
+        ? { node: mathHints.focusNode, mode: mathHints.focusMode }
+        : null
     void prepareMathPathA(
       {
         level: 1,
@@ -1129,6 +1187,8 @@ export default function App() {
           return
         }
         mathUnloadRef.current = prepared.unload
+        // ticket 86ca9atqh: freeze the picked session focus identity.
+        mathSessionFocusRef.current = mathSessionFocus
         // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up).
         // Records the resolve in the audioCtxLog timeline so the iPad
         // export shows when the pre-warm finished. Fires BEFORE the
@@ -1166,6 +1226,10 @@ export default function App() {
           '[App] Math Path A unavailable; using silent fallback:',
           err,
         )
+        // ticket 86ca9atqh: freeze the picked session focus identity even
+        // on the silent-fallback path — the session still runs on the
+        // picked focus node.
+        mathSessionFocusRef.current = mathSessionFocus
         // Even on failure, unblock Math's cold-mount read-aloud — the
         // silent fallback at least walks the caption + unlocks chips,
         // which is better than leaving the screen permanently waiting.
@@ -1310,6 +1374,31 @@ export default function App() {
     '/o/' | '/u/' | '/i/' | '/e/' | null
   >(null)
   /**
+   * The picked session focus IDENTITY (`{ node, mode }`) for the active
+   * word-song session (ticket 86ca9atqh). Frozen at session-start kick-time
+   * from the SAME `pickFocusNode(progress, 'word-song', sessionCount)` call
+   * (via `readProgressHintsForTrack`) that drives the `/api/claude` request,
+   * and forwarded into the SessionEnd payload at session-complete so
+   * SessionEnd records the ACTUAL focus instead of re-deriving it
+   * sessionCount-blind.
+   *
+   * This is the load-bearing fix for the periodic CVC-review skillFocus
+   * mislabel: the periodic-review picker branch is sessionCount-dependent,
+   * so a session-end re-derivation (which omits sessionCount) lands on the
+   * forward node and contaminates its mastery counter. Freezing the picked
+   * identity here — the only place that has the real sessionCount — and
+   * carrying it through the payload makes the recorded `skillFocus` match
+   * what the session actually ran under. `null` on the no-progress path
+   * (first run / private mode) → SessionEnd's back-compat re-derivation
+   * applies (correct for that greenfield state). Reset whenever the
+   * word-song fetch latch resets so a stale identity can't leak into the
+   * next session's entry.
+   */
+  const wordSongSessionFocusRef = useRef<{
+    node: SkillNode
+    mode: FocusMode
+  } | null>(null)
+  /**
    * Cross-vowel distractor mix mode for the active session (ticket
    * 86c9qa0kf). Computed once from `loadProgress()` + the live
    * parentSettings at session-start kick-time, frozen on the
@@ -1391,6 +1480,9 @@ export default function App() {
       // vowel so a stale vowel can't leak into the next session's
       // history entry.
       wordSongCurrentTargetVowelRef.current = null
+      // ticket 86ca9atqh — reset the frozen session focus identity so a
+      // stale node/mode can't leak into the next session's history entry.
+      wordSongSessionFocusRef.current = null
     }
   })
 
@@ -1450,6 +1542,27 @@ export default function App() {
     // 2–3 novel short-a probe words into the 8-problem set.
     const sessionId = `word-song-${wordSongFallbackPlan.id}-${Date.now()}`
     const wordSongHints = readProgressHintsForTrack('word-song')
+
+    // ticket 86ca9atqh: capture the picked session focus IDENTITY for this
+    // session. `readProgressHintsForTrack` already ran the
+    // sessionCount-aware `pickFocusNode(progress, 'word-song',
+    // sessionCount)`; freeze its `{ node, mode }` so SessionEnd records the
+    // ACTUAL focus the session ran under rather than re-deriving it
+    // sessionCount-blind (which mislabels periodic CVC-review sessions as
+    // the forward node). `undefined` on the no-progress path → store null;
+    // SessionEnd's back-compat re-derivation handles that greenfield state.
+    //
+    // The ref is assigned inside the settle handlers (resolve AND reject)
+    // rather than in the effect body, to satisfy React 19's
+    // `react-hooks/immutability` rule (refs may not be mutated in the effect
+    // body) — same posture as `wordSongCurrentTargetVowelRef` below. Both
+    // settle paths set it because the session runs regardless of whether the
+    // live audio resolved or fell back to the silent path.
+    const wordSongSessionFocus: { node: SkillNode; mode: FocusMode } | null =
+      wordSongHints.focusNode !== undefined &&
+      wordSongHints.focusMode !== undefined
+        ? { node: wordSongHints.focusNode, mode: wordSongHints.focusMode }
+        : null
 
     // Cross-vowel mix mode (ticket 86c9qa0kf — cross-vowel mix v1 impl;
     // ticket 86c9qa6n3 — CVC review firing layer). Compute once at
@@ -1539,6 +1652,8 @@ export default function App() {
         // cache / fallback / tier-mastered) → store `null`.
         wordSongCurrentTargetVowelRef.current =
           prepared.currentTargetVowel ?? null
+        // ticket 86ca9atqh: freeze the picked session focus identity.
+        wordSongSessionFocusRef.current = wordSongSessionFocus
         // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). See
         // the Math fetch-effect for the rationale.
         recordPathASettleEvent('wordSong', 'resolve')
@@ -1559,6 +1674,10 @@ export default function App() {
           '[App] Word Song Path A unavailable; using silent fallback:',
           err,
         )
+        // ticket 86ca9atqh: freeze the picked session focus identity even
+        // on the silent-fallback path — the session still RUNS on the
+        // picked focus node, so SessionEnd must record it correctly.
+        wordSongSessionFocusRef.current = wordSongSessionFocus
         // Even on failure, unblock the cold-mount read-aloud so the
         // silent fallback walks the caption + unlocks chips. See the
         // Math gate's docstring above for the same-shape rationale.
@@ -1634,6 +1753,9 @@ export default function App() {
       // resolve also set the audio state, so `hadAudio` is true on every
       // path that could have left a stale vowel.
       wordSongCurrentTargetVowelRef.current = null
+      // ticket 86ca9atqh — reset the frozen session focus identity, symmetry
+      // with the imperative tear-down above.
+      wordSongSessionFocusRef.current = null
     })
     return () => {
       cancelled = true

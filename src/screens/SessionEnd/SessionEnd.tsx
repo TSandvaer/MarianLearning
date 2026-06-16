@@ -39,6 +39,7 @@ import {
   isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
+  type FocusMode,
   type Progress,
   type ProgressTrack,
   type SkillNode,
@@ -211,6 +212,33 @@ export interface SessionEndPayload {
    * it.
    */
   currentTargetVowel?: '/o/' | '/u/' | '/i/' | '/e/'
+  /**
+   * The picked session focus IDENTITY — the `{ node, mode }` the session
+   * actually ran under (ticket 86ca9atqh). Frozen at session-start
+   * kick-time in App.tsx (the SAME `pickFocusNode(progress, track,
+   * sessionCount)` call that drives the `/api/claude` request) and threaded
+   * through here so SessionEnd records the ACTUAL focus instead of
+   * re-deriving it.
+   *
+   * Why this field exists: SessionEnd's mount-effect previously re-derived
+   * focus via `pickFocusNode(progress, track)` with `sessionCount` OMITTED
+   * (→ 0). For ordinary forward progression and the one-shot CVC graduation
+   * review that re-derivation agrees with the kick-effect (both are
+   * sessionCount-independent). But the PERIODIC CVC-review branch
+   * (`pickCvcReviewNode`) is gated on `sessionCount > 0 && sessionCount % 5
+   * === 0`; a sessionCount-blind re-derivation falls through to the forward
+   * walk and lands on the next non-mastered node (e.g. `digraphs-sh`). The
+   * session, however, actually RAN as a cross-vowel review — so the
+   * re-derived `skillFocus` mislabeled the forward node, and
+   * `applyMasteryRule`'s `qualifies()` filter (`skillFocus.includes(node)`)
+   * wrongly credited that tier's 90/3 counter (mastery contamination).
+   *
+   * Optional + additive — callers that don't ship it (hand-built test
+   * fixtures predating this ticket) fall back to the sessionCount-blind
+   * re-derivation, which stays correct for every branch EXCEPT the periodic
+   * review. App.tsx ships it for both surfaces.
+   */
+  sessionFocus?: { node: SkillNode; mode: FocusMode }
 }
 
 /**
@@ -378,6 +406,13 @@ export default function SessionEnd({
    * saw, matching the P0.2 invariant documented on the mount effect.
    */
   const [focusRecapCopy] = useState<string>(() => {
+    // ticket 86ca9atqh: prefer the threaded session focus node so the recap
+    // names the tier the session ACTUALLY ran under (a periodic CVC review
+    // names the reviewed CVC tier, not the sessionCount-blind forward node).
+    // Falls back to the re-derivation for hand-built fixtures.
+    if (payload?.sessionFocus) {
+      return focusRecapLine(payload.sessionFocus.node)
+    }
     const progressForFocus = loadProgress() ?? defaultProgress()
     const track = trackForSurface(payload?.surface ?? 'math')
     // `.node` — the recap copy only needs the focus node, not the
@@ -470,18 +505,28 @@ export default function SessionEnd({
     // `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` P0.2).
     const progressForFocus = loadProgress() ?? defaultProgress()
     const track = trackForSurface(p.surface)
-    // ticket 86c9qa6n3 widened the picker to `{ node, mode }`. `mode` is
-    // re-derived here (sessionCount omitted) ONLY to detect the one-shot
-    // CVC graduation review — that branch is sessionCount-independent and
-    // fires whenever `cvcGraduationSessionFired` is still false at the
-    // session-end write (which it is, until this very write sets it). The
-    // writer uses `focusMode` to latch `cvcGraduationSessionFired = true`
-    // exactly once. `focusNode` keeps the existing P0.2 re-derivation
-    // semantics for `skillFocus` / recap.
-    const { node: focusNode, mode: focusMode } = pickFocusNode(
-      progressForFocus,
-      track,
-    )
+    // ticket 86ca9atqh: prefer the THREADED session focus identity — the
+    // `{ node, mode }` App.tsx froze at session-start kick-time from the
+    // SAME `pickFocusNode(progress, track, sessionCount)` call that drove
+    // the `/api/claude` request. This is the only sessionCount-aware source
+    // available at session-end, so it is authoritative for the periodic
+    // CVC-review branch (which the local re-derivation below cannot
+    // reproduce — it omits `sessionCount`).
+    //
+    // BACK-COMPAT FALLBACK: when `sessionFocus` is absent (hand-built test
+    // fixtures predating this ticket), fall back to the local re-derivation.
+    // ticket 86c9qa6n3 widened the picker to `{ node, mode }`. The fallback
+    // `mode` is re-derived (sessionCount omitted) to detect the one-shot CVC
+    // graduation review — that branch IS sessionCount-independent and fires
+    // whenever `cvcGraduationSessionFired` is still false at the session-end
+    // write (which it is, until this very write sets it). The writer uses
+    // `focusMode` to latch `cvcGraduationSessionFired = true` exactly once.
+    // The fallback's `focusNode` keeps the existing P0.2 re-derivation
+    // semantics for `skillFocus` / recap. The PERIODIC review branch is the
+    // only one the fallback cannot reproduce — and it is exactly the branch
+    // the threaded field exists to fix.
+    const { node: focusNode, mode: focusMode } =
+      p.sessionFocus ?? pickFocusNode(progressForFocus, track)
     // 86c9m3aec: graduation-session split computation. Lives at the
     // session-end persistence boundary because:
     //   1. We need to read `loadProgress()` at the same instant we

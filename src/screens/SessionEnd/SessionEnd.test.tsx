@@ -9,11 +9,17 @@ import type { StorageAdapter } from '../Math/stardust'
 import { STARDUST_STORAGE_KEY, STARDUST_SCHEMA_VERSION } from '../Math/stardust'
 import { loadStardust } from '../_shared/stardust'
 import { WORDSONG_SESSION_END_BONUS } from '../_shared/wordSongCompletionBonus'
-import { SESSION_HISTORY_KEY } from './sessionHistory'
+import {
+  SESSION_HISTORY_KEY,
+  SESSION_HISTORY_SCHEMA_VERSION,
+} from './sessionHistory'
 import {
   STORAGE_KEY as PROGRESS_STORAGE_KEY,
+  defaultProgress,
   isProgressV1,
   loadProgress,
+  saveProgress,
+  type Progress,
 } from '../../lib/progress'
 
 function withMotion(node: ReactNode) {
@@ -406,6 +412,215 @@ describe('SessionEnd', () => {
     expect(loaded?.history[0].successRate).toBe(
       WORD_SONG_PAYLOAD.totalCorrect / 8,
     )
+  })
+
+  // ── Periodic CVC-review skillFocus mislabel (ticket 86ca9atqh) ──────────
+  //
+  // AC3: a REAL SessionEnd-level test exercising the periodic CVC-review
+  // path. Before the fix, SessionEnd re-derived its focus via
+  // `pickFocusNode(progress, track)` with `sessionCount` OMITTED (→ 0). The
+  // periodic-review branch of `pickCvcReviewNode` is gated on
+  // `sessionCount > 0 && sessionCount % 5 === 0`, so a sessionCount-blind
+  // re-derivation falls through to the FORWARD walk and lands on the next
+  // non-mastered node (e.g. `digraphs-sh`). App.tsx's session-start
+  // kick-effect, by contrast, passes the REAL sessionCount, so the session
+  // actually RAN as a CVC review — but SessionEnd recorded `skillFocus` for
+  // the forward node. That mislabel is read by `applyMasteryRule`'s
+  // `qualifies()` filter (`skillFocus.includes(node)`, mastery.ts:620), so a
+  // high-scoring cross-vowel review wrongly credited the forward tier's 90/3
+  // counter (mastery contamination).
+  //
+  // The fix threads the picked session focus identity (`sessionFocus =
+  // { node, mode }`) through the SessionEnd payload, so SessionEnd records
+  // the ACTUAL focus the session ran under instead of re-deriving it
+  // sessionCount-blind. These tests pin the SessionEnd consumer of that
+  // threaded field — the kick-vs-session-end divergence had ZERO coverage
+  // before this ticket (the pre-existing `progressHistory.test.ts` periodic
+  // case hand-constructs a `focusMode` production wouldn't emit and so
+  // bypasses the re-derivation entirely).
+
+  /**
+   * Seed a post-graduation, all-CVC-mastered Progress doc plus a
+   * session-history blob with the given `sessionCount`. This is the state
+   * a real returning Marian is in once every CVC tier is mastered, the
+   * graduation review has fired, and she is doing ordinary forward work on
+   * `digraphs-sh` — interleaved with periodic cross-vowel reviews every 5th
+   * session.
+   */
+  function seedPeriodicReviewState(
+    storage: ReturnType<typeof createMemoryStorage>,
+    sessionCount: number,
+  ): void {
+    const base = defaultProgress('Marian')
+    const progress: Progress = {
+      ...base,
+      skillLevels: {
+        ...base.skillLevels,
+        // Everything up to and including all CVC tiers mastered; the
+        // forward walk's first non-mastered node is `digraphs-sh`, which
+        // is exactly the tier the ticket warns would be contaminated.
+        'letter-sounds': 'mastered',
+        'blending-cv': 'mastered',
+        'cvc-words': 'mastered',
+        'cvc-words-short-o': 'mastered',
+        'cvc-words-short-u': 'mastered',
+        'cvc-words-short-i': 'mastered',
+        'cvc-words-short-e': 'mastered',
+        'digraphs-sh': 'practicing',
+      },
+      // Graduation review already fired — periodic round-robin is active.
+      cvcGraduationSessionFired: true,
+    }
+    saveProgress(progress)
+    // `recordSessionEnd` reads + increments sessionCount from this blob;
+    // the value we re-derive against in the (buggy) path is what matters
+    // for the divergence, but the SessionEnd re-derivation OMITS it
+    // entirely — so the threaded `sessionFocus` is the only correct source.
+    storage.store.set(
+      SESSION_HISTORY_KEY,
+      JSON.stringify({
+        schemaVersion: SESSION_HISTORY_SCHEMA_VERSION,
+        sessionCount,
+        lastSessionCompletedAt: '2026-06-15T10:00:00.000Z',
+        longestStreakEver: 5,
+        cumulativeStardust: 40,
+        lastSessionStardust: 5,
+        dayStreak: 3,
+        todayTreesTouched: { date: '', trees: [] },
+        lastSuggestion: null,
+        consecutiveOverrides: 0,
+        suggestionCooldownUntil: null,
+      }),
+    )
+  }
+
+  it('records the THREADED cvc-review focus node on a periodic review session (AC1/AC2)', () => {
+    const storage = createMemoryStorage()
+    seedStardust(storage, 8)
+    // sessionCount 10 → `10 % 5 === 0`, round-robin index
+    // `floor(10/5) % 3 === 2` → `cvc-words-short-u`. App.tsx picked this at
+    // session-start with the real sessionCount and the session ran as a
+    // cross-vowel review on short-u.
+    seedPeriodicReviewState(storage, 10)
+    const fixedDate = new Date('2026-06-15T18:00:00.000Z')
+
+    render(
+      withMotion(
+        <SessionEnd
+          payload={{
+            ...WORD_SONG_PAYLOAD,
+            // The focus identity the session actually ran under, frozen at
+            // session-start kick-time and threaded through the payload.
+            sessionFocus: { node: 'cvc-words-short-u', mode: 'cvc-review' },
+          }}
+          playUtteranceFn={createFakePlayUtterance()}
+          chime={createFakeSfx()}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+          now={() => fixedDate}
+        />,
+      ),
+    )
+
+    const loaded = loadProgress()
+    const newEntry = loaded!.history[loaded!.history.length - 1]
+    // AC2: skillFocus is the CVC review tier, NOT the forward node
+    // (`digraphs-sh`) the sessionCount-blind re-derivation would have
+    // produced. So `qualifies()` credits short-u, not digraphs-sh.
+    expect(newEntry.skillFocus).toEqual(['cvc-words-short-u'])
+  })
+
+  it('does NOT credit the forward node (digraphs-sh) on a periodic review (mastery-contamination guard)', () => {
+    const storage = createMemoryStorage()
+    seedStardust(storage, 8)
+    seedPeriodicReviewState(storage, 10)
+    const fixedDate = new Date('2026-06-15T18:00:00.000Z')
+
+    render(
+      withMotion(
+        <SessionEnd
+          payload={{
+            ...WORD_SONG_PAYLOAD,
+            totalCorrect: 8, // high score — exactly what would contaminate
+            sessionFocus: { node: 'cvc-words-short-u', mode: 'cvc-review' },
+          }}
+          playUtteranceFn={createFakePlayUtterance()}
+          chime={createFakeSfx()}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+          now={() => fixedDate}
+        />,
+      ),
+    )
+
+    const loaded = loadProgress()
+    const newEntry = loaded!.history[loaded!.history.length - 1]
+    // The forward node MUST NOT appear in skillFocus — a high-scoring
+    // cross-vowel review must never count toward digraphs-sh's 90/3.
+    expect(newEntry.skillFocus).not.toContain('digraphs-sh')
+  })
+
+  it('falls back to the sessionCount-blind re-derivation when sessionFocus is absent (back-compat)', () => {
+    // Hand-built fixtures + math sessions that predate the threaded field
+    // still re-derive. The graduation review is sessionCount-INDEPENDENT
+    // (its branch fires on `cvcGraduationSessionFired === false` once the
+    // whole tree is mastered), so the re-derivation still agrees with the
+    // kick-effect there — only the PERIODIC branch diverges, and that
+    // requires the threaded field.
+    const storage = createMemoryStorage()
+    seedStardust(storage, 8)
+    const base = defaultProgress('Marian')
+    // Whole word-song tree mastered so the forward walk finds NOTHING and
+    // the graduation review fires (sessionCount-independent → short-u).
+    const allMasteredWordSong = { ...base.skillLevels }
+    for (const node of [
+      'letter-names',
+      'letter-sounds',
+      'blending-cv',
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+      'cvc-words-short-i',
+      'cvc-words-short-e',
+      'digraphs-sh',
+      'digraphs-ch',
+      'digraphs-th-voiceless',
+      'sight-words',
+      'simple-sentences',
+    ] as const) {
+      allMasteredWordSong[node] = 'mastered'
+    }
+    const progress: Progress = {
+      ...base,
+      skillLevels: allMasteredWordSong,
+      cvcGraduationSessionFired: false, // graduation not yet fired
+    }
+    saveProgress(progress)
+    const fixedDate = new Date('2026-06-15T18:00:00.000Z')
+
+    render(
+      withMotion(
+        <SessionEnd
+          // No `sessionFocus` field — exercises the back-compat fallback.
+          payload={WORD_SONG_PAYLOAD}
+          playUtteranceFn={createFakePlayUtterance()}
+          chime={createFakeSfx()}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+          now={() => fixedDate}
+        />,
+      ),
+    )
+
+    const loaded = loadProgress()
+    const newEntry = loaded!.history[loaded!.history.length - 1]
+    // Graduation review (sessionCount-independent) → short-u, agreeing
+    // with what the kick-effect would have picked. Re-derivation is safe
+    // here precisely because this branch ignores sessionCount.
+    expect(newEntry.skillFocus).toEqual(['cvc-words-short-u'])
   })
 
   it('shows the stardust counter', () => {
