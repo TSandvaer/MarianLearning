@@ -48,6 +48,16 @@ const validBody = {
   breakMs: 250,
 }
 
+const validIpaBody = {
+  word: 'fan',
+  graphemes: ['f', 'a', 'n'],
+  onsetMode: 'ipa',
+  onsetText: 'fː', // IPA length-marked /f/ — the held-fricative lever
+  ratePct: 0,
+  pitchPct: -5,
+  breakMs: 250,
+}
+
 beforeEach(() => {
   delete process.env.VERCEL_ENV
 })
@@ -60,7 +70,9 @@ afterEach(() => {
 describe('buildBlendInnerTextWithOnset — structure mirrors production', () => {
   it('parameterizes ONLY the onset slot; medial + coda + whole word are production-identical', () => {
     const inner = buildBlendInnerTextWithOnset('cat', ['c', 'a', 't'], {
+      onsetMode: 'text',
       onsetText: 'kuh',
+      graphemeFallback: 'c',
       ratePct: 0,
       pitchPct: 0,
       breakMs: 250,
@@ -86,7 +98,9 @@ describe('buildBlendInnerTextWithOnset — structure mirrors production', () => 
 
   it('renders signed rate/pitch correctly (positive and negative)', () => {
     const inner = buildBlendInnerTextWithOnset('sun', ['s', 'u', 'n'], {
+      onsetMode: 'text',
       onsetText: 'sss',
+      graphemeFallback: 's',
       ratePct: 10,
       pitchPct: -20,
       breakMs: 300,
@@ -97,7 +111,9 @@ describe('buildBlendInnerTextWithOnset — structure mirrors production', () => 
 
   it('escapes SSML-injection attempts in onset and word', () => {
     const inner = buildBlendInnerTextWithOnset('fan', ['f', 'a', 'n'], {
+      onsetMode: 'text',
       onsetText: 'a</prosody><break time="9000ms"/>',
+      graphemeFallback: 'f',
       ratePct: 0,
       pitchPct: 0,
       breakMs: 250,
@@ -109,7 +125,9 @@ describe('buildBlendInnerTextWithOnset — structure mirrors production', () => 
 
   it('renders the /ks/ cluster coda for fox bare (production rule: x stays bare)', () => {
     const inner = buildBlendInnerTextWithOnset('fox', ['f', 'o', 'x'], {
+      onsetMode: 'text',
       onsetText: 'ff',
+      graphemeFallback: 'f',
       ratePct: 0,
       pitchPct: 0,
       breakMs: 250,
@@ -118,6 +136,108 @@ describe('buildBlendInnerTextWithOnset — structure mirrors production', () => 
     expect(inner).toContain('<phoneme alphabet="ipa" ph="ɒ">o</phoneme>')
     // coda x → /ks/ cluster, BARE (no ə release — not in BLEND_STOP_GRAPHEMES)
     expect(inner).toContain('<phoneme alphabet="ipa" ph="ks">x</phoneme>')
+  })
+})
+
+describe('buildBlendInnerTextWithOnset — IPA onset mode', () => {
+  it('emits a <phoneme alphabet="ipa"> onset wrapper INSIDE the prosody wrap; preserves the IPA length mark', () => {
+    const inner = buildBlendInnerTextWithOnset('fan', ['f', 'a', 'n'], {
+      onsetMode: 'ipa',
+      onsetText: 'fː', // held fricative — the length-mark lever
+      graphemeFallback: 'f',
+      ratePct: 0,
+      pitchPct: -5,
+      breakMs: 250,
+    })
+    // Onset slot: prosody-wrapped IPA phoneme, glyph fallback `f`, then break.
+    expect(inner).toContain(
+      '<prosody rate="+0%" pitch="-5%"><phoneme alphabet="ipa" ph="fː">f</phoneme></prosody><break time="250ms"/>',
+    )
+    // The IPA length mark survives intact in the ph attribute (the whole point).
+    expect(inner).toContain('ph="fː"')
+    // The medial/coda stay production-identical (unaffected by onset mode).
+    expect(inner).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+    expect(inner).toContain('<break time="450ms"/>fan')
+  })
+
+  it('preserves a range of IPA unicode codepoints in the ph value (dʒ, ʊw, sː)', () => {
+    const jam = buildBlendInnerTextWithOnset('jam', ['j', 'a', 'm'], {
+      onsetMode: 'ipa',
+      onsetText: 'dʒ',
+      graphemeFallback: 'j',
+      ratePct: 0,
+      pitchPct: 0,
+      breakMs: 250,
+    })
+    expect(jam).toContain('<phoneme alphabet="ipa" ph="dʒ">j</phoneme>')
+
+    const web = buildBlendInnerTextWithOnset('web', ['w', 'e', 'b'], {
+      onsetMode: 'ipa',
+      onsetText: 'ʊw',
+      graphemeFallback: 'w',
+      ratePct: 0,
+      pitchPct: -15,
+      breakMs: 250,
+    })
+    expect(web).toContain('<phoneme alphabet="ipa" ph="ʊw">w</phoneme>')
+
+    const sip = buildBlendInnerTextWithOnset('sip', ['s', 'i', 'p'], {
+      onsetMode: 'ipa',
+      onsetText: 'sː',
+      graphemeFallback: 's',
+      ratePct: 0,
+      pitchPct: 0,
+      breakMs: 250,
+    })
+    expect(sip).toContain('<phoneme alphabet="ipa" ph="sː">s</phoneme>')
+  })
+
+  it('neutralizes XML metacharacters in the ph value while preserving IPA unicode', () => {
+    // A defence-in-depth case: even though the request validator rejects markup
+    // in IPA onset, the builder still escapes — verify " < > are neutralised
+    // but a benign IPA codepoint alongside survives.
+    const inner = buildBlendInnerTextWithOnset('fan', ['f', 'a', 'n'], {
+      onsetMode: 'ipa',
+      onsetText: 'fː"<>', // IPA char + raw quote + angle brackets
+      graphemeFallback: 'f',
+      ratePct: 0,
+      pitchPct: 0,
+      breakMs: 250,
+    })
+    // The IPA length mark is preserved verbatim.
+    expect(inner).toContain('fː')
+    // The XML metacharacters are escaped inside the attribute — no raw " < >.
+    expect(inner).toContain('ph="fː&quot;&lt;&gt;"')
+    // No raw closing-tag injection survived.
+    expect(inner).not.toContain('ph="fː"<>')
+  })
+
+  it('escapes the grapheme fallback glyph', () => {
+    const inner = buildBlendInnerTextWithOnset('fan', ['f', 'a', 'n'], {
+      onsetMode: 'ipa',
+      onsetText: 'fː',
+      graphemeFallback: '<f>',
+      ratePct: 0,
+      pitchPct: 0,
+      breakMs: 250,
+    })
+    expect(inner).toContain('ph="fː">&lt;f&gt;</phoneme>')
+  })
+
+  it('text mode is byte-unchanged regression: no <phoneme> in the onset slot', () => {
+    const inner = buildBlendInnerTextWithOnset('fan', ['f', 'a', 'n'], {
+      onsetMode: 'text',
+      onsetText: 'fff',
+      graphemeFallback: 'f',
+      ratePct: 0,
+      pitchPct: 0,
+      breakMs: 250,
+    })
+    // Onset is the raw orthography, NOT a phoneme tag.
+    expect(inner).toContain('<prosody rate="+0%" pitch="+0%">fff</prosody>')
+    // The onset prosody wrap must NOT contain an ipa phoneme tag.
+    const onsetSlot = inner.slice(0, inner.indexOf('<break'))
+    expect(onsetSlot).not.toContain('alphabet="ipa"')
   })
 })
 
@@ -159,6 +279,23 @@ describe('handler — non-production gate', () => {
     })
     expect(res.status).toBe(200)
   })
+
+  it('renders IPA mode — the override SSML carries the IPA <phoneme> onset wrapper with the length mark intact', async () => {
+    process.env.VERCEL_ENV = 'preview'
+    const { synthesize, calls } = makeSynthStub()
+    const res = await handler(makeRequest(validIpaBody), {
+      ...freshLimiterOverride(),
+      synthesize,
+    })
+    expect(res.status).toBe(200)
+    expect(calls).toHaveLength(1)
+    const ssml = calls[0]!.ssmlOverride!
+    // The onset is now a prosody-wrapped IPA phoneme, NOT raw text.
+    expect(ssml).toContain(
+      '<prosody rate="+0%" pitch="-5%"><phoneme alphabet="ipa" ph="fː">f</phoneme></prosody>',
+    )
+    expect(ssml).toContain('en-GB-OliviaNeural')
+  })
 })
 
 describe('handler — request validation', () => {
@@ -177,6 +314,22 @@ describe('handler — request validation', () => {
     { name: 'pitchPct out of range', body: { ...validBody, pitchPct: -999 } },
     { name: 'breakMs out of range', body: { ...validBody, breakMs: 9000 } },
     { name: 'breakMs non-integer', body: { ...validBody, breakMs: 12.5 } },
+    {
+      name: 'invalid onsetMode',
+      body: { ...validBody, onsetMode: 'syllable' },
+    },
+    {
+      name: 'ipa onsetText with markup',
+      body: { ...validIpaBody, onsetText: 'f<b>' },
+    },
+    {
+      name: 'ipa onsetText with whitespace',
+      body: { ...validIpaBody, onsetText: 'f ː' },
+    },
+    {
+      name: 'ipa onsetText empty',
+      body: { ...validIpaBody, onsetText: '' },
+    },
   ]
   for (const c of cases) {
     it(`400s on ${c.name}`, async () => {

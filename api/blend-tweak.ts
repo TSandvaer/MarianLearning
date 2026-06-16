@@ -124,10 +124,28 @@ function renderProductionGrapheme(grapheme: string): string {
   return `<phoneme alphabet="ipa" ph="${escapeSsml(released)}">${escapeSsml(grapheme)}</phoneme>`
 }
 
+/** Onset render mode.
+ *  - `'text'` (default): the onset is free-text orthography voiced literally
+ *    inside the prosody wrap — the original behaviour. Azure spells / schwas
+ *    a bare consonant run ("fff" → "F-F-F", "ef" → letter-name "ee-eff").
+ *  - `'ipa'`: the onset is an IPA phoneme string rendered as a
+ *    `<phoneme alphabet="ipa" ph="…">` wrapper, mirroring the production blend
+ *    pattern. This is the only lever that can produce a HELD fricative
+ *    (`fː`, `sː` — the IPA length mark is honoured by Olivia, see
+ *    `planner-and-canon.md`). The `ph` value preserves IPA unicode while
+ *    XML metacharacters are neutralised. */
+export type OnsetMode = 'text' | 'ipa'
+
 /** Onset prosody params Thomas drives. Rate/pitch are percent integers
- *  (relative to the speak-root prosody); break is the post-onset pause. */
+ *  (relative to the speak-root prosody); break is the post-onset pause. In
+ *  `'ipa'` mode, `onsetText` carries the IPA phoneme string (the `ph` value);
+ *  `graphemeFallback` is the visible glyph inside the `<phoneme>` tag. */
 export interface BlendOnsetParams {
+  onsetMode: OnsetMode
   onsetText: string
+  /** The onset grapheme letter shown inside the `<phoneme>` tag in IPA mode
+   *  (and ignored in text mode). Escaped before emission. */
+  graphemeFallback: string
   ratePct: number
   pitchPct: number
   breakMs: number
@@ -137,7 +155,9 @@ export interface BlendOnsetParams {
  * Build the FULL blend inner-text, mirroring production structure, with the
  * ONSET slot parameterized.
  *
- *   onset:  <prosody rate pitch>{onsetText}</prosody><break breakMs/>
+ *   onset (text mode): <prosody rate pitch>{onsetText}</prosody><break breakMs/>
+ *   onset (ipa mode):  <prosody rate pitch><phoneme alphabet="ipa"
+ *                        ph="{onsetText}">{graphemeFallback}</phoneme></prosody><break breakMs/>
  *   medial: <production grapheme render><break 250ms/>      (vowel)
  *   coda:   <production grapheme render><break 250ms/>      (final consonant)
  *   word:   <break 450ms/>{word}
@@ -146,6 +166,11 @@ export interface BlendOnsetParams {
  * `x`=/ks/ cluster stays one token). The first grapheme is the onset slot;
  * the rest render via the production helper. This guarantees the tuned onset
  * is heard against the exact medial/coda/whole-word bytes production ships.
+ *
+ * In IPA mode the onset `ph` value preserves IPA unicode (`ː`, `ɛ`, `ʃ`, …)
+ * — `escapeSsml` only neutralises the five XML metacharacters (`& < > " '`),
+ * which is exactly what lets the length-mark fricative lever (`fː`/`sː`) reach
+ * Azure intact.
  */
 export function buildBlendInnerTextWithOnset(
   word: string,
@@ -157,9 +182,20 @@ export function buildBlendInnerTextWithOnset(
   // ── ONSET slot (parameterized) ──
   const rate = `${onset.ratePct >= 0 ? '+' : ''}${onset.ratePct}%`
   const pitch = `${onset.pitchPct >= 0 ? '+' : ''}${onset.pitchPct}%`
+  const onsetInner =
+    onset.onsetMode === 'ipa'
+      ? // IPA mode: wrap the production-pattern <phoneme>. `ph` preserves IPA
+        // unicode; only XML metacharacters are escaped (the whole point — `fː`
+        // survives, `"`/`<`/`>` are neutralised). The visible glyph is the
+        // onset grapheme letter (escaped).
+        `<phoneme alphabet="ipa" ph="${escapeSsml(onset.onsetText)}">` +
+        `${escapeSsml(onset.graphemeFallback)}` +
+        `</phoneme>`
+      : // Text mode (default): the onset orthography voiced literally.
+        escapeSsml(onset.onsetText)
   parts.push(
     `<prosody rate="${escapeSsml(rate)}" pitch="${escapeSsml(pitch)}">` +
-      `${escapeSsml(onset.onsetText)}` +
+      `${onsetInner}` +
       `</prosody>`,
   )
   parts.push(`<break time="${onset.breakMs}ms"/>`)
@@ -199,6 +235,7 @@ function buildSpeakBody(innerText: string): string {
 interface BlendTweakRequest {
   word: string
   graphemes: string[]
+  onsetMode: OnsetMode
   onsetText: string
   ratePct: number
   pitchPct: number
@@ -209,10 +246,17 @@ interface BlendTweakRequest {
  *  cluster, which the page may send as a single "x" token; defensive upper
  *  bound). */
 const GRAPHEME_RE = /^[a-z]{1,3}$/i
-/** The onset text the sponsor types. Constrained to a short string of
- *  letters/spaces so a stray paste can't smuggle a huge body. `escapeSsml`
- *  still runs regardless — this is a size/shape guard, not the safety net. */
+/** The TEXT-mode onset the sponsor types. Constrained to a short string of
+ *  ASCII letters/spaces so a stray paste can't smuggle a huge body.
+ *  `escapeSsml` still runs regardless — this is a size/shape guard, not the
+ *  safety net. */
 const ONSET_TEXT_RE = /^[a-z ]{1,12}$/i
+/** The IPA-mode onset (the `ph` value). Must accept IPA unicode (length mark
+ *  `ː`, `ɛ`, `ʃ`, `ʒ`, `ʊ`, `ɡ`, `dʒ`, …) so the held-fricative lever works,
+ *  but reject angle brackets / ampersands / quotes that would smuggle markup,
+ *  plus whitespace. Any other codepoint (IPA unicode included) passes, 1-12
+ *  chars. `escapeSsml` still runs on emission as defence in depth. */
+const ONSET_IPA_RE = /^[^<>&"'\s]{1,12}$/u
 
 function parseRequest(body: unknown): BlendTweakRequest | { error: string } {
   if (typeof body !== 'object' || body === null)
@@ -239,8 +283,31 @@ function parseRequest(body: unknown): BlendTweakRequest | { error: string } {
     graphemes.push(g)
   }
 
+  // onsetMode: optional, defaults to 'text' (back-compat — the original
+  // client omits it). Only 'text' | 'ipa' are valid.
+  const rawMode = b.onsetMode
+  let onsetMode: OnsetMode
+  if (rawMode === undefined || rawMode === 'text') {
+    onsetMode = 'text'
+  } else if (rawMode === 'ipa') {
+    onsetMode = 'ipa'
+  } else {
+    return { error: "onsetMode must be 'text' or 'ipa'" }
+  }
+
+  // The onset string is validated per-mode: text mode is ASCII letters/spaces;
+  // ipa mode accepts IPA unicode but no markup/whitespace.
   const onsetText = b.onsetText
-  if (typeof onsetText !== 'string' || !ONSET_TEXT_RE.test(onsetText)) {
+  if (typeof onsetText !== 'string') {
+    return { error: 'onsetText must be a string' }
+  }
+  if (onsetMode === 'ipa') {
+    if (!ONSET_IPA_RE.test(onsetText)) {
+      return {
+        error: 'onsetText (ipa) must be 1-12 IPA chars, no markup/whitespace',
+      }
+    }
+  } else if (!ONSET_TEXT_RE.test(onsetText)) {
     return { error: 'onsetText must be 1-12 letters/spaces' }
   }
 
@@ -272,7 +339,7 @@ function parseRequest(body: unknown): BlendTweakRequest | { error: string } {
     return { error: 'breakMs must be an integer in [0, 1500]' }
   }
 
-  return { word, graphemes, onsetText, ratePct, pitchPct, breakMs }
+  return { word, graphemes, onsetMode, onsetText, ratePct, pitchPct, breakMs }
 }
 
 // ── Rate limiter (module singleton, same tunables as /api/claude) ───────
@@ -344,7 +411,11 @@ export async function handler(
     parsed.word,
     parsed.graphemes,
     {
+      onsetMode: parsed.onsetMode,
       onsetText: parsed.onsetText,
+      // The visible glyph inside the IPA <phoneme> tag = the onset grapheme
+      // (the word's first grapheme token). Ignored in text mode.
+      graphemeFallback: parsed.graphemes[0] ?? parsed.word.charAt(0),
       ratePct: parsed.ratePct,
       pitchPct: parsed.pitchPct,
       breakMs: parsed.breakMs,

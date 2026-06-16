@@ -182,11 +182,50 @@
         opacity: 0.5;
         cursor: progress;
       }
+      .modetoggle {
+        display: inline-flex;
+        border: 1px solid #cdbfa6;
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 44px;
+      }
+      .modetoggle button {
+        appearance: none;
+        border: none;
+        background: #fffdf9;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 0.5rem 0.8rem;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      .modetoggle button + button {
+        border-left: 1px solid #cdbfa6;
+      }
+      .modetoggle button.active {
+        background: var(--blue);
+        color: #fff;
+      }
       .chips {
         margin-top: 0.5rem;
         display: flex;
         flex-wrap: wrap;
         gap: 0.35rem;
+        align-items: center;
+      }
+      .chips .chlabel {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-right: 0.15rem;
+      }
+      .chips .ch.ipa {
+        background: var(--blue-soft);
+        border-color: #c9d8f2;
+        font-weight: 700;
       }
       .chips .ch {
         font-size: 0.78rem;
@@ -243,13 +282,19 @@
       <strong>in context</strong>. Each row renders the FULL production blend
       SSML (<code>en-GB-OliviaNeural</code>, root rate <code>-10%</code>) — the
       medial vowel + coda + whole word are byte-identical to what ships; ONLY
-      the onset slot (text / rate / pitch / break) is yours to drive. Type a
-      candidate onset, tweak rate/pitch/break, tap <strong>Play</strong>, hear
-      it live. The hint chips below each row are starting candidates — tap one
-      to load it. When a row sounds right, read off the params from the inputs
-      and the generated SSML, and report the winner per class in chat.
-      <strong>Open in a private tab</strong> to dodge any stale service-worker
-      cache. Non-prod only — this page 404s on production.
+      the onset slot (mode / text / rate / pitch / break) is yours to drive.
+      Each row has a <strong>Text / IPA</strong> toggle: <strong>Text</strong>
+      voices the onset orthography literally (Azure spells / schwas it);
+      <strong>IPA</strong> wraps the onset in a
+      <code>&lt;phoneme alphabet="ipa" ph="…"&gt;</code> — the only lever that
+      can <strong>HOLD a fricative</strong> via the IPA length mark
+      (<code>fː</code>, <code>sː</code>). Type a candidate onset, tweak
+      rate/pitch/break, tap <strong>Play</strong>, hear it live. The chips below
+      each row are starting candidates (text chips + IPA chips) — tap one to
+      load it and switch mode. When a row sounds right, read off the params from
+      the inputs and the generated SSML, and report the winner per class in
+      chat. <strong>Open in a private tab</strong> to dodge any stale
+      service-worker cache. Non-prod only — this page 404s on production.
     </p>
 
     <div id="status" class="status">Initialising&hellip;</div>
@@ -282,73 +327,82 @@
           word: 'fan',
           cls: '/f/',
           ctx: 'short-a CVC · onset fricative /f/',
-          hint: 'Thomas: "should be ‘af’ or ‘ef’" but the /f/ keeps getting swallowed — stretch it.',
+          hint: 'Thomas: "should be ‘af’ or ‘ef’" but the /f/ keeps getting swallowed. Orthographic onsets cannot HOLD the fricative — switch to <strong>IPA</strong> and try the length-mark <code>fː</code>.',
           start: { onsetText: 'f', ratePct: 0, pitchPct: 0, breakMs: 250 },
           chips: ['f', 'ff', 'fff', 'af', 'ef', 'eff'],
+          ipaChips: ['fː', 'fːf', 'fːə'],
         },
         {
           word: 'fox',
           cls: '/f/',
           ctx: 'short-o CVC · onset fricative /f/ · coda /ks/ cluster',
-          hint: 'Same /f/ class as fan, different vowel context. Try the same onset that wins on fan.',
+          hint: 'Same /f/ class as fan, different vowel context. Carry the winning IPA onset (<code>fː</code>) across.',
           start: { onsetText: 'f', ratePct: 0, pitchPct: 0, breakMs: 250 },
           chips: ['f', 'ff', 'fff', 'af', 'ef', 'eff'],
+          ipaChips: ['fː', 'fːf', 'fːə'],
         },
         {
           word: 'sip',
           cls: '/s/',
           ctx: 'short-i CVC · onset fricative /s/',
-          hint: 'Leading-vowel "es" swallows the /s/ — let it hiss longer.',
+          hint: 'Leading-vowel "es" swallows the /s/. Switch to <strong>IPA</strong> and let the length mark hiss: <code>sː</code>.',
           start: { onsetText: 's', ratePct: 0, pitchPct: 0, breakMs: 250 },
           chips: ['s', 'ss', 'sss', 'es', 'as', 'ess'],
+          ipaChips: ['sː', 'sːs', 'sːə'],
         },
         {
           word: 'sun',
           cls: '/s/',
           ctx: 'short-u CVC · onset fricative /s/',
-          hint: 'Same /s/ class as sip. Carry the winner across.',
+          hint: 'Same /s/ class as sip. Carry the winning IPA onset (<code>sː</code>) across.',
           start: { onsetText: 's', ratePct: 0, pitchPct: 0, breakMs: 250 },
           chips: ['s', 'ss', 'sss', 'es', 'as', 'ess'],
+          ipaChips: ['sː', 'sːs', 'sːə'],
         },
         {
           word: 'jam',
           cls: '/dʒ/',
           ctx: 'short-a CVC · onset affricate /dʒ/',
-          hint: 'Thomas explicitly wants <code>dje</code> (front vowel, jet-onset). "juh" read too deep.',
+          hint: 'Thomas explicitly wants <code>dje</code> (front vowel, jet-onset). "juh" read too deep. IPA: try the bare affricate <code>dʒ</code> or length-marked <code>dʒː</code>.',
           start: { onsetText: 'dje', ratePct: 0, pitchPct: 0, breakMs: 250 },
           chips: ['dje', 'dge', 'jeh', 'juh', 'je'],
+          ipaChips: ['dʒ', 'dʒː'],
         },
         {
           word: 'web',
           cls: '/w/',
           ctx: 'short-e CVC · onset glide /w/',
-          hint: 'Thomas: deepest pitch was closest. Try deeper pitch + a rounded onset.',
+          hint: 'Thomas: deepest pitch was closest. IPA: try the bare glide <code>w</code>, the length-marked <code>wː</code>, or a <code>ʊw</code> on-glide.',
           start: { onsetText: 'wuh', ratePct: 0, pitchPct: -15, breakMs: 250 },
           chips: ['wuh', 'oo', 'woo', 'ooh', 'w'],
+          ipaChips: ['w', 'wː', 'ʊw'],
         },
         {
           word: 'wig',
           cls: '/w/',
           ctx: 'short-i CVC · onset glide /w/',
-          hint: 'Same /w/ class as web. Deeper pitch was closest.',
+          hint: 'Same /w/ class as web. Deeper pitch was closest; IPA glide candidates below.',
           start: { onsetText: 'wuh', ratePct: 0, pitchPct: -15, breakMs: 250 },
           chips: ['wuh', 'oo', 'woo', 'ooh', 'w'],
+          ipaChips: ['w', 'wː', 'ʊw'],
         },
         {
           word: 'cat',
           cls: '/k/ (control)',
           ctx: 'short-a CVC · clean STOP onset — already SHIPPED. A/B anchor.',
-          hint: 'Stops are locked (candidate-f, shipped). This row is the clean control — it should already sound right at the default.',
+          hint: 'Stops are locked (candidate-f, shipped). This row is the clean control — it should already sound right at the default. IPA: the production release <code>kə</code>.',
           start: { onsetText: 'k', ratePct: 0, pitchPct: 0, breakMs: 250 },
           chips: ['k'],
+          ipaChips: ['kə', 'k'],
         },
         {
           word: 'van',
           cls: '/v/ (floor)',
           ctx: 'short-a CVC · /v/ = FLOOR reference (locked out of scope).',
-          hint: 'Reference only — /v/ is the floor case (locked). Use it to calibrate "how bad is bad" against the classes under tuning.',
+          hint: 'Reference only — /v/ is the floor case (locked). Use it to calibrate "how bad is bad" against the classes under tuning. IPA: <code>vː</code> long-V onset was accepted by Olivia.',
           start: { onsetText: 'v', ratePct: 0, pitchPct: 0, breakMs: 250 },
           chips: ['v', 'vv', 'ev'],
+          ipaChips: ['vː', 'vːə', 'v'],
         },
       ]
 
@@ -452,15 +506,39 @@
           '  (onset = first grapheme)</span>'
         bodyEl.appendChild(wordEl)
 
+        // ── Per-row onset render mode. 'text' (default) = orthographic
+        //    onset voiced literally; 'ipa' = onset wrapped in a
+        //    <phoneme alphabet="ipa" ph="…"> — the only lever that can hold a
+        //    fricative (fː/sː). ──
+        let mode = 'text'
+
         const controls = document.createElement('div')
         controls.className = 'controls'
+
+        // Text / IPA mode toggle.
+        const modeToggle = document.createElement('div')
+        modeToggle.className = 'modetoggle'
+        modeToggle.setAttribute('data-testid', 'tweak-mode-' + spec.word)
+        const textModeBtn = document.createElement('button')
+        textModeBtn.textContent = 'Text'
+        textModeBtn.className = 'active'
+        textModeBtn.setAttribute('data-testid', 'tweak-mode-text-' + spec.word)
+        const ipaModeBtn = document.createElement('button')
+        ipaModeBtn.textContent = 'IPA'
+        ipaModeBtn.setAttribute('data-testid', 'tweak-mode-ipa-' + spec.word)
+        modeToggle.append(textModeBtn, ipaModeBtn)
+        const modeField = field('Mode', modeToggle)
 
         const onsetInput = document.createElement('input')
         onsetInput.className = 'onset'
         onsetInput.type = 'text'
         onsetInput.value = spec.start.onsetText
         onsetInput.setAttribute('data-testid', 'tweak-onset-' + spec.word)
-        const onsetField = field('Onset text', onsetInput)
+        const onsetLabel = document.createElement('label')
+        onsetLabel.textContent = 'Onset text'
+        const onsetField = document.createElement('div')
+        onsetField.className = 'field'
+        onsetField.append(onsetLabel, onsetInput)
 
         const rateInput = numInput(
           spec.start.ratePct,
@@ -483,22 +561,71 @@
         playBtn.textContent = '▶ Play'
         playBtn.setAttribute('data-testid', 'tweak-play-' + spec.word)
 
-        controls.append(onsetField, rateField, pitchField, breakField, playBtn)
+        controls.append(
+          modeField,
+          onsetField,
+          rateField,
+          pitchField,
+          breakField,
+          playBtn,
+        )
         bodyEl.appendChild(controls)
 
-        // hint chips
-        const chips = document.createElement('div')
-        chips.className = 'chips'
+        // ── Hint chips: one row of TEXT chips (always shown) + one row of IPA
+        //    chips (shown only in IPA mode). Tapping a chip loads it into the
+        //    onset input AND switches to the chip's mode. ──
+        const textChips = document.createElement('div')
+        textChips.className = 'chips'
+        textChips.setAttribute('data-testid', 'tweak-textchips-' + spec.word)
+        const textChipLabel = document.createElement('span')
+        textChipLabel.className = 'chlabel'
+        textChipLabel.textContent = 'text'
+        textChips.appendChild(textChipLabel)
         for (const c of spec.chips) {
           const ch = document.createElement('button')
           ch.className = 'ch'
           ch.textContent = c
           ch.addEventListener('click', () => {
+            setMode('text')
             onsetInput.value = c
           })
-          chips.appendChild(ch)
+          textChips.appendChild(ch)
         }
-        bodyEl.appendChild(chips)
+        bodyEl.appendChild(textChips)
+
+        const ipaChips = document.createElement('div')
+        ipaChips.className = 'chips'
+        ipaChips.setAttribute('data-testid', 'tweak-ipachips-' + spec.word)
+        const ipaChipLabel = document.createElement('span')
+        ipaChipLabel.className = 'chlabel'
+        ipaChipLabel.textContent = 'IPA'
+        ipaChips.appendChild(ipaChipLabel)
+        for (const c of spec.ipaChips || []) {
+          const ch = document.createElement('button')
+          ch.className = 'ch ipa'
+          ch.textContent = c
+          ch.addEventListener('click', () => {
+            setMode('ipa')
+            onsetInput.value = c
+          })
+          ipaChips.appendChild(ch)
+        }
+        bodyEl.appendChild(ipaChips)
+
+        // ── Mode switch handler — flips the toggle UI, the onset label, and
+        //    the IPA-chip-row visibility. Does NOT clear the onset input (so a
+        //    sponsor can hand-edit either way), but chips set both together. ──
+        function setMode(next) {
+          mode = next === 'ipa' ? 'ipa' : 'text'
+          const isIpa = mode === 'ipa'
+          textModeBtn.classList.toggle('active', !isIpa)
+          ipaModeBtn.classList.toggle('active', isIpa)
+          onsetLabel.textContent = isIpa ? 'Onset IPA (ph)' : 'Onset text'
+          ipaChips.style.display = isIpa ? 'flex' : 'none'
+        }
+        textModeBtn.addEventListener('click', () => setMode('text'))
+        ipaModeBtn.addEventListener('click', () => setMode('ipa'))
+        setMode('text') // initial: hide IPA chip row
 
         const ssmlEl = document.createElement('div')
         ssmlEl.className = 'ssml'
@@ -515,6 +642,7 @@
           const payload = {
             word: spec.word,
             graphemes,
+            onsetMode: mode,
             onsetText: onsetInput.value.trim(),
             ratePct: clampNum(rateInput.value, 0),
             pitchPct: clampNum(pitchInput.value, 0),
