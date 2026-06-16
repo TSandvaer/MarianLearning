@@ -393,6 +393,225 @@ export interface BlendWord {
   context: string
 }
 
+// ═════════════════════════════════════════════════════════════════════════
+// PASS 4 — IPA length-mark fricatives (/f/, /s/)
+// ─────────────────────────────────────────────────────────────────────────
+// Pass-3's orthographic-onset lever ("ef"/"es") was the WRONG knob for the
+// two fricatives. On the #473 LIVE handle Devon proved the IPA LENGTH-MARK
+// form — `<phoneme alphabet="ipa" ph="fː">f</phoneme>` (held /f/) and the /s/
+// equivalent — DO render as a sustained held fricative on real Azure
+// (westeurope: HTTP 200, audible held friction). The catch: the Vercel
+// preview's Azure region REJECTS the length-mark at runtime (400), so Thomas
+// can't ear-test them on the LIVE endpoint. The fix Thomas chose: bake them
+// here as STATIC pre-baked clips (westeurope creds → base64 in the manifest →
+// region-independent, plays on any preview).
+//
+// LEVER vs pass-3: the onset is an IPA `<phoneme alphabet="ipa" ph="...">`
+// (the held length-mark form), NOT plain orthographic text. The onset
+// `<phoneme>` sits inside a per-onset `<prosody rate=...>` (compounding inside
+// the speak-root -10% shell, same nested-prosody math as pass-3), then the
+// production 250ms break, then the rest of the word (vowel + coda + 450ms +
+// whole word) rendered EXACTLY as production `renderBlendInnerText`
+// (candidate-f: stop release + bare-IPA continuants/vowels + per-grapheme
+// breaks). So only the ONSET grapheme differs from the shipped render.
+//
+// Candidates per fricative word: the held-fricative onset forms × two rates,
+// PLUS the whole-word FLOOR baseline for A/B. Thomas reads off the winning
+// `ph` + rate per class. The accepted (form, rate) is ported into
+// `renderBlendInnerText` in a pass-5 PR (BUT NOTE: production must verify the
+// runtime Azure region accepts the length-mark before shipping — these clips
+// prove it SOUNDS right, not that the live endpoint will render it).
+// ═════════════════════════════════════════════════════════════════════════
+
+/** A held-fricative onset FORM (the IPA `ph=` payload) + a label for the page.
+ *  `grapheme` is the visible glyph inside the `<phoneme>` tag. */
+interface Pass4OnsetForm {
+  /** Stable slug fragment used in the candidate id (e.g. `flen`, `flen-schwa`). */
+  formId: string
+  /** The IPA payload voiced as `ph=` (e.g. `fː`, `fːə`). */
+  ph: string
+  /** Short human label for the page (e.g. `fː (held)`, `fːə (held + schwa)`). */
+  formLabel: string
+}
+
+/** Per-onset rate, compounded inside the speak-root -10% shell (same
+ *  multiplicative math as pass-3 — see NESTED-PROSODY NOTE). */
+interface Pass4Rate {
+  /** Slug fragment for the candidate id (e.g. `r25`). */
+  rateId: string
+  /** The `<prosody rate=...>` value (e.g. `-25%`). */
+  rate: string
+}
+
+/** Held-fricative onset forms per failing class. `fː` = the bare held
+ *  length-mark; `fːə` = held length-mark + a schwa carrier tail (the pass-3
+ *  leading-vowel intuition, but now AFTER the held friction so the friction
+ *  leads). Two forms × two rates = 4 candidate clips per word + FLOOR. */
+const PASS4_FRICATIVE_FORMS: Readonly<
+  Record<string, readonly Pass4OnsetForm[]>
+> = {
+  f: [
+    { formId: 'flen', ph: 'fː', formLabel: 'fː (held)' },
+    { formId: 'flen-schwa', ph: 'fːə', formLabel: 'fːə (held + schwa tail)' },
+  ],
+  s: [
+    { formId: 'slen', ph: 'sː', formLabel: 'sː (held)' },
+    { formId: 'slen-schwa', ph: 'sːə', formLabel: 'sːə (held + schwa tail)' },
+  ],
+}
+
+/** The two rates auditioned per onset form. -25% = a moderate stretch; -40% =
+ *  a deep hold so the sustained friction is unmistakable. */
+const PASS4_RATES: readonly Pass4Rate[] = [
+  { rateId: 'r25', rate: '-25%' },
+  { rateId: 'r40', rate: '-40%' },
+]
+
+/** Build the pass-4 IPA-held-fricative onset SSML: the held `<phoneme>` inside
+ *  a per-onset `<prosody rate=...>`, exactly the production phoneme-tag shape
+ *  but with the length-mark `ph` payload. */
+function pass4OnsetSsml(
+  grapheme: string,
+  form: Pass4OnsetForm,
+  rate: string,
+): string {
+  const tag = `<phoneme alphabet="ipa" ph="${esc(form.ph)}">${esc(grapheme)}</phoneme>`
+  return `<prosody rate="${esc(rate)}">${tag}</prosody>`
+}
+
+/**
+ * Build the pass-4 candidate inner-SSML for a fricative word at a given
+ * (onset-form, rate): the held-fricative IPA onset + 150ms onset break, then
+ * the rest of the word (vowel + coda) rendered EXACTLY as production
+ * candidate-f (stop release / bare IPA + 250ms breaks), then the 450ms break +
+ * the whole word voiced naturally. Only the ONSET grapheme differs from the
+ * shipped `renderBlendInnerText`.
+ */
+function buildPass4Inner(
+  word: string,
+  form: Pass4OnsetForm,
+  rate: string,
+): string {
+  const graphemes = splitGraphemes(word)
+  const parts: string[] = []
+  graphemes.forEach((g, idx) => {
+    if (idx === 0) {
+      parts.push(pass4OnsetSsml(g, form, rate))
+      parts.push(`<break time="${PASS3_ONSET_BREAK_MS}ms"/>`)
+    } else {
+      parts.push(prodGrapheme(g))
+      parts.push(`<break time="${PROD_GRAPHEME_BREAK_MS}ms"/>`)
+    }
+  })
+  parts.push(`<break time="${PROD_WHOLE_WORD_BREAK_MS}ms"/>`)
+  parts.push(esc(word))
+  return parts.join('')
+}
+
+/** A pass-4 auditioned word — same shape as BlendWord but the class is always
+ *  a fricative and the candidates are generated (form × rate) + FLOOR. */
+export interface BlendPass4Word {
+  /** The fricative CVC probe word (also the slug). */
+  word: string
+  /** The fricative class this word probes (page grouping). */
+  phonemeClass: '/f/' | '/s/'
+  /** The ONSET grapheme whose held form is being auditioned (`f` or `s`). */
+  onsetGrapheme: 'f' | 's'
+  /** Why this word is in the set. */
+  context: string
+}
+
+/** The pass-4 word set: two /f/ words (fan, fox) + two /s/ words (sip, sun),
+ *  each probing the held-fricative onset against a different coda for
+ *  cross-coda coverage. */
+export const BLEND_PASS4_WORDS: BlendPass4Word[] = [
+  {
+    word: 'fan',
+    phonemeClass: '/f/',
+    onsetGrapheme: 'f',
+    context:
+      '/f/ onset + continuant /n/ coda. The held-fricative onset (fː / fːə) ' +
+      'against a sustainable coda — isolates the onset friction with no coda ' +
+      'stop to muddy it.',
+  },
+  {
+    word: 'fox',
+    phonemeClass: '/f/',
+    onsetGrapheme: 'f',
+    context:
+      '/f/ onset + the /ks/ cluster grapheme (x). Probes the held /f/ AND that ' +
+      'the x=/ks/ cluster still releases cleanly after the held onset.',
+  },
+  {
+    word: 'sip',
+    phonemeClass: '/s/',
+    onsetGrapheme: 's',
+    context:
+      '/s/ onset + /p/ stop coda. The held sibilant (sː / sːə) against a final ' +
+      'clipped stop — does the long /s/ resolve before the /p/ release?',
+  },
+  {
+    word: 'sun',
+    phonemeClass: '/s/',
+    onsetGrapheme: 's',
+    context:
+      '/s/ onset + continuant /n/ coda. Isolates the held sibilant onset with ' +
+      'no coda stop.',
+  },
+]
+
+/** A pass-4 candidate spec (one (word × form × rate) clip, or the FLOOR). */
+export interface BlendPass4Candidate {
+  /** Stable id fragment, unique within the word (e.g. `flen-r25`, `floor`). */
+  id: string
+  /** Human label for the page row. */
+  label: string
+  /** pass4 (held-fricative candidate) | floor (whole-word A/B baseline). */
+  treatment: 'pass4' | 'floor'
+  /** One-line mechanism description for the page. */
+  mechanism: string
+  /** Build the inner-SSML for this candidate from the word. */
+  buildInner: (word: string) => string
+}
+
+/**
+ * Generate the pass-4 candidates for a word: every (onset-form × rate) clip,
+ * in form-major / rate-minor order, then the whole-word FLOOR baseline last.
+ * The FLOOR is the same shape pass-3 uses (the ship-if-rejected clip).
+ */
+export function pass4CandidatesFor(
+  word: BlendPass4Word,
+): BlendPass4Candidate[] {
+  const forms = PASS4_FRICATIVE_FORMS[word.onsetGrapheme] ?? []
+  const candidates: BlendPass4Candidate[] = []
+  for (const form of forms) {
+    for (const r of PASS4_RATES) {
+      candidates.push({
+        id: `${form.formId}-${r.rateId}`,
+        treatment: 'pass4',
+        label: `${form.formLabel} @ ${r.rate}`,
+        mechanism:
+          `Held-fricative IPA onset ph="${form.ph}" inside <prosody rate="${r.rate}"> ` +
+          `(compounds inside the speak-root -10%), then a 150ms break, then the ` +
+          `rest of the word rendered as production candidate-f. LISTEN: is the ` +
+          `onset a clean sustained /${word.onsetGrapheme}/ AND the whole word natural?`,
+        buildInner: (w: string) => buildPass4Inner(w, form, r.rate),
+      })
+    }
+  }
+  candidates.push({
+    id: 'floor',
+    treatment: 'floor',
+    label: 'floor — whole-word only (ship if rejected)',
+    mechanism:
+      'NO segmentation: the word voiced slowly once (<prosody rate="-15%">), a ' +
+      'pause, then naturally. The safe fallback A/B — what ships if every held- ' +
+      'fricative onset is rejected for this class.',
+    buildInner: buildFloorInner,
+  })
+  return candidates
+}
+
 /**
  * The pass-3 word set — the failing classes Thomas REJECTED in pass-2, two
  * words per fricative class for cross-coda coverage, one each for the affricate

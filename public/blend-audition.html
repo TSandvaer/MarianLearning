@@ -122,6 +122,9 @@
       .row.candidate {
         background: var(--green-soft);
       }
+      .row.pass4cand {
+        background: var(--blue-soft);
+      }
       .row.floor {
         background: #fbf6ee;
       }
@@ -167,6 +170,10 @@
       .tag.cand {
         background: var(--green-soft);
         color: var(--green);
+      }
+      .tag.pass4 {
+        background: var(--blue-soft);
+        color: var(--blue);
       }
       .tag.floor {
         background: #efe3cf;
@@ -300,7 +307,7 @@
       If yes, Pick <strong>pass3</strong>; if no, Pick <strong>floor</strong>.
       Report ONE verdict per failing class (/f/, /s/, /dʒ/, /w/) in chat or the
       issue. Winners get ported into <code>renderBlendInnerText</code> +
-      re-baked in a pass-4 PR. Unlinked audition tooling —
+      re-baked in a later PR. Unlinked audition tooling —
       <strong>open in a private tab</strong> to dodge any stale service-worker
       cache.
     </p>
@@ -308,6 +315,47 @@
     <div id="status" class="status">Loading blend renders&hellip;</div>
 
     <div id="groups"></div>
+
+    <section
+      id="pass4-section"
+      data-testid="pass4-section"
+      style="display: none"
+    >
+      <h1 style="margin-top: 2.5rem">
+        IPA length-mark fricatives
+        <span class="voice" style="background: var(--blue)">pass&nbsp;4</span>
+      </h1>
+      <p class="sub">
+        Pass 3's orthographic onset ("ef"/"es") was the wrong knob for the two
+        <strong>fricatives</strong>. On the live #473 handle the
+        <strong>IPA length-mark</strong> form —
+        <code>&lt;phoneme ph="fː"&gt;f&lt;/phoneme&gt;</code> (a
+        <strong>held</strong> /f/) and its /s/ + schwa-tail variants — was
+        proven to render a sustained held fricative on real Azure
+        (<code>westeurope</code>: 200&nbsp;OK, audible hold). The catch: the
+        Vercel preview's Azure region <strong>rejects</strong> the length-mark
+        at runtime (400), so it can't be ear-tested on the LIVE endpoint. So
+        these are baked here as
+        <strong>STATIC pre-baked clips</strong> (westeurope creds → base64 →
+        region-independent, plays on any preview). Per fricative word you get
+        four held-onset candidates — <strong>fː</strong>/<strong>sː</strong>
+        (held) and <strong>fːə</strong>/<strong>sːə</strong> (held + schwa
+        tail), each at <strong>-25%</strong> and <strong>-40%</strong> onset
+        rate (compounding inside the speak-root -10%) — plus the whole-word
+        <strong>floor</strong>
+        baseline. Only the ONSET grapheme differs from the shipped render; the
+        vowel + coda + whole word mirror production candidate-f byte-for-byte.
+        <strong>Open each candidate's "show SSML"</strong> to read off the exact
+        <code>ph</code> + onset rate, then report ONE winning (form, rate) per
+        class — <strong>/f/</strong> and <strong>/s/</strong> — or floor.
+        <em
+          >NOTE: these clips prove the held fricative SOUNDS right; a follow-up
+          PR must still confirm the runtime Azure region accepts the length-mark
+          before shipping it live (else production keeps the floor).</em
+        >
+      </p>
+      <div id="pass4-groups"></div>
+    </section>
 
     <footer id="footer"></footer>
 
@@ -436,8 +484,10 @@
       }
 
       // ── Render ───────────────────────────────────────────────────────────
-      function buildGroup(word) {
-        const groupsEl = document.getElementById('groups')
+      // `containerId` lets the same builder render the pass-3 groups into
+      // #groups and the pass-4 groups into #pass4-groups.
+      function buildGroup(word, containerId) {
+        const groupsEl = document.getElementById(containerId || 'groups')
         const group = document.createElement('section')
         group.className = 'group'
         group.setAttribute('data-testid', 'audition-group-' + word.key)
@@ -469,8 +519,9 @@
         const rows = []
         for (const c of word.candidates) {
           const itemId = word.key + '#' + c.id
-          const treatment = c.treatment || c.id // pass3 / floor / broken
+          const treatment = c.treatment || c.id // pass3 / pass4 / floor / broken
           const isPass3 = treatment === 'pass3'
+          const isPass4 = treatment === 'pass4'
           const isFloor = treatment === 'floor'
           const isBroken = treatment === 'broken'
           const rendered = !!c.base64 && !c.error
@@ -479,6 +530,7 @@
           row.className =
             'row' +
             (isPass3 ? ' candidate' : '') +
+            (isPass4 ? ' pass4cand' : '') +
             (isFloor ? ' floor' : '') +
             (isBroken ? ' broken' : '') +
             (rendered ? '' : ' unrendered')
@@ -494,6 +546,8 @@
           let tags = ''
           if (isPass3) {
             tags = ' <span class="tag cand">pass3 candidate</span>'
+          } else if (isPass4) {
+            tags = ' <span class="tag pass4">pass4 candidate</span>'
           } else if (isFloor) {
             tags = ' <span class="tag floor">FLOOR (ship if rejected)</span>'
           } else if (isBroken) {
@@ -571,8 +625,10 @@
 
       function renderFooter(data) {
         const el = document.getElementById('footer')
-        const total = data.words.reduce((n, w) => n + w.candidates.length, 0)
-        const rejected = data.words.reduce(
+        const pass4Words = Array.isArray(data.pass4Words) ? data.pass4Words : []
+        const allWords = [...data.words, ...pass4Words]
+        const total = allWords.reduce((n, w) => n + w.candidates.length, 0)
+        const rejected = allWords.reduce(
           (n, w) => n + w.candidates.filter((c) => c.error).length,
           0,
         )
@@ -580,7 +636,7 @@
           '<span data-testid="audition-render-count">Rendered <strong>' +
           total +
           '</strong> candidates across <strong>' +
-          data.words.length +
+          allWords.length +
           '</strong> words</span> ' +
           (rejected
             ? '(<strong style="color:#a94442">' +
@@ -615,13 +671,30 @@
           if (!data || !Array.isArray(data.words)) {
             throw new Error('manifest has no words array')
           }
-          for (const word of data.words) buildGroup(word)
+          for (const word of data.words) buildGroup(word, 'groups')
+          // Pass-4 section (IPA length-mark held fricatives) — only shown when
+          // the manifest carries pass4Words.
+          const pass4Words = Array.isArray(data.pass4Words)
+            ? data.pass4Words
+            : []
+          if (pass4Words.length > 0) {
+            document.getElementById('pass4-section').style.display = ''
+            for (const word of pass4Words) buildGroup(word, 'pass4-groups')
+          }
           renderFooter(data)
-          const total = data.words.reduce((n, w) => n + w.candidates.length, 0)
+          const total = [...data.words, ...pass4Words].reduce(
+            (n, w) => n + w.candidates.length,
+            0,
+          )
+          const wordCount = data.words.length + pass4Words.length
           setStatus(
             'Ready — ' +
+              wordCount +
+              ' words (' +
               data.words.length +
-              ' words, ' +
+              ' pass-3 + ' +
+              pass4Words.length +
+              ' pass-4), ' +
               total +
               ' candidates. Play each, then Pick the best per word.',
             'ok',

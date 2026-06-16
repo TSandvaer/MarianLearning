@@ -9,9 +9,20 @@
  * (ef/es/juh/wuh, NO IPA) inside a per-onset <prosody> wrapper. Each word gets
  * THREE clips: (a) the pass-3 candidate, (b) a whole-word-only FLOOR baseline
  * (the ship-if-rejected clip), (c) the broken control (current live render).
+ *
+ * PASS 4 (IPA length-mark fricatives) adds a SECOND section: for the two
+ * fricatives Thomas rejected in pass-3 (/f/, /s/), it auditions the IPA
+ * length-mark held-fricative onset — `<phoneme alphabet="ipa" ph="fː">f</phoneme>`
+ * and its /s/ + schwa-tail variants — at two rates, plus the whole-word FLOOR
+ * per word. These were proven to render on real Azure (westeurope) but are
+ * REJECTED at runtime by the Vercel preview's Azure region, so they ship as
+ * STATIC pre-baked base64 clips (region-independent). See
+ * `blendAuditionVariants.ts` PASS 4 header.
+ *
  * The manifest (`public/blend-audition-data.json`) feeds the standalone
  * `public/blend-audition.html` page — base64 MP3 + the exact SSML body + a
- * SHA-256 hash per (word × candidate).
+ * SHA-256 hash per (word × candidate). Pass-3 words live under `words`; pass-4
+ * fricative words under `pass4Words` (both arrays share the WordRecord shape).
  *
  * Every candidate is a HAND-BUILT inner-SSML POSTed directly to Azure. The
  * `broken` candidate mirrors the production `renderBlendInnerText` byte-for-
@@ -48,8 +59,18 @@ import {
   escapeSsml,
 } from '../api/_tts.js'
 import { EMMA_VOICE_CONFIG } from '../api/_session.js'
-import { BLEND_CANDIDATES, BLEND_WORDS } from './blendAuditionVariants.js'
-import type { BlendCandidate, BlendWord } from './blendAuditionVariants.js'
+import {
+  BLEND_CANDIDATES,
+  BLEND_WORDS,
+  BLEND_PASS4_WORDS,
+  pass4CandidatesFor,
+} from './blendAuditionVariants.js'
+import type {
+  BlendCandidate,
+  BlendWord,
+  BlendPass4Word,
+  BlendPass4Candidate,
+} from './blendAuditionVariants.js'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT_PATH = join(REPO_ROOT, 'public/blend-audition-data.json')
@@ -119,11 +140,22 @@ async function renderRawSsml(body: string): Promise<Uint8Array> {
   return new Uint8Array(await res.arrayBuffer())
 }
 
+/** The fields a candidate must expose for rendering — pass-3 `BlendCandidate`
+ *  and pass-4 `BlendPass4Candidate` both satisfy this (treatment widened to the
+ *  union of both). */
+interface RenderableCandidate {
+  id: string
+  label: string
+  treatment: BlendCandidate['treatment'] | BlendPass4Candidate['treatment']
+  mechanism: string
+  buildInner: (word: string) => string
+}
+
 interface CandidateRecord {
   id: string
   label: string
-  /** Which treatment this candidate represents (pass3 / floor / broken). */
-  treatment: BlendCandidate['treatment']
+  /** Which treatment this candidate represents (pass3 / pass4 / floor / broken). */
+  treatment: RenderableCandidate['treatment']
   mechanism: string
   /** The full SSML body sent to Azure (for the inventory table). */
   ssml: string
@@ -141,15 +173,15 @@ interface WordRecord {
   /** slug == word */
   key: string
   word: string
-  /** The pass-3 failing class this word probes (page grouping). */
-  phonemeClass: BlendWord['phonemeClass']
+  /** The failing class this word probes (page grouping). */
+  phonemeClass: BlendWord['phonemeClass'] | BlendPass4Word['phonemeClass']
   context: string
   candidates: CandidateRecord[]
 }
 
 async function renderCandidate(
-  word: BlendWord,
-  candidate: BlendCandidate,
+  word: { word: string },
+  candidate: RenderableCandidate,
   dry: boolean,
 ): Promise<CandidateRecord> {
   const inner = candidate.buildInner(word.word)
@@ -213,13 +245,19 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
-  const words: WordRecord[] = []
-  for (const word of BLEND_WORDS) {
-    process.stdout.write(
-      `\n${word.word} (${BLEND_CANDIDATES.length} candidates)\n`,
-    )
-    const candidates: CandidateRecord[] = []
-    for (const candidate of BLEND_CANDIDATES) {
+  /** Render one word's candidate list into a WordRecord (shared by pass-3 +
+   *  pass-4 loops — only the candidate source differs). */
+  async function renderWord(
+    word: {
+      word: string
+      phonemeClass: WordRecord['phonemeClass']
+      context: string
+    },
+    candidates: RenderableCandidate[],
+  ): Promise<WordRecord> {
+    process.stdout.write(`\n${word.word} (${candidates.length} candidates)\n`)
+    const recs: CandidateRecord[] = []
+    for (const candidate of candidates) {
       process.stdout.write(`  ${candidate.id} ${candidate.label} ... `)
       const rec = await renderCandidate(word, candidate, dry)
       if (dry) {
@@ -232,15 +270,27 @@ async function main(): Promise<void> {
           `ok (${rec.base64!.length} b64 chars, hash ${rec.audioHash!.slice(0, 12)})\n`,
         )
       }
-      candidates.push(rec)
+      recs.push(rec)
     }
-    words.push({
+    return {
       key: word.word,
       word: word.word,
       phonemeClass: word.phonemeClass,
       context: word.context,
-      candidates,
-    })
+      candidates: recs,
+    }
+  }
+
+  process.stdout.write('\n══ PASS 3 (orthographic onset) ══\n')
+  const words: WordRecord[] = []
+  for (const word of BLEND_WORDS) {
+    words.push(await renderWord(word, BLEND_CANDIDATES))
+  }
+
+  process.stdout.write('\n══ PASS 4 (IPA length-mark held fricatives) ══\n')
+  const pass4Words: WordRecord[] = []
+  for (const word of BLEND_PASS4_WORDS) {
+    pass4Words.push(await renderWord(word, pass4CandidatesFor(word)))
   }
 
   if (dry) {
@@ -256,18 +306,20 @@ async function main(): Promise<void> {
       pitch: EMMA_VOICE_CONFIG.pitch,
       volume: EMMA_VOICE_CONFIG.volume,
     },
-    note: 'NOT PRODUCTION. CVC phoneme-blend pass-3 audition (orthographic onset vs whole-word FLOOR). Per word: pass3 candidate, FLOOR baseline (ship-if-rejected), broken control. The accepted onsets are ported into renderBlendInnerText + re-baked in a separate pass-4 PR.',
+    note: 'NOT PRODUCTION. CVC phoneme-blend audition. PASS 3 (words[]): orthographic onset vs whole-word FLOOR (pass3 / FLOOR / broken control per word). PASS 4 (pass4Words[]): IPA length-mark held-fricative onset (fː/fːə/sː/sːə) × two rates + whole-word FLOOR per fricative word — proven to render on real Azure (westeurope) but rejected at runtime by the preview region, so baked here as static clips. Accepted onsets/rates are ported into renderBlendInnerText + re-baked in a separate PR.',
     words,
+    pass4Words,
   }
   writeFileSync(OUT_PATH, JSON.stringify(manifest, null, 2), 'utf8')
 
-  const total = words.reduce((n, w) => n + w.candidates.length, 0)
-  const failed = words.reduce(
+  const allWords = [...words, ...pass4Words]
+  const total = allWords.reduce((n, w) => n + w.candidates.length, 0)
+  const failed = allWords.reduce(
     (n, w) => n + w.candidates.filter((c) => c.error).length,
     0,
   )
   console.log(
-    `\nWrote ${OUT_PATH}\n  ${words.length} words, ${total} candidates` +
+    `\nWrote ${OUT_PATH}\n  pass-3: ${words.length} words; pass-4: ${pass4Words.length} words; ${total} candidates total` +
       (failed
         ? `, ${failed} Azure-rejected (recorded with error, no audio)`
         : ''),
