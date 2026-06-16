@@ -1086,7 +1086,7 @@ export function substituteSentenceGap(
 // same lexical-set picks as `PHONEME_OVERRIDES`'s uuu/iii/eee). Consonants
 // map to their bare IPA; `x` is the /ks/ cluster. A grapheme absent from the
 // map is voiced bare (defensive — should never happen for CVC content).
-const BLEND_GRAPHEME_IPA: Record<string, string> = {
+export const BLEND_GRAPHEME_IPA: Record<string, string> = {
   // short vowels (mirror PHONEME_OVERRIDES aaa/ooo/uuu/iii/eee)
   a: 'æ',
   o: 'ɒ',
@@ -1121,9 +1121,9 @@ const BLEND_GRAPHEME_IPA: Record<string, string> = {
 /** Inter-grapheme pause (ms) — short beat AFTER each sounded phoneme (the stop
  *  releases into this silence rather than being preceded by a dead gap that
  *  forces an unreleased, scratchy onset). Candidate-f placement. */
-const BLEND_GRAPHEME_BREAK_MS = 250
+export const BLEND_GRAPHEME_BREAK_MS = 250
 /** Pre-whole-word pause (ms) — the "…" beat where the blend resolves. */
-const BLEND_WHOLE_WORD_BREAK_MS = 450
+export const BLEND_WHOLE_WORD_BREAK_MS = 450
 
 /** Stop consonants — the graphemes whose isolated phoneme is unreleased and
  *  scratches on Azure neural. These are the ONLY graphemes that get the clipped
@@ -1133,7 +1133,7 @@ const BLEND_WHOLE_WORD_BREAK_MS = 450
  *  BARE (the cluster's /s/ tail releases it naturally, and a `ksə` would read
  *  as "kss-uh"). The trailing `ə` is an INAUDIBLE coarticulation release a real
  *  en-GB synthetic-phonics teacher uses, NOT a full "kuh" syllable. */
-const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
+export const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
   'b',
   'c',
   'd',
@@ -1660,6 +1660,17 @@ export interface SynthesizeOptions {
    *  `{ maxAttempts: 0 }` to disable retries entirely (some test paths
    *  want the legacy single-shot behavior). */
   backoff?: BackoffPolicy
+  /**
+   * DEBUG-ONLY pre-built SSML body. When set, this exact string is POSTed
+   * to Azure instead of the body `buildSsmlBody(req)` would construct from
+   * `req.text`. Used by the `/api/blend-tweak` onset-tuning handle to render
+   * a production-mirroring blend line whose ONSET slot is parameterized —
+   * the caller has already escaped + assembled the SSML, so re-running it
+   * through `renderSsmlInnerText` would double-escape the markup. The
+   * caller is responsible for SSML safety (escaping all user-derived text);
+   * the production session/canon paths never set this. `req` is still used
+   * for the diagnostic log fields (voice/rate/pitch). */
+  ssmlOverride?: string
 }
 
 /**
@@ -1691,7 +1702,11 @@ export async function synthesizeUtterance(
 
   const { key, region } = readAzureCredentials(opts.env)
   const endpoint = buildAzureEndpoint(region)
-  const body = buildSsmlBody(req)
+  // DEBUG seam: `/api/blend-tweak` passes a pre-built, already-escaped SSML
+  // body so it can render a production-mirroring blend line with a
+  // parameterized onset. Production session/canon paths never set this and
+  // get the normal `buildSsmlBody(req)` body. See SynthesizeOptions.ssmlOverride.
+  const body = opts.ssmlOverride ?? buildSsmlBody(req)
 
   // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). Logs the
   // SSML body fingerprint to Vercel function logs so we can correlate

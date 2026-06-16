@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Blend onset tweak — live /f/ /s/ /dʒ/ /w/ tuning</title>
+    <style>
+      :root {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        --ink: #2a2a2a;
+        --muted: #6b6b6b;
+        --line: #ece4d6;
+        --cream: #faf7f2;
+        --green: #1b5e20;
+        --green-soft: #eaf3ea;
+        --blue: #2c5d8a;
+        --blue-soft: #e7eefb;
+        --amber: #8a6d3b;
+        --amber-soft: #fcf8e3;
+        --orange: #d9822b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1rem 0.75rem 6rem;
+        background: var(--cream);
+        color: var(--ink);
+        max-width: 920px;
+        margin-inline: auto;
+        -webkit-text-size-adjust: 100%;
+      }
+      h1 {
+        font-size: 1.3rem;
+        margin: 0 0 0.25rem;
+      }
+      .voice {
+        display: inline-block;
+        background: var(--green);
+        color: #fff;
+        border-radius: 999px;
+        padding: 0.1rem 0.6rem;
+        font-size: 0.78rem;
+        font-weight: 600;
+        vertical-align: middle;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin: 0 0 0.75rem;
+        line-height: 1.45;
+      }
+      .sub code {
+        background: #f0e9dc;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+      }
+      .status {
+        font-size: 0.86rem;
+        color: var(--amber);
+        background: var(--amber-soft);
+        border: 1px solid #faebcc;
+        border-radius: 8px;
+        padding: 0.6rem 0.75rem;
+        margin: 0.5rem 0;
+      }
+      .status.ok {
+        color: var(--green);
+        background: var(--green-soft);
+        border-color: #cce4cc;
+      }
+      .status.err {
+        color: #a94442;
+        background: #f2dede;
+        border-color: #ebccd1;
+      }
+      .group {
+        margin: 0 0 1.25rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        overflow: hidden;
+      }
+      .group > .ghead {
+        padding: 0.7rem 0.85rem;
+        background: #f6f0e6;
+        border-bottom: 1px solid var(--line);
+      }
+      .group > .ghead h2 {
+        margin: 0 0 0.15rem;
+        font-size: 1.05rem;
+      }
+      .group > .ghead .gctx {
+        font-size: 0.8rem;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+      .group > .ghead .hint {
+        font-size: 0.8rem;
+        color: var(--blue);
+        margin-top: 0.3rem;
+        line-height: 1.4;
+      }
+      .group > .ghead .hint code {
+        background: var(--blue-soft);
+        padding: 0 0.25rem;
+        border-radius: 4px;
+        font-weight: 700;
+      }
+      .gbody {
+        padding: 0.6rem 0.6rem 0.75rem;
+      }
+      .word {
+        font-weight: 700;
+        font-size: 1.05rem;
+        margin-bottom: 0.5rem;
+      }
+      .word .seg {
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 0.85rem;
+        margin-left: 0.5rem;
+      }
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem 0.9rem;
+        align-items: flex-end;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+      }
+      .field label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .field input {
+        appearance: none;
+        border: 1px solid #cdbfa6;
+        border-radius: 8px;
+        padding: 0.5rem 0.55rem;
+        font-size: 0.95rem;
+        min-height: 44px;
+        background: #fffdf9;
+        color: var(--ink);
+      }
+      .field input.onset {
+        width: 7.5rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-weight: 700;
+      }
+      .field input.num {
+        width: 4.5rem;
+      }
+      button.play {
+        appearance: none;
+        border: 1px solid var(--green);
+        background: var(--green-soft);
+        color: var(--green);
+        border-radius: 8px;
+        padding: 0.55rem 1.1rem;
+        font-size: 0.95rem;
+        font-weight: 700;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      button.play:active {
+        transform: translateY(1px);
+      }
+      button.play.playing {
+        background: var(--green);
+        color: #fff;
+      }
+      button.play[disabled] {
+        opacity: 0.5;
+        cursor: progress;
+      }
+      .modetoggle {
+        display: inline-flex;
+        border: 1px solid #cdbfa6;
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 44px;
+      }
+      .modetoggle button {
+        appearance: none;
+        border: none;
+        background: #fffdf9;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+        padding: 0.5rem 0.8rem;
+        cursor: pointer;
+        min-height: 44px;
+      }
+      .modetoggle button + button {
+        border-left: 1px solid #cdbfa6;
+      }
+      .modetoggle button.active {
+        background: var(--blue);
+        color: #fff;
+      }
+      .chips {
+        margin-top: 0.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        align-items: center;
+      }
+      .chips .chlabel {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-right: 0.15rem;
+      }
+      .chips .ch.ipa {
+        background: var(--blue-soft);
+        border-color: #c9d8f2;
+        font-weight: 700;
+      }
+      .chips .ch {
+        font-size: 0.78rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #f4ecdd;
+        border: 1px solid #e3d6bd;
+        border-radius: 999px;
+        padding: 0.2rem 0.6rem;
+        cursor: pointer;
+        min-height: 32px;
+      }
+      .chips .ch:active {
+        background: var(--blue-soft);
+      }
+      .ssml {
+        margin-top: 0.5rem;
+        color: #555;
+        font-size: 0.72rem;
+        word-break: break-all;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: #f7f2e9;
+        border: 1px solid #efe6d6;
+        border-radius: 6px;
+        padding: 0.4rem 0.5rem;
+        min-height: 2.2rem;
+        white-space: pre-wrap;
+      }
+      .rownote {
+        font-size: 0.78rem;
+        color: #a94442;
+        font-style: italic;
+        margin-top: 0.35rem;
+        min-height: 1rem;
+      }
+      footer {
+        margin-top: 1.5rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.5;
+      }
+      footer code {
+        background: #f0e9dc;
+        padding: 0 0.25rem;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Blend onset tweak <span class="voice">live Olivia render</span></h1>
+    <p class="sub">
+      Tune the <strong>onset</strong> of each blend line
+      <strong>in context</strong>. Each row renders the FULL production blend
+      SSML (<code>en-GB-OliviaNeural</code>, root rate <code>-10%</code>) — the
+      medial vowel + coda + whole word are byte-identical to what ships; ONLY
+      the onset slot (mode / text / rate / pitch / break) is yours to drive.
+      Each row has a <strong>Text / IPA</strong> toggle: <strong>Text</strong>
+      voices the onset orthography literally (Azure spells / schwas it);
+      <strong>IPA</strong> wraps the onset in a
+      <code>&lt;phoneme alphabet="ipa" ph="…"&gt;</code> — the only lever that
+      can <strong>HOLD a fricative</strong> via the IPA length mark
+      (<code>fː</code>, <code>sː</code>). Type a candidate onset, tweak
+      rate/pitch/break, tap <strong>Play</strong>, hear it live. The chips below
+      each row are starting candidates (text chips + IPA chips) — tap one to
+      load it and switch mode. When a row sounds right, read off the params from
+      the inputs and the generated SSML, and report the winner per class in
+      chat. <strong>Open in a private tab</strong> to dodge any stale
+      service-worker cache. Non-prod only — this page 404s on production.
+    </p>
+
+    <div id="status" class="status">Initialising&hellip;</div>
+
+    <div id="groups"></div>
+
+    <footer id="footer"></footer>
+
+    <script>
+      'use strict'
+
+      const ENDPOINT = '/api/blend-tweak'
+
+      // ── Word → grapheme tokens (mirrors the canon split). Single-char
+      //    tokens EXCEPT `x` which the canon decodes as the /ks/ cluster and
+      //    keeps as one grapheme token. The onset is graphemes[0]. ──────────
+      function splitGraphemes(word) {
+        // CVC words here are all 3 letters; `x` is its own cluster token but
+        // still a single character, so a plain char split is correct for this
+        // set (fox → ['f','o','x']). Kept as a function so the server-side
+        // contract (graphemes array) stays explicit.
+        return word.split('')
+      }
+
+      // ── The audition rows. Each carries the word, the IPA class label, the
+      //    pass-3 starting onset/params, and Thomas's corrective candidate
+      //    chips. cat = clean stop control; van = the /v/ FLOOR reference. ──
+      const ROWS = [
+        {
+          word: 'fan',
+          cls: '/f/',
+          ctx: 'short-a CVC · onset fricative /f/',
+          hint: 'Thomas: "should be ‘af’ or ‘ef’" but the /f/ keeps getting swallowed. Orthographic onsets cannot HOLD the fricative — switch to <strong>IPA</strong> and try the length-mark <code>fː</code>.',
+          start: { onsetText: 'f', ratePct: 0, pitchPct: 0, breakMs: 250 },
+          chips: ['f', 'ff', 'fff', 'af', 'ef', 'eff'],
+          ipaChips: ['fː', 'fːf', 'fːə'],
+        },
+        {
+          word: 'fox',
+          cls: '/f/',
+          ctx: 'short-o CVC · onset fricative /f/ · coda /ks/ cluster',
+          hint: 'Same /f/ class as fan, different vowel context. Carry the winning IPA onset (<code>fː</code>) across.',
+          start: { onsetText: 'f', ratePct: 0, pitchPct: 0, breakMs: 250 },
+          chips: ['f', 'ff', 'fff', 'af', 'ef', 'eff'],
+          ipaChips: ['fː', 'fːf', 'fːə'],
+        },
+        {
+          word: 'sip',
+          cls: '/s/',
+          ctx: 'short-i CVC · onset fricative /s/',
+          hint: 'Leading-vowel "es" swallows the /s/. Switch to <strong>IPA</strong> and let the length mark hiss: <code>sː</code>.',
+          start: { onsetText: 's', ratePct: 0, pitchPct: 0, breakMs: 250 },
+          chips: ['s', 'ss', 'sss', 'es', 'as', 'ess'],
+          ipaChips: ['sː', 'sːs', 'sːə'],
+        },
+        {
+          word: 'sun',
+          cls: '/s/',
+          ctx: 'short-u CVC · onset fricative /s/',
+          hint: 'Same /s/ class as sip. Carry the winning IPA onset (<code>sː</code>) across.',
+          start: { onsetText: 's', ratePct: 0, pitchPct: 0, breakMs: 250 },
+          chips: ['s', 'ss', 'sss', 'es', 'as', 'ess'],
+          ipaChips: ['sː', 'sːs', 'sːə'],
+        },
+        {
+          word: 'jam',
+          cls: '/dʒ/',
+          ctx: 'short-a CVC · onset affricate /dʒ/',
+          hint: 'Thomas explicitly wants <code>dje</code> (front vowel, jet-onset). "juh" read too deep. IPA: try the bare affricate <code>dʒ</code> or length-marked <code>dʒː</code>.',
+          start: { onsetText: 'dje', ratePct: 0, pitchPct: 0, breakMs: 250 },
+          chips: ['dje', 'dge', 'jeh', 'juh', 'je'],
+          ipaChips: ['dʒ', 'dʒː'],
+        },
+        {
+          word: 'web',
+          cls: '/w/',
+          ctx: 'short-e CVC · onset glide /w/',
+          hint: 'Thomas: deepest pitch was closest. IPA: try the bare glide <code>w</code>, the length-marked <code>wː</code>, or a <code>ʊw</code> on-glide.',
+          start: { onsetText: 'wuh', ratePct: 0, pitchPct: -15, breakMs: 250 },
+          chips: ['wuh', 'oo', 'woo', 'ooh', 'w'],
+          ipaChips: ['w', 'wː', 'ʊw'],
+        },
+        {
+          word: 'wig',
+          cls: '/w/',
+          ctx: 'short-i CVC · onset glide /w/',
+          hint: 'Same /w/ class as web. Deeper pitch was closest; IPA glide candidates below.',
+          start: { onsetText: 'wuh', ratePct: 0, pitchPct: -15, breakMs: 250 },
+          chips: ['wuh', 'oo', 'woo', 'ooh', 'w'],
+          ipaChips: ['w', 'wː', 'ʊw'],
+        },
+        {
+          word: 'cat',
+          cls: '/k/ (control)',
+          ctx: 'short-a CVC · clean STOP onset — already SHIPPED. A/B anchor.',
+          hint: 'Stops are locked (candidate-f, shipped). This row is the clean control — it should already sound right at the default. IPA: the production release <code>kə</code>.',
+          start: { onsetText: 'k', ratePct: 0, pitchPct: 0, breakMs: 250 },
+          chips: ['k'],
+          ipaChips: ['kə', 'k'],
+        },
+        {
+          word: 'van',
+          cls: '/v/ (floor)',
+          ctx: 'short-a CVC · /v/ = FLOOR reference (locked out of scope).',
+          hint: 'Reference only — /v/ is the floor case (locked). Use it to calibrate "how bad is bad" against the classes under tuning. IPA: <code>vː</code> long-V onset was accepted by Olivia.',
+          start: { onsetText: 'v', ratePct: 0, pitchPct: 0, breakMs: 250 },
+          chips: ['v', 'vv', 'ev'],
+          ipaChips: ['vː', 'vːə', 'v'],
+        },
+      ]
+
+      function setStatus(msg, cls) {
+        const el = document.getElementById('status')
+        el.textContent = msg
+        el.className = 'status' + (cls ? ' ' + cls : '')
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+      }
+
+      function base64ToBlobUrl(base64, mime) {
+        const bin = atob(base64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        return URL.createObjectURL(
+          new Blob([bytes], { type: mime || 'audio/mpeg' }),
+        )
+      }
+
+      // ── Audio playback (one active clip) ─────────────────────────────────
+      let currentAudio = null
+      let currentBtn = null
+      let currentUrl = null
+      function stopActive() {
+        if (currentAudio) {
+          currentAudio.pause()
+          currentAudio = null
+        }
+        if (currentBtn) {
+          currentBtn.classList.remove('playing')
+          currentBtn = null
+        }
+        if (currentUrl) {
+          URL.revokeObjectURL(currentUrl)
+          currentUrl = null
+        }
+      }
+      function playBase64(base64, mime, btn) {
+        stopActive()
+        const url = base64ToBlobUrl(base64, mime)
+        const audio = new Audio(url)
+        currentAudio = audio
+        currentBtn = btn
+        currentUrl = url
+        btn.classList.add('playing')
+        const clear = () => {
+          if (currentBtn === btn) btn.classList.remove('playing')
+          if (currentUrl === url) {
+            URL.revokeObjectURL(url)
+            if (currentUrl === url) currentUrl = null
+          }
+        }
+        audio.onended = clear
+        audio.onerror = clear
+        audio.play().catch(clear)
+      }
+
+      // ── Render one row ───────────────────────────────────────────────────
+      function buildGroup(spec) {
+        const groupsEl = document.getElementById('groups')
+        const group = document.createElement('section')
+        group.className = 'group'
+        group.setAttribute('data-testid', 'tweak-group-' + spec.word)
+
+        const graphemes = splitGraphemes(spec.word)
+
+        const head = document.createElement('div')
+        head.className = 'ghead'
+        head.innerHTML =
+          '<h2>' +
+          escapeHtml(spec.cls) +
+          ' — ' +
+          escapeHtml(spec.word) +
+          '</h2>' +
+          '<div class="gctx">' +
+          escapeHtml(spec.ctx) +
+          '</div>' +
+          '<div class="hint">' +
+          spec.hint +
+          '</div>'
+        group.appendChild(head)
+
+        const bodyEl = document.createElement('div')
+        bodyEl.className = 'gbody'
+
+        const wordEl = document.createElement('div')
+        wordEl.className = 'word'
+        wordEl.innerHTML =
+          escapeHtml(spec.word) +
+          '<span class="seg">blend: ' +
+          escapeHtml(graphemes.join(' - ')) +
+          ' ... ' +
+          escapeHtml(spec.word) +
+          '  (onset = first grapheme)</span>'
+        bodyEl.appendChild(wordEl)
+
+        // ── Per-row onset render mode. 'text' (default) = orthographic
+        //    onset voiced literally; 'ipa' = onset wrapped in a
+        //    <phoneme alphabet="ipa" ph="…"> — the only lever that can hold a
+        //    fricative (fː/sː). ──
+        let mode = 'text'
+
+        const controls = document.createElement('div')
+        controls.className = 'controls'
+
+        // Text / IPA mode toggle.
+        const modeToggle = document.createElement('div')
+        modeToggle.className = 'modetoggle'
+        modeToggle.setAttribute('data-testid', 'tweak-mode-' + spec.word)
+        const textModeBtn = document.createElement('button')
+        textModeBtn.textContent = 'Text'
+        textModeBtn.className = 'active'
+        textModeBtn.setAttribute('data-testid', 'tweak-mode-text-' + spec.word)
+        const ipaModeBtn = document.createElement('button')
+        ipaModeBtn.textContent = 'IPA'
+        ipaModeBtn.setAttribute('data-testid', 'tweak-mode-ipa-' + spec.word)
+        modeToggle.append(textModeBtn, ipaModeBtn)
+        const modeField = field('Mode', modeToggle)
+
+        const onsetInput = document.createElement('input')
+        onsetInput.className = 'onset'
+        onsetInput.type = 'text'
+        onsetInput.value = spec.start.onsetText
+        onsetInput.setAttribute('data-testid', 'tweak-onset-' + spec.word)
+        const onsetLabel = document.createElement('label')
+        onsetLabel.textContent = 'Onset text'
+        const onsetField = document.createElement('div')
+        onsetField.className = 'field'
+        onsetField.append(onsetLabel, onsetInput)
+
+        const rateInput = numInput(
+          spec.start.ratePct,
+          'tweak-rate-' + spec.word,
+        )
+        const rateField = field('Rate %', rateInput)
+        const pitchInput = numInput(
+          spec.start.pitchPct,
+          'tweak-pitch-' + spec.word,
+        )
+        const pitchField = field('Pitch %', pitchInput)
+        const breakInput = numInput(
+          spec.start.breakMs,
+          'tweak-break-' + spec.word,
+        )
+        const breakField = field('Break ms', breakInput)
+
+        const playBtn = document.createElement('button')
+        playBtn.className = 'play'
+        playBtn.textContent = '▶ Play'
+        playBtn.setAttribute('data-testid', 'tweak-play-' + spec.word)
+
+        controls.append(
+          modeField,
+          onsetField,
+          rateField,
+          pitchField,
+          breakField,
+          playBtn,
+        )
+        bodyEl.appendChild(controls)
+
+        // ── Hint chips: one row of TEXT chips (always shown) + one row of IPA
+        //    chips (shown only in IPA mode). Tapping a chip loads it into the
+        //    onset input AND switches to the chip's mode. ──
+        const textChips = document.createElement('div')
+        textChips.className = 'chips'
+        textChips.setAttribute('data-testid', 'tweak-textchips-' + spec.word)
+        const textChipLabel = document.createElement('span')
+        textChipLabel.className = 'chlabel'
+        textChipLabel.textContent = 'text'
+        textChips.appendChild(textChipLabel)
+        for (const c of spec.chips) {
+          const ch = document.createElement('button')
+          ch.className = 'ch'
+          ch.textContent = c
+          ch.addEventListener('click', () => {
+            setMode('text')
+            onsetInput.value = c
+          })
+          textChips.appendChild(ch)
+        }
+        bodyEl.appendChild(textChips)
+
+        const ipaChips = document.createElement('div')
+        ipaChips.className = 'chips'
+        ipaChips.setAttribute('data-testid', 'tweak-ipachips-' + spec.word)
+        const ipaChipLabel = document.createElement('span')
+        ipaChipLabel.className = 'chlabel'
+        ipaChipLabel.textContent = 'IPA'
+        ipaChips.appendChild(ipaChipLabel)
+        for (const c of spec.ipaChips || []) {
+          const ch = document.createElement('button')
+          ch.className = 'ch ipa'
+          ch.textContent = c
+          ch.addEventListener('click', () => {
+            setMode('ipa')
+            onsetInput.value = c
+          })
+          ipaChips.appendChild(ch)
+        }
+        bodyEl.appendChild(ipaChips)
+
+        // ── Mode switch handler — flips the toggle UI, the onset label, and
+        //    the IPA-chip-row visibility. Does NOT clear the onset input (so a
+        //    sponsor can hand-edit either way), but chips set both together. ──
+        function setMode(next) {
+          mode = next === 'ipa' ? 'ipa' : 'text'
+          const isIpa = mode === 'ipa'
+          textModeBtn.classList.toggle('active', !isIpa)
+          ipaModeBtn.classList.toggle('active', isIpa)
+          onsetLabel.textContent = isIpa ? 'Onset IPA (ph)' : 'Onset text'
+          ipaChips.style.display = isIpa ? 'flex' : 'none'
+        }
+        textModeBtn.addEventListener('click', () => setMode('text'))
+        ipaModeBtn.addEventListener('click', () => setMode('ipa'))
+        setMode('text') // initial: hide IPA chip row
+
+        const ssmlEl = document.createElement('div')
+        ssmlEl.className = 'ssml'
+        ssmlEl.setAttribute('data-testid', 'tweak-ssml-' + spec.word)
+        ssmlEl.textContent = '(SSML appears here after Play)'
+        bodyEl.appendChild(ssmlEl)
+
+        const note = document.createElement('div')
+        note.className = 'rownote'
+        bodyEl.appendChild(note)
+
+        playBtn.addEventListener('click', async () => {
+          note.textContent = ''
+          const payload = {
+            word: spec.word,
+            graphemes,
+            onsetMode: mode,
+            onsetText: onsetInput.value.trim(),
+            ratePct: clampNum(rateInput.value, 0),
+            pitchPct: clampNum(pitchInput.value, 0),
+            breakMs: clampNum(breakInput.value, 250),
+          }
+          playBtn.disabled = true
+          playBtn.textContent = '… rendering'
+          try {
+            const res = await fetch(ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) {
+              note.textContent =
+                'Render failed (' +
+                res.status +
+                '): ' +
+                (data.error || data.detail || 'unknown')
+              ssmlEl.textContent = data.ssml || ssmlEl.textContent
+              return
+            }
+            ssmlEl.textContent = data.ssml || '(no ssml returned)'
+            if (data.base64) {
+              playBase64(data.base64, data.mime, playBtn)
+            } else {
+              note.textContent = 'No audio in response.'
+            }
+          } catch (err) {
+            note.textContent = 'Network error: ' + (err && err.message)
+          } finally {
+            playBtn.disabled = false
+            playBtn.textContent = '▶ Play'
+          }
+        })
+
+        group.appendChild(bodyEl)
+        groupsEl.appendChild(group)
+      }
+
+      function field(labelText, inputEl) {
+        const f = document.createElement('div')
+        f.className = 'field'
+        const lab = document.createElement('label')
+        lab.textContent = labelText
+        f.append(lab, inputEl)
+        return f
+      }
+      function numInput(value, testid) {
+        const i = document.createElement('input')
+        i.className = 'num'
+        i.type = 'number'
+        i.value = String(value)
+        i.setAttribute('data-testid', testid)
+        return i
+      }
+      function clampNum(raw, fallback) {
+        const n = Number(raw)
+        return Number.isFinite(n) ? n : fallback
+      }
+
+      function renderFooter() {
+        const el = document.getElementById('footer')
+        el.innerHTML =
+          'Live render via <code>POST /api/blend-tweak</code> — ' +
+          'production-mirroring blend SSML, onset slot parameterized. ' +
+          'Endpoint 404s when <code>VERCEL_ENV=production</code>. ' +
+          'Out of scope: stops (shipped), /h/ (fric-rel), /v/ (floor). ' +
+          'Winners get baked into <code>renderBlendInnerText</code> in a ' +
+          'separate follow-up PR — nothing here changes production canon.'
+      }
+
+      // ── Boot ─────────────────────────────────────────────────────────────
+      function main() {
+        for (const spec of ROWS) buildGroup(spec)
+        renderFooter()
+        setStatus(
+          'Ready — ' +
+            ROWS.length +
+            ' rows. Type an onset, tweak params, tap Play to hear it live.',
+          'ok',
+        )
+      }
+      window.addEventListener('pagehide', stopActive)
+
+      // ── Service-worker bypass (mirrors voice-audition.html) ──────────────
+      // On an installed iPad PWA whose SW predates this deploy, a precached
+      // copy of this page could be served stale. Unregister every SW + delete
+      // every Cache Storage bucket, then reload ONCE. A sessionStorage
+      // one-shot guards the reload loop.
+      const SW_BYPASS_FLAG = 'blend-tweak-sw-bypassed'
+      async function bypassServiceWorker() {
+        let alreadyBypassed = false
+        try {
+          alreadyBypassed = sessionStorage.getItem(SW_BYPASS_FLAG) === '1'
+        } catch {
+          /* sessionStorage blocked — fall through */
+        }
+        if (alreadyBypassed) return false
+        if (!('serviceWorker' in navigator)) return false
+
+        let hadSomethingToClear = false
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations()
+          if (regs.length > 0) hadSomethingToClear = true
+          await Promise.all(regs.map((r) => r.unregister().catch(() => false)))
+        } catch {
+          /* ignore */
+        }
+        try {
+          if ('caches' in self) {
+            const keys = await caches.keys()
+            if (keys.length > 0) hadSomethingToClear = true
+            await Promise.all(
+              keys.map((k) => caches.delete(k).catch(() => false)),
+            )
+          }
+        } catch {
+          /* ignore */
+        }
+        if (navigator.serviceWorker.controller) hadSomethingToClear = true
+        if (!hadSomethingToClear) return false
+
+        try {
+          sessionStorage.setItem(SW_BYPASS_FLAG, '1')
+        } catch {
+          return false
+        }
+        setStatus('Clearing service worker cache for a fresh render…')
+        location.reload()
+        return true
+      }
+
+      async function boot() {
+        const reloading = await bypassServiceWorker()
+        if (reloading) return
+        main()
+      }
+      boot()
+    </script>
+  </body>
+</html>
