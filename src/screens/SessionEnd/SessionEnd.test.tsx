@@ -623,6 +623,151 @@ describe('SessionEnd', () => {
     expect(newEntry.skillFocus).toEqual(['cvc-words-short-u'])
   })
 
+  it('records the review tier (not the simple-sentences forward fallback) when the whole tree is mastered (matches Jessica PR #474 invariant)', () => {
+    // Jessica's failing-first e2e seeds the post-graduation, whole-word-song-
+    // tree-mastered state. There the forward fallback in `pickFocusNode` is
+    // the LAST node (`simple-sentences`), so a sessionCount-blind
+    // re-derivation would record `skillFocus: ['simple-sentences']` instead
+    // of the periodic review tier. Her spec asserts `reviewEntry.skillFocus`
+    // deep-equals the review tier — this is the SessionEnd-unit mirror.
+    const storage = createMemoryStorage()
+    seedStardust(storage, 8)
+    const base = defaultProgress('Marian')
+    const allMastered = { ...base.skillLevels }
+    for (const node of [
+      'letter-names',
+      'letter-sounds',
+      'blending-cv',
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+      'cvc-words-short-i',
+      'cvc-words-short-e',
+      'digraphs-sh',
+      'digraphs-ch',
+      'digraphs-th-voiceless',
+      'sight-words',
+      'simple-sentences',
+    ] as const) {
+      allMastered[node] = 'mastered'
+    }
+    const progress: Progress = {
+      ...base,
+      skillLevels: allMastered,
+      cvcGraduationSessionFired: true, // graduation done — periodic active
+    }
+    saveProgress(progress)
+    const fixedDate = new Date('2026-06-15T18:00:00.000Z')
+
+    render(
+      withMotion(
+        <SessionEnd
+          payload={{
+            ...WORD_SONG_PAYLOAD,
+            // sessionCount 10 → round-robin index `floor(10/5) % 3 === 2`
+            // → `cvc-words-short-u`. This is the identity App.tsx froze at
+            // session-start with the real sessionCount.
+            sessionFocus: { node: 'cvc-words-short-u', mode: 'cvc-review' },
+          }}
+          playUtteranceFn={createFakePlayUtterance()}
+          chime={createFakeSfx()}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+          now={() => fixedDate}
+        />,
+      ),
+    )
+
+    const loaded = loadProgress()
+    const newEntry = loaded!.history[loaded!.history.length - 1]
+    // Exactly Jessica's assertion: the review tier, NOT the forward
+    // fallback (`simple-sentences`).
+    expect(newEntry.skillFocus).toEqual(['cvc-words-short-u'])
+    expect(newEntry.skillFocus).not.toContain('simple-sentences')
+  })
+
+  it('names the threaded review tier in the focus-recap caption, not the forward fallback (focusRecapCopy sibling)', async () => {
+    // The `focusRecapCopy` lazy initializer ALSO called `pickFocusNode`
+    // WITHOUT sessionCount, so on a periodic review it would name the
+    // forward fallback's friendly tier. `cvc-words-short-u` → "reading
+    // words"; the `simple-sentences` forward fallback → "reading
+    // sentences" — distinguishable in the recap copy. Pin that the recap
+    // reflects the THREADED node.
+    const storage = createMemoryStorage()
+    seedStardust(storage, 8)
+    const base = defaultProgress('Marian')
+    const allMastered = { ...base.skillLevels }
+    for (const node of [
+      'letter-names',
+      'letter-sounds',
+      'blending-cv',
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+      'cvc-words-short-i',
+      'cvc-words-short-e',
+      'digraphs-sh',
+      'digraphs-ch',
+      'digraphs-th-voiceless',
+      'sight-words',
+      'simple-sentences',
+    ] as const) {
+      allMastered[node] = 'mastered'
+    }
+    saveProgress({
+      ...base,
+      skillLevels: allMastered,
+      cvcGraduationSessionFired: true,
+    })
+
+    // Word-walking + DEFERRED-resolve fake so the focus-recap phase paints
+    // before the recap block's own setPhase runs (same shape as the
+    // "STILL engages the beat" test above).
+    const playUtterance = ((
+      utteranceId: string,
+      opts?: {
+        onPlay?: () => void
+        onWordTick?: (wordIndex: number) => void
+      },
+    ) => {
+      opts?.onPlay?.()
+      // "You worked on reading words today!" → 6 words.
+      const wc = utteranceId === 'session.end.recap.focus' ? 6 : 1
+      for (let i = 0; i < wc; i++) opts?.onWordTick?.(i)
+      if (utteranceId === 'session.end.recap.focus') {
+        return new Promise<void>((resolve) => setTimeout(resolve, 0))
+      }
+      return Promise.resolve()
+    }) as PlayUtteranceFn
+
+    render(
+      withMotion(
+        <SessionEnd
+          payload={{
+            ...WORD_SONG_PAYLOAD,
+            sessionFocus: { node: 'cvc-words-short-u', mode: 'cvc-review' },
+          }}
+          playUtteranceFn={playUtterance}
+          chime={createFakeSfx()}
+          sparkle={createFakeSfx()}
+          plink={createFakeSfx()}
+          storage={storage}
+        />,
+      ),
+    )
+
+    await advanceSequence(1300)
+
+    const caption = screen
+      .queryAllByTestId('session-end-caption-word')
+      .map((el) => el.textContent)
+      .join(' ')
+    // Threaded `cvc-words-short-u` → "reading words", NOT the forward
+    // fallback `simple-sentences` → "reading sentences".
+    expect(caption).toBe('You worked on reading words today!')
+  })
+
   it('shows the stardust counter', () => {
     const storage = createMemoryStorage()
     seedStardust(storage, 9)
