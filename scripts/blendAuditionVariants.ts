@@ -11,68 +11,67 @@
  * clipped `<stop>ə` release.
  *
  * ── PASS 1 (merged, PR #466) ──────────────────────────────────────────────
- * Candidate f ("lightly-released stops") FIXED the stop consonants. Pass-1
- * auditioned cat / dog / big / box / van — those 5 words only exercise stops,
- * the /v/, and the /ks/ cluster, so f's handling of the OTHER continuants and
- * the glide was never ear-checked.
+ * Candidate f ("lightly-released stops") FIXED the stop consonants.
  *
- * ── PASS 2 (this module's reason to exist) ────────────────────────────────
- * Candidate f leaves CONTINUANTS + the GLIDE + the AFFRICATE bare. Thomas's
- * re-test (voice-QA #467, 14 blend fails) shows the bare-continuant path now
- * scratches on a fresh set of phonemes that pass-1 never probed:
- *   • Fricatives bare-scratch: h (hat/hen/hot), f (fan/fig/fox), s (sip/sun),
- *     v (van).
- *   • Affricate j /dʒ/ (jam/jet/jug) — the stop-burst onset of the affricate
- *     scratches like a bare stop.
- *   • Glide w (web/wig) — heard as "U instead of W" (the bare /w/ IPA renders
- *     as the vowel /uː/, losing the glide onset).
- * STOPS STAY candidate-f and are NOT re-auditioned here — `cat` is carried
- * only as a STOP CONTROL so Thomas has a known-good anchor in the same frame.
+ * ── PASS 2 (merged into this branch's parent, PR #470) ────────────────────
+ * Pass-2 auditioned the bare CONTINUANTS / GLIDE / AFFRICATE that candidate-f
+ * left bare. Thomas A/B'd the page and ruled:
+ *   • LOCKED (do NOT re-audition): stops (shipped clipped release); /h/ =
+ *     fric-rel (hə minimal vowel-support); /v/ = FLOOR (van whole-word only).
+ *   • REJECTED, needs NEW candidates: /f/, /s/, /dʒ/ (j), /w/. The pass-2
+ *     leads (fff/sss elongation; dʒə clip; wə support) did not land.
  *
- * This is an AUDITION-FIRST pass: Thomas (or Dave's pass-2 phonics note) plays
- * the per-class candidates, picks ONE winner PER FAILING CLASS, and a SEPARATE
- * follow-up PR ports the winning treatment into `renderBlendInnerText` +
+ * ── PASS 3 (this module's reason to exist) ────────────────────────────────
+ * Dave's pass-3 phonics ruling (design/research/cvc-blend-audio-phonics-pass3.md)
+ * supplies a new candidate PER failing class. The lever change vs pass-2 is
+ * ORTHOGRAPHIC ONSET TEXT, NO IPA — bare IPA produced a "soe" artifact, so the
+ * onset is spelled phonetically as plain text inside a per-onset `<prosody>`
+ * wrapper, with a 150ms break AFTER the onset (before the rest of the word's
+ * segmented graphemes):
+ *
+ *   | Class | Words     | Onset text | Onset wrapper                          | break |
+ *   |-------|-----------|------------|----------------------------------------|-------|
+ *   | /f/   | fan, fox  | ef         | <prosody rate="-20%">ef</prosody>      | 150ms |
+ *   | /s/   | sip, sun  | es         | <prosody rate="-20%">es</prosody>      | 150ms |
+ *   | /dʒ/  | jam       | juh        | <prosody rate="-30%" pitch="-15%">juh  | 150ms |
+ *   | /w/   | web, wig  | wuh        | <prosody rate="-25%" pitch="-20%">wuh  | 150ms |
+ *
+ * The /f/ + /s/ leads are LEADING-VOWEL spellings ("ef"/"es" = the letter
+ * names) — the leading schwa+vowel gives Azure a steady carrier so the
+ * fricative friction lands as the CODA of the onset syllable rather than a
+ * bare turbulent burst. /dʒ/ + /w/ are phonetic syllable spellings ("juh"
+ * "wuh") at a deeper pitch + slower rate so the onset reads as the target
+ * consonant, not a vowel.
+ *
+ * AUDITION-FIRST: Thomas plays the candidate vs a whole-word-only FLOOR
+ * baseline per word and picks accept (port the candidate) or reject (ship the
+ * FLOOR). A SEPARATE pass-4 PR ports the winners into `renderBlendInnerText` +
  * re-bakes the real canon. Do NOT wire this module into the runtime bundle,
  * and do NOT change production behaviour here.
  *
- * Per-class LEAD treatments (aligned to Dave's pass-2 phonics note,
- * design/research/cvc-blend-audio-phonics-pass2.md):
- *   • FRICATIVES f/s/h — LEAD is ORTHOGRAPHIC ELONGATION: letter REPETITION
- *     (fff / sss / hhh) inside `<prosody rate="-20%">`, NO vowel support.
- *     Continuants sustain; repetition forces sustained production better than a
- *     bare IPA tag, and the slow rate lets the steady-state friction dominate
- *     the buzzy turbulent onset that scratches when bare. /h/ leads with hhh
- *     too (Marian has native /h/), with a "huh" (`hə`) minimal vowel-support
- *     FALLBACK (`fric-rel`) if elongation fails.
- *   • AFFRICATE /dʒ/ — treat as a STOP, not a fricative: a clipped `dʒə`
- *     release ("juh", sub-syllabic) + pitch-down, the SAME class as the shipped
- *     stop fix. Do NOT elongate j ("jjj" is wrong — a stop onset can't sustain).
- *   • GLIDE /w/ — "wuh" (`wə`) vowel-support + pitch-down. The "U instead of W"
- *     is STRUCTURAL: a glide IS a vowel-onset transition, so bare /w/ holds as
- *     /uː/. Vowel support is CORRECT here, not the schwa anti-pattern.
- *   • /v/ — FLOORED. Dave: do NOT audition a /v/ render fix — it's a confirmed
- *     en-GB-Olivia floor AND absent from Tagalog (double jeopardy). `van` is
- *     presented WHOLE-WORD-ONLY (no segmented /v/) on EVERY candidate so the
- *     sponsor confirms the floor on the page. (The pass-3 impl adds a
- *     `BLEND_FLOOR_PHONEMES` routing table; here it's the `FLOOR_GRAPHEMES` set.)
+ * NESTED-PROSODY NOTE (Dave's flagged pass-3 risk; verified — see PR body /
+ * Self-Test Report). The per-onset `<prosody rate=...>` sits INSIDE the
+ * speak-root `<prosody rate="-10%">` shell (buildSpeakBody in
+ * renderBlendAudition.ts). Azure SSML `rate` is MULTIPLICATIVE across nested
+ * prosody: an inner `rate="-20%"` inside an outer `rate="-10%"` yields an
+ * effective ~0.72× speed (0.90 × 0.80), it does NOT override the outer to a
+ * flat 0.80×. `pitch` offsets likewise COMPOUND (outer +0Hz here, so the inner
+ * pitch is the net pitch). So the table's intended slow/deep onset DOES take
+ * effect; no flattening / single-computed-rate workaround was needed.
  *
- * SYNTHETIC-PHONICS CONSTRAINT (Dave's phonics notes,
- * design/research/cvc-blend-audio-phonics.md + ...-pass2.md): the forbidden
- * thing is a FULL-SYLLABLE schwa ("kuh-a-tuh" / "fuh-a-nuh"), NOT a clipped,
- * inaudible release. The vowel-support candidates reuse the EXACT clipped-`ə`
- * mechanism the Thomas-approved stop fix already uses — proven sub-syllabic on
- * the stops. Note the asymmetry Dave draws: for CONTINUANTS (f/s/h) the
- * vowel-support is the FALLBACK and elongation is the lead (continuants don't
- * need a vowel to render); for the GLIDE /w/ the vowel-support is CORRECT and
- * primary (a glide is definitionally a transition INTO a vowel). Each
- * vowel-support candidate's acceptance test is the sponsor's ear: "does the
- * release stay inaudible as a syllable?" (surfaced on the page).
+ * SYNTHETIC-PHONICS CONSTRAINT (Dave's phonics notes): the forbidden thing is
+ * a FULL-SYLLABLE schwa drill ("kuh-a-tuh"). The /dʒ/ "juh" + /w/ "wuh" onsets
+ * ARE single-syllable carriers BY DESIGN — Dave's pass-3 ruling accepts them
+ * for these two classes specifically (a stop-burst affricate and a glide both
+ * need a vowel to be audible at all; bare /dʒ/ scratches and bare /w/ collapses
+ * to /uː/). The acceptance test is the sponsor's ear, surfaced on the page:
+ * "is the onset identifiable as the target phoneme AND does the whole word
+ * sound natural?" Reject → FLOOR (whole-word only).
  *
- * The candidate set is intentionally an ARRAY of pure functions, and the
- * per-class candidates are TRIVIALLY EXTENSIBLE: Dave's pass-2 phonics note
- * (in flight) can add or veto a candidate by editing `BLEND_CANDIDATES` alone,
- * or scope an existing candidate to a different phoneme class by editing the
- * `*_GRAPHEMES` sets — the render script and page iterate generically.
+ * The candidate set is intentionally an ARRAY of pure functions and the
+ * per-class onsets are a TABLE (`PASS3_ONSETS`) — trivially extensible /
+ * vetoable by editing the table or the candidate array alone; the render
+ * script and page iterate generically.
  *
  * SSML returned here is the INNER-TEXT region only (the bit between the
  * speak-root `<prosody>` open/close). The render script wraps it in the
@@ -82,14 +81,14 @@
  */
 
 /** Per-grapheme IPA — mirrors `BLEND_GRAPHEME_IPA` in api/_tts.ts EXACTLY so
- *  the baseline candidate reproduces the production render byte-for-byte and
- *  every other candidate explores ONLY the SSML envelope, never the IPA
- *  payload (synthetic-phonics purity constraint). `x` decodes as the cluster
- *  /ks/ (box/fox); every other grapheme is a single phoneme. */
+ *  the non-onset graphemes (the vowel + coda of each word) reproduce the
+ *  production render byte-for-byte, and only the ONSET grapheme of a failing
+ *  class is replaced by the pass-3 orthographic onset. `x` decodes as the
+ *  cluster /ks/ (box/fox); every other grapheme is a single phoneme. */
 export const BLEND_GRAPHEME_IPA: Readonly<Record<string, string>> = {
   // short vowels — EXACT mirror of api/_tts.ts (a→æ, o→ɒ, u→ə, i→ɘ, e→e; the
   // central/lax u/i picks match PHONEME_OVERRIDES's uuu/iii). These MUST stay
-  // identical to production so candidate `a` is a byte-faithful A/B anchor.
+  // identical to production so the baseline anchor is byte-faithful.
   a: 'æ',
   o: 'ɒ',
   u: 'ə',
@@ -119,15 +118,21 @@ export const BLEND_GRAPHEME_IPA: Readonly<Record<string, string>> = {
   x: 'ks',
 }
 
-/** Production constants (mirror api/_tts.ts so the baseline is byte-faithful).
- *  Candidate-f production = break AFTER each phoneme, NO whole-line rate wrap
- *  (the house -10% speak-root rate is correct). */
+/** Production constants (mirror api/_tts.ts so the baseline + non-onset
+ *  graphemes are byte-faithful). Candidate-f production = break AFTER each
+ *  phoneme, NO whole-line rate wrap (the house -10% speak-root rate is
+ *  correct). */
 const PROD_GRAPHEME_BREAK_MS = 250
 const PROD_WHOLE_WORD_BREAK_MS = 450
 
+/** Break AFTER the pass-3 onset, before the rest of the word's graphemes (Dave
+ *  pass-3 spec: 150ms). Distinct from the 250ms inter-grapheme break so the
+ *  onset syllable sits a touch tighter against the following vowel. */
+const PASS3_ONSET_BREAK_MS = 150
+
 /** Stop consonants — the candidate-f set already shipped to production. These
- *  graphemes get the clipped `<stop>ə` release in EVERY pass-2 candidate too
- *  (we never regress the stop fix while auditioning the continuant fix). */
+ *  graphemes get the clipped `<stop>ə` release in EVERY candidate (we never
+ *  regress the stop fix). LOCKED by Thomas's pass-2 ruling. */
 const STOP_GRAPHEMES: ReadonlySet<string> = new Set([
   'b',
   'c',
@@ -138,23 +143,50 @@ const STOP_GRAPHEMES: ReadonlySet<string> = new Set([
   't',
 ])
 
-/** Fricative graphemes the pass-2 fricative candidates (elongate / vowel-
- *  support) target. /h/ /f/ /s/ are the unvoiced fricatives Thomas flagged
- *  (voice-QA #467). /v/ is intentionally NOT here — Dave FLOORED it (see
- *  `FLOOR_GRAPHEMES`), so the fricative candidates skip it and its word renders
- *  whole-only. Trivially extensible — add a grapheme to bring it into scope. */
-const FRICATIVE_GRAPHEMES: ReadonlySet<string> = new Set(['h', 'f', 's'])
+/**
+ * Pass-3 per-onset treatments — the failing classes ONLY (/f/ /s/ /dʒ/ /w/).
+ * Keyed by the ONSET grapheme. Each entry is the orthographic onset text (NO
+ * IPA — bare IPA produced the "soe" artifact) and its per-onset `<prosody>`
+ * attributes (compounded inside the speak-root -10% shell — see NESTED-PROSODY
+ * NOTE above). Trivially extensible: add a grapheme to bring a class into
+ * scope, or edit a row to retune a class.
+ *
+ * Locked / out-of-scope onsets are deliberately ABSENT:
+ *   • /h/ → Thomas locked fric-rel (hə) in pass-2; rendered via the production
+ *     bare-IPA path here (NOT re-auditioned). [carried only as anchor context]
+ *   • /v/ → FLOOR (van whole-word only).
+ *   • stops → candidate-f clipped release (locked).
+ */
+interface Pass3Onset {
+  /** Orthographic onset text, voiced as plain text (NO <phoneme>/IPA). */
+  text: string
+  /** Per-onset prosody rate (compounds inside the -10% speak-root). */
+  rate: string
+  /** Optional per-onset prosody pitch (compounds; absent = inherit). */
+  pitch?: string
+}
 
-/** Affricate graphemes — /dʒ/ (the `j` grapheme). Its leading /d/ stop burst
- *  scratches like a bare stop. Candidate `j-clip` gives it the clipped
- *  release. (`ch` would join here if a digraph-CVCC blend tier ever ships.) */
-const AFFRICATE_GRAPHEMES: ReadonlySet<string> = new Set(['j'])
+export const PASS3_ONSETS: Readonly<Record<string, Pass3Onset>> = {
+  // /f/ — leading-vowel "ef" (the letter name): the leading e gives Azure a
+  // steady carrier so the /f/ friction lands as the syllable coda, not a bare
+  // turbulent burst. High-probability accept (Dave).
+  f: { text: 'ef', rate: '-20%' },
+  // /s/ — leading-vowel "es": same mechanism as /f/ for the sibilant.
+  // High-probability accept (Dave).
+  s: { text: 'es', rate: '-20%' },
+  // /dʒ/ — phonetic syllable "juh" at deeper pitch + slower rate so the onset
+  // reads as the affricate, not a vowel. May floor (Dave).
+  j: { text: 'juh', rate: '-30%', pitch: '-15%' },
+  // /w/ — phonetic syllable "wuh", deepest pitch so the glide onset is W not U.
+  // May floor (Dave).
+  w: { text: 'wuh', rate: '-25%', pitch: '-20%' },
+}
 
-/** Glide graphemes — /w/ (and /j/=`y`, not in the v1 CVC onset pool). Rendered
- *  bare, /w/ collapses to the vowel /uː/ ("U not W"). Candidate `w-support`
- *  gives it a "wuh" (wə) vowel to glide into + pitch-down. Trivially
- *  extensible. */
-const GLIDE_GRAPHEMES: ReadonlySet<string> = new Set(['w', 'y'])
+/** Graphemes Dave FLOORS — no segmented onset render; the WORD is presented
+ *  whole-word-only so the sponsor confirms the floor on the page. /v/ is a
+ *  confirmed en-GB-Olivia floor AND absent from Tagalog (double jeopardy),
+ *  locked by Thomas in pass-2. Trivially extensible. */
+const FLOOR_GRAPHEMES: ReadonlySet<string> = new Set(['v'])
 
 /** XML-escape (mirrors api/_tts.ts escapeSsml — duplicated to keep this
  *  audition module free of any production import that could drift). */
@@ -183,16 +215,28 @@ function phonemeTagFor(grapheme: string, ipa: string | undefined): string {
   return `<phoneme alphabet="ipa" ph="${esc(ipa)}">${esc(grapheme)}</phoneme>`
 }
 
-/** The PRODUCTION candidate-f release: STOP graphemes get a clipped `<stop>ə`;
- *  every other grapheme stays bare. This is the live render's per-grapheme
- *  IPA, reused as the baseline FOR THE STOPS in every pass-2 candidate so the
- *  stop fix never regresses while we audition the continuant/glide/affricate
- *  fix. */
+/** The PRODUCTION candidate-f release for a non-onset grapheme: STOP graphemes
+ *  get a clipped `<stop>ə`; every other grapheme stays bare. Used for the
+ *  vowel + coda of every word (and the onset of LOCKED classes), so the
+ *  shipped stop fix never regresses while we audition the failing-class onset. */
 function prodReleasedIpa(grapheme: string): string | undefined {
   const g = grapheme.toLowerCase()
   const ipa = BLEND_GRAPHEME_IPA[g]
   if (ipa === undefined) return undefined
   return STOP_GRAPHEMES.has(g) ? `${ipa}ə` : ipa
+}
+
+/** Production per-grapheme render (candidate-f): clipped stop release, else
+ *  bare IPA. Drives every grapheme EXCEPT a pass-3 failing-class onset. */
+function prodGrapheme(grapheme: string): string {
+  return phonemeTagFor(grapheme, prodReleasedIpa(grapheme))
+}
+
+/** Render the pass-3 orthographic onset for a failing-class onset grapheme:
+ *  plain onset text (NO IPA) inside its per-onset `<prosody>` wrapper. */
+function pass3OnsetSsml(onset: Pass3Onset): string {
+  const pitchAttr = onset.pitch ? ` pitch="${esc(onset.pitch)}"` : ''
+  return `<prosody rate="${esc(onset.rate)}"${pitchAttr}>${esc(onset.text)}</prosody>`
 }
 
 /** A single blend candidate (one SSML treatment, applied to every word). */
@@ -201,16 +245,12 @@ export interface BlendCandidate {
   id: string
   /** Short human label shown on the page. */
   label: string
-  /** Which failing phoneme CLASS this candidate targets (for the page
-   *  grouping + so Dave's note can reason about coverage). 'baseline' is the
-   *  A/B anchor; 'stop-control' is candidate-f carried unchanged. */
-  targetClass:
-    | 'baseline'
-    | 'stop-control'
-    | 'fricative'
-    | 'affricate'
-    | 'glide'
-    | 'all'
+  /** Which treatment this candidate represents (page grouping):
+   *  - 'pass3'  : the new pass-3 orthographic-onset candidate.
+   *  - 'floor'  : whole-word-only FLOOR baseline (what ships if rejected).
+   *  - 'broken' : the pass-2 baseline (current live render) — A/B reference.
+   */
+  treatment: 'pass3' | 'floor' | 'broken'
   /** One-line description of the MECHANISM being tried (shown on the page). */
   mechanism: string
   /**
@@ -220,58 +260,67 @@ export interface BlendCandidate {
   buildInner: (word: string) => string
 }
 
-/** Graphemes Dave's pass-2 note FLOORS — do NOT audition a segmented render
- *  fix; present the WORD whole-only so the sponsor confirms the floor decision.
- *  /v/ is a confirmed en-GB-Olivia floor AND absent from Tagalog (double
- *  jeopardy). The pass-3 impl adds a `BLEND_FLOOR_PHONEMES` routing table in
- *  `renderBlendInnerText`; here it just routes `van` to a whole-word render.
- *  Trivially extensible — add a grapheme to floor its word's segmentation. */
-const FLOOR_GRAPHEMES: ReadonlySet<string> = new Set(['v'])
-
-/** True if a word contains any FLOORed grapheme — its blend is rendered
- *  whole-word-only (no segmentation), per Dave's pass-2 floor decision. */
+/** True if a word's ONSET grapheme is FLOORed — the whole word is rendered
+ *  whole-word-only (no segmentation), per Dave's floor decision. We check the
+ *  onset (first grapheme) only: /v/ is an onset in this pool (van). */
 function wordIsFloored(word: string): boolean {
   return splitGraphemes(word).some((g) => FLOOR_GRAPHEMES.has(g.toLowerCase()))
 }
 
 /**
- * Per-grapheme render hook. Returns the SSML for ONE grapheme — either a
- * `<phoneme>` IPA tag (optionally with a transformed payload + per-phoneme
- * `<prosody>` wrap) OR raw orthographic text (e.g. `fff` for elongation). The
- * default is the production candidate-f render: STOPS get the clipped release,
- * everything else bare. A candidate overrides ONLY the graphemes in its target
- * class, leaving the production stop fix intact.
+ * PASS-3 candidate: the word's ONSET grapheme, if it's a pass-3 failing class,
+ * is rendered as the orthographic onset (plain text + per-onset prosody +
+ * 150ms break); every other grapheme (vowel, coda, and the onset of any
+ * non-pass-3 class) is the production candidate-f render. A FLOORed word (van)
+ * renders whole-word-only regardless. A word whose onset is NOT a pass-3 class
+ * (e.g. `cat` stop-control, `hat`/`hen` /h/-locked) renders fully via the
+ * production path — i.e. it is identical to the baseline, which is correct:
+ * those classes are NOT being re-auditioned.
  */
-type GraphemeRender = (grapheme: string) => string
-
-/** Default grapheme render = production candidate-f (stop release, else bare).
- *  Every pass-2 candidate composes ON TOP of this so the stop fix never
- *  regresses while we audition the continuant / glide / affricate fix. */
-function prodGrapheme(grapheme: string): string {
-  return phonemeTagFor(grapheme, prodReleasedIpa(grapheme))
+function buildPass3Inner(word: string): string {
+  if (wordIsFloored(word)) return buildFloorInner(word)
+  const graphemes = splitGraphemes(word)
+  const parts: string[] = []
+  graphemes.forEach((g, idx) => {
+    const lower = g.toLowerCase()
+    const onset = idx === 0 ? PASS3_ONSETS[lower] : undefined
+    if (onset) {
+      parts.push(pass3OnsetSsml(onset))
+      parts.push(`<break time="${PASS3_ONSET_BREAK_MS}ms"/>`)
+    } else {
+      parts.push(prodGrapheme(g))
+      parts.push(`<break time="${PROD_GRAPHEME_BREAK_MS}ms"/>`)
+    }
+  })
+  parts.push(`<break time="${PROD_WHOLE_WORD_BREAK_MS}ms"/>`)
+  parts.push(esc(word))
+  return parts.join('')
 }
 
 /**
- * Generic per-grapheme blend builder. Walks the word, applies `renderGrapheme`
- * to each grapheme, places a `<break>` AFTER each (candidate-f placement — the
- * stop releases into the pause), then voices the whole word naturally after a
- * longer break. No whole-line rate wrap (candidate-f: the house -10% speak-root
- * rate is correct). A FLOORED word (contains a /v/-class grapheme Dave floored)
- * is rendered WHOLE-WORD-ONLY — no segmentation — regardless of the candidate.
+ * FLOOR baseline: NO segmentation. The word is voiced slowly once, a pause,
+ * then naturally — exactly the production FLOOR shape for /v/. This is the clip
+ * we ship if Thomas rejects the pass-3 candidate for that word's class.
  */
-function buildBlend(word: string, renderGrapheme: GraphemeRender): string {
-  if (wordIsFloored(word)) {
-    // Dave's floor: no segmented render for this word — Marian hears the whole
-    // word slowly once, then naturally, with no isolated FLOORed phoneme.
-    return (
-      `<prosody rate="-15%">${esc(word)}</prosody>` +
-      `<break time="${PROD_WHOLE_WORD_BREAK_MS}ms"/>` +
-      esc(word)
-    )
-  }
+function buildFloorInner(word: string): string {
+  return (
+    `<prosody rate="-15%">${esc(word)}</prosody>` +
+    `<break time="${PROD_WHOLE_WORD_BREAK_MS}ms"/>` +
+    esc(word)
+  )
+}
+
+/**
+ * BROKEN control (pass-2 baseline = current live render, candidate f): STOP
+ * graphemes get the clipped release, every other grapheme (incl. the failing-
+ * class onsets) stays BARE. This is the A/B reference so Thomas hears the
+ * scratch the pass-3 onset is fixing. Cheap to keep (Dave: keep if cheap).
+ */
+function buildBrokenInner(word: string): string {
+  if (wordIsFloored(word)) return buildFloorInner(word)
   const parts: string[] = []
   for (const g of splitGraphemes(word)) {
-    parts.push(renderGrapheme(g))
+    parts.push(prodGrapheme(g))
     parts.push(`<break time="${PROD_GRAPHEME_BREAK_MS}ms"/>`)
   }
   parts.push(`<break time="${PROD_WHOLE_WORD_BREAK_MS}ms"/>`)
@@ -280,262 +329,142 @@ function buildBlend(word: string, renderGrapheme: GraphemeRender): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// CANDIDATE a — baseline (current production renderBlendInnerText, candidate f)
+// CANDIDATES (display order per word): pass-3 candidate, FLOOR baseline,
+// broken control. For FLOORed words (van) and locked-class words (cat / hat /
+// hen) the pass-3 candidate == the production render; the page still shows the
+// FLOOR + broken rows so the frame is uniform.
 // ─────────────────────────────────────────────────────────────────────────
-// STOPS get the clipped `<stop>ə` release; CONTINUANTS / glide / affricate /
-// vowels stay BARE. Break AFTER each phoneme, no whole-line rate wrap. This is
-// the LIVE render — it fixed the stops but left the now-failing bare
-// continuants/glide/affricate (voice-QA #467). The A/B anchor + broken control.
-const CANDIDATE_BASELINE: BlendCandidate = {
-  id: 'a',
-  targetClass: 'baseline',
-  label: 'a — baseline (current live render, candidate f)',
+
+const CANDIDATE_PASS3: BlendCandidate = {
+  id: 'pass3',
+  treatment: 'pass3',
+  label: 'pass3 — orthographic onset (ef/es/juh/wuh) + per-onset prosody',
   mechanism:
-    'STOPS get the clipped <stop>ə release; continuants / w / j / vowels stay ' +
-    'BARE. Break-after, no rate wrap. The LIVE render — fixed stops, but bare ' +
-    'continuants/glide/affricate scratch (voice-QA #467). The A/B anchor and ' +
-    'the BROKEN CONTROL for every class.',
-  buildInner: (word) => buildBlend(word, prodGrapheme),
+    'The ONSET of a failing class (/f/→"ef", /s/→"es", /dʒ/→"juh", /w/→"wuh") ' +
+    'is voiced as PLAIN TEXT (no IPA — bare IPA gave the "soe" artifact) inside ' +
+    'a per-onset <prosody> (f/s @ -20%; j @ -30%/-15st-style pitch; w @ ' +
+    '-25%/-20%), then a 150ms break, then the rest of the word segmented as ' +
+    'production. Stops keep their clipped release; /h/,/v/ unchanged. LISTEN: ' +
+    'is the onset clearly the target phoneme AND the whole word natural?',
+  buildInner: buildPass3Inner,
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// FRICATIVE candidates (f / s / h) — Dave's pass-2 leads
-// ─────────────────────────────────────────────────────────────────────────
-// Dave's pass-2 note: for f/s the TOP approach is ORTHOGRAPHIC ELONGATION —
-// letter REPETITION (fff / sss / hhh) inside <prosody rate="-20%">, NO vowel
-// support (continuants sustain; repetition forces sustained production better
-// than a bare IPA tag). /h/ leads with hhh too, with a "huh" minimal
-// vowel-support FALLBACK (Marian has native /h/).
-
-const FRIC_ELONG_REPEAT = 3 // fff / sss / hhh
-const FRIC_ELONG_RATE = '-20%'
-
-/** Render a fricative grapheme as REPEATED ORTHOGRAPHIC LETTERS (fff/sss/hhh)
- *  wrapped in <prosody rate="-20%"> — NO <phoneme> tag, NO vowel. Dave's TOP
- *  pass-2 approach for f/s/h: letter repetition makes Azure sustain the
- *  continuant longer than a bare IPA tag, and the slow rate gives the
- *  steady-state friction time to dominate the buzzy onset. */
-function fricElongGrapheme(grapheme: string): string {
-  const g = grapheme.toLowerCase()
-  if (FRICATIVE_GRAPHEMES.has(g) && !FLOOR_GRAPHEMES.has(g)) {
-    const repeated = esc(g.repeat(FRIC_ELONG_REPEAT))
-    return `<prosody rate="${FRIC_ELONG_RATE}">${repeated}</prosody>`
-  }
-  return prodGrapheme(grapheme)
-}
-
-/** LEAD for f/s/h: orthographic elongation (fff/sss/hhh @ -20% rate). */
-const CANDIDATE_FRIC_ELONGATE: BlendCandidate = {
-  id: 'fric-elong',
-  targetClass: 'fricative',
-  label: 'fric-elong — orthographic elongation fff/sss/hhh @ -20% (Dave lead)',
+const CANDIDATE_FLOOR: BlendCandidate = {
+  id: 'floor',
+  treatment: 'floor',
+  label: 'floor — whole-word only (the ship-if-rejected baseline)',
   mechanism:
-    'FRICATIVES f/s/h rendered as REPEATED LETTERS (fff / sss / hhh) inside ' +
-    '<prosody rate="-20%"> — no <phoneme>, no vowel. Dave pass-2 TOP pick: ' +
-    'repetition forces sustained continuant production; the slow rate lets the ' +
-    'friction dominate the buzzy onset. Stops keep their <stop>ə.',
-  buildInner: (word) => buildBlend(word, fricElongGrapheme),
+    'NO segmentation: the word is voiced slowly once (<prosody rate="-15%">), ' +
+    'a pause, then naturally. This is exactly what ships if the pass3 candidate ' +
+    'is REJECTED for this class — the same FLOOR shape /v/ uses. The safe ' +
+    'fallback A/B.',
+  buildInner: buildFloorInner,
 }
 
-/** /h/ FALLBACK (and a general fricative fallback): minimal vowel-support —
- *  the SAME clipped `<fric>ə` shape the stop fix uses ("huh"/"fuh" sub-syllabic
- *  release). Dave: add this for /h/ specifically; harmless for f/s as an A/B. */
-function fricReleaseGrapheme(grapheme: string): string {
-  const g = grapheme.toLowerCase()
-  const ipa = BLEND_GRAPHEME_IPA[g]
-  if (
-    ipa !== undefined &&
-    FRICATIVE_GRAPHEMES.has(g) &&
-    !FLOOR_GRAPHEMES.has(g)
-  ) {
-    return phonemeTagFor(grapheme, `${ipa}ə`)
-  }
-  return prodGrapheme(grapheme)
-}
-
-/** FALLBACK for /h/ (+ f/s A/B): minimal vowel-support clipped release. */
-const CANDIDATE_FRIC_RELEASE: BlendCandidate = {
-  id: 'fric-rel',
-  targetClass: 'fricative',
-  label: 'fric-rel — minimal vowel-support fricatives (hə/fə/sə, /h/ fallback)',
+const CANDIDATE_BROKEN: BlendCandidate = {
+  id: 'broken',
+  treatment: 'broken',
+  label: 'broken — current live render (pass-2 baseline, bare onset)',
   mechanism:
-    'FRICATIVES f/s/h get the SAME clipped <fric>ə release the stops got ' +
-    '(h→hə "huh", f→fə, s→sə). Dave pass-2: the FALLBACK for /h/ if hhh ' +
-    'elongation fails; an A/B for f/s. Listen: does ə stay sub-syllabic?',
-  buildInner: (word) => buildBlend(word, fricReleaseGrapheme),
+    'The CURRENT production render (candidate f): stops clipped, the failing- ' +
+    'class onset BARE. This is the scratch the pass3 onset fixes — kept as the ' +
+    'A/B reference so the improvement is audible. (For cat/hat/hen/van this ' +
+    'equals pass3, since those classes are locked / not re-auditioned.)',
+  buildInner: buildBrokenInner,
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// AFFRICATE candidate (j = /dʒ/) — Dave: treat as a STOP
-// ─────────────────────────────────────────────────────────────────────────
-// Dave pass-2: /dʒ/ is a STOP, not a fricative — "juh" clipped release +
-// pitch-down (same class as the shipped stop fix). Do NOT elongate j (jjj is
-// wrong — a stop onset can't sustain).
-
-/** Clipped affricate release + pitch-down (Dave: treat /dʒ/ as a stop). The
- *  `dʒə` clip gives the leading /d/ burst a vowel to release into; the
- *  pitch-down de-emphasises the burst. Stops keep their release; rest baseline. */
-function affricateGrapheme(grapheme: string): string {
-  const g = grapheme.toLowerCase()
-  const ipa = BLEND_GRAPHEME_IPA[g]
-  if (ipa !== undefined && AFFRICATE_GRAPHEMES.has(g)) {
-    return `<prosody pitch="-2st">${phonemeTagFor(grapheme, `${ipa}ə`)}</prosody>`
-  }
-  return prodGrapheme(grapheme)
-}
-
-/** LEAD for /dʒ/: clipped "juh" release + pitch-down (treat as a stop). */
-const CANDIDATE_AFFR_RELEASE: BlendCandidate = {
-  id: 'j-clip',
-  targetClass: 'affricate',
-  label: 'j-clip — clipped affricate release dʒə + pitch-down (Dave lead)',
-  mechanism:
-    'AFFRICATE /dʒ/ (j) treated as a STOP (Dave pass-2): clipped dʒə release ' +
-    '("juh", sub-syllabic) wrapped in <prosody pitch="-2st"> to de-emphasise ' +
-    'the /d/ burst. NOT elongated (a stop onset cannot sustain). Listen: clean ' +
-    '/dʒ/ or a full "juh"?',
-  buildInner: (word) => buildBlend(word, affricateGrapheme),
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// GLIDE candidate (w) — Dave: "wuh" vowel-support + pitch-down (CORRECT here)
-// ─────────────────────────────────────────────────────────────────────────
-// Dave pass-2: the "U instead of W" is STRUCTURAL — a glide is a vowel-onset
-// transition, so bare /w/ holds as /uː/. Vowel support is CORRECT here, not an
-// anti-pattern. "wuh" (wə) + pitch-down.
-
-/** Glide vowel-support + pitch-down (Dave: correct for /w/). `wə` supplies the
- *  formant transition that DEFINES the glide; pitch-down keeps the carrier
- *  un-salient. Stops keep their release; everything else at baseline. */
-function glideGrapheme(grapheme: string): string {
-  const g = grapheme.toLowerCase()
-  const ipa = BLEND_GRAPHEME_IPA[g]
-  if (ipa !== undefined && GLIDE_GRAPHEMES.has(g)) {
-    return `<prosody pitch="-2st">${phonemeTagFor(grapheme, `${ipa}ə`)}</prosody>`
-  }
-  return prodGrapheme(grapheme)
-}
-
-/** LEAD for /w/: "wuh" vowel-support + pitch-down. */
-const CANDIDATE_GLIDE_SUPPORT: BlendCandidate = {
-  id: 'w-support',
-  targetClass: 'glide',
-  label: 'w-support — wuh vowel-support + pitch-down (Dave lead)',
-  mechanism:
-    'GLIDE /w/ gets a wə ("wuh") payload + <prosody pitch="-2st"> (Dave pass-2 ' +
-    '— the "U not W" is STRUCTURAL; a glide is a vowel-onset transition, so ' +
-    'vowel support is CORRECT, not an anti-pattern). Stops keep their release. ' +
-    'Listen: clear /w/ onset, or still "oo"?',
-  buildInner: (word) => buildBlend(word, glideGrapheme),
-}
-
-/** The candidate set, in display order. Baseline FIRST (the A/B anchor + broken
- *  control), then ONE LEAD per failing class aligned to Dave's pass-2 note,
- *  plus the /h/ vowel-support fallback. Trivially extensible — append a
- *  `BlendCandidate` to add a row, scope a class by editing the `*_GRAPHEMES`
- *  sets, FLOOR a phoneme via `FLOOR_GRAPHEMES`, or remove one to veto it. Dave's
- *  note may edit this array alone; the render script + page iterate generically.
- *
- *  Dave pass-2 lead-per-class mapping:
- *    • fricatives f/s/h → `fric-elong` (orthographic fff/sss/hhh @ -20%) LEAD
- *      + `fric-rel` (hə/fə/sə) as the /h/ fallback / f-s A/B.
- *    • affricate /dʒ/   → `j-clip` (dʒə clip + pitch-down; treat as a stop) LEAD.
- *    • glide /w/        → `w-support` (wə + pitch-down) LEAD.
- *    • /v/              → FLOORED (FLOOR_GRAPHEMES): `van` renders whole-word
- *      only on EVERY candidate so the sponsor confirms the floor on the page. */
+/** The candidate set, in per-word display order: pass-3 candidate FIRST, then
+ *  the FLOOR baseline, then the broken control. Trivially extensible — append
+ *  a `BlendCandidate`, retune a class via `PASS3_ONSETS`, or floor a phoneme
+ *  via `FLOOR_GRAPHEMES`. The render script + page iterate generically. */
 export const BLEND_CANDIDATES: BlendCandidate[] = [
-  CANDIDATE_BASELINE,
-  // fricative-class (f / s / h) — Dave lead + /h/ fallback
-  CANDIDATE_FRIC_ELONGATE,
-  CANDIDATE_FRIC_RELEASE,
-  // affricate-class (j = /dʒ/) — Dave lead
-  CANDIDATE_AFFR_RELEASE,
-  // glide-class (w) — Dave lead
-  CANDIDATE_GLIDE_SUPPORT,
+  CANDIDATE_PASS3,
+  CANDIDATE_FLOOR,
+  CANDIDATE_BROKEN,
 ]
 
 /** One auditioned word: the CVC target + why it's a representative hard case. */
 export interface BlendWord {
   /** The target CVC word (also the slug). */
   word: string
+  /** Which pass-3 failing class this word probes (page grouping + coverage). */
+  phonemeClass: '/f/' | '/s/' | '/dʒ/' | '/w/' | 'stop-control' | 'floor'
   /** Why this word is in the set (the hard phoneme it probes). */
   context: string
 }
 
 /**
- * The pass-2 word set, spanning the failing phoneme classes + final stops.
- * Per the ticket: hat / fan / sip / jam / web / wig / fox / hen, with `cat`
- * carried as a STOP CONTROL (candidate-f's known-good anchor). Each word names
- * the failing phoneme it probes so Thomas can map a clip to a class.
+ * The pass-3 word set — the failing classes Thomas REJECTED in pass-2, two
+ * words per fricative class for cross-coda coverage, one each for the affricate
+ * + glide pair, plus the `cat` stop-control anchor and the `van` floor-confirm
+ * anchor so Thomas has a known-good + known-floor in the same frame.
  */
 export const BLEND_WORDS: BlendWord[] = [
   {
     word: 'cat',
+    phonemeClass: 'stop-control',
     context:
       'STOP CONTROL (NOT re-auditioned) — voiceless stops /k/ + /t/, fixed by ' +
-      'candidate f. Carried as the known-good anchor: every candidate must ' +
-      'keep this clean.',
-  },
-  {
-    word: 'hat',
-    context:
-      'Fricative /h/ onset + /t/ stop coda. /h/ is bare aspiration with no ' +
-      'place cue — near-silent-then-scratch when bare (voice-QA #467 hat).',
-  },
-  {
-    word: 'hen',
-    context:
-      'Fricative /h/ onset + continuant /n/ coda. Isolates the bare-/h/ ' +
-      'scratch without a coda stop (voice-QA #467 hen).',
+      'candidate f and LOCKED. pass3 == broken here. The known-good anchor: ' +
+      'every candidate keeps it clean.',
   },
   {
     word: 'fan',
+    phonemeClass: '/f/',
     context:
-      'Fricative /f/ onset + continuant /n/ coda. The buzzy unvoiced-fricative ' +
-      'onset Thomas flagged (voice-QA #467 fan).',
+      '/f/ onset + continuant /n/ coda. The buzzy unvoiced-fricative onset ' +
+      'Thomas rejected in pass-2. pass3 leads with "ef" @ -20% (high-prob ' +
+      'accept — Dave).',
   },
   {
     word: 'fox',
+    phonemeClass: '/f/',
     context:
-      'Fricative /f/ onset + the /ks/ cluster grapheme (x). Probes /f/ AND ' +
-      'whether the x=/ks/ cluster still releases cleanly (voice-QA #467 fox).',
+      '/f/ onset + the /ks/ cluster grapheme (x). Probes "ef" onset AND that ' +
+      'the x=/ks/ cluster still releases cleanly after the onset break.',
   },
   {
     word: 'sip',
+    phonemeClass: '/s/',
     context:
-      'Fricative /s/ onset + /p/ stop coda. The sibilant /s/ + a final stop — ' +
-      'two failing classes in one word (voice-QA #467 sip).',
+      '/s/ onset + /p/ stop coda. The sibilant "es" onset against a final ' +
+      'clipped stop (high-prob accept — Dave).',
   },
   {
     word: 'sun',
+    phonemeClass: '/s/',
     context:
-      'Fricative /s/ onset + continuant /n/ coda. Isolates the bare-/s/ ' +
-      'sibilant scratch (voice-QA #467 sun).',
-  },
-  {
-    word: 'van',
-    context:
-      'FLOOR CASE — /v/ onset is a confirmed en-GB-Olivia floor AND absent ' +
-      'from Tagalog (Dave pass-2: do NOT audition a /v/ render fix). EVERY ' +
-      'candidate renders `van` WHOLE-WORD-ONLY (no segmented /v/) so the ' +
-      'sponsor confirms the floor decision on the page.',
+      '/s/ onset + continuant /n/ coda. Isolates the "es" sibilant onset ' +
+      'without a coda stop.',
   },
   {
     word: 'jam',
+    phonemeClass: '/dʒ/',
     context:
-      'Affricate /dʒ/ onset (j) + continuant /m/ coda. The /d/ stop-burst of ' +
-      'the affricate scratches like a bare stop (voice-QA #467 jam).',
+      'Affricate /dʒ/ onset (j) + continuant /m/ coda. pass3 onset "juh" @ ' +
+      '-30%/pitch-down. MAY FLOOR (Dave) — listen: clean /dʒ/ or a full "juh"?',
   },
   {
     word: 'web',
+    phonemeClass: '/w/',
     context:
-      'Glide /w/ onset + /b/ stop coda. /w/ bare collapses to the vowel /uː/ ' +
-      '("U instead of W") + a final voiced stop (voice-QA #467 web).',
+      'Glide /w/ onset + /b/ stop coda. Bare /w/ collapses to /uː/ ("U not ' +
+      'W"); pass3 onset "wuh" @ -25%/deep pitch. MAY FLOOR (Dave).',
   },
   {
     word: 'wig',
+    phonemeClass: '/w/',
     context:
       'Glide /w/ onset + /ɡ/ stop coda. The "U not W" glide failure with a ' +
-      'final voiced stop (voice-QA #467 wig).',
+      'final voiced stop. pass3 onset "wuh". MAY FLOOR (Dave).',
+  },
+  {
+    word: 'van',
+    phonemeClass: 'floor',
+    context:
+      'FLOOR CONFIRM — /v/ onset is a confirmed en-GB-Olivia floor AND absent ' +
+      'from Tagalog (Dave: do NOT audition a /v/ render fix; LOCKED pass-2). ' +
+      'EVERY candidate renders `van` WHOLE-WORD-ONLY so the floor is confirmed ' +
+      'on the page.',
   },
 ]

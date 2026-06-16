@@ -4,19 +4,19 @@
  * ⚠️  NOT PRODUCTION CODE. Audition tooling only.  ⚠️
  * --------------------------------------------------------------------------
  * Renders the candidate blend SSML treatments defined in
- * `blendAuditionVariants.ts`. PASS 2 audits the now-failing CONTINUANT /
- * GLIDE / AFFRICATE classes (fricatives h/f/s/v, glide w, affricate j=/dʒ/ —
- * voice-QA #467) that candidate-f left bare; stops stay candidate-f and are
- * carried only as a `cat` control. Each candidate × word pair is rendered;
- * the manifest (`public/blend-audition-data.json`) feeds the standalone
- * `public/blend-audition.html` page reads — base64 MP3 + the exact SSML body
- * + a SHA-256 hash per (word × candidate).
+ * `blendAuditionVariants.ts`. PASS 3 audits the classes Thomas REJECTED in
+ * pass-2 (/f/, /s/, /dʒ/, /w/) with a NEW lever: an orthographic onset
+ * (ef/es/juh/wuh, NO IPA) inside a per-onset <prosody> wrapper. Each word gets
+ * THREE clips: (a) the pass-3 candidate, (b) a whole-word-only FLOOR baseline
+ * (the ship-if-rejected clip), (c) the broken control (current live render).
+ * The manifest (`public/blend-audition-data.json`) feeds the standalone
+ * `public/blend-audition.html` page — base64 MP3 + the exact SSML body + a
+ * SHA-256 hash per (word × candidate).
  *
- * Every candidate (including candidate `a`, the baseline) is a HAND-BUILT
- * inner-SSML POSTed directly to Azure. Candidate `a`'s builder mirrors the
- * production `renderBlendInnerText` byte-for-byte, so playing it auditions the
- * EXACT rejected render; candidates b..e explore the break-placement / rate /
- * pitch levers BEYOND the production path.
+ * Every candidate is a HAND-BUILT inner-SSML POSTed directly to Azure. The
+ * `broken` candidate mirrors the production `renderBlendInnerText` byte-for-
+ * byte, so playing it auditions the EXACT rejected render; the `pass3`
+ * candidate explores the orthographic-onset + per-onset-prosody lever.
  *
  * All candidates use the SAME voice config (EMMA_VOICE_CONFIG,
  * en-GB-OliviaNeural, rate -10% / pitch +0Hz / volume +0%), the SAME Azure
@@ -122,8 +122,8 @@ async function renderRawSsml(body: string): Promise<Uint8Array> {
 interface CandidateRecord {
   id: string
   label: string
-  /** Which failing phoneme class this candidate targets (page grouping). */
-  targetClass: BlendCandidate['targetClass']
+  /** Which treatment this candidate represents (pass3 / floor / broken). */
+  treatment: BlendCandidate['treatment']
   mechanism: string
   /** The full SSML body sent to Azure (for the inventory table). */
   ssml: string
@@ -141,6 +141,8 @@ interface WordRecord {
   /** slug == word */
   key: string
   word: string
+  /** The pass-3 failing class this word probes (page grouping). */
+  phonemeClass: BlendWord['phonemeClass']
   context: string
   candidates: CandidateRecord[]
 }
@@ -157,7 +159,7 @@ async function renderCandidate(
     return {
       id: candidate.id,
       label: candidate.label,
-      targetClass: candidate.targetClass,
+      treatment: candidate.treatment,
       mechanism: candidate.mechanism,
       ssml: body,
       audioHash: null,
@@ -173,7 +175,7 @@ async function renderCandidate(
     return {
       id: candidate.id,
       label: candidate.label,
-      targetClass: candidate.targetClass,
+      treatment: candidate.treatment,
       mechanism: candidate.mechanism,
       ssml: body,
       audioHash,
@@ -185,7 +187,7 @@ async function renderCandidate(
     return {
       id: candidate.id,
       label: candidate.label,
-      targetClass: candidate.targetClass,
+      treatment: candidate.treatment,
       mechanism: candidate.mechanism,
       ssml: body,
       audioHash: null,
@@ -235,6 +237,7 @@ async function main(): Promise<void> {
     words.push({
       key: word.word,
       word: word.word,
+      phonemeClass: word.phonemeClass,
       context: word.context,
       candidates,
     })
@@ -253,7 +256,7 @@ async function main(): Promise<void> {
       pitch: EMMA_VOICE_CONFIG.pitch,
       volume: EMMA_VOICE_CONFIG.volume,
     },
-    note: 'NOT PRODUCTION. CVC phoneme-blend audition. The winning candidate is ported into renderBlendInnerText + re-baked in a separate follow-up PR.',
+    note: 'NOT PRODUCTION. CVC phoneme-blend pass-3 audition (orthographic onset vs whole-word FLOOR). Per word: pass3 candidate, FLOOR baseline (ship-if-rejected), broken control. The accepted onsets are ported into renderBlendInnerText + re-baked in a separate pass-4 PR.',
     words,
   }
   writeFileSync(OUT_PATH, JSON.stringify(manifest, null, 2), 'utf8')

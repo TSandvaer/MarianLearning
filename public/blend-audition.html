@@ -119,14 +119,32 @@
       .row:last-child {
         border-bottom: none;
       }
-      .row.baseline {
+      .row.candidate {
+        background: var(--green-soft);
+      }
+      .row.floor {
         background: #fbf6ee;
+      }
+      .row.broken {
+        background: #fbeeee;
       }
       .row.picked {
         background: var(--blue-soft);
+        box-shadow: inset 3px 0 0 var(--blue);
       }
       .row.unrendered {
         opacity: 0.65;
+      }
+      h2 .classchip {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        background: var(--blue-soft);
+        color: var(--blue);
+        border-radius: 999px;
+        padding: 0.08rem 0.5rem;
+        vertical-align: middle;
+        letter-spacing: 0.01em;
       }
       .meta {
         flex: 1 1 16rem;
@@ -146,21 +164,17 @@
         margin-left: 0.35rem;
         vertical-align: middle;
       }
-      .tag.base {
-        background: #efe3cf;
-        color: var(--amber);
-      }
-      .tag.rej {
-        background: #f2dede;
-        color: #a94442;
-      }
-      .tag.ctrl {
+      .tag.cand {
         background: var(--green-soft);
         color: var(--green);
       }
-      .tag.cls {
-        background: var(--blue-soft);
-        color: var(--blue);
+      .tag.floor {
+        background: #efe3cf;
+        color: var(--amber);
+      }
+      .tag.broke {
+        background: #f2dede;
+        color: #a94442;
       }
       .meta .mech {
         color: var(--muted);
@@ -251,43 +265,44 @@
     </style>
   </head>
   <body>
-    <h1>Blend audition — pass 2 <span class="voice">Olivia renders</span></h1>
+    <h1>Blend audition — pass 3 <span class="voice">Olivia renders</span></h1>
     <p class="sub">
       The CVC phoneme-blend (<code>blend</code> slot) sounds out a word
       letter-by-letter then says the whole word —
       <code>c&#8202;…&#8202;a&#8202;…&#8202;t&#8202;…&#8202;cat</code>. Pass 1
-      (candidate f) <strong>fixed the stop consonants</strong>, but it left the
-      <strong>fricatives, the glide, and the affricate BARE</strong> — and those
-      now scratch (voice-QA #467, 14 fails): <em>h</em> (hat/hen/hot),
-      <em>f</em> (fan/fig/fox), <em>s</em> (sip/sun), the affricate
-      <em>j /dʒ/</em> (jam), and the glide <em>w</em> (web/wig — heard as "U not
-      W"). Each row below is a candidate SSML treatment rendered through the
-      real Azure pipeline (<code>en-GB-OliviaNeural</code>, rate
-      <code>-10%</code>). <strong>Candidate a</strong> is the current live
-      render (candidate f) — your A/B anchor and the BROKEN control;
-      <strong><code>cat</code> is the stop-control</strong> (already good —
-      every candidate must keep it clean, stops are NOT being re-auditioned).
-      The other candidates are ONE LEAD per failing class, aligned to Dave's
-      pass-2 phonics note: <strong>fric-elong</strong> (<code>fff/sss/hhh</code>
-      orthographic elongation @ -20% — the lead for f/s/h) with
-      <strong>fric-rel</strong> (<code>hə/fə/sə</code> minimal vowel-support,
-      the /h/ fallback); <strong>j-clip</strong> (clipped <code>dʒə</code> "juh"
-      + pitch-down — the affricate treated as a stop);
-      <strong>w-support</strong> (<code>wə</code>
-      "wuh" vowel-support + pitch-down — correct for a glide).
-      <strong><code>van</code> is FLOORED</strong> — Dave: /v/ is an
-      en-GB-Olivia floor + absent from Tagalog, so it renders whole-word-only on
-      every candidate (confirm the floor on the page). The key listen on any
-      <em>release</em> candidate:
+      fixed the <strong>stops</strong>; pass 2 you LOCKED <em>/h/</em> (hə) and
+      FLOORED <em>/v/</em>, but REJECTED the leads for
+      <strong
+        ><em>/f/</em>, <em>/s/</em>, the affricate <em>j /dʒ/</em>, and the
+        glide <em>/w/</em></strong
+      >. Pass 3 tries a new lever per failing class — an
+      <strong>orthographic onset, NO IPA</strong> (bare IPA gave a "soe"
+      artifact): the onset is spelled phonetically as plain text inside a
+      per-onset <code>&lt;prosody&gt;</code>, then a 150ms break, then the rest
+      of the word as before. <strong>/f/ → "ef"</strong> and
+      <strong>/s/ → "es"</strong> @ -20% (leading-vowel carrier so the friction
+      lands clean — high-probability accepts); <strong>/dʒ/ → "juh"</strong> @
+      -30% + deep pitch and <strong>/w/ → "wuh"</strong> @ -25% + deeper pitch
+      (may floor). Every onset <code>&lt;prosody rate&gt;</code> sits INSIDE the
+      speak-root -10% and COMPOUNDS with it (verified — see PR), so the
+      slow/deep onset really takes effect. Per word you get THREE rows:
+      <strong>pass3</strong> (the candidate),
+      <strong>floor</strong> (whole-word-only — what ships if you REJECT), and
+      <strong>broken</strong> (the current live render — the scratch you're
+      fixing). <strong><code>cat</code> is the stop-control</strong> (pass3 ==
+      broken, must stay clean) and
+      <strong><code>van</code> confirms the /v/ FLOOR</strong> (all three rows
+      identical). The accept test per class:
       <em
-        >does the ə stay inaudible as a syllable, or drift toward
-        "fuh"/"suh"?</em
+        >is the onset clearly the target phoneme AND does the whole word sound
+        natural?</em
       >
-      Play each, then tap <strong>Pick</strong> on the best per word; report ONE
-      winner per failing class in chat or the issue. The winners get ported into
-      <code>renderBlendInnerText</code> + re-baked in a follow-up PR. Unlinked
-      audition tooling — <strong>open in a private tab</strong> to dodge any
-      stale service-worker cache.
+      If yes, Pick <strong>pass3</strong>; if no, Pick <strong>floor</strong>.
+      Report ONE verdict per failing class (/f/, /s/, /dʒ/, /w/) in chat or the
+      issue. Winners get ported into <code>renderBlendInnerText</code> +
+      re-baked in a pass-4 PR. Unlinked audition tooling —
+      <strong>open in a private tab</strong> to dodge any stale service-worker
+      cache.
     </p>
 
     <div id="status" class="status">Loading blend renders&hellip;</div>
@@ -431,6 +446,14 @@
         head.className = 'ghead'
         const h2 = document.createElement('h2')
         h2.textContent = word.word
+        // Phoneme-class chip next to the word so Thomas scans coverage by class.
+        if (word.phonemeClass) {
+          const clsChip = document.createElement('span')
+          clsChip.className = 'classchip'
+          clsChip.textContent = word.phonemeClass
+          h2.appendChild(document.createTextNode(' '))
+          h2.appendChild(clsChip)
+        }
         const gctx = document.createElement('div')
         gctx.className = 'gctx'
         gctx.textContent = word.context
@@ -446,13 +469,18 @@
         const rows = []
         for (const c of word.candidates) {
           const itemId = word.key + '#' + c.id
-          const isBaseline = c.id === 'a'
+          const treatment = c.treatment || c.id // pass3 / floor / broken
+          const isPass3 = treatment === 'pass3'
+          const isFloor = treatment === 'floor'
+          const isBroken = treatment === 'broken'
           const rendered = !!c.base64 && !c.error
 
           const row = document.createElement('div')
           row.className =
             'row' +
-            (isBaseline ? ' baseline' : '') +
+            (isPass3 ? ' candidate' : '') +
+            (isFloor ? ' floor' : '') +
+            (isBroken ? ' broken' : '') +
             (rendered ? '' : ' unrendered')
           row.setAttribute('data-testid', 'audition-row-' + itemId)
 
@@ -461,20 +489,15 @@
 
           const label = document.createElement('div')
           label.className = 'label'
-          // Class tag: baseline gets baseline/rejected; per-class candidates get
-          // their failing-class tag so Thomas can scan coverage at a glance.
+          // Treatment tag: pass3 (the candidate) / floor (ship-if-rejected) /
+          // broken (current live render, the scratch) — so the A/B is obvious.
           let tags = ''
-          if (isBaseline) {
-            tags =
-              ' <span class="tag base">baseline</span><span class="tag rej">rejected</span>'
-          } else if (c.targetClass && c.targetClass !== 'baseline') {
-            const cls = c.targetClass === 'stop-control' ? 'ctrl' : 'cls'
-            tags =
-              ' <span class="tag ' +
-              cls +
-              '">' +
-              escapeHtml(c.targetClass) +
-              '</span>'
+          if (isPass3) {
+            tags = ' <span class="tag cand">pass3 candidate</span>'
+          } else if (isFloor) {
+            tags = ' <span class="tag floor">FLOOR (ship if rejected)</span>'
+          } else if (isBroken) {
+            tags = ' <span class="tag broke">broken (current)</span>'
           }
           label.innerHTML = escapeHtml(c.label) + tags
           meta.appendChild(label)
