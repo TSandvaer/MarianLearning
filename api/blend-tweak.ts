@@ -435,11 +435,25 @@ export async function handler(
     ...EMMA_VOICE_CONFIG,
   }
 
+  // DEBUG-ONLY diagnostic fields (this endpoint is 404-gated off prod, so these
+  // never ship to production). Echo ONLY the region string + the env scope so we
+  // can SEE which Azure resource the preview runtime actually resolved to,
+  // instead of guessing at the Vercel config. NEVER echo AZURE_SPEECH_KEY.
+  const azureRegion = process.env.AZURE_SPEECH_REGION ?? null
+  const debug = { azureRegion, vercelEnv: vercelEnv ?? null }
+
   try {
     const result = await synthesize(req, { ssmlOverride: ssml })
     const base64 = uint8ToBase64(result.audio)
     return jsonResponse(
-      { ok: true, ssml, base64, mime: 'audio/mpeg', word: parsed.word },
+      {
+        ok: true,
+        ssml,
+        base64,
+        mime: 'audio/mpeg',
+        word: parsed.word,
+        ...debug,
+      },
       200,
       headers,
     )
@@ -447,7 +461,7 @@ export async function handler(
     const message = err instanceof Error ? err.message : String(err)
     console.error('[api/blend-tweak] render-failed', { message })
     return jsonResponse(
-      { error: 'render-failed', detail: message },
+      { error: 'render-failed', detail: message, ...debug },
       502,
       headers,
     )
