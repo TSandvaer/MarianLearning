@@ -140,24 +140,42 @@ describe('buildBlendInnerTextWithOnset — structure mirrors production', () => 
 })
 
 describe('buildBlendInnerTextWithOnset — IPA onset mode', () => {
-  it('emits a <phoneme alphabet="ipa"> onset wrapper INSIDE the prosody wrap; preserves the IPA length mark', () => {
+  it('at default 0/0 prosody emits a BARE <phoneme alphabet="ipa"> onset (production-identical — no prosody wrap; avoids the Azure-400 nesting bug); preserves the IPA length mark', () => {
     const inner = buildBlendInnerTextWithOnset('fan', ['f', 'a', 'n'], {
       onsetMode: 'ipa',
       onsetText: 'fː', // held fricative — the length-mark lever
       graphemeFallback: 'f',
       ratePct: 0,
-      pitchPct: -5,
+      pitchPct: 0,
       breakMs: 250,
     })
-    // Onset slot: prosody-wrapped IPA phoneme, glyph fallback `f`, then break.
+    // Onset slot: BARE IPA phoneme (no <prosody> wrap at 0/0), glyph fallback
+    // `f`, then break. This is the production blend pattern exactly.
     expect(inner).toContain(
-      '<prosody rate="+0%" pitch="-5%"><phoneme alphabet="ipa" ph="fː">f</phoneme></prosody><break time="250ms"/>',
+      '<phoneme alphabet="ipa" ph="fː">f</phoneme><break time="250ms"/>',
     )
+    // No prosody wrap around the onset phoneme at 0/0.
+    const onsetSlot = inner.slice(0, inner.indexOf('<break'))
+    expect(onsetSlot).not.toContain('<prosody')
     // The IPA length mark survives intact in the ph attribute (the whole point).
     expect(inner).toContain('ph="fː"')
     // The medial/coda stay production-identical (unaffected by onset mode).
     expect(inner).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
     expect(inner).toContain('<break time="450ms"/>fan')
+  })
+
+  it('wraps the IPA onset phoneme in <prosody> ONLY when rate or pitch is non-zero (sponsor dialled a nudge)', () => {
+    const nudged = buildBlendInnerTextWithOnset('web', ['w', 'e', 'b'], {
+      onsetMode: 'ipa',
+      onsetText: 'w',
+      graphemeFallback: 'w',
+      ratePct: 0,
+      pitchPct: -15, // sponsor pitch nudge → prosody wrap returns
+      breakMs: 250,
+    })
+    expect(nudged).toContain(
+      '<prosody rate="+0%" pitch="-15%"><phoneme alphabet="ipa" ph="w">w</phoneme></prosody>',
+    )
   })
 
   it('preserves a range of IPA unicode codepoints in the ph value (dʒ, ʊw, sː)', () => {
@@ -176,7 +194,7 @@ describe('buildBlendInnerTextWithOnset — IPA onset mode', () => {
       onsetText: 'ʊw',
       graphemeFallback: 'w',
       ratePct: 0,
-      pitchPct: -15,
+      pitchPct: 0,
       breakMs: 250,
     })
     expect(web).toContain('<phoneme alphabet="ipa" ph="ʊw">w</phoneme>')
