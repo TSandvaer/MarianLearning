@@ -156,9 +156,8 @@ export interface BlendOnsetParams {
  * ONSET slot parameterized.
  *
  *   onset (text mode): <prosody rate pitch>{onsetText}</prosody><break breakMs/>
- *   onset (ipa mode, 0/0): <phoneme alphabet="ipa"
- *                        ph="{onsetText}">{graphemeFallback}</phoneme><break breakMs/>
- *   onset (ipa mode, nudged): <prosody rate pitch><phoneme …/></prosody><break/>
+ *   onset (ipa mode):  <prosody rate pitch><phoneme alphabet="ipa"
+ *                        ph="{onsetText}">{graphemeFallback}</phoneme></prosody><break breakMs/>
  *   medial: <production grapheme render><break 250ms/>      (vowel)
  *   coda:   <production grapheme render><break 250ms/>      (final consonant)
  *   word:   <break 450ms/>{word}
@@ -185,36 +184,22 @@ export function buildBlendInnerTextWithOnset(
   const pitch = `${onset.pitchPct >= 0 ? '+' : ''}${onset.pitchPct}%`
   const onsetInner =
     onset.onsetMode === 'ipa'
-      ? // IPA mode: emit the production-pattern <phoneme>. `ph` preserves IPA
-        // unicode; only XML metacharacters are escaped (the whole point — `fː`
-        // survives, `"`/`<`/`>` are neutralised). The visible glyph is the
-        // onset grapheme letter (escaped).
+      ? // IPA mode: wrap the production-pattern <phoneme> INSIDE the onset
+        // prosody (verified to render on real Azure en-GB-Olivia, 2026-06-16:
+        // `<prosody…><phoneme ph="fː">f</phoneme></prosody>` → 200 + audio).
+        // `ph` preserves IPA unicode; only XML metacharacters are escaped (the
+        // whole point — `fː`/`sː` survive, `"`/`<`/`>` are neutralised). The
+        // visible glyph is the onset grapheme letter (escaped).
         `<phoneme alphabet="ipa" ph="${escapeSsml(onset.onsetText)}">` +
         `${escapeSsml(onset.graphemeFallback)}` +
         `</phoneme>`
       : // Text mode (default): the onset orthography voiced literally.
         escapeSsml(onset.onsetText)
-  // Azure neural TTS returns HTTP 400 for `<phoneme>` nested inside a
-  // `<prosody rate/pitch>` wrap (empirically: preview `tts http error (400)`
-  // on `<prosody…><phoneme ph="fː">f</phoneme></prosody>`, 2026-06-16). The
-  // production blend render (`renderBlendInnerText`) never wraps its phonemes
-  // in a per-grapheme prosody for this reason. So in IPA mode we emit the BARE
-  // <phoneme> (production-identical, renders cleanly) UNLESS the sponsor has
-  // dialled a non-zero rate/pitch — only then do we add the prosody wrap and
-  // accept the documented Azure-400 risk. The default fː/sː candidates run at
-  // 0/0, so they take the bare path and render. Text mode is unaffected: a
-  // bare-text onset inside <prosody> is always valid.
-  const onsetHasProsody =
-    onset.onsetMode !== 'ipa' || onset.ratePct !== 0 || onset.pitchPct !== 0
-  if (onsetHasProsody) {
-    parts.push(
-      `<prosody rate="${escapeSsml(rate)}" pitch="${escapeSsml(pitch)}">` +
-        `${onsetInner}` +
-        `</prosody>`,
-    )
-  } else {
-    parts.push(onsetInner)
-  }
+  parts.push(
+    `<prosody rate="${escapeSsml(rate)}" pitch="${escapeSsml(pitch)}">` +
+      `${onsetInner}` +
+      `</prosody>`,
+  )
   parts.push(`<break time="${onset.breakMs}ms"/>`)
 
   // ── MEDIAL + CODA (production-identical) ──
