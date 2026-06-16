@@ -133,6 +133,11 @@ export default defineConfig({
           'voice-qa.html',
           'voice-audition.html',
           'letter-sounds-test.html',
+          // blend-tweak.html is a standalone DEBUG onset-tuning surface
+          // (ticket 86ca8t...; live /api/blend-tweak handle). Same stale-SW
+          // bootstrapping trap as the other QA pages — exclude from precache
+          // so it's always network-served and can't serve its own stale copy.
+          'blend-tweak.html',
         ],
       },
       devOptions: {
