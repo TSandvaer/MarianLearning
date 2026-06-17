@@ -8,10 +8,11 @@
  * settled the per-CLASS isolated-phoneme renders on his ear; pass-5 bakes the
  * full fidelity into canon. The production `renderBlendInnerText` (api/_tts.ts)
  * full-fidelity path: STOP consonants (b/c/k/d/g/p/t) → clipped `<stop>ə` IPA
- * release; /f/, /s/ FRICATIVES → length-marked rate-slowed NESTED-PROSODY onset
- * (`fːə`/`sːə`) + 150ms settle break; /h/ → `hə` fric-rel; /v/, /dʒ/(j), /w/
- * voiced onsets → WHOLE-WORD floor; continuants + vowels stay bare; break-AFTER
- * each phoneme; no whole-line `<prosody rate>` wrap.
+ * release; /f/, /s/, /v/, /w/ HELD onsets → length-marked rate-slowed
+ * NESTED-PROSODY onset (`fːə`/`sːə`/`vːə`/`wːə`) + 150ms settle break (/v/+/w/
+ * recovered from FLOOR in pass-7, Thomas 2026-06-17); /h/ → `hə` fric-rel;
+ * /dʒ/(j) affricate → WHOLE-WORD floor; continuants + vowels stay bare;
+ * break-AFTER each phoneme; no whole-line `<prosody rate>` wrap.
  *
  * RUNTIME-SAFE vs FULL-FIDELITY (pass-5). The fricative nested-prosody onset is
  * REJECTED (HTTP 400) by the production RUNTIME Azure resource but ACCEPTED by
