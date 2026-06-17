@@ -1143,6 +1143,78 @@ const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
   't',
 ])
 
+// ── pass-5 full-fidelity fricative + floor treatment ────────────────────────
+//
+// Pass-4 ear-test (Thomas, 2026-06-15) settled the per-CLASS isolated-phoneme
+// renders. The candidate-f baseline above (stop `<stop>ə` release, everything
+// else BARE) cleared the stop scratch but two fricative classes still needed
+// bespoke shaping, and three voiced onsets scratched in isolation no matter the
+// treatment and had to fall back to whole-word. Pass-5 bakes the full per-class
+// fidelity into canon:
+//
+//   • /h/  → `hə` (fric-rel)  — the pass-2 form Thomas accepted for hat/hen.
+//   • /f/  → a length-marked, rate-slowed onset: a one-level
+//            `<prosody rate="-25%"><phoneme ph="fːə">f</phoneme></prosody>`
+//            followed by a 150ms settle break, THEN the candidate-f beat.
+//   • /s/  → the same nested-prosody onset shape with `ph="sːə"`.
+//   • /v/, /dʒ/(j), /w/ → FLOOR: these voiced onsets scratch in isolation on
+//            EVERY treatment, so any word whose graphemes include one renders as
+//            the whole-word floor shape (no segmentation at all).
+//
+// RUNTIME-REACHABILITY (the reason this is opt-in). The graduation cvc-words
+// path renders blend lines LIVE at runtime (cache-miss, no canon) — see
+// audio-system.md `wordSongPathA` graduation branch + planner-and-canon.md
+// graduation bypass. The production Vercel runtime Azure resource REJECTS the
+// nested-prosody-around-a-phoneme onset shape `/f/`,`/s/` use with HTTP 400
+// (bare phonemes 200; the `<prosody><phoneme></prosody>` onset 400s). The BAKE
+// resource (local westeurope creds, pass-4: 0 rejections) ACCEPTS it. So the
+// full-fidelity render is OPT-IN, taken ONLY by the canon bake; the runtime
+// default is the plain whole-word floor, which carries no nested prosody and no
+// `<phoneme>` and therefore always renders on the rejecting resource.
+
+/** Fricative graphemes that get the length-marked, rate-slowed nested-prosody
+ *  onset in FULL-FIDELITY mode. `/h/` is handled separately (`hə` fric-rel, no
+ *  nested prosody). Each maps to the length-marked IPA used in the onset wrap. */
+const BLEND_FRICATIVE_ONSET_IPA: Record<string, string> = {
+  f: 'fːə',
+  s: 'sːə',
+}
+/** Rate slow applied to the fricative onset's nested `<prosody>` (FULL-FIDELITY
+ *  only). NOTE: this is the nested shape the production runtime resource 400s. */
+const BLEND_FRICATIVE_ONSET_RATE = '-25%'
+/** Settle break (ms) after a fricative onset, before the candidate-f beat. */
+const BLEND_FRICATIVE_SETTLE_BREAK_MS = 150
+/** `/h/` fric-rel release (pass-2 form Thomas accepted for hat/hen). */
+const BLEND_H_FRIC_REL_IPA = 'hə'
+
+/** Voiced onsets that scratch in isolation on every treatment. In FULL-FIDELITY
+ *  mode a word containing ANY of these renders as the whole-word FLOOR shape
+ *  (no per-grapheme segmentation). `j` is the grapheme for /dʒ/. */
+const BLEND_FLOOR_GRAPHEMES: ReadonlySet<string> = new Set(['v', 'j', 'w'])
+
+/** Whole-word floor rate-slow — the runtime-safe shape's leading `<prosody>`
+ *  (PLAIN text inside, no `<phoneme>`, no nesting). */
+const BLEND_FLOOR_RATE = '-15%'
+
+/** True if a parsed blend word must take the whole-word FLOOR render in
+ *  full-fidelity mode (its graphemes include a scratchy voiced onset). */
+function wordIsFloored(graphemes: readonly string[]): boolean {
+  return graphemes.some((g) => BLEND_FLOOR_GRAPHEMES.has(g.toLowerCase()))
+}
+
+/** The whole-word floor inner-text: `<prosody rate>word</prosody>` + break +
+ *  bare word. PLAIN text only — no `<phoneme>`, no nested prosody — so it
+ *  renders on the production runtime Azure resource that 400s the fricative
+ *  onset. This is BOTH the runtime-safe default render AND the per-word fallback
+ *  for floored voiced onsets in full-fidelity mode. */
+function renderBlendFloorInnerText(word: string): string {
+  const w = escapeSsml(word)
+  return (
+    `<prosody rate="${BLEND_FLOOR_RATE}">${w}</prosody>` +
+    `<break time="${BLEND_WHOLE_WORD_BREAK_MS}ms"/>${w}`
+  )
+}
+
 /**
  * Parse a stored blend canon text into `{ graphemes, word }`, or `null` if
  * the text isn't blend-shaped. Accepts BOTH the lint-clean ASCII form
@@ -1188,20 +1260,33 @@ const BLEND_CVC_TIERS: ReadonlySet<string> = new Set([
  * Render a CVC phoneme-blend prompt to SSML inner-text, or `null` if the
  * text isn't a blend line (so the caller falls through to the normal path).
  *
- * Treatment = candidate f, "lightly-released stops" (Thomas-approved across
- * ALL words, 2026-06-15; voice-QA #463 fixed the ~37/40 bare-unreleased-stop
- * scratch). For each grapheme:
- *   • STOP consonants (b/c/k/d/g/p/t) get a clipped `<stop>ə` IPA release —
- *     INAUDIBLE as a syllable, NOT "kuh"; it gives Azure neural the
- *     coarticulation it needs to voice an isolated stop without scratching.
- *   • CONTINUANTS (f/v/s/m/n/l/r/w/y/z/h/j) and VOWELS stay BARE IPA — they
- *     sustain in isolation and need no release.
- *   • `x` = /ks/ cluster stays BARE (its /s/ tail self-releases).
- * The `<break>` is placed AFTER each phoneme so the stop releases into the
- * silence (candidate f), and there is NO whole-line `<prosody rate>` wrap —
- * the round-5 audition found the rate-slow OVER-articulates the onset; the
- * house rate (-10%) on the speak-root prosody is correct. The whole word is
- * voiced naturally after a longer break so Marian hears the blended target.
+ * TWO RENDER MODES (pass-5, ticket 86ca…blend-pass5; Thomas-decided 2026-06-16):
+ *
+ * 1. RUNTIME-SAFE (DEFAULT, `blendFullFidelity` falsy) — render the ENTIRE word
+ *    as the whole-word FLOOR shape: `<prosody rate="-15%">word</prosody>` +
+ *    break + bare word. NO segmentation, NO nested prosody, NO `<phoneme>`.
+ *    Plain text only, so it always renders on the production runtime Azure
+ *    resource that REJECTS (HTTP 400) the full-fidelity fricative onset. The
+ *    graduation cvc-words path renders blend lines LIVE at runtime (cache-miss),
+ *    so the default MUST be the resource-safe shape. Fail-safe by construction.
+ *
+ * 2. FULL-FIDELITY (OPT-IN, `blendFullFidelity === true`) — the per-class
+ *    segmented render the canon BAKE takes (the bake resource accepts the nested
+ *    onset; pass-4 proved 0 rejections). Per grapheme:
+ *      • STOP consonants (b/c/k/d/g/p/t) → clipped `<stop>ə` IPA release
+ *        (candidate-f, voice-QA #463). INAUDIBLE coarticulation, NOT "kuh".
+ *      • /f/, /s/ FRICATIVES → a length-marked, rate-slowed nested onset
+ *        `<prosody rate="-25%"><phoneme ph="fːə"/sːə">…</phoneme></prosody>`
+ *        + a 150ms settle break (the nested shape the runtime resource 400s —
+ *        which is exactly why mode 1 exists).
+ *      • /h/ → `hə` fric-rel (pass-2 form Thomas accepted for hat/hen).
+ *      • CONTINUANTS (m/n/l/r/y/z) + VOWELS → BARE IPA (sustain in isolation).
+ *      • `x` = /ks/ cluster → BARE (its /s/ tail self-releases).
+ *      • /v/, /dʒ/(j), /w/ FLOOR-graphemes → the WHOLE word falls back to the
+ *        whole-word floor render (these voiced onsets scratch in isolation on
+ *        every treatment), via `wordIsFloored`.
+ *    Break placed AFTER each phoneme so the stop releases into the silence; no
+ *    whole-LINE `<prosody rate>` wrap (the house rate -10% governs).
  *
  * Gated by tier (the CVC tiers) so a CVC `read`/`correct`/`hint` line that
  * happens to contain a hyphen or ellipsis never accidentally renders as a
@@ -1212,19 +1297,54 @@ const BLEND_CVC_TIERS: ReadonlySet<string> = new Set([
 export function renderBlendInnerText(
   text: string,
   tierFilter?: string,
+  blendFullFidelity = false,
 ): string | null {
   if (tierFilter === undefined || !BLEND_CVC_TIERS.has(tierFilter)) return null
   const parsed = parseBlendText(text)
   if (parsed === null) return null
 
+  // RUNTIME-SAFE default: whole-word floor render. No segmentation, no nested
+  // prosody, no <phoneme> — survives the production runtime resource that 400s
+  // the full-fidelity fricative onset. The graduation live-render path lands
+  // here (it never sets blendFullFidelity).
+  if (!blendFullFidelity) {
+    return renderBlendFloorInnerText(parsed.word)
+  }
+
+  // FULL-FIDELITY (bake-only). A word containing a scratchy voiced onset
+  // (v/dʒ/w) floors WHOLE — the segmented render is skipped entirely.
+  if (wordIsFloored(parsed.graphemes)) {
+    return renderBlendFloorInnerText(parsed.word)
+  }
+
   const parts: string[] = []
   for (const grapheme of parsed.graphemes) {
     const g = grapheme.toLowerCase()
+    const fricativeOnset = BLEND_FRICATIVE_ONSET_IPA[g]
+    if (fricativeOnset !== undefined) {
+      // /f/, /s/ → length-marked, rate-slowed NESTED-PROSODY onset, then a
+      // short settle break. This is the shape the runtime resource rejects;
+      // only the bake (full-fidelity) ever emits it.
+      parts.push(
+        `<prosody rate="${BLEND_FRICATIVE_ONSET_RATE}">` +
+          `<phoneme alphabet="ipa" ph="${escapeSsml(fricativeOnset)}">${escapeSsml(grapheme)}</phoneme>` +
+          `</prosody>` +
+          `<break time="${BLEND_FRICATIVE_SETTLE_BREAK_MS}ms"/>`,
+      )
+      // Then the candidate-f beat (break AFTER) like every other grapheme.
+      parts.push(`<break time="${BLEND_GRAPHEME_BREAK_MS}ms"/>`)
+      continue
+    }
     const ipa = BLEND_GRAPHEME_IPA[g]
     if (ipa !== undefined) {
-      // STOP graphemes get the clipped `<stop>ə` release; continuants + vowels
+      // /h/ → `hə` fric-rel; STOPs → clipped `<stop>ə`; continuants + vowels
       // stay bare. The grapheme glyph is visible inside the tag; Azure uses `ph=`.
-      const released = BLEND_STOP_GRAPHEMES.has(g) ? `${ipa}ə` : ipa
+      let released = ipa
+      if (g === 'h') {
+        released = BLEND_H_FRIC_REL_IPA
+      } else if (BLEND_STOP_GRAPHEMES.has(g)) {
+        released = `${ipa}ə`
+      }
       parts.push(
         `<phoneme alphabet="ipa" ph="${escapeSsml(released)}">${escapeSsml(grapheme)}</phoneme>`,
       )
@@ -1245,7 +1365,11 @@ export function renderBlendInnerText(
   return parts.join('')
 }
 
-export function renderSsmlInnerText(text: string, tierFilter?: string): string {
+export function renderSsmlInnerText(
+  text: string,
+  tierFilter?: string,
+  blendFullFidelity = false,
+): string {
   // Session-end recap-4 / streak-4 lines (GitHub issue #446). These two
   // utterances are byte-SHARED across all 24 tier files
   // (every track ends with the same SessionEnd sequence), so the failing
@@ -1285,7 +1409,7 @@ export function renderSsmlInnerText(text: string, tierFilter?: string): string {
   // reprompt/hint/giveAnswer never match `parseBlendText`'s segmented shape),
   // so the normal CVC path is unaffected. Checked here (after simple-sentences,
   // before letter-sounds) so the blend render owns the line whole.
-  const blend = renderBlendInnerText(text, tierFilter)
+  const blend = renderBlendInnerText(text, tierFilter, blendFullFidelity)
   if (blend !== null) return blend
   // Letter-sounds tier (British-voice rollout): the question-prosody
   // wrapper (`<break/><prosody pitch="+8%" rate="-5%">`) is DELIBERATELY
@@ -1391,13 +1515,28 @@ export function renderSsmlInnerText(text: string, tierFilter?: string): string {
  *  Inner-text rendering goes through `renderSsmlInnerText` so that
  *  trailing-interrogative utterances pick up an `<emphasis>` prosody
  *  hint (see that function's doc for the full rationale, ticket
- *  86c9gxup4). */
-export function buildSsmlBody(req: TtsRequest): string {
+ *  86c9gxup4).
+ *
+ *  `opts.blendFullFidelity` (pass-5) opts the CVC `blend` slot into the
+ *  full per-class segmented render (fricative nested-prosody onset + stop
+ *  release). It is set ONLY by the canon BAKE path; the runtime handler
+ *  leaves it falsy so the blend renders as the resource-safe whole-word
+ *  floor (the production runtime Azure resource 400s the nested onset). */
+export interface BuildSsmlOptions {
+  /** Opt the CVC `blend` slot into the full-fidelity per-class render.
+   *  Bake-only — default false renders the runtime-safe whole-word floor. */
+  blendFullFidelity?: boolean
+}
+
+export function buildSsmlBody(
+  req: TtsRequest,
+  opts: BuildSsmlOptions = {},
+): string {
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">` +
     `<voice name="${escapeSsml(req.voice)}">` +
     `<prosody pitch="${escapeSsml(req.pitch)}" rate="${escapeSsml(req.rate)}" volume="${escapeSsml(req.volume)}">` +
-    `${renderSsmlInnerText(req.text, req.tier)}` +
+    `${renderSsmlInnerText(req.text, req.tier, opts.blendFullFidelity ?? false)}` +
     `</prosody></voice></speak>`
   )
 }
@@ -1660,6 +1799,19 @@ export interface SynthesizeOptions {
    *  `{ maxAttempts: 0 }` to disable retries entirely (some test paths
    *  want the legacy single-shot behavior). */
   backoff?: BackoffPolicy
+  /**
+   * Pass-5 blend-fidelity flag (ticket 86ca…blend-pass5). When `true`, a CVC
+   * `blend` utterance renders through the FULL per-class segmented path
+   * (fricative nested-prosody onset, stop `<stop>ə` release, /h/ fric-rel,
+   * voiced-onset whole-word floor). Set ONLY by the canon BAKE path —
+   * `scripts/generateSessionCanon.ts` threads `renderOptions.synthOptions =
+   * { blendFullFidelity: true }`. The runtime handler (`api/_session.ts` via
+   * the cache-miss / graduation live-render) leaves it UNSET so the blend
+   * renders as the resource-safe whole-word floor: the production runtime
+   * Azure resource REJECTS (HTTP 400) the full-fidelity fricative onset, but
+   * accepts plain whole-word text. Default = false (fail-safe).
+   */
+  blendFullFidelity?: boolean
 }
 
 /**
@@ -1691,7 +1843,9 @@ export async function synthesizeUtterance(
 
   const { key, region } = readAzureCredentials(opts.env)
   const endpoint = buildAzureEndpoint(region)
-  const body = buildSsmlBody(req)
+  const body = buildSsmlBody(req, {
+    blendFullFidelity: opts.blendFullFidelity ?? false,
+  })
 
   // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up). Logs the
   // SSML body fingerprint to Vercel function logs so we can correlate

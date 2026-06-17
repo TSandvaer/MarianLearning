@@ -1,18 +1,28 @@
 /**
- * BLEND-SLOT canon re-bake — candidate f, "lightly-released stops".
+ * BLEND-SLOT canon re-bake — pass-5 FULL-FIDELITY (per-class isolated phonemes).
  *
  * Why this exists (vs. revoiceCanonTargeted.ts / canon:regen --force)
  * ------------------------------------------------------------------
  * Thomas ear-tested ~37/40 baked `word.p<N>.blend` clips as FAIL (scratchy,
- * unreleased stops — "scratch no C, then AT then CAT", voice-QA #463). After
- * auditioning 7 candidate SSML treatments (PR #465), he picked candidate f —
- * lightly-released stops — for ALL words. That treatment is now ported into the
- * production `renderBlendInnerText` (api/_tts.ts): STOP consonants (b/c/k/d/g/
- * p/t) get a clipped `<stop>ə` IPA release; continuants + vowels stay bare;
- * break-AFTER each phoneme; no whole-line `<prosody rate>` wrap.
+ * unreleased stops — "scratch no C, then AT then CAT", voice-QA #463). Pass-4
+ * settled the per-CLASS isolated-phoneme renders on his ear; pass-5 bakes the
+ * full fidelity into canon. The production `renderBlendInnerText` (api/_tts.ts)
+ * full-fidelity path: STOP consonants (b/c/k/d/g/p/t) → clipped `<stop>ə` IPA
+ * release; /f/, /s/ FRICATIVES → length-marked rate-slowed NESTED-PROSODY onset
+ * (`fːə`/`sːə`) + 150ms settle break; /h/ → `hə` fric-rel; /v/, /dʒ/(j), /w/
+ * voiced onsets → WHOLE-WORD floor; continuants + vowels stay bare; break-AFTER
+ * each phoneme; no whole-line `<prosody rate>` wrap.
+ *
+ * RUNTIME-SAFE vs FULL-FIDELITY (pass-5). The fricative nested-prosody onset is
+ * REJECTED (HTTP 400) by the production RUNTIME Azure resource but ACCEPTED by
+ * the BAKE resource. So `renderBlendInnerText`'s default is the resource-safe
+ * whole-word floor and full-fidelity is OPT-IN (`blendFullFidelity`). This
+ * script passes `synthOptions: { blendFullFidelity: true }` so the splice
+ * re-bake takes the full-fidelity render — bake on local westeurope creds (the
+ * resource that ACCEPTS the nested onset).
  *
  * This script re-renders ONLY the `word.p<N>.blend` audio of the 5 CVC tiers in
- * place (same id, same text, new candidate-f bytes) and leaves every other
+ * place (same id, same text, new full-fidelity bytes) and leaves every other
  * utterance byte-for-byte untouched. Same shape as `revoiceCanonTargeted.ts`
  * (re-render existing ids in place) — NOT additive like `bakeRecapFocus.ts` /
  * `rebakeThreeHint.ts`.
@@ -146,7 +156,11 @@ async function main(): Promise<void> {
     }
 
     // Re-render the blend clips through the SAME pipeline the handler uses,
-    // with this tier's tierFilter so renderBlendInnerText fires candidate f.
+    // with this tier's tierFilter so renderBlendInnerText fires, and with
+    // blendFullFidelity so it takes the FULL per-class render (pass-5) — the
+    // bake resource accepts the fricative nested-prosody onset the production
+    // runtime resource 400s. Without this flag the splice would re-bake the
+    // runtime-safe whole-word floor instead of the full-fidelity render.
     process.stdout.write(`  rendering ${blends.length} blend clips ... `)
     const response = await renderSessionAudio(
       {
@@ -154,7 +168,7 @@ async function main(): Promise<void> {
         label: canon.plan.label,
         utterances: blends.map((b) => ({ id: b.id, text: b.text })),
       },
-      { tierFilter: tier },
+      { tierFilter: tier, synthOptions: { blendFullFidelity: true } },
     )
     if (response.utterances.length !== blends.length) {
       throw new Error(

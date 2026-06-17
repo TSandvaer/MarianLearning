@@ -377,6 +377,14 @@ async function bakeOne(
       // module-singleton retry/backoff logic inside synthesizeUtterance
       // handles transient 429s.
       synth: synthesizeUtterance,
+      // Pass-5: the canon BAKE opts the CVC `blend` slot into the full
+      // per-class fidelity render (fricative nested-prosody onset, stop
+      // release, /h/ fric-rel, voiced-onset whole-word floor). The bake
+      // resource (local westeurope creds) ACCEPTS the nested onset; the
+      // production RUNTIME resource 400s it, which is why the runtime path
+      // (api/_session.ts cache-miss / graduation live-render) does NOT set
+      // this flag and falls back to the resource-safe whole-word floor.
+      synthOptions: { blendFullFidelity: true },
     },
   })
 
