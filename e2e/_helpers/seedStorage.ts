@@ -108,6 +108,31 @@ export interface SeedProgressOptions {
    * defaulter fills the rest.
    */
   letterSoundsVowelStates?: Record<string, string>
+  /**
+   * Override the CVC-graduation latch `Progress.cvcGraduationSessionFired`
+   * (ticket 86caa6k18 — the 3rd raw-spread adopter per
+   * `.claude/docs/testing-and-ci.md` §4.1.1c).
+   *
+   * The latch gates the CVC-review graduation branch in
+   * `pickCvcReviewNode` / `pickFocusNode` (see `progress-and-persistence.md`
+   * "firing-order invariant"). It is an additive boolean — the storage
+   * read-path normalises a missing field to `false` at load time.
+   *
+   * **When omitted, the field is left ABSENT on the seeded blob** — which
+   * is the fresh-production value (the latch is not set until the learner
+   * actually reaches her one-shot graduation review). A spec that doesn't
+   * set it therefore exercises the REAL forward-learner path, where the
+   * latch reads falsy. This is deliberate per §4.1.8: a convenient
+   * default of `true` here would silently exercise the wrong branch and
+   * mask the exact regression class PR #471 hit (a buggy picker passed
+   * vitest because the helper default skipped the graduation branch, then
+   * failed ~30 e2e specs that carry the falsy production latch).
+   *
+   * Pass `cvcGraduationSessionFired: true` ONLY to simulate a
+   * post-graduation Marian whose one-shot review has already fired (e.g.
+   * the periodic round-robin path).
+   */
+  cvcGraduationSessionFired?: boolean
 }
 
 /** Diagnostic defaults from `src/lib/progress/defaults.ts`. Mirrored here
@@ -247,6 +272,16 @@ export function buildSeedProgress(opts: SeedProgressOptions = {}): unknown {
             letterSoundsVowelStates: { ...opts.letterSoundsVowelStates },
           },
         }
+      : {}),
+    // Seed `cvcGraduationSessionFired` ONLY when the caller asks
+    // explicitly (ticket 86caa6k18). Otherwise leave the field ABSENT —
+    // the fresh-production value. The storage read-path normalises a
+    // missing latch to `false` at load time, so a seeded blob with no
+    // override exercises the real pre-graduation forward-learner path
+    // (latch falsy). A convenience default of `true` would mask the
+    // §4.1.8 regression class — DO NOT add one.
+    ...(opts.cvcGraduationSessionFired !== undefined
+      ? { cvcGraduationSessionFired: opts.cvcGraduationSessionFired }
       : {}),
   }
 }

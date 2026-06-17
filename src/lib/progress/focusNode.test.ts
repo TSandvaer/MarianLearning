@@ -20,11 +20,20 @@ import type { Progress, SkillLevels } from './types'
  * Build a Progress with all skills set to `mastered`, then layer overrides
  * on top. Tests that need a specific shape spell out only the deltas.
  *
- * `cvcGraduationSessionFired` defaults to `true` so forward-progression
- * tests (which seed all CVC tiers mastered to exercise the walk PAST them)
- * are not hijacked by the CVC graduation review (ticket 86c9qa6n3). The
- * CVC-review-specific tests pass `{ cvcGraduationSessionFired: false }` (or
- * other top-level fields) via the second argument to opt INTO review mode.
+ * `cvcGraduationSessionFired` is left UNSET (absent → reads falsy) — the
+ * fresh-production value for a forward learner who has not yet reached her
+ * one-shot graduation review (ticket 86caa6k18). This deliberately matches
+ * the real e2e/production seed shape: a convenience default of `true` here
+ * MASKED the PR #471 regression (testing-and-ci.md §4.1.8) because it
+ * silently skipped the graduation branch every existing picker test should
+ * have exercised. With the corrected `pickFocusNode` (review consulted only
+ * when the forward walk finds NO non-mastered node), the falsy default is
+ * safe for forward-progression tests — review never fires while any tier is
+ * still progressing. Tests that need the post-graduation periodic-review
+ * path (or the all-mastered defensive fallback, which must NOT trip the
+ * one-shot graduation branch) pass `{ cvcGraduationSessionFired: true }`
+ * via the second argument; CVC-graduation tests pass `false` explicitly to
+ * opt INTO the one-shot review.
  */
 function buildProgress(
   overrides: Partial<SkillLevels> = {},
@@ -37,7 +46,6 @@ function buildProgress(
   return {
     ...base,
     skillLevels: { ...allMastered, ...overrides },
-    cvcGraduationSessionFired: true,
     ...progressOverrides,
   }
 }
@@ -311,7 +319,12 @@ describe('pickFocusNode — word-song (un-clamped, planner-parser contract step 
 
   it('falls back to the last word-song node when every node is mastered (defensive)', () => {
     // Mirrors the math fallback at the end of MATH_NODES_IN_ORDER.
-    const progress = buildProgress() // every level → mastered via helper
+    // Latch `true` (post-graduation) so the defensive forward fallback is
+    // the path under test — with the latch falsy + every CVC tier mastered
+    // + sessionCount 0, `pickCvcReviewNode` would fire the one-shot
+    // graduation review (cvc-words-short-u) instead, which is a different
+    // scenario covered by the CVC-review describe block below.
+    const progress = buildProgress({}, { cvcGraduationSessionFired: true })
     expect(pickFocusNode(progress, 'word-song').node).toBe('simple-sentences')
   })
 
@@ -481,9 +494,10 @@ describe('pickRecentSuccessRate', () => {
 // a mastered CVC tier on a graduation-once-then-round-robin cadence.
 //
 // All three CVC tiers (`cvc-words`, `cvc-words-short-o`,
-// `cvc-words-short-u`) are mastered by the `buildProgress()` default; the
-// helper's default `cvcGraduationSessionFired: true` is OVERRIDDEN to
-// `false` here to test the graduation path, and back to `true` to test the
+// `cvc-words-short-u`) are mastered by the `buildProgress()` default. The
+// latch is UNSET by default (the fresh-production forward-learner shape —
+// ticket 86caa6k18); these tests set `cvcGraduationSessionFired: false`
+// explicitly to exercise the graduation path and `true` to exercise the
 // periodic path. The intermediate vowel tiers (`-short-i`, `-short-e`) are
 // NOT part of the cross-vowel set — only the original three.
 
