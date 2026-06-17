@@ -2182,12 +2182,30 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
       expect(ssml).not.toContain('<phoneme')
     })
 
-    it('is plain whole-word for a floored voiced onset (van) — no phoneme', () => {
+    it('is plain whole-word for a /v/ onset (van) — runtime floors ALL words, even held-onset ones', () => {
+      // Post-pass-7 /v/ takes the held nested onset in FULL-FIDELITY, but the
+      // RUNTIME-SAFE default floors every word (no nested prosody reaches the
+      // rejecting runtime resource).
       const ssml = renderBlendInnerText('v - a - n ... van', 'cvc-words')!
       expect(ssml).toBe(
         '<prosody rate="-15%">van</prosody><break time="450ms"/>van',
       )
       expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('is plain whole-word for a /w/ onset (web) — runtime floors the held glide too', () => {
+      // The runtime-safety invariant for the pass-7 /w/ recovery: the held
+      // `wːə` nested onset must NEVER reach the runtime (it 400s the prod
+      // resource). The default render floors web whole, plain text.
+      const ssml = renderBlendInnerText(
+        'w - e - b ... web',
+        'cvc-words-short-e',
+      )!
+      expect(ssml).toBe(
+        '<prosody rate="-15%">web</prosody><break time="450ms"/>web',
+      )
+      expect(ssml).not.toContain('<phoneme')
+      expect(ssml).not.toContain('ph="wːə"')
     })
   })
 
@@ -2245,26 +2263,47 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
       expect(ssml).toContain('<phoneme alphabet="ipa" ph="tə">t</phoneme>')
     })
 
-    it('FLOORS a word with a /v/ onset (van) WHOLE — no segmentation', () => {
+    it('renders the /v/ onset (van) with the held nested-prosody shape (vːə) — pass-7 recovered from FLOOR', () => {
       const ssml = renderBlendInnerText('v - a - n ... van', 'cvc-words', true)!
-      // van contains /v/ (a floor grapheme) → whole-word floor, even in
-      // full-fidelity mode.
-      expect(ssml).toBe(
+      // van: v (/v/) → <prosody rate="-25%"><phoneme ph="vːə">v</phoneme>
+      // </prosody><break time="150ms"/> then the candidate-f beat. No longer
+      // floored — pass-7 ear-test (Thomas, 2026-06-17) recovered /v/.
+      expect(ssml).toContain(
+        '<prosody rate="-25%"><phoneme alphabet="ipa" ph="vːə">v</phoneme></prosody><break time="150ms"/>',
+      )
+      expect(ssml).toContain(
+        '<phoneme alphabet="ipa" ph="vːə">v</phoneme></prosody><break time="150ms"/><break time="250ms"/>',
+      )
+      // a (/æ/ vowel) bare; n (/n/ continuant) bare; whole word natural.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="n">n</phoneme>')
+      expect(ssml).toContain('<break time="450ms"/>van')
+      // It is NOT the whole-word floor anymore.
+      expect(ssml).not.toBe(
         '<prosody rate="-15%">van</prosody><break time="450ms"/>van',
       )
-      expect(ssml).not.toContain('<phoneme')
     })
 
-    it('FLOORS a word with a /w/ onset (web) WHOLE — no segmentation', () => {
+    it('renders the /w/ onset (web) with the held nested-prosody shape (wːə) — pass-7 recovered from FLOOR', () => {
       const ssml = renderBlendInnerText(
         'w - e - b ... web',
         'cvc-words-short-e',
         true,
       )!
-      expect(ssml).toBe(
+      // web: w (/w/) → the same held + schwa-tail onset shape with ph="wːə".
+      expect(ssml).toContain(
+        '<prosody rate="-25%"><phoneme alphabet="ipa" ph="wːə">w</phoneme></prosody><break time="150ms"/>',
+      )
+      expect(ssml).toContain(
+        '<phoneme alphabet="ipa" ph="wːə">w</phoneme></prosody><break time="150ms"/><break time="250ms"/>',
+      )
+      // e (/e/ vowel) bare; b (/b/ stop) clipped release; whole word natural.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="e">e</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="bə">b</phoneme>')
+      expect(ssml).toContain('<break time="450ms"/>web')
+      expect(ssml).not.toBe(
         '<prosody rate="-15%">web</prosody><break time="450ms"/>web',
       )
-      expect(ssml).not.toContain('<phoneme')
     })
 
     it('FLOORS a word with a /dʒ/ (j) onset (jam) WHOLE — no segmentation', () => {

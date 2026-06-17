@@ -1149,17 +1149,21 @@ const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
 // renders. The candidate-f baseline above (stop `<stop>ə` release, everything
 // else BARE) cleared the stop scratch but two fricative classes still needed
 // bespoke shaping, and three voiced onsets scratched in isolation no matter the
-// treatment and had to fall back to whole-word. Pass-5 bakes the full per-class
-// fidelity into canon:
+// treatment. Pass-5 baked /f/+/s/ held-fricatives and FLOORED /v/+/dʒ/+/w/.
+// Pass-7 (Thomas, 2026-06-17) RECOVERED /v/ and /w/ with the SAME held +
+// schwa-tail length-mark shape that won /f/+/s/ (`vːə`/`wːə` @ -25%); only
+// /dʒ/ (the affricate, which cannot be held) stays floored. Net per-class:
 //
 //   • /h/  → `hə` (fric-rel)  — the pass-2 form Thomas accepted for hat/hen.
 //   • /f/  → a length-marked, rate-slowed onset: a one-level
 //            `<prosody rate="-25%"><phoneme ph="fːə">f</phoneme></prosody>`
 //            followed by a 150ms settle break, THEN the candidate-f beat.
 //   • /s/  → the same nested-prosody onset shape with `ph="sːə"`.
-//   • /v/, /dʒ/(j), /w/ → FLOOR: these voiced onsets scratch in isolation on
-//            EVERY treatment, so any word whose graphemes include one renders as
-//            the whole-word floor shape (no segmentation at all).
+//   • /v/  → the same shape with `ph="vːə"` (pass-7; recovered from FLOOR).
+//   • /w/  → the same shape with `ph="wːə"` (pass-7; held glide + schwa tail).
+//   • /dʒ/(j) → FLOOR: the affricate cannot be held, scratches in isolation on
+//            every treatment, so any word whose graphemes include `j` renders
+//            as the whole-word floor shape (no segmentation at all).
 //
 // RUNTIME-REACHABILITY (the reason this is opt-in). The graduation cvc-words
 // path renders blend lines LIVE at runtime (cache-miss, no canon) — see
@@ -1172,12 +1176,19 @@ const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
 // default is the plain whole-word floor, which carries no nested prosody and no
 // `<phoneme>` and therefore always renders on the rejecting resource.
 
-/** Fricative graphemes that get the length-marked, rate-slowed nested-prosody
- *  onset in FULL-FIDELITY mode. `/h/` is handled separately (`hə` fric-rel, no
- *  nested prosody). Each maps to the length-marked IPA used in the onset wrap. */
+/** Held-onset graphemes that get the length-marked, rate-slowed nested-prosody
+ *  onset in FULL-FIDELITY mode. `/f/`+`/s/` are fricatives; `/v/`+`/w/` are a
+ *  voiced fricative + glide that the pass-7 ear-test recovered with the SAME
+ *  held + schwa-tail length-mark shape. `/h/` is handled separately (`hə`
+ *  fric-rel, no nested prosody). Each maps to the length-marked IPA used in the
+ *  onset wrap. NOTE: all of these use the nested `<prosody><phoneme></prosody>`
+ *  shape the production runtime resource 400s — so they are full-fidelity (bake)
+ *  ONLY; the runtime default is the plain whole-word floor for every word. */
 const BLEND_FRICATIVE_ONSET_IPA: Record<string, string> = {
   f: 'fːə',
   s: 'sːə',
+  v: 'vːə',
+  w: 'wːə',
 }
 /** Rate slow applied to the fricative onset's nested `<prosody>` (FULL-FIDELITY
  *  only). NOTE: this is the nested shape the production runtime resource 400s. */
@@ -1187,10 +1198,12 @@ const BLEND_FRICATIVE_SETTLE_BREAK_MS = 150
 /** `/h/` fric-rel release (pass-2 form Thomas accepted for hat/hen). */
 const BLEND_H_FRIC_REL_IPA = 'hə'
 
-/** Voiced onsets that scratch in isolation on every treatment. In FULL-FIDELITY
- *  mode a word containing ANY of these renders as the whole-word FLOOR shape
- *  (no per-grapheme segmentation). `j` is the grapheme for /dʒ/. */
-const BLEND_FLOOR_GRAPHEMES: ReadonlySet<string> = new Set(['v', 'j', 'w'])
+/** Onsets that scratch in isolation on every treatment. In FULL-FIDELITY mode a
+ *  word containing ANY of these renders as the whole-word FLOOR shape (no
+ *  per-grapheme segmentation). `j` is the grapheme for /dʒ/ — the affricate,
+ *  which cannot be held the way /v/+/w/ can, so it alone stays floored after
+ *  pass-7 recovered /v/+/w/ via the held + schwa-tail length-mark onset. */
+const BLEND_FLOOR_GRAPHEMES: ReadonlySet<string> = new Set(['j'])
 
 /** Whole-word floor rate-slow — the runtime-safe shape's leading `<prosody>`
  *  (PLAIN text inside, no `<phoneme>`, no nesting). */
@@ -1275,16 +1288,17 @@ const BLEND_CVC_TIERS: ReadonlySet<string> = new Set([
  *    onset; pass-4 proved 0 rejections). Per grapheme:
  *      • STOP consonants (b/c/k/d/g/p/t) → clipped `<stop>ə` IPA release
  *        (candidate-f, voice-QA #463). INAUDIBLE coarticulation, NOT "kuh".
- *      • /f/, /s/ FRICATIVES → a length-marked, rate-slowed nested onset
- *        `<prosody rate="-25%"><phoneme ph="fːə"/sːə">…</phoneme></prosody>`
- *        + a 150ms settle break (the nested shape the runtime resource 400s —
- *        which is exactly why mode 1 exists).
+ *      • /f/, /s/, /v/, /w/ HELD onsets → a length-marked, rate-slowed nested
+ *        onset `<prosody rate="-25%"><phoneme ph="fːə"/sːə"/vːə"/wːə">…</phoneme>
+ *        </prosody>` + a 150ms settle break (the nested shape the runtime
+ *        resource 400s — which is exactly why mode 1 exists). /v/+/w/ recovered
+ *        from FLOOR in pass-7 (Thomas, 2026-06-17).
  *      • /h/ → `hə` fric-rel (pass-2 form Thomas accepted for hat/hen).
  *      • CONTINUANTS (m/n/l/r/y/z) + VOWELS → BARE IPA (sustain in isolation).
  *      • `x` = /ks/ cluster → BARE (its /s/ tail self-releases).
- *      • /v/, /dʒ/(j), /w/ FLOOR-graphemes → the WHOLE word falls back to the
- *        whole-word floor render (these voiced onsets scratch in isolation on
- *        every treatment), via `wordIsFloored`.
+ *      • /dʒ/(j) FLOOR-grapheme → the WHOLE word falls back to the whole-word
+ *        floor render (the affricate scratches in isolation on every treatment
+ *        and cannot be held), via `wordIsFloored`.
  *    Break placed AFTER each phoneme so the stop releases into the silence; no
  *    whole-LINE `<prosody rate>` wrap (the house rate -10% governs).
  *
@@ -1311,8 +1325,9 @@ export function renderBlendInnerText(
     return renderBlendFloorInnerText(parsed.word)
   }
 
-  // FULL-FIDELITY (bake-only). A word containing a scratchy voiced onset
-  // (v/dʒ/w) floors WHOLE — the segmented render is skipped entirely.
+  // FULL-FIDELITY (bake-only). A word containing the scratchy /dʒ/ (j) onset
+  // floors WHOLE — the segmented render is skipped entirely. (/v/+/w/ recovered
+  // in pass-7 and now take the held nested-prosody onset like /f/+/s/.)
   if (wordIsFloored(parsed.graphemes)) {
     return renderBlendFloorInnerText(parsed.word)
   }
@@ -1322,9 +1337,9 @@ export function renderBlendInnerText(
     const g = grapheme.toLowerCase()
     const fricativeOnset = BLEND_FRICATIVE_ONSET_IPA[g]
     if (fricativeOnset !== undefined) {
-      // /f/, /s/ → length-marked, rate-slowed NESTED-PROSODY onset, then a
-      // short settle break. This is the shape the runtime resource rejects;
-      // only the bake (full-fidelity) ever emits it.
+      // /f/, /s/, /v/, /w/ → length-marked, rate-slowed NESTED-PROSODY onset,
+      // then a short settle break. This is the shape the runtime resource
+      // rejects; only the bake (full-fidelity) ever emits it.
       parts.push(
         `<prosody rate="${BLEND_FRICATIVE_ONSET_RATE}">` +
           `<phoneme alphabet="ipa" ph="${escapeSsml(fricativeOnset)}">${escapeSsml(grapheme)}</phoneme>` +
