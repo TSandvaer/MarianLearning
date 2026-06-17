@@ -1,14 +1,24 @@
 /**
- * BYTE-PRESERVATION PROOF for the candidate-f blend re-bake.
+ * BYTE-PRESERVATION PROOF for the pass-5 FULL-FIDELITY blend re-bake.
  *
- * Proves the re-bake changed ONLY the `word.p<N>.blend` clips of the 5 CVC
- * tiers, leaving every OTHER utterance byte-for-byte identical to the committed
- * baseline:
+ * Proves the re-bake touched ONLY the `word.p<N>.blend` clips of the 5 CVC
+ * tiers, and within those, ONLY the clips whose full-fidelity SSML actually
+ * diverges from origin/main's candidate-f baseline:
  *   - every PRE-EXISTING NON-blend id (read/correct/reprompt/hint/giveAnswer +
  *     the shared session.end.* family) has base64 audio byte-identical to the
  *     baseline, in BOTH the audio-side `utterances[]` and the `plan.utterances[]`
  *     skeleton;
- *   - every `word.p<N>.blend` clip's base64 CHANGED (the re-bake's whole point);
+ *   - every blend clip with a DIVERGING grapheme (f/s/h or a floored v/j/w)
+ *     CHANGED — these are the only clips whose pass-5 render differs from the
+ *     candidate-f baseline on main;
+ *   - every blend clip with ONLY stop/continuant/vowel graphemes stayed
+ *     byte-IDENTICAL — its full-fidelity SSML equals the candidate-f baseline
+ *     verbatim, and Azure re-rendered identical bytes (the common in-resource
+ *     deterministic case; see planner-and-canon.md "Azure TTS renders are NOT
+ *     byte-deterministic across separate bake calls" — divergence is the
+ *     exception, identical-SSML→identical-bytes is the norm). This is the
+ *     pass-5 difference from the candidate-f pass, where ALL 40 blend clips
+ *     changed because candidate-f differed from the prior bare-stop render;
  *   - no id was added or removed; no blend clip's TEXT changed.
  *
  * The baseline is read straight from a git ref (default origin/main) via
@@ -27,6 +37,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseBlendText } from '../api/_tts.js'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -38,6 +49,30 @@ const BLEND_TIERS: readonly string[] = [
   'cvc-words-short-e',
 ]
 const BLEND_ID_RE = /^word\.p[1-8]\.blend$/
+
+/** Graphemes whose pass-5 full-fidelity render DIVERGES from the candidate-f
+ *  baseline on main: f/s get the nested-prosody fricative onset, h gets the
+ *  `hə` fric-rel (was bare on main), and v/j/w force the whole-word floor. A
+ *  blend word containing ANY of these MUST have changed bytes; a word with only
+ *  stop/continuant/vowel graphemes renders byte-identically to candidate-f.
+ *  Mirrors BLEND_FRICATIVE_ONSET_IPA ∪ {h} ∪ BLEND_FLOOR_GRAPHEMES in _tts.ts. */
+const PASS5_DIVERGING_GRAPHEMES: ReadonlySet<string> = new Set([
+  'f',
+  's',
+  'h',
+  'v',
+  'j',
+  'w',
+])
+
+/** Does this blend word's full-fidelity render diverge from candidate-f? */
+function blendWordDiverges(blendText: string): boolean {
+  const parsed = parseBlendText(blendText)
+  if (parsed === null) return false
+  return parsed.graphemes.some((g) =>
+    PASS5_DIVERGING_GRAPHEMES.has(g.toLowerCase()),
+  )
+}
 
 interface SkeletonUtterance {
   id: string
@@ -83,8 +118,10 @@ function main(): void {
 
   let nonBlendChecked = 0
   let nonBlendMismatches = 0
-  let blendChanged = 0
-  let blendUnchanged = 0
+  let blendDivergingChanged = 0
+  let blendNonDivergingIdentical = 0
+  let blendDivergingUnchanged = 0
+  let blendNonDivergingChanged = 0
   const failures: string[] = []
 
   for (const tier of BLEND_TIERS) {
@@ -116,13 +153,32 @@ function main(): void {
             `${tier}: blend ${id} TEXT changed (must stay the same)`,
           )
         }
-        if (sha(b64Before) === sha(b64After)) {
+        const changed = sha(b64Before) !== sha(b64After)
+        // Pass-5 expectation is per-word: a clip with an f/s/h/v/j/w grapheme
+        // diverges from main's candidate-f and MUST change; a clip with only
+        // stop/continuant/vowel graphemes renders byte-identically to
+        // candidate-f and MUST stay unchanged.
+        const diverges = blendWordDiverges(afterU.text)
+        if (diverges && changed) {
+          blendDivergingChanged++
+        } else if (diverges && !changed) {
           failures.push(
-            `${tier}: blend ${id} bytes UNCHANGED (re-bake did not take)`,
+            `${tier}: blend ${id} (${afterU.text}) has a diverging ` +
+              `grapheme but bytes UNCHANGED (full-fidelity render did not take)`,
           )
-          blendUnchanged++
+          blendDivergingUnchanged++
+        } else if (!diverges && !changed) {
+          blendNonDivergingIdentical++
         } else {
-          blendChanged++
+          // !diverges && changed — a stop/continuant/vowel-only word's bytes
+          // moved, which means either the SSML changed unexpectedly OR Azure
+          // returned non-deterministic bytes for identical SSML. Either way it
+          // breaks the splice-only guarantee for an unchanged-SSML clip.
+          failures.push(
+            `${tier}: blend ${id} (${afterU.text}) has NO diverging grapheme ` +
+              `but bytes CHANGED (non-deterministic re-render — should be identical)`,
+          )
+          blendNonDivergingChanged++
         }
       } else {
         // Every non-blend clip MUST be byte-identical.
@@ -142,13 +198,19 @@ function main(): void {
     }
   }
 
-  console.log('=== candidate-f blend re-bake byte-preservation proof ===')
-  console.log(`baseline ref:            ${base}`)
-  console.log(`tiers:                   ${BLEND_TIERS.length}`)
-  console.log(`non-blend clips checked: ${nonBlendChecked}`)
-  console.log(`non-blend mismatches:    ${nonBlendMismatches}`)
-  console.log(`blend clips re-rendered: ${blendChanged}`)
-  console.log(`blend clips unchanged:   ${blendUnchanged}`)
+  console.log(
+    '=== pass-5 full-fidelity blend re-bake byte-preservation proof ===',
+  )
+  console.log(`baseline ref:                       ${base}`)
+  console.log(`tiers:                              ${BLEND_TIERS.length}`)
+  console.log(`non-blend clips checked:            ${nonBlendChecked}`)
+  console.log(`non-blend mismatches:               ${nonBlendMismatches}`)
+  console.log(`blend diverging (f/s/h/v/j/w) ↻:    ${blendDivergingChanged}`)
+  console.log(
+    `blend non-diverging identical:      ${blendNonDivergingIdentical}`,
+  )
+  console.log(`blend diverging UNCHANGED (bad):    ${blendDivergingUnchanged}`)
+  console.log(`blend non-diverging CHANGED (bad):  ${blendNonDivergingChanged}`)
   if (failures.length) {
     console.log(`\nFAILURES (${failures.length}):`)
     for (const f of failures.slice(0, 40)) console.log(`  - ${f}`)
@@ -159,7 +221,9 @@ function main(): void {
   console.log('\nBYTE-PRESERVATION: PASS')
   console.log(
     `(${nonBlendChecked} non-blend clips byte-identical; ` +
-      `${blendChanged} blend clips re-rendered across ${BLEND_TIERS.length} tiers)`,
+      `${blendDivergingChanged} diverging blend clips re-rendered, ` +
+      `${blendNonDivergingIdentical} non-diverging blend clips byte-identical, ` +
+      `across ${BLEND_TIERS.length} tiers)`,
   )
 }
 

@@ -150,6 +150,28 @@ describe('buildSsmlBody', () => {
     // verify it's gone after escaping.
     expect(body).not.toContain(`voice name="evil" onerror=""`)
   })
+
+  // ── pass-5 blend-fidelity threading ─────────────────────────────────────
+  it('threads blendFullFidelity into the blend render (bake path)', () => {
+    const req = {
+      text: 'f - a - n ... fan',
+      voice: 'en-GB-OliviaNeural',
+      rate: '-10%',
+      pitch: '+0Hz',
+      volume: '+0%',
+      tier: 'cvc-words',
+    }
+    // Full-fidelity: the fricative nested-prosody onset reaches the wire.
+    const full = buildSsmlBody(req, { blendFullFidelity: true })
+    expect(full).toContain(
+      '<prosody rate="-25%"><phoneme alphabet="ipa" ph="fːə">f</phoneme></prosody>',
+    )
+    // Default (runtime-safe): plain whole-word floor, no nested onset.
+    const safe = buildSsmlBody(req)
+    expect(safe).not.toContain('<phoneme')
+    expect(safe).toContain('<prosody rate="-15%">fan</prosody>')
+    expect(safe).not.toBe(full)
+  })
 })
 
 describe('renderSsmlInnerText (interrogative prosody hint, ticket 86c9gxup4)', () => {
@@ -896,6 +918,45 @@ describe('synthesizeUtterance', () => {
     expect(init!.body as string).toContain('Hi!')
 
     expect(Array.from(result.audio)).toEqual([0xff, 0xfb, 0x90, 0x44])
+  })
+
+  // ── pass-5: SynthesizeOptions.blendFullFidelity reaches the POSTed SSML ────
+  it('threads opts.blendFullFidelity into the POSTed blend SSML body', async () => {
+    const blendReq = {
+      text: 'f - a - n ... fan',
+      voice: 'en-GB-OliviaNeural',
+      rate: '-10%',
+      pitch: '+0Hz',
+      volume: '+0%',
+      tier: 'cvc-words',
+    }
+    // Bake path — flag set → full-fidelity fricative onset on the wire.
+    const fullFetch =
+      vi.fn<(input: string | URL, init?: RequestInit) => Promise<Response>>()
+    fullFetch.mockImplementation(async () =>
+      fakeOkResponse(new Uint8Array([1])),
+    )
+    await synthesizeUtterance(blendReq, {
+      fetchFn: fullFetch as unknown as typeof fetch,
+      env: TEST_ENV,
+      blendFullFidelity: true,
+    })
+    const fullBody = fullFetch.mock.calls[0]![1]!.body as string
+    expect(fullBody).toContain('ph="fːə"')
+
+    // Runtime path — flag unset → resource-safe whole-word floor (no phoneme).
+    const safeFetch =
+      vi.fn<(input: string | URL, init?: RequestInit) => Promise<Response>>()
+    safeFetch.mockImplementation(async () =>
+      fakeOkResponse(new Uint8Array([1])),
+    )
+    await synthesizeUtterance(blendReq, {
+      fetchFn: safeFetch as unknown as typeof fetch,
+      env: TEST_ENV,
+    })
+    const safeBody = safeFetch.mock.calls[0]![1]!.body as string
+    expect(safeBody).not.toContain('<phoneme')
+    expect(safeBody).toContain('<prosody rate="-15%">fan</prosody>')
   })
 
   it('passes the response body through as a Uint8Array unchanged', async () => {
@@ -2077,9 +2138,63 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
     })
   })
 
-  describe('renderBlendInnerText (candidate f — lightly-released stops)', () => {
-    it('releases STOP graphemes with a clipped ə and voices the whole word naturally', () => {
+  // ── RUNTIME-SAFE default (pass-5): whole-word floor, no nested prosody,
+  //    no <phoneme>. This is what the production runtime renders so it survives
+  //    the Azure resource that 400s the full-fidelity fricative onset. ────────
+  describe('renderBlendInnerText — RUNTIME-SAFE default (blendFullFidelity unset)', () => {
+    it('renders the WHOLE word as the floor shape — no segmentation, no phoneme, no nested prosody', () => {
       const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')
+      expect(ssml).not.toBeNull()
+      // Floor shape: <prosody rate="-15%">cat</prosody><break/>cat. PLAIN text.
+      expect(ssml).toBe(
+        '<prosody rate="-15%">cat</prosody><break time="450ms"/>cat',
+      )
+      // The defining safety property: NO <phoneme> wrap anywhere (the runtime
+      // resource accepts plain whole-word text but 400s the phoneme onset).
+      expect(ssml).not.toContain('<phoneme')
+      // And no length-marked fricative onset / nested prosody.
+      expect(ssml).not.toContain('ph="fːə"')
+      expect(ssml).not.toContain('ph="sːə"')
+      // The single <prosody> is the floor's own rate wrap — there is no
+      // INNER prosody nested inside another (the rejected shape).
+      expect(ssml).not.toContain('<prosody rate="-25%">')
+    })
+
+    it('is plain whole-word for a fricative onset (sun) — no nested prosody onset', () => {
+      const ssml = renderBlendInnerText(
+        's - u - n ... sun',
+        'cvc-words-short-u',
+      )!
+      expect(ssml).toBe(
+        '<prosody rate="-15%">sun</prosody><break time="450ms"/>sun',
+      )
+      expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('is plain whole-word for a /ks/ word (box) — no phoneme cluster wrap', () => {
+      const ssml = renderBlendInnerText(
+        'b - o - x ... box',
+        'cvc-words-short-o',
+      )!
+      expect(ssml).toBe(
+        '<prosody rate="-15%">box</prosody><break time="450ms"/>box',
+      )
+      expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('is plain whole-word for a floored voiced onset (van) — no phoneme', () => {
+      const ssml = renderBlendInnerText('v - a - n ... van', 'cvc-words')!
+      expect(ssml).toBe(
+        '<prosody rate="-15%">van</prosody><break time="450ms"/>van',
+      )
+      expect(ssml).not.toContain('<phoneme')
+    })
+  })
+
+  // ── FULL-FIDELITY (pass-5, BAKE-only): per-class segmented render. ──────────
+  describe('renderBlendInnerText — FULL-FIDELITY (blendFullFidelity=true)', () => {
+    it('releases STOP graphemes with a clipped ə and voices the whole word naturally', () => {
+      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words', true)
       expect(ssml).not.toBeNull()
       // Stop graphemes c (/k/) + t (/t/) get the clipped <stop>ə release.
       expect(ssml).toContain('<phoneme alphabet="ipa" ph="kə">c</phoneme>')
@@ -2091,19 +2206,77 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
       expect(ssml).toContain('cat')
     })
 
-    it('leaves CONTINUANT consonants bare (no ə release)', () => {
-      // van: v (/v/ continuant) stays bare; n (/n/ continuant) stays bare;
-      // a (/æ/ vowel) stays bare. No grapheme here is a stop.
-      const ssml = renderBlendInnerText('v - a - n ... van', 'cvc-words')!
-      expect(ssml).toContain('<phoneme alphabet="ipa" ph="v">v</phoneme>')
-      expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+    it('renders the /f/ fricative onset as a length-marked, rate-slowed NESTED prosody + 150ms settle break', () => {
+      // fan: f (/f/ fricative) → <prosody rate="-25%"><phoneme ph="fːə">f
+      // </phoneme></prosody><break time="150ms"/> then the candidate-f beat.
+      const ssml = renderBlendInnerText('f - a - n ... fan', 'cvc-words', true)!
+      expect(ssml).toContain(
+        '<prosody rate="-25%"><phoneme alphabet="ipa" ph="fːə">f</phoneme></prosody><break time="150ms"/>',
+      )
+      // The settle break is followed by the normal inter-grapheme beat.
+      expect(ssml).toContain(
+        '<phoneme alphabet="ipa" ph="fːə">f</phoneme></prosody><break time="150ms"/><break time="250ms"/>',
+      )
+      // n (/n/ continuant) stays bare; a (/æ/ vowel) stays bare.
       expect(ssml).toContain('<phoneme alphabet="ipa" ph="n">n</phoneme>')
-      // Nothing gets a trailing ə on this all-continuant word.
-      expect(ssml).not.toContain('ə')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+      expect(ssml).toContain('<break time="450ms"/>fan')
+    })
+
+    it('renders the /s/ fricative onset with the same nested-prosody shape (sːə)', () => {
+      // sit is short-i; sip/sap not in pool — use "sat" (cvc-words short-a).
+      const ssml = renderBlendInnerText('s - a - t ... sat', 'cvc-words', true)!
+      expect(ssml).toContain(
+        '<prosody rate="-25%"><phoneme alphabet="ipa" ph="sːə">s</phoneme></prosody><break time="150ms"/>',
+      )
+      // t (/t/ stop) still gets its clipped release.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="tə">t</phoneme>')
+    })
+
+    it('renders the /h/ onset as the `hə` fric-rel (NOT bare, NOT nested prosody)', () => {
+      // hat: h → hə fric-rel; a (/æ/) bare; t (/t/) stop release.
+      const ssml = renderBlendInnerText('h - a - t ... hat', 'cvc-words', true)!
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="hə">h</phoneme>')
+      // /h/ does NOT take the nested-prosody fricative onset.
+      expect(ssml).not.toContain('ph="hː')
+      expect(ssml).not.toContain(
+        '<prosody rate="-25%"><phoneme alphabet="ipa" ph="hə"',
+      )
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="tə">t</phoneme>')
+    })
+
+    it('FLOORS a word with a /v/ onset (van) WHOLE — no segmentation', () => {
+      const ssml = renderBlendInnerText('v - a - n ... van', 'cvc-words', true)!
+      // van contains /v/ (a floor grapheme) → whole-word floor, even in
+      // full-fidelity mode.
+      expect(ssml).toBe(
+        '<prosody rate="-15%">van</prosody><break time="450ms"/>van',
+      )
+      expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('FLOORS a word with a /w/ onset (web) WHOLE — no segmentation', () => {
+      const ssml = renderBlendInnerText(
+        'w - e - b ... web',
+        'cvc-words-short-e',
+        true,
+      )!
+      expect(ssml).toBe(
+        '<prosody rate="-15%">web</prosody><break time="450ms"/>web',
+      )
+      expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('FLOORS a word with a /dʒ/ (j) onset (jam) WHOLE — no segmentation', () => {
+      const ssml = renderBlendInnerText('j - a - m ... jam', 'cvc-words', true)!
+      expect(ssml).toBe(
+        '<prosody rate="-15%">jam</prosody><break time="450ms"/>jam',
+      )
+      expect(ssml).not.toContain('<phoneme')
     })
 
     it('injects a break AFTER each grapheme and a longer break before the whole word', () => {
-      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')!
+      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words', true)!
       // Inter-grapheme break (250ms) appears AFTER each phoneme — the stop
       // releases into the silence (candidate-f placement).
       expect(ssml).toContain('</phoneme><break time="250ms"/>')
@@ -2113,10 +2286,10 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
       expect(ssml).toContain('<break time="450ms"/>cat')
     })
 
-    it('does NOT wrap the line in a <prosody rate> — renders at the house rate', () => {
-      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words')!
-      // Candidate f drops the -12% rate-slow (it over-articulated the onset);
-      // the speak-root house rate (-10%) governs.
+    it('does NOT wrap the LINE in a <prosody rate> — renders at the house rate (segmented words)', () => {
+      const ssml = renderBlendInnerText('c - a - t ... cat', 'cvc-words', true)!
+      // cat has no fricative onset, so there is no nested -25% prosody and no
+      // line-level prosody wrap; the speak-root house rate (-10%) governs.
       expect(ssml).not.toContain('<prosody rate=')
       expect(ssml.startsWith('<phoneme')).toBe(true)
     })
@@ -2125,6 +2298,7 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
       const ssml = renderBlendInnerText(
         'b - o - x ... box',
         'cvc-words-short-o',
+        true,
       )!
       // x = /ks/ is a cluster ending in a stop but is left BARE (the /s/ tail
       // self-releases; a `ksə` would read as "kss-uh").
@@ -2145,45 +2319,90 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
         'cvc-words-short-i',
         'cvc-words-short-e',
       ]) {
-        expect(renderBlendInnerText('d - o - g ... dog', tier)).not.toBeNull()
+        expect(
+          renderBlendInnerText('d - o - g ... dog', tier, true),
+        ).not.toBeNull()
       }
     })
 
     it('returns null for a non-CVC tier (digraphs / letter-sounds / undefined)', () => {
       expect(
-        renderBlendInnerText('c - a - t ... cat', 'digraphs-sh'),
+        renderBlendInnerText('c - a - t ... cat', 'digraphs-sh', true),
       ).toBeNull()
       expect(
-        renderBlendInnerText('c - a - t ... cat', 'letter-sounds'),
+        renderBlendInnerText('c - a - t ... cat', 'letter-sounds', true),
       ).toBeNull()
-      expect(renderBlendInnerText('c - a - t ... cat', undefined)).toBeNull()
+      expect(
+        renderBlendInnerText('c - a - t ... cat', undefined, true),
+      ).toBeNull()
     })
 
     it('returns null for a NON-blend CVC line (read/correct/hint pass through unchanged)', () => {
       // The whole point: the blend render must NOT hijack the normal CVC
       // utterances. None of them match parseBlendText's segmented shape.
-      expect(renderBlendInnerText('Read the cat.', 'cvc-words')).toBeNull()
-      expect(renderBlendInnerText('Yes! Cat.', 'cvc-words')).toBeNull()
-      expect(renderBlendInnerText("Let's look. Cat.", 'cvc-words')).toBeNull()
-      expect(renderBlendInnerText('This one is cat.', 'cvc-words')).toBeNull()
-      expect(renderBlendInnerText('Hmm... try again?', 'cvc-words')).toBeNull()
+      expect(
+        renderBlendInnerText('Read the cat.', 'cvc-words', true),
+      ).toBeNull()
+      expect(renderBlendInnerText('Yes! Cat.', 'cvc-words', true)).toBeNull()
+      expect(
+        renderBlendInnerText("Let's look. Cat.", 'cvc-words', true),
+      ).toBeNull()
+      expect(
+        renderBlendInnerText('This one is cat.', 'cvc-words', true),
+      ).toBeNull()
+      expect(
+        renderBlendInnerText('Hmm... try again?', 'cvc-words', true),
+      ).toBeNull()
+    })
+  })
+
+  // ── DEFAULT IS RUNTIME-SAFE: the two modes diverge on the same input. ───────
+  describe('renderBlendInnerText — default is runtime-safe (fail-safe)', () => {
+    it('a fricative word renders nested-prosody ONLY in full-fidelity, plain by default', () => {
+      const input = 'f - a - n ... fan'
+      const safe = renderBlendInnerText(input, 'cvc-words')
+      const full = renderBlendInnerText(input, 'cvc-words', true)
+      // Default (runtime-safe): NO nested fricative onset.
+      expect(safe).not.toContain('<phoneme')
+      expect(safe).not.toContain('ph="fːə"')
+      // Full-fidelity: HAS the nested fricative onset.
+      expect(full).toContain('ph="fːə"')
+      // They are NOT the same string.
+      expect(safe).not.toBe(full)
+    })
+
+    it('explicit false matches the unset default', () => {
+      const input = 'c - a - t ... cat'
+      expect(renderBlendInnerText(input, 'cvc-words', false)).toBe(
+        renderBlendInnerText(input, 'cvc-words'),
+      )
     })
   })
 
   describe('renderSsmlInnerText dispatch', () => {
-    it('renders a CVC blend line through the blend transform', () => {
+    it('renders a CVC blend line through the RUNTIME-SAFE floor by default', () => {
       const ssml = renderSsmlInnerText('c - a - t ... cat', 'cvc-words')
-      // Candidate-f release on the leading stop, rendered at the house rate
-      // (no -12% prosody wrap).
+      // Default (no fidelity flag) → resource-safe whole-word floor.
+      expect(ssml).toBe(
+        '<prosody rate="-15%">cat</prosody><break time="450ms"/>cat',
+      )
+      expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('renders a CVC blend line through FULL-FIDELITY when the flag is set', () => {
+      const ssml = renderSsmlInnerText('c - a - t ... cat', 'cvc-words', true)
+      // Candidate-f release on the leading stop, rendered at the house rate.
       expect(ssml).toContain('<phoneme alphabet="ipa" ph="kə">c</phoneme>')
       expect(ssml.startsWith('<phoneme')).toBe(true)
     })
 
-    it('does NOT alter a normal CVC read line (no blend hijack)', () => {
-      const ssml = renderSsmlInnerText('Read the cat.', 'cvc-words')
-      // Plain path — no phoneme wraps on the word.
-      expect(ssml).not.toContain('<phoneme')
-      expect(ssml).toContain('Read the cat.')
+    it('does NOT alter a normal CVC read line (no blend hijack), either mode', () => {
+      for (const full of [false, true]) {
+        const ssml = renderSsmlInnerText('Read the cat.', 'cvc-words', full)
+        // Plain path — no phoneme wraps on the word.
+        expect(ssml).not.toContain('<phoneme')
+        expect(ssml).toContain('Read the cat.')
+      }
     })
   })
 })
