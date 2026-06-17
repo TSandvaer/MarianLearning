@@ -64,12 +64,16 @@ import {
   BLEND_WORDS,
   BLEND_PASS4_WORDS,
   pass4CandidatesFor,
+  BLEND_PASS6_WORDS,
+  pass6CandidatesFor,
 } from './blendAuditionVariants.js'
 import type {
   BlendCandidate,
   BlendWord,
   BlendPass4Word,
   BlendPass4Candidate,
+  BlendPass6Word,
+  BlendPass6Candidate,
 } from './blendAuditionVariants.js'
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -146,7 +150,10 @@ async function renderRawSsml(body: string): Promise<Uint8Array> {
 interface RenderableCandidate {
   id: string
   label: string
-  treatment: BlendCandidate['treatment'] | BlendPass4Candidate['treatment']
+  treatment:
+    | BlendCandidate['treatment']
+    | BlendPass4Candidate['treatment']
+    | BlendPass6Candidate['treatment']
   mechanism: string
   buildInner: (word: string) => string
 }
@@ -174,7 +181,10 @@ interface WordRecord {
   key: string
   word: string
   /** The failing class this word probes (page grouping). */
-  phonemeClass: BlendWord['phonemeClass'] | BlendPass4Word['phonemeClass']
+  phonemeClass:
+    | BlendWord['phonemeClass']
+    | BlendPass4Word['phonemeClass']
+    | BlendPass6Word['phonemeClass']
   context: string
   candidates: CandidateRecord[]
 }
@@ -293,6 +303,12 @@ async function main(): Promise<void> {
     pass4Words.push(await renderWord(word, pass4CandidatesFor(word)))
   }
 
+  process.stdout.write('\n══ PASS 6 (IPA length-mark recovery: /v/ + /w/) ══\n')
+  const pass6Words: WordRecord[] = []
+  for (const word of BLEND_PASS6_WORDS) {
+    pass6Words.push(await renderWord(word, pass6CandidatesFor(word)))
+  }
+
   if (dry) {
     console.log('\n[--dry] No Azure calls made; no manifest written.')
     return
@@ -306,20 +322,21 @@ async function main(): Promise<void> {
       pitch: EMMA_VOICE_CONFIG.pitch,
       volume: EMMA_VOICE_CONFIG.volume,
     },
-    note: 'NOT PRODUCTION. CVC phoneme-blend audition. PASS 3 (words[]): orthographic onset vs whole-word FLOOR (pass3 / FLOOR / broken control per word). PASS 4 (pass4Words[]): IPA length-mark held-fricative onset (fː/fːə/sː/sːə) × two rates + whole-word FLOOR per fricative word — proven to render on real Azure (westeurope) but rejected at runtime by the preview region, so baked here as static clips. Accepted onsets/rates are ported into renderBlendInnerText + re-baked in a separate PR.',
+    note: 'NOT PRODUCTION. CVC phoneme-blend audition. PASS 3 (words[]): orthographic onset vs whole-word FLOOR (pass3 / FLOOR / broken control per word). PASS 4 (pass4Words[]): IPA length-mark held-fricative onset (fː/fːə/sː/sːə) × two rates + whole-word FLOOR per fricative word — proven to render on real Azure (westeurope) but rejected at runtime by the preview region, so baked here as static clips. PASS 6 (pass6Words[]): IPA length-mark recovery of /v/ (voiced fricative — vːə, the form that won /f/ in pass-4, never tried on /v/ which was floored pre-IPA-lever) + /w/ (glide — wː / wːə / ʊw), each + whole-word FLOOR. /dʒ/ stays floored (affricate). Accepted onsets/rates are ported into renderBlendInnerText full-fidelity + re-baked in pass-7.',
     words,
     pass4Words,
+    pass6Words,
   }
   writeFileSync(OUT_PATH, JSON.stringify(manifest, null, 2), 'utf8')
 
-  const allWords = [...words, ...pass4Words]
+  const allWords = [...words, ...pass4Words, ...pass6Words]
   const total = allWords.reduce((n, w) => n + w.candidates.length, 0)
   const failed = allWords.reduce(
     (n, w) => n + w.candidates.filter((c) => c.error).length,
     0,
   )
   console.log(
-    `\nWrote ${OUT_PATH}\n  pass-3: ${words.length} words; pass-4: ${pass4Words.length} words; ${total} candidates total` +
+    `\nWrote ${OUT_PATH}\n  pass-3: ${words.length} words; pass-4: ${pass4Words.length} words; pass-6: ${pass6Words.length} words; ${total} candidates total` +
       (failed
         ? `, ${failed} Azure-rejected (recorded with error, no audio)`
         : ''),

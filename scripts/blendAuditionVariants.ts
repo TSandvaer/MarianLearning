@@ -687,3 +687,231 @@ export const BLEND_WORDS: BlendWord[] = [
       'on the page.',
   },
 ]
+
+// ═════════════════════════════════════════════════════════════════════════
+// PASS 6 — IPA length-mark RECOVERY of /v/ (voiced fricative) + /w/ (glide)
+// ─────────────────────────────────────────────────────────────────────────
+// Pass-4 cracked the two VOICELESS fricatives /f/ + /s/ with the IPA
+// length-mark + schwa-tail form (`fːə`/`sːə` @ -25%) — Thomas's pass-4 picks.
+// Pass-5 shipped those (#476). The leftover floors are /v/, /dʒ/, /w/.
+//
+// KEY INSIGHT (why /v/ and /w/ get one more pass): /v/ is a VOICED FRICATIVE —
+// the SAME articulatory class as /f/, just with voicing. The `vːə`
+// length-mark + schwa-tail trick that won for /f/ in pass-4 was never tried on
+// /v/, because /v/ was floored back in PASS 2 — BEFORE that lever was found.
+// planner-and-canon.md cites "vːə extended cleanly" (the lever that motivated
+// pass-4's IPA mode). So `van` should un-floor with the held-fricative form.
+// /w/ is a glide (bare /w/ collapses to /uː/ — "U not W"); we try the held
+// glide `wː`, the held-glide + schwa `wːə` (mirroring the winning fricative
+// shape), and `ʊw` (Thomas's pass-4-round "oo-w" hint — a near-close back vowel
+// onglide INTO /w/), all @ -25%.
+//
+// /dʒ/ stays FLOORED (affricate, can't be held; exhausted over passes 2/3/4).
+//
+// LEVER (identical to pass-4): the onset is an IPA `<phoneme alphabet="ipa"
+// ph="...">` inside a per-onset `<prosody rate=...>` (compounds inside the
+// speak-root -10% shell — see NESTED-PROSODY NOTE), then a 150ms break, then
+// the rest of the word rendered EXACTLY as the production candidate-f
+// `renderBlendInnerText` (stop release / bare-IPA continuants+vowels + 250ms
+// breaks + 450ms + whole word). Only the ONSET grapheme differs from the
+// shipped render — so a winning candidate ports 1:1 into pass-7's production
+// `renderBlendInnerText` full-fidelity path.
+//
+// AUDITION-FIRST: Thomas plays each candidate vs the whole-word FLOOR per word
+// and picks accept (port into pass-7) or reject (keep the floor). A SEPARATE
+// pass-7 PR ports the winners; this module does NOT touch production.
+// ═════════════════════════════════════════════════════════════════════════
+
+/** A pass-6 onset FORM (the IPA `ph=` payload) + a page label. `grapheme` is
+ *  the visible glyph inside the `<phoneme>` tag (the word's onset letter). */
+interface Pass6OnsetForm {
+  /** Stable slug fragment used in the candidate id (e.g. `vlen-schwa`, `oow`). */
+  formId: string
+  /** The IPA payload voiced as `ph=` (e.g. `vːə`, `wː`, `ʊw`). */
+  ph: string
+  /** Short human label for the page (e.g. `vːə (held + schwa)`). */
+  formLabel: string
+  /** Per-onset prosody rate (compounds inside the -10% speak-root). */
+  rate: string
+}
+
+/**
+ * A pass-6 auditioned word: the CVC probe + which onset forms to try on it.
+ * Unlike pass-4 (forms × a fixed rate set), pass-6 carries the rate ON each
+ * form, because /v/ wants two rates of ONE form (`vːə` @ -25% / -40%) while /w/
+ * wants three forms at ONE rate (`wː`/`wːə`/`ʊw` @ -25%).
+ */
+export interface BlendPass6Word {
+  /** The CVC probe word (also the slug). */
+  word: string
+  /** The phoneme class this word probes (page grouping). */
+  phonemeClass: '/v/' | '/w/'
+  /** The ONSET grapheme whose held form is being auditioned (`v` or `w`). */
+  onsetGrapheme: 'v' | 'w'
+  /** The lead candidate's formId — highlighted as "lead" on the page. */
+  leadFormId: string
+  /** Why this word is in the set. */
+  context: string
+  /** The onset forms (+ per-form rate) to audition on this word, in order. */
+  forms: readonly Pass6OnsetForm[]
+}
+
+/** /v/ — voiced fricative. `vːə` (held + schwa tail) at two rates — the EXACT
+ *  shape that won /f/ in pass-4 (`fːə`), now applied to the voiced sibling.
+ *  Lead = -25% (pass-4's natural-blend pole). */
+const VAN_FORMS: readonly Pass6OnsetForm[] = [
+  {
+    formId: 'vlen-schwa-r25',
+    ph: 'vːə',
+    formLabel: 'vːə (held + schwa tail)',
+    rate: '-25%',
+  },
+  {
+    formId: 'vlen-schwa-r40',
+    ph: 'vːə',
+    formLabel: 'vːə (held + schwa tail)',
+    rate: '-40%',
+  },
+]
+
+/** /w/ — glide. Held glide `wː`, held glide + schwa `wːə` (mirrors the winning
+ *  fricative shape), and `ʊw` (Thomas's "oo-w" hint: a near-close back vowel
+ *  onglide INTO the /w/, so the glide reads as W not a bare /uː/). All @ -25%. */
+const W_FORMS: readonly Pass6OnsetForm[] = [
+  { formId: 'wlen-r25', ph: 'wː', formLabel: 'wː (held glide)', rate: '-25%' },
+  {
+    formId: 'wlen-schwa-r25',
+    ph: 'wːə',
+    formLabel: 'wːə (held glide + schwa tail)',
+    rate: '-25%',
+  },
+  {
+    formId: 'oow-r25',
+    ph: 'ʊw',
+    formLabel: 'ʊw (oo-w onglide — Thomas hint)',
+    rate: '-25%',
+  },
+]
+
+/** The pass-6 word set: `van` (/v/ recovery, the key insight) + `web`/`wig`
+ *  (/w/ recovery, two codas for cross-coda coverage). */
+export const BLEND_PASS6_WORDS: BlendPass6Word[] = [
+  {
+    word: 'van',
+    phonemeClass: '/v/',
+    onsetGrapheme: 'v',
+    leadFormId: 'vlen-schwa-r25',
+    context:
+      '/v/ RECOVERY — /v/ is a VOICED fricative (same class as /f/, just voiced). ' +
+      'The `vːə` held + schwa-tail form that won /f/ in pass-4 was never tried on ' +
+      '/v/ (floored in pass-2, BEFORE the IPA lever existed). planner-and-canon ' +
+      'cites "vːə extended cleanly". Lead: vːə @ -25% (pass-4 natural-blend pole).',
+    forms: VAN_FORMS,
+  },
+  {
+    word: 'web',
+    phonemeClass: '/w/',
+    onsetGrapheme: 'w',
+    leadFormId: 'wlen-schwa-r25',
+    context:
+      'Glide /w/ onset + /b/ stop coda. Bare /w/ collapses to /uː/ ("U not W"); ' +
+      'pass-3 "wuh" + deep pitch failed. New levers: held glide wː, held + schwa ' +
+      'wːə (mirrors the winning fricative shape), and ʊw (Thomas\'s "oo-w" onglide).',
+    forms: W_FORMS,
+  },
+  {
+    word: 'wig',
+    phonemeClass: '/w/',
+    onsetGrapheme: 'w',
+    leadFormId: 'wlen-schwa-r25',
+    context:
+      'Glide /w/ onset + /ɡ/ stop coda. The "U not W" glide failure with a final ' +
+      'voiced stop. Same three /w/ forms (wː / wːə / ʊw) @ -25% for cross-coda ' +
+      'coverage against `web`.',
+    forms: W_FORMS,
+  },
+]
+
+/** Build the pass-6 onset SSML: the held IPA `<phoneme>` inside a per-onset
+ *  `<prosody rate=...>` — the EXACT production-faithful onset shape pass-7 will
+ *  port into `renderBlendInnerText` full-fidelity. Mirrors pass4OnsetSsml. */
+function pass6OnsetSsml(grapheme: string, form: Pass6OnsetForm): string {
+  const tag = `<phoneme alphabet="ipa" ph="${esc(form.ph)}">${esc(grapheme)}</phoneme>`
+  return `<prosody rate="${esc(form.rate)}">${tag}</prosody>`
+}
+
+/**
+ * Build a pass-6 candidate inner-SSML for a word at a given onset form: the
+ * held IPA onset + 150ms break, then the rest of the word (vowel + coda)
+ * rendered EXACTLY as production candidate-f (stop release / bare IPA + 250ms
+ * breaks), then 450ms + the whole word voiced naturally. Only the ONSET
+ * grapheme differs from the shipped render — byte-faithful elsewhere so a
+ * winning candidate ports 1:1 to pass-7.
+ */
+function buildPass6Inner(word: string, form: Pass6OnsetForm): string {
+  const graphemes = splitGraphemes(word)
+  const parts: string[] = []
+  graphemes.forEach((g, idx) => {
+    if (idx === 0) {
+      parts.push(pass6OnsetSsml(g, form))
+      parts.push(`<break time="${PASS3_ONSET_BREAK_MS}ms"/>`)
+    } else {
+      parts.push(prodGrapheme(g))
+      parts.push(`<break time="${PROD_GRAPHEME_BREAK_MS}ms"/>`)
+    }
+  })
+  parts.push(`<break time="${PROD_WHOLE_WORD_BREAK_MS}ms"/>`)
+  parts.push(esc(word))
+  return parts.join('')
+}
+
+/** A pass-6 candidate spec (one (word × onset-form) clip, or the FLOOR). */
+export interface BlendPass6Candidate {
+  /** Stable id fragment, unique within the word (e.g. `vlen-schwa-r25`, `floor`). */
+  id: string
+  /** Human label for the page row. */
+  label: string
+  /** pass6 (held-onset candidate) | floor (whole-word A/B baseline). */
+  treatment: 'pass6' | 'floor'
+  /** One-line mechanism description for the page. */
+  mechanism: string
+  /** Build the inner-SSML for this candidate from the word. */
+  buildInner: (word: string) => string
+}
+
+/**
+ * Generate the pass-6 candidates for a word: every onset form (in declared
+ * order, lead first), then the whole-word FLOOR baseline last. The FLOOR is the
+ * same shape pass-3/pass-4 use (the ship-if-rejected clip).
+ */
+export function pass6CandidatesFor(
+  word: BlendPass6Word,
+): BlendPass6Candidate[] {
+  const candidates: BlendPass6Candidate[] = []
+  for (const form of word.forms) {
+    const isLead = form.formId === word.leadFormId
+    candidates.push({
+      id: form.formId,
+      treatment: 'pass6',
+      label: `${form.formLabel} @ ${form.rate}` + (isLead ? ' — LEAD' : ''),
+      mechanism:
+        `Held IPA onset ph="${form.ph}" inside <prosody rate="${form.rate}"> ` +
+        `(compounds inside the speak-root -10%), then a 150ms break, then the ` +
+        `rest of the word rendered as production candidate-f. LISTEN: is the ` +
+        `onset a clean /${word.onsetGrapheme}/ (not a vowel / not collapsed) AND ` +
+        `the whole word natural?`,
+      buildInner: (w: string) => buildPass6Inner(w, form),
+    })
+  }
+  candidates.push({
+    id: 'floor',
+    treatment: 'floor',
+    label: 'floor — whole-word only (ship if rejected)',
+    mechanism:
+      'NO segmentation: the word voiced slowly once (<prosody rate="-15%">), a ' +
+      'pause, then naturally. The safe fallback A/B — what ships if every held- ' +
+      'onset candidate is rejected for this class (the current /v/ + /w/ floor).',
+    buildInner: buildFloorInner,
+  })
+  return candidates
+}

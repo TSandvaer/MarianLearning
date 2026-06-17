@@ -125,6 +125,9 @@
       .row.pass4cand {
         background: var(--blue-soft);
       }
+      .row.pass6cand {
+        background: #efe9fb;
+      }
       .row.floor {
         background: #fbf6ee;
       }
@@ -174,6 +177,10 @@
       .tag.pass4 {
         background: var(--blue-soft);
         color: var(--blue);
+      }
+      .tag.pass6 {
+        background: #efe9fb;
+        color: #5b3ea6;
       }
       .tag.floor {
         background: #efe3cf;
@@ -357,6 +364,53 @@
       <div id="pass4-groups"></div>
     </section>
 
+    <section
+      id="pass6-section"
+      data-testid="pass6-section"
+      style="display: none"
+    >
+      <h1 style="margin-top: 2.5rem">
+        IPA length-mark recovery — /v/ &amp; /w/
+        <span class="voice" style="background: #5b3ea6">pass&nbsp;6</span>
+      </h1>
+      <p class="sub">
+        Pass 4's <strong>IPA length-mark + schwa tail</strong> form
+        (<code>fːə</code>/<code>sːə</code> @&nbsp;-25%) cracked the two
+        <em>voiceless</em> fricatives <strong>/f/</strong> +
+        <strong>/s/</strong> — your pass-4 picks, now shipped (pass&nbsp;5).
+        Pass 6 tries that SAME lever on the two leftover floors that might still
+        recover. <strong>Key insight for /v/:</strong>
+        <em>/v/ is a VOICED fricative</em> — the same articulatory class as /f/,
+        just with voicing. The <code>vːə</code> held + schwa-tail trick was
+        <em>never tried</em> on /v/, because /v/ was floored back in
+        <strong>pass&nbsp;2</strong>, BEFORE that lever existed
+        (planner-and-canon cites "<code>vːə</code> extended cleanly"). So
+        <code>van</code> should <strong>un-floor</strong>.
+        <strong>/w/</strong> is a glide (bare /w/ collapses to /uː/ — "U not
+        W"): we try the held glide <code>wː</code>, the held glide + schwa
+        <code>wːə</code> (mirroring the winning fricative shape), and
+        <code>ʊw</code> (your "oo-w" hint — a near-close back-vowel onglide INTO
+        the /w/), all @&nbsp;-25%. The affricate
+        <strong>/dʒ/ stays FLOORED</strong> (can't be held; exhausted over
+        passes&nbsp;2/3/4). Each onset renders EXACTLY as production
+        full-fidelity would —
+        <code
+          >&lt;prosody rate="-25%"&gt;&lt;phoneme
+          ph="vːə"&gt;v&lt;/phoneme&gt;&lt;/prosody&gt;</code
+        >
+        then the production medial/coda — so a winning candidate ports 1:1 into
+        the pass-7 production bake. These are
+        <strong>STATIC pre-baked clips</strong> (westeurope creds → base64 →
+        region-independent), same as pass 4. Per word you get the held-onset
+        candidate(s) plus the whole-word <strong>floor</strong> reference.
+        <strong>Open "show SSML"</strong> to read the exact <code>ph</code> +
+        rate, then report ONE verdict per class — <strong>/v/</strong> (accept a
+        form or keep the floor) and <strong>/w/</strong> (accept a form or keep
+        the floor).
+      </p>
+      <div id="pass6-groups"></div>
+    </section>
+
     <footer id="footer"></footer>
 
     <script>
@@ -519,9 +573,10 @@
         const rows = []
         for (const c of word.candidates) {
           const itemId = word.key + '#' + c.id
-          const treatment = c.treatment || c.id // pass3 / pass4 / floor / broken
+          const treatment = c.treatment || c.id // pass3 / pass4 / pass6 / floor / broken
           const isPass3 = treatment === 'pass3'
           const isPass4 = treatment === 'pass4'
+          const isPass6 = treatment === 'pass6'
           const isFloor = treatment === 'floor'
           const isBroken = treatment === 'broken'
           const rendered = !!c.base64 && !c.error
@@ -531,6 +586,7 @@
             'row' +
             (isPass3 ? ' candidate' : '') +
             (isPass4 ? ' pass4cand' : '') +
+            (isPass6 ? ' pass6cand' : '') +
             (isFloor ? ' floor' : '') +
             (isBroken ? ' broken' : '') +
             (rendered ? '' : ' unrendered')
@@ -548,6 +604,8 @@
             tags = ' <span class="tag cand">pass3 candidate</span>'
           } else if (isPass4) {
             tags = ' <span class="tag pass4">pass4 candidate</span>'
+          } else if (isPass6) {
+            tags = ' <span class="tag pass6">pass6 candidate</span>'
           } else if (isFloor) {
             tags = ' <span class="tag floor">FLOOR (ship if rejected)</span>'
           } else if (isBroken) {
@@ -626,7 +684,8 @@
       function renderFooter(data) {
         const el = document.getElementById('footer')
         const pass4Words = Array.isArray(data.pass4Words) ? data.pass4Words : []
-        const allWords = [...data.words, ...pass4Words]
+        const pass6Words = Array.isArray(data.pass6Words) ? data.pass6Words : []
+        const allWords = [...data.words, ...pass4Words, ...pass6Words]
         const total = allWords.reduce((n, w) => n + w.candidates.length, 0)
         const rejected = allWords.reduce(
           (n, w) => n + w.candidates.filter((c) => c.error).length,
@@ -681,12 +740,22 @@
             document.getElementById('pass4-section').style.display = ''
             for (const word of pass4Words) buildGroup(word, 'pass4-groups')
           }
+          // Pass-6 section (IPA length-mark recovery of /v/ + /w/) — only shown
+          // when the manifest carries pass6Words.
+          const pass6Words = Array.isArray(data.pass6Words)
+            ? data.pass6Words
+            : []
+          if (pass6Words.length > 0) {
+            document.getElementById('pass6-section').style.display = ''
+            for (const word of pass6Words) buildGroup(word, 'pass6-groups')
+          }
           renderFooter(data)
-          const total = [...data.words, ...pass4Words].reduce(
+          const total = [...data.words, ...pass4Words, ...pass6Words].reduce(
             (n, w) => n + w.candidates.length,
             0,
           )
-          const wordCount = data.words.length + pass4Words.length
+          const wordCount =
+            data.words.length + pass4Words.length + pass6Words.length
           setStatus(
             'Ready — ' +
               wordCount +
@@ -694,7 +763,9 @@
               data.words.length +
               ' pass-3 + ' +
               pass4Words.length +
-              ' pass-4), ' +
+              ' pass-4 + ' +
+              pass6Words.length +
+              ' pass-6), ' +
               total +
               ' candidates. Play each, then Pick the best per word.',
             'ok',
