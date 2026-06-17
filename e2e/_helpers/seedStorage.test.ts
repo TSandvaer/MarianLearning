@@ -39,6 +39,10 @@ interface PersistedProgress {
   }>
 }
 
+interface ProgressWithLatch {
+  cvcGraduationSessionFired?: boolean
+}
+
 describe('buildSeedProgress — SessionHistoryEntry widening (ticket 86c9xaybc)', () => {
   it('accepts a narrow legacy entry (dateISO + skillFocus + successRate) and emits no additive fields', () => {
     const progress = buildSeedProgress({
@@ -227,5 +231,54 @@ describe('buildSeedProgress — SessionHistoryEntry widening (ticket 86c9xaybc)'
         ],
       }),
     ).not.toThrow()
+  })
+})
+
+describe('buildSeedProgress — cvcGraduationSessionFired latch (ticket 86caa6k18)', () => {
+  it('leaves the latch ABSENT by default — the fresh-production forward-learner shape (§4.1.8)', () => {
+    // AC4: the helper default must match the fresh-production value (latch
+    // unset / falsy), NOT a convenience `true`. A seed that doesn't set it
+    // therefore exercises the real pre-graduation path where the storage
+    // read-path normalises the missing latch to falsy. This is the whole
+    // point of the ticket — a `true` default would mask the PR #471
+    // regression class.
+    const progress = buildSeedProgress() as ProgressWithLatch
+    expect(progress.cvcGraduationSessionFired).toBeUndefined()
+    expect('cvcGraduationSessionFired' in progress).toBe(false)
+  })
+
+  it('leaves the latch ABSENT when other options are set but the latch is omitted', () => {
+    // Setting unrelated options must not accidentally materialise the
+    // latch — absence is the production default regardless of what else
+    // the spec seeds.
+    const progress = buildSeedProgress({
+      skillLevelOverrides: { 'cvc-words-short-u': 'mastered' },
+      history: [
+        {
+          dateISO: '2026-05-20T10:00:00.000Z',
+          skillFocus: ['cvc-words'],
+          successRate: 1,
+        },
+      ],
+    }) as ProgressWithLatch
+    expect(progress.cvcGraduationSessionFired).toBeUndefined()
+  })
+
+  it('threads cvcGraduationSessionFired: true through to the seeded blob (post-graduation periodic-review path)', () => {
+    const progress = buildSeedProgress({
+      cvcGraduationSessionFired: true,
+    }) as ProgressWithLatch
+    expect(progress.cvcGraduationSessionFired).toBe(true)
+  })
+
+  it('threads an explicit cvcGraduationSessionFired: false through to the seeded blob', () => {
+    // An explicit `false` must round-trip as a present-and-false field
+    // (distinct from absent), so a spec can pin the pre-graduation latch
+    // value explicitly when it wants the field materialised.
+    const progress = buildSeedProgress({
+      cvcGraduationSessionFired: false,
+    }) as ProgressWithLatch
+    expect(progress.cvcGraduationSessionFired).toBe(false)
+    expect('cvcGraduationSessionFired' in progress).toBe(true)
   })
 })

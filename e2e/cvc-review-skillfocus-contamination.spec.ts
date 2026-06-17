@@ -236,31 +236,33 @@ test.describe('periodic CVC-review must not contaminate forward-node mastery (ti
     // CVC_REVIEW_PERIOD_SESSIONS (5) whose round-robin index lands on
     // `cvc-words-short-u`.
     //
-    // `cvcGraduationSessionFired` is NOT exposed by `buildSeedProgress`, so
-    // it is raw-spread onto the seeded blob (the established stopgap for
-    // Progress-level fields per testing-and-ci.md §4.1.1c — flagged as a NOF
-    // for `SeedProgressOptions` widening). This is the real post-graduation
-    // production shape, not a synthetic shortcut: the graduation review has
-    // already fired for a Marian who finished the whole tree.
-    const seededProgress = {
-      ...(buildSeedProgress({
-        skillLevelOverrides: {
-          'letter-sounds': 'mastered',
-          'blending-cv': 'mastered',
-          'cvc-words': 'mastered',
-          'cvc-words-short-o': 'mastered',
-          'cvc-words-short-u': 'mastered',
-          'cvc-words-short-i': 'mastered',
-          'cvc-words-short-e': 'mastered',
-          'digraphs-sh': 'mastered',
-          'digraphs-ch': 'mastered',
-          'digraphs-th-voiceless': 'mastered',
-          'sight-words': 'mastered',
-          'simple-sentences': 'mastered',
-        },
-      }) as Record<string, unknown>),
+    // `cvcGraduationSessionFired` is the real post-graduation production
+    // shape, not a synthetic shortcut: the graduation review has already
+    // fired for a Marian who finished the whole tree. It is set via the
+    // typed `SeedProgressOptions.cvcGraduationSessionFired` option (ticket
+    // 86caa6k18 widened the helper off the prior raw-spread stopgap per
+    // testing-and-ci.md 4.1.1c).
+    const seededProgress = buildSeedProgress({
+      skillLevelOverrides: {
+        'letter-sounds': 'mastered',
+        'blending-cv': 'mastered',
+        'cvc-words': 'mastered',
+        'cvc-words-short-o': 'mastered',
+        'cvc-words-short-u': 'mastered',
+        'cvc-words-short-i': 'mastered',
+        'cvc-words-short-e': 'mastered',
+        'digraphs-sh': 'mastered',
+        'digraphs-ch': 'mastered',
+        'digraphs-th-voiceless': 'mastered',
+        'sight-words': 'mastered',
+        'simple-sentences': 'mastered',
+      },
+      // Post-graduation Marian — the one-shot graduation review has
+      // already fired, so the PERIODIC round-robin is the branch under
+      // test (ticket 86caa6k18 migrated this off the raw-spread per
+      // testing-and-ci.md §4.1.1c).
       cvcGraduationSessionFired: true,
-    }
+    })
 
     await seedLocalStorage(page, {
       progress: seededProgress,
