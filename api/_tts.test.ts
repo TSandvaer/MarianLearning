@@ -1583,19 +1583,20 @@ describe('cluster 2 — break after "This one is X." in the fricative giveAnswer
 })
 
 describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)', () => {
-  it('softens vvv in EVERY /v/ slot with the round-5 audition-winner v2 prosody + schwa-tail IPA (86ca8c3t7)', () => {
-    // Round-5 audition winner v2 ("Pitch-lowered"): rounds 1 (`və` rate-12%)
-    // and 2 (`vːə` rate-20%/vol-12%) were both rejected ×4 for a hard buzzy
-    // ONSET. The winning lever is PITCH (`-3st`) — a lower f0 fricative
-    // buzzes less — on the bare schwa-tail phoneme `və` (NO length mark),
-    // with rate `-15%` + volume `-20%`. Attribute order pitch→rate→volume.
+  it('softens vvv in EVERY /v/ slot with the pass-8 audition-winner vv2 (held vːə @ rate -35%, no pitch/volume)', () => {
+    // Pass-8 audition winner vv2 (devon/blend-dj-vv-audition, 2026-06-18): the
+    // round-5 v2 (`pitch="-3st" rate="-15%" volume="-20%"` on bare `və`) was an
+    // accepted MODEL-FLOOR — still scratchy. The blend pass-7 /v/ recovery (held
+    // + schwa-tail `vːə`) cross-benefited the isolated letter-sound; Thomas
+    // picked vv2 = the held `vːə` onset at a DEEPER rate slow (`-35%`) with NO
+    // pitch and NO volume. The length mark + schwa tail carry the smoothing.
     for (const text of [
       'Which letter says vvv?',
       'Yes. V says it. vvv?',
       'It says vvv?',
     ]) {
       expect(renderSsmlInnerText(text, 'letter-sounds')).toContain(
-        '<prosody pitch="-3st" rate="-15%" volume="-20%"><phoneme alphabet="ipa" ph="və">vvv</phoneme></prosody>',
+        '<prosody rate="-35%"><phoneme alphabet="ipa" ph="vːə">vvv</phoneme></prosody>',
       )
     }
   })
@@ -1637,12 +1638,12 @@ describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)'
     expect(applyPhonemeOverrides('says vvv', 'letter-sounds')).not.toContain(
       '<prosody',
     )
-    // vvv carries the round-5 audition-winner v2 per-mnemonic prosody
-    // (86ca8c3t7): pitch-lowered + rate + volume, distinct from the shared
+    // vvv carries the pass-8 audition-winner vv2 per-mnemonic prosody
+    // (devon/blend-dj-vv-audition): rate-only `-35%`, distinct from the shared
     // `-12%` rate-only vowels.
     expect(
       applyPhonemeOverrides('says vvv', 'letter-sounds', 300, true),
-    ).toContain('<prosody pitch="-3st" rate="-15%" volume="-20%">')
+    ).toContain('<prosody rate="-35%">')
   })
 })
 
@@ -2306,12 +2307,35 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
       )
     })
 
-    it('FLOORS a word with a /dʒ/ (j) onset (jam) WHOLE — no segmentation', () => {
+    it('renders the /dʒ/ onset (jam) with the BARE held + schwa-tail phoneme (dʒːə) — pass-8 recovered from FLOOR', () => {
       const ssml = renderBlendInnerText('j - a - m ... jam', 'cvc-words', true)!
-      expect(ssml).toBe(
+      // jam: j (/dʒ/) → a BARE <phoneme ph="dʒːə">j</phoneme> (NOT nested in a
+      // <prosody> wrap like /f/+/s/+/v/+/w/), then the candidate-f beat. The
+      // EXACT audition j2 onset (origin/devon/blend-dj-vv-audition).
+      expect(ssml).toContain(
+        '<phoneme alphabet="ipa" ph="dʒːə">j</phoneme><break time="250ms"/>',
+      )
+      // a (/æ/ vowel) bare; m (/m/ continuant) bare; whole word natural.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="m">m</phoneme>')
+      expect(ssml).toContain('<break time="450ms"/>jam')
+      // The /dʒ/ onset is BARE (no nested -25% prosody wrap) — the affricate
+      // recovery lever differs from the held-fricative onsets.
+      expect(ssml).not.toContain('<prosody rate="-25%">')
+      // It is NOT the whole-word floor anymore.
+      expect(ssml).not.toBe(
         '<prosody rate="-15%">jam</prosody><break time="450ms"/>jam',
       )
-      expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('renders the FULL j2 segmented jam render byte-exactly (matches audition j2)', () => {
+      const ssml = renderBlendInnerText('j - a - m ... jam', 'cvc-words', true)!
+      expect(ssml).toBe(
+        '<phoneme alphabet="ipa" ph="dʒːə">j</phoneme><break time="250ms"/>' +
+          '<phoneme alphabet="ipa" ph="æ">a</phoneme><break time="250ms"/>' +
+          '<phoneme alphabet="ipa" ph="m">m</phoneme><break time="250ms"/>' +
+          '<break time="450ms"/>jam',
+      )
     })
 
     it('injects a break AFTER each grapheme and a longer break before the whole word', () => {

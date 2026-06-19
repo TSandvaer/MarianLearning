@@ -300,18 +300,17 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   // stay bare — they get their run-up from the flowing "says it" text
   // lead-in instead.
   //
-  // ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
-  // rounds 1 (`və` + rate-12%) and 2 (`vːə` + rate-20%/vol-12%) were BOTH
-  // rejected ×4 — the residual was a hard, buzzy ONSET on the voiced
-  // labiodental. The voice-audition page (scripts/voiceAuditionVariants.ts)
-  // explored several mechanisms; Thomas picked v2: the bare schwa-tail
-  // phoneme `və` (NO length mark) paired with a PITCH-LOWERED prosody
-  // (`pitch="-3st"`). A lower f0 voiced fricative buzzes less harshly — the
-  // length-mark sustain (round-2) attacked duration but not the onset
-  // harshness; dropping the pitch attacks the buzz directly. Rate `-15%` +
-  // volume `-20%` complete the softening. IPA reverts to `və`; the per-
-  // mnemonic prosody below carries the pitch/rate/volume.
-  vvv: { ipa: 'və', tiers: ['letter-sounds'] },
+  // PASS-8 AUDITION WINNER (variant vv2 "deeper-slow held onset", audition
+  // devon/blend-dj-vv-audition, Thomas ear-test 2026-06-18). HISTORY: round-5
+  // (ticket 86ca8c3t7) shipped v2 = bare `və` + `<prosody pitch="-3st"
+  // rate="-15%" volume="-20%">` as an ACCEPTED MODEL-FLOOR (still scratchy, best
+  // available at the time). The blend pass-7 /v/ recovery (held + schwa-tail
+  // `vːə`) prompted a cross-benefit audition on the ISOLATED letter-sound /v/;
+  // Thomas picked vv2 = the held + schwa-tail `vːə` at a DEEPER rate slow
+  // (`-35%`) with NO pitch and NO volume lever (the length mark does the work;
+  // pushing the rate past pass-7's -25% smooths the onset further). IPA moves
+  // `və` → `vːə`; the per-mnemonic prosody below carries the rate-only `-35%`.
+  vvv: { ipa: 'vːə', tiers: ['letter-sounds'] },
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
@@ -455,16 +454,19 @@ const SCRATCHY_PROSODY_RATE = '-12%'
  * GREENED aaa/ooo but the /v/ slots stayed "very scratchy" ×4 through two
  * more rounds.
  *
- * ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
- * the residual /v/ scratch is a hard, buzzy ONSET, not a duration problem.
- * Round-2's deeper rate + volume cut on a length-marked `vːə` did not move
- * it. The winning lever is PITCH: a lower f0 voiced fricative buzzes less.
+ * PASS-8 AUDITION WINNER (variant vv2, audition devon/blend-dj-vv-audition,
+ * Thomas ear-test 2026-06-18). The round-5 v2 (`pitch="-3st" rate="-15%"
+ * volume="-20%"` on a bare `və`) was an ACCEPTED MODEL-FLOOR — still scratchy,
+ * best available then. The blend pass-7 /v/ recovery (held + schwa-tail `vːə`)
+ * cross-benefited the isolated letter-sound /v/: Thomas picked vv2 = the held
+ * `vːə` onset at a DEEPER rate slow, NO pitch, NO volume.
  *
- *   • pitch (`-3st`) — the NEW dominant cue; drops the f0 of the buzz so
- *     the onset reads soft instead of harsh. Olivia honours `<prosody
- *     pitch>` (it drives the question-prosody + four-stress paths).
- *   • rate (`-15%`) — gentle slowing, lighter than round-2's `-20%`.
- *   • volume (`-20%`) — tames the loud attack directly.
+ *   • rate (`-35%`) — the SOLE lever; deeper than pass-7's blend -25%. The
+ *     length mark + schwa tail (the `vːə` IPA above) carry the smoothing; the
+ *     deeper rate gives the held fricative room to articulate without a buzzy
+ *     onset. (The audition confirmed a vv2-with-volume and a double-length-mark
+ *     vːːə each rendered byte-identical — Azure ignores volume on this wrap and
+ *     caps the length mark — so the rate lever alone is canonical.)
  *
  * aaa/ooo are LEFT on the `-12%`-rate / no-volume treatment so their
  * Thomas-approved (round-1 GREEN) bytes are preserved byte-for-byte — only
@@ -480,7 +482,7 @@ interface ScratchyProsody {
   volume?: string
 }
 const SCRATCHY_PROSODY_BY_MNEMONIC: Record<string, ScratchyProsody> = {
-  vvv: { pitch: '-3st', rate: '-15%', volume: '-20%' },
+  vvv: { rate: '-35%' },
 }
 
 export function applyPhonemeOverrides(
@@ -1101,7 +1103,19 @@ const BLEND_GRAPHEME_IPA: Record<string, string> = {
   f: 'f',
   g: 'ɡ',
   h: 'h',
-  j: 'dʒ',
+  // /dʒ/ (affricate). Pass-8 (Thomas, ear-test of audition j2, 2026-06-18):
+  // recovered the LAST blend FLOOR. The winning lever is the SAME held +
+  // schwa-tail length mark that recovered /v/+/w/ in pass-7 — but applied as a
+  // BARE `<phoneme>` (NOT the nested `<prosody rate="-25%">` wrap /f/+/s/+/v/+/w/
+  // take). The affricate cannot be "held" the way a continuant is, but the
+  // length-mark + schwa tail (`dʒːə`) gives Olivia enough duration to articulate
+  // the stop-burst-into-fricative cleanly instead of scratching. Because it is a
+  // bare phoneme (no nested prosody), it ALSO renders on the production runtime
+  // Azure resource that 400s the nested onset — so /dʒ/ is NOT runtime-floored
+  // (unlike /f/+/s/+/v/+/w/, which stay bake-only). j is therefore NO LONGER in
+  // BLEND_FLOOR_GRAPHEMES (which is now empty). See the audition j2 candidate in
+  // scripts/blendDjVvAuditionVariants.ts (origin/devon/blend-dj-vv-audition).
+  j: 'dʒːə',
   k: 'k',
   l: 'l',
   m: 'm',
@@ -1151,8 +1165,13 @@ const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
 // bespoke shaping, and three voiced onsets scratched in isolation no matter the
 // treatment. Pass-5 baked /f/+/s/ held-fricatives and FLOORED /v/+/dʒ/+/w/.
 // Pass-7 (Thomas, 2026-06-17) RECOVERED /v/ and /w/ with the SAME held +
-// schwa-tail length-mark shape that won /f/+/s/ (`vːə`/`wːə` @ -25%); only
-// /dʒ/ (the affricate, which cannot be held) stays floored. Net per-class:
+// schwa-tail length-mark shape that won /f/+/s/ (`vːə`/`wːə` @ -25%).
+// Pass-8 (Thomas, 2026-06-18) RECOVERED the LAST floor, /dʒ/, via audition j2
+// (`dʒːə` — the same held + schwa-tail length mark, but as a BARE `<phoneme>`,
+// NOT the nested `<prosody>` wrap the fricative onsets take). The affricate
+// can't be "held" like a continuant, yet the length mark + schwa tail gives
+// Olivia enough duration to articulate the burst-into-fricative cleanly.
+// BLEND_FLOOR_GRAPHEMES is now EMPTY. Net per-class:
 //
 //   • /h/  → `hə` (fric-rel)  — the pass-2 form Thomas accepted for hat/hen.
 //   • /f/  → a length-marked, rate-slowed onset: a one-level
@@ -1161,9 +1180,11 @@ const BLEND_STOP_GRAPHEMES: ReadonlySet<string> = new Set([
 //   • /s/  → the same nested-prosody onset shape with `ph="sːə"`.
 //   • /v/  → the same shape with `ph="vːə"` (pass-7; recovered from FLOOR).
 //   • /w/  → the same shape with `ph="wːə"` (pass-7; held glide + schwa tail).
-//   • /dʒ/(j) → FLOOR: the affricate cannot be held, scratches in isolation on
-//            every treatment, so any word whose graphemes include `j` renders
-//            as the whole-word floor shape (no segmentation at all).
+//   • /dʒ/(j) → a BARE `<phoneme ph="dʒːə">j</phoneme>` (pass-8; recovered from
+//            FLOOR). Lives in BLEND_GRAPHEME_IPA, NOT the nested fricative-onset
+//            table — so unlike /f/+/s/+/v/+/w/ it is ALSO runtime-safe (the bare
+//            phoneme renders on the production resource that 400s the nested
+//            onset). No word is floored anymore.
 //
 // RUNTIME-REACHABILITY (the reason this is opt-in). The graduation cvc-words
 // path renders blend lines LIVE at runtime (cache-miss, no canon) — see
@@ -1198,12 +1219,18 @@ const BLEND_FRICATIVE_SETTLE_BREAK_MS = 150
 /** `/h/` fric-rel release (pass-2 form Thomas accepted for hat/hen). */
 const BLEND_H_FRIC_REL_IPA = 'hə'
 
-/** Onsets that scratch in isolation on every treatment. In FULL-FIDELITY mode a
- *  word containing ANY of these renders as the whole-word FLOOR shape (no
- *  per-grapheme segmentation). `j` is the grapheme for /dʒ/ — the affricate,
- *  which cannot be held the way /v/+/w/ can, so it alone stays floored after
- *  pass-7 recovered /v/+/w/ via the held + schwa-tail length-mark onset. */
-const BLEND_FLOOR_GRAPHEMES: ReadonlySet<string> = new Set(['j'])
+/** Onsets that scratch in isolation on every treatment, EVEN with the best
+ *  available lever. In FULL-FIDELITY mode a word containing ANY of these renders
+ *  as the whole-word FLOOR shape (no per-grapheme segmentation).
+ *
+ *  EMPTY as of pass-8 (Thomas, 2026-06-18). /dʒ/ (`j`) was the last floored
+ *  grapheme; the audition j2 candidate (`dʒːə` bare held + schwa-tail length
+ *  mark — the same lever that recovered /v/+/w/ in pass-7) cleared the scratch,
+ *  so `j` moved from FLOOR into BLEND_GRAPHEME_IPA as a normal segmented onset.
+ *  The set is retained (not deleted) so a future class that genuinely cannot be
+ *  recovered has a typed home; `wordIsFloored` returns false for every word
+ *  while it is empty. */
+const BLEND_FLOOR_GRAPHEMES: ReadonlySet<string> = new Set([])
 
 /** Whole-word floor rate-slow — the runtime-safe shape's leading `<prosody>`
  *  (PLAIN text inside, no `<phoneme>`, no nesting). */
@@ -1296,9 +1323,10 @@ const BLEND_CVC_TIERS: ReadonlySet<string> = new Set([
  *      • /h/ → `hə` fric-rel (pass-2 form Thomas accepted for hat/hen).
  *      • CONTINUANTS (m/n/l/r/y/z) + VOWELS → BARE IPA (sustain in isolation).
  *      • `x` = /ks/ cluster → BARE (its /s/ tail self-releases).
- *      • /dʒ/(j) FLOOR-grapheme → the WHOLE word falls back to the whole-word
- *        floor render (the affricate scratches in isolation on every treatment
- *        and cannot be held), via `wordIsFloored`.
+ *      • /dʒ/(j) → a BARE `<phoneme ph="dʒːə">j</phoneme>` held + schwa-tail
+ *        onset (pass-8, audition j2). Recovered from FLOOR; rides the normal
+ *        bare-IPA path (BLEND_GRAPHEME_IPA), so BLEND_FLOOR_GRAPHEMES is empty
+ *        and `wordIsFloored` returns false for every word.
  *    Break placed AFTER each phoneme so the stop releases into the silence; no
  *    whole-LINE `<prosody rate>` wrap (the house rate -10% governs).
  *
@@ -1325,9 +1353,12 @@ export function renderBlendInnerText(
     return renderBlendFloorInnerText(parsed.word)
   }
 
-  // FULL-FIDELITY (bake-only). A word containing the scratchy /dʒ/ (j) onset
-  // floors WHOLE — the segmented render is skipped entirely. (/v/+/w/ recovered
-  // in pass-7 and now take the held nested-prosody onset like /f/+/s/.)
+  // FULL-FIDELITY (bake-only). A word whose graphemes include any FLOOR onset
+  // floors WHOLE — the segmented render is skipped entirely. As of pass-8 the
+  // floor set is EMPTY (/v/+/w/ recovered pass-7; /dʒ/ recovered pass-8 via the
+  // bare `dʒːə` onset), so this never fires today. The guard stays so a future
+  // genuinely-unrecoverable class can be re-floored by adding its grapheme to
+  // BLEND_FLOOR_GRAPHEMES alone.
   if (wordIsFloored(parsed.graphemes)) {
     return renderBlendFloorInnerText(parsed.word)
   }

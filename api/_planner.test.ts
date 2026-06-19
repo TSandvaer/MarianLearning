@@ -23,12 +23,15 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  CONTINUANT_ONSET_GRAPHEMES,
   deriveCurrentTargetVowel,
   generateSessionPlan,
   letterSoundsStatesAreNonFallback,
   parseLetterSoundsVowelStates,
   PlannerError,
+  reorderContinuantOnsetFirst,
   slashVowelToIpa,
+  STOP_ONSET_GRAPHEMES,
   stripMarkdownFence,
   VALID_WORD_SONG_FOCUS_NODES,
   type GenerateSessionPlanArgs,
@@ -5286,5 +5289,202 @@ describe('celebration-prosody fix — word-song correct-slot template (ticket 86
       prompt.match(/- correct: "Yes! <Word>\."/g) ?? []
     ).length
     expect(oldDirectiveMatches).toEqual(0)
+  })
+})
+
+describe('reorderContinuantOnsetFirst — continuant-onset CVC reorder (Q1)', () => {
+  // Build a CVC-tier flat plan: one problem group per word (read/correct/
+  // reprompt/hint/giveAnswer/blend slots) in the given order, plus a couple of
+  // session.end.* tail utterances that must stay untouched at the end.
+  function makeCvcPlan(words: string[]): {
+    id: string
+    label: string
+    utterances: { id: string; text: string }[]
+  } {
+    const utterances: { id: string; text: string }[] = []
+    words.forEach((word, i) => {
+      const p = i + 1
+      const cap = word[0]!.toUpperCase() + word.slice(1)
+      utterances.push(
+        { id: `word.p${p}.read`, text: `Read the ${word}.` },
+        { id: `word.p${p}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${p}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${p}.hint`, text: `Look. ${cap}.` },
+        { id: `word.p${p}.giveAnswer`, text: `This one is ${word}.` },
+        {
+          id: `word.p${p}.blend`,
+          text: `${word.split('').join(' - ')} ... ${word}`,
+        },
+      )
+    })
+    // Tail (non-problem) utterances — must be left exactly where they are.
+    utterances.push(
+      { id: 'session.end.opener', text: 'Wow! You did it!' },
+      { id: 'session.end.goodbye', text: 'See you soon!' },
+    )
+    return { id: 'cvc-test', label: 'CVC test', utterances }
+  }
+
+  /** Read back the word order from a reordered plan (by p-index ascending). */
+  function wordOrder(plan: {
+    utterances: { id: string; text: string }[]
+  }): string[] {
+    const byIndex = new Map<number, string>()
+    for (const u of plan.utterances) {
+      const m = u.id.match(/^word\.p(\d+)\.read$/)
+      if (!m) continue
+      const word = u.text.match(/^Read the ([a-z]+)\.$/i)?.[1]
+      if (word) byIndex.set(Number.parseInt(m[1]!, 10), word)
+    }
+    return [...byIndex.keys()].sort((a, b) => a - b).map((k) => byIndex.get(k)!)
+  }
+
+  it('the continuant/stop onset sets are disjoint and cover the CVC onset alphabet', () => {
+    // Contract pin: the two classes partition the consonant onset alphabet
+    // (vowels never lead a CVC word). Disjoint + complete.
+    for (const g of CONTINUANT_ONSET_GRAPHEMES) {
+      expect(STOP_ONSET_GRAPHEMES.has(g)).toBe(false)
+    }
+    const union = new Set([
+      ...CONTINUANT_ONSET_GRAPHEMES,
+      ...STOP_ONSET_GRAPHEMES,
+    ])
+    // Every single-consonant CVC onset used by the word pools (incl. the
+    // glides w/y, classed as continuants).
+    for (const g of 'bcdfghjklmnprstvwy') {
+      expect(union.has(g)).toBe(true)
+    }
+  })
+
+  it('emits continuant-onset words BEFORE stop-onset words, preserving order within each class', () => {
+    // Input mixes stop + continuant onsets.
+    const input = ['cat', 'man', 'bag', 'fan', 'dad', 'van', 'jam', 'hat']
+    const plan = makeCvcPlan(input)
+    const out = reorderContinuantOnsetFirst(plan, 'cvc-words')
+    // Continuants (input order): man, fan, van, hat. Stops (input order):
+    // cat, bag, dad, jam. (h is a continuant onset; j/dʒ sequences with stops.)
+    expect(wordOrder(out)).toEqual([
+      'man',
+      'fan',
+      'van',
+      'hat',
+      'cat',
+      'bag',
+      'dad',
+      'jam',
+    ])
+  })
+
+  it('renumbers ids and keeps each problem slot bundle intact', () => {
+    const plan = makeCvcPlan(['cat', 'man']) // stop, continuant
+    const out = reorderContinuantOnsetFirst(plan, 'cvc-words')
+    // man (continuant) -> p1, cat (stop) -> p2.
+    const p1 = out.utterances.filter((u) => u.id.startsWith('word.p1.'))
+    const p2 = out.utterances.filter((u) => u.id.startsWith('word.p2.'))
+    expect(p1.find((u) => u.id === 'word.p1.read')!.text).toBe('Read the man.')
+    expect(p1.find((u) => u.id === 'word.p1.correct')!.text).toBe('Yes! Man.')
+    expect(p1.find((u) => u.id === 'word.p1.blend')!.text).toBe(
+      'm - a - n ... man',
+    )
+    expect(p2.find((u) => u.id === 'word.p2.read')!.text).toBe('Read the cat.')
+    expect(p2.find((u) => u.id === 'word.p2.blend')!.text).toBe(
+      'c - a - t ... cat',
+    )
+    // Every original slot survives (6 slots x 2 problems = 12 problem utterances).
+    expect(out.utterances.filter((u) => /^word\.p/.test(u.id))).toHaveLength(12)
+  })
+
+  it('leaves session.end.* tail utterances untouched at the end', () => {
+    const plan = makeCvcPlan(['cat', 'fan'])
+    const out = reorderContinuantOnsetFirst(plan, 'cvc-words')
+    const tail = out.utterances.slice(-2)
+    expect(tail).toEqual([
+      { id: 'session.end.opener', text: 'Wow! You did it!' },
+      { id: 'session.end.goodbye', text: 'See you soon!' },
+    ])
+  })
+
+  it('is a no-op (byte-identical) for an already-continuant-first session', () => {
+    // man, fan (continuants) then cat, bag (stops) — already ordered.
+    const plan = makeCvcPlan(['man', 'fan', 'cat', 'bag'])
+    const out = reorderContinuantOnsetFirst(plan, 'cvc-words')
+    expect(out.utterances).toEqual(plan.utterances)
+  })
+
+  it('fires on every CVC vowel tier', () => {
+    for (const tier of [
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+      'cvc-words-short-i',
+      'cvc-words-short-e',
+    ]) {
+      const plan = makeCvcPlan(['cat', 'man']) // stop, continuant
+      const out = reorderContinuantOnsetFirst(plan, tier)
+      expect(wordOrder(out)).toEqual(['man', 'cat'])
+    }
+  })
+
+  it('passes through unchanged for a non-CVC tier (blending-cv / digraphs / letter-sounds)', () => {
+    const plan = makeCvcPlan(['cat', 'man'])
+    for (const tier of [
+      'blending-cv',
+      'digraphs-sh',
+      'letter-sounds',
+      'simple-sentences',
+    ]) {
+      expect(reorderContinuantOnsetFirst(plan, tier).utterances).toEqual(
+        plan.utterances,
+      )
+    }
+  })
+
+  it('passes through unchanged when a read line is not the "Read the <word>." shape (defensive)', () => {
+    const plan = makeCvcPlan(['cat', 'man'])
+    // Corrupt p1's read into a blending-cv "Tap the" shape — the reorder can't
+    // classify it, so it must NOT reshuffle.
+    plan.utterances = plan.utterances.map((u) =>
+      u.id === 'word.p1.read' ? { ...u, text: 'Tap the cat.' } : u,
+    )
+    expect(reorderContinuantOnsetFirst(plan, 'cvc-words').utterances).toEqual(
+      plan.utterances,
+    )
+  })
+
+  it('integrates with generateSessionPlan — a CVC-words plan is reordered post-Haiku', async () => {
+    // Haiku returns a mixed-onset plan; the planner reorders it before return.
+    const words = ['cat', 'fan', 'bag', 'man'] // stop, cont, stop, cont
+    const utterances: { id: string; text: string }[] = []
+    words.forEach((word, i) => {
+      const p = i + 1
+      const cap = word[0]!.toUpperCase() + word.slice(1)
+      utterances.push(
+        { id: `word.p${p}.read`, text: `Read the ${word}.` },
+        { id: `word.p${p}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${p}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${p}.hint`, text: `Look. ${cap}.` },
+        { id: `word.p${p}.giveAnswer`, text: `This one is ${word}.` },
+      )
+    })
+    const client = makeMockClient(
+      JSON.stringify({ id: 'h', label: 'l', utterances }),
+    )
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words',
+    })
+    const order = [...plan.utterances]
+      .filter((u) => /^word\.p\d+\.read$/.test(u.id))
+      .sort((a, b) => {
+        const ai = Number.parseInt(a.id.match(/p(\d+)/)![1]!, 10)
+        const bi = Number.parseInt(b.id.match(/p(\d+)/)![1]!, 10)
+        return ai - bi
+      })
+      .map((u) => u.text.match(/^Read the ([a-z]+)\.$/)![1])
+    // Continuants fan, man first (input order); stops cat, bag after.
+    expect(order).toEqual(['fan', 'man', 'cat', 'bag'])
   })
 })
