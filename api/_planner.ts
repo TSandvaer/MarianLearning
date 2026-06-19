@@ -348,6 +348,46 @@ export function reorderContinuantOnsetFirst(
   }
 }
 
+/** The single child-facing recap phrase for every cvc-words* tier. Mirrors the
+ *  `session.end.recap.focus` directive at the SYSTEM_PREAMBLE
+ *  ("any cvc-words* tier ... -> \"reading words\""). All 5 cvc-words* tiers
+ *  share this one line — they are vocabulary-extension siblings, not distinct
+ *  child-facing skills, so Emma says the same warm recap for each. */
+const CVC_RECAP_FOCUS_TEXT = 'You worked on reading words today!'
+
+/**
+ * Deterministic post-Haiku pin for `session.end.recap.focus` on the cvc-words*
+ * tiers. Haiku is instructed (SYSTEM_PREAMBLE) to emit "You worked on reading
+ * words today!" for any cvc-words* tier, but a re-bake can stochastically drift
+ * it to a tier-specific phrase ("You worked on short u words today!" — observed
+ * on cvc-words-short-u, PR #484 re-bake). The pin makes the line unforgeable:
+ * it overwrites the recap.focus text with `CVC_RECAP_FOCUS_TEXT` for the 5
+ * cvc-words* tiers, leaving every other utterance — and every other tier —
+ * byte-identical. Pure; returns a new plan (never mutates the input). No-op
+ * (returns the input plan) when `effectiveTier` is not a cvc-words* tier OR the
+ * recap.focus line is already the canonical text (so the 4 tiers that already
+ * say "reading words" round-trip byte-identical).
+ */
+export function pinCvcRecapFocus(
+  plan: PlannerPlan,
+  effectiveTier: string,
+): PlannerPlan {
+  if (!CVC_REORDER_TIERS.has(effectiveTier)) return plan
+  const needsPin = plan.utterances.some(
+    (u) =>
+      u.id === 'session.end.recap.focus' && u.text !== CVC_RECAP_FOCUS_TEXT,
+  )
+  if (!needsPin) return plan
+  return {
+    ...plan,
+    utterances: plan.utterances.map((u) =>
+      u.id === 'session.end.recap.focus'
+        ? { ...u, text: CVC_RECAP_FOCUS_TEXT }
+        : u,
+    ),
+  }
+}
+
 export interface GenerateSessionPlanArgs {
   /** Anthropic SDK client (or a test stub matching its surface). */
   client: PlannerAnthropicClient
@@ -715,7 +755,13 @@ export async function generateSessionPlan(
     track: args.track,
     focusNode: args.focusNode,
   })
-  return reorderContinuantOnsetFirst(parsed, effectiveTier)
+  // Deterministic post-Haiku passes (order-independent — reorder touches only
+  // problem utterances, the pin touches only session.end.recap.focus):
+  //   1. Continuant-onset-first CVC reorder (Q1).
+  //   2. Pin session.end.recap.focus to the canonical cvc-words* recap text so
+  //      a re-bake can't drift it to a tier-specific phrase (PR #484 fix).
+  const reordered = reorderContinuantOnsetFirst(parsed, effectiveTier)
+  return pinCvcRecapFocus(reordered, effectiveTier)
 }
 
 /**

@@ -300,17 +300,18 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   // stay bare — they get their run-up from the flowing "says it" text
   // lead-in instead.
   //
-  // PASS-8 AUDITION WINNER (variant vv2 "deeper-slow held onset", audition
-  // devon/blend-dj-vv-audition, Thomas ear-test 2026-06-18). HISTORY: round-5
-  // (ticket 86ca8c3t7) shipped v2 = bare `və` + `<prosody pitch="-3st"
-  // rate="-15%" volume="-20%">` as an ACCEPTED MODEL-FLOOR (still scratchy, best
-  // available at the time). The blend pass-7 /v/ recovery (held + schwa-tail
-  // `vːə`) prompted a cross-benefit audition on the ISOLATED letter-sound /v/;
-  // Thomas picked vv2 = the held + schwa-tail `vːə` at a DEEPER rate slow
-  // (`-35%`) with NO pitch and NO volume lever (the length mark does the work;
-  // pushing the rate past pass-7's -25% smooths the onset further). IPA moves
-  // `və` → `vːə`; the per-mnemonic prosody below carries the rate-only `-35%`.
-  vvv: { ipa: 'vːə', tiers: ['letter-sounds'] },
+  // ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
+  // rounds 1 (`və` + rate-12%) and 2 (`vːə` + rate-20%/vol-12%) were BOTH
+  // rejected ×4 — the residual was a hard, buzzy ONSET on the voiced
+  // labiodental. The voice-audition page (scripts/voiceAuditionVariants.ts)
+  // explored several mechanisms; Thomas picked v2: the bare schwa-tail
+  // phoneme `və` (NO length mark) paired with a PITCH-LOWERED prosody
+  // (`pitch="-3st"`). A lower f0 voiced fricative buzzes less harshly — the
+  // length-mark sustain (round-2) attacked duration but not the onset
+  // harshness; dropping the pitch attacks the buzz directly. Rate `-15%` +
+  // volume `-20%` complete the softening. IPA reverts to `və`; the per-
+  // mnemonic prosody below carries the pitch/rate/volume.
+  vvv: { ipa: 'və', tiers: ['letter-sounds'] },
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
@@ -454,19 +455,16 @@ const SCRATCHY_PROSODY_RATE = '-12%'
  * GREENED aaa/ooo but the /v/ slots stayed "very scratchy" ×4 through two
  * more rounds.
  *
- * PASS-8 AUDITION WINNER (variant vv2, audition devon/blend-dj-vv-audition,
- * Thomas ear-test 2026-06-18). The round-5 v2 (`pitch="-3st" rate="-15%"
- * volume="-20%"` on a bare `və`) was an ACCEPTED MODEL-FLOOR — still scratchy,
- * best available then. The blend pass-7 /v/ recovery (held + schwa-tail `vːə`)
- * cross-benefited the isolated letter-sound /v/: Thomas picked vv2 = the held
- * `vːə` onset at a DEEPER rate slow, NO pitch, NO volume.
+ * ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
+ * the residual /v/ scratch is a hard, buzzy ONSET, not a duration problem.
+ * Round-2's deeper rate + volume cut on a length-marked `vːə` did not move
+ * it. The winning lever is PITCH: a lower f0 voiced fricative buzzes less.
  *
- *   • rate (`-35%`) — the SOLE lever; deeper than pass-7's blend -25%. The
- *     length mark + schwa tail (the `vːə` IPA above) carry the smoothing; the
- *     deeper rate gives the held fricative room to articulate without a buzzy
- *     onset. (The audition confirmed a vv2-with-volume and a double-length-mark
- *     vːːə each rendered byte-identical — Azure ignores volume on this wrap and
- *     caps the length mark — so the rate lever alone is canonical.)
+ *   • pitch (`-3st`) — the NEW dominant cue; drops the f0 of the buzz so
+ *     the onset reads soft instead of harsh. Olivia honours `<prosody
+ *     pitch>` (it drives the question-prosody + four-stress paths).
+ *   • rate (`-15%`) — gentle slowing, lighter than round-2's `-20%`.
+ *   • volume (`-20%`) — tames the loud attack directly.
  *
  * aaa/ooo are LEFT on the `-12%`-rate / no-volume treatment so their
  * Thomas-approved (round-1 GREEN) bytes are preserved byte-for-byte — only
@@ -482,7 +480,7 @@ interface ScratchyProsody {
   volume?: string
 }
 const SCRATCHY_PROSODY_BY_MNEMONIC: Record<string, ScratchyProsody> = {
-  vvv: { rate: '-35%' },
+  vvv: { pitch: '-3st', rate: '-15%', volume: '-20%' },
 }
 
 export function applyPhonemeOverrides(

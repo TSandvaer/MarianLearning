@@ -28,6 +28,7 @@ import {
   generateSessionPlan,
   letterSoundsStatesAreNonFallback,
   parseLetterSoundsVowelStates,
+  pinCvcRecapFocus,
   PlannerError,
   reorderContinuantOnsetFirst,
   slashVowelToIpa,
@@ -5486,5 +5487,122 @@ describe('reorderContinuantOnsetFirst — continuant-onset CVC reorder (Q1)', ()
       .map((u) => u.text.match(/^Read the ([a-z]+)\.$/)![1])
     // Continuants fan, man first (input order); stops cat, bag after.
     expect(order).toEqual(['fan', 'man', 'cat', 'bag'])
+  })
+})
+
+describe('pinCvcRecapFocus — deterministic session.end.recap.focus pin (PR #484)', () => {
+  const CANONICAL = 'You worked on reading words today!'
+
+  // Minimal plan: one cvc-word problem + the session-end tail (recap.focus is
+  // what we pin; everything else must round-trip untouched).
+  function makePlan(recapFocusText: string): {
+    id: string
+    label: string
+    utterances: { id: string; text: string }[]
+  } {
+    return {
+      id: 'p',
+      label: 'l',
+      utterances: [
+        { id: 'word.p1.read', text: 'Read the cat.' },
+        { id: 'word.p1.correct', text: 'Yes! Cat.' },
+        { id: 'word.p1.reprompt', text: 'Hmm... try again?' },
+        { id: 'word.p1.hint', text: 'Look. Cat.' },
+        { id: 'word.p1.giveAnswer', text: 'This one is cat.' },
+        { id: 'session.end.opener', text: 'You did it!' },
+        { id: 'session.end.recap.focus', text: recapFocusText },
+        { id: 'session.end.recap.1', text: 'You earned one star!' },
+        { id: 'session.end.goodbye', text: 'See you soon.' },
+      ],
+    }
+  }
+
+  function recapFocus(plan: { utterances: { id: string; text: string }[] }) {
+    return plan.utterances.find((u) => u.id === 'session.end.recap.focus')!.text
+  }
+
+  it('overwrites a drifted recap.focus on EVERY cvc-words* tier (e.g. short-u "short u words" → "reading words")', () => {
+    for (const tier of [
+      'cvc-words',
+      'cvc-words-short-o',
+      'cvc-words-short-u',
+      'cvc-words-short-i',
+      'cvc-words-short-e',
+    ]) {
+      const plan = makePlan('You worked on short u words today!')
+      const out = pinCvcRecapFocus(plan, tier)
+      expect(recapFocus(out)).toBe(CANONICAL)
+    }
+  })
+
+  it('is a no-op (byte-identical) when recap.focus is already canonical — the 4 correct tiers do NOT churn', () => {
+    const plan = makePlan(CANONICAL)
+    const out = pinCvcRecapFocus(plan, 'cvc-words-short-o')
+    // Reference equality: the function returns the SAME object when no pin is
+    // needed, so the canon bytes for already-correct tiers are untouched.
+    expect(out).toBe(plan)
+    expect(out.utterances).toEqual(plan.utterances)
+  })
+
+  it('touches ONLY recap.focus — every other utterance is byte-identical', () => {
+    const plan = makePlan('You worked on short e words today!')
+    const out = pinCvcRecapFocus(plan, 'cvc-words-short-e')
+    for (const u of plan.utterances) {
+      if (u.id === 'session.end.recap.focus') continue
+      expect(out.utterances.find((x) => x.id === u.id)).toEqual(u)
+    }
+    // id order preserved.
+    expect(out.utterances.map((u) => u.id)).toEqual(
+      plan.utterances.map((u) => u.id),
+    )
+  })
+
+  it('passes through unchanged for a non-cvc-words* tier (digraphs / sight-words / simple-sentences / blending-cv)', () => {
+    // Even though the directive maps digraphs* + sight-words to "reading words"
+    // too, the PIN is scoped to the 5 cvc-words* tiers — other tiers keep
+    // whatever Haiku emitted (their own recap phrases differ, e.g.
+    // simple-sentences -> "reading sentences").
+    const plan = makePlan('You worked on reading sentences today!')
+    for (const tier of [
+      'digraphs-sh',
+      'sight-words',
+      'simple-sentences',
+      'blending-cv',
+      'letter-sounds',
+    ]) {
+      const out = pinCvcRecapFocus(plan, tier)
+      expect(out).toBe(plan)
+    }
+  })
+
+  it('integrates with generateSessionPlan — a drifted cvc-words-short-u recap.focus is pinned post-Haiku', async () => {
+    const utterances: { id: string; text: string }[] = []
+    for (let p = 1; p <= 2; p++) {
+      const word = p === 1 ? 'sun' : 'cup'
+      const cap = word[0]!.toUpperCase() + word.slice(1)
+      utterances.push(
+        { id: `word.p${p}.read`, text: `Read the ${word}.` },
+        { id: `word.p${p}.correct`, text: `Yes! ${cap}.` },
+        { id: `word.p${p}.reprompt`, text: 'Hmm... try again?' },
+        { id: `word.p${p}.hint`, text: `Look. ${cap}.` },
+        { id: `word.p${p}.giveAnswer`, text: `This one is ${word}.` },
+      )
+    }
+    // Haiku drifts the recap.focus to a tier-specific phrase.
+    utterances.push({
+      id: 'session.end.recap.focus',
+      text: 'You worked on short u words today!',
+    })
+    const client = makeMockClient(
+      JSON.stringify({ id: 'h', label: 'l', utterances }),
+    )
+    const plan = await generateSessionPlan({
+      client,
+      track: 'word-song',
+      level: 1,
+      childName: 'Marian',
+      focusNode: 'cvc-words-short-u',
+    })
+    expect(recapFocus(plan)).toBe(CANONICAL)
   })
 })

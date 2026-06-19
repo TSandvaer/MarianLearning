@@ -1583,20 +1583,19 @@ describe('cluster 2 — break after "This one is X." in the fricative giveAnswer
 })
 
 describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)', () => {
-  it('softens vvv in EVERY /v/ slot with the pass-8 audition-winner vv2 (held vːə @ rate -35%, no pitch/volume)', () => {
-    // Pass-8 audition winner vv2 (devon/blend-dj-vv-audition, 2026-06-18): the
-    // round-5 v2 (`pitch="-3st" rate="-15%" volume="-20%"` on bare `və`) was an
-    // accepted MODEL-FLOOR — still scratchy. The blend pass-7 /v/ recovery (held
-    // + schwa-tail `vːə`) cross-benefited the isolated letter-sound; Thomas
-    // picked vv2 = the held `vːə` onset at a DEEPER rate slow (`-35%`) with NO
-    // pitch and NO volume. The length mark + schwa tail carry the smoothing.
+  it('softens vvv in EVERY /v/ slot with the round-5 audition-winner v2 prosody + schwa-tail IPA (86ca8c3t7)', () => {
+    // Round-5 audition winner v2 ("Pitch-lowered"): rounds 1 (`və` rate-12%)
+    // and 2 (`vːə` rate-20%/vol-12%) were both rejected ×4 for a hard buzzy
+    // ONSET. The winning lever is PITCH (`-3st`) — a lower f0 fricative
+    // buzzes less — on the bare schwa-tail phoneme `və` (NO length mark),
+    // with rate `-15%` + volume `-20%`. Attribute order pitch→rate→volume.
     for (const text of [
       'Which letter says vvv?',
       'Yes. V says it. vvv?',
       'It says vvv?',
     ]) {
       expect(renderSsmlInnerText(text, 'letter-sounds')).toContain(
-        '<prosody rate="-35%"><phoneme alphabet="ipa" ph="vːə">vvv</phoneme></prosody>',
+        '<prosody pitch="-3st" rate="-15%" volume="-20%"><phoneme alphabet="ipa" ph="və">vvv</phoneme></prosody>',
       )
     }
   })
@@ -1638,12 +1637,12 @@ describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)'
     expect(applyPhonemeOverrides('says vvv', 'letter-sounds')).not.toContain(
       '<prosody',
     )
-    // vvv carries the pass-8 audition-winner vv2 per-mnemonic prosody
-    // (devon/blend-dj-vv-audition): rate-only `-35%`, distinct from the shared
+    // vvv carries the round-5 audition-winner v2 per-mnemonic prosody
+    // (86ca8c3t7): pitch-lowered + rate + volume, distinct from the shared
     // `-12%` rate-only vowels.
     expect(
       applyPhonemeOverrides('says vvv', 'letter-sounds', 300, true),
-    ).toContain('<prosody rate="-35%">')
+    ).toContain('<prosody pitch="-3st" rate="-15%" volume="-20%">')
   })
 })
 
