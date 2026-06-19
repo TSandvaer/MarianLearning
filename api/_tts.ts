@@ -300,18 +300,23 @@ const PHONEME_OVERRIDES: Record<string, PhonemeOverrideEntry> = {
   // stay bare — they get their run-up from the flowing "says it" text
   // lead-in instead.
   //
-  // ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
-  // rounds 1 (`və` + rate-12%) and 2 (`vːə` + rate-20%/vol-12%) were BOTH
-  // rejected ×4 — the residual was a hard, buzzy ONSET on the voiced
-  // labiodental. The voice-audition page (scripts/voiceAuditionVariants.ts)
-  // explored several mechanisms; Thomas picked v2: the bare schwa-tail
-  // phoneme `və` (NO length mark) paired with a PITCH-LOWERED prosody
-  // (`pitch="-3st"`). A lower f0 voiced fricative buzzes less harshly — the
-  // length-mark sustain (round-2) attacked duration but not the onset
-  // harshness; dropping the pitch attacks the buzz directly. Rate `-15%` +
-  // volume `-20%` complete the softening. IPA reverts to `və`; the per-
-  // mnemonic prosody below carries the pitch/rate/volume.
-  vvv: { ipa: 'və', tiers: ['letter-sounds'] },
+  // ROUND-6 IN-FRAME AUDITION WINNER (variant v3 "labiodental approximant",
+  // ticket 86ca8c3t7 follow-up / PR #485): the round-5 floor `və` +
+  // pitch-lowered prosody (rounds 1 `və`@-12%, 2 `vːə`@-20%/-12%, 5 `və`+
+  // -3st) all left a residual hard, buzzy ONSET — the scratch IS the
+  // FRICATION of the voiced labiodental FRICATIVE /v/. v3 swaps the fricative
+  // /v/ for the labiodental APPROXIMANT /ʋ/ (`ʋə`): SAME place of
+  // articulation, NO frication, and close enough that an 8-year-old still
+  // hears "the v sound". The earlier `voiceAuditionVariants.ts` pass had
+  // auditioned only the bare-token frame; per testing-and-ci.md §4.4.7 the
+  // in-frame audition (scripts/renderVFrameAudition.ts, PR #485) rendered
+  // every candidate through the ACTUAL production sentence frame for all four
+  // production slots (read/correct/hint/giveAnswer). Isolated picked v1
+  // (`vːə`), confirming the sentence frame — not the bare token — was the
+  // scratch culprit; but production always plays IN-FRAME, where Thomas
+  // picked v3 across ALL FOUR slots. ONLY the IPA moves `və → ʋə`; the floor
+  // softening prosody below (pitch -3st, rate -15%, volume -20%) is UNCHANGED.
+  vvv: { ipa: 'ʋə', tiers: ['letter-sounds'] },
   lll: { ipa: 'l', tiers: ['letter-sounds'] },
   rrr: { ipa: 'r', tiers: ['letter-sounds'] },
   hhh: { ipa: 'h', tiers: ['letter-sounds'] },
@@ -455,21 +460,24 @@ const SCRATCHY_PROSODY_RATE = '-12%'
  * GREENED aaa/ooo but the /v/ slots stayed "very scratchy" ×4 through two
  * more rounds.
  *
- * ROUND-5 AUDITION WINNER (variant v2 "Pitch-lowered", ticket 86ca8c3t7):
- * the residual /v/ scratch is a hard, buzzy ONSET, not a duration problem.
- * Round-2's deeper rate + volume cut on a length-marked `vːə` did not move
- * it. The winning lever is PITCH: a lower f0 voiced fricative buzzes less.
+ * ROUND-6 IN-FRAME AUDITION WINNER (variant v3 "labiodental approximant",
+ * PR #485): the residual /v/ scratch is the FRICATION of the voiced
+ * labiodental FRICATIVE /v/, not a duration or pitch problem — rounds 1/2/5
+ * all left a buzzy onset. The fix moves the IPA `və → ʋə` (the labiodental
+ * APPROXIMANT, no frication — see PHONEME_OVERRIDES.vvv above), NOT the
+ * prosody. This per-mnemonic prosody is UNCHANGED from round-5; it stays the
+ * pitch/rate/volume softening floor that v3 kept:
  *
- *   • pitch (`-3st`) — the NEW dominant cue; drops the f0 of the buzz so
- *     the onset reads soft instead of harsh. Olivia honours `<prosody
- *     pitch>` (it drives the question-prosody + four-stress paths).
+ *   • pitch (`-3st`) — drops the f0 of the buzz so the onset reads soft
+ *     instead of harsh. Olivia honours `<prosody pitch>` (it drives the
+ *     question-prosody + four-stress paths).
  *   • rate (`-15%`) — gentle slowing, lighter than round-2's `-20%`.
  *   • volume (`-20%`) — tames the loud attack directly.
  *
  * aaa/ooo are LEFT on the `-12%`-rate / no-volume treatment so their
  * Thomas-approved (round-1 GREEN) bytes are preserved byte-for-byte — only
- * vvv's render changes. A mnemonic absent from this map falls back to the
- * shared rate-only prosody.
+ * vvv's render changes (the IPA, above). A mnemonic absent from this map
+ * falls back to the shared rate-only prosody.
  */
 interface ScratchyProsody {
   /** Optional `<prosody pitch>`; omitted → no pitch attribute. */
