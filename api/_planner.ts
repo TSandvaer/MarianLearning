@@ -174,6 +174,220 @@ export const VALID_WORD_SONG_FOCUS_NODES: readonly string[] = [
   'simple-sentences',
 ]
 
+// ── continuant-onset CVC reorder (Q1, design/research/cvc-blend-audio-phonics.md)
+//
+// Five-from-Five (continuant-first) + Gonzalez-Frey/Ehri (2021): beginning
+// blenders decode words with a CONTINUANT onset (a sound that can be held —
+// f, v, s, m, n, l, r, h) more reliably than words with a STOP onset (b, c/k,
+// d, g, p, t — and the affricate /dʒ/ = `j`, which behaves like a stop for
+// sequencing). Ordering continuant-onset words ahead of stop-onset words inside
+// a session lets Marian build the blending schema on the easier shapes first.
+//
+// The wire is utterance-only and the problem index in `word.p<N>.<slot>` ids is
+// POSITIONAL (the browser parser buckets by index and walks p1..p8 in order —
+// see src/screens/WordSong/planFromServer.ts), so the order Marian experiences
+// problems is exactly the p-index order. This reorder is a DETERMINISTIC
+// post-Haiku pass: it stable-partitions the 8 problem groups into
+// [continuant-onset, then stop-onset], preserving each group's slot bundle and
+// relative order WITHIN its class, then renumbers the ids to the new positions.
+// Non-problem utterances (session.end.*) are left untouched at the tail.
+//
+// Gated to the CVC-word tiers (where the read line is "Read the <word>." and the
+// onset is a real consonant grapheme); every other tier passes through unchanged.
+
+/** Onset graphemes that can be held (continuants — the EASIER blending onsets).
+ *  The research class list is f, v, s, m, n, l, r, h; the glides `w`/`y` are
+ *  also held (the blend render recovered /w/ as a held onset) and sequence with
+ *  the continuants. Exported so the reorder unit test pins the class membership
+ *  contract. */
+export const CONTINUANT_ONSET_GRAPHEMES: ReadonlySet<string> = new Set([
+  'f',
+  'v',
+  's',
+  'm',
+  'n',
+  'l',
+  'r',
+  'h',
+  'w',
+  'y',
+])
+
+/** Onset graphemes that cannot be held (stops + the affricate /dʒ/ = `j`, which
+ *  sequences with the stops). The reorder treats any non-continuant onset as the
+ *  "later" class; this set is the explicit complement of
+ *  {@link CONTINUANT_ONSET_GRAPHEMES} over the CVC onset alphabet. Exported so
+ *  the unit test pins that the two sets are disjoint and cover the alphabet. */
+export const STOP_ONSET_GRAPHEMES: ReadonlySet<string> = new Set([
+  'b',
+  'c',
+  'k',
+  'd',
+  'g',
+  'p',
+  't',
+  'j',
+])
+
+/** CVC-word tiers whose problems carry a real consonant onset and a
+ *  "Read the <word>." read line. Mirrors `BLEND_CVC_TIERS` in `api/_tts.ts`. */
+const CVC_REORDER_TIERS: ReadonlySet<string> = new Set([
+  'cvc-words',
+  'cvc-words-short-o',
+  'cvc-words-short-u',
+  'cvc-words-short-i',
+  'cvc-words-short-e',
+])
+
+/** Match `word.p<N>.<slot>` — capture the 1-based problem index. */
+const WORD_PROBLEM_ID = /^word\.p(\d+)\.([a-zA-Z]+)$/
+
+/** Extract the CVC target word's onset grapheme (lowercase first letter) from a
+ *  `"Read the <word>."` read line, or `null` if the line isn't that shape. */
+function cvcOnsetFromRead(read: string): string | null {
+  const m = read.match(/^\s*read\s+the\s+([a-z]+)\s*\.\s*$/i)
+  if (!m) return null
+  const word = m[1]!.toLowerCase()
+  return word.length > 0 ? word[0]! : null
+}
+
+/** True if the onset grapheme is a continuant (the EARLIER class). */
+function isContinuantOnset(onset: string | null): boolean {
+  return onset !== null && CONTINUANT_ONSET_GRAPHEMES.has(onset)
+}
+
+/**
+ * Reorder a CVC-tier plan's problems so continuant-onset words are emitted
+ * BEFORE stop-onset words, preserving relative order within each class, and
+ * renumber the `word.p<N>.<slot>` ids to the new positions. Pure; returns a new
+ * plan (never mutates the input). No-op (returns the input plan) when:
+ *   - `effectiveTier` is not a CVC-word tier, OR
+ *   - any problem's read line isn't the "Read the <word>." shape (defensive:
+ *     don't reshuffle a plan we can't classify), OR
+ *   - the problem set isn't a clean contiguous p1..pN (defensive).
+ *
+ * Stable: a session that is already continuant-first is returned byte-identical.
+ */
+export function reorderContinuantOnsetFirst(
+  plan: PlannerPlan,
+  effectiveTier: string,
+): PlannerPlan {
+  if (!CVC_REORDER_TIERS.has(effectiveTier)) return plan
+
+  // Bucket utterances into per-problem groups (keyed by index, insertion-
+  // ordered) + a tail of non-problem utterances (session.end.*, etc.).
+  const groups = new Map<number, { id: string; text: string }[]>()
+  const tail: { id: string; text: string }[] = []
+  for (const u of plan.utterances) {
+    const m = u.id.match(WORD_PROBLEM_ID)
+    if (!m) {
+      tail.push(u)
+      continue
+    }
+    const index = Number.parseInt(m[1]!, 10)
+    let bucket = groups.get(index)
+    if (!bucket) {
+      bucket = []
+      groups.set(index, bucket)
+    }
+    bucket.push(u)
+  }
+
+  // Defensive: require a clean contiguous p1..pN. Anything else → pass through.
+  const indices = [...groups.keys()].sort((a, b) => a - b)
+  if (indices.length === 0) return plan
+  for (let i = 0; i < indices.length; i++) {
+    if (indices[i] !== i + 1) return plan
+  }
+
+  // Classify each problem by its read-line onset. Bail (pass through) if any
+  // problem lacks a parseable "Read the <word>." read — we won't reshuffle a
+  // plan we can't fully classify.
+  const classified: {
+    oldIndex: number
+    isContinuant: boolean
+    utterances: { id: string; text: string }[]
+  }[] = []
+  for (const index of indices) {
+    const bucket = groups.get(index)!
+    const read = bucket.find((u) => u.id === `word.p${index}.read`)
+    if (!read) return plan
+    const onset = cvcOnsetFromRead(read.text)
+    if (onset === null) return plan
+    classified.push({
+      oldIndex: index,
+      isContinuant: isContinuantOnset(onset),
+      utterances: bucket,
+    })
+  }
+
+  // Stable partition: continuants first (input order), then stops (input
+  // order). `Array.prototype.sort` is stable in modern V8/Node, but we build
+  // the order explicitly to make the contract obvious and version-independent.
+  const continuants = classified.filter((p) => p.isContinuant)
+  const stops = classified.filter((p) => !p.isContinuant)
+  const reordered = [...continuants, ...stops]
+
+  // Renumber: the problem now at position k (1-based) takes id prefix
+  // `word.p<k>.<slot>`. Rewrite each utterance id, preserving slot + text.
+  const newProblemUtterances: { id: string; text: string }[] = []
+  reordered.forEach((p, k) => {
+    const newIndex = k + 1
+    for (const u of p.utterances) {
+      const slot = u.id.slice(`word.p${p.oldIndex}.`.length)
+      newProblemUtterances.push({
+        id: `word.p${newIndex}.${slot}`,
+        text: u.text,
+      })
+    }
+  })
+
+  return {
+    ...plan,
+    utterances: [...newProblemUtterances, ...tail],
+  }
+}
+
+/** The single child-facing recap phrase for every cvc-words* tier. Mirrors the
+ *  `session.end.recap.focus` directive at the SYSTEM_PREAMBLE
+ *  ("any cvc-words* tier ... -> \"reading words\""). All 5 cvc-words* tiers
+ *  share this one line — they are vocabulary-extension siblings, not distinct
+ *  child-facing skills, so Emma says the same warm recap for each. */
+const CVC_RECAP_FOCUS_TEXT = 'You worked on reading words today!'
+
+/**
+ * Deterministic post-Haiku pin for `session.end.recap.focus` on the cvc-words*
+ * tiers. Haiku is instructed (SYSTEM_PREAMBLE) to emit "You worked on reading
+ * words today!" for any cvc-words* tier, but a re-bake can stochastically drift
+ * it to a tier-specific phrase ("You worked on short u words today!" — observed
+ * on cvc-words-short-u, PR #484 re-bake). The pin makes the line unforgeable:
+ * it overwrites the recap.focus text with `CVC_RECAP_FOCUS_TEXT` for the 5
+ * cvc-words* tiers, leaving every other utterance — and every other tier —
+ * byte-identical. Pure; returns a new plan (never mutates the input). No-op
+ * (returns the input plan) when `effectiveTier` is not a cvc-words* tier OR the
+ * recap.focus line is already the canonical text (so the 4 tiers that already
+ * say "reading words" round-trip byte-identical).
+ */
+export function pinCvcRecapFocus(
+  plan: PlannerPlan,
+  effectiveTier: string,
+): PlannerPlan {
+  if (!CVC_REORDER_TIERS.has(effectiveTier)) return plan
+  const needsPin = plan.utterances.some(
+    (u) =>
+      u.id === 'session.end.recap.focus' && u.text !== CVC_RECAP_FOCUS_TEXT,
+  )
+  if (!needsPin) return plan
+  return {
+    ...plan,
+    utterances: plan.utterances.map((u) =>
+      u.id === 'session.end.recap.focus'
+        ? { ...u, text: CVC_RECAP_FOCUS_TEXT }
+        : u,
+    ),
+  }
+}
+
 export interface GenerateSessionPlanArgs {
   /** Anthropic SDK client (or a test stub matching its surface). */
   client: PlannerAnthropicClient
@@ -533,7 +747,21 @@ export async function generateSessionPlan(
     )
   }
 
-  return parsed
+  // Continuant-onset CVC reorder (Q1, design/research/cvc-blend-audio-phonics.md).
+  // Deterministic post-Haiku pass: on the CVC-word tiers, emit continuant-onset
+  // words before stop-onset words (preserving relative order within each class).
+  // No-op for every other tier and for an already-continuant-first session.
+  const effectiveTier = effectiveFocusNode({
+    track: args.track,
+    focusNode: args.focusNode,
+  })
+  // Deterministic post-Haiku passes (order-independent — reorder touches only
+  // problem utterances, the pin touches only session.end.recap.focus):
+  //   1. Continuant-onset-first CVC reorder (Q1).
+  //   2. Pin session.end.recap.focus to the canonical cvc-words* recap text so
+  //      a re-bake can't drift it to a tier-specific phrase (PR #484 fix).
+  const reordered = reorderContinuantOnsetFirst(parsed, effectiveTier)
+  return pinCvcRecapFocus(reordered, effectiveTier)
 }
 
 /**

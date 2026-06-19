@@ -2306,12 +2306,35 @@ describe('CVC phoneme-blend prompt render (ticket 86c9qa6n3)', () => {
       )
     })
 
-    it('FLOORS a word with a /dʒ/ (j) onset (jam) WHOLE — no segmentation', () => {
+    it('renders the /dʒ/ onset (jam) with the BARE held + schwa-tail phoneme (dʒːə) — pass-8 recovered from FLOOR', () => {
       const ssml = renderBlendInnerText('j - a - m ... jam', 'cvc-words', true)!
-      expect(ssml).toBe(
+      // jam: j (/dʒ/) → a BARE <phoneme ph="dʒːə">j</phoneme> (NOT nested in a
+      // <prosody> wrap like /f/+/s/+/v/+/w/), then the candidate-f beat. The
+      // EXACT audition j2 onset (origin/devon/blend-dj-vv-audition).
+      expect(ssml).toContain(
+        '<phoneme alphabet="ipa" ph="dʒːə">j</phoneme><break time="250ms"/>',
+      )
+      // a (/æ/ vowel) bare; m (/m/ continuant) bare; whole word natural.
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="æ">a</phoneme>')
+      expect(ssml).toContain('<phoneme alphabet="ipa" ph="m">m</phoneme>')
+      expect(ssml).toContain('<break time="450ms"/>jam')
+      // The /dʒ/ onset is BARE (no nested -25% prosody wrap) — the affricate
+      // recovery lever differs from the held-fricative onsets.
+      expect(ssml).not.toContain('<prosody rate="-25%">')
+      // It is NOT the whole-word floor anymore.
+      expect(ssml).not.toBe(
         '<prosody rate="-15%">jam</prosody><break time="450ms"/>jam',
       )
-      expect(ssml).not.toContain('<phoneme')
+    })
+
+    it('renders the FULL j2 segmented jam render byte-exactly (matches audition j2)', () => {
+      const ssml = renderBlendInnerText('j - a - m ... jam', 'cvc-words', true)!
+      expect(ssml).toBe(
+        '<phoneme alphabet="ipa" ph="dʒːə">j</phoneme><break time="250ms"/>' +
+          '<phoneme alphabet="ipa" ph="æ">a</phoneme><break time="250ms"/>' +
+          '<phoneme alphabet="ipa" ph="m">m</phoneme><break time="250ms"/>' +
+          '<break time="450ms"/>jam',
+      )
     })
 
     it('injects a break AFTER each grapheme and a longer break before the whole word', () => {

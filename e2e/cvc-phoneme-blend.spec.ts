@@ -8,14 +8,17 @@
  * phoneme-blend sound-out ("c - a - t ... cat") for `cvc-word` problems
  * whose session bundle carries a baked `word.p{N}.blend` utterance, and
  * GRACEFUL-SKIPS to the existing `hint` line when the blend slot is absent
- * (every tier today, pre-bake). Two cases:
+ * (any tier / bundle whose canon carries no blend lines). Two cases:
  *
  *   1. **Blend fires** — a canon mutated to carry `blend` lines → the 2nd
  *      wrong tap plays the blend (caption shows the segmented text) and the
  *      letters highlight in sequence.
- *   2. **Graceful-skip (pre-bake)** — the REAL production cvc-words canon
- *      (no `blend` slot) → the 2nd wrong tap fires the existing
- *      "Let's look. <Word>." hint, no letter highlight, no soft-lock.
+ *   2. **Graceful-skip (no blend slot)** — the production cvc-words canon
+ *      with its `word.p{N}.blend` slots STRIPPED → the 2nd wrong tap fires
+ *      the existing "Let's look. <Word>." hint, no letter highlight, no
+ *      soft-lock. (The committed canon now ships baked blend lines after
+ *      the holistic CVC re-bake, so the blend-free condition is constructed
+ *      explicitly — see `canonWithoutBlend` — rather than read off disk.)
  *
  * Mock strategy
  * -------------
@@ -97,6 +100,29 @@ function canonWithBlend(): Canon {
       audio: { ...hint.audio },
     })
   }
+  return canon
+}
+
+/**
+ * Return a deep copy of the canon with every `word.p{N}.blend` utterance
+ * STRIPPED — the genuine "no blend slot" condition the graceful-skip beat
+ * falls back from.
+ *
+ * Why this exists: the holistic CVC re-bake (this branch) baked
+ * `word.p{N}.blend` lines INTO the committed production canon, so reading
+ * `cvc-words.json` off disk no longer represents the pre-bake "no blend
+ * slot" state. The graceful-skip beat fires the existing `hint` ONLY when
+ * `problem.utterances.blend === undefined` (WordSong.tsx — the
+ * `blendText !== undefined` guard), which now requires us to construct the
+ * no-blend canon explicitly rather than assume the on-disk canon is one.
+ * `parseUtteranceId` carries `blend` as optional / not in `ALL_SLOTS`, so a
+ * stripped bundle rehydrates cleanly with `utterances.blend === undefined`.
+ */
+function canonWithoutBlend(): Canon {
+  const canon = loadCanon()
+  const isBlend = (id: string) => /^word\.p\d+\.blend$/.test(id)
+  canon.plan.utterances = canon.plan.utterances.filter((u) => !isBlend(u.id))
+  canon.utterances = canon.utterances.filter((u) => !isBlend(u.id))
   return canon
 }
 
@@ -238,12 +264,16 @@ test.describe('CVC phoneme-blend prompt (2nd wrong tap, ticket 86c9qa6n3)', () =
     await expect(wordSong).toHaveAttribute('data-read-aloud-played', 'true')
   })
 
-  test('graceful-skip: the REAL canon (no blend slot) fires the existing hint, no letter highlight, no soft-lock', async ({
+  test('graceful-skip: a canon with no blend slot fires the existing hint, no letter highlight, no soft-lock', async ({
     page,
   }, testInfo) => {
     testInfo.skip(testInfo.project.name === 'webkit')
-    // Real production canon — carries NO `blend` slot (pre-bake state).
-    await installMock(page, readFileSync(CVC_WORDS_CANON_PATH, 'utf-8'))
+    // Production canon with every `word.p{N}.blend` slot STRIPPED — the
+    // genuine "no blend slot" condition the 2nd-wrong beat graceful-skips
+    // from. (The committed canon now ships baked blend lines after the
+    // holistic CVC re-bake, so we can no longer read it off disk and assume
+    // it is blend-free — see `canonWithoutBlend`.)
+    await installMock(page, JSON.stringify(canonWithoutBlend()))
     await enterWordSong(page)
 
     const wordSong = page.getByTestId('word-song')
