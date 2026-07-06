@@ -59,7 +59,7 @@
 import {
   loadSessionAudio as defaultLoadSessionAudio,
   playSessionUtterance as defaultPlaySessionUtterance,
-  unloadSessionAudio as defaultUnloadSessionAudio,
+  unloadIfActive as defaultUnloadIfActive,
 } from './sessionAudio'
 import type { HowlLike, PlaySessionUtteranceOptions } from './sessionAudio'
 import type {
@@ -96,8 +96,12 @@ export interface PrepareMathPathAOptions {
     utteranceId: string,
     opts?: PlaySessionUtteranceOptions,
   ) => Promise<void>
-  /** Test seam — replaces `unloadSessionAudio` from `./sessionAudio`. */
-  unloadSessionAudio?: () => void
+  /**
+   * Test seam — replaces `unloadIfActive` from `./sessionAudio`. Called with
+   * this session's id so the ownership guard only tears down when this
+   * session still owns the singleton bundle (P0-4).
+   */
+  unloadIfActive?: (sessionId: string) => void
   /** Optional AbortSignal — App.tsx can cancel the in-flight fetch when
    *  the user navigates away from Math before the request resolves. */
   signal?: AbortSignal
@@ -233,7 +237,7 @@ export async function prepareMathPathA(
   const fetchImpl = opts.fetch ?? globalThis.fetch
   const loadAudio = opts.loadSessionAudio ?? defaultLoadSessionAudio
   const playSession = opts.playSessionUtterance ?? defaultPlaySessionUtterance
-  const unloadAudio = opts.unloadSessionAudio ?? defaultUnloadSessionAudio
+  const unloadIfActiveFn = opts.unloadIfActive ?? defaultUnloadIfActive
 
   // Track-based payload (ticket 86c9jteud). The server's _planner.ts
   // generates the plan via Haiku; api/claude.ts feeds the plan into the
@@ -432,6 +436,9 @@ export async function prepareMathPathA(
     playUtterance,
     textToId,
     utteranceCount: sessionResponse.utterances.length,
-    unload: () => unloadAudio(),
+    // P0-4: ownership-checked unload. If a newer session (e.g. Math pre-warm
+    // on greet superseding this bundle) is active by the time this closure
+    // fires, unloadIfActive is a no-op — it must not tear down the successor.
+    unload: () => unloadIfActiveFn(args.sessionId),
   }
 }

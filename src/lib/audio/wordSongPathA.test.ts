@@ -314,22 +314,25 @@ describe('prepareWordSongPathA — happy path', () => {
     expect(prepared.utteranceCount).toBe(response.utterances.length)
   })
 
-  it('unload() invokes the supplied unloadSessionAudio', async () => {
+  it('unload() forwards to unloadIfActive with this session id (P0-4)', async () => {
     const plan = STATIC_WORD_SONG_PLANS[0]!
     const fetchMock = makeFetchMock(async () =>
       jsonResp(buildServerResponse(plan)),
     )
-    const unloadMock = vi.fn()
+    const unloadIfActiveMock = vi.fn()
 
     const prepared = await prepareWordSongPathA(STD_ARGS, {
       fetch: fetchMock as unknown as typeof globalThis.fetch,
       loadSessionAudio: vi.fn(async () => new Map<string, HowlLike>()),
       playSessionUtterance: vi.fn(async () => {}),
-      unloadSessionAudio: unloadMock,
+      unloadIfActive: unloadIfActiveMock,
     })
 
     prepared.unload()
-    expect(unloadMock).toHaveBeenCalledOnce()
+    // Ownership-checked: the closure passes THIS session's id so a stale
+    // unload no-ops when a newer session owns the singleton bundle.
+    expect(unloadIfActiveMock).toHaveBeenCalledOnce()
+    expect(unloadIfActiveMock).toHaveBeenCalledWith(STD_ARGS.sessionId)
   })
 })
 
