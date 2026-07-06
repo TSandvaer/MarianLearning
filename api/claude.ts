@@ -77,7 +77,6 @@ import {
   type ClaudeStubResponse,
   type SessionStartResponse,
 } from './_types.js'
-import { renderSessionAudio } from './_session.js'
 import {
   deriveCurrentTargetVowel,
   generateSessionStartResponse,
@@ -605,8 +604,9 @@ function extractSourceIp(request: Request): string {
  *  interface. Kept as a factory so tests can inject a stub via the
  *  exported handler-level seam below. */
 function buildAnthropicClient(): PlannerAnthropicClient {
-  // Anthropic SDK reads ANTHROPIC_API_KEY from env automatically; we
-  // already presence-checked it above the planner call.
+  // Anthropic SDK reads ANTHROPIC_API_KEY from env automatically; the
+  // track branch presence-checks it just before this factory is called
+  // (a missing key would otherwise throw inside `new Anthropic()`).
   const sdk = new Anthropic()
   return {
     messages: {
@@ -718,59 +718,41 @@ export async function handler(
     )
   }
 
-  // Env check. Note: presence-only — never read or echo the value here.
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return jsonResponse({ error: 'config-missing' }, 500, headers)
-  }
-
   // session-start branches:
-  //   1. payload.plan present  → render TTS for the supplied plan
-  //      (legacy v1 client path; preserved unchanged for backward compat).
+  //   1. payload.plan present  → 400 invalid-body. The legacy
+  //      client-supplied plan path was REMOVED (P0-1, 2026-07-06); see
+  //      the rejection below.
   //   2. payload.track present → call Haiku to generate a plan, then
   //      render TTS (added ticket 86c9jdh39 — replaces the prior stub
   //      that produced silence on Math + WordSong in production).
   //   3. neither present       → legacy stub (200 with stub: true).
   //
-  // Order matters: plan-attached requests bypass the rate limiter
-  // entirely (no Claude call, just TTS — same cost surface as v1). Only
-  // the new track-based path goes through the limiter, since that's the
-  // one that costs Anthropic credits.
+  // The ANTHROPIC_API_KEY presence check lives INSIDE the track branch,
+  // after the canon + cache short-circuits (P0-5, 2026-07-06): canon- and
+  // cache-served responses make no Anthropic call and must survive a
+  // missing key. Only the live planner path needs it.
   if (body.kind === 'session-start') {
-    const plan = extractPlan(body.payload)
-    if (plan !== null) {
-      try {
-        const rendered = await renderSessionAudio(plan)
-        return jsonResponse(rendered, 200, headers)
-      } catch (err) {
-        // Surface the failure in `vercel logs` so future tts-failed shapes
-        // can be root-caused from stack traces instead of from the
-        // response message alone (see ticket 86c9gwxah; the 86c9gwvn0 P0
-        // investigation had to reason from message shape because this
-        // catch path was silent). Log message + stack ONLY — never the
-        // request body, payload, or any provider headers; the underlying
-        // _tts module is responsible for never embedding the Azure key
-        // in the error it throws, and we deliberately don't widen the
-        // log surface here in case that contract ever slips.
-        const message = err instanceof Error ? err.message : String(err)
-        const stack = err instanceof Error ? err.stack : undefined
-        console.error('[api/claude] tts-failed', { message, stack })
-
-        // Don't leak provider internals — `tts-failed` is the stable
-        // code; the browser falls back to a degraded session per
-        // "Claude is the brain, not the mouth" / graceful-degradation
-        // policy in CLAUDE.md.
-        return jsonResponse(
-          {
-            error: 'tts-failed',
-            message:
-              err instanceof Error && err.message
-                ? `tts pipeline failed: ${err.message}`
-                : 'tts pipeline failed',
-          },
-          502,
-          headers,
-        )
-      }
+    // P0-1 (backend hardening, 2026-07-06): the legacy client-supplied
+    // `payload.plan` path is REMOVED. It piped an opaque, client-controlled
+    // plan straight into `renderSessionAudio` with NO rate limiter, NO
+    // canon lookup, and NO utterance-count / text-length cap — so a leaked
+    // share-link could POST an unbounded utterance array directly into the
+    // paid Azure S0 TTS pipeline (the "bypasses rate limit" comment predated
+    // the F0 → S0 paid upgrade). No live client uses it: both production
+    // callers (src/lib/audio/mathPathA.ts + wordSongPathA.ts) POST the
+    // track-based payload. Reject a plan-carrying body with a clear 400
+    // rather than servicing it or silently falling through to the stub.
+    if (extractPlan(body.payload) !== null) {
+      return jsonResponse(
+        {
+          error: 'invalid-body',
+          message:
+            'The client-supplied `plan` path is no longer supported. ' +
+            'Send a track-based payload: { track, level, childName }.',
+        },
+        400,
+        headers,
+      )
     }
 
     // Track-based branch: try the pre-baked canon first; fall through
@@ -926,6 +908,20 @@ export async function handler(
           })
           return jsonResponse(gated, 200, headers)
         }
+      }
+
+      // P0-5 (backend hardening, 2026-07-06): ANTHROPIC_API_KEY presence
+      // check. Reached only on a canon miss AND a cache miss — i.e. the
+      // live planner path, the ONLY branch that calls Anthropic. Canon hits
+      // + cache hits returned above and survive a missing key (that's the P0
+      // this fixes: the old global check 500'd ALL traffic before the canon
+      // lookup). Must run before `buildAnthropicClient()` below —
+      // `new Anthropic()` throws on a missing key, so checking here returns
+      // a clean `config-missing` instead of an unhandled construction throw.
+      // The planner double-checks the key too (api/_planner.ts
+      // `generateSessionPlan`) as a backstop for future cron / CLI callers.
+      if (!process.env.ANTHROPIC_API_KEY) {
+        return jsonResponse({ error: 'config-missing' }, 500, headers)
       }
 
       // Canon-miss log (single line per miss). Lets us monitor coverage
