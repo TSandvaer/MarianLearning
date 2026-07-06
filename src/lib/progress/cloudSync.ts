@@ -44,15 +44,14 @@
  * continues to function locally with no network noise.
  */
 
-import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
+import { LETTER_SOUNDS_VOWELS } from './defaults'
 import { isProgressV1 } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
-import { saveProgress } from './storage'
+import { saveProgress, withDefaultedSkillLevels } from './storage'
 import type {
   LetterSoundsVowel,
   Progress,
   SessionHistoryEntry,
-  SkillLevels,
   VowelSubMasteryState,
 } from './types'
 
@@ -416,16 +415,16 @@ export async function reconcileWithCloud(
  *
  * Returns null when the blob can't be repaired into a valid v1 Progress.
  *
- * Why we replicate `withDefaultedSkillLevels` here instead of importing
- * it: the storage adapter's defaulter is private (file-local). Lifting
- * it would require a public export and a re-export from the index;
- * that's a bigger surface change than just keeping the small two-arm
- * defaulter local to this module. The implementation matches
- * `storage.ts:withDefaultedSkillLevels` 1:1; if either drifts, the
- * cloud-installed blob and the locally-loaded blob would default
- * different keys, which is exactly the four-place-sync hazard T1 was
- * supposed to prevent. Add a regression test that pins them together
- * if a future change touches one.
+ * `withDefaultedSkillLevels` is imported directly from `./storage`
+ * (P0-6, 2026-07-06) — NOT re-implemented here. The former private mirror
+ * lacked the dead-letter remaps (`digraphs → digraphs-sh`,
+ * `two-digit-addsub → two-digit-addsub-no-regroup`) the storage version
+ * carries, so a cloud blob holding a legacy key installed with the level
+ * silently dropped (the new sibling floor-filled to `'locked'`) while a
+ * local load preserved it — the exact parity hazard the old "matches 1:1"
+ * comment claimed was impossible. Sharing the one function makes drift
+ * structurally impossible; the `withDefaultedSkillLevels parity` tests in
+ * `cloudSync.test.ts` pin the legacy-key round-trip.
  */
 function installCloudBlob(
   blob: unknown,
@@ -549,45 +548,6 @@ export function mergeSessionHistories(
   return deduped.sort((a, b) =>
     a.dateISO < b.dateISO ? -1 : a.dateISO > b.dateISO ? 1 : 0,
   )
-}
-
-/**
- * Mirror of `storage.ts:withDefaultedSkillLevels`. See the lengthy
- * comment in that file for the rationale; the contract is preserved
- * here verbatim. If the storage version changes, this MUST change in
- * the same PR.
- */
-function withDefaultedSkillLevels(parsed: unknown): unknown {
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return parsed
-  }
-  const obj = parsed as Record<string, unknown>
-  const skillLevels = obj.skillLevels
-  if (
-    typeof skillLevels !== 'object' ||
-    skillLevels === null ||
-    Array.isArray(skillLevels)
-  ) {
-    return parsed
-  }
-  const present = skillLevels as Record<string, unknown>
-  const floor = defaultLockedSkillLevels()
-  let mutated = false
-  const filled: SkillLevels = { ...floor }
-  for (const key of Object.keys(floor) as Array<keyof SkillLevels>) {
-    if (key in present && present[key] !== undefined) {
-      filled[key] = present[key] as SkillLevels[typeof key]
-    } else {
-      mutated = true
-    }
-  }
-  for (const key of Object.keys(present)) {
-    if (!(key in floor)) {
-      ;(filled as Record<string, unknown>)[key] = present[key]
-    }
-  }
-  if (!mutated) return parsed
-  return { ...obj, skillLevels: filled }
 }
 
 /**

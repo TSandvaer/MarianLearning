@@ -81,6 +81,7 @@ export {
   clearProgress,
   loadProgress,
   saveProgress,
+  withDefaultedSkillLevels,
 } from './storage'
 
 export {

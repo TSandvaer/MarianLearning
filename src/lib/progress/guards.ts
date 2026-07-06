@@ -120,13 +120,19 @@ function isHistoryEntry(v: unknown): v is SessionHistoryEntry {
     return false
   }
   if (!Array.isArray(v.skillFocus)) return false
-  if (
-    !v.skillFocus.every(
-      (n) => typeof n === 'string' && SKILL_NODES.has(n as SkillNode),
-    )
-  ) {
-    return false
-  }
+  // skillFocus entries must be strings, but we deliberately DO NOT require
+  // SKILL_NODES membership (P0-2, 2026-07-06). History is an append-only
+  // audit log: a retired node literal (e.g. 'digraphs', 'two-digit-addsub')
+  // legitimately persists in an OLD entry after a K2 read-path remap
+  // rewrites `skillLevels` KEYS but NOT `history[].skillFocus`. Rejecting the
+  // whole blob for an inert historical string would null a returning user's
+  // entire progress on the next node rename. The strings are inert — every
+  // consumer reads them only via `.includes(node)` / `.some(...)` membership
+  // filters (mastery.ts, focusNode.ts, slowFacts.ts) or a dedupe-key join
+  // (cloudSync.ts), so an unrecognised literal simply never matches and is
+  // skipped. See storage.ts:withDefaultedSkillLevels for the remap asymmetry
+  // this tolerance is paired with.
+  if (!v.skillFocus.every((n) => typeof n === 'string')) return false
   // latencyMs is optional (ticket 86c9pwgc8 — additive, no schemaVersion
   // bump). When present it must be an array of finite numbers; the `-1`
   // sentinel for "no measurement" is allowed (so we accept any finite
