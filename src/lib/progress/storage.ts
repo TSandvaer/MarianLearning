@@ -88,6 +88,12 @@ export function loadProgress(): Progress | null {
 /**
  * Read-path skill-level defaulter (ticket 86c9pkfth).
  *
+ * Exported + shared with `cloudSync.ts:installCloudBlob` (P0-6, 2026-07-06)
+ * so the localStorage read path and the cloud install path run the SAME
+ * defaulter — including the dead-letter remaps below. A prior private
+ * cloudSync mirror lacked the remaps and silently dropped a legacy key's
+ * level on cloud-install; consolidating here removes that drift class.
+ *
  * Fills missing keys on the parsed `skillLevels` object with the
  * schema-floor value `'locked'`. Mirror-of-shape for `withDefaultedSettings`
  * below: layered post-parse so the strict `isProgressV1` guard never sees
@@ -125,7 +131,7 @@ export function loadProgress(): Progress | null {
  * Input is `unknown` because this runs BEFORE `isProgressV1`. We
  * downcast defensively and only touch the `skillLevels` field.
  */
-function withDefaultedSkillLevels(parsed: unknown): unknown {
+export function withDefaultedSkillLevels(parsed: unknown): unknown {
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     return parsed
   }
@@ -178,11 +184,17 @@ function withDefaultedSkillLevels(parsed: unknown): unknown {
   // explicitly per Dave's research deliverable, ticket epic 86c9xwjtr).
   // Marian's `defaultProgress` had `two-digit-addsub: 'locked'`, so
   // for production users the remap is a no-op. The branch covers the
-  // QA hand-edit case + any session-history records (note: history
-  // entries carry SkillNode strings on `skillFocus`, but the storage
-  // guard tolerates unknown SkillNode strings inside history strings
-  // — see `isHistoryEntry` — only `skillLevels` keys are floor-checked).
-  // When both legacy and new keys are present (post-PR-B QA edits),
+  // QA hand-edit case. Deliberate asymmetry: this remap rewrites
+  // `skillLevels` KEYS only — it does NOT rewrite retired literals inside
+  // `history[].skillFocus`. That is safe because `isHistoryEntry`
+  // (guards.ts) tolerates unknown `skillFocus` strings (relaxed in P0-2,
+  // 2026-07-06): a retired literal like `'two-digit-addsub'` or
+  // `'digraphs'` round-trips inertly (consumers read skillFocus only via
+  // `.includes(node)` membership, so an unrecognised string never matches).
+  // Without that tolerance, a returning user with real play history on a
+  // renamed node would fail the strict guard and have their whole blob
+  // nulled on next load.
+  // When both legacy and new keys are present (post-Wave-5 QA edits),
   // the new key wins; the legacy literal is stripped so the strict
   // guard's downstream check doesn't see an unrecognised key.
   if (

@@ -28,6 +28,7 @@ import {
 } from './cloudSync'
 import { defaultProgress } from './defaults'
 import { isProgressV1 } from './guards'
+import { STORAGE_KEY, loadProgress } from './storage'
 import type { Progress, SessionHistoryEntry, SkillLevels } from './types'
 
 const VALID_UUID = '11111111-2222-4333-8444-555555555555'
@@ -449,6 +450,84 @@ describe('reconcileWithCloud', () => {
     expect(installed[0]!.skillLevels['cvc-words-short-o']).toBe('locked')
     // The result remains a valid v1 doc.
     expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
+  it('withDefaultedSkillLevels parity — cloud blob with a legacy `digraphs` key installs the level onto `digraphs-sh`, matching local load (P0-6)', async () => {
+    // P0-6 (2026-07-06): the cloud install path now shares
+    // storage.ts:withDefaultedSkillLevels, which carries the
+    // `digraphs → digraphs-sh` dead-letter remap. Pre-fix, the private
+    // cloudSync mirror lacked it: the legacy key rode along and
+    // `digraphs-sh` floor-filled to 'locked', silently dropping the level
+    // — divergent from the local load path.
+    const seed = defaultProgress()
+    const skillLevels: Record<string, unknown> = { ...seed.skillLevels }
+    delete skillLevels['digraphs-sh']
+    skillLevels['digraphs'] = 'mastered' // QA hand-edit on a retired literal
+    const cloudBlob = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-07-06T11:00:00.000Z' },
+      skillLevels,
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, defaultProgress(), {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-07-06T11:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    // Level preserved on the new sibling key — NOT floor-filled to 'locked'.
+    expect(installed[0]!.skillLevels['digraphs-sh']).toBe('mastered')
+    // Legacy literal stripped from the installed skillLevels.
+    expect(
+      (installed[0]!.skillLevels as Record<string, unknown>)['digraphs'],
+    ).toBeUndefined()
+    // Literal parity: the same blob loaded from localStorage yields the
+    // same skillLevels (both paths call the shared storage-side defaulter).
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudBlob))
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(installed[0]!.skillLevels).toEqual(loaded!.skillLevels)
+  })
+
+  it('withDefaultedSkillLevels parity — cloud blob with a legacy `two-digit-addsub` key installs the level onto `two-digit-addsub-no-regroup`, matching local load (P0-6)', async () => {
+    const seed = defaultProgress()
+    const skillLevels: Record<string, unknown> = { ...seed.skillLevels }
+    delete skillLevels['two-digit-addsub-no-regroup']
+    skillLevels['two-digit-addsub'] = 'practicing'
+    const cloudBlob = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-07-06T11:00:00.000Z' },
+      skillLevels,
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, defaultProgress(), {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-07-06T11:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed[0]!.skillLevels['two-digit-addsub-no-regroup']).toBe(
+      'practicing',
+    )
+    expect(
+      (installed[0]!.skillLevels as Record<string, unknown>)[
+        'two-digit-addsub'
+      ],
+    ).toBeUndefined()
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudBlob))
+    const loaded = loadProgress()
+    expect(loaded).not.toBeNull()
+    expect(installed[0]!.skillLevels).toEqual(loaded!.skillLevels)
   })
 
   it('cloud blob without lifetimeFirstEncounters (pre-86c9q9ben device) → field inferred at install time', async () => {

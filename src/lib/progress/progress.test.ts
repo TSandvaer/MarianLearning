@@ -85,6 +85,48 @@ describe('loadProgress', () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(future))
     expect(loadProgress()).toBeNull()
   })
+
+  it('round-trips a retired SkillNode literal in history[].skillFocus without nulling (P0-2)', () => {
+    // P0-2 (2026-07-06): the K2 read-path remaps rewrite `skillLevels` KEYS
+    // only, never `history[].skillFocus`. A returning user with real play
+    // history on a since-renamed node ('digraphs', 'two-digit-addsub')
+    // carries the retired literal in an OLD history entry. `isHistoryEntry`
+    // must tolerate it — pre-fix it required SKILL_NODES membership, so the
+    // whole blob was rejected, `loadProgress` returned null, and the user
+    // was silently reset to defaults.
+    const seed = defaultProgress('Marian')
+    const history = [
+      {
+        dateISO: '2026-05-01T10:00:00.000Z',
+        skillFocus: ['cvc-words'],
+        successRate: 1,
+      },
+      // Retired literals — persisted from before the K2 splits.
+      {
+        dateISO: '2026-05-02T10:00:00.000Z',
+        skillFocus: ['digraphs'],
+        successRate: 0.875,
+      },
+      {
+        dateISO: '2026-05-03T10:00:00.000Z',
+        skillFocus: ['two-digit-addsub'],
+        successRate: 0.75,
+      },
+    ] as unknown as SessionHistoryEntry[]
+    const blob: Progress = { ...seed, history }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+
+    const loaded = loadProgress()
+    // The whole blob survives — NOT nulled.
+    expect(loaded).not.toBeNull()
+    // The retired-literal entries round-trip verbatim (inert, never remapped).
+    expect(loaded!.history.map((h) => h.skillFocus)).toEqual([
+      ['cvc-words'],
+      ['digraphs'],
+      ['two-digit-addsub'],
+    ])
+    expect(isProgressV1(loaded)).toBe(true)
+  })
 })
 
 describe('saveProgress', () => {
