@@ -214,10 +214,22 @@ describe('body validation', () => {
     expect(await res.json()).toMatchObject({ error: 'invalid-body' })
   })
 
-  it('rejects when the API key env var is missing', async () => {
+  it('rejects with config-missing when the key is absent on the LIVE planner path (P0-5)', async () => {
+    // P0-5 (2026-07-06): the ANTHROPIC_API_KEY presence check now lives in
+    // the track branch, AFTER the canon + cache short-circuits — so ONLY a
+    // request that reaches the live planner 500s on a missing key. A track
+    // payload that misses canon reaches that path. (Canon-served + stub
+    // traffic surviving keyless is proven by dedicated tests below.)
     delete process.env.ANTHROPIC_API_KEY
     const res = await handler(
-      makeRequest({ kind: 'session-start', payload: {} }),
+      makeRequest({
+        kind: 'session-start',
+        payload: { track: 'math', level: 1, childName: 'Marian' },
+      }),
+      {
+        getCanonEntry: noCanon,
+        sessionCache: createSessionCache({ ttlMs: 60_000 }),
+      },
     )
     expect(res.status).toBe(500)
     expect(await res.json()).toMatchObject({ error: 'config-missing' })
@@ -259,107 +271,62 @@ describe('stub path (no plan in payload)', () => {
       stub: true,
     })
   })
+
+  it('serves the stub WITHOUT ANTHROPIC_API_KEY (P0-5 — non-planner traffic survives a missing key)', async () => {
+    // Regression guard for the pre-P0-5 global check that 500'd ALL traffic
+    // (incl. stub / non-planner paths) before the branch dispatch.
+    delete process.env.ANTHROPIC_API_KEY
+    const res = await handler(
+      makeRequest({ kind: 'session-start', payload: {} }),
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      ok: true,
+      kind: 'session-start',
+      stub: true,
+    })
+    expect(mockedRender).not.toHaveBeenCalled()
+  })
 })
 
-describe('TTS-merge path (session-start with plan)', () => {
-  it('renders TTS and returns the SessionStartResponse', async () => {
+describe('legacy plan-attached path is rejected (P0-1 — backend hardening)', () => {
+  it('returns 400 invalid-body for session-start carrying payload.plan and does NOT render TTS', async () => {
+    // P0-1 (2026-07-06): the client-supplied plan path was removed — it
+    // bypassed the rate limiter, canon, and any utterance cap. A plan-
+    // carrying body now gets a clear 400 instead of being serviced (or
+    // silently falling through to the stub).
     const fakePlan = {
       utterances: [{ id: 'p1', text: 'Two plus three.' }],
     }
-    mockedRender.mockResolvedValueOnce({
-      ok: true,
-      kind: 'session-start',
-      plan: fakePlan,
-      utterances: [
-        {
-          id: 'p1',
-          text: 'Two plus three.',
-          audio: { kind: 'inline', base64: 'AAEC', mime: 'audio/mpeg' },
-        },
-      ],
-    })
-
     const res = await handler(
       makeRequest({
         kind: 'session-start',
         payload: { plan: fakePlan },
       }),
     )
-    expect(res.status).toBe(200)
-    const body = (await res.json()) as {
-      kind: string
-      utterances: { id: string; audio: { mime: string } }[]
-    }
-    expect(body.kind).toBe('session-start')
-    expect(body.utterances).toHaveLength(1)
-    expect(body.utterances[0]!.audio.mime).toBe('audio/mpeg')
-    expect(mockedRender).toHaveBeenCalledOnce()
-    // The plan reaches the function via JSON.stringify → JSON.parse, so
-    // structural equality, not identity.
-    expect(mockedRender.mock.calls[0]![0]).toEqual(fakePlan)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid-body' })
+    expect(mockedRender).not.toHaveBeenCalled()
   })
 
-  it('returns 502 tts-failed when the TTS render throws', async () => {
-    // Suppress the new console.error log (asserted by its own test below)
-    // so this existing assertion isn't noisy in test output.
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      mockedRender.mockRejectedValueOnce(new Error('socket reset'))
-      const res = await handler(
-        makeRequest({
-          kind: 'session-start',
-          payload: { plan: { utterances: [{ id: 'a', text: 't' }] } },
-        }),
-      )
-      expect(res.status).toBe(502)
-      const body = (await res.json()) as { error: string; message?: string }
-      expect(body.error).toBe('tts-failed')
-      expect(body.message).toContain('socket reset')
-    } finally {
-      errorSpy.mockRestore()
+  it('rejects a plan with an unbounded utterance array — the exact bypass P0-1 closes', async () => {
+    // The pre-fix hole: an unbounded client-supplied utterance array piped
+    // straight into the paid TTS pipeline. Prove it never reaches render.
+    const hugePlan = {
+      utterances: Array.from({ length: 5000 }, (_, i) => ({
+        id: `u${i}`,
+        text: 'x'.repeat(1000),
+      })),
     }
-  })
-
-  it('logs the underlying error to console.error on the tts-failed path (ticket 86c9gwxah — so vercel logs is non-empty)', async () => {
-    // Background: the 86c9gwvn0 P0 investigation had to reason from the
-    // 502 response-message shape because this catch path was silent. The
-    // structural fix is to log message + stack so future failures of
-    // this shape are diagnosable from `vercel logs` directly.
-    //
-    // PII / secrets discipline: the log line must NOT carry the request
-    // body, the payload, or the Azure key. Asserting on the call shape
-    // (exactly { message, stack }) keeps that contract enforced — if
-    // someone widens the log surface, this test fails and the PR review
-    // surfaces it.
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const thrown = new Error('socket reset')
-      mockedRender.mockRejectedValueOnce(thrown)
-
-      const res = await handler(
-        makeRequest({
-          kind: 'session-start',
-          payload: { plan: { utterances: [{ id: 'a', text: 't' }] } },
-        }),
-      )
-      expect(res.status).toBe(502)
-
-      // Logged exactly once, with a stable label and a structured payload
-      // carrying message + stack. No third positional arg — no payload /
-      // body / headers / key surface.
-      expect(errorSpy).toHaveBeenCalledTimes(1)
-      const [label, detail, ...rest] = errorSpy.mock.calls[0]!
-      expect(label).toBe('[api/claude] tts-failed')
-      expect(rest).toEqual([])
-      expect(detail).toMatchObject({
-        message: 'socket reset',
-        stack: expect.stringContaining('Error: socket reset'),
-      })
-      // Belt-and-braces: nothing else snuck in.
-      expect(Object.keys(detail as object).sort()).toEqual(['message', 'stack'])
-    } finally {
-      errorSpy.mockRestore()
-    }
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: { plan: hugePlan },
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid-body' })
+    expect(mockedRender).not.toHaveBeenCalled()
   })
 
   it('cache-control header is no-store on every response', async () => {
@@ -625,27 +592,15 @@ describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => 
     expect(anthropicClient.messages.create).not.toHaveBeenCalled()
   })
 
-  it('does NOT rate-limit the legacy plan-attached path', async () => {
-    // The plan-attached path costs nothing on Anthropic (it only renders
-    // TTS), so we deliberately skip the limiter for it. This test pins
-    // that contract — a saturated limiter should NOT block a v1 client.
+  it('the removed plan-attached path returns 400 before touching the limiter (P0-1)', async () => {
+    // Pre-P0-1 this path bypassed the limiter AND rendered TTS. It is now a
+    // hard 400 (see the "legacy plan-attached path is rejected" suite).
+    // Assert it rejects even with a saturated limiter and never renders —
+    // i.e. the rejection fires before both the limiter and the TTS pipeline.
     const rateLimiter = createRateLimiter({ limit: 1, windowMs: 60_000 })
     rateLimiter.check('203.0.113.2', 1000)
 
     const fakePlan = { utterances: [{ id: 'p1', text: 'Hi.' }] }
-    mockedRender.mockResolvedValueOnce({
-      ok: true,
-      kind: 'session-start',
-      plan: fakePlan,
-      utterances: [
-        {
-          id: 'p1',
-          text: 'Hi.',
-          audio: { kind: 'inline', base64: 'AAEC', mime: 'audio/mpeg' },
-        },
-      ],
-    })
-
     const req = new Request('https://example.test/api/claude', {
       method: 'POST',
       headers: {
@@ -665,8 +620,9 @@ describe('Rate limiting on track-based session-start (ticket 86c9jdh39)', () => 
       getCanonEntry: noCanon,
     })
 
-    expect(res.status).toBe(200)
-    expect(mockedRender).toHaveBeenCalled()
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'invalid-body' })
+    expect(mockedRender).not.toHaveBeenCalled()
   })
 })
 
@@ -1246,6 +1202,45 @@ describe('Canon-first session-start (D — pre-baked canon, ticket 86c9kwhbc)', 
       level: 1,
       focusNode: 'add-to-10',
     })
+  })
+
+  it('serves canon WITHOUT ANTHROPIC_API_KEY set (P0-5 — canon-served traffic survives a missing key)', async () => {
+    // P0-5 (2026-07-06): a canon hit makes NO Anthropic call, so a missing
+    // key must NOT 500 it. Regression guard for the old global presence
+    // check that 500'd ALL traffic before the canon lookup ever ran.
+    delete process.env.ANTHROPIC_API_KEY
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const anthropicCreate = vi.fn(async () => {
+      throw new Error('anthropic should not be called on a canon hit')
+    })
+    const anthropicClient = { messages: { create: anthropicCreate } }
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: { focusNode: 'add-to-10' },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      utterances: { text: string }[]
+    }
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(anthropicCreate).not.toHaveBeenCalled()
+    expect(mockedRender).not.toHaveBeenCalled()
   })
 
   it('falls through to the live planner on canon miss (returns null)', async () => {
