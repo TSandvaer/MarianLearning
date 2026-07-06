@@ -1583,19 +1583,21 @@ describe('cluster 2 — break after "This one is X." in the fricative giveAnswer
 })
 
 describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)', () => {
-  it('softens vvv in EVERY /v/ slot with the round-5 audition-winner v2 prosody + schwa-tail IPA (86ca8c3t7)', () => {
-    // Round-5 audition winner v2 ("Pitch-lowered"): rounds 1 (`və` rate-12%)
-    // and 2 (`vːə` rate-20%/vol-12%) were both rejected ×4 for a hard buzzy
-    // ONSET. The winning lever is PITCH (`-3st`) — a lower f0 fricative
-    // buzzes less — on the bare schwa-tail phoneme `və` (NO length mark),
-    // with rate `-15%` + volume `-20%`. Attribute order pitch→rate→volume.
+  it('softens vvv in EVERY /v/ slot with the round-6 in-frame audition-winner v3 (labiodental approximant ʋə) + unchanged floor prosody (PR #485)', () => {
+    // Round-6 in-frame audition winner v3 ("labiodental approximant"): rounds
+    // 1 (`və` rate-12%), 2 (`vːə` rate-20%/vol-12%), 5 (`və` + -3st) all left
+    // a hard buzzy ONSET — the scratch IS the FRICATION of the voiced
+    // labiodental FRICATIVE /v/. v3 swaps the fricative for the labiodental
+    // APPROXIMANT `ʋə` (no frication), keeping the floor softening prosody
+    // (pitch -3st, rate -15%, volume -20%) UNCHANGED — only the IPA moves
+    // `və → ʋə`. Attribute order pitch→rate→volume.
     for (const text of [
       'Which letter says vvv?',
       'Yes. V says it. vvv?',
       'It says vvv?',
     ]) {
       expect(renderSsmlInnerText(text, 'letter-sounds')).toContain(
-        '<prosody pitch="-3st" rate="-15%" volume="-20%"><phoneme alphabet="ipa" ph="və">vvv</phoneme></prosody>',
+        '<prosody pitch="-3st" rate="-15%" volume="-20%"><phoneme alphabet="ipa" ph="ʋə">vvv</phoneme></prosody>',
       )
     }
   })
@@ -1637,9 +1639,9 @@ describe('cluster 5 — scratchy isolated sounds softened (slot × class gated)'
     expect(applyPhonemeOverrides('says vvv', 'letter-sounds')).not.toContain(
       '<prosody',
     )
-    // vvv carries the round-5 audition-winner v2 per-mnemonic prosody
-    // (86ca8c3t7): pitch-lowered + rate + volume, distinct from the shared
-    // `-12%` rate-only vowels.
+    // vvv carries the per-mnemonic floor prosody (pitch-lowered + rate +
+    // volume), distinct from the shared `-12%` rate-only vowels. The prosody
+    // is UNCHANGED by the round-6 v3 IPA swap (`və → ʋə`, PR #485).
     expect(
       applyPhonemeOverrides('says vvv', 'letter-sounds', 300, true),
     ).toContain('<prosody pitch="-3st" rate="-15%" volume="-20%">')

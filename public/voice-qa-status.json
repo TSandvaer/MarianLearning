@@ -12,16 +12,16 @@
       "label": "round-6 fix (#446) — 'row' GOAT realisation (ɹəʊː) + stress-lift; re-test"
     },
     "letter-sounds-audit#word.p2.correct": {
-      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
+      "label": "v3 /ʋ/ approximant recovery (#485 in-frame audition winner) — labiodental approximant, no frication; re-test"
     },
     "letter-sounds-audit#word.p2.giveAnswer": {
-      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
+      "label": "v3 /ʋ/ approximant recovery (#485 in-frame audition winner) — labiodental approximant, no frication; re-test"
     },
     "letter-sounds-audit#word.p2.hint": {
-      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
+      "label": "v3 /ʋ/ approximant recovery (#485 in-frame audition winner) — labiodental approximant, no frication; re-test"
     },
     "letter-sounds-audit#word.p2.read": {
-      "label": "ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"
+      "label": "v3 /ʋ/ approximant recovery (#485 in-frame audition winner) — labiodental approximant, no frication; re-test"
     },
     "hub#hub-welcome-what-today-alt-3.mp3": {
       "label": "round-5 fix — audition winners v2/o3/f2 + row re-render (86ca8c3t7); re-test"
