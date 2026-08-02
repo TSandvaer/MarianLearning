@@ -64,7 +64,7 @@ echo "=== should DENY (destructive) ==="
 run DENY 'git reset --hard HEAD~1'
 run DENY 'git push --force origin main'
 run DENY 'git push origin main --force'          # flag-order robustness
-run DENY 'git push --force-with-lease origin feat/x'
+run DENY 'git push -f origin main'
 run DENY 'rm -rf /c/tmp/somedir'
 run DENY 'cd /tmp && rm -fr build'               # leading-verb + chained
 run DENY 'gh repo delete TSandvaer/MarianLearning'
@@ -79,6 +79,11 @@ run ALLOW 'git commit -m "explain why rm -rf is dangerous"'        # quoted-span
 run ALLOW 'gh pr create --body "do not use git push --force here"' # quoted-span strip
 run ALLOW 'git branch -d feat/merged-branch'                       # -d is SAFE, not -D
 run ALLOW 'yarn build'
+# Lease-based force-push is ALLOWED (narrowed 2026-08-02): it refuses if the remote
+# moved, so it cannot clobber. These also guard the substring trap — the `--force`
+# alternative must NOT match inside `--force-with-lease` / `--force-if-includes`.
+run ALLOW 'git push --force-with-lease origin feat/x'
+run ALLOW 'git push --force-with-lease --force-if-includes origin feat/x'
 
 echo
 if [ "$fails" -eq 0 ]; then

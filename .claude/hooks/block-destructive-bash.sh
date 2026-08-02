@@ -61,9 +61,21 @@ deny() {
 }
 
 # --- git force-push (any flag order) ---
+# The LEASE-BASED family is deliberately ALLOWED: `--force-with-lease` and its
+# companion `--force-if-includes` refuse the push if the remote moved under you,
+# so they cannot silently clobber someone else's work -- which is the harm this
+# check exists to prevent. Bare `--force` / `-f` stay blocked.
+#
+# Narrowed 2026-08-02 (Thomas's call) after the original all-force pattern blocked
+# a legitimate rebase recovery on this project's own alignment PR #490: rebase-then-
+# force-with-lease is routine here, so the guard was firing on the safe form several
+# times a week. See .claude/alignment/alignment-plan-Far-Horizon-2026-08-02.md V-2.
+#
+# `--force` must be followed by space / quote / end so it does NOT substring-match
+# `--force-with-lease` or `--force-if-includes`. Verified by scripts/smoke-destructive-hook.sh.
 if printf '%s' "$cmd" | grep -Eqi 'git[^"]*[[:space:]]push([[:space:]]|"|$)' \
-   && printf '%s' "$cmd" | grep -Eqi -- '(--force-with-lease|--force-if-includes|--force|(^|[[:space:]])-[a-zA-Z]*f([[:space:]]|"|$))'; then
-  deny "Blocked: git force-push is never an auto-decide. Stage it to .claude/away-queue.md for the sponsor instead."
+   && printf '%s' "$cmd" | grep -Eqi -- '(--force([[:space:]]|"|$)|(^|[[:space:]])-[a-zA-Z]*f([[:space:]]|"|$))'; then
+  deny "Blocked: bare git force-push is never an auto-decide. Use --force-with-lease (allowed -- it refuses if the remote moved), or stage the push to .claude/away-queue.md for the sponsor."
 fi
 
 # --- git reset --hard ---

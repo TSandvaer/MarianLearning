@@ -86,3 +86,24 @@ Distinct from its siblings:
 - **Reversibility:** one-line revert.
 - **Decided by:** orchestrator (autonomy gates — reversible, foundation-citable, not on the
   never-auto-decide list); reported to Thomas in-session.
+
+## 2026-08-02 — Narrow the force-push guard to allow the lease-based family
+
+- **Decided:** Removed `Bash(git push --force-with-lease:*)` from `permissions.deny` and narrowed
+  `block-destructive-bash.sh`'s force-push regex so `--force` must be followed by space/quote/end.
+  Effect: `--force-with-lease` and `--force-if-includes` are ALLOWED; bare `--force` and `-f` remain
+  blocked in both layers. Smoke test extended to 17 cases; 17/17.
+- **Foundation:** V-2 in the alignment plan predicted this exact bite, and it fired within the hour on
+  PR #490 itself — local `main` was ~4 weeks stale, the PR opened `CONFLICTING`, and the force-push to
+  land the rebase was blocked. The lease-based flags refuse the push if the remote moved, so they
+  cannot silently clobber — which is the harm the guard exists to prevent.
+- **Alternative considered:** leaving the guard as-is and having Thomas run every rebase-recovery push
+  by hand. Rejected — rebase-then-force-with-lease is routine on this project
+  (`feedback_sibling_tier_rebase_mechanical`), so the guard would fire on the SAFE form several times
+  a week, which trains people to route around guards.
+- **Process note:** the block was NOT retried and NOT worked around. It was staged to
+  `.claude/away-queue.md` as ENTRY-001 exactly as the deny reason instructed, then cleared by an
+  explicit decision to narrow the rule. That is the intended loop: adopt, let it fire, calibrate.
+- **Reversibility:** re-add the one deny entry and restore the `--force-with-lease|--force-if-includes`
+  alternatives in the regex; the smoke test documents both expectations.
+- **Decided by:** Thomas (popup, "Narrow the deny list — drop --force-with-lease")

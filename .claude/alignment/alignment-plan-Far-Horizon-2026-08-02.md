@@ -470,12 +470,23 @@ incident` (change 4) — heading text matches exactly. Change 12 referenced a tr
   may be a dead agent) in the second — and retires the always-dispatch conclusion, citing the
   Far-Horizon measurement. `MEMORY.md` index lines updated so neither still advertises the retired
   framing.
-- **V-2 — `[carried]` Change 9 denies `git push --force-with-lease`, which the rebase flow uses.**
-  Grep of `.claude/**` found **0 occurrences**, so no committed config depends on it — but
-  `[[feedback_rebase_crlf_lint_failure]]` and `[[feedback_sibling_tier_rebase_mechanical]]` both
-  describe rebase recovery ending in a force-push the orchestrator types by hand. After this, that is
-  denied. Flagged at decision time; **Adopt was chosen with the flag visible.** Offered once more at
-  the apply gate as a narrowing option.
+- **V-2 — `[RESOLVED 2026-08-02, after firing in production]` Change 9 denied
+  `git push --force-with-lease`.** Flagged at decision time; Adopt-as-written was chosen with the flag
+  visible. **It then fired within the hour, on this very PR.** Local `main` turned out to be ~4 weeks
+  stale, so PR #490 opened `CONFLICTING`; the fix was a rebase onto `origin/main` `cea94c3`, and the
+  force-push to land it was blocked by both layers — exactly the predicted bite, on exactly the
+  predicted workflow.
+  **Resolved (Thomas's call):** narrowed to allow the **lease-based family** — `--force-with-lease`
+  and its companion `--force-if-includes` refuse the push if the remote moved under you, so they
+  cannot silently clobber, which is the harm the check exists to prevent. **Bare `--force` and `-f`
+  stay blocked in both layers.** Removed the deny entry; narrowed the hook's regex so `--force` must
+  be followed by space/quote/end and therefore does **not** substring-match `--force-with-lease`.
+  Smoke test extended to 17 cases (added bare `-f` on the deny side, both lease forms on the allow
+  side, the latter specifically guarding the substring trap) — **17/17**.
+  **Calibration note:** this is the intended feedback loop working. The guard was adopted, it fired,
+  the firing was correct-by-its-own-rule but wrong-for-the-workflow, and the rule was narrowed rather
+  than bypassed. The block was never retried or routed around; it was staged to `.claude/away-queue.md`
+  as ENTRY-001 per the deny reason's own instruction, then cleared by decision.
 - **V-3 — `[carried]` Change 9 denies `git branch -D`, which squash-merge cleanup needs.**
   Squash-merged branches read as _unmerged_ to `git branch -d`, so deleting them genuinely requires
   `-D` (`[[feedback_squash_merge_branch_triage]]`). FH tolerates this because it merges with
