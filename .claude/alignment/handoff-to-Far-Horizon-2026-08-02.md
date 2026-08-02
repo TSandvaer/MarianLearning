@@ -43,9 +43,7 @@ Far-Horizon.
   `Remove-Item -Recurse`, `gh repo delete`, `git branch -D` — behaves correctly, and the
   quoted-span stripping correctly allows `git commit -m "explain why rm -rf is dangerous"` and
   `gh pr create --body "...git push --force..."`.
-- **The fix (one character):** drop the `i` from that single check so it is case-sensitive. Leave the
-  other checks' `-i` alone — they match flag _words_ (`--force`, `--hard`, `-recurse`) where case
-  folding is harmless or wanted.
+- **The fix (one character):** drop the `i` from that single check so it is case-sensitive.
 
   ```bash
   # CASE-SENSITIVE on purpose (no -i): `-D` force-deletes an UNMERGED branch, but
@@ -55,11 +53,66 @@ Far-Horizon.
 
 - **Note on your `permissions.deny` list:** `"Bash(git branch -D:*)"` there is fine — prefix-glob
   matching is case-sensitive, so only the hook regex needed changing.
-- **Reusable smoke test:** the 15-payload script is at
-  `<MarianLearning scratchpad>/smoke-destructive-hook.sh`. It builds payloads with `python -c json.dumps`
-  and greps the hook's stdout for `"deny"`, so it is project-agnostic — point `HOOK` at your path and
-  run it after any pattern change. Worth keeping under `tools/debug/` per your instrument-registry
-  convention.
+
+> ⚠ **CORRECTION (appended after a SECOND instance surfaced).** This bullet originally said _"Leave
+> the other checks' `-i` alone — they match flag words where case folding is harmless."_ **That advice
+> was wrong.** See bug 2 immediately below: the force-push check's `-i` is the same defect, and it bit
+> in production hours later. If you already applied the fix above and stopped there, come back.
+
+### 0b. ⚠ SECOND BUG, same class — `-i` makes the force-push check match `-F` [hook fix]
+
+Found the hard way after the first fix shipped: the guard denied an ordinary
+`git commit -q -F - && git push -q origin main`.
+
+- **The bug:** the force-push check reads
+
+  ```bash
+  if printf '%s' "$cmd" | grep -Eqi 'git[^"]*[[:space:]]push([[:space:]]|"|$)' \
+     && printf '%s' "$cmd" | grep -Eqi -- '(--force-with-lease|--force-if-includes|--force|(^|[[:space:]])-[a-zA-Z]*f([[:space:]]|"|$))'; then
+  ```
+
+  The `-i` on the **second** grep makes `-[a-zA-Z]*f` match uppercase **`-F`** — which is
+  `git commit --file` (read the commit message from a file), nothing to do with force. And because
+  the hook inspects the **whole compound command as one string**, a `-F` anywhere plus a `git push`
+  anywhere satisfies both conditions. So a completely ordinary
+  `git commit -F msg.txt && git push origin main` is denied as a force-push. Anyone who writes commit
+  messages via heredoc or `-F -` will hit this constantly.
+
+- **The fix:** drop the `i` from the **flag** grep (keep it on the `git … push` grep, which matches a
+  subcommand word, not a flag). Git's force flags are lowercase.
+
+  ```bash
+  # The FLAG check is CASE-SENSITIVE (no -i): git's force flags are lowercase
+  # (`--force`, `-f`); uppercase `-F` is `git commit --file`. With -i, and because
+  # this hook sees the WHOLE compound command as one string, an ordinary
+  # `git commit -F - && git push origin main` tripped BOTH conditions.
+  if printf '%s' "$cmd" | grep -Eqi 'git[^"]*[[:space:]]push([[:space:]]|"|$)' \
+     && printf '%s' "$cmd" | grep -Eq -- '(--force([[:space:]]|"|$)|(^|[[:space:]])-[a-zA-Z]*f([[:space:]]|"|$))'; then
+  ```
+
+- **The pattern worth internalising:** two defects, one root cause — **a case-insensitive grep folding
+  a benign flag into a destructive one.** Audit every `-i` in that file and ask "is there an
+  opposite-case flag that means something harmless?" `-d`/`-D` and `-f`/`-F` both had one.
+- **Related design smell (not fixed, flagged):** matching the whole compound command means any
+  destructive-looking flag anywhere co-occurring with a destructive verb anywhere trips the guard.
+  Both bugs were amplified by it. Scoping each check to its own command segment would be the real fix;
+  we didn't attempt it.
+
+- **Separate, optional — narrowing to the lease-based family.** The `--force` alternative in the
+  regex above deliberately requires a trailing space/quote/end so it does **not** substring-match
+  `--force-with-lease` / `--force-if-includes`. That is a **policy choice we made**, not a bug fix:
+  those flags refuse the push if the remote moved, so they cannot silently clobber — which is the harm
+  the check exists to prevent. We narrowed after the guard blocked a legitimate rebase recovery on our
+  own PR. **Your call whether to match it** — if your flow is `gh pr merge --admin --squash` with few
+  rebases, you may not need it. If you keep all-force denied, restore the
+  `--force-with-lease|--force-if-includes|--force` alternation but still drop the `-i`.
+
+- **Reusable smoke test (now 20 cases):** at `scripts/smoke-destructive-hook.sh` in the MarianLearning
+  repo. Builds payloads with `python -c json.dumps`, greps the hook's stdout for `"deny"`, exits
+  non-zero on any mismatch — project-agnostic, just point `HOOK` at your path. It caught bug 1 before
+  it shipped and now carries explicit regression cases for both. **Both defects were in the
+  false-positive direction, and a deny-only test suite would have found neither** — the allow cases
+  are the ones that earn their keep here. Worth a `tools/debug/` registry entry on your side.
 
 ### 1. Post-wave retrospectives (`.claude/retros/`) [process / docs]
 
@@ -129,6 +182,23 @@ Far-Horizon.
 - **Fit note:** this composes with FH's existing "verify the live merge mechanism before acting; never
   assume a label name" bullet and with its § Unity-build-cap instruction to _re-measure before citing_.
   Same instinct — do not trust a cached or remembered signal — applied to the CI surface specifically.
+
+### 3. Data point on YOUR maintain-docs decision — the content gate may be doing the work alone [feedback, not a proposal]
+
+Not something to adopt — **evidence about a call you already made**, from the one place that ran the other arm of the experiment.
+
+You concluded the _automatic trigger_ was the problem and made `maintain-docs` manual-only, with _"never re-register this skill as a Stop hook."_ We adopted your **incident gate** but deliberately **kept the Stop hook**, to see whether the content bar alone holds against the firing pressure.
+
+**Result over the landing session — a long, dense one (a doctrine adoption, a PR, a rebase, two hook bugs found and fixed): 4 invocations, 4 × `NO_CHANGES`, zero docs written.**
+
+Each refusal was for a defensible reason, and the interesting part is _which_ reasons did the work:
+
+- Twice the candidate was a **near-miss** — a bug caught by a smoke test before it cost anything. Real defect, zero cost, so no incident.
+- Twice the lesson was **already recorded closer to the point of use** — in the hook's own comments and in an executable regression test — so a `.claude/docs/` copy would have sat further from whoever needs it.
+
+**The tentative read: the incident gate, not the manual trigger, is the load-bearing half.** Deleting _"how could the documentation be improved?"_ from the proposer prompt looks like the single highest-leverage edit — that question always has an answer, and it is the one that manufactures docs.
+
+Caveats, stated plainly: this is **one session on a different project**, our doc set is ~704 KB where yours is different, and 4 samples is not a finding. It is also possible we've simply over-tightened — the skill's tripwire only warns about the _opposite_ failure (consecutive runs all producing edits), so a gate that has silently gone too strict would look exactly like this. **We're watching for that.** If your manual-only setup is working, there's no reason to change it; this is offered as the other arm's data, not a recommendation.
 
 ## Considered and NOT proposed
 
