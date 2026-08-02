@@ -75,9 +75,26 @@ Letter names -> letter sounds -> blending (CV) -> CVC words -> digraphs (sh/ch/t
 
 The `maintain-docs` skill (auto-triggered after every turn via the Stop hook) reviews each turn for non-obvious findings worth capturing here, and updates this index when new doc files are created. Most turns produce nothing doc-worthy; the early-exit filter is high.
 
-### Sub-agents — read the docs at start
+### Sub-agents — read the SCOPED docs at start
 
-**If you are a sub-agent spawned via the Agent tool, you do NOT inherit the SessionStart auto-load.** Before starting any work, Read every `.claude/docs/*.md` file (in parallel). These are the canonical project-context briefs the main session sees automatically; without them you are working blind on architecture, audio system, progress shape, planner contracts, screens, skill trees, and test-helper patterns. Sub-agents should also include a "Non-obvious findings" section in their final report so the main session can route insights into the docs via the maintain-docs Stop hook (see `feedback_dispatch_brief_template.md` memory for the brief template).
+**If you are a sub-agent spawned via the Agent tool, you do NOT inherit the SessionStart auto-load.** The former blanket rule ("Read every `.claude/docs/*.md` before any work") is **retired** — this doc set is ~704 KB across ten files, and loading all of it on every dispatch, including trivial ones, is paid for in context on tasks that never touch most of it. (Imported from Far-Horizon 2026-08-02, which retired the same rule after ~1,855 lines of per-dispatch context was paid in full by ~13 agents that died mid-task in a single week.)
+
+**Dispatch briefs NAME the 1–3 docs the task class requires.** Reading a doc outside your list is fine when you have a reason; reading all of them by default is not. Routing table:
+
+| Task class                                               | Read before starting                                      |
+| -------------------------------------------------------- | --------------------------------------------------------- |
+| Audio / voice / TTS / canon bake / SSML                  | `audio-system.md`, `planner-and-canon.md`                 |
+| Content tier / skill node / word pack / distractors      | `skill-trees-and-content.md`, `sibling-tier-checklist.md` |
+| Screen / UI / route / flow change                        | `screens-and-flows.md`, `architecture-overview.md`        |
+| Emma visual / pose / animation                           | `emma-character-and-animation.md`                         |
+| Progress / mastery / focus-node / Leitner / persistence  | `progress-and-persistence.md`                             |
+| Planner / `/api/claude` / parser contract / rate limiter | `planner-and-canon.md`                                    |
+| Test authoring / E2E / CI gates                          | `testing-and-ci.md`                                       |
+| Orchestration / dispatch concurrency                     | `orchestration-concurrency.md`                            |
+
+If your brief names no docs and the task is non-trivial, ask the orchestrator which apply rather than defaulting to all of them.
+
+Sub-agents should still include a "Non-obvious findings" section in their final report (see `feedback_dispatch_brief_template.md` memory for the brief template) — but note that findings now clear the incident gate (§ Documentation requires a paid-for incident) before they become docs.
 
 For deep-dive reference, see the topic files in `.claude/docs/`:
 
@@ -108,3 +125,74 @@ Sub-agents spawned via the Agent tool do NOT inherit user-global `~/.claude/CLAU
 ## CI-status command discipline
 
 When checking "is CI green?" for a merge-gate decision, use `gh pr view <num> --json statusCheckRollup -q '.statusCheckRollup[] | {name, status, conclusion}'` OR `gh run view <run-id> --json status,conclusion` (both authoritative). Do NOT rely on `gh pr checks <num>` for merge decisions — it can cache "pending" for 2+ hours after the underlying run completes, burning polling cycles. Both the `fast-gate` and `e2e` checks must be SUCCESS before merge (`feedback_ci_fast_gate_split`). Sanity check: any "pending" > 30 min → drill in with the authoritative command before concluding "still waiting". When querying a just-pushed branch, query CI by HEAD SHA, not `--branch --limit 1` (avoids the run-list race). Note: `statusCheckRollup` itself can cache `IN_PROGRESS` after the underlying run has already completed/failed — when a rollup entry looks stuck, ground truth is `gh run list --commit <full-40-char-sha>` (must be the FULL sha; a short sha silently returns `[]`). (Imported from RandomGame 2026-06-11.)
+
+---
+
+<!--
+Orchestration doctrine imported from Far-Horizon 2026-08-02
+(`.claude/alignment/alignment-plan-Far-Horizon-2026-08-02.md`).
+
+Provenance: FH rewrote its doctrine after measuring 79 commits since its last `feat` — 47 docs,
+12 chore, 10 fix, 8 test, 1 spike, 1 ci, ZERO feat. Its diagnosis: a DEMAND engine (an anti-idle
+hook forbidding a tick to end without dispatching) feeding on SUPPLY engines (auto-docs, NITs
+tickets, agent-created tickets) that manufacture work from work. The sections below are the
+countermeasures. FH's anti-idle hook is deliberately NOT imported — it is the demand engine.
+-->
+
+## Idle is free; an unjustified dispatch is the bug
+
+Rank the dispatchable set by **user-visible value** — value to Marian in the deployed app — never by readiness. A bug in the shipped PWA outranks every doc ticket. **Prefer leaving a slot idle to manufacturing work.**
+
+Still scan the **whole** board so you never wrongly conclude "all gated" — but having scanned, dispatch only what earns its cost. Drain-complete is a legitimate resting state, not a failure to be papered over with regenerated backlog.
+
+## Reviews may NEVER create a ticket
+
+`APPROVE_WITH_NITS` is **deleted**. There are two verdicts:
+
+- **`APPROVE`** — merge.
+- **`REQUEST_CHANGES`** — fixed **in this PR**; the reviewer re-checks the diff **once**, then done.
+
+Nits are fixed now or dropped. Dropping them is an accepted cost. A would-be third round escalates to Thomas with the ship-with-documented-defect option rather than spawning another round.
+
+**Docs-only and test-only PRs get NO reviewer** — CI green, merge. **Code PRs get one reviewer, one round.**
+
+This supersedes, for this project, the user-global auto-decide class "NITs-ticket-creation from APPROVE_WITH_NITS review comments" — that class has no subject any more, because the verdict it keys on no longer exists. Peer-review _routing_ (`feedback_pr_review_routing`) is unaffected; only the verdict vocabulary changes.
+
+## Agents may not create tickets
+
+Agents may file a ticket **only** for a bug **reproduced in the deployed PWA** (or in a PR preview build). Every other ticket — features, refactors, research, hygiene, follow-ups — needs Thomas's yes first.
+
+An unbounded ticket source plus any board scan guarantees the team never runs out of non-user-visible work. Combined with § Reviews may NEVER create a ticket, this closes both agent-side supply engines.
+
+## Documentation requires a paid-for incident
+
+A `.claude/docs/` entry may be written only by naming **the incident it would have prevented and what that incident cost** — a wasted rebuild, an overturned ear-test, a dead agent-hour, a wrong merge, a re-bake. Write it in this shape before proposing anything:
+
+> **Incident:** &lt;what broke, cited&gt; — **Cost:** &lt;what was actually spent&gt;
+
+No named incident with a cost → **no doc**. "Useful", "non-obvious", and "future Claude would benefit" are **not incidents** — that bar was already written down here and it did not hold.
+
+**Corollary:** the docs are not a growth surface. Prefer amending an existing doc over creating a new one; a new file needs its own incident. `NO_CHANGES` is the expected outcome of most `maintain-docs` runs, and is a success rather than a failure.
+
+## Predict-Before-Soak + bounded convergence
+
+Any PR whose acceptance is **Thomas's ear or eye** (voice/audio renders, Emma visuals, motion feel, first-of-class UI) carries two extra lines in its Self-Test Report:
+
+- **Prediction (falsifiable, written BEFORE the soak):** what you expect Thomas to hear or see, specific enough to be wrong. "Sounds good" is not a prediction; "the /v/ in _van_ will hold ~180 ms and will NOT buzz like the isolated /ʋ/" is.
+- **Bounded convergence claim:** name the bar you tested **and the bars you did NOT test**. Silence about an untested surface reads as coverage; say what you left alone.
+
+After the soak, grade the prediction against the verdict. A wrong prediction is useful signal, not a failure — an ungraded one wastes the round. Predictions are strongest when made against a _confirmed_ bar from `.claude/quality-bars.md` (maintained by the `/name-the-bar` skill).
+
+## Kill switch (automatic — not a judgement call)
+
+**Any calendar week with zero `feat` merges retires the standing team.** Check:
+
+```
+git log origin/main --since="7 days ago" --pretty=%s | grep -c "^feat"
+```
+
+`0` → collapse to a single hands-on session + an on-demand QA agent, and stop dispatching personas. No debate, no appeal. This exists because a drought is invisible from inside it — Far-Horizon's ran ten days before anyone named it, and it took an independent audit to surface.
+
+## Coordination docs stay small
+
+`team/STATE.md` is a **resume header, not a log**. `team/DECISIONS.md` is **append-only history**. Historical `.claude/away-queue.md` and `.claude/decisions-while-away.md` content is archived under `.claude/log/` — do not grow the live files back into logs. If a live coordination file passes ~10 KB, archive the closed entries rather than letting it accrete.
