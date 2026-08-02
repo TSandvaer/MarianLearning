@@ -869,6 +869,22 @@ Two disciplines (voice-QA round 5, PR #418, 2026-06-12):
 - **Always run `revoiceCanonTargeted.ts --ids <ids> --dry` first** — it prints the dedup-expansion plan (members per fail id + totals) before any Azure spend.
 - **`git diff --stat` proves nothing on single-line JSON canon files** — every touched file shows `1 1` regardless of how many utterances changed. The only reliable scope check is a per-`audio.base64` sha256 comparison against `origin/main` (the byte-preservation script's approach).
 
+#### 4.4.6 `voice-qa-status.json` badge labels are STATIC — not re-bake-aware (2026-06-19)
+
+The per-item `label` strings in `public/voice-qa-status.json` (e.g. `"ACCEPTED model-floor (#446) — scratchy /v/ is the en-GB-Olivia voice floor; NOT re-baked"`) are **hand-authored annotations committed in a specific PR**. They persist verbatim — **a later PR that re-bakes that clip's audio does NOT update the label.**
+
+**A "NOT re-baked" badge is NOT evidence the audio is unchanged.** To know whether a clip actually changed, sha256 its `audio.base64` and diff against `origin/main` (the per-`audio.base64` technique in §4.4.5). A re-bake with a slower rate lever produces a noticeably **longer** base64 string, so a byte-count on the two sides of the diff confirms the change without decoding. (Hit 2026-06-19: a re-baked `/v/` clip still carried its stale #446 "NOT re-baked" label — the hash diff proved the bytes had in fact changed, and grown.)
+
+**Corollary — to COUNT or audit canon utterance ids, parse the JSON; a raw `grep`/regex double-counts.** Every utterance id (e.g. `word.p1.blend`) appears TWICE in a canon file: once in the consumed top-level `utterances[]` array and once in the dead, `unknown`-typed nested `plan` echo (planner-and-canon.md §"Math `planFromServer`" / the `plan`-field note). A raw `grep -c '\.blend"'` therefore double-counts and is unreliable. Count the parsed top-level array instead — e.g. `ConvertFrom-Json` then `.utterances | where id -match '\.blend$'`. (Hit 2026-06-19 verifying a reorder: `grep '\.blend"'` returned 8 on main / 16 on branch, but the parsed top-level count was 8/8 — the raw count had silently folded in the nested echo, nearly producing a false "blend slots doubled" conclusion.)
+
+**Corollary — "UNTESTED" on a fresh origin is expected, not a defect.** `voice-qa.html` derives per-item display state from the `vqa-verdicts` localStorage key: no stored verdict → **untested**; a stored verdict whose `audioHash` ≠ the item's current hash → **needs-retest**; else passed/failed. A PR preview is a distinct origin with empty localStorage (§4.4.4), so **every** enumerated clip reads untested — a count like "784 untested" is just the total clip count with zero local verdicts, not evidence of broken or unrendered audio.
+
+#### 4.4.7 Phoneme-audition candidates must be tested in the production utterance frame (2026-06-19)
+
+A phoneme-audition page that plays the **isolated token** (e.g. a bare `"vvv"` clip rendered with the candidate SSML) can approve a candidate that then **fails in the production sentence frame**. Confirmed: the `/v/` "vv2" candidate (`vːə` @ −35%) won the bare-token audition but still scratched in production `"V says it. vvv?"` — the question-intonation prosody wrap plus the ~300 ms `<break>` before the mnemonic re-introduce the scratch the isolated render hid.
+
+**Rule:** after a candidate wins an isolated audition, render the **full production utterance** for that slot through the same SSML path the canon bake uses, and ear-test _that_ before committing to a production re-bake. The audition page should present both (1) the isolated token (direct A/B on the phoneme) and (2) the production-frame utterance. A candidate that wins on (1) but fails on (2) is not a winner. The extra Azure render per candidate is cheap relative to discovering the failure only after the bake + a wasted ear-test round.
+
 ### 4.2.1 Count-based assertions on `/api/claude` must filter by track (post 86c9pr4h9)
 
 After PR #162 (ticket `86c9pr4h9`) added the Word Song pre-warm at Hub mount, **Hub mount fires BOTH math and word-song POSTs to `/api/claude`** (math from the existing greet-or-math kick effect that was already running pre-Hub; word-song from the new Hub-anchored kick effect). Any unit/component test that counts `/api/claude` calls across a Hub-touching flow MUST filter on `JSON.parse(init.body).payload.track` to avoid silently double-counting.
@@ -1063,6 +1079,12 @@ Until PR #293, only `parseTwoDigitAddsubReadLine` had one direction of this cove
 > | `failNetwork` + structural + wrong-tier | Static fallback is add-to-10; spec asserts op/range for a different tier               | Test trivially-green or deterministically-red; no content mismatch                                      |
 > | Chip-row content for OOS gate           | `gentleDistractors` extreme-of-range is a legitimate distractor                        | E2E false-positive on `getByText('<extreme>')` regardless of OOS-gate state                             |
 > | Prose-template-coupled                  | `MATH_TRACK_GUIDE` read-line directive template re-worded (e.g. "minus" → "take away") | Substring-pin assertion silently no longer matches; underlying behaviour unchanged; no failure surfaces |
+
+### Planner-pass-coupled spec drift — `reorderContinuantOnsetFirst` shifts word-at-index (PR #484)
+
+A deterministic post-Haiku pass — distinct from a canon re-bake — can shift which word lands at a CVC problem index. `reorderContinuantOnsetFirst` (see `planner-and-canon.md` § "Deterministic post-Haiku passes") reorders CVC words by onset class, so a spec that identifies a test word **by position** (e.g. "problem N has no blend slot → exercise graceful-skip") silently tests the WRONG word once the order shifts — the locator is FOUND, but the condition the spec assumed is no longer there.
+
+**Robust pattern:** construct the condition explicitly instead of discovering it by position — e.g. for a no-blend graceful-skip test, strip `.blend` utterances from a COPY of the canon fixture (`canon.utterances = canon.utterances.filter(u => !u.id.endsWith('.blend'))`) rather than relying on a particular word being slot-less at a particular index. This makes the RED→GREEN flip depend on the production graceful-skip logic, not on canon word-order. (Broke the `cvc-phoneme-blend` graceful-skip spec in the PR #484 cycle; fixed via an explicit `canonWithoutBlend()` helper.)
 
 ### Canon-content-coupled E2E spec drift (PR #266, 2026-05-16)
 

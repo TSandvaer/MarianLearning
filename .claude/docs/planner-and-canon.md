@@ -166,6 +166,13 @@ These lists are duplicated against `src/lib/progress/types.ts` because `api/` ru
 
 Alignment contract: every word here MUST exist in `src/screens/WordSong/wordPack.ts` with `isTarget: true` plus a `TARGET_PAIRINGS` row. Drift would crash the chip render. Enforced by code review + smoke tests in `claude.test.ts` and `plannerRoundTrip.test.ts`.
 
+### Deterministic post-Haiku passes — `reorderContinuantOnsetFirst`, `pinCvcRecapFocus` (CVC tiers, PR #484)
+
+`api/_planner.ts` runs two deterministic passes on the Haiku-returned plan for `cvc-words*` tiers, after JSON parse and before TTS render — they correct known Haiku drift without a re-prompt:
+
+- **`reorderContinuantOnsetFirst`** — reorders the emitted CVC words so **continuant-onset words lead** (onset grapheme ∈ `f v s m n l r h w y`) and **stop-onset words follow** (onset ∈ `b c k d g p t j`), preserving relative order within each class. Grounded in `design/research/cvc-blend-audio-phonics.md` (continuant-first phonics — continuants sustain in the blend "sound-it-out"; stops cannot). **Consequence:** which word lands at a given CVC problem index is now onset-class-dependent, not Haiku-stable — a consumer (or e2e spec) that targets "the word at problem N" by position is fragile (see `testing-and-ci.md` § "Planner-pass-coupled spec drift").
+- **`pinCvcRecapFocus`** — overwrites `session.end.recap.focus` to the canonical `"You worked on reading words today!"` for `cvc-words*` tiers; no-op when already canonical (zero churn). The planner directive alone did NOT guarantee this — short-u once drifted to `"short u words today!"` (curriculum jargon banned by the Emma vocabulary cap), so this pass is the enforcement layer. Any new cvc-vowel sibling tier must be added to its tier set.
+
 ### Wire shape is utterance-only — invariant
 
 **The `PlannerPlan` wire shape carries only `{id, label, utterances: Array<{id, text}>}`.** It is **utterance-only by design**. Any planner directive of the form "tag each problem with X" must either:
@@ -174,6 +181,8 @@ Alignment contract: every word here MUST exist in `src/screens/WordSong/wordPack
 2. **Propose a wire widening BEFORE the directive lands** — typed extension to `PlannerPlan` + `isPlannerPlan` validator + canon-adapter changes + screen-side adapter changes + parser test fixtures. ~150-200 LOC across 6 files plus a canon re-bake of all 10 tiers.
 
 The deliberate utterance-only discipline keeps audio bytes + plan validation symmetric: every utterance has both validation-side metadata (id + text on `plan.utterances`) and audio-side payload (id + text + base64 on `utterances`); structured per-problem tags would break that symmetry and force a parallel validation path.
+
+**The two `utterances` surfaces can DISAGREE after a surgical splice.** `plan.utterances` (validation-side, `unknown`-typed, NOT the consumed surface) and the top-level `utterances` (the audio payload the runtime parser reads) are normally in sync, but a targeted canon reconciliation that touches only the render side can leave them divergent — observed after PR #484: a CVC tier had **0** blend ids in `plan.utterances` but **8** in top-level `utterances`. For any "did feature X actually go live at runtime?" check, query `.utterances` (e.g. `.utterances.filter(u => u.id.endsWith('.blend'))`), NEVER `plan.utterances` — the latter can read 0 while the feature is fully live.
 
 **Three incidents have surfaced this gap** (each a directive promising what the wire cannot carry — Haiku emits the field, the canon adapter / browser parser silently discards it):
 
@@ -255,6 +264,15 @@ The browser parser (`src/screens/WordSong/plannerWire.ts`) and the planner promp
 Lock: utterance ids ALWAYS use the `word.` prefix regardless of focus node. The content-type discriminant lives on the read-line template (`Tap the X.` vs `Read the X.`), NOT the id namespace ([\_planner.ts:701](MarianLearning/api/_planner.ts#L701) commentary).
 
 See `project_planner_parser_contract.md` memory entry.
+
+### Optional per-problem slot contract — `ALL_SLOTS` exclusion + `=== undefined` guard (PR #484)
+
+A per-problem utterance slot can be **optional** — the `blend` slot ("sound-it-out" phoneme audio) is present on CVC problems but absent from older bakes and non-blend tiers. An optional slot needs BOTH halves below, landed together in one PR, or canon that omits it crashes the session instead of gracefully skipping:
+
+1. **Exclude it from `ALL_SLOTS`** in `src/screens/WordSong/planFromServer.ts` (the per-problem completeness check). The required slots are `read · correct · reprompt · hint · giveAnswer`; `blend` is deliberately NOT among them. An optional slot left in `ALL_SLOTS` makes any bundle omitting it FAIL the completeness check and HARD-THROW at session start.
+2. **Guard consumption with `=== undefined`** at the render site (`WordSong.tsx`: `if (blendText !== undefined)`), not a falsy check — `undefined` is the canonical "slot absent" signal; a falsy check conflates absent with empty.
+
+This pairing is the load-bearing reason pre-bake / no-blend canon graceful-skips (fires the plain hint) rather than crashing. Mirror it for any future optional per-problem slot.
 
 ### Parser tier-widening sequence — `Math/planFromServer.ts` (Devon NOF on PR #287 + Kevin NOF, 2026-05-21)
 
@@ -596,10 +614,10 @@ An inner per-segment `<prosody rate>` / `<prosody pitch>` nested **inside** the 
 
 The blend's runtime-reachability (above) is resolved by splitting `renderBlendInnerText` into two fidelity modes via a `blendFullFidelity` flag threaded through `SynthesizeOptions` → `buildSsmlBody` → `renderSsmlInnerText` (the pre-existing `RenderSessionOptions.synthOptions` plumbing — there is NO `ssmlOverride`):
 
-- **Runtime-safe (the DEFAULT):** the whole word, plain — `<prosody rate="-15%">word</prosody><break/>word`. No segmentation, no nested prosody, no `<phoneme>`. Renders on the production *runtime* Azure resource (graduation cvc-words sessions hit this live path).
+- **Runtime-safe (the DEFAULT):** the whole word, plain — `<prosody rate="-15%">word</prosody><break/>word`. No segmentation, no nested prosody, no `<phoneme>`. Renders on the production _runtime_ Azure resource (graduation cvc-words sessions hit this live path).
 - **Full-fidelity (opt-in, BAKE only):** the per-class segmented render — stops `kə`; `/h/`=`hə` (fric-rel); `/f/`=`<prosody rate="-25%"><phoneme ph="fːə">f</phoneme></prosody>`; `/s/`=`sːə`; `/v/`,`/dʒ/`(grapheme `j`),`/w/`=whole-word FLOOR (`BLEND_FLOOR_GRAPHEMES`/`wordIsFloored()`) — _this is the pass-5 state; /v/ and /w/ were recovered in pass-7 (#479), only /dʒ/ stays floored — see the pass-7 subsection below_. The bake path (`generateSessionCanon.ts::bakeOne`, `rebakeBlendCandidateF.ts`) sets `blendFullFidelity: true`; the runtime path (`api/claude.ts`) passes no renderOptions → safe default.
 
-**Root cause it works around:** the production *runtime* Azure resource rejects a `<phoneme>` nested two prosody levels deep (`<prosody>(root)<prosody>(onset)<phoneme/></prosody></prosody>` — the segmented onset shape) while accepting bare `<phoneme>` (the medial/coda) and plain text. The *bake* resource accepts the nested shape. **Both are "westeurope" — same region name, different resource behaviour** (proven by echoing `process.env.AZURE_SPEECH_REGION` from a debug endpoint: it WAS `westeurope` and still 400'd the nested onset). So the bake-vs-runtime split is the fix; aligning the Vercel region was a dead end.
+**Root cause it works around:** the production _runtime_ Azure resource rejects a `<phoneme>` nested two prosody levels deep (`<prosody>(root)<prosody>(onset)<phoneme/></prosody></prosody>` — the segmented onset shape) while accepting bare `<phoneme>` (the medial/coda) and plain text. The _bake_ resource accepts the nested shape. **Both are "westeurope" — same region name, different resource behaviour** (proven by echoing `process.env.AZURE_SPEECH_REGION` from a debug endpoint: it WAS `westeurope` and still 400'd the nested onset). So the bake-vs-runtime split is the fix; aligning the Vercel region was a dead end.
 
 **The runtime fail-safe is STRUCTURAL, not explicit.** Safety relies on `api/claude.ts`'s session-start call passing NO `renderOptions` → `blendFullFidelity` defaults false through a spread-of-undefined across three hops (no `false` literal on the live path). **Any future caller that starts passing `renderOptions.synthOptions` on the runtime path could silently re-enable the 400-ing onset** → per-utterance soft-fail → silently-absent clip. Guard/comment the `claude.ts` call site if that path ever grows options.
 
@@ -611,7 +629,7 @@ The blend's runtime-reachability (above) is resolved by splitting `renderBlendIn
 
 Pass-6 (static audition on `blend-audition.html` #472) + pass-7 (production #479) recovered the two remaining floored classes. **/v/ (voiced fricative) and /w/ (glide) both crack with the SAME held + schwa-tail length-mark shape that won /f//s/:** `<prosody rate="-25%"><phoneme ph="vːə">v</phoneme></prosody>` and `ph="wːə"`, @ -25%. They had been floored in pass-2 — BEFORE the length-mark+schwa lever was discovered (pass-4) — and re-auditioning with `vːə`/`wːə` cracked them cleanly. So `BLEND_FRICATIVE_ONSET_IPA` now also maps `v→vːə, w→wːə` (the constant name is now a misnomer — it's held-**onset** graphemes, not just fricatives); `BLEND_FLOOR_GRAPHEMES` retains ONLY `j` (/dʒ/ — the affricate genuinely cannot be sustained). **Lesson: a "floored for now" class is not permanently floored — re-audition it with the current best lever before treating the floor as final.** (Latent: soft-`g` /dʒ/ in `gem`/`gel` is grapheme `g`, escapes the grapheme-`j` floor → renders as a hard-g stop; tracked as NIT `86caa6jyf`.)
 
-**Byte-proof divergence set must be recomputed against the ACTUAL merge-base, never copied from the prior pass's verifier.** Pass-5's `verifyBlendBytePreservation.ts` expected `{f,s,h,v,j,w}` to change (its baseline was the candidate-f state). Pass-7's baseline is *merged*-pass-5 (f/s/h already shipped their renders), so relative to it ONLY `{v,w}` diverge — Devon wrote a dedicated `verifyBlendBytePreservationPass7.ts` (reusing pass-5's unchanged would false-expect f/s/h to change). Its **4-cell discrimination** (diverging-changed / diverging-unchanged / non-diverging-identical / non-diverging-changed) catches both "the fix didn't take" AND "non-deterministic re-render churned an unchanged-SSML clip"; the `--base <ref>` + `git show origin/main:<path>` baseline makes the proof independent of the bake script. Reuse this template verbatim for any future single-class onset recovery.
+**Byte-proof divergence set must be recomputed against the ACTUAL merge-base, never copied from the prior pass's verifier.** Pass-5's `verifyBlendBytePreservation.ts` expected `{f,s,h,v,j,w}` to change (its baseline was the candidate-f state). Pass-7's baseline is _merged_-pass-5 (f/s/h already shipped their renders), so relative to it ONLY `{v,w}` diverge — Devon wrote a dedicated `verifyBlendBytePreservationPass7.ts` (reusing pass-5's unchanged would false-expect f/s/h to change). Its **4-cell discrimination** (diverging-changed / diverging-unchanged / non-diverging-identical / non-diverging-changed) catches both "the fix didn't take" AND "non-deterministic re-render churned an unchanged-SSML clip"; the `--base <ref>` + `git show origin/main:<path>` baseline makes the proof independent of the bake script. Reuse this template verbatim for any future single-class onset recovery.
 
 #### Text-shape-gated SSML helpers silently die when canon text changes (voice-QA round 5, 2026-06-12)
 
