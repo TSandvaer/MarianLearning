@@ -73,8 +73,16 @@ deny() {
 #
 # `--force` must be followed by space / quote / end so it does NOT substring-match
 # `--force-with-lease` or `--force-if-includes`. Verified by scripts/smoke-destructive-hook.sh.
+#
+# The FLAG check is CASE-SENSITIVE (no -i) -- second instance of the same class of
+# bug as the `-D`/`-d` one above. Git's force flags are lowercase (`--force`, `-f`);
+# uppercase `-F` is an unrelated flag (`git commit -F <file>`, read message from
+# file). With -i, the short-flag alternation matched `-F`, and because this hook
+# sees the WHOLE compound command as one string, an ordinary
+# `git commit -F - && git push origin main` tripped BOTH conditions and was denied
+# as a force-push. Hit 2026-08-02 committing this very file's sibling change.
 if printf '%s' "$cmd" | grep -Eqi 'git[^"]*[[:space:]]push([[:space:]]|"|$)' \
-   && printf '%s' "$cmd" | grep -Eqi -- '(--force([[:space:]]|"|$)|(^|[[:space:]])-[a-zA-Z]*f([[:space:]]|"|$))'; then
+   && printf '%s' "$cmd" | grep -Eq -- '(--force([[:space:]]|"|$)|(^|[[:space:]])-[a-zA-Z]*f([[:space:]]|"|$))'; then
   deny "Blocked: bare git force-push is never an auto-decide. Use --force-with-lease (allowed -- it refuses if the remote moved), or stage the push to .claude/away-queue.md for the sponsor."
 fi
 

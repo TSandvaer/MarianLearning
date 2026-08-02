@@ -1,6 +1,17 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _Awaiting Thomas's review+merge of the Far-Horizon alignment PR (branch `chore/far-horizon-alignment-2026-08-02`). Nothing is dispatched and nothing is blocked on an agent. **On merge, the doctrine in `CLAUDE.md` changes** — read the seven new `##` sections before the next orchestration tick, because three of them (idle-is-free, reviews-never-create-tickets, agents-may-not-create-tickets) reverse habits earlier sessions ran on._
+**Resume next-action:** _Idle — board not scanned this session. Nothing dispatched, no agent in flight, no PR open. **Before your first dispatch, read the seven new `##` doctrine sections in `CLAUDE.md`** (landed 2026-08-02 in PR #490, `976beef`) — three of them reverse habits earlier sessions ran on, so acting from memory will be wrong._
+
+> **The doctrine is LIVE as of `976beef`.** What changed for you, concretely:
+>
+> - **Dispatch briefs must NAME 1–3 docs.** The blanket "read every `.claude/docs/*.md`" rule is gone; the routing table is in `CLAUDE.md § Sub-agents — read the SCOPED docs at start`. Any brief template still saying "read them all" is stale.
+> - **`APPROVE_WITH_NITS` no longer exists.** Two verdicts only. Reviews may not create tickets; nits are fixed in-PR or dropped. Docs-only and test-only PRs get no reviewer.
+> - **Agents may not create tickets**, except a bug reproduced in the deployed PWA.
+> - **Idle is free.** Scan the whole board so you never wrongly conclude "all gated" — then dispatch only what earns its cost. A justified idle slot is a valid outcome; say why.
+> - **`maintain-docs` needs a named incident with a named cost.** `NO_CHANGES` is the expected result (3/3 runs in the landing session returned it). If several consecutive runs all produce edits, the gate is being read too loosely.
+> - **Kill switch:** any calendar week with zero `feat` merges retires the standing team — `git log origin/main --since="7 days ago" --pretty=%s | grep -c "^feat"`.
+>
+> Two project-scoped memories were reconciled to match (`feedback_drain_isnt_stop_signal`, `feedback_constant_work`); they live outside the repo in `~/.claude/projects/`.
 
 ---
 
@@ -42,7 +53,7 @@ reference point.
 
 ## Current gates
 
-- **Thomas review+merge** — the alignment PR. Only open item.
+_(none — PR #490 merged 2026-08-02 17:05 UTC as `976beef`)_
 
 ## Known loose ends (not blocking)
 

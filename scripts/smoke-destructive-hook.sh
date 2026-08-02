@@ -84,6 +84,12 @@ run ALLOW 'yarn build'
 # alternative must NOT match inside `--force-with-lease` / `--force-if-includes`.
 run ALLOW 'git push --force-with-lease origin feat/x'
 run ALLOW 'git push --force-with-lease --force-if-includes origin feat/x'
+# Regression: uppercase -F is `git commit --file`, NOT force. The hook sees the whole
+# compound command as one string, so a -F anywhere plus a `git push` anywhere used to
+# trip the force-push check when the flag grep was case-insensitive. Hit 2026-08-02.
+run ALLOW 'git commit -q -F - && git push -q origin main'
+run ALLOW 'git commit -F msg.txt'
+run ALLOW 'git push -q origin main'
 
 echo
 if [ "$fails" -eq 0 ]; then
