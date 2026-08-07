@@ -136,6 +136,15 @@ export interface SessionAudio {
   cancel: () => void
   /** Tear down all cached Howls + revoke their blob URLs. */
   unload: () => void
+  /**
+   * Ownership-checked teardown. Tears down the loaded bundle ONLY when
+   * `sessionId` is the currently-active session; a no-op otherwise. This is
+   * the safe form for a per-session `unload` closure that may fire LATE — a
+   * superseded track's stale `unload()` must not destroy the bundle a newer
+   * session is actively using (the P0-4 Path A interleaving). Sibling of
+   * `clearSessionAudio`'s active-guard, minus the IndexedDB removal.
+   */
+  unloadIfActive: (sessionId: string) => void
   /** Drop the session's audio from the IndexedDB cache. */
   clearSessionAudio: (sessionId: string) => Promise<void>
 }
@@ -784,6 +793,17 @@ export function createSessionAudio(
     doUnload()
   }
 
+  function unloadIfActive(sessionId: string): void {
+    // Ownership guard — mirror of `clearSessionAudio`'s active check. Only
+    // tear down when this sessionId still owns the loaded bundle. A late /
+    // stale Path A `unload()` closure for a superseded session must NOT
+    // destroy the successor bundle the active session is actively using
+    // (P0-4: word-song pre-warms on hub, math on greet, into ONE singleton).
+    if (activeSessionId === sessionId) {
+      doUnload()
+    }
+  }
+
   function clearSessionAudio(sessionId: string): Promise<void> {
     if (activeSessionId === sessionId) {
       doUnload()
@@ -796,6 +816,7 @@ export function createSessionAudio(
     playSessionUtterance,
     cancel,
     unload,
+    unloadIfActive,
     clearSessionAudio,
   }
 }
@@ -807,4 +828,5 @@ export const loadSessionAudio = defaultInstance.loadSessionAudio
 export const playSessionUtterance = defaultInstance.playSessionUtterance
 export const cancelSessionAudio = defaultInstance.cancel
 export const unloadSessionAudio = defaultInstance.unload
+export const unloadIfActive = defaultInstance.unloadIfActive
 export const clearSessionAudio = defaultInstance.clearSessionAudio

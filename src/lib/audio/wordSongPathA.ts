@@ -34,7 +34,7 @@
 import {
   loadSessionAudio as defaultLoadSessionAudio,
   playSessionUtterance as defaultPlaySessionUtterance,
-  unloadSessionAudio as defaultUnloadSessionAudio,
+  unloadIfActive as defaultUnloadIfActive,
 } from './sessionAudio'
 import type { HowlLike, PlaySessionUtteranceOptions } from './sessionAudio'
 import type {
@@ -69,8 +69,12 @@ export interface PrepareWordSongPathAOptions {
     utteranceId: string,
     opts?: PlaySessionUtteranceOptions,
   ) => Promise<void>
-  /** Test seam — replaces `unloadSessionAudio` from `./sessionAudio`. */
-  unloadSessionAudio?: () => void
+  /**
+   * Test seam — replaces `unloadIfActive` from `./sessionAudio`. Called with
+   * this session's id so the ownership guard only tears down when this
+   * session still owns the singleton bundle (P0-4).
+   */
+  unloadIfActive?: (sessionId: string) => void
   /** Optional AbortSignal. */
   signal?: AbortSignal
 }
@@ -199,7 +203,7 @@ export async function prepareWordSongPathA(
   const fetchImpl = opts.fetch ?? globalThis.fetch
   const loadAudio = opts.loadSessionAudio ?? defaultLoadSessionAudio
   const playSession = opts.playSessionUtterance ?? defaultPlaySessionUtterance
-  const unloadAudio = opts.unloadSessionAudio ?? defaultUnloadSessionAudio
+  const unloadIfActiveFn = opts.unloadIfActive ?? defaultUnloadIfActive
 
   // M2 (ticket 86c9kmwba): optionally include `progress.focusNode` +
   // `progress.recentSuccessRate`. See mathPathA.ts for the full
@@ -394,6 +398,10 @@ export async function prepareWordSongPathA(
     textToId,
     utteranceCount: sessionResponse.utterances.length,
     currentTargetVowel,
-    unload: () => unloadAudio(),
+    // P0-4: ownership-checked unload. If a newer session (e.g. Math pre-warm
+    // on greet superseding this word-song bundle) is active by the time this
+    // closure fires, unloadIfActive is a no-op — it must not tear down the
+    // successor bundle the active session is using.
+    unload: () => unloadIfActiveFn(args.sessionId),
   }
 }

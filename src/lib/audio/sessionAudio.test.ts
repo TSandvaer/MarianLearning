@@ -419,6 +419,51 @@ describe('clearSessionAudio', () => {
   })
 })
 
+describe('unloadIfActive (P0-4 — ownership-checked teardown)', () => {
+  it('unloads the bundle when the id IS the active session', async () => {
+    const h = makeHarness()
+    await h.audio.loadSessionAudio('s', [makeUtterance('u1', 'a')])
+    h.audio.unloadIfActive('s')
+    expect(h.fakes.get('blob:test://0')!.__unloadCalls).toBe(1)
+    expect(h.blobsRevoked).toHaveLength(1)
+  })
+
+  it('is a no-op on the active bundle when the id is stale', async () => {
+    const h = makeHarness()
+    await h.audio.loadSessionAudio('active', [makeUtterance('u1', 'a')])
+    h.audio.unloadIfActive('stale-session')
+    expect(h.fakes.get('blob:test://0')!.__unloadCalls).toBe(0)
+    expect(h.blobsRevoked).toHaveLength(0)
+  })
+
+  it("a superseded session's stale unload does NOT kill the successor bundle", async () => {
+    // Models the P0-4 interleaving: word-song pre-warms first (id 'ws'),
+    // math pre-warms next into the SAME singleton (id 'math' — this tears
+    // down 'ws' and becomes active), then word-song's stale Path A unload()
+    // closure fires late → unloadIfActive('ws'). Because 'math' is now the
+    // active session, the guard makes it a no-op and math's bundle survives.
+    const h = makeHarness()
+    await h.audio.loadSessionAudio('ws', [makeUtterance('ws1', 'wsA')])
+    await h.audio.loadSessionAudio('math', [makeUtterance('m1', 'mA')])
+    // Loading 'math' tore down the superseded 'ws' bundle (howl index 0).
+    expect(h.fakes.get('blob:test://0')!.__unloadCalls).toBe(1)
+
+    // The stale word-song unload closure fires:
+    h.audio.unloadIfActive('ws')
+
+    // Math's bundle (howl index 1) is untouched...
+    expect(h.fakes.get('blob:test://1')!.__unloadCalls).toBe(0)
+    // ...and still playable end-to-end (a torn-down bundle would instead
+    // reject with "loadSessionAudio() must be called before play").
+    const promise = h.audio.playSessionUtterance('m1')
+    await Promise.resolve()
+    const mathFake = h.fakes.get('blob:test://1')!
+    mathFake.__fire('play')
+    mathFake.__fire('end')
+    await expect(promise).resolves.toBeUndefined()
+  })
+})
+
 describe('onplay watchdog (ticket 86c9kxtmu round 2)', () => {
   function makeMemoryStorage(): {
     storage: Map<string, string>

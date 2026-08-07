@@ -74,6 +74,7 @@ import {
   unlockIosAudioSession,
 } from '../../lib/audio/howlerContext'
 import { drainOnGesture } from '../../lib/audio/pendingResumeGate'
+import { recordUnlockStateEvent } from '../../lib/debug/audioContextProbe'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import {
   SESSION_HISTORY_STORAGE_KEY,
@@ -478,17 +479,30 @@ export default function Hub({
 
   const handleNodeTap = useCallback(
     (tree: SkillTreeId) => {
-      // PR #137 round 3 (ticket 86c9kxtmu) — gesture-deferred recovery
-      // drain. If the visibility-recovery gate is pending (Marian
-      // backgrounded the PWA on Hub, returned, and iOS handed us a
-      // suspended/interrupted ctx on the visible edge), this call
-      // runs `Howler.ctx.resume()` + `unlockIosAudioSession()` SYNCHRONOUSLY
-      // inside this user-gesture handler — the iOS-required contract.
-      // Drains any queued Hub welcome-back Howl so the line plays
-      // inside this gesture window. When the gate is idle, this is
-      // effectively a belt-and-suspenders resume + unlock for first-
-      // gesture iOS unlocks.
+      // Gesture-window audio unlock (ticket 86c9gvd0y) — mirror of Math's
+      // and WordSong's chip-tap ritual. Pre-call snapshot → drain any pending
+      // visibility-recovery → UNCONDITIONAL resume + unlock → post-call
+      // snapshot.
+      //
+      // `drainOnGesture` handles ONLY the visibility-recovery case (Marian
+      // backgrounded the PWA on Hub, returned, and iOS handed us a suspended/
+      // interrupted ctx on the visible edge): it runs resume + unlock and
+      // drains any queued Hub welcome-back Howl inside this gesture tick. But
+      // when the gate is idle — the common daily `app-open` path, where Hub IS
+      // the first screen — `drainOnGesture` is a NO-OP (it returns WITHOUT
+      // resuming/unlocking; see pendingResumeGate.ts). So the unconditional
+      // resume + unlock below are what actually re-engage the iOS audio
+      // session on the first gesture. Without them, first-play rests on
+      // Howler's internal document-capture unlock, documented unreliable on
+      // long-idle iPad PWA (howlerContext.ts) → intermittent silent Hub
+      // greeting.
+      recordUnlockStateEvent()
       drainOnGesture(resumeHowlerContextOnGesture, unlockIosAudioSession)
+      resumeHowlerContextOnGesture()
+      const unlockResult = unlockIosAudioSession()
+      recordUnlockStateEvent({
+        howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+      })
 
       // Cancel any in-flight greeting. `cancelledRef` short-circuits
       // caption-walk state updates inside the play promise; `cancelLine()`
@@ -538,11 +552,21 @@ export default function Hub({
   // ── First-tap audio unlock for the app-open path ----------------------
 
   const handleFirstTap = useCallback(() => {
-    // PR #137 round 2 (ticket 86c9kxtmu) — same as `handleNodeTap`.
-    // The wake-tap on app-open paths IS the user gesture iOS needs to
-    // unstick a backgrounded audio context; drain inside this handler
-    // so any pending utterance fires in the gesture window.
+    // Gesture-window audio unlock — same ritual as `handleNodeTap`. The
+    // wake-tap on the `app-open` path IS the user gesture iOS needs to
+    // unstick a never-yet-unlocked / backgrounded audio context.
+    // `drainOnGesture` covers the visibility-recovery case (and NO-OPs when
+    // the gate is idle); the unconditional resume + unlock below re-engage
+    // the OS audio session on the first gesture so the Hub greeting isn't
+    // left resting on Howler's unreliable internal unlock. See
+    // `handleNodeTap` for the full rationale.
+    recordUnlockStateEvent()
     drainOnGesture(resumeHowlerContextOnGesture, unlockIosAudioSession)
+    resumeHowlerContextOnGesture()
+    const unlockResult = unlockIosAudioSession()
+    recordUnlockStateEvent({
+      howlerUnlockMethodCalled: unlockResult?.howlerUnlockMethodCalled,
+    })
     if (gestureUnlocked) return
     setGestureUnlocked(true)
   }, [gestureUnlocked])
