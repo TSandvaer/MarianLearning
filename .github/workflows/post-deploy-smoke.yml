@@ -1,7 +1,8 @@
 # Post-deploy smoke check for /api/claude on production.
 #
-# Runs after every push to `main` (i.e. after Vercel auto-deploys main to
-# production at https://marian-learning.vercel.app). Polls the production
+# Runs after a manual production release (`yarn release`, which deploys with
+# `vercel --prod` and then dispatches this workflow). Pushes to `main` no
+# longer deploy: vercel.json sets git.deploymentEnabled.main = false. Polls the production
 # /api/claude endpoint until it stops returning the previous deploy's
 # response (up to 5 min — Vercel cold-starts can take 30-60s after a push)
 # then runs the smoke assertions in scripts/post-deploy-smoke.sh.
@@ -18,8 +19,6 @@
 name: post-deploy-smoke
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       base_url:

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "release": "bash scripts/release.sh",
     "prebuild": "tsx scripts/generateSessionCanon.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

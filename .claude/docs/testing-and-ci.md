@@ -227,7 +227,7 @@ The `updated_at` field from the REST response is authoritative for elapsed-time 
 
 ### 3.2 `post-deploy-smoke.yml` — production smoke on push to `main`
 
-[.github/workflows/post-deploy-smoke.yml](MarianLearning/.github/workflows/post-deploy-smoke.yml). Runs after every push to `main` (i.e. after Vercel auto-deploys main to production at https://marian-learning.vercel.app).
+[.github/workflows/post-deploy-smoke.yml](MarianLearning/.github/workflows/post-deploy-smoke.yml). Dispatch-only since 2026-10-03: `yarn release` (`scripts/release.sh`) runs `vercel --prod` and then dispatches this workflow against https://marian-learning.vercel.app.
 
 Polls the production `/api/claude` endpoint until it stops returning the previous deploy's response (up to 5 min — Vercel cold-starts can take 30-60s after a push), then runs the smoke assertions in `scripts/post-deploy-smoke.sh`.
 
@@ -239,7 +239,7 @@ Why this exists: PR #28 caused `FUNCTION_INVOCATION_FAILED` at cold-start due to
 
 The Vercel deploy itself is NOT a GitHub Actions workflow — it's a Vercel-side integration:
 
-- Production at https://marian-learning.vercel.app/, auto-deploys on push to `main`.
+- Production at https://marian-learning.vercel.app/. Since 2026-10-03 pushes to `main` do NOT deploy (`vercel.json` `git.deploymentEnabled.main: false`); production ships only via `yarn release`, which refuses unless local `main` is clean and equal to `origin/main` (`vercel --prod` uploads the local tree). PR previews still build.
 - PR previews per branch.
 - `gh pr merge --auto` is **disabled at the repo level** — see memory `reference_pwa_asset_size_limits.md`.
 - Windows yarn `build` has a known EPERM workaround (PR-level documentation; the Linux runner doesn't hit it).
@@ -1605,7 +1605,7 @@ Documented here so a future sub-agent that sees the hook in `.claude/settings.js
 - Memory: `project_canon_commit_strategy.md` — canon committed, regenerate locally.
 - Memory: `project_anthropic_billing_constraint.md` — empty balance fails CI builds, prod survives.
 - Memory: `project_vercel_runtime_config.md` — never `runtime: 'nodejs'` in `/api/*.ts`.
-- Memory: `reference_deploy.md` — Vercel auto-deploy.
+- Memory: `reference_deploy.md` — Vercel deploy (manual production release since 2026-10-03).
 - Memory: `reference_pwa_asset_size_limits.md` — `gh pr merge --auto` disabled, Windows yarn EPERM workaround.
 - Memory: `feedback_background_agent_notification_delay.md` — poll `gh pr list` in drain mode.
 - Source: [vite.config.ts](MarianLearning/vite.config.ts) — Vitest configuration.

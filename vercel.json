@@ -4,5 +4,10 @@
     "api/claude.ts": {
       "includeFiles": "public/canon/**"
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
   }
 }
