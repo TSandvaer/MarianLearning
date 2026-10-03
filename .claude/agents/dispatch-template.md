@@ -76,18 +76,18 @@ Per `[[feedback_per_role_persistent_worktrees]]`.
 ````markdown
 **Worktree state — IMPORTANT:**
 
-- Operate ONLY in `C:/Trunk/PRIVATE/MarianLearning-<your-role>-wt` (your role-persistent worktree). Do NOT touch other agents' worktrees. Do NOT operate in the main checkout `C:/Trunk/PRIVATE/MarianLearning/` — that's the orchestrator's survey directory, READ-ONLY.
+- You start in a fresh worktree under `.claude/worktrees/agent-<id>/` (dispatched with `isolation: "worktree"`, based on `origin/main`). Stay in it. Do NOT touch other agents' worktrees or the main checkout `~/DEV/MarianLearning/` (orchestrator's checkout, READ-ONLY).
 - Run-start invocation:
   ```bash
-  cd C:/Trunk/PRIVATE/MarianLearning-<your-role>-wt
   git fetch origin
-  git checkout -B <your-role>/<task-name> origin/main
+  git checkout -b <your-role>/<task-name> origin/main
+  yarn install --prefer-offline
   ```
+- `.env.local` is NOT in your worktree (gitignored). Credentialed steps (bake / re-render) route to the main checkout via the orchestrator.
 ````
 
 - Push by refspec: `git push origin <your-role>/<task-name>:<your-role>/<task-name>`.
-- The `git checkout -B` always force-creates from `origin/main`. Don't try to recover prior in-flight work — every dispatch starts fresh.
-- Worktree-busy local-branch-delete errors after merge are harmless (remote branch is deleted by `gh pr merge --delete-branch`; only the local ref lingers). Next dispatch's `git checkout -B` overwrites it.
+- Every dispatch starts in a fresh worktree; there is no prior in-flight work to recover. Push early — unpushed work is easy to lose.
 - **Reviewer-side checkout pattern** (when reviewing a PR whose branch is still claimed by the author's worktree): use `git fetch origin pull/<n>/head:pr-<n>-review && git checkout pr-<n>-review` OR `git checkout --detach origin/<author-branch>`. Do NOT use `gh pr checkout` if the author's worktree is still bound to the head ref — it'll fail.
 
 ````
@@ -223,7 +223,7 @@ Detailed content goes in artifacts the orchestrator can read on-demand, NOT in t
 Per `[[feedback_subagent_doc_edits_visibility]]` + `[[feedback_claude_docs_not_in_git]]`.
 
 ```markdown
-**Doc updates (`.claude/docs/`):** if your maintain-docs Stop hook ran and produced an update to any file under `.claude/docs/`, list those files + the rationale in your final report. Format: `Doc updates: <file> — <one-line rationale>`. If no docs were updated, state explicitly: `Doc updates: none.` Apply doc edits DIRECTLY to the parent workspace `C:/Trunk/PRIVATE/MarianLearning/.claude/docs/` — these files are not in git (per `[[feedback_claude_docs_not_in_git]]`); propagation is via SessionStart hook. NEVER include `.claude/docs/` files in your PR.
+**Doc updates (`.claude/docs/`):** if your maintain-docs Stop hook ran and produced an update to any file under `.claude/docs/`, list those files + the rationale in your final report. Format: `Doc updates: <file> — <one-line rationale>`. If no docs were updated, state explicitly: `Doc updates: none.` `.claude/docs/` IS in git (per `[[feedback_claude_docs_in_git]]`), so doc edits made in your worktree ride your PR; propagation is via SessionStart hook. NEVER include `.claude/docs/` files in your PR.
 ```
 
 ## Self-Test Report (UX-visible PRs only)
@@ -302,10 +302,7 @@ Replace `<list of artifacts>` and `<list of facts>` with task-specific values.
 
 ## Worktree cleanup notes (orchestrator-side, post-merge)
 
-After a PR merges, the local-branch-delete may fail with `cannot delete branch '<role>/<task>' used by worktree at '<path>'`. This is cosmetic — the GitHub-side state is clean (remote branch deleted via `--delete-branch`), only the local branch ref lingers. Options:
-
-- Leave it — next dispatch's `git checkout -B <new-task>` overwrites the stale local branch.
-- Force-overwrite via `cd <worktree-path> && git fetch origin && git checkout -B <new-branch> origin/main`.
+`isolation: "worktree"` removes a worktree automatically when the agent made no changes. Worktrees with changes are kept under `.claude/worktrees/`; after the PR merges, remove them with `git worktree remove .claude/worktrees/agent-<id>` (check `git worktree list` first, and confirm the branch was pushed).
 
 ---
 
@@ -313,7 +310,7 @@ After a PR merges, the local-branch-delete may fail with `cannot delete branch '
 
 Run BEFORE firing each `Agent` call. Catches missing brief blocks when fixing them is a one-line edit — not after the agent burned cycles on an under-specified task.
 
-- [ ] **Worktree-concurrency check** — scan in-flight Agent tasks for any in the target persona's worktree (`MarianLearning-<role>-wt`). Occupied → queue or reassign; never stack.
+- [ ] **`isolation: "worktree"`** set on every code-touching dispatch (each agent gets its own fresh worktree, so there is no per-role occupancy to check).
 - [ ] **Fresh `origin/main`** — Step 0 force-creates the branch from `origin/main`; confirm a fetch happens (the standard Step 0 includes it).
 - [ ] **Ticket body reachable** — personas WITH ClickUp read tools (Kevin, Devon, Dave, Matt) get a routing slip + ticket ID; personas WITHOUT (Jessica, Kyle) get the body inline verbatim.
 - [ ] **Ticket hard gates** — explicit Out-of-scope list + named success-test present; missing → flesh out before dispatch (auto-decide class when context suffices).
@@ -322,7 +319,7 @@ Run BEFORE firing each `Agent` call. Catches missing brief blocks when fixing th
 - [ ] **Reviewer named** per routing: Devon reviews Kevin/Kyle/Jessica; Kevin reviews Devon; Dave research merges direct; markdown-only plan/spec/research PRs merge on fast-gate per precedent.
 - [ ] **Pedagogy gate** (content-tier / curriculum dispatches) — committed research citation named, or explicit not-required line.
 - [ ] **Port-4173 rule** — at most ONE `yarn e2e` runner across all worktrees; tell other concurrent agents vitest-only.
-- [ ] **Azure credential routing** — bake / re-render work goes to a worktree with `.env.local` (kevin-wt, devon-wt) or carries compensating analysis.
+- [ ] **Azure credential routing** — isolated worktrees have no `.env.local`; bake / re-render steps run in the main checkout `~/DEV/MarianLearning` (which has it) or carry compensating analysis.
 - [ ] **ClickUp lifecycle** — flip to IN PROGRESS at dispatch (this-session tickets; older tickets skip to IN-REVIEW at PR-open per classifier precedent).
 - [ ] **Final-report contract** — terse, cite-able evidence, real values only (no fabricated PR numbers/SHAs; "the creating turn is never the referencing turn").
 - [ ] **Doc preload preamble** ("read `.claude/docs/*.md` first") + **non-obvious-findings postamble** present.

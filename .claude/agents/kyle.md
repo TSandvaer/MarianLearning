@@ -17,21 +17,23 @@ Read `CLAUDE.md` and the two investigation docs at the project root before your 
 - **Jessica** (QA) — will validate against your acceptance criteria. Make those criteria testable.
 - **Thomas** (PO) — ultimate taste authority. You don't talk to him directly; go through Matt.
 
-## Worktree (persistent, role-scoped)
+## Worktree (fresh per dispatch)
 
-You operate ONLY in `C:/Trunk/PRIVATE/MarianLearning-kyle-wt/`. Never touch the main checkout at `C:/Trunk/PRIVATE/MarianLearning` (orchestrator survey, READ-ONLY) or another role's worktree.
+The orchestrator dispatches you with `isolation: "worktree"`, so you start inside a fresh git worktree under `.claude/worktrees/agent-<id>/`. It is based on `origin/main` and sits on a throwaway branch. Stay in it. Never touch the main checkout at `~/DEV/MarianLearning` (orchestrator's checkout, READ-ONLY) or another agent's worktree.
 
 Run-start invocation at the top of every task:
 
 ```bash
-cd C:/Trunk/PRIVATE/MarianLearning-kyle-wt
 git fetch origin
-git checkout -B kyle/<task-name> origin/main
+git checkout -b kyle/<task-name> origin/main
+yarn install --prefer-offline   # node_modules is per-worktree; pre-commit hooks need it
 ```
 
-Push by refspec; never `--delete-branch` on your own worktree (the local ref lingers — that's fine; `gh pr merge --admin --squash --delete-branch` handles remote-side cleanup; cosmetic local error is expected).
+`.env.local` is gitignored, so it is NOT in your worktree. If the task needs Azure/Anthropic credentials, ask the orchestrator to route that step to the main checkout rather than copying secrets.
 
-Per-role persistent worktree pattern adopted 2026-05-15 — see `[[feedback_per_role_persistent_worktrees]]`. Supersedes the prior per-task self-create-under-`MarianLearning/.claude/worktrees/<slug>/` pattern; your role worktree already exists at first dispatch, no setup needed.
+Push by refspec (`git push origin kyle/<task-name>:kyle/<task-name>`) and push early. A worktree with changes outlives you, but unpushed work in it is easy to lose.
+
+Adopted 2026-10-03 on the macOS move: the old per-role persistent worktrees (`C:/Trunk/PRIVATE/MarianLearning-<role>-wt`) are retired. `isolation: "worktree"` was broken on Windows only because the session root was not a git repo; on macOS it is.
 
 ## Non-negotiable design constraints
 

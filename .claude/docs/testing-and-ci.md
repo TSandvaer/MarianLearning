@@ -140,10 +140,10 @@ On CI (`process.env.CI === 'true'`), `reuseExistingServer` is `false` so the sec
 
 Two recoverable errors surface routinely when a reviewing agent (or any second worker) needs read-only access to a branch that another worktree already has checked out. Both came up during the PR #308 cross-review setup (2026-05-22); flagging here so future setups skip the friction.
 
-**(a) Cannot check out the same branch in two worktrees.** Per the per-role-persistent-worktrees pattern (memory `feedback_per_role_persistent_worktrees.md`), seven sibling worktrees under `C:/Trunk/PRIVATE/` (matt / kyle / kevin / devon / jessica / dave / orch) each track their own working branch. If Kevin's worktree already has `kevin/wave-5-skill-node-split` checked out, attempting the same checkout in Devon's worktree fails with:
+**(a) Cannot check out the same branch in two worktrees.** Each agent's isolated worktree (§11) tracks its own working branch. If Kevin's worktree already has `kevin/wave-5-skill-node-split` checked out, attempting the same checkout in Devon's worktree fails with:
 
 ```
-fatal: 'kevin/wave-5-skill-node-split' is already used by worktree at 'C:/Trunk/PRIVATE/MarianLearning-kevin-wt'
+fatal: 'kevin/wave-5-skill-node-split' is already used by worktree at '<another worktree path>'
 ```
 
 **Pattern for read-only review access:** detach-fetch the remote ref instead of checking out the named branch:
@@ -154,10 +154,6 @@ git checkout --detach origin/<branch-name>
 ```
 
 The detached HEAD reads identically for review purposes (running `npx vitest run`, `npm run canon:lint`, inspecting files) and never conflicts with the sibling worktree's working state.
-
-**(b) MarianLearning worktrees are flat, not nested.** The project root `C:/Trunk/PRIVATE/MARIAN-TUTOR/` contains a `MarianLearning/` subdirectory holding the actual repo (per §7's "Agent-tool `isolation: \"worktree\"` does NOT work in this project" note — the project root is not itself a git repo). The per-role worktrees (e.g. `C:/Trunk/PRIVATE/MarianLearning-devon-wt/`) are the **flat equivalent**: the worktree root contents directly mirror the `MarianLearning/` contents of the project root. There is no nested `MarianLearning/` inside a per-role worktree.
-
-Running `cd <worktree>/MarianLearning` will fail with `No such file or directory`. Pattern: cd into the worktree root directly to run `npx vitest run`, `npm run canon:lint`, `npx playwright test`, etc.
 
 ---
 
@@ -932,26 +928,7 @@ The hook does NOT run `vitest` or e2e — those are author/dispatcher responsibi
 
 **Fix:** run `yarn install --prefer-offline` inside the worktree as Step 0 — before any edit or `git commit`. `--prefer-offline` uses the local Yarn cache and completes in seconds rather than hitting the registry. **Every dispatch brief targeting a worktree-isolated agent that will commit must include this as a pre-commit step.** Observed on PR #236 (Devon, digraphs-th wiring, 2026-05-15) — the pattern recurs on every fresh worktree dispatch, not a one-off.
 
-**Gotcha — the Agent-tool `isolation: "worktree"` mode does NOT work in this project (structural).** The Agent tool's built-in worktree isolation runs `git worktree add` from the **session's project root** (`c:/Trunk/PRIVATE/MARIAN-TUTOR/`). That directory contains `.claude/` config + `AWAY-QUEUE.md` + `MarianLearning/` — but it is **not itself a git repository**; the actual git repo is the `MarianLearning/` subdirectory. The Agent tool aborts immediately with:
-
-```
-Cannot create agent worktree: not in a git repository and no WorktreeCreate hooks are configured.
-Configure WorktreeCreate/WorktreeRemove hooks in settings.json to use worktree isolation with other VCS systems.
-```
-
-This is **structural, not transient** — every dispatch in this project that passes `isolation: "worktree"` will fail with the same error. **Never use `isolation: "worktree"` in this project.** (Per the §7.5 incident below, the old advice was "always pass it" — that advice predates the move to the nested-repo project layout and is now wrong; see §7.5's exception callout for the correction.)
-
-**Replacement pattern — dispatch without isolation, brief the agent to self-create the worktree as Step 0:**
-
-```sh
-cd c:/Trunk/PRIVATE/MARIAN-TUTOR/MarianLearning
-git fetch origin
-git worktree add .claude/worktrees/<ticket-slug> -b <branch-name> origin/main
-cd .claude/worktrees/<ticket-slug>
-yarn install --prefer-offline   # mandatory — see "empty node_modules" gotcha above
-```
-
-The per-ticket worktree-directory convention (`.claude/worktrees/<slug>` inside `MarianLearning/`) is unchanged; only the creation mechanism shifts from "Agent-tool isolation" to "agent does it itself." This is identical to what persona-spawn agents have always done. First surfaced 2026-05-15 dispatching Kyle on the digraphs-th polish bundle.
+**`isolation: "worktree"` works again (macOS, 2026-10-03).** From 2026-05-15 to the macOS move it failed with `Cannot create agent worktree: not in a git repository` because the Windows session root was not a git repo. On macOS the session root is the repo and a probe confirmed isolation works — use it on every code-touching dispatch (§11).
 
 ---
 
@@ -1420,7 +1397,7 @@ A sub-agent dispatched **without `isolation: worktree`** runs in the shared main
 2. Confirm its content is superseded — `git diff <local-sha> origin/main` (expect the squash-merge to fully represent it; a non-empty diff just means the merged PR was a later revision, which is still fine — `origin/main` is canonical).
 3. `git reset --hard origin/main`. Untracked files are not touched.
 
-**Prevention (UPDATED 2026-05-15) — `isolation: "worktree"` is now structurally broken in this project.** The original advice here was "always pass `isolation: "worktree"`," and that worked at the time. The project layout has since changed: the session root (`c:/Trunk/PRIVATE/MARIAN-TUTOR/`) is no longer a git repo — only the nested `MarianLearning/` subdir is — so the Agent tool's worktree mode aborts immediately with "not in a git repository." See §5 "the Agent-tool `isolation: \"worktree\"` mode does NOT work in this project" for the full diagnosis and the **replacement pattern**: dispatch without isolation, brief the agent to `cd MarianLearning && git worktree add .claude/worktrees/<slug> -b <branch> origin/main` themselves, then `yarn install --prefer-offline`. The pollution-prevention goal is unchanged — each agent still gets its own checkout — only the creation mechanism shifts. Hit 2026-05-14 — Kyle's spec agent (no isolation) left a superseded early draft on local `main`; the build-wave agents that followed used Agent-tool isolation and were unaffected — but that flag is no longer usable, so the self-setup snippet replaces it.
+**Prevention:** always pass `isolation: "worktree"` (works again since the 2026-10-03 macOS move; it was broken on Windows 2026-05-15 → 2026-10-03 — see §11).
 
 ---
 
@@ -1508,44 +1485,29 @@ Memory rule `feedback_background_agent_notification_delay.md` notes that Task-no
 
 ---
 
-## 11. Multi-agent worktree topology — per-role persistent worktrees
+## 11. Multi-agent worktree topology — isolated worktree per dispatch
 
-Adopted 2026-05-15 (canonical memory: `feedback_per_role_persistent_worktrees.md`). Supersedes the prior pattern where each agent self-created a worktree under `MarianLearning/.claude/worktrees/<slug>` per dispatch. This section complements the operational gotchas in §5 (empty `node_modules`, structurally-broken Agent-tool `isolation: "worktree"`) and the worktree-pitfall set in §7.5 / §7.6 / §7.7.
+Adopted 2026-10-03 on the move to macOS. Every code-touching dispatch uses the Agent tool's `isolation: "worktree"`. Supersedes the 2026-05-15 per-role persistent worktrees (`C:/Trunk/PRIVATE/MarianLearning-<role>-wt`), which existed only because isolation was broken on Windows: the session root there (`C:/Trunk/PRIVATE/MARIAN-TUTOR/`) was not a git repo. On macOS the session root `~/DEV/MarianLearning` is the repo, and a probe dispatch on 2026-10-03 confirmed isolation works.
 
-### 11.1 Topology — 7 sibling worktrees
+### 11.1 Topology
 
-Seven persistent worktrees live as siblings of the main checkout under `C:/Trunk/PRIVATE/`:
-
-| Role            | Worktree path                                 | Idle branch    |
-| --------------- | --------------------------------------------- | -------------- |
-| Matt (lead)     | `C:/Trunk/PRIVATE/MarianLearning-matt-wt/`    | `matt/idle`    |
-| Kyle (UX)       | `C:/Trunk/PRIVATE/MarianLearning-kyle-wt/`    | `kyle/idle`    |
-| Kevin (dev)     | `C:/Trunk/PRIVATE/MarianLearning-kevin-wt/`   | `kevin/idle`   |
-| Devon (dev)     | `C:/Trunk/PRIVATE/MarianLearning-devon-wt/`   | `devon/idle`   |
-| Jessica (QA)    | `C:/Trunk/PRIVATE/MarianLearning-jessica-wt/` | `jessica/idle` |
-| Dave (research) | `C:/Trunk/PRIVATE/MarianLearning-dave-wt/`    | `dave/idle`    |
-| Orchestrator    | `C:/Trunk/PRIVATE/MarianLearning-orch-wt/`    | `orch/idle`    |
-
-Each worktree parks on its `<role>/idle` branch (tracking `origin/main`) between tasks. The main checkout at `C:/Trunk/PRIVATE/MARIAN-TUTOR/MarianLearning` is the orchestrator survey checkout and is READ-ONLY — agents must not touch it.
+- Each agent starts in `.claude/worktrees/agent-<id>/` (gitignored), on a throwaway `worktree-agent-<id>` branch based on `origin/main` (not local `main` — unpushed local commits are not visible to agents).
+- A worktree whose agent made no changes is removed automatically; one with changes is kept until the orchestrator removes it after merge.
+- The main checkout `~/DEV/MarianLearning` is the orchestrator's checkout — agents never edit it.
 
 ### 11.2 Run-start invocation
 
-Every persona dispatch begins with:
-
 ```bash
-cd C:/Trunk/PRIVATE/MarianLearning-<role>-wt
 git fetch origin
-git checkout -B <role>/<task-name> origin/main
+git checkout -b <role>/<task-name> origin/main
+yarn install --prefer-offline
 ```
 
-`-B` recreates the branch off fresh `origin/main` regardless of where the worktree was previously parked. Persona files + `TEAM.md` have been updated with this invocation — do NOT restate it in dispatch briefs; reference the persona-file rule instead.
+### 11.3 Operational gotchas
 
-### 11.3 Operational gotchas (inherited from the old pattern)
-
-- **`.env.local` lives only in the canonical MarianLearning checkout.** Each role's worktree starts without `.env.local`; copy from the canonical checkout (`cp ../MARIAN-TUTOR/MarianLearning/.env.local .`) or symlink on first use if the role needs Azure/Anthropic credentials. QA/E2E work typically does not — `mockClaude.ts` intercepts all `/api/claude` calls (see §4.2).
-- **`node_modules` is per-worktree.** First dispatch into a fresh worktree must run `yarn install --prefer-offline` before any `yarn typecheck` / commit / e2e. Pre-commit hooks fail without it (see §5 "empty `node_modules`" gotcha).
-- **Vitest junction-resolution on Windows.** Symlinks (junctions) into `node_modules` from sibling worktrees confuse Vitest's module resolver. Don't symlink — install per-worktree.
-- **Agent-tool `isolation: "worktree"` is structurally BROKEN here.** The session root (`C:/Trunk/PRIVATE/MARIAN-TUTOR/`) is not a git repo; only the nested `MarianLearning/` subdir is. Dispatch WITHOUT the isolation flag. The persistent role worktree already exists at dispatch — no Agent-tool worktree creation needed. See §5 for the full diagnosis and the structural error trace.
+- **`.env.local` exists only in the main checkout.** It is gitignored, so isolated worktrees start without it. Route credentialed steps (Azure bake / re-render) to the main checkout rather than copying secrets.
+- **`node_modules` is per-worktree.** Run `yarn install --prefer-offline` before any `yarn typecheck` / commit / e2e; pre-commit hooks fail without it (see §5 "empty `node_modules`" gotcha).
+- **Port 4173:** at most ONE `yarn e2e` runner across all worktrees at a time.
 
 ### 11.3.1 Cross-review branch-collision — `gh pr checkout` fallback
 
@@ -1554,7 +1516,6 @@ git checkout -B <role>/<task-name> origin/main
 **Fallback (Devon, PR #261 cross-review, 2026-05-16):**
 
 ```bash
-cd C:/Trunk/PRIVATE/MarianLearning-devon-wt
 git fetch origin pull/261/head:pr-261-review
 git checkout pr-261-review
 ```
@@ -1590,9 +1551,7 @@ Reference precedent: PR #305 review (Wave 5, 2026-05-22) — the spec's load-bea
 
 ### 11.4 Cross-references
 
-- Memory: `feedback_per_role_persistent_worktrees.md` — canonical adoption record + supersession note for the old pattern.
-- Memory: `feedback_worktree_isolation.md` — superseded 2026-05-15; old operational gotchas (the three above) remain accurate.
-- Memory: `feedback_agent_isolation_worktree_broken.md` — structural diagnosis of the Agent-tool `isolation: "worktree"` flag in this project.
+- Memory: `feedback_per_role_persistent_worktrees.md` / `feedback_agent_isolation_worktree_broken.md` — Windows-era records, superseded 2026-10-03.
 - §5 — pre-commit hooks and the `node_modules` / `isolation: "worktree"` gotchas as they manifest at commit time.
 - §7.5 / §7.6 / §7.7 — historical worktree pitfalls (local-`main` pollution, absolute-path escapes, double-force cleanup).
 

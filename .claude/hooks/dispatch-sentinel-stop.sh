@@ -22,4 +22,7 @@ if printf '%s' "$input" | grep -Eq '"stop_hook_active"[[:space:]]*:[[:space:]]*t
 fi
 
 # Delegate to Python; swallow any error so we never block on a hook bug.
-printf '%s' "$input" | python "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch-sentinel-stop.py" 2>/dev/null || exit 0
+# Prefer python3 (macOS / ubuntu ship no bare `python`), fall back to python.
+_PY="$(command -v python3 || command -v python || true)"
+[ -n "$_PY" ] || exit 0
+printf '%s' "$input" | "$_PY" "$CLAUDE_PROJECT_DIR/.claude/hooks/dispatch-sentinel-stop.py" 2>/dev/null || exit 0

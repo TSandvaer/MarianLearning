@@ -69,36 +69,26 @@ Every agent reads these before a first substantive task:
 
 ## Worktree map
 
-Per-role persistent worktrees as siblings of `MarianLearning/`, established 2026-05-15 per `[[feedback_per_role_persistent_worktrees]]`. Each git-active role has a dedicated worktree where ALL their task branches checkout. Supersedes the prior per-ticket ephemeral worktree pattern (`MarianLearning/.claude/worktrees/<slug>/`).
+Since the macOS move (2026-10-03) every code-touching dispatch uses the Agent tool's `isolation: "worktree"`: each agent gets a fresh worktree under `.claude/worktrees/agent-<id>/`, based on `origin/main`. The old per-role persistent worktrees (`C:/Trunk/PRIVATE/MarianLearning-<role>-wt`, 2026-05-15) are retired; isolation was only broken on Windows because the session root was not a git repo.
 
-| Worktree                                     | Role         | Used for                                                                     |
-| -------------------------------------------- | ------------ | ---------------------------------------------------------------------------- |
-| `C:/Trunk/PRIVATE/MarianLearning-kyle-wt`    | Kyle         | Spec authoring + design asset PRs                                            |
-| `C:/Trunk/PRIVATE/MarianLearning-kevin-wt`   | Kevin        | Implementation + code review                                                 |
-| `C:/Trunk/PRIVATE/MarianLearning-devon-wt`   | Devon        | Implementation + code review                                                 |
-| `C:/Trunk/PRIVATE/MarianLearning-jessica-wt` | Jessica      | E2E specs + QA automation                                                    |
-| `C:/Trunk/PRIVATE/MarianLearning-matt-wt`    | Matt         | (Reserved — read-only inspection if needed)                                  |
-| `C:/Trunk/PRIVATE/MarianLearning-dave-wt`    | Dave         | (Reserved — Dave saves research to parent workspace, no git ops)             |
-| `C:/Trunk/PRIVATE/MarianLearning-orch-wt`    | Orchestrator | (Reserved — orchestrator survey + occasional git ops outside agent dispatch) |
-
-Each worktree starts on a `<role>/idle` tracking branch off `origin/main`. Run-start invocation for any git-active agent:
+Run-start invocation for any git-active agent:
 
 ```bash
-cd C:/Trunk/PRIVATE/MarianLearning-<role>-wt
 git fetch origin
-git checkout -B <role>/<task-name> origin/main
+git checkout -b <role>/<task-name> origin/main
+yarn install --prefer-offline
 ```
 
-Push by refspec; never `--delete-branch` on your own worktree (cosmetic-only local-ref-lingers error is expected); `gh pr merge --admin --squash --delete-branch` handles remote-side cleanup.
+Push by refspec; `gh pr merge --admin --squash --delete-branch` handles remote-side cleanup. Isolated worktrees have no `.env.local` (gitignored) — credentialed steps run in the main checkout.
 
-The main checkout at `C:/Trunk/PRIVATE/MarianLearning` is the orchestrator's READ-ONLY survey checkout — never edited by agents.
+The main checkout at `~/DEV/MarianLearning` is the orchestrator's checkout — never edited by agents.
 
 ## Prerequisites status
 
 - [x] **ClickUp MCP server configured and authenticated.** ✓ (use `mcp__clickup__*` tools)
 - [x] **GitHub repo cloned locally.** ✓ — empty, first push will seed `main`
-- [x] **`gh` CLI installed and authenticated** as `TSandvaer`. ✓ (portable at `C:\Users\538252\.local\bin\gh.exe`)
-- [~] **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`** — set in `.claude/settings.json` AND at Windows User + Machine env-var scopes. **Confirmed inert in this Claude Code build** (probes 2026-04-24 → 2026-04-25 all failed to unlock nested-Agent). Top-level fan-out is the permanent topology. Re-probe if Anthropic announces native nested-Agent support.
+- [x] **`gh` CLI installed and authenticated** as `TSandvaer`. ✓ (Homebrew, `/opt/homebrew/bin/gh`)
+- [~] **`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`** — set in `.claude/settings.json`. **Confirmed inert in this Claude Code build** (probes 2026-04-24 → 2026-04-25 all failed to unlock nested-Agent). Top-level fan-out is the permanent topology. Re-probe if Anthropic announces native nested-Agent support.
 - [ ] **Anthropic API key** in a Vercel env var (NOT the client bundle). Needed for Week 2+ Claude calls — not blocking Week 1 scaffold.
 
 ## Models
