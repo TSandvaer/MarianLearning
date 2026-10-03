@@ -43,16 +43,6 @@ Letter names -> letter sounds -> blending (CV) -> CVC words -> digraphs (sh/ch/t
 | CVC reading      | Emerging; pair every word with picture for vocab                                                            |
 | Sight words      | Not tested; introduce gradually                                                                             |
 
-## Tech stack (planned)
-
-- React + Vite + Tailwind
-- Framer Motion for animations
-- Web Speech API (TTS) for Emma to read problems aloud (NOTE: actual implementation is Azure Speech REST, not Web Speech — see `design/audio-architecture.md`. This bullet predates the architecture pivot and is kept here only as historical context; the canonical voice is `en-US-EmmaMultilingualNeural` rate `-10%`.)
-- Howler.js for sound effects
-- Claude API via Cloudflare Worker / Vercel Function (never from browser)
-- Progress stored in localStorage (no database)
-- Deploy: Vercel with shared-secret URL
-
 ## Design principles
 
 - Audio-first: Emma speaks every instruction via TTS. Text mirrors speech for passive reading exposure.
@@ -67,11 +57,10 @@ Letter names -> letter sounds -> blending (CV) -> CVC words -> digraphs (sh/ch/t
 ## Key reference
 
 - Full investigation and analysis: `build a tutor AI app with investigation and analysis.md`
-- Paper practice plan PDF: `C:\Users\538252\Documents\marian-practice\marian-practice.pdf`
 
 ## Detailed Documentation
 
-**Always read the relevant `.claude/docs/` files at the start of a task when the work touches that area.** These docs contain essential architectural context that is not repeated elsewhere — they are auto-loaded into context at session start via `.claude/hooks/session-start-read-docs.sh`, so you typically do not need to Read them manually.
+**Always read the relevant `.claude/docs/` files at the start of a task when the work touches that area.** These docs contain essential architectural context that is not repeated elsewhere. They are NOT preloaded: `.claude/hooks/session-start-read-docs.sh` injects only an index (names, sizes, one-line descriptions) at session start, so Read the matching doc before working in its area — for the 90-210KB docs, grep for the section and Read with offset/limit.
 
 The `maintain-docs` skill (auto-triggered after every turn via the Stop hook) reviews each turn for non-obvious findings worth capturing here, and updates this index when new doc files are created. Most turns produce nothing doc-worthy; the early-exit filter is high.
 
@@ -139,6 +128,8 @@ tickets, agent-created tickets) that manufacture work from work. The sections be
 countermeasures. FH's anti-idle hook is deliberately NOT imported — it is the demand engine.
 -->
 
+@~/.claude/orchestration-rules.md
+
 ## Idle is free; an unjustified dispatch is the bug
 
 Rank the dispatchable set by **user-visible value** — value to Marian in the deployed app — never by readiness. A bug in the shipped PWA outranks every doc ticket. **Prefer leaving a slot idle to manufacturing work.**
@@ -156,7 +147,7 @@ Nits are fixed now or dropped. Dropping them is an accepted cost. A would-be thi
 
 **Docs-only and test-only PRs get NO reviewer** — CI green, merge. **Code PRs get one reviewer, one round.**
 
-This supersedes, for this project, the user-global auto-decide class "NITs-ticket-creation from APPROVE_WITH_NITS review comments" — that class has no subject any more, because the verdict it keys on no longer exists. Peer-review _routing_ (`feedback_pr_review_routing`) is unaffected; only the verdict vocabulary changes.
+This supersedes, for this project, the user-global auto-decide class "NITs-ticket-creation from APPROVE*WITH_NITS review comments" — that class has no subject any more, because the verdict it keys on no longer exists. Peer-review \_routing* (`feedback_pr_review_routing`) is unaffected; only the verdict vocabulary changes.
 
 ## Agents may not create tickets
 

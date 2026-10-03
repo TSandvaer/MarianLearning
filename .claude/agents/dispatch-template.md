@@ -94,13 +94,13 @@ Per `[[feedback_per_role_persistent_worktrees]]`.
 
 Replace `<your-role>` with the literal role name (kevin / devon / jessica / kyle / dave / matt) and `<task-name>` with a kebab-case task slug.
 
-## Pre-load `.claude/docs/` (mandatory for ALL sub-agents)
+## Scoped docs (mandatory for ALL sub-agents)
 
-Per `[[feedback_dispatch_brief_template]]` — sub-agents don't inherit the SessionStart auto-load. Their first action MUST be to read the project docs.
+Per the project CLAUDE.md § "Sub-agents — read the SCOPED docs at start": the blanket "read every doc" rule is retired (~684KB). Name the 1-3 docs the task class needs, using the CLAUDE.md routing table.
 
 ```markdown
-**Read first (sub-agent — auto-load doesn't fire):** Read ALL `.claude/docs/*.md` files in parallel before starting any work. They are the canonical project briefs the main session sees automatically; without them you're working blind on architecture / audio / progress / planner contracts / screens / skill trees / testing-and-ci. Especially relevant for this dispatch: <name 1-3 specific docs>.
-````
+**Read first:** <name 1-3 specific `.claude/docs/` files for this task class>. For the 90-210KB docs (testing-and-ci, planner-and-canon, progress-and-persistence, skill-trees-and-content), grep for the relevant section and Read with offset/limit. Reading other docs is fine when you have a reason; reading all of them by default is not.
+```
 
 ## Auto-mode disclaimer (mandatory in every dispatch)
 
@@ -337,3 +337,4 @@ Skip most blocks for:
 - Idle-tick state updates (no scope needed).
 
 The template is for **work-producing dispatches** (impl PRs, test PRs, review dispatches, spec PRs). Trivial admin actions stay short.
+````
