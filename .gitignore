@@ -87,3 +87,4 @@ tmp/
 .claude/skills/mobile-app-design/
 .claude/skills/motion/
 .claude/skills/pwa-manifest-generator/
+.vercel
