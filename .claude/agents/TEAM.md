@@ -93,9 +93,7 @@ The main checkout at `~/DEV/MarianLearning` is the orchestrator's checkout — n
 
 ## Models
 
-Five core agents (Matt, Kyle, Kevin, Devon, Jessica) are `opus` by default because the project values care over throughput. Downgrade Kevin/Devon to `sonnet` later if volume grows.
-
-**Dave is `sonnet`.** Research and synthesis at scale benefit from sonnet's larger context and faster iteration on web-search loops; the precision premium of opus is less load-bearing for a consult role than for spec authoring or PR review.
+All six agents (Matt, Kyle, Kevin, Devon, Jessica, Dave) are `opus` because the project values care over throughput. Dave moved from `sonnet` to `opus` on 2026-10-03: his pedagogy calls are judgement-heavy and he is rarely dispatched, so the cost is small. Downgrade Kevin/Devon to `sonnet` later if volume grows.
 
 ## Invoking the team
 
