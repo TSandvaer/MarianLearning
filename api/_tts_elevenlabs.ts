@@ -151,6 +151,23 @@ export function renderElevenLabsText(text: string, tier?: string): string {
   return text
 }
 
+/** Drop a leading ID3v2 tag. ElevenLabs MP3s start with one; the app's
+ *  asset-integrity guard (tests/qa/audioAssetIntegrity.test.ts) expects the
+ *  first bytes to be an MPEG frame sync, as Azure's output was. */
+export function stripId3v2(bytes: Uint8Array): Uint8Array {
+  if (
+    bytes.length < 10 ||
+    bytes[0] !== 0x49 ||
+    bytes[1] !== 0x44 ||
+    bytes[2] !== 0x33
+  ) {
+    return bytes
+  }
+  const size = (bytes[6] << 21) | (bytes[7] << 14) | (bytes[8] << 7) | bytes[9]
+  const footer = bytes[5] & 0x10 ? 10 : 0
+  return bytes.subarray(Math.min(bytes.length, 10 + size + footer))
+}
+
 export function readElevenLabsKey(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
@@ -215,5 +232,5 @@ export async function synthesizeElevenLabs(
     }
     throw new Error(`elevenlabs tts failed: HTTP ${response.status} ${hint}`)
   }
-  return { audio: new Uint8Array(await response.arrayBuffer()) }
+  return { audio: stripId3v2(new Uint8Array(await response.arrayBuffer())) }
 }
