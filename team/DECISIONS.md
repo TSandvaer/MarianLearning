@@ -107,3 +107,10 @@ Distinct from its siblings:
 - **Reversibility:** re-add the one deny entry and restore the `--force-with-lease|--force-if-includes`
   alternatives in the regex; the smoke test documents both expectations.
 - **Decided by:** Thomas (popup, "Narrow the deny list — drop --force-with-lease")
+
+## 2026-10-04 — Progression: Emma's Path (levels = lands, 3 good days, worlds always open)
+
+- **Decided:** (1) a step is mastered after 3 separate days at ≥ 7/8, in any order; good days accumulate and progress only grows. (2) A level is a land (Number Garden 4, Word Song 5). (3) Both worlds always open; locks only inside a world. Plan: `design/progression-emmas-path.md`.
+- **Foundation:** read-only audits 2026-10-04 (UX: tiny 5-icon strip, invisible locks, silent mis-labelled celebration; R&D: mastery = three 8/8 days, linear trees, no schema change needed; research: close subgoals, upward-only progress, skill-named unlocks).
+- **Reverses:** `design/screen-hub.md` "no whole-tree map" (:264) and "no how-to-unlock copy" (:238, :283).
+- **Decided by:** Thomas (popups, recommended option on all three).

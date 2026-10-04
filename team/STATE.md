@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _Idle — board not scanned this session. Nothing dispatched, no agent in flight, no PR open. **Before your first dispatch, read the seven new `##` doctrine sections in `CLAUDE.md`** (landed 2026-08-02 in PR #490, `976beef`) — three of them reverse habits earlier sessions ran on, so acting from memory will be wrong._
+**Resume next-action:** _2026-10-04: Lily voice LIVE in production. PR #494 (Number Garden speed: canon audio reuse + canon-bypass gate) awaiting CI → merge + release (Thomas approved). Next: Emma's Path progression plan (`design/progression-emmas-path.md`, decisions logged in DECISIONS.md) — tickets need Thomas's yes before creation._
 
 > **The doctrine is LIVE as of `976beef`.** What changed for you, concretely:
 >
