@@ -189,6 +189,43 @@ describe('synthesizeUtterance provider switch', () => {
     expect(url.startsWith('https://api.elevenlabs.io/')).toBe(true)
   })
 
+  it('falls back to Azure for one utterance when ElevenLabs fails', async () => {
+    const fetchFn = vi.fn(async (url: string) =>
+      url.startsWith('https://api.elevenlabs.io/')
+        ? new Response('quota exceeded', { status: 401 })
+        : new Response(new Uint8Array([9]), { status: 200 }),
+    )
+    const out = await synthesizeUtterance(req('Hi!'), {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      backoff: { maxAttempts: 0 },
+      env: {
+        TTS_PROVIDER: 'elevenlabs',
+        ELEVENLABS_API_KEY: 'k',
+        AZURE_SPEECH_KEY: 'a',
+        AZURE_SPEECH_REGION: 'westeurope',
+      } as NodeJS.ProcessEnv,
+    })
+    expect(Array.from(out.audio)).toEqual([9])
+    expect(fetchFn).toHaveBeenCalledTimes(2)
+    expect(String(fetchFn.mock.calls[1][0])).toContain(
+      'tts.speech.microsoft.com',
+    )
+  })
+
+  it('rethrows the ElevenLabs error when Azure is not configured', async () => {
+    const fetchFn = vi.fn(async () => new Response('down', { status: 503 }))
+    await expect(
+      synthesizeUtterance(req('Hi!'), {
+        fetchFn,
+        backoff: { maxAttempts: 0 },
+        env: {
+          TTS_PROVIDER: 'elevenlabs',
+          ELEVENLABS_API_KEY: 'k',
+        } as NodeJS.ProcessEnv,
+      }),
+    ).rejects.toThrow(/elevenlabs tts failed: HTTP 503/)
+  })
+
   it('stays on Azure by default', async () => {
     const fetchFn = okFetch()
     await synthesizeUtterance(req('Hi!'), {
