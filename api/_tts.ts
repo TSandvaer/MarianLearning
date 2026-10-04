@@ -43,6 +43,7 @@
 // scoped to `api/`.
 
 import { createHash } from 'node:crypto'
+import { synthesizeElevenLabs } from './_tts_elevenlabs.js'
 
 const AZURE_TTS_PATH = '/cognitiveservices/v1'
 
@@ -1880,6 +1881,17 @@ export async function synthesizeUtterance(
   req: TtsRequest,
   opts: SynthesizeOptions = {},
 ): Promise<TtsResult> {
+  // Voice migration (design/voice-migration-elevenlabs.md): opt-in
+  // ElevenLabs backend. Azure stays the default until the re-voice and
+  // live-path tickets switch production over.
+  if ((opts.env ?? process.env).TTS_PROVIDER === 'elevenlabs') {
+    return synthesizeElevenLabs(req, {
+      fetchFn: opts.fetchFn,
+      timeoutMs: opts.timeoutMs,
+      env: opts.env,
+      backoff: opts.backoff,
+    })
+  }
   const fetchFn = opts.fetchFn ?? globalThis.fetch
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const scheduleTimeout = opts.setTimeoutFn ?? ((cb, ms) => setTimeout(cb, ms))
