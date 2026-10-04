@@ -627,6 +627,40 @@ export class PlannerError extends Error {
  *  is `claude-haiku-4-5-20251001`. */
 export const PLANNER_MODEL_ID = 'claude-haiku-4-5-20251001'
 
+/**
+ * Whether the planner will actually USE a Leitner / slow-fact hint for this
+ * (track, focusNode). Shared with the handler (api/claude.ts) so it only
+ * bypasses the canon when the hint changes the plan. Before 2026-10-04 the
+ * handler bypassed on ANY non-empty hint, so every math session on
+ * add-to-20+ paid the ~11-13 s live planner for a hint the planner ignored
+ * (Number Garden blank screen on the iPad).
+ */
+export function isLeitnerDirectiveActive(
+  track: string,
+  focusNode: string | undefined,
+  leitner: readonly unknown[] | undefined,
+): boolean {
+  return (
+    track === 'math' &&
+    focusNode === 'add-to-10' &&
+    leitner !== undefined &&
+    leitner.length > 0
+  )
+}
+
+export function isSlowFactDirectiveActive(
+  track: string,
+  focusNode: string | undefined,
+  slowFacts: readonly unknown[] | undefined,
+): boolean {
+  return (
+    track === 'math' &&
+    (focusNode === 'add-to-10' || focusNode === 'sub-to-10') &&
+    slowFacts !== undefined &&
+    slowFacts.length > 0
+  )
+}
+
 const SUPPORTED_TRACKS: readonly PlannerTrack[] = ['math', 'word-song']
 
 /**
@@ -1096,11 +1130,11 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
   // Lives in the user message (volatile per call). The cache prefix
   // (system prompt) is unchanged so two Leitner-on calls share the
   // same prompt-cache hits as a Leitner-off call.
-  const isLeitnerActive =
-    args.track === 'math' &&
-    focusNode === 'add-to-10' &&
-    args.leitner !== undefined &&
-    args.leitner.length > 0
+  const isLeitnerActive = isLeitnerDirectiveActive(
+    args.track,
+    focusNode,
+    args.leitner,
+  )
   const leitnerLine = isLeitnerActive
     ? buildLeitnerDirective(args.leitner!)
     : null
@@ -1113,11 +1147,11 @@ function buildUserMessage(args: GenerateSessionPlanArgs): string {
   // [] for the first 5 sub-to-10 sessions so the wire field is
   // omitted entirely on the cold-start path. Lives in the user
   // message; cache prefix unchanged.
-  const isSlowFactsActive =
-    args.track === 'math' &&
-    (focusNode === 'add-to-10' || focusNode === 'sub-to-10') &&
-    args.slowFacts !== undefined &&
-    args.slowFacts.length > 0
+  const isSlowFactsActive = isSlowFactDirectiveActive(
+    args.track,
+    focusNode,
+    args.slowFacts,
+  )
   const slowFactsLine = isSlowFactsActive
     ? buildSlowFactDirective(args.slowFacts!)
     : null

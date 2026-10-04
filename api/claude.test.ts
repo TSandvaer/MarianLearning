@@ -1543,6 +1543,121 @@ describe('M4 Leitner-hint payload (ticket 86c9pwgc8)', () => {
     expect(canonStub.mock.calls.length).toBeLessThanOrEqual(1)
   })
 
+  const SLOW_FACT_ITEM = {
+    fact: { a: 6, b: 4, op: '+' as const },
+    attempts: 6,
+    correctRate: 0.9,
+    medianLatencyMs: 6000,
+  }
+
+  it('leitner on a node the planner ignores it for (add-to-20) still hits canon — no live planner', async () => {
+    // Regression (2026-10-04, Number Garden blank screen): the planner only
+    // uses the Leitner directive on add-to-10, so bypassing canon for any
+    // other math node paid ~11-13 s of live planner for nothing.
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-20',
+            leitner: [{ a: 3, b: 2, op: '+', box: 1 }],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { utterances: { text: string }[] }
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(capture.lastArgs).toBeUndefined()
+  })
+
+  it('slow facts on sub-to-10 (planner uses them) DO bypass canon — control for the test below', async () => {
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: { focusNode: 'sub-to-10', slowFacts: [SLOW_FACT_ITEM] },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { utterances: { text: string }[] }
+    expect(body.utterances[0]!.text).toContain('LIVE')
+    expect(capture.lastArgs).toBeDefined()
+  })
+
+  it('slow facts on a node the planner ignores them for (add-to-20) still hit canon', async () => {
+    const canonStub = vi.fn(() => CANON_FIXTURE)
+    const capture: { lastArgs?: unknown } = {}
+    const anthropicClient = makeStubAnthropicClient(
+      STUB_MATH_PLAN_BODY,
+      capture,
+    )
+
+    const res = await handler(
+      makeRequest({
+        kind: 'session-start',
+        payload: {
+          track: 'math',
+          level: 1,
+          childName: 'Marian',
+          progress: {
+            focusNode: 'add-to-20',
+            slowFacts: [SLOW_FACT_ITEM],
+          },
+        },
+      }),
+      {
+        anthropicClient,
+        sessionCache,
+        rateLimiter,
+        now: nowFn,
+        getCanonEntry: canonStub,
+      },
+    )
+
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { utterances: { text: string }[] }
+    expect(body.utterances[0]!.text).toContain('CANON')
+    expect(capture.lastArgs).toBeUndefined()
+  })
+
   it('empty leitner array still hits canon (browser should not have shipped it, but defend)', async () => {
     // The browser's `readProgressHintsForTrack` omits the field when
     // the box is empty — but defense in depth: if a future change
