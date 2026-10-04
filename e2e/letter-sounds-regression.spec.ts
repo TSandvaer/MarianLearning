@@ -318,13 +318,12 @@ function targetMnemonicsByProblem(canon: CanonShape): Map<number, string> {
  * glyph; we lower-case here for category-membership checks against the
  * lowercase canonical letter set).
  *
- * British-voice-rollout `correct` shapes (the OLD "Yes! <L> says <M>."
- * was retired):
- *   - non-fricative:  "Yes. <L>. <mnemonic>."        e.g. "Yes. M. mmm."
- *   - fricative S/F/H/V: "Yes. <L> says it. <mnemonic>?"
- *                                                    e.g. "Yes. S says it. sss?"
- *   - anchored U/I:   "Yes. <L>. <Iso>, like in <word>."
- *                                                    e.g. "Yes. U. Uh, like in cup."
+ * Lily-voice `correct` shapes (voice migration 2026-10-04; the Azure-era
+ * "Yes. M. mmm." / "Yes. S says it. sss?" shapes were retired):
+ *   - every sound:  "Yes. <L> says <mnemonic>."       e.g. "Yes. M says mmm."
+ *   - R only:       "Yes! R says <mnemonic>!"         e.g. "Yes! R says rrr!"
+ *   - anchored U/I: "Yes. <L> says <iso>, like in <word>."
+ *                                                     e.g. "Yes. U says uh, like in cup."
  * In every shape the LETTER is the single ASCII glyph immediately
  * after the leading "Yes." — captured by the anchored regex below.
  *
@@ -338,11 +337,9 @@ function targetLettersByProblem(canon: CanonShape): Map<number, string> {
     const idMatch = u.id.match(/^word\.p(\d+)\.correct$/)
     if (idMatch === null) continue
     const problemNum = Number(idMatch[1])
-    // The letter is the single ASCII glyph right after "Yes. " — either
-    // "Yes. <L>. ..." (non-fric / vowels) or "Yes. <L> says it. ..."
-    // (fricatives). Anchor on the leading "Yes." + the glyph + a
-    // following "." or " says it".
-    const textMatch = u.text.match(/^Yes\. ([A-Za-z])(?:\.| says it)/)
+    // The letter is the single ASCII glyph right after "Yes. " / "Yes! "
+    // and before " says ".
+    const textMatch = u.text.match(/^Yes[.!] ([A-Za-z]) says /)
     if (textMatch === null) continue
     byProblem.set(problemNum, textMatch[1]!.toLowerCase())
   }
