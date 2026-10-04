@@ -13,6 +13,15 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
   echo "release: local main differs from origin/main — push or pull first"; exit 1; }
 
 echo "Releasing $(git log -1 --format='%h %s') to production…"
-vercel --prod
+if ! vercel deploy --prod --yes; then
+  cat <<'MSG'
+release: Vercel refused the production deploy (seen once on 2026-10-04 as
+"Not authorized"; it did not reproduce minutes later). Workaround that worked:
+  1. vercel deploy --yes          (preview of the same clean main)
+  2. Vercel dashboard → Deployments → that preview → ⋯ → Promote to Production
+  3. gh workflow run post-deploy-smoke.yml --ref main
+MSG
+  exit 1
+fi
 gh workflow run post-deploy-smoke.yml --ref main
 echo "Smoke check dispatched: gh run list --workflow post-deploy-smoke.yml --limit 1"
