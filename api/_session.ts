@@ -144,7 +144,11 @@ export async function renderSessionAudio(
   opts: RenderSessionOptions = {},
 ): Promise<SessionStartResponse> {
   const synth = opts.synth ?? synthesizeUtterance
-  const concurrency = Math.max(1, opts.concurrency ?? 6)
+  // ElevenLabs Starter allows 3 concurrent requests; a 4th returns 429
+  // concurrent_limit_exceeded (measured 2026-10-04: 6 parallel -> 3 x 429),
+  // which made 4/68 live graduation lines fall back to Azure.
+  const defaultConcurrency = process.env.TTS_PROVIDER === 'elevenlabs' ? 3 : 6
+  const concurrency = Math.max(1, opts.concurrency ?? defaultConcurrency)
   const sources = extractUtteranceTexts(plan)
 
   // Concurrency-limited fan-out. Promise.all without limit would open one

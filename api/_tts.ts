@@ -1884,13 +1884,29 @@ export async function synthesizeUtterance(
   // Voice migration (design/voice-migration-elevenlabs.md): opt-in
   // ElevenLabs backend. Azure stays the default until the re-voice and
   // live-path tickets switch production over.
-  if ((opts.env ?? process.env).TTS_PROVIDER === 'elevenlabs') {
-    return synthesizeElevenLabs(req, {
-      fetchFn: opts.fetchFn,
-      timeoutMs: opts.timeoutMs,
-      env: opts.env,
-      backoff: opts.backoff,
-    })
+  const providerEnv = opts.env ?? process.env
+  if (providerEnv.TTS_PROVIDER === 'elevenlabs') {
+    try {
+      return await synthesizeElevenLabs(req, {
+        fetchFn: opts.fetchFn,
+        timeoutMs: opts.timeoutMs,
+        env: opts.env,
+        backoff: opts.backoff,
+      })
+    } catch (err) {
+      // Live-path safety (voice migration 5/6): an ElevenLabs outage,
+      // quota or timeout must not leave Marian with a silent line. Fall
+      // back to Azure for this one utterance when Azure is configured;
+      // otherwise surface the original error.
+      if (!providerEnv.AZURE_SPEECH_KEY || !providerEnv.AZURE_SPEECH_REGION)
+        throw err
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn({
+          event: 'tts-elevenlabs-fallback',
+          error: err instanceof Error ? err.message.slice(0, 200) : String(err),
+        })
+      }
+    }
   }
   const fetchFn = opts.fetchFn ?? globalThis.fetch
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
