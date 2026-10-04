@@ -37,8 +37,11 @@ const DEFAULT_TIMEOUT_MS = 15_000
  * Letter-sound mnemonics (as spelled in canon text) → IPA for `eleven_v4`.
  * Continuants are held (`ː`); stops and affricates are bare — no added
  * schwa, which is exactly what Azure could not do.
- * Ear-approved 2026-10-04: v, w, f, s, t, th, sh, j. The rest are locked by
- * the remaining-sounds audition (ClickUp 123jpnbc33f).
+ * Ear-approved 2026-10-04 (bake-off rounds 1 and 3): every entry except
+ * hhh and rrr, which were approved in the question line ("Which letter
+ * says /h/?") but not yet in the confirm line ("Yes. H says /h/.").
+ * Round 3 settled: short vowels (not held), bare stops (no schwa), held
+ * l/m/n/z. ClickUp 123jpnbc33f.
  */
 export const LETTER_SOUND_IPA: Readonly<Record<string, string>> = {
   aaa: 'æ',
@@ -99,6 +102,10 @@ export const BLEND_GRAPHEME_IPA: Readonly<Record<string, string>> = {
   z: 'zː',
 }
 
+/** Whole words whose CVC onset `g` is soft (/dʒ/), not the default hard
+ *  /ɡ/. Ear-approved for "gem" 2026-10-04 (Azure rendered it hard). */
+export const SOFT_G_WORDS: ReadonlySet<string> = new Set(['gem', 'gel', 'gym'])
+
 const MNEMONIC_PATTERN = new RegExp(
   `\\b(${Object.keys(LETTER_SOUND_IPA)
     .sort((a, b) => b.length - a.length)
@@ -113,8 +120,12 @@ export function renderElevenLabsBlend(text: string): string | null {
   const parsed = parseBlendText(text)
   if (parsed === null || parsed.graphemes.length < 2) return null
   const segments: string[] = []
-  for (const g of parsed.graphemes) {
-    const ipa = BLEND_GRAPHEME_IPA[g.toLowerCase()]
+  const softG = SOFT_G_WORDS.has(parsed.word.toLowerCase())
+  for (const [i, g] of parsed.graphemes.entries()) {
+    const ipa =
+      i === 0 && softG && g.toLowerCase() === 'g'
+        ? 'dʒ'
+        : BLEND_GRAPHEME_IPA[g.toLowerCase()]
     if (ipa === undefined) return null
     segments.push(`/${ipa}/`)
   }
