@@ -84,10 +84,16 @@ describe('renderElevenLabsText', () => {
 
   it('renders a soft onset g for gem but keeps hard g elsewhere', () => {
     expect(renderElevenLabsText('g - e - m ... gem', 'cvc-words-short-e')).toBe(
-      '/dʒ/ - /e/ - /mː/ ... gem',
+      '/dʒ/ - /ɛ/ - /mː/ ... gem',
     )
     expect(renderElevenLabsText('b - a - g ... bag', 'cvc-words')).toBe(
       '/b/ - /æ/ - /ɡ/ ... bag',
+    )
+  })
+
+  it('never emits an all-ASCII blend (short e uses ɛ)', () => {
+    expect(renderElevenLabsText('n - e - t ... net', 'cvc-words-short-e')).toBe(
+      '/n/ - /ɛ/ - /t/ ... net',
     )
   })
 

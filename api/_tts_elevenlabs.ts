@@ -80,7 +80,10 @@ export const LETTER_SOUND_IPA: Readonly<Record<string, string>> = {
  *  isolated sounds; vowels are the short vowels the CVC tiers teach. */
 export const BLEND_GRAPHEME_IPA: Readonly<Record<string, string>> = {
   a: 'æ',
-  e: 'e',
+  // ɛ, not e: with "e" a short-e blend (n - e - t) is plain ASCII, and the
+  // model read the slashes aloud ("slash n slash"). ɛ won 4/4 rows
+  // (net, hen, bed, pen) in the 2026-10-04 round-5 ear-test.
+  e: 'ɛ',
   i: 'ɪ',
   o: 'ɒ',
   u: 'ʌ',

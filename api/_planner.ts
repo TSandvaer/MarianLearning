@@ -3109,6 +3109,8 @@ voice migration 2026-10-04, ear-tested on the ElevenLabs voice, round 4
                 e.g. "Which letter says mmm?"  "Which letter says sss?"
 - hint:       "It says <SOUND-MNEMONIC>."
                 e.g. "It says mmm."  "It says buh."
+              EXCEPTION — O only: "Hear this sound: ooo." ("It says ooo."
+              rendered as /a/ on the ElevenLabs voice).
 - correct:    "Yes. <LETTER-UPPER> says <SOUND-MNEMONIC>."
                 e.g. "Yes. M says mmm."  "Yes. S says sss."
               EXCEPTION — R only: "Yes! R says rrr!" (the plain form
@@ -3311,8 +3313,8 @@ all other slots are content-mode-agnostic:
 - hint (letter-names tier): "Let's look. <NAME>." e.g.
   "Let's look. M." — <NAME> case-preserved from the read line.
 - hint (letter-sounds tier): "It says <SOUND-MNEMONIC>." for every
-  sound, e.g. "It says mmm." — see LETTER-SOUNDS UTTERANCE TEMPLATE
-  block above.
+  sound except O ("Hear this sound: ooo."), e.g. "It says mmm." — see
+  LETTER-SOUNDS UTTERANCE TEMPLATE block above.
 - hint (sight-words tier): "Look. <Word>." — capitalised target, e.g.
   "Look. The." Whole-word only; do NOT hint by sounding out letters.
 - hint (simple-sentences tier): "Listen. <full sentence WITH the answer

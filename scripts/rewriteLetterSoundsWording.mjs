@@ -4,7 +4,7 @@
  * ClickUp 123jpnbc33g; ear-tested 2026-10-04, round 4: simplified won 15/15).
  *
  *   read        "Which letter says <m>?"
- *   hint        "It says <m>."
+ *   hint        "It says <m>."            (O: "Hear this sound: ooo.")
  *   correct     "Yes. <L> says <m>."        (R: "Yes! R says <m>!")
  *   giveAnswer  "This one is <L>. <L> says <m>."
  *   U/I anchor  kept on correct + giveAnswer ("…, like in cup."), dropped on
@@ -31,7 +31,9 @@ export function lilyWording(letter, mnem, anchor) {
   const tail = anchor ? `${mnem}, like in ${anchor}` : mnem
   return {
     read: `Which letter says ${mnem}?`,
-    hint: `It says ${mnem}.`,
+    // O only: "It says ooo." rendered as /a/ in three voice-QA attempts;
+    // "Hear this sound: ooo." won the round-6 ear-test (2026-10-04).
+    hint: mnem === 'ooo' ? `Hear this sound: ${mnem}.` : `It says ${mnem}.`,
     correct:
       letter === 'R' ? `Yes! R says ${tail}!` : `Yes. ${letter} says ${tail}.`,
     giveAnswer: `This one is ${letter}. ${letter} says ${tail}.`,
