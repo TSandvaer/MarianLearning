@@ -64,6 +64,9 @@ export const LETTER_SOUND_IPA: Readonly<Record<string, string>> = {
   sss: 'sː',
   tuh: 't',
   uuu: 'ʌ',
+  // U/I anchored canon forms ("uh, like in cup", "ih, like in ink").
+  uh: 'ʌ',
+  ih: 'ɪ',
   vvv: 'vː',
   www: 'wː',
   yuh: 'j',

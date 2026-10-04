@@ -51,6 +51,18 @@ describe('renderElevenLabsText', () => {
     )
   })
 
+  it('maps the U/I anchored lead sounds but keeps the anchor word plain', () => {
+    expect(
+      renderElevenLabsText('Yes. U. Uh, like in cup.', 'letter-sounds'),
+    ).toBe('Yes. U. /ʌ/, like in cup.')
+    expect(
+      renderElevenLabsText(
+        'Which letter says ih, like in ink?',
+        'letter-sounds',
+      ),
+    ).toBe('Which letter says /ɪ/, like in ink?')
+  })
+
   it('leaves mnemonic-looking words alone outside the letter-sounds tier', () => {
     expect(renderElevenLabsText('Hmm... try again?', 'cvc-words')).toBe(
       'Hmm... try again?',
