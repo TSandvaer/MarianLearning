@@ -37,11 +37,12 @@ const DEFAULT_TIMEOUT_MS = 15_000
  * Letter-sound mnemonics (as spelled in canon text) → IPA for `eleven_v4`.
  * Continuants are held (`ː`); stops and affricates are bare — no added
  * schwa, which is exactly what Azure could not do.
- * Ear-approved 2026-10-04 (bake-off rounds 1 and 3): every entry except
- * hhh and rrr, which were approved in the question line ("Which letter
- * says /h/?") but not yet in the confirm line ("Yes. H says /h/.").
- * Round 3 settled: short vowels (not held), bare stops (no schwa), held
- * l/m/n/z. ClickUp 123jpnbc33f.
+ * Ear-approved 2026-10-04 (bake-off rounds 1, 3 and 3b): short vowels
+ * (not held), bare stops (no schwa), held l/m/n/z. /h/ failed one confirm
+ * take and passed on a retake, so takes vary: re-take flagged clips rather
+ * than changing the IPA. /r/'s confirm line only passed as an exclamation
+ * ("Yes! R says /ɹː/!"), which is a wording change (ClickUp 123jpnbc33g).
+ * Approvals: ClickUp 123jpnbc33f.
  */
 export const LETTER_SOUND_IPA: Readonly<Record<string, string>> = {
   aaa: 'æ',
