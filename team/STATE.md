@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-04: Lily voice LIVE in production. PR #494 (Number Garden speed: canon audio reuse + canon-bypass gate) awaiting CI → merge + release (Thomas approved). Next: Emma's Path progression plan (`design/progression-emmas-path.md`, decisions logged in DECISIONS.md) — tickets need Thomas's yes before creation._
+**Resume next-action:** _2026-10-04 22:02: orca-wave pilot SUCCEEDED — worker built PR #495 (Emma's Path 3/10, head accdf4c), released. Reviewer worker in flight: Orca run `run_7b5e4c25954a`, dispatch `ctx_ac0dc2e8f6b6` (workspace review-495). Next: on its worker_done read the `## REVIEW VERDICT` on #495; merge when fast-gate+e2e SUCCESS + APPROVE. PR #494 (Number Garden speed) awaits Playwright → merge + `yarn release` (Thomas approved)._
 
 > **The doctrine is LIVE as of `976beef`.** What changed for you, concretely:
 >
