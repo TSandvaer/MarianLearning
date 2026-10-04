@@ -397,8 +397,8 @@
     <p class="sub">
       Every clip below is decoded from the
       <strong>real production canon</strong>
-      (baked through the same Azure render pipeline the app uses) plus the
-      bundled Greet and Hub MP3s. Play each render, then mark
+      (rendered in the ElevenLabs Lily voice the app uses) plus the bundled
+      Greet and Hub MP3s. Play each render, then mark
       <strong>Pass</strong> or <strong>Fail</strong>. A fail asks for a category
       and an optional note. Verdicts autosave locally; <strong>Submit</strong>
       sends the whole set (passes included) to the report endpoint. Unlinked QA
@@ -1388,7 +1388,7 @@
 
       // ── Footer (AC: print computed unique-render count) ──────────────────
       function renderFooter(canonUnique, rawCanon, greetCount, hubCount) {
-        const expected = 632
+        const expected = 760
         const ok = canonUnique === expected
         const total = canonUnique + greetCount + hubCount
         const el = document.getElementById('footer')
@@ -1409,10 +1409,10 @@
           hubCount +
           ' hub. ' +
           (ok
-            ? 'Computed unique canon count matches expected <code>632</code>. ✓'
+            ? 'Computed unique canon count matches expected <code>760</code>. ✓'
             : '<strong style="color:#a94442">Computed unique canon count = ' +
               canonUnique +
-              ', expected 632 — DISCREPANCY.</strong>') +
+              ', expected 760 — DISCREPANCY.</strong>') +
           ' &nbsp;·&nbsp; <code>itemId</code> = canonical member <code>&lt;file-stem&gt;#&lt;utteranceId&gt;</code>.'
       }
 
@@ -1470,8 +1470,8 @@
           setFilter('all')
 
           const mismatch =
-            canonUnique !== 632
-              ? ' ⚠ canon unique = ' + canonUnique + ' (expected 632)'
+            canonUnique !== 760
+              ? ' ⚠ canon unique = ' + canonUnique + ' (expected 760)'
               : ''
           setStatus(
             'Ready — ' +

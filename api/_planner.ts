@@ -2249,10 +2249,8 @@ matching that node. Thirteen first-class content modes today:
     read-line template + the chip-content discipline (letter glyph,
     not picture) differ. See the LETTER-NAMES SESSION COMPOSITION
     RULES block below.
-  - letter-sounds: "Which letter says <SOUND>" problems (terminal
-    punctuation is sound-class-dependent — declarative for voiced
-    sounds, question for voiceless; see the SOUND-CLASS CLASSIFICATION
-    block in the LETTER-SOUNDS UTTERANCE TEMPLATE). Marian hears
+  - letter-sounds: "Which letter says <SOUND>?" problems (see the
+    LETTER-SOUNDS UTTERANCE TEMPLATE for every slot). Marian hears
     Emma voice an isolated short-vowel or consonant phoneme and taps
     the LETTER GLYPH that maps to that sound (no pictures). This is
     the SECOND literacy tier in tree order (between letter-names and
@@ -3094,194 +3092,51 @@ letter M) — this rule exists ONLY because the bare vowel mnemonic used
 to equal the single-letter name. Inside <phoneme ph="æ">aaa</phoneme>
 Azure uses the ph, so "aaa" sounds identical to the approved "a".
 
-SOUND-CLASS CLASSIFICATION (drives read terminal punctuation and hint
-framing — apply per target sound). Two independent axes:
-
-  READ terminal punctuation — ROUND-2 per-sound partition (Dave
-  straggler spec; supersedes round-1 "all stops are questions"):
-    · DECLARATIVE, read ends with "." :
-        nasals  /m/ /n/
-        liquids /l/ /r/
-        ALL vowels /æ/ /ɒ/ /ʌ/ /ɪ/ /ɛ/
-        SCHWA-TAILED stops /p/ /b/ /d/ /g/  (round-2 — vowel-final after
-          the schwa, so declarative fits better than a question)
-    · QUESTION, read ends with "?" :
-        voiceless fricatives /s/ /f/ /h/
-        voiced fricative /v/  (round-2 — flipped TO question)
-        the two non-schwa-or-velar stops /t/ /k/  (/t/ bare-FROZEN;
-          /k/ question read Thomas-approved GREEN)
-
-  FRICATIVE vs NON-FRICATIVE (drives HINT framing):
-    · FRICATIVE → hint "It says <SOUND-MNEMONIC>?" :
-        /s/ /f/ /h/ /v/ /z/  (+ sh/th digraph sounds, out of scope here)
-    · NON-FRICATIVE → hint "Listen. <SOUND-MNEMONIC>." :
-        nasals /m/ /n/, liquids /l/ /r/, ALL vowels, ALL stops
-        /p/ /b/ /t/ /d/ /k/ /g/
-
-  Per-sound resolved table for THIS tier's 16-sound active pool
-  (mastered consonants + /æ/ + current-target vowel):
-    /m/ → read "."  hint "Listen."     (voiced nasal, non-fric)
-    /n/ → read "."  hint "Listen."     (voiced nasal, non-fric)
-    /l/ → read "."  hint "Listen."     (voiced liquid, non-fric)
-    /r/ → read "."  hint "Listen."     (voiced liquid, non-fric)
-    /v/ → read "?"  hint "It says …?"  (voiced fric; round-2 read flip; saysIt correct/give; ph və)
-    /z/ → read "?"  hint "It says …?"  (voiced fricative; OOS v1)
-    /s/ → read "?"  hint "It says …?"  (voiceless fric; saysIt correct/give)
-    /f/ → read "?"  hint "It says …?"  (voiceless fric; saysIt correct/give)
-    /h/ → read "?"  hint "It says …?"  (voiceless fric; saysIt correct/give)
-    /b/ → read "."  hint "Listen."     (voiced stop — schwa /bə/; round-2 read flip)
-    /d/ → read "."  hint "Listen."     (voiced stop — schwa /də/; round-2 read flip)
-    /g/ → read "."  hint "Listen."     (voiced stop — schwa /ɡə/; round-2 read flip)
-    /p/ → read "."  hint "Listen."     (voiceless stop — schwa /pə/; round-2 read flip)
-    /t/ → read "?"  hint "Listen."     (voiceless stop — bare /t/, FROZEN)
-    /k/ → read "."  hint "Listen."     (voiceless stop — ph kə; ROUND-3: read flips to declarative, like every other schwa-stop — "kuh was scratching" on the question read)
-    /æ/ /ɒ/ → read "."  hint "Listen."  (vowels A/O — FROZEN æ/ɒ)
-    /ʌ/ /ɪ/ → read "."  hint "Listen."  (vowels U/I — ROUND-3 example-word anchored; see ANCHORED VOWEL block below)
-    /ɛ/ → read "."  hint "Listen."  (vowel E — ph "e")
-
 NEGATIVE ANCHOR — DO NOT spell out letter NAMES phonetically in
 utterance text. "em", "kyoo", "double-yoo", "see" are FORBIDDEN.
 DO NOT use slash-IPA notation. DO NOT use raw IPA characters in
 utterance text. DO NOT use inline SSML tags. The mnemonic word is
 the canonical surface form; the render-time substitution does the
-phoneme conversion. (Rationale: per project_audio_phoneme_overrides
-memory, defensive SSML wrapping on words the engine already
-handles correctly DEGRADES pronunciation. The tier-aware
-PHONEME_OVERRIDES extension at A7 is the single SSML construction
-site; the canon stays plain text and the substitution activates
-ONLY for letter-sounds tier utterances per the tier-filter
-parameter.)
+phoneme conversion (api/_tts_elevenlabs.ts maps each mnemonic to
+IPA for the ElevenLabs voice; the canon stays plain text).
 
-Per-slot templates (letter-sounds tier; <SOUND-MNEMONIC> is the
-substituted word from the table above; <LETTER-UPPER> is the
-uppercase letter glyph for the target):
+Per-slot templates (letter-sounds tier; ONE shape for EVERY sound —
+voice migration 2026-10-04, ear-tested on the ElevenLabs voice, round 4
+15/15). <SOUND-MNEMONIC> is the word from the table above;
+<LETTER-UPPER> is the uppercase letter glyph for the target:
 
-- read: SOUND-CLASS-DEPENDENT terminal punctuation (see SOUND-CLASS
-    CLASSIFICATION block below). The canon TEXT is bare prose
-    "Which letter says <SOUND-MNEMONIC>" + terminal punctuation; the
-    300ms break before the mnemonic and the phoneme wrap
-    are BOTH injected at render time by the tier-aware letter-sounds
-    path in api/_tts.ts — do NOT write any SSML tag into the canon
-    text. The terminal punctuation is per-sound (ROUND-2 partition, Dave
-    straggler spec, supersedes round-1 "all stops are questions"):
-      · DECLARATIVE, ends with "." : nasals m/n, liquids l/r, ALL vowels
-        /æ ɒ ʌ ɪ ɛ/, AND ALL SCHWA-TAILED stops /p b d g k/ (round-2
-        added p/b/d/g; ROUND-3 adds /k/ — their schwa makes them
-        vowel-final, so a falling declarative fits better than a
-        question):
-          "Which letter says mmm."
-          "Which letter says ooo." (sound /ɒ/ — TRIPLET vowel mnemonic)
-          "Which letter says buh." (voiced stop /b/ — round-2: declarative)
-          "Which letter says puh." (voiceless stop /p/ — round-2: declarative)
-          "Which letter says kuh." (voiceless stop /k/ — ROUND-3: declarative; "kuh was scratching" on the question read)
-      · QUESTION, ends with "?" : voiceless fricatives /s f h/, the
-        VOICED fricative /v/ (round-2), AND the bare stop /t/ (the only
-        stop with NO schwa, so it keeps the question read):
-          "Which letter says sss?"
-          "Which letter says vvv?" (voiced fricative /v/ — round-2)
-          "Which letter says tuh?" (voiceless stop /t/ — bare /t/, FROZEN)
-    Rationale: the round-1 "all stops are questions" was wrong for the
-    SCHWA-tailed stops — once they carry a schwa tail they are
-    vowel-final and the rising question contour over-inflected them;
-    declarative is the fix. Round-2 flipped /p b d g/; ROUND-3 flips /k/
-    (which moved to a schwa ph="kə" in round-2 but kept the question read
-    by oversight — "kuh was scratching"). Only bare /t/ (no schwa) keeps
-    the question read. /v/ flips TO a question. Continuant-voiced sounds
-    (nasals, liquids, vowels) keep their round-1 declarative.
-- correct: SOUND-CLASS-DEPENDENT (round-2, Dave straggler spec):
-    · FRICATIVE (S/F/H/V) → flowing "says it" lead-in, ends "?" :
-        "Yes. <LETTER-UPPER> says it. <SOUND-MNEMONIC>?"
-        e.g. "Yes. S says it. sss?"   e.g. "Yes. V says it. vvv?"
-      Why: a bare fricative had a cold near-silent onset (sink/drumbeat
-      artefact). The voiced "says it" run-up + trailing "?" gives Olivia
-      a flowing lead-in INTO the fricative so it doesn't start cold. The
-      letter-NAME ("S") stays un-wrapped (Azure speaks "ess"); only the
-      mnemonic is <phoneme>-wrapped at render time. Renders as
-      "Yes. <name> says it. <break/><phoneme>sss</phoneme>?".
-    · EVERYONE ELSE (nasals/liquids/vowels/stops) → round-1 approved
-      three-sentence shape "Yes. <LETTER-UPPER>. <SOUND-MNEMONIC>." :
-        e.g. "Yes. M. mmm."
-        e.g. "Yes. O. ooo."   (vowel — TRIPLET; letter-name O stays bare)
-        e.g. "Yes. B. buh."
-  THREE-SENTENCE SHAPE (Dave master spec, non-fricatives): the letter-NAME is its OWN sentence
-  (followed by a period), then the SOUND-MNEMONIC is its own sentence.
-  DROP the word "says" — on Olivia "O says ooo" ran together as
-  "Osays". Three short sentences ("Yes." / "<LETTER>." / "<MNEMONIC>.")
-  give Olivia clean sentence boundaries so the letter NAME and the
-  SOUND are each spoken distinctly. The <LETTER-UPPER> is the UPPERCASE
-  letter glyph (M, O, B) — read by Azure as the letter NAME ("em",
-  "oh", "bee") rather than the phoneme. Only the <SOUND-MNEMONIC> (mmm,
-  ooo, buh) is wrapped in <phoneme> at render time; the letter-name
-  reference stays plain prose and Azure renders it as its native letter
-  name. For VOWELS this separation is ONLY correct because the mnemonic
-  is a TRIPLET (ooo) that differs from the single letter-name (O) — see
-  the VOWEL TRIPLET RULE above. A bare "o" mnemonic would collide with
-  the letter-name "O" and both would render /ɒ/ ("Yes ahh ahh").
-- reprompt: "Hmm... try again?"  (verbatim — SAME as every other
-  word-song tier)
-- hint: SOUND-CLASS-DEPENDENT framing (see SOUND-CLASS CLASSIFICATION
-    block below). The canon TEXT is bare prose; the <break> + <phoneme>
-    wrap are injected at render time (same as read). The hint shape
-    depends on whether the target sound is a FRICATIVE:
-      · FRICATIVE (s, f, h, v, z, and the sh/th digraph sounds) →
-        "It says <SOUND-MNEMONIC>?" :
-          "It says sss?"
-          "It says hhh?"
-          "It says fff?"
-      · NON-FRICATIVE (nasals m/n, liquids l/r, ALL vowels, and ALL
-        stops p/b/t/d/k/g) → "Listen. <SOUND-MNEMONIC>." :
-          "Listen. mmm."
-          "Listen. ooo." (vowel /ɒ/ — TRIPLET mnemonic)
-          "Listen. buh." (stop /b/ — a stop is NOT a fricative)
-  Rationale: a fricative can be sustained and "tried on" by Marian, so
-  the inviting "It says …?" prompt with rising intonation works; a
-  non-fricative is voiced once cleanly after the "Listen." cue with
-  falling intonation. The hint slot voices ONLY the sound — no other
-  framing beyond the class-appropriate carrier.
-- giveAnswer: SOUND-CLASS-DEPENDENT (round-2, Dave straggler spec):
-    · FRICATIVE (S/F/H/V) → flowing "says it" lead-in, ends "?" :
-        "This one is <LETTER-UPPER>. <LETTER-UPPER> says it. <SOUND-MNEMONIC>?"
-        e.g. "This one is S. S says it. sss?"
-        e.g. "This one is V. V says it. vvv?"
-      Same cold-onset fix as the fricative correct: the second "<L> says
-      it." clause gives Olivia a voiced run-up into the fricative. Both
-      letter-NAME mentions stay un-wrapped; only the mnemonic is wrapped.
-    · EVERYONE ELSE → round-1 approved shape:
-        "This one is <LETTER-UPPER>. <SOUND-MNEMONIC>."
-        e.g. "This one is M. mmm."
-        e.g. "This one is O. ooo."   (vowel — TRIPLET mnemonic)
-        e.g. "This one is B. buh."
-  NON-FRICATIVE shape (Dave master spec): DROP the redundant second
-  "<LETTER> says <MNEMONIC>" clause. The letter-NAME is named once
-  ("This one is O."), then the SOUND is voiced once as its own sentence
-  ("ooo."). Only the mnemonic is phoneme-wrapped; the letter-name stays
-  bare prose.
+- read:       "Which letter says <SOUND-MNEMONIC>?"
+                e.g. "Which letter says mmm?"  "Which letter says sss?"
+- hint:       "It says <SOUND-MNEMONIC>."
+                e.g. "It says mmm."  "It says buh."
+              EXCEPTION — O only: "Hear this sound: ooo." ("It says ooo."
+              rendered as /a/ on the ElevenLabs voice).
+- correct:    "Yes. <LETTER-UPPER> says <SOUND-MNEMONIC>."
+                e.g. "Yes. M says mmm."  "Yes. S says sss."
+              EXCEPTION — R only: "Yes! R says rrr!" (the plain form
+              failed the ear-test for /r/; the exclamation passed).
+- reprompt:   "Hmm... try again?"  (verbatim — SAME as every other
+              word-song tier)
+- giveAnswer: "This one is <LETTER-UPPER>. <LETTER-UPPER> says <SOUND-MNEMONIC>."
+                e.g. "This one is M. M says mmm."
 
-ANCHORED VOWELS U/I (ROUND-3 — example-word anchoring, LOCKED). Olivia
-cannot separate the central/lax vowels from bare IPA (ʌ/ə/ɘ collapse
-toward /æ/; ɪ/ɘ merge). The fix is structured-literacy keyword
-anchoring: pair the sound with a real word Olivia's lexicon voices
-correctly. U anchors to "cup", I anchors to "ink". When /ʌ/ (letter u)
-or /ɪ/ (letter i) is the target sound in a real session, ALWAYS emit the
-PRIMARY anchored form below — this is the Thomas-approved final
-treatment:
-      U read "Which letter says uh, like in cup?"
-        hint "Listen. Uh, like in cup."
-        correct "Yes. U. Uh, like in cup."
-        giveAnswer "This one is U. Uh, like in cup."
-      I read "Which letter says ih, like in ink?"
-        hint "Listen. Ih, like in ink."
-        correct "Yes. I. Ih, like in ink."
-        giveAnswer "This one is I. Ih, like in ink."
-The isolate lead (uh /ʌ/, ih /ɪ/) is phoneme-wrapped; the anchor word
-(cup/ink) is DELIBERATELY PLAIN TEXT — its whole value is Olivia's
-native lexicon voicing it correctly. NEVER wrap cup/ink.
-The comma before "like in" keeps it one flowing intonation unit. The
-300ms break before the wrapped isolate is injected at render time as
-usual. (A and O are FROZEN at æ/ɒ; E at "e" — no anchoring needed.)
-(An "Anchor-only" variant that dropped the isolate lead was A/B-tested
-and REJECTED — Olivia spoke the bare letter NAME "you"/"eye" instead of
-the sound. Do NOT emit a bare-letter u/i read.)
+Every read ends with "?" and every hint/correct/giveAnswer ends with
+"." (R's correct ends with "!"). There is NO sound-class-dependent
+punctuation, NO "says it" lead-in, and NO three-sentence "Yes. M. mmm."
+shape any more — those were workarounds for the previous Azure voice.
+
+ANCHORED VOWELS U/I. Use the mnemonics uh (/ʌ/, letter U) and ih (/ɪ/,
+letter I). The read and hint are PLAIN; the correct and giveAnswer keep
+the example-word anchor (cup for U, ink for I) after a comma:
+      U read "Which letter says uh?"
+        hint "It says uh."
+        correct "Yes. U says uh, like in cup."
+        giveAnswer "This one is U. U says uh, like in cup."
+      I read "Which letter says ih?"
+        hint "It says ih."
+        correct "Yes. I says ih, like in ink."
+        giveAnswer "This one is I. I says ih, like in ink."
+NEVER use a bare single-letter u/i mnemonic.
 
 NO ARTICLE-LED FALLBACK for letter-sounds — the "Yes! That's a
 <word>." article-led default (used by blending-cv / cvc-words /
@@ -3292,59 +3147,19 @@ giveAnswer uses the demonstrative ("This one is M."). NEVER write
 "Yes! That's a m." or "Yes! That's an mmm." for letter-sounds.
 
 NO CROSS-TIER SCAFFOLDING in letter-sounds utterance text. Do NOT
-write CVC words ("M says mmm like in mat"), do NOT reference the
-sh/ch/th digraphs, do NOT cross-link the letter NAME tier ("M is
-the letter M and it says mmm"). This tier teaches the isolated
-phoneme → letter mapping ONLY — every other tier handles its own
-content.
+write CVC words ("M says mmm like in mat" — the U/I cup/ink anchors
+above are the ONLY exception), do NOT reference the sh/ch/th digraphs,
+do NOT cross-link the letter NAME tier ("M is the letter M and it says
+mmm"). This tier teaches the isolated phoneme → letter mapping ONLY.
 
 PINNED SESSION (Dave master spec Part A — DETERMINISTIC, current-target
 vowel = /ɒ/). For the shipped /ɒ/ session, emit EXACTLY this 8-tuple of
-targets in this order: m, s, l, a, b, o, n, o. This pin removes the
-stochastic re-roll churn AND satisfies every composition rule below
-(MASTERED-CONSONANT=5 ≥ 4; MASTERED-VOWEL /æ/=1 at P4; CURRENT-TARGET
-/ɒ/=2 at P6+P8; P1-P3 all mastered-consonant; no /ɪ/+/ɛ/ collision).
-Emit each slot per the class-dependent templates above:
-   P1: target /m/ → letter m  (MASTERED-CONSONANT, gentle ramp)
-       read: "Which letter says mmm."   (continuant-voiced → declarative)
-       hint: "Listen. mmm."             (non-fric → Listen)
-       correct: "Yes. M. mmm."
-       giveAnswer: "This one is M. mmm."
-   P2: target /s/ → letter s  (MASTERED-CONSONANT, gentle ramp)
-       read: "Which letter says sss?"   (voiceless fric → question)
-       hint: "It says sss?"             (fricative → It says…?)
-       correct: "Yes. S says it. sss?"  (round-2 fricative saysIt lead-in)
-       giveAnswer: "This one is S. S says it. sss?"
-   P3: target /l/ → letter l  (MASTERED-CONSONANT, gentle ramp)
-       read: "Which letter says lll."   (continuant-voiced → declarative)
-       hint: "Listen. lll."             (non-fric → Listen)
-       correct: "Yes. L. lll."
-       giveAnswer: "This one is L. lll."
-   P4: target /æ/ → letter a  (MASTERED-VOWEL anchor at mid-tier)
-       read: "Which letter says aaa."   (vowel → declarative; TRIPLET)
-       hint: "Listen. aaa."             (non-fric → Listen; TRIPLET)
-       correct: "Yes. A. aaa."          (letter-name A bare; only aaa wrapped)
-       giveAnswer: "This one is A. aaa."
-   P5: target /b/ → letter b  (MASTERED-CONSONANT, voiced stop)
-       read: "Which letter says buh."   (round-2: schwa /bə/ → DECLARATIVE)
-       hint: "Listen. buh."             (stop, non-fric → Listen)
-       correct: "Yes. B. buh."
-       giveAnswer: "This one is B. buh."
-   P6: target /ɒ/ → letter o  (CURRENT-TARGET vowel #1 — lift fires)
-       read: "Which letter says ooo."   (vowel → declarative; TRIPLET)
-       hint: "Listen. ooo."             (non-fric → Listen; TRIPLET)
-       correct: "Yes. O. ooo."          (letter-name O bare; only ooo wrapped)
-       giveAnswer: "This one is O. ooo."
-   P7: target /n/ → letter n  (MASTERED-CONSONANT, between the two /ɒ/ slots)
-       read: "Which letter says nnn."   (continuant-voiced → declarative)
-       hint: "Listen. nnn."             (non-fric → Listen)
-       correct: "Yes. N. nnn."
-       giveAnswer: "This one is N. nnn."
-   P8: target /ɒ/ → letter o  (CURRENT-TARGET vowel #2 — at floor of 2)
-       read: "Which letter says ooo."   (vowel → declarative; TRIPLET)
-       hint: "Listen. ooo."             (non-fric → Listen; TRIPLET)
-       correct: "Yes. O. ooo."          (letter-name O bare; only ooo wrapped)
-       giveAnswer: "This one is O. ooo."
+targets in this order: m, s, l, a, b, o, n, o, each slot using the
+per-slot templates above. Example, P1 (target /m/):
+       read: "Which letter says mmm?"
+       hint: "It says mmm."
+       correct: "Yes. M says mmm."
+       giveAnswer: "This one is M. M says mmm."
 Counts (pinned m,s,l,a,b,o,n,o): MASTERED-CONSONANT=5 (m,s,l,b,n —
 above floor of 4), MASTERED-VOWEL /æ/=1 at P4 (at floor), CURRENT-TARGET
 /ɒ/=2 at P6+P8 (at floor of 2). P1-P3 all mastered-consonant. P4 carries
@@ -3405,14 +3220,12 @@ all other slots are content-mode-agnostic:
       case discipline is the screen's responsibility, but the
       directive's read-line + correct utterance MUST be internally
       consistent on case.
-    - letter-sounds: "Which letter says <SOUND-MNEMONIC>" with
-      SOUND-CLASS-DEPENDENT terminal punctuation — declarative "."
-      for VOICED sounds (e.g. "Which letter says mmm."), question "?"
-      for VOICELESS sounds (e.g. "Which letter says sss?"). See the
+    - letter-sounds: "Which letter says <SOUND-MNEMONIC>?" — always
+      ends with "?" (e.g. "Which letter says mmm?"). See the
       LETTER-SOUNDS UTTERANCE TEMPLATE block above for the
       phoneme→mnemonic substitution table (mmm, buh, ooo, aaa, etc. —
-      vowels are TRIPLETS per the VOWEL TRIPLET RULE), the SOUND-CLASS
-      CLASSIFICATION table, and the no-inline-SSML rule.
+      vowels are TRIPLETS per the VOWEL TRIPLET RULE) and the
+      no-inline-SSML rule.
     - blending-cv: "Tap the <word>." e.g. "Tap the cat."
     - cvc-words:   "Read the <word>." e.g. "Read the cat."
     - cvc-words-short-o: "Read the <word>." e.g. "Read the dog."
@@ -3448,8 +3261,8 @@ all other slots are content-mode-agnostic:
   letters are not nouns. The "letter" word in the template is what
   carries the grammatical role; the case of <NAME> is preserved from
   the read line.
-- correct (letter-sounds tier): "Yes! <LETTER-UPPER> says <SOUND-MNEMONIC>."
-  e.g. "Yes! M says mmm." — see LETTER-SOUNDS UTTERANCE TEMPLATE
+- correct (letter-sounds tier): "Yes. <LETTER-UPPER> says <SOUND-MNEMONIC>."
+  e.g. "Yes. M says mmm." (R: "Yes! R says rrr!") — see LETTER-SOUNDS UTTERANCE TEMPLATE
   block above. NEVER use the article-led "Yes! That's a <word>."
   default for letter-sounds — letters and sounds are not nouns.
 - correct (sight-words tier): "Yes! <Word>." — capitalised target,
@@ -3499,10 +3312,9 @@ all other slots are content-mode-agnostic:
   letter-names, letter-sounds, and every other word-song tier)
 - hint (letter-names tier): "Let's look. <NAME>." e.g.
   "Let's look. M." — <NAME> case-preserved from the read line.
-- hint (letter-sounds tier): SOUND-CLASS-DEPENDENT — "It says
-  <SOUND-MNEMONIC>?" for FRICATIVES (s/f/h/v/z), e.g. "It says sss?";
-  "Listen. <SOUND-MNEMONIC>." for NON-FRICATIVES, e.g. "Listen. mmm."
-  — see LETTER-SOUNDS UTTERANCE TEMPLATE block above.
+- hint (letter-sounds tier): "It says <SOUND-MNEMONIC>." for every
+  sound except O ("Hear this sound: ooo."), e.g. "It says mmm." — see
+  LETTER-SOUNDS UTTERANCE TEMPLATE block above.
 - hint (sight-words tier): "Look. <Word>." — capitalised target, e.g.
   "Look. The." Whole-word only; do NOT hint by sounding out letters.
 - hint (simple-sentences tier): "Listen. <full sentence WITH the answer

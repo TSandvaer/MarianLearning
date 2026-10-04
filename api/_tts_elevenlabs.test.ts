@@ -13,6 +13,7 @@ import {
   readElevenLabsKey,
   renderElevenLabsBlend,
   renderElevenLabsText,
+  stripId3v2,
   synthesizeElevenLabs,
 } from './_tts_elevenlabs.js'
 
@@ -83,10 +84,16 @@ describe('renderElevenLabsText', () => {
 
   it('renders a soft onset g for gem but keeps hard g elsewhere', () => {
     expect(renderElevenLabsText('g - e - m ... gem', 'cvc-words-short-e')).toBe(
-      '/dʒ/ - /e/ - /mː/ ... gem',
+      '/dʒ/ - /ɛ/ - /mː/ ... gem',
     )
     expect(renderElevenLabsText('b - a - g ... bag', 'cvc-words')).toBe(
       '/b/ - /æ/ - /ɡ/ ... bag',
+    )
+  })
+
+  it('never emits an all-ASCII blend (short e uses ɛ)', () => {
+    expect(renderElevenLabsText('n - e - t ... net', 'cvc-words-short-e')).toBe(
+      '/n/ - /ɛ/ - /t/ ... net',
     )
   })
 
@@ -237,5 +244,19 @@ describe('synthesizeUtterance provider switch', () => {
     })
     const [url] = fetchFn.mock.calls[0] as unknown as [string]
     expect(url).toContain('tts.speech.microsoft.com')
+  })
+})
+
+describe('stripId3v2', () => {
+  it('drops a leading ID3v2 tag so the clip starts on an MPEG frame', () => {
+    const tag = [0x49, 0x44, 0x33, 4, 0, 0, 0, 0, 0, 2, 0xaa, 0xbb]
+    const out = stripId3v2(new Uint8Array([...tag, 0xff, 0xfb, 0x50]))
+    expect(Array.from(out)).toEqual([0xff, 0xfb, 0x50])
+  })
+
+  it('leaves untagged audio unchanged', () => {
+    expect(Array.from(stripId3v2(new Uint8Array([0xff, 0xf3, 1])))).toEqual([
+      0xff, 0xf3, 1,
+    ])
   })
 })
