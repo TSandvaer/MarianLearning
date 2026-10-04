@@ -172,7 +172,8 @@ export interface CreateSessionAudioOptions {
  *    letter-sounds reads). Every cached row from v3 was rendered on the US
  *    voice and must be invalidated.
  */
-export const CACHE_VERSION = 4
+// v5 (2026-10-04): voice migration to ElevenLabs Lily — every clip changed.
+export const CACHE_VERSION = 5
 export const STORE_NAME = `session-audio-v${CACHE_VERSION}`
 export const DB_NAME = 'marian-tutor-session-audio'
 /** Tied to CACHE_VERSION so `onupgradeneeded` fires on any bump. The IDB
