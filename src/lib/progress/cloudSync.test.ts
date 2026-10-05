@@ -29,6 +29,7 @@ import {
 import { defaultProgress } from './defaults'
 import { isProgressV1 } from './guards'
 import type { Progress, SessionHistoryEntry, SkillLevels } from './types'
+import { pendingUnlock, seedUnlocksCelebrated } from './pathBeats'
 
 const VALID_UUID = '11111111-2222-4333-8444-555555555555'
 const SECRET = 'test-secret'
@@ -648,6 +649,50 @@ describe('reconcileWithCloud', () => {
     expect(installed[0]!.goodDays).toEqual({
       'sub-to-10': ['2026-05-01', '2026-05-02', '2026-06-14'],
     })
+    expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
+  it('unlocksCelebrated never lost — a newer cloud blob from before the map celebrated an unlock does not replay it (Emma’s Path 9/10)', async () => {
+    // The session-end push carried the unlock still pending (add-to-20 not
+    // on the list); the map then marked it locally. A later cloud install
+    // must keep the local mark, or the map would celebrate it again.
+    const seed = defaultProgress()
+    const levels = {
+      ...seed.skillLevels,
+      'add-to-10': 'mastered' as const,
+      'add-to-20': 'intro' as const,
+    }
+    // Seeded before the session: add-to-20 was locked, so not on the list.
+    const seededList = seedUnlocksCelebrated(seed)
+    const local: Progress = {
+      ...seed,
+      skillLevels: levels,
+      unlocksCelebrated: [...seededList, 'add-to-20'],
+    }
+    const cloudBlob: Progress = {
+      ...seed,
+      skillLevels: levels,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-15T10:00:00.000Z' },
+      unlocksCelebrated: seededList,
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-15T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.unlocksCelebrated).toEqual([
+      ...seededList,
+      'add-to-20',
+    ])
+    expect(pendingUnlock(installed[0]!, 'math')).toBeNull()
     expect(isProgressV1(installed[0]!)).toBe(true)
   })
 
