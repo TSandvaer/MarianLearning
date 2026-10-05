@@ -51,6 +51,15 @@ import {
   type SessionStartFallbackHandle,
 } from './lib/audio/sessionStartFallback'
 import {
+  isPrefetchStale,
+  markSessionScreenShown,
+  markSessionStartBegin,
+  markSessionStartSettled,
+  useHubSessionPrefetch,
+  type PrefetchFocus,
+  type PrefetchTrack,
+} from './lib/audio/hubSessionPrefetch'
+import {
   useHowlerSuspendOnHide,
   useRequestPersistentStorageOnGesture,
 } from './lib/lifecycle'
@@ -424,6 +433,12 @@ function readProgressHintsForTrack(track: ProgressTrack): {
  */
 export default function App() {
   const [route, setRoute] = useState<Route>(() => getInitialRoute())
+  /**
+   * Emma's Path 2/10 (123jpnbc3dj): the track whose session the Hub
+   * prefetches — the Hub's suggested world (see hubSessionPrefetch.ts).
+   * `null` off-Hub. Drives the Math / Word Song kick-effects below.
+   */
+  const hubPrefetchTrack = useHubSessionPrefetch(route === 'hub')
 
   // ── Page-lifecycle hooks (Jessica e2e batch — Bugs B + C) ──
   //
@@ -568,6 +583,15 @@ export default function App() {
     setRoute('math')
   }, [])
 
+  /** Math sibling of `tearDownWordSongAudioRef` (Emma's Path 2/10): the
+   *  Math leave-effect now excepts `hub` so the Hub prefetch survives,
+   *  so the post-session / back-arrow teardown is imperative too. */
+  const tearDownMathAudioRef = useRef<(() => void) | null>(null)
+  /** Discards a track's Hub prefetch when its focus went stale; wired
+   *  below once both tracks' refs exist. */
+  const discardStaleHubPrefetchRef = useRef<
+    ((track: PrefetchTrack) => void) | null
+  >(null)
   /**
    * Hub → Math/WordSong handoff. The Hub component owns the
    * suggestion-outcome write; this orchestrator records the tree as
@@ -580,6 +604,13 @@ export default function App() {
    * write atomic with the route change.
    */
   const handleHubPickTree = useCallback((tree: SkillTreeId) => {
+    // Emma's Path 2/10: reuse the Hub prefetch unless its focus is stale.
+    // Torn down HERE (not in a route effect) so the cleared plan/player
+    // batch with the route flip — the screen never mounts on a stale
+    // prefetched plan.
+    discardStaleHubPrefetchRef.current?.(
+      tree === 'number-garden' ? 'math' : 'word-song',
+    )
     try {
       const prev = readSessionHistory()
       const next = markTreeTouched(prev, tree, new Date())
@@ -646,6 +677,9 @@ export default function App() {
   const handleBackToHub = useCallback(() => {
     if (route === 'literacy') {
       tearDownWordSongAudioRef.current?.()
+    }
+    if (route === 'math') {
+      tearDownMathAudioRef.current?.()
     }
     setHubEntryPath('mid-skill-back')
     setRoute('hub')
@@ -721,6 +755,12 @@ export default function App() {
   const handleSessionEndAllDone = useCallback(() => {
     if (sessionEndPayload?.surface === 'word-song') {
       tearDownWordSongAudioRef.current?.()
+    } else {
+      // Math (an absent `surface` is the Math back-compat default). The
+      // Math leave-effect excepts `hub` for the prefetch (Emma's Path
+      // 2/10), so the teardown it used to run on session-end → hub is
+      // driven here, like Word Song's.
+      tearDownMathAudioRef.current?.()
     }
     setHubEntryPath('session-end')
     setRoute('hub')
@@ -1089,6 +1129,35 @@ export default function App() {
   /** Handle for the in-flight Math session start (123jpnbc3dh) — lets the
    *  visible-wait effect below start the hint-timeout once Math shows. */
   const mathStartRef = useRef<SessionStartFallbackHandle<unknown> | null>(null)
+  /** Focus the in-flight Math request was started under — compared on
+   *  the Hub tap to discard a stale prefetch (Emma's Path 2/10). */
+  const mathPrefetchFocusRef = useRef<PrefetchFocus | null>(null)
+
+  /**
+   * Imperative Math teardown (Emma's Path 2/10) — body mirrors the Math
+   * leave-effect's: abort, unload, reset the latch, clear plan/player/
+   * ready. Used by `handleSessionEndAllDone`, `handleBackToHub` and the
+   * stale-prefetch discard, since the leave-effect excepts `hub`.
+   * Idempotent. Wired in an effect for React 19's `react-hooks/refs`.
+   */
+  useEffect(() => {
+    tearDownMathAudioRef.current = () => {
+      if (mathAbortRef.current) {
+        mathAbortRef.current.abort()
+        mathAbortRef.current = null
+      }
+      if (mathUnloadRef.current) {
+        mathUnloadRef.current()
+        mathUnloadRef.current = null
+      }
+      mathFetchStartedRef.current = false
+      mathStartRef.current = null
+      mathPrefetchFocusRef.current = null
+      setMathPlay(null)
+      setMathAudioReady(false)
+      setMathPlan(null)
+    }
+  })
 
   /**
    * Kick the Math Path A fetch as soon as Greet mounts (ticket 86c9hjnn8).
@@ -1123,7 +1192,11 @@ export default function App() {
    * authoritative "should I publish state?" signal under the new shape.
    */
   useEffect(() => {
-    if (route !== 'greet' && route !== 'math') return
+    // Emma's Path 2/10 (123jpnbc3dj): also prefetch from the Hub when
+    // the Hub suggests Number Garden. The latch makes the later Math
+    // entry adopt this request instead of starting another.
+    const onMathHubPrefetch = route === 'hub' && hubPrefetchTrack === 'math'
+    if (route !== 'greet' && route !== 'math' && !onMathHubPrefetch) return
     if (mathFetchStartedRef.current) return
     mathFetchStartedRef.current = true
 
@@ -1161,6 +1234,11 @@ export default function App() {
     const mathHasHints =
       (mathHints.leitner?.length ?? 0) > 0 ||
       (mathHints.slowFacts?.length ?? 0) > 0
+    mathPrefetchFocusRef.current = {
+      node: mathHints.focusNode,
+      mode: mathHints.focusMode,
+    }
+    markSessionStartBegin('math', route)
     const mathStart = startSessionWithFallback({
       hasHints: mathHasHints,
       signal: controller.signal,
@@ -1203,7 +1281,10 @@ export default function App() {
     })
     mathStartRef.current = mathStart
     void mathStart.promise
-      .then(({ prepared }) => {
+      .then(({ prepared, usedFallback }) => {
+        if (!controller.signal.aborted) {
+          markSessionStartSettled('math', 'resolve', usedFallback)
+        }
         if (controller.signal.aborted) {
           // Leave-effect (or unmount-effect) aborted us mid-flight. Drop
           // the loaded howls so we don't leak — the next greet/math entry
@@ -1242,6 +1323,7 @@ export default function App() {
         // Diagnostic instrumentation (ticket 86c9hjnn8 follow-up).
         // Records the rejection with its message so the iPad export
         // attributes the silent-fallback path to a concrete cause.
+        markSessionStartSettled('math', 'reject', false)
         recordPathASettleEvent(
           'math',
           'reject',
@@ -1284,7 +1366,7 @@ export default function App() {
     // eslint without changing semantics. Route is in deps so the effect
     // is allowed to fire on the first transition into greet/math even if
     // App mounted on splash.
-  }, [route, mathFallbackPlan])
+  }, [route, mathFallbackPlan, hubPrefetchTrack])
 
   /**
    * Visible-wait timer for the Math session start (Emma's Path 1/10,
@@ -1294,6 +1376,7 @@ export default function App() {
    * kick-effect so a direct `?route=math` launch sees the fresh handle.
    */
   useEffect(() => {
+    if (route === 'math') markSessionScreenShown('math')
     if (route === 'math' && !mathAudioReady) {
       mathStartRef.current?.startWaitTimer()
     }
@@ -1326,7 +1409,17 @@ export default function App() {
    * audio-unlock effects (see Math.tsx / WordSong.tsx).
    */
   useEffect(() => {
-    if (route === 'math' || route === 'greet' || route === 'session-end') return
+    // `hub` is excepted for the Hub prefetch (Emma's Path 2/10); the
+    // session-end → hub and back-arrow teardowns are imperative
+    // (`tearDownMathAudioRef`), mirroring Word Song's 86c9pr4h9 shape.
+    if (
+      route === 'math' ||
+      route === 'greet' ||
+      route === 'session-end' ||
+      route === 'hub'
+    ) {
+      return
+    }
 
     // ── Latch + abort cleanup ALWAYS runs when leaving the audio surfaces.
     //
@@ -1470,6 +1563,8 @@ export default function App() {
   const wordSongStartRef = useRef<SessionStartFallbackHandle<unknown> | null>(
     null,
   )
+  /** Word Song sibling of `mathPrefetchFocusRef` (Emma's Path 2/10). */
+  const wordSongPrefetchFocusRef = useRef<PrefetchFocus | null>(null)
   /**
    * Audio-ready gate for Word Song (ticket 86c9hjnn8). Same shape as
    * `mathAudioReady` above — flipped to `true` once
@@ -1508,6 +1603,8 @@ export default function App() {
         wordSongUnloadRef.current = null
       }
       wordSongFetchStartedRef.current = false
+      wordSongStartRef.current = null
+      wordSongPrefetchFocusRef.current = null
       setWordSongPlay(null)
       setWordSongAudioReady(false)
       setWordSongPlan(null)
@@ -1569,7 +1666,12 @@ export default function App() {
    * imperatively from `handleSessionEndAllDone` (see below).
    */
   useEffect(() => {
-    if (route !== 'hub' && route !== 'literacy') return
+    // Emma's Path 2/10 (123jpnbc3dj): the Hub prefetches only the world
+    // it suggests (session audio is a singleton), so Word Song kicks on
+    // Hub only when it is the prefetch track.
+    const onWordSongHubPrefetch =
+      route === 'hub' && hubPrefetchTrack === 'word-song'
+    if (route !== 'literacy' && !onWordSongHubPrefetch) return
     if (wordSongFetchStartedRef.current) return
     wordSongFetchStartedRef.current = true
 
@@ -1669,6 +1771,11 @@ export default function App() {
     const wordSongHasHints =
       wordSongHints.isGraduationSession === true ||
       wordSongHints.letterSoundsVowelStates !== undefined
+    wordSongPrefetchFocusRef.current = {
+      node: wordSongHints.focusNode,
+      mode: wordSongHints.focusMode,
+    }
+    markSessionStartBegin('word-song', route)
     const wordSongStart = startSessionWithFallback({
       hasHints: wordSongHasHints,
       signal: controller.signal,
@@ -1703,7 +1810,10 @@ export default function App() {
     })
     wordSongStartRef.current = wordSongStart
     void wordSongStart.promise
-      .then(({ prepared }) => {
+      .then(({ prepared, usedFallback }) => {
+        if (!controller.signal.aborted) {
+          markSessionStartSettled('word-song', 'resolve', usedFallback)
+        }
         if (controller.signal.aborted) {
           prepared.unload()
           return
@@ -1728,6 +1838,7 @@ export default function App() {
       })
       .catch((err: unknown) => {
         if (controller.signal.aborted) return
+        markSessionStartSettled('word-song', 'reject', false)
         recordPathASettleEvent(
           'wordSong',
           'reject',
@@ -1751,16 +1862,52 @@ export default function App() {
     // No cleanup — see the Math fetch-effect for the why (route changes
     // must NOT abort, and adding a `[]`-deps unmount cleanup re-creates
     // the StrictMode-double-mount bug shape).
-  }, [route, wordSongFallbackPlan])
+  }, [route, wordSongFallbackPlan, hubPrefetchTrack])
 
   /** Visible-wait timer for the Word Song session start — see the Math
    *  sibling above (Emma's Path 1/10, 123jpnbc3dh). The Hub pre-warm's
    *  dwell time never counts toward the timeout. */
   useEffect(() => {
+    if (route === 'literacy') markSessionScreenShown('word-song')
     if (route === 'literacy' && !wordSongAudioReady) {
       wordSongStartRef.current?.startWaitTimer()
     }
   }, [route, wordSongAudioReady])
+
+  /**
+   * Hub tap → discard a stale prefetch (Emma's Path 2/10, 123jpnbc3dj).
+   * A prefetch is stale when the focus the child would get NOW (fresh
+   * `readProgressHintsForTrack`) differs from the one it was requested
+   * under — a cloud-sync install or parent-settings change landed while
+   * the Hub was up. Teardown resets the latch, so the screen entry's
+   * kick-effect issues one fresh request. Only a request started on the
+   * Hub is checked; one started by the screen itself is never stale.
+   */
+  useEffect(() => {
+    discardStaleHubPrefetchRef.current = (track) => {
+      const started =
+        track === 'math'
+          ? mathFetchStartedRef.current
+          : wordSongFetchStartedRef.current
+      const prefetched =
+        track === 'math'
+          ? mathPrefetchFocusRef.current
+          : wordSongPrefetchFocusRef.current
+      if (!started || prefetched === null) return
+      const hints = readProgressHintsForTrack(track)
+      if (
+        !isPrefetchStale(prefetched, {
+          node: hints.focusNode,
+          mode: hints.focusMode,
+        })
+      ) {
+        return
+      }
+      console.info(`[App] Hub prefetch for ${track} is stale; re-requesting`)
+      if (track === 'math') tearDownMathAudioRef.current?.()
+      else tearDownWordSongAudioRef.current?.()
+    }
+  })
 
   /**
    * Tear-down effect for Word Song. Same shape as Math's tear-down above,

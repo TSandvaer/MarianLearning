@@ -97,7 +97,7 @@ export interface PrepareMathPathAOptions {
     opts?: PlaySessionUtteranceOptions,
   ) => Promise<void>
   /** Test seam — replaces `unloadSessionAudio` from `./sessionAudio`. */
-  unloadSessionAudio?: () => void
+  unloadSessionAudio?: (sessionId?: string) => void
   /** Optional AbortSignal — App.tsx can cancel the in-flight fetch when
    *  the user navigates away from Math before the request resolves. */
   signal?: AbortSignal
@@ -441,6 +441,7 @@ export async function prepareMathPathA(
     playUtterance,
     textToId,
     utteranceCount: sessionResponse.utterances.length,
-    unload: () => unloadAudio(),
+    // Session-scoped: never unloads a session that replaced this one.
+    unload: () => unloadAudio(args.sessionId),
   }
 }
