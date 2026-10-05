@@ -78,7 +78,7 @@ export const DEFAULT_PARENT_SETTINGS: ParentSettings = Object.freeze({
   sessionModePicker: 'off',
   masteryThreshold: DEFAULT_PER_TRACK_THRESHOLD,
   crossDayEnforcement: true,
-  showLevelToMarian: false,
+  showLevelToMarian: true,
   // Ticket 86c9qa0kf — cross-vowel distractor mix v1. Default ON per
   // spec §10 Q1 lock 2026-05-09 + Dave's research (PR #175) §4.4: the
   // per-aggregate mastery gate (all three CVC tiers `'mastered'`)

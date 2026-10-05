@@ -64,7 +64,8 @@ import {
 import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
-import { StageIcon } from './stageIcons'
+import { HubPathCard } from './HubPathCard'
+import { buildHubCardModel, type HubCardModel } from './hubCardModel'
 import {
   playHubLine as defaultPlayHubLine,
   cancelActiveHubLine as defaultCancelHubLine,
@@ -79,15 +80,9 @@ import {
   SESSION_HISTORY_STORAGE_KEY,
   useStorageSync,
 } from '../../lib/lifecycle'
-import {
-  NUMBER_GARDEN_STAGES,
-  WORD_SONG_STAGES,
-  slidingWindow,
-  type StageId,
-} from './stages'
 import PromotionCelebration from './PromotionCelebration'
 import { unlockCelebrationFor } from './unlockCelebration'
-import type { SkillNode } from '../../lib/progress'
+import { loadProgress, type Progress, type SkillNode } from '../../lib/progress'
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -109,8 +104,20 @@ export interface HubProps {
   storage?: StorageAdapter
   /** Test seam: clock injection. */
   now?: () => Date
-  /** Per-tree progress indices for path-strip rendering. */
+  /**
+   * Per-tree progress indices (App's projection of its Progress
+   * snapshot). The Hub card no longer renders from these; Hub uses the
+   * prop's identity as the "App re-read Progress" signal to reload the
+   * doc (see `progressDoc`).
+   */
   progress?: HubTreeProgress
+  /**
+   * The Progress doc the Hub card renders from (ticket 123jpnbc3dq).
+   * When omitted, Hub calls `loadProgress()` — re-read whenever the
+   * `progress` prop changes identity, which App does on every snapshot
+   * refresh (hub-route entry, cloud install).
+   */
+  progressDoc?: Progress | null
   /**
    * Skill node that the M3 mastery rule has queued for promotion (ticket
    * 86c9kwnkw). When set, Hub mounts the PromotionCelebration overlay on
@@ -188,11 +195,25 @@ export type PlayHubLineFn = (
 
 // ── Component ────────────────────────────────────────────────────────────
 
+const DEFAULT_TREE_PROGRESS: HubTreeProgress = {
+  numberGardenIndex: 0,
+  wordSongIndex: 0,
+}
+
+function safeLoadProgress(): Progress | null {
+  try {
+    return loadProgress()
+  } catch {
+    return null
+  }
+}
+
 export default function Hub({
   path = 'app-open',
   storage,
   now = () => new Date(),
-  progress = { numberGardenIndex: 0, wordSongIndex: 0 },
+  progress = DEFAULT_TREE_PROGRESS,
+  progressDoc,
   pendingPromotion,
   onPickTree,
   onParentGate,
@@ -223,6 +244,17 @@ export default function Hub({
         : unlockCelebrationFor(pendingPromotion),
     [pendingPromotion],
   )
+
+  // Hub card data (ticket 123jpnbc3dq). `progress` changes identity
+  // whenever App refreshes its Progress snapshot, so keying the reload on
+  // it keeps the card in step with App without App passing the doc.
+  const doc = useMemo<Progress | null>(
+    () => (progressDoc !== undefined ? progressDoc : safeLoadProgress()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `progress` is the refresh signal
+    [progressDoc, progress],
+  )
+  const numberGardenCard = useMemo(() => buildHubCardModel(doc, 'math'), [doc])
+  const wordSongCard = useMemo(() => buildHubCardModel(doc, 'word-song'), [doc])
 
   // Read history once on mount + subscribe to cross-tab writes.
   //
@@ -781,8 +813,7 @@ export default function Hub({
           tree="number-garden"
           label="Number Garden"
           signature={<NumberGardenSignature />}
-          stages={NUMBER_GARDEN_STAGES}
-          currentIndex={progress.numberGardenIndex}
+          card={numberGardenCard}
           suggested={suggestion === 'number-garden'}
           onTap={() => handleNodeTap('number-garden')}
           onPress={handleNodePress}
@@ -791,8 +822,7 @@ export default function Hub({
           tree="word-song"
           label="Word Song"
           signature={<WordSongSignature />}
-          stages={WORD_SONG_STAGES}
-          currentIndex={progress.wordSongIndex}
+          card={wordSongCard}
           suggested={suggestion === 'word-song'}
           onTap={() => handleNodeTap('word-song')}
           onPress={handleNodePress}
@@ -858,8 +888,7 @@ interface SkillTreeNodeProps {
   tree: SkillTreeId
   label: string
   signature: ReactElement
-  stages: readonly StageId[]
-  currentIndex: number
+  card: HubCardModel
   suggested: boolean
   onTap: () => void
   /**
@@ -877,17 +906,11 @@ function SkillTreeNode({
   tree,
   label,
   signature,
-  stages,
-  currentIndex,
+  card,
   suggested,
   onTap,
   onPress,
 }: SkillTreeNodeProps): ReactElement {
-  const window5 = useMemo(
-    () => slidingWindow(stages, currentIndex, 5),
-    [stages, currentIndex],
-  )
-
   return (
     <m.button
       type="button"
@@ -911,53 +934,14 @@ function SkillTreeNode({
       whileTap={{ scale: 0.96 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
     >
-      <div className="flex h-20 items-center justify-center">{signature}</div>
+      <div className="flex h-16 items-center justify-center">{signature}</div>
       <span
         data-testid="hub-tree-label"
         className="font-display text-2xl text-ink"
       >
         {label}
       </span>
-      <div
-        data-testid="hub-path-strip"
-        data-tree={tree}
-        className="flex items-center justify-center gap-1.5"
-      >
-        {window5.items.map((stage, i) => {
-          const absoluteIdx = window5.offset + i
-          let kind: 'mastered' | 'in-progress' | 'current' | 'locked'
-          if (absoluteIdx < currentIndex) kind = 'mastered'
-          else if (absoluteIdx === currentIndex) kind = 'current'
-          else kind = 'locked'
-          return (
-            <span
-              key={stage}
-              className="inline-flex items-center"
-              data-testid="hub-path-strip-cell"
-              data-stage={stage}
-              data-kind={kind}
-            >
-              <StageIcon
-                stage={stage as StageId}
-                kind={kind}
-                shimmering={kind === 'current'}
-              />
-              {i < window5.items.length - 1 && (
-                <span
-                  aria-hidden
-                  className="mx-1 inline-block h-px w-3"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(to right, currentColor 50%, transparent 50%)',
-                    backgroundSize: '4px 1px',
-                    color: kind === 'mastered' ? '#E91E63' : '#F8BBD0',
-                  }}
-                />
-              )}
-            </span>
-          )
-        })}
-      </div>
+      <HubPathCard model={card} />
     </m.button>
   )
 }

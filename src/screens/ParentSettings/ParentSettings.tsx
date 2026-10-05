@@ -9,7 +9,7 @@
  *    math (default 95/3), one for word-song (default 90/3). Presets:
  *    80/2 | 90/3 | 95/3 (ticket 86c9kwvy0).
  *  - crossDayEnforcement: toggle
- *  - showLevelToMarian: toggle
+ *  - showLevelToMarian: toggle (Hub card land number; default on)
  *
  * Save-on-change (no explicit save button) — every control writes the
  * updated Progress through `saveProgress()` immediately. The "Done"
@@ -548,7 +548,7 @@ export default function ParentSettings({
           <ToggleRow
             id="showLevelToMarian"
             label="Show level to Marian"
-            description="Surface her current curriculum level on the Hub. Off by default."
+            description="Show her land number on the Hub cards. On by default."
             value={settings.showLevelToMarian}
             onChange={(v) => update({ showLevelToMarian: v })}
           />
