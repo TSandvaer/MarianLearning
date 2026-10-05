@@ -21,6 +21,11 @@
  */
 
 import type { SkillTreeId } from '../SessionEnd/sessionHistory'
+import {
+  CELEBRATE_LINE_TEXT,
+  celebrateLineSrc,
+  type HubCelebrateLineId,
+} from './celebrationLines'
 
 /** Stable identifiers for every Hub line. */
 export type HubLineId =
@@ -45,6 +50,9 @@ export type HubLineId =
   // Node-tap "enter" lines
   | 'hub.enter.number-garden'
   | 'hub.enter.word-song'
+  // Unlock-celebration lines (one per unlockable stage) — see
+  // ./celebrationLines.ts
+  | HubCelebrateLineId
 
 export interface HubLineManifestEntry {
   /** Asset URL relative to `public/`. */
@@ -131,6 +139,12 @@ export const HUB_LINES: Record<HubLineId, HubLineManifestEntry> = {
     src: '/assets/audio/hub/hub-enter-word-song.mp3',
     text: 'Word Song!',
   },
+  ...(Object.fromEntries(
+    (Object.keys(CELEBRATE_LINE_TEXT) as HubCelebrateLineId[]).map((id) => [
+      id,
+      { src: celebrateLineSrc(id), text: CELEBRATE_LINE_TEXT[id] },
+    ]),
+  ) as Record<HubCelebrateLineId, HubLineManifestEntry>),
 }
 
 /** Word count per line — drives the linear caption tick interval. */

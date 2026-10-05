@@ -10,7 +10,7 @@
  */
 
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import Hub from './Hub'
@@ -851,9 +851,11 @@ describe('Hub — promotion celebration (M3 audit follow-up, ticket 86c9kwnkw)',
     const overlay = screen.getByTestId('hub-promotion-celebration')
     expect(overlay).toBeInTheDocument()
     expect(overlay.getAttribute('data-node')).toBe('add-to-20')
-    // Caption surfaces the human-readable label (not the raw id).
+    // Caption names the stage add-to-20 UNLOCKED (sub-to-10), not the
+    // mastered stage itself (ticket 123jpnbc3dn).
+    expect(overlay.getAttribute('data-unlocked-node')).toBe('sub-to-10')
     const label = screen.getByTestId('hub-promotion-node-label')
-    expect(label.textContent).toBe('add to 20')
+    expect(label.textContent).toBe('Taking away to ten')
     // Emma's celebration pose is rendered (replaces the idle Emma).
     expect(screen.getByTestId('hub-promotion-emma')).toBeInTheDocument()
   })
@@ -867,13 +869,64 @@ describe('Hub — promotion celebration (M3 audit follow-up, ticket 86c9kwnkw)',
     expect(sparkles).toHaveLength(8)
   })
 
-  it('uses the human-readable label for word-song nodes', () => {
+  it('names the unlocked word-song stage, not the mastered one', () => {
     renderHub({
       storage: createMemoryStorage(),
       pendingPromotion: 'cvc-words',
     })
+    expect(screen.getAllByTestId('hub-promotion-node-label')).toHaveLength(1)
     expect(screen.getByTestId('hub-promotion-node-label').textContent).toBe(
-      'CVC words',
+      'Words like dog',
+    )
+    expect(screen.getByTestId('hub-promotion-caption').textContent).toBe(
+      'Something new! Words like dog!',
+    )
+  })
+
+  it('says "You did it!" with no stage label when the last stage of a tree is mastered', () => {
+    renderHub({
+      storage: createMemoryStorage(),
+      pendingPromotion: 'mult-6-9',
+    })
+    const overlay = screen.getByTestId('hub-promotion-celebration')
+    expect(overlay.getAttribute('data-unlocked-node')).toBe('')
+    expect(screen.queryAllByTestId('hub-promotion-node-label')).toHaveLength(0)
+    expect(screen.getByTestId('hub-promotion-caption').textContent).toBe(
+      'You did it!',
+    )
+  })
+
+  it('speaks the unlocked stage line INSTEAD of the welcome-back line (exactly one line per mount)', async () => {
+    const playLineFn = vi.fn<NonNullable<HubProps['playLineFn']>>(() =>
+      Promise.resolve(),
+    )
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'session-end', // gate already unlocked → line fires on mount
+      pendingPromotion: 'add-to-10',
+      playLineFn,
+    })
+    await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(1))
+    // Let any further microtask-dispatched effect settle.
+    await act(async () => {})
+    expect(playLineFn).toHaveBeenCalledTimes(1)
+    expect(playLineFn.mock.calls[0]![0]).toBe('hub.celebrate.add-to-20')
+    // The Hub ribbon stays hidden — the overlay carries the caption.
+    expect(screen.queryAllByTestId('hub-ribbon')).toHaveLength(0)
+  })
+
+  it('plays the welcome-back line (not a celebrate line) when no promotion is pending', async () => {
+    const playLineFn = vi.fn<NonNullable<HubProps['playLineFn']>>(() =>
+      Promise.resolve(),
+    )
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'session-end',
+      playLineFn,
+    })
+    await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(1))
+    expect(String(playLineFn.mock.calls[0]![0])).not.toMatch(
+      /^hub\.celebrate\./,
     )
   })
 

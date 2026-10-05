@@ -21,10 +21,9 @@
  *
  * V1 deliberate simplifications
  * -----------------------------
- *  - Audio: generic placeholder caption "You unlocked a new skill!" with
- *    the node label appended. Kyle's spec calls for per-node tailored
- *    audio ("You unlocked add-to-20!"); v1 ships node-name interpolation
- *    in the caption only — the audio binary work happens in a follow-up.
+ *  - Audio: Hub.tsx plays the per-stage Lily line (`hub.celebrate.*`,
+ *    ticket 123jpnbc3dn) through `playHubLine`; this component only
+ *    renders the matching caption.
  *  - Sparkle burst: 8 inline-SVG sparkles arranged in a radial pattern
  *    with staggered scale/opacity in. No third-party particle lib (iPad
  *    bundle budget). Kyle's spec may replace this with a richer
@@ -40,11 +39,21 @@ import { useEffect, type ReactElement } from 'react'
 import { m } from 'motion/react'
 import type { SkillNode } from '../../lib/progress'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
+import { CELEBRATE_DONE_TEXT, CELEBRATE_LEAD } from './celebrationLines'
 
 export interface PromotionCelebrationProps {
-  /** The skill node that was just promoted. Drives the caption text. */
+  /** The skill node that was just MASTERED (`progress.pendingPromotion`). */
   node: SkillNode
-  /** Display label for the node (human-readable). */
+  /**
+   * The stage that mastery unlocked (next node in the tree), or null when
+   * `node` was the tree's last stage. Ticket 123jpnbc3dn: the caption
+   * names THIS node, never the mastered one.
+   */
+  unlockedNode: SkillNode | null
+  /**
+   * Child-facing name of `unlockedNode` (from `unlockCelebrationFor`).
+   * Ignored when `unlockedNode` is null — the caption reads "You did it!".
+   */
   label: string
   /**
    * Fires after the auto-dismiss timer elapses. Hub uses this to swap
@@ -84,6 +93,7 @@ const SPARKLE_POSITIONS: ReadonlyArray<{
 
 export default function PromotionCelebration({
   node,
+  unlockedNode,
   label,
   onDismiss,
   durationMs = DEFAULT_DURATION_MS,
@@ -104,6 +114,7 @@ export default function PromotionCelebration({
     <m.div
       data-testid="hub-promotion-celebration"
       data-node={node}
+      data-unlocked-node={unlockedNode ?? ''}
       role="status"
       aria-live="polite"
       className="
@@ -162,7 +173,8 @@ export default function PromotionCelebration({
         ))}
       </div>
 
-      {/* Caption — node-tailored placeholder. Bordered ribbon matches
+      {/* Caption — mirrors Emma's spoken celebrate line word-for-word
+          ("Something new! Adding to twenty!"). Bordered ribbon matches
           Hub's existing welcome-back caption surface. */}
       <m.div
         data-testid="hub-promotion-caption"
@@ -177,11 +189,20 @@ export default function PromotionCelebration({
         transition={{ duration: 0.35, delay: 0.2, ease: 'easeOut' }}
       >
         <p className="font-display text-[1.6rem] leading-snug text-ink">
-          You unlocked{' '}
-          <span data-testid="hub-promotion-node-label" className="text-my-rose">
-            {label}
-          </span>
-          !
+          {unlockedNode === null ? (
+            CELEBRATE_DONE_TEXT
+          ) : (
+            <>
+              {CELEBRATE_LEAD}{' '}
+              <span
+                data-testid="hub-promotion-node-label"
+                className="text-my-rose"
+              >
+                {label}
+              </span>
+              !
+            </>
+          )}
         </p>
       </m.div>
     </m.div>
