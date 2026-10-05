@@ -39,7 +39,7 @@
  * mis-derived focus node never bricks the celebration.
  */
 
-import type { SkillNode } from '../../lib/progress'
+import type { SkillNode } from '../../lib/progress/types'
 
 /**
  * Generic fallback phrase. Used when a focus node can't be resolved to a
@@ -111,4 +111,52 @@ export function friendlyNodeName(node: SkillNode | string): string {
  */
 export function focusRecapLine(node: SkillNode | string): string {
   return `You worked on ${friendlyNodeName(node)} today!`
+}
+
+/**
+ * One DIFFERENT spoken name per stage for Emma's Path surfaces (map, locked
+ * stops, session-end beats) — `design/emmas-path/emmas-path-spec.md` §4.3,
+ * kept verbatim per team/DECISIONS.md 2026-10-05 ("making tens", "star
+ * words" stay). Unlike `FRIENDLY_NODE_NAMES` above (the recap map, which
+ * collapses tiers into "reading words"), no two stages share a name here, so
+ * every locked-stop and celebration line names a distinct stage. The recap
+ * map is left unchanged; adopting these names for the recap is a separate
+ * call (spec §4.3) and would need a recap re-bake.
+ *
+ * Lower-case; `capitalizeSpokenName` gives the sentence-start form.
+ * The Lily lines in `src/lib/emmasPath/pathLines.ts` are built from this map.
+ */
+export const STAGE_SPOKEN_NAMES: Record<SkillNode, string> = {
+  // ── Number Garden (math) ──────────────────────────────────────────────
+  'number-recog': 'numbers',
+  'add-to-10': 'adding to ten',
+  'add-to-20': 'adding to twenty',
+  'sub-to-10': 'taking away to ten',
+  'sub-to-20': 'taking away to twenty',
+  'two-digit-addsub-no-regroup': 'big numbers',
+  'two-digit-addsub-with-regroup': 'making tens',
+  'skip-counting': 'skip counting',
+  'mult-2-5-10': 'groups of two, five and ten',
+  'mult-3-4': 'groups of three and four',
+  'mult-6-9': 'big groups',
+
+  // ── Word Song (literacy) ──────────────────────────────────────────────
+  'letter-names': 'letter names',
+  'letter-sounds': 'letter sounds',
+  'blending-cv': 'blending sounds',
+  'cvc-words': 'cat words',
+  'cvc-words-short-o': 'dog words',
+  'cvc-words-short-u': 'sun words',
+  'cvc-words-short-i': 'pig words',
+  'cvc-words-short-e': 'bed words',
+  'digraphs-sh': 'ship words',
+  'digraphs-ch': 'chick words',
+  'digraphs-th-voiceless': 'thumb words',
+  'sight-words': 'star words',
+  'simple-sentences': 'reading sentences',
+}
+
+/** "adding to ten" → "Adding to ten" (sentence-start form). */
+export function capitalizeSpokenName(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1)
 }
