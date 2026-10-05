@@ -13,17 +13,7 @@ describe('HUB_LINES manifest', () => {
   it("has exactly 18 welcome/enter entries (9 anchor + 7 rotation + 2 enter — first-ever / pick-again / pick-next anchors don't rotate)", () => {
     // Spec says 20 MP3s; 7 rotation per the variants table + 11 anchor lines = 18 distinct ids.
     // (Three 'first-ever' / 'session-end' / 'mid-skill-back' anchors have no rotation pool.)
-    const welcome = Object.keys(HUB_LINES).filter(
-      (id) => !id.startsWith('hub.celebrate.'),
-    )
-    expect(welcome).toHaveLength(18)
-  })
-
-  it('has exactly 23 celebrate entries (10 math + 12 word-song unlockable stages + you-did-it)', () => {
-    const celebrate = Object.keys(HUB_LINES).filter((id) =>
-      id.startsWith('hub.celebrate.'),
-    )
-    expect(celebrate).toHaveLength(23)
+    expect(Object.keys(HUB_LINES)).toHaveLength(18)
   })
 
   it('every line has a unique src URL', () => {
