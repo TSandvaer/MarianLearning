@@ -125,3 +125,10 @@ Distinct from its siblings:
 - **Decided:** the full whole-line expansion of spec §4 is 289 lines (11,618 chars), not ~130. Bake the 140 one-name lines now; defer `locked.later` (111) and `gate.locked` (38) — they need one bake per (stop, current-step) pair. Catalogued with `src: null` in `src/lib/emmasPath/pathLines.ts` (PR #501).
 - **Revisit:** after Thomas hears the first batch — bake them, reword to one name ("First let's finish <current>!", ~24 lines, spec change), or splice.
 - **Decided by:** Thomas (popup, recommended option).
+
+## 2026-10-05 — Emma's Path redesign: direction A "Toy Box", clay-render fidelity
+
+- **Context:** Thomas on production (#502/#503/#504): "the design is very confusing and not very modern". Quality bars 9-12 confirmed the same day (`.claude/quality-bars.md`).
+- **Decided:** (1) Direction A · Toy Box from Kyle's 3 clickable mockups (PR #506, artifact https://claude.ai/artifact/LnQ3b748sKNTQuPpujyjeg). (2) The target look is the Codex clay render (`design/emmas-path/redesign/concepts/direction-a-hub.png`), not Kyle's flatter vector version: Codex image generation makes the card art, stage icons and map art as images; the app builds layout and interaction around them; the real Emma art stays.
+- **Known render faults to NOT copy:** Emma off-model, invented label "Flower sums", side-by-side cards (layout still to be settled).
+- **Decided by:** Thomas (popups, recommended option both times).
