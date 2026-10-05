@@ -47,7 +47,8 @@
 import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isProgressV1 } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
-import { saveProgress } from './storage'
+import { recordGoodDays } from './mastery'
+import { saveProgress, withRetiredLegacyThresholds } from './storage'
 import type {
   LetterSoundsVowel,
   Progress,
@@ -434,10 +435,15 @@ function installCloudBlob(
   // Pre-guard defaulters, in the SAME order as storage.ts:loadProgress —
   // skill-level floor first, then the W9.2 per-vowel letter-sounds
   // defaulter (ticket 86c9ya3gd), then the strict guard.
-  const defaulted = withDefaultedLetterSoundsVowelStates(
+  const guarded = withDefaultedLetterSoundsVowelStates(
     withDefaultedSkillLevels(blob),
   )
-  if (!isProgressV1(defaulted)) return null
+  if (!isProgressV1(guarded)) return null
+  // Mirror of the storage.ts one-time threshold retirement (ticket
+  // 123jpnbc3dm): a cloud blob from a device that predates the good-day
+  // counter carries no `goodDays`, so its stored old default thresholds
+  // retire here exactly as a local load would retire them.
+  const defaulted = withRetiredLegacyThresholds(guarded)
 
   // History merge (ticket 86c9qa6na — P1 data-loss fix). The cloud blob
   // wins last-write-wins on every field EXCEPT `history`. Under plain
@@ -481,10 +487,25 @@ function installCloudBlob(
   // cloudSync.test.ts `cvcGraduationSessionFired parity` test pins). The
   // picker tolerates `undefined` as `false` either way, but keeping the
   // two read paths byte-identical avoids future drift.
-  if (withFirstEncounters.cvcGraduationSessionFired === undefined) {
-    return { ...withFirstEncounters, cvcGraduationSessionFired: false }
+  const withGraduationLatch: Progress =
+    withFirstEncounters.cvcGraduationSessionFired === undefined
+      ? { ...withFirstEncounters, cvcGraduationSessionFired: false }
+      : withFirstEncounters
+
+  // Good-day counter (ticket 123jpnbc3dm). Mirror of
+  // `storage.ts:withSeededGoodDays`, widened: the cloud blob's counter
+  // wins like every other field, but good days are never lost, so every
+  // good day in the MERGED history (local sessions included) is unioned
+  // back in. A pre-counter cloud blob is seeded exactly as a local load
+  // would seed it.
+  const goodDays = recordGoodDays(withGraduationLatch)
+  if (
+    withGraduationLatch.goodDays === undefined ||
+    goodDays !== withGraduationLatch.goodDays
+  ) {
+    return { ...withGraduationLatch, goodDays: { ...goodDays } }
   }
-  return withFirstEncounters
+  return withGraduationLatch
 }
 
 /**

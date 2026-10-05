@@ -559,6 +559,63 @@ describe('reconcileWithCloud', () => {
     expect(isProgressV1(installed[0]!)).toBe(true)
   })
 
+  it('goodDays parity — pre-counter cloud blob: old default thresholds retire, counter is seeded, local good days are unioned in (ticket 123jpnbc3dm)', async () => {
+    const seed = defaultProgress()
+    const cloudBlob: Record<string, unknown> = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-15T10:00:00.000Z' },
+      // Written by an older build that persisted the old defaults.
+      parentSettings: {
+        ...seed.parentSettings!,
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.9, sessions: 3 },
+        },
+      },
+      history: [
+        {
+          dateISO: new Date(2026, 5, 10, 12).toISOString(),
+          skillFocus: ['sub-to-10'],
+          successRate: 1,
+        },
+      ],
+    }
+    delete cloudBlob.goodDays
+    const local: Progress = {
+      ...defaultProgress(),
+      history: [
+        {
+          dateISO: new Date(2026, 5, 11, 12).toISOString(),
+          skillFocus: ['sub-to-10'],
+          successRate: 0.875,
+        },
+      ],
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-15T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.parentSettings!.masteryThreshold).toEqual({
+      math: { percent: 0.875, sessions: 3 },
+      'word-song': { percent: 0.875, sessions: 3 },
+    })
+    // The local 7/8 day is only good under the RETIRED (new) threshold —
+    // proves retirement runs before seeding.
+    expect(installed[0]!.goodDays).toEqual({
+      'sub-to-10': ['2026-06-10', '2026-06-11'],
+    })
+    expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
   it('cvcGraduationSessionFired parity — cloud blob with the latch true preserves it verbatim across install', async () => {
     // Round-trip pin: a cloud blob that already fired the graduation
     // review (latch true) must NOT have it reset to false by the

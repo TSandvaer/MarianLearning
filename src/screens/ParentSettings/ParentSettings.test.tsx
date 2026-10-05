@@ -121,7 +121,8 @@ describe('ParentSettings — rendering', () => {
     const { storage } = createMemoryStorage(null)
     render(<ParentSettings storage={storage} />)
     // Default is autoPromote=true, sessionModePicker=off,
-    // math threshold=95/3, word-song threshold=90/3.
+    // both thresholds 7/8 on 3 good days (0.875/3, preset id 88-3 —
+    // ticket 123jpnbc3dm).
     expect(
       screen
         .getByTestId('parent-settings-toggle-autoPromote')
@@ -134,13 +135,13 @@ describe('ParentSettings — rendering', () => {
     ).toBe('true')
     expect(
       screen
-        .getByTestId('parent-settings-segmented-masteryThreshold-math-95-3')
+        .getByTestId('parent-settings-segmented-masteryThreshold-math-88-3')
         .getAttribute('data-selected'),
     ).toBe('true')
     expect(
       screen
         .getByTestId(
-          'parent-settings-segmented-masteryThreshold-word-song-90-3',
+          'parent-settings-segmented-masteryThreshold-word-song-88-3',
         )
         .getAttribute('data-selected'),
     ).toBe('true')
@@ -161,8 +162,8 @@ describe('ParentSettings — save-on-change', () => {
     // The other defaults must be preserved.
     expect(last.parentSettings?.sessionModePicker).toBe('off')
     expect(last.parentSettings?.masteryThreshold).toEqual({
-      math: { percent: 0.95, sessions: 3 },
-      'word-song': { percent: 0.9, sessions: 3 },
+      math: { percent: 0.875, sessions: 3 },
+      'word-song': { percent: 0.875, sessions: 3 },
     })
   })
 
@@ -190,8 +191,8 @@ describe('ParentSettings — save-on-change', () => {
     )
     expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
       math: { percent: 0.8, sessions: 2 },
-      // word-song untouched at its 90/3 default.
-      'word-song': { percent: 0.9, sessions: 3 },
+      // word-song untouched at its 0.875/3 default.
+      'word-song': { percent: 0.875, sessions: 3 },
     })
 
     await user.click(
@@ -201,7 +202,7 @@ describe('ParentSettings — save-on-change', () => {
     )
     expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
       math: { percent: 0.95, sessions: 3 },
-      'word-song': { percent: 0.9, sessions: 3 },
+      'word-song': { percent: 0.875, sessions: 3 },
     })
   })
 
@@ -216,8 +217,8 @@ describe('ParentSettings — save-on-change', () => {
       ),
     )
     expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
-      // math untouched at its 95/3 default.
-      math: { percent: 0.95, sessions: 3 },
+      // math untouched at its 0.875/3 default.
+      math: { percent: 0.875, sessions: 3 },
       'word-song': { percent: 0.8, sessions: 2 },
     })
 
@@ -227,7 +228,7 @@ describe('ParentSettings — save-on-change', () => {
       ),
     )
     expect(ctx.saved.at(-1)?.parentSettings?.masteryThreshold).toEqual({
-      math: { percent: 0.95, sessions: 3 },
+      math: { percent: 0.875, sessions: 3 },
       'word-song': { percent: 0.95, sessions: 3 },
     })
   })

@@ -12,13 +12,21 @@
  * -----------------------------------
  * Per Thomas's 2026-05-01 update on the M3 ticket: the rule reads its
  * thresholds from the M2.5 `parentSettings` shape (`getSettings()`),
- * never from hardcoded constants in this file. Defaults (per-track,
- * 2026-05-02 update / ticket 86c9kwvy0):
- *  - math: 0.95 percent / 3 sessions
- *  - word-song: 0.90 percent / 3 sessions
+ * never from hardcoded constants in this file. Defaults: 0.875 percent
+ * / 3 good days on both tracks (Emma's Path decision 1, ticket
+ * 123jpnbc3dm — "3 good days at 7/8+, any order, never lost").
  * Cross-day enforcement on, auto-promote on. The percent/sessions are
  * looked up per track inside the per-track scan loop, so a single
  * call walks both trees with each track's own threshold.
+ *
+ * Good days (ticket 123jpnbc3dm)
+ * ------------------------------
+ * A good day is a local calendar day on which a step scored at or
+ * above the threshold percent. Good days accumulate in
+ * `progress.goodDays` and are never removed: a weak session does not
+ * reset them and `history` aging out (30-entry cap) does not lose them.
+ * Every call unions the good days visible in `history` into the
+ * counter, so the counter and the rule never disagree.
  *
  * Tree adjacency lives here
  * -------------------------
@@ -41,6 +49,8 @@
 import { LETTER_SOUNDS_VOWELS } from './defaults'
 import { getSettings } from './parentSettings'
 import type {
+  GoodDayKey,
+  GoodDays,
   LetterSoundsVowel,
   MasteryThreshold,
   NumberGardenNode,
@@ -197,20 +207,15 @@ export function nextNode(
  *
  * Rule
  * ----
- * For every node in either tree whose current `skillLevels[node]` is
- * `'practicing'` (where `track` = the node's track, math or word-song):
- *   1. Filter `progress.history` to entries whose `skillFocus` includes
- *      this node.
- *   2. If `parentSettings.crossDayEnforcement === true`, dedupe to one
- *      entry per calendar day (by `dateISO`'s `YYYY-MM-DD` prefix —
- *      same convention recordProgressOnSessionEnd writes). Keep the
- *      LAST entry per day (the most recent session of that day).
- *   3. Take the last `parentSettings.masteryThreshold[track].sessions`
- *      entries.
- *   4. If there are fewer entries than required, no promotion.
- *   5. If every retained entry has
- *      `successRate >= parentSettings.masteryThreshold[track].percent`,
- *      the node qualifies for promotion.
+ * First, every good day visible in `progress.history` is unioned into
+ * `progress.goodDays` (see `recordGoodDays`). Then, for every node in
+ * either tree whose current `skillLevels[node]` is `'practicing'`
+ * (where `track` = the node's track, math or word-song), the node
+ * qualifies when it has at least
+ * `parentSettings.masteryThreshold[track].sessions` good days — local
+ * calendar days with a session at or above `.percent` — in any order.
+ * With `crossDayEnforcement === false`, good sessions in `history`
+ * count individually instead of per day (see `goodDayCount`).
  *
  * Promotion
  * ---------
@@ -267,6 +272,14 @@ export function applyMasteryRule(progress: Progress): Progress {
   const out: Progress = {
     ...progress,
     skillLevels: { ...progress.skillLevels },
+  }
+
+  // ── Good-day counter (ticket 123jpnbc3dm) ──
+  // Bank every good day the history shows before any promotion check,
+  // so the checks below and `nodeProgress` read the same counter.
+  const goodDays = recordGoodDays(progress, settings)
+  if (goodDays !== progress.goodDays && goodDays !== EMPTY_GOOD_DAYS) {
+    out.goodDays = goodDays
   }
 
   // ── Apply any queued pendingPromotion when autoPromote is now on ──
@@ -363,6 +376,7 @@ export function applyMasteryRule(progress: Progress): Progress {
       progress.literacy!.letterSoundsVowelStates!,
       wordSongThreshold,
       settings,
+      goodDays,
     )
     perVowelAllMastered = result.allMastered
     if (result.changed) {
@@ -402,7 +416,17 @@ export function applyMasteryRule(progress: Progress): Progress {
         }
         continue
       }
-      if (!qualifies(progress.history, node, trackThreshold, settings)) continue
+      if (
+        !qualifies(
+          progress.history,
+          node,
+          trackThreshold,
+          settings,
+          goodDays[node],
+        )
+      ) {
+        continue
+      }
       // Graduation gate (ticket 86c9m3aec). For graduation-gated nodes
       // the standard rule is necessary but not sufficient — the most
       // recent qualifying entry must additionally carry a passing
@@ -528,8 +552,8 @@ export function perVowelTrackingActive(progress: Progress): boolean {
  *   - intro → practicing: at least one entry where
  *     `skillFocus.includes('letter-sounds') && currentTargetVowel === v`
  *     AND `successRate > 0` (post-#201 intro→practicing shape).
- *   - practicing → mastered: the standard word-song 90/3 rule over the
- *     vowel-filtered, cross-day-deduped history.
+ *   - practicing → mastered: the word-song good-day rule over the
+ *     vowel-filtered history plus the vowel's banked good days.
  *
  * NO cross-pollination: a `/o/`-target session is filtered out for `/u/`
  * because the `currentTargetVowel === v` predicate excludes it. The
@@ -543,6 +567,7 @@ function scanPerVowelSubMastery(
   states: Record<LetterSoundsVowel, VowelSubMasteryState>,
   threshold: MasteryThreshold,
   settings: ParentSettings,
+  goodDays: GoodDays,
 ): PerVowelScanResult {
   const out = { ...states }
   let changed = false
@@ -576,7 +601,9 @@ function scanPerVowelSubMastery(
     // mastered in a single call when history is sufficient (same
     // same-call-traversal property as the node-level scan).
     if (level === 'practicing') {
-      if (qualifiesOverHistory(vowelHistory, threshold, settings)) {
+      if (
+        hasEnoughGoodDays(vowelHistory, threshold, settings, goodDays[vowel])
+      ) {
         level = 'mastered'
       }
     }
@@ -605,65 +632,154 @@ export function trackOf(node: SkillNode): MasteryTrack | null {
 }
 
 /**
- * Return true iff `node` has enough recent qualifying history to be
- * promoted under `threshold`. Pure read of `history`; does not mutate.
+ * Return true iff `node` has enough good days to be promoted under
+ * `threshold`. Pure read of `history`; does not mutate.
  *
  * `threshold` is the per-track value (math vs word-song); `settings`
  * still carries the rule-level toggles (`crossDayEnforcement`).
+ * `banked` is the node's entry in `progress.goodDays`.
  */
 function qualifies(
   history: readonly SessionHistoryEntry[],
   node: SkillNode,
   threshold: MasteryThreshold,
   settings: ParentSettings,
+  banked: readonly string[] | undefined,
 ): boolean {
   const focused = history.filter((entry) => entry.skillFocus.includes(node))
-  return qualifiesOverHistory(focused, threshold, settings)
+  return hasEnoughGoodDays(focused, threshold, settings, banked)
 }
 
 /**
- * Core 90/3-style qualification check over an ALREADY-FILTERED history
- * slice. `qualifies()` (node-level) and the per-vowel sub-mastery scan
- * (vowel-level) both funnel through here so the cross-day dedupe +
- * last-N-window + threshold logic stays in ONE place — the node and
- * per-vowel paths can never drift on history shape.
- *
- * The `focused` argument is the caller's already-narrowed slice (filtered
- * by node membership, or by node + `currentTargetVowel`). Returns false
- * for an empty slice or a window shorter than `threshold.sessions`.
+ * Core good-day qualification check over an ALREADY-FILTERED history
+ * slice plus the step's banked good days. `qualifies()` (node-level) and
+ * the per-vowel sub-mastery scan (vowel-level) both funnel through here
+ * so the node and per-vowel paths can never drift.
  */
-export function qualifiesOverHistory(
+export function hasEnoughGoodDays(
   focused: readonly SessionHistoryEntry[],
   threshold: MasteryThreshold,
   settings: ParentSettings,
+  banked: readonly string[] | undefined,
 ): boolean {
-  return qualifyingDayCount(focused, threshold, settings) >= threshold.sessions
+  return (
+    goodDayCount(focused, threshold, settings, banked) >= threshold.sessions
+  )
 }
 
 /**
- * How many of the `threshold.sessions` days the rule needs are already
- * banked: the trailing run of (cross-day-deduped) entries at or above
- * `threshold.percent`, capped at `threshold.sessions`. A node qualifies
- * exactly when this reaches `threshold.sessions` — `qualifiesOverHistory`
- * is defined in terms of it, so the progress display (`nodeProgress.ts`)
- * and the rule cannot drift apart.
+ * How many good days a step has: the distinct local calendar days in
+ * `banked` (the step's `progress.goodDays` entry) plus those in
+ * `focused` (its history slice) with `successRate >= threshold.percent`.
+ * Order does not matter and a weak day removes nothing. Uncapped —
+ * callers that display it clamp to `threshold.sessions`.
+ *
+ * With `crossDayEnforcement === false` the parent has opted out of the
+ * separate-days requirement, so good SESSIONS in history count one each
+ * (the banked day list is still a floor).
  */
-export function qualifyingDayCount(
+export function goodDayCount(
   focused: readonly SessionHistoryEntry[],
   threshold: MasteryThreshold,
   settings: ParentSettings,
+  banked: readonly string[] | undefined,
 ): number {
-  const filtered = settings.crossDayEnforcement
-    ? dedupeByCalendarDay(focused)
-    : focused
-  let count = 0
-  for (let i = filtered.length - 1; i >= 0; i--) {
-    if (count >= threshold.sessions) break
-    if (filtered[i]!.successRate < threshold.percent) break
-    count++
+  const bankedDays = banked ?? []
+  if (!settings.crossDayEnforcement) {
+    const goodSessions = focused.filter(
+      (entry) => entry.successRate >= threshold.percent,
+    ).length
+    return Math.max(new Set(bankedDays).size, goodSessions)
   }
-  return count
+  const days = new Set(bankedDays)
+  for (const day of goodDayKeysFromHistory(focused, threshold.percent)) {
+    days.add(day)
+  }
+  return days.size
 }
+
+/**
+ * Local-day keys (`YYYY-MM-DD`) of the entries in `focused` that scored
+ * at or above `percent`, distinct and sorted.
+ */
+export function goodDayKeysFromHistory(
+  focused: readonly SessionHistoryEntry[],
+  percent: number,
+): string[] {
+  const days = new Set<string>()
+  for (const entry of focused) {
+    if (entry.successRate >= percent) days.add(localDayKey(entry.dateISO))
+  }
+  return [...days].sort()
+}
+
+/**
+ * Cap on the days kept per step in `progress.goodDays`. Far above any
+ * threshold the parent settings offer (3), so trimming the oldest days
+ * never changes a promotion decision; it only bounds the stored blob.
+ */
+export const MAX_GOOD_DAYS_PER_STEP = 30
+
+/**
+ * Return `progress.goodDays` with every good day visible in
+ * `progress.history` unioned in — per node (track threshold percent)
+ * and per letter-sounds vowel (word-song percent, entries tagged with
+ * `currentTargetVowel`). Days are never removed except by the
+ * `MAX_GOOD_DAYS_PER_STEP` cap (oldest first).
+ *
+ * Returns `progress.goodDays` itself (or a shared empty object when the
+ * field is absent) when nothing new was found, so callers can cheaply
+ * detect "no change". Also the read-path seeder: `storage.ts`
+ * calls it on load when the field is absent.
+ */
+export function recordGoodDays(
+  progress: Progress,
+  settings: ParentSettings = getSettings(progress),
+): GoodDays {
+  const current: GoodDays = progress.goodDays ?? EMPTY_GOOD_DAYS
+  const next: GoodDays = { ...current }
+  let changed = false
+
+  const merge = (key: GoodDayKey, fresh: readonly string[]): void => {
+    if (fresh.length === 0) return
+    const existing = current[key] ?? []
+    const union = new Set(existing)
+    for (const day of fresh) union.add(day)
+    if (union.size === existing.length) return
+    next[key] = [...union].sort().slice(-MAX_GOOD_DAYS_PER_STEP)
+    changed = true
+  }
+
+  const trees: readonly { track: MasteryTrack; nodes: readonly SkillNode[] }[] =
+    [
+      { track: 'math', nodes: MATH_TREE },
+      { track: 'word-song', nodes: LITERACY_TREE },
+    ]
+  for (const { track, nodes } of trees) {
+    const percent = settings.masteryThreshold[track].percent
+    for (const node of nodes) {
+      const focused = progress.history.filter((entry) =>
+        entry.skillFocus.includes(node),
+      )
+      merge(node, goodDayKeysFromHistory(focused, percent))
+    }
+  }
+
+  const wordSongPercent = settings.masteryThreshold['word-song'].percent
+  for (const vowel of LETTER_SOUNDS_VOWELS) {
+    const vowelHistory = progress.history.filter(
+      (entry) =>
+        entry.skillFocus.includes(LETTER_SOUNDS_NODE) &&
+        entry.currentTargetVowel === vowel,
+    )
+    merge(vowel, goodDayKeysFromHistory(vowelHistory, wordSongPercent))
+  }
+
+  return changed ? next : current
+}
+
+/** Shared empty counter, returned unchanged so callers can compare by reference. */
+const EMPTY_GOOD_DAYS: GoodDays = Object.freeze({})
 
 /**
  * Reduce a list of history entries to one-per-calendar-day. The day key
@@ -748,18 +864,19 @@ export function isGraduationGated(node: SkillNode): boolean {
 
 /**
  * For a graduation-gated node already passing `qualifies()`, return
- * true iff the MOST RECENT entry in the qualifying window carries a
- * `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD`. The shared filter
- * pipeline (skillFocus filter + cross-day dedupe + last-N window)
- * mirrors `qualifies()` so the two stay in lockstep on history shape.
+ * true iff the MOST RECENT (cross-day-deduped) session on the node was
+ * a good session (`successRate >= threshold.percent`, as the old
+ * all-good window guaranteed) that also carries a
+ * `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD`.
  *
- * Why "most recent" and not "all of the window"
- * ---------------------------------------------
- * The novel-pool gate is a single-session generalization probe. The
- * graduation session IS the most recent of the window. Earlier
- * sessions in the window are non-graduation entries (no
- * `novelPoolSuccessRate`); requiring them to clear the novel gate
- * would never be satisfiable. So the gate reads only the tail entry.
+ * Why "most recent" only
+ * ----------------------
+ * The novel-pool gate is a single-session generalization probe, and the
+ * graduation session is the most recent one. Earlier sessions are
+ * non-graduation entries (no `novelPoolSuccessRate`); requiring them to
+ * clear the novel gate would never be satisfiable. The good days
+ * themselves are counted by `qualifies()`, in any order (ticket
+ * 123jpnbc3dm).
  */
 export function graduationGateClears(
   history: readonly SessionHistoryEntry[],
@@ -772,10 +889,9 @@ export function graduationGateClears(
   const filtered = settings.crossDayEnforcement
     ? dedupeByCalendarDay(focused)
     : focused
-  if (filtered.length < threshold.sessions) return false
-  const window = filtered.slice(-threshold.sessions)
-  const tail = window[window.length - 1]!
+  const tail = filtered[filtered.length - 1]!
   return (
+    tail.successRate >= threshold.percent &&
     typeof tail.novelPoolSuccessRate === 'number' &&
     tail.novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD
   )
@@ -793,17 +909,17 @@ export function graduationGateClears(
  *   2. `node` is currently at `'practicing'` (a `'mastered'` node has
  *      already promoted; an `'intro'` / `'locked'` node hasn't reached
  *      a graduation gate yet).
- *   3. The last `threshold.sessions` qualifying entries (cross-day-
- *      deduped per `parentSettings.crossDayEnforcement`) all hit
- *      `successRate >= threshold.percent`.
- *   4. NONE of those tail entries already carries a
- *      `novelPoolSuccessRate` — i.e. graduation hasn't happened yet,
+ *   3. The node has `threshold.sessions` good days banked, in any
+ *      order (ticket 123jpnbc3dm — see `goodDayCount`).
+ *   4. NONE of the last `threshold.sessions` sessions (cross-day-
+ *      deduped per `parentSettings.crossDayEnforcement`) already carries
+ *      a `novelPoolSuccessRate` — i.e. graduation hasn't happened yet,
  *      or the previous attempt's novel-tagged entry has aged out of
  *      the tail window.
  *
- * Rule (4) is the "engine waits for canonical 90/3 to reset" guarantee
- * from the AC. After a failed graduation (novel < 80%), the failed
- * entry sits at the tail of the qualifying window with a
+ * Rule (4) is the "engine waits before re-probing" guarantee from the
+ * AC. After a failed graduation (novel < 80%), the failed
+ * entry sits at the tail of the window with a
  * `novelPoolSuccessRate` set — predicate returns false, so the next
  * session is a regular cvc-words session. Only after 3 fresh
  * non-graduation sessions push the failed entry out of the tail
@@ -963,21 +1079,20 @@ export function isGraduationSessionPending(
   const focused = progress.history.filter((entry) =>
     entry.skillFocus.includes(node),
   )
-  if (focused.length === 0) return false
+  // The good days must be banked (any order — ticket 123jpnbc3dm) ...
+  if (
+    !hasEnoughGoodDays(focused, threshold, settings, progress.goodDays?.[node])
+  ) {
+    return false
+  }
 
   const filtered = settings.crossDayEnforcement
     ? dedupeByCalendarDay(focused)
     : focused
-  if (filtered.length < threshold.sessions) return false
-
+  // ... and none of the last `threshold.sessions` sessions may already
+  // be tagged with a novelPoolSuccessRate: a previous graduation
+  // (passing or failing) blocks an immediate re-attempt until that many
+  // fresh sessions have pushed it out.
   const window = filtered.slice(-threshold.sessions)
-  // Every entry in the window must hit the canonical threshold AND none
-  // may already be tagged with a novelPoolSuccessRate. The latter
-  // ensures a previous graduation (whether passing or failing) blocks
-  // an immediate re-attempt.
-  for (const entry of window) {
-    if (entry.successRate < threshold.percent) return false
-    if (entry.novelPoolSuccessRate !== undefined) return false
-  }
-  return true
+  return window.every((entry) => entry.novelPoolSuccessRate === undefined)
 }

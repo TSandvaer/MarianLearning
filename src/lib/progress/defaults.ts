@@ -265,5 +265,9 @@ export function defaultProgress(childName = 'Marian'): Progress {
     // rely on `withDefaultedCvcGraduationSessionFired` to fill it for any
     // blob that predates the field. See types.ts comment.
     cvcGraduationSessionFired: false,
+    // Cumulative good-day counter (ticket 123jpnbc3dm). Greenfield Marian
+    // has no good days yet; `withSeededGoodDays` seeds it from history
+    // for any blob that predates the field. See types.ts comment.
+    goodDays: {},
   }
 }

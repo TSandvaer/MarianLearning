@@ -20,16 +20,17 @@ import {
   loadProgress,
   saveProgress,
 } from './index'
+import { retireLegacyMasteryThreshold } from './parentSettings'
 import type { ParentSettings, Progress } from './types'
 
 describe('DEFAULT_PARENT_SETTINGS', () => {
-  it('matches the Thomas-locked 2026-05-02 per-track values (ticket 86c9kwvy0) + 2026-05-09 cross-vowel mix lock (ticket 86c9qa0kf)', () => {
+  it("matches the Emma's Path decision-1 thresholds (7/8 on 3 good days, ticket 123jpnbc3dm) + 2026-05-09 cross-vowel mix lock (ticket 86c9qa0kf)", () => {
     expect(DEFAULT_PARENT_SETTINGS).toEqual({
       autoPromote: true,
       sessionModePicker: 'off',
       masteryThreshold: {
-        math: { percent: 0.95, sessions: 3 },
-        'word-song': { percent: 0.9, sessions: 3 },
+        math: { percent: 0.875, sessions: 3 },
+        'word-song': { percent: 0.875, sessions: 3 },
       },
       crossDayEnforcement: true,
       showLevelToMarian: false,
@@ -38,11 +39,11 @@ describe('DEFAULT_PARENT_SETTINGS', () => {
   })
 
   it('exposes the three v1 mastery threshold presets in left-to-right order', () => {
-    // Updated 2026-05-02 (ticket 86c9kwvy0): the middle preset is now
-    // 90/3 (was 90/2) so the word-song default is selectable.
+    // Updated 2026-10-05 (ticket 123jpnbc3dm): the middle preset is the
+    // new 7/8-on-3-days default for both tracks.
     expect(MASTERY_THRESHOLD_PRESETS).toEqual([
       { percent: 0.8, sessions: 2 },
-      { percent: 0.9, sessions: 3 },
+      { percent: 0.875, sessions: 3 },
       { percent: 0.95, sessions: 3 },
     ])
   })
@@ -87,8 +88,8 @@ describe('getSettings', () => {
     const b = getSettings(undefined)
     // Defaults must remain intact for the next reader.
     expect(b.autoPromote).toBe(true)
-    expect(b.masteryThreshold.math.percent).toBe(0.95)
-    expect(b.masteryThreshold['word-song'].percent).toBe(0.9)
+    expect(b.masteryThreshold.math.percent).toBe(0.875)
+    expect(b.masteryThreshold['word-song'].percent).toBe(0.875)
   })
 
   it('fills missing top-level keys from defaults (partial merge)', () => {
@@ -105,8 +106,8 @@ describe('getSettings', () => {
     // Ticket 86c9qa0kf — cross-vowel default is `true` when missing.
     expect(result.crossVowelMixingEnabled).toBe(true)
     expect(result.masteryThreshold).toEqual({
-      math: { percent: 0.95, sessions: 3 },
-      'word-song': { percent: 0.9, sessions: 3 },
+      math: { percent: 0.875, sessions: 3 },
+      'word-song': { percent: 0.875, sessions: 3 },
     })
   })
 
@@ -143,7 +144,7 @@ describe('getSettings', () => {
     const result = getSettings(partial)
     expect(result.masteryThreshold.math).toEqual({ percent: 0.8, sessions: 2 })
     expect(result.masteryThreshold['word-song']).toEqual({
-      percent: 0.9,
+      percent: 0.875,
       sessions: 3,
     })
   })
@@ -159,7 +160,7 @@ describe('getSettings', () => {
         },
       },
     }
-    expect(getSettings(bad).masteryThreshold.math.percent).toBe(0.95)
+    expect(getSettings(bad).masteryThreshold.math.percent).toBe(0.875)
   })
 
   it('rejects non-positive / non-integer sessions and falls back to per-track default', () => {
@@ -231,11 +232,14 @@ describe('getSettings', () => {
     }
     const result = getSettings(bogus)
     // Both percent (>1) and sessions (<=0) reject; legacy fallback uses
-    // the math default (95/3) as the per-key base. That value is then
-    // applied to BOTH tracks (legacy intent preservation).
-    expect(result.masteryThreshold.math).toEqual({ percent: 0.95, sessions: 3 })
+    // the math default (now 0.875/3) as the per-key base. That value is
+    // then applied to BOTH tracks (legacy intent preservation).
+    expect(result.masteryThreshold.math).toEqual({
+      percent: 0.875,
+      sessions: 3,
+    })
     expect(result.masteryThreshold['word-song']).toEqual({
-      percent: 0.95,
+      percent: 0.875,
       sessions: 3,
     })
   })
@@ -250,8 +254,78 @@ describe('getSettings', () => {
     }
     const result = getSettings(bogus)
     expect(result.masteryThreshold).toEqual({
-      math: { percent: 0.95, sessions: 3 },
-      'word-song': { percent: 0.9, sessions: 3 },
+      math: { percent: 0.875, sessions: 3 },
+      'word-song': { percent: 0.875, sessions: 3 },
+    })
+  })
+
+  // ── Ticket 123jpnbc3dm: retire the stored pre-decision-1 defaults ──────
+  //
+  // The Parent Settings screen persists the FULL settings object on any
+  // change, so a device can carry the old defaults (math 95/3, word-song
+  // 90/3) without a parent ever picking them. Those exact values retire
+  // to the new 7/8-on-3-days default ONCE, on the first load of a blob
+  // that predates the good-day counter; anything else is a deliberate
+  // choice. `getSettings` itself never retires, so a parent who picks
+  // 95/3 after this ticket keeps it.
+  describe('legacy default retirement (ticket 123jpnbc3dm)', () => {
+    it('retireLegacyMasteryThreshold maps exact old per-track defaults to the new default', () => {
+      expect(
+        retireLegacyMasteryThreshold({
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.9, sessions: 3 },
+        }),
+      ).toEqual({
+        math: { percent: 0.875, sessions: 3 },
+        'word-song': { percent: 0.875, sessions: 3 },
+      })
+    })
+
+    it('keeps custom values and near-misses (only exact per-track matches retire)', () => {
+      const custom = {
+        math: { percent: 0.8, sessions: 2 },
+        // 95/3 was the MATH default, never word-song's.
+        'word-song': { percent: 0.95, sessions: 3 },
+      }
+      expect(retireLegacyMasteryThreshold(custom)).toBe(custom)
+      const nearMiss = {
+        math: { percent: 0.95, sessions: 2 },
+        'word-song': { percent: 0.9, sessions: 4 },
+      }
+      expect(retireLegacyMasteryThreshold(nearMiss)).toBe(nearMiss)
+    })
+
+    it('retires the old single-shape default (95/3) to the per-track defaults', () => {
+      expect(
+        retireLegacyMasteryThreshold({ percent: 0.95, sessions: 3 }),
+      ).toEqual({
+        math: { percent: 0.875, sessions: 3 },
+        'word-song': { percent: 0.875, sessions: 3 },
+      })
+      const custom = { percent: 0.8, sessions: 2 }
+      expect(retireLegacyMasteryThreshold(custom)).toBe(custom)
+    })
+
+    it('passes malformed input through for getSettings to default', () => {
+      expect(retireLegacyMasteryThreshold('x')).toBe('x')
+      expect(retireLegacyMasteryThreshold(null)).toBe(null)
+    })
+
+    it('getSettings does NOT retire — a deliberate 95/3 choice is kept', () => {
+      const p: Progress = {
+        ...defaultProgress(),
+        parentSettings: {
+          ...DEFAULT_PARENT_SETTINGS,
+          masteryThreshold: {
+            math: { percent: 0.95, sessions: 3 },
+            'word-song': { percent: 0.9, sessions: 3 },
+          },
+        },
+      }
+      expect(getSettings(p).masteryThreshold).toEqual({
+        math: { percent: 0.95, sessions: 3 },
+        'word-song': { percent: 0.9, sessions: 3 },
+      })
     })
   })
 
@@ -379,9 +453,67 @@ describe('loadProgress + parentSettings', () => {
     expect(loaded).not.toBeNull()
     // The legacy single value lands on BOTH tracks (per the
     // intent-preservation choice documented in `mergePerTrackMasteryThreshold`).
+    // The blob already carries the good-day counter (defaultProgress
+    // seeds it), so the one-time 123jpnbc3dm retirement does not run.
     expect(loaded?.parentSettings?.masteryThreshold).toEqual({
       math: { percent: 0.95, sessions: 3 },
       'word-song': { percent: 0.95, sessions: 3 },
+    })
+  })
+
+  it('pre-counter blob: stored old defaults retire once on load; the next save keeps a later 95/3 choice (ticket 123jpnbc3dm)', () => {
+    const seed = defaultProgress()
+    const preCounter: Record<string, unknown> = {
+      ...seed,
+      parentSettings: {
+        ...DEFAULT_PARENT_SETTINGS,
+        masteryThreshold: {
+          math: { percent: 0.95, sessions: 3 },
+          'word-song': { percent: 0.9, sessions: 3 },
+        },
+      },
+    }
+    delete preCounter.goodDays
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preCounter))
+
+    const first = loadProgress()
+    expect(first?.parentSettings?.masteryThreshold).toEqual({
+      math: { percent: 0.875, sessions: 3 },
+      'word-song': { percent: 0.875, sessions: 3 },
+    })
+    expect(first?.goodDays).toEqual({})
+
+    // The parent now deliberately picks 95/3 for math and it is saved.
+    saveProgress({
+      ...first!,
+      parentSettings: {
+        ...first!.parentSettings!,
+        masteryThreshold: {
+          ...first!.parentSettings!.masteryThreshold,
+          math: { percent: 0.95, sessions: 3 },
+        },
+      },
+    })
+    expect(loadProgress()?.parentSettings?.masteryThreshold.math).toEqual({
+      percent: 0.95,
+      sessions: 3,
+    })
+  })
+
+  it('pre-counter single-shape 95/3 blob retires to the per-track defaults (ticket 123jpnbc3dm)', () => {
+    const seed = defaultProgress()
+    const preCounter: Record<string, unknown> = {
+      ...seed,
+      parentSettings: {
+        ...DEFAULT_PARENT_SETTINGS,
+        masteryThreshold: { percent: 0.95, sessions: 3 },
+      },
+    }
+    delete preCounter.goodDays
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preCounter))
+    expect(loadProgress()?.parentSettings?.masteryThreshold).toEqual({
+      math: { percent: 0.875, sessions: 3 },
+      'word-song': { percent: 0.875, sessions: 3 },
     })
   })
 
