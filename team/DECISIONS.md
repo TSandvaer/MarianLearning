@@ -119,3 +119,9 @@ Distinct from its siblings:
 
 - **Decided:** (1) Keep "making tens" (regroup) and "star words" (sight words) — spec §10 Q1. Dave: "bigger numbers" is one sound from "big numbers" and "quick words" rhymes with "chick words", both fail the distinct-when-heard rule (Cutler 2012; Ehri 2014). Ear-test the "making tens" / "taking away to ten" pair. (2) Bake every new line whole (~120 + 9 land lines), not name + carrier splices — spec §10 Q2.
 - **Decided by:** Q1 Dave (research, no spec change); Q2 Thomas (popup, recommended option).
+
+## 2026-10-05 — Emma's Path 10/10: bake 140 one-name lines now, defer 149 two-name lines
+
+- **Decided:** the full whole-line expansion of spec §4 is 289 lines (11,618 chars), not ~130. Bake the 140 one-name lines now; defer `locked.later` (111) and `gate.locked` (38) — they need one bake per (stop, current-step) pair. Catalogued with `src: null` in `src/lib/emmasPath/pathLines.ts` (PR #501).
+- **Revisit:** after Thomas hears the first batch — bake them, reword to one name ("First let's finish <current>!", ~24 lines, spec change), or splice.
+- **Decided by:** Thomas (popup, recommended option).

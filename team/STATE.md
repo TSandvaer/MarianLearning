@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-05 05:45Z: Orca run `run_4d45085be2cd`. MERGED (not released): #496 6/10 2a37696, #497 5/10 0a59dd1, #498 1/10 36e0894. #499 4/10 approved (re-check APPROVE) — merge on Playwright SUCCESS. WAVE 2 in flight: 2/10 Hub prefetch `ctx_e037083f3301`, 7/10 Hub card `ctx_f58d9eb12e69` (owns local e2e; needs Thomas's iPad eye), 10/10 Lily lines `ctx_e630b34040bc` (whole-line bakes, Thomas ear-tests all). Each code PR → reviewer worker → merge on CI+APPROVE. Then 8/10 map, 9/10 session-end. `yarn release` needs Thomas._
+**Resume next-action:** _2026-10-05 07:15Z: Orca run `run_4d45085be2cd`, no workers in flight. MERGED, main e2e GREEN on a31ca52, NOT released: #496 6/10, #497 5/10, #498 1/10, #499 4/10, #500 2/10 (+ #495 3/10 released earlier). Waiting on Thomas: #501 10/10 Lily lines (reviewer APPROVE, CI green — ear-test 140 clips on preview /voice-qa.html; 149 two-name lines deferred), #502 7/10 Hub card (reviewer APPROVE, Playwright on 8493018 — iPad look; then flip showLevelToMarian on, on Marian's iPad). Next: 8/10 map after #501 merges, then 9/10. Open for Thomas: `yarn release`; ~14 s live-planner gap (SessionEnd plan-ahead or faster planner, no ticket)._
 
 > **The doctrine is LIVE as of `976beef`.** What changed for you, concretely:
 >
