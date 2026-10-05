@@ -132,3 +132,8 @@ Distinct from its siblings:
 - **Decided:** (1) Direction A · Toy Box from Kyle's 3 clickable mockups (PR #506, artifact https://claude.ai/artifact/LnQ3b748sKNTQuPpujyjeg). (2) The target look is the Codex clay render (`design/emmas-path/redesign/concepts/direction-a-hub.png`), not Kyle's flatter vector version: Codex image generation makes the card art, stage icons and map art as images; the app builds layout and interaction around them; the real Emma art stays.
 - **Known render faults to NOT copy:** Emma off-model, invented label "Flower sums", side-by-side cards (layout still to be settled).
 - **Decided by:** Thomas (popups, recommended option both times).
+
+## 2026-10-05 — Emma's Path redesign art: Codex for icons, Midjourney for heroes
+
+- **Decided:** Codex built-in image generation makes the 41 icons (24 stages, 9 lands, 8 UI) in the locked clay style (quality bar 13). Midjourney (Thomas, Web UI, v7, one prompt at a time, remove.bg step) makes the ~4-6 hero images: Hub card scenes, the two map landscapes, any Emma pose (Omni Reference to stay on-model). Any Codex icon Thomas rejects is redone in MJ.
+- **Decided by:** Thomas (popup, recommended option), after "remember i have midjourney".
