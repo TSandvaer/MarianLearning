@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-05 07:15Z: Orca run `run_4d45085be2cd`, no workers in flight. MERGED, main e2e GREEN on a31ca52, NOT released: #496 6/10, #497 5/10, #498 1/10, #499 4/10, #500 2/10 (+ #495 3/10 released earlier). Waiting on Thomas: #501 10/10 Lily lines (reviewer APPROVE, CI green — ear-test 140 clips on preview /voice-qa.html; 149 two-name lines deferred), #502 7/10 Hub card (reviewer APPROVE, Playwright on 8493018 — iPad look; then flip showLevelToMarian on, on Marian's iPad). Next: 8/10 map after #501 merges, then 9/10. Open for Thomas: `yarn release`; ~14 s live-planner gap (SessionEnd plan-ahead or faster planner, no ticket)._
+**Resume next-action:** _2026-10-05 17:00Z: Emma's Path 1-10/10 ALL MERGED and RELEASED (main d79e12b; prod deploy Ready; post-deploy smoke run 37344680607 SUCCESS). In flight: cleanup ticket 123jpnbc4jj (remove 23 unused hub-celebrate clips), worker `ctx_9df3bdfb79a0` on Orca run `run_4d45085be2cd` — asset/test-only, merge on green CI, then tear down its workspace via `bash tmp/cleanup-ws.sh`. Thomas to do on Marian's iPad: switch 'show level to Marian' ON. Open for Thomas: 149 deferred two-name Lily lines (bake / reword / splice); ~14 s live-planner gap (no ticket); real stop art (Midjourney round); unexplained local :4173 SIGKILLs during the full local e2e run._
 
 > **The doctrine is LIVE as of `976beef`.** What changed for you, concretely:
 >
