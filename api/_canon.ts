@@ -59,13 +59,14 @@
 // For now this module does no substitution — it just hands the parsed
 // JSON to the caller as-is.
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import type { PlannerTrack } from './_planner.js'
 import type { SessionStartResponse } from './_types.js'
 import { isSessionStartResponse } from './_types.js'
+import { renderElevenLabsText } from './_tts_elevenlabs.js'
 
 /**
  * Lookup key for a canon entry. Mirrors what the canon generator writes
@@ -259,4 +260,75 @@ export function getCanonEntry(
  */
 export function _resetCanonCacheForTesting(): void {
   cache.clear()
+}
+
+/**
+ * Lily audio already baked into the canon, keyed by the exact ElevenLabs
+ * request text (`renderElevenLabsText(text, tier)`), so a live render can
+ * reuse an identical approved clip instead of synthesising it again.
+ *
+ * Why: returning children with Leitner/slow-fact hints bypass the canon and
+ * render live. With ElevenLabs capped at 3 concurrent requests a 76-line
+ * maths session took 31s and the Math screen sat blank (2026-10-04). 74/76
+ * of those lines already exist in the canon.
+ *
+ * Tier per file mirrors scripts/revoiceCanonLily.ts: math -> none; both
+ * letter-sounds files -> 'letter-sounds'; other word-song -> basename.
+ * Built lazily once per function instance.
+ */
+let audioIndex: Map<string, string> | null = null
+
+function canonFileTier(relTrack: string, base: string): string | undefined {
+  if (relTrack === 'math') return undefined
+  return base.startsWith('letter-sounds') ? 'letter-sounds' : base
+}
+
+export function getCanonAudioIndex(
+  canonRoot: string = DEFAULT_CANON_ROOT,
+): Map<string, string> {
+  if (audioIndex !== null) return audioIndex
+  const index = new Map<string, string>()
+  try {
+    for (const track of readdirSync(canonRoot)) {
+      for (const level of readdirSync(join(canonRoot, track))) {
+        for (const file of readdirSync(join(canonRoot, track, level))) {
+          if (!file.endsWith('.json')) continue
+          const tier = canonFileTier(track, file.replace(/\.json$/, ''))
+          const doc = JSON.parse(
+            readFileSync(join(canonRoot, track, level, file), 'utf8'),
+          ) as {
+            utterances?: Array<{
+              text?: string
+              audio?: { kind?: string; base64?: string }
+            }>
+          }
+          for (const u of doc.utterances ?? []) {
+            if (
+              typeof u.text === 'string' &&
+              u.audio?.kind === 'inline' &&
+              u.audio.base64
+            ) {
+              const k = renderElevenLabsText(u.text, tier)
+              if (!index.has(k)) index.set(k, u.audio.base64)
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // A missing/unreadable canon must never break a live session — fall
+    // back to rendering everything.
+    if (process.env.NODE_ENV !== 'test') {
+      console.warn(
+        '[api/_canon] audio index unavailable',
+        err instanceof Error ? err.message : err,
+      )
+    }
+  }
+  audioIndex = index
+  return index
+}
+
+export function _resetCanonAudioIndexForTesting(): void {
+  audioIndex = null
 }

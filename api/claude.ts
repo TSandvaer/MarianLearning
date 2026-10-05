@@ -81,6 +81,8 @@ import { renderSessionAudio } from './_session.js'
 import {
   deriveCurrentTargetVowel,
   generateSessionStartResponse,
+  isLeitnerDirectiveActive,
+  isSlowFactDirectiveActive,
   letterSoundsStatesAreNonFallback,
   parseLetterSoundsVowelStates,
   PlannerError,
@@ -852,10 +854,23 @@ export async function handler(
       const derivedTargetVowel = letterSoundsNonFallback
         ? deriveCurrentTargetVowel(letterSoundsStates!)
         : null
+      // Bypass only when the planner will actually use the hint (shared
+      // predicates in _planner.ts); an ignored hint must not cost a live
+      // planner run.
       const bypassCanonAndCache =
         trackPayload.isGraduationSession === true ||
-        hasLeitnerHint ||
-        hasSlowFactHint ||
+        (hasLeitnerHint &&
+          isLeitnerDirectiveActive(
+            trackPayload.track,
+            effectiveFocus,
+            trackPayload.leitner,
+          )) ||
+        (hasSlowFactHint &&
+          isSlowFactDirectiveActive(
+            trackPayload.track,
+            effectiveFocus,
+            trackPayload.slowFacts,
+          )) ||
         letterSoundsNonFallback
       if (!bypassCanonAndCache) {
         const canonHit = canonResolver({

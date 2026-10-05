@@ -289,3 +289,55 @@ describe('renderSessionAudio', () => {
     expect(out.utterances).toEqual([])
   })
 })
+
+describe('renderSessionAudio canon audio reuse (live-path speed fix)', () => {
+  it('reuses approved canon audio and only synthesises lines it lacks', async () => {
+    const synth = vi.fn(async (req: TtsRequest) => ({
+      audio: new TextEncoder().encode(`new-${req.text}`),
+    }))
+    const plan = {
+      utterances: [
+        { id: 'p1.reprompt', text: 'Hmm... try again?' },
+        { id: 'p1.read', text: 'Three plus four. How many?' },
+      ],
+    }
+    const out = await renderSessionAudio(plan, {
+      synth,
+      canonAudio: new Map([['Hmm... try again?', 'Q0FOT04=']]),
+    })
+    expect(synth).toHaveBeenCalledTimes(1)
+    expect(synth.mock.calls[0]![0].text).toBe('Three plus four. How many?')
+    expect(out.utterances.map((u) => u.audio.base64)).toEqual([
+      'Q0FOT04=',
+      Buffer.from('new-Three plus four. How many?').toString('base64'),
+    ])
+  })
+
+  it('keys canon reuse on the ElevenLabs request text, so letter-sounds lines match', async () => {
+    const synth = vi.fn(async () => ({ audio: new Uint8Array([1]) }))
+    await renderSessionAudio(
+      { utterances: [{ id: 'p1.read', text: 'Which letter says mmm?' }] },
+      {
+        synth,
+        tierFilter: 'letter-sounds',
+        canonAudio: new Map([['Which letter says /mː/?', 'TQ==']]),
+      },
+    )
+    expect(synth).toHaveBeenCalledTimes(0)
+  })
+
+  it('renders a line repeated within one session only once', async () => {
+    const synth = vi.fn(async () => ({ audio: new Uint8Array([7]) }))
+    const out = await renderSessionAudio(
+      {
+        utterances: [
+          { id: 'a', text: 'Look at the flowers.' },
+          { id: 'b', text: 'Look at the flowers.' },
+        ],
+      },
+      { synth, concurrency: 1, canonAudio: new Map() },
+    )
+    expect(synth).toHaveBeenCalledTimes(1)
+    expect(out.utterances).toHaveLength(2)
+  })
+})

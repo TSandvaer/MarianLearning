@@ -30,6 +30,8 @@ import {
   type TtsRequest,
 } from './_tts.js'
 import type { SessionStartResponse, Utterance } from './_types.js'
+import { getCanonAudioIndex } from './_canon.js'
+import { renderElevenLabsText } from './_tts_elevenlabs.js'
 
 /**
  * Voice config used app-wide.
@@ -133,6 +135,13 @@ export interface RenderSessionOptions {
    * content.md §2.4` for the substitution-table architecture.
    */
   tierFilter?: string
+  /**
+   * Approved canon audio keyed by ElevenLabs request text. Lines found here
+   * are reused instead of synthesised. Defaults to the canon index when
+   * TTS_PROVIDER=elevenlabs (canon audio is Lily), otherwise none. Tests
+   * pass a Map.
+   */
+  canonAudio?: ReadonlyMap<string, string>
 }
 
 /**
@@ -150,6 +159,14 @@ export async function renderSessionAudio(
   const defaultConcurrency = process.env.TTS_PROVIDER === 'elevenlabs' ? 3 : 6
   const concurrency = Math.max(1, opts.concurrency ?? defaultConcurrency)
   const sources = extractUtteranceTexts(plan)
+  // Reuse approved canon audio for any line already baked (see
+  // getCanonAudioIndex), and never render the same line twice per session.
+  const canonAudio =
+    opts.canonAudio ??
+    (process.env.TTS_PROVIDER === 'elevenlabs'
+      ? getCanonAudioIndex()
+      : undefined)
+  const sessionRendered = new Map<string, string>()
 
   // Concurrency-limited fan-out. Promise.all without limit would open one
   // socket per utterance simultaneously; the Edge endpoint tolerates a
@@ -199,6 +216,16 @@ export async function renderSessionAudio(
       const i = nextIndex++
       if (i >= sources.length) return
       const src = sources[i]!
+      const reuseKey = renderElevenLabsText(src.text, opts.tierFilter)
+      const reused = canonAudio?.get(reuseKey) ?? sessionRendered.get(reuseKey)
+      if (reused !== undefined) {
+        utterances[i] = {
+          id: src.id,
+          text: src.text,
+          audio: { kind: 'inline', base64: reused, mime: 'audio/mpeg' },
+        }
+        continue
+      }
       let result: { audio: Uint8Array }
       try {
         result = await synth(
@@ -222,14 +249,12 @@ export async function renderSessionAudio(
         }
         continue
       }
+      const base64 = uint8ToBase64(result.audio)
+      sessionRendered.set(reuseKey, base64)
       utterances[i] = {
         id: src.id,
         text: src.text,
-        audio: {
-          kind: 'inline',
-          base64: uint8ToBase64(result.audio),
-          mime: 'audio/mpeg',
-        },
+        audio: { kind: 'inline', base64, mime: 'audio/mpeg' },
       }
     }
   }
