@@ -778,6 +778,31 @@ export function recordGoodDays(
   return changed ? next : current
 }
 
+/**
+ * Per-key union of two good-day counters: days deduped, sorted, and
+ * capped oldest-first at `MAX_GOOD_DAYS_PER_STEP` — the same shape
+ * `recordGoodDays` produces. Used by the cloud install so a newer cloud
+ * blob never drops days the local device banked (ticket 123jpnbc3dm).
+ */
+export function unionGoodDays(
+  a: GoodDays | undefined,
+  b: GoodDays | undefined,
+): GoodDays {
+  const out: GoodDays = {}
+  for (const source of [a ?? EMPTY_GOOD_DAYS, b ?? EMPTY_GOOD_DAYS]) {
+    for (const [key, days] of Object.entries(source) as [
+      GoodDayKey,
+      readonly string[] | undefined,
+    ][]) {
+      if (days === undefined) continue
+      out[key] = [...new Set([...(out[key] ?? []), ...days])]
+        .sort()
+        .slice(-MAX_GOOD_DAYS_PER_STEP)
+    }
+  }
+  return out
+}
+
 /** Shared empty counter, returned unchanged so callers can compare by reference. */
 const EMPTY_GOOD_DAYS: GoodDays = Object.freeze({})
 

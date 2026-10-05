@@ -616,6 +616,41 @@ describe('reconcileWithCloud', () => {
     expect(isProgressV1(installed[0]!)).toBe(true)
   })
 
+  it('goodDays never lost — a newer cloud blob keeps the local banked days whose sessions aged out of history (ticket 123jpnbc3dm)', async () => {
+    // Local banked two good days whose sessions are no longer in history
+    // (aged out of the 30-entry cap). A newer cloud blob carries a
+    // different day. The install must keep all three.
+    const local: Progress = {
+      ...defaultProgress(),
+      history: [],
+      goodDays: { 'sub-to-10': ['2026-05-01', '2026-05-02'] },
+    }
+    const seed = defaultProgress()
+    const cloudBlob: Progress = {
+      ...seed,
+      profile: { ...seed.profile, lastPlayedISO: '2026-06-15T10:00:00.000Z' },
+      history: [],
+      goodDays: { 'sub-to-10': ['2026-06-14'] },
+    }
+    const installed: Progress[] = []
+    const outcome = await reconcileWithCloud(VALID_UUID, local, {
+      fetchImpl: makeFetchReturning({
+        kind: 'found',
+        blob: cloudBlob,
+        lastModifiedISO: '2026-06-15T10:00:00.000Z',
+      }),
+      authSecret: SECRET,
+      installLocally: (p) => installed.push(p),
+      pushImpl: vi.fn(async () => 'sent' as const),
+    })
+    expect(outcome.kind).toBe('installed-from-cloud')
+    expect(installed).toHaveLength(1)
+    expect(installed[0]!.goodDays).toEqual({
+      'sub-to-10': ['2026-05-01', '2026-05-02', '2026-06-14'],
+    })
+    expect(isProgressV1(installed[0]!)).toBe(true)
+  })
+
   it('cvcGraduationSessionFired parity — cloud blob with the latch true preserves it verbatim across install', async () => {
     // Round-trip pin: a cloud blob that already fired the graduation
     // review (latch true) must NOT have it reset to false by the

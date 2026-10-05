@@ -47,9 +47,10 @@
 import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isProgressV1 } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
-import { recordGoodDays } from './mastery'
+import { recordGoodDays, unionGoodDays } from './mastery'
 import { saveProgress, withRetiredLegacyThresholds } from './storage'
 import type {
+  GoodDays,
   LetterSoundsVowel,
   Progress,
   SessionHistoryEntry,
@@ -381,10 +382,16 @@ export async function reconcileWithCloud(
   // on EVERY field EXCEPT `progress.history`, which is union-merged with
   // the local history so genuinely-novel sessions on the losing (slower-
   // clock) device are never clobbered (ticket 86c9qa6na — P1 data-loss
-  // fix). `currentLocal?.history` is threaded in so the merge can run;
-  // when there's no local blob it's a plain cloud install.
+  // fix), and `progress.goodDays`, which is unioned with the local
+  // counter so banked good days are never lost (ticket 123jpnbc3dm).
+  // `currentLocal` is threaded in so both merges can run; when there's
+  // no local blob it's a plain cloud install.
   if (cloudTimeMs > localTimeMs) {
-    const validated = installCloudBlob(fetched.blob, currentLocal?.history)
+    const validated = installCloudBlob(
+      fetched.blob,
+      currentLocal?.history,
+      currentLocal?.goodDays,
+    )
     if (validated === null) {
       return { kind: 'cloud-blob-rejected' }
     }
@@ -431,6 +438,7 @@ export async function reconcileWithCloud(
 function installCloudBlob(
   blob: unknown,
   localHistory?: SessionHistoryEntry[],
+  localGoodDays?: GoodDays,
 ): Progress | null {
   // Pre-guard defaulters, in the SAME order as storage.ts:loadProgress —
   // skill-level floor first, then the W9.2 per-vowel letter-sounds
@@ -496,16 +504,25 @@ function installCloudBlob(
   // `storage.ts:withSeededGoodDays`, widened: the cloud blob's counter
   // wins like every other field, but good days are never lost, so every
   // good day in the MERGED history (local sessions included) is unioned
-  // back in. A pre-counter cloud blob is seeded exactly as a local load
-  // would seed it.
-  const goodDays = recordGoodDays(withGraduationLatch)
+  // back in, and so is the local counter itself — its days may belong to
+  // sessions that already aged out of the 30-entry history. A
+  // pre-counter cloud blob is seeded exactly as a local load would seed
+  // it.
+  const withLocalGoodDays: Progress =
+    localGoodDays === undefined
+      ? withGraduationLatch
+      : {
+          ...withGraduationLatch,
+          goodDays: unionGoodDays(withGraduationLatch.goodDays, localGoodDays),
+        }
+  const goodDays = recordGoodDays(withLocalGoodDays)
   if (
-    withGraduationLatch.goodDays === undefined ||
-    goodDays !== withGraduationLatch.goodDays
+    withLocalGoodDays.goodDays === undefined ||
+    goodDays !== withLocalGoodDays.goodDays
   ) {
-    return { ...withGraduationLatch, goodDays: { ...goodDays } }
+    return { ...withLocalGoodDays, goodDays: { ...goodDays } }
   }
-  return withGraduationLatch
+  return withLocalGoodDays
 }
 
 /**
