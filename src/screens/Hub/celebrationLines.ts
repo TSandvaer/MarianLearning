@@ -4,7 +4,7 @@
  * `progress.pendingPromotion` holds the node Marian just MASTERED. The
  * celebration has to name the stage that mastery UNLOCKED — the next
  * node in the same tree — so the caption and Emma's spoken line both
- * come from `unlockCelebrationFor(mastered)` below, never from the
+ * come from `unlockCelebrationFor(mastered)` (./unlockCelebration.ts), never from the
  * mastered node's own label.
  *
  * One short Lily line per unlockable stage ("Something new! <name>!"),
@@ -19,8 +19,10 @@
  * drift apart.
  */
 
-import { nextNode, type SkillNode } from '../../lib/progress'
-import { trackOf } from '../../lib/progress/mastery'
+// Pure data module: only a type import from types.ts, so the node-typed
+// render script can load it without pulling in browser-only progress
+// code. The mastered → unlocked lookup lives in ./unlockCelebration.ts.
+import type { SkillNode } from '../../lib/progress/types'
 
 /** Every stage that can be unlocked (= every node except each tree's first). */
 export type UnlockableNode = Exclude<SkillNode, 'number-recog' | 'letter-names'>
@@ -64,7 +66,7 @@ export const CELEBRATE_LEAD = 'Something new!'
 /** Line for mastering a tree's final stage (nothing left to unlock). */
 export const CELEBRATE_DONE_TEXT = 'You did it!'
 
-function isUnlockable(node: SkillNode): node is UnlockableNode {
+export function isUnlockable(node: SkillNode): node is UnlockableNode {
   return node in UNLOCKED_STAGE_NAMES
 }
 
@@ -82,30 +84,4 @@ export const CELEBRATE_LINE_TEXT: Record<HubCelebrateLineId, string> = {
 /** Bundled MP3 path (relative to `public/`) for a celebrate line id. */
 export function celebrateLineSrc(id: HubCelebrateLineId): string {
   return `/assets/audio/hub/${id.replace(/\./g, '-')}.mp3`
-}
-
-export interface UnlockCelebration {
-  /** The stage the mastery unlocked, or null when a tree was finished. */
-  unlocked: UnlockableNode | null
-  /** Child-facing stage name for the caption highlight ('' when finished). */
-  name: string
-  /** Hub line Emma speaks. */
-  lineId: HubCelebrateLineId
-}
-
-/**
- * What to celebrate after `mastered` was mastered: the next node in its
- * tree (via `nextNode`), or the "You did it!" line for a tree's last node.
- */
-export function unlockCelebrationFor(mastered: SkillNode): UnlockCelebration {
-  const track = trackOf(mastered)
-  const next = track === null ? null : nextNode(track, mastered)
-  if (next === null || !isUnlockable(next)) {
-    return { unlocked: null, name: '', lineId: 'hub.celebrate.you-did-it' }
-  }
-  return {
-    unlocked: next,
-    name: UNLOCKED_STAGE_NAMES[next],
-    lineId: `hub.celebrate.${next}`,
-  }
 }

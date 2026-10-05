@@ -86,7 +86,7 @@ import {
   type StageId,
 } from './stages'
 import PromotionCelebration from './PromotionCelebration'
-import { unlockCelebrationFor } from './celebrationLines'
+import { unlockCelebrationFor } from './unlockCelebration'
 import type { SkillNode } from '../../lib/progress'
 
 // ── Public types ────────────────────────────────────────────────────────
