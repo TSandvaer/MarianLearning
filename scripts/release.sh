@@ -13,7 +13,9 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
   echo "release: local main differs from origin/main — push or pull first"; exit 1; }
 
 echo "Releasing $(git log -1 --format='%h %s') to production…"
-if ! vercel deploy --prod --yes; then
+# The first production deploy after a while has twice returned "Not authorized"
+# and succeeded on an immediate retry (2026-10-04 and 2026-10-05), so retry once.
+if ! vercel deploy --prod --yes && ! { echo 'release: retrying once…'; vercel deploy --prod --yes; }; then
   cat <<'MSG'
 release: Vercel refused the production deploy (seen once on 2026-10-04 as
 "Not authorized"; it did not reproduce minutes later). Workaround that worked:
