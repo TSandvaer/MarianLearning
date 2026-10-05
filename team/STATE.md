@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-04 22:02: orca-wave pilot SUCCEEDED — worker built PR #495 (Emma's Path 3/10, head accdf4c), released. Reviewer worker in flight: Orca run `run_7b5e4c25954a`, dispatch `ctx_ac0dc2e8f6b6` (workspace review-495). Next: on its worker_done read the `## REVIEW VERDICT` on #495; merge when fast-gate+e2e SUCCESS + APPROVE. PR #494 (Number Garden speed) awaits Playwright → merge + `yarn release` (Thomas approved)._
+**Resume next-action:** _2026-10-05: #494 + #495 merged and RELEASED (prod add-to-20+Leitner 0.7 s). orca-wave WAVE 1 in flight — Orca run `run_4d45085be2cd`: 1/10 `ctx_73f18e1fd2f3` (ep1-session-timeout), 4/10 `ctx_0572b1c3448d` (ep4-mastery-good-days, owns local e2e), 5/10 `ctx_a0d42d925424` (ep5-celebration-fix, taste-gated: needs Thomas's ear before merge), 6/10 `ctx_2e2497a38af3` (ep6-emmas-path-spec, docs-only). On resume: `orca orchestration check --run run_4d45085be2cd --wait --types worker_done,escalation,question --timeout-ms 900000 --json > tmp/orca-wait.jsonl`, then follow .claude/skills/orca-wave §3-4._
 
 > **The doctrine is LIVE as of `976beef`.** What changed for you, concretely:
 >
