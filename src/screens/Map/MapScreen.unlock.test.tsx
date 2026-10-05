@@ -186,6 +186,23 @@ describe('map land beat (spec §6 step 4)', () => {
   })
 })
 
+describe('map unlock beat — Emma', () => {
+  it('cheers while the line plays, then goes back to idle', async () => {
+    const { player } = setup(landUnlockDoc())
+    let finish: () => void = () => {}
+    player.play.mockImplementation(
+      () => new Promise<void>((resolve) => (finish = resolve)),
+    )
+    await at(2100)
+    expect(screen.getByTestId('map-emma')).toHaveAttribute(
+      'data-pose',
+      'cheering',
+    )
+    await act(async () => finish())
+    expect(screen.getByTestId('map-emma')).toHaveAttribute('data-pose', 'idle')
+  })
+})
+
 describe('map without a pending unlock', () => {
   it('plays the open line, no beat, marks nothing', () => {
     const base = defaultProgress()

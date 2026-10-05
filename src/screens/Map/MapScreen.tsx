@@ -816,6 +816,7 @@ export function MapScreen({
                           border: '1.5px solid #BCAAA4',
                           borderRadius: 2,
                           transformOrigin: 'left center',
+                          transformPerspective: 200,
                         }}
                         initial={{ rotateY: 0, opacity: 1 }}
                         animate={
