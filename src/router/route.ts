@@ -36,5 +36,13 @@ export type Route =
    * "Parent settings (v1 scope)".
    */
   | 'parent-settings'
+  /**
+   * One world's Emma's Path map (Emma's Path 8/10, ClickUp 123jpnbc3dr).
+   * Reached from the Hub card's map button; Home returns to the Hub.
+   * The world lives in App state (`mapWorld`), not in the route.
+   *
+   * Source-of-truth: `design/emmas-path/emmas-path-spec.md` §3.
+   */
+  | 'map'
 
 export const FIRST_ROUTE: Route = 'splash'
