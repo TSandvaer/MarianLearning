@@ -393,6 +393,25 @@ describe('unload', () => {
     expect(h.fakes.get('blob:test://1')!.__unloadCalls).toBe(1)
     expect(h.blobsRevoked).toHaveLength(2)
   })
+
+  // Emma's Path 2/10: a late unload from an abandoned request (discarded
+  // Hub prefetch, timeout fallback) must not tear down its replacement.
+  it('unload(sessionId) is a no-op when another session is loaded', async () => {
+    const h = makeHarness()
+    await h.audio.loadSessionAudio('old', [makeUtterance('u1', 'a')])
+    await h.audio.loadSessionAudio('new', [makeUtterance('u2', 'b')])
+    h.audio.unload('old')
+    expect(h.fakes.get('blob:test://1')!.__unloadCalls).toBe(0)
+    // Only the first session's blob was revoked (by the second load).
+    expect(h.blobsRevoked).toEqual(['blob:test://0'])
+  })
+
+  it('unload(sessionId) unloads when that session is the loaded one', async () => {
+    const h = makeHarness()
+    await h.audio.loadSessionAudio('s', [makeUtterance('u1', 'a')])
+    h.audio.unload('s')
+    expect(h.fakes.get('blob:test://0')!.__unloadCalls).toBe(1)
+  })
 })
 
 describe('clearSessionAudio', () => {
