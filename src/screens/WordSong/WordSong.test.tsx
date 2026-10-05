@@ -1831,6 +1831,13 @@ describe('Word Song screen', () => {
     expect(screen.queryByTestId('word-song-letters')).not.toBeInTheDocument()
     expect(screen.queryByTestId('word-song-chips')).not.toBeInTheDocument()
     expect(screen.queryAllByTestId('word-song-chip')).toHaveLength(0)
+
+    // Emma's Path 1/10 (123jpnbc3dh): "getting ready" beat + listening pose.
+    expect(screen.getByTestId('word-song-getting-ready')).toBeInTheDocument()
+    expect(screen.getByTestId('word-song-emma')).toHaveAttribute(
+      'data-pose',
+      'listening',
+    )
   })
 
   it('render gate: audioReady=true renders the word card + chips (ticket 86c9kxb5q)', () => {
@@ -1857,6 +1864,9 @@ describe('Word Song screen', () => {
       'data-word',
       'cat',
     )
+    expect(
+      screen.queryByTestId('word-song-getting-ready'),
+    ).not.toBeInTheDocument()
   })
 
   it('render gate: flipping audioReady false → true makes the word card appear (ticket 86c9kxb5q)', async () => {

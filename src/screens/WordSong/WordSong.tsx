@@ -18,6 +18,7 @@ import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
+import { GettingReady } from '../../components/GettingReady'
 import { pickDistractors } from './wordDistractors'
 import { buildBlendHighlightSteps } from './blendHighlight'
 import {
@@ -1701,7 +1702,7 @@ function WordSongScreen({
             celebration keyframe wiggle is firing" to "Emma is in a
             non-idle motion-bearing pose with motion enabled". */}
         <EmmaCharacter
-          pose={pose}
+          pose={audioReady === false && pose === 'idle' ? 'listening' : pose}
           layoutId="emma"
           data-testid="word-song-emma"
           className="h-[26vh] w-auto select-none"
@@ -1793,6 +1794,12 @@ function WordSongScreen({
        * every test/caller that pre-dates this gate. App.tsx always passes
        * a boolean in production. Mirrors Math.tsx's gate.
        */}
+      {/* Emma's Path 1/10 (123jpnbc3dh): while the session start is in
+          flight, show a "getting ready" beat in the problem slot instead of
+          an empty screen (Emma holds her `listening` pose above). */}
+      {audioReady === false && (
+        <GettingReady testId="word-song-getting-ready" />
+      )}
       {audioReady !== false && (
         <>
           {/* Word card — picture above letters (per spec §"Word card composition").
