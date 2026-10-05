@@ -389,6 +389,15 @@ export async function prepareMathPathA(
   }
 
   // Register howls keyed by utterance id.
+  // A request aborted after its body arrived (session-start timeout
+  // fallback, 123jpnbc3dh) must not register howls: session audio is a
+  // singleton and the fallback request's load owns it.
+  if (opts.signal?.aborted) {
+    throw new PrepareMathPathAError(
+      'aborted',
+      'Path A aborted before audio load',
+    )
+  }
   await loadAudio(args.sessionId, sessionResponse.utterances)
 
   // Build a text → first-matching-id lookup. See file header for the

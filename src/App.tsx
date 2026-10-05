@@ -47,6 +47,10 @@ import type { PlaySessionUtteranceOptions } from './lib/audio'
 import { prepareMathPathA } from './lib/audio/mathPathA'
 import { prepareWordSongPathA } from './lib/audio/wordSongPathA'
 import {
+  startSessionWithFallback,
+  type SessionStartFallbackHandle,
+} from './lib/audio/sessionStartFallback'
+import {
   useHowlerSuspendOnHide,
   useRequestPersistentStorageOnGesture,
 } from './lib/lifecycle'
@@ -1082,6 +1086,9 @@ export default function App() {
    * end so a future session re-fetches).
    */
   const mathFetchStartedRef = useRef(false)
+  /** Handle for the in-flight Math session start (123jpnbc3dh) — lets the
+   *  visible-wait effect below start the hint-timeout once Math shows. */
+  const mathStartRef = useRef<SessionStartFallbackHandle<unknown> | null>(null)
 
   /**
    * Kick the Math Path A fetch as soon as Greet mounts (ticket 86c9hjnn8).
@@ -1147,38 +1154,56 @@ export default function App() {
       mathHints.focusNode !== undefined && mathHints.focusMode !== undefined
         ? { node: mathHints.focusNode, mode: mathHints.focusMode }
         : null
-    void prepareMathPathA(
-      {
-        level: 1,
-        childName: 'Marian',
-        sessionId,
-        focusNode: mathHints.focusNode,
-        recentSuccessRate: mathHints.recentSuccessRate,
-        // 86c9pwgc8 (M4): forward the Leitner hint for the math track.
-        // Server-side planner reads this via the `progress.leitner`
-        // wire field and weights box-1 facts toward problems 4-8.
-        // Empty box → undefined here, which keeps the canon-served
-        // free path active.
-        leitner: mathHints.leitner,
-        // M4.x slow-fact directive (follow-up to 86c9pwgc8). Forward
-        // the "accurate but slow" fact list. Server-side planner reads
-        // this via the `progress.slowFacts` wire field and dosed-back
-        // for automaticity-building practice. Empty list → undefined,
-        // canon-served path stays free.
-        slowFacts: mathHints.slowFacts,
-        // sub-to-10 content tier (Kyle §4.3, 2026-05-15): forward the
-        // lifetime-first-encounter list. Server's
-        // `applyFirstEncounterGate` consults it for gated math nodes
-        // (`'sub-to-10'`); the schema now legally carries math node ids
-        // (Wave 3.4), but the rewrite remains a no-op until session-end
-        // append-on-math lands in a follow-up. Jessica's
-        // sub-to-10-first-encounter-gate.spec.ts asserts the field
-        // is present on math requests.
-        lifetimeFirstEncounters: mathHints.lifetimeFirstEncounters,
-      },
-      { signal: controller.signal },
-    )
-      .then((prepared) => {
+    // Emma's Path 1/10 (123jpnbc3dh): the hinted request (leitner /
+    // slowFacts bypass canon → live planner, ~15 s measured) is abandoned
+    // for a hint-free canon re-request once Marian has visibly waited
+    // SESSION_START_WAIT_TIMEOUT_MS on Math. See sessionStartFallback.ts.
+    const mathHasHints =
+      (mathHints.leitner?.length ?? 0) > 0 ||
+      (mathHints.slowFacts?.length ?? 0) > 0
+    const mathStart = startSessionWithFallback({
+      hasHints: mathHasHints,
+      signal: controller.signal,
+      onFallback: () =>
+        console.info(
+          '[App] Math session-start slow; re-requesting without planner hints',
+        ),
+      run: (withHints, signal) =>
+        prepareMathPathA(
+          {
+            level: 1,
+            childName: 'Marian',
+            sessionId: withHints ? sessionId : `${sessionId}-fallback`,
+            focusNode: mathHints.focusNode,
+            recentSuccessRate: mathHints.recentSuccessRate,
+            // 86c9pwgc8 (M4): forward the Leitner hint for the math track.
+            // Server-side planner reads this via the `progress.leitner`
+            // wire field and weights box-1 facts toward problems 4-8.
+            // Empty box → undefined here, which keeps the canon-served
+            // free path active.
+            leitner: withHints ? mathHints.leitner : undefined,
+            // M4.x slow-fact directive (follow-up to 86c9pwgc8). Forward
+            // the "accurate but slow" fact list. Server-side planner reads
+            // this via the `progress.slowFacts` wire field and dosed-back
+            // for automaticity-building practice. Empty list → undefined,
+            // canon-served path stays free.
+            slowFacts: withHints ? mathHints.slowFacts : undefined,
+            // sub-to-10 content tier (Kyle §4.3, 2026-05-15): forward the
+            // lifetime-first-encounter list. Server's
+            // `applyFirstEncounterGate` consults it for gated math nodes
+            // (`'sub-to-10'`); the schema now legally carries math node ids
+            // (Wave 3.4), but the rewrite remains a no-op until session-end
+            // append-on-math lands in a follow-up. Jessica's
+            // sub-to-10-first-encounter-gate.spec.ts asserts the field
+            // is present on math requests.
+            lifetimeFirstEncounters: mathHints.lifetimeFirstEncounters,
+          },
+          { signal },
+        ),
+    })
+    mathStartRef.current = mathStart
+    void mathStart.promise
+      .then(({ prepared }) => {
         if (controller.signal.aborted) {
           // Leave-effect (or unmount-effect) aborted us mid-flight. Drop
           // the loaded howls so we don't leak — the next greet/math entry
@@ -1260,6 +1285,19 @@ export default function App() {
     // is allowed to fire on the first transition into greet/math even if
     // App mounted on splash.
   }, [route, mathFallbackPlan])
+
+  /**
+   * Visible-wait timer for the Math session start (Emma's Path 1/10,
+   * 123jpnbc3dh). Starts only once Math is on screen and still waiting —
+   * latency hidden behind Greet's pre-warm never counts — and is a no-op
+   * when the request carried no canon-bypassing hints. Declared after the
+   * kick-effect so a direct `?route=math` launch sees the fresh handle.
+   */
+  useEffect(() => {
+    if (route === 'math' && !mathAudioReady) {
+      mathStartRef.current?.startWaitTimer()
+    }
+  }, [route, mathAudioReady])
 
   /**
    * Tear-down on session-end / cold-restart. Runs only when route leaves
@@ -1428,6 +1466,10 @@ export default function App() {
   const wordSongUnloadRef = useRef<(() => void) | null>(null)
   const wordSongAbortRef = useRef<AbortController | null>(null)
   const wordSongFetchStartedRef = useRef(false)
+  /** Handle for the in-flight Word Song session start (123jpnbc3dh). */
+  const wordSongStartRef = useRef<SessionStartFallbackHandle<unknown> | null>(
+    null,
+  )
   /**
    * Audio-ready gate for Word Song (ticket 86c9hjnn8). Same shape as
    * `mathAudioReady` above — flipped to `true` once
@@ -1621,26 +1663,47 @@ export default function App() {
       }
     }
 
-    void prepareWordSongPathA(
-      {
-        level: 1,
-        childName: 'Marian',
-        sessionId,
-        focusNode: wordSongHints.focusNode,
-        recentSuccessRate: wordSongHints.recentSuccessRate,
-        isGraduationSession: wordSongHints.isGraduationSession,
-        // 86c9q9ben (AC9f): drives the server-side session.end.opener
-        // gate for tier-specific first-encounter scaffolding.
-        lifetimeFirstEncounters: wordSongHints.lifetimeFirstEncounters,
-        // Wave 9 W9.4 (ticket 86c9ya3r9): per-vowel letter-sounds
-        // sub-mastery map. Only populated by the hint reader when the
-        // picked focus node is `letter-sounds`; the server derives the
-        // current-target vowel + round-trips it on the response.
-        letterSoundsVowelStates: wordSongHints.letterSoundsVowelStates,
-      },
-      { signal: controller.signal },
-    )
-      .then((prepared) => {
+    // Emma's Path 1/10 (123jpnbc3dh): same visible-wait timeout as Math.
+    // Word Song's canon-bypassing hints are the graduation probe and the
+    // letter-sounds vowel map; the fallback request strips both.
+    const wordSongHasHints =
+      wordSongHints.isGraduationSession === true ||
+      wordSongHints.letterSoundsVowelStates !== undefined
+    const wordSongStart = startSessionWithFallback({
+      hasHints: wordSongHasHints,
+      signal: controller.signal,
+      onFallback: () =>
+        console.info(
+          '[App] Word Song session-start slow; re-requesting without planner hints',
+        ),
+      run: (withHints, signal) =>
+        prepareWordSongPathA(
+          {
+            level: 1,
+            childName: 'Marian',
+            sessionId: withHints ? sessionId : `${sessionId}-fallback`,
+            focusNode: wordSongHints.focusNode,
+            recentSuccessRate: wordSongHints.recentSuccessRate,
+            isGraduationSession: withHints
+              ? wordSongHints.isGraduationSession
+              : undefined,
+            // 86c9q9ben (AC9f): drives the server-side session.end.opener
+            // gate for tier-specific first-encounter scaffolding.
+            lifetimeFirstEncounters: wordSongHints.lifetimeFirstEncounters,
+            // Wave 9 W9.4 (ticket 86c9ya3r9): per-vowel letter-sounds
+            // sub-mastery map. Only populated by the hint reader when the
+            // picked focus node is `letter-sounds`; the server derives the
+            // current-target vowel + round-trips it on the response.
+            letterSoundsVowelStates: withHints
+              ? wordSongHints.letterSoundsVowelStates
+              : undefined,
+          },
+          { signal },
+        ),
+    })
+    wordSongStartRef.current = wordSongStart
+    void wordSongStart.promise
+      .then(({ prepared }) => {
         if (controller.signal.aborted) {
           prepared.unload()
           return
@@ -1689,6 +1752,15 @@ export default function App() {
     // must NOT abort, and adding a `[]`-deps unmount cleanup re-creates
     // the StrictMode-double-mount bug shape).
   }, [route, wordSongFallbackPlan])
+
+  /** Visible-wait timer for the Word Song session start — see the Math
+   *  sibling above (Emma's Path 1/10, 123jpnbc3dh). The Hub pre-warm's
+   *  dwell time never counts toward the timeout. */
+  useEffect(() => {
+    if (route === 'literacy' && !wordSongAudioReady) {
+      wordSongStartRef.current?.startWaitTimer()
+    }
+  }, [route, wordSongAudioReady])
 
   /**
    * Tear-down effect for Word Song. Same shape as Math's tear-down above,
