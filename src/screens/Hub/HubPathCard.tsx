@@ -191,6 +191,7 @@ function BeadDot({
       data-testid="hub-card-bead"
       data-node={bead.node}
       data-state={bead.state}
+      data-fill={bead.state === 'current' ? fill.toFixed(3) : undefined}
       style={style}
       initial={shimmer ? { opacity: 0.4 } : false}
       animate={shimmer ? { opacity: [0.4, 1, 0.4, 1] } : undefined}
@@ -291,9 +292,12 @@ export function HubPathCard({ model }: HubPathCardProps): ReactElement {
                 className="relative flex items-center justify-center"
                 style={{ width: 44, height: 44 }}
               >
+                {/* Spec §3.3 frost (6px blur, 55% veil) is sized for the
+                    72px map stop; at 44px it erased the glyph, so it is
+                    scaled down here to stay a recognisable peek. */}
                 <span
                   style={{
-                    filter: 'blur(2.5px) saturate(0.7)',
+                    filter: 'blur(1.2px) saturate(0.7)',
                     display: 'inline-flex',
                   }}
                 >
@@ -302,7 +306,7 @@ export function HubPathCard({ model }: HubPathCardProps): ReactElement {
                 <span
                   aria-hidden
                   className="absolute inset-0 rounded-full"
-                  style={{ background: CREAM, opacity: 0.55 }}
+                  style={{ background: CREAM, opacity: 0.45 }}
                 />
                 <span
                   aria-hidden
