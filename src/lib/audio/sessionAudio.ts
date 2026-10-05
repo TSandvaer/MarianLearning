@@ -134,8 +134,11 @@ export interface SessionAudio {
   ) => Promise<void>
   /** Cancel any in-flight playback. */
   cancel: () => void
-  /** Tear down all cached Howls + revoke their blob URLs. */
-  unload: () => void
+  /** Tear down all cached Howls + revoke their blob URLs. With a
+   *  `sessionId`, a no-op unless that session is the one loaded — a late
+   *  unload from an abandoned request (Hub prefetch discarded, timeout
+   *  fallback) must not tear down the session that replaced it. */
+  unload: (sessionId?: string) => void
   /** Drop the session's audio from the IndexedDB cache. */
   clearSessionAudio: (sessionId: string) => Promise<void>
 }
@@ -781,7 +784,8 @@ export function createSessionAudio(
     }
   }
 
-  function unload(): void {
+  function unload(sessionId?: string): void {
+    if (sessionId !== undefined && activeSessionId !== sessionId) return
     doUnload()
   }
 

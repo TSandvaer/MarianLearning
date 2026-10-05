@@ -70,7 +70,7 @@ export interface PrepareWordSongPathAOptions {
     opts?: PlaySessionUtteranceOptions,
   ) => Promise<void>
   /** Test seam — replaces `unloadSessionAudio` from `./sessionAudio`. */
-  unloadSessionAudio?: () => void
+  unloadSessionAudio?: (sessionId?: string) => void
   /** Optional AbortSignal. */
   signal?: AbortSignal
 }
@@ -403,6 +403,7 @@ export async function prepareWordSongPathA(
     textToId,
     utteranceCount: sessionResponse.utterances.length,
     currentTargetVowel,
-    unload: () => unloadAudio(),
+    // Session-scoped: never unloads a session that replaced this one.
+    unload: () => unloadAudio(args.sessionId),
   }
 }
