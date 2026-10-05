@@ -454,6 +454,14 @@ export function isProgressV1(v: unknown): v is Progress {
       if (!days.every((day) => typeof day === 'string')) return false
     }
   }
+  // unlocksCelebrated is optional (Emma's Path 9/10 — ticket 123jpnbc3dt;
+  // additive, no schemaVersion bump). When present it must be an array of
+  // strings. A name that is not a current step is inert (`pathBeats.ts`
+  // only looks up tree steps) rather than discarding the blob.
+  if ('unlocksCelebrated' in v && v.unlocksCelebrated !== undefined) {
+    if (!Array.isArray(v.unlocksCelebrated)) return false
+    if (!v.unlocksCelebrated.every((n) => typeof n === 'string')) return false
+  }
   return true
 }
 

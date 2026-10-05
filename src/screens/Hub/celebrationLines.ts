@@ -1,11 +1,10 @@
 /**
  * Unlock-celebration lines (Emma's Path 5/10, ClickUp 123jpnbc3dn).
  *
- * `progress.pendingPromotion` holds the node Marian just MASTERED. The
- * celebration has to name the stage that mastery UNLOCKED — the next
- * node in the same tree — so the caption and Emma's spoken line both
- * come from `unlockCelebrationFor(mastered)` (./unlockCelebration.ts), never from the
- * mastered node's own label.
+ * These lines voiced the Hub `PromotionCelebration` overlay, which Emma's
+ * Path 9/10 (123jpnbc3dt) retired: the unlock moment now plays on the map
+ * with the `end.unlock.*` / `end.land.*` lines (`pathLines.ts`). The
+ * catalogue and its MP3s stay as baked canon (Hub manifest, voice-QA).
  *
  * One short Lily line per unlockable stage ("Something new! <name>!"),
  * plus `hub.celebrate.you-did-it` for mastering the LAST stage of a tree
@@ -21,7 +20,7 @@
 
 // Pure data module: only a type import from types.ts, so the node-typed
 // render script can load it without pulling in browser-only progress
-// code. The mastered → unlocked lookup lives in ./unlockCelebration.ts.
+// code.
 import type { SkillNode } from '../../lib/progress/types'
 
 /** Every stage that can be unlocked (= every node except each tree's first). */

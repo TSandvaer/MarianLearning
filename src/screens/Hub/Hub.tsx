@@ -80,9 +80,7 @@ import {
   SESSION_HISTORY_STORAGE_KEY,
   useStorageSync,
 } from '../../lib/lifecycle'
-import PromotionCelebration from './PromotionCelebration'
-import { unlockCelebrationFor } from './unlockCelebration'
-import { loadProgress, type Progress, type SkillNode } from '../../lib/progress'
+import { loadProgress, type Progress } from '../../lib/progress'
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -118,28 +116,6 @@ export interface HubProps {
    * refresh (hub-route entry, cloud install).
    */
   progressDoc?: Progress | null
-  /**
-   * Skill node that the M3 mastery rule has queued for promotion (ticket
-   * 86c9kwnkw). When set, Hub mounts the PromotionCelebration overlay on
-   * top of the normal greeting — Marian sees Emma in the celebration
-   * pose with a sparkle burst + a caption and spoken Lily line naming the
-   * stage this mastery UNLOCKED ("Something new! Adding to twenty!").
-   *
-   * The orchestrator (App.tsx) reads `progress.pendingPromotion` from
-   * `loadProgress()` and passes it through. The field is set by
-   * `applyMasteryRule()` when `parentSettings.autoPromote === false`
-   * (the parent confirms via Settings before the engine moves the node
-   * on `skillLevels`). Cleared automatically by the rule on the next
-   * session-end run when `autoPromote` is flipped back to `true`, OR
-   * via the Parent Settings confirm UI.
-   *
-   * Hub itself does NOT clear the field — clearing belongs with the
-   * confirm UI / engine, not with the celebration overlay. This means
-   * the celebration fires every time Hub mounts while the queue is
-   * non-empty; that's intentional for v1 (one celebration per Hub
-   * mount, not one per app lifetime).
-   */
-  pendingPromotion?: SkillNode
   /**
    * Fires when Marian taps a skill-tree node. The orchestrator routes
    * to Math (number-garden) or WordSong (word-song) as a result. The
@@ -220,7 +196,6 @@ export default function Hub({
   now = () => new Date(),
   progress = DEFAULT_TREE_PROGRESS,
   progressDoc,
-  pendingPromotion,
   onPickTree,
   onOpenMap,
   onParentGate,
@@ -228,29 +203,9 @@ export default function Hub({
   playLineFn,
   cancelLineFn,
 }: HubProps): ReactElement {
-  // Celebration overlay state — driven by `pendingPromotion`. The state
-  // is the dismissed-pose marker; visibility is derived from the prop.
-  // We track WHICH pendingPromotion value was last dismissed so a fresh
-  // value re-shows the overlay without needing to subscribe to prop
-  // changes via an effect (avoids the `react-hooks/set-state-in-effect`
-  // cascade-render warning). The persisted `pendingPromotion` is owned
-  // by the parent-settings confirm UI / engine — Hub does not mutate
-  // storage on dismiss (see HubProps doc comment).
-  const [dismissedFor, setDismissedFor] = useState<SkillNode | null>(null)
-  const celebrationVisible =
-    pendingPromotion !== undefined && dismissedFor !== pendingPromotion
-  const handleCelebrationDismiss = useCallback(() => {
-    if (pendingPromotion !== undefined) setDismissedFor(pendingPromotion)
-  }, [pendingPromotion])
-  // `pendingPromotion` is the MASTERED node; the celebration names and
-  // speaks the stage it UNLOCKED (ticket 123jpnbc3dn).
-  const celebration = useMemo(
-    () =>
-      pendingPromotion === undefined
-        ? null
-        : unlockCelebrationFor(pendingPromotion),
-    [pendingPromotion],
-  )
+  // Unlock celebrations moved to the map (Emma's Path 9/10, spec §6):
+  // the Hub no longer mounts the PromotionCelebration overlay, so an
+  // unlock is celebrated once — there — and never again on the Hub.
 
   // Hub card data (ticket 123jpnbc3dq). `progress` changes identity
   // whenever App refreshes its Progress snapshot, so keying the reload on
@@ -386,23 +341,6 @@ export default function Hub({
 
   const dispatchGreeting = useCallback(() => {
     if (greetingDispatchedRef.current) return
-    // A visible celebration REPLACES the welcome-back line for this mount
-    // (design/screen-hub/promotion-celebration.md: only one ribbon line
-    // per mount, and it's the celebration line). No caption ticks — the
-    // celebration overlay renders its own caption, so the Hub ribbon
-    // stays hidden.
-    if (celebrationVisible && celebration !== null) {
-      greetingDispatchedRef.current = true
-      console.log('[Hub] celebration: dispatching', {
-        lineId: celebration.lineId,
-        mastered: pendingPromotion,
-        unlocked: celebration.unlocked,
-      })
-      greetingPromiseRef.current = playLine(celebration.lineId).catch((err) => {
-        console.warn('[Hub] celebration line failed:', err)
-      })
-      return
-    }
     if (greeting.lineId === null) {
       // Log suppression decisions exactly once per Hub mount so the
       // iPad-export consoles show *why* the welcome-back was skipped.
@@ -437,16 +375,7 @@ export default function Hub({
       // nodes remain tappable.
       console.warn('[Hub] welcome-back line failed:', err)
     })
-  }, [
-    celebration,
-    celebrationVisible,
-    greeting.lineId,
-    path,
-    pendingPromotion,
-    playLine,
-    suggestion,
-    suppressed,
-  ])
+  }, [greeting.lineId, path, playLine, suggestion, suppressed])
 
   // For paths where the audio context is already hot, fire on mount.
   // For app-open paths, wait for the first user gesture (tap-anywhere).
@@ -723,62 +652,28 @@ export default function Hub({
           the M2.5 character long-press — only the image bounds are
           live, not the surrounding band.
 
-          Idle Emma and the PromotionCelebration overlay live under one
-          shared `<AnimatePresence mode="wait">` so the swap is animated
-          (graceful fade-out → fade-in) rather than the instantaneous
-          mount/unmount swap that landed in PR #140. `mode="wait"`
-          guarantees only ONE Emma is in the DOM at any moment — old
-          element fully unmounts before the new one mounts — which keeps
-          the existing count-based regression tests green
-          (e2e cvc-words-regression test 10b asserts `hub-emma` count is
-          0 when celebration is visible and 1 when not, and the Hub.test
-          mutual-exclusion case asserts the same). The
-          `pointer-events-none` band reserves the 22vh layout slot during
-          the celebration; the celebration's `absolute inset-0` overlays
-          the whole Hub from `<m.main>`'s positioned ancestor regardless
-          of where in the tree it mounts. */}
+          Unlock celebrations play on the map (Emma's Path 9/10); the
+          Hub band only ever shows idle Emma. */}
       <div className="pointer-events-none flex h-[22vh] w-full items-center justify-center">
-        <AnimatePresence mode="wait" initial={false}>
-          {celebrationVisible &&
-          pendingPromotion !== undefined &&
-          celebration !== null ? (
-            <PromotionCelebration
-              key={`celebration-emma-${pendingPromotion}`}
-              node={pendingPromotion}
-              unlockedNode={celebration.unlocked}
-              label={celebration.name}
-              onDismiss={handleCelebrationDismiss}
-            />
-          ) : (
-            // Phase 3b motion brief (ticket 86c9kwvza): consume
-            // `EmmaCharacter` so Hub's idle Emma breathes (`scale [1,
-            // 1.02, 1]` over 4s) per §3.5. Hub never swaps poses, so
-            // the only motion-brief item that matters here is the
-            // breathing loop. The shared component also wires the
-            // long-press handlers via spread.
-            //
-            // Wrapped in `m.div` so AnimatePresence can run an exit
-            // animation when celebration takes over. The wrapper carries
-            // the opacity choreography; the EmmaCharacter inside keeps
-            // its own pose/breathing motion.
-            <m.div
-              key="idle-emma"
-              className="flex h-full items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            >
-              <EmmaCharacter
-                pose="idle"
-                layoutId="emma"
-                data-testid="hub-emma"
-                className="pointer-events-auto h-full w-auto select-none touch-none"
-                {...characterLongPressProps}
-              />
-            </m.div>
-          )}
-        </AnimatePresence>
+        {/* Phase 3b motion brief (ticket 86c9kwvza): consume
+            `EmmaCharacter` so Hub's idle Emma breathes (`scale [1,
+            1.02, 1]` over 4s) per §3.5. The shared component also wires
+            the long-press handlers via spread. */}
+        <m.div
+          key="idle-emma"
+          className="flex h-full items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
+        >
+          <EmmaCharacter
+            pose="idle"
+            layoutId="emma"
+            data-testid="hub-emma"
+            className="pointer-events-auto h-full w-auto select-none touch-none"
+            {...characterLongPressProps}
+          />
+        </m.div>
       </div>
 
       {/* Speech ribbon — same word-by-word reveal pattern as
@@ -912,13 +807,6 @@ export default function Hub({
           </div>
         )}
       </div>
-
-      {/* Promotion celebration overlay lives under the unified
-          AnimatePresence in the Emma band (above) — see the band
-          wrapper for the rationale. The celebration's `absolute inset-0`
-          overlays the whole Hub regardless of where in the tree it
-          mounts; pointer-events-none on its wrapper means taps still
-          fall through to the picker beneath. */}
     </m.main>
   )
 }

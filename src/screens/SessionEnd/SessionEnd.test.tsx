@@ -22,6 +22,22 @@ import {
   type Progress,
 } from '../../lib/progress'
 
+// Emma's Path 9/10: a good-day session now plays the bud beat's Lily line
+// through the map line player. Its Howl never ends in jsdom, so every test
+// here gets a player that resolves at once — the beat costs only its
+// fixed 600 ms gap, and the bud-beat tests read `pathPlays`.
+const pathPlays: string[] = []
+vi.mock('../Map/playMapLine', () => ({
+  createMapLinePlayer: () => ({
+    play: (line: { id: string }) => {
+      pathPlays.push(line.id)
+      return Promise.resolve()
+    },
+    cancel: () => {},
+    unload: () => {},
+  }),
+}))
+
 function withMotion(node: ReactNode) {
   return (
     <LazyMotion features={domAnimation} strict>

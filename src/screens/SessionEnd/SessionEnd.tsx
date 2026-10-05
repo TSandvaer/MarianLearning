@@ -34,6 +34,14 @@ import SleepSplash from './SleepSplash'
 import { recordSessionEnd } from './sessionHistory'
 import { recordProgressOnSessionEnd } from './progressHistory'
 import { focusRecapLine } from './friendlyNodeName'
+import { BudBeat } from './BudBeat'
+import { BUD_OPEN_DELAY_S } from './budGroups'
+import { pathLine } from '../../lib/emmasPath/pathLines'
+import {
+  sessionEndBeat,
+  type SessionEndBeat,
+} from '../../lib/progress/pathBeats'
+import { createMapLinePlayer, type MapLinePlayer } from '../Map/playMapLine'
 import {
   defaultProgress,
   isGraduationSessionPending,
@@ -275,6 +283,8 @@ export interface SessionEndProps {
   storage?: StorageAdapter
   /** Test seam: clock injection. */
   now?: () => Date
+  /** Test seam: player for the Emma's Path bud line (`end.bud.*`). */
+  createPathPlayer?: () => MapLinePlayer
 }
 
 // ── Sequence phases ---------------------------------------------------------
@@ -283,6 +293,7 @@ type Phase =
   | 'opener' // t=0: "You did it!" + sparkle burst
   | 'focus-recap' // t~1100: "You worked on <friendly-name> today!" (M5). SKIPPED entirely (never entered) when the `session.end.recap.focus` utterance is unavailable/rejects — see the focus-recap block in the TTS sequence effect (M5 #451 graceful skip).
   | 'recap' // t~2500: stardust count-up + "You earned N stars!"
+  | 'bud' // after recap, good day banked: bud beat (Emma's Path 9/10)
   | 'streak' // t~4500: streak band (if finalStreak >= 3)
   | 'goodbye' // t~6100: "See you soon."
   | 'settled' // t~7300: CTA visible, idle
@@ -300,6 +311,10 @@ const RECAP_DELAY_MS = 2500
 const STREAK_DELAY_MS = 4500
 const GOODBYE_DELAY_MS = 6100
 const CTA_DELAY_MS = 7300
+// Emma's Path 9/10: the bud beat follows the stardust tally after one
+// short gap; its line is capped so a stalled MP3 never holds the screen.
+const BUD_DELAY_MS = 600
+const BUD_LINE_MAX_MS = 6000
 // Fallback CTA reveal if all audio fails. Bumped +1100ms in lockstep with
 // the focus-recap shift so the silent-audio path still settles AFTER the
 // last spoken beat would have, never before it.
@@ -352,6 +367,7 @@ export default function SessionEnd({
   plink: plinkProp,
   storage,
   now,
+  createPathPlayer = createMapLinePlayer,
 }: SessionEndProps): ReactElement {
   const reducedMotion = usePrefersReducedMotion()
 
@@ -444,6 +460,17 @@ export default function SessionEnd({
   const [showStreakBand, setShowStreakBand] = useState(false)
   const [showCta, setShowCta] = useState(false)
   const [ctaTapping, setCtaTapping] = useState(false)
+
+  // Emma's Path 9/10 — what this session earned, computed once from the
+  // session-end write (`sessionEndBeat`). The bud card renders from state
+  // set when the sequence reaches the bud beat.
+  const beatRef = useRef<SessionEndBeat | null>(null)
+  const pathPlayerRef = useRef<MapLinePlayer | null>(null)
+  const [beatKind, setBeatKind] = useState<SessionEndBeat['kind'] | null>(null)
+  const [budBeat, setBudBeat] = useState<Extract<
+    SessionEndBeat,
+    { kind: 'bud' }
+  > | null>(null)
 
   // Refs for timer cleanup
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
@@ -563,7 +590,7 @@ export default function SessionEnd({
       leitnerOutcomes = buildLeitnerOutcomes(p.mathFacts, p.perProblemCorrect)
     }
 
-    recordProgressOnSessionEnd({
+    const savedProgress = recordProgressOnSessionEnd({
       surface: p.surface,
       totalCorrect: p.totalCorrect,
       dateISO,
@@ -644,6 +671,14 @@ export default function SessionEnd({
         ? { currentTargetVowel: p.currentTargetVowel }
         : {}),
     })
+    // Emma's Path 9/10: before = the doc this session started from, after
+    // = the doc just saved. `??=` keeps the first answer if the effect runs
+    // twice (StrictMode dev re-run would see its own write as `before`).
+    beatRef.current ??= sessionEndBeat(
+      progressForFocus,
+      savedProgress,
+      focusNode,
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -681,6 +716,7 @@ export default function SessionEnd({
 
     // t=0: Opener -- "You did it!"
     const runSequence = async () => {
+      setBeatKind(beatRef.current?.kind ?? 'none')
       try {
         // Play sparkle SFX on entry
         sparkleInstance.play()
@@ -847,6 +883,33 @@ export default function SessionEnd({
         // Swallow -- continue sequence
       }
 
+      // Bud beat (Emma's Path 9/10, spec §6 step 2): a good day banked and
+      // nothing unlocked → the focus stop slides up, its new bud opens and
+      // Emma says `end.bud.{node}`. A bad day or an unlock (the map's
+      // moment) adds nothing here.
+      // The bud beat's lead-in gap comes out of the pause before the next
+      // beat, so the screen only grows by the length of Emma's line.
+      let budGapMs = 0
+      const beat = beatRef.current
+      if (beat?.kind === 'bud') {
+        const line = pathLine(`end.bud.${beat.node}`)
+        if (line !== undefined) {
+          budGapMs = BUD_DELAY_MS
+          await new Promise<void>((resolve) => {
+            addTimer(() => {
+              setPhase('bud')
+              setBudBeat(beat)
+              addTimer(() => sparkleInstance.play(), BUD_OPEN_DELAY_S * 1000)
+              setCaptionText(line.text)
+              setCaptionRevealed(line.text.split(/\s+/).length)
+              pathPlayerRef.current ??= createPathPlayer()
+              addTimer(resolve, BUD_LINE_MAX_MS)
+              void pathPlayerRef.current.play(line).then(resolve)
+            }, BUD_DELAY_MS)
+          })
+        }
+      }
+
       // t=4500: Streak -- "N in a row! Wow!" (only if finalStreak >= 3)
       if (p.finalStreak >= 3) {
         try {
@@ -854,20 +917,23 @@ export default function SessionEnd({
           setShowStreakBand(true)
 
           await new Promise<void>((resolve) => {
-            addTimer(() => {
-              const streakId = `session.end.streak.${p.finalStreak}`
-              playUtterance(streakId, {
-                onWordTick: (wordIndex) => {
-                  setCaptionText(`${p.finalStreak} in a row! Wow!`)
-                  setCaptionRevealed(wordIndex + 1)
-                },
-              })
-                .then(resolve)
-                .catch((err) => {
-                  console.warn('[SessionEnd] streak utterance failed:', err)
-                  resolve()
+            addTimer(
+              () => {
+                const streakId = `session.end.streak.${p.finalStreak}`
+                playUtterance(streakId, {
+                  onWordTick: (wordIndex) => {
+                    setCaptionText(`${p.finalStreak} in a row! Wow!`)
+                    setCaptionRevealed(wordIndex + 1)
+                  },
                 })
-            }, STREAK_DELAY_MS - RECAP_DELAY_MS)
+                  .then(resolve)
+                  .catch((err) => {
+                    console.warn('[SessionEnd] streak utterance failed:', err)
+                    resolve()
+                  })
+              },
+              STREAK_DELAY_MS - RECAP_DELAY_MS - budGapMs,
+            )
           })
         } catch {
           // Swallow -- continue sequence
@@ -881,7 +947,7 @@ export default function SessionEnd({
           const baseDelay =
             p.finalStreak >= 3
               ? GOODBYE_DELAY_MS - STREAK_DELAY_MS
-              : GOODBYE_DELAY_MS - RECAP_DELAY_MS
+              : GOODBYE_DELAY_MS - RECAP_DELAY_MS - budGapMs
           addTimer(() => {
             playUtterance('session.end.goodbye', {
               onPlay: () => {
@@ -930,6 +996,8 @@ export default function SessionEnd({
       chimeInstance.unload()
       sparkleInstance.unload()
       plinkInstance.unload()
+      pathPlayerRef.current?.unload()
+      pathPlayerRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -944,6 +1012,7 @@ export default function SessionEnd({
 
     // Cancel any in-flight TTS
     cancelSessionAudio()
+    pathPlayerRef.current?.cancel()
 
     // Hub-route flip (`design/screen-hub.md` § Q4): when the orchestrator
     // wires `onAllDone`, route to Hub instead of falling through to the
@@ -986,6 +1055,7 @@ export default function SessionEnd({
       data-earned={displayedEarnedThisSession}
       data-final-streak={p.finalStreak}
       data-completion-bonus={wordSongCompletionGrant}
+      data-path-beat={beatKind ?? 'pending'}
       className="
         relative flex h-full w-full flex-col items-center
         bg-my-cream text-ink
@@ -1116,8 +1186,18 @@ export default function SessionEnd({
         reducedMotion={reducedMotion}
       />
 
-      {/* Spacer -- ~8vh breathing room */}
-      <div className="h-[8vh]" aria-hidden />
+      {/* Spacer -- ~8vh breathing room; holds the bud beat card (Emma's
+          Path 9/10) when a good day was banked. */}
+      <div className="relative flex h-[8vh] w-full items-center justify-center">
+        {budBeat !== null && (
+          <BudBeat
+            node={budBeat.node}
+            before={budBeat.before}
+            after={budBeat.after}
+            reducedMotion={reducedMotion}
+          />
+        )}
+      </div>
 
       {/* "All done!" CTA -- ~12vh bottom band, thumb-zone */}
       <div className="flex h-[12vh] w-full items-center justify-center">
