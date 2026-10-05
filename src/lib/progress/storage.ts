@@ -11,10 +11,12 @@
 import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isProgressV1, readSchemaVersion } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
+import { recordGoodDays } from './mastery'
 import { migrate } from './migrate'
-import { getSettings } from './parentSettings'
+import { getSettings, retireLegacyMasteryThreshold } from './parentSettings'
 import type {
   LetterSoundsVowel,
+  ParentSettings,
   Progress,
   SkillLevels,
   VowelSubMasteryState,
@@ -72,16 +74,24 @@ export function loadProgress(): Progress | null {
     // blob is fine but whose presence is preferred by downstream
     // consumers (the planner-side gate doesn't have to short-circuit
     // a missing list when the field is always set after load).
-    return withDefaultedCvcGraduationSessionFired(
-      withDefaultedLifetimeFirstEncounters(withDefaultedSettings(defaulted)),
+    return withSeededGoodDays(
+      withDefaultedCvcGraduationSessionFired(
+        withDefaultedLifetimeFirstEncounters(
+          withDefaultedSettings(withRetiredLegacyThresholds(defaulted)),
+        ),
+      ),
     )
   }
 
   // Different version (older or newer) — route through migrate.
   const migrated = migrate(parsed)
   if (migrated === null) return null
-  return withDefaultedCvcGraduationSessionFired(
-    withDefaultedLifetimeFirstEncounters(withDefaultedSettings(migrated)),
+  return withSeededGoodDays(
+    withDefaultedCvcGraduationSessionFired(
+      withDefaultedLifetimeFirstEncounters(
+        withDefaultedSettings(withRetiredLegacyThresholds(migrated)),
+      ),
+    ),
   )
 }
 
@@ -394,6 +404,51 @@ function withDefaultedLifetimeFirstEncounters(p: Progress): Progress {
 function withDefaultedCvcGraduationSessionFired(p: Progress): Progress {
   if (p.cvcGraduationSessionFired !== undefined) return p
   return { ...p, cvcGraduationSessionFired: false }
+}
+
+/**
+ * One-time retirement of the stored pre-123jpnbc3dm default thresholds
+ * (math 95/3, word-song 90/3 → 7/8 on 3 good days). Keyed on the
+ * good-day counter being absent, which marks a blob written before this
+ * ticket: once `withSeededGoodDays` adds the counter and the blob is
+ * saved, this never runs again, so a parent's later deliberate 95/3
+ * choice sticks. Runs BEFORE `withDefaultedSettings` because it needs
+ * the raw stored shape (the legacy single shape is still distinguishable
+ * there) and BEFORE `withSeededGoodDays` so seeding uses the new
+ * thresholds.
+ */
+export function withRetiredLegacyThresholds(p: Progress): Progress {
+  if (p.goodDays !== undefined || p.parentSettings === undefined) return p
+  const raw = p.parentSettings.masteryThreshold as unknown
+  const retired = retireLegacyMasteryThreshold(raw)
+  if (retired === raw) return p
+  return {
+    ...p,
+    parentSettings: {
+      ...p.parentSettings,
+      masteryThreshold: retired as ParentSettings['masteryThreshold'],
+    },
+  }
+}
+
+/**
+ * Read-path seeder for the cumulative good-day counter (ticket
+ * 123jpnbc3dm — Emma's Path decision 1).
+ *
+ * A blob written before the counter existed has no `goodDays`; seed it
+ * from the good days still visible in `history` (at the CURRENT
+ * thresholds, i.e. 7/8+), so nothing banked under the old rule's
+ * history is lost before it ages out of the 30-entry cap. Runs after
+ * `withDefaultedSettings` so `getSettings` sees the stored thresholds.
+ * Already-mastered steps are untouched: the counter only feeds the
+ * practicing → mastered check, never a demotion.
+ *
+ * A blob that already carries the field passes through untouched —
+ * `applyMasteryRule` keeps it current from then on.
+ */
+function withSeededGoodDays(p: Progress): Progress {
+  if (p.goodDays !== undefined) return p
+  return { ...p, goodDays: { ...recordGoodDays(p) } }
 }
 
 /**

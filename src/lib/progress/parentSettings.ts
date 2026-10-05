@@ -40,30 +40,45 @@ import type {
  * UI can render them as a segmented control without re-declaring the
  * constants. Order matters — UI renders left-to-right in this order.
  *
- * Updated 2026-05-02 (ticket 86c9kwvy0): the middle preset is now 90/3
- * (was 90/2). This pairs with the per-track defaults — word-song
- * defaults to 90/3, math defaults to 95/3 — so the parent has both
- * defaults available as presets without inventing a fourth.
+ * Updated 2026-10-05 (ticket 123jpnbc3dm, Emma's Path decision 1): the
+ * middle preset is the new default for both tracks, 7/8 on 3 good days
+ * (was 90/3). The strict 95/3 preset stays for a parent who wants it.
  */
 export const MASTERY_THRESHOLD_PRESETS: readonly MasteryThreshold[] = [
   { percent: 0.8, sessions: 2 },
-  { percent: 0.9, sessions: 3 }, // word-song default
-  { percent: 0.95, sessions: 3 }, // math default
+  { percent: 0.875, sessions: 3 }, // default, both tracks
+  { percent: 0.95, sessions: 3 },
 ] as const
 
 /**
- * Per-track default mastery thresholds (Thomas-locked, 2026-05-02).
- * Pulled out so backward-compat code below can fall back per-track.
+ * Per-track default mastery thresholds. Pulled out so backward-compat
+ * code below can fall back per-track.
  *
- * Math: 95/3 (over-practice durability hypothesis, see types.ts).
- * Word-song: 90/3 (Pickering et al. PMC5843573 — 90% over-learning is
- * the durable plateau; 95% adds practice time without measurable
- * benefit and Marian's August timeline can't afford the slack).
+ * Both tracks: 0.875/3 — a step is mastered after 3 separate days at
+ * 7/8 or better, in any order (Emma's Path decision 1, Thomas
+ * 2026-10-04; ticket 123jpnbc3dm). Replaces the 2026-05-02 per-track
+ * defaults (math 95/3, word-song 90/3), which with 8-problem sessions
+ * meant three 8/8 days where one 7/8 reset the run.
  */
 const DEFAULT_PER_TRACK_THRESHOLD: PerTrackMasteryThreshold = Object.freeze({
-  math: Object.freeze({ percent: 0.95, sessions: 3 }),
-  'word-song': Object.freeze({ percent: 0.9, sessions: 3 }),
+  math: Object.freeze({ percent: 0.875, sessions: 3 }),
+  'word-song': Object.freeze({ percent: 0.875, sessions: 3 }),
 }) as PerTrackMasteryThreshold
+
+/**
+ * The per-track defaults before ticket 123jpnbc3dm. The Parent Settings
+ * screen persists the FULL settings object whenever any control
+ * changes, so a device can carry these old defaults explicitly without
+ * a parent ever choosing them. `retireLegacyMasteryThreshold` maps a
+ * stored track value exactly equal to its old default to the new
+ * default; any other stored value is the parent's deliberate choice and
+ * is kept (coordinator decision 2026-10-05, on Thomas's decision 1).
+ */
+const LEGACY_DEFAULT_PER_TRACK_THRESHOLD: PerTrackMasteryThreshold =
+  Object.freeze({
+    math: Object.freeze({ percent: 0.95, sessions: 3 }),
+    'word-song': Object.freeze({ percent: 0.9, sessions: 3 }),
+  }) as PerTrackMasteryThreshold
 
 /**
  * Default settings (Thomas-locked, 2026-05-02 update for per-track
@@ -141,6 +156,45 @@ export function getSettings(
 
 // ── internals ──────────────────────────────────────────────────────────
 
+/**
+ * One-time migration of a STORED `parentSettings.masteryThreshold` value
+ * (raw, pre-merge) written before ticket 123jpnbc3dm: a track value
+ * exactly equal to that track's old default (math 95/3, word-song 90/3)
+ * becomes the new default; the legacy single shape's own default (95/3)
+ * becomes the new per-track defaults. Anything else — including
+ * malformed input, which `getSettings` handles — passes through.
+ *
+ * Deliberately NOT applied inside `getSettings`: it would also undo a
+ * parent's deliberate post-ticket choice of 95/3 on every read. The
+ * storage / cloud-install read paths call it only for blobs that
+ * predate the good-day counter (`goodDays` absent), i.e. exactly once.
+ */
+export function retireLegacyMasteryThreshold(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw
+  const obj = raw as Record<string, unknown>
+  const matches = (v: unknown, legacy: MasteryThreshold): boolean =>
+    !!v &&
+    typeof v === 'object' &&
+    (v as Record<string, unknown>).percent === legacy.percent &&
+    (v as Record<string, unknown>).sessions === legacy.sessions
+
+  if ('math' in obj || 'word-song' in obj) {
+    const out: Record<string, unknown> = { ...obj }
+    let changed = false
+    for (const track of ['math', 'word-song'] as const) {
+      if (matches(obj[track], LEGACY_DEFAULT_PER_TRACK_THRESHOLD[track])) {
+        out[track] = { ...DEFAULT_PER_TRACK_THRESHOLD[track] }
+        changed = true
+      }
+    }
+    return changed ? out : raw
+  }
+  if (matches(obj, LEGACY_DEFAULT_PER_TRACK_THRESHOLD.math)) {
+    return clonePerTrackDefaults()
+  }
+  return raw
+}
+
 function cloneDefaults(): ParentSettings {
   return {
     autoPromote: DEFAULT_PARENT_SETTINGS.autoPromote,
@@ -209,8 +263,7 @@ function mergePerTrackMasteryThreshold(
   // then apply the SAME validated value to both tracks. The legacy
   // validator also fell back per-key on out-of-range / wrong-type
   // input — using the math default here as the fallback base is
-  // arbitrary but harmless; the legacy code also defaulted to a
-  // single hard-coded value (95/3) and the math default matches that.
+  // arbitrary but harmless (both tracks share one default today).
   if ('percent' in obj || 'sessions' in obj) {
     const single = mergeSingleMasteryThreshold(
       obj,

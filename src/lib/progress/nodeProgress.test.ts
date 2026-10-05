@@ -81,8 +81,8 @@ describe('nodeProgress — basic fields', () => {
   })
 })
 
-describe('nodeProgress — good days follow TODAY’s rule', () => {
-  it('counts trailing qualifying days (math 95%)', () => {
+describe('nodeProgress — good days follow the rule (3 days at 7/8+, any order)', () => {
+  it('counts good days', () => {
     const p = build(levels({ 'add-to-10': 'practicing' }), [
       entry(1, 'add-to-10', 1),
       entry(2, 'add-to-10', 1),
@@ -90,14 +90,23 @@ describe('nodeProgress — good days follow TODAY’s rule', () => {
     expect(nodeProgress(p, 'add-to-10').goodDays).toBe(2)
   })
 
-  it('a below-threshold day resets the count (rule is consecutive today)', () => {
+  it('a weak day does not reset the count; 7/8 counts as good', () => {
     const p = build(levels({ 'add-to-10': 'practicing' }), [
       entry(1, 'add-to-10', 1),
-      entry(2, 'add-to-10', 1),
+      entry(2, 'add-to-10', 0.5),
       entry(3, 'add-to-10', 0.875),
-      entry(4, 'add-to-10', 1),
+      entry(4, 'add-to-10', 0.75),
     ])
-    expect(nodeProgress(p, 'add-to-10').goodDays).toBe(1)
+    expect(nodeProgress(p, 'add-to-10').goodDays).toBe(2)
+  })
+
+  it('reads the cumulative counter: banked days that aged out of history still count', () => {
+    const p = build(
+      levels({ 'add-to-10': 'practicing' }),
+      [entry(3, 'add-to-10', 1)],
+      { goodDays: { 'add-to-10': ['2026-04-01'] } },
+    )
+    expect(nodeProgress(p, 'add-to-10').goodDays).toBe(2)
   })
 
   it('two good sessions on one calendar day count once', () => {
@@ -138,6 +147,19 @@ describe('nodeProgress — good days follow TODAY’s rule', () => {
         entry(3, 'add-to-10', 1),
         entry(4, 'add-to-10', 1),
       ],
+      [
+        entry(1, 'add-to-10', 1),
+        entry(2, 'add-to-10', 0.5),
+        entry(3, 'add-to-10', 0.875),
+        entry(4, 'add-to-10', 0.25),
+      ],
+      [
+        entry(1, 'add-to-10', 0.875),
+        entry(2, 'add-to-10', 0.5),
+        entry(3, 'add-to-10', 0.875),
+        entry(4, 'add-to-10', 0.25),
+        entry(5, 'add-to-10', 0.875),
+      ],
     ]
     const outcomes = fixtures.map((history) => {
       const p = build(levels({ 'add-to-10': 'practicing' }), history)
@@ -147,7 +169,7 @@ describe('nodeProgress — good days follow TODAY’s rule', () => {
       expect(np.goodDays === np.requiredDays).toBe(promoted)
       return promoted
     })
-    expect(outcomes).toEqual([false, true, false, true])
+    expect(outcomes).toEqual([false, true, true, true, false, true])
   })
 })
 

@@ -114,3 +114,8 @@ Distinct from its siblings:
 - **Foundation:** read-only audits 2026-10-04 (UX: tiny 5-icon strip, invisible locks, silent mis-labelled celebration; R&D: mastery = three 8/8 days, linear trees, no schema change needed; research: close subgoals, upward-only progress, skill-named unlocks).
 - **Reverses:** `design/screen-hub.md` "no whole-tree map" (:264) and "no how-to-unlock copy" (:238, :283).
 - **Decided by:** Thomas (popups, recommended option on all three).
+
+## 2026-10-05 — Emma's Path 10/10: stage names kept; whole-line Lily bakes
+
+- **Decided:** (1) Keep "making tens" (regroup) and "star words" (sight words) — spec §10 Q1. Dave: "bigger numbers" is one sound from "big numbers" and "quick words" rhymes with "chick words", both fail the distinct-when-heard rule (Cutler 2012; Ehri 2014). Ear-test the "making tens" / "taking away to ten" pair. (2) Bake every new line whole (~120 + 9 land lines), not name + carrier splices — spec §10 Q2.
+- **Decided by:** Q1 Dave (research, no spec change); Q2 Thomas (popup, recommended option).

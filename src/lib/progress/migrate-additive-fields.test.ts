@@ -267,15 +267,15 @@ describe('Progress — additive-no-bump field migrations', () => {
     const loaded = loadProgress()
     expect(loaded).not.toBeNull()
     expect(loaded?.parentSettings).toBeDefined()
-    // Defaults — Thomas-locked 2026-05-02.
+    // Defaults — Emma's Path decision 1 (ticket 123jpnbc3dm).
     expect(loaded?.parentSettings?.autoPromote).toBe(true)
     expect(loaded?.parentSettings?.crossDayEnforcement).toBe(true)
     expect(loaded?.parentSettings?.masteryThreshold.math).toEqual({
-      percent: 0.95,
+      percent: 0.875,
       sessions: 3,
     })
     expect(loaded?.parentSettings?.masteryThreshold['word-song']).toEqual({
-      percent: 0.9,
+      percent: 0.875,
       sessions: 3,
     })
   })
@@ -540,5 +540,101 @@ describe('Progress — additive-no-bump field migrations', () => {
     // The guard rejects it; loadProgress falls back to defaults rather
     // than carrying a corrupted counter forward.
     expect(isProgressV1(blob)).toBe(false)
+  })
+})
+
+// --------------------------------------------------------------------------
+// goodDays — cumulative good-day counter (ticket 123jpnbc3dm)
+// --------------------------------------------------------------------------
+
+describe('Progress — goodDays read-path seeding (ticket 123jpnbc3dm)', () => {
+  beforeEach(() => window.localStorage.clear())
+  afterEach(() => window.localStorage.clear())
+
+  /** Day `d` of May 2026 at local noon, so the day key is TZ-proof. */
+  function day(d: number): string {
+    return new Date(2026, 4, d, 12).toISOString()
+  }
+
+  function preCounterBlob(
+    history: SessionHistoryEntry[],
+    skillLevels: Partial<SkillLevels> = {},
+  ): Record<string, unknown> {
+    const seed = defaultProgress('Marian')
+    const blob: Record<string, unknown> = {
+      ...seed,
+      skillLevels: { ...seed.skillLevels, ...skillLevels },
+      history,
+    }
+    delete blob.goodDays
+    return blob
+  }
+
+  it('seeds the counter from history at the 7/8 threshold (weak days excluded)', () => {
+    const blob = preCounterBlob([
+      { dateISO: day(1), skillFocus: ['sub-to-10'], successRate: 0.875 },
+      { dateISO: day(2), skillFocus: ['sub-to-10'], successRate: 0.5 },
+      { dateISO: day(3), skillFocus: ['sub-to-10'], successRate: 1 },
+      { dateISO: day(3), skillFocus: ['add-to-20'], successRate: 0.75 },
+    ])
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+    const loaded = loadProgress()
+    expect(loaded?.goodDays).toEqual({
+      'sub-to-10': ['2026-05-01', '2026-05-03'],
+    })
+  })
+
+  it('an empty history seeds an empty counter', () => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preCounterBlob([])))
+    expect(loadProgress()?.goodDays).toEqual({})
+  })
+
+  it('a blob that already carries the counter passes through untouched', () => {
+    const blob = {
+      ...preCounterBlob([
+        { dateISO: day(3), skillFocus: ['sub-to-10'], successRate: 1 },
+      ]),
+      goodDays: { 'sub-to-10': ['2026-04-01'] },
+    }
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+    // The seeder only fills an ABSENT field; applyMasteryRule unions the
+    // history days in at the next session-end.
+    expect(loadProgress()?.goodDays).toEqual({ 'sub-to-10': ['2026-04-01'] })
+  })
+
+  it('already-mastered steps stay mastered through the seeding load', () => {
+    const blob = preCounterBlob([], {
+      'add-to-10': 'mastered',
+      'add-to-20': 'mastered',
+    })
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(blob))
+    const loaded = loadProgress()
+    expect(loaded?.skillLevels['add-to-10']).toBe('mastered')
+    expect(loaded?.skillLevels['add-to-20']).toBe('mastered')
+  })
+
+  it('round-trips through save/load', () => {
+    const p: Progress = {
+      ...defaultProgress('Marian'),
+      goodDays: { 'sub-to-10': ['2026-05-01'], '/o/': ['2026-05-02'] },
+    }
+    saveProgress(p)
+    expect(loadProgress()).toEqual(p)
+  })
+
+  it('the guard rejects a malformed counter', () => {
+    const base = defaultProgress('Marian')
+    expect(isProgressV1({ ...base, goodDays: [] })).toBe(false)
+    expect(isProgressV1({ ...base, goodDays: { 'sub-to-10': 'x' } })).toBe(
+      false,
+    )
+    expect(isProgressV1({ ...base, goodDays: { 'sub-to-10': [1] } })).toBe(
+      false,
+    )
+    // Unknown keys are tolerated (inert), so a renamed step never
+    // discards the whole blob.
+    expect(isProgressV1({ ...base, goodDays: { 'old-node': ['x'] } })).toBe(
+      true,
+    )
   })
 })

@@ -4,20 +4,20 @@
  * unlocks (design/progression-emmas-path.md, "What changes underneath").
  *
  * Pure, and built only from the mastery rule's own helpers in
- * `mastery.ts` (`qualifyingDayCount`, `perVowelTrackingActive`,
+ * `mastery.ts` (`goodDayCount`, `perVowelTrackingActive`,
  * `graduationGateClears`, `nextNode`, ...), so the display cannot drift
- * from the rule. When the rule changes (cumulative good days, ticket
- * 4/10) only those helpers change; this module follows.
+ * from the rule. Good days come from the cumulative `progress.goodDays`
+ * counter plus whatever `history` shows (ticket 123jpnbc3dm), exactly
+ * as `applyMasteryRule` counts them.
  */
 
 import { LETTER_SOUNDS_VOWELS } from './defaults'
 import {
+  goodDayCount,
   graduationGateClears,
   isGraduationGated,
   nextNode,
   perVowelTrackingActive,
-  qualifiesOverHistory,
-  qualifyingDayCount,
   trackOf,
 } from './mastery'
 import { getSettings } from './parentSettings'
@@ -93,7 +93,15 @@ export function nodeProgress(
         goodDays:
           state === 'mastered' || level === 'mastered'
             ? threshold.sessions
-            : qualifyingDayCount(vowelHistory, threshold, settings),
+            : Math.min(
+                threshold.sessions,
+                goodDayCount(
+                  vowelHistory,
+                  threshold,
+                  settings,
+                  progress.goodDays?.[vowel],
+                ),
+              ),
         requiredDays: threshold.sessions,
       }
     })
@@ -108,17 +116,23 @@ export function nodeProgress(
     }
   }
 
+  const bankedDays = goodDayCount(
+    focused,
+    threshold,
+    settings,
+    progress.goodDays?.[node],
+  )
   const goodDays =
     level === 'mastered'
       ? threshold.sessions
       : level === 'locked'
         ? 0
-        : qualifyingDayCount(focused, threshold, settings)
+        : Math.min(threshold.sessions, bankedDays)
 
   const awaitingNovelWordCheck =
     level === 'practicing' &&
     isGraduationGated(node) &&
-    qualifiesOverHistory(focused, threshold, settings) &&
+    bankedDays >= threshold.sessions &&
     !graduationGateClears(progress.history, node, threshold, settings)
 
   return {
