@@ -203,15 +203,25 @@ Steps:
 | **Concurrency cancel**     | New push landed while run was mid-flight; `cancel-in-progress: true` killed the older run | Normal — no action needed              |
 | **External / user cancel** | Someone clicked "Cancel" in the Actions UI, or the billing stop-usage gate fired          | Investigate billing or operator action |
 
-**Diagnostic — compute elapsed time before escalating.** When you see `conclusion=cancelled`, compute `elapsed = updatedAt − createdAt` and compare against the `timeout-minutes` value in `.github/workflows/e2e.yml` (currently 35):
+**Diagnostic — compute elapsed time before escalating.** When you see `conclusion=cancelled`, compute `elapsed = updatedAt − createdAt` and compare against the `timeout-minutes` value in `.github/workflows/e2e.yml` (Playwright job: currently 50):
 
-| elapsed vs budget                                                                         | interpretation                                                                                 |
-| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| elapsed ≈ budget (within ~1 min)                                                          | **Timeout hit.** Suite ran too long. Fix: bump `timeout-minutes` (next natural step: 35 → 50). |
-| elapsed << budget (seconds to a few minutes) AND a sibling push exists on the same branch | **Concurrency cancel.** Normal. Confirm via `gh run list --branch <branch> --workflow e2e`.    |
-| elapsed << budget AND no sibling push                                                     | External cancel (rare) or billing stop-usage gate. Check Actions billing.                      |
+| elapsed vs budget                                                                         | interpretation                                                                                                       |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| elapsed ≈ budget (within ~1 min)                                                          | **Timeout hit.** First rule out failing tests (below); only a clean-but-long run justifies a `timeout-minutes` bump. |
+| elapsed << budget (seconds to a few minutes) AND a sibling push exists on the same branch | **Concurrency cancel.** Normal. Confirm via `gh run list --branch <branch> --workflow e2e`.                          |
+| elapsed << budget AND no sibling push                                                     | External cancel (rare) or billing stop-usage gate. Check Actions billing.                                            |
 
 **Concrete precedent (PR #304, 2026-05-22).** Session-save file recorded two "cancellations without orchestrator action" on Jessica's failing-first E2E PR. Empirical check via `gh run view`: first run 14:30:20 → 15:02:54 = **32m34s**; second run 15:45:04 → 16:20:26 = **35m22s**. Both ended at the 35-min budget boundary — `timeout-minutes` hits, not external cancels. A 30-min orchestrator investigation merely confirmed the budget is tight; the actual fix is a `timeout-minutes` bump.
+
+**A timeout can be failing tests in disguise — count `✘` before bumping the budget.** Playwright retries each failing test twice (`retries: 2` in CI), so a dozen real failures add ~20+ minutes and push a normally ~42-min suite past the budget; the job then shows only `cancelled`, never `failure`. Check the log first:
+
+```bash
+gh run view <run_id> --log | sed 's/\x1b\[[0-9;]*m//g' | grep "Run e2e suite" | grep -E "✘|Running [0-9]+ tests" | cut -c1-200
+```
+
+Any `✘` lines → it is a test failure, not a budget problem: fix the specs/app, do not touch `timeout-minutes`. Also note how far the run got (the last `[N/total]` index) — tests after that point never ran, so the failure list is incomplete.
+
+> **Incident:** PR #504 (Emma's Path 9/10, 2026-10-05) — Playwright `cancelled` at 50m18s, then again on rerun (run 37288046513). Read as "suite outgrew the budget"; the log showed ~13 existing progression specs failing ×3 attempts after "All done" was rerouted to the map, with only 230/436 tests reached. — **Cost:** two full 50-min CI runs (~100 runner-min) and a near-miss CI-config change that would have masked 13 real regressions.
 
 **`gh` stale-cache caveat for in-flight or just-completed runs.** `gh run list` and `gh pr view --json statusCheckRollup` cache results on the CLI side (memory rule `[[feedback_gh_pr_checks_stale_cache]]`). For a run that is currently in progress or recently completed, fetch fresh state via the REST API:
 
