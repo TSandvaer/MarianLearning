@@ -123,6 +123,11 @@ REQUEST_CHANGES → send the findings to the author worker (or a new worker) onc
 REQUEST_CHANGES escalates to Thomas.
 When the merge gate holds: `gh pr merge <n> --squash`, flip the ticket to `complete` with a
 comment (PR URL, merge SHA), update `team/STATE.md`.
+Then tear down that ticket's workspaces yourself (author + reviewer + any fix worker): confirm each
+is clean (`git status --porcelain` empty, `git log @{u}..HEAD` empty) and its worker released, then
+`orca worktree rm --worktree "path:<workspace>" --json` from the main checkout, run via a script
+(`bash tmp/cleanup-ws.sh`) — an inline command line can false-match the rm-rf guard hook. Finish
+with `git worktree prune`. Never leave finished workspaces for Thomas (2026-10-05: 21 piled up).
 
 ## 5. Next wave / stop
 
