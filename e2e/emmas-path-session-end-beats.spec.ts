@@ -163,10 +163,21 @@ const beatPhases = (page: Page) =>
     () => (window as unknown as { __beatPhases?: string[] }).__beatPhases ?? [],
   )
 
-/** Wait (rAF polling) until the map reaches `phase` — short phases too. */
+/**
+ * Wait (rAF polling) until the map reaches `phase` — short phases too.
+ * Also satisfied once `recordBeatPhases`' observer has seen the phase: a
+ * 400–600 ms phase can be over before a slow (CI WebKit) poll lands on
+ * it (Hypothesis for CI run 37288046513's one WebKit miss on test 3 —
+ * not reproduced locally). The gate stays open after its phase, so
+ * test 3's `data-open` check still holds; when the live poll does land
+ * on the phase (the normal case) nothing changes.
+ */
 async function untilPhase(page: Page, phase: string): Promise<void> {
   await page.waitForFunction(
     (p) =>
+      (
+        (window as unknown as { __beatPhases?: string[] }).__beatPhases ?? []
+      ).includes(p) ||
       document
         .querySelector('[data-testid="map"]')
         ?.getAttribute('data-beat-phase') === p,
