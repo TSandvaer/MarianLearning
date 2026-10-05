@@ -647,6 +647,454 @@
         ['hub-welcome-what-today.mp3', 'Hi! What today?'],
       ]
 
+      // Emma's Path lines (Emma's Path 10/10, ClickUp 123jpnbc3du) — one group
+      // per script section so the ear-test runs in batches. Mirrors
+      // BAKED_PATH_LINES in src/lib/emmasPath/pathLines.ts (drift-guarded by
+      // pathLines.test.ts). itemId = `path#<filename>`.
+      const PATH_GROUPS = [
+        [
+          'Path — map open',
+          [
+            [
+              'path-open-number-recog.mp3',
+              'Here is your path! You are on numbers.',
+            ],
+            [
+              'path-open-add-to-10.mp3',
+              'Here is your path! You are on adding to ten.',
+            ],
+            [
+              'path-open-add-to-20.mp3',
+              'Here is your path! You are on adding to twenty.',
+            ],
+            [
+              'path-open-sub-to-10.mp3',
+              'Here is your path! You are on taking away to ten.',
+            ],
+            [
+              'path-open-sub-to-20.mp3',
+              'Here is your path! You are on taking away to twenty.',
+            ],
+            [
+              'path-open-two-digit-addsub-no-regroup.mp3',
+              'Here is your path! You are on big numbers.',
+            ],
+            [
+              'path-open-two-digit-addsub-with-regroup.mp3',
+              'Here is your path! You are on making tens.',
+            ],
+            [
+              'path-open-skip-counting.mp3',
+              'Here is your path! You are on skip counting.',
+            ],
+            [
+              'path-open-mult-2-5-10.mp3',
+              'Here is your path! You are on groups of two, five and ten.',
+            ],
+            [
+              'path-open-mult-3-4.mp3',
+              'Here is your path! You are on groups of three and four.',
+            ],
+            [
+              'path-open-mult-6-9.mp3',
+              'Here is your path! You are on big groups.',
+            ],
+            ['path-open-done.mp3', 'You did all of it! Look at your flowers!'],
+            [
+              'path-open-letter-names.mp3',
+              'Here is your path! You are on letter names.',
+            ],
+            [
+              'path-open-letter-sounds.mp3',
+              'Here is your path! You are on letter sounds.',
+            ],
+            [
+              'path-open-blending-cv.mp3',
+              'Here is your path! You are on blending sounds.',
+            ],
+            [
+              'path-open-cvc-words.mp3',
+              'Here is your path! You are on cat words.',
+            ],
+            [
+              'path-open-cvc-words-short-o.mp3',
+              'Here is your path! You are on dog words.',
+            ],
+            [
+              'path-open-cvc-words-short-u.mp3',
+              'Here is your path! You are on sun words.',
+            ],
+            [
+              'path-open-cvc-words-short-i.mp3',
+              'Here is your path! You are on pig words.',
+            ],
+            [
+              'path-open-cvc-words-short-e.mp3',
+              'Here is your path! You are on bed words.',
+            ],
+            [
+              'path-open-digraphs-sh.mp3',
+              'Here is your path! You are on ship words.',
+            ],
+            [
+              'path-open-digraphs-ch.mp3',
+              'Here is your path! You are on chick words.',
+            ],
+            [
+              'path-open-digraphs-th-voiceless.mp3',
+              'Here is your path! You are on thumb words.',
+            ],
+            [
+              'path-open-sight-words.mp3',
+              'Here is your path! You are on star words.',
+            ],
+            [
+              'path-open-simple-sentences.mp3',
+              'Here is your path! You are on reading sentences.',
+            ],
+          ],
+        ],
+        [
+          'Path — stop names',
+          [
+            ['path-stop-number-recog.mp3', 'Numbers.'],
+            ['path-stop-add-to-10.mp3', 'Adding to ten.'],
+            ['path-stop-add-to-20.mp3', 'Adding to twenty.'],
+            ['path-stop-sub-to-10.mp3', 'Taking away to ten.'],
+            ['path-stop-sub-to-20.mp3', 'Taking away to twenty.'],
+            ['path-stop-two-digit-addsub-no-regroup.mp3', 'Big numbers.'],
+            ['path-stop-two-digit-addsub-with-regroup.mp3', 'Making tens.'],
+            ['path-stop-skip-counting.mp3', 'Skip counting.'],
+            ['path-stop-mult-2-5-10.mp3', 'Groups of two, five and ten.'],
+            ['path-stop-mult-3-4.mp3', 'Groups of three and four.'],
+            ['path-stop-mult-6-9.mp3', 'Big groups.'],
+            ['path-stop-letter-names.mp3', 'Letter names.'],
+            ['path-stop-letter-sounds.mp3', 'Letter sounds.'],
+            ['path-stop-blending-cv.mp3', 'Blending sounds.'],
+            ['path-stop-cvc-words.mp3', 'Cat words.'],
+            ['path-stop-cvc-words-short-o.mp3', 'Dog words.'],
+            ['path-stop-cvc-words-short-u.mp3', 'Sun words.'],
+            ['path-stop-cvc-words-short-i.mp3', 'Pig words.'],
+            ['path-stop-cvc-words-short-e.mp3', 'Bed words.'],
+            ['path-stop-digraphs-sh.mp3', 'Ship words.'],
+            ['path-stop-digraphs-ch.mp3', 'Chick words.'],
+            ['path-stop-digraphs-th-voiceless.mp3', 'Thumb words.'],
+            ['path-stop-sight-words.mp3', 'Star words.'],
+            ['path-stop-simple-sentences.mp3', 'Reading sentences.'],
+          ],
+        ],
+        [
+          'Path — land gates',
+          [
+            ['path-land-math-1.mp3', 'Land 1: Counting.'],
+            ['path-land-math-2.mp3', 'Land 2: Adding and taking away.'],
+            ['path-land-math-3.mp3', 'Land 3: Big numbers.'],
+            ['path-land-math-4.mp3', 'Land 4: Groups.'],
+            ['path-land-word-song-1.mp3', 'Land 1: Letters.'],
+            ['path-land-word-song-2.mp3', 'Land 2: Blending.'],
+            ['path-land-word-song-3.mp3', 'Land 3: Words.'],
+            ['path-land-word-song-4.mp3', 'Land 4: Sound pairs.'],
+            ['path-land-word-song-5.mp3', 'Land 5: Sentences.'],
+          ],
+        ],
+        [
+          'Path — locked stop (next)',
+          [
+            [
+              'path-locked-next-add-to-10.mp3',
+              'Adding to ten! First, numbers. Then this!',
+            ],
+            [
+              'path-locked-next-add-to-20.mp3',
+              'Adding to twenty! First, adding to ten. Then this!',
+            ],
+            [
+              'path-locked-next-sub-to-10.mp3',
+              'Taking away to ten! First, adding to twenty. Then this!',
+            ],
+            [
+              'path-locked-next-sub-to-20.mp3',
+              'Taking away to twenty! First, taking away to ten. Then this!',
+            ],
+            [
+              'path-locked-next-two-digit-addsub-no-regroup.mp3',
+              'Big numbers! First, taking away to twenty. Then this!',
+            ],
+            [
+              'path-locked-next-two-digit-addsub-with-regroup.mp3',
+              'Making tens! First, big numbers. Then this!',
+            ],
+            [
+              'path-locked-next-skip-counting.mp3',
+              'Skip counting! First, making tens. Then this!',
+            ],
+            [
+              'path-locked-next-mult-2-5-10.mp3',
+              'Groups of two, five and ten! First, skip counting. Then this!',
+            ],
+            [
+              'path-locked-next-mult-3-4.mp3',
+              'Groups of three and four! First, groups of two, five and ten. Then this!',
+            ],
+            [
+              'path-locked-next-mult-6-9.mp3',
+              'Big groups! First, groups of three and four. Then this!',
+            ],
+            [
+              'path-locked-next-letter-sounds.mp3',
+              'Letter sounds! First, letter names. Then this!',
+            ],
+            [
+              'path-locked-next-blending-cv.mp3',
+              'Blending sounds! First, letter sounds. Then this!',
+            ],
+            [
+              'path-locked-next-cvc-words.mp3',
+              'Cat words! First, blending sounds. Then this!',
+            ],
+            [
+              'path-locked-next-cvc-words-short-o.mp3',
+              'Dog words! First, cat words. Then this!',
+            ],
+            [
+              'path-locked-next-cvc-words-short-u.mp3',
+              'Sun words! First, dog words. Then this!',
+            ],
+            [
+              'path-locked-next-cvc-words-short-i.mp3',
+              'Pig words! First, sun words. Then this!',
+            ],
+            [
+              'path-locked-next-cvc-words-short-e.mp3',
+              'Bed words! First, pig words. Then this!',
+            ],
+            [
+              'path-locked-next-digraphs-sh.mp3',
+              'Ship words! First, bed words. Then this!',
+            ],
+            [
+              'path-locked-next-digraphs-ch.mp3',
+              'Chick words! First, ship words. Then this!',
+            ],
+            [
+              'path-locked-next-digraphs-th-voiceless.mp3',
+              'Thumb words! First, chick words. Then this!',
+            ],
+            [
+              'path-locked-next-sight-words.mp3',
+              'Star words! First, thumb words. Then this!',
+            ],
+            [
+              'path-locked-next-simple-sentences.mp3',
+              'Reading sentences! First, star words. Then this!',
+            ],
+          ],
+        ],
+        [
+          'Path — session end: new flower',
+          [
+            ['end-bud-number-recog.mp3', 'Look! A new flower for numbers!'],
+            ['end-bud-add-to-10.mp3', 'Look! A new flower for adding to ten!'],
+            [
+              'end-bud-add-to-20.mp3',
+              'Look! A new flower for adding to twenty!',
+            ],
+            [
+              'end-bud-sub-to-10.mp3',
+              'Look! A new flower for taking away to ten!',
+            ],
+            [
+              'end-bud-sub-to-20.mp3',
+              'Look! A new flower for taking away to twenty!',
+            ],
+            [
+              'end-bud-two-digit-addsub-no-regroup.mp3',
+              'Look! A new flower for big numbers!',
+            ],
+            [
+              'end-bud-two-digit-addsub-with-regroup.mp3',
+              'Look! A new flower for making tens!',
+            ],
+            [
+              'end-bud-skip-counting.mp3',
+              'Look! A new flower for skip counting!',
+            ],
+            [
+              'end-bud-mult-2-5-10.mp3',
+              'Look! A new flower for groups of two, five and ten!',
+            ],
+            [
+              'end-bud-mult-3-4.mp3',
+              'Look! A new flower for groups of three and four!',
+            ],
+            ['end-bud-mult-6-9.mp3', 'Look! A new flower for big groups!'],
+            [
+              'end-bud-letter-names.mp3',
+              'Look! A new flower for letter names!',
+            ],
+            [
+              'end-bud-letter-sounds.mp3',
+              'Look! A new flower for letter sounds!',
+            ],
+            [
+              'end-bud-blending-cv.mp3',
+              'Look! A new flower for blending sounds!',
+            ],
+            ['end-bud-cvc-words.mp3', 'Look! A new flower for cat words!'],
+            [
+              'end-bud-cvc-words-short-o.mp3',
+              'Look! A new flower for dog words!',
+            ],
+            [
+              'end-bud-cvc-words-short-u.mp3',
+              'Look! A new flower for sun words!',
+            ],
+            [
+              'end-bud-cvc-words-short-i.mp3',
+              'Look! A new flower for pig words!',
+            ],
+            [
+              'end-bud-cvc-words-short-e.mp3',
+              'Look! A new flower for bed words!',
+            ],
+            ['end-bud-digraphs-sh.mp3', 'Look! A new flower for ship words!'],
+            ['end-bud-digraphs-ch.mp3', 'Look! A new flower for chick words!'],
+            [
+              'end-bud-digraphs-th-voiceless.mp3',
+              'Look! A new flower for thumb words!',
+            ],
+            ['end-bud-sight-words.mp3', 'Look! A new flower for star words!'],
+            [
+              'end-bud-simple-sentences.mp3',
+              'Look! A new flower for reading sentences!',
+            ],
+          ],
+        ],
+        [
+          'Path — session end: unlock',
+          [
+            [
+              'end-unlock-add-to-10.mp3',
+              'You learned numbers! Now you can do adding to ten!',
+            ],
+            [
+              'end-unlock-add-to-20.mp3',
+              'You learned adding to ten! Now you can do adding to twenty!',
+            ],
+            [
+              'end-unlock-sub-to-10.mp3',
+              'You learned adding to twenty! Now you can do taking away to ten!',
+            ],
+            [
+              'end-unlock-sub-to-20.mp3',
+              'You learned taking away to ten! Now you can do taking away to twenty!',
+            ],
+            [
+              'end-unlock-two-digit-addsub-no-regroup.mp3',
+              'You learned taking away to twenty! Now you can do big numbers!',
+            ],
+            [
+              'end-unlock-two-digit-addsub-with-regroup.mp3',
+              'You learned big numbers! Now you can do making tens!',
+            ],
+            [
+              'end-unlock-skip-counting.mp3',
+              'You learned making tens! Now you can do skip counting!',
+            ],
+            [
+              'end-unlock-mult-2-5-10.mp3',
+              'You learned skip counting! Now you can do groups of two, five and ten!',
+            ],
+            [
+              'end-unlock-mult-3-4.mp3',
+              'You learned groups of two, five and ten! Now you can do groups of three and four!',
+            ],
+            [
+              'end-unlock-mult-6-9.mp3',
+              'You learned groups of three and four! Now you can do big groups!',
+            ],
+            [
+              'end-unlock-letter-sounds.mp3',
+              'You learned letter names! Now you can do letter sounds!',
+            ],
+            [
+              'end-unlock-blending-cv.mp3',
+              'You learned letter sounds! Now you can do blending sounds!',
+            ],
+            [
+              'end-unlock-cvc-words.mp3',
+              'You learned blending sounds! Now you can do cat words!',
+            ],
+            [
+              'end-unlock-cvc-words-short-o.mp3',
+              'You learned cat words! Now you can do dog words!',
+            ],
+            [
+              'end-unlock-cvc-words-short-u.mp3',
+              'You learned dog words! Now you can do sun words!',
+            ],
+            [
+              'end-unlock-cvc-words-short-i.mp3',
+              'You learned sun words! Now you can do pig words!',
+            ],
+            [
+              'end-unlock-cvc-words-short-e.mp3',
+              'You learned pig words! Now you can do bed words!',
+            ],
+            [
+              'end-unlock-digraphs-sh.mp3',
+              'You learned bed words! Now you can do ship words!',
+            ],
+            [
+              'end-unlock-digraphs-ch.mp3',
+              'You learned ship words! Now you can do chick words!',
+            ],
+            [
+              'end-unlock-digraphs-th-voiceless.mp3',
+              'You learned chick words! Now you can do thumb words!',
+            ],
+            [
+              'end-unlock-sight-words.mp3',
+              'You learned thumb words! Now you can do star words!',
+            ],
+            [
+              'end-unlock-simple-sentences.mp3',
+              'You learned star words! Now you can do reading sentences!',
+            ],
+          ],
+        ],
+        [
+          'Path — session end: new land',
+          [
+            [
+              'end-land-math-2.mp3',
+              'A new land! Land 2: Adding and taking away!',
+            ],
+            ['end-land-math-3.mp3', 'A new land! Land 3: Big numbers!'],
+            ['end-land-math-4.mp3', 'A new land! Land 4: Groups!'],
+            ['end-land-word-song-2.mp3', 'A new land! Land 2: Blending!'],
+            ['end-land-word-song-3.mp3', 'A new land! Land 3: Words!'],
+            ['end-land-word-song-4.mp3', 'A new land! Land 4: Sound pairs!'],
+            ['end-land-word-song-5.mp3', 'A new land! Land 5: Sentences!'],
+          ],
+        ],
+        [
+          'Path — session end: new land (no number)',
+          [
+            [
+              'end-land-math-2-no-number.mp3',
+              'A new land: Adding and taking away!',
+            ],
+            ['end-land-math-3-no-number.mp3', 'A new land: Big numbers!'],
+            ['end-land-math-4-no-number.mp3', 'A new land: Groups!'],
+            ['end-land-word-song-2-no-number.mp3', 'A new land: Blending!'],
+            ['end-land-word-song-3-no-number.mp3', 'A new land: Words!'],
+            ['end-land-word-song-4-no-number.mp3', 'A new land: Sound pairs!'],
+            ['end-land-word-song-5-no-number.mp3', 'A new land: Sentences!'],
+          ],
+        ],
+      ]
+
       // ── State ────────────────────────────────────────────────────────────
       // items: array of render descriptors. Order = group order, then within
       // a group the order rows are appended.
@@ -1387,10 +1835,16 @@
       }
 
       // ── Footer (AC: print computed unique-render count) ──────────────────
-      function renderFooter(canonUnique, rawCanon, greetCount, hubCount) {
+      function renderFooter(
+        canonUnique,
+        rawCanon,
+        greetCount,
+        hubCount,
+        pathCount,
+      ) {
         const expected = 760
         const ok = canonUnique === expected
-        const total = canonUnique + greetCount + hubCount
+        const total = canonUnique + greetCount + hubCount + pathCount
         const el = document.getElementById('footer')
         // The vqa-render-count element's FIRST number must equal the total
         // rendered row count (Jessica's AC1 reads its first \d+ and asserts
@@ -1407,7 +1861,9 @@
           greetCount +
           ' greet + ' +
           hubCount +
-          ' hub. ' +
+          ' hub + ' +
+          pathCount +
+          ' path. ' +
           (ok
             ? 'Computed unique canon count matches expected <code>760</code>. ✓'
             : '<strong style="color:#a94442">Computed unique canon count = ' +
@@ -1459,12 +1915,23 @@
             HUB_FILES,
           )
           appendGroup('Hub', hubRenders.length + ' clips', hubRenders)
+          let pathCount = 0
+          for (const [label, files] of PATH_GROUPS) {
+            const pathRenders = await loadAssetGroup(
+              'path',
+              '/assets/audio/path/',
+              files,
+            )
+            appendGroup(label, pathRenders.length + ' clips', pathRenders)
+            pathCount += pathRenders.length
+          }
 
           renderFooter(
             canonUnique,
             rawCanon,
             greetRenders.length,
             hubRenders.length,
+            pathCount,
           )
           refreshCounters()
           setFilter('all')
@@ -1482,7 +1949,9 @@
               greetRenders.length +
               ' greet + ' +
               hubRenders.length +
-              ' hub). Tap Play, then Pass / Fail.' +
+              ' hub + ' +
+              pathCount +
+              ' path). Tap Play, then Pass / Fail.' +
               mismatch,
             mismatch ? '' : 'ok',
           )
