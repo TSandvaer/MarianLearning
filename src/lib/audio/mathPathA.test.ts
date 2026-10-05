@@ -477,6 +477,29 @@ describe('prepareMathPathA — failure paths', () => {
       }),
     ).rejects.toMatchObject({ code: 'aborted' })
   })
+
+  it('does not register howls when aborted after the response arrived (123jpnbc3dh)', async () => {
+    // Session-start timeout fallback: the hinted request is aborted while
+    // its body is already in hand. Loading its audio would stomp the
+    // fallback request's howls in the session-audio singleton.
+    const plan = STATIC_SESSION_PLANS[0]!
+    const controller = new AbortController()
+    const fetchMock = vi.fn(async () => {
+      controller.abort()
+      return jsonResp(buildServerResponse(plan))
+    })
+    const loadSessionAudio = vi.fn(async () => new Map())
+
+    await expect(
+      prepareMathPathA(STD_ARGS, {
+        fetch: fetchMock as unknown as typeof globalThis.fetch,
+        signal: controller.signal,
+        loadSessionAudio,
+        playSessionUtterance: vi.fn(async () => {}),
+      }),
+    ).rejects.toMatchObject({ code: 'aborted' })
+    expect(loadSessionAudio).toHaveBeenCalledTimes(0)
+  })
 })
 
 describe('prepareMathPathA — playUtterance edge cases', () => {

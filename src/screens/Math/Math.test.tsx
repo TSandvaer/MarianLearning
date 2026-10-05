@@ -2466,6 +2466,14 @@ describe('Math (Number Garden) screen', () => {
     expect(screen.queryAllByTestId('math-chip')).toHaveLength(0)
     expect(screen.queryByTestId('math-addend-a')).not.toBeInTheDocument()
     expect(screen.queryByTestId('math-addend-b')).not.toBeInTheDocument()
+
+    // Emma's Path 1/10 (123jpnbc3dh): the empty slot shows a "getting
+    // ready" beat and Emma holds her existing `listening` pose.
+    expect(screen.getByTestId('math-getting-ready')).toBeInTheDocument()
+    expect(screen.getByTestId('math-emma')).toHaveAttribute(
+      'data-pose',
+      'listening',
+    )
   })
 
   it('render gate: audioReady=true renders the problem area (ticket 86c9kxb5q)', () => {
@@ -2488,6 +2496,7 @@ describe('Math (Number Garden) screen', () => {
     expect(screen.getByTestId('math-chips')).toBeInTheDocument()
     expect(screen.getAllByTestId('math-chip')).toHaveLength(3)
     expect(screen.getByTestId('math-addend-a')).toHaveTextContent('3')
+    expect(screen.queryByTestId('math-getting-ready')).not.toBeInTheDocument()
     expect(screen.getByTestId('math-addend-b')).toHaveTextContent('2')
   })
 

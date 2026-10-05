@@ -339,6 +339,15 @@ export async function prepareWordSongPathA(
     throw err
   }
 
+  // A request aborted after its body arrived (session-start timeout
+  // fallback, 123jpnbc3dh) must not register howls: session audio is a
+  // singleton and the fallback request's load owns it.
+  if (opts.signal?.aborted) {
+    throw new PrepareWordSongPathAError(
+      'aborted',
+      'Path A aborted before audio load',
+    )
+  }
   await loadAudio(args.sessionId, sessionResponse.utterances)
 
   const textToId = new Map<string, string>()

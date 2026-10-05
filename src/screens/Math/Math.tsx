@@ -26,6 +26,7 @@ import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
+import { GettingReady } from '../../components/GettingReady'
 import { chipMaxAnswerForCorrects, pickDistractors } from './distractors'
 import { flowerRowFontSizeRem } from './flowerRowFit'
 import {
@@ -2969,7 +2970,7 @@ function MathScreen({
             brief.md` §3.2-§3.5. Reduce-motion is honoured via the
             shared component. */}
         <EmmaCharacter
-          pose={pose}
+          pose={audioReady === false && pose === 'idle' ? 'listening' : pose}
           layoutId="emma"
           data-testid="math-emma"
           className="h-[26vh] w-auto select-none"
@@ -3022,6 +3023,10 @@ function MathScreen({
        * every test/caller that pre-dates this gate. App.tsx always passes
        * a boolean in production.
        */}
+      {/* Emma's Path 1/10 (123jpnbc3dh): while the session start is in
+          flight, show a "getting ready" beat in the problem slot instead of
+          an empty screen (Emma holds her `listening` pose above). */}
+      {audioReady === false && <GettingReady testId="math-getting-ready" />}
       {audioReady !== false && (
         <>
           {/* Problem display — symbolic + (op==='+' only) visual flowers */}
