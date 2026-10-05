@@ -239,6 +239,8 @@ rendered as a **linear path of icon nodes**, not a dot row and not a graph:
 | **Locked (future)**   | `🔒` (or padlock SVG) at `--my-pink-30`, opacity 0.6                                                                           | Stage not yet reached; not tappable; no "how to unlock" copy |
 | **Connector**         | 12pt dashed line `—` between icons, color matches the _earlier_ node's state                                                   | Reinforces the path / temporal ordering                      |
 
+> **Superseded (Emma's Path, 2026-10-05):** the 5-icon strip is replaced by the Hub land card; locked steps show frosted real art and every tap gets Emma's voice naming the requirement. See `design/emmas-path/emmas-path-spec.md` §0.
+
 Per Dave's memo: **no text labels on the path icons.** The text-free convention reduces
 working-memory load and respects Marian's reading-emergent level. Tapping an individual icon
 does nothing — the _whole node_ is the tap target. The path strip is informative-only.
@@ -266,6 +268,8 @@ comprehension requires explicit instruction. We don't have that. A linear slidin
 honours the v1 progression (locked linear per CLAUDE.md, no branching choices in v1) without
 asking Marian to read a diagram convention.
 
+> **Superseded (Emma's Path, 2026-10-05):** each world now has a whole-tree map screen (one linear path, audio on every stop). See `design/emmas-path/emmas-path-spec.md` §0.
+
 **Why no "skill complete!" celebration on the Hub.** Stage transitions happen at session-end,
 not at Hub-view. Hub just renders the current state — celebrations live in the session
 end-screen if/when a stage rolls over (out of scope for v1; flag as v2 enhancement).
@@ -281,6 +285,8 @@ or a stage-of-prior-tree threshold:
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Unlocked (v1 default)** | Full colour, gentle 4s breathing scale loop (1.0 → 1.02 → 1.0), tappable                                                                                                                                                                                                                                                                          |
 | **Locked (v2+)**          | Desaturated to 60%, no breathing loop, padlock glyph in top-right of card, tap shows a single line "Coming soon!" with no further detail. **Never** show "earn 47 more stardust to unlock" — that's the gap-framing dark pattern Mammarella et al. (cited in `design/research/math-distractor-and-streak-decisions.md`) explicitly warns against. |
+
+> **Superseded (Emma's Path, 2026-10-05):** locks never apply to a whole world, and a locked step's tap speaks its requirement as a skill — "Coming soon!" is retired. The no-stardust-to-unlock ban stands. See `design/emmas-path/emmas-path-spec.md` §0.
 
 **Defer to v2.** No locked node ships in v1.
 
@@ -1186,7 +1192,7 @@ Per CLAUDE.md non-negotiables, confirmed absent from this spec:
       path.
 - [x] **Never a red X / never a soft no on initiative.** Tapping a node always commits — there
       is no disabled-while-speaking state per the Greet edge-case rule (`design/decisions/greet-
-    edge-cases.md` Edge case 1).
+  edge-cases.md` Edge case 1).
 - [x] **Soft suggestion respects autonomy.** The guided-default is a question, not an
       imperative; the alternative node is fully tappable and visually equal (no dimming);
       override-detection caps suggestion at 3 days running and triggers a 2-day suspension to
