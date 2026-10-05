@@ -154,8 +154,9 @@ describe('promotion round-trip (writer → reader)', () => {
     const overlay = screen.getByTestId('hub-promotion-celebration')
     expect(overlay).toBeInTheDocument()
     expect(overlay.getAttribute('data-node')).toBe('add-to-10')
+    // Mastered add-to-10 → the caption names the UNLOCKED stage.
     expect(screen.getByTestId('hub-promotion-node-label').textContent).toBe(
-      'add to 10',
+      'Adding to twenty',
     )
     // The picker remains functional beneath the overlay.
     expect(screen.getAllByTestId('hub-tree-node')).toHaveLength(2)
@@ -282,8 +283,9 @@ describe('promotion round-trip (writer → reader)', () => {
     const overlay = screen.getByTestId('hub-promotion-celebration')
     expect(overlay).toBeInTheDocument()
     expect(overlay.getAttribute('data-node')).toBe('add-to-10')
+    // Mastered add-to-10 → the caption names the UNLOCKED stage.
     expect(screen.getByTestId('hub-promotion-node-label').textContent).toBe(
-      'add to 10',
+      'Adding to twenty',
     )
   })
 

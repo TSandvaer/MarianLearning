@@ -906,9 +906,10 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     // Sparkle burst renders — 8 sparkles per the radial layout.
     await expect(page.getByTestId('hub-promotion-sparkle')).toHaveCount(8)
 
-    // Caption uses the projected human label for cvc-words.
+    // Caption names the stage cvc-words UNLOCKED (short o), not
+    // cvc-words itself (ticket 123jpnbc3dn).
     await expect(page.getByTestId('hub-promotion-node-label')).toHaveText(
-      'CVC words',
+      'Words like dog',
     )
   })
 

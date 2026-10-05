@@ -86,7 +86,7 @@ import {
   type StageId,
 } from './stages'
 import PromotionCelebration from './PromotionCelebration'
-import { labelForSkillNode } from './progressProjection'
+import { unlockCelebrationFor } from './unlockCelebration'
 import type { SkillNode } from '../../lib/progress'
 
 // ── Public types ────────────────────────────────────────────────────────
@@ -115,7 +115,8 @@ export interface HubProps {
    * Skill node that the M3 mastery rule has queued for promotion (ticket
    * 86c9kwnkw). When set, Hub mounts the PromotionCelebration overlay on
    * top of the normal greeting — Marian sees Emma in the celebration
-   * pose with a sparkle burst + "You unlocked X!" caption.
+   * pose with a sparkle burst + a caption and spoken Lily line naming the
+   * stage this mastery UNLOCKED ("Something new! Adding to twenty!").
    *
    * The orchestrator (App.tsx) reads `progress.pendingPromotion` from
    * `loadProgress()` and passes it through. The field is set by
@@ -213,6 +214,15 @@ export default function Hub({
   const handleCelebrationDismiss = useCallback(() => {
     if (pendingPromotion !== undefined) setDismissedFor(pendingPromotion)
   }, [pendingPromotion])
+  // `pendingPromotion` is the MASTERED node; the celebration names and
+  // speaks the stage it UNLOCKED (ticket 123jpnbc3dn).
+  const celebration = useMemo(
+    () =>
+      pendingPromotion === undefined
+        ? null
+        : unlockCelebrationFor(pendingPromotion),
+    [pendingPromotion],
+  )
 
   // Read history once on mount + subscribe to cross-tab writes.
   //
@@ -337,6 +347,23 @@ export default function Hub({
 
   const dispatchGreeting = useCallback(() => {
     if (greetingDispatchedRef.current) return
+    // A visible celebration REPLACES the welcome-back line for this mount
+    // (design/screen-hub/promotion-celebration.md: only one ribbon line
+    // per mount, and it's the celebration line). No caption ticks — the
+    // celebration overlay renders its own caption, so the Hub ribbon
+    // stays hidden.
+    if (celebrationVisible && celebration !== null) {
+      greetingDispatchedRef.current = true
+      console.log('[Hub] celebration: dispatching', {
+        lineId: celebration.lineId,
+        mastered: pendingPromotion,
+        unlocked: celebration.unlocked,
+      })
+      greetingPromiseRef.current = playLine(celebration.lineId).catch((err) => {
+        console.warn('[Hub] celebration line failed:', err)
+      })
+      return
+    }
     if (greeting.lineId === null) {
       // Log suppression decisions exactly once per Hub mount so the
       // iPad-export consoles show *why* the welcome-back was skipped.
@@ -371,7 +398,16 @@ export default function Hub({
       // nodes remain tappable.
       console.warn('[Hub] welcome-back line failed:', err)
     })
-  }, [greeting.lineId, path, playLine, suggestion, suppressed])
+  }, [
+    celebration,
+    celebrationVisible,
+    greeting.lineId,
+    path,
+    pendingPromotion,
+    playLine,
+    suggestion,
+    suppressed,
+  ])
 
   // For paths where the audio context is already hot, fire on mount.
   // For app-open paths, wait for the first user gesture (tap-anywhere).
@@ -650,11 +686,14 @@ export default function Hub({
           of where in the tree it mounts. */}
       <div className="pointer-events-none flex h-[22vh] w-full items-center justify-center">
         <AnimatePresence mode="wait" initial={false}>
-          {celebrationVisible && pendingPromotion !== undefined ? (
+          {celebrationVisible &&
+          pendingPromotion !== undefined &&
+          celebration !== null ? (
             <PromotionCelebration
               key={`celebration-emma-${pendingPromotion}`}
               node={pendingPromotion}
-              label={labelForSkillNode(pendingPromotion)}
+              unlockedNode={celebration.unlocked}
+              label={celebration.name}
               onDismiss={handleCelebrationDismiss}
             />
           ) : (
