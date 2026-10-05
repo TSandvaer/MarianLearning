@@ -510,7 +510,7 @@ interface PerVowelScanResult {
  * When EITHER condition fails, the caller falls through to the unchanged
  * Wave 7 composite-tier 90/3 rule for `letter-sounds`.
  */
-function perVowelTrackingActive(progress: Progress): boolean {
+export function perVowelTrackingActive(progress: Progress): boolean {
   const states = progress.literacy?.letterSoundsVowelStates
   if (states === undefined) return false
   return progress.history.some(
@@ -598,7 +598,7 @@ function scanPerVowelSubMastery(
  * node (programming error — kept defensive so the caller doesn't crash
  * on an out-of-band string).
  */
-function trackOf(node: SkillNode): MasteryTrack | null {
+export function trackOf(node: SkillNode): MasteryTrack | null {
   if ((MATH_TREE as readonly string[]).includes(node)) return 'math'
   if ((LITERACY_TREE as readonly string[]).includes(node)) return 'word-song'
   return null
@@ -632,20 +632,37 @@ function qualifies(
  * by node membership, or by node + `currentTargetVowel`). Returns false
  * for an empty slice or a window shorter than `threshold.sessions`.
  */
-function qualifiesOverHistory(
+export function qualifiesOverHistory(
   focused: readonly SessionHistoryEntry[],
   threshold: MasteryThreshold,
   settings: ParentSettings,
 ): boolean {
-  if (focused.length === 0) return false
+  return qualifyingDayCount(focused, threshold, settings) >= threshold.sessions
+}
 
+/**
+ * How many of the `threshold.sessions` days the rule needs are already
+ * banked: the trailing run of (cross-day-deduped) entries at or above
+ * `threshold.percent`, capped at `threshold.sessions`. A node qualifies
+ * exactly when this reaches `threshold.sessions` — `qualifiesOverHistory`
+ * is defined in terms of it, so the progress display (`nodeProgress.ts`)
+ * and the rule cannot drift apart.
+ */
+export function qualifyingDayCount(
+  focused: readonly SessionHistoryEntry[],
+  threshold: MasteryThreshold,
+  settings: ParentSettings,
+): number {
   const filtered = settings.crossDayEnforcement
     ? dedupeByCalendarDay(focused)
     : focused
-  if (filtered.length < threshold.sessions) return false
-
-  const window = filtered.slice(-threshold.sessions)
-  return window.every((entry) => entry.successRate >= threshold.percent)
+  let count = 0
+  for (let i = filtered.length - 1; i >= 0; i--) {
+    if (count >= threshold.sessions) break
+    if (filtered[i]!.successRate < threshold.percent) break
+    count++
+  }
+  return count
 }
 
 /**
@@ -725,7 +742,7 @@ function localDayKey(dateISO: string): string {
 // ── Graduation-gate helpers (ticket 86c9m3aec) ─────────────────────────
 
 /** True when `node` is in the graduation-gated set. */
-function isGraduationGated(node: SkillNode): boolean {
+export function isGraduationGated(node: SkillNode): boolean {
   return (WORD_SONG_GRADUATION_GATED_NODES as readonly string[]).includes(node)
 }
 
@@ -744,7 +761,7 @@ function isGraduationGated(node: SkillNode): boolean {
  * `novelPoolSuccessRate`); requiring them to clear the novel gate
  * would never be satisfiable. So the gate reads only the tail entry.
  */
-function graduationGateClears(
+export function graduationGateClears(
   history: readonly SessionHistoryEntry[],
   node: SkillNode,
   threshold: MasteryThreshold,
