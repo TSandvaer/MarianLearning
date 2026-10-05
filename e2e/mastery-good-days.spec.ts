@@ -217,11 +217,11 @@ test.describe('mastery: 3 good days at 7/8+, any order, never lost (ticket 123jp
     expect(persisted.history.at(-1)!.skillFocus).toEqual(['sub-to-10'])
     expect(persisted.history.at(-1)!.successRate).toBe(1)
 
-    // Three good days banked: the two seeded 7/8 days + today.
-    expect(persisted.goodDays?.['sub-to-10']).toHaveLength(3)
-
     expect(persisted.skillLevels['sub-to-10']).toBe('mastered')
     expect(persisted.skillLevels['sub-to-20']).toBe('intro')
+
+    // Three good days banked: the two seeded 7/8 days + today.
+    expect(persisted.goodDays?.['sub-to-10']).toHaveLength(3)
   })
 
   test('good days banked in the counter survive history aging out', async ({
@@ -249,12 +249,12 @@ test.describe('mastery: 3 good days at 7/8+, any order, never lost (ticket 123jp
     expect(persisted.history).toHaveLength(1)
     expect(persisted.history[0]!.skillFocus).toEqual(['sub-to-10'])
 
+    expect(persisted.skillLevels['sub-to-10']).toBe('mastered')
+    expect(persisted.skillLevels['sub-to-20']).toBe('intro')
+
     // Banked days kept + today's added — never removed.
     const days = persisted.goodDays?.['sub-to-10'] ?? []
     expect(days).toHaveLength(3)
     expect(days.slice(0, 2)).toEqual(['2026-01-05', '2026-01-06'])
-
-    expect(persisted.skillLevels['sub-to-10']).toBe('mastered')
-    expect(persisted.skillLevels['sub-to-20']).toBe('intro')
   })
 })
