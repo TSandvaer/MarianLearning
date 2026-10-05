@@ -1,6 +1,6 @@
 # STATE — Marian Tutor live coordination
 
-**Resume next-action:** _2026-10-05 05:30Z: WAVE 1 (Orca run `run_4d45085be2cd`) — all workers released. 6/10 #496 MERGED 2a37696. Merge on Playwright SUCCESS (all approvals in hand): #497 5/10 celebration (reviewer APPROVE + Thomas ear-test APPROVED), #498 1/10 session timeout (APPROVE), #499 4/10 good days (REQUEST_CHANGES → fixed 472678b → re-check APPROVE; fast-gate flake in Math.test.tsx re-run, passes 3/3 locally). Then flip tickets COMPLETE, start wave 2: 2/10 Hub prefetch (after #497+#498 merge — shares Hub/session-start files), 10/10 + 7/10 (6/10 now merged). Nothing released yet — `yarn release` needs Thomas._
+**Resume next-action:** _2026-10-05 05:45Z: Orca run `run_4d45085be2cd`. MERGED (not released): #496 6/10 2a37696, #497 5/10 0a59dd1, #498 1/10 36e0894. #499 4/10 approved (re-check APPROVE) — merge on Playwright SUCCESS. WAVE 2 in flight: 2/10 Hub prefetch `ctx_e037083f3301`, 7/10 Hub card `ctx_f58d9eb12e69` (owns local e2e; needs Thomas's iPad eye), 10/10 Lily lines `ctx_e630b34040bc` (whole-line bakes, Thomas ear-tests all). Each code PR → reviewer worker → merge on CI+APPROVE. Then 8/10 map, 9/10 session-end. `yarn release` needs Thomas._
 
 > **The doctrine is LIVE as of `976beef`.** What changed for you, concretely:
 >
