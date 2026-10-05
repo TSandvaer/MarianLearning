@@ -13,7 +13,8 @@
  *
  * Art: the spec's 24 stop pictures (§5) are not produced yet, so the
  * hero uses the existing word pictures for the five CVC steps and the
- * old path-strip glyph for the rest.
+ * old path-strip glyph for the rest. The map screen (8/10) reuses
+ * `StepArt` + `Padlock` for its stops.
  */
 
 import type { CSSProperties, ReactElement } from 'react'
@@ -22,6 +23,7 @@ import { LITERACY_TREE, MATH_TREE, type SkillNode } from '../../lib/progress'
 import type { Bead, HubCardModel } from './hubCardModel'
 import { NUMBER_GARDEN_STAGES, WORD_SONG_STAGES, type StageId } from './stages'
 import { StageGlyph } from './stageIcons'
+import { createSfx, type Sfx } from '../../lib/sfx'
 
 const ROSE = '#F48FB1'
 const PINK_30 = 'rgba(255, 192, 203, 0.3)'
@@ -43,7 +45,7 @@ function stageIdOf(node: SkillNode): StageId {
   return WORD_SONG_STAGES[wi]!
 }
 
-function StepArt({
+export function StepArt({
   node,
   size,
 }: {
@@ -70,7 +72,7 @@ function StepArt({
   )
 }
 
-function Padlock({ size }: { size: number }): ReactElement {
+export function Padlock({ size }: { size: number }): ReactElement {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden>
       <rect x="5" y="10" width="14" height="11" rx="2.5" fill={ROSE} />
@@ -360,5 +362,80 @@ export function HubPathCard({ model }: HubPathCardProps): ReactElement {
         ))}
       </div>
     </div>
+  )
+}
+
+// ── Map button (spec §2 "Map button", Emma's Path 8/10) ───────────────
+
+// One plink for the app session: the tap flips the route at once, so a
+// per-mount Howl unloaded with the Hub would cut the sound off.
+let plinkSfx: Sfx | null = null
+function playPlink(): void {
+  plinkSfx ??= createSfx({ src: '/assets/sfx-plink.mp3', volume: 0.3 })
+  plinkSfx.play()
+}
+
+function FoldedMap(): ReactElement {
+  return (
+    <svg viewBox="0 0 40 40" width={40} height={40} aria-hidden>
+      <path
+        d="M4 9 L14 5 L26 9 L36 5 V31 L26 35 L14 31 L4 35 Z"
+        fill="#FFF9C4"
+        stroke={ROSE}
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+      <path d="M14 5 V31 M26 9 V35" stroke={ROSE} strokeWidth="1.5" />
+      <path
+        d="M8 26 Q14 18 19 22 T31 13"
+        stroke="#E91E63"
+        strokeWidth="1.6"
+        strokeDasharray="2.5 2.5"
+        fill="none"
+      />
+      <circle cx="31" cy="13" r="2.4" fill="#E91E63" />
+    </svg>
+  )
+}
+
+export interface HubMapButtonProps {
+  world: HubCardModel['world']
+  /** Card width — the button is a card-width pill. */
+  width: string
+  onOpen: () => void
+  /** Fires on pointerdown, before the Hub's first-tap handler (see Hub). */
+  onPress?: () => void
+}
+
+/** 64px card-width pill with a folded-map picture; tap → plink + map. */
+export function HubMapButton({
+  world,
+  width,
+  onOpen,
+  onPress,
+}: HubMapButtonProps): ReactElement {
+  return (
+    <m.button
+      type="button"
+      data-testid="hub-map-button"
+      data-world={world}
+      aria-label={world === 'math' ? 'Number Garden map' : 'Word Song map'}
+      onPointerDown={onPress}
+      onClick={() => {
+        playPlink()
+        onOpen()
+      }}
+      className="flex select-none touch-manipulation items-center justify-center rounded-full"
+      style={{
+        width,
+        height: 64,
+        background: CREAM,
+        border: `2px solid ${ROSE}`,
+      }}
+      whileTap={{ scale: 0.96 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+    >
+      <FoldedMap />
+    </m.button>
   )
 }

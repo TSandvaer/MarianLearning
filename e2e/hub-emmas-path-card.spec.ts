@@ -106,8 +106,8 @@ test.describe("Emma's Path — Hub card (123jpnbc3dq)", () => {
     await expect(word.getByTestId('hub-card-land')).toHaveCount(5)
     await expect(word.getByTestId('hub-land-number')).toHaveCount(1)
 
-    // Out of scope until 8/10: no map button renders.
-    await expect(page.getByRole('button', { name: /map/i })).toHaveCount(0)
+    // One map button per card (Emma's Path 8/10).
+    await expect(page.getByRole('button', { name: /map/i })).toHaveCount(2)
   })
 
   test('showLevelToMarian=false hides only the land numbers', async ({

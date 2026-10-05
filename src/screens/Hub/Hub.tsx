@@ -64,7 +64,7 @@ import {
 import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
-import { HubPathCard } from './HubPathCard'
+import { HubMapButton, HubPathCard } from './HubPathCard'
 import { buildHubCardModel, type HubCardModel } from './hubCardModel'
 import {
   playHubLine as defaultPlayHubLine,
@@ -148,6 +148,12 @@ export interface HubProps {
    */
   onPickTree?: (tree: SkillTreeId) => void
   /**
+   * Fires when Marian taps the map button under a card (Emma's Path
+   * 8/10, spec §2 "Map button"). The orchestrator routes to that world's
+   * map. When omitted no map button renders.
+   */
+  onOpenMap?: (world: HubCardModel['world']) => void
+  /**
    * Fires when the invisible 2-second corner long-press completes. v1
    * defaults to a `console.log` (per spec). v2 will navigate to the
    * real parent area.
@@ -216,6 +222,7 @@ export default function Hub({
   progressDoc,
   pendingPromotion,
   onPickTree,
+  onOpenMap,
   onParentGate,
   onCharacterLongPress,
   playLineFn,
@@ -603,6 +610,20 @@ export default function Hub({
     ],
   )
 
+  // ── Map button (Emma's Path 8/10) -------------------------------------
+
+  const handleOpenMap = useCallback(
+    (world: HubCardModel['world']) => {
+      // Same gesture contract as a card tap: drain a pending iOS resume
+      // inside the tap, stop the greeting, hand the route to App.
+      drainOnGesture(resumeHowlerContextOnGesture, unlockIosAudioSession)
+      cancelledRef.current = true
+      cancelLine()
+      onOpenMap?.(world)
+    },
+    [onOpenMap, cancelLine],
+  )
+
   // ── First-tap audio unlock for the app-open path ----------------------
 
   const handleFirstTap = useCallback(() => {
@@ -809,24 +830,44 @@ export default function Hub({
 
       {/* Skill-tree picker — two nodes side-by-side. */}
       <div className="flex flex-1 items-center justify-center gap-7 px-4">
-        <SkillTreeNode
-          tree="number-garden"
-          label="Number Garden"
-          signature={<NumberGardenSignature />}
-          card={numberGardenCard}
-          suggested={suggestion === 'number-garden'}
-          onTap={() => handleNodeTap('number-garden')}
-          onPress={handleNodePress}
-        />
-        <SkillTreeNode
-          tree="word-song"
-          label="Word Song"
-          signature={<WordSongSignature />}
-          card={wordSongCard}
-          suggested={suggestion === 'word-song'}
-          onTap={() => handleNodeTap('word-song')}
-          onPress={handleNodePress}
-        />
+        <div className="flex flex-col items-center" style={{ gap: 16 }}>
+          <SkillTreeNode
+            tree="number-garden"
+            label="Number Garden"
+            signature={<NumberGardenSignature />}
+            card={numberGardenCard}
+            suggested={suggestion === 'number-garden'}
+            onTap={() => handleNodeTap('number-garden')}
+            onPress={handleNodePress}
+          />
+          {onOpenMap && (
+            <HubMapButton
+              world="math"
+              width="280pt"
+              onPress={handleNodePress}
+              onOpen={() => handleOpenMap('math')}
+            />
+          )}
+        </div>
+        <div className="flex flex-col items-center" style={{ gap: 16 }}>
+          <SkillTreeNode
+            tree="word-song"
+            label="Word Song"
+            signature={<WordSongSignature />}
+            card={wordSongCard}
+            suggested={suggestion === 'word-song'}
+            onTap={() => handleNodeTap('word-song')}
+            onPress={handleNodePress}
+          />
+          {onOpenMap && (
+            <HubMapButton
+              world="word-song"
+              width="280pt"
+              onPress={handleNodePress}
+              onOpen={() => handleOpenMap('word-song')}
+            />
+          )}
+        </div>
       </div>
 
       {/* Recent-stats strip — fixed-slot height; renders empty when no

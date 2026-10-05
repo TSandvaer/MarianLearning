@@ -24,6 +24,7 @@ import type {
 import SessionEnd from './screens/SessionEnd'
 import type { PlayUtteranceFn, SessionEndPayload } from './screens/SessionEnd'
 import ParentSettings from './screens/ParentSettings'
+import MapScreen from './screens/Map/MapScreen'
 import {
   SESSION_HISTORY_KEY,
   markTreeTouched,
@@ -79,6 +80,7 @@ import {
   type FocusMode,
   type LeitnerSessionHintItem,
   type LetterSoundsVowel,
+  type MasteryTrack,
   type Progress,
   type ProgressTrack,
   type SkillLevel,
@@ -231,7 +233,8 @@ function getInitialRoute(): Route {
       v === 'literacy' ||
       v === 'session-end' ||
       v === 'reward' ||
-      v === 'parent-settings'
+      v === 'parent-settings' ||
+      v === 'map'
     ) {
       return v
     }
@@ -239,6 +242,17 @@ function getInitialRoute(): Route {
     // URLSearchParams should not throw on a string, but be defensive.
   }
   return FIRST_ROUTE
+}
+
+/** `?route=map&world=word-song` QA launch; any other value → Number Garden. */
+function getInitialMapWorld(): MasteryTrack {
+  if (typeof window === 'undefined') return 'math'
+  try {
+    const v = new URLSearchParams(window.location.search).get('world')
+    return v === 'word-song' ? 'word-song' : 'math'
+  } catch {
+    return 'math'
+  }
 }
 
 /**
@@ -635,6 +649,21 @@ export default function App() {
    */
   const handleHubCharacterLongPress = useCallback(() => {
     setRoute('parent-settings')
+  }, [])
+
+  /**
+   * Hub map button → that world's map (Emma's Path 8/10, 123jpnbc3dr).
+   * The map's Home button returns as a mid-skill back: no welcome-back
+   * greeting (the map stamps the Hub's rapid-remount key on leave).
+   */
+  const [mapWorld, setMapWorld] = useState<MasteryTrack>(getInitialMapWorld)
+  const handleHubOpenMap = useCallback((world: MasteryTrack) => {
+    setMapWorld(world)
+    setRoute('map')
+  }, [])
+  const handleMapBack = useCallback(() => {
+    setHubEntryPath('mid-skill-back')
+    setRoute('hub')
   }, [])
 
   /** Parent Settings → Hub when the parent taps "Done". */
@@ -1412,11 +1441,15 @@ export default function App() {
     // `hub` is excepted for the Hub prefetch (Emma's Path 2/10); the
     // session-end → hub and back-arrow teardowns are imperative
     // (`tearDownMathAudioRef`), mirroring Word Song's 86c9pr4h9 shape.
+    // `map` (Emma's Path 8/10) is excepted too: the map plays its own
+    // Howls, so a Hub prefetch survives a map visit and Home → Hub adopts
+    // it through the kick latch instead of fetching again.
     if (
       route === 'math' ||
       route === 'greet' ||
       route === 'session-end' ||
-      route === 'hub'
+      route === 'hub' ||
+      route === 'map'
     ) {
       return
     }
@@ -1929,7 +1962,13 @@ export default function App() {
    * `react-hooks/set-state-in-effect` rule.
    */
   useEffect(() => {
-    if (route === 'hub' || route === 'literacy' || route === 'session-end') {
+    // `map`: see the Math leave-effect (Emma's Path 8/10).
+    if (
+      route === 'hub' ||
+      route === 'literacy' ||
+      route === 'session-end' ||
+      route === 'map'
+    ) {
       return
     }
 
@@ -1998,6 +2037,7 @@ export default function App() {
               progress={hubTreeProgress}
               pendingPromotion={hubProgressSnapshot?.pendingPromotion}
               onPickTree={handleHubPickTree}
+              onOpenMap={handleHubOpenMap}
               onParentGate={handleHubParentGate}
               onCharacterLongPress={handleHubCharacterLongPress}
             />
@@ -2035,6 +2075,9 @@ export default function App() {
               playUtteranceFn={sessionEndPlayUtterance}
               onAllDone={handleSessionEndAllDone}
             />
+          )}
+          {route === 'map' && (
+            <MapScreen key="map" world={mapWorld} onBack={handleMapBack} />
           )}
           {route === 'parent-settings' && (
             <ParentSettings
