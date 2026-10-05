@@ -241,6 +241,7 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { returnToHubAfterAllDone } from './_helpers/allDoneToHub'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
@@ -346,7 +347,7 @@ async function runOneMathSession(
   const cta = page.getByTestId('session-end-cta')
   await expect(cta).toBeVisible({ timeout: 12_000 })
   await cta.click()
-  await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+  await returnToHubAfterAllDone(page)
 }
 
 /**

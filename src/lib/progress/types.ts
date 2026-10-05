@@ -736,6 +736,19 @@ export interface Progress {
    * `schemaVersion` bump, same precedent as `literacy`.
    */
   goodDays?: GoodDays
+  /**
+   * Unlock seen-marker (Emma's Path 9/10 — ticket 123jpnbc3dt): every step
+   * whose opening is already accounted for — celebrated on the map, or
+   * already open when the marker was first seeded. A step that is open
+   * (not `'locked'`) but missing here is an unlock still to celebrate;
+   * the map celebrates it once and adds it (`pathBeats.ts`). Steps are
+   * only ever added.
+   *
+   * Optional + additive — no `schemaVersion` bump. Absent = nothing to
+   * celebrate: the session-end write seeds it from the pre-session doc,
+   * so a blob that predates the marker never replays old unlocks.
+   */
+  unlocksCelebrated?: SkillNode[]
 }
 
 /**

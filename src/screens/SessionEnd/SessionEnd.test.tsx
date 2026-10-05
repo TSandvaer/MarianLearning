@@ -22,6 +22,22 @@ import {
   type Progress,
 } from '../../lib/progress'
 
+// Emma's Path 9/10: a good-day session now plays the bud beat's Lily line
+// through the map line player. Its Howl never ends in jsdom, so every test
+// here gets a player that resolves at once — the beat costs only its
+// fixed 600 ms gap, and the bud-beat tests read `pathPlays`.
+const pathPlays: string[] = []
+vi.mock('../Map/playMapLine', () => ({
+  createMapLinePlayer: () => ({
+    play: (line: { id: string }) => {
+      pathPlays.push(line.id)
+      return Promise.resolve()
+    },
+    cancel: () => {},
+    unload: () => {},
+  }),
+}))
+
 function withMotion(node: ReactNode) {
   return (
     <LazyMotion features={domAnimation} strict>
@@ -1656,6 +1672,113 @@ describe('SessionEnd', () => {
         .map((el) => el.textContent)
         .join(' ')
       expect(captionWords).toBe('You earned five stars for finishing!')
+    })
+  })
+
+  describe("Emma's Path bud beat (123jpnbc3dt)", () => {
+    beforeEach(() => {
+      pathPlays.length = 0
+    })
+
+    function renderEnd(payload: SessionEndPayload, sparkle = createFakeSfx()) {
+      const storage = createMemoryStorage()
+      seedStardust(storage, payload.totalStardust)
+      render(
+        withMotion(
+          <SessionEnd
+            payload={payload}
+            playUtteranceFn={createFakePlayUtterance()}
+            chime={createFakeSfx()}
+            sparkle={sparkle}
+            plink={createFakeSfx()}
+            storage={storage}
+          />,
+        ),
+      )
+    }
+
+    it('good day: the focus stop slides up with one new open bud and Emma says end.bud.{node}', async () => {
+      // Baseline: add-to-10 practicing, no good days yet; 7/8 is a good day.
+      const sparkle = createFakeSfx()
+      renderEnd(MATH_PAYLOAD, sparkle)
+      await advanceSequence(4200)
+      const card = screen.getByTestId('session-end-bud-beat')
+      expect(card).toHaveAttribute('data-node', 'add-to-10')
+      expect(screen.getByTestId('session-end')).toHaveAttribute(
+        'data-path-beat',
+        'bud',
+      )
+      const buds = screen.getAllByTestId('session-end-bud')
+      expect(buds).toHaveLength(3)
+      expect(buds.map((b) => b.getAttribute('data-open'))).toEqual([
+        'true',
+        'false',
+        'false',
+      ])
+      expect(buds.map((b) => b.getAttribute('data-new'))).toEqual([
+        'true',
+        'false',
+        'false',
+      ])
+      expect(pathPlays).toEqual(['end.bud.add-to-10'])
+      // Entry sparkle + the bud-open sparkle.
+      expect(sparkle.play).toHaveBeenCalledTimes(2)
+      // The sequence still reaches the CTA.
+      await advanceSequence(5000)
+      expect(screen.getByTestId('session-end-cta')).toBeInTheDocument()
+      expect(pathPlays).toEqual(['end.bud.add-to-10'])
+    })
+
+    it('bad day (< 7/8): no bud, no beat line, CTA as before (never a negative beat)', async () => {
+      renderEnd({ ...MATH_PAYLOAD, totalCorrect: 3 })
+      await advanceSequence(9000)
+      expect(screen.queryByTestId('session-end-bud-beat')).toBeNull()
+      expect(screen.getByTestId('session-end')).toHaveAttribute(
+        'data-path-beat',
+        'none',
+      )
+      expect(pathPlays).toEqual([])
+      expect(screen.getByTestId('session-end-cta')).toBeInTheDocument()
+    })
+
+    it('second good session the same day: no bud (one per good day)', async () => {
+      const base = defaultProgress()
+      saveProgress({
+        ...base,
+        history: [
+          {
+            dateISO: new Date().toISOString(),
+            skillFocus: ['add-to-10'],
+            successRate: 1,
+          },
+        ],
+      })
+      renderEnd(MATH_PAYLOAD)
+      await advanceSequence(9000)
+      expect(screen.queryByTestId('session-end-bud-beat')).toBeNull()
+      expect(pathPlays).toEqual([])
+    })
+
+    it('unlock: no bud here — the unlock moment belongs to the map', async () => {
+      const base = defaultProgress()
+      const day = (d: number) =>
+        new Date(Date.now() - d * 86_400_000).toISOString()
+      saveProgress({
+        ...base,
+        history: [
+          { dateISO: day(2), skillFocus: ['add-to-10'], successRate: 1 },
+          { dateISO: day(1), skillFocus: ['add-to-10'], successRate: 1 },
+        ],
+      })
+      renderEnd(MATH_PAYLOAD)
+      await advanceSequence(9000)
+      expect(loadProgress()?.skillLevels['add-to-10']).toBe('mastered')
+      expect(screen.getByTestId('session-end')).toHaveAttribute(
+        'data-path-beat',
+        'unlock',
+      )
+      expect(screen.queryByTestId('session-end-bud-beat')).toBeNull()
+      expect(pathPlays).toEqual([])
     })
   })
 })

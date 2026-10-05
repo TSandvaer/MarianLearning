@@ -31,6 +31,7 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { returnToHubAfterAllDone } from './_helpers/allDoneToHub'
 import type { Page } from '@playwright/test'
 import { canonicalMathSessionResponse } from './fixtures/canonicalSessionResponses'
 import {
@@ -122,7 +123,7 @@ async function runOnePerfectMathSession(page: Page): Promise<void> {
   const cta = page.getByTestId('session-end-cta')
   await expect(cta).toBeVisible({ timeout: 12_000 })
   await cta.click()
-  await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+  await returnToHubAfterAllDone(page)
 }
 
 /**

@@ -7,35 +7,9 @@ import {
   UNLOCKED_STAGE_NAMES,
   celebrateLineSrc,
 } from './celebrationLines'
-import { unlockCelebrationFor } from './unlockCelebration'
 import { HUB_LINES } from './hubLines'
 
-describe('unlockCelebrationFor (ticket 123jpnbc3dn)', () => {
-  it('names the NEXT stage in the tree, never the mastered one', () => {
-    for (const tree of [MATH_TREE, LITERACY_TREE]) {
-      for (let i = 0; i < tree.length - 1; i++) {
-        const mastered = tree[i]!
-        const next = tree[i + 1]!
-        const c = unlockCelebrationFor(mastered)
-        expect(c.unlocked).toBe(next)
-        expect(c.lineId).toBe(`hub.celebrate.${next}`)
-        expect(c.name).toBe(
-          UNLOCKED_STAGE_NAMES[next as keyof typeof UNLOCKED_STAGE_NAMES],
-        )
-      }
-    }
-  })
-
-  it('returns the you-did-it line for each tree’s last stage', () => {
-    for (const last of [MATH_TREE.at(-1)!, LITERACY_TREE.at(-1)!]) {
-      expect(unlockCelebrationFor(last)).toEqual({
-        unlocked: null,
-        name: '',
-        lineId: 'hub.celebrate.you-did-it',
-      })
-    }
-  })
-
+describe('Hub celebrate lines (ticket 123jpnbc3dn)', () => {
   it('has exactly one name per unlockable stage (every node except each tree’s first)', () => {
     const unlockable = [...MATH_TREE.slice(1), ...LITERACY_TREE.slice(1)]
     expect(Object.keys(UNLOCKED_STAGE_NAMES).sort()).toEqual(

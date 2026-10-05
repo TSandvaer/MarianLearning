@@ -88,6 +88,7 @@ import {
   type SlowFactHint,
   type VowelSubMasteryState,
 } from './lib/progress'
+import { pendingUnlock } from './lib/progress/pathBeats'
 import {
   createSubitisingRng,
   easyBandLeitnerMeanBox,
@@ -790,6 +791,17 @@ export default function App() {
       // 2/10), so the teardown it used to run on session-end → hub is
       // driven here, like Word Song's.
       tearDownMathAudioRef.current?.()
+    }
+    // Emma's Path 9/10 (spec §6 step 3): an unlock this world has not
+    // celebrated yet sends "All done" to the map, which plays the unlock
+    // beat and marks it seen. Home from there is a mid-skill back.
+    const world: MasteryTrack =
+      sessionEndPayload?.surface === 'word-song' ? 'word-song' : 'math'
+    const saved = loadProgress()
+    if (saved !== null && pendingUnlock(saved, world) !== null) {
+      setMapWorld(world)
+      setRoute('map')
+      return
     }
     setHubEntryPath('session-end')
     setRoute('hub')
@@ -2035,7 +2047,6 @@ export default function App() {
               key="hub"
               path={hubEntryPath}
               progress={hubTreeProgress}
-              pendingPromotion={hubProgressSnapshot?.pendingPromotion}
               onPickTree={handleHubPickTree}
               onOpenMap={handleHubOpenMap}
               onParentGate={handleHubParentGate}

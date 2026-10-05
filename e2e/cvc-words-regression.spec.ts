@@ -24,9 +24,9 @@
  *      Hub on every hub-route entry. `projectHubTreeProgress()` derives
  *      `wordSongIndex` from the count of consecutive mastered nodes from
  *      the start of the track. Path-strip cells render as
- *      `mastered | current | locked`. PromotionCelebration overlay mounts
- *      when `pendingPromotion` is set; idle Emma is suppressed under
- *      mutual-exclusion gate while celebration visible.
+ *      `mastered | current | locked`. A queued `pendingPromotion` mounts
+ *      no Hub overlay (retired by Emma's Path 9/10 — the unlock plays on
+ *      the map); exactly one idle Emma renders.
  *
  * What PR #144 shipped (commit `ad8c1cb`):
  *   7. Hub `cancelActive()` — chip tap calls `cancelLineFn()` before the
@@ -793,11 +793,11 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
   })
 
   /**
-   * Mutual-exclusion regression: when `pendingPromotion` is set on the
-   * persisted Progress blob, the PromotionCelebration overlay mounts and
-   * idle Emma is suppressed. Pre-PR-#140-v2 the two Emma instances
-   * stacked visibly; post-fix the idle Emma is conditionally rendered
-   * behind `!celebrationVisible`.
+   * Mutual-exclusion regression, rewired by Emma's Path 9/10
+   * (123jpnbc3dt): the Hub PromotionCelebration overlay is retired — the
+   * unlock moment plays on the map — so a queued `pendingPromotion` must
+   * NOT mount any overlay on the Hub, and exactly ONE (idle) Emma shows.
+   * The original PR #140 intent (never two Emmas stacked) still holds.
    *
    * We seed `pendingPromotion: 'cvc-words'` directly into the persisted
    * Progress blob via `addInitScript` (mirrors `seedLocalStorage`'s
@@ -811,7 +811,7 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
    * No mock — Hub doesn't POST to /api/claude on its own. Runs on both
    * chromium and webkit (no audio dependency).
    */
-  test('10b. PR #140 — pendingPromotion mounts celebration overlay; idle Emma is suppressed under mutual-exclusion gate', async ({
+  test('10b. PR #140 / Emma’s Path 9/10 — pendingPromotion mounts no Hub overlay; exactly one idle Emma', async ({
     page,
   }) => {
     // Seed a Progress blob with pendingPromotion set BEFORE the cvc
@@ -877,26 +877,11 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     const hub = page.getByTestId('hub')
     await expect(hub).toBeVisible({ timeout: 10_000 })
 
-    // Celebration overlay mounts with the queued node tagged on the root.
-    const celebration = page.getByTestId('hub-promotion-celebration')
-    await expect(celebration).toHaveCount(1)
-    await expect(celebration).toHaveAttribute('data-node', 'cvc-words')
-
-    // Celebration's own Emma is on screen.
-    await expect(page.getByTestId('hub-promotion-emma')).toHaveCount(1)
-
-    // Mutual-exclusion gate: idle Emma is suppressed while celebration
-    // is visible. Pre-fix BOTH would render and stack visibly.
-    await expect(page.getByTestId('hub-emma')).toHaveCount(0)
-
-    // Sparkle burst renders — 8 sparkles per the radial layout.
-    await expect(page.getByTestId('hub-promotion-sparkle')).toHaveCount(8)
-
-    // Caption names the stage cvc-words UNLOCKED (short o), not
-    // cvc-words itself (ticket 123jpnbc3dn).
-    await expect(page.getByTestId('hub-promotion-node-label')).toHaveText(
-      'Words like dog',
-    )
+    // No unlock overlay on the Hub (it moved to the map) …
+    await expect(page.getByTestId('hub-promotion-celebration')).toHaveCount(0)
+    await expect(page.getByTestId('hub-promotion-emma')).toHaveCount(0)
+    // … and exactly one Emma: the idle one.
+    await expect(page.getByTestId('hub-emma')).toHaveCount(1)
   })
 
   // ── PR #144 — cancel-on-tap (no audio leak past route flip) ─────────────

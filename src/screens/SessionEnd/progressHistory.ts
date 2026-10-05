@@ -62,6 +62,7 @@ import {
   type SkillNode,
   type WordSongNode,
 } from '../../lib/progress'
+import { seedUnlocksCelebrated } from '../../lib/progress/pathBeats'
 import {
   SCAFFOLD_FOCUS_NODE,
   SUB_SCAFFOLD_FOCUS_NODE,
@@ -408,6 +409,11 @@ export function recordProgressOnSessionEnd(
     history: [...existing.history, entry],
     mathFactsLeitner: nextLeitner,
     cvcGraduationSessionFired: nextCvcGraduationSessionFired,
+    // Emma's Path 9/10 (ticket 123jpnbc3dt): seed the unlock seen-marker
+    // from the PRE-session doc, so everything unlocked before this session
+    // counts as celebrated and an unlock this session's mastery rule makes
+    // is pending for the map (`pathBeats.ts`). An existing list is kept.
+    unlocksCelebrated: seedUnlocksCelebrated(existing),
   }
 
   // 86c9q9ben (AC9f): mark the just-completed session's focus node as

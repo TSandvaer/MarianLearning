@@ -27,7 +27,7 @@ import {
   useState,
   type ReactElement,
 } from 'react'
-import { m, useReducedMotion } from 'motion/react'
+import { AnimatePresence, m, useReducedMotion } from 'motion/react'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import {
@@ -45,10 +45,19 @@ import { createSfx, type Sfx } from '../../lib/sfx'
 import { Padlock, StepArt } from '../Hub/HubPathCard'
 import { STAGE_SPOKEN_NAMES } from '../SessionEnd/friendlyNodeName'
 import { HUB_LAST_UNMOUNT_KEY } from '../Hub/useRapidRemountSuppression'
+import { Bud } from './Bud'
 import { buildMapModel, type MapLand, type MapStop } from './mapModel'
 import { layoutMap, STOP_SIZE, STOP_TAP } from './mapLayout'
 import { gateLine, openLine, stopLine } from './mapLines'
 import { createMapLinePlayer, type MapLinePlayer } from './playMapLine'
+import { pendingUnlock, type PendingUnlock } from '../../lib/progress/pathBeats'
+import {
+  persistUnlockCelebrated,
+  reached,
+  unlockLine,
+  unlockTimeline,
+  type UnlockPhase,
+} from './unlockBeat'
 
 const ROSE = '#F48FB1'
 const ROSE_DEEP = '#E91E63'
@@ -71,6 +80,8 @@ export interface MapScreenProps {
   createPlayer?: () => MapLinePlayer
   /** Test seam: sfx factory. */
   createSfxFn?: typeof createSfx
+  /** Test seam: save the unlock seen-marker (default: progress storage). */
+  markUnlockCelebrated?: (world: MasteryTrack) => void
 }
 
 function safeLoadProgress(): Progress | null {
@@ -82,41 +93,6 @@ function safeLoadProgress(): Progress | null {
 }
 
 // ── Small pictures ──────────────────────────────────────────────────────
-
-function Bud({ open, size }: { open: boolean; size: number }): ReactElement {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      width={size}
-      height={size}
-      aria-hidden
-      data-testid="map-bud"
-      data-open={open ? 'true' : 'false'}
-    >
-      {open ? (
-        <g>
-          {[0, 72, 144, 216, 288].map((deg) => (
-            <ellipse
-              key={deg}
-              cx="8"
-              cy="4.6"
-              rx="2.6"
-              ry="3.4"
-              fill={ROSE}
-              transform={`rotate(${deg} 8 8)`}
-            />
-          ))}
-          <circle cx="8" cy="8" r="2.2" fill="#FFEB3B" />
-        </g>
-      ) : (
-        <g>
-          <path d="M8 15 V9" stroke="#81C784" strokeWidth="1.4" />
-          <ellipse cx="8" cy="7" rx="3" ry="4" fill="#A5D6A7" />
-        </g>
-      )}
-    </svg>
-  )
-}
 
 function FlowerBadge(): ReactElement {
   return (
@@ -272,6 +248,45 @@ function GateArch({ open }: { open: boolean }): ReactElement {
   )
 }
 
+/** `count` pink sparkles flying out from the centre (spec §6 pops). */
+function SparkleBurst({
+  count,
+  radius,
+  testId,
+}: {
+  count: number
+  radius: number
+  testId: string
+}): ReactElement {
+  return (
+    <span
+      aria-hidden
+      data-testid={testId}
+      className="pointer-events-none absolute"
+      style={{ left: '50%', top: '50%', width: 0, height: 0 }}
+    >
+      {Array.from({ length: count }, (_, i) => {
+        const a = (i / count) * Math.PI * 2
+        return (
+          <m.span
+            key={i}
+            className="absolute rounded-full"
+            style={{ width: 8, height: 8, left: -4, top: -4, background: ROSE }}
+            initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+            animate={{
+              x: Math.cos(a) * radius,
+              y: Math.sin(a) * radius,
+              opacity: 0,
+              scale: 0.4,
+            }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+          />
+        )
+      })}
+    </span>
+  )
+}
+
 // ── Stop ────────────────────────────────────────────────────────────────
 
 function StopView({
@@ -279,12 +294,18 @@ function StopView({
   x,
   y,
   reduceMotion,
+  bloom = false,
+  popping = false,
   onTap,
 }: {
   stop: MapStop
   x: number
   y: number
   reduceMotion: boolean
+  /** Unlock beat: the just-mastered stop's flower badge blooms in. */
+  bloom?: boolean
+  /** Unlock beat: the padlock pops and the frost fades off this stop. */
+  popping?: boolean
   onTap: () => void
 }): ReactElement {
   const locked = stop.state === 'locked'
@@ -363,10 +384,55 @@ function StopView({
             </span>
           </>
         )}
+        {popping && (
+          <>
+            <m.span
+              aria-hidden
+              data-testid="map-frost-fade"
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: CREAM,
+                backdropFilter: 'blur(2px)',
+                WebkitBackdropFilter: 'blur(2px)',
+              }}
+              initial={{ opacity: 0.45 }}
+              animate={{ opacity: 0 }}
+              transition={{ duration: 0.4 }}
+            />
+            <m.span
+              aria-hidden
+              data-testid="map-padlock-pop"
+              className="absolute"
+              style={{ left: STOP_SIZE / 2 - 14, bottom: -10 }}
+              initial={{ scale: 1, opacity: 1 }}
+              animate={
+                reduceMotion
+                  ? { opacity: 0 }
+                  : { scale: [1, 1.3, 0], opacity: [1, 1, 0] }
+              }
+              transition={{ duration: reduceMotion ? 0.2 : 0.4 }}
+            >
+              <Padlock size={28} />
+            </m.span>
+            {!reduceMotion && (
+              <SparkleBurst count={6} radius={56} testId="map-pop-sparkles" />
+            )}
+          </>
+        )}
         {stop.state === 'mastered' && (
-          <span aria-hidden className="absolute" style={{ right: -6, top: -6 }}>
+          <m.span
+            aria-hidden
+            data-testid={bloom ? 'map-flower-bloom' : undefined}
+            className="absolute"
+            style={{ right: -6, top: -6 }}
+            initial={
+              bloom ? (reduceMotion ? { opacity: 0 } : { scale: 0 }) : false
+            }
+            animate={reduceMotion ? { opacity: 1 } : { scale: 1 }}
+            transition={{ duration: reduceMotion ? 0.2 : 0.3 }}
+          >
             <FlowerBadge />
-          </span>
+          </m.span>
         )}
       </m.span>
       {stop.buds.length > 0 && (
@@ -406,13 +472,29 @@ export function MapScreen({
   onBack,
   createPlayer,
   createSfxFn = createSfx,
+  markUnlockCelebrated = persistUnlockCelebrated,
 }: MapScreenProps): ReactElement {
   const reduceMotion = useReducedMotion() ?? false
   const doc = useMemo<Progress | null>(
     () => (progressDoc !== undefined ? progressDoc : safeLoadProgress()),
     [progressDoc],
   )
-  const model = useMemo(() => buildMapModel(doc, world), [doc, world])
+  const finalModel = useMemo(() => buildMapModel(doc, world), [doc, world])
+
+  // Unlock beat (Emma's Path 9/10): an unlock not celebrated yet is
+  // frozen at mount and played once; `phase` walks the spec §6 timeline.
+  const [unlock] = useState<PendingUnlock | null>(() =>
+    doc === null ? null : pendingUnlock(doc, world),
+  )
+  const [phase, setPhase] = useState<UnlockPhase | null>(
+    unlock === null ? null : 'bloom',
+  )
+  // Before the pop the new stop still wears its frost + padlock; before
+  // the swing its land's gate is still closed.
+  const model = useMemo(
+    () => (unlock === null ? finalModel : beatModel(finalModel, unlock, phase)),
+    [finalModel, unlock, phase],
+  )
 
   // Path-region size → layout.
   const regionRef = useRef<HTMLDivElement | null>(null)
@@ -448,11 +530,15 @@ export function MapScreen({
   }, [createPlayer])
 
   // The open line's caption shows from the first frame; its audio
-  // starts in the mount effect below.
-  const [caption, setCaption] = useState<PathLine>(() => openLine(model))
+  // starts in the mount effect below. An unlock beat holds the ribbon
+  // until Emma speaks its line.
+  const [caption, setCaption] = useState<PathLine | null>(() =>
+    unlock === null ? openLine(model) : null,
+  )
   const [pose, setPose] = useState<EmmaPose>(
     model.complete ? 'cheering' : 'idle',
   )
+  const sfxRef = useRef<Sfx[]>([])
   const poseTimer = useRef<number | null>(null)
 
   const speak = useCallback(
@@ -465,9 +551,38 @@ export function MapScreen({
 
   // Map opens → "Here is your path! You are on {name}." The Hub tap that
   // brought us here already unlocked the audio context.
+  //
+  // Unlock beat instead (spec §6): flower blooms → Emma hops → padlock
+  // pops (+ gate swings on a new land) → Emma cheers and says the line.
+  // The seen-marker is saved first, so leaving mid-beat never replays it.
   useEffect(() => {
-    void getPlayer().play(caption)
-    // Open line fires once per mount.
+    if (unlock === null) {
+      if (caption !== null) void getPlayer().play(caption)
+      return
+    }
+    markUnlockCelebrated(world)
+    const sfx = (src: string, volume: number) => {
+      const s = createSfxFn({ src, volume })
+      sfxRef.current.push(s)
+      return s
+    }
+    const timers = unlockTimeline(unlock).map(({ phase: next, at }) =>
+      window.setTimeout(() => {
+        setPhase(next)
+        if (next === 'pop') sfx('/assets/sfx-chime-soft.mp3', 0.85).play()
+        if (next === 'gate') sfx('/assets/sfx-cheer.mp3', 0.7).play()
+        if (next === 'cheer') {
+          setPose('cheering')
+          const line = unlockLine(unlock, finalModel.showLandNumber)
+          setCaption(line)
+          void getPlayer()
+            .play(line)
+            .then(() => setPose(finalModel.complete ? 'cheering' : 'idle'))
+        }
+      }, at),
+    )
+    return () => timers.forEach((t) => window.clearTimeout(t))
+    // Mount-once: the beat (or open line) fires once per mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -477,6 +592,8 @@ export function MapScreen({
       playerRef.current = null
       poofRef.current?.unload()
       poofRef.current = null
+      sfxRef.current.forEach((s) => s.unload())
+      sfxRef.current = []
       if (poseTimer.current !== null) window.clearTimeout(poseTimer.current)
       // Back to the Hub counts as a rapid re-mount: no welcome-back
       // greeting replay however long the map was open (spec §3.6).
@@ -492,8 +609,12 @@ export function MapScreen({
   const gesture = () =>
     drainOnGesture(resumeHowlerContextOnGesture, unlockIosAudioSession)
 
+  // Taps wait until the unlock beat has reached Emma's line.
+  const beatRunning = phase !== null && phase !== 'cheer'
+
   const handleStopTap = (stop: MapStop) => {
     gesture()
+    if (beatRunning) return
     if (stop.state === 'locked') {
       poofRef.current ??= createSfxFn({
         src: '/assets/sfx-poof.mp3',
@@ -512,10 +633,14 @@ export function MapScreen({
 
   const handleGateTap = (land: MapLand) => {
     gesture()
+    if (beatRunning) return
     speak(gateLine(model, land))
   }
 
-  const currentPos = layout.stops.find((s) => s.node === model.current)
+  // Emma stands on the just-mastered stop until she hops (unlock beat).
+  const emmaNode =
+    unlock !== null && !reached(phase, 'hop') ? unlock.mastered : model.current
+  const currentPos = layout.stops.find((s) => s.node === emmaNode)
   const toPoints = (pts: { x: number; y: number }[]) =>
     pts.map((p) => `${p.x},${p.y}`).join(' ')
   const ready = size.w > 0 && size.h > 0
@@ -526,6 +651,8 @@ export function MapScreen({
       data-world={world}
       data-current={model.current}
       data-complete={model.complete ? 'true' : 'false'}
+      data-beat={unlock === null ? 'none' : unlock.land ? 'land' : 'unlock'}
+      data-beat-phase={phase ?? 'none'}
       className="
         relative flex h-full w-full flex-col overflow-hidden
         bg-my-cream text-ink
@@ -573,22 +700,30 @@ export function MapScreen({
       >
         {ready && (
           <>
-            {layout.bands.map((band, i) => (
-              <div
-                key={band.land}
-                data-testid="map-band"
-                data-land={band.land}
-                aria-hidden
-                className="absolute left-0 right-0"
-                style={{
-                  top: band.top,
-                  height: band.height,
-                  background: BAND_TINTS[i % BAND_TINTS.length],
-                  opacity: 0.35,
-                  borderRadius: 24,
-                }}
-              />
-            ))}
+            {layout.bands.map((band, i) => {
+              // A land gate opening fades its band tint in (spec §6 step 4).
+              const newLand = unlock?.land?.number === band.land
+              return (
+                <m.div
+                  key={band.land}
+                  data-testid="map-band"
+                  data-land={band.land}
+                  aria-hidden
+                  className="absolute left-0 right-0"
+                  style={{
+                    top: band.top,
+                    height: band.height,
+                    background: BAND_TINTS[i % BAND_TINTS.length],
+                    borderRadius: 24,
+                  }}
+                  initial={false}
+                  animate={{
+                    opacity: newLand && !reached(phase, 'gate') ? 0 : 0.35,
+                  }}
+                  transition={{ duration: 0.6 }}
+                />
+              )
+            })}
 
             <svg
               aria-hidden
@@ -666,6 +801,40 @@ export function MapScreen({
                   }}
                 >
                   <GateArch open={land.open} />
+                  {unlock?.land?.number === g.land && phase === 'gate' && (
+                    <>
+                      <m.span
+                        aria-hidden
+                        data-testid="map-gate-swing"
+                        className="absolute"
+                        style={{
+                          left: 12 + 12,
+                          top: 20 + 8,
+                          width: 40,
+                          height: 18,
+                          background: '#FFE0B2',
+                          border: '1.5px solid #BCAAA4',
+                          borderRadius: 2,
+                          transformOrigin: 'left center',
+                          transformPerspective: 200,
+                        }}
+                        initial={{ rotateY: 0, opacity: 1 }}
+                        animate={
+                          reduceMotion
+                            ? { opacity: 0 }
+                            : { rotateY: -70, opacity: [1, 1, 0] }
+                        }
+                        transition={{ duration: reduceMotion ? 0.2 : 0.6 }}
+                      />
+                      {!reduceMotion && (
+                        <SparkleBurst
+                          count={12}
+                          radius={64}
+                          testId="map-gate-sparkles"
+                        />
+                      )}
+                    </>
+                  )}
                 </button>
               )
             })}
@@ -680,6 +849,8 @@ export function MapScreen({
                     x={pos.x}
                     y={pos.y}
                     reduceMotion={reduceMotion}
+                    bloom={unlock?.mastered === stop.node}
+                    popping={unlock?.unlocked === stop.node && phase === 'pop'}
                     onTap={() => handleStopTap(stop)}
                   />
                 )
@@ -687,30 +858,63 @@ export function MapScreen({
             )}
 
             {currentPos && (
-              <div
-                data-testid="map-emma"
-                data-node={model.current}
-                data-pose={pose}
-                className="pointer-events-none absolute"
-                style={{
-                  left: currentPos.x - 60,
-                  top: currentPos.y - STOP_SIZE / 2 - EMMA_H + 6,
-                  width: 120,
-                  height: EMMA_H,
-                  zIndex: 3,
-                  // One grid cell: the pose cross-fade keeps the old and
-                  // new image mounted together; stacked, not side by side.
-                  display: 'grid',
-                  justifyItems: 'center',
-                }}
-              >
-                <EmmaCharacter
-                  pose={pose}
-                  data-testid="map-emma-character"
-                  className="h-full w-auto select-none"
-                  style={{ gridArea: '1 / 1' }}
-                />
-              </div>
+              <AnimatePresence initial={false}>
+                <m.div
+                  // Reduced motion: the hop is a cross-fade (a new key per stop).
+                  key={reduceMotion ? emmaNode : 'emma'}
+                  data-testid="map-emma"
+                  data-node={emmaNode}
+                  data-pose={pose}
+                  className="pointer-events-none absolute"
+                  style={{
+                    width: 120,
+                    height: EMMA_H,
+                    zIndex: 3,
+                    // One grid cell: the pose cross-fade keeps the old and
+                    // new image mounted together; stacked, not side by side.
+                    display: 'grid',
+                    justifyItems: 'center',
+                  }}
+                  initial={
+                    reduceMotion
+                      ? {
+                          opacity: 0,
+                          left: currentPos.x - 60,
+                          top: currentPos.y - STOP_SIZE / 2 - EMMA_H + 6,
+                        }
+                      : false
+                  }
+                  animate={{
+                    opacity: 1,
+                    left: currentPos.x - 60,
+                    top: currentPos.y - STOP_SIZE / 2 - EMMA_H + 6,
+                  }}
+                  exit={{ opacity: 0 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0.2 }
+                      : { type: 'spring', stiffness: 260, damping: 22 }
+                  }
+                >
+                  {/* Two small arcs while she hops (spec §6, 700 ms). */}
+                  <m.div
+                    style={{ gridArea: '1 / 1', height: '100%' }}
+                    animate={
+                      phase === 'hop' && !reduceMotion
+                        ? { y: [0, -28, 0, -18, 0] }
+                        : { y: 0 }
+                    }
+                    transition={{ duration: 0.7, ease: 'easeInOut' }}
+                  >
+                    <EmmaCharacter
+                      pose={pose}
+                      data-testid="map-emma-character"
+                      className="h-full w-auto select-none"
+                      style={{ gridArea: '1 / 1' }}
+                    />
+                  </m.div>
+                </m.div>
+              </AnimatePresence>
             )}
           </>
         )}
@@ -721,7 +925,7 @@ export function MapScreen({
         className="flex w-full shrink-0 items-center justify-center px-6"
         style={{ height: RIBBON }}
       >
-        {
+        {caption !== null && (
           <m.div
             key={caption.id}
             data-testid="map-ribbon"
@@ -736,10 +940,38 @@ export function MapScreen({
           >
             {caption.text}
           </m.div>
-        }
+        )}
       </div>
     </m.main>
   )
+}
+
+/**
+ * The model as the unlock beat shows it at `phase`: before the pop the new
+ * stop is still locked (frost + padlock, no buds); before the swing its
+ * land's gate is still closed.
+ */
+function beatModel(
+  model: ReturnType<typeof buildMapModel>,
+  unlock: PendingUnlock,
+  phase: UnlockPhase | null,
+): ReturnType<typeof buildMapModel> {
+  const stillLocked = !reached(phase, 'pop')
+  const gateClosed = unlock.land !== null && !reached(phase, 'gate')
+  if (!stillLocked && !gateClosed) return model
+  return {
+    ...model,
+    lands: model.lands.map((land) => ({
+      ...land,
+      open:
+        gateClosed && land.number === unlock.land?.number ? false : land.open,
+      stops: land.stops.map((stop) =>
+        stillLocked && stop.node === unlock.unlocked
+          ? { ...stop, state: 'locked' as const, buds: [], nearlyThere: false }
+          : stop,
+      ),
+    })),
+  }
 }
 
 export default MapScreen

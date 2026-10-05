@@ -72,6 +72,7 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { returnToHubAfterAllDone } from './_helpers/allDoneToHub'
 import type { Page, Request } from '@playwright/test'
 import { canonicalMathSessionResponse } from './fixtures/canonicalSessionResponses'
 import {
@@ -231,7 +232,7 @@ async function runOneMathSession(page: Page): Promise<void> {
   const cta = page.getByTestId('session-end-cta')
   await expect(cta).toBeVisible({ timeout: 12_000 })
   await cta.click()
-  await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+  await returnToHubAfterAllDone(page)
 }
 
 test.describe('sub-to-10 progression-mastery loop', () => {

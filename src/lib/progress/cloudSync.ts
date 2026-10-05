@@ -48,6 +48,7 @@ import { LETTER_SOUNDS_VOWELS, defaultLockedSkillLevels } from './defaults'
 import { isProgressV1 } from './guards'
 import { inferLifetimeFirstEncountersFromProgress } from './lifetimeFirstEncounters'
 import { recordGoodDays, unionGoodDays } from './mastery'
+import { mergeUnlocksCelebrated } from './pathBeats'
 import { saveProgress, withRetiredLegacyThresholds } from './storage'
 import type {
   GoodDays,
@@ -55,6 +56,7 @@ import type {
   Progress,
   SessionHistoryEntry,
   SkillLevels,
+  SkillNode,
   VowelSubMasteryState,
 } from './types'
 
@@ -391,6 +393,7 @@ export async function reconcileWithCloud(
       fetched.blob,
       currentLocal?.history,
       currentLocal?.goodDays,
+      currentLocal?.unlocksCelebrated,
     )
     if (validated === null) {
       return { kind: 'cloud-blob-rejected' }
@@ -439,6 +442,7 @@ function installCloudBlob(
   blob: unknown,
   localHistory?: SessionHistoryEntry[],
   localGoodDays?: GoodDays,
+  localUnlocksCelebrated?: SkillNode[],
 ): Progress | null {
   // Pre-guard defaulters, in the SAME order as storage.ts:loadProgress —
   // skill-level floor first, then the W9.2 per-vowel letter-sounds
@@ -516,13 +520,23 @@ function installCloudBlob(
           goodDays: unionGoodDays(withGraduationLatch.goodDays, localGoodDays),
         }
   const goodDays = recordGoodDays(withLocalGoodDays)
-  if (
+  const withGoodDays: Progress =
     withLocalGoodDays.goodDays === undefined ||
     goodDays !== withLocalGoodDays.goodDays
-  ) {
-    return { ...withLocalGoodDays, goodDays: { ...goodDays } }
-  }
-  return withLocalGoodDays
+      ? { ...withLocalGoodDays, goodDays: { ...goodDays } }
+      : withLocalGoodDays
+
+  // Unlock seen-marker (Emma's Path 9/10, ticket 123jpnbc3dt): a celebrated
+  // unlock stays celebrated, so the two lists are unioned — the map marks
+  // an unlock locally after the session-end push, and a cloud install must
+  // not hand the old list back and replay it.
+  const unlocksCelebrated = mergeUnlocksCelebrated(
+    withGoodDays.unlocksCelebrated,
+    localUnlocksCelebrated,
+  )
+  return unlocksCelebrated === withGoodDays.unlocksCelebrated
+    ? withGoodDays
+    : { ...withGoodDays, unlocksCelebrated }
 }
 
 /**

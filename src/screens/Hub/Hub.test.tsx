@@ -895,133 +895,44 @@ describe("Hub — Emma's Path card (ticket 123jpnbc3dq)", () => {
   })
 })
 
-describe('Hub — promotion celebration (M3 audit follow-up, ticket 86c9kwnkw)', () => {
-  it('does NOT render the celebration overlay when pendingPromotion is undefined', () => {
-    renderHub({ storage: createMemoryStorage() })
+// Emma's Path 9/10 (123jpnbc3dt): the unlock moment moved to the map
+// (spec §6), so the Hub never celebrates an unlock — an unlock is
+// celebrated exactly once, there. Replaces the PromotionCelebration
+// overlay tests (ticket 86c9kwnkw); their "exactly one Emma" and
+// "exactly one line per mount" intent is kept below.
+describe("Hub — no unlock celebration (moved to the map, Emma's Path 9/10)", () => {
+  function promotedDoc() {
+    const p = defaultProgress()
+    p.skillLevels['add-to-10'] = 'mastered'
+    p.skillLevels['add-to-20'] = 'intro'
+    p.pendingPromotion = 'add-to-10'
+    return p
+  }
+
+  it('renders exactly one idle Emma and no overlay while a promotion is queued', () => {
+    renderHub({ storage: createMemoryStorage(), progressDoc: promotedDoc() })
     expect(screen.queryByTestId('hub-promotion-celebration')).toBeNull()
-    expect(screen.queryByTestId('hub-promotion-emma')).toBeNull()
+    expect(screen.queryAllByTestId(/^hub(-promotion)?-emma$/)).toHaveLength(1)
+    expect(screen.getByTestId('hub-emma')).toBeInTheDocument()
+    expect(screen.getAllByTestId('hub-tree-node')).toHaveLength(2)
   })
 
-  it('renders the celebration overlay when pendingPromotion is set', () => {
-    renderHub({
-      storage: createMemoryStorage(),
-      pendingPromotion: 'add-to-20',
-    })
-    const overlay = screen.getByTestId('hub-promotion-celebration')
-    expect(overlay).toBeInTheDocument()
-    expect(overlay.getAttribute('data-node')).toBe('add-to-20')
-    // Caption names the stage add-to-20 UNLOCKED (sub-to-10), not the
-    // mastered stage itself (ticket 123jpnbc3dn).
-    expect(overlay.getAttribute('data-unlocked-node')).toBe('sub-to-10')
-    const label = screen.getByTestId('hub-promotion-node-label')
-    expect(label.textContent).toBe('Taking away to ten')
-    // Emma's celebration pose is rendered (replaces the idle Emma).
-    expect(screen.getByTestId('hub-promotion-emma')).toBeInTheDocument()
-  })
-
-  it('renders the sparkle burst (8 sparkles) when celebration is visible', () => {
-    renderHub({
-      storage: createMemoryStorage(),
-      pendingPromotion: 'cvc-words',
-    })
-    const sparkles = screen.getAllByTestId('hub-promotion-sparkle')
-    expect(sparkles).toHaveLength(8)
-  })
-
-  it('names the unlocked word-song stage, not the mastered one', () => {
-    renderHub({
-      storage: createMemoryStorage(),
-      pendingPromotion: 'cvc-words',
-    })
-    expect(screen.getAllByTestId('hub-promotion-node-label')).toHaveLength(1)
-    expect(screen.getByTestId('hub-promotion-node-label').textContent).toBe(
-      'Words like dog',
-    )
-    expect(screen.getByTestId('hub-promotion-caption').textContent).toBe(
-      'Something new! Words like dog!',
-    )
-  })
-
-  it('says "You did it!" with no stage label when the last stage of a tree is mastered', () => {
-    renderHub({
-      storage: createMemoryStorage(),
-      pendingPromotion: 'mult-6-9',
-    })
-    const overlay = screen.getByTestId('hub-promotion-celebration')
-    expect(overlay.getAttribute('data-unlocked-node')).toBe('')
-    expect(screen.queryAllByTestId('hub-promotion-node-label')).toHaveLength(0)
-    expect(screen.getByTestId('hub-promotion-caption').textContent).toBe(
-      'You did it!',
-    )
-  })
-
-  it('speaks the unlocked stage line INSTEAD of the welcome-back line (exactly one line per mount)', async () => {
-    const playLineFn = vi.fn<NonNullable<HubProps['playLineFn']>>(() =>
-      Promise.resolve(),
-    )
-    renderHub({
-      storage: createMemoryStorage(),
-      path: 'session-end', // gate already unlocked → line fires on mount
-      pendingPromotion: 'add-to-10',
-      playLineFn,
-    })
-    await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(1))
-    // Let any further microtask-dispatched effect settle.
-    await act(async () => {})
-    expect(playLineFn).toHaveBeenCalledTimes(1)
-    expect(playLineFn.mock.calls[0]![0]).toBe('hub.celebrate.add-to-20')
-    // The Hub ribbon stays hidden — the overlay carries the caption.
-    expect(screen.queryAllByTestId('hub-ribbon')).toHaveLength(0)
-  })
-
-  it('plays the welcome-back line (not a celebrate line) when no promotion is pending', async () => {
+  it('speaks exactly one line per mount, and never a celebrate line', async () => {
     const playLineFn = vi.fn<NonNullable<HubProps['playLineFn']>>(() =>
       Promise.resolve(),
     )
     renderHub({
       storage: createMemoryStorage(),
       path: 'session-end',
+      progressDoc: promotedDoc(),
       playLineFn,
     })
     await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(1))
+    await act(async () => {})
+    expect(playLineFn).toHaveBeenCalledTimes(1)
     expect(String(playLineFn.mock.calls[0]![0])).not.toMatch(
       /^hub\.celebrate\./,
     )
-  })
-
-  it('still renders the skill-tree picker beneath the celebration overlay', () => {
-    // The picker must remain functional — Marian can tap a tree even
-    // while the celebration auto-fades.
-    renderHub({
-      storage: createMemoryStorage(),
-      pendingPromotion: 'add-to-20',
-    })
-    expect(screen.getAllByTestId('hub-tree-node')).toHaveLength(2)
-  })
-
-  it('renders exactly one Emma at a time (mutual exclusion: idle vs celebration)', () => {
-    // Regression for the iPad double-Emma stacking bug surfaced on
-    // PR #140: the idle Hub Emma was rendering as a sibling of the
-    // celebration Emma, so both were visible. Gate is a hard
-    // mutual-exclusion — count assertion per
-    // `feedback_count_assertions_on_regression_tests.md`.
-
-    // (1) No pendingPromotion → only the idle Emma renders.
-    const { unmount } = renderHub({ storage: createMemoryStorage() })
-    expect(screen.getByTestId('hub-emma')).toBeInTheDocument()
-    expect(screen.queryByTestId('hub-promotion-emma')).toBeNull()
-    expect(screen.queryAllByTestId(/^hub(-promotion)?-emma$/)).toHaveLength(1)
-    unmount()
-
-    // (2) pendingPromotion set → only the celebration Emma renders;
-    //     the idle Emma is unmounted.
-    renderHub({
-      storage: createMemoryStorage(),
-      pendingPromotion: 'add-to-20',
-    })
-    expect(screen.queryByTestId('hub-emma')).toBeNull()
-    expect(screen.getByTestId('hub-promotion-emma')).toBeInTheDocument()
-    expect(screen.queryAllByTestId(/^hub(-promotion)?-emma$/)).toHaveLength(1)
   })
 })
 

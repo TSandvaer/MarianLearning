@@ -83,6 +83,7 @@
  */
 
 import { test, expect } from '@playwright/test'
+import { returnToHubAfterAllDone } from './_helpers/allDoneToHub'
 import { installClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedProgress,
@@ -145,7 +146,7 @@ async function runOneMathSession(
   const cta = page.getByTestId('session-end-cta')
   await expect(cta).toBeVisible({ timeout: 12_000 })
   await cta.click()
-  await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+  await returnToHubAfterAllDone(page)
 }
 
 /**
@@ -176,7 +177,7 @@ async function runOneWordSongSession(
   const cta = page.getByTestId('session-end-cta')
   await expect(cta).toBeVisible({ timeout: 12_000 })
   await cta.click()
-  await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+  await returnToHubAfterAllDone(page)
 }
 
 // ── Part 1 — cvc-words (graduation-gated; verifies intro → practicing) ─────
