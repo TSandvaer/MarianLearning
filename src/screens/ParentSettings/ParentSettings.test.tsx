@@ -270,7 +270,8 @@ describe('ParentSettings — save-on-change', () => {
       screen.getByTestId('parent-settings-toggle-showLevelToMarian'),
     )
     const last = ctx.saved.at(-1)!
-    expect(last.parentSettings?.showLevelToMarian).toBe(true)
+    // Default is on (ticket 123jpnbc3dq); the tap flips it off.
+    expect(last.parentSettings?.showLevelToMarian).toBe(false)
     // crossDayEnforcement remains false from the previous tap.
     expect(last.parentSettings?.crossDayEnforcement).toBe(false)
     // autoPromote and sessionModePicker remain at defaults.
@@ -293,7 +294,7 @@ describe('ParentSettings — save-on-change', () => {
     // Other defaults preserved.
     expect(last.parentSettings?.autoPromote).toBe(true)
     expect(last.parentSettings?.crossDayEnforcement).toBe(true)
-    expect(last.parentSettings?.showLevelToMarian).toBe(false)
+    expect(last.parentSettings?.showLevelToMarian).toBe(true)
   })
 
   it('crossVowelMixingEnabled defaults to "on" in the UI', () => {

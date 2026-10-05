@@ -88,11 +88,7 @@ import {
 // Refactored under ticket 86c9qa0kq (4th occurrence — Kevin and Devon
 // both flagged the pattern on PR #174 review). Helper unit tests live
 // at `e2e/_helpers/slidingWindow.test.ts`.
-import { slidingWindow } from './_helpers/slidingWindow'
-import {
-  WORD_SONG_NODES_IN_ORDER,
-  projectExpectedCells,
-} from './_helpers/wordSongNodesInOrder'
+import { WORD_SONG_NODES_IN_ORDER } from './_helpers/wordSongNodesInOrder'
 
 /**
  * Path to the production canon file the spec serves as the mock
@@ -326,34 +322,25 @@ test.describe('cvc-words-short-i flow regression (ticket 86c9qdba4)', () => {
     // derived from the canonical node list — no hardcoded stage
     // counts.
     const focusIndex = WORD_SONG_NODES_IN_ORDER.indexOf('cvc-words-short-i')
-    const { items: expectedSlice, offset: expectedOffset } = slidingWindow(
-      WORD_SONG_NODES_IN_ORDER,
-      focusIndex,
-      1,
-      3,
+    // Hub card bead row (Emma's Path 7/10, replaces the 5-cell strip):
+    // one bead per Word Song step; every step before the focus is
+    // mastered and the focus step is the current bead.
+    const wordSongBeads = page.locator(
+      '[data-testid="hub-card-progress"][data-world="word-song"] [data-testid="hub-card-bead"]',
     )
-    const expectedProjection = projectExpectedCells(
-      expectedSlice,
-      expectedOffset,
-      focusIndex,
-    )
-
-    const wordSongStrip = page.locator(
-      '[data-testid="hub-path-strip"][data-tree="word-song"]',
-    )
-    await expect(wordSongStrip).toBeVisible()
-    const wordSongCells = wordSongStrip.locator(
-      '[data-testid="hub-path-strip-cell"]',
-    )
-    await expect(wordSongCells).toHaveCount(expectedSlice.length)
-
-    const wordSongProjection = await wordSongCells.evaluateAll((nodes) =>
+    await expect(wordSongBeads).toHaveCount(WORD_SONG_NODES_IN_ORDER.length)
+    const beadProjection = await wordSongBeads.evaluateAll((nodes) =>
       nodes.map((n) => ({
-        stage: (n as HTMLElement).getAttribute('data-stage'),
-        kind: (n as HTMLElement).getAttribute('data-kind'),
+        node: (n as HTMLElement).getAttribute('data-node'),
+        state: (n as HTMLElement).getAttribute('data-state'),
       })),
     )
-    expect(wordSongProjection).toEqual(expectedProjection)
+    expect(beadProjection.slice(0, focusIndex + 1)).toEqual(
+      WORD_SONG_NODES_IN_ORDER.slice(0, focusIndex + 1).map((node, i) => ({
+        node,
+        state: i < focusIndex ? 'mastered' : 'current',
+      })),
+    )
 
     // No pendingPromotion seeded → celebration overlay must NOT render.
     await expect(page.getByTestId('hub-promotion-celebration')).toHaveCount(0)

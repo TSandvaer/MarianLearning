@@ -118,6 +118,8 @@ function PadlockGlyph(): ReactElement {
 interface StageGlyphProps {
   stage: StageId
   dim?: boolean
+  /** Rendered px size (default 22 — the old path-strip glyph). */
+  size?: number
 }
 
 /**
@@ -126,11 +128,15 @@ interface StageGlyphProps {
  * generic vs tree-themed" Q9. Thomas locked Q9=B (tree-themed), but
  * v1 ships placeholders until Kyle delivers the SVGs.
  */
-function StageGlyph({ stage, dim }: StageGlyphProps): ReactElement {
+export function StageGlyph({
+  stage,
+  dim,
+  size = 22,
+}: StageGlyphProps): ReactElement {
   const opacity = dim ? 0.65 : 1
   const text = STAGE_LABEL[stage] ?? '•'
   return (
-    <svg viewBox="0 0 28 28" width="22" height="22" aria-hidden>
+    <svg viewBox="0 0 28 28" width={size} height={size} aria-hidden>
       <text
         x="14"
         y="20"

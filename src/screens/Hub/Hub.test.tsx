@@ -15,6 +15,7 @@ import userEvent from '@testing-library/user-event'
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import Hub from './Hub'
 import type { HubProps } from './Hub'
+import { defaultProgress, saveProgress } from '../../lib/progress'
 import {
   SESSION_HISTORY_KEY,
   emptySessionHistory,
@@ -795,44 +796,102 @@ describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
   })
 })
 
-describe('Hub — path-strip sliding window', () => {
-  it('renders 5 cells per tree at default (currentIndex=0)', () => {
-    renderHub({ storage: createMemoryStorage() })
-    const numberCells = screen
-      .getAllByTestId('hub-path-strip-cell')
-      .filter(
-        (c) =>
-          c
-            .closest('[data-testid="hub-path-strip"]')
-            ?.getAttribute('data-tree') === 'number-garden',
-      )
-    expect(numberCells.length).toBeLessThanOrEqual(5)
-    expect(numberCells.length).toBeGreaterThan(0)
-  })
+describe("Hub — Emma's Path card (ticket 123jpnbc3dq)", () => {
+  /** Nothing mastered: first step of each tree at intro, rest locked. */
+  function freshDoc() {
+    const p = defaultProgress()
+    for (const k of Object.keys(
+      p.skillLevels,
+    ) as (keyof typeof p.skillLevels)[])
+      p.skillLevels[k] = 'locked'
+    p.skillLevels['number-recog'] = 'intro'
+    p.skillLevels['letter-names'] = 'intro'
+    return p
+  }
 
-  it('marks the current stage as "current" and earlier as "mastered"', () => {
+  function beadsFor(world: 'math' | 'word-song'): HTMLElement[] {
+    const card = screen
+      .getAllByTestId('hub-card-progress')
+      .find((c) => c.getAttribute('data-world') === world)!
+    return Array.from(
+      card.querySelectorAll<HTMLElement>('[data-testid="hub-card-bead"]'),
+    )
+  }
+
+  it('fresh progress: 11 / 13 beads, land 1, current = first step, next = second', () => {
     renderHub({
       storage: createMemoryStorage(),
-      progress: { numberGardenIndex: 3, wordSongIndex: 0 },
+      progressDoc: freshDoc(),
     })
-    const numberCells = screen
-      .getAllByTestId('hub-path-strip-cell')
-      .filter(
-        (c) =>
-          c
-            .closest('[data-testid="hub-path-strip"]')
-            ?.getAttribute('data-tree') === 'number-garden',
-      )
-    // Window is current-1 (=2) → current+3 (=6), so 5 cells with the
-    // current cell at index 1 of the window.
-    const masteredCount = numberCells.filter(
-      (c) => c.getAttribute('data-kind') === 'mastered',
-    ).length
-    const currentCount = numberCells.filter(
-      (c) => c.getAttribute('data-kind') === 'current',
-    ).length
-    expect(currentCount).toBe(1)
-    expect(masteredCount).toBeGreaterThanOrEqual(1)
+    expect(beadsFor('math')).toHaveLength(11)
+    expect(beadsFor('word-song')).toHaveLength(13)
+    const landNumbers = screen.getAllByTestId('hub-land-number')
+    expect(landNumbers.map((n) => n.getAttribute('data-value'))).toEqual([
+      '1',
+      '1',
+    ])
+    expect(
+      beadsFor('math')
+        .slice(0, 2)
+        .map((b) => b.getAttribute('data-state')),
+    ).toEqual(['current', 'next'])
+    expect(
+      screen
+        .getAllByTestId('hub-card-next')
+        .map((n) => n.getAttribute('data-node')),
+    ).toEqual(['add-to-10', 'letter-sounds'])
+  })
+
+  it('beads group into 4 math lands and 5 word lands', () => {
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: freshDoc(),
+    })
+    const cards = screen.getAllByTestId('hub-card-progress')
+    const landsIn = (world: string) =>
+      cards
+        .find((c) => c.getAttribute('data-world') === world)!
+        .querySelectorAll('[data-testid="hub-card-land"]').length
+    expect(landsIn('math')).toBe(4)
+    expect(landsIn('word-song')).toBe(5)
+  })
+
+  it('hides only the land number when showLevelToMarian is false', () => {
+    const p = freshDoc()
+    p.parentSettings = { ...p.parentSettings!, showLevelToMarian: false }
+    renderHub({ storage: createMemoryStorage(), progressDoc: p })
+    expect(screen.queryAllByTestId('hub-land-number')).toHaveLength(0)
+    expect(beadsFor('math')).toHaveLength(11)
+    expect(screen.getAllByTestId('hub-card-current')).toHaveLength(2)
+  })
+
+  it('a tap on a bead still starts that tree (the card is one target)', async () => {
+    const onPickTree = vi.fn()
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: freshDoc(),
+      onPickTree,
+    })
+    await userEvent.click(beadsFor('word-song')[0]!)
+    expect(onPickTree).toHaveBeenCalledTimes(1)
+    expect(onPickTree).toHaveBeenCalledWith('word-song')
+  })
+
+  it('falls back to loadProgress() when no progressDoc is passed', () => {
+    const p = freshDoc()
+    p.skillLevels['number-recog'] = 'mastered'
+    p.skillLevels['add-to-10'] = 'intro'
+    saveProgress(p)
+    renderHub({ storage: createMemoryStorage() })
+    expect(
+      beadsFor('math')
+        .slice(0, 3)
+        .map((b) => b.getAttribute('data-state')),
+    ).toEqual(['mastered', 'current', 'next'])
+    expect(screen.getAllByTestId('hub-land-number')[0]).toHaveAttribute(
+      'data-value',
+      '2',
+    )
   })
 })
 

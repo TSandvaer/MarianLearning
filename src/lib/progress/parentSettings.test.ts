@@ -33,7 +33,8 @@ describe('DEFAULT_PARENT_SETTINGS', () => {
         'word-song': { percent: 0.875, sessions: 3 },
       },
       crossDayEnforcement: true,
-      showLevelToMarian: false,
+      // Emma's Path 7/10 (ticket 123jpnbc3dq): land number shown by default.
+      showLevelToMarian: true,
       crossVowelMixingEnabled: true,
     })
   })
@@ -102,7 +103,7 @@ describe('getSettings', () => {
     expect(result.sessionModePicker).toBe('on')
     expect(result.autoPromote).toBe(true)
     expect(result.crossDayEnforcement).toBe(true)
-    expect(result.showLevelToMarian).toBe(false)
+    expect(result.showLevelToMarian).toBe(true)
     // Ticket 86c9qa0kf — cross-vowel default is `true` when missing.
     expect(result.crossVowelMixingEnabled).toBe(true)
     expect(result.masteryThreshold).toEqual({
