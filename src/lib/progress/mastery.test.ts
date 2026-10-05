@@ -34,9 +34,12 @@ import {
   NOVEL_POOL_THRESHOLD,
   WORD_SONG_GRADUATION_GATED_NODES,
   applyMasteryRule,
+  MAX_GOOD_DAYS_PER_STEP,
   crossVowelMixingActive,
+  goodDayCount,
   isGraduationSessionPending,
   nextNode,
+  recordGoodDays,
 } from './mastery'
 import { defaultProgress } from './defaults'
 import { MATH_NODES_IN_ORDER, WORD_SONG_NODES_IN_ORDER } from './focusNode'
@@ -183,7 +186,7 @@ describe('nextNode', () => {
 // Default rule (95% / 3 sessions, cross-day on, autoPromote on)
 // --------------------------------------------------------------------------
 
-describe('applyMasteryRule — defaults (95/3, cross-day, autoPromote)', () => {
+describe('applyMasteryRule — defaults (7/8 on 3 good days, cross-day, autoPromote)', () => {
   it('promotes after 3 cross-day high-score entries on add-to-10', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'add-to-10': 'practicing' }),
@@ -811,63 +814,305 @@ describe('applyMasteryRule — pendingPromotion edge cases', () => {
 // defaults from `defaultProgress()` flow through — the assertion
 // vehicle is the divergent outcome on identical successRate data.
 
-describe('applyMasteryRule — per-track defaults (ticket 86c9kwvy0)', () => {
-  it('promotes word-song with 3 sessions at 0.91 under the 90/3 default', () => {
+describe('applyMasteryRule — per-track defaults (ticket 123jpnbc3dm)', () => {
+  // Emma's Path decision 1: both tracks default to 0.875/3 — three good
+  // days at 7/8 or better. The old 95/3 (math) / 90/3 (word-song)
+  // defaults meant three 8/8 days in practice.
+  it('promotes word-song with 3 days at 7/8 under the default', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'blending-cv': 'practicing' }),
       history: [
-        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 0.91),
-        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 0.91),
-        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 0.91),
+        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 0.875),
+        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 0.875),
+        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 0.875),
       ],
     })
     const result = applyMasteryRule(progress)
     expect(result.skillLevels['blending-cv']).toBe('mastered')
-    // Downstream node was 'intro' in defaultProgress() seed; it's not
-    // 'locked' so the rule leaves it as-is. The promotion of
-    // blending-cv is the assertion vehicle here.
   })
 
-  it('does NOT promote math with 3 sessions at 0.91 under the 95/3 default', () => {
+  it('promotes math with 3 days at 7/8 under the default (was blocked by 95/3)', () => {
     const progress = buildProgress({
       skillLevels: levels({ 'add-to-10': 'practicing' }),
       history: [
-        entry('2026-04-29T10:00:00.000Z', 'add-to-10', 0.91),
-        entry('2026-04-30T10:00:00.000Z', 'add-to-10', 0.91),
-        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 0.91),
+        entry('2026-04-29T10:00:00.000Z', 'add-to-10', 0.875),
+        entry('2026-04-30T10:00:00.000Z', 'add-to-10', 0.875),
+        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 0.875),
       ],
     })
     const result = applyMasteryRule(progress)
-    // 0.91 < 0.95 — fails the math threshold.
+    expect(result.skillLevels['add-to-10']).toBe('mastered')
+    expect(result.skillLevels['add-to-20']).toBe('intro')
+  })
+
+  it('does NOT promote with 3 days at 6/8', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'add-to-10', 0.75),
+        entry('2026-04-30T10:00:00.000Z', 'add-to-10', 0.75),
+        entry('2026-05-01T10:00:00.000Z', 'add-to-10', 0.75),
+      ],
+    })
+    const result = applyMasteryRule(progress)
     expect(result.skillLevels['add-to-10']).toBe('practicing')
     expect(result.skillLevels['add-to-20']).toBe('locked')
     expect(result.pendingPromotion).toBeUndefined()
   })
 
   it('reads the math threshold for math nodes and the word-song threshold for literacy nodes within a single call', () => {
-    // Both tracks have qualifying 0.91 history — but only word-song
-    // promotes under defaults. This proves the per-track lookup happens
-    // once per track, not once per node-from-the-same-settings.
+    // Both tracks have 7/8 history, but math is set to a custom 90/3 —
+    // only word-song promotes. Proves the per-track lookup.
     const progress = buildProgress({
       skillLevels: levels({
         'add-to-10': 'practicing',
         'blending-cv': 'practicing',
       }),
+      parentSettings: {
+        masteryThreshold: {
+          math: { percent: 0.9, sessions: 3 },
+        } as ParentSettings['masteryThreshold'],
+      },
       history: [
-        entry('2026-04-29T08:00:00.000Z', 'add-to-10', 0.91),
-        entry('2026-04-30T08:00:00.000Z', 'add-to-10', 0.91),
-        entry('2026-05-01T08:00:00.000Z', 'add-to-10', 0.91),
-        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 0.91),
-        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 0.91),
-        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 0.91),
+        entry('2026-04-29T08:00:00.000Z', 'add-to-10', 0.875),
+        entry('2026-04-30T08:00:00.000Z', 'add-to-10', 0.875),
+        entry('2026-05-01T08:00:00.000Z', 'add-to-10', 0.875),
+        entry('2026-04-29T10:00:00.000Z', 'blending-cv', 0.875),
+        entry('2026-04-30T10:00:00.000Z', 'blending-cv', 0.875),
+        entry('2026-05-01T10:00:00.000Z', 'blending-cv', 0.875),
       ],
     })
     const result = applyMasteryRule(progress)
-    // Math: 0.91 < 0.95 — no promotion.
+    // Math: 0.875 < 0.9 — no promotion.
     expect(result.skillLevels['add-to-10']).toBe('practicing')
     expect(result.skillLevels['add-to-20']).toBe('locked')
-    // Word-song: 0.91 ≥ 0.90 — promotion fires.
+    // Word-song: 0.875 ≥ 0.875 — promotion fires.
     expect(result.skillLevels['blending-cv']).toBe('mastered')
+  })
+})
+
+// --------------------------------------------------------------------------
+// Cumulative good days — "3 good days at 7/8+, any order, never lost"
+// (ticket 123jpnbc3dm, Emma's Path decision 1)
+// --------------------------------------------------------------------------
+
+describe('applyMasteryRule — cumulative good days (ticket 123jpnbc3dm)', () => {
+  it('good days count in any order: good, weak, good, weak, good → mastered', () => {
+    // Under the old rule the trailing weak day reset the run.
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-27T10:00:00.000Z', 'sub-to-10', 0.875),
+        entry('2026-04-28T10:00:00.000Z', 'sub-to-10', 0.5),
+        entry('2026-04-29T10:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-30T10:00:00.000Z', 'sub-to-10', 0.625),
+        entry('2026-05-01T10:00:00.000Z', 'sub-to-10', 0.875),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sub-to-10']).toBe('mastered')
+    expect(result.skillLevels['sub-to-20']).toBe('intro')
+  })
+
+  it('a weak latest day does not undo banked good days', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-27T10:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-28T10:00:00.000Z', 'sub-to-10', 0.875),
+        entry('2026-04-29T10:00:00.000Z', 'sub-to-10', 0.875),
+        entry('2026-04-30T10:00:00.000Z', 'sub-to-10', 0.25),
+      ],
+    })
+    expect(applyMasteryRule(progress).skillLevels['sub-to-10']).toBe('mastered')
+  })
+
+  it('several good sessions on ONE day count as one good day', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T01:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-29T03:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-29T05:00:00.000Z', 'sub-to-10', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sub-to-10']).toBe('practicing')
+    expect(result.goodDays?.['sub-to-10']).toEqual(['2026-04-29'])
+  })
+
+  it('a weak session on a day that already has a good session keeps the good day', () => {
+    // The old dedupe kept only the LATEST session per day; the good day
+    // is now banked regardless of what follows on that day.
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-27T02:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-27T04:00:00.000Z', 'sub-to-10', 0.25),
+        entry('2026-04-28T02:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-29T02:00:00.000Z', 'sub-to-10', 1),
+      ],
+    })
+    expect(applyMasteryRule(progress).skillLevels['sub-to-10']).toBe('mastered')
+  })
+
+  it('banks good days into progress.goodDays (local days, sorted, weak days excluded)', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-10': 'practicing' }),
+      history: [
+        entry('2026-04-29T10:00:00.000Z', 'sub-to-10', 0.875),
+        entry('2026-04-27T10:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-28T10:00:00.000Z', 'sub-to-10', 0.75),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    // Asia/Manila (UTC+8): 10:00Z → 18:00 local, same calendar day.
+    expect(result.goodDays).toEqual({
+      'sub-to-10': ['2026-04-27', '2026-04-29'],
+    })
+    expect(result.skillLevels['sub-to-10']).toBe('practicing')
+  })
+
+  it('banked good days survive history aging out (never lost)', () => {
+    // Two good days banked from sessions no longer in history, plus one
+    // new good day in history → 3 → mastered.
+    const progress: Progress = {
+      ...buildProgress({
+        skillLevels: levels({ 'sub-to-10': 'practicing' }),
+        history: [entry('2026-05-01T10:00:00.000Z', 'sub-to-10', 0.875)],
+      }),
+      goodDays: { 'sub-to-10': ['2026-04-01', '2026-04-05'] },
+    }
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sub-to-10']).toBe('mastered')
+    expect(result.goodDays?.['sub-to-10']).toEqual([
+      '2026-04-01',
+      '2026-04-05',
+      '2026-05-01',
+    ])
+  })
+
+  it('a banked day and the same day in history count once', () => {
+    const progress: Progress = {
+      ...buildProgress({
+        skillLevels: levels({ 'sub-to-10': 'practicing' }),
+        history: [entry('2026-05-01T10:00:00.000Z', 'sub-to-10', 1)],
+      }),
+      goodDays: { 'sub-to-10': ['2026-04-30', '2026-05-01'] },
+    }
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['sub-to-10']).toBe('practicing')
+    expect(result.goodDays?.['sub-to-10']).toHaveLength(2)
+  })
+
+  it('weak sessions never remove banked days', () => {
+    const banked = ['2026-04-01', '2026-04-05']
+    const progress: Progress = {
+      ...buildProgress({
+        skillLevels: levels({ 'sub-to-10': 'practicing' }),
+        history: [
+          entry('2026-05-01T10:00:00.000Z', 'sub-to-10', 0.125),
+          entry('2026-05-02T10:00:00.000Z', 'sub-to-10', 0.5),
+        ],
+      }),
+      goodDays: { 'sub-to-10': banked },
+    }
+    const result = applyMasteryRule(progress)
+    expect(result.goodDays?.['sub-to-10']).toEqual(banked)
+    expect(result.skillLevels['sub-to-10']).toBe('practicing')
+  })
+
+  it('is idempotent on the counter and leaves it untouched (same reference) when nothing new', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-10': 'practicing' }),
+      history: [entry('2026-05-01T10:00:00.000Z', 'sub-to-10', 1)],
+    })
+    const once = applyMasteryRule(progress)
+    const twice = applyMasteryRule(once)
+    expect(twice.goodDays).toBe(once.goodDays)
+    expect(twice.goodDays).toEqual({ 'sub-to-10': ['2026-05-01'] })
+  })
+
+  it('caps each step at MAX_GOOD_DAYS_PER_STEP, dropping the oldest', () => {
+    // 2026-01-01 .. 2026-01-30
+    const banked = Array.from(
+      { length: MAX_GOOD_DAYS_PER_STEP },
+      (_, i) => `2026-01-${String(i + 1).padStart(2, '0')}`,
+    )
+    const progress: Progress = {
+      ...buildProgress({
+        skillLevels: levels({ 'sub-to-10': 'mastered' }),
+        history: [entry('2026-05-01T10:00:00.000Z', 'sub-to-10', 1)],
+      }),
+      goodDays: { 'sub-to-10': banked },
+    }
+    const days = applyMasteryRule(progress).goodDays?.['sub-to-10'] ?? []
+    expect(days).toHaveLength(MAX_GOOD_DAYS_PER_STEP)
+    expect(days[days.length - 1]).toBe('2026-05-01')
+    expect(days).not.toContain('2026-01-01')
+  })
+
+  it('already-mastered steps stay mastered with no good days at all', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'add-to-10': 'mastered', 'add-to-20': 'mastered' }),
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['add-to-10']).toBe('mastered')
+    expect(result.skillLevels['add-to-20']).toBe('mastered')
+    expect(result.goodDays).toEqual(progress.goodDays)
+  })
+
+  it('crossDayEnforcement=false counts good SESSIONS (same day allowed)', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'sub-to-10': 'practicing' }),
+      parentSettings: { crossDayEnforcement: false },
+      history: [
+        entry('2026-04-29T01:00:00.000Z', 'sub-to-10', 0.5),
+        entry('2026-04-29T02:00:00.000Z', 'sub-to-10', 0.875),
+        entry('2026-04-29T03:00:00.000Z', 'sub-to-10', 0.5),
+        entry('2026-04-29T04:00:00.000Z', 'sub-to-10', 1),
+        entry('2026-04-29T05:00:00.000Z', 'sub-to-10', 0.875),
+      ],
+    })
+    expect(applyMasteryRule(progress).skillLevels['sub-to-10']).toBe('mastered')
+  })
+
+  it('goodDayCount is uncapped and matches the rule', () => {
+    const settings = buildProgress({ skillLevels: levels() }).parentSettings!
+    const threshold = settings.masteryThreshold.math
+    const focused = [
+      entry('2026-04-27T10:00:00.000Z', 'sub-to-10', 1),
+      entry('2026-04-28T10:00:00.000Z', 'sub-to-10', 0.5),
+      entry('2026-04-29T10:00:00.000Z', 'sub-to-10', 0.875),
+    ]
+    expect(goodDayCount(focused, threshold, settings, undefined)).toBe(2)
+    expect(
+      goodDayCount(focused, threshold, settings, ['2026-01-01', '2026-01-02']),
+    ).toBe(4)
+  })
+
+  it('recordGoodDays banks per-vowel good days from vowel-tagged letter-sounds sessions', () => {
+    const progress: Progress = {
+      ...buildProgress({ skillLevels: levels() }),
+      history: [
+        {
+          dateISO: '2026-04-29T10:00:00.000Z',
+          skillFocus: ['letter-sounds'],
+          successRate: 0.875,
+          currentTargetVowel: '/o/',
+        },
+        {
+          dateISO: '2026-04-30T10:00:00.000Z',
+          skillFocus: ['letter-sounds'],
+          successRate: 0.5,
+          currentTargetVowel: '/u/',
+        },
+      ],
+    }
+    expect(recordGoodDays(progress)).toEqual({
+      'letter-sounds': ['2026-04-29'],
+      '/o/': ['2026-04-29'],
+    })
   })
 })
 
@@ -1042,6 +1287,56 @@ describe('isGraduationSessionPending — cvc-words detector (ticket 86c9m3aec)',
 })
 
 describe('applyMasteryRule — graduation gate on cvc-words (ticket 86c9m3aec)', () => {
+  // ── ticket 123jpnbc3dm: good days in any order, novel gate still applies ──
+  it('3 good days in any order make cvc-words graduation-pending, not mastered', () => {
+    const progress = buildProgress({
+      skillLevels: levels({ 'cvc-words': 'practicing' }),
+      history: [
+        entry('2026-04-27T10:00:00.000Z', 'cvc-words', 0.875),
+        entry('2026-04-28T10:00:00.000Z', 'cvc-words', 0.5),
+        entry('2026-04-29T10:00:00.000Z', 'cvc-words', 0.875),
+        entry('2026-04-30T10:00:00.000Z', 'cvc-words', 0.875),
+        entry('2026-05-01T10:00:00.000Z', 'cvc-words', 0.625),
+      ],
+    })
+    expect(isGraduationSessionPending(progress, 'cvc-words', 'word-song')).toBe(
+      true,
+    )
+    expect(applyMasteryRule(progress).skillLevels['cvc-words']).toBe(
+      'practicing',
+    )
+  })
+
+  it('banked good days + a passing graduation session promote cvc-words', () => {
+    const progress: Progress = {
+      ...buildProgress({
+        skillLevels: levels({ 'cvc-words': 'practicing' }),
+        history: [
+          graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 0.875, 1),
+        ],
+      }),
+      goodDays: { 'cvc-words': ['2026-04-01', '2026-04-02'] },
+    }
+    const result = applyMasteryRule(progress)
+    expect(result.skillLevels['cvc-words']).toBe('mastered')
+    expect(result.skillLevels['cvc-words-short-o']).toBe('intro')
+  })
+
+  it('a graduation session that scored below 7/8 canonically does not clear the gate', () => {
+    const progress: Progress = {
+      ...buildProgress({
+        skillLevels: levels({ 'cvc-words': 'practicing' }),
+        history: [
+          graduationEntry('2026-05-01T10:00:00.000Z', 'cvc-words', 0.75, 1),
+        ],
+      }),
+      goodDays: { 'cvc-words': ['2026-04-01', '2026-04-02', '2026-04-03'] },
+    }
+    expect(applyMasteryRule(progress).skillLevels['cvc-words']).toBe(
+      'practicing',
+    )
+  })
+
   it('does NOT promote cvc-words after 3 canonical sessions at 100% (graduation pending)', () => {
     // The standard 90/3 rule WOULD have fired here; the graduation
     // gate holds promotion until the next session lands a
@@ -1782,6 +2077,56 @@ describe('letter-sounds per-vowel sub-mastery (W9.3)', () => {
     const result = applyMasteryRule(progress)
     expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('mastered')
     // The composite node is NOT mastered — only one of four vowels is.
+    expect(result.skillLevels['letter-sounds']).toBe('practicing')
+  })
+
+  // ── ticket 123jpnbc3dm: per-vowel good days, any order, never lost ────
+  it('promotes a vowel on 3 good days in any order (weak days between)', () => {
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro, '/o/': 'practicing' },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 0.875),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/o/', 0.5),
+        vowelEntry('2026-05-03T10:00:00.000Z', '/o/', 0.875),
+        vowelEntry('2026-05-04T10:00:00.000Z', '/o/', 0.375),
+        vowelEntry('2026-05-05T10:00:00.000Z', '/o/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('mastered')
+    expect(result.goodDays?.['/o/']).toEqual([
+      '2026-05-01',
+      '2026-05-03',
+      '2026-05-05',
+    ])
+  })
+
+  it("counts a vowel's banked good days that aged out of history", () => {
+    const progress: Progress = {
+      ...perVowelProgress({
+        vowelStates: { ...allIntro, '/u/': 'practicing' },
+        history: [vowelEntry('2026-05-05T10:00:00.000Z', '/u/', 0.875)],
+      }),
+      goodDays: { '/u/': ['2026-04-01', '2026-04-02'] },
+    }
+    const result = applyMasteryRule(progress)
+    expect(result.literacy!.letterSoundsVowelStates!['/u/']).toBe('mastered')
+  })
+
+  it('the composite letter-sounds node still needs all four vowels (good days on the node alone are not enough)', () => {
+    // 3 good letter-sounds days, all on /o/ — the node has 3 good days
+    // but the per-vowel AND-of-four gate still holds it at practicing.
+    const progress = perVowelProgress({
+      vowelStates: { ...allIntro, '/o/': 'practicing' },
+      history: [
+        vowelEntry('2026-05-01T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-02T10:00:00.000Z', '/o/', 1),
+        vowelEntry('2026-05-03T10:00:00.000Z', '/o/', 1),
+      ],
+    })
+    const result = applyMasteryRule(progress)
+    expect(result.goodDays?.['letter-sounds']).toHaveLength(3)
+    expect(result.literacy!.letterSoundsVowelStates!['/o/']).toBe('mastered')
     expect(result.skillLevels['letter-sounds']).toBe('practicing')
   })
 

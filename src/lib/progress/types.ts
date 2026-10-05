@@ -520,7 +520,11 @@ export interface MathFact {
 export interface MasteryThreshold {
   /** Required success rate, 0..1. */
   percent: number
-  /** Required consecutive sessions at or above `percent` to promote. */
+  /**
+   * Required good days to promote: separate calendar days (any order,
+   * never lost) with a session at or above `percent` — see
+   * `Progress.goodDays` (Emma's Path decision 1, 2026-10-04).
+   */
   sessions: number
 }
 
@@ -535,14 +539,12 @@ export type MasteryTrackKey = 'math' | 'word-song'
 /**
  * Per-track mastery threshold map (ticket 86c9kwvy0, locked 2026-05-02).
  *
- * Math and word-song each carry their own threshold:
- *  - math: 95/3 default — math-fact automaticity benefits from
- *    over-practice; the durability gain at 95% vs 90% may be real even
- *    if the literature doesn't quantify it cleanly.
- *  - word-song: 90/3 default — per Pickering et al. (PMC5843573), 90%
- *    over-learning produces durable maintenance; 95% adds practice
- *    time without clear benefit. Marian's August timeline makes
- *    literacy progression the binding constraint.
+ * Math and word-song each carry their own threshold. Both default to
+ * 0.875/3 — three good days at 7/8 or better (Emma's Path decision 1,
+ * Thomas 2026-10-04). The earlier 95/3 math and 90/3 word-song defaults
+ * meant three 8/8 days in a row in practice; a stored value equal to
+ * one of those old defaults is read as the new default
+ * (`parentSettings.ts:getSettings`).
  *
  * Cross-day enforcement (PMC8164994: sleep consolidation) stays on for
  * BOTH tracks regardless of percent threshold — see
@@ -726,6 +728,30 @@ export interface Progress {
    * `lifetimeFirstEncounters`, and `literacy`.
    */
   cvcGraduationSessionFired?: boolean
+  /**
+   * Cumulative good-day counter (ticket 123jpnbc3dm). Written by
+   * `applyMasteryRule`, which unions in every good day it can see in
+   * `history`; seeded from `history` on load when absent
+   * (`storage.ts:withSeededGoodDays`). Optional + additive — no
+   * `schemaVersion` bump, same precedent as `literacy`.
+   */
+  goodDays?: GoodDays
 }
+
+/**
+ * Key of the good-day counter: a SkillNode, or a letter-sounds vowel for
+ * the per-vowel sub-mastery steps (slash-LETTER keys never collide with
+ * SkillNode names).
+ */
+export type GoodDayKey = SkillNode | LetterSoundsVowel
+
+/**
+ * Cumulative good days per step (Emma's Path decision 1 — ticket
+ * 123jpnbc3dm). Each value is the list of local-time calendar days
+ * (`YYYY-MM-DD`) on which the step scored at or above the mastery
+ * threshold percent. Days are only ever added, never removed, so they
+ * survive `history` being trimmed to `MAX_SESSION_HISTORY`.
+ */
+export type GoodDays = Partial<Record<GoodDayKey, string[]>>
 
 export const CURRENT_SCHEMA_VERSION = 1 as const

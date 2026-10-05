@@ -440,6 +440,20 @@ export function isProgressV1(v: unknown): v is Progress {
   ) {
     if (typeof v.cvcGraduationSessionFired !== 'boolean') return false
   }
+  // goodDays is optional (ticket 123jpnbc3dm — cumulative good-day
+  // counter; additive, no schemaVersion bump). When present it must be
+  // an object of string arrays (local-day keys). Keys are NOT checked
+  // against SKILL_NODES: a counter entry for a renamed/removed step is
+  // inert, and rejecting it would discard the whole blob. Absent is the
+  // pre-counter state; `storage.ts:withSeededGoodDays` seeds it on load.
+  if ('goodDays' in v && v.goodDays !== undefined) {
+    if (!isObject(v.goodDays) || Array.isArray(v.goodDays)) return false
+    for (const days of Object.values(v.goodDays)) {
+      if (days === undefined) continue
+      if (!Array.isArray(days)) return false
+      if (!days.every((day) => typeof day === 'string')) return false
+    }
+  }
   return true
 }
 
