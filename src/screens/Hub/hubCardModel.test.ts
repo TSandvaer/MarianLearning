@@ -44,6 +44,9 @@ function entry(d: number, node: SkillNode, rate: number): SessionHistoryEntry {
   }
 }
 
+/** Local day key of day `d` of May 2026. */
+const MAY = (d: number): string => `2026-05-${String(d).padStart(2, '0')}`
+
 describe('buildHubCardModel', () => {
   it('null progress renders like defaultProgress()', () => {
     expect(buildHubCardModel(null, 'math')).toEqual(
@@ -81,17 +84,78 @@ describe('buildHubCardModel', () => {
     expect(Object.keys(m)).not.toContain('buds')
   })
 
-  it('seed holes = nodeProgress goodDays of requiredDays', () => {
+  it('flower slots = nodeProgress goodDays of requiredDays', () => {
     const p: Progress = {
       ...withLevels({ 'number-recog': 'practicing' }),
       history: [entry(1, 'number-recog', 1), entry(2, 'number-recog', 1)],
     }
     const np = nodeProgress(p, 'number-recog')
-    const m = buildHubCardModel(p, 'math')
-    expect(m.holes).toEqual(
-      Array.from({ length: np.requiredDays }, (_, i) => i < np.goodDays),
+    const m = buildHubCardModel(p, 'math', MAY(10))
+    expect(m.slots).toEqual(
+      Array.from({ length: np.requiredDays }, (_, i) =>
+        i < np.goodDays ? 'grown' : 'empty',
+      ),
     )
-    expect(m.holes).toEqual([true, true, false])
+    expect(m.slots).toEqual(['grown', 'grown', 'empty'])
+    expect(m.slotDays).toEqual([MAY(1), MAY(2), null])
+    expect(m.earnedToday).toBe(false)
+    expect(m.flowersToUnlock).toBe(1)
+  })
+
+  it("today's good day sleeps (last filled slot); earlier days are grown", () => {
+    const p: Progress = {
+      ...withLevels({ 'number-recog': 'practicing' }),
+      history: [entry(1, 'number-recog', 1), entry(2, 'number-recog', 1)],
+    }
+    const m = buildHubCardModel(p, 'math', MAY(2))
+    expect(m.slots).toEqual(['grown', 'sleeping', 'empty'])
+    expect(m.slotDays).toEqual([MAY(1), null, null])
+    expect(m.earnedToday).toBe(true)
+  })
+
+  it('a second good session the same day adds no flower (practice)', () => {
+    const p: Progress = {
+      ...withLevels({ 'number-recog': 'practicing' }),
+      history: [entry(2, 'number-recog', 1), entry(2, 'number-recog', 1)],
+    }
+    expect(buildHubCardModel(p, 'math', MAY(2)).slots).toEqual([
+      'sleeping',
+      'empty',
+      'empty',
+    ])
+  })
+
+  it('a weak session today is not a sleeping flower', () => {
+    const p: Progress = {
+      ...withLevels({ 'number-recog': 'practicing' }),
+      history: [entry(1, 'number-recog', 1), entry(2, 'number-recog', 0.5)],
+    }
+    const m = buildHubCardModel(p, 'math', MAY(2))
+    expect(m.slots).toEqual(['grown', 'empty', 'empty'])
+    expect(m.earnedToday).toBe(false)
+  })
+
+  it('banked progress.goodDays count as flowers and can sleep', () => {
+    const p: Progress = {
+      ...withLevels({ 'number-recog': 'practicing' }),
+      goodDays: { 'number-recog': [MAY(1), MAY(3)] },
+    }
+    expect(buildHubCardModel(p, 'math', MAY(3)).slots).toEqual([
+      'grown',
+      'sleeping',
+      'empty',
+    ])
+  })
+
+  it('separate-days rule switched off: nothing sleeps', () => {
+    const p: Progress = {
+      ...withLevels({ 'number-recog': 'practicing' }),
+      history: [entry(2, 'number-recog', 1)],
+    }
+    p.parentSettings = { ...p.parentSettings!, crossDayEnforcement: false }
+    const m = buildHubCardModel(p, 'math', MAY(2))
+    expect(m.slots).toEqual(['grown', 'empty', 'empty'])
+    expect(m.earnedToday).toBe(false)
   })
 
   it('letter sounds per vowel: 3 holes for the vowel being worked on', () => {
@@ -114,14 +178,19 @@ describe('buildHubCardModel', () => {
     expect(np.vowels).toBeDefined()
     const working = np.vowels!.find((v) => v.goodDays < v.requiredDays)!
     expect(working.vowel).toBe('/u/')
-    const m = buildHubCardModel(p, 'word-song')
-    expect(m.holes).toEqual(
-      Array.from(
-        { length: working.requiredDays },
-        (_, i) => i < working.goodDays,
+    const m = buildHubCardModel(p, 'word-song', MAY(10))
+    expect(m.slots).toEqual(
+      Array.from({ length: working.requiredDays }, (_, i) =>
+        i < working.goodDays ? 'grown' : 'empty',
       ),
     )
-    expect(m.holes).toHaveLength(3)
+    expect(m.slots).toHaveLength(3)
+    // Today's /u/ session sleeps on the /u/ row.
+    expect(buildHubCardModel(p, 'word-song', MAY(1)).slots).toEqual([
+      'sleeping',
+      'empty',
+      'empty',
+    ])
   })
 
   it('whole world mastered: complete, no next unlock, last step shown', () => {
@@ -131,7 +200,8 @@ describe('buildHubCardModel', () => {
     expect(m.unlocksNext).toBeNull()
     expect(m.current).toBe('mult-6-9')
     expect(m.landNumber).toBe(4)
-    expect(m.holes.every(Boolean)).toBe(true)
+    expect(m.slots.every((slot) => slot === 'grown')).toBe(true)
+    expect(m.flowersToUnlock).toBe(0)
   })
 
   it('showLandNumber mirrors parentSettings.showLevelToMarian', () => {

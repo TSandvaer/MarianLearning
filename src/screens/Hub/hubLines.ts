@@ -20,8 +20,6 @@
  * files in `public/assets/audio/hub/` change.
  */
 
-import type { SkillTreeId } from '../SessionEnd/sessionHistory'
-
 /** Stable identifiers for every Hub line. */
 export type HubLineId =
   // Anchor lines (always pre-rendered)
@@ -142,11 +140,13 @@ export const HUB_LINE_WORD_COUNTS: Record<HubLineId, number> =
     ]),
   ) as Record<HubLineId, number>
 
-// ── Greeting variant selection ───────────────────────────────────────────
+// ── Entry path ───────────────────────────────────────────────────────────
 
 /**
- * The path that brought Marian to Hub. Drives which welcome-line variants
- * are eligible and which audio gate the screen needs.
+ * The path that brought Marian to Hub. Drives the audio gate (app-open
+ * paths wait for the first tap once a line has a recording). Emma's Hub
+ * lines are now the guidance lines in `hubGuidance.ts` (Guidance G1);
+ * the welcome-line manifest above stays for the Howler line player.
  */
 export type HubEntryPath =
   | 'first-ever' // sessionCount === 1 (just finished Greet → Math → Session-End → Hub)
@@ -154,164 +154,3 @@ export type HubEntryPath =
   | 'app-open-recent' // app-open within 6h of last session
   | 'session-end' // from Session-End "All done!" tap
   | 'mid-skill-back' // from Math/WordSong back-arrow
-
-/** What the algorithm decides for this Hub mount. */
-export interface HubGreetingChoice {
-  /** Which line to play. `null` ⇒ no greeting (rapid re-mount suppression). */
-  lineId: HubLineId | null
-  /** Did the algorithm pick the anchor (true) or a rotation variant (false)? */
-  isAnchor: boolean
-}
-
-interface VariantTable {
-  anchor: HubLineId
-  rotation: HubLineId[]
-}
-
-/**
- * Per-entry-path variants — anchor + optional rotation pool.
- *
- * Suggestion-aware variants ('try-number-garden' / 'try-word-song') are
- * keyed off `suggestion` separately; this table covers the
- * non-suggestion paths.
- */
-const VARIANTS_BY_PATH: Record<HubEntryPath, VariantTable> = {
-  'first-ever': {
-    anchor: 'hub.welcome.first-again',
-    rotation: [], // anchor-only
-  },
-  'app-open': {
-    anchor: 'hub.welcome.what-today',
-    rotation: [
-      'hub.welcome.what-today.alt-1',
-      'hub.welcome.what-today.alt-2',
-      'hub.welcome.what-today.alt-3',
-    ],
-  },
-  'app-open-recent': {
-    anchor: 'hub.welcome.back-soon',
-    rotation: ['hub.welcome.back-soon.alt-1', 'hub.welcome.back-soon.alt-2'],
-  },
-  'session-end': {
-    anchor: 'hub.welcome.pick-again',
-    rotation: [], // anchor-only
-  },
-  'mid-skill-back': {
-    anchor: 'hub.welcome.pick-next',
-    rotation: [], // anchor-only
-  },
-}
-
-/** Suggestion-aware tables — used when a non-null suggestion is set. */
-const VARIANTS_BY_SUGGESTION: Record<SkillTreeId, VariantTable> = {
-  'number-garden': {
-    anchor: 'hub.welcome.try-number-garden',
-    rotation: [
-      'hub.welcome.try-number-garden.alt-1',
-      'hub.welcome.try-number-garden.alt-2',
-    ],
-  },
-  'word-song': {
-    anchor: 'hub.welcome.try-word-song',
-    rotation: [
-      'hub.welcome.try-word-song.alt-1',
-      'hub.welcome.try-word-song.alt-2',
-    ],
-  },
-}
-
-/**
- * Deterministic 0..1 pseudo-random keyed on a session count. Used so
- * the greeting variant for a given session is reproducible (tests can
- * assert "session 5 picks variant X" without mocking randomness).
- *
- * Lifted from a small splitmix-style hash; collisions don't matter
- * here because the only consumer is variant selection.
- */
-export function pseudoRandom(seed: number): number {
-  // splitmix32 on the seed; map to [0, 1).
-  let z = (seed | 0) + 0x9e3779b9
-  z = Math.imul(z ^ (z >>> 16), 0x85ebca6b)
-  z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35)
-  z = z ^ (z >>> 16)
-  return ((z >>> 0) % 1_000_000) / 1_000_000
-}
-
-/**
- * Pick the welcome-back line for this Hub mount.
- *
- * Inputs:
- *   - `path`: how Marian got here.
- *   - `suggestion`: current soft-suggestion (or null).
- *   - `seed`: a deterministic seed (typically `sessionCount`). Same
- *     seed → same variant, every time.
- *   - `suppressed`: rapid-remount suppression flag — if true, returns
- *     `{ lineId: null, isAnchor: true }`.
- *
- * Selection rule (per spec § "Greeting model" + § "Suggestion-aware lines"):
- *   - On `app-open` or `app-open-recent` paths with a non-null
- *     suggestion, USE the suggestion table — Melody verbalises the
- *     nudge. Other paths use the path table even with a suggestion
- *     set (the suggestion is visual-only there, so we don't repeat
- *     "Pick again? Try Word Song?" on Session-End return).
- *   - 80% land on the anchor; 20% spread evenly across the rotation
- *     pool. Anchor-only tables always return the anchor.
- */
-export function pickHubGreeting(opts: {
-  path: HubEntryPath
-  suggestion: SkillTreeId | null
-  seed: number
-  suppressed?: boolean
-}): HubGreetingChoice {
-  if (opts.suppressed) return { lineId: null, isAnchor: true }
-
-  const useSuggestionTable =
-    opts.suggestion !== null &&
-    (opts.path === 'app-open' || opts.path === 'app-open-recent')
-
-  const table = useSuggestionTable
-    ? VARIANTS_BY_SUGGESTION[opts.suggestion as SkillTreeId]
-    : VARIANTS_BY_PATH[opts.path]
-
-  if (table.rotation.length === 0) {
-    return { lineId: table.anchor, isAnchor: true }
-  }
-
-  const r = pseudoRandom(opts.seed)
-  if (r < 0.8) return { lineId: table.anchor, isAnchor: true }
-
-  // Rotation slot: split [0.8, 1.0) evenly across the pool.
-  const idx = Math.min(
-    table.rotation.length - 1,
-    Math.floor(((r - 0.8) / 0.2) * table.rotation.length),
-  )
-  return { lineId: table.rotation[idx], isAnchor: false }
-}
-
-/**
- * Helper: should the day-streak band render? Per spec, only when the
- * streak is >= 1 AND last session was today or yesterday.
- */
-export function shouldShowDayStreak(
-  dayStreak: number,
-  lastSessionCompletedAtIso: string,
-  now: Date,
-): boolean {
-  if (dayStreak < 1) return false
-  if (!lastSessionCompletedAtIso) return false
-  const last = new Date(lastSessionCompletedAtIso)
-  if (Number.isNaN(last.getTime())) return false
-  // Local-time calendar-day delta — same rule as nextDayStreak.
-  const aMid = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime()
-  const bMid = new Date(
-    last.getFullYear(),
-    last.getMonth(),
-    last.getDate(),
-  ).getTime()
-  const diff = Math.round((aMid - bMid) / 86_400_000)
-  return diff <= 1
-}

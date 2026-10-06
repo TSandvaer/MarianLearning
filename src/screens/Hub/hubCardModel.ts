@@ -16,13 +16,23 @@ import {
   MATH_TREE,
   defaultProgress,
   getSettings,
+  type LetterSoundsVowel,
   type MasteryTrack,
   type Progress,
   type SkillNode,
 } from '../../lib/progress'
 import { landOf } from '../../lib/progress/lands'
 import { nodeProgress } from '../../lib/progress/nodeProgress'
+import { goodDayKeysFromHistory } from '../../lib/progress/mastery'
 import { landArtId, type LandArtId } from '../../lib/emmasPath/pathArt'
+import { isoDate } from '../SessionEnd/sessionHistory'
+
+/**
+ * One flower slot (Guidance G1): `grown` = a good day from an earlier
+ * day, `sleeping` = the good day earned today (closed bud + moon + "z"
+ * until tomorrow), `empty` = still to come.
+ */
+export type FlowerSlot = 'grown' | 'sleeping' | 'empty'
 
 export interface HubCardModel {
   world: MasteryTrack
@@ -36,12 +46,23 @@ export interface HubCardModel {
   /** `nodeProgress(p, current).unlocksNext` — null on a tree's last step. */
   unlocksNext: SkillNode | null
   /**
-   * Seed holes, one per required good day; true = a banked good day.
-   * Letter sounds with per-vowel tracking shows the vowel being worked
-   * on (the first not-yet-full vowel), so the Hub keeps one row of 3
-   * instead of the spec's 12 per-vowel buds (redesign README).
+   * Flower slots, one per required good day, oldest first. Letter sounds
+   * with per-vowel tracking shows the vowel being worked on (the first
+   * not-yet-full vowel), so the Hub keeps one row of 3 instead of the
+   * spec's 12 per-vowel buds (redesign README).
    */
-  holes: boolean[]
+  slots: FlowerSlot[]
+  /**
+   * The local day key (`YYYY-MM-DD`) behind each `grown` slot, same
+   * index as `slots`; null for sleeping / empty slots and when the
+   * parent has switched off the separate-days rule. Drives the morning
+   * wake-up (`hubGuidance.ts`).
+   */
+  slotDays: (string | null)[]
+  /** The current step already banked today's good day (a sleeping flower). */
+  earnedToday: boolean
+  /** Good days still needed before the next step opens; 0 when complete. */
+  flowersToUnlock: number
   /** True when every step of the world is mastered. */
   complete: boolean
 }
@@ -59,13 +80,39 @@ export function currentStepOf(
   return first ?? tree[tree.length - 1]!
 }
 
-function holeRow(good: number, required: number): boolean[] {
-  return Array.from({ length: required }, (_, i) => i < good)
+/**
+ * The distinct local day keys on which the step (or letter-sounds vowel)
+ * banked a good day: `progress.goodDays` unioned with the qualifying
+ * history days — the same two sources `goodDayCount` counts, keyed by
+ * the mastery rule's own local-day logic. Sorted ascending.
+ */
+function goodDayKeysOf(
+  p: Progress,
+  world: MasteryTrack,
+  node: SkillNode,
+  vowel: LetterSoundsVowel | null,
+): string[] {
+  const percent = getSettings(p).masteryThreshold[world].percent
+  const focused = p.history.filter(
+    (entry) =>
+      entry.skillFocus.includes(node) &&
+      (vowel === null || entry.currentTargetVowel === vowel),
+  )
+  const banked = p.goodDays?.[vowel ?? node] ?? []
+  return [
+    ...new Set([...banked, ...goodDayKeysFromHistory(focused, percent)]),
+  ].sort()
 }
 
+/**
+ * @param today local day key (`isoDate`) the sleeping check compares
+ *   against; defaults to the device clock. Ticket G4 centralises the
+ *   clock later.
+ */
 export function buildHubCardModel(
   progress: Progress | null,
   world: MasteryTrack,
+  today: string = isoDate(new Date()),
 ): HubCardModel {
   const p = progress ?? defaultProgress()
   const current = currentStepOf(p, world)
@@ -75,16 +122,37 @@ export function buildHubCardModel(
   )
   const land = landOf(current)
 
-  let holes: boolean[]
+  let good: number
+  let required: number
+  let vowel: LetterSoundsVowel | null = null
   if (cur.vowels !== undefined && cur.vowels.length > 0) {
     const working =
       cur.vowels.find((v) => v.goodDays < v.requiredDays) ??
       cur.vowels[cur.vowels.length - 1]!
-    holes = holeRow(working.goodDays, working.requiredDays)
+    good = working.goodDays
+    required = working.requiredDays
+    vowel = working.vowel
   } else {
-    holes = holeRow(cur.goodDays, cur.requiredDays)
+    good = cur.goodDays
+    required = cur.requiredDays
   }
-  if (complete) holes = holes.map(() => true)
+  if (complete) good = required
+
+  // With the separate-days rule switched off (parent setting) there is
+  // no "come back tomorrow", so nothing sleeps.
+  const days =
+    !complete && getSettings(p).crossDayEnforcement && good > 0
+      ? goodDayKeysOf(p, world, current, vowel)
+      : []
+  const earnedToday = days.includes(today)
+
+  const slots: FlowerSlot[] = Array.from({ length: required }, (_, i) =>
+    i >= good ? 'empty' : earnedToday && i === good - 1 ? 'sleeping' : 'grown',
+  )
+  const pastDays = days.filter((d) => d < today)
+  const slotDays = slots.map((slot, i) =>
+    slot === 'grown' ? (pastDays[i] ?? null) : null,
+  )
 
   return {
     world,
@@ -93,7 +161,10 @@ export function buildHubCardModel(
     showLandNumber: getSettings(p).showLevelToMarian,
     current,
     unlocksNext: complete ? null : cur.unlocksNext,
-    holes,
+    slots,
+    slotDays,
+    earnedToday,
+    flowersToUnlock: complete ? 0 : Math.max(0, required - good),
     complete,
   }
 }
