@@ -223,11 +223,12 @@
     0 calc(var(--u) * 12) calc(var(--u) * 18) rgba(120, 40, 70, 0.25);
 }
 /* Suggestion (Guidance G1, mockup .card.sug): the card Emma names wears
-   a soft golden ring and bobs gently. Same size as the other card, which
-   is never dimmed. `translate` (not `transform`) so the press dip still
-   composes. */
+   a soft golden ring that breathes, and bobs gently twice as the Hub
+   opens, then rests so it is a still target to tap. Same size as the
+   other card, which is never dimmed. `translate` (not `transform`) so
+   the press dip still composes. */
 .hub-card[data-suggested='true'] {
-  animation: hub-suggest-bob 2.2s ease-in-out infinite;
+  animation: hub-suggest-bob 2.2s ease-in-out 2;
 }
 .hub-card[data-suggested='true']::after {
   content: '';
@@ -239,6 +240,12 @@
   box-shadow:
     0 0 0 calc(var(--u) * 6) #fff3a8,
     0 0 calc(var(--u) * 36) calc(var(--u) * 14) rgba(255, 210, 63, 0.8);
+  animation: hub-suggest-ring 2.2s ease-in-out infinite;
+}
+@keyframes hub-suggest-ring {
+  50% {
+    opacity: 0.65;
+  }
 }
 @keyframes hub-suggest-bob {
   0%,
@@ -523,9 +530,9 @@
 }
 .hub-zz {
   position: absolute;
-  left: -6%;
-  top: -18%;
-  font-size: calc(var(--u) * 18);
+  left: -8%;
+  top: -24%;
+  font-size: calc(var(--u) * 24);
   font-weight: 700;
   line-height: 1;
   color: #fff;
@@ -617,7 +624,8 @@
   .hub-spark,
   .hub-zz,
   .hub-hole.is-waking img,
-  .hub-card[data-suggested='true'] {
+  .hub-card[data-suggested='true'],
+  .hub-card[data-suggested='true']::after {
     animation: none;
   }
   .hub-card,

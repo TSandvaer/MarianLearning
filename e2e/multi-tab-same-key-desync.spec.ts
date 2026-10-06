@@ -165,7 +165,7 @@ test.describe('Multi-tab same-key desync (audit P1.2)', () => {
    * the HUD stays stale. .fixme until the product adds a `storage`
    * subscription.
    */
-  test('session-history write in tab A reflects in tab B Hub HUD', async ({
+  test('session-history write in tab A reflects in tab B Hub', async ({
     page,
     context,
   }) => {
@@ -175,12 +175,15 @@ test.describe('Multi-tab same-key desync (audit P1.2)', () => {
     const tabB = await openSecondTab(context, 'http://127.0.0.1:4173/')
     await expect(tabB.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
 
-    // Capture tab B's initial cumulative stardust.
-    const initialBadge = tabB.getByTestId('hub-cumulative-stardust')
-    const initialTotal = Number(await initialBadge.getAttribute('data-total'))
-    expect(Number.isFinite(initialTotal)).toBe(true)
+    // The Hub no longer shows a stardust total (Guidance G1, bar 14).
+    // Its visible read of session-history is the suggestion tie-break
+    // (`lastSuggestion`): flip it in tab A and tab B's glow must follow.
+    const hubB = tabB.getByTestId('hub')
+    const initial = await hubB.getAttribute('data-suggestion')
+    expect(initial === 'number-garden' || initial === 'word-song').toBe(true)
+    // The suggestion that a lastSuggestion of `initial` alternates to.
+    const flipped = initial === 'word-song' ? 'number-garden' : 'word-song'
 
-    // Tab A writes a NEW session-history blob with a higher total.
     await page.evaluate(
       ({ key, blob }) => {
         window.localStorage.setItem(key, JSON.stringify(blob))
@@ -192,27 +195,21 @@ test.describe('Multi-tab same-key desync (audit P1.2)', () => {
           sessionCount: 6,
           lastSessionCompletedAt: new Date().toISOString(),
           longestStreakEver: 4,
-          cumulativeStardust: initialTotal + 7,
+          cumulativeStardust: 19,
           lastSessionStardust: 7,
           dayStreak: 1,
           todayTreesTouched: { date: '', trees: [] },
-          lastSuggestion: null,
+          lastSuggestion: initial,
           consecutiveOverrides: 0,
           suggestionCooldownUntil: null,
         },
       },
     )
 
-    // ── ASSERT (target product behaviour) ──
-    // Tab B's HUD should pick up the new total without a reload.
-    // The product fix subscribes to the `storage` event and
-    // re-projects the HUD; this assertion will flip green when
-    // that lands.
-    await expect(initialBadge).toHaveAttribute(
-      'data-total',
-      String(initialTotal + 7),
-      { timeout: 5_000 },
-    )
+    // ── ASSERT ── tab B re-reads on the `storage` event, no reload.
+    await expect(hubB).toHaveAttribute('data-suggestion', flipped, {
+      timeout: 5_000,
+    })
   })
 
   /**

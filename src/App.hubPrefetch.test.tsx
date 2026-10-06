@@ -33,8 +33,9 @@ function setSearch(search: string): void {
   })
 }
 
-/** Rule 4 of computeSuggestion: nothing touched today, last suggestion
- *  was Word Song → the Hub suggests Number Garden. */
+/** computeSuggestion tie-break: no flower today in either world and
+ *  equally far from an unlock, last suggestion was Word Song → the Hub
+ *  suggests Number Garden (Guidance G1). */
 function seedHubSuggests(tree: 'number-garden' | 'word-song'): void {
   window.localStorage.setItem(
     HISTORY_KEY,
@@ -277,18 +278,20 @@ describe("Hub prefetch (Emma's Path 2/10)", () => {
       fireEvent.click(screen.getByTestId('pick-math'))
     })
     await flush()
-    // pick-math marks number-garden touched today → the Hub now suggests
-    // Word Song, so the return trip prefetches Word Song.
+    // Backing out earns no flower, so Number Garden can still earn
+    // today's and stays suggested (Guidance G1): the return trip
+    // prefetches a FRESH math session.
     await act(async () => {
       fireEvent.click(screen.getByTestId('math-exit'))
     })
     await flush()
 
     expect(screen.getByTestId('hub-mock')).toBeInTheDocument()
-    const calls = claudeCalls(spy)
-    expect(byTrack(calls, 'math')).toHaveLength(1)
-    expect(byTrack(calls, 'math')[0]!.signal?.aborted).toBe(true)
-    expect(byTrack(calls, 'word-song')).toHaveLength(1)
+    const math = byTrack(claudeCalls(spy), 'math')
+    expect(math).toHaveLength(2)
+    expect(math[0]!.signal?.aborted).toBe(true)
+    expect(math[1]!.signal?.aborted).toBe(false)
+    expect(byTrack(claudeCalls(spy), 'word-song')).toHaveLength(0)
   })
 
   it('Hub dwell does not count toward the 5 s timeout: a hinted prefetch is adopted, timer starts at Math mount', async () => {

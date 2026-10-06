@@ -177,7 +177,7 @@ export type PlayHubLineFn = (
 ) => Promise<void>
 
 /** Pause between two of Emma's lines (wake-up, then the next action). */
-const LINE_GAP_MS = 900
+const LINE_GAP_MS = 1200
 
 // ── Component ────────────────────────────────────────────────────────────
 

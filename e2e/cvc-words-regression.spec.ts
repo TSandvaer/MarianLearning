@@ -301,12 +301,19 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     // landed in the right session-history blob.
     await expect(page.getByTestId('greet')).toHaveCount(0)
 
-    // Cumulative stardust HUD reflects the seeder's actual writes. The
+    // Cumulative stardust reflects the seeder's actual writes. The
     // seeder uses `emptySessionHistory()` + sessionCount: 1 — it does
-    // NOT write any stardust — so the badge shows 0. (Contract said 8;
-    // call-site truth is 0. See file header.)
-    const stardustBadge = page.getByTestId('hub-cumulative-stardust')
-    await expect(stardustBadge).toHaveAttribute('data-total', '0')
+    // NOT write any stardust — so the stored total is 0. (Contract said
+    // 8; call-site truth is 0. See file header.) The Hub no longer shows
+    // the total (Guidance G1, bar 14), so read it from storage.
+    await expect(page.getByTestId('hub-cumulative-stardust')).toHaveCount(0)
+    const storedTotal = await page.evaluate(() => {
+      const raw = localStorage.getItem('marian-tutor.session-history.v1')
+      return raw === null
+        ? null
+        : (JSON.parse(raw) as { cumulativeStardust: number }).cumulativeStardust
+    })
+    expect(storedTotal).toBe(0)
   })
 
   test('2. Tapping Word Song fires planner request with progress.focusNode === "cvc-words"', async ({
