@@ -32,6 +32,7 @@ import StardustCounter from './StardustCounter'
 import StreakBand from './StreakBand'
 import SleepSplash from './SleepSplash'
 import { recordSessionEnd } from './sessionHistory'
+import { now as progressNow } from '../../lib/progress/clock'
 import { recordProgressOnSessionEnd } from './progressHistory'
 import { focusRecapLine } from './friendlyNodeName'
 import { BudBeat } from './BudBeat'
@@ -509,16 +510,19 @@ export default function SessionEnd({
   // inside `saveProgress`.
 
   useEffect(() => {
-    const clock = now ?? (() => new Date())
+    // The progress clock honours the test-only `?debug=1&dayOffset=N`
+    // (ticket 123jpnbca4v); `clock` feeds every write below so all three
+    // payloads share one instant.
+    const clock = now ?? progressNow
     const dateISO = clock().toISOString()
     // Word-song completion bonus (ticket 86c9kwvza). Persists FIRST so
     // `recordSessionEnd` (which reads stardust to compute Hub's
     // `cumulativeStardust` field) sees the post-bonus total — otherwise
     // Hub would understate cumulative stardust for word-song sessions.
     if (p.surface === 'word-song') {
-      grantWordSongCompletionBonus(storage, now)
+      grantWordSongCompletionBonus(storage, clock)
     }
-    recordSessionEnd(p.finalStreak, storage, now)
+    recordSessionEnd(p.finalStreak, storage, clock)
     // P0.2 fix (audit follow-up to PR #120): derive the focus node the
     // just-completed session targeted, instead of writing a hardcoded
     // surface-keyed constant. Reads `loadProgress()` and runs the same

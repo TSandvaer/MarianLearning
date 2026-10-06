@@ -212,6 +212,7 @@ import {
   type SessionHistoryV2,
 } from '../../screens/SessionEnd/sessionHistory'
 import { isDebugEnabled } from './isDebugEnabled'
+import { now as progressNow } from '../progress/clock'
 
 interface SeedRecipe {
   /**
@@ -247,7 +248,7 @@ interface SeedRecipe {
  * days under any timezone.
  */
 function buildGraduationReadyHistory(): SessionHistoryEntry[] {
-  const now = Date.now()
+  const now = progressNow().getTime()
   const oneDayMs = 24 * 60 * 60 * 1000
   return [3, 2, 1].map((daysAgo) => ({
     dateISO: new Date(now - daysAgo * oneDayMs).toISOString(),
@@ -777,7 +778,7 @@ function bumpSessionCountIfZero(): void {
   const fakeHistory: SessionHistoryV2 = {
     ...emptySessionHistory(),
     sessionCount: 1,
-    lastSessionCompletedAt: new Date().toISOString(),
+    lastSessionCompletedAt: progressNow().toISOString(),
   }
   writeSessionHistory(fakeHistory)
 }
