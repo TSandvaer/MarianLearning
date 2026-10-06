@@ -66,7 +66,11 @@ import {
   enqueueOnResume,
   isPendingResume,
 } from '../../lib/audio/pendingResumeGate'
-import { HUB_LINES, HUB_LINE_WORD_COUNTS, type HubLineId } from './hubLines'
+import {
+  HUB_LINES,
+  type HubLineId,
+  type HubLineManifestEntry,
+} from './hubLines'
 
 /** Minimal Howl shape we depend on — keeps the test surface tiny. */
 export interface HubHowlLike {
@@ -93,14 +97,14 @@ export interface PlayHubLineOptions {
   cancelSchedule?: (handle: unknown) => void
 }
 
-export interface HubLinePlayer {
+export interface HubLinePlayer<Id extends string = HubLineId> {
   /**
    * Play one Hub line by id. Resolves on `end` (or on the caption-walk
    * fallback's last tick if the Howl failed to load). Never rejects —
    * load/play failures degrade to silent caption-walk so the screen
    * always finishes.
    */
-  playHubLine: (id: HubLineId, opts?: PlayHubLineOptions) => Promise<void>
+  playHubLine: (id: Id, opts?: PlayHubLineOptions) => Promise<void>
   /**
    * Cancel the most-recently-started Hub utterance. Stops the in-flight
    * Howl and any pending caption-walk fallback timer; resolves the
@@ -118,9 +122,19 @@ export interface HubLinePlayer {
   unload: () => void
 }
 
-export interface CreateHubLinePlayerOptions {
+export interface CreateHubLinePlayerOptions<Id extends string = HubLineId> {
   /** Test seam: Howl constructor. Production omits, real Howl is used. */
   HowlCtor?: typeof Howl
+  /**
+   * Line manifest (src + caption text). Defaults to the welcome-line
+   * manifest `HUB_LINES`; the Hub's guidance lines (`hubGuidance.ts`)
+   * pass their own.
+   */
+  lines?: Readonly<Record<Id, HubLineManifestEntry>>
+}
+
+function countWords(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length
 }
 
 /**
@@ -146,14 +160,13 @@ interface ActivePlayHandle {
  * a no-op.
  */
 function walkCaption(
-  id: HubLineId,
+  wordCount: number,
   opts: PlayHubLineOptions,
   registerHandle?: (handle: ActivePlayHandle) => void,
   onSettle?: () => void,
 ): Promise<void> {
   return new Promise<void>((resolve) => {
     opts.onPlay?.()
-    const wordCount = HUB_LINE_WORD_COUNTS[id]
     const totalMs = (wordCount / 165) * 60_000
     const interval = wordCount > 0 ? totalMs / wordCount : 0
     opts.onWordTick?.(0)
@@ -193,15 +206,19 @@ function walkCaption(
  * Build a Howler-backed Hub-line player. Howls are constructed lazily on
  * first `playHubLine(id)`; subsequent calls reuse the cached instance.
  */
-export function createHubLinePlayer(
-  opts: CreateHubLinePlayerOptions = {},
-): HubLinePlayer {
+export function createHubLinePlayer<Id extends string = HubLineId>(
+  opts: CreateHubLinePlayerOptions<Id> = {},
+): HubLinePlayer<Id> {
   const HowlCtor = opts.HowlCtor ?? Howl
-  const cache = new Map<HubLineId, HubHowlLike>()
+  const lines = (opts.lines ?? HUB_LINES) as Readonly<
+    Record<Id, HubLineManifestEntry>
+  >
+  const wordCountOf = (id: Id): number => countWords(lines[id].text)
+  const cache = new Map<Id, HubHowlLike>()
   // Latches per-line so a load failure produces exactly one console.warn
   // and the next play of the same line jumps straight to the caption-
   // walk fallback without re-attempting the Howl.
-  const failed = new Set<HubLineId>()
+  const failed = new Set<Id>()
   let warnedHowlerUnavailable = false
   // Most-recently-started utterance, or null when nothing is playing.
   // `playHubLine` writes here on dispatch; both the natural-end path and
@@ -209,13 +226,13 @@ export function createHubLinePlayer(
   // at a time so a single slot is sufficient (no FIFO queue).
   let activeHandle: ActivePlayHandle | null = null
 
-  function ensureHowl(id: HubLineId): HubHowlLike | null {
+  function ensureHowl(id: Id): HubHowlLike | null {
     if (failed.has(id)) return null
     const cached = cache.get(id)
     if (cached) return cached
     try {
       const howl = new HowlCtor({
-        src: [HUB_LINES[id].src],
+        src: [lines[id].src],
         preload: true,
       }) as unknown as HubHowlLike
       cache.set(id, howl)
@@ -225,7 +242,7 @@ export function createHubLinePlayer(
       if (!warnedHowlerUnavailable) {
         warnedHowlerUnavailable = true
         console.warn(
-          `[playHubLine] Howler unavailable for "${HUB_LINES[id].src}" (${
+          `[playHubLine] Howler unavailable for "${lines[id].src}" (${
             err instanceof Error ? err.message : 'unknown'
           }) — playing silently.`,
         )
@@ -239,7 +256,7 @@ export function createHubLinePlayer(
   }
 
   function playHubLine(
-    id: HubLineId,
+    id: Id,
     playOpts: PlayHubLineOptions = {},
   ): Promise<void> {
     // PR #137 round 3 (ticket 86c9kxtmu) — gesture-deferred recovery.
@@ -273,7 +290,7 @@ export function createHubLinePlayer(
   }
 
   function playRunImmediate(
-    id: HubLineId,
+    id: Id,
     playOpts: PlayHubLineOptions = {},
   ): Promise<void> {
     const howl = ensureHowl(id)
@@ -281,7 +298,7 @@ export function createHubLinePlayer(
       // No Howl path — register the walker's cancel directly.
       let walkHandle: ActivePlayHandle | null = null
       const promise = walkCaption(
-        id,
+        wordCountOf(id),
         playOpts,
         (h) => {
           walkHandle = h
@@ -352,7 +369,7 @@ export function createHubLinePlayer(
         if (!failed.has(id)) {
           failed.add(id)
           console.warn(
-            `[playHubLine] ${reason} for "${HUB_LINES[id].src}" — falling back to silent caption-walk.`,
+            `[playHubLine] ${reason} for "${lines[id].src}" — falling back to silent caption-walk.`,
           )
         }
         // Drain any pending tick handle before we hand off to the walker
@@ -363,7 +380,7 @@ export function createHubLinePlayer(
         // subsequent cancelActive() during the fallback walk also works.
         let walkHandle: ActivePlayHandle | null = null
         walkCaption(
-          id,
+          wordCountOf(id),
           playOpts,
           (h) => {
             walkHandle = h
@@ -378,7 +395,7 @@ export function createHubLinePlayer(
       howl.on('play', () => {
         if (resolved) return
         playOpts.onPlay?.()
-        const wordCount = HUB_LINE_WORD_COUNTS[id]
+        const wordCount = wordCountOf(id)
         playOpts.onWordTick?.(0)
         if (wordCount <= 1) return
         const duration = howl.duration()

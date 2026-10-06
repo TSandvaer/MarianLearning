@@ -1,0 +1,635 @@
+/*
+ * Hub in clay — Redesign R2 (ClickUp 123jpnbc68z), direction A "Toy Box".
+ *
+ * Ported from the approved reference `design/emmas-path/redesign/
+ * real-art-check.html` (Hub tab). The reference is drawn on an 820×1180
+ * iPad canvas; here that canvas is `.hub-stage`, a size container, and
+ * every length is written as reference-px × `--u` (1/820 of the stage
+ * width) so the layout keeps its proportions on every portrait iPad
+ * without a transform (a transform would break Emma's shared layoutId).
+ */
+
+.hub-clay {
+  /* Fills the side gutters on iPads wider than 820:1180 with the same
+     sky → meadow → path bands the stage paints. */
+  background: linear-gradient(
+    #bfe6ff 0,
+    #dff2ff 30%,
+    #cdebb4 38%,
+    #b9e19e 60%,
+    #e9dcc4 88%,
+    #e0cfb2 100%
+  );
+}
+
+.hub-stage {
+  --u: calc(100cqw / 820);
+  container-type: inline-size;
+  position: relative;
+  /* 820:1180, as large as the safe area allows. */
+  width: min(
+    100%,
+    calc(
+      (100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 820 /
+        1180
+    )
+  );
+  aspect-ratio: 820 / 1180;
+  margin: 0 auto;
+  font-family: 'Fredoka', ui-rounded, system-ui, sans-serif;
+  color: #5a3524;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hub-stage img {
+  display: block;
+  -webkit-user-drag: none;
+}
+
+/* ── backdrop: soft, out of focus, so the clay chrome is the foreground ── */
+.hub-garden {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      calc(var(--u) * 60) calc(var(--u) * 60) at calc(var(--u) * 70)
+        calc(var(--u) * 1120),
+      #ffb3c9 0,
+      #ffb3c900 70%
+    ),
+    radial-gradient(
+      calc(var(--u) * 80) calc(var(--u) * 80) at calc(var(--u) * 760)
+        calc(var(--u) * 1100),
+      #ffc7d6 0,
+      #ffc7d600 70%
+    ),
+    radial-gradient(
+      calc(var(--u) * 50) calc(var(--u) * 50) at calc(var(--u) * 130)
+        calc(var(--u) * 520),
+      #ffd0dc 0,
+      #ffd0dc00 70%
+    ),
+    radial-gradient(
+      calc(var(--u) * 70) calc(var(--u) * 70) at calc(var(--u) * 720)
+        calc(var(--u) * 470),
+      #fff0b8 0,
+      #fff0b800 70%
+    ),
+    radial-gradient(
+      calc(var(--u) * 520) calc(var(--u) * 260) at calc(var(--u) * 120)
+        calc(var(--u) * 420),
+      #a6d98d 0,
+      #a6d98d00 70%
+    ),
+    radial-gradient(
+      calc(var(--u) * 520) calc(var(--u) * 260) at calc(var(--u) * 720)
+        calc(var(--u) * 420),
+      #9fd488 0,
+      #9fd48800 70%
+    ),
+    linear-gradient(
+      #bfe6ff 0,
+      #dff2ff 30%,
+      #cdebb4 38%,
+      #b9e19e 60%,
+      #e9dcc4 88%,
+      #e0cfb2 100%
+    );
+}
+
+.hub-emma-light {
+  position: absolute;
+  left: calc(var(--u) * 250);
+  top: calc(var(--u) * 40);
+  width: calc(var(--u) * 420);
+  height: calc(var(--u) * 420);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(255, 236, 190, 0.85) 0,
+    rgba(255, 224, 160, 0.4) 40%,
+    rgba(255, 214, 140, 0) 70%
+  );
+}
+.hub-emma-band {
+  position: absolute;
+  left: calc(var(--u) * 200);
+  top: calc(var(--u) * -6);
+  width: calc(var(--u) * 520);
+  height: calc(var(--u) * 520);
+  pointer-events: none;
+}
+.hub-emma-img {
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  filter: drop-shadow(
+      0 calc(var(--u) * 10) calc(var(--u) * 10) rgba(90, 50, 20, 0.28)
+    )
+    drop-shadow(0 0 calc(var(--u) * 18) rgba(255, 210, 140, 0.35));
+}
+
+/* ── Emma's speech bubble (the Hub ribbon) ── */
+.hub-bubble {
+  /* Left of Emma, in the sky the removed stardust / sun chips used to
+     hold: wide enough for the longest guidance line in ~4 lines. */
+  position: absolute;
+  left: calc(var(--u) * 26);
+  top: calc(var(--u) * 120);
+  width: calc(var(--u) * 330);
+  padding: calc(var(--u) * 14) calc(var(--u) * 18);
+  border-radius: calc(var(--u) * 34);
+  background: linear-gradient(#fffdf8, #fff1e2);
+  box-shadow:
+    inset 0 calc(var(--u) * 3) 0 #fff,
+    0 calc(var(--u) * 7) 0 #e3c6a6,
+    0 calc(var(--u) * 12) calc(var(--u) * 18) rgba(60, 30, 10, 0.2);
+  text-align: center;
+  pointer-events: none;
+}
+.hub-bubble::before {
+  /* tail toward Emma */
+  content: '';
+  position: absolute;
+  right: calc(var(--u) * -16);
+  top: calc(var(--u) * 34);
+  width: calc(var(--u) * 34);
+  height: calc(var(--u) * 30);
+  background: #fff8ee;
+  clip-path: polygon(0 0, 100% 55%, 0 100%);
+}
+.hub-bubble p {
+  margin: 0;
+  font-size: calc(var(--u) * 30);
+  font-weight: 600;
+  line-height: 1.15;
+  color: #6b3f1f;
+}
+
+/* ── sculpted slab cards ── */
+.hub-card {
+  position: absolute;
+  top: calc(var(--u) * 470);
+  width: calc(var(--u) * 378);
+  height: calc(var(--u) * 672);
+  border-radius: calc(var(--u) * 64) calc(var(--u) * 64) calc(var(--u) * 52)
+    calc(var(--u) * 52);
+  cursor: pointer;
+  outline: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+.hub-card:focus-visible {
+  outline: calc(var(--u) * 5) solid #ffe27a;
+  outline-offset: calc(var(--u) * 6);
+}
+.hub-card.is-down {
+  transform: translateY(calc(var(--u) * 8));
+}
+.hub-card--math {
+  left: calc(var(--u) * 24);
+  background: linear-gradient(170deg, #d39a63 0, #b97c47 55%, #a96d3c 100%);
+  box-shadow:
+    inset 0 calc(var(--u) * 6) 0 rgba(255, 255, 255, 0.25),
+    inset 0 calc(var(--u) * -10) 0 rgba(0, 0, 0, 0.12),
+    0 calc(var(--u) * 14) 0 #82532b,
+    0 calc(var(--u) * 26) calc(var(--u) * 34) rgba(60, 30, 10, 0.3);
+}
+.hub-card--math.is-down {
+  box-shadow:
+    inset 0 calc(var(--u) * 6) 0 rgba(255, 255, 255, 0.25),
+    0 calc(var(--u) * 6) 0 #82532b,
+    0 calc(var(--u) * 12) calc(var(--u) * 18) rgba(60, 30, 10, 0.3);
+}
+.hub-card--word {
+  left: calc(var(--u) * 418);
+  background: linear-gradient(170deg, #ffd3e2 0, #f9b7cd 55%, #f3a2bf 100%);
+  box-shadow:
+    inset 0 calc(var(--u) * 6) 0 rgba(255, 255, 255, 0.45),
+    inset 0 calc(var(--u) * -10) 0 rgba(0, 0, 0, 0.08),
+    0 calc(var(--u) * 14) 0 #d27b9c,
+    0 calc(var(--u) * 26) calc(var(--u) * 34) rgba(120, 40, 70, 0.25);
+}
+.hub-card--word.is-down {
+  box-shadow:
+    inset 0 calc(var(--u) * 6) 0 rgba(255, 255, 255, 0.45),
+    0 calc(var(--u) * 6) 0 #d27b9c,
+    0 calc(var(--u) * 12) calc(var(--u) * 18) rgba(120, 40, 70, 0.25);
+}
+/* Suggestion (Guidance G1, mockup .card.sug): the card Emma names wears
+   a soft golden ring that breathes, and bobs gently twice as the Hub
+   opens, then rests so it is a still target to tap. Same size as the
+   other card, which is never dimmed. `translate` (not `transform`) so
+   the press dip still composes. */
+.hub-card[data-suggested='true'] {
+  animation: hub-suggest-bob 2.2s ease-in-out 2;
+}
+.hub-card[data-suggested='true']::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--u) * -14);
+  border-radius: calc(var(--u) * 76) calc(var(--u) * 76) calc(var(--u) * 64)
+    calc(var(--u) * 64);
+  pointer-events: none;
+  box-shadow:
+    0 0 0 calc(var(--u) * 6) #fff3a8,
+    0 0 calc(var(--u) * 36) calc(var(--u) * 14) rgba(255, 210, 63, 0.8);
+  animation: hub-suggest-ring 2.2s ease-in-out infinite;
+}
+@keyframes hub-suggest-ring {
+  50% {
+    opacity: 0.65;
+  }
+}
+@keyframes hub-suggest-bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 calc(var(--u) * -10);
+  }
+}
+
+.hub-abs {
+  position: absolute;
+}
+
+/* mossy / cloudy crown */
+.hub-crown {
+  position: absolute;
+  left: calc(var(--u) * -10);
+  right: calc(var(--u) * -10);
+  top: calc(var(--u) * -18);
+  height: calc(var(--u) * 170);
+  border-radius: calc(var(--u) * 70) calc(var(--u) * 70) calc(var(--u) * 40)
+    calc(var(--u) * 40);
+}
+.hub-card--math .hub-crown {
+  background:
+    radial-gradient(
+      calc(var(--u) * 40) calc(var(--u) * 34) at calc(var(--u) * 40)
+        calc(var(--u) * 50),
+      #7cc95a 98%,
+      #0000
+    ),
+    radial-gradient(
+      calc(var(--u) * 46) calc(var(--u) * 38) at calc(var(--u) * 110)
+        calc(var(--u) * 30),
+      #86d063 98%,
+      #0000
+    ),
+    radial-gradient(
+      calc(var(--u) * 48) calc(var(--u) * 40) at calc(var(--u) * 200)
+        calc(var(--u) * 26),
+      #7cc95a 98%,
+      #0000
+    ),
+    radial-gradient(
+      calc(var(--u) * 46) calc(var(--u) * 38) at calc(var(--u) * 290)
+        calc(var(--u) * 32),
+      #86d063 98%,
+      #0000
+    ),
+    radial-gradient(
+      calc(var(--u) * 40) calc(var(--u) * 34) at calc(var(--u) * 355)
+        calc(var(--u) * 56),
+      #7cc95a 98%,
+      #0000
+    ),
+    linear-gradient(#7cc95a, #6bb84d);
+  box-shadow:
+    inset 0 calc(var(--u) * 5) 0 rgba(255, 255, 255, 0.3),
+    inset 0 calc(var(--u) * -8) 0 rgba(0, 0, 0, 0.12),
+    0 calc(var(--u) * 6) 0 #4f9437;
+}
+.hub-card--word .hub-crown {
+  background:
+    radial-gradient(
+      calc(var(--u) * 44) calc(var(--u) * 36) at calc(var(--u) * 50)
+        calc(var(--u) * 46),
+      #fff 98%,
+      #0000
+    ),
+    radial-gradient(
+      calc(var(--u) * 52) calc(var(--u) * 42) at calc(var(--u) * 130)
+        calc(var(--u) * 26),
+      #fff 98%,
+      #0000
+    ),
+    radial-gradient(
+      calc(var(--u) * 50) calc(var(--u) * 40) at calc(var(--u) * 230)
+        calc(var(--u) * 24),
+      #fff6fb 98%,
+      #0000
+    ),
+    radial-gradient(
+      calc(var(--u) * 44) calc(var(--u) * 36) at calc(var(--u) * 320)
+        calc(var(--u) * 44),
+      #fff 98%,
+      #0000
+    ),
+    linear-gradient(#fff, #ffeef6);
+  box-shadow:
+    inset 0 calc(var(--u) * -8) 0 rgba(240, 170, 200, 0.35),
+    0 calc(var(--u) * 6) 0 #f0b6cd;
+}
+
+.hub-title {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--u) * 34);
+  text-align: center;
+  font-size: calc(var(--u) * 52);
+  line-height: 0.98;
+  font-weight: 700;
+  letter-spacing: calc(var(--u) * 0.5);
+}
+.hub-card--math .hub-title {
+  color: #ffd54a;
+  text-shadow:
+    0 calc(var(--u) * 2) 0 #fff3b0,
+    0 calc(var(--u) * 5) 0 #8a5a1f,
+    0 calc(var(--u) * 6) 0 #8a5a1f,
+    0 calc(var(--u) * 10) calc(var(--u) * 10) rgba(0, 0, 0, 0.25);
+}
+.hub-card--math .hub-title .hub-title-2 {
+  color: #9ee070;
+}
+.hub-card--word .hub-title {
+  color: #ff79a8;
+  text-shadow:
+    0 calc(var(--u) * 2) 0 #ffd0e2,
+    0 calc(var(--u) * 5) 0 #8f3c5f,
+    0 calc(var(--u) * 6) 0 #8f3c5f,
+    0 calc(var(--u) * 10) calc(var(--u) * 10) rgba(0, 0, 0, 0.2);
+}
+.hub-card--word .hub-title .hub-title-2 {
+  color: #ffcf3d;
+}
+
+/* plinth + glowing sticker */
+.hub-plinth {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 45% 30%,
+    #fff8ec 0,
+    #f1dcc0 55%,
+    #d9bb94 100%
+  );
+  box-shadow:
+    0 calc(var(--u) * 10) 0 #b8946a,
+    0 calc(var(--u) * 16) calc(var(--u) * 18) rgba(60, 30, 10, 0.25);
+}
+.hub-glow {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7c2 0, #ffe066cc 45%, #ffd23f00 70%);
+  box-shadow:
+    0 0 0 calc(var(--u) * 5) #ffe27a,
+    0 0 calc(var(--u) * 30) calc(var(--u) * 8) #ffd23f99;
+  animation: hub-glow 2.4s ease-in-out infinite;
+}
+@keyframes hub-glow {
+  50% {
+    box-shadow:
+      0 0 0 calc(var(--u) * 5) #fff0a8,
+      0 0 calc(var(--u) * 44) calc(var(--u) * 14) #ffd23fbb;
+  }
+}
+.hub-sticker {
+  position: absolute;
+  filter: drop-shadow(
+    0 calc(var(--u) * 6) calc(var(--u) * 4) rgba(60, 30, 10, 0.25)
+  );
+}
+.hub-next .hub-sticker {
+  filter: saturate(0.55) brightness(1.04)
+    drop-shadow(0 calc(var(--u) * 5) calc(var(--u) * 3) rgba(60, 30, 10, 0.2));
+}
+.hub-lock {
+  position: absolute;
+  filter: drop-shadow(
+    0 calc(var(--u) * 3) calc(var(--u) * 2) rgba(0, 0, 0, 0.25)
+  );
+}
+.hub-spark {
+  position: absolute;
+  width: calc(var(--u) * 22);
+  height: calc(var(--u) * 22);
+  animation: hub-twinkle 1.8s ease-in-out infinite;
+}
+@keyframes hub-twinkle {
+  50% {
+    transform: scale(0.5);
+    opacity: 0.4;
+  }
+}
+
+/* land pill */
+.hub-landpill {
+  position: absolute;
+  right: calc(var(--u) * 18);
+  top: calc(var(--u) * 176);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 2);
+  padding: 0 calc(var(--u) * 14) 0 calc(var(--u) * 4);
+  height: calc(var(--u) * 58);
+  border-radius: calc(var(--u) * 30);
+  background: linear-gradient(#fffaf0, #f3e3c8);
+  box-shadow:
+    inset 0 calc(var(--u) * 3) 0 #fff,
+    0 calc(var(--u) * 5) 0 rgba(90, 50, 20, 0.35);
+  font-size: calc(var(--u) * 32);
+  font-weight: 700;
+  line-height: 1;
+  color: #6b3f1f;
+}
+.hub-landpill img {
+  width: calc(var(--u) * 54);
+  height: calc(var(--u) * 54);
+}
+
+/* seed tray + holes */
+.hub-tray {
+  position: absolute;
+  left: calc(var(--u) * 22);
+  bottom: calc(var(--u) * 30);
+  width: calc(var(--u) * 222);
+  height: calc(var(--u) * 108);
+  border-radius: calc(var(--u) * 40);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 calc(var(--u) * 8);
+  box-sizing: border-box;
+}
+.hub-card--math .hub-tray {
+  background: linear-gradient(#c58a55, #a86c3c);
+  box-shadow:
+    inset 0 calc(var(--u) * 4) 0 rgba(255, 255, 255, 0.2),
+    0 calc(var(--u) * 7) 0 #7d4a26;
+}
+.hub-card--word .hub-tray {
+  background: linear-gradient(#ffc2d7, #f7a6c3);
+  box-shadow:
+    inset 0 calc(var(--u) * 4) 0 rgba(255, 255, 255, 0.45),
+    0 calc(var(--u) * 7) 0 #d27b9c;
+}
+.hub-hole {
+  position: relative;
+  flex: none;
+  width: calc(var(--u) * 64);
+  height: calc(var(--u) * 64);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 62%,
+    #6b4128 0,
+    #4e2c19 60%,
+    #3d2112 100%
+  );
+  box-shadow:
+    inset 0 calc(var(--u) * 8) calc(var(--u) * 10) rgba(0, 0, 0, 0.45),
+    0 calc(var(--u) * 2) 0 rgba(255, 255, 255, 0.35);
+}
+.hub-hole img {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--u) * 6);
+  width: calc(var(--u) * 62);
+  height: calc(var(--u) * 62);
+  transform: translateX(-50%);
+  filter: drop-shadow(
+    0 calc(var(--u) * 3) calc(var(--u) * 2) rgba(0, 0, 0, 0.3)
+  );
+}
+
+/* sleeping flower: closed bud, moon, a soft "z" (mockup .hole.sleep) */
+.hub-hole.is-sleeping img {
+  filter: brightness(0.85) saturate(0.8)
+    drop-shadow(0 calc(var(--u) * 3) calc(var(--u) * 2) rgba(0, 0, 0, 0.3));
+}
+.hub-moon {
+  position: absolute;
+  right: -12%;
+  top: -14%;
+  width: 48%;
+  height: 48%;
+  filter: drop-shadow(
+    0 calc(var(--u) * 2) calc(var(--u) * 2) rgba(0, 0, 0, 0.3)
+  );
+}
+.hub-zz {
+  position: absolute;
+  left: -8%;
+  top: -24%;
+  font-size: calc(var(--u) * 24);
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 calc(var(--u) * 2) 0 #6b4a9c;
+  animation: hub-zz 2.4s ease-in-out infinite;
+}
+@keyframes hub-zz {
+  50% {
+    translate: 0 calc(var(--u) * -6);
+    opacity: 0.6;
+  }
+}
+/* morning wake-up: yesterday's bud opens (mockup .wake) */
+.hub-hole.is-waking img {
+  animation: hub-wake 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both;
+}
+@keyframes hub-wake {
+  0% {
+    transform: translateX(-50%) scale(0.6) rotate(-10deg);
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+/* round wooden map button */
+.hub-mapbtn {
+  position: absolute;
+  right: calc(var(--u) * 20);
+  bottom: calc(var(--u) * 24);
+  width: calc(var(--u) * 118);
+  height: calc(var(--u) * 118);
+  /* Bar: 44pt touch target floor even on the smallest stage. */
+  min-width: 44pt;
+  min-height: 44pt;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  background: radial-gradient(
+    circle at 40% 32%,
+    #e7b07a 0,
+    #c98a55 55%,
+    #a86c3c 100%
+  );
+  box-shadow:
+    inset 0 calc(var(--u) * 5) 0 rgba(255, 255, 255, 0.3),
+    inset 0 calc(var(--u) * -6) 0 rgba(0, 0, 0, 0.18),
+    0 calc(var(--u) * 9) 0 #7d4a26,
+    0 calc(var(--u) * 14) calc(var(--u) * 18) rgba(60, 30, 10, 0.3);
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+.hub-mapbtn img {
+  width: calc(var(--u) * 84);
+  height: calc(var(--u) * 84);
+  pointer-events: none;
+}
+.hub-card--word .hub-mapbtn {
+  background: radial-gradient(
+    circle at 40% 32%,
+    #ffe0a8 0,
+    #f2c27a 55%,
+    #d9a159 100%
+  );
+  box-shadow:
+    inset 0 calc(var(--u) * 5) 0 rgba(255, 255, 255, 0.4),
+    inset 0 calc(var(--u) * -6) 0 rgba(0, 0, 0, 0.12),
+    0 calc(var(--u) * 9) 0 #b27b37,
+    0 calc(var(--u) * 14) calc(var(--u) * 18) rgba(120, 60, 20, 0.25);
+}
+.hub-mapbtn:active {
+  transform: translateY(calc(var(--u) * 7));
+  box-shadow:
+    inset 0 calc(var(--u) * 5) 0 rgba(255, 255, 255, 0.3),
+    0 calc(var(--u) * 2) 0 #7d4a26;
+}
+
+/* Reduced motion: the glow and sparkles hold still; press feedback is a
+   direct response to the finger, not ambient motion, and stays. */
+@media (prefers-reduced-motion: reduce) {
+  .hub-glow,
+  .hub-spark,
+  .hub-zz,
+  .hub-hole.is-waking img,
+  .hub-card[data-suggested='true'],
+  .hub-card[data-suggested='true']::after {
+    animation: none;
+  }
+  .hub-card,
+  .hub-mapbtn {
+    transition: none;
+  }
+}

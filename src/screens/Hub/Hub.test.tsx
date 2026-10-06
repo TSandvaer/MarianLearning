@@ -10,12 +10,18 @@
  */
 
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { render, screen, act, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import Hub from './Hub'
 import type { HubProps } from './Hub'
-import { defaultProgress, saveProgress } from '../../lib/progress'
+import {
+  MATH_TREE,
+  defaultProgress,
+  saveProgress,
+  type Progress,
+  type SkillNode,
+} from '../../lib/progress'
 import {
   SESSION_HISTORY_KEY,
   emptySessionHistory,
@@ -26,9 +32,10 @@ import {
   RAPID_REMOUNT_THRESHOLD_MS,
 } from './useRapidRemountSuppression'
 import {
-  SUGGESTION_COOLDOWN_MS,
-  SUGGESTION_OVERRIDE_CAP,
-} from './hubSuggestion'
+  FLOWER_WAKE_STORAGE_KEY,
+  GUIDANCE_LINES,
+  type GuidanceLineId,
+} from './hubGuidance'
 import type { StorageAdapter } from '../Math/stardust'
 
 function createMemoryStorage(): StorageAdapter & {
@@ -51,6 +58,27 @@ function seed(
   const value: SessionHistoryV2 = { ...emptySessionHistory(), ...patch }
   adapter.setItem(SESSION_HISTORY_KEY, JSON.stringify(value))
   return value
+}
+
+/** Nothing mastered: first step of each tree at intro, rest locked. */
+function freshDoc(): Progress {
+  const p = defaultProgress()
+  for (const k of Object.keys(p.skillLevels) as (keyof typeof p.skillLevels)[])
+    p.skillLevels[k] = 'locked'
+  p.skillLevels['number-recog'] = 'intro'
+  p.skillLevels['letter-names'] = 'intro'
+  return p
+}
+
+/** A good (100%) session on `node`, `daysAgo` days before `now`, at noon. */
+function goodDay(now: Date, daysAgo: number, node: SkillNode) {
+  const d = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - daysAgo,
+    12,
+  )
+  return { dateISO: d.toISOString(), skillFocus: [node], successRate: 1 }
 }
 
 function renderHub(props: Partial<HubProps> = {}) {
@@ -102,13 +130,24 @@ describe('Hub — render states', () => {
     expect(root.textContent ?? '').not.toMatch(/melody/i)
   })
 
-  it('renders cumulative stardust in the HUD', () => {
+  it('shows no stardust total and no day-streak sun (bar 14); the data stays', () => {
     const adapter = createMemoryStorage()
-    seed(adapter, { cumulativeStardust: 47 })
-    renderHub({ storage: adapter })
-    const counter = screen.getByTestId('hub-cumulative-stardust')
-    expect(counter.getAttribute('data-total')).toBe('47')
-    expect(counter.textContent ?? '').toContain('47')
+    const stored = seed(adapter, {
+      cumulativeStardust: 47,
+      sessionCount: 4,
+      lastSessionCompletedAt: new Date(2026, 3, 29, 8, 0).toISOString(),
+      dayStreak: 3,
+    })
+    renderHub({ storage: adapter, now: () => new Date(2026, 3, 29, 18, 0) })
+    expect(screen.queryByTestId('hub-hud')).toBeNull()
+    expect(screen.queryByTestId('hub-cumulative-stardust')).toBeNull()
+    expect(screen.queryByTestId('hub-day-streak')).toBeNull()
+    expect(screen.getByTestId('hub').textContent ?? '').not.toMatch(/47/)
+    const after = JSON.parse(
+      adapter.store.get(SESSION_HISTORY_KEY)!,
+    ) as SessionHistoryV2
+    expect(after.cumulativeStardust).toBe(stored.cumulativeStardust)
+    expect(after.dayStreak).toBe(stored.dayStreak)
   })
 
   it('renders an invisible 96×96pt parent-gate corner with no glyph', () => {
@@ -119,57 +158,6 @@ describe('Hub — render states', () => {
     expect(gate.getAttribute('style')).toMatch(/96pt/)
     // No visible content
     expect(gate.textContent ?? '').toBe('')
-  })
-})
-
-describe('Hub — recent-stats strip (4 states)', () => {
-  it('idle: no stats visible when no qualifying values', () => {
-    const adapter = createMemoryStorage()
-    seed(adapter)
-    renderHub({ storage: adapter, now: () => new Date(2026, 3, 29, 12, 0) })
-    expect(
-      screen.getByTestId('hub-recent-stats').getAttribute('data-visible'),
-    ).toBe('false')
-    expect(screen.queryByTestId('hub-stardust-today')).toBeNull()
-    expect(screen.queryByTestId('hub-day-streak')).toBeNull()
-  })
-
-  it("returning-user-with-stats: shows today's stardust + streak", () => {
-    const adapter = createMemoryStorage()
-    const now = new Date(2026, 3, 29, 18, 0)
-    seed(adapter, {
-      sessionCount: 4,
-      lastSessionCompletedAt: new Date(2026, 3, 29, 8, 0).toISOString(),
-      lastSessionStardust: 11,
-      dayStreak: 3,
-    })
-    renderHub({ storage: adapter, now: () => now })
-    expect(
-      screen.getByTestId('hub-recent-stats').getAttribute('data-visible'),
-    ).toBe('true')
-    expect(
-      screen.getByTestId('hub-stardust-today').getAttribute('data-value'),
-    ).toBe('11')
-    expect(
-      screen.getByTestId('hub-day-streak').getAttribute('data-value'),
-    ).toBe('3')
-  })
-
-  it('day-streak hidden when last session was 2+ days ago (silent reset)', () => {
-    const adapter = createMemoryStorage()
-    const now = new Date(2026, 3, 29, 18, 0)
-    seed(adapter, {
-      sessionCount: 4,
-      // 2.5 days ago
-      lastSessionCompletedAt: new Date(2026, 3, 27, 6, 0).toISOString(),
-      lastSessionStardust: 6,
-      dayStreak: 5,
-    })
-    renderHub({ storage: adapter, now: () => now })
-    // Last session was >24h ago AND >1 calendar day → both stats hidden
-    expect(
-      screen.getByTestId('hub-recent-stats').getAttribute('data-visible'),
-    ).toBe('false')
   })
 })
 
@@ -191,15 +179,15 @@ describe('Hub — soft suggestion algorithm', () => {
     expect(numberNode.getAttribute('data-suggested')).toBe('false')
   })
 
-  it('no ring when both trees touched today (suggestion === null)', () => {
+  it("no ring when both worlds have today's flower (suggestion === null)", () => {
     const adapter = createMemoryStorage()
-    seed(adapter, {
-      todayTreesTouched: {
-        date: '2026-04-29',
-        trees: ['number-garden', 'word-song'],
-      },
-    })
-    renderHub({ storage: adapter, now: () => apr29 })
+    seed(adapter)
+    const doc = freshDoc()
+    doc.history = [
+      goodDay(apr29, 0, 'number-recog'),
+      goodDay(apr29, 0, 'letter-names'),
+    ]
+    renderHub({ storage: adapter, now: () => apr29, progressDoc: doc })
     const nodes = screen.getAllByTestId('hub-tree-node')
     for (const node of nodes) {
       expect(node.getAttribute('data-suggested')).toBe('false')
@@ -242,13 +230,13 @@ describe('Hub — soft suggestion algorithm', () => {
     expect(persisted.suggestionCooldownUntil).toBeNull()
   })
 
-  it('persists suggestion outcome on override tap (bumps consecutiveOverrides)', async () => {
+  it('an override tap only records the suggestion she was shown (no cool-down)', async () => {
     const user = userEvent.setup()
     const adapter = createMemoryStorage()
     seed(adapter, {
       sessionCount: 3,
-      consecutiveOverrides: 0,
-      lastSuggestion: 'number-garden', // → algorithm picks word-song
+      consecutiveOverrides: 2,
+      lastSuggestion: 'number-garden', // → tie alternates to word-song
     })
     renderHub({
       storage: adapter,
@@ -263,51 +251,9 @@ describe('Hub — soft suggestion algorithm', () => {
     const persisted = JSON.parse(
       adapter.store.get(SESSION_HISTORY_KEY)!,
     ) as SessionHistoryV2
-    expect(persisted.consecutiveOverrides).toBe(1)
     expect(persisted.lastSuggestion).toBe('word-song')
-  })
-
-  it('arms 2-day cool-down on the third consecutive override', async () => {
-    const user = userEvent.setup()
-    const adapter = createMemoryStorage()
-    const now = apr29
-    seed(adapter, {
-      sessionCount: 5,
-      consecutiveOverrides: SUGGESTION_OVERRIDE_CAP - 1, // = 2
-      lastSuggestion: 'number-garden', // → algorithm picks word-song
-    })
-    renderHub({
-      storage: adapter,
-      now: () => now,
-      onPickTree: vi.fn(),
-    })
-    const numberNode = screen
-      .getAllByTestId('hub-tree-node')
-      .find((n) => n.getAttribute('data-tree') === 'number-garden')!
-    await user.click(numberNode)
-
-    const persisted = JSON.parse(
-      adapter.store.get(SESSION_HISTORY_KEY)!,
-    ) as SessionHistoryV2
-    // Counter resets when cap is hit; cool-down armed.
     expect(persisted.consecutiveOverrides).toBe(0)
-    expect(persisted.suggestionCooldownUntil).toBe(
-      now.getTime() + SUGGESTION_COOLDOWN_MS,
-    )
-  })
-
-  it('returns null suggestion while cool-down is active (both nodes equal)', () => {
-    const adapter = createMemoryStorage()
-    const now = apr29
-    seed(adapter, {
-      sessionCount: 5,
-      suggestionCooldownUntil: now.getTime() + 60_000,
-      lastSuggestion: 'word-song',
-    })
-    renderHub({ storage: adapter, now: () => now })
-    expect(screen.getByTestId('hub').getAttribute('data-suggestion')).toBe(
-      'none',
-    )
+    expect(persisted.suggestionCooldownUntil).toBeNull()
   })
 })
 
@@ -669,6 +615,29 @@ describe('Hub — audio-handoff cancellation (ticket 86c9m4afh)', () => {
   })
 })
 
+describe('Hub — recorded lines wait for the first tap on app-open (Guidance G3)', () => {
+  it('app-open: Emma does not speak on mount; the first tap starts her line', async () => {
+    const playLineFn = vi.fn(() => Promise.resolve())
+    renderHub({
+      storage: createMemoryStorage(),
+      path: 'app-open',
+      playLineFn,
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(playLineFn).toHaveBeenCalledTimes(0)
+    act(() => {
+      screen
+        .getByTestId('hub')
+        .dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+    })
+    await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(1))
+  })
+})
+
 describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
   /**
    * Regression tests for the chip-tap-as-first-gesture audio leak
@@ -770,7 +739,7 @@ describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
 
   it('still plays the greeting when first gesture is a non-chip tap (handleFirstTap path)', async () => {
     // If Marian taps anywhere on Hub OTHER than a chip — the body of
-    // the screen, the Emma image, the recent-stats area — the gate
+    // the screen, the Emma image, the HUD chips — the gate
     // unlocks via `handleFirstTap` and the greeting SHOULD fire. Only
     // a chip tap suppresses the greeting (because she's leaving).
     const playLineFn = vi.fn(() => Promise.resolve())
@@ -796,85 +765,158 @@ describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
   })
 })
 
-describe("Hub — Emma's Path card (ticket 123jpnbc3dq)", () => {
-  /** Nothing mastered: first step of each tree at intro, rest locked. */
-  function freshDoc() {
-    const p = defaultProgress()
-    for (const k of Object.keys(
-      p.skillLevels,
-    ) as (keyof typeof p.skillLevels)[])
-      p.skillLevels[k] = 'locked'
-    p.skillLevels['number-recog'] = 'intro'
-    p.skillLevels['letter-names'] = 'intro'
-    return p
+describe('Hub — clay world cards (Redesign R2, 123jpnbc68z)', () => {
+  function cardFor(tree: 'number-garden' | 'word-song'): HTMLElement {
+    return screen
+      .getAllByTestId('hub-tree-node')
+      .find((c) => c.getAttribute('data-tree') === tree)!
   }
 
-  function beadsFor(world: 'math' | 'word-song'): HTMLElement[] {
-    const card = screen
-      .getAllByTestId('hub-card-progress')
-      .find((c) => c.getAttribute('data-world') === world)!
-    return Array.from(
-      card.querySelectorAll<HTMLElement>('[data-testid="hub-card-bead"]'),
-    )
-  }
-
-  it('fresh progress: 11 / 13 beads, land 1, current = first step, next = second', () => {
+  it('fresh progress: land 1, current = first step, padlocked next = second, 3 empty holes', () => {
     renderHub({
       storage: createMemoryStorage(),
       progressDoc: freshDoc(),
     })
-    expect(beadsFor('math')).toHaveLength(11)
-    expect(beadsFor('word-song')).toHaveLength(13)
     const landNumbers = screen.getAllByTestId('hub-land-number')
     expect(landNumbers.map((n) => n.getAttribute('data-value'))).toEqual([
       '1',
       '1',
     ])
     expect(
-      beadsFor('math')
-        .slice(0, 2)
-        .map((b) => b.getAttribute('data-state')),
-    ).toEqual(['current', 'next'])
+      screen
+        .getAllByTestId('hub-card-current')
+        .map((n) => n.getAttribute('data-node')),
+    ).toEqual(['number-recog', 'letter-names'])
     expect(
       screen
         .getAllByTestId('hub-card-next')
         .map((n) => n.getAttribute('data-node')),
     ).toEqual(['add-to-10', 'letter-sounds'])
+    expect(screen.getAllByTestId('hub-card-lock')).toHaveLength(2)
+    const seeds = within(cardFor('number-garden')).getAllByTestId(
+      'hub-card-seed',
+    )
+    expect(seeds.map((s) => s.getAttribute('data-filled'))).toEqual([
+      'false',
+      'false',
+      'false',
+    ])
   })
 
-  it('beads group into 4 math lands and 5 word lands', () => {
+  it('has no bead row (the overview lives on the map, bar 9)', () => {
+    renderHub({ storage: createMemoryStorage(), progressDoc: freshDoc() })
+    expect(screen.queryAllByTestId('hub-card-bead')).toHaveLength(0)
+    expect(screen.queryAllByTestId('hub-card-land')).toHaveLength(0)
+  })
+
+  it('uses the clay art manifest for stickers, land pill, seeds and map', () => {
+    const p = freshDoc()
+    p.skillLevels['number-recog'] = 'mastered'
+    p.skillLevels['add-to-10'] = 'practicing'
+    p.history = [
+      {
+        dateISO: new Date(2026, 4, 1, 12).toISOString(),
+        skillFocus: ['add-to-10'],
+        successRate: 1,
+      },
+    ]
     renderHub({
       storage: createMemoryStorage(),
-      progressDoc: freshDoc(),
+      progressDoc: p,
+      onOpenMap: () => {},
     })
-    const cards = screen.getAllByTestId('hub-card-progress')
-    const landsIn = (world: string) =>
-      cards
-        .find((c) => c.getAttribute('data-world') === world)!
-        .querySelectorAll('[data-testid="hub-card-land"]').length
-    expect(landsIn('math')).toBe(4)
-    expect(landsIn('word-song')).toBe(5)
+    const math = within(cardFor('number-garden'))
+    expect(math.getByTestId('hub-card-current')).toHaveAttribute(
+      'src',
+      '/assets/path/add-to-10-512.webp',
+    )
+    const srcs = Array.from(
+      cardFor('number-garden').querySelectorAll('img'),
+    ).map((i) => i.getAttribute('src'))
+    expect(srcs).toEqual(
+      expect.arrayContaining([
+        '/assets/path/add-to-20-256.webp',
+        '/assets/path/ui-padlock-256.webp',
+        '/assets/path/land-ng-2-256.webp',
+        '/assets/path/ui-bud-open-256.webp',
+        '/assets/path/ui-map-256.webp',
+      ]),
+    )
+    expect(
+      math
+        .getAllByTestId('hub-card-seed')
+        .map((s) => s.getAttribute('data-filled')),
+    ).toEqual(['true', 'false', 'false'])
   })
 
-  it('hides only the land number when showLevelToMarian is false', () => {
+  it('hides only the land pill when showLevelToMarian is false', () => {
     const p = freshDoc()
     p.parentSettings = { ...p.parentSettings!, showLevelToMarian: false }
-    renderHub({ storage: createMemoryStorage(), progressDoc: p })
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: p,
+      onOpenMap: () => {},
+    })
     expect(screen.queryAllByTestId('hub-land-number')).toHaveLength(0)
-    expect(beadsFor('math')).toHaveLength(11)
     expect(screen.getAllByTestId('hub-card-current')).toHaveLength(2)
+    expect(screen.getAllByTestId('hub-card-next')).toHaveLength(2)
+    expect(screen.getAllByTestId('hub-card-seed')).toHaveLength(6)
+    expect(screen.getAllByTestId('hub-map-button')).toHaveLength(2)
   })
 
-  it('a tap on a bead still starts that tree (the card is one target)', async () => {
+  it('a tap on the hero sticker still starts that tree (the card is one target)', async () => {
     const onPickTree = vi.fn()
     renderHub({
       storage: createMemoryStorage(),
       progressDoc: freshDoc(),
       onPickTree,
     })
-    await userEvent.click(beadsFor('word-song')[0]!)
+    await userEvent.click(
+      within(cardFor('word-song')).getByTestId('hub-card-current'),
+    )
     expect(onPickTree).toHaveBeenCalledTimes(1)
     expect(onPickTree).toHaveBeenCalledWith('word-song')
+  })
+
+  it('the map button inside the card opens the map and never starts a session', async () => {
+    const onPickTree = vi.fn()
+    const onOpenMap = vi.fn()
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: freshDoc(),
+      onPickTree,
+      onOpenMap,
+    })
+    const mapButton = within(cardFor('number-garden')).getByRole('button', {
+      name: 'Number Garden map',
+    })
+    await userEvent.click(mapButton)
+    expect(onOpenMap).toHaveBeenCalledTimes(1)
+    expect(onOpenMap).toHaveBeenCalledWith('math')
+    expect(onPickTree).toHaveBeenCalledTimes(0)
+  })
+
+  it('the card is keyboard-operable (Enter starts the tree)', async () => {
+    const onPickTree = vi.fn()
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: freshDoc(),
+      onPickTree,
+    })
+    cardFor('number-garden').focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onPickTree).toHaveBeenCalledTimes(1)
+    expect(onPickTree).toHaveBeenCalledWith('number-garden')
+  })
+
+  it('a whole-world-complete card shows a bloom instead of a padlocked next', () => {
+    const p = freshDoc()
+    for (const n of MATH_TREE) p.skillLevels[n] = 'mastered'
+    renderHub({ storage: createMemoryStorage(), progressDoc: p })
+    const math = within(cardFor('number-garden'))
+    expect(math.queryByTestId('hub-card-next')).toBeNull()
+    expect(math.queryByTestId('hub-card-lock')).toBeNull()
+    expect(math.getByTestId('hub-card-bloom')).toBeInTheDocument()
   })
 
   it('falls back to loadProgress() when no progressDoc is passed', () => {
@@ -884,10 +926,8 @@ describe("Hub — Emma's Path card (ticket 123jpnbc3dq)", () => {
     saveProgress(p)
     renderHub({ storage: createMemoryStorage() })
     expect(
-      beadsFor('math')
-        .slice(0, 3)
-        .map((b) => b.getAttribute('data-state')),
-    ).toEqual(['mastered', 'current', 'next'])
+      within(cardFor('number-garden')).getByTestId('hub-card-current'),
+    ).toHaveAttribute('data-node', 'add-to-10')
     expect(screen.getAllByTestId('hub-land-number')[0]).toHaveAttribute(
       'data-value',
       '2',
@@ -969,5 +1009,240 @@ describe('Hub — anti-dark-pattern', () => {
     expect(text).not.toMatch(/42/)
     expect(text).not.toMatch(/best/i)
     expect(text).not.toMatch(/longest/i)
+  })
+})
+
+// Guidance G1 (123jpnbca4r): the mockup's Hub states a / c / d / a2.
+describe('Hub — guidance (mockup a / c / d / a2)', () => {
+  const now = new Date(2026, 4, 12, 9, 0)
+
+  function cardFor(tree: 'number-garden' | 'word-song'): HTMLElement {
+    return screen
+      .getAllByTestId('hub-tree-node')
+      .find((c) => c.getAttribute('data-tree') === tree)!
+  }
+  const slotStates = (tree: 'number-garden' | 'word-song') =>
+    within(cardFor(tree))
+      .getAllByTestId('hub-card-seed')
+      .map((s) => s.getAttribute('data-state'))
+
+  async function spoken(playLineFn: ReturnType<typeof vi.fn>, n: number) {
+    // The lines are recorded (G3): on app-open Emma waits for the first
+    // tap, so tap the screen (not a card) the way Marian would.
+    act(() => {
+      screen
+        .getByTestId('hub')
+        .dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+    })
+    await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(n), {
+      timeout: 3000,
+    })
+    return playLineFn.mock.calls.map(
+      (c) => GUIDANCE_LINES[c[0] as GuidanceLineId].text,
+    )
+  }
+
+  it('a · morning: Number Garden glows (closer to its unlock), Emma names it', async () => {
+    const storage = createMemoryStorage()
+    // Yesterday's flower already seen awake.
+    storage.setItem(
+      FLOWER_WAKE_STORAGE_KEY,
+      JSON.stringify({ math: '2026-05-11' }),
+    )
+    const doc = freshDoc()
+    doc.history = [goodDay(now, 1, 'number-recog')]
+    const playLineFn = vi.fn(() => Promise.resolve())
+    renderHub({ storage, now: () => now, progressDoc: doc, playLineFn })
+
+    expect(cardFor('number-garden')).toHaveAttribute('data-suggested', 'true')
+    expect(cardFor('word-song')).toHaveAttribute('data-suggested', 'false')
+    expect(slotStates('number-garden')).toEqual(['grown', 'empty', 'empty'])
+    expect(slotStates('word-song')).toEqual(['empty', 'empty', 'empty'])
+    expect(await spoken(playLineFn, 1)).toEqual([
+      "Let's grow a flower in Number Garden! Or pick Word Song.",
+    ])
+  })
+
+  it('c · Number Garden done today: its flower sleeps, Word Song glows', async () => {
+    const storage = createMemoryStorage()
+    storage.setItem(
+      FLOWER_WAKE_STORAGE_KEY,
+      JSON.stringify({ math: '2026-05-11' }),
+    )
+    const doc = freshDoc()
+    doc.history = [
+      goodDay(now, 1, 'number-recog'),
+      goodDay(now, 0, 'number-recog'),
+    ]
+    const playLineFn = vi.fn(() => Promise.resolve())
+    renderHub({
+      storage,
+      now: () => now,
+      progressDoc: doc,
+      playLineFn,
+      path: 'session-end',
+    })
+
+    expect(slotStates('number-garden')).toEqual(['grown', 'sleeping', 'empty'])
+    const sleeping = within(cardFor('number-garden')).getAllByTestId(
+      'hub-card-seed',
+    )[1]!
+    expect(sleeping.querySelector('img')).toHaveAttribute(
+      'src',
+      '/assets/path/ui-bud-closed-256.webp',
+    )
+    expect(sleeping.querySelector('.hub-moon')).not.toBeNull()
+    expect(sleeping.textContent).toBe('z')
+    expect(cardFor('word-song')).toHaveAttribute('data-suggested', 'true')
+    expect(await spoken(playLineFn, 1)).toEqual([
+      "Your flower is sleeping. Let's play Word Song!",
+    ])
+  })
+
+  it('d · both done: no glow, Emma offers practice, a card tap still starts a session', async () => {
+    const doc = freshDoc()
+    doc.history = [
+      goodDay(now, 0, 'number-recog'),
+      goodDay(now, 0, 'letter-names'),
+    ]
+    const playLineFn = vi.fn(() => Promise.resolve())
+    const onPickTree = vi.fn()
+    renderHub({
+      storage: createMemoryStorage(),
+      now: () => now,
+      progressDoc: doc,
+      playLineFn,
+      onPickTree,
+      path: 'session-end',
+    })
+    expect(screen.getByTestId('hub')).toHaveAttribute('data-suggestion', 'none')
+    expect(slotStates('number-garden')).toEqual(['sleeping', 'empty', 'empty'])
+    expect(slotStates('word-song')).toEqual(['sleeping', 'empty', 'empty'])
+    expect(await spoken(playLineFn, 1)).toEqual([
+      'Both flowers are sleeping. Want to practise more?',
+    ])
+    await userEvent.click(cardFor('word-song'))
+    expect(onPickTree).toHaveBeenCalledWith('word-song')
+  })
+
+  it('a2 · next morning: buds open once with "Your flowers woke up!", then the path line', async () => {
+    const storage = createMemoryStorage()
+    // Yesterday both flowers were asleep (last seen awake: day before).
+    storage.setItem(
+      FLOWER_WAKE_STORAGE_KEY,
+      JSON.stringify({ math: '2026-05-10' }),
+    )
+    const doc = freshDoc()
+    doc.history = [
+      goodDay(now, 2, 'number-recog'),
+      goodDay(now, 1, 'number-recog'),
+      goodDay(now, 1, 'letter-names'),
+    ]
+    const playLineFn = vi.fn(() => Promise.resolve())
+    const view = renderHub({
+      storage,
+      now: () => now,
+      progressDoc: doc,
+      playLineFn,
+    })
+
+    expect(slotStates('number-garden')).toEqual(['grown', 'grown', 'empty'])
+    const waking = (tree: 'number-garden' | 'word-song') =>
+      within(cardFor(tree))
+        .getAllByTestId('hub-card-seed')
+        .map((s) => s.getAttribute('data-waking') === 'true')
+    expect(waking('number-garden')).toEqual([false, true, false])
+    expect(waking('word-song')).toEqual([true, false, false])
+    expect(cardFor('number-garden')).toHaveAttribute('data-suggested', 'true')
+    expect(await spoken(playLineFn, 2)).toEqual([
+      'Your flowers woke up!',
+      'One more flower, and a new path opens!',
+    ])
+    expect(JSON.parse(storage.store.get(FLOWER_WAKE_STORAGE_KEY)!)).toEqual({
+      math: '2026-05-11',
+      'word-song': '2026-05-11',
+    })
+
+    // Once: the next visit the same morning neither animates nor says it.
+    view.unmount()
+    window.sessionStorage.clear() // not a rapid remount
+    const again = vi.fn(() => Promise.resolve())
+    renderHub({ storage, now: () => now, progressDoc: doc, playLineFn: again })
+    expect(
+      screen
+        .getAllByTestId('hub-card-seed')
+        .some((s) => s.getAttribute('data-waking') === 'true'),
+    ).toBe(false)
+    expect(await spoken(again, 1)).toEqual([
+      "Let's grow a flower in Number Garden! Or pick Word Song.",
+    ])
+  })
+
+  it('?debug=1&dayOffset=1: the default clock moves "today", so today\'s sleeping flower is grown', () => {
+    const realLocation = window.location
+    const setSearch = (search: string) =>
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...realLocation, search },
+      })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+    try {
+      const doc = freshDoc()
+      doc.history = [goodDay(now, 0, 'number-recog')]
+      const props = {
+        progressDoc: doc,
+        playLineFn: vi.fn(() => Promise.resolve()),
+        path: 'session-end' as const,
+      }
+
+      // No `now` prop: the Hub reads the progress clock.
+      setSearch('')
+      const view = renderHub({ storage: createMemoryStorage(), ...props })
+      expect(slotStates('number-garden')).toEqual([
+        'sleeping',
+        'empty',
+        'empty',
+      ])
+      view.unmount()
+
+      window.sessionStorage.clear() // not a rapid remount
+      setSearch('?debug=1&dayOffset=1')
+      renderHub({ storage: createMemoryStorage(), ...props })
+      expect(slotStates('number-garden')).toEqual(['grown', 'empty', 'empty'])
+      expect(cardFor('number-garden')).toHaveAttribute('data-suggested', 'true')
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: realLocation,
+      })
+      vi.useRealTimers()
+    }
+  })
+
+  it('the caption shows the line Emma is saying', async () => {
+    const doc = freshDoc()
+    const playLineFn = vi.fn(
+      (_id: GuidanceLineId, opts?: { onWordTick?: (i: number) => void }) => {
+        opts?.onWordTick?.(0)
+        return Promise.resolve()
+      },
+    )
+    renderHub({
+      storage: createMemoryStorage(),
+      now: () => now,
+      progressDoc: doc,
+      playLineFn,
+      path: 'session-end',
+    })
+    await screen.findByTestId('hub-caption')
+    const words = screen
+      .getAllByTestId('hub-caption-word')
+      .map((w) => w.textContent)
+    expect(words.join(' ')).toBe(
+      "Let's grow a flower in Word Song! Or pick Number Garden.",
+    )
   })
 })

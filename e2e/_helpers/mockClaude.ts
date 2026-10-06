@@ -10,6 +10,7 @@
 
 import type { Page, Request, Route } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
+import { holdHubSuggestionStill } from './hubSuggestionStill'
 import {
   canonicalMathSessionResponse,
   canonicalWordSongSessionResponse,
@@ -40,17 +41,44 @@ export interface MockClaudeOptions {
    * delay; the route handler resolves immediately like before.
    */
   delayMs?: number
+  /**
+   * Hold every planner request in flight until the spec calls
+   * `release()` on the returned handle, then settle it as usual. Use it
+   * instead of `delayMs` when a spec asserts the in-flight window: a
+   * fixed delay races the harness (a starved WebKit CI runner can spend
+   * the whole window on one tap), and since Emma's Path 2/10 the Hub may
+   * already have started the fetch for the world it suggests, so the
+   * window can begin before the spec's tap. A held request cannot settle
+   * before the spec has finished its pre-flip assertions.
+   */
+  holdUntilReleased?: boolean
+}
+
+/** Handle returned by `installClaudeMock`. */
+export interface ClaudeMock {
+  /** Let held requests (and every later one) settle. No-op unless
+   *  `holdUntilReleased` was set. */
+  release: () => void
 }
 
 export async function installClaudeMock(
   page: Page,
   options: MockClaudeOptions = {},
-): Promise<void> {
+): Promise<ClaudeMock> {
   const mathFactory = options.mathResponse ?? canonicalMathSessionResponse
   const wordSongFactory =
     options.wordSongResponse ?? canonicalWordSongSessionResponse
 
   const delayMs = options.delayMs ?? 0
+  let release = () => {}
+  const released = options.holdUntilReleased
+    ? new Promise<void>((resolve) => {
+        release = resolve
+      })
+    : Promise.resolve()
+
+  // Taps on the Hub's suggested card must land at once (Guidance G1 bob).
+  await holdHubSuggestionStill(page)
 
   await page.route('**/api/claude', async (route: Route) => {
     // Hold the route in flight before either fulfilling or aborting so
@@ -59,6 +87,7 @@ export async function installClaudeMock(
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
+    await released
     if (options.failNetwork) {
       await route.abort('failed')
       return
@@ -131,6 +160,8 @@ export async function installClaudeMock(
       body: JSON.stringify(responseBody),
     })
   })
+
+  return { release: () => release() }
 }
 
 /**

@@ -12,6 +12,7 @@
  */
 
 import type { Page } from '@playwright/test'
+import { holdHubSuggestionStill } from './hubSuggestionStill'
 import type {
   LetterSoundsVowel,
   SessionHistoryEntry,
@@ -338,6 +339,8 @@ export async function seedLocalStorage(
     seedOnce?: boolean
   },
 ): Promise<void> {
+  // Taps on the Hub's suggested card must land at once (Guidance G1 bob).
+  await holdHubSuggestionStill(page)
   await page.addInitScript(
     ({
       progressKey,

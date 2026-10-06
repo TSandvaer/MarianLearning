@@ -13,7 +13,7 @@
  * What this spec adds
  * -------------------
  * The existing `hub-to-math.spec.ts` already pins the `failNetwork:true`
- * branch with `delayMs: 3000`. This spec adds the complementary
+ * branch with `holdUntilReleased`. This spec adds the complementary
  * fetch-shape paths the audit called out as load-bearing:
  *
  *   1. `route fulfils with canonical fixture, but delayed`. Exercises
@@ -58,7 +58,7 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { installClaudeMock } from './_helpers/mockClaude'
+import { installClaudeMock, type ClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
   forceHowlerUnlock,
@@ -66,26 +66,25 @@ import {
 } from './_helpers/seedStorage'
 
 /**
- * Mid-flight delay we hold the route open. Same logic that landed in
- * `hub-to-math.spec.ts`: WebKit on slow CI was observed to flake at
- * 800ms when the chained `expect.toBeVisible` calls happened to land
- * near the cutover. 3000ms gives the entire pre-flip assertion block
- * headroom under parallel-worker load while keeping total spec runtime
- * well under the 90s test timeout.
+ * Both branches hold the route open until the pre-flip assertion block
+ * is done (`holdUntilReleased`), then release it. A fixed delay (800 ms,
+ * later 3000 ms) kept flaking on WebKit CI: a starved runner can spend
+ * the whole window on the Hub tap alone, and the fetch then settles
+ * before the pre-flip assertions run.
  */
-const IN_FLIGHT_DELAY_MS = 3000
 
 test.describe('Cold-mount Math while /api/claude is in flight', () => {
   test.describe('canonical fulfill branch — fetch resolves mid-mount', () => {
+    let claude: ClaudeMock
     test.beforeEach(async ({ page }) => {
       // No `failNetwork`: the route fulfils with the canonical math
-      // fixture once the delay elapses. App.tsx's `.then` block handles
+      // fixture once the spec releases it. App.tsx's `.then` block handles
       // the resolve; whether `prepareMathPathA` further succeeds in
       // decoding the inline silent MP3 (Path A "happy path") OR
       // rejects on decode (silent-fallback path) depends on the
       // headless engine. Either way `mathAudioReady` ends true and the
       // structural contract holds.
-      await installClaudeMock(page, { delayMs: IN_FLIGHT_DELAY_MS })
+      claude = await installClaudeMock(page, { holdUntilReleased: true })
       await seedLocalStorage(page, {
         sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
       })
@@ -122,11 +121,12 @@ test.describe('Cold-mount Math while /api/claude is in flight', () => {
       await expect(page.getByTestId('math-addend-a')).toHaveCount(0)
       await expect(page.getByTestId('math-addend-b')).toHaveCount(0)
 
-      // Post-flip: route fulfils after the delay; App.tsx's settle
+      // Post-flip: the spec releases the route and it fulfils; App.tsx's settle
       // handlers run; `mathAudioReady` flips true; Math's render-gate
       // opens. The problem area renders for the FIRST time. Pre-fix
       // the static fallback Q1 would have been on screen already and
       // we'd have failed the toHaveCount(0) assertion above.
+      claude.release()
       await expect(page.getByTestId('math-symbolic')).toBeVisible({
         timeout: 10_000,
       })
@@ -165,15 +165,16 @@ test.describe('Cold-mount Math while /api/claude is in flight', () => {
   })
 
   test.describe('reject branch — fetch fails, gate still flips', () => {
+    let claude: ClaudeMock
     test.beforeEach(async ({ page }) => {
-      // Hold for the same window, then abort. Mirrors a real-world
-      // Anthropic-down outage but with a deterministic delay so we can
-      // observe the pre-flip DOM state. App.tsx's `.catch` block flips
+      // Hold until released, then abort. Mirrors a real-world
+      // Anthropic-down outage but held in flight so we can observe the
+      // pre-flip DOM state. App.tsx's `.catch` block flips
       // `mathAudioReady` to `true` so the silent fallback path can
       // unblock the chips.
-      await installClaudeMock(page, {
+      claude = await installClaudeMock(page, {
         failNetwork: true,
-        delayMs: IN_FLIGHT_DELAY_MS,
+        holdUntilReleased: true,
       })
       await seedLocalStorage(page, {
         sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
@@ -203,8 +204,9 @@ test.describe('Cold-mount Math while /api/claude is in flight', () => {
       await expect(page.getByTestId('math-symbolic')).toHaveCount(0)
       await expect(page.getByTestId('math-chips')).toHaveCount(0)
 
-      // After the abort, App.tsx's `.catch` flips the gate. Static
+      // Release: the route aborts and App.tsx's `.catch` flips the gate. Static
       // fallback plan renders for the first (and final) time.
+      claude.release()
       await expect(page.getByTestId('math-symbolic')).toBeVisible({
         timeout: 10_000,
       })

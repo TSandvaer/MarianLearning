@@ -29,8 +29,11 @@
  * in tests 2-4.
  *
  * Test 1 requires observing Placement A BEFORE audioReady flips. We use
- * `delayMs` so the fetch is in flight during the assertion window, then
- * assert A absent AFTER the delay expires and the gate opens.
+ * `holdUntilReleased` so the fetch stays in flight until the pre-flip
+ * assertions are done, then release it and assert A absent after the
+ * gate opens. (A fixed `delayMs` raced the harness: the Hub prefetches
+ * the world it suggests, so for this seed the Word Song fetch starts at
+ * Hub mount and a 4 s delay could expire before Word Song mounted.)
  *
  * WHY NOT `forceHowlerUnlock`
  * ---------------------------
@@ -53,12 +56,11 @@ import {
 } from './_helpers/seedStorage'
 
 /**
- * Delay used for test 1 to hold the Path A fetch in flight while we
- * assert Placement A visible. Must be long enough for the assertions
- * to complete but short enough for the test not to time out.
- * 4 000 ms gives ample assertion headroom on parallel-worker CI.
+ * Test 1's post-release wait for Placement A to exit: the reject branch
+ * flips audioReady on the next microtask, then AnimatePresence runs a
+ * 200 ms fade.
  */
-const FETCH_IN_FLIGHT_DELAY_MS = 4_000
+const POST_RELEASE_EXIT_TIMEOUT_MS = 6_000
 
 /**
  * Seed: `digraphs-th-voiceless` is `intro`, absent from
@@ -243,11 +245,11 @@ test.describe('digraphs-th mouth-cue display — Placements A + B (spec #231)', 
    * Test 1 — First-encounter session: Placement A (intro panel) visible
    * during the fetch window, absent after audioReady flips.
    *
-   * Uses `delayMs` to hold the fetch in flight. During the in-flight
-   * window, Placement A must be in the DOM (the gate is `audioReady !== true`
-   * which is `false` during the fetch). After the delay expires the catch
-   * handler flips `wordSongAudioReady` to `true`; Placement A exits via
-   * AnimatePresence.
+   * Uses `holdUntilReleased` to hold the fetch in flight. During the
+   * in-flight window, Placement A must be in the DOM (the gate is
+   * `audioReady !== true` which is `false` during the fetch). Once the
+   * spec releases the fetch the catch handler flips `wordSongAudioReady`
+   * to `true`; Placement A exits via AnimatePresence.
    *
    * Placement B (corner cue) is also visible during and after the fetch
    * because `digraphsThNodeLevel === 'intro'`.
@@ -255,9 +257,9 @@ test.describe('digraphs-th mouth-cue display — Placements A + B (spec #231)', 
   test('1. first-encounter: intro panel (A) visible pre-audioReady, absent post-flip; corner cue (B) present throughout', async ({
     page,
   }) => {
-    await installClaudeMock(page, {
+    const claude = await installClaudeMock(page, {
       failNetwork: true,
-      delayMs: FETCH_IN_FLIGHT_DELAY_MS,
+      holdUntilReleased: true,
     })
     await seedThFirstEncounterProgress(page)
     await page.goto('/')
@@ -278,11 +280,12 @@ test.describe('digraphs-th mouth-cue display — Placements A + B (spec #231)', 
     await expect(page.getByTestId('th-intro-panel')).toBeVisible()
     await expect(page.getByTestId('th-corner-cue')).toBeVisible()
 
-    // Post-flip: delay expires, catch handler flips audioReady=true,
-    // Placement A exits via AnimatePresence (200ms fade).
-    // Give AnimatePresence time to complete the exit animation.
+    // Post-flip: release the fetch; the catch handler flips
+    // audioReady=true and Placement A exits via AnimatePresence (200ms
+    // fade). Give AnimatePresence time to complete the exit animation.
+    claude.release()
     await expect(page.getByTestId('th-intro-panel')).toHaveCount(0, {
-      timeout: FETCH_IN_FLIGHT_DELAY_MS + 2_000,
+      timeout: POST_RELEASE_EXIT_TIMEOUT_MS,
     })
     // Placement B stays (corner cue is static once mounted).
     await expect(page.getByTestId('th-corner-cue')).toBeVisible()

@@ -1,34 +1,39 @@
 /**
- * Hub card progress area — land number + hero row + all-steps bead row.
- * Replaces the 5-icon path strip. Spec: `design/emmas-path/emmas-path-spec.md`
- * §2 "Hub card" (ticket 123jpnbc3dq, Emma's Path 7/10). Data comes from
- * `buildHubCardModel` (→ `nodeProgress`).
+ * Hub world card in clay — Redesign R2 (ClickUp 123jpnbc68z), direction A
+ * "Toy Box". Reference: `design/emmas-path/redesign/real-art-check.html`
+ * (Hub tab) + `concepts/direction-a-hub.png`; quality bars 9-13.
  *
- * Not a tap target of its own: it renders inside the tree-node button,
- * so a tap anywhere on the card still starts a session (spec §2 "Beads
- * and hero are not separate tap targets").
+ * One sculpted slab per world: crown + clay title, the current step as a
+ * big glowing clay sticker on a plinth, the next step as a small padlocked
+ * sticker, the land pill, a tray of flower slots (one per required good
+ * day: grown / sleeping / empty, Guidance G1), and a round wooden map
+ * button. No bead row: the all-steps overview
+ * lives on the map (bar 9). Data comes from `buildHubCardModel`
+ * (→ `nodeProgress`); art from the `pathArt` manifest.
  *
- * Sizes are CSS px taken from the spec's arithmetic (the 280pt card is
- * 373px wide; the spec's bead-row width check is against 341px usable).
+ * The whole slab is the start target (role="button"); the map button is
+ * the only other target inside it and never starts a session.
  *
- * Art: the spec's 24 stop pictures (§5) are not produced yet, so the
- * hero uses the existing word pictures for the five CVC steps and the
- * old path-strip glyph for the rest. The map screen (8/10) reuses
- * `StepArt` + `Padlock` for its stops.
+ * `StepArt` + `Padlock` stay exported for the map and session-end screens
+ * (they move to clay art in R3 / R4).
  */
 
-import type { CSSProperties, ReactElement } from 'react'
-import { m, useReducedMotion } from 'motion/react'
+import {
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactElement,
+} from 'react'
 import { LITERACY_TREE, MATH_TREE, type SkillNode } from '../../lib/progress'
-import type { Bead, HubCardModel } from './hubCardModel'
+import { pathArtSrc } from '../../lib/emmasPath/pathArt'
+import type { SkillTreeId } from '../SessionEnd/sessionHistory'
+import type { HubCardModel } from './hubCardModel'
 import { NUMBER_GARDEN_STAGES, WORD_SONG_STAGES, type StageId } from './stages'
 import { StageGlyph } from './stageIcons'
 import { createSfx, type Sfx } from '../../lib/sfx'
+import './hubClay.css'
 
 const ROSE = '#F48FB1'
-const PINK_30 = 'rgba(255, 192, 203, 0.3)'
-const PALE = '#FCE4EC'
-const CREAM = '#FFF5F0'
 
 const CVC_PICTURES: Partial<Record<SkillNode, string>> = {
   'cvc-words': 'cat',
@@ -86,286 +91,10 @@ export function Padlock({ size }: { size: number }): ReactElement {
   )
 }
 
-function Bud({ open, size }: { open: boolean; size: number }): ReactElement {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      width={size}
-      height={size}
-      aria-hidden
-      data-testid="hub-card-bud"
-      data-open={open ? 'true' : 'false'}
-    >
-      {open ? (
-        <g>
-          {[0, 72, 144, 216, 288].map((deg) => (
-            <ellipse
-              key={deg}
-              cx="8"
-              cy="4.6"
-              rx="2.6"
-              ry="3.4"
-              fill={ROSE}
-              transform={`rotate(${deg} 8 8)`}
-            />
-          ))}
-          <circle cx="8" cy="8" r="2.2" fill="#FFEB3B" />
-        </g>
-      ) : (
-        <g>
-          <path d="M8 15 V9" stroke="#81C784" strokeWidth="1.4" />
-          <ellipse cx="8" cy="7" rx="3" ry="4" fill="#A5D6A7" />
-        </g>
-      )}
-    </svg>
-  )
-}
+// ── Clay world card ───────────────────────────────────────────────────
 
-function BloomedFlower(): ReactElement {
-  return (
-    <svg
-      viewBox="0 0 28 28"
-      width={28}
-      height={28}
-      aria-hidden
-      data-testid="hub-card-bloom"
-    >
-      {[0, 60, 120, 180, 240, 300].map((deg) => (
-        <ellipse
-          key={deg}
-          cx="14"
-          cy="7"
-          rx="4"
-          ry="6"
-          fill={ROSE}
-          transform={`rotate(${deg} 14 14)`}
-        />
-      ))}
-      <circle cx="14" cy="14" r="4" fill="#FFEB3B" />
-    </svg>
-  )
-}
-
-/** Pie fill for the current bead: never empties (Decision 1). */
-function pieStyle(fill: number): CSSProperties {
-  const deg = Math.round(fill * 360)
-  return {
-    background: `conic-gradient(${ROSE} 0deg ${deg}deg, ${PALE} ${deg}deg 360deg)`,
-  }
-}
-
-function BeadDot({
-  bead,
-  fill,
-  shimmer,
-}: {
-  bead: Bead
-  fill: number
-  shimmer: boolean
-}): ReactElement {
-  const base: CSSProperties = {
-    width: 18,
-    height: 18,
-    borderRadius: '50%',
-    boxSizing: 'border-box',
-    display: 'inline-block',
-  }
-  let style: CSSProperties
-  switch (bead.state) {
-    case 'mastered':
-      style = { ...base, background: ROSE }
-      break
-    case 'current':
-      style = { ...base, border: `2px solid ${ROSE}`, ...pieStyle(fill) }
-      break
-    case 'open':
-      style = { ...base, border: `2px solid ${ROSE}`, background: PALE }
-      break
-    case 'next':
-      style = { ...base, border: `2px dashed ${ROSE}`, background: PALE }
-      break
-    case 'locked':
-      style = { ...base, border: `2px solid ${PINK_30}`, opacity: 0.6 }
-      break
-  }
-  return (
-    <m.span
-      data-testid="hub-card-bead"
-      data-node={bead.node}
-      data-state={bead.state}
-      data-fill={bead.state === 'current' ? fill.toFixed(3) : undefined}
-      style={style}
-      initial={shimmer ? { opacity: 0.4 } : false}
-      animate={shimmer ? { opacity: [0.4, 1, 0.4, 1] } : undefined}
-      transition={shimmer ? { duration: 1.2, ease: 'easeInOut' } : undefined}
-    />
-  )
-}
-
-export interface HubPathCardProps {
-  model: HubCardModel
-}
-
-export function HubPathCard({ model }: HubPathCardProps): ReactElement {
-  const reduceMotion = useReducedMotion() ?? false
-  return (
-    <div
-      data-testid="hub-card-progress"
-      data-world={model.world}
-      className="flex w-full flex-col items-center gap-3"
-    >
-      {/* Hero row — 56px tall: land number, current step, next unlock. */}
-      <div
-        data-testid="hub-card-hero"
-        className="flex w-full items-center gap-3"
-        style={{ height: 56, paddingLeft: 0 }}
-      >
-        {model.showLandNumber && (
-          <span
-            data-testid="hub-land-number"
-            data-value={model.landNumber}
-            aria-label={`Land ${model.landNumber}`}
-            className="flex shrink-0 items-center justify-center rounded-full font-display font-bold"
-            style={{
-              width: 56,
-              height: 56,
-              background: ROSE,
-              color: CREAM,
-              fontSize: 34,
-              lineHeight: 1,
-            }}
-          >
-            {model.landNumber}
-          </span>
-        )}
-        <div className="flex flex-1 items-center justify-center gap-2">
-          <div className="flex flex-col items-center">
-            <span
-              data-testid="hub-card-current"
-              data-node={model.current}
-              className="flex items-center justify-center rounded-full bg-white"
-              style={{
-                width: 48,
-                height: 48,
-                boxShadow: `0 0 0 2px ${ROSE}`,
-              }}
-            >
-              <StepArt node={model.current} size={40} />
-            </span>
-            {!model.complete && (
-              <span
-                data-testid="hub-card-buds"
-                data-good-days={model.goodDays}
-                data-required-days={model.requiredDays}
-                className="mt-0.5 flex items-center"
-                style={{ gap: 6 }}
-              >
-                {model.buds.map((group, gi) => (
-                  <span key={gi} className="flex items-center gap-0.5">
-                    {group.map((open, i) => (
-                      <Bud
-                        key={i}
-                        open={open}
-                        size={model.buds.length > 1 ? 12 : 14}
-                      />
-                    ))}
-                  </span>
-                ))}
-              </span>
-            )}
-          </div>
-          {model.unlocksNext === null ? (
-            <BloomedFlower />
-          ) : (
-            <>
-              <svg width="20" height="12" viewBox="0 0 20 12" aria-hidden>
-                <path
-                  d="M1 6 H16 M12 2 L17 6 L12 10"
-                  stroke={ROSE}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-              </svg>
-              <span
-                data-testid="hub-card-next"
-                data-node={model.unlocksNext}
-                className="relative flex items-center justify-center"
-                style={{ width: 44, height: 44 }}
-              >
-                {/* Spec §3.3 frost (6px blur, 55% veil) is sized for the
-                    72px map stop; at 44px it erased the glyph, so it is
-                    scaled down here to stay a recognisable peek. */}
-                <span
-                  style={{
-                    filter: 'blur(1.2px) saturate(0.7)',
-                    display: 'inline-flex',
-                  }}
-                >
-                  <StepArt node={model.unlocksNext} size={40} />
-                </span>
-                <span
-                  aria-hidden
-                  className="absolute inset-0 rounded-full"
-                  style={{ background: CREAM, opacity: 0.45 }}
-                />
-                <span
-                  aria-hidden
-                  className="absolute"
-                  style={{ right: -2, bottom: -2 }}
-                >
-                  <Padlock size={16} />
-                </span>
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Bead row — one bead per step, a divider between lands. */}
-      <div
-        data-testid="hub-card-beads"
-        className="flex items-center justify-center"
-      >
-        {model.lands.map((land, li) => (
-          <span key={land.number} className="flex items-center">
-            {li > 0 && (
-              <span
-                aria-hidden
-                data-testid="hub-card-land-divider"
-                style={{
-                  width: 2,
-                  height: 12,
-                  margin: '0 5.5px',
-                  background: PINK_30,
-                  borderRadius: 1,
-                }}
-              />
-            )}
-            <span
-              data-testid="hub-card-land"
-              data-land={land.number}
-              className="flex items-center"
-              style={{ gap: 5 }}
-            >
-              {land.beads.map((bead) => (
-                <BeadDot
-                  key={bead.node}
-                  bead={bead}
-                  fill={model.fill}
-                  shimmer={bead.state === 'next' && !reduceMotion}
-                />
-              ))}
-            </span>
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ── Map button (spec §2 "Map button", Emma's Path 8/10) ───────────────
+/** A length in reference px (820-wide stage), scaled by `--u`. */
+const u = (px: number): string => `calc(var(--u) * ${px})`
 
 // One plink for the app session: the tap flips the route at once, so a
 // per-mount Howl unloaded with the Hub would cut the sound off.
@@ -375,67 +104,259 @@ function playPlink(): void {
   plinkSfx.play()
 }
 
-function FoldedMap(): ReactElement {
+function Spark({
+  left,
+  top,
+  delay,
+}: {
+  left: number
+  top: number
+  delay: number
+}): ReactElement {
   return (
-    <svg viewBox="0 0 40 40" width={40} height={40} aria-hidden>
+    <svg
+      className="hub-spark"
+      style={{ left: u(left), top: u(top), animationDelay: `${delay}s` }}
+      viewBox="0 0 100 100"
+      aria-hidden
+    >
       <path
-        d="M4 9 L14 5 L26 9 L36 5 V31 L26 35 L14 31 L4 35 Z"
-        fill="#FFF9C4"
-        stroke={ROSE}
-        strokeWidth="2"
-        strokeLinejoin="round"
+        d="M50 0 L60 40 L100 50 L60 60 L50 100 L40 60 L0 50 L40 40 Z"
+        fill="#fff6b0"
       />
-      <path d="M14 5 V31 M26 9 V35" stroke={ROSE} strokeWidth="1.5" />
-      <path
-        d="M8 26 Q14 18 19 22 T31 13"
-        stroke="#E91E63"
-        strokeWidth="1.6"
-        strokeDasharray="2.5 2.5"
-        fill="none"
-      />
-      <circle cx="31" cy="13" r="2.4" fill="#E91E63" />
     </svg>
   )
 }
 
-export interface HubMapButtonProps {
-  world: HubCardModel['world']
-  /** Card width — the button is a card-width pill. */
-  width: string
-  onOpen: () => void
-  /** Fires on pointerdown, before the Hub's first-tap handler (see Hub). */
-  onPress?: () => void
+const TITLES: Record<SkillTreeId, [string, string]> = {
+  'number-garden': ['Number', 'Garden'],
+  'word-song': ['Word', 'Song'],
 }
 
-/** 64px card-width pill with a folded-map picture; tap → plink + map. */
-export function HubMapButton({
-  world,
-  width,
-  onOpen,
-  onPress,
-}: HubMapButtonProps): ReactElement {
+export interface HubWorldCardProps {
+  tree: SkillTreeId
+  label: string
+  model: HubCardModel
+  suggested: boolean
+  onTap: () => void
+  /**
+   * Fires on `pointerdown`, before the event bubbles to the Hub's
+   * first-tap handler (see Hub `handleNodePress`).
+   */
+  onPress?: () => void
+  /** Map button inside the card; omitted → no map button. */
+  onOpenMap?: () => void
+  /** Slot indexes whose flower wakes (bud opens) on this visit. */
+  wakeSlots?: readonly number[]
+}
+
+/** Moon for a sleeping flower (mockup `MOON`). */
+function Moon(): ReactElement {
   return (
-    <m.button
-      type="button"
-      data-testid="hub-map-button"
-      data-world={world}
-      aria-label={world === 'math' ? 'Number Garden map' : 'Word Song map'}
-      onPointerDown={onPress}
-      onClick={() => {
-        playPlink()
-        onOpen()
+    <svg className="hub-moon" viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <radialGradient id="hub-moon-fill" cx="35%" cy="30%">
+          <stop offset="0" stopColor="#fffbd6" />
+          <stop offset=".7" stopColor="#ffe27a" />
+          <stop offset="1" stopColor="#f0b72a" />
+        </radialGradient>
+      </defs>
+      <path
+        d="M62 8 A44 44 0 1 0 92 70 A36 36 0 1 1 62 8 Z"
+        fill="url(#hub-moon-fill)"
+        stroke="#d99a1a"
+        strokeWidth="3"
+      />
+    </svg>
+  )
+}
+
+export function HubWorldCard({
+  tree,
+  label,
+  model,
+  suggested,
+  onTap,
+  onPress,
+  onOpenMap,
+  wakeSlots = [],
+}: HubWorldCardProps): ReactElement {
+  const [down, setDown] = useState(false)
+  const [title1, title2] = TITLES[tree]
+  const mapLabel =
+    model.world === 'math' ? 'Number Garden map' : 'Word Song map'
+
+  const onMapButton = (target: EventTarget): boolean =>
+    target instanceof Element &&
+    target.closest('[data-testid="hub-map-button"]') !== null
+
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    onPress?.()
+    if (!onMapButton(e.target)) setDown(true)
+  }
+  const release = () => setDown(false)
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onTap()
+    }
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      data-testid="hub-tree-node"
+      data-tree={tree}
+      data-suggested={suggested ? 'true' : 'false'}
+      className={[
+        'hub-card',
+        tree === 'number-garden' ? 'hub-card--math' : 'hub-card--word',
+        down ? 'is-down' : '',
+      ].join(' ')}
+      onPointerDown={handlePointerDown}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onPointerLeave={release}
+      onClick={(e) => {
+        if (onMapButton(e.target)) return
+        onTap()
       }}
-      className="flex select-none touch-manipulation items-center justify-center rounded-full"
-      style={{
-        width,
-        height: 64,
-        background: CREAM,
-        border: `2px solid ${ROSE}`,
-      }}
-      whileTap={{ scale: 0.96 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      onKeyDown={handleKeyDown}
     >
-      <FoldedMap />
-    </m.button>
+      <div className="hub-crown" aria-hidden />
+      <div className="hub-title" aria-hidden data-testid="hub-tree-label">
+        {title1}
+        <br />
+        <span className="hub-title-2">{title2}</span>
+      </div>
+
+      <div data-testid="hub-card-progress" data-world={model.world} aria-hidden>
+        <div
+          className="hub-plinth"
+          style={{ left: u(50), top: u(380), width: u(208), height: u(64) }}
+        />
+        <div
+          className="hub-glow"
+          style={{ left: u(36), top: u(170), width: u(236), height: u(236) }}
+        />
+        <img
+          className="hub-sticker"
+          data-testid="hub-card-current"
+          data-node={model.current}
+          src={pathArtSrc(model.current, 512)}
+          alt=""
+          draggable={false}
+          style={{ left: u(46), top: u(180), width: u(216), height: u(216) }}
+        />
+        <Spark left={52} top={196} delay={0} />
+        <Spark left={236} top={360} delay={0.7} />
+
+        <div
+          className="hub-next"
+          data-testid={
+            model.unlocksNext === null ? 'hub-card-bloom' : 'hub-card-next'
+          }
+          data-node={model.unlocksNext ?? undefined}
+        >
+          <div
+            className="hub-plinth"
+            style={{ left: u(262), top: u(388), width: u(104), height: u(34) }}
+          />
+          <img
+            className="hub-sticker"
+            src={pathArtSrc(model.unlocksNext ?? 'ui-bloom', 256)}
+            alt=""
+            draggable={false}
+            style={{ left: u(258), top: u(290), width: u(112), height: u(112) }}
+          />
+          {model.unlocksNext !== null && (
+            <img
+              className="hub-lock"
+              data-testid="hub-card-lock"
+              src={pathArtSrc('ui-padlock', 256)}
+              alt=""
+              draggable={false}
+              style={{ left: u(318), top: u(350), width: u(52), height: u(52) }}
+            />
+          )}
+        </div>
+
+        {model.showLandNumber && (
+          <div
+            className="hub-landpill"
+            data-testid="hub-land-number"
+            data-value={model.landNumber}
+          >
+            <img
+              src={pathArtSrc(model.landArt, 256)}
+              alt=""
+              draggable={false}
+            />
+            {model.landNumber}
+          </div>
+        )}
+
+        <div
+          className="hub-tray"
+          data-testid="hub-card-seeds"
+          data-good-days={model.slots.filter((s) => s !== 'empty').length}
+          data-required-days={model.slots.length}
+        >
+          {model.slots.map((slot, i) => {
+            const waking = slot === 'grown' && wakeSlots.includes(i)
+            return (
+              <div
+                key={i}
+                className={[
+                  'hub-hole',
+                  slot === 'sleeping' ? 'is-sleeping' : '',
+                  waking ? 'is-waking' : '',
+                ].join(' ')}
+                data-testid="hub-card-seed"
+                data-filled={slot === 'empty' ? 'false' : 'true'}
+                data-state={slot}
+                data-waking={waking ? 'true' : undefined}
+              >
+                {slot !== 'empty' && (
+                  <img
+                    src={pathArtSrc(
+                      slot === 'sleeping' ? 'ui-bud-closed' : 'ui-bud-open',
+                      256,
+                    )}
+                    alt=""
+                    draggable={false}
+                  />
+                )}
+                {slot === 'sleeping' && (
+                  <>
+                    <Moon />
+                    <span className="hub-zz">z</span>
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {onOpenMap && (
+        <button
+          type="button"
+          className="hub-mapbtn"
+          data-testid="hub-map-button"
+          data-world={model.world}
+          aria-label={mapLabel}
+          onClick={() => {
+            playPlink()
+            onOpenMap()
+          }}
+        >
+          <img src={pathArtSrc('ui-map', 256)} alt="" draggable={false} />
+        </button>
+      )}
+    </div>
   )
 }

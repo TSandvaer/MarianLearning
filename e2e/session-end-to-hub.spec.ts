@@ -114,23 +114,13 @@ test.describe('Math session → SessionEnd → Hub flip', () => {
     await expect(hub).toBeVisible({ timeout: 10_000 })
     await expect(hub).toHaveAttribute('data-path', 'session-end')
 
-    // Cumulative stardust HUD reflects a real, non-negative integer.
+    // The Hub shows no stardust total (Guidance G1, bar 14); the data is
+    // still kept — the persisted blob below carries `cumulativeStardust`.
     // We deliberately don't compare against the seed: `cumulativeStardust`
     // is recomputed at session-end as `stardustState.total` (read from a
     // SEPARATE localStorage key — see `recordSessionEnd` in
-    // `screens/SessionEnd/sessionHistory.ts`). Our seed only writes the
-    // session-history key; the stardust adapter starts at 0 and the new
-    // total is whatever this session earned. A stronger seed would
-    // pre-populate the stardust key too — out of scope for v1.
-    const cumulativeStardustBadge = page.getByTestId('hub-cumulative-stardust')
-    const cumulativeAttr =
-      await cumulativeStardustBadge.getAttribute('data-total')
-    const cumulative = Number(cumulativeAttr)
-    expect(Number.isFinite(cumulative)).toBe(true)
-    expect(cumulative).toBeGreaterThanOrEqual(0)
-    // Earning eight correct answers should produce > 0 stardust under
-    // every realistic stardust formula (`_shared/stardust.ts`).
-    expect(cumulative).toBeGreaterThan(0)
+    // `screens/SessionEnd/sessionHistory.ts`).
+    await expect(page.getByTestId('hub-cumulative-stardust')).toHaveCount(0)
 
     // The SessionEnd write path bumped sessionCount on disk. Read
     // the persisted blob back and assert.
@@ -145,6 +135,9 @@ test.describe('Math session → SessionEnd → Hub flip', () => {
     )) as PersistedSessionHistory | null
     expect(ph).not.toBeNull()
     expect(ph!.sessionCount).toBeGreaterThanOrEqual(6)
+    // Earning eight correct answers should produce > 0 stardust under
+    // every realistic stardust formula (`_shared/stardust.ts`).
+    expect(ph!.cumulativeStardust).toBeGreaterThan(0)
     // longestStreakEver was 4 in the seed. After 8 correct in a row,
     // it should be at least 8 — proves the correct chip taps registered.
     expect(ph!.longestStreakEver).toBeGreaterThanOrEqual(8)

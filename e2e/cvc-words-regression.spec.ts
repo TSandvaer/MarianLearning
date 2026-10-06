@@ -301,12 +301,19 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     // landed in the right session-history blob.
     await expect(page.getByTestId('greet')).toHaveCount(0)
 
-    // Cumulative stardust HUD reflects the seeder's actual writes. The
+    // Cumulative stardust reflects the seeder's actual writes. The
     // seeder uses `emptySessionHistory()` + sessionCount: 1 — it does
-    // NOT write any stardust — so the badge shows 0. (Contract said 8;
-    // call-site truth is 0. See file header.)
-    const stardustBadge = page.getByTestId('hub-cumulative-stardust')
-    await expect(stardustBadge).toHaveAttribute('data-total', '0')
+    // NOT write any stardust — so the stored total is 0. (Contract said
+    // 8; call-site truth is 0. See file header.) The Hub no longer shows
+    // the total (Guidance G1, bar 14), so read it from storage.
+    await expect(page.getByTestId('hub-cumulative-stardust')).toHaveCount(0)
+    const storedTotal = await page.evaluate(() => {
+      const raw = localStorage.getItem('marian-tutor.session-history.v1')
+      return raw === null
+        ? null
+        : (JSON.parse(raw) as { cumulativeStardust: number }).cumulativeStardust
+    })
+    expect(storedTotal).toBe(0)
   })
 
   test('2. Tapping Word Song fires planner request with progress.focusNode === "cvc-words"', async ({
@@ -762,25 +769,13 @@ test.describe('cvc-words flow regression (PRs #135, #142, #140, #144)', () => {
     // automatically update the expected projection without spec churn.
     // See `e2e/_helpers/slidingWindow.ts` and `wordSongNodesInOrder.ts`.
     const focusIndex = WORD_SONG_NODES_IN_ORDER.indexOf('cvc-words')
-    // Hub card bead row (Emma's Path 7/10, replaces the 5-cell strip):
-    // one bead per Word Song step; every step before the focus is
-    // mastered and the focus step is the current bead.
-    const wordSongBeads = page.locator(
-      '[data-testid="hub-card-progress"][data-world="word-song"] [data-testid="hub-card-bead"]',
-    )
-    await expect(wordSongBeads).toHaveCount(WORD_SONG_NODES_IN_ORDER.length)
-    const beadProjection = await wordSongBeads.evaluateAll((nodes) =>
-      nodes.map((n) => ({
-        node: (n as HTMLElement).getAttribute('data-node'),
-        state: (n as HTMLElement).getAttribute('data-state'),
-      })),
-    )
-    expect(beadProjection.slice(0, focusIndex + 1)).toEqual(
-      WORD_SONG_NODES_IN_ORDER.slice(0, focusIndex + 1).map((node, i) => ({
-        node,
-        state: i < focusIndex ? 'mastered' : 'current',
-      })),
-    )
+    // Clay Hub card (Redesign R2; the all-steps bead row moved to the
+    // map): the Word Song card's current sticker is the focus step.
+    await expect(
+      page.locator(
+        '[data-testid="hub-card-progress"][data-world="word-song"] [data-testid="hub-card-current"]',
+      ),
+    ).toHaveAttribute('data-node', WORD_SONG_NODES_IN_ORDER[focusIndex]!)
 
     // No pendingPromotion seeded → celebration overlay must NOT render.
     await expect(page.getByTestId('hub-promotion-celebration')).toHaveCount(0)
