@@ -6,7 +6,7 @@
  *
  * The ~1254 px PNG sources are NOT in git (design/emmas-path/redesign/assets/
  * in the main checkout only); this script is the reproducible bridge.
- * Each source `{name}.png` becomes `{name}-256.webp` and `{name}-512.webp`
+ * Each manifest id's `{id}.png` becomes `{id}-256.webp` and `{id}-512.webp`
  * (`PATH_ART_SIZES` in src/lib/emmasPath/pathArt.ts). Alpha is kept at full
  * quality (residue below ALPHA_FLOOR is cleared to 0), and every output is decoded again to check its four corner
  * pixels are fully transparent — the run fails if one is not.
@@ -18,10 +18,14 @@
  * sharp is a devDependency only; nothing here enters the app bundle.
  */
 
-import { existsSync, mkdirSync, readdirSync } from 'fs'
-import { basename, join } from 'path'
+import { existsSync, mkdirSync } from 'fs'
+import { join } from 'path'
 import sharp from 'sharp'
-import { PATH_ART_DIR, PATH_ART_SIZES } from '../src/lib/emmasPath/pathArt'
+import {
+  PATH_ART_DIR,
+  PATH_ART_IDS,
+  PATH_ART_SIZES,
+} from '../src/lib/emmasPath/pathArt'
 
 const QUALITY = 80
 /** Alpha below this (of 255) is invisible residue and becomes 0. */
@@ -36,11 +40,13 @@ if (!sourceDir || !existsSync(sourceDir)) {
 const outDir = join('public', PATH_ART_DIR)
 mkdirSync(outDir, { recursive: true })
 
-const files = readdirSync(sourceDir)
-  .filter((f) => f.toLowerCase().endsWith('.png'))
-  .sort()
-if (files.length === 0) {
-  console.error(`No PNG files found in ${sourceDir}`)
+// Driven by the manifest, so stray files in the source dir (e.g. the uncut
+// ui-arch-closed-white.png) are ignored and a missing source fails loudly.
+const missing = PATH_ART_IDS.filter(
+  (id) => !existsSync(join(sourceDir, `${id}.png`)),
+)
+if (missing.length > 0) {
+  console.error(`Missing source PNGs: ${missing.join(', ')}`)
   process.exit(1)
 }
 
@@ -62,11 +68,10 @@ async function cornersTransparent(file: string): Promise<boolean> {
 }
 
 const totals: Record<number, number> = {}
-for (const file of files) {
-  const name = basename(file, '.png')
+for (const id of PATH_ART_IDS) {
   for (const size of PATH_ART_SIZES) {
-    const outPath = join(outDir, `${name}-${size}.webp`)
-    const { data, info: raw } = await sharp(join(sourceDir, file))
+    const outPath = join(outDir, `${id}-${size}.webp`)
+    const { data, info: raw } = await sharp(join(sourceDir, `${id}.png`))
       .resize(size, size, { fit: 'contain', background: '#0000' })
       .ensureAlpha()
       .raw()
@@ -90,6 +95,8 @@ for (const file of files) {
 
 const all = Object.values(totals).reduce((a, b) => a + b, 0)
 for (const size of PATH_ART_SIZES) {
-  console.log(`${size}px: ${files.length} files, ${totals[size]} B`)
+  console.log(`${size}px: ${PATH_ART_IDS.length} files, ${totals[size]} B`)
 }
-console.log(`total: ${files.length * PATH_ART_SIZES.length} files, ${all} B`)
+console.log(
+  `total: ${PATH_ART_IDS.length * PATH_ART_SIZES.length} files, ${all} B`,
+)

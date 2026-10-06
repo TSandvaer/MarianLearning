@@ -5,8 +5,8 @@ import { defaultProgress } from '../progress/defaults'
 import { LANDS } from '../progress/lands'
 import type { SkillNode } from '../progress/types'
 import {
-  PATH_ART,
   PATH_ART_DIR,
+  PATH_ART_IDS,
   PATH_ART_SIZES,
   landArtId,
   pathArtSrc,
@@ -18,43 +18,40 @@ const PUBLIC = join(process.cwd(), 'public')
 const fileFor = (id: PathArtId, size: number) =>
   join(PUBLIC, PATH_ART_DIR, `${id}-${size}.webp`)
 
-const ids = Object.keys(PATH_ART) as PathArtId[]
-const ready = ids.filter((id) => PATH_ART[id] === 'ready')
+const ids = new Set<PathArtId>(PATH_ART_IDS)
 
 describe('PATH_ART manifest', () => {
-  it('lists 24 stages + 9 lands + 8 UI pieces, one pending', () => {
+  it('lists 24 stages + 9 lands + 8 UI pieces, no duplicates', () => {
     expect(ALL_NODES).toHaveLength(24)
-    expect(ids).toHaveLength(24 + 9 + 8)
-    expect(ids.filter((id) => PATH_ART[id] === 'pending')).toEqual([
-      'ui-arch-closed',
-    ])
+    expect(PATH_ART_IDS).toHaveLength(24 + 9 + 8)
+    expect(ids.size).toBe(PATH_ART_IDS.length)
   })
 
-  it('has a ready file at every size for every SkillNode', () => {
+  it('has a file at every size for every SkillNode', () => {
     const found = ALL_NODES.flatMap((node) =>
       PATH_ART_SIZES.filter(
-        (size) => PATH_ART[node] === 'ready' && existsSync(fileFor(node, size)),
+        (size) => ids.has(node) && existsSync(fileFor(node, size)),
       ),
     )
     expect(found).toHaveLength(ALL_NODES.length * PATH_ART_SIZES.length)
   })
 
-  it('has a ready file at every size for every land', () => {
+  it('has a file at every size for every land', () => {
     const landIds = LANDS.map(landArtId)
     expect(new Set(landIds).size).toBe(9)
     const found = landIds.flatMap((id) =>
       PATH_ART_SIZES.filter(
-        (size) => PATH_ART[id] === 'ready' && existsSync(fileFor(id, size)),
+        (size) => ids.has(id) && existsSync(fileFor(id, size)),
       ),
     )
     expect(found).toHaveLength(LANDS.length * PATH_ART_SIZES.length)
   })
 
-  it('ships exactly the ready files, nothing else, in public/assets/path', () => {
-    const expected = ready
-      .flatMap((id) => PATH_ART_SIZES.map((size) => `${id}-${size}.webp`))
-      .sort()
-    expect(expected).toHaveLength(40 * PATH_ART_SIZES.length)
+  it('ships exactly the manifest files, nothing else, in public/assets/path', () => {
+    const expected = PATH_ART_IDS.flatMap((id) =>
+      PATH_ART_SIZES.map((size) => `${id}-${size}.webp`),
+    ).sort()
+    expect(expected).toHaveLength(41 * PATH_ART_SIZES.length)
     expect(readdirSync(join(PUBLIC, PATH_ART_DIR)).sort()).toEqual(expected)
   })
 })
@@ -67,11 +64,10 @@ describe('landArtId', () => {
 })
 
 describe('pathArtSrc', () => {
-  it('returns the site-root URL of a ready piece', () => {
+  it('returns the site-root URL of a piece', () => {
     expect(pathArtSrc('add-to-20', 512)).toBe('/assets/path/add-to-20-512.webp')
-  })
-
-  it('returns undefined for a pending piece', () => {
-    expect(pathArtSrc('ui-arch-closed', 256)).toBeUndefined()
+    expect(pathArtSrc('ui-arch-closed', 256)).toBe(
+      '/assets/path/ui-arch-closed-256.webp',
+    )
   })
 })

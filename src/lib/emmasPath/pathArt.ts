@@ -7,10 +7,8 @@
  * piece ships at two sizes, `{id}-256.webp` and `{id}-512.webp`, written by
  * `scripts/build-path-art.ts` from PNG sources that are not in git.
  *
- * `pathArt.test.ts` checks every `ready` entry has both files on disk, so a
- * new SkillNode without art fails CI (the Record type already fails tsc).
- * A `pending` entry has no file yet: `pathArtSrc` returns `undefined` for it
- * and the screen falls back.
+ * `pathArt.test.ts` checks every entry has both files on disk, so a new
+ * SkillNode without art fails CI (the Record type already fails tsc).
  *
  * Pure data module: type-only imports, so the node-run build script can
  * load it.
@@ -49,57 +47,57 @@ export type UiArtId =
 
 export type PathArtId = SkillNode | LandArtId | UiArtId
 
-/** `pending` = art not made yet, no file shipped. */
-export type PathArtStatus = 'ready' | 'pending'
-
-export const PATH_ART: Readonly<Record<PathArtId, PathArtStatus>> = {
+// A Record so tsc fails when a SkillNode (or other id) has no entry.
+const PATH_ART_SET: Readonly<Record<PathArtId, true>> = {
   // Number Garden stages
-  'number-recog': 'ready',
-  'add-to-10': 'ready',
-  'add-to-20': 'ready',
-  'sub-to-10': 'ready',
-  'sub-to-20': 'ready',
-  'two-digit-addsub-no-regroup': 'ready',
-  'two-digit-addsub-with-regroup': 'ready',
-  'skip-counting': 'ready',
-  'mult-2-5-10': 'ready',
-  'mult-3-4': 'ready',
-  'mult-6-9': 'ready',
+  'number-recog': true,
+  'add-to-10': true,
+  'add-to-20': true,
+  'sub-to-10': true,
+  'sub-to-20': true,
+  'two-digit-addsub-no-regroup': true,
+  'two-digit-addsub-with-regroup': true,
+  'skip-counting': true,
+  'mult-2-5-10': true,
+  'mult-3-4': true,
+  'mult-6-9': true,
   // Word Song stages
-  'letter-names': 'ready',
-  'letter-sounds': 'ready',
-  'blending-cv': 'ready',
-  'cvc-words': 'ready',
-  'cvc-words-short-o': 'ready',
-  'cvc-words-short-u': 'ready',
-  'cvc-words-short-i': 'ready',
-  'cvc-words-short-e': 'ready',
-  'digraphs-sh': 'ready',
-  'digraphs-ch': 'ready',
-  'digraphs-th-voiceless': 'ready',
-  'sight-words': 'ready',
-  'simple-sentences': 'ready',
+  'letter-names': true,
+  'letter-sounds': true,
+  'blending-cv': true,
+  'cvc-words': true,
+  'cvc-words-short-o': true,
+  'cvc-words-short-u': true,
+  'cvc-words-short-i': true,
+  'cvc-words-short-e': true,
+  'digraphs-sh': true,
+  'digraphs-ch': true,
+  'digraphs-th-voiceless': true,
+  'sight-words': true,
+  'simple-sentences': true,
   // Land emblems
-  'land-ng-1': 'ready',
-  'land-ng-2': 'ready',
-  'land-ng-3': 'ready',
-  'land-ng-4': 'ready',
-  'land-ws-1': 'ready',
-  'land-ws-2': 'ready',
-  'land-ws-3': 'ready',
-  'land-ws-4': 'ready',
-  'land-ws-5': 'ready',
+  'land-ng-1': true,
+  'land-ng-2': true,
+  'land-ng-3': true,
+  'land-ng-4': true,
+  'land-ws-1': true,
+  'land-ws-2': true,
+  'land-ws-3': true,
+  'land-ws-4': true,
+  'land-ws-5': true,
   // UI pieces
-  'ui-map': 'ready',
-  'ui-house': 'ready',
-  'ui-padlock': 'ready',
-  'ui-bloom': 'ready',
-  'ui-bud-open': 'ready',
-  'ui-bud-closed': 'ready',
-  'ui-arch-open': 'ready',
-  // Thomas makes this one in Midjourney later.
-  'ui-arch-closed': 'pending',
+  'ui-map': true,
+  'ui-house': true,
+  'ui-padlock': true,
+  'ui-bloom': true,
+  'ui-bud-open': true,
+  'ui-bud-closed': true,
+  'ui-arch-open': true,
+  'ui-arch-closed': true,
 }
+
+/** Every art piece, in manifest order. */
+export const PATH_ART_IDS = Object.keys(PATH_ART_SET) as readonly PathArtId[]
 
 /** The emblem id of a land. */
 export function landArtId(land: Pick<Land, 'world' | 'number'>): LandArtId {
@@ -107,11 +105,7 @@ export function landArtId(land: Pick<Land, 'world' | 'number'>): LandArtId {
   return `land-${world}-${land.number}` as LandArtId
 }
 
-/** Site-root URL of a piece at one size; `undefined` while it is pending. */
-export function pathArtSrc(
-  id: PathArtId,
-  size: PathArtSize,
-): string | undefined {
-  if (PATH_ART[id] === 'pending') return undefined
+/** Site-root URL of a piece at one size. */
+export function pathArtSrc(id: PathArtId, size: PathArtSize): string {
   return `/${PATH_ART_DIR}/${id}-${size}.webp`
 }

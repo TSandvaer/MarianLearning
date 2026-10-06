@@ -84,7 +84,7 @@ export default defineConfig({
         // 1 plays, so we want it ready offline-first rather than paying
         // network latency on a freshly-installed PWA. WebP covers the
         // Emma's Path clay art under assets/path/ (ClickUp 123jpnbc68y,
-        // 80 files, 1,467,070 B total, largest 40,454 B).
+        // 82 files, 1,533,770 B total, largest 45,684 B).
         globPatterns: [
           '**/*.{js,css,html,png,svg,webp,webmanifest,woff,woff2,ico,mp3}',
         ],
