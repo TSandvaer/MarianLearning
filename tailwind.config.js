@@ -30,6 +30,9 @@ export default {
         // System stack for now; Kyle picks web fonts later
         display: ['ui-rounded', 'system-ui', 'sans-serif'],
         body: ['system-ui', 'sans-serif'],
+        // Clay chrome display face (Redesign R5 lesson frame). Self-hosted
+        // via @fontsource/fredoka so it works offline in the installed PWA.
+        clay: ['Fredoka', 'ui-rounded', 'system-ui', 'sans-serif'],
       },
     },
   },

@@ -26,3 +26,180 @@ body,
 body {
   background-color: #fff5f0; /* my-cream */
 }
+
+/*
+ * Lesson-frame clay chrome (Redesign R5, ClickUp 123jpnbc692).
+ *
+ * The Math (Number Garden) and Word Song lesson frame uses the same chunky,
+ * filled, press-able clay treatment as the Toy Box Hub mockup
+ * (design/emmas-path/redesign/real-art-check.html — `.chip`, `.mapbtn`,
+ * `.caption`, `.card` slab shadows): solid fill, inset top highlight, a thick
+ * coloured bottom "slab" shadow, a soft drop shadow, and a translateY press
+ * state. Quality bar 10 ("modern = chunky, filled, tactile").
+ *
+ * Lesson-only: these classes are not used by Hub / Map / SessionEnd (R2-R4
+ * restyle those separately). The world accent is set by `.clay-world-math` /
+ * `.clay-world-word` on the screen root.
+ *
+ * Press state: `.clay-press:active` drops the slab while Framer's `whileTap`
+ * moves the element down by the same amount, so the face sinks onto its slab.
+ */
+@layer components {
+  .clay-world-math {
+    --clay-slab: #dba675;
+    --clay-slab-deep: #b97c47;
+    --clay-ink: #5a3524;
+  }
+  .clay-world-word {
+    --clay-slab: #f2a7c3;
+    --clay-slab-deep: #d27b9c;
+    --clay-ink: #6b2a45;
+  }
+
+  .clay-press {
+    transition:
+      box-shadow 0.12s ease-out,
+      filter 0.12s ease-out;
+  }
+
+  /* Answer tile: cream clay face on a thick world-coloured slab. */
+  .clay-tile {
+    border: 0;
+    border-radius: 32px;
+    background: linear-gradient(#ffffff 0%, #fff7ee 60%, #ffeedd 100%);
+    color: var(--clay-ink);
+    box-shadow:
+      inset 0 4px 0 #ffffff,
+      inset 0 -6px 0 rgba(120, 70, 40, 0.08),
+      0 6px 0 var(--clay-slab),
+      0 10px 14px rgba(90, 45, 20, 0.12);
+  }
+  .clay-tile.clay-press:active:not(:disabled) {
+    box-shadow:
+      inset 0 4px 0 #ffffff,
+      0 2px 0 var(--clay-slab),
+      0 4px 8px rgba(90, 45, 20, 0.12);
+  }
+  /* Guided-attempt shimmer on the correct tile: a warm glow ring around the
+     same slab, never a colour that reads as right/wrong. */
+  .clay-tile.clay-tile-glow {
+    box-shadow:
+      inset 0 4px 0 #ffffff,
+      inset 0 -6px 0 rgba(120, 70, 40, 0.08),
+      0 6px 0 var(--clay-slab),
+      0 0 0 6px rgba(255, 214, 92, 0.75),
+      0 0 30px 10px rgba(255, 196, 64, 0.55);
+  }
+
+  /* Round caramel clay button (back to Hub). */
+  .clay-round-btn {
+    border: 0;
+    border-radius: 9999px;
+    color: #ffffff;
+    background: radial-gradient(
+      circle at 40% 32%,
+      #e7b07a 0,
+      #c98a55 55%,
+      #a86c3c 100%
+    );
+    box-shadow:
+      inset 0 4px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -5px 0 rgba(0, 0, 0, 0.16),
+      0 7px 0 #7d4a26,
+      0 12px 16px rgba(60, 30, 10, 0.28);
+  }
+  .clay-round-btn.clay-press:active {
+    transform: translateY(5px);
+    box-shadow:
+      inset 0 4px 0 rgba(255, 255, 255, 0.3),
+      0 2px 0 #7d4a26,
+      0 4px 8px rgba(60, 30, 10, 0.28);
+  }
+  .clay-round-btn svg {
+    filter: drop-shadow(0 2px 0 rgba(90, 45, 15, 0.55));
+  }
+
+  /* Stardust pill. */
+  .clay-pill {
+    border-radius: 9999px;
+    color: #ffffff;
+    background: linear-gradient(#c98a55, #a8683a);
+    box-shadow:
+      inset 0 3px 0 rgba(255, 255, 255, 0.28),
+      inset 0 -5px 0 rgba(0, 0, 0, 0.15),
+      0 6px 0 #7d4a26,
+      0 10px 14px rgba(60, 30, 10, 0.22);
+    text-shadow: 0 2px 0 rgba(90, 45, 15, 0.6);
+  }
+
+  /* Session progress: a recessed clay track holding 8 chunky beads. */
+  .clay-track {
+    border-radius: 9999px;
+    background: linear-gradient(#f3e3d3, #fbf1e6);
+    box-shadow:
+      inset 0 4px 6px rgba(120, 70, 40, 0.22),
+      inset 0 -2px 0 rgba(255, 255, 255, 0.9),
+      0 3px 0 rgba(255, 255, 255, 0.95);
+  }
+  .clay-bead {
+    display: block;
+    border-radius: 9999px;
+    transition:
+      width 0.2s ease-out,
+      height 0.2s ease-out,
+      background 0.2s ease-out;
+  }
+  .clay-bead[data-state='upcoming'] {
+    width: 18px;
+    height: 18px;
+    background: #e6d2c0;
+    box-shadow: inset 0 3px 3px rgba(120, 70, 40, 0.28);
+  }
+  .clay-bead[data-state='completed'] {
+    width: 22px;
+    height: 22px;
+    background: radial-gradient(
+      circle at 40% 32%,
+      #fff1a6 0,
+      #ffd54a 50%,
+      #f2b42a 100%
+    );
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.6),
+      0 3px 0 #c98a1f;
+  }
+  /* "You are here": ~10% larger than a completed bead so it stays inside
+     the 44px track, with a small slab + soft shadow for the raised read. */
+  .clay-bead[data-state='current'] {
+    width: 24px;
+    height: 24px;
+    background: radial-gradient(
+      circle at 40% 32%,
+      #ffd3e2 0,
+      #ff8fb1 55%,
+      #f06c98 100%
+    );
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.6),
+      0 2px 0 #c2456f,
+      0 3px 4px rgba(150, 40, 80, 0.25);
+  }
+
+  /* Caption ribbon: cream clay speech slab (was a thin pink outline card). */
+  .clay-ribbon {
+    border: 0;
+    border-radius: 32px;
+    background: linear-gradient(#fffdf8, #fff1e2);
+    box-shadow:
+      inset 0 3px 0 #ffffff,
+      0 8px 0 #efcfb4,
+      0 14px 22px rgba(90, 45, 20, 0.16);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .clay-press,
+    .clay-bead {
+      transition: none;
+    }
+  }
+}
