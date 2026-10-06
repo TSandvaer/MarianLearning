@@ -2,14 +2,14 @@
  * Emma's Path 9/10 (ClickUp 123jpnbc3dt) — session-end progress beats.
  * Spec: design/emmas-path/emmas-path-spec.md §6 (flow), §4.4 (lines), §7.
  *
- *  1. Good day → SessionEnd shows the bud beat (focus stop + a new open
- *     bud) and Emma says `end.bud.{node}`; "All done" → Hub as before.
+ *  1. (Good day: moved to `guidance-session-end.spec.ts` — Guidance G2
+ *     replaced the bud card with the flower tray.)
  *  2. Unlock → "All done" goes to the MAP: Emma starts on the mastered
  *     stop, hops, the padlock pops and she says `end.unlock.{new}`.
  *  3. Land gate → as 2, plus the gate swings and the line is
  *     `end.land.{world}.{n}`.
- *  4. Bad day → no bud, no beat line, "All done" → Hub (never a negative
- *     beat).
+ *  4. Bad day → no path beat line; Home → Hub (never a negative beat;
+ *     the not-yet guidance lines are covered in `guidance-session-end`).
  *  5. One-shot → after a reload neither the Hub nor the map replays the
  *     unlock.
  *
@@ -129,13 +129,6 @@ const linePlays = (page: Page) =>
     ).map((r) => r.id),
   )
 
-/** Session-end caption: one span per word, so join the words. */
-const captionWords = (page: Page) =>
-  page
-    .getByTestId('session-end-caption-word')
-    .allTextContents()
-    .then((w) => w.join(' '))
-
 /**
  * Record every `data-beat-phase` the map walks through (a MutationObserver
  * sees each phase, however short) — installed before the map mounts.
@@ -190,49 +183,6 @@ const stop = (page: Page, node: string) =>
   page.locator(`[data-testid="map-stop"][data-node="${node}"]`)
 
 test.describe("Emma's Path session-end beats", () => {
-  test('1. good day → bud beat on SessionEnd + end.bud line; All done → Hub', async ({
-    page,
-  }) => {
-    test.setTimeout(120_000)
-    await arm(page, seedProgress(1, 0)) // add-to-10, no good days yet
-    await playGoodMathSession(page)
-
-    const beat = page.getByTestId('session-end-bud-beat')
-    await expect(beat).toBeVisible({ timeout: 15_000 })
-    await expect(beat).toHaveAttribute('data-node', 'add-to-10')
-    await expect(page.getByTestId('session-end')).toHaveAttribute(
-      'data-path-beat',
-      'bud',
-    )
-    const buds = page.getByTestId('session-end-bud')
-    await expect(buds).toHaveCount(3)
-    await expect(
-      page.locator('[data-testid="session-end-bud"][data-open="true"]'),
-    ).toHaveCount(1)
-    await expect(
-      page.locator('[data-testid="session-end-bud"][data-new="true"]'),
-    ).toHaveCount(1)
-    await expect
-      .poll(() => linePlays(page), { timeout: 5_000 })
-      .toContain('end.bud.add-to-10')
-    await expect
-      .poll(() => captionWords(page))
-      .toBe('Look! A new flower for adding to ten!')
-    await page.waitForTimeout(800) // bud pop settles
-    await page.screenshot({ path: `${SHOTS}/end-bud-beat.png` })
-
-    await tapAllDone(page)
-    await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByTestId('hub')).toHaveAttribute(
-      'data-path',
-      'session-end',
-    )
-    // Exactly one bud line for the session.
-    expect(
-      (await linePlays(page)).filter((id) => id.startsWith('end.')),
-    ).toEqual(['end.bud.add-to-10'])
-  })
-
   test('2. unlock → All done opens the map: hop, padlock pop, end.unlock line — and 5. a reload never replays it', async ({
     page,
   }) => {
@@ -353,9 +303,7 @@ test.describe("Emma's Path session-end beats", () => {
     await page.screenshot({ path: `${SHOTS}/end-land-line.png` })
   })
 
-  test('4. bad day → no bud, no beat line; All done → Hub', async ({
-    page,
-  }) => {
+  test('4. bad day → no path beat line; Home → Hub', async ({ page }) => {
     // SessionEnd mounted straight from the QA route has the zero payload
     // (0 correct) — a bad day for the seeded focus step.
     await arm(page, seedProgress(1, 0))

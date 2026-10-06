@@ -1,0 +1,334 @@
+/*
+ * Session-end clay chrome (Guidance G2, ClickUp 123jpnbca4t; folds in R4).
+ *
+ * Ported from `design/emmas-path/redesign/guidance-mockup.html` (`.garden`,
+ * `.endpanel`, `.tray`, `.hole`, `.count`, `.btn`, `.caption`) — the same
+ * direction-A clay as the merged lesson frame (#507) and map (#509): solid
+ * fills, inset top highlight, a thick coloured slab shadow, a soft drop
+ * shadow, translateY press. Quality bars 10 and 13. Sized for the 820x1180
+ * iPad portrait frame, scaling down with the viewport.
+ */
+
+.se-clay {
+  color: #5a3524;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.se-garden {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(60px 60px at 8% 95%, #ffb3c9 0, #ffb3c900 70%),
+    radial-gradient(80px 80px at 93% 93%, #ffc7d6 0, #ffc7d600 70%),
+    radial-gradient(520px 260px at 15% 36%, #a6d98d 0, #a6d98d00 70%),
+    radial-gradient(520px 260px at 88% 36%, #9fd488 0, #9fd48800 70%),
+    linear-gradient(
+      #bfe6ff 0,
+      #dff2ff 30%,
+      #cdebb4 38%,
+      #b9e19e 60%,
+      #e9dcc4 88%,
+      #e0cfb2 100%
+    );
+}
+
+.se-stack {
+  position: relative;
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: max(env(safe-area-inset-top), 12px) 16px
+    calc(env(safe-area-inset-bottom) + 130px);
+}
+
+.se-emma {
+  display: flex;
+  height: min(33vh, 390px);
+  width: 100%;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* The cream clay panel. */
+.se-panel {
+  position: relative;
+  display: flex;
+  min-height: min(430px, 38vh);
+  width: min(720px, 92vw);
+  flex-direction: column;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 26px 30px 18px;
+  border-radius: 56px;
+  background: linear-gradient(170deg, #fffaf2, #f6e4cc);
+  box-shadow:
+    inset 0 5px 0 #fff,
+    0 14px 0 #d9bb94,
+    0 26px 36px rgba(60, 30, 10, 0.2);
+}
+
+/* Stars: "you got it" feedback only — never counted, never collected. */
+.se-stars {
+  display: flex;
+  min-height: 46px;
+  justify-content: center;
+  gap: 24px;
+}
+.se-star {
+  display: block;
+  width: 46px;
+  height: 46px;
+}
+.se-star svg {
+  width: 100%;
+  height: 100%;
+}
+.se-twinkle {
+  animation: se-tw 1.6s ease-in-out infinite;
+  animation-delay: var(--d);
+}
+@keyframes se-tw {
+  50% {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+}
+
+.se-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  margin-top: 34px;
+}
+
+/* Flower tray: the ONE progress number. */
+.se-tray {
+  display: flex;
+  height: 116px;
+  width: 350px;
+  align-items: center;
+  justify-content: space-around;
+  border-radius: 44px;
+}
+.se-tray-ng {
+  background: linear-gradient(#c58a55, #a86c3c);
+  box-shadow:
+    inset 0 4px 0 rgba(255, 255, 255, 0.2),
+    0 7px 0 #7d4a26;
+}
+.se-tray-ws {
+  background: linear-gradient(#ffc2d7, #f7a6c3);
+  box-shadow:
+    inset 0 4px 0 rgba(255, 255, 255, 0.45),
+    0 7px 0 #d27b9c;
+}
+
+.se-hole {
+  position: relative;
+  width: 86px;
+  height: 86px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 62%,
+    #6b4128 0,
+    #4e2c19 60%,
+    #3d2112 100%
+  );
+  box-shadow:
+    inset 0 8px 10px rgba(0, 0, 0, 0.45),
+    0 2px 0 rgba(255, 255, 255, 0.35);
+}
+.se-hole-flower {
+  position: absolute;
+  left: 2px;
+  bottom: 5px;
+  display: block;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.3));
+}
+.se-sleep .se-hole-flower {
+  filter: brightness(0.85) saturate(0.8)
+    drop-shadow(0 3px 2px rgba(0, 0, 0, 0.3));
+}
+.se-moon {
+  position: absolute;
+  right: -12%;
+  top: -14%;
+  width: 48%;
+  height: 48%;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+}
+.se-zz {
+  position: absolute;
+  left: -6%;
+  top: -18%;
+  font:
+    700 22px 'Fredoka',
+    ui-rounded,
+    system-ui,
+    sans-serif;
+  color: #fff;
+  text-shadow: 0 2px 0 #6b4a9c;
+  animation: se-zz 2.4s ease-in-out infinite;
+}
+@keyframes se-zz {
+  50% {
+    transform: translateY(-6px);
+    opacity: 0.6;
+  }
+}
+
+.se-count-row {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 22px;
+}
+.se-count {
+  font-size: 54px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffb12e;
+  text-shadow: 0 3px 0 #8a5a1f;
+}
+
+/* Today's flower before it flies into its slot. */
+.se-newflower {
+  position: absolute;
+  left: calc(50% - 60px);
+  top: 60px;
+  width: 120px;
+  height: 120px;
+  z-index: 3;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 4px rgba(60, 30, 10, 0.25));
+}
+
+/* Thick press-able clay buttons. */
+.se-buttons {
+  display: flex;
+  min-height: 130px;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 46px;
+}
+.se-btn {
+  display: flex;
+  height: 112px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 56px;
+  font:
+    700 40px 'Fredoka',
+    ui-rounded,
+    system-ui,
+    sans-serif;
+  color: #fff;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s;
+}
+.se-btn:active {
+  transform: translateY(9px);
+}
+.se-btn-icon {
+  width: 56px;
+  height: 56px;
+}
+.se-btn-go {
+  background: linear-gradient(#7fd364, #5cb945);
+  box-shadow:
+    inset 0 5px 0 rgba(255, 255, 255, 0.35),
+    0 11px 0 #3f8a2e,
+    0 18px 24px rgba(40, 90, 20, 0.3);
+  text-shadow: 0 3px 0 #3f8a2e;
+}
+.se-btn-go:active {
+  box-shadow:
+    inset 0 5px 0 rgba(255, 255, 255, 0.35),
+    0 2px 0 #3f8a2e,
+    0 6px 10px rgba(40, 90, 20, 0.3);
+}
+.se-btn-alt {
+  background: linear-gradient(#e7b07a, #c98a55);
+  box-shadow:
+    inset 0 5px 0 rgba(255, 255, 255, 0.3),
+    0 11px 0 #7d4a26,
+    0 18px 24px rgba(60, 30, 10, 0.3);
+  text-shadow: 0 3px 0 #7d4a26;
+}
+.se-btn-alt:active {
+  box-shadow:
+    inset 0 5px 0 rgba(255, 255, 255, 0.3),
+    0 2px 0 #7d4a26,
+    0 6px 10px rgba(60, 30, 10, 0.3);
+}
+
+/* Caption ribbon = Emma's spoken line. */
+.se-caption {
+  position: absolute;
+  left: 44px;
+  right: 44px;
+  bottom: calc(env(safe-area-inset-bottom) + 22px);
+  z-index: 9;
+  display: flex;
+  min-height: 84px;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 26px;
+  border-radius: 42px;
+  background: linear-gradient(#fffdf8, #fff1e2);
+  box-shadow:
+    inset 0 3px 0 #fff,
+    0 8px 0 #e3c6a6,
+    0 14px 22px rgba(60, 30, 10, 0.2);
+  font-size: 29px;
+  font-weight: 600;
+  line-height: 1.18;
+  color: #6b3f1f;
+}
+.se-caption svg {
+  flex: none;
+}
+
+@media (max-width: 600px) {
+  .se-tray {
+    width: 270px;
+    height: 96px;
+  }
+  .se-hole {
+    width: 70px;
+    height: 70px;
+  }
+  .se-stars {
+    gap: 8px;
+  }
+  .se-btn {
+    height: 88px;
+    font-size: 30px;
+  }
+  .se-caption {
+    left: 16px;
+    right: 16px;
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .se-twinkle,
+  .se-zz {
+    animation: none;
+  }
+  .se-btn {
+    transition: none;
+  }
+}

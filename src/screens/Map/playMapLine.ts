@@ -21,6 +21,10 @@ import {
 } from '../../lib/audio/pendingResumeGate'
 import type { PathLine } from '../../lib/emmasPath/pathLines'
 
+/** What the player needs from a line: a path line, or a guidance line
+ *  (session end, Guidance G2) — both carry an id and a bundled src. */
+export type PlayableLine = Pick<PathLine, 'id' | 'src'>
+
 export interface MapHowlLike {
   play: () => number
   stop: () => void
@@ -31,7 +35,7 @@ export interface MapHowlLike {
 
 export interface MapLinePlayer {
   /** Resolves when the line ends, fails, is cancelled — or at once for `src: null`. */
-  play: (line: PathLine) => Promise<void>
+  play: (line: PlayableLine) => Promise<void>
   cancel: () => void
   unload: () => void
 }
@@ -50,7 +54,7 @@ export interface MapLinePlayRecord {
 
 const MAX_RECORDS = 50
 
-function record(line: PathLine): void {
+function record(line: PlayableLine): void {
   if (typeof window === 'undefined') return
   const w = window as unknown as { __mapLinePlays?: MapLinePlayRecord[] }
   const log = (w.__mapLinePlays ??= [])
@@ -137,7 +141,7 @@ export function createMapLinePlayer(
     })
   }
 
-  function play(line: PathLine): Promise<void> {
+  function play(line: PlayableLine): Promise<void> {
     cancel()
     record(line)
     // Deferred line: caption only — never load a null src.
