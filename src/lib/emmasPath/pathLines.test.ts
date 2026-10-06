@@ -122,7 +122,7 @@ describe('PATH_LINES (Emma’s Path 10/10)', () => {
     )
     const block = html.slice(
       html.indexOf('const PATH_GROUPS'),
-      html.indexOf('// ── State'),
+      html.indexOf('const GUIDANCE_FILES'),
     )
     const listed = [...block.matchAll(/\[\s*'([^']+\.mp3)',\s*'([^']*)'/g)].map(
       (m) => `${m[1]}|${m[2]}`,
