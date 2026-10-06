@@ -27,7 +27,7 @@
  */
 
 import { test, expect } from '@playwright/test'
-import { installClaudeMock } from './_helpers/mockClaude'
+import { installClaudeMock, type ClaudeMock } from './_helpers/mockClaude'
 import {
   buildSeedSessionHistory,
   forceHowlerUnlock,
@@ -143,10 +143,11 @@ test.describe('Hub → Math golden path', () => {
  *
  * Strategy
  * --------
- * The mock helper now supports `delayMs` — we hold the /api/claude route
- * in flight for 800ms so the App.tsx state machine sits with
- * `mathAudioReady === false` long enough for Playwright to assert
- * against the DOM. Then the mock aborts (failNetwork: true) — App's
+ * The mock helper's `holdUntilReleased` holds the /api/claude route in
+ * flight until the pre-flip assertions are done, so the App.tsx state
+ * machine sits with `mathAudioReady === false` for as long as Playwright
+ * needs. Then the spec releases it and the mock aborts (failNetwork:
+ * true) — App's
  * catch flips audioReady to true and the static fallback plan renders.
  * That's the soft-fail path; the assertion that matters is "no problem
  * area was on screen during the in-flight window".
@@ -160,14 +161,16 @@ test.describe('Hub → Math golden path', () => {
  * text visible after the flip" — holds either way.
  */
 test.describe('Hub → Math no-swap-jolt on cold mount (86c9kxb5q)', () => {
+  let claude: ClaudeMock
   test.beforeEach(async ({ page }) => {
-    // 3000ms delay before the route aborts. Long enough that the chain
-    // of `expect.toBeVisible({timeout:10s})` calls leading up to the
-    // pre-flip `toHaveCount(0)` assertion always lands inside the
-    // pre-flip window even under parallel-worker load on slower CI
-    // engines (WebKit observed flaking at 800ms). Total spec runtime
-    // is still well under the project's 90s timeout.
-    await installClaudeMock(page, { failNetwork: true, delayMs: 3000 })
+    // Hold the route until the spec releases it, then abort. A fixed
+    // delay (800 ms, then 3000 ms) kept flaking on WebKit CI: a starved
+    // runner can spend the whole window on the Hub tap, so the fetch
+    // settled before the pre-flip `toHaveCount(0)` assertions ran.
+    claude = await installClaudeMock(page, {
+      failNetwork: true,
+      holdUntilReleased: true,
+    })
     await seedLocalStorage(page, {
       sessionHistory: buildSeedSessionHistory({ sessionCount: 5 }),
     })
@@ -184,7 +187,7 @@ test.describe('Hub → Math no-swap-jolt on cold mount (86c9kxb5q)', () => {
     await expect(hub).toBeVisible({ timeout: 10_000 })
 
     // Tap Number Garden — Math mounts immediately, but the parent's
-    // /api/claude fetch is held in flight by the mock for 800ms.
+    // /api/claude fetch is held in flight by the mock until released.
     await page
       .locator('[data-testid="hub-tree-node"][data-tree="number-garden"]')
       .click()
@@ -210,11 +213,12 @@ test.describe('Hub → Math no-swap-jolt on cold mount (86c9kxb5q)', () => {
     await expect(page.getByTestId('math-addend-a')).toHaveCount(0)
     await expect(page.getByTestId('math-addend-b')).toHaveCount(0)
 
-    // Wait for the route to settle (abort fires after 800ms; App's
-    // catch flips mathAudioReady to true on the next microtask).
+    // Release the route (it aborts; App's catch flips mathAudioReady to
+    // true on the next microtask).
     // Once the gate flips, the problem area renders for the first
     // time — against the static fallback plan since the fetch failed,
     // which is the soft-fail contract Marian sees on Anthropic outage.
+    claude.release()
     await expect(page.getByTestId('math-symbolic')).toBeVisible({
       timeout: 10_000,
     })

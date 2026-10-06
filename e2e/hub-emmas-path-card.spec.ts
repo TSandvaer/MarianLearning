@@ -27,10 +27,14 @@ const MIN_TARGET_PX = (44 * 4) / 3
 test.use({ viewport: { width: 820, height: 1180 } })
 
 /** Emma's lines are recorded (Guidance G3), so on app-open she waits
- *  for the first tap (iOS audio unlock). Tap her, not a card, the way
- *  Marian would. */
+ *  for the first tap (iOS audio unlock), which the Hub root takes from
+ *  a tap anywhere. Tap the empty sky (top-left; the parent gate is
+ *  top-right), not a card and not Emma: Emma's art carries the 3 s
+ *  parent long-press, and on a starved WebKit CI runner Playwright's
+ *  mouse-down → mouse-up can stretch past 3 s and open Parent settings
+ *  instead of the Hub (c/d failed that way). */
 async function firstTap(page: Page): Promise<void> {
-  await page.getByTestId('hub-emma').click()
+  await page.getByTestId('hub-stage').click({ position: { x: 24, y: 24 } })
 }
 
 function pastDayISO(daysAgo: number): string {

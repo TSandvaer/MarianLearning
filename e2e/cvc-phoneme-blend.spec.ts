@@ -40,6 +40,7 @@ import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Page } from '@playwright/test'
+import { holdHubSuggestionStill } from './_helpers/hubSuggestionStill'
 
 const CVC_WORDS_CANON_PATH = resolve(
   process.cwd(),
@@ -163,6 +164,7 @@ async function installMock(page: Page, body: string): Promise<void> {
 
 /** Drive Hub → Word Song and wait for the first read-aloud to complete. */
 async function enterWordSong(page: Page): Promise<void> {
+  await holdHubSuggestionStill(page)
   await page.goto('/?debug=1&seed=cvc-words')
   await expect(page.getByTestId('hub')).toBeVisible({ timeout: 15_000 })
   await page
