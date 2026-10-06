@@ -82,9 +82,11 @@ export default defineConfig({
         // pre-recorded Greet voice lines (ticket 86c9gqprh). The Greet
         // audio is gateway-critical — the screen can't progress until line
         // 1 plays, so we want it ready offline-first rather than paying
-        // network latency on a freshly-installed PWA.
+        // network latency on a freshly-installed PWA. WebP covers the
+        // Emma's Path clay art under assets/path/ (ClickUp 123jpnbc68y,
+        // 82 files, 1,533,770 B total, largest 45,684 B).
         globPatterns: [
-          '**/*.{js,css,html,png,svg,webmanifest,woff,woff2,ico,mp3}',
+          '**/*.{js,css,html,png,svg,webp,webmanifest,woff,woff2,ico,mp3}',
         ],
         // PER-FILE precache gate (NOT cumulative). Workbox excludes any
         // single asset larger than this from the precache manifest; total

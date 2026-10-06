@@ -152,7 +152,7 @@ Auxiliary scripts in [`MarianLearning/scripts/`](MarianLearning/scripts/):
 - Build target `es2020`, sourcemaps on.
 - `injectManifest` SW strategy with source at [`src/pwa/sw.ts`](MarianLearning/src/pwa/sw.ts).
 - `maximumFileSizeToCacheInBytes: 8 * 1024 * 1024` (8 MiB) — bumped from the 2 MiB default to fit the upscaled PNG-in-SVG Emma assets (originally raised to 4 MiB, lifted to 8 MiB in ticket 86c9qa7uh). See [vite.config.ts:112](MarianLearning/vite.config.ts#L112) and auto-memory `reference_pwa_asset_size_limits.md`.
-- `globPatterns` precaches JS/CSS/HTML/PNG/SVG/webmanifest/woff(2)/ico/**mp3**. The Greet MP3s are gateway-critical — precached so a fresh PWA install can play offline-first.
+- `globPatterns` precaches JS/CSS/HTML/PNG/SVG/**WebP**/webmanifest/woff(2)/ico/**mp3**. The Greet MP3s are gateway-critical — precached so a fresh PWA install can play offline-first. WebP was added for the Emma's Path clay art (`public/assets/path/`, PR #508); before that, a `.webp` under `public/` was silently left out of the offline precache.
 - `VITE_COMMIT_SHA` defined from `VERCEL_GIT_COMMIT_SHA` ([vite.config.ts:21-28](MarianLearning/vite.config.ts#L21-L28)) so the debug overlay can show the deployed bundle SHA.
 - Vitest config (`test: { environment: 'jsdom', exclude: ['e2e/**', ...] }`) — Playwright e2e is run via `yarn e2e`, not vitest.
 
