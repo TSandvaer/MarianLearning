@@ -236,9 +236,7 @@ async function rectOf(page: Page, selector: string): Promise<Rect> {
 }
 
 test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
-  test('Hub map buttons are 64px pills that open each world, not a session', async ({
-    page,
-  }) => {
+  test('Hub map buttons open each world, not a session', async ({ page }) => {
     await arm(page, null)
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
@@ -249,7 +247,9 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       const box = await page
         .locator(`[data-testid="hub-map-button"][data-world="${world}"]`)
         .boundingBox()
-      expect(box?.height).toBe(64)
+      // Redesign R2: a round wooden button inside the card, 44pt+.
+      expect(box!.height).toBeGreaterThanOrEqual((44 * 4) / 3)
+      expect(box!.width).toBeCloseTo(box!.height, 0)
     }
     await expect(
       page.getByRole('button', { name: 'Number Garden map' }),
