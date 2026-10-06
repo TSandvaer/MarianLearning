@@ -1095,6 +1095,48 @@
         ],
       ]
 
+      // Guidance-layer lines (Guidance G3, ClickUp 123jpnbca4u) — one group.
+      // Mirrors GUIDANCE_LINES in src/lib/emmasPath/guidanceLines.ts
+      // (drift-guarded by guidanceLines.test.ts). Files sit in
+      // /assets/audio/path/; itemId = `guide#<filename>`.
+      const GUIDANCE_FILES = [
+        [
+          'guide-hub-suggest-math.mp3',
+          "Let's grow a flower in Number Garden! Or pick Word Song.",
+        ],
+        [
+          'guide-hub-suggest-word-song.mp3',
+          "Let's grow a flower in Word Song! Or pick Number Garden.",
+        ],
+        [
+          'guide-hub-sleeping-math.mp3',
+          "Your flower is sleeping. Let's play Number Garden!",
+        ],
+        [
+          'guide-hub-sleeping-word-song.mp3',
+          "Your flower is sleeping. Let's play Word Song!",
+        ],
+        [
+          'guide-hub-both-sleeping.mp3',
+          'Both flowers are sleeping. Want to practise more?',
+        ],
+        ['guide-hub-woke.mp3', 'Your flowers woke up!'],
+        ['guide-hub-one-more.mp3', 'One more flower, and a new path opens!'],
+        ['guide-end-right-7.mp3', 'Seven right! You worked hard!'],
+        ['guide-end-right-8.mp3', 'Eight right! You worked hard!'],
+        ['guide-end-flower.mp3', 'You got a flower!'],
+        ['guide-end-count-1.mp3', 'One of three!'],
+        ['guide-end-count-2.mp3', 'Two of three!'],
+        ['guide-end-count-3.mp3', 'Three of three!'],
+        [
+          'guide-end-sleeps.mp3',
+          'It sleeps tonight. Come back tomorrow for one more.',
+        ],
+        ['guide-end-path-opens.mp3', 'A new path opens. Look!'],
+        ['guide-end-not-yet-praise.mp3', 'You practised hard! Good work!'],
+        ['guide-end-not-yet-again.mp3', "Play again to get today's flower."],
+      ]
+
       // ── State ────────────────────────────────────────────────────────────
       // items: array of render descriptors. Order = group order, then within
       // a group the order rows are appended.
@@ -1841,10 +1883,12 @@
         greetCount,
         hubCount,
         pathCount,
+        guideCount,
       ) {
         const expected = 760
         const ok = canonUnique === expected
-        const total = canonUnique + greetCount + hubCount + pathCount
+        const total =
+          canonUnique + greetCount + hubCount + pathCount + guideCount
         const el = document.getElementById('footer')
         // The vqa-render-count element's FIRST number must equal the total
         // rendered row count (Jessica's AC1 reads its first \d+ and asserts
@@ -1863,7 +1907,9 @@
           hubCount +
           ' hub + ' +
           pathCount +
-          ' path. ' +
+          ' path + ' +
+          guideCount +
+          ' guidance. ' +
           (ok
             ? 'Computed unique canon count matches expected <code>760</code>. ✓'
             : '<strong style="color:#a94442">Computed unique canon count = ' +
@@ -1925,6 +1971,12 @@
             appendGroup(label, pathRenders.length + ' clips', pathRenders)
             pathCount += pathRenders.length
           }
+          const guideRenders = await loadAssetGroup(
+            'guide',
+            '/assets/audio/path/',
+            GUIDANCE_FILES,
+          )
+          appendGroup('Guidance', guideRenders.length + ' clips', guideRenders)
 
           renderFooter(
             canonUnique,
@@ -1932,6 +1984,7 @@
             greetRenders.length,
             hubRenders.length,
             pathCount,
+            guideRenders.length,
           )
           refreshCounters()
           setFilter('all')
