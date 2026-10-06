@@ -322,25 +322,13 @@ test.describe('cvc-words-short-i flow regression (ticket 86c9qdba4)', () => {
     // derived from the canonical node list — no hardcoded stage
     // counts.
     const focusIndex = WORD_SONG_NODES_IN_ORDER.indexOf('cvc-words-short-i')
-    // Hub card bead row (Emma's Path 7/10, replaces the 5-cell strip):
-    // one bead per Word Song step; every step before the focus is
-    // mastered and the focus step is the current bead.
-    const wordSongBeads = page.locator(
-      '[data-testid="hub-card-progress"][data-world="word-song"] [data-testid="hub-card-bead"]',
-    )
-    await expect(wordSongBeads).toHaveCount(WORD_SONG_NODES_IN_ORDER.length)
-    const beadProjection = await wordSongBeads.evaluateAll((nodes) =>
-      nodes.map((n) => ({
-        node: (n as HTMLElement).getAttribute('data-node'),
-        state: (n as HTMLElement).getAttribute('data-state'),
-      })),
-    )
-    expect(beadProjection.slice(0, focusIndex + 1)).toEqual(
-      WORD_SONG_NODES_IN_ORDER.slice(0, focusIndex + 1).map((node, i) => ({
-        node,
-        state: i < focusIndex ? 'mastered' : 'current',
-      })),
-    )
+    // Clay Hub card (Redesign R2; the all-steps bead row moved to the
+    // map): the Word Song card's current sticker is the focus step.
+    await expect(
+      page.locator(
+        '[data-testid="hub-card-progress"][data-world="word-song"] [data-testid="hub-card-current"]',
+      ),
+    ).toHaveAttribute('data-node', WORD_SONG_NODES_IN_ORDER[focusIndex]!)
 
     // No pendingPromotion seeded → celebration overlay must NOT render.
     await expect(page.getByTestId('hub-promotion-celebration')).toHaveCount(0)

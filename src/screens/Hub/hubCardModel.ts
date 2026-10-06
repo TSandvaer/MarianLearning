@@ -1,12 +1,14 @@
 /**
- * Hub card model — the data behind one world's Hub card (land number,
- * hero row, bead row) per `design/emmas-path/emmas-path-spec.md` §1
- * "Data contract" + §2 "Hub card". Ticket 123jpnbc3dq (Emma's Path 7/10).
+ * Hub card model — the data behind one world's clay Hub card (Redesign
+ * R2, ClickUp 123jpnbc68z): the current step, the padlocked next step,
+ * the land, and the seed holes. The full all-steps overview lives on the
+ * map, not the Hub (quality bar 9), so this model carries no bead row.
  *
  * Pure. Every per-step fact comes from `nodeProgress()` so the card
  * cannot drift from the mastery rule; this module never reads raw
  * mastery history. The current-step rule (first not-mastered step in
- * tree order; last step when all mastered) is spec §1.
+ * tree order; last step when all mastered) is
+ * `design/emmas-path/emmas-path-spec.md` §1.
  */
 
 import {
@@ -18,44 +20,32 @@ import {
   type Progress,
   type SkillNode,
 } from '../../lib/progress'
-import { landOf, landsOf } from '../../lib/progress/lands'
+import { landOf } from '../../lib/progress/lands'
 import { nodeProgress } from '../../lib/progress/nodeProgress'
-
-export type BeadState = 'mastered' | 'current' | 'next' | 'open' | 'locked'
-
-export interface Bead {
-  node: SkillNode
-  state: BeadState
-}
-
-export interface BeadLand {
-  number: number
-  beads: Bead[]
-}
+import { landArtId, type LandArtId } from '../../lib/emmasPath/pathArt'
 
 export interface HubCardModel {
   world: MasteryTrack
   /** `landOf(current).number`. */
   landNumber: number
-  /** `getSettings(p).showLevelToMarian`. */
+  /** Clay emblem of the current step's land. */
+  landArt: LandArtId
+  /** `getSettings(p).showLevelToMarian` — gates the land pill only. */
   showLandNumber: boolean
   current: SkillNode
   /** `nodeProgress(p, current).unlocksNext` — null on a tree's last step. */
   unlocksNext: SkillNode | null
   goodDays: number
   requiredDays: number
-  /** goodDays / requiredDays, clamped to 0..1. */
-  fill: number
   /**
-   * Bud rows under the hero icon: one group of `requiredDays` for a plain
-   * step; for letter-sounds with per-vowel tracking, one group of
-   * `requiredDays` per vowel from `nodeProgress().vowels` (spec §3.4).
-   * true = open (a banked good day).
+   * Seed holes, one per required good day; true = a banked good day.
+   * Letter sounds with per-vowel tracking shows the vowel being worked
+   * on (the first not-yet-full vowel), so the Hub keeps one row of 3
+   * instead of the spec's 12 per-vowel buds (redesign README).
    */
-  buds: boolean[][]
+  holes: boolean[]
   /** True when every step of the world is mastered. */
   complete: boolean
-  lands: BeadLand[]
 }
 
 function treeOf(world: MasteryTrack): readonly SkillNode[] {
@@ -71,6 +61,10 @@ export function currentStepOf(
   return first ?? tree[tree.length - 1]!
 }
 
+function holeRow(good: number, required: number): boolean[] {
+  return Array.from({ length: required }, (_, i) => i < good)
+}
+
 export function buildHubCardModel(
   progress: Progress | null,
   world: MasteryTrack,
@@ -81,44 +75,29 @@ export function buildHubCardModel(
   const complete = treeOf(world).every(
     (node) => p.skillLevels[node] === 'mastered',
   )
-  const unlocksNext = complete ? null : cur.unlocksNext
+  const land = landOf(current)
 
-  const lands = landsOf(world).map(
-    (land): BeadLand => ({
-      number: land.number,
-      beads: land.nodes.map((node): Bead => {
-        if (node === current && !complete) return { node, state: 'current' }
-        const level = nodeProgress(p, node).level
-        if (level === 'mastered') return { node, state: 'mastered' }
-        if (node === unlocksNext) return { node, state: 'next' }
-        if (level === 'locked') return { node, state: 'locked' }
-        return { node, state: 'open' }
-      }),
-    }),
-  )
-
-  const requiredDays = cur.requiredDays
-  const fill =
-    requiredDays > 0 ? Math.min(1, Math.max(0, cur.goodDays / requiredDays)) : 0
-
-  const budRow = (good: number, required: number): boolean[] =>
-    Array.from({ length: required }, (_, i) => i < good)
-  const buds =
-    cur.vowels !== undefined
-      ? cur.vowels.map((v) => budRow(v.goodDays, v.requiredDays))
-      : [budRow(cur.goodDays, cur.requiredDays)]
+  let holes: boolean[]
+  if (cur.vowels !== undefined && cur.vowels.length > 0) {
+    const working =
+      cur.vowels.find((v) => v.goodDays < v.requiredDays) ??
+      cur.vowels[cur.vowels.length - 1]!
+    holes = holeRow(working.goodDays, working.requiredDays)
+  } else {
+    holes = holeRow(cur.goodDays, cur.requiredDays)
+  }
+  if (complete) holes = holes.map(() => true)
 
   return {
     world,
-    landNumber: landOf(current).number,
+    landNumber: land.number,
+    landArt: landArtId(land),
     showLandNumber: getSettings(p).showLevelToMarian,
     current,
-    unlocksNext,
+    unlocksNext: complete ? null : cur.unlocksNext,
     goodDays: cur.goodDays,
-    requiredDays,
-    fill,
-    buds,
+    requiredDays: cur.requiredDays,
+    holes,
     complete,
-    lands,
   }
 }

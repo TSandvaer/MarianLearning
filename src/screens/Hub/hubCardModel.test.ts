@@ -4,7 +4,6 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  LITERACY_TREE,
   MATH_TREE,
   defaultProgress,
   type Progress,
@@ -60,26 +59,6 @@ describe('buildHubCardModel', () => {
     expect(m.unlocksNext).toBe('add-to-10')
   })
 
-  it('one bead per step, grouped by land: math 1+4+3+3, word 2+1+5+3+2', () => {
-    const p = defaultProgress()
-    expect(
-      buildHubCardModel(p, 'math').lands.map((l) => l.beads.length),
-    ).toEqual([1, 4, 3, 3])
-    expect(
-      buildHubCardModel(p, 'word-song').lands.map((l) => l.beads.length),
-    ).toEqual([2, 1, 5, 3, 2])
-    expect(
-      buildHubCardModel(p, 'math').lands.flatMap((l) =>
-        l.beads.map((b) => b.node),
-      ),
-    ).toEqual([...MATH_TREE])
-    expect(
-      buildHubCardModel(p, 'word-song').lands.flatMap((l) =>
-        l.beads.map((b) => b.node),
-      ),
-    ).toEqual([...LITERACY_TREE])
-  })
-
   it('current = first not-mastered step; land number follows it', () => {
     const p = withLevels({
       'number-recog': 'mastered',
@@ -91,18 +70,18 @@ describe('buildHubCardModel', () => {
     expect(currentStepOf(p, 'math')).toBe('add-to-20')
     expect(m.current).toBe('add-to-20')
     expect(m.landNumber).toBe(2)
+    expect(m.landArt).toBe('land-ng-2')
     expect(m.unlocksNext).toBe(nodeProgress(p, 'add-to-20').unlocksNext)
-    const states = m.lands.flatMap((l) => l.beads.map((b) => b.state))
-    expect(states.slice(0, 5)).toEqual([
-      'mastered',
-      'mastered',
-      'current',
-      'next',
-      'locked',
-    ])
+    expect(m.unlocksNext).toBe('sub-to-10')
   })
 
-  it('current bead fill = nodeProgress goodDays / requiredDays', () => {
+  it('carries no bead row: the overview lives on the map (bar 9)', () => {
+    const m = buildHubCardModel(defaultProgress(), 'math')
+    expect(Object.keys(m)).not.toContain('lands')
+    expect(Object.keys(m)).not.toContain('buds')
+  })
+
+  it('seed holes = nodeProgress goodDays of requiredDays', () => {
     const p: Progress = {
       ...withLevels({ 'number-recog': 'practicing' }),
       history: [entry(1, 'number-recog', 1), entry(2, 'number-recog', 1)],
@@ -111,11 +90,40 @@ describe('buildHubCardModel', () => {
     const m = buildHubCardModel(p, 'math')
     expect(m.goodDays).toBe(np.goodDays)
     expect(m.requiredDays).toBe(np.requiredDays)
-    expect(m.fill).toBeCloseTo(np.goodDays / np.requiredDays)
-    expect(m.buds).toEqual([
+    expect(m.holes).toEqual(
       Array.from({ length: np.requiredDays }, (_, i) => i < np.goodDays),
-    ])
-    expect(np.goodDays).toBeGreaterThan(0)
+    )
+    expect(m.holes).toEqual([true, true, false])
+  })
+
+  it('letter sounds per vowel: 3 holes for the vowel being worked on', () => {
+    const p: Progress = {
+      ...withLevels({
+        'letter-names': 'mastered',
+        'letter-sounds': 'practicing',
+      }),
+      literacy: {
+        letterSoundsVowelStates: {
+          '/o/': 'mastered',
+          '/u/': 'practicing',
+          '/i/': 'intro',
+          '/e/': 'intro',
+        },
+      },
+      history: [{ ...entry(1, 'letter-sounds', 1), currentTargetVowel: '/u/' }],
+    }
+    const np = nodeProgress(p, 'letter-sounds')
+    expect(np.vowels).toBeDefined()
+    const working = np.vowels!.find((v) => v.goodDays < v.requiredDays)!
+    expect(working.vowel).toBe('/u/')
+    const m = buildHubCardModel(p, 'word-song')
+    expect(m.holes).toEqual(
+      Array.from(
+        { length: working.requiredDays },
+        (_, i) => i < working.goodDays,
+      ),
+    )
+    expect(m.holes).toHaveLength(3)
   })
 
   it('whole world mastered: complete, no next unlock, last step shown', () => {
@@ -125,9 +133,7 @@ describe('buildHubCardModel', () => {
     expect(m.unlocksNext).toBeNull()
     expect(m.current).toBe('mult-6-9')
     expect(m.landNumber).toBe(4)
-    expect(
-      m.lands.flatMap((l) => l.beads).every((b) => b.state === 'mastered'),
-    ).toBe(true)
+    expect(m.holes.every(Boolean)).toBe(true)
   })
 
   it('showLandNumber mirrors parentSettings.showLevelToMarian', () => {

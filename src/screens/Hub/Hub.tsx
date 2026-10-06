@@ -55,7 +55,6 @@ import {
 } from './hubSuggestion'
 import {
   HUB_LINES,
-  isLastSessionRecent,
   pickHubGreeting,
   shouldShowDayStreak,
   type HubEntryPath,
@@ -64,7 +63,7 @@ import {
 import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
-import { HubMapButton, HubPathCard } from './HubPathCard'
+import { HubWorldCard } from './HubPathCard'
 import { buildHubCardModel, type HubCardModel } from './hubCardModel'
 import {
   playHubLine as defaultPlayHubLine,
@@ -565,20 +564,19 @@ export default function Hub({
     setGestureUnlocked(true)
   }, [gestureUnlocked])
 
-  // ── Recent-stats visibility -------------------------------------------
+  // ── Day streak (the only stat besides stardust; R2 drops the strip) ---
 
-  const showStardustToday = isLastSessionRecent(
-    history.lastSessionCompletedAt,
-    now(),
-  )
   const showStreak = shouldShowDayStreak(
     history.dayStreak,
     history.lastSessionCompletedAt,
     now(),
   )
-  const showRecentStats = showStardustToday || showStreak
 
   // ── Render ------------------------------------------------------------
+  //
+  // Redesign R2 (123jpnbc68z): the clay "Toy Box" Hub. Everything sits
+  // on `.hub-stage`, the reference's 820×1180 canvas scaled to the
+  // screen (see hubClay.css); positions are reference px.
 
   return (
     <m.main
@@ -588,8 +586,9 @@ export default function Hub({
       data-suppressed={suppressed ? 'true' : 'false'}
       onPointerDown={handleFirstTap}
       className="
+        hub-clay
         relative flex h-full w-full flex-col
-        bg-my-cream text-ink
+        text-ink
         pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
         pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]
         overflow-hidden
@@ -599,86 +598,51 @@ export default function Hub({
       exit={{ opacity: 0, transition: { duration: 0.25 } }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
     >
-      {/* Pastel meadow wash (placeholder — Kyle's bg-meadow.svg lands via
-          ticket 86c9j53yx). */}
+      {/* Invisible parent-gate corner. 96×96pt; no glyph, no
+          affordance. Spec: aria-hidden, tabIndex omitted so screen
+          readers / Marian's assistive tech don't surface it. */}
       <div
+        data-testid="hub-parent-gate"
         aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10"
+        className="absolute right-0 top-0 z-10"
         style={{
-          backgroundImage:
-            'radial-gradient(circle at 50% 30%, rgba(186,222,255,0.45) 0%, rgba(255,250,242,0) 60%), linear-gradient(180deg, #FFFAF2 0%, #FFF5E6 100%)',
+          width: '96pt',
+          height: '96pt',
+          // Pure invisible touch target — no background, no border.
         }}
+        {...parentGateProps}
       />
 
-      {/* HUD strip — cumulative stardust left, invisible parent-gate
-          zone top-right. */}
-      <div
-        data-testid="hub-hud"
-        className="relative flex h-14 w-full items-center justify-between px-4"
-      >
-        <div
-          data-testid="hub-cumulative-stardust"
-          data-total={history.cumulativeStardust}
-          className="flex items-center gap-2 font-display text-3xl text-ink"
-        >
-          <SparkleGlyph />
-          <span aria-label={`Stardust: ${history.cumulativeStardust}`}>
-            {history.cumulativeStardust}
-          </span>
-        </div>
+      <div className="hub-stage" data-testid="hub-stage">
+        <div className="hub-garden" aria-hidden />
 
-        {/* Invisible parent-gate corner. 96×96pt; no glyph, no
-            affordance. Spec: aria-hidden, tabIndex omitted so screen
-            readers / Marian's assistive tech don't surface it. */}
-        <div
-          data-testid="hub-parent-gate"
-          aria-hidden
-          className="absolute right-0 top-0"
-          style={{
-            width: '96pt',
-            height: '96pt',
-            // Pure invisible touch target — no background, no border.
-          }}
-          {...parentGateProps}
-        />
-      </div>
-
-      {/* Emma centred-upper, ~22vh. layoutId carries from / to other
-          screens via Framer Motion's shared-element transition.
-
-          The wrapper is `pointer-events-none` so taps anywhere in the
-          22vh band fall through to whatever sits behind. The Emma
-          image itself opts back in (`pointer-events-auto`) to receive
-          the M2.5 character long-press — only the image bounds are
-          live, not the surrounding band.
-
-          Unlock celebrations play on the map (Emma's Path 9/10); the
-          Hub band only ever shows idle Emma. */}
-      <div className="pointer-events-none flex h-[22vh] w-full items-center justify-center">
-        {/* Phase 3b motion brief (ticket 86c9kwvza): consume
-            `EmmaCharacter` so Hub's idle Emma breathes (`scale [1,
-            1.02, 1]` over 4s) per §3.5. The shared component also wires
-            the long-press handlers via spread. */}
+        {/* Emma: real art unchanged, with a warm backlight and a soft
+            contact shadow (hubClay.css). The band is
+            pointer-events-none; only the image takes the M2.5 long-press.
+            Unlock celebrations play on the map (Emma's Path 9/10); the
+            Hub only ever shows idle Emma. */}
+        <div className="hub-emma-light" aria-hidden />
         <m.div
           key="idle-emma"
-          className="flex h-full items-center justify-center"
+          className="hub-emma-band"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.25, ease: 'easeOut' }}
         >
+          {/* Phase 3b motion brief (ticket 86c9kwvza): `EmmaCharacter`
+              breathes (`scale [1, 1.02, 1]` over 4s) and takes the
+              long-press handlers via spread. */}
           <EmmaCharacter
             pose="idle"
             layoutId="emma"
             data-testid="hub-emma"
-            className="pointer-events-auto h-full w-auto select-none touch-none"
+            className="hub-emma-img select-none touch-none"
             {...characterLongPressProps}
           />
         </m.div>
-      </div>
 
-      {/* Speech ribbon — same word-by-word reveal pattern as
-          Greet/Math/Session-End. */}
-      <div className="flex min-h-[3.5rem] items-start justify-center px-6">
+        {/* Speech bubble — same word-by-word reveal pattern as
+            Greet/Math/Session-End. */}
         <AnimatePresence>
           {showRibbon && (
             <m.div
@@ -686,21 +650,13 @@ export default function Hub({
               data-testid="hub-ribbon"
               role="status"
               aria-live="polite"
-              className="
-                rounded-3xl border-[3px] border-my-pink bg-white
-                px-6 py-2
-                shadow-[0_8px_24px_rgba(244,143,177,0.18)]
-                text-center
-              "
+              className="hub-bubble"
               initial={{ opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <p
-                data-testid="hub-caption"
-                className="font-display text-[1.6rem] leading-snug text-ink"
-              >
+              <p data-testid="hub-caption">
                 {captionWords.map((word, i) => (
                   <m.span
                     key={`hub-w-${i}`}
@@ -708,7 +664,7 @@ export default function Hub({
                     data-revealed={i < captionRevealed ? 'true' : 'false'}
                     className="inline-block"
                     style={{
-                      marginRight: i === captionWords.length - 1 ? 0 : '0.4em',
+                      marginRight: i === captionWords.length - 1 ? 0 : '0.3em',
                     }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: i < captionRevealed ? 1 : 0 }}
@@ -721,230 +677,112 @@ export default function Hub({
             </m.div>
           )}
         </AnimatePresence>
-      </div>
 
-      {/* Skill-tree picker — two nodes side-by-side. */}
-      <div className="flex flex-1 items-center justify-center gap-7 px-4">
-        <div className="flex flex-col items-center" style={{ gap: 16 }}>
-          <SkillTreeNode
-            tree="number-garden"
-            label="Number Garden"
-            signature={<NumberGardenSignature />}
-            card={numberGardenCard}
-            suggested={suggestion === 'number-garden'}
-            onTap={() => handleNodeTap('number-garden')}
-            onPress={handleNodePress}
-          />
-          {onOpenMap && (
-            <HubMapButton
-              world="math"
-              width="280pt"
-              onPress={handleNodePress}
-              onOpen={() => handleOpenMap('math')}
-            />
-          )}
-        </div>
-        <div className="flex flex-col items-center" style={{ gap: 16 }}>
-          <SkillTreeNode
-            tree="word-song"
-            label="Word Song"
-            signature={<WordSongSignature />}
-            card={wordSongCard}
-            suggested={suggestion === 'word-song'}
-            onTap={() => handleNodeTap('word-song')}
-            onPress={handleNodePress}
-          />
-          {onOpenMap && (
-            <HubMapButton
-              world="word-song"
-              width="280pt"
-              onPress={handleNodePress}
-              onOpen={() => handleOpenMap('word-song')}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Recent-stats strip — fixed-slot height; renders empty when no
-          values qualify so the layout doesn't reflow. */}
-      <div
-        data-testid="hub-recent-stats"
-        data-visible={showRecentStats ? 'true' : 'false'}
-        className="flex h-[8vh] w-full items-center justify-center gap-8 px-4"
-      >
-        {showStardustToday && (
+        {/* HUD chips — stardust shown once; the day streak (sun) only
+            while it is live. */}
+        <div data-testid="hub-hud" className="hub-chips">
           <div
-            data-testid="hub-stardust-today"
-            data-value={history.lastSessionStardust}
-            className="flex flex-col items-center"
+            data-testid="hub-cumulative-stardust"
+            data-total={history.cumulativeStardust}
+            className="hub-chip"
           >
-            <div className="flex items-center gap-1 font-display text-2xl text-my-rose">
-              <SparkleGlyph />
-              <span>{history.lastSessionStardust}</span>
-            </div>
-            <span className="font-display text-sm text-ink/70">
-              today's session
+            <StarGlyph />
+            <span aria-label={`Stardust: ${history.cumulativeStardust}`}>
+              {history.cumulativeStardust}
             </span>
           </div>
-        )}
-        {showStreak && (
-          <div
-            data-testid="hub-day-streak"
-            data-value={history.dayStreak}
-            className="flex flex-col items-center"
-          >
-            <div className="flex items-center gap-1 font-display text-2xl text-my-rose">
-              {/* Sparkle glyph — same indicator the rest of the UI
-                  uses for streaks (see Dave PR #38 streak-glyph
-                  decision; the alternative would have triggered the
-                  ambient-warmth dark pattern Mammarella et al. flag).
-                  The text below ("day streak") disambiguates it from
-                  the stardust-today sparkle to its left. */}
-              <SparkleGlyph />
-              <span>{history.dayStreak}</span>
+          {showStreak && (
+            <div
+              data-testid="hub-day-streak"
+              data-value={history.dayStreak}
+              aria-label={`Day streak: ${history.dayStreak}`}
+              className="hub-chip hub-chip--small"
+            >
+              <SunGlyph />
+              <span aria-hidden>{history.dayStreak}</span>
             </div>
-            <span className="font-display text-sm text-ink/70">day streak</span>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* The two world cards; each carries its own map button. */}
+        <HubWorldCard
+          tree="number-garden"
+          label="Number Garden"
+          model={numberGardenCard}
+          suggested={suggestion === 'number-garden'}
+          onTap={() => handleNodeTap('number-garden')}
+          onPress={handleNodePress}
+          onOpenMap={onOpenMap ? () => handleOpenMap('math') : undefined}
+        />
+        <HubWorldCard
+          tree="word-song"
+          label="Word Song"
+          model={wordSongCard}
+          suggested={suggestion === 'word-song'}
+          onTap={() => handleNodeTap('word-song')}
+          onPress={handleNodePress}
+          onOpenMap={onOpenMap ? () => handleOpenMap('word-song') : undefined}
+        />
       </div>
     </m.main>
   )
 }
 
-// ── SkillTreeNode subcomponent ─────────────────────────────────────────
+// ── Clay HUD glyphs ────────────────────────────────────────────────────
 
-interface SkillTreeNodeProps {
-  tree: SkillTreeId
-  label: string
-  signature: ReactElement
-  card: HubCardModel
-  suggested: boolean
-  onTap: () => void
-  /**
-   * Fires synchronously on `pointerdown` BEFORE the event bubbles up to
-   * `<m.main>`'s `handleFirstTap`. Hub uses this to mark the greeting
-   * as "dispatched" when the chip tap is the first user gesture, so the
-   * gesture-unlock effect's microtask sees the ref already set and the
-   * `dispatchGreeting()` body short-circuits. See the chip-tap comment
-   * block in `handleNodeTap` for the full rationale (ticket 86c9m4u13).
-   */
-  onPress?: () => void
-}
-
-function SkillTreeNode({
-  tree,
-  label,
-  signature,
-  card,
-  suggested,
-  onTap,
-  onPress,
-}: SkillTreeNodeProps): ReactElement {
+function StarGlyph(): ReactElement {
   return (
-    <m.button
-      type="button"
-      data-testid="hub-tree-node"
-      data-tree={tree}
-      data-suggested={suggested ? 'true' : 'false'}
-      onPointerDown={onPress}
-      onClick={onTap}
-      aria-label={label}
-      className={[
-        'flex flex-col items-center justify-between',
-        'rounded-[32px] bg-white px-6 py-6',
-        'shadow-[0_8px_24px_rgba(244,143,177,0.20)]',
-        'select-none touch-manipulation',
-        suggested
-          ? 'border-2 border-my-rose ring-2 ring-my-rose/30'
-          : 'border border-my-pink/40',
-      ].join(' ')}
-      style={{ width: '280pt', height: '280pt' }}
-      initial={{ scale: 1 }}
-      whileTap={{ scale: 0.96 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-    >
-      <div className="flex h-16 items-center justify-center">{signature}</div>
-      <span
-        data-testid="hub-tree-label"
-        className="font-display text-2xl text-ink"
-      >
-        {label}
-      </span>
-      <HubPathCard model={card} />
-    </m.button>
-  )
-}
-
-// ── Inline SVG signatures (placeholders — real assets via 86c9j53yx) ───
-
-function NumberGardenSignature(): ReactElement {
-  return (
-    <svg
-      viewBox="0 0 120 64"
-      width="120"
-      height="64"
-      role="presentation"
-      aria-hidden
-      data-testid="hub-signature-number-garden"
-    >
-      {[20, 60, 100].map((cx, i) => (
-        <g key={cx} transform={`rotate(${(i - 1) * 8} ${cx} 32)`}>
-          {/* 6 petals around a centre */}
-          {[0, 60, 120, 180, 240, 300].map((deg) => (
-            <ellipse
-              key={deg}
-              cx={cx}
-              cy={32}
-              rx="6"
-              ry="14"
-              fill={i === 1 ? '#F48FB1' : '#FFC1CC'}
-              transform={`rotate(${deg} ${cx} 32)`}
-            />
-          ))}
-          <circle cx={cx} cy={32} r="6" fill="#FFEB3B" />
-        </g>
-      ))}
+    <svg viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <radialGradient id="hub-star-fill" cx="40%" cy="30%">
+          <stop offset="0" stopColor="#fff6a8" />
+          <stop offset=".6" stopColor="#ffd23f" />
+          <stop offset="1" stopColor="#f0a818" />
+        </radialGradient>
+      </defs>
+      <path
+        d="M50 6 L62 36 L94 38 L69 59 L77 91 L50 73 L23 91 L31 59 L6 38 L38 36 Z"
+        fill="url(#hub-star-fill)"
+        stroke="#e39a10"
+        strokeWidth="3"
+        strokeLinejoin="round"
+      />
+      <ellipse cx="40" cy="36" rx="6" ry="10" fill="#fff" opacity=".55" />
     </svg>
   )
 }
 
-function WordSongSignature(): ReactElement {
+function SunGlyph(): ReactElement {
   return (
-    <svg
-      viewBox="0 0 120 64"
-      width="120"
-      height="64"
-      role="presentation"
-      aria-hidden
-      data-testid="hub-signature-word-song"
-    >
-      {/* Three music notes — heads + stems, gently tilted. */}
-      {[
-        { x: 18, y: 38, tilt: -6 },
-        { x: 56, y: 30, tilt: 4 },
-        { x: 96, y: 42, tilt: -2 },
-      ].map((n, i) => (
-        <g key={i} transform={`rotate(${n.tilt} ${n.x} ${n.y})`} fill="#9C27B0">
-          <ellipse cx={n.x} cy={n.y} rx="8" ry="6" />
-          <rect x={n.x + 6} y={n.y - 22} width="2" height="24" />
-        </g>
+    <svg viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <radialGradient id="hub-sun-fill" cx="40%" cy="35%">
+          <stop offset="0" stopColor="#fff3b0" />
+          <stop offset=".6" stopColor="#ffb52e" />
+          <stop offset="1" stopColor="#f08a12" />
+        </radialGradient>
+      </defs>
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+        <rect
+          key={deg}
+          x="45"
+          y="2"
+          width="10"
+          height="20"
+          rx="5"
+          fill="#ffc531"
+          transform={`rotate(${deg} 50 50)`}
+        />
       ))}
-    </svg>
-  )
-}
-
-function SparkleGlyph(): ReactElement {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 24 24"
-      fill="#FFD966"
-      stroke="#E0B800"
-      strokeWidth="0.6"
-      aria-hidden
-    >
-      <path d="M12 2 L13.6 9.4 L21 11 L13.6 12.6 L12 20 L10.4 12.6 L3 11 L10.4 9.4 Z" />
+      <circle
+        cx="50"
+        cy="50"
+        r="27"
+        fill="url(#hub-sun-fill)"
+        stroke="#e8890f"
+        strokeWidth="3"
+      />
+      <ellipse cx="42" cy="40" rx="6" ry="9" fill="#fff" opacity=".5" />
     </svg>
   )
 }

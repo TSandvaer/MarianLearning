@@ -10,12 +10,12 @@
  */
 
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { render, screen, act, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import Hub from './Hub'
 import type { HubProps } from './Hub'
-import { defaultProgress, saveProgress } from '../../lib/progress'
+import { MATH_TREE, defaultProgress, saveProgress } from '../../lib/progress'
 import {
   SESSION_HISTORY_KEY,
   emptySessionHistory,
@@ -122,19 +122,17 @@ describe('Hub — render states', () => {
   })
 })
 
-describe('Hub — recent-stats strip (4 states)', () => {
-  it('idle: no stats visible when no qualifying values', () => {
+describe('Hub — HUD chips (Redesign R2: stardust once + streak sun)', () => {
+  it('idle: stardust chip only, no streak chip, no recent-stats strip', () => {
     const adapter = createMemoryStorage()
     seed(adapter)
     renderHub({ storage: adapter, now: () => new Date(2026, 3, 29, 12, 0) })
-    expect(
-      screen.getByTestId('hub-recent-stats').getAttribute('data-visible'),
-    ).toBe('false')
-    expect(screen.queryByTestId('hub-stardust-today')).toBeNull()
+    expect(screen.getAllByTestId('hub-cumulative-stardust')).toHaveLength(1)
     expect(screen.queryByTestId('hub-day-streak')).toBeNull()
+    expect(screen.queryByTestId('hub-recent-stats')).toBeNull()
   })
 
-  it("returning-user-with-stats: shows today's stardust + streak", () => {
+  it("returning user: streak chip beside stardust; today's stardust is not shown again", () => {
     const adapter = createMemoryStorage()
     const now = new Date(2026, 3, 29, 18, 0)
     seed(adapter, {
@@ -144,15 +142,12 @@ describe('Hub — recent-stats strip (4 states)', () => {
       dayStreak: 3,
     })
     renderHub({ storage: adapter, now: () => now })
-    expect(
-      screen.getByTestId('hub-recent-stats').getAttribute('data-visible'),
-    ).toBe('true')
-    expect(
-      screen.getByTestId('hub-stardust-today').getAttribute('data-value'),
-    ).toBe('11')
-    expect(
-      screen.getByTestId('hub-day-streak').getAttribute('data-value'),
-    ).toBe('3')
+    const streak = screen.getByTestId('hub-day-streak')
+    expect(streak.getAttribute('data-value')).toBe('3')
+    expect(streak.textContent).toBe('3')
+    expect(screen.getByTestId('hub-hud')).toContainElement(streak)
+    expect(screen.queryByTestId('hub-stardust-today')).toBeNull()
+    expect(screen.getAllByTestId('hub-cumulative-stardust')).toHaveLength(1)
   })
 
   it('day-streak hidden when last session was 2+ days ago (silent reset)', () => {
@@ -166,10 +161,7 @@ describe('Hub — recent-stats strip (4 states)', () => {
       dayStreak: 5,
     })
     renderHub({ storage: adapter, now: () => now })
-    // Last session was >24h ago AND >1 calendar day → both stats hidden
-    expect(
-      screen.getByTestId('hub-recent-stats').getAttribute('data-visible'),
-    ).toBe('false')
+    expect(screen.queryByTestId('hub-day-streak')).toBeNull()
   })
 })
 
@@ -796,7 +788,7 @@ describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
   })
 })
 
-describe("Hub — Emma's Path card (ticket 123jpnbc3dq)", () => {
+describe('Hub — clay world cards (Redesign R2, 123jpnbc68z)', () => {
   /** Nothing mastered: first step of each tree at intro, rest locked. */
   function freshDoc() {
     const p = defaultProgress()
@@ -809,72 +801,157 @@ describe("Hub — Emma's Path card (ticket 123jpnbc3dq)", () => {
     return p
   }
 
-  function beadsFor(world: 'math' | 'word-song'): HTMLElement[] {
-    const card = screen
-      .getAllByTestId('hub-card-progress')
-      .find((c) => c.getAttribute('data-world') === world)!
-    return Array.from(
-      card.querySelectorAll<HTMLElement>('[data-testid="hub-card-bead"]'),
-    )
+  function cardFor(tree: 'number-garden' | 'word-song'): HTMLElement {
+    return screen
+      .getAllByTestId('hub-tree-node')
+      .find((c) => c.getAttribute('data-tree') === tree)!
   }
 
-  it('fresh progress: 11 / 13 beads, land 1, current = first step, next = second', () => {
+  it('fresh progress: land 1, current = first step, padlocked next = second, 3 empty holes', () => {
     renderHub({
       storage: createMemoryStorage(),
       progressDoc: freshDoc(),
     })
-    expect(beadsFor('math')).toHaveLength(11)
-    expect(beadsFor('word-song')).toHaveLength(13)
     const landNumbers = screen.getAllByTestId('hub-land-number')
     expect(landNumbers.map((n) => n.getAttribute('data-value'))).toEqual([
       '1',
       '1',
     ])
     expect(
-      beadsFor('math')
-        .slice(0, 2)
-        .map((b) => b.getAttribute('data-state')),
-    ).toEqual(['current', 'next'])
+      screen
+        .getAllByTestId('hub-card-current')
+        .map((n) => n.getAttribute('data-node')),
+    ).toEqual(['number-recog', 'letter-names'])
     expect(
       screen
         .getAllByTestId('hub-card-next')
         .map((n) => n.getAttribute('data-node')),
     ).toEqual(['add-to-10', 'letter-sounds'])
+    expect(screen.getAllByTestId('hub-card-lock')).toHaveLength(2)
+    const seeds = within(cardFor('number-garden')).getAllByTestId(
+      'hub-card-seed',
+    )
+    expect(seeds.map((s) => s.getAttribute('data-filled'))).toEqual([
+      'false',
+      'false',
+      'false',
+    ])
   })
 
-  it('beads group into 4 math lands and 5 word lands', () => {
+  it('has no bead row (the overview lives on the map, bar 9)', () => {
+    renderHub({ storage: createMemoryStorage(), progressDoc: freshDoc() })
+    expect(screen.queryAllByTestId('hub-card-bead')).toHaveLength(0)
+    expect(screen.queryAllByTestId('hub-card-land')).toHaveLength(0)
+  })
+
+  it('uses the clay art manifest for stickers, land pill, seeds and map', () => {
+    const p = freshDoc()
+    p.skillLevels['number-recog'] = 'mastered'
+    p.skillLevels['add-to-10'] = 'practicing'
+    p.history = [
+      {
+        dateISO: new Date(2026, 4, 1, 12).toISOString(),
+        skillFocus: ['add-to-10'],
+        successRate: 1,
+      },
+    ]
     renderHub({
       storage: createMemoryStorage(),
-      progressDoc: freshDoc(),
+      progressDoc: p,
+      onOpenMap: () => {},
     })
-    const cards = screen.getAllByTestId('hub-card-progress')
-    const landsIn = (world: string) =>
-      cards
-        .find((c) => c.getAttribute('data-world') === world)!
-        .querySelectorAll('[data-testid="hub-card-land"]').length
-    expect(landsIn('math')).toBe(4)
-    expect(landsIn('word-song')).toBe(5)
+    const math = within(cardFor('number-garden'))
+    expect(math.getByTestId('hub-card-current')).toHaveAttribute(
+      'src',
+      '/assets/path/add-to-10-512.webp',
+    )
+    const srcs = Array.from(
+      cardFor('number-garden').querySelectorAll('img'),
+    ).map((i) => i.getAttribute('src'))
+    expect(srcs).toEqual(
+      expect.arrayContaining([
+        '/assets/path/add-to-20-256.webp',
+        '/assets/path/ui-padlock-256.webp',
+        '/assets/path/land-ng-2-256.webp',
+        '/assets/path/ui-bud-open-256.webp',
+        '/assets/path/ui-map-256.webp',
+      ]),
+    )
+    expect(
+      math
+        .getAllByTestId('hub-card-seed')
+        .map((s) => s.getAttribute('data-filled')),
+    ).toEqual(['true', 'false', 'false'])
   })
 
-  it('hides only the land number when showLevelToMarian is false', () => {
+  it('hides only the land pill when showLevelToMarian is false', () => {
     const p = freshDoc()
     p.parentSettings = { ...p.parentSettings!, showLevelToMarian: false }
-    renderHub({ storage: createMemoryStorage(), progressDoc: p })
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: p,
+      onOpenMap: () => {},
+    })
     expect(screen.queryAllByTestId('hub-land-number')).toHaveLength(0)
-    expect(beadsFor('math')).toHaveLength(11)
     expect(screen.getAllByTestId('hub-card-current')).toHaveLength(2)
+    expect(screen.getAllByTestId('hub-card-next')).toHaveLength(2)
+    expect(screen.getAllByTestId('hub-card-seed')).toHaveLength(6)
+    expect(screen.getAllByTestId('hub-map-button')).toHaveLength(2)
   })
 
-  it('a tap on a bead still starts that tree (the card is one target)', async () => {
+  it('a tap on the hero sticker still starts that tree (the card is one target)', async () => {
     const onPickTree = vi.fn()
     renderHub({
       storage: createMemoryStorage(),
       progressDoc: freshDoc(),
       onPickTree,
     })
-    await userEvent.click(beadsFor('word-song')[0]!)
+    await userEvent.click(
+      within(cardFor('word-song')).getByTestId('hub-card-current'),
+    )
     expect(onPickTree).toHaveBeenCalledTimes(1)
     expect(onPickTree).toHaveBeenCalledWith('word-song')
+  })
+
+  it('the map button inside the card opens the map and never starts a session', async () => {
+    const onPickTree = vi.fn()
+    const onOpenMap = vi.fn()
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: freshDoc(),
+      onPickTree,
+      onOpenMap,
+    })
+    const mapButton = within(cardFor('number-garden')).getByRole('button', {
+      name: 'Number Garden map',
+    })
+    await userEvent.click(mapButton)
+    expect(onOpenMap).toHaveBeenCalledTimes(1)
+    expect(onOpenMap).toHaveBeenCalledWith('math')
+    expect(onPickTree).toHaveBeenCalledTimes(0)
+  })
+
+  it('the card is keyboard-operable (Enter starts the tree)', async () => {
+    const onPickTree = vi.fn()
+    renderHub({
+      storage: createMemoryStorage(),
+      progressDoc: freshDoc(),
+      onPickTree,
+    })
+    cardFor('number-garden').focus()
+    await userEvent.keyboard('{Enter}')
+    expect(onPickTree).toHaveBeenCalledTimes(1)
+    expect(onPickTree).toHaveBeenCalledWith('number-garden')
+  })
+
+  it('a whole-world-complete card shows a bloom instead of a padlocked next', () => {
+    const p = freshDoc()
+    for (const n of MATH_TREE) p.skillLevels[n] = 'mastered'
+    renderHub({ storage: createMemoryStorage(), progressDoc: p })
+    const math = within(cardFor('number-garden'))
+    expect(math.queryByTestId('hub-card-next')).toBeNull()
+    expect(math.queryByTestId('hub-card-lock')).toBeNull()
+    expect(math.getByTestId('hub-card-bloom')).toBeInTheDocument()
   })
 
   it('falls back to loadProgress() when no progressDoc is passed', () => {
@@ -884,10 +961,8 @@ describe("Hub — Emma's Path card (ticket 123jpnbc3dq)", () => {
     saveProgress(p)
     renderHub({ storage: createMemoryStorage() })
     expect(
-      beadsFor('math')
-        .slice(0, 3)
-        .map((b) => b.getAttribute('data-state')),
-    ).toEqual(['mastered', 'current', 'next'])
+      within(cardFor('number-garden')).getByTestId('hub-card-current'),
+    ).toHaveAttribute('data-node', 'add-to-10')
     expect(screen.getAllByTestId('hub-land-number')[0]).toHaveAttribute(
       'data-value',
       '2',
