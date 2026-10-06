@@ -11,7 +11,7 @@
  *      ("You got a flower!"), then "N of 3";
  *   3. what comes next and when: "It sleeps tonight. Come back tomorrow
  *      for one more." / "A new path opens. Look!" (All done then opens
- *      the map's unlock beat) / the finished-world line.
+ *      the map's unlock beat) / "You grew your whole garden!".
  *
  * A not-yet day (under 7 of 8) gets warm praise, an untouched tray and,
  * once a day per world, "Play again to get today's flower.", with Again

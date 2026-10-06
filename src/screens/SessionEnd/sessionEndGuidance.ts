@@ -51,14 +51,7 @@ export type FlowerSlot = 'grown' | 'sleeping' | 'empty'
 /** Which beat a line belongs to; drives the screen's phase. */
 export type EndBeat = 'praise' | 'flower' | 'count' | 'next'
 
-/** Placeholder for the finished-world line: caption only until Kyle/Dave
- *  pick the words and it is recorded (no MP3 yet). */
-export const WORLD_DONE_LINE_ID = 'path.end.worldDone'
-export const WORLD_DONE_TEXT = 'You grew your whole garden!'
-
-export type EndLineId =
-  | (typeof GUIDANCE_LINES)[number]['id']
-  | typeof WORLD_DONE_LINE_ID
+export type EndLineId = (typeof GUIDANCE_LINES)[number]['id']
 
 export interface EndLine {
   id: EndLineId
@@ -86,6 +79,8 @@ export const END_CLIP_SECONDS: Readonly<Record<string, number>> = {
   'guide.end.path-opens': 2.64,
   'guide.end.not-yet.praise': 2.88,
   'guide.end.not-yet.again': 2.48,
+  // PR #514's render run (ffprobe 2.400 s).
+  'guide.end.world-done': 2.4,
 }
 
 /** Caption-only lines read at ~165 wpm plus a breath. */
@@ -104,14 +99,6 @@ function line(id: string, beat: EndBeat): EndLine | null {
     beat,
     seconds: END_CLIP_SECONDS[g.id] ?? captionSeconds(g.text),
   }
-}
-
-const WORLD_DONE: EndLine = {
-  id: WORLD_DONE_LINE_ID,
-  text: WORLD_DONE_TEXT,
-  src: null,
-  beat: 'next',
-  seconds: captionSeconds(WORLD_DONE_TEXT),
 }
 
 export interface SessionEndGuidance {
@@ -255,7 +242,8 @@ export function sessionEndGuidance(
     ]
     if (counted) lines.push(line(`guide.end.count.${row.now}`, 'count')!)
     if (day === 'unlock') lines.push(line('guide.end.path-opens', 'next')!)
-    else if (day === 'world-done') lines.push(WORLD_DONE)
+    else if (day === 'world-done')
+      lines.push(line('guide.end.world-done', 'next')!)
     else if (!full && crossDay) lines.push(line('guide.end.sleeps', 'next')!)
     return {
       ...base,

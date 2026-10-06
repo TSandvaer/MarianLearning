@@ -995,6 +995,42 @@ describe('SessionEnd', () => {
       expect(onAllDone).toHaveBeenCalledTimes(1)
     })
 
+    it('last step of a world: "3 of 3!" then "You grew your whole garden!" plays its clip', async () => {
+      const day = (d: number) =>
+        new Date(Date.now() - d * 86_400_000).toISOString()
+      const base = defaultProgress()
+      saveProgress({
+        ...base,
+        skillLevels: { ...base.skillLevels, 'mult-6-9': 'practicing' },
+        history: [
+          { dateISO: day(2), skillFocus: ['mult-6-9'], successRate: 1 },
+          { dateISO: day(1), skillFocus: ['mult-6-9'], successRate: 1 },
+        ],
+      })
+      renderEnd({
+        ...MATH_PAYLOAD,
+        totalCorrect: 8,
+        sessionFocus: { node: 'mult-6-9', mode: 'forward' },
+      })
+      expect(screen.getByTestId('session-end')).toHaveAttribute(
+        'data-day',
+        'world-done',
+      )
+      await advanceSequence(15_000)
+      expect(screen.getByTestId('session-end-count')).toHaveTextContent(
+        '3 of 3!',
+      )
+      expect(screen.getByTestId('session-end-caption')).toHaveTextContent(
+        'You grew your whole garden!',
+      )
+      expect(pathPlays).toEqual([
+        'guide.end.right.8',
+        'guide.end.flower',
+        'guide.end.count.3',
+        'guide.end.world-done',
+      ])
+    })
+
     it('not-yet day: warm praise, tray untouched, "Play again…" once; Again + Home; never a negative beat', async () => {
       const onAgain = vi.fn()
       const onAllDone = vi.fn()
