@@ -148,3 +148,9 @@ Distinct from its siblings:
 - **Reference:** `design/emmas-path/redesign/real-art-check.html` (artifact https://claude.ai/artifact/C8kT7oP5PMNJDzEaJwMqvS): direction A with the real Emma, the clay icons and a capture of today's lesson. Cards side by side (Kyle: two equal doors; stacking adds width, not readability).
 - **Decided:** (1) Emma's art stays exactly as is; in the build she gets a soft contact shadow and slight warm light so she sits on the clay world; on the map she stands BEHIND the current stop. (2) The lesson screens' frame (answer tiles, back button, progress dots) is restyled to the same chunky clay buttons; the lesson pictures inside stay unchanged.
 - **Decided by:** Thomas (popups, recommended options).
+
+## 2026-10-06 — Guidance layer ("carried through") before merging the clay Hub/map
+
+- **Context:** Thomas tried the #510 Hub preview after several sessions: "I dont know what the number 36 star or 1 sun in the top is for, I dont feel like im being carried through the app, what i can do to progress (or why i cannot progress)". Root cause: the 3-separate-days rule works (1 flower per tray = today's good day) but nothing on screen explains it; stardust (cumulative, not spendable) and the day-streak sun are unexplained.
+- **Decided:** Kyle (UX) + Dave (child psychology) design ONE recommended guidance layer as a clickable mockup first (quality bar 12): what to do next, why progress waits ("come back tomorrow"), what star/sun mean or whether they go, plus a test-only day fast-forward. #509 (map) and #510 (Hub) stay open and merge together with the guidance.
+- **Decided by:** Thomas (popups, recommended options).
