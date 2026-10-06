@@ -11,8 +11,8 @@
  *   - mid-skill back-arrow tap from Math/WordSong
  *
  * The screen is intentionally calm: two skill-tree picker tiles, a
- * cumulative stardust counter, an invisible parent-gate corner, and an
- * optional recent-stats strip. No nags, no auto-advance, no leaderboard.
+ * cumulative stardust counter, a day-streak chip, and an invisible
+ * parent-gate corner. No nags, no auto-advance, no leaderboard.
  *
  * Architectural notes
  * -------------------

@@ -4,7 +4,6 @@ import {
   HUB_LINE_WORD_COUNTS,
   pickHubGreeting,
   pseudoRandom,
-  isLastSessionRecent,
   shouldShowDayStreak,
 } from './hubLines'
 import type { HubLineId } from './hubLines'
@@ -192,28 +191,6 @@ describe('pickHubGreeting', () => {
         'hub.welcome.try-number-garden.alt-2',
       ].includes(choice.lineId as string),
     ).toBe(true)
-  })
-})
-
-describe('isLastSessionRecent', () => {
-  const now = new Date(2026, 3, 29, 12, 0, 0)
-
-  it('returns true for a session within the last 24h', () => {
-    const recent = new Date(2026, 3, 29, 6, 0, 0).toISOString()
-    expect(isLastSessionRecent(recent, now)).toBe(true)
-  })
-
-  it('returns false for a session more than 24h ago', () => {
-    const old = new Date(2026, 3, 28, 6, 0, 0).toISOString() // 30h ago
-    expect(isLastSessionRecent(old, now)).toBe(false)
-  })
-
-  it('returns false for an empty timestamp', () => {
-    expect(isLastSessionRecent('', now)).toBe(false)
-  })
-
-  it('returns false for a malformed timestamp', () => {
-    expect(isLastSessionRecent('not-a-date', now)).toBe(false)
   })
 })
 

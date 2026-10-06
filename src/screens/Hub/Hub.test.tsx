@@ -762,7 +762,7 @@ describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
 
   it('still plays the greeting when first gesture is a non-chip tap (handleFirstTap path)', async () => {
     // If Marian taps anywhere on Hub OTHER than a chip — the body of
-    // the screen, the Emma image, the recent-stats area — the gate
+    // the screen, the Emma image, the HUD chips — the gate
     // unlocks via `handleFirstTap` and the greeting SHOULD fire. Only
     // a chip tap suppresses the greeting (because she's leaving).
     const playLineFn = vi.fn(() => Promise.resolve())

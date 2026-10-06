@@ -88,8 +88,6 @@ describe('buildHubCardModel', () => {
     }
     const np = nodeProgress(p, 'number-recog')
     const m = buildHubCardModel(p, 'math')
-    expect(m.goodDays).toBe(np.goodDays)
-    expect(m.requiredDays).toBe(np.requiredDays)
     expect(m.holes).toEqual(
       Array.from({ length: np.requiredDays }, (_, i) => i < np.goodDays),
     )

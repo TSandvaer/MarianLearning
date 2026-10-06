@@ -289,23 +289,6 @@ export function pickHubGreeting(opts: {
 }
 
 /**
- * Helper: when does the recent-stats strip's "today's session" line
- * qualify? Returns true iff `lastSessionCompletedAt` is within the
- * last 24h of `now`. Used by Hub to decide whether to surface the
- * stardust-today number; never displayed when no session has happened.
- */
-export function isLastSessionRecent(
-  lastSessionCompletedAtIso: string,
-  now: Date,
-  withinMs = 24 * 60 * 60 * 1000,
-): boolean {
-  if (!lastSessionCompletedAtIso) return false
-  const last = new Date(lastSessionCompletedAtIso)
-  if (Number.isNaN(last.getTime())) return false
-  return now.getTime() - last.getTime() < withinMs
-}
-
-/**
  * Helper: should the day-streak band render? Per spec, only when the
  * streak is >= 1 AND last session was today or yesterday.
  */

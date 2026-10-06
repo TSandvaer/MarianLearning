@@ -58,7 +58,8 @@ export interface SessionHistoryV1 {
  * Hub-driven additions (from `screen-hub.md`):
  *
  * - `lastSessionStardust` — stardust earned in the most recent session.
- *   Surfaced on Hub's recent-stats strip iff the session was within 24 h.
+ *   Persisted only; no screen reads it since R2 removed Hub's
+ *   recent-stats strip.
  * - `dayStreak` — consecutive-day streak count. Bumped at Session-End
  *   when last completion was yesterday; left alone if today; silently
  *   resets to 0 on missed days. Hub renders only when ≥ 1 AND last

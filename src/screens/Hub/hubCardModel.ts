@@ -35,8 +35,6 @@ export interface HubCardModel {
   current: SkillNode
   /** `nodeProgress(p, current).unlocksNext` — null on a tree's last step. */
   unlocksNext: SkillNode | null
-  goodDays: number
-  requiredDays: number
   /**
    * Seed holes, one per required good day; true = a banked good day.
    * Letter sounds with per-vowel tracking shows the vowel being worked
@@ -95,8 +93,6 @@ export function buildHubCardModel(
     showLandNumber: getSettings(p).showLevelToMarian,
     current,
     unlocksNext: complete ? null : cur.unlocksNext,
-    goodDays: cur.goodDays,
-    requiredDays: cur.requiredDays,
     holes,
     complete,
   }
