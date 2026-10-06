@@ -5,11 +5,7 @@ import {
   sessionEndBeat,
 } from '../../lib/progress/pathBeats'
 import type { Progress, SkillNode } from '../../lib/progress'
-import {
-  END_CLIP_SECONDS,
-  WORLD_DONE_LINE_ID,
-  sessionEndGuidance,
-} from './sessionEndGuidance'
+import { END_CLIP_SECONDS, sessionEndGuidance } from './sessionEndGuidance'
 import { markNudgeSaid, nudgeSaidToday } from './notYetNudge'
 import { GUIDANCE_LINES } from '../../lib/emmasPath/guidanceLines'
 
@@ -151,7 +147,7 @@ describe('sessionEndGuidance (Guidance G2)', () => {
     expect(ids(g)).toEqual(['guide.end.not-yet.praise'])
   })
 
-  it('finishing the last step of a world: "3 of 3!" then the caption-only worldDone line', () => {
+  it('finishing the last step of a world: "3 of 3!" then Emma says "You grew your whole garden!" with its clip', () => {
     const d1 = entry('mult-6-9', 3, 1)
     const d2 = entry('mult-6-9', 4, 1)
     const today = entry('mult-6-9', 6, 1)
@@ -162,9 +158,16 @@ describe('sessionEndGuidance (Guidance G2)', () => {
     expect(g.day).toBe('world-done')
     expect(g.countText).toBe('3 of 3!')
     const last = g.lines[g.lines.length - 1]!
-    expect(last.id).toBe(WORLD_DONE_LINE_ID)
+    expect(ids(g)).toEqual([
+      'guide.end.right.8',
+      'guide.end.flower',
+      'guide.end.count.3',
+      'guide.end.world-done',
+    ])
     expect(last.text).toBe('You grew your whole garden!')
-    expect(last.src).toBeNull()
+    expect(last.src).toBe('/assets/audio/path/guide-end-world-done.mp3')
+    expect(last.beat).toBe('next')
+    expect(last.seconds).toBe(2.4)
   })
 
   it('a step already grown (review) is practice with a full tray', () => {

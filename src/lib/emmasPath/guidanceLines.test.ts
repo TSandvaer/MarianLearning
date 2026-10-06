@@ -16,6 +16,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'hub-sleeping': 2,
       'hub-both-sleeping': 1,
       'hub-woke': 1,
+      'hub-woke-one': 1,
       'hub-one-more': 1,
       'end-right': 2,
       'end-flower': 1,
@@ -24,11 +25,12 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       'end-path-opens': 1,
       'end-not-yet-praise': 1,
       'end-not-yet-again': 1,
+      'end-world-done': 1,
     })
-    expect(GUIDANCE_LINES).toHaveLength(17)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(17)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(17)
-    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(17)
+    expect(GUIDANCE_LINES).toHaveLength(19)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.id)).size).toBe(19)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.text)).size).toBe(19)
+    expect(new Set(GUIDANCE_LINES.map((l) => l.src)).size).toBe(19)
   })
 
   it('bakes each world and count variant', () => {
@@ -53,6 +55,12 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
     expect(guidanceLine('guide.end.right.8')?.text).toBe(
       'Eight right! You worked hard!',
     )
+    expect(guidanceLine('guide.hub.woke.one')?.text).toBe(
+      'Your flower woke up!',
+    )
+    expect(guidanceLine('guide.end.world-done')?.src).toBe(
+      '/assets/audio/path/guide-end-world-done.mp3',
+    )
     expect(guidanceLine('guide.end.right.7')?.src).toBe(
       '/assets/audio/path/guide-end-right-7.mp3',
     )
@@ -67,7 +75,7 @@ describe('GUIDANCE_LINES (Guidance G3)', () => {
       GUIDANCE_LINES.filter((l) =>
         l.src.startsWith('/assets/audio/path/guide-'),
       ),
-    ).toHaveLength(17)
+    ).toHaveLength(19)
   })
 
   it('repeats no Emma’s Path line', () => {
