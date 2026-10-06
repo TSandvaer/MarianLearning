@@ -28,6 +28,7 @@ export type GuidanceLineKind =
   | 'hub-sleeping'
   | 'hub-both-sleeping'
   | 'hub-woke'
+  | 'hub-woke-one'
   | 'hub-one-more'
   | 'end-right'
   | 'end-flower'
@@ -36,6 +37,7 @@ export type GuidanceLineKind =
   | 'end-path-opens'
   | 'end-not-yet-praise'
   | 'end-not-yet-again'
+  | 'end-world-done'
 
 export interface GuidanceLine {
   /** Dotted id, e.g. `guide.hub.suggest.math`. */
@@ -87,6 +89,8 @@ function buildLines(): GuidanceLine[] {
     'Both flowers are sleeping. Want to practise more?',
   )
   add('guide.hub.woke', 'hub-woke', 'Your flowers woke up!')
+  // Next morning when only one world had a sleeping flower.
+  add('guide.hub.woke.one', 'hub-woke-one', 'Your flower woke up!')
   add(
     'guide.hub.one-more',
     'hub-one-more',
@@ -120,6 +124,8 @@ function buildLines(): GuidanceLine[] {
     'end-not-yet-again',
     "Play again to get today's flower.",
   )
+  // The flower that finishes a world's last step.
+  add('guide.end.world-done', 'end-world-done', 'You grew your whole garden!')
   return lines
 }
 
