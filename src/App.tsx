@@ -90,6 +90,10 @@ import {
 } from './lib/progress'
 import { pendingUnlock } from './lib/progress/pathBeats'
 import {
+  now as progressNow,
+  nowMs as progressNowMs,
+} from './lib/progress/clock'
+import {
   createSubitisingRng,
   easyBandLeitnerMeanBox,
   easyBandSubLeitnerMeanBox,
@@ -374,7 +378,7 @@ function readProgressHintsForTrack(track: ProgressTrack): {
   // the canon-served free path is preserved exactly as before.
   let leitner: LeitnerSessionHintItem[] | undefined = undefined
   if (track === 'math') {
-    const due = dueLeitnerItems(progress.mathFactsLeitner, Date.now())
+    const due = dueLeitnerItems(progress.mathFactsLeitner, progressNowMs())
     const hint = buildLeitnerSessionHint(due)
     if (hint.length > 0) {
       leitner = hint
@@ -628,7 +632,7 @@ export default function App() {
     )
     try {
       const prev = readSessionHistory()
-      const next = markTreeTouched(prev, tree, new Date())
+      const next = markTreeTouched(prev, tree, progressNow())
       if (next !== prev) writeSessionHistory(next)
     } catch {
       // Storage failures are non-fatal — the suggestion algorithm

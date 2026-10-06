@@ -28,6 +28,7 @@
 
 import type { StorageAdapter } from '../Math/stardust'
 import { loadStardust } from '../Math/stardust'
+import { localDateKey, now as progressNow } from '../../lib/progress/clock'
 
 /** Single source of truth for the storage key. */
 export const SESSION_HISTORY_KEY = 'marian-tutor.session-history.v1'
@@ -282,10 +283,7 @@ export function differenceInCalendarDays(a: Date, b: Date): number {
  * `todayTreesTouched.date` key.
  */
 export function isoDate(now: Date): string {
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+  return localDateKey(now)
 }
 
 /**
@@ -345,7 +343,7 @@ export function readSessionHistoryForToday(
 export function recordSessionEnd(
   finalStreak: number,
   adapter: StorageAdapter = defaultAdapter(),
-  now: () => Date = () => new Date(),
+  now: () => Date = progressNow,
   earnedThisSession?: number,
 ): SessionHistoryV2 {
   const prev = readSessionHistory(adapter)
