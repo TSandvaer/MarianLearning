@@ -10,6 +10,10 @@
  * their caption and reach the player with src null (no Howl is built —
  * playMapLine.test.ts), and browser speech must never be used.
  *
+ * Clay redesign (Redesign R3, ClickUp 123jpnbc690): stickers on plinths,
+ * stepping stones, garden-arch gates, land pills, Emma behind the current
+ * stop — all art from the `pathArt` manifest (`/assets/path/*.webp`).
+ *
  * Screenshots (820×1180, iPad portrait in CSS px) go to
  * design/emmas-path/screens/ for the PR.
  */
@@ -190,6 +194,47 @@ async function speakCalls(page: Page): Promise<number> {
   )
 }
 
+interface Rect {
+  left: number
+  top: number
+  right: number
+  bottom: number
+}
+
+/** Every map image comes from the manifest and has decoded. */
+async function expectArtLoaded(page: Page) {
+  await expect
+    .poll(() =>
+      page
+        .getByTestId('map')
+        .locator('img')
+        .evaluateAll((imgs) =>
+          (imgs as HTMLImageElement[]).every(
+            (i) => i.complete && i.naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true)
+  const srcs = await page
+    .getByTestId('map-path')
+    .locator('img[data-art]')
+    .evaluateAll((imgs) =>
+      (imgs as HTMLImageElement[]).map((i) => i.getAttribute('src') ?? ''),
+    )
+  for (const src of srcs)
+    expect(src).toMatch(/^\/assets\/path\/[a-z0-9-]+-256\.webp$/)
+}
+
+async function rectOf(page: Page, selector: string): Promise<Rect> {
+  return page
+    .locator(selector)
+    .first()
+    .evaluate((n) => {
+      const r = n.getBoundingClientRect()
+      return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+    })
+}
+
 test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
   test('Hub map buttons are 64px pills that open each world, not a session', async ({
     page,
@@ -242,7 +287,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await page.screenshot({ path: `${SHOTS}/map-word-first-launch.png` })
   })
 
-  test('first launch Number Garden: Emma on add-to-10, whole map fits, 72px stops / 88px targets', async ({
+  test('first launch Number Garden: Emma behind add-to-10, whole map fits, clay stickers on plinths', async ({
     page,
   }) => {
     await arm(page, null)
@@ -257,14 +302,21 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       'add-to-10',
     )
     await expect(page.getByTestId('map-stop')).toHaveCount(11)
+    await expect(page.getByTestId('map-plinth')).toHaveCount(11)
     await expect(page.getByTestId('map-band')).toHaveCount(4)
     await expect(page.getByTestId('map-gate')).toHaveCount(3)
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
+    await expect(page.getByTestId('map-title')).toHaveText('Number Garden')
     await expect(ribbon(page)).toHaveText(
       'Here is your path! You are on adding to ten.',
     )
     await expect
       .poll(() => playedSrcs(page))
       .toContain('/assets/audio/path/path-open-add-to-10.mp3')
+    await expectArtLoaded(page)
+    await expect(
+      stop(page, 'add-to-10').locator('img[data-art="add-to-10"]'),
+    ).toHaveCount(1)
 
     // No scrolling at 820×1180.
     const scroll = await page.evaluate(() => ({
@@ -276,18 +328,15 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     expect(scroll.sh).toBeLessThanOrEqual(scroll.ih)
     expect(scroll.sw).toBeLessThanOrEqual(scroll.iw)
 
-    // Every stop: 72px disc, 88px tap target, fully inside the viewport.
+    // Every stop: ≥ 88px tap target, fully inside the viewport, no two
+    // overlapping; the current stop is the biggest.
     const boxes = await page.getByTestId('map-stop').evaluateAll((nodes) =>
       nodes.map((n) => {
         const r = n.getBoundingClientRect()
-        const d = n
-          .querySelector('[data-testid="map-stop-disc"]')!
-          .getBoundingClientRect()
         return {
+          node: n.getAttribute('data-node'),
           w: r.width,
           h: r.height,
-          dw: d.width,
-          dh: d.height,
           top: r.top,
           bottom: r.bottom,
           left: r.left,
@@ -296,15 +345,52 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       }),
     )
     for (const b of boxes) {
-      expect(b.w).toBe(88)
-      expect(b.h).toBe(88)
-      expect(b.dw).toBe(72)
-      expect(b.dh).toBe(72)
+      expect(b.w).toBeGreaterThanOrEqual(88)
+      expect(b.h).toBe(b.w)
       expect(b.top).toBeGreaterThanOrEqual(0)
       expect(b.bottom).toBeLessThanOrEqual(1180)
       expect(b.left).toBeGreaterThanOrEqual(0)
       expect(b.right).toBeLessThanOrEqual(820)
     }
+    for (let i = 0; i < boxes.length; i++)
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i]!
+        const c = boxes[j]!
+        const hit =
+          a.left < c.right &&
+          c.left < a.right &&
+          a.top < c.bottom &&
+          c.top < a.bottom
+        expect(hit, `${a.node} overlaps ${c.node}`).toBe(false)
+      }
+    const cur = boxes.find((b) => b.node === 'add-to-10')!
+    for (const b of boxes.filter((x) => x !== cur))
+      expect(b.w).toBeLessThan(cur.w)
+
+    // Real Emma stands BEHIND the current stop: centred on it, her head
+    // above it, stacked under it, with a soft contact shadow.
+    const emma = await rectOf(page, '[data-testid="map-emma"]')
+    expect((emma.left + emma.right) / 2).toBeCloseTo(
+      (cur.left + cur.right) / 2,
+      0,
+    )
+    expect(emma.top).toBeLessThan(cur.top)
+    const z = await page.evaluate(() => {
+      const zi = (sel: string) =>
+        Number(getComputedStyle(document.querySelector(sel)!).zIndex)
+      return {
+        emma: zi('[data-testid="map-emma"]'),
+        stop: zi('[data-testid="map-stop"]'),
+        gate: zi('[data-testid="map-gate"]'),
+      }
+    })
+    expect(z.emma).toBeLessThan(z.stop)
+    expect(z.emma).toBeLessThan(z.gate)
+    await expect(page.getByTestId('map-emma-shadow')).toHaveCount(1)
+    await expect(page.getByTestId('map-current-glow')).toHaveCount(1)
+    // The current stop shows its buds, nothing else does.
+    await expect(page.getByTestId('map-buds')).toHaveCount(1)
+    await expect(stop(page, 'add-to-10').getByTestId('map-bud')).toHaveCount(3)
     await page.screenshot({ path: `${SHOTS}/map-math-first-launch.png` })
   })
 
@@ -357,16 +443,42 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await expect(
       stop(page, current).locator('[data-testid="map-bud"][data-open="true"]'),
     ).toHaveCount(2)
-    // Mastered stops carry the flower badge; locked ones frost + padlock.
+    // Mastered stops carry the bloom badge; locked ones are pale + padlock.
     await expect(page.getByTestId('map-flower-badge')).toHaveCount(5)
     await expect(page.getByTestId('map-stop-frost')).toHaveCount(5)
     await expect(page.getByTestId('map-stop-padlock')).toHaveCount(5)
-    // Gates: 2 and 3 open (first step not locked), 4 closed.
+    const frost = await page
+      .getByTestId('map-stop-frost')
+      .first()
+      .evaluate((n) => getComputedStyle(n).filter)
+    expect(frost).toContain('saturate(0.2)')
+    expect(frost).toContain('opacity(0.62)')
+    // Gates: 2 and 3 open (first step not locked), 4 closed. The closed
+    // arch art carries its own padlock: nothing is overlaid on a gate.
     await expect(gate(page, 2)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 3)).toHaveAttribute('data-open', 'true')
     await expect(gate(page, 4)).toHaveAttribute('data-open', 'false')
-    // Land pebbles shown (showLevelToMarian on).
-    await expect(page.getByTestId('map-land-pebble')).toHaveCount(4)
+    await expect(
+      gate(page, 2).locator('img[data-art="ui-arch-open"]'),
+    ).toHaveCount(1)
+    await expect(
+      gate(page, 4).locator('img[data-art="ui-arch-closed"]'),
+    ).toHaveCount(1)
+    await expect(
+      page.getByTestId('map-gate').locator('img[data-art="ui-padlock"]'),
+    ).toHaveCount(0)
+    // Stepping stones: walked (pink) up to the current stop, ahead after.
+    const stones = await page
+      .getByTestId('map-stone')
+      .evaluateAll((n) => n.map((s) => s.getAttribute('data-walked')))
+    expect(stones.length).toBeGreaterThan(8)
+    const firstAhead = stones.indexOf('false')
+    expect(firstAhead).toBeGreaterThan(0)
+    expect(stones.slice(firstAhead).every((w) => w === 'false')).toBe(true)
+    // Land pills with their numbers (showLevelToMarian on).
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
+    await expect(page.getByTestId('map-land-number')).toHaveCount(4)
+    await expectArtLoaded(page)
     await page.screenshot({ path: `${SHOTS}/map-math-mid-tree.png` })
 
     // Open (mastered) stop → its name.
@@ -473,6 +585,11 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
       'data-node',
       'cvc-words-short-o',
     )
+    await expect(page.getByTestId('map-title')).toHaveText('Word Song')
+    await expectArtLoaded(page)
+    await expect(
+      gate(page, 5).locator('img[data-art="ui-arch-closed"]'),
+    ).toHaveCount(1)
     await expect(ribbon(page)).toHaveText(
       'Here is your path! You are on dog words.',
     )
@@ -545,12 +662,13 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     expect(probe.sessionStarts).toHaveLength(startsBefore)
   })
 
-  test('showLevelToMarian=false hides the land pebbles only', async ({
+  test('showLevelToMarian=false hides the land numbers only', async ({
     page,
   }) => {
     await arm(page, seedProgress({ math: 3, showLevelToMarian: false }))
     await openMapFromHub(page, 'math')
-    await expect(page.getByTestId('map-land-pebble')).toHaveCount(0)
+    await expect(page.getByTestId('map-land-pill')).toHaveCount(4)
+    await expect(page.getByTestId('map-land-number')).toHaveCount(0)
     await expect(page.getByTestId('map-stop')).toHaveCount(11)
     await expect(page.getByTestId('map-gate')).toHaveCount(3)
   })
