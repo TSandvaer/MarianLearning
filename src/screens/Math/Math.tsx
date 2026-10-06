@@ -3337,12 +3337,12 @@ function MathScreen({
                         }
                   }
                   // Clay press: the face sinks onto its slab (the CSS
-                  // `.clay-press:active` drops the slab by the same 6px).
+                  // `.clay-press:active` drops the slab by the same 4px).
                   // MotionConfig reducedMotion="user" skips the transform.
                   whileTap={
                     problemState.resolved || dimForGuided || !chipGateOpen
                       ? undefined
-                      : { y: 6 }
+                      : { y: 4 }
                   }
                   transition={
                     isShaking
