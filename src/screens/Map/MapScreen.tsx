@@ -443,7 +443,7 @@ export function MapScreen({
                       bottom: '-22%',
                       height: '22%',
                       background:
-                        'radial-gradient(ellipse at 50% 50%, rgba(70,40,15,0.34) 0, rgba(70,40,15,0.16) 45%, rgba(70,40,15,0) 70%)',
+                        'radial-gradient(ellipse at 50% 50%, rgba(80,45,15,0.5) 0, rgba(80,45,15,0.28) 40%, rgba(80,45,15,0) 70%)',
                     }}
                   />
                   {/* Two small arcs while she hops (spec §6, 700 ms). */}

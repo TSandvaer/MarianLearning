@@ -29,7 +29,7 @@ export const GATE_TAP = 88
 /** Gate centre's distance from the region's side edge. */
 export const GATE_INSET = 64
 /** First / last stop centre's distance from the side edge. */
-export const STOP_INSET = 180
+export const STOP_INSET = 190
 /** Stop centre, as a fraction of the band height from the band top. */
 const STOP_Y = 0.58
 /** Band inset from the region's side edges. */
