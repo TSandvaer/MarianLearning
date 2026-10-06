@@ -811,6 +811,19 @@ export default function App() {
     setRoute('hub')
   }, [sessionEndPayload])
 
+  /**
+   * Session-End "Again" on a not-yet day (Guidance G2, 123jpnbca4t):
+   * another session in the same world. Same audio teardown as "All
+   * done", then the Hub card-tap path (prefetch staleness check, tree
+   * touched, route) — so the new session starts exactly as from the Hub.
+   */
+  const handleSessionEndAgain = useCallback(() => {
+    const wordSong = sessionEndPayload?.surface === 'word-song'
+    if (wordSong) tearDownWordSongAudioRef.current?.()
+    else tearDownMathAudioRef.current?.()
+    handleHubPickTree(wordSong ? 'word-song' : 'number-garden')
+  }, [sessionEndPayload, handleHubPickTree])
+
   const handleMathComplete = useCallback((result: MathSessionResult) => {
     // Math's existing payload omits the `surface` discriminant per
     // PR #54 / screen-3-math.md:411 — the Session-End spec's
@@ -2089,6 +2102,7 @@ export default function App() {
               payload={sessionEndPayload}
               playUtteranceFn={sessionEndPlayUtterance}
               onAllDone={handleSessionEndAllDone}
+              onAgain={handleSessionEndAgain}
             />
           )}
           {route === 'map' && (

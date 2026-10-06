@@ -1,26 +1,30 @@
 /**
- * Screen 5 -- Session End.
+ * Screen 5 -- Session End, with the guidance layer (Guidance G2, ClickUp
+ * 123jpnbca4t; folds in the R4 clay reskin).
  *
- * Spec: `design/screen-5-session-end.md`
+ * Reference: `design/emmas-path/redesign/guidance-mockup.html` screens
+ * b / e / f, team/DECISIONS.md "2026-10-06 — Guidance layer approved",
+ * quality bars 9-14. Emma carries the child through one beat order:
  *
- * Mounts after problem 8 on either Math or Word Song. Shows a calm,
- * predictable closing moment: stardust count-up, optional streak band,
- * spoken goodbye via Path A TTS, and a single "All done!" CTA that leads
- * to the Option C sleep splash.
+ *   1. effort praise ("Seven right! You worked hard!");
+ *   2. on a good day the new flower appears and flies into its slot
+ *      ("You got a flower!"), then "N of 3";
+ *   3. what comes next and when: "It sleeps tonight. Come back tomorrow
+ *      for one more." / "A new path opens. Look!" (All done then opens
+ *      the map's unlock beat) / the finished-world line.
  *
- * This is NOT a results screen or a report card. It celebrates "you did
- * the thing" without quantifying wrongs, ranking against past self, or
- * dangling a re-engagement nudge.
+ * A not-yet day (under 7 of 8) gets warm praise, an untouched tray and,
+ * once a day per world, "Play again to get today's flower.", with Again
+ * and Home buttons. A same-day replay after today's flower is praised
+ * practice with no new flower. Never a negative beat, never a red X.
  *
- * Audio contract
- * --------------
- * All TTS is routed through `playUtteranceFn` (backed by
- * `sessionAudio.playSessionUtterance` in production). The session-start
- * audio bundle includes all Session-End utterances pre-rendered. This
- * screen does NOT use `lib/tts.speak()` or `preRecorded.playGreetLine()`.
+ * Stars are in-session feedback only: no stardust total here and nothing
+ * collects into the flower. The stardust data writes are unchanged.
  *
- * The audio context is already gesture-unlocked from the last tap on
- * Math/Word Song's problem 8. `useAudioUnlockGate` is NOT used here.
+ * Audio: Emma's guidance lines (PR #512, `guidanceLines.ts`) play through
+ * the map line player; each beat waits for its clip to end, with the real
+ * clip length as the floor (`END_CLIP_SECONDS`). The celebration is
+ * derived from the one session-end write, so it never replays.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -28,31 +32,26 @@ import { AnimatePresence, m } from 'motion/react'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { cancelSessionAudio } from '../../lib/audio'
 import type { PlaySessionUtteranceOptions } from '../../lib/audio'
-import StardustCounter from './StardustCounter'
-import StreakBand from './StreakBand'
 import SleepSplash from './SleepSplash'
 import { recordSessionEnd } from './sessionHistory'
-import { now as progressNow } from '../../lib/progress/clock'
+import { localDateKey, now as progressNow } from '../../lib/progress/clock'
 import { recordProgressOnSessionEnd } from './progressHistory'
-import { focusRecapLine } from './friendlyNodeName'
-import { BudBeat } from './BudBeat'
-import { BUD_OPEN_DELAY_S } from './budGroups'
-import { pathLine } from '../../lib/emmasPath/pathLines'
 import {
   sessionEndBeat,
   type SessionEndBeat,
 } from '../../lib/progress/pathBeats'
 import { createMapLinePlayer, type MapLinePlayer } from '../Map/playMapLine'
+import { PathImg, SpeakerIcon } from '../Map/mapParts'
 import {
   defaultProgress,
   isGraduationSessionPending,
   loadProgress,
   pickFocusNode,
-  type FocusMode,
   type Progress,
   type ProgressTrack,
   type SkillNode,
 } from '../../lib/progress'
+import type { FocusMode } from '../../lib/progress'
 import { WORD_SONG_NOVEL_PROBE_WORDS } from '../../../api/_plannerWordList'
 import type { GraduationSessionSplit, LeitnerOutcome } from './progressHistory'
 import type { StorageAdapter } from '../Math/stardust'
@@ -61,7 +60,18 @@ import {
   WORDSONG_SESSION_END_BONUS,
   grantWordSongCompletionBonus,
 } from '../_shared/wordSongCompletionBonus'
-import type { ReactElement } from 'react'
+import {
+  sessionEndGuidance,
+  type EndBeat,
+  type EndLine,
+  type FlowerSlot,
+  type SessionEndGuidance,
+} from './sessionEndGuidance'
+import { markNudgeSaid, nudgeSaidToday } from './notYetNudge'
+import './sessionEndClay.css'
+import type { CSSProperties, ReactElement } from 'react'
+
+// ── Public types ------------------------------------------------------------
 
 // ── Public types ------------------------------------------------------------
 
@@ -252,7 +262,9 @@ export interface SessionEndPayload {
 
 /**
  * Signature for playing one pre-rendered session-end utterance by id.
- * Backed by `sessionAudio.playSessionUtterance` in production.
+ * Kept for App.tsx's `playUtteranceFn` wiring; the guidance layer plays
+ * its own Lily lines (G2) and no longer uses the planner's
+ * `session.end.*` bundle.
  */
 export type PlayUtteranceFn = (
   utteranceId: string,
@@ -263,77 +275,54 @@ export interface SessionEndProps {
   /** Payload from the originating screen's `onSessionComplete`. */
   payload: SessionEndPayload | null
   /**
-   * Optional: fires when Marian taps "All done!". When provided, the
-   * screen routes to Hub via this handler instead of falling through
-   * to the legacy Sleep splash. Wired by App.tsx as part of the Hub
-   * navigation contract (`design/screen-hub.md` § "Q4: Session-End →
-   * Hub flip"). When `undefined` the legacy Sleep-splash path runs —
-   * preserved for unit tests + the dark-launch fallback Thomas
-   * approves.
+   * Fires when Marian taps "All done" (or "Home" on a not-yet day). App.tsx
+   * routes to the map when an unlock is waiting, else to the Hub. When
+   * `undefined` the legacy Sleep splash renders (unit tests).
    */
   onAllDone?: () => void
-  /** Test seam: replace the live Path A playback function. */
+  /**
+   * Not-yet day "Again": start another session in the same world. No
+   * Again button renders when this is absent.
+   */
+  onAgain?: () => void
+  /**
+   * @deprecated Ignored since Guidance G2 (the planner's `session.end.*`
+   * lines are not played any more). Still accepted so App.tsx's wiring
+   * compiles unchanged.
+   */
   playUtteranceFn?: PlayUtteranceFn
-  /** Test seam: replace chime SFX. */
+  /** Test seam: replace chime SFX (button tap). */
   chime?: Sfx
-  /** Test seam: replace sparkle SFX. */
+  /** Test seam: replace sparkle SFX (flower lands). */
   sparkle?: Sfx
-  /** Test seam: replace plink SFX. */
-  plink?: Sfx
   /** Test seam: replace localStorage adapter. */
   storage?: StorageAdapter
   /** Test seam: clock injection. */
   now?: () => Date
-  /** Test seam: player for the Emma's Path bud line (`end.bud.*`). */
+  /** Test seam: player for Emma's guidance lines. */
   createPathPlayer?: () => MapLinePlayer
 }
 
-// ── Sequence phases ---------------------------------------------------------
+// ── Sequence ----------------------------------------------------------------
 
 type Phase =
-  | 'opener' // t=0: "You did it!" + sparkle burst
-  | 'focus-recap' // t~1100: "You worked on <friendly-name> today!" (M5). SKIPPED entirely (never entered) when the `session.end.recap.focus` utterance is unavailable/rejects — see the focus-recap block in the TTS sequence effect (M5 #451 graceful skip).
-  | 'recap' // t~2500: stardust count-up + "You earned N stars!"
-  | 'bud' // after recap, good day banked: bud beat (Emma's Path 9/10)
-  | 'streak' // t~4500: streak band (if finalStreak >= 3)
-  | 'goodbye' // t~6100: "See you soon."
-  | 'settled' // t~7300: CTA visible, idle
-  | 'sleep-splash' // post-CTA-tap
+  | 'pending' // before the first line
+  | EndBeat // 'praise' | 'flower' | 'count' | 'next'
+  | 'settled' // every line said, buttons up
+  | 'sleep-splash' // legacy post-CTA path
 
-// ── Timing constants (spec section "Audio dispatch sequence") ---------------
+type FlowerStage = 'hidden' | 'pop' | 'fly' | 'landed'
 
-const OPENER_DELAY_MS = 0
-// M5 (ticket 86c9kmwh0): the focus-recap beat ("You worked on … today!")
-// lands between the opener and the stardust recap. The downstream beats
-// (recap / streak / goodbye / CTA) each shift +1100ms to keep the same
-// ~1.4-2s breathing room between spoken lines that the pre-M5 sequence had.
-const FOCUS_RECAP_DELAY_MS = 1100
-const RECAP_DELAY_MS = 2500
-const STREAK_DELAY_MS = 4500
-const GOODBYE_DELAY_MS = 6100
-const CTA_DELAY_MS = 7300
-// Emma's Path 9/10: the bud beat follows the stardust tally after one
-// short gap; its line is capped so a stalled MP3 never holds the screen.
-const BUD_DELAY_MS = 600
-const BUD_LINE_MAX_MS = 6000
-// Fallback CTA reveal if all audio fails. Bumped +1100ms in lockstep with
-// the focus-recap shift so the silent-audio path still settles AFTER the
-// last spoken beat would have, never before it.
-const FALLBACK_CTA_DELAY_MS = 5100
-
-// ── Spring presets (spec section "Motion") ----------------------------------
-
-const RIBBON_SPRING = {
-  type: 'spring' as const,
-  stiffness: 260,
-  damping: 20,
-}
-
-const CTA_SPRING = {
-  type: 'spring' as const,
-  stiffness: 300,
-  damping: 16,
-}
+/** Pause between Emma's lines. */
+const BEAT_GAP_MS = 300
+/** A clip that never ends is given up on this long after its length. */
+const LINE_SLACK_MS = 1500
+/** The flower pops in, holds, then flies to its slot (lands ≈ the end of
+ *  the 1.52 s "You got a flower!" clip). */
+const FLOWER_FLY_AT_MS = 650
+const FLOWER_LAND_AT_MS = 1450
+/** Buttons appear at the latest this long after mount, whatever audio does. */
+const FALLBACK_CTA_MS = 20_000
 
 // ── Reduce-motion hook (copied from Greet pattern) --------------------------
 
@@ -362,10 +351,9 @@ function usePrefersReducedMotion(): boolean {
 export default function SessionEnd({
   payload,
   onAllDone,
-  playUtteranceFn,
+  onAgain,
   chime: chimeProp,
   sparkle: sparkleProp,
-  plink: plinkProp,
   storage,
   now,
   createPathPlayer = createMapLinePlayer,
@@ -390,52 +378,15 @@ export default function SessionEnd({
   }, [payload])
 
   /**
-   * Word-song completion bonus (ticket 86c9kwvza, locked 2026-05-02).
-   *
-   * Per Dave's audit, word-song stardust moved from per-correct-tap to
-   * per-session-end. WordSong no longer mutates the stardust store while
-   * Marian is playing; the flat `+WORDSONG_SESSION_END_BONUS` is granted
-   * here, in the mount effect, alongside the other session-end persistence
-   * writes. Math is unchanged — its grants land per-correct inside Math.tsx.
-   *
-   * `displayedTotalStardust` is what the counter ticks up to AND what the
-   * `data-total-stardust` data-attribute exposes for QA. For math it equals
-   * `payload.totalStardust` (already includes the in-session grants). For
-   * word-song it equals `payload.totalStardust + WORDSONG_SESSION_END_BONUS`
-   * because the bonus has not yet been folded into the payload at the point
-   * Marian's last chip-tap fires `onSessionComplete`.
+   * Word-song completion bonus (ticket 86c9kwvza): granted here at
+   * session end. Nothing shows a stardust total any more (G2); the
+   * data attributes below keep exposing it for QA and specs.
    */
   const wordSongCompletionGrant =
     p.surface === 'word-song' ? WORDSONG_SESSION_END_BONUS : 0
   const displayedTotalStardust = p.totalStardust + wordSongCompletionGrant
   const displayedEarnedThisSession =
     p.surface === 'word-song' ? wordSongCompletionGrant : p.earnedThisSession
-
-  /**
-   * Focus-recap copy (M5, ticket 86c9kmwh0): "You worked on <friendly-name>
-   * today!". The friendly name is derived from the session's focus node —
-   * the SAME `pickFocusNode(loadProgress() ?? defaultProgress(), track)`
-   * derivation the mount-persistence effect uses below. Computed once via a
-   * lazy initializer so it reflects the focus node as it was at SESSION-
-   * START: `applyMasteryRule()` (which could shift `skillLevels`) only runs
-   * INSIDE `recordProgressOnSessionEnd` in the mount effect, which has not
-   * fired yet at first render — so this read sees exactly what the planner
-   * saw, matching the P0.2 invariant documented on the mount effect.
-   */
-  const [focusRecapCopy] = useState<string>(() => {
-    // ticket 86ca9atqh: prefer the threaded session focus node so the recap
-    // names the tier the session ACTUALLY ran under (a periodic CVC review
-    // names the reviewed CVC tier, not the sessionCount-blind forward node).
-    // Falls back to the re-derivation for hand-built fixtures.
-    if (payload?.sessionFocus) {
-      return focusRecapLine(payload.sessionFocus.node)
-    }
-    const progressForFocus = loadProgress() ?? defaultProgress()
-    const track = trackForSurface(payload?.surface ?? 'math')
-    // `.node` — the recap copy only needs the focus node, not the
-    // forward/cvc-review mode (ticket 86c9qa6n3 widened the return shape).
-    return focusRecapLine(pickFocusNode(progressForFocus, track).node)
-  })
 
   // ── SFX instances (lazy-init, one per mount) ----------------------------
 
@@ -448,38 +399,31 @@ export default function SessionEnd({
     () =>
       sparkleProp ?? createSfx({ src: '/assets/sfx-sparkle.mp3', volume: 0.7 }),
   )
-  const [plinkInstance] = useState<Sfx>(
-    () => plinkProp ?? createSfx({ src: '/assets/sfx-plink.mp3', volume: 0.6 }),
-  )
 
-  // ── Phase state machine -------------------------------------------------
+  // ── State -----------------------------------------------------------------
 
-  const [phase, setPhase] = useState<Phase>('opener')
-  const [captionText, setCaptionText] = useState('')
-  const [captionRevealed, setCaptionRevealed] = useState(0)
-  const [showStardustCounter, setShowStardustCounter] = useState(false)
-  const [showStreakBand, setShowStreakBand] = useState(false)
+  const [phase, setPhase] = useState<Phase>('pending')
+  const [caption, setCaption] = useState('')
   const [showCta, setShowCta] = useState(false)
   const [ctaTapping, setCtaTapping] = useState(false)
-
-  // Emma's Path 9/10 — what this session earned, computed once from the
-  // session-end write (`sessionEndBeat`). The bud card renders from state
-  // set when the sequence reaches the bud beat.
-  const beatRef = useRef<SessionEndBeat | null>(null)
-  const pathPlayerRef = useRef<MapLinePlayer | null>(null)
+  const [flower, setFlower] = useState<FlowerStage>('hidden')
+  const [flyTo, setFlyTo] = useState<{ x: number; y: number } | null>(null)
   const [beatKind, setBeatKind] = useState<SessionEndBeat['kind'] | null>(null)
-  const [budBeat, setBudBeat] = useState<Extract<
-    SessionEndBeat,
-    { kind: 'bud' }
-  > | null>(null)
+
+  // What this session earned, computed once from the session-end write.
+  const beatRef = useRef<SessionEndBeat | null>(null)
+  const guidanceRef = useRef<SessionEndGuidance | null>(null)
+  const [guidance, setGuidance] = useState<SessionEndGuidance | null>(null)
+  const pathPlayerRef = useRef<MapLinePlayer | null>(null)
+
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const flowerRef = useRef<HTMLDivElement | null>(null)
 
   // Refs for timer cleanup
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
-  const audioFailedRef = useRef(false)
 
   const addTimer = useCallback((cb: () => void, ms: number) => {
     const id = setTimeout(() => {
-      // Remove from the tracked list
       timersRef.current = timersRef.current.filter((t) => t !== id)
       cb()
     }, ms)
@@ -495,19 +439,11 @@ export default function SessionEnd({
   // ── Persist session history on mount (spec section "localStorage") ------
   //
   // Two writes land here, both gated to mount-once:
-  //   1. `recordSessionEnd` -> `marian-tutor.session-history.v1` (Hub stats:
-  //      session count, day-streak, lastPlayed, etc.)
-  //   2. `recordProgressOnSessionEnd` -> `marian-tutor:progress:v1` (adaptive
-  //      engine plumbing: rolling SessionHistoryEntry list capped at 30, plus
-  //      profile.lastPlayedISO). Ticket 86c9kmu63 is the first production
-  //      caller of `saveProgress` — until now the progress blob was only
-  //      exercised by unit tests.
-  //
-  // Both writes use the same wall-clock instant for clean cross-payload
-  // correlation. The progress write goes through its own helper so the
-  // SessionEnd component stays UI-only; the helper handles `loadProgress
-  // ?? defaultProgress()` and the `MAX_SESSION_HISTORY=30` trim is enforced
-  // inside `saveProgress`.
+  //   1. `recordSessionEnd` -> `marian-tutor.session-history.v1`
+  //   2. `recordProgressOnSessionEnd` -> `marian-tutor:progress:v1`
+  // Both use the same wall-clock instant. The guidance model (which day
+  // this was, the tray, Emma's lines) is derived from the before/after
+  // docs of that one write, so it is computed once and never replays.
 
   useEffect(() => {
     // The progress clock honours the test-only `?debug=1&dayOffset=N`
@@ -675,583 +611,394 @@ export default function SessionEnd({
         ? { currentTargetVowel: p.currentTargetVowel }
         : {}),
     })
-    // Emma's Path 9/10: before = the doc this session started from, after
-    // = the doc just saved. `??=` keeps the first answer if the effect runs
-    // twice (StrictMode dev re-run would see its own write as `before`).
+    // Emma's Path 9/10 + Guidance G2: before = the doc this session started
+    // from, after = the doc just saved. `??=` keeps the first answer if the
+    // effect runs twice (StrictMode dev re-run would see its own write as
+    // `before`).
     beatRef.current ??= sessionEndBeat(
       progressForFocus,
       savedProgress,
       focusNode,
     )
+    if (guidanceRef.current === null) {
+      const today = localDateKey(clock())
+      const world = trackForSurface(p.surface)
+      const g = sessionEndGuidance({
+        before: progressForFocus,
+        after: savedProgress,
+        node: focusNode,
+        ...(p.currentTargetVowel !== undefined
+          ? { vowel: p.currentTargetVowel }
+          : {}),
+        beat: beatRef.current,
+        totalCorrect: p.totalCorrect,
+        today,
+        nudgeSaidToday: nudgeSaidToday(world, today, storage),
+      })
+      // "Play again to get today's flower" is said at most once a day:
+      // marked as said the moment it is scheduled, so a reload or an
+      // early Home tap never earns a second one.
+      if (g.lines.some((l) => l.id === 'guide.end.not-yet.again')) {
+        markNudgeSaid(world, today, storage)
+      }
+      guidanceRef.current = g
+      setGuidance(g)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Play utterance helper (tolerant of missing fn) ----------------------
+  // ── Speak one line: wait for the clip to end, never less than its length,
+  //    never longer than its length + slack. --------------------------------
 
-  const playUtterance = useCallback(
-    (
-      utteranceId: string,
-      opts?: PlaySessionUtteranceOptions,
-    ): Promise<void> => {
-      if (!playUtteranceFn) {
-        // Silent fallback: fire onPlay immediately, tick words linearly
-        // at 165 wpm so caption still reveals. Matches Math's default.
-        return new Promise<void>((resolve) => {
-          opts?.onPlay?.()
-          opts?.onWordTick?.(0)
+  const speak = useCallback(
+    (line: EndLine): Promise<void> =>
+      new Promise<void>((resolve) => {
+        let audioDone = false
+        let floorDone = false
+        let finished = false
+        const finish = () => {
+          if (finished) return
+          finished = true
           resolve()
+        }
+        const check = () => {
+          if (audioDone && floorDone) finish()
+        }
+        addTimer(() => {
+          floorDone = true
+          check()
+        }, line.seconds * 1000)
+        addTimer(finish, line.seconds * 1000 + LINE_SLACK_MS)
+        pathPlayerRef.current ??= createPathPlayer()
+        void pathPlayerRef.current.play(line).then(() => {
+          audioDone = true
+          check()
         })
-      }
-      return playUtteranceFn(utteranceId, opts)
-    },
-    [playUtteranceFn],
+      }),
+    [addTimer, createPathPlayer],
   )
 
-  // ── Orchestrate the TTS sequence on mount -------------------------------
+  // ── Flower flight: measured from the floating flower to its hole ---------
+
+  const measureFlight = useCallback(
+    (slot: number): { x: number; y: number } | null => {
+      const hole = panelRef.current?.querySelector<HTMLElement>(
+        `[data-slot-index="${slot}"]`,
+      )
+      const fl = flowerRef.current
+      if (!hole || !fl) return null
+      const a = fl.getBoundingClientRect()
+      const b = hole.getBoundingClientRect()
+      return {
+        x: b.left + b.width / 2 - (a.left + a.width / 2),
+        y: b.top + b.height / 2 - (a.top + a.height / 2),
+      }
+    },
+    [],
+  )
+
+  // ── Orchestrate the beats on mount ---------------------------------------
 
   useEffect(() => {
-    // Fallback timer: surface CTA even if all audio fails
-    const fallbackTimerId = addTimer(() => {
-      if (!showCta) {
-        setShowCta(true)
-        setPhase('settled')
-      }
-    }, FALLBACK_CTA_DELAY_MS)
+    let cancelled = false
+    const fallback = addTimer(() => setShowCta(true), FALLBACK_CTA_MS)
 
-    // t=0: Opener -- "You did it!"
-    const runSequence = async () => {
+    const run = async () => {
+      const g = guidanceRef.current
       setBeatKind(beatRef.current?.kind ?? 'none')
-      try {
-        // Play sparkle SFX on entry
-        sparkleInstance.play()
-
-        // Play opener utterance
-        setPhase('opener')
-        await new Promise<void>((resolve, reject) => {
-          const timer = addTimer(() => {
-            playUtterance('session.end.opener', {
-              onPlay: () => {
-                // Cancel the fallback timer -- audio is working
-                clearTimeout(fallbackTimerId)
-                timersRef.current = timersRef.current.filter(
-                  (t) => t !== fallbackTimerId,
-                )
-              },
-              onWordTick: (wordIndex) => {
-                setCaptionText('You did it!')
-                setCaptionRevealed(wordIndex + 1)
-              },
-            })
-              .then(resolve)
-              .catch(reject)
-          }, OPENER_DELAY_MS)
-          // If timer never fires (shouldn't happen but be defensive)
-          if (timer === undefined) resolve()
-        })
-      } catch (err) {
-        console.warn('[SessionEnd] opener utterance failed:', err)
-        audioFailedRef.current = true
-      }
-
-      // t=1100: Focus recap -- "You worked on <friendly-name> today!" (M5,
-      // ticket 86c9kmwh0). One new spoken beat, surface-independent.
-      //
-      // GRACEFUL SKIP (Thomas-approved, M5 #451 follow-up to Jessica's #453
-      // P1). Audio id `session.end.recap.focus` is NOT in the committed canon
-      // bundle yet (the planner directive that emits it ships separately;
-      // re-baking all tiers is M5-out-of-scope). On a real device pre-bake the
-      // id misses the howl-map and the singleton `playSessionUtterance`
-      // REJECTS without ever firing `onPlay`/`onWordTick` — so we must NOT
-      // commit the `focus-recap` phase up front: doing so leaves a dead pause
-      // (phase delay, no audio, no caption) for the whole inter-beat gap,
-      // which Jessica's #453 caught. A captioned-but-silent line would also
-      // violate audio-first.
-      //
-      // So we attempt the utterance FIRST and only enter the `focus-recap`
-      // phase + reveal the caption REACTIVELY, from inside `onPlay`/
-      // `onWordTick` — i.e. only when the utterance actually engages. If it
-      // rejects (unbaked id on a real device), we skip the phase entirely:
-      // no phase flip, no caption, no dwell. The sequence collapses cleanly
-      // to the next beat with no dead pause. Once the clip is baked, the
-      // utterance plays and the beat engages normally with audio + caption,
-      // with zero further code change.
-      //
-      // Note: the unit-test "silent fallback fires onWordTick(0)" path only
-      // runs when `playUtteranceFn === undefined` (the internal shim) — it
-      // does NOT mask the production reject. See the reject-path unit test in
-      // SessionEnd.test.tsx.
-      //
-      // Copy is client-supplied (`focusRecapCopy`, derived from the session
-      // focus node) so the caption is correct independent of audio state.
-      //
-      // Timing collapse: on the SKIP path the promise resolves immediately at
-      // ~opener-end, and the recap beat below schedules at
-      // `RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS` (1400ms) — which lands recap
-      // one standard inter-beat gap after the opener, exactly the pre-M5
-      // cadence. So removing the focus-recap beat removes precisely its added
-      // time with no dead pause and no special-casing of the recap delay.
-      await new Promise<void>((resolve) => {
-        addTimer(() => {
-          playUtterance('session.end.recap.focus', {
-            onPlay: () => {
-              // Engine fired the audio: commit the phase. Caption is set by
-              // `onWordTick`.
-              setPhase('focus-recap')
-            },
-            onWordTick: (wordIndex) => {
-              // First tick is the commit point for engines that don't fire a
-              // separate `onPlay` (the internal silent shim ticks word 0
-              // without an `onPlay`). Set the phase here too so the engaged
-              // path is robust regardless of which callback fires first.
-              setPhase('focus-recap')
-              setCaptionText(focusRecapCopy)
-              setCaptionRevealed(wordIndex + 1)
-            },
-          })
-            .then(resolve)
-            .catch((err) => {
-              // Reject = id unavailable (unbaked) OR a real play error. Skip
-              // the beat: no phase, no caption, no dwell. Resolve immediately
-              // so the recap beat fires one standard inter-beat gap later
-              // instead of holding the full focus-recap window silent.
-              console.warn('[SessionEnd] focus-recap utterance skipped:', err)
-              resolve()
-            })
-        }, FOCUS_RECAP_DELAY_MS - OPENER_DELAY_MS)
-      })
-
-      // t=2500: Recap -- copy is surface-dependent.
-      //
-      //   - math: "You earned N stars!" where N = totalStardust (unchanged).
-      //     Utterance id `session.end.recap.<N>` is in the planner bundle.
-      //   - word-song (ticket 86c9kwvza): "You earned 5 stars for finishing!"
-      //     Copy is fixed — the +5 is the completion bonus, not a function
-      //     of how many problems Marian got right. Utterance id
-      //     `session.end.recap.wordsong-completion` is a NEW id; until the
-      //     planner's audio bundle includes it, the silent fallback (which
-      //     fires `onWordTick(0)` once) keeps the caption pipeline alive
-      //     and the existing graceful-degradation path bridges the audio.
-      //
-      // Skip-when-zero only applies to math (word-song always has a +5
-      // grant to celebrate, even on a session where Marian got 0 correct).
-      try {
-        setPhase('recap')
-        setShowStardustCounter(true)
-
-        if (p.surface === 'word-song') {
-          await new Promise<void>((resolve) => {
-            addTimer(() => {
-              const recapId = 'session.end.recap.wordsong-completion'
-              const copy = `You earned ${numberToWord(WORDSONG_SESSION_END_BONUS)} stars for finishing!`
-              playUtterance(recapId, {
-                onWordTick: (wordIndex) => {
-                  setCaptionText(copy)
-                  setCaptionRevealed(wordIndex + 1)
-                },
-              })
-                .then(resolve)
-                .catch((err) => {
-                  console.warn('[SessionEnd] recap utterance failed:', err)
-                  resolve()
-                })
-            }, RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS)
-          })
-        } else if (p.totalStardust > 0) {
-          await new Promise<void>((resolve) => {
-            addTimer(() => {
-              const recapId = `session.end.recap.${p.totalStardust}`
-              playUtterance(recapId, {
-                onWordTick: (wordIndex) => {
-                  const starWord =
-                    p.totalStardust === 1
-                      ? `You earned one star!`
-                      : `You earned ${numberToWord(p.totalStardust)} stars!`
-                  setCaptionText(starWord)
-                  setCaptionRevealed(wordIndex + 1)
-                },
-              })
-                .then(resolve)
-                .catch((err) => {
-                  console.warn('[SessionEnd] recap utterance failed:', err)
-                  resolve()
-                })
-            }, RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS)
-          })
-        } else {
-          // Zero stardust on math: skip the recap line but wait the gap.
-          await new Promise<void>((resolve) => {
-            addTimer(resolve, RECAP_DELAY_MS - FOCUS_RECAP_DELAY_MS)
-          })
-        }
-      } catch {
-        // Swallow -- continue sequence
-      }
-
-      // Bud beat (Emma's Path 9/10, spec §6 step 2): a good day banked and
-      // nothing unlocked → the focus stop slides up, its new bud opens and
-      // Emma says `end.bud.{node}`. A bad day or an unlock (the map's
-      // moment) adds nothing here.
-      // The bud beat's lead-in gap comes out of the pause before the next
-      // beat, so the screen only grows by the length of Emma's line.
-      let budGapMs = 0
-      const beat = beatRef.current
-      if (beat?.kind === 'bud') {
-        const line = pathLine(`end.bud.${beat.node}`)
-        if (line !== undefined) {
-          budGapMs = BUD_DELAY_MS
-          await new Promise<void>((resolve) => {
-            addTimer(() => {
-              setPhase('bud')
-              setBudBeat(beat)
-              addTimer(() => sparkleInstance.play(), BUD_OPEN_DELAY_S * 1000)
-              setCaptionText(line.text)
-              setCaptionRevealed(line.text.split(/\s+/).length)
-              pathPlayerRef.current ??= createPathPlayer()
-              addTimer(resolve, BUD_LINE_MAX_MS)
-              void pathPlayerRef.current.play(line).then(resolve)
-            }, BUD_DELAY_MS)
-          })
-        }
-      }
-
-      // t=4500: Streak -- "N in a row! Wow!" (only if finalStreak >= 3)
-      if (p.finalStreak >= 3) {
-        try {
-          setPhase('streak')
-          setShowStreakBand(true)
-
-          await new Promise<void>((resolve) => {
-            addTimer(
-              () => {
-                const streakId = `session.end.streak.${p.finalStreak}`
-                playUtterance(streakId, {
-                  onWordTick: (wordIndex) => {
-                    setCaptionText(`${p.finalStreak} in a row! Wow!`)
-                    setCaptionRevealed(wordIndex + 1)
-                  },
-                })
-                  .then(resolve)
-                  .catch((err) => {
-                    console.warn('[SessionEnd] streak utterance failed:', err)
-                    resolve()
-                  })
-              },
-              STREAK_DELAY_MS - RECAP_DELAY_MS - budGapMs,
-            )
-          })
-        } catch {
-          // Swallow -- continue sequence
-        }
-      }
-
-      // t=6100: Goodbye -- "See you soon."
-      try {
-        setPhase('goodbye')
-        await new Promise<void>((resolve) => {
-          const baseDelay =
-            p.finalStreak >= 3
-              ? GOODBYE_DELAY_MS - STREAK_DELAY_MS
-              : GOODBYE_DELAY_MS - RECAP_DELAY_MS - budGapMs
-          addTimer(() => {
-            playUtterance('session.end.goodbye', {
-              onPlay: () => {
-                // Cancel fallback timer if it somehow survived
-                clearTimeout(fallbackTimerId)
-              },
-              onWordTick: (wordIndex) => {
-                setCaptionText('See you soon.')
-                setCaptionRevealed(wordIndex + 1)
-              },
-            })
-              .then(resolve)
-              .catch((err) => {
-                console.warn('[SessionEnd] goodbye utterance failed:', err)
-                resolve()
-              })
-          }, baseDelay)
-        })
-      } catch {
-        // Swallow
-      }
-
-      // t=7300: CTA appears
-      const settledDelay = CTA_DELAY_MS - GOODBYE_DELAY_MS
-      addTimer(() => {
-        setPhase('settled')
+      if (g === null) {
         setShowCta(true)
-        // Clear caption after goodbye settles
-        setCaptionText('')
-        setCaptionRevealed(0)
-      }, settledDelay)
+        return
+      }
+      for (let i = 0; i < g.lines.length; i++) {
+        if (cancelled) return
+        const line = g.lines[i]!
+        if (i > 0) {
+          await new Promise<void>((r) => addTimer(r, BEAT_GAP_MS))
+          if (cancelled) return
+        }
+        setPhase(line.beat)
+        setCaption(line.text)
+        // Buttons come up with Emma's last line, so the explanation is
+        // heard but never holds her on the screen.
+        if (i === g.lines.length - 1) setShowCta(true)
+        if (line.beat === 'flower' && g.newSlot !== null) {
+          const slot = g.newSlot
+          setFlower('pop')
+          if (reducedMotion) {
+            addTimer(() => setFlower('landed'), 300)
+          } else {
+            addTimer(() => {
+              setFlyTo(measureFlight(slot) ?? { x: 0, y: 0 })
+              setFlower('fly')
+            }, FLOWER_FLY_AT_MS)
+            addTimer(() => {
+              setFlower('landed')
+              sparkleInstance.play()
+            }, FLOWER_LAND_AT_MS)
+          }
+        }
+        await speak(line)
+      }
+      if (cancelled) return
+      clearTimeout(fallback)
+      setPhase('settled')
+      setShowCta(true)
     }
-
-    void runSequence()
+    void run()
 
     return () => {
+      cancelled = true
       clearTimers()
+      pathPlayerRef.current?.cancel()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Cleanup SFX on unmount ----------------------------------------------
+  // ── Cleanup on unmount ----------------------------------------------------
 
   useEffect(() => {
     return () => {
       chimeInstance.unload()
       sparkleInstance.unload()
-      plinkInstance.unload()
       pathPlayerRef.current?.unload()
       pathPlayerRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── CTA tap handler -----------------------------------------------------
+  // ── Button taps -------------------------------------------------------------
 
-  const handleCtaTap = useCallback(() => {
-    if (phase === 'sleep-splash') return
-
-    setCtaTapping(true)
-    chimeInstance.play()
-
-    // Cancel any in-flight TTS
-    cancelSessionAudio()
-    pathPlayerRef.current?.cancel()
-
-    // Hub-route flip (`design/screen-hub.md` § Q4): when the orchestrator
-    // wires `onAllDone`, route to Hub instead of falling through to the
-    // legacy Sleep splash. The chime + scale tween still play; only the
-    // post-300ms destination changes. When `onAllDone` is undefined,
-    // legacy Sleep splash renders — preserves existing tests + supports
-    // a dark-launch fallback if Thomas opts for one.
-    if (onAllDone) {
-      addTimer(() => {
-        onAllDone()
-      }, 300)
-      return
-    }
-
-    // Fade to sleep splash after 300ms (legacy path).
-    addTimer(() => {
-      setPhase('sleep-splash')
-    }, 300)
-  }, [phase, chimeInstance, addTimer, onAllDone])
-
-  // ── Sparkle particles (entry burst) -------------------------------------
-  // Positions are generated once via useState lazy initializer. This avoids
-  // both the useMemo react-hooks/purity violation (Math.random) and the
-  // useRef react-hooks/refs violation (reading .current during render).
-
-  const [sparkleParticles] = useState(() =>
-    generateSparkleParticles(reducedMotion),
+  const leave = useCallback(
+    (to: (() => void) | undefined) => {
+      if (phase === 'sleep-splash' || ctaTapping) return
+      setCtaTapping(true)
+      chimeInstance.play()
+      cancelSessionAudio()
+      pathPlayerRef.current?.cancel()
+      if (to) {
+        addTimer(to, 300)
+        return
+      }
+      // Legacy path (no router wired): fade to the sleep splash.
+      addTimer(() => setPhase('sleep-splash'), 300)
+    },
+    [phase, ctaTapping, chimeInstance, addTimer],
   )
+  const handleCtaTap = useCallback(() => leave(onAllDone), [leave, onAllDone])
+  const handleAgainTap = useCallback(() => leave(onAgain), [leave, onAgain])
 
   // ── Render ----------------------------------------------------------------
 
-  const showRibbon = captionText.length > 0
+  const day = guidance?.day ?? 'practice'
+  const flowerDay = guidance?.newSlot != null
+  const landed = flower === 'landed'
+  const slots: FlowerSlot[] =
+    guidance === null
+      ? []
+      : landed || !flowerDay
+        ? guidance.slotsAfter
+        : guidance.slotsBefore
+  const starCount = Math.max(0, Math.min(8, p.totalCorrect))
+  const notYet = day === 'not-yet'
 
   return (
     <m.main
       data-testid="session-end"
       data-surface={p.surface}
       data-phase={phase}
+      data-day={guidance?.day ?? 'pending'}
       data-total-stardust={displayedTotalStardust}
       data-earned={displayedEarnedThisSession}
       data-final-streak={p.finalStreak}
       data-completion-bonus={wordSongCompletionGrant}
       data-path-beat={beatKind ?? 'pending'}
-      className="
-        relative flex h-full w-full flex-col items-center
-        bg-my-cream text-ink
-        pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
-        pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]
-        overflow-hidden
-      "
+      className="se-clay relative h-full w-full overflow-hidden font-clay"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.25 } }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* Twilight wash background */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10"
-        style={{
-          backgroundImage:
-            'radial-gradient(circle at 50% 35%, rgba(230,210,245,0.5) 0%, rgba(255,245,250,0) 60%), linear-gradient(180deg, #FFF5FA 0%, #F5EDF7 100%)',
-        }}
-      />
+      <div aria-hidden className="se-garden" />
 
-      {/* Emma celebrating -- centered, ~38vh */}
-      <div className="pointer-events-none relative flex h-[38vh] w-full items-center justify-center">
-        {/* Sparkle burst on entry */}
-        <AnimatePresence>
-          {phase !== 'sleep-splash' &&
-            sparkleParticles.map((particle) => (
-              <m.div
-                key={`sparkle-${particle.id}`}
-                aria-hidden
-                className="absolute"
-                initial={{ opacity: 1, x: 0, y: 0, scale: 0.5 }}
-                animate={
-                  reducedMotion
-                    ? { opacity: [1, 0], scale: 0.5 }
-                    : {
-                        opacity: [1, 0],
-                        x: particle.x,
-                        y: particle.y,
-                        scale: [0.5, 1, 0],
-                      }
-                }
-                transition={{
-                  duration: 1.2,
-                  delay: particle.delay,
-                  ease: 'easeOut',
-                }}
-              >
-                <SparkleParticle />
-              </m.div>
-            ))}
-        </AnimatePresence>
-
-        {/* Emma image -- uses emma-cheering.svg (the canonical
-            big-celebration pose, BOTH hands raised; reserved for
-            Session-End and never used per-problem). Replaces the legacy
-            melody-cheering.svg in the Phase 3b character pivot
-            (ticket 86c9jccp7). */}
-        <AnimatePresence initial={false}>
+      <div className="se-stack">
+        {/* Emma: cheering when a flower came, calm and warm otherwise. */}
+        <div className="se-emma">
           <m.img
-            layoutId="emma"
-            key="celebrating"
+            key={flowerDay ? 'cheering' : 'idle'}
             data-testid="session-end-emma"
-            src="/assets/emma-cheering.svg"
-            alt="Emma celebrating"
+            src={
+              flowerDay ? '/assets/emma-cheering.svg' : '/assets/emma-idle.svg'
+            }
+            alt={flowerDay ? 'Emma celebrating' : 'Emma smiling'}
             draggable={false}
-            className="absolute h-full w-auto select-none"
+            className="h-full w-auto select-none"
             initial={
-              reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.8 }
+              reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85 }
             }
             animate={reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
             transition={
               reducedMotion
                 ? { duration: 0.3 }
-                : {
-                    type: 'spring',
-                    stiffness: 180,
-                    damping: 20,
-                  }
+                : { type: 'spring', stiffness: 180, damping: 20 }
             }
           />
-        </AnimatePresence>
+        </div>
+
+        {/* The clay panel: stars (feedback only), the step, its tray. */}
+        <div
+          ref={panelRef}
+          data-testid="session-end-panel"
+          className="se-panel"
+        >
+          <div className="se-stars" aria-hidden data-testid="session-end-stars">
+            {Array.from({ length: starCount }, (_, i) => (
+              <span
+                key={i}
+                className={reducedMotion ? 'se-star' : 'se-star se-twinkle'}
+                style={
+                  { '--d': `${(0.5 + i * 0.08).toFixed(2)}s` } as CSSProperties
+                }
+              >
+                <StarIcon />
+              </span>
+            ))}
+          </div>
+
+          {guidance !== null && (
+            <div className="se-row">
+              <PathImg
+                id={guidance.node}
+                px={112}
+                testId="session-end-step"
+                style={{ filter: 'drop-shadow(0 5px 3px rgba(60,30,10,.25))' }}
+              />
+              <div
+                data-testid="session-end-tray"
+                data-world={guidance.world}
+                data-state={landed || !flowerDay ? 'after' : 'before'}
+                className={`se-tray ${guidance.world === 'math' ? 'se-tray-ng' : 'se-tray-ws'}`}
+              >
+                {slots.map((slot, i) => (
+                  <Hole
+                    key={i}
+                    index={i}
+                    slot={slot}
+                    pop={landed && i === guidance.newSlot}
+                    reducedMotion={reducedMotion}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="se-count-row">
+            <AnimatePresence>
+              {landed && guidance?.countText != null && (
+                <m.div
+                  key="count"
+                  data-testid="session-end-count"
+                  className="se-count"
+                  initial={{ opacity: 0, scale: reducedMotion ? 1 : 0.6 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={
+                    reducedMotion
+                      ? { duration: 0.2 }
+                      : { type: 'spring', stiffness: 320, damping: 16 }
+                  }
+                >
+                  {guidance.countText}
+                </m.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Today's flower: pops in, then flies into its slot. */}
+          {(flower === 'pop' || flower === 'fly') && (
+            <m.div
+              ref={flowerRef}
+              data-testid="session-end-new-flower"
+              data-stage={flower}
+              className="se-newflower"
+              initial={
+                reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
+              }
+              animate={
+                flower === 'fly' && flyTo !== null
+                  ? { opacity: 1, x: flyTo.x, y: flyTo.y, scale: 0.72 }
+                  : { opacity: 1, scale: 1 }
+              }
+              transition={
+                flower === 'fly'
+                  ? { duration: 0.75, ease: [0.5, 0, 0.3, 1] }
+                  : reducedMotion
+                    ? { duration: 0.2 }
+                    : { type: 'spring', stiffness: 300, damping: 14 }
+              }
+            >
+              <PathImg id="ui-bud-open" px={120} />
+            </m.div>
+          )}
+        </div>
+
+        {/* Buttons. A not-yet day offers Again + Home; every other day one
+            "All done" (it opens the map when an unlock is waiting). */}
+        <div className="se-buttons">
+          <AnimatePresence>
+            {showCta && phase !== 'sleep-splash' && notYet && onAgain && (
+              <m.button
+                key="again"
+                type="button"
+                data-testid="session-end-again"
+                aria-label="Again"
+                onClick={handleAgainTap}
+                className="se-btn se-btn-go"
+                style={{ width: 330 }}
+                initial={{ opacity: 0, y: reducedMotion ? 0 : 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                <AgainIcon />
+                <span>Again</span>
+              </m.button>
+            )}
+            {showCta && phase !== 'sleep-splash' && (
+              <m.button
+                key={notYet ? 'home' : 'all-done'}
+                type="button"
+                data-testid="session-end-cta"
+                aria-label={notYet ? 'Home' : 'All done!'}
+                onClick={handleCtaTap}
+                className={notYet ? 'se-btn se-btn-alt' : 'se-btn se-btn-go'}
+                style={{ width: notYet ? (onAgain ? 220 : 300) : 360 }}
+                initial={{ opacity: 0, y: reducedMotion ? 0 : 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+              >
+                {notYet ? <PathImg id="ui-house" px={56} /> : <CheckIcon />}
+                <span>{notYet ? 'Home' : 'All done'}</span>
+              </m.button>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
-      {/* Speech ribbon -- identical pattern to Greet/Math caption */}
-      {showRibbon && (
-        <m.div
+      {/* Caption ribbon = Emma's spoken line. */}
+      {caption.length > 0 && phase !== 'sleep-splash' && (
+        <div
           data-testid="session-end-ribbon"
           role="status"
           aria-live="polite"
-          className="
-            mx-auto mt-2 mb-4 w-[88%] max-w-2xl
-            rounded-3xl border-[3px] border-my-pink bg-white
-            px-6 py-3
-            shadow-[0_8px_24px_rgba(244,143,177,0.18)]
-            text-center
-          "
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={reducedMotion ? { duration: 0.3 } : RIBBON_SPRING}
+          className="se-caption"
         >
-          <p
-            data-testid="session-end-caption"
-            className="font-display text-[2.4rem] leading-snug text-ink"
-          >
-            {renderCaption(captionText, captionRevealed)}
+          <SpeakerIcon />
+          <p data-testid="session-end-caption" className="m-0">
+            {caption}
           </p>
-        </m.div>
+        </div>
       )}
 
-      {/* Stardust counter -- ~14vh band. For word-song, the displayed
-          total includes the +5 completion bonus so Marian sees the post-
-          grant number tick up. Math is unchanged. */}
-      <div className="flex h-[14vh] items-center justify-center">
-        <StardustCounter
-          totalStardust={displayedTotalStardust}
-          active={showStardustCounter}
-          plink={plinkInstance}
-          reducedMotion={reducedMotion}
-        />
-      </div>
-
-      {/* Streak band -- ~10vh, fixed height even when hidden */}
-      <StreakBand
-        finalStreak={p.finalStreak}
-        visible={showStreakBand}
-        reducedMotion={reducedMotion}
-      />
-
-      {/* Spacer -- ~8vh breathing room; holds the bud beat card (Emma's
-          Path 9/10) when a good day was banked. */}
-      <div className="relative flex h-[8vh] w-full items-center justify-center">
-        {budBeat !== null && (
-          <BudBeat
-            node={budBeat.node}
-            before={budBeat.before}
-            after={budBeat.after}
-            reducedMotion={reducedMotion}
-          />
-        )}
-      </div>
-
-      {/* "All done!" CTA -- ~12vh bottom band, thumb-zone */}
-      <div className="flex h-[12vh] w-full items-center justify-center">
-        <AnimatePresence>
-          {showCta && phase !== 'sleep-splash' && (
-            <m.button
-              key="cta-all-done"
-              data-testid="session-end-cta"
-              type="button"
-              aria-label="All done!"
-              onClick={handleCtaTap}
-              className="
-                flex select-none items-center justify-center gap-2
-                rounded-full border-[3px] border-my-pink bg-white
-                px-10 font-display text-[2rem] text-my-rose
-                shadow-[0_6px_20px_rgba(244,143,177,0.25)]
-                active:scale-95
-                touch-manipulation
-              "
-              style={{
-                height: '88pt',
-                minWidth: '220pt',
-              }}
-              initial={
-                reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9 }
-              }
-              animate={
-                ctaTapping
-                  ? { opacity: 1, scale: [1, 0.95, 1] }
-                  : reducedMotion
-                    ? { opacity: 1 }
-                    : { opacity: 1, scale: 1 }
-              }
-              exit={{ opacity: 0 }}
-              transition={
-                ctaTapping
-                  ? { duration: 0.2, ease: 'easeOut' }
-                  : reducedMotion
-                    ? { duration: 0.2 }
-                    : CTA_SPRING
-              }
-            >
-              <span aria-hidden>&#x2713;</span>
-              <span>All done!</span>
-            </m.button>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Sleep splash overlay (Option C) */}
+      {/* Sleep splash overlay (legacy path, no router wired) */}
       <AnimatePresence>
         {phase === 'sleep-splash' && <SleepSplash key="sleep-splash" />}
       </AnimatePresence>
@@ -1259,64 +1006,128 @@ export default function SessionEnd({
   )
 }
 
-// ── Helpers -----------------------------------------------------------------
+// ── Pieces ------------------------------------------------------------------
 
-/** Render caption text with word-by-word reveal. Same pattern as Greet. */
-function renderCaption(text: string, revealedCount: number): ReactElement[] {
-  const words = text.split(/\s+/).filter(Boolean)
-  return words.map((word, i) => (
-    <m.span
-      key={`caption-${i}`}
-      data-testid="session-end-caption-word"
-      data-revealed={i < revealedCount ? 'true' : 'false'}
-      className="inline-block"
-      style={{ marginRight: i === words.length - 1 ? 0 : '0.4em' }}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: i < revealedCount ? 1 : 0 }}
-      transition={{ duration: 0.1, ease: 'easeOut' }}
+/** One clay hole of the flower tray. */
+function Hole({
+  index,
+  slot,
+  pop,
+  reducedMotion,
+}: {
+  index: number
+  slot: FlowerSlot
+  pop: boolean
+  reducedMotion: boolean
+}): ReactElement {
+  return (
+    <span
+      data-testid="session-end-slot"
+      data-slot-index={index}
+      data-slot={slot}
+      className={slot === 'sleeping' ? 'se-hole se-sleep' : 'se-hole'}
     >
-      {word}
-    </m.span>
-  ))
+      {slot !== 'empty' && (
+        <m.span
+          className="se-hole-flower"
+          initial={
+            pop ? (reducedMotion ? { opacity: 0 } : { scale: 0.7 }) : false
+          }
+          animate={
+            pop ? (reducedMotion ? { opacity: 1 } : { scale: 1 }) : undefined
+          }
+          transition={{ duration: reducedMotion ? 0.2 : 0.35 }}
+        >
+          <PathImg
+            id={slot === 'sleeping' ? 'ui-bud-closed' : 'ui-bud-open'}
+            px={82}
+          />
+        </m.span>
+      )}
+      {slot === 'sleeping' && (
+        <>
+          <MoonIcon />
+          <span aria-hidden className="se-zz">
+            z
+          </span>
+        </>
+      )}
+    </span>
+  )
 }
 
-/** Inline sparkle particle SVG. Same shape as Math/Greet. */
-function SparkleParticle(): ReactElement {
+function StarIcon(): ReactElement {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      role="presentation"
-      aria-hidden
-    >
+    <svg viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <radialGradient id="se-star-g" cx="40%" cy="30%">
+          <stop offset="0" stopColor="#fff6a8" />
+          <stop offset=".6" stopColor="#ffd23f" />
+          <stop offset="1" stopColor="#f0a818" />
+        </radialGradient>
+      </defs>
       <path
-        d="M12 2 L13.6 9.4 L21 11 L13.6 12.6 L12 20 L10.4 12.6 L3 11 L10.4 9.4 Z"
-        fill="#FFD966"
-        stroke="#E0B800"
-        strokeWidth="0.6"
+        d="M50 6 L62 36 L94 38 L69 59 L77 91 L50 73 L23 91 L31 59 L6 38 L38 36 Z"
+        fill="url(#se-star-g)"
+        stroke="#e39a10"
+        strokeWidth="3"
         strokeLinejoin="round"
       />
     </svg>
   )
 }
 
-/** Generate sparkle particle positions. Called once during ref init
- *  (outside of render) to avoid react-hooks/purity lint violations
- *  from Math.random(). */
-function generateSparkleParticles(
-  reducedMotion: boolean,
-): { id: number; x: number; y: number; delay: number }[] {
-  const spread = reducedMotion ? 200 : 300
-  const maxDelay = reducedMotion ? 0.2 : 0.3
-  return Array.from({ length: 20 }, (_, i) => ({
-    id: i,
-    x: (Math.random() - 0.5) * spread,
-    y: (Math.random() - 0.5) * spread,
-    delay: Math.random() * maxDelay,
-  }))
+function MoonIcon(): ReactElement {
+  return (
+    <svg className="se-moon" viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <radialGradient id="se-moon-g" cx="35%" cy="30%">
+          <stop offset="0" stopColor="#fffbd6" />
+          <stop offset=".7" stopColor="#ffe27a" />
+          <stop offset="1" stopColor="#f0b72a" />
+        </radialGradient>
+      </defs>
+      <path
+        d="M62 8 A44 44 0 1 0 92 70 A36 36 0 1 1 62 8 Z"
+        fill="url(#se-moon-g)"
+        stroke="#d99a1a"
+        strokeWidth="3"
+      />
+    </svg>
+  )
 }
+
+function CheckIcon(): ReactElement {
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden className="se-btn-icon">
+      <path
+        d="M20 52 L42 72 L80 30"
+        stroke="#fff"
+        strokeWidth="14"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function AgainIcon(): ReactElement {
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden className="se-btn-icon">
+      <path
+        d="M76 34 A32 32 0 1 0 82 58"
+        stroke="#fff"
+        strokeWidth="12"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <path d="M84 14 L80 40 L56 34 Z" fill="#fff" />
+    </svg>
+  )
+}
+
+// ── Helpers -----------------------------------------------------------------
 
 /**
  * Map the SessionEnd `surface` discriminant to the `ProgressTrack` shape
@@ -1436,31 +1247,4 @@ function buildLeitnerOutcomes(
     }
   }
   return out
-}
-
-/** Convert a number (0-19) to its English word for the TTS caption. */
-function numberToWord(n: number): string {
-  const words = [
-    'zero',
-    'one',
-    'two',
-    'three',
-    'four',
-    'five',
-    'six',
-    'seven',
-    'eight',
-    'nine',
-    'ten',
-    'eleven',
-    'twelve',
-    'thirteen',
-    'fourteen',
-    'fifteen',
-    'sixteen',
-    'seventeen',
-    'eighteen',
-    'nineteen',
-  ]
-  return words[n] ?? String(n)
 }
