@@ -137,3 +137,8 @@ Distinct from its siblings:
 
 - **Decided:** Codex built-in image generation makes the 41 icons (24 stages, 9 lands, 8 UI) in the locked clay style (quality bar 13). Midjourney (Thomas, Web UI, v7, one prompt at a time, remove.bg step) makes the ~4-6 hero images: Hub card scenes, the two map landscapes, any Emma pose (Omni Reference to stay on-model). Any Codex icon Thomas rejects is redone in MJ.
 - **Decided by:** Thomas (popup, recommended option), after "remember i have midjourney".
+
+## 2026-10-06 — Clay style only for Path chrome; Emma and lesson art unchanged
+
+- **Decided:** the clay/vinyl-toy style (quality bar 13) applies to Hub cards, map, stops, lands, padlock, buds and other progress/navigation chrome only. Emma's 10 poses and the 53 lesson pictures + 8 scenes keep their current style. Before the build, Kyle composes one Hub + map screen from the REAL Emma art, the clay icons and a lesson picture so Thomas can see them together.
+- **Decided by:** Thomas (popup, recommended option), after asking "do we have to change emma and a lot of other pictures done in another style".
