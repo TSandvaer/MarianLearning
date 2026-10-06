@@ -55,8 +55,12 @@
 /* The cream clay panel. */
 .se-panel {
   position: relative;
+  display: flex;
+  min-height: min(430px, 38vh);
   width: min(720px, 92vw);
-  margin-top: 8px;
+  flex-direction: column;
+  justify-content: center;
+  margin-top: 20px;
   padding: 26px 30px 18px;
   border-radius: 56px;
   background: linear-gradient(170deg, #fffaf2, #f6e4cc);
@@ -98,7 +102,7 @@
   align-items: center;
   justify-content: center;
   gap: 28px;
-  margin-top: 26px;
+  margin-top: 34px;
 }
 
 /* Flower tray: the ONE progress number. */
@@ -182,7 +186,7 @@
   min-height: 72px;
   align-items: center;
   justify-content: center;
-  margin-top: 10px;
+  margin-top: 22px;
 }
 .se-count {
   font-size: 54px;
@@ -211,7 +215,7 @@
   align-items: center;
   justify-content: center;
   gap: 30px;
-  margin-top: 40px;
+  margin-top: 46px;
 }
 .se-btn {
   display: flex;
