@@ -10,9 +10,11 @@
  *   - Session-End "All done!" tap (post-route-flip)
  *   - mid-skill back-arrow tap from Math/WordSong
  *
- * The screen is intentionally calm: two skill-tree picker tiles, a
- * cumulative stardust counter, a day-streak chip, and an invisible
- * parent-gate corner. No nags, no auto-advance, no leaderboard.
+ * The screen is intentionally calm: two clay world cards with their
+ * flower slots, Emma naming one next action (Guidance G1, ClickUp
+ * 123jpnbca4r), and an invisible parent-gate corner. No stardust total,
+ * no day streak (bar 14: no unexplained counters), no nags, no
+ * auto-advance, no leaderboard.
  *
  * Architectural notes
  * -------------------
@@ -22,11 +24,9 @@
  *   choreography. Tests for the algorithms live with the algorithms.
  * - All animation goes through `<m.*>` under the global LazyMotion at the
  *   App root. Same iPad budget rule as everywhere else.
- * - Audio: 20 new pre-recorded MP3s (manifest in `hubLines.ts`); Kyle
- *   delivers the binaries via ticket `86c9j53yx`. v1 mocks them by
- *   playing through a default `playLineFn` that walks the caption at
- *   165 wpm even when audio fails to load — same shape as Math's silent
- *   fallback.
+ * - Emma's lines: the guidance lines in `hubGuidance.ts`, captions only
+ *   until ticket G3 records them (`audioSrc`); the default `playLineFn`
+ *   walks the caption at 165 wpm.
  * - Phase 3a / 3b character pivot: visuals + character name use Emma
  *   throughout (`emma-idle.svg`, "Number Garden", "Word Song").
  */
@@ -42,6 +42,7 @@ import {
 import { AnimatePresence, m } from 'motion/react'
 import {
   emptySessionHistory,
+  isoDate,
   readSessionHistoryForToday,
   writeSessionHistory,
   type SessionHistoryV2,
@@ -53,22 +54,23 @@ import {
   recordSuggestionOutcome,
   type SuggestionTarget,
 } from './hubSuggestion'
+import type { HubEntryPath } from './hubLines'
 import {
-  HUB_LINES,
-  pickHubGreeting,
-  shouldShowDayStreak,
-  type HubEntryPath,
-  type HubLineId,
-} from './hubLines'
+  GUIDANCE_LINES,
+  cancelGuidanceLine as defaultCancelGuidanceLine,
+  flowerWakeFor,
+  guidanceNeedsGesture,
+  pickGuidanceLines,
+  playGuidanceLine as defaultPlayGuidanceLine,
+  readFlowerWake,
+  writeFlowerWake,
+  type GuidanceLineId,
+} from './hubGuidance'
 import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
 import { HubWorldCard } from './HubPathCard'
 import { buildHubCardModel, type HubCardModel } from './hubCardModel'
-import {
-  playHubLine as defaultPlayHubLine,
-  cancelActiveHubLine as defaultCancelHubLine,
-} from './playHubLine'
 import {
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
@@ -170,9 +172,12 @@ export interface PlayHubLineOptions {
 }
 
 export type PlayHubLineFn = (
-  id: HubLineId,
+  id: GuidanceLineId,
   opts?: PlayHubLineOptions,
 ) => Promise<void>
+
+/** Pause between two of Emma's lines (wake-up, then the next action). */
+const LINE_GAP_MS = 900
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -214,8 +219,27 @@ export default function Hub({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `progress` is the refresh signal
     [progressDoc, progress],
   )
-  const numberGardenCard = useMemo(() => buildHubCardModel(doc, 'math'), [doc])
-  const wordSongCard = useMemo(() => buildHubCardModel(doc, 'word-song'), [doc])
+  // Today's local day key, fixed for the visit (ticket G4 centralises
+  // the clock later).
+  const [today] = useState(() => isoDate(now()))
+  const numberGardenCard = useMemo(
+    () => buildHubCardModel(doc, 'math', today),
+    [doc, today],
+  )
+  const wordSongCard = useMemo(
+    () => buildHubCardModel(doc, 'word-song', today),
+    [doc, today],
+  )
+
+  // Morning wake-up (Guidance G1): flowers that slept since the last
+  // visit open once. Decided on mount, recorded right away so the next
+  // visit — even a rapid remount — never shows it again.
+  const [wake] = useState(() =>
+    flowerWakeFor([numberGardenCard, wordSongCard], readFlowerWake(storage)),
+  )
+  useEffect(() => {
+    writeFlowerWake(wake.next, storage)
+  }, [wake, storage])
 
   // Read history once on mount + subscribe to cross-tab writes.
   //
@@ -247,58 +271,60 @@ export default function Hub({
     onChange: refreshHistoryFromStorage,
   })
 
-  // Decide the soft suggestion target (or null) for this mount.
+  // The world Emma names (Guidance G1): the one that can still earn
+  // today's flower, closest to its unlock first; null when both have it.
   const suggestion = useMemo<SuggestionTarget>(
-    () => computeSuggestion(history, now()),
-    // history + now are stable for the mount lifetime; recompute on
-    // history change so a tap-driven write reflects on next render.
-    [history, now],
+    () => computeSuggestion(history, now(), doc),
+    // now is stable for the mount lifetime; recompute on history / doc
+    // change so a tap-driven write reflects on next render.
+    [history, now, doc],
   )
 
   // Rapid-remount suppression — if Hub mounts within 30s of an unmount,
   // skip the welcome-back greeting (per Dave's Q5 30s rule).
   const suppressed = useRapidRemountSuppression()
 
-  // Pick the greeting variant.
-  const greeting = useMemo(
-    () =>
-      pickHubGreeting({
-        path,
-        suggestion,
-        seed: history.sessionCount,
-        suppressed,
-      }),
-    [path, suggestion, history.sessionCount, suppressed],
+  // Emma's lines for this visit, decided once on mount: the wake-up
+  // first when flowers woke, then one next action (hubGuidance.ts).
+  const [lines] = useState<GuidanceLineId[]>(() =>
+    suppressed
+      ? []
+      : pickGuidanceLines({
+          numberGarden: numberGardenCard,
+          wordSong: wordSongCard,
+          suggestion,
+          wakeWorlds: wake.wakeWorlds,
+        }),
   )
 
   // ── Caption ribbon -----------------------------------------------------
 
+  const [lineIndex, setLineIndex] = useState(0)
   const [captionRevealed, setCaptionRevealed] = useState(0)
+  const currentLine: GuidanceLineId | null = lines[lineIndex] ?? null
   const captionWords = useMemo(() => {
-    if (greeting.lineId === null) return [] as string[]
-    return HUB_LINES[greeting.lineId].text.split(/\s+/).filter(Boolean)
-  }, [greeting.lineId])
-  const showRibbon = captionRevealed > 0 && greeting.lineId !== null
+    if (currentLine === null) return [] as string[]
+    return GUIDANCE_LINES[currentLine].text.split(/\s+/).filter(Boolean)
+  }, [currentLine])
+  const showRibbon = captionRevealed > 0 && currentLine !== null
 
-  // Audio gate: app-open path needs the user-gesture unlock; other
-  // paths (session-end / mid-skill-back) reach Hub via a tap, so the
-  // audio context is already hot.
-  const needsGesture = path === 'app-open' || path === 'app-open-recent'
+  // Audio gate: once a line has a recording (ticket G3), the app-open
+  // path waits for the iOS user-gesture unlock; other paths (session-end
+  // / mid-skill-back) reach Hub via a tap, so the context is hot.
+  // Caption-only lines show straight away.
+  const needsGesture =
+    (path === 'app-open' || path === 'app-open-recent') &&
+    guidanceNeedsGesture(lines)
   const [gestureUnlocked, setGestureUnlocked] = useState(!needsGesture)
 
   // ── Greeting playback --------------------------------------------------
 
   const playLine = useCallback(
-    (id: HubLineId, opts: PlayHubLineOptions = {}): Promise<void> => {
+    (id: GuidanceLineId, opts: PlayHubLineOptions = {}): Promise<void> => {
       if (playLineFn) return playLineFn(id, opts)
-      // Default: Howler-backed playback against the line manifest. The
-      // helper soft-fails to a 165-wpm caption-walk on load/play error so
-      // the screen never bricks even when an MP3 404s. Wired in ticket
-      // 86c9kxv47 after Thomas's iPad ear-test (2026-05-02) reported "no
-      // greet when I return to hub" — Hub had been running on a silent
-      // caption-walk fallback because no production caller was supplying
-      // `playLineFn`. See `./playHubLine.ts` for the player shape.
-      return defaultPlayHubLine(id, opts)
+      // Default: the guidance caption walk (165 wpm). Ticket G3 plays
+      // the recorded line here once a manifest entry has `audioSrc`.
+      return defaultPlayGuidanceLine(id, opts)
     },
     [playLineFn],
   )
@@ -321,7 +347,7 @@ export default function Hub({
       return
     }
     if (playLineFn) return // injected player without injected canceller
-    defaultCancelHubLine()
+    defaultCancelGuidanceLine()
   }, [cancelLineFn, playLineFn])
 
   /**
@@ -340,41 +366,42 @@ export default function Hub({
 
   const dispatchGreeting = useCallback(() => {
     if (greetingDispatchedRef.current) return
-    if (greeting.lineId === null) {
+    greetingDispatchedRef.current = true
+    if (lines.length === 0) {
       // Log suppression decisions exactly once per Hub mount so the
-      // iPad-export consoles show *why* the welcome-back was skipped.
-      // Added in ticket 86c9kxv47 — Thomas's "no greet when I return"
-      // report turned out to be the silent-fallback bug, but the
-      // logging was missing either way and would have made the
-      // diagnosis 30 seconds instead of an investigation.
-      greetingDispatchedRef.current = true
+      // iPad-export consoles show *why* Emma stayed quiet (ticket
+      // 86c9kxv47).
       console.log(
-        '[Hub] welcome-back: suppressed',
-        suppressed ? '(rapid-remount within 30s)' : '(no line for path)',
+        '[Hub] guidance: no line',
+        suppressed ? '(rapid-remount within 30s)' : '(nothing to say)',
         { path, suggestion, suppressed },
       )
       return
     }
-    greetingDispatchedRef.current = true
     cancelledRef.current = false
-    setCaptionRevealed(0)
-    console.log('[Hub] welcome-back: dispatching', {
-      lineId: greeting.lineId,
-      path,
-      suggestion,
-    })
-    greetingPromiseRef.current = playLine(greeting.lineId, {
-      onWordTick: (i) => {
+    console.log('[Hub] guidance: dispatching', { lines, path, suggestion })
+    greetingPromiseRef.current = (async () => {
+      for (let i = 0; i < lines.length; i++) {
         if (cancelledRef.current) return
-        setCaptionRevealed(i + 1)
-      },
-    }).catch((err) => {
-      // Soft-fail: log but don't break the screen. Failure surfaces
-      // visually as "no caption revealed past initial render"; both
-      // nodes remain tappable.
-      console.warn('[Hub] welcome-back line failed:', err)
+        if (i > 0) {
+          await new Promise((r) => setTimeout(r, LINE_GAP_MS))
+          if (cancelledRef.current) return
+        }
+        setLineIndex(i)
+        setCaptionRevealed(0)
+        await playLine(lines[i]!, {
+          onWordTick: (w) => {
+            if (cancelledRef.current) return
+            setCaptionRevealed(w + 1)
+          },
+        })
+      }
+    })().catch((err) => {
+      // Soft-fail: log but don't break the screen. Both cards stay
+      // tappable.
+      console.warn('[Hub] guidance line failed:', err)
     })
-  }, [greeting.lineId, path, playLine, suggestion, suppressed])
+  }, [lines, path, playLine, suggestion, suppressed])
 
   // For paths where the audio context is already hot, fire on mount.
   // For app-open paths, wait for the first user gesture (tap-anywhere).
@@ -419,7 +446,8 @@ export default function Hub({
    */
   useEffect(() => {
     return () => {
-      defaultCancelHubLine()
+      cancelledRef.current = true
+      defaultCancelGuidanceLine()
     }
   }, [])
 
@@ -518,7 +546,7 @@ export default function Hub({
 
       // Commit the suggestion outcome immediately so the next Hub
       // visit's algorithm reflects what just happened.
-      const patch = recordSuggestionOutcome(history, suggestion, tree, now())
+      const patch = recordSuggestionOutcome(history, suggestion)
       const next: SessionHistoryV2 = { ...history, ...patch }
       writeSessionHistory(next, storage)
       setHistory(next)
@@ -527,15 +555,7 @@ export default function Hub({
       // change to Math / WordSong; Hub doesn't navigate directly.
       onPickTree?.(tree)
     },
-    [
-      history,
-      suggestion,
-      now,
-      storage,
-      onPickTree,
-      gestureUnlocked,
-      cancelLine,
-    ],
+    [history, suggestion, storage, onPickTree, gestureUnlocked, cancelLine],
   )
 
   // ── Map button (Emma's Path 8/10) -------------------------------------
@@ -564,14 +584,6 @@ export default function Hub({
     setGestureUnlocked(true)
   }, [gestureUnlocked])
 
-  // ── Day streak (the only stat besides stardust; R2 drops the strip) ---
-
-  const showStreak = shouldShowDayStreak(
-    history.dayStreak,
-    history.lastSessionCompletedAt,
-    now(),
-  )
-
   // ── Render ------------------------------------------------------------
   //
   // Redesign R2 (123jpnbc68z): the clay "Toy Box" Hub. Everything sits
@@ -583,6 +595,7 @@ export default function Hub({
       data-testid="hub"
       data-path={path}
       data-suggestion={suggestion ?? 'none'}
+      data-lines={lines.join(' ')}
       data-suppressed={suppressed ? 'true' : 'false'}
       onPointerDown={handleFirstTap}
       className="
@@ -646,7 +659,7 @@ export default function Hub({
         <AnimatePresence>
           {showRibbon && (
             <m.div
-              key={greeting.lineId ?? 'no-line'}
+              key={currentLine ?? 'no-line'}
               data-testid="hub-ribbon"
               role="status"
               aria-live="polite"
@@ -656,7 +669,7 @@ export default function Hub({
               exit={{ opacity: 0 }}
               transition={{ duration: 0.25 }}
             >
-              <p data-testid="hub-caption">
+              <p data-testid="hub-caption" data-line={currentLine ?? ''}>
                 {captionWords.map((word, i) => (
                   <m.span
                     key={`hub-w-${i}`}
@@ -678,38 +691,13 @@ export default function Hub({
           )}
         </AnimatePresence>
 
-        {/* HUD chips — stardust shown once; the day streak (sun) only
-            while it is live. */}
-        <div data-testid="hub-hud" className="hub-chips">
-          <div
-            data-testid="hub-cumulative-stardust"
-            data-total={history.cumulativeStardust}
-            className="hub-chip"
-          >
-            <StarGlyph />
-            <span aria-label={`Stardust: ${history.cumulativeStardust}`}>
-              {history.cumulativeStardust}
-            </span>
-          </div>
-          {showStreak && (
-            <div
-              data-testid="hub-day-streak"
-              data-value={history.dayStreak}
-              aria-label={`Day streak: ${history.dayStreak}`}
-              className="hub-chip hub-chip--small"
-            >
-              <SunGlyph />
-              <span aria-hidden>{history.dayStreak}</span>
-            </div>
-          )}
-        </div>
-
         {/* The two world cards; each carries its own map button. */}
         <HubWorldCard
           tree="number-garden"
           label="Number Garden"
           model={numberGardenCard}
           suggested={suggestion === 'number-garden'}
+          wakeSlots={wake.wakeSlots.math}
           onTap={() => handleNodeTap('number-garden')}
           onPress={handleNodePress}
           onOpenMap={onOpenMap ? () => handleOpenMap('math') : undefined}
@@ -719,70 +707,12 @@ export default function Hub({
           label="Word Song"
           model={wordSongCard}
           suggested={suggestion === 'word-song'}
+          wakeSlots={wake.wakeSlots['word-song']}
           onTap={() => handleNodeTap('word-song')}
           onPress={handleNodePress}
           onOpenMap={onOpenMap ? () => handleOpenMap('word-song') : undefined}
         />
       </div>
     </m.main>
-  )
-}
-
-// ── Clay HUD glyphs ────────────────────────────────────────────────────
-
-function StarGlyph(): ReactElement {
-  return (
-    <svg viewBox="0 0 100 100" aria-hidden>
-      <defs>
-        <radialGradient id="hub-star-fill" cx="40%" cy="30%">
-          <stop offset="0" stopColor="#fff6a8" />
-          <stop offset=".6" stopColor="#ffd23f" />
-          <stop offset="1" stopColor="#f0a818" />
-        </radialGradient>
-      </defs>
-      <path
-        d="M50 6 L62 36 L94 38 L69 59 L77 91 L50 73 L23 91 L31 59 L6 38 L38 36 Z"
-        fill="url(#hub-star-fill)"
-        stroke="#e39a10"
-        strokeWidth="3"
-        strokeLinejoin="round"
-      />
-      <ellipse cx="40" cy="36" rx="6" ry="10" fill="#fff" opacity=".55" />
-    </svg>
-  )
-}
-
-function SunGlyph(): ReactElement {
-  return (
-    <svg viewBox="0 0 100 100" aria-hidden>
-      <defs>
-        <radialGradient id="hub-sun-fill" cx="40%" cy="35%">
-          <stop offset="0" stopColor="#fff3b0" />
-          <stop offset=".6" stopColor="#ffb52e" />
-          <stop offset="1" stopColor="#f08a12" />
-        </radialGradient>
-      </defs>
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-        <rect
-          key={deg}
-          x="45"
-          y="2"
-          width="10"
-          height="20"
-          rx="5"
-          fill="#ffc531"
-          transform={`rotate(${deg} 50 50)`}
-        />
-      ))}
-      <circle
-        cx="50"
-        cy="50"
-        r="27"
-        fill="url(#hub-sun-fill)"
-        stroke="#e8890f"
-        strokeWidth="3"
-      />
-      <ellipse cx="42" cy="40" rx="6" ry="9" fill="#fff" opacity=".5" />
-    </svg>
   )
 }

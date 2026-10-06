@@ -71,7 +71,11 @@ describe('computeSuggestion', () => {
   it('the world closer to its unlock wins over the alternation', () => {
     const p = withHistory([entry(1, 'number-recog')])
     expect(
-      computeSuggestion(makeHistory({ lastSuggestion: 'number-garden' }), may5, p),
+      computeSuggestion(
+        makeHistory({ lastSuggestion: 'number-garden' }),
+        may5,
+        p,
+      ),
     ).toBe('number-garden')
   })
 
@@ -110,8 +114,6 @@ describe('recordSuggestionOutcome', () => {
 
   it('keeps the previous lastSuggestion when nothing was suggested', () => {
     const prev = makeHistory({ lastSuggestion: 'word-song' })
-    expect(recordSuggestionOutcome(prev, null).lastSuggestion).toBe(
-      'word-song',
-    )
+    expect(recordSuggestionOutcome(prev, null).lastSuggestion).toBe('word-song')
   })
 })

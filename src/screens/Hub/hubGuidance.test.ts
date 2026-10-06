@@ -186,16 +186,16 @@ describe('pickGuidanceLines — the mockup states', () => {
 })
 
 describe('flowerWakeFor — once, the first visit after the flower slept', () => {
-  const asleep = card('math', ['grown', 'sleeping', 'empty'], [
-    '2026-05-01',
-    null,
-    null,
-  ])
-  const nextMorning = card('math', ['grown', 'grown', 'empty'], [
-    '2026-05-01',
-    '2026-05-02',
-    null,
-  ])
+  const asleep = card(
+    'math',
+    ['grown', 'sleeping', 'empty'],
+    ['2026-05-01', null, null],
+  )
+  const nextMorning = card(
+    'math',
+    ['grown', 'grown', 'empty'],
+    ['2026-05-01', '2026-05-02', null],
+  )
 
   it('wakes the flowers newer than the last seen day, and records them', () => {
     const r = flowerWakeFor([nextMorning], { math: '2026-05-01' })
@@ -215,19 +215,22 @@ describe('flowerWakeFor — once, the first visit after the flower slept', () =>
   })
 
   it('skipped days: the buds simply wait and wake on the next visit', () => {
-    const later = card('math', ['grown', 'grown', 'empty'], [
-      '2026-05-01',
-      '2026-05-02',
-      null,
-    ])
-    // Last visit was the day she earned it (May 2); she returns May 9.
-    expect(flowerWakeFor([later], { math: '2026-05-01' }).wakeWorlds).toEqual(
-      ['math'],
+    const later = card(
+      'math',
+      ['grown', 'grown', 'empty'],
+      ['2026-05-01', '2026-05-02', null],
     )
+    // Last visit was the day she earned it (May 2); she returns May 9.
+    expect(flowerWakeFor([later], { math: '2026-05-01' }).wakeWorlds).toEqual([
+      'math',
+    ])
   })
 
   it('empty cards never wake', () => {
-    const r = flowerWakeFor([card('word-song', ['empty', 'empty', 'empty'])], {})
+    const r = flowerWakeFor(
+      [card('word-song', ['empty', 'empty', 'empty'])],
+      {},
+    )
     expect(r.wakeWorlds).toEqual([])
     expect(r.next).toEqual({})
   })

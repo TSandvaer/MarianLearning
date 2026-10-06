@@ -77,7 +77,9 @@ export const GUIDANCE_LINES: Record<GuidanceLineId, GuidanceLine> = {
 
 /** True when any line has a recording, so the app-open path must wait
  *  for the first tap (iOS audio unlock) before Emma speaks. */
-export function guidanceNeedsGesture(lines: readonly GuidanceLineId[]): boolean {
+export function guidanceNeedsGesture(
+  lines: readonly GuidanceLineId[],
+): boolean {
   return lines.some((id) => GUIDANCE_LINES[id].audioSrc !== null)
 }
 

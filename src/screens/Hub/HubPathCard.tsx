@@ -5,8 +5,9 @@
  *
  * One sculpted slab per world: crown + clay title, the current step as a
  * big glowing clay sticker on a plinth, the next step as a small padlocked
- * sticker, the land pill, a seed tray with one hole per required good day,
- * and a round wooden map button. No bead row: the all-steps overview
+ * sticker, the land pill, a tray of flower slots (one per required good
+ * day: grown / sleeping / empty, Guidance G1), and a round wooden map
+ * button. No bead row: the all-steps overview
  * lives on the map (bar 9). Data comes from `buildHubCardModel`
  * (→ `nodeProgress`); art from the `pathArt` manifest.
  *
@@ -145,6 +146,29 @@ export interface HubWorldCardProps {
   onPress?: () => void
   /** Map button inside the card; omitted → no map button. */
   onOpenMap?: () => void
+  /** Slot indexes whose flower wakes (bud opens) on this visit. */
+  wakeSlots?: readonly number[]
+}
+
+/** Moon for a sleeping flower (mockup `MOON`). */
+function Moon(): ReactElement {
+  return (
+    <svg className="hub-moon" viewBox="0 0 100 100" aria-hidden>
+      <defs>
+        <radialGradient id="hub-moon-fill" cx="35%" cy="30%">
+          <stop offset="0" stopColor="#fffbd6" />
+          <stop offset=".7" stopColor="#ffe27a" />
+          <stop offset="1" stopColor="#f0b72a" />
+        </radialGradient>
+      </defs>
+      <path
+        d="M62 8 A44 44 0 1 0 92 70 A36 36 0 1 1 62 8 Z"
+        fill="url(#hub-moon-fill)"
+        stroke="#d99a1a"
+        strokeWidth="3"
+      />
+    </svg>
+  )
 }
 
 export function HubWorldCard({
@@ -155,6 +179,7 @@ export function HubWorldCard({
   onTap,
   onPress,
   onOpenMap,
+  wakeSlots = [],
 }: HubWorldCardProps): ReactElement {
   const [down, setDown] = useState(false)
   const [title1, title2] = TITLES[tree]
@@ -277,25 +302,43 @@ export function HubWorldCard({
         <div
           className="hub-tray"
           data-testid="hub-card-seeds"
-          data-good-days={model.holes.filter(Boolean).length}
-          data-required-days={model.holes.length}
+          data-good-days={model.slots.filter((s) => s !== 'empty').length}
+          data-required-days={model.slots.length}
         >
-          {model.holes.map((filled, i) => (
-            <div
-              key={i}
-              className="hub-hole"
-              data-testid="hub-card-seed"
-              data-filled={filled ? 'true' : 'false'}
-            >
-              {filled && (
-                <img
-                  src={pathArtSrc('ui-bud-open', 256)}
-                  alt=""
-                  draggable={false}
-                />
-              )}
-            </div>
-          ))}
+          {model.slots.map((slot, i) => {
+            const waking = slot === 'grown' && wakeSlots.includes(i)
+            return (
+              <div
+                key={i}
+                className={[
+                  'hub-hole',
+                  slot === 'sleeping' ? 'is-sleeping' : '',
+                  waking ? 'is-waking' : '',
+                ].join(' ')}
+                data-testid="hub-card-seed"
+                data-filled={slot === 'empty' ? 'false' : 'true'}
+                data-state={slot}
+                data-waking={waking ? 'true' : undefined}
+              >
+                {slot !== 'empty' && (
+                  <img
+                    src={pathArtSrc(
+                      slot === 'sleeping' ? 'ui-bud-closed' : 'ui-bud-open',
+                      256,
+                    )}
+                    alt=""
+                    draggable={false}
+                  />
+                )}
+                {slot === 'sleeping' && (
+                  <>
+                    <Moon />
+                    <span className="hub-zz">z</span>
+                  </>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
 
