@@ -45,10 +45,12 @@ vi.mock('howler', () => ({
 import {
   GUIDANCE_LINES,
   cancelGuidanceLine,
+  pickGuidanceLines,
   playGuidanceLine,
   unloadGuidanceLines,
   type GuidanceLineId,
 } from './hubGuidance'
+import type { HubCardModel } from './hubCardModel'
 
 afterEach(() => {
   cancelGuidanceLine()
@@ -81,9 +83,55 @@ describe('playGuidanceLine — recorded lines', () => {
     unloadGuidanceLines()
     expect(howl.unload).toHaveBeenCalledTimes(1)
   })
+})
 
-  it('the line without a recording builds no Howl', () => {
-    void playGuidanceLine('guide.woke-up.one')
-    expect(howls).toHaveLength(0)
+describe('morning wake-up — which clip the Hub requests', () => {
+  /** A world whose flower slept yesterday and is one of three today. */
+  const card = (world: HubCardModel['world']): HubCardModel => ({
+    world,
+    landNumber: 1,
+    landArt: world === 'math' ? 'land-ng-1' : 'land-ws-1',
+    showLandNumber: true,
+    current: world === 'math' ? 'add-to-20' : 'letter-sounds',
+    unlocksNext: world === 'math' ? 'sub-to-10' : 'blending-cv',
+    slots: ['grown', 'empty', 'empty'],
+    slotDays: ['2026-05-02', null, null],
+    earnedToday: false,
+    flowersToUnlock: 2,
+    complete: false,
+  })
+  const oneClip = GUIDANCE_LINES['guide.hub.woke.one'].audioSrc
+  const twoClip = GUIDANCE_LINES['guide.woke-up'].audioSrc
+
+  /** Play this morning's Hub lines in order; the clip srcs requested. */
+  async function requestedSrcs(
+    wakeWorlds: HubCardModel['world'][],
+  ): Promise<string[]> {
+    const lines = pickGuidanceLines({
+      numberGarden: card('math'),
+      wordSong: card('word-song'),
+      suggestion: 'number-garden',
+      wakeWorlds,
+    })
+    for (const id of lines) {
+      const done = playGuidanceLine(id)
+      howls[howls.length - 1]!.handlers.end?.()
+      await done
+    }
+    return howls.flatMap((h) => h.src)
+  }
+
+  it('one world woke: "Your flower woke up!" plays its own Lily clip', async () => {
+    expect(oneClip).toBe('/assets/audio/path/guide-hub-woke-one.mp3')
+    const srcs = await requestedSrcs(['math'])
+    expect(srcs[0]).toBe(oneClip)
+    expect(srcs.filter((s) => s === oneClip)).toHaveLength(1)
+    expect(srcs).not.toContain(twoClip)
+  })
+
+  it('two worlds woke: the plural clip plays, never the one-world clip', async () => {
+    const srcs = await requestedSrcs(['math', 'word-song'])
+    expect(srcs[0]).toBe(twoClip)
+    expect(srcs).not.toContain(oneClip)
   })
 })
