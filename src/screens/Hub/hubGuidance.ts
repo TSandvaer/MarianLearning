@@ -7,18 +7,20 @@
  * action, the card she names glows, and a flower earned today sleeps
  * until tomorrow, when it wakes once with Emma's line.
  *
- * Pure helpers plus a tiny caption-only player. Emma's lines are
- * captions for now: every entry in `GUIDANCE_LINES` has
- * `audioSrc: null`. Ticket G3 records them in Lily's voice; it sets
- * `audioSrc` per line and plays it through a Howler player, and the Hub
- * then waits for the iOS first-gesture unlock on app-open again
- * (`guidanceNeedsGesture`).
+ * Pure helpers plus the line player. Emma's lines play the Lily
+ * recordings from Guidance G3 (`lib/emmasPath/guidanceLines.ts`, PR
+ * #512) through the Hub's Howler line player (`playHubLine.ts`), with
+ * the caption walking alongside; the Hub waits for the iOS first-gesture
+ * unlock on app-open (`guidanceNeedsGesture`). A line with no recording
+ * (`audioSrc: null`) walks its caption at 165 wpm.
  */
 
 import type { MasteryTrack } from '../../lib/progress'
+import { guidanceLine as guidanceClip } from '../../lib/emmasPath/guidanceLines'
 import type { StorageAdapter } from '../Math/stardust'
 import type { SkillTreeId } from '../SessionEnd/sessionHistory'
 import type { HubCardModel } from './hubCardModel'
+import { createHubLinePlayer } from './playHubLine'
 
 // ── Emma's lines ─────────────────────────────────────────────────────
 
@@ -34,8 +36,30 @@ export type GuidanceLineId =
 
 export interface GuidanceLine {
   text: string
-  /** Recorded voice line; null = caption only until ticket G3. */
+  /** Recorded Lily line (G3); null = caption only. */
   audioSrc: string | null
+}
+
+/**
+ * The G3 recording for each Hub line: the id in
+ * `lib/emmasPath/guidanceLines.ts`, or null when G3 recorded none.
+ * `guide.woke-up.one` ("Your flower woke up!") has no recording; it
+ * shows its caption only.
+ */
+export const GUIDANCE_CLIP_IDS: Record<GuidanceLineId, string | null> = {
+  'guide.grow.number-garden': 'guide.hub.suggest.math',
+  'guide.grow.word-song': 'guide.hub.suggest.word-song',
+  'guide.sleeping.number-garden': 'guide.hub.sleeping.math',
+  'guide.sleeping.word-song': 'guide.hub.sleeping.word-song',
+  'guide.both-sleeping': 'guide.hub.both-sleeping',
+  'guide.woke-up': 'guide.hub.woke',
+  'guide.woke-up.one': null,
+  'guide.one-more': 'guide.hub.one-more',
+}
+
+function clipSrc(id: GuidanceLineId): string | null {
+  const clipId = GUIDANCE_CLIP_IDS[id]
+  return clipId === null ? null : (guidanceClip(clipId)?.src ?? null)
 }
 
 /**
@@ -47,31 +71,37 @@ export interface GuidanceLine {
 export const GUIDANCE_LINES: Record<GuidanceLineId, GuidanceLine> = {
   'guide.grow.number-garden': {
     text: "Let's grow a flower in Number Garden! Or pick Word Song.",
-    audioSrc: null,
+    audioSrc: clipSrc('guide.grow.number-garden'),
   },
   'guide.grow.word-song': {
     text: "Let's grow a flower in Word Song! Or pick Number Garden.",
-    audioSrc: null,
+    audioSrc: clipSrc('guide.grow.word-song'),
   },
   // "Your flower is sleeping" names the OTHER world's flower; the line
   // suggests the world it names.
   'guide.sleeping.number-garden': {
     text: "Your flower is sleeping. Let's play Number Garden!",
-    audioSrc: null,
+    audioSrc: clipSrc('guide.sleeping.number-garden'),
   },
   'guide.sleeping.word-song': {
     text: "Your flower is sleeping. Let's play Word Song!",
-    audioSrc: null,
+    audioSrc: clipSrc('guide.sleeping.word-song'),
   },
   'guide.both-sleeping': {
     text: 'Both flowers are sleeping. Want to practise more?',
-    audioSrc: null,
+    audioSrc: clipSrc('guide.both-sleeping'),
   },
-  'guide.woke-up': { text: 'Your flowers woke up!', audioSrc: null },
-  'guide.woke-up.one': { text: 'Your flower woke up!', audioSrc: null },
+  'guide.woke-up': {
+    text: 'Your flowers woke up!',
+    audioSrc: clipSrc('guide.woke-up'),
+  },
+  'guide.woke-up.one': {
+    text: 'Your flower woke up!',
+    audioSrc: clipSrc('guide.woke-up.one'),
+  },
   'guide.one-more': {
     text: 'One more flower, and a new path opens!',
-    audioSrc: null,
+    audioSrc: clipSrc('guide.one-more'),
   },
 }
 
@@ -248,7 +278,7 @@ export function flowerWakeFor(
   return { wakeWorlds, wakeSlots, next }
 }
 
-// ── Caption-only player ──────────────────────────────────────────────
+// ── Line player ──────────────────────────────────────────────────────
 
 /** Same pace as the Hub's silent caption walk (165 wpm). */
 export const CAPTION_MS_PER_WORD = Math.round(60_000 / 165)
@@ -260,16 +290,33 @@ export interface PlayGuidanceLineOptions {
 
 let activeCancel: (() => void) | null = null
 
+/** Lines with a recording, as the Howler player's manifest. */
+const CLIP_MANIFEST = Object.fromEntries(
+  Object.entries(GUIDANCE_LINES).flatMap(([id, line]) =>
+    line.audioSrc === null
+      ? []
+      : [[id, { src: line.audioSrc, text: line.text }]],
+  ),
+) as Record<GuidanceLineId, { src: string; text: string }>
+
+const clipPlayer = createHubLinePlayer<GuidanceLineId>({
+  lines: CLIP_MANIFEST,
+})
+
 /**
- * Speak one guidance line. Caption only for now: reveals the words at
- * 165 wpm and resolves when the last word is shown. Ticket G3 swaps in
- * the recorded audio for lines whose `audioSrc` is set.
+ * Speak one guidance line. A recorded line plays through the Hub's
+ * Howler player (pending-resume gate, caption ticks against the clip's
+ * duration, caption walk if the clip fails to load); a line without a
+ * recording reveals its words at 165 wpm. Resolves when the line ends.
  */
 export function playGuidanceLine(
   id: GuidanceLineId,
   opts: PlayGuidanceLineOptions = {},
 ): Promise<void> {
   cancelGuidanceLine()
+  if (GUIDANCE_LINES[id].audioSrc !== null && id in CLIP_MANIFEST) {
+    return clipPlayer.playHubLine(id, opts)
+  }
   const words = GUIDANCE_LINES[id].text.split(/\s+/).filter(Boolean)
   return new Promise<void>((resolve) => {
     const timers: ReturnType<typeof setTimeout>[] = []
@@ -295,4 +342,10 @@ export function playGuidanceLine(
 /** Stop the line in flight (card tap, unmount). Idempotent. */
 export function cancelGuidanceLine(): void {
   activeCancel?.()
+  clipPlayer.cancelActive()
+}
+
+/** Release the recorded lines' Howls (Hub leaves). Idempotent. */
+export function unloadGuidanceLines(): void {
+  clipPlayer.unload()
 }

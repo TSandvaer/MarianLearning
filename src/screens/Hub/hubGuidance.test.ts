@@ -2,10 +2,15 @@
  * Guidance G1 (123jpnbca4r) — suggestion rule, Emma's lines per Hub
  * state (mockup screens a / c / d / a2) and the once-only morning wake.
  */
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { guidanceLine as guidanceClip } from '../../lib/emmasPath/guidanceLines'
 import type { HubCardModel, FlowerSlot } from './hubCardModel'
 import {
+  GUIDANCE_CLIP_IDS,
   GUIDANCE_LINES,
+  type GuidanceLineId,
   flowerWakeFor,
   guidanceNeedsGesture,
   pickGuidanceLines,
@@ -174,14 +179,40 @@ describe('pickGuidanceLines — the mockup states', () => {
     ])
   })
 
-  it("every line is short (≤ 11 words, the mockup's longest) and caption-only for now", () => {
+  it("every line is short (≤ 11 words, the mockup's longest)", () => {
     for (const line of Object.values(GUIDANCE_LINES)) {
       expect(line.text.split(/\s+/).length).toBeLessThanOrEqual(11)
-      expect(line.audioSrc).toBeNull()
     }
-    expect(guidanceNeedsGesture(['guide.woke-up', 'guide.one-more'])).toBe(
-      false,
+  })
+})
+
+describe('GUIDANCE_LINES — the G3 Lily recordings', () => {
+  it('every line but "Your flower woke up!" plays its G3 clip, same words', () => {
+    const recorded = Object.entries(GUIDANCE_LINES).filter(
+      ([, line]) => line.audioSrc !== null,
     )
+    expect(recorded.map(([id]) => id)).toEqual([
+      'guide.grow.number-garden',
+      'guide.grow.word-song',
+      'guide.sleeping.number-garden',
+      'guide.sleeping.word-song',
+      'guide.both-sleeping',
+      'guide.woke-up',
+      'guide.one-more',
+    ])
+    for (const [id, line] of recorded) {
+      const clip = guidanceClip(GUIDANCE_CLIP_IDS[id as GuidanceLineId]!)!
+      expect(clip.text).toBe(line.text)
+      expect(line.audioSrc).toBe(clip.src)
+      expect(existsSync(join(process.cwd(), 'public', clip.src))).toBe(true)
+    }
+    expect(GUIDANCE_CLIP_IDS['guide.woke-up.one']).toBeNull()
+    expect(GUIDANCE_LINES['guide.woke-up.one'].audioSrc).toBeNull()
+  })
+
+  it('a recorded line waits for the first tap; the caption-only line does not', () => {
+    expect(guidanceNeedsGesture(['guide.woke-up', 'guide.one-more'])).toBe(true)
+    expect(guidanceNeedsGesture(['guide.woke-up.one'])).toBe(false)
   })
 })
 
@@ -252,13 +283,13 @@ describe('flowerWakeFor — once, the first visit after the flower slept', () =>
   })
 })
 
-describe('playGuidanceLine (caption only)', () => {
+describe('playGuidanceLine (line without a recording)', () => {
   afterEach(() => vi.useRealTimers())
 
   it('reveals every word at 165 wpm, then resolves', async () => {
     vi.useFakeTimers()
     const ticks: number[] = []
-    const done = playGuidanceLine('guide.woke-up', {
+    const done = playGuidanceLine('guide.woke-up.one', {
       onWordTick: (i) => ticks.push(i),
     })
     await vi.advanceTimersByTimeAsync(CAPTION_MS_PER_WORD * 4)
@@ -269,7 +300,7 @@ describe('playGuidanceLine (caption only)', () => {
   it('cancel stops the walk and resolves', async () => {
     vi.useFakeTimers()
     const ticks: number[] = []
-    const done = playGuidanceLine('guide.both-sleeping', {
+    const done = playGuidanceLine('guide.woke-up.one', {
       onWordTick: (i) => ticks.push(i),
     })
     await vi.advanceTimersByTimeAsync(CAPTION_MS_PER_WORD)

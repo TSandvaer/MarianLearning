@@ -26,6 +26,13 @@ const MIN_TARGET_PX = (44 * 4) / 3
 
 test.use({ viewport: { width: 820, height: 1180 } })
 
+/** Emma's lines are recorded (Guidance G3), so on app-open she waits
+ *  for the first tap (iOS audio unlock). Tap her, not a card, the way
+ *  Marian would. */
+async function firstTap(page: Page): Promise<void> {
+  await page.getByTestId('hub-emma').click()
+}
+
 function pastDayISO(daysAgo: number): string {
   const d = new Date()
   d.setDate(d.getDate() - daysAgo)
@@ -170,8 +177,7 @@ test.describe('Redesign R2 — clay Hub cards (123jpnbc68z)', () => {
     page,
   }) => {
     await openHub(page)
-    // Emma's guidance lines are captions for now (no audio until G3), so
-    // the bubble shows without a first tap.
+    await firstTap(page)
     const bubble = page.getByTestId('hub-ribbon')
     await expect(bubble).toBeVisible({ timeout: 10_000 })
     await expect(
@@ -332,6 +338,7 @@ test.describe('Guidance G1 — Hub states (123jpnbca4r)', () => {
     }, opts.seenAwake ?? null)
     await page.goto('/')
     await expect(page.getByTestId('hub')).toBeVisible({ timeout: 10_000 })
+    await firstTap(page)
   }
 
   const slots = (page: Page, tree: 'number-garden' | 'word-song') =>

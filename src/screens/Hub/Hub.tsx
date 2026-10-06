@@ -24,9 +24,9 @@
  *   choreography. Tests for the algorithms live with the algorithms.
  * - All animation goes through `<m.*>` under the global LazyMotion at the
  *   App root. Same iPad budget rule as everywhere else.
- * - Emma's lines: the guidance lines in `hubGuidance.ts`, captions only
- *   until ticket G3 records them (`audioSrc`); the default `playLineFn`
- *   walks the caption at 165 wpm.
+ * - Emma's lines: the guidance lines in `hubGuidance.ts`, played from the
+ *   G3 Lily recordings (`audioSrc`) with the caption walking alongside;
+ *   a line without a recording walks its caption at 165 wpm.
  * - Phase 3a / 3b character pivot: visuals + character name use Emma
  *   throughout (`emma-idle.svg`, "Number Garden", "Word Song").
  */
@@ -63,6 +63,7 @@ import {
   pickGuidanceLines,
   playGuidanceLine as defaultPlayGuidanceLine,
   readFlowerWake,
+  unloadGuidanceLines,
   writeFlowerWake,
   type GuidanceLineId,
 } from './hubGuidance'
@@ -82,6 +83,7 @@ import {
   useStorageSync,
 } from '../../lib/lifecycle'
 import { loadProgress, type Progress } from '../../lib/progress'
+import { now as progressNow } from '../../lib/progress/clock'
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -101,7 +103,11 @@ export interface HubProps {
   path?: HubEntryPath
   /** Test seam: replace localStorage adapter. */
   storage?: StorageAdapter
-  /** Test seam: clock injection. */
+  /**
+   * Test seam: clock injection. Defaults to the progress clock
+   * (`lib/progress/clock.ts`), so `?debug=1&dayOffset=N` moves the
+   * Hub's "today" (sleeping flowers, suggestion) with the rest of the app.
+   */
   now?: () => Date
   /**
    * Per-tree progress indices (App's projection of its Progress
@@ -197,7 +203,7 @@ function safeLoadProgress(): Progress | null {
 export default function Hub({
   path = 'app-open',
   storage,
-  now = () => new Date(),
+  now = progressNow,
   progress = DEFAULT_TREE_PROGRESS,
   progressDoc,
   onPickTree,
@@ -219,8 +225,7 @@ export default function Hub({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `progress` is the refresh signal
     [progressDoc, progress],
   )
-  // Today's local day key, fixed for the visit (ticket G4 centralises
-  // the clock later).
+  // Today's local day key on the progress clock, fixed for the visit.
   const [today] = useState(() => isoDate(now()))
   const numberGardenCard = useMemo(
     () => buildHubCardModel(doc, 'math', today),
@@ -308,7 +313,7 @@ export default function Hub({
   }, [currentLine])
   const showRibbon = captionRevealed > 0 && currentLine !== null
 
-  // Audio gate: once a line has a recording (ticket G3), the app-open
+  // Audio gate: when a line has a recording (ticket G3), the app-open
   // path waits for the iOS user-gesture unlock; other paths (session-end
   // / mid-skill-back) reach Hub via a tap, so the context is hot.
   // Caption-only lines show straight away.
@@ -322,8 +327,8 @@ export default function Hub({
   const playLine = useCallback(
     (id: GuidanceLineId, opts: PlayHubLineOptions = {}): Promise<void> => {
       if (playLineFn) return playLineFn(id, opts)
-      // Default: the guidance caption walk (165 wpm). Ticket G3 plays
-      // the recorded line here once a manifest entry has `audioSrc`.
+      // Default: the recorded Lily line (Howler), or the caption walk
+      // (165 wpm) for a line without a recording.
       return defaultPlayGuidanceLine(id, opts)
     },
     [playLineFn],
@@ -448,6 +453,9 @@ export default function Hub({
     return () => {
       cancelledRef.current = true
       defaultCancelGuidanceLine()
+      // Release the recorded lines' Howls when the Hub leaves; the next
+      // visit rebuilds the one or two it plays.
+      unloadGuidanceLines()
     }
   }, [])
 

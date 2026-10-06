@@ -615,32 +615,30 @@ describe('Hub — audio-handoff cancellation (ticket 86c9m4afh)', () => {
   })
 })
 
-describe('Hub — caption-only lines need no first tap (Guidance G1)', () => {
-  it('app-open: Emma speaks on mount when no line has a recording yet', async () => {
+describe('Hub — recorded lines wait for the first tap on app-open (Guidance G3)', () => {
+  it('app-open: Emma does not speak on mount; the first tap starts her line', async () => {
     const playLineFn = vi.fn(() => Promise.resolve())
     renderHub({
       storage: createMemoryStorage(),
       path: 'app-open',
       playLineFn,
     })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(playLineFn).toHaveBeenCalledTimes(0)
+    act(() => {
+      screen
+        .getByTestId('hub')
+        .dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+    })
     await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(1))
   })
 })
 
-describe('Hub — gesture-unlock race (ticket 86c9m4u13), once lines have audio (G3 hook)', () => {
-  // Ticket G3 sets `audioSrc` on the guidance lines; from then on the
-  // app-open path waits for the iOS first-gesture unlock again.
-  const saved = new Map<GuidanceLineId, string | null>()
-  beforeEach(() => {
-    for (const [id, line] of Object.entries(GUIDANCE_LINES)) {
-      saved.set(id as GuidanceLineId, line.audioSrc)
-      line.audioSrc = `/assets/audio/hub/${id}.mp3`
-    }
-  })
-  afterEach(() => {
-    for (const [id, src] of saved) GUIDANCE_LINES[id].audioSrc = src
-  })
-
+describe('Hub — gesture-unlock race (ticket 86c9m4u13)', () => {
   /**
    * Regression tests for the chip-tap-as-first-gesture audio leak
    * surfaced 2026-05-03 evening.
@@ -1029,6 +1027,15 @@ describe('Hub — guidance (mockup a / c / d / a2)', () => {
       .map((s) => s.getAttribute('data-state'))
 
   async function spoken(playLineFn: ReturnType<typeof vi.fn>, n: number) {
+    // The lines are recorded (G3): on app-open Emma waits for the first
+    // tap, so tap the screen (not a card) the way Marian would.
+    act(() => {
+      screen
+        .getByTestId('hub')
+        .dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }),
+        )
+    })
     await waitFor(() => expect(playLineFn).toHaveBeenCalledTimes(n), {
       timeout: 3000,
     })
@@ -1171,6 +1178,48 @@ describe('Hub — guidance (mockup a / c / d / a2)', () => {
     expect(await spoken(again, 1)).toEqual([
       "Let's grow a flower in Number Garden! Or pick Word Song.",
     ])
+  })
+
+  it('?debug=1&dayOffset=1: the default clock moves "today", so today\'s sleeping flower is grown', () => {
+    const realLocation = window.location
+    const setSearch = (search: string) =>
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: { ...realLocation, search },
+      })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now)
+    try {
+      const doc = freshDoc()
+      doc.history = [goodDay(now, 0, 'number-recog')]
+      const props = {
+        progressDoc: doc,
+        playLineFn: vi.fn(() => Promise.resolve()),
+        path: 'session-end' as const,
+      }
+
+      // No `now` prop: the Hub reads the progress clock.
+      setSearch('')
+      const view = renderHub({ storage: createMemoryStorage(), ...props })
+      expect(slotStates('number-garden')).toEqual([
+        'sleeping',
+        'empty',
+        'empty',
+      ])
+      view.unmount()
+
+      window.sessionStorage.clear() // not a rapid remount
+      setSearch('?debug=1&dayOffset=1')
+      renderHub({ storage: createMemoryStorage(), ...props })
+      expect(slotStates('number-garden')).toEqual(['grown', 'empty', 'empty'])
+      expect(cardFor('number-garden')).toHaveAttribute('data-suggested', 'true')
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: realLocation,
+      })
+      vi.useRealTimers()
+    }
   })
 
   it('the caption shows the line Emma is saying', async () => {

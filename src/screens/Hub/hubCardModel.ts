@@ -25,7 +25,7 @@ import { landOf } from '../../lib/progress/lands'
 import { nodeProgress } from '../../lib/progress/nodeProgress'
 import { goodDayKeysFromHistory } from '../../lib/progress/mastery'
 import { landArtId, type LandArtId } from '../../lib/emmasPath/pathArt'
-import { isoDate } from '../SessionEnd/sessionHistory'
+import { todayKey } from '../../lib/progress/clock'
 
 /**
  * One flower slot (Guidance G1): `grown` = a good day from an earlier
@@ -112,7 +112,7 @@ function goodDayKeysOf(
 export function buildHubCardModel(
   progress: Progress | null,
   world: MasteryTrack,
-  today: string = isoDate(new Date()),
+  today: string = todayKey(),
 ): HubCardModel {
   const p = progress ?? defaultProgress()
   const current = currentStepOf(p, world)
