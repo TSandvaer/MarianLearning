@@ -142,3 +142,9 @@ Distinct from its siblings:
 
 - **Decided:** the clay/vinyl-toy style (quality bar 13) applies to Hub cards, map, stops, lands, padlock, buds and other progress/navigation chrome only. Emma's 10 poses and the 53 lesson pictures + 8 scenes keep their current style. Before the build, Kyle composes one Hub + map screen from the REAL Emma art, the clay icons and a lesson picture so Thomas can see them together.
 - **Decided by:** Thomas (popup, recommended option), after asking "do we have to change emma and a lot of other pictures done in another style".
+
+## 2026-10-06 — Redesign build scope after the real-art check
+
+- **Reference:** `design/emmas-path/redesign/real-art-check.html` (artifact https://claude.ai/artifact/C8kT7oP5PMNJDzEaJwMqvS): direction A with the real Emma, the clay icons and a capture of today's lesson. Cards side by side (Kyle: two equal doors; stacking adds width, not readability).
+- **Decided:** (1) Emma's art stays exactly as is; in the build she gets a soft contact shadow and slight warm light so she sits on the clay world; on the map she stands BEHIND the current stop. (2) The lesson screens' frame (answer tiles, back button, progress dots) is restyled to the same chunky clay buttons; the lesson pictures inside stay unchanged.
+- **Decided by:** Thomas (popups, recommended options).
