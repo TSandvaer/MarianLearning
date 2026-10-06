@@ -2804,7 +2804,7 @@ function MathScreen({
       data-paused={pageHidden ? 'true' : 'false'}
       className="
         relative flex h-full w-full flex-col
-        bg-my-cream text-ink
+        bg-my-cream text-ink clay-world-math
         pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
         pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]
         overflow-hidden
@@ -2828,7 +2828,7 @@ function MathScreen({
       <div
         data-testid="math-hud"
         className="
-          flex h-14 w-full items-center justify-between
+          flex h-24 w-full items-center justify-between
           px-4
         "
       >
@@ -2853,19 +2853,22 @@ function MathScreen({
               onRequestExit()
             }}
             className="
-              flex items-center justify-center
-              text-my-rose
+              clay-round-btn clay-press
+              flex shrink-0 items-center justify-center
               touch-manipulation select-none
             "
+            // Clay round button (Redesign R5): the whole 56pt touch zone
+            // is now the visible clay disc (was a 28pt glyph in an
+            // invisible 56pt zone).
             style={{ width: '56pt', height: '56pt' }}
           >
             <svg
               viewBox="0 0 28 28"
-              width="28"
-              height="28"
+              width="32"
+              height="32"
               fill="none"
               stroke="currentColor"
-              strokeWidth="3"
+              strokeWidth="4.5"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden
@@ -2878,7 +2881,7 @@ function MathScreen({
         <div
           data-testid="math-stardust"
           data-total={stardust.total}
-          className="flex items-center gap-2 font-display text-3xl text-ink"
+          className="clay-pill flex h-14 items-center gap-2 pl-3 pr-5 font-clay text-3xl font-bold"
         >
           <m.span
             key={stardust.total}
@@ -2899,7 +2902,7 @@ function MathScreen({
         <div
           data-testid="math-problem-dots"
           aria-hidden
-          className="flex items-center gap-2"
+          className="clay-track flex h-11 items-center gap-2 px-3"
         >
           {plan.problems.map((p, i) => {
             const completed = i < problemIndex
@@ -2911,13 +2914,9 @@ function MathScreen({
                 data-state={
                   completed ? 'completed' : current ? 'current' : 'upcoming'
                 }
-                className={
-                  current
-                    ? 'block h-3 w-3 rounded-full bg-my-rose ring-2 ring-my-pink ring-offset-2 ring-offset-transparent'
-                    : completed
-                      ? 'block h-3 w-3 rounded-full bg-my-rose'
-                      : 'block h-3 w-3 rounded-full border border-my-pink bg-transparent'
-                }
+                // Clay bead: size + fill keyed on `data-state` in
+                // index.css (`.clay-bead[data-state=...]`).
+                className="clay-bead"
               />
             )
           })}
@@ -2984,10 +2983,9 @@ function MathScreen({
             role="status"
             aria-live="polite"
             className="
+              clay-ribbon
               mt-4 flex-1
-              rounded-2xl border-[3px] border-my-pink bg-white
-              px-4 py-3
-              shadow-[0_8px_24px_rgba(244,143,177,0.18)]
+              px-6 py-4
             "
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -3306,14 +3304,13 @@ function MathScreen({
                     problemState.resolved || dimForGuided || !chipGateOpen
                   }
                   className={`
+                clay-tile clay-press
                 relative flex select-none items-center justify-center
-                rounded-3xl border-[3px] border-my-pink bg-white
-                font-display text-5xl text-ink
-                transition-opacity duration-200 ease-out
+                font-clay text-[3.25rem] font-semibold
                 disabled:cursor-default
                 touch-manipulation
                 ${dimForGuided || !chipGateOpen ? 'opacity-60' : 'opacity-100'}
-                ${guidedShimmer ? 'shadow-[0_0_24px_rgba(244,143,177,0.85)]' : 'shadow-[0_4px_12px_rgba(244,143,177,0.18)]'}
+                ${guidedShimmer ? 'clay-tile-glow' : ''}
               `}
                   style={{
                     width: '120px',
@@ -3339,10 +3336,13 @@ function MathScreen({
                           x: 0,
                         }
                   }
+                  // Clay press: the face sinks onto its slab (the CSS
+                  // `.clay-press:active` drops the slab by the same 6px).
+                  // MotionConfig reducedMotion="user" skips the transform.
                   whileTap={
                     problemState.resolved || dimForGuided || !chipGateOpen
                       ? undefined
-                      : { scale: 0.92 }
+                      : { y: 6 }
                   }
                   transition={
                     isShaking
