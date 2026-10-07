@@ -146,6 +146,45 @@ describe('createHubLinePlayer', () => {
     await promise
   })
 
+  it('reveals the last word on `end` when the clip ends before the last tick', async () => {
+    const { HowlCtor, instances } = makeFakeHowl()
+    const player = createHubLinePlayer({ HowlCtor })
+    const onWordTick = vi.fn()
+
+    // "Hi! What today?" has 3 words; 500 ms clip → ticks at 167 / 333 ms.
+    const promise = player.playHubLine('hub.welcome.what-today', {
+      onWordTick,
+    })
+    instances[0]._emit('play')
+    // Main thread is late: only the first interval tick has run when the
+    // audio ends (the WebKit CI case — the last word stayed hidden).
+    await vi.advanceTimersByTimeAsync(200)
+    expect(onWordTick.mock.calls.map((c) => c[0] as number)).toEqual([0, 1])
+
+    instances[0]._emit('end')
+    await promise
+    expect(onWordTick.mock.calls.map((c) => c[0] as number)).toEqual([0, 1, 2])
+
+    // The interval is gone: no tick after the line settled.
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(onWordTick).toHaveBeenCalledTimes(3)
+  })
+
+  it('does not re-fire the last word on `end` when the walk already finished', async () => {
+    const { HowlCtor, instances } = makeFakeHowl()
+    const player = createHubLinePlayer({ HowlCtor })
+    const onWordTick = vi.fn()
+
+    const promise = player.playHubLine('hub.welcome.what-today', {
+      onWordTick,
+    })
+    instances[0]._emit('play')
+    await vi.advanceTimersByTimeAsync(700)
+    instances[0]._emit('end')
+    await promise
+    expect(onWordTick.mock.calls.map((c) => c[0] as number)).toEqual([0, 1, 2])
+  })
+
   it('soft-falls-back to caption-walk on loaderror and still resolves', async () => {
     const { HowlCtor, instances } = makeFakeHowl()
     const player = createHubLinePlayer({ HowlCtor })
