@@ -91,8 +91,14 @@ jobs:
           CI: 'true'
 
   e2e:
-    name: Playwright (Chromium + WebKit)
+    name: Playwright (shard ${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
+    # Two parallel halves of the suite (Playwright --shard). At 564 tests a
+    # single job no longer fit in 70 min (PR #522 run 37656582883).
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     # Gate the expensive Playwright run on the cheap fast-gate. When the
     # fast gate fails, no Playwright runner is allocated — saving ~25-35 min
     # of runner-minutes on cheap-failure PRs and freeing concurrency-cap
@@ -128,7 +134,7 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
 
       - name: Run e2e suite
-        run: yarn e2e
+        run: yarn e2e --shard=${{ matrix.shard }}/2
         env:
           CI: 'true'
 
@@ -136,7 +142,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
 
@@ -144,6 +150,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
