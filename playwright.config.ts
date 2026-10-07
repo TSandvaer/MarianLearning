@@ -26,6 +26,18 @@
  */
 
 import { defineConfig, devices } from '@playwright/test'
+import {
+  chromiumMuteArgs,
+  installSilentAudio,
+} from './e2e/_helpers/silentAudio'
+
+// Local runs are SILENT: Emma must not talk out loud from a test run.
+// Chromium gets `--mute-audio`; every context (WebKit has no mute flag)
+// gets an init script that zeroes WebAudio output and mutes media while
+// keeping timing and events intact. Runs in every worker because
+// Playwright re-loads this file there. `E2E_AUDIBLE=1` restores sound.
+// See e2e/_helpers/silentAudio.ts.
+installSilentAudio()
 
 const IPAD_PRO_PORTRAIT = { width: 1024, height: 1366 }
 
@@ -92,6 +104,7 @@ export default defineConfig({
         // Touch-emulation matters for the Hub long-press hooks and the
         // chip-tap rage-test in v2 specs.
         hasTouch: true,
+        launchOptions: { args: chromiumMuteArgs },
       },
     },
     {
