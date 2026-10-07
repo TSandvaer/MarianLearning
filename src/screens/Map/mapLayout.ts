@@ -16,7 +16,9 @@
  * shoulders in a round clay badge, a tail pointing down at the stop), all
  * of it clear of the stop: Thomas (2026-10-07) did not want the stop's art
  * covering her, and the standing art has no legs. Her land's band is
- * taller by the room the badge needs, so it stays inside it.
+ * taller by the room the badge needs, so it stays inside it. During an
+ * unlock beat the badge starts on the just-mastered stop, so that stop's
+ * land gets the room too (`alsoBadged`).
  */
 
 import type { SkillNode } from '../../lib/progress'
@@ -141,6 +143,23 @@ export function emmaRoom(size: number, bandH: number): number {
   return Math.max(0, emmaRise(size) - bandH * STOP_Y)
 }
 
+/**
+ * Indexes of the lands that host Emma's badge: her current stop's land,
+ * plus the land of every node in `alsoBadged` (where the badge stands
+ * during an unlock beat, before she hops).
+ */
+export function badgeLands(
+  model: MapModel,
+  alsoBadged: readonly SkillNode[] = [],
+): Set<number> {
+  const nodes = [model.current, ...alsoBadged]
+  const out = new Set<number>()
+  model.lands.forEach((land, i) => {
+    if (land.stops.some((s) => nodes.includes(s.node))) out.add(i)
+  })
+  return out
+}
+
 const STONE_STEP = 42
 
 function stonesAlong(
@@ -168,18 +187,21 @@ export function layoutMap(
   model: MapModel,
   width: number,
   height: number,
+  alsoBadged: readonly SkillNode[] = [],
 ): MapLayout {
   const count = model.lands.length
   const widest = Math.max(...model.lands.map((l) => l.stops.length))
   const spacing = widest > 1 ? (width - 2 * STOP_INSET) / (widest - 1) : width
   const curScale = model.complete ? 1 : CURRENT_SCALE
-  // Emma's land is `extra` taller; the stop size depends on the band height,
-  // and her room on the stop size, so settle the two together.
+  // Each land hosting Emma's badge is `extra` taller; the stop size depends
+  // on the band height, and her room on the stop size, so settle the two
+  // together.
+  const roomy = badgeLands(model, alsoBadged)
   let extra = 0
   let bandH = 0
   let stopSize = 0
   for (let pass = 0; pass < 4; pass++) {
-    bandH = (height - (count - 1) * BAND_GAP - extra) / count
+    bandH = (height - (count - 1) * BAND_GAP - roomy.size * extra) / count
     stopSize = Math.round(
       Math.max(
         MIN_STOP,
@@ -188,10 +210,7 @@ export function layoutMap(
     )
     extra = emmaRoom(Math.round(stopSize * curScale), bandH)
   }
-  bandH = (height - (count - 1) * BAND_GAP - extra) / count
-  const emmaLand = model.lands.findIndex((l) =>
-    l.stops.some((s) => s.node === model.current),
-  )
+  bandH = (height - (count - 1) * BAND_GAP - roomy.size * extra) / count
   const sizeOf = (node: SkillNode) =>
     node === model.current && !model.complete
       ? Math.round(stopSize * CURRENT_SCALE)
@@ -211,7 +230,7 @@ export function layoutMap(
   let side: Side = 'left'
   let bottom = height
   model.lands.forEach((land, i) => {
-    const room = i === emmaLand ? extra : 0
+    const room = roomy.has(i) ? extra : 0
     const bandHeight = bandH + room
     const top = bottom - bandHeight
     bottom = top - BAND_GAP
@@ -268,7 +287,8 @@ export function layoutMap(
  * real region, the bands come out so short that the current stop's bud
  * tray runs onto the stop below and Emma's land squeezes the others. In
  * landscape the path is laid out on a taller virtual region instead, with
- * bands of at least LANDSCAPE_BAND (plus Emma's room in hers), then scaled
+ * bands of at least LANDSCAPE_BAND (plus Emma's room in the `rooms` lands
+ * that host her badge — two during a land-crossing unlock beat), then scaled
  * down to fit — everything shrinks together, nothing overlaps.
  */
 export const LANDSCAPE_BAND = 136
@@ -276,10 +296,17 @@ export const LANDSCAPE_BAND = 136
 export const LANDSCAPE_TRAY_ROOM = 60
 
 /** Scale (≤ 1) that fits `lands` landscape bands into `height` px. */
-export function landscapeScale(lands: number, height: number): number {
+export function landscapeScale(
+  lands: number,
+  height: number,
+  rooms = 1,
+): number {
   // Bands of LANDSCAPE_BAND hold MIN_STOP stops (0.52 × 136 < 88).
   const room = emmaRoom(Math.round(MIN_STOP * CURRENT_SCALE), LANDSCAPE_BAND)
   const need =
-    lands * LANDSCAPE_BAND + (lands - 1) * BAND_GAP + room + LANDSCAPE_TRAY_ROOM
+    lands * LANDSCAPE_BAND +
+    (lands - 1) * BAND_GAP +
+    rooms * room +
+    LANDSCAPE_TRAY_ROOM
   return height > 0 ? Math.min(1, height / need) : 1
 }

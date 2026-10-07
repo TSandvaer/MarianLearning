@@ -19,6 +19,7 @@ import { currentStepOf } from '../Hub/hubCardModel'
 import { buildMapModel, stopsInOrder } from './mapModel'
 import {
   BAND_GAP,
+  badgeLands,
   CURRENT_SCALE,
   emmaBadge,
   GATE_TAP,
@@ -271,6 +272,78 @@ describe('layoutMap', () => {
       }
     }
   })
+  // Unlock beat (PR #522 review): the badge stays on the just-mastered
+  // stop until Emma hops. When the unlock opens a new land, that stop sits
+  // in a different land from the current one; it gets badge room too, so
+  // the frosted new stop above it never covers her face.
+  it('unlock beat: the badge on the just-mastered stop clears every stop and gate and stays in its band (portrait + landscape)', () => {
+    const regions = [
+      { w: W, h: H, landscape: false },
+      { w: 760, h: 654, landscape: true },
+      { w: 821, h: 624, landscape: true },
+      { w: 897, h: 664, landscape: true },
+      { w: 1000, h: 560, landscape: true },
+      { w: 1038, h: 884, landscape: true },
+    ] as const
+    let crossings = 0
+    for (const [world, tree] of worlds) {
+      for (let i = 1; i < tree.length; i++) {
+        const mastered = tree[i - 1]!
+        const m = buildMapModel(seed(tree, i), world)
+        const landOf = (n: SkillNode) =>
+          m.lands.find((l) => l.stops.some((s) => s.node === n))!.number
+        if (landOf(mastered) !== landOf(m.current)) crossings++
+        const rooms = badgeLands(m, [mastered]).size
+        for (const r of regions) {
+          const k = r.landscape ? landscapeScale(m.lands.length, r.h, rooms) : 1
+          const h = r.landscape ? r.h / k - LANDSCAPE_TRAY_ROOM : r.h
+          const l = layoutMap(m, r.w / k, h, [mastered])
+          if (r.landscape)
+            for (const b of l.bands)
+              expect(b.height).toBeGreaterThanOrEqual(LANDSCAPE_BAND - 0.01)
+          // Before the hop (on the mastered stop) and after it (on the new one).
+          for (const node of [mastered, m.current]) {
+            const stop = l.stops.find((s) => s.node === node)!
+            const e = emmaBadge(stop)
+            const box = {
+              l: e.left,
+              t: e.top,
+              r: e.left + e.size,
+              b: e.top + e.height,
+            }
+            const where = `${world} ${mastered}->${m.current} @${node} ${r.w}x${r.h}`
+            expect(box.b, where).toBeLessThanOrEqual(stop.y - stop.size / 2)
+            for (const s of l.stops)
+              expect(overlap(box, boxOf(s.x, s.y, s.size)), where).toBe(false)
+            for (const g of l.gates)
+              expect(overlap(box, boxOf(g.x, g.y, GATE_TAP)), where).toBe(false)
+            const band = l.bands.find((b) => b.land === stop.land)!
+            expect(box.t, where).toBeGreaterThanOrEqual(band.top)
+            expect(box.l, where).toBeGreaterThanOrEqual(0)
+            expect(box.r, where).toBeLessThanOrEqual(r.w / k)
+          }
+        }
+      }
+    }
+    // Every land after the first is entered once per world.
+    expect(crossings).toBe(
+      worlds.reduce(
+        (n, [world, tree]) =>
+          n + buildMapModel(seed(tree, 0), world).lands.length - 1,
+        0,
+      ),
+    )
+  })
+
+  it('no unlock beat: the layout is the steady-state one', () => {
+    for (const [world, tree] of worlds) {
+      const m = buildMapModel(seed(tree, 3), world)
+      expect(layoutMap(m, W, H, [])).toEqual(layoutMap(m, W, H))
+      // A mastered stop in the current land adds no room.
+      expect(layoutMap(m, W, H, [m.current])).toEqual(layoutMap(m, W, H))
+    }
+  })
+
   // Landscape path regions: Thomas's iPad in Safari (1000x670) and the
   // other landscape sizes, after the left header column and margins.
   it("landscape: scaled to fit, Emma's badge and the bud tray clear every other stop", () => {

@@ -49,6 +49,7 @@ import { HUB_LAST_UNMOUNT_KEY } from '../Hub/useRapidRemountSuppression'
 import { buildMapModel, type MapLand, type MapStop } from './mapModel'
 import {
   BAND_INSET,
+  badgeLands,
   emmaBadge,
   GATE_TAP,
   LANDSCAPE_TRAY_ROOM,
@@ -155,15 +156,28 @@ export function MapScreen({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+  // Emma's badge starts an unlock beat on the just-mastered stop, so its
+  // land gets badge room too — for the whole mount, so nothing jumps when
+  // she hops.
+  const alsoBadged = useMemo(
+    () => (unlock === null ? [] : [unlock.mastered]),
+    [unlock],
+  )
   // Landscape: laid out on a taller virtual region, then scaled to fit
   // (see `landscapeScale`). Portrait: the region as it is.
   const landscape = useLandscape()
-  const scale = landscape ? landscapeScale(model.lands.length, size.h) : 1
+  const scale = landscape
+    ? landscapeScale(
+        model.lands.length,
+        size.h,
+        badgeLands(model, alsoBadged).size,
+      )
+    : 1
   const pathW = size.w / scale
   const pathH = landscape ? size.h / scale - LANDSCAPE_TRAY_ROOM : size.h
   const layout = useMemo(
-    () => layoutMap(model, pathW, pathH),
-    [model, pathW, pathH],
+    () => layoutMap(model, pathW, pathH, alsoBadged),
+    [model, pathW, pathH, alsoBadged],
   )
 
   // Audio: one player + poof for this mount; both released on leave.
