@@ -981,22 +981,26 @@ export default function SessionEnd({
             )}
           </AnimatePresence>
         </div>
-      </div>
 
-      {/* Caption ribbon = Emma's spoken line. */}
-      {caption.length > 0 && phase !== 'sleep-splash' && (
-        <div
-          data-testid="session-end-ribbon"
-          role="status"
-          aria-live="polite"
-          className="se-caption"
-        >
-          <SpeakerIcon />
-          <p data-testid="session-end-caption" className="m-0">
-            {caption}
-          </p>
+        {/* Caption ribbon = Emma's spoken line. It sits in the layout under
+            the buttons, in a slot that always holds room for two lines, so
+            no line can cover a button. */}
+        <div className="se-caption-slot">
+          {caption.length > 0 && phase !== 'sleep-splash' && (
+            <div
+              data-testid="session-end-ribbon"
+              role="status"
+              aria-live="polite"
+              className="se-caption"
+            >
+              <SpeakerIcon />
+              <p data-testid="session-end-caption" className="m-0">
+                {caption}
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Sleep splash overlay (legacy path, no router wired) */}
       <AnimatePresence>

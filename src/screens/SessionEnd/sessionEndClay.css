@@ -41,12 +41,16 @@
   flex-direction: column;
   align-items: center;
   padding: max(env(safe-area-inset-top), 12px) 16px
-    calc(env(safe-area-inset-bottom) + 130px);
+    calc(env(safe-area-inset-bottom) + 22px);
 }
 
+/* Emma is the one piece that gives way when the screen is short, so the
+   panel, the buttons and the caption below them always fit. */
 .se-emma {
   display: flex;
+  flex: 0 1 auto;
   height: min(33vh, 390px);
+  min-height: 160px;
   width: 100%;
   justify-content: center;
   pointer-events: none;
@@ -56,6 +60,7 @@
 .se-panel {
   position: relative;
   display: flex;
+  flex: none;
   min-height: min(430px, 38vh);
   width: min(720px, 92vw);
   flex-direction: column;
@@ -211,6 +216,7 @@
 /* Thick press-able clay buttons. */
 .se-buttons {
   display: flex;
+  flex: none;
   min-height: 130px;
   align-items: center;
   justify-content: center;
@@ -274,12 +280,20 @@
 }
 
 /* Caption ribbon = Emma's spoken line. */
+/* The caption's place in the layout, under the buttons: it takes up the
+   leftover height (ribbon at the bottom) and always holds room for a
+   two-line ribbon, so the buttons above never move when a line wraps. */
+.se-caption-slot {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-self: stretch;
+  min-height: calc(2 * 1.18 * 29px + 24px + 20px);
+  margin: 0 28px;
+  padding-top: 20px;
+}
 .se-caption {
-  position: absolute;
-  left: 44px;
-  right: 44px;
-  bottom: calc(env(safe-area-inset-bottom) + 22px);
-  z-index: 9;
   display: flex;
   min-height: 84px;
   align-items: center;
@@ -316,9 +330,11 @@
     height: 88px;
     font-size: 30px;
   }
+  .se-caption-slot {
+    min-height: calc(2 * 1.18 * 22px + 24px + 20px);
+    margin: 0;
+  }
   .se-caption {
-    left: 16px;
-    right: 16px;
     font-size: 22px;
   }
 }
