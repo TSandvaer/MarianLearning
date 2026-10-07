@@ -339,6 +339,49 @@
   }
 }
 
+/* Landscape (an iPad held sideways in a Safari tab: ~1000-1366 wide and
+   only 640-900 tall). Stacked, Emma + panel + buttons + caption need
+   ~850 px, so the buttons fell off the bottom. Emma moves beside the
+   column instead of above it, and the column's spacing tightens; text and
+   button sizes stay as in portrait. Portrait is untouched. */
+@media (orientation: landscape) {
+  .se-stack {
+    display: grid;
+    grid-template-columns: auto minmax(0, 720px);
+    grid-template-rows: max-content max-content minmax(0, 1fr);
+    justify-content: center;
+    column-gap: 28px;
+  }
+  .se-emma {
+    grid-row: 1 / -1;
+    align-self: center;
+    width: auto;
+    /* Emma's art is square, so her height is also her column's width;
+       30vw leaves the panel room for the Again + Home pair at 1000 px. */
+    height: min(64vh, 480px, 30vw);
+    min-height: 0;
+  }
+  .se-panel {
+    width: 100%;
+    min-height: 0;
+    margin-top: 0;
+  }
+  .se-row {
+    margin-top: 18px;
+  }
+  .se-count-row {
+    min-height: 56px;
+    margin-top: 12px;
+  }
+  .se-buttons {
+    min-height: 124px;
+    margin-top: 22px;
+  }
+  .se-caption-slot {
+    margin: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .se-twinkle,
   .se-zz {

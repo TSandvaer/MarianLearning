@@ -7,7 +7,9 @@
  * screen outside the layout, so nothing kept the buttons above it.
  *
  * Guard: for every session-end guidance line (guide.end.*) at both iPad
- * portrait sizes the suite uses, an in-page monitor checks every
+ * portrait sizes the suite uses, and at two iPad landscape sizes in
+ * Safari (Thomas's 1000x670 and the shortest, 1080x640 — there Emma
+ * stands beside the panel), an in-page monitor checks every
  * animation frame that the caption ribbon's box does not intersect any
  * visible button's box, and the settled screen is checked once more.
  *
@@ -39,6 +41,8 @@ const SHOT_TAG = process.env.END_CAPTION_SHOTS
 const VIEWPORTS = [
   { width: 810, height: 1080 },
   { width: 820, height: 1180 },
+  { width: 1000, height: 670 },
+  { width: 1080, height: 640 },
 ] as const
 
 const MATH = [

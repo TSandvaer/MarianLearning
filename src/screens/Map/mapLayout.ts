@@ -221,3 +221,27 @@ export function layoutMap(
 
   return { bands, stops, gates, pills, stones, stopSize }
 }
+
+/**
+ * Landscape (an iPad sideways in Safari: 640-900 px tall). Laid out on the
+ * real region, the bands come out so short that a current stop's Emma
+ * (head + shoulders above it) runs into the stop above and its bud tray
+ * onto the stop below. In landscape the path is laid out on a taller
+ * virtual region instead, with bands of at least LANDSCAPE_BAND, then
+ * scaled down to fit — everything shrinks together, nothing overlaps.
+ */
+export const LANDSCAPE_BAND = 136
+/** Virtual room above the top band for Emma's head. */
+export const LANDSCAPE_HEAD_ROOM = 56
+/** Virtual room below the bottom band for the current stop's bud tray. */
+export const LANDSCAPE_TRAY_ROOM = 60
+
+/** Scale (≤ 1) that fits `lands` landscape bands into `height` px. */
+export function landscapeScale(lands: number, height: number): number {
+  const need =
+    lands * LANDSCAPE_BAND +
+    (lands - 1) * BAND_GAP +
+    LANDSCAPE_HEAD_ROOM +
+    LANDSCAPE_TRAY_ROOM
+  return height > 0 ? Math.min(1, height / need) : 1
+}

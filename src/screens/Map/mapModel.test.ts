@@ -23,6 +23,9 @@ import {
   emmaFigure,
   emmaRect,
   GATE_TAP,
+  LANDSCAPE_HEAD_ROOM,
+  LANDSCAPE_TRAY_ROOM,
+  landscapeScale,
   layoutMap,
   MIN_STOP,
 } from './mapLayout'
@@ -253,6 +256,51 @@ describe('layoutMap', () => {
         const emma = { l: f.left, t: f.top, r: f.right, b: f.bottom }
         for (const g of l.gates)
           expect(overlap(emma, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
+      }
+    }
+  })
+  // Landscape path regions: Thomas's iPad in Safari (1000x670) and the
+  // other landscape sizes, after the left header column and margins.
+  it('landscape: scaled to fit, Emma and the bud tray clear every other stop', () => {
+    const regions = [
+      [760, 654],
+      [821, 624],
+      [897, 664],
+      [1038, 884],
+    ] as const
+    for (const [rw, rh] of regions) {
+      for (const [world, tree] of worlds) {
+        for (let cur = 0; cur < tree.length; cur++) {
+          const m = buildMapModel(seed(tree, cur), world)
+          const k = landscapeScale(m.lands.length, rh)
+          const h = rh / k - LANDSCAPE_HEAD_ROOM - LANDSCAPE_TRAY_ROOM
+          const l = layoutMap(m, rw / k, h)
+          // Tap targets stay ≥ 44 px on screen.
+          expect(l.stopSize * k).toBeGreaterThanOrEqual(44)
+          expect(GATE_TAP * k).toBeGreaterThanOrEqual(44)
+          const stop = l.stops.find((s) => s.node === m.current)!
+          const f = emmaFigure(stop)
+          const emma = { l: f.left, t: f.top, r: f.right, b: f.bottom }
+          // BudTray: top at 1.02 × size inside the stop box, 3 × 42 px
+          // holes + padding ≈ 160 × 55 px.
+          const trayTop = stop.y - stop.size / 2 + stop.size * 1.02
+          const tray = {
+            l: stop.x - 80,
+            t: trayTop,
+            r: stop.x + 80,
+            b: trayTop + 55,
+          }
+          expect(emma.t).toBeGreaterThanOrEqual(-LANDSCAPE_HEAD_ROOM)
+          expect(tray.b).toBeLessThanOrEqual(h + LANDSCAPE_TRAY_ROOM)
+          for (const s of l.stops) {
+            if (s.node === stop.node) continue
+            const box = boxOf(s.x, s.y, s.size)
+            expect(overlap(emma, box)).toBe(false)
+            expect(overlap(tray, box)).toBe(false)
+          }
+          for (const g of l.gates)
+            expect(overlap(tray, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
+        }
       }
     }
   })

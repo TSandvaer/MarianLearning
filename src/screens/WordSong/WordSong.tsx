@@ -1684,7 +1684,7 @@ function WordSongScreen({
       </div>
 
       {/* Emma + ribbon row */}
-      <div className="relative flex w-full items-start gap-4 px-4">
+      <div className="relative flex w-full items-start gap-4 px-4 landscape:min-h-[88px] landscape:pl-[calc(26vh+2rem)]">
         {/* Emma — upper-left, ~26vh per spec (slightly smaller than
             Math's 30vh — see spec line 141).
 
@@ -1704,7 +1704,7 @@ function WordSongScreen({
           pose={audioReady === false && pose === 'idle' ? 'listening' : pose}
           layoutId="emma"
           data-testid="word-song-emma"
-          className="h-[26vh] w-auto select-none"
+          className="h-[26vh] w-auto select-none landscape:absolute landscape:left-4 landscape:top-0"
         />
 
         {/* Placement A — digraphs-th first-encounter intro panel.
@@ -1800,7 +1800,11 @@ function WordSongScreen({
       )}
       {audioReady !== false && (
         <>
-          {/* Word card — picture above letters (per spec §"Word card composition").
+          {/* Landscape: the problem area sits right of Emma's column (Emma
+            leaves the row above and stands in the left gutter), so the
+            chips fit the short screen. Portrait: no box at all. */}
+          <div className="contents landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pl-[calc(26vh+1rem)]">
+            {/* Word card — picture above letters (per spec §"Word card composition").
           Picture leads (meaning first), letters below (decoding follows).
 
           Letter-names tier (Wave 7 A4b, ticket 86c9y6nc7) and
@@ -1826,20 +1830,93 @@ function WordSongScreen({
           no single-word picture card and no per-word decode breakdown
           (Kyle §3.2 — the cloze mechanic transfers the sight-words
           written-word chip, NOT the CVC picture card). */}
-          {currentProblem.contentType !== 'letter-names' &&
-            currentProblem.contentType !== 'letter-sounds' &&
-            currentProblem.contentType !== 'sight-word' &&
-            currentProblem.contentType !== 'simple-sentence' && (
+            {currentProblem.contentType !== 'letter-names' &&
+              currentProblem.contentType !== 'letter-sounds' &&
+              currentProblem.contentType !== 'sight-word' &&
+              currentProblem.contentType !== 'simple-sentence' && (
+                <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
+                  <div
+                    data-testid="word-song-word-card"
+                    data-word={currentProblem.target.word}
+                    className="flex flex-col items-center gap-2"
+                  >
+                    {/* Picture — 180pt square. Renders inline-SVG placeholder until
+                real pack ships (see wordPictures.tsx for sourcing posture). */}
+                    <m.div
+                      data-testid="word-song-word-picture"
+                      className="flex items-center justify-center"
+                      style={{ width: '180px', height: '180px' }}
+                      initial={
+                        reducedMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, scale: 0 }
+                      }
+                      animate={
+                        reducedMotion
+                          ? { opacity: 1 }
+                          : { opacity: 1, scale: 1 }
+                      }
+                      transition={
+                        reducedMotion
+                          ? { duration: 0.2 }
+                          : { type: 'spring', stiffness: 260, damping: 16 }
+                      }
+                    >
+                      <WordPicture
+                        pictureKey={currentProblem.target.pictureKey}
+                        large
+                        ariaLabel={currentProblem.target.word}
+                      />
+                    </m.div>
+
+                    {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
+                phoneme playback per spec §"Audio dispatch sequence on letter
+                tap". v1 keeps letter taps as visual-only. During the CVC
+                phoneme-blend prompt (ticket 86c9qa6n3) the letters are driven
+                instead by `highlighted` off `blendActiveLetterIndex`: index i
+                highlights letter[i] as its phoneme plays; the whole-word beat
+                (index === word.length) pulses ALL letters together once. */}
+                    <div
+                      data-testid="word-song-letters"
+                      className="flex items-center"
+                      style={{ gap: '32px' }}
+                    >
+                      {currentProblem.target.word.split('').map((letter, i) => (
+                        <LetterGlyph
+                          key={`${i}-${letter}`}
+                          letter={letter}
+                          index={i}
+                          reducedMotion={reducedMotion}
+                          // Per-letter highlight during the blend: this letter
+                          // when its index is active, OR every letter on the
+                          // whole-word beat (active index === word length).
+                          highlighted={
+                            blendActiveLetterIndex === i ||
+                            blendActiveLetterIndex ===
+                              currentProblem.target.word.length
+                          }
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            {/* Letter-names word card — single large glyph centered, in the
+          slot the picture would occupy on CVC tiers. Marian sees only the
+          chips below, but the centered glyph reinforces the read-line
+          target while Emma speaks. Kyle's A1 spec §4.1 frames this as
+          "the chip glyph IS the assessment" — the centered card glyph is
+          a visual reading-anchor mirroring the picture role on CVC. */}
+            {currentProblem.contentType === 'letter-names' && (
               <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
                 <div
-                  data-testid="word-song-word-card"
-                  data-word={currentProblem.target.word}
+                  data-testid="word-song-letter-card"
+                  data-letter={currentProblem.target.word}
                   className="flex flex-col items-center gap-2"
                 >
-                  {/* Picture — 180pt square. Renders inline-SVG placeholder until
-                real pack ships (see wordPictures.tsx for sourcing posture). */}
                   <m.div
-                    data-testid="word-song-word-picture"
+                    data-testid="word-song-letter-glyph"
                     className="flex items-center justify-center"
                     style={{ width: '180px', height: '180px' }}
                     initial={
@@ -1854,151 +1931,82 @@ function WordSongScreen({
                         : { type: 'spring', stiffness: 260, damping: 16 }
                     }
                   >
-                    <WordPicture
-                      pictureKey={currentProblem.target.pictureKey}
-                      large
-                      ariaLabel={currentProblem.target.word}
-                    />
+                    <span
+                      style={{
+                        fontSize: '128px',
+                        lineHeight: 1,
+                        fontWeight: 700,
+                        color: '#1F2937',
+                        // System sans-serif stack; Kyle's A1 spec §4.2 recommends
+                        // Atkinson Hyperlegible but project design-tokens have
+                        // not landed that font yet — pending Devon. System
+                        // sans-serif disambiguates Il1 + bdpq adequately on iPad
+                        // at 128px scale.
+                        fontFamily:
+                          'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                      }}
+                      aria-label={`Letter ${currentProblem.target.word}`}
+                    >
+                      {currentProblem.target.word}
+                    </span>
                   </m.div>
-
-                  {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
-                phoneme playback per spec §"Audio dispatch sequence on letter
-                tap". v1 keeps letter taps as visual-only. During the CVC
-                phoneme-blend prompt (ticket 86c9qa6n3) the letters are driven
-                instead by `highlighted` off `blendActiveLetterIndex`: index i
-                highlights letter[i] as its phoneme plays; the whole-word beat
-                (index === word.length) pulses ALL letters together once. */}
-                  <div
-                    data-testid="word-song-letters"
-                    className="flex items-center"
-                    style={{ gap: '32px' }}
-                  >
-                    {currentProblem.target.word.split('').map((letter, i) => (
-                      <LetterGlyph
-                        key={`${i}-${letter}`}
-                        letter={letter}
-                        index={i}
-                        reducedMotion={reducedMotion}
-                        // Per-letter highlight during the blend: this letter
-                        // when its index is active, OR every letter on the
-                        // whole-word beat (active index === word length).
-                        highlighted={
-                          blendActiveLetterIndex === i ||
-                          blendActiveLetterIndex ===
-                            currentProblem.target.word.length
-                        }
-                      />
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
 
-          {/* Letter-names word card — single large glyph centered, in the
-          slot the picture would occupy on CVC tiers. Marian sees only the
-          chips below, but the centered glyph reinforces the read-line
-          target while Emma speaks. Kyle's A1 spec §4.1 frames this as
-          "the chip glyph IS the assessment" — the centered card glyph is
-          a visual reading-anchor mirroring the picture role on CVC. */}
-          {currentProblem.contentType === 'letter-names' && (
-            <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
-              <div
-                data-testid="word-song-letter-card"
-                data-letter={currentProblem.target.word}
-                className="flex flex-col items-center gap-2"
-              >
-                <m.div
-                  data-testid="word-song-letter-glyph"
-                  className="flex items-center justify-center"
-                  style={{ width: '180px', height: '180px' }}
-                  initial={
-                    reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
-                  }
-                  animate={
-                    reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
-                  }
-                  transition={
-                    reducedMotion
-                      ? { duration: 0.2 }
-                      : { type: 'spring', stiffness: 260, damping: 16 }
-                  }
-                >
-                  <span
-                    style={{
-                      fontSize: '128px',
-                      lineHeight: 1,
-                      fontWeight: 700,
-                      color: '#1F2937',
-                      // System sans-serif stack; Kyle's A1 spec §4.2 recommends
-                      // Atkinson Hyperlegible but project design-tokens have
-                      // not landed that font yet — pending Devon. System
-                      // sans-serif disambiguates Il1 + bdpq adequately on iPad
-                      // at 128px scale.
-                      fontFamily:
-                        'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-                    }}
-                    aria-label={`Letter ${currentProblem.target.word}`}
-                  >
-                    {currentProblem.target.word}
-                  </span>
-                </m.div>
-              </div>
-            </div>
-          )}
-
-          {/* Letter-sounds word card — single large glyph centered, in
+            {/* Letter-sounds word card — single large glyph centered, in
           the slot the picture would occupy on CVC tiers. The chip strip
           below carries the answer; this centered glyph is a visual
           reading-anchor mirroring the picture role on CVC. Sized to
           180pt to match the picture footprint. */}
-          {currentProblem.contentType === 'letter-sounds' && (
-            <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
-              <div
-                data-testid="word-song-letter-sound-card"
-                data-letter={currentProblem.target.word}
-                className="flex flex-col items-center gap-2"
-              >
-                <m.div
-                  data-testid="word-song-letter-sound-glyph"
-                  className="flex items-center justify-center"
-                  style={{ width: '180px', height: '180px' }}
-                  initial={
-                    reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
-                  }
-                  animate={
-                    reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
-                  }
-                  transition={
-                    reducedMotion
-                      ? { duration: 0.2 }
-                      : { type: 'spring', stiffness: 260, damping: 16 }
-                  }
+            {currentProblem.contentType === 'letter-sounds' && (
+              <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
+                <div
+                  data-testid="word-song-letter-sound-card"
+                  data-letter={currentProblem.target.word}
+                  className="flex flex-col items-center gap-2"
                 >
-                  <span
-                    style={{
-                      fontSize: '128px',
-                      lineHeight: 1,
-                      fontWeight: 700,
-                      color: '#1F2937',
-                      // System sans-serif stack; Kyle's A5 spec §4.2
-                      // (adopting A1's recommendation) calls for
-                      // Atkinson Hyperlegible but project design-tokens
-                      // have not landed that font yet — pending Devon.
-                      // System sans-serif disambiguates Il1 + bdpq
-                      // adequately on iPad at 128px scale.
-                      fontFamily:
-                        'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-                    }}
-                    aria-label={`Letter ${currentProblem.target.word}`}
+                  <m.div
+                    data-testid="word-song-letter-sound-glyph"
+                    className="flex items-center justify-center"
+                    style={{ width: '180px', height: '180px' }}
+                    initial={
+                      reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
+                    }
+                    animate={
+                      reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
+                    }
+                    transition={
+                      reducedMotion
+                        ? { duration: 0.2 }
+                        : { type: 'spring', stiffness: 260, damping: 16 }
+                    }
                   >
-                    {currentProblem.target.word}
-                  </span>
-                </m.div>
+                    <span
+                      style={{
+                        fontSize: '128px',
+                        lineHeight: 1,
+                        fontWeight: 700,
+                        color: '#1F2937',
+                        // System sans-serif stack; Kyle's A5 spec §4.2
+                        // (adopting A1's recommendation) calls for
+                        // Atkinson Hyperlegible but project design-tokens
+                        // have not landed that font yet — pending Devon.
+                        // System sans-serif disambiguates Il1 + bdpq
+                        // adequately on iPad at 128px scale.
+                        fontFamily:
+                          'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                      }}
+                      aria-label={`Letter ${currentProblem.target.word}`}
+                    >
+                      {currentProblem.target.word}
+                    </span>
+                  </m.div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Simple-sentences reading surface (Wave 13 W13-03/04, ticket
+            {/* Simple-sentences reading surface (Wave 13 W13-03/04, ticket
           86ca8e6fr): a gentle-phase SCENE illustration above the SENTENCE
           PANEL (the net-new center-stage gapped-sentence card). The scene
           renders only when a scene asset is registered for the problem's
@@ -2009,88 +2017,89 @@ function WordSongScreen({
           Emma's read (same `captionRevealed` tick as the caption ribbon),
           and the gap fills with the target word once the problem resolves
           (the closure beat, Kyle §3.2 / sponsor Q2). */}
-          {currentProblem.contentType === 'simple-sentence' && (
-            <div className="mt-2 flex flex-1 flex-col items-center justify-start gap-3 px-4">
-              <ScenePanel
-                sceneId={currentProblem.sceneId}
-                ariaLabel={
-                  currentProblem.sentenceFrame?.replace(
-                    SENTENCE_GAP_TOKEN,
-                    currentProblem.target.word,
-                  ) ?? currentProblem.target.word
-                }
-              />
-              {currentProblem.sentenceFrame !== undefined && (
-                <SentencePanel
-                  frame={currentProblem.sentenceFrame}
-                  targetWord={currentProblem.target.word}
-                  revealedCount={captionRevealed}
-                  filled={problemState.resolved}
-                  reducedMotion={reducedMotion}
+            {currentProblem.contentType === 'simple-sentence' && (
+              <div className="mt-2 flex flex-1 flex-col items-center justify-start gap-3 px-4">
+                <ScenePanel
+                  sceneId={currentProblem.sceneId}
+                  ariaLabel={
+                    currentProblem.sentenceFrame?.replace(
+                      SENTENCE_GAP_TOKEN,
+                      currentProblem.target.word,
+                    ) ?? currentProblem.target.word
+                  }
                 />
-              )}
-            </div>
-          )}
+                {currentProblem.sentenceFrame !== undefined && (
+                  <SentencePanel
+                    frame={currentProblem.sentenceFrame}
+                    targetWord={currentProblem.target.word}
+                    revealedCount={captionRevealed}
+                    filled={problemState.resolved}
+                    reducedMotion={reducedMotion}
+                  />
+                )}
+              </div>
+            )}
 
-          {/* Picture chips — 3 chips, 96×96pt with 24pt gaps per spec line 143.
+            {/* Picture chips — 3 chips, 96×96pt with 24pt gaps per spec line 143.
           For `letter-names` and `letter-sounds` the chip CONTENT swaps
           from `<WordPicture>` to a centered letter glyph; the chip FRAME
           (size, border, spring, hit area, shake animation) is unchanged.
           Kyle's A1 spec §4.1 (which A5 §4.1 adopts) requires the
           chip-frame contract stay identical to the CVC chips. */}
-          <div
-            data-testid="word-song-chips"
-            className="
+            <div
+              data-testid="word-song-chips"
+              className="
           mb-8 flex w-full items-center justify-center px-4
         "
-            style={{ gap: '24px' }}
-          >
-            {chipOrder.map((entry) => {
-              const isCorrect = entry.word === currentProblem.target.word
-              const isShaking = shakingChip === entry.word
-              const dimForGuided = guidedActive && !isCorrect
-              const guidedShimmer = guidedActive && isCorrect
-              const isLetterNames =
-                currentProblem.contentType === 'letter-names'
-              const isLetterSounds =
-                currentProblem.contentType === 'letter-sounds'
-              const isLetterTier = isLetterNames || isLetterSounds
-              // Sight-words tier (Wave 11 W11-03): the chip presents the
-              // WRITTEN word as text (no picture), per Dave's W11-01
-              // audio-first whole-word-matching mechanic. The chip FRAME
-              // (size, border, spring, hit area, shake) is identical to the
-              // CVC chips — only the CONTENT swaps from <WordPicture> to a
-              // text glyph, the same seam the letter tiers use.
-              const isSightWord = currentProblem.contentType === 'sight-word'
-              // Simple-sentences tier (Wave 13 W13-03/04): the chip is the
-              // WRITTEN word as text — the EXACT sight-words written-word
-              // chip (Kyle §3.3, "reuse the isSightWord text-glyph chip").
-              // Same frame, same 36px text; only the gate widens. Render
-              // dispatch keys on this combined predicate so both tiers
-              // share one branch.
-              const isWrittenWordChip =
-                isSightWord || currentProblem.contentType === 'simple-sentence'
-              return (
-                <m.button
-                  key={entry.word}
-                  type="button"
-                  data-testid="word-song-chip"
-                  data-word={entry.word}
-                  data-picture-key={entry.pictureKey}
-                  data-correct={isCorrect ? 'true' : 'false'}
-                  data-shaking={isShaking ? 'true' : 'false'}
-                  aria-label={
-                    isLetterTier
-                      ? `Letter ${entry.word}`
-                      : isWrittenWordChip
-                        ? `Word ${entry.word}`
-                        : `Picture of ${entry.word}`
-                  }
-                  onClick={() => onChipTap(entry.word)}
-                  disabled={
-                    problemState.resolved || dimForGuided || !readAloudPlayed
-                  }
-                  className={`
+              style={{ gap: '24px' }}
+            >
+              {chipOrder.map((entry) => {
+                const isCorrect = entry.word === currentProblem.target.word
+                const isShaking = shakingChip === entry.word
+                const dimForGuided = guidedActive && !isCorrect
+                const guidedShimmer = guidedActive && isCorrect
+                const isLetterNames =
+                  currentProblem.contentType === 'letter-names'
+                const isLetterSounds =
+                  currentProblem.contentType === 'letter-sounds'
+                const isLetterTier = isLetterNames || isLetterSounds
+                // Sight-words tier (Wave 11 W11-03): the chip presents the
+                // WRITTEN word as text (no picture), per Dave's W11-01
+                // audio-first whole-word-matching mechanic. The chip FRAME
+                // (size, border, spring, hit area, shake) is identical to the
+                // CVC chips — only the CONTENT swaps from <WordPicture> to a
+                // text glyph, the same seam the letter tiers use.
+                const isSightWord = currentProblem.contentType === 'sight-word'
+                // Simple-sentences tier (Wave 13 W13-03/04): the chip is the
+                // WRITTEN word as text — the EXACT sight-words written-word
+                // chip (Kyle §3.3, "reuse the isSightWord text-glyph chip").
+                // Same frame, same 36px text; only the gate widens. Render
+                // dispatch keys on this combined predicate so both tiers
+                // share one branch.
+                const isWrittenWordChip =
+                  isSightWord ||
+                  currentProblem.contentType === 'simple-sentence'
+                return (
+                  <m.button
+                    key={entry.word}
+                    type="button"
+                    data-testid="word-song-chip"
+                    data-word={entry.word}
+                    data-picture-key={entry.pictureKey}
+                    data-correct={isCorrect ? 'true' : 'false'}
+                    data-shaking={isShaking ? 'true' : 'false'}
+                    aria-label={
+                      isLetterTier
+                        ? `Letter ${entry.word}`
+                        : isWrittenWordChip
+                          ? `Word ${entry.word}`
+                          : `Picture of ${entry.word}`
+                    }
+                    onClick={() => onChipTap(entry.word)}
+                    disabled={
+                      problemState.resolved || dimForGuided || !readAloudPlayed
+                    }
+                    className={`
                 clay-tile clay-press
                 relative flex select-none items-center justify-center
                 disabled:cursor-default
@@ -2098,74 +2107,76 @@ function WordSongScreen({
                 ${dimForGuided || !readAloudPlayed ? 'opacity-60' : 'opacity-100'}
                 ${guidedShimmer ? 'clay-tile-glow' : ''}
               `}
-                  style={{
-                    width: '112px',
-                    height: '112px',
-                    minWidth: '60px',
-                    minHeight: '60px',
-                    cursor:
-                      problemState.resolved || dimForGuided || !readAloudPlayed
-                        ? 'default'
-                        : 'pointer',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    padding: '12px',
-                  }}
-                  initial={{ scale: 0.9, opacity: 0, y: 40 }}
-                  animate={
-                    isShaking
-                      ? reducedMotion
-                        ? { scale: 1, opacity: [1, 0.7, 1], y: 0 }
+                    style={{
+                      width: '112px',
+                      height: '112px',
+                      minWidth: '60px',
+                      minHeight: '60px',
+                      cursor:
+                        problemState.resolved ||
+                        dimForGuided ||
+                        !readAloudPlayed
+                          ? 'default'
+                          : 'pointer',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      padding: '12px',
+                    }}
+                    initial={{ scale: 0.9, opacity: 0, y: 40 }}
+                    animate={
+                      isShaking
+                        ? reducedMotion
+                          ? { scale: 1, opacity: [1, 0.7, 1], y: 0 }
+                          : {
+                              x: [0, -6, 6, -4, 4, 0],
+                              scale: 1,
+                              opacity: 1,
+                              y: 0,
+                            }
                         : {
-                            x: [0, -6, 6, -4, 4, 0],
                             scale: 1,
-                            opacity: 1,
+                            opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
+                            x: 0,
                             y: 0,
                           }
-                      : {
-                          scale: 1,
-                          opacity: dimForGuided || !readAloudPlayed ? 0.6 : 1,
-                          x: 0,
-                          y: 0,
+                    }
+                    // Clay press: the face sinks onto its slab (the CSS
+                    // `.clay-press:active` drops the slab by the same 4px).
+                    // MotionConfig reducedMotion="user" skips the transform.
+                    whileTap={
+                      problemState.resolved || dimForGuided || !readAloudPlayed
+                        ? undefined
+                        : { y: 4 }
+                    }
+                    transition={
+                      isShaking
+                        ? reducedMotion
+                          ? { duration: WRONG_SHAKE_MS / 1000 }
+                          : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
+                        : CHIP_TAP_SPRING
+                    }
+                  >
+                    {isLetterTier ? (
+                      <span
+                        data-testid={
+                          isLetterSounds
+                            ? 'word-song-chip-letter-sound'
+                            : 'word-song-chip-letter'
                         }
-                  }
-                  // Clay press: the face sinks onto its slab (the CSS
-                  // `.clay-press:active` drops the slab by the same 4px).
-                  // MotionConfig reducedMotion="user" skips the transform.
-                  whileTap={
-                    problemState.resolved || dimForGuided || !readAloudPlayed
-                      ? undefined
-                      : { y: 4 }
-                  }
-                  transition={
-                    isShaking
-                      ? reducedMotion
-                        ? { duration: WRONG_SHAKE_MS / 1000 }
-                        : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
-                      : CHIP_TAP_SPRING
-                  }
-                >
-                  {isLetterTier ? (
-                    <span
-                      data-testid={
-                        isLetterSounds
-                          ? 'word-song-chip-letter-sound'
-                          : 'word-song-chip-letter'
-                      }
-                      style={{
-                        fontSize: '64px',
-                        lineHeight: 1,
-                        fontWeight: 700,
-                        color: '#1F2937',
-                        fontFamily:
-                          'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-                        userSelect: 'none',
-                      }}
-                    >
-                      {entry.word}
-                    </span>
-                  ) : isWrittenWordChip ? (
-                    /* Written-word chip — the WRITTEN word as text, the chip
+                        style={{
+                          fontSize: '64px',
+                          lineHeight: 1,
+                          fontWeight: 700,
+                          color: '#1F2937',
+                          fontFamily:
+                            'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {entry.word}
+                      </span>
+                    ) : isWrittenWordChip ? (
+                      /* Written-word chip — the WRITTEN word as text, the chip
                        target itself. Shared by the sight-words tier (Dave's
                        W11-01 mechanic) AND the simple-sentences cloze tier
                        (Kyle W13-02 §3.3 — the sight-words chip transfers
@@ -2179,35 +2190,36 @@ function WordSongScreen({
                        contains data-word). The shared `word-song-chip-sight-word`
                        testid is retained (it names the chip SHAPE, not the
                        tier — Kyle §7 Q5). */
-                    <span
-                      data-testid="word-song-chip-sight-word"
-                      style={{
-                        fontSize: entry.word.length >= 5 ? '32px' : '36px',
-                        lineHeight: 1,
-                        fontWeight: 700,
-                        color: '#1F2937',
-                        fontFamily:
-                          'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-                        userSelect: 'none',
-                      }}
-                    >
-                      {entry.word}
-                    </span>
-                  ) : (
-                    <WordPicture
-                      pictureKey={entry.pictureKey}
-                      ariaLabel={entry.word}
-                    />
-                  )}
-
-                  <AnimatePresence>
-                    {celebrating && isCorrect && !reducedMotion && (
-                      <SparkleBurst key="burst" />
+                      <span
+                        data-testid="word-song-chip-sight-word"
+                        style={{
+                          fontSize: entry.word.length >= 5 ? '32px' : '36px',
+                          lineHeight: 1,
+                          fontWeight: 700,
+                          color: '#1F2937',
+                          fontFamily:
+                            'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {entry.word}
+                      </span>
+                    ) : (
+                      <WordPicture
+                        pictureKey={entry.pictureKey}
+                        ariaLabel={entry.word}
+                      />
                     )}
-                  </AnimatePresence>
-                </m.button>
-              )
-            })}
+
+                    <AnimatePresence>
+                      {celebrating && isCorrect && !reducedMotion && (
+                        <SparkleBurst key="burst" />
+                      )}
+                    </AnimatePresence>
+                  </m.button>
+                )
+              })}
+            </div>
           </div>
         </>
       )}
