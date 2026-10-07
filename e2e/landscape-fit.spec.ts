@@ -282,12 +282,13 @@ interface Rect {
 }
 
 /**
- * Map, settled: no two stops overlap; Emma's figure clears every stop but
- * her own (she stands behind it) and every gate; the current stop's bud
- * tray clears every stop and gate; the caption clears all of them. Thomas's
- * iPad (2026-10-07): in landscape the bands were so short that the tray sat
- * on the stop below, the stop above hid Emma, and the caption covered the
- * bottom land.
+ * Map, settled: no two stops overlap; Emma's figure clears every stop and
+ * gate; the current stop's bud tray clears every stop and gate; the
+ * caption clears all of them. Thomas's iPad (2026-10-07): in landscape the
+ * bands were so short that the tray sat on the stop below, the stop above
+ * hid Emma, and the caption covered the bottom land. Then (same day) the
+ * current stop's pot still hid her body: her whole box must clear her own
+ * stop, its pot art and its bud tray.
  */
 async function expectMapClear(page: Page): Promise<void> {
   const found = await page.evaluate(() => {
@@ -310,6 +311,17 @@ async function expectMapClear(page: Page): Promise<void> {
     )
     const trays = all('[data-testid="map-buds"]', () => 'bud tray')
     const ribbons = all('[data-testid="map-ribbon"]', () => 'caption')
+    // Her whole box, transparent margins included.
+    const emmaBox = all('[data-testid="map-emma"]', () => 'emma box')
+    // The current stop and its pot art (the sticker image).
+    const own = all(
+      `[data-testid="map-stop"][data-node="${current}"]`,
+      () => 'current stop',
+    )
+    const ownArt = all(
+      `[data-testid="map-stop"][data-node="${current}"] [data-testid="map-stop-sticker"] img`,
+      () => 'current stop art',
+    )
     // Emma's figure inside her square box (emmaFigure in mapLayout.ts).
     const emma = all('[data-testid="map-emma"]', () => 'emma').map((e) => {
       const w = e.r - e.l
@@ -322,7 +334,7 @@ async function expectMapClear(page: Page): Promise<void> {
         b: e.t + h * 0.98,
       }
     })
-    return { current, stops, gates, trays, ribbons, emma }
+    return { current, stops, gates, trays, ribbons, emma, emmaBox, own, ownArt }
   })
   const hit = (a: Rect, c: Rect) =>
     a.l < c.r && c.l < a.r && a.t < c.b && c.t < a.b
@@ -333,13 +345,20 @@ async function expectMapClear(page: Page): Promise<void> {
         if (a !== c && !skip?.(c) && hit(a, c))
           clashes.push(`${a.name} × ${c.name}`)
   }
-  const { stops, gates, trays, ribbons, emma } = found
+  const { stops, gates, trays, ribbons, emma, emmaBox, own, ownArt } = found
   expect(stops.length).toBeGreaterThan(0)
   expect(trays.length).toBe(1)
   expect(emma.length).toBe(1)
+  expect(own.length).toBe(1)
+  expect(ownArt.length).toBe(1)
   check(stops, stops)
-  check(emma, stops, (c) => c.name === `stop ${found.current}`)
+  check(emma, stops)
   check(emma, gates)
+  // Fully visible: nothing at her stop covers any part of her box.
+  const ownClashes: string[] = []
+  for (const c of [...own, ...ownArt, ...trays])
+    if (hit(emmaBox[0]!, c)) ownClashes.push(`emma box × ${c.name}`)
+  expect.soft(ownClashes, 'Emma covered at her stop').toEqual([])
   check(trays, [...stops, ...gates])
   check(ribbons, [...stops, ...gates, ...trays, ...emma])
   expect.soft(clashes, 'map pieces overlapping').toEqual([])

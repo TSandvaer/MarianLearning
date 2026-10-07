@@ -23,7 +23,7 @@ import {
   emmaFigure,
   emmaRect,
   GATE_TAP,
-  LANDSCAPE_HEAD_ROOM,
+  LANDSCAPE_BAND,
   LANDSCAPE_TRAY_ROOM,
   landscapeScale,
   layoutMap,
@@ -240,22 +240,34 @@ describe('layoutMap', () => {
     expect(done.stones.every((s) => s.walked)).toBe(true)
   })
 
-  it('Emma stands behind her stop: above it, clear of every gate', () => {
+  // Thomas (2026-10-07): the stop's art hid Emma's body. She now stands
+  // just above her stop, all of her inside her (taller) band.
+  it('Emma stands above her stop, fully in view: clear of every stop and gate, inside her band', () => {
     for (const [world, tree] of worlds) {
-      for (let cur = 0; cur < tree.length; cur++) {
+      for (let cur = -1; cur < tree.length; cur++) {
         const m = buildMapModel(seed(tree, cur), world)
         const l = layoutMap(m, W, H)
         const stop = l.stops.find((s) => s.node === m.current)!
         const e = emmaRect(stop)
-        expect(e.top).toBeLessThan(stop.y - stop.size / 2)
         expect(e.left + e.size / 2).toBeCloseTo(stop.x)
-        const f = emmaFigure(stop)
-        // Her feet are hidden behind the stop's sticker.
-        expect(f.bottom).toBeGreaterThan(stop.y)
-        expect(f.bottom).toBeLessThan(stop.y + stop.size / 2)
-        const emma = { l: f.left, t: f.top, r: f.right, b: f.bottom }
+        // Her whole box, not only her figure, is above her stop's box.
+        const box = {
+          l: e.left,
+          t: e.top,
+          r: e.left + e.size,
+          b: e.top + e.size,
+        }
+        expect(box.b).toBeLessThanOrEqual(stop.y - stop.size / 2)
+        for (const s of l.stops)
+          expect(overlap(box, boxOf(s.x, s.y, s.size))).toBe(false)
         for (const g of l.gates)
-          expect(overlap(emma, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
+          expect(overlap(box, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
+        const band = l.bands.find((b) => b.land === stop.land)!
+        expect(box.t).toBeGreaterThanOrEqual(band.top)
+        // The figure is inside the box.
+        const f = emmaFigure(stop)
+        expect(f.top).toBeGreaterThanOrEqual(box.t)
+        expect(f.bottom).toBeLessThanOrEqual(box.b)
       }
     }
   })
@@ -273,7 +285,7 @@ describe('layoutMap', () => {
         for (let cur = 0; cur < tree.length; cur++) {
           const m = buildMapModel(seed(tree, cur), world)
           const k = landscapeScale(m.lands.length, rh)
-          const h = rh / k - LANDSCAPE_HEAD_ROOM - LANDSCAPE_TRAY_ROOM
+          const h = rh / k - LANDSCAPE_TRAY_ROOM
           const l = layoutMap(m, rw / k, h)
           // Tap targets stay ≥ 44 px on screen.
           expect(l.stopSize * k).toBeGreaterThanOrEqual(44)
@@ -290,13 +302,17 @@ describe('layoutMap', () => {
             r: stop.x + 80,
             b: trayTop + 55,
           }
-          expect(emma.t).toBeGreaterThanOrEqual(-LANDSCAPE_HEAD_ROOM)
+          expect(emma.t).toBeGreaterThanOrEqual(0)
           expect(tray.b).toBeLessThanOrEqual(h + LANDSCAPE_TRAY_ROOM)
+          expect(overlap(emma, tray)).toBe(false)
+          // Bands stay at least LANDSCAPE_BAND tall (her own is taller).
+          for (const b of l.bands)
+            expect(b.height).toBeGreaterThanOrEqual(LANDSCAPE_BAND - 0.01)
           for (const s of l.stops) {
-            if (s.node === stop.node) continue
             const box = boxOf(s.x, s.y, s.size)
+            // Emma clears every stop, her own included.
             expect(overlap(emma, box)).toBe(false)
-            expect(overlap(tray, box)).toBe(false)
+            if (s.node !== stop.node) expect(overlap(tray, box)).toBe(false)
           }
           for (const g of l.gates)
             expect(overlap(tray, boxOf(g.x, g.y, GATE_TAP))).toBe(false)

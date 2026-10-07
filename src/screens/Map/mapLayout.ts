@@ -11,6 +11,10 @@
  * the gap between their bands, out at that side's edge (clear of the stop
  * column, the current stop's buds and Emma). Each land's pill sits in the
  * top corner of its start side (the far side for a one-stop land).
+ *
+ * Emma stands just above (behind) the current stop, all of her in view:
+ * Thomas (2026-10-07) did not want the stop's art covering her body. Her
+ * land's band is taller by the room she needs, so she stays inside it.
  */
 
 import type { SkillNode } from '../../lib/progress'
@@ -82,19 +86,43 @@ export interface MapLayout {
   stopSize: number
 }
 
-/** Emma's square box behind a stop: head + shoulders above it, body hidden behind it. */
+/** Emma's square box is this much bigger than the stop she stands at. */
+export const EMMA_SCALE = 1.25
+/** Gap between the bottom of Emma's box and the top of her stop's box. */
+const EMMA_FEET_GAP = 2
+/** Room kept between the top of Emma's box and her band's top edge. */
+const EMMA_HEAD_GAP = 4
+
+/**
+ * Emma's square box at a stop: standing just above it, the whole box clear
+ * of the stop, so no part of her is behind the stop's art.
+ */
 export function emmaRect(stop: StopLayout): {
   left: number
   top: number
   size: number
 } {
-  const size = Math.round(stop.size * 1.45)
+  const size = Math.round(stop.size * EMMA_SCALE)
   return {
     left: stop.x - size / 2,
-    // Her feet sit just under the stop centre, behind the sticker.
-    top: stop.y + stop.size * 0.18 - size,
+    top: stop.y - stop.size / 2 - EMMA_FEET_GAP - size,
     size,
   }
+}
+
+/** Height Emma needs above the centre of a stop of `size`, to her band's top. */
+function emmaRise(size: number): number {
+  return (
+    size / 2 + EMMA_FEET_GAP + Math.round(size * EMMA_SCALE) + EMMA_HEAD_GAP
+  )
+}
+
+/**
+ * Extra height Emma's band needs on top of `bandH` so that all of her,
+ * standing above a stop of `size`, stays inside it.
+ */
+export function emmaRoom(size: number, bandH: number): number {
+  return Math.max(0, emmaRise(size) - bandH * STOP_Y)
 }
 
 /**
@@ -146,14 +174,27 @@ export function layoutMap(
   height: number,
 ): MapLayout {
   const count = model.lands.length
-  const bandH = (height - (count - 1) * BAND_GAP) / count
   const widest = Math.max(...model.lands.map((l) => l.stops.length))
   const spacing = widest > 1 ? (width - 2 * STOP_INSET) / (widest - 1) : width
-  const stopSize = Math.round(
-    Math.max(
-      MIN_STOP,
-      Math.min(MAX_STOP, bandH * 0.52, spacing / ((1 + CURRENT_SCALE) / 2)),
-    ),
+  const curScale = model.complete ? 1 : CURRENT_SCALE
+  // Emma's land is `extra` taller; the stop size depends on the band height,
+  // and her room on the stop size, so settle the two together.
+  let extra = 0
+  let bandH = 0
+  let stopSize = 0
+  for (let pass = 0; pass < 4; pass++) {
+    bandH = (height - (count - 1) * BAND_GAP - extra) / count
+    stopSize = Math.round(
+      Math.max(
+        MIN_STOP,
+        Math.min(MAX_STOP, bandH * 0.52, spacing / ((1 + CURRENT_SCALE) / 2)),
+      ),
+    )
+    extra = emmaRoom(Math.round(stopSize * curScale), bandH)
+  }
+  bandH = (height - (count - 1) * BAND_GAP - extra) / count
+  const emmaLand = model.lands.findIndex((l) =>
+    l.stops.some((s) => s.node === model.current),
   )
   const sizeOf = (node: SkillNode) =>
     node === model.current && !model.complete
@@ -172,14 +213,18 @@ export function layoutMap(
   }
 
   let side: Side = 'left'
+  let bottom = height
   model.lands.forEach((land, i) => {
-    const top = height - (i + 1) * bandH - i * BAND_GAP
-    bands.push({ land: land.number, top, height: bandH })
+    const room = i === emmaLand ? extra : 0
+    const bandHeight = bandH + room
+    const top = bottom - bandHeight
+    bottom = top - BAND_GAP
+    bands.push({ land: land.number, top, height: bandHeight })
     if (i > 0) {
       gates.push({
         land: land.number,
         x: side === 'left' ? GATE_INSET : width - GATE_INSET,
-        y: top + bandH + BAND_GAP / 2,
+        y: top + bandHeight + BAND_GAP / 2,
       })
     }
     const n = land.stops.length
@@ -187,7 +232,7 @@ export function layoutMap(
     // in that top corner, so its pill goes to the other one.
     const pillSide: Side = n === 1 ? (side === 'left' ? 'right' : 'left') : side
     pills.push({ land: land.number, side: pillSide, top: top + 12 })
-    const y = top + bandH * STOP_Y
+    const y = top + room + bandH * STOP_Y
     land.stops.forEach((stop, k) => {
       stops.push({
         node: stop.node,
@@ -224,24 +269,21 @@ export function layoutMap(
 
 /**
  * Landscape (an iPad sideways in Safari: 640-900 px tall). Laid out on the
- * real region, the bands come out so short that a current stop's Emma
- * (head + shoulders above it) runs into the stop above and its bud tray
- * onto the stop below. In landscape the path is laid out on a taller
- * virtual region instead, with bands of at least LANDSCAPE_BAND, then
- * scaled down to fit — everything shrinks together, nothing overlaps.
+ * real region, the bands come out so short that the current stop's bud
+ * tray runs onto the stop below and Emma's land squeezes the others. In
+ * landscape the path is laid out on a taller virtual region instead, with
+ * bands of at least LANDSCAPE_BAND (plus Emma's room in hers), then scaled
+ * down to fit — everything shrinks together, nothing overlaps.
  */
 export const LANDSCAPE_BAND = 136
-/** Virtual room above the top band for Emma's head. */
-export const LANDSCAPE_HEAD_ROOM = 56
 /** Virtual room below the bottom band for the current stop's bud tray. */
 export const LANDSCAPE_TRAY_ROOM = 60
 
 /** Scale (≤ 1) that fits `lands` landscape bands into `height` px. */
 export function landscapeScale(lands: number, height: number): number {
+  // Bands of LANDSCAPE_BAND hold MIN_STOP stops (0.52 × 136 < 88).
+  const room = emmaRoom(Math.round(MIN_STOP * CURRENT_SCALE), LANDSCAPE_BAND)
   const need =
-    lands * LANDSCAPE_BAND +
-    (lands - 1) * BAND_GAP +
-    LANDSCAPE_HEAD_ROOM +
-    LANDSCAPE_TRAY_ROOM
+    lands * LANDSCAPE_BAND + (lands - 1) * BAND_GAP + room + LANDSCAPE_TRAY_ROOM
   return height > 0 ? Math.min(1, height / need) : 1
 }

@@ -52,7 +52,6 @@ import {
   BAND_INSET,
   emmaRect,
   GATE_TAP,
-  LANDSCAPE_HEAD_ROOM,
   LANDSCAPE_TRAY_ROOM,
   landscapeScale,
   layoutMap,
@@ -161,9 +160,7 @@ export function MapScreen({
   const landscape = useLandscape()
   const scale = landscape ? landscapeScale(model.lands.length, size.h) : 1
   const pathW = size.w / scale
-  const pathH = landscape
-    ? size.h / scale - LANDSCAPE_HEAD_ROOM - LANDSCAPE_TRAY_ROOM
-    : size.h
+  const pathH = landscape ? size.h / scale - LANDSCAPE_TRAY_ROOM : size.h
   const layout = useMemo(
     () => layoutMap(model, pathW, pathH),
     [model, pathW, pathH],
@@ -446,7 +443,9 @@ export function MapScreen({
                   style={{
                     width: emmaBox.size,
                     height: emmaBox.size,
-                    // Behind every stop and gate: she never hides one.
+                    // She stands above her stop, clear of it (mapLayout.ts).
+                    // Stacked under every stop and gate all the same, so
+                    // she never hides one.
                     zIndex: 2,
                     // One grid cell: the pose cross-fade keeps the old and
                     // new image mounted together; stacked, not side by side.
@@ -472,12 +471,11 @@ export function MapScreen({
                     data-testid="map-emma-shadow"
                     className="absolute rounded-[50%]"
                     style={{
-                      // Wider than the plinth, at its level, so it shows
-                      // either side of the stop she stands behind.
-                      left: '-4%',
-                      width: '108%',
-                      bottom: '-22%',
-                      height: '22%',
+                      // Under her feet (the figure ends at 98% of the box).
+                      left: '14%',
+                      width: '72%',
+                      bottom: '-4%',
+                      height: '10%',
                       background:
                         'radial-gradient(ellipse at 50% 50%, rgba(80,45,15,0.5) 0, rgba(80,45,15,0.28) 40%, rgba(80,45,15,0) 70%)',
                     }}
@@ -606,8 +604,8 @@ function useLandscape(): boolean {
 }
 
 /**
- * Landscape: the path drawn on its virtual region (room for Emma's head
- * above, the bud tray below), scaled down into the real one. Portrait:
+ * Landscape: the path drawn on its virtual region (room for the bud tray
+ * below), scaled down into the real one. Portrait:
  * the path as it is, straight in the region.
  */
 function LandscapeFrame({
@@ -629,7 +627,7 @@ function LandscapeFrame({
       data-testid="map-path-frame"
       className="absolute left-0"
       style={{
-        top: LANDSCAPE_HEAD_ROOM * scale,
+        top: 0,
         width,
         height,
         transform: `scale(${scale})`,
