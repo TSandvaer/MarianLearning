@@ -1075,6 +1075,8 @@ export default function Greet({
         pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
         pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]
         overflow-hidden
+        landscape:grid landscape:grid-cols-2
+        landscape:grid-rows-[minmax(0,1fr)_auto_auto_minmax(0,1fr)]
       "
       initial={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.25 } }}
@@ -1138,7 +1140,10 @@ export default function Greet({
        */}
       <div
         data-testid="greet-emma-slot"
-        className="pointer-events-none relative flex h-[60vh] w-full flex-1 items-center justify-center"
+        // Landscape (iPad sideways in Safari, 640-900 tall): Emma stands
+        // in the left half and the ribbon + heart sit in the right half;
+        // stacked, the heart ran up into the ribbon.
+        className="pointer-events-none relative flex h-[60vh] w-full flex-1 items-center justify-center landscape:col-start-1 landscape:row-span-4 landscape:row-start-1 landscape:h-[min(80vh,50vw)] landscape:self-center"
       >
         {/* Ready ring — Wake state only (or the silent retry relock state).
             Pure SVG, no asset file. Spec line 198 documents this is inline. */}
@@ -1412,6 +1417,7 @@ export default function Greet({
           aria-live="polite"
           className="
             mx-auto mt-2 mb-6 w-[88%] max-w-2xl
+            landscape:col-start-2 landscape:row-start-2
             rounded-3xl border-[3px] border-my-pink bg-white
             px-6 py-4
             shadow-[0_8px_24px_rgba(244,143,177,0.18)]
@@ -1435,7 +1441,7 @@ export default function Greet({
       {/* Heart CTA. Hidden until line 3 (HEART_REVEAL_AFTER_LINE_INDEX)
           completes, then springs in. Idle bob (y: [0, -6, 0]) on a 2s loop
           unless reduced-motion. Tap → squish + chime + advance. */}
-      <div className="mb-8 flex h-[12vh] w-full items-center justify-center">
+      <div className="mb-8 flex h-[12vh] w-full items-center justify-center landscape:col-start-2 landscape:row-start-3 landscape:h-[132px]">
         <AnimatePresence>
           {heartReady && (
             <m.button

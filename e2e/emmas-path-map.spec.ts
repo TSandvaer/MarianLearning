@@ -287,7 +287,7 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     await page.screenshot({ path: `${SHOTS}/map-word-first-launch.png` })
   })
 
-  test('first launch Number Garden: Emma behind add-to-10, whole map fits, clay stickers on plinths', async ({
+  test("first launch Number Garden: Emma's badge above add-to-10, whole map fits, clay stickers on plinths", async ({
     page,
   }) => {
     await arm(page, null)
@@ -367,14 +367,30 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     for (const b of boxes.filter((x) => x !== cur))
       expect(b.w).toBeLessThan(cur.w)
 
-    // Real Emma stands BEHIND the current stop: centred on it, her head
-    // above it, stacked under it, with a soft contact shadow.
+    // Emma's "you are here" badge sits just above the current stop,
+    // centred on it, fully in view (Thomas, 2026-10-07: the pot hid her
+    // body and the standing art has no legs): the whole badge, tail
+    // included, clears the stop, its pot art and bud tray.
     const emma = await rectOf(page, '[data-testid="map-emma"]')
     expect((emma.left + emma.right) / 2).toBeCloseTo(
       (cur.left + cur.right) / 2,
       0,
     )
     expect(emma.top).toBeLessThan(cur.top)
+    expect(emma.bottom).toBeLessThanOrEqual(cur.top)
+    const art = await rectOf(
+      page,
+      '[data-testid="map-stop"][data-node="add-to-10"] [data-testid="map-stop-sticker"] img',
+    )
+    const tray = await rectOf(page, '[data-testid="map-buds"]')
+    for (const c of [cur, art, tray]) {
+      const hit =
+        emma.left < c.right &&
+        c.left < emma.right &&
+        emma.top < c.bottom &&
+        c.top < emma.bottom
+      expect(hit, 'Emma covered at her stop').toBe(false)
+    }
     const z = await page.evaluate(() => {
       const zi = (sel: string) =>
         Number(getComputedStyle(document.querySelector(sel)!).zIndex)
@@ -386,7 +402,22 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     })
     expect(z.emma).toBeLessThan(z.stop)
     expect(z.emma).toBeLessThan(z.gate)
-    await expect(page.getByTestId('map-emma-shadow')).toHaveCount(1)
+    // A round badge with a tail, her idle face inside, 72-96 px across,
+    // fully inside the viewport.
+    await expect(page.getByTestId('map-emma-tail')).toHaveCount(1)
+    await expect(page.getByTestId('map-emma-face')).toHaveAttribute(
+      'data-face',
+      'idle',
+    )
+    const circle = await rectOf(page, '[data-testid="map-emma-badge"]')
+    expect(circle.right - circle.left).toBeGreaterThanOrEqual(72)
+    expect(circle.right - circle.left).toBeLessThanOrEqual(96)
+    expect(emma.top).toBeGreaterThanOrEqual(0)
+    expect(emma.left).toBeGreaterThanOrEqual(0)
+    expect(emma.right).toBeLessThanOrEqual(820)
+    await expect(
+      page.locator('[data-testid="map-emma-face"]'),
+    ).toHaveJSProperty('complete', true)
     await expect(page.getByTestId('map-current-glow')).toHaveCount(1)
     // The current stop shows its buds, nothing else does.
     await expect(page.getByTestId('map-buds')).toHaveCount(1)
@@ -627,6 +658,11 @@ test.describe("Emma's Path — map screen (123jpnbc3dr)", () => {
     )
     await expect(page.getByTestId('map-emma')).toHaveAttribute(
       'data-pose',
+      'cheering',
+    )
+    // The badge shows her cheering face.
+    await expect(page.getByTestId('map-emma-face')).toHaveAttribute(
+      'data-face',
       'cheering',
     )
     await expect(ribbon(page)).toHaveAttribute(

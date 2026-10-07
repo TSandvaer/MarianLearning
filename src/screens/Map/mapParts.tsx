@@ -595,7 +595,12 @@ export function CaptionSlab({
   children: ReactNode
 }): ReactElement {
   return (
-    <span className="flex items-center" style={{ gap: 14 }}>
+    // Landscape: the caption sits in a narrow left column and wraps; the
+    // speaker keeps its size instead of shrinking beside the text.
+    <span
+      className="flex items-center landscape:[&>svg]:shrink-0"
+      style={{ gap: 14 }}
+    >
       <SpeakerIcon />
       <span>{children}</span>
     </span>

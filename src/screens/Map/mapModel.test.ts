@@ -19,10 +19,13 @@ import { currentStepOf } from '../Hub/hubCardModel'
 import { buildMapModel, stopsInOrder } from './mapModel'
 import {
   BAND_GAP,
+  badgeLands,
   CURRENT_SCALE,
-  emmaFigure,
-  emmaRect,
+  emmaBadge,
   GATE_TAP,
+  LANDSCAPE_BAND,
+  LANDSCAPE_TRAY_ROOM,
+  landscapeScale,
   layoutMap,
   MIN_STOP,
 } from './mapLayout'
@@ -237,22 +240,163 @@ describe('layoutMap', () => {
     expect(done.stones.every((s) => s.walked)).toBe(true)
   })
 
-  it('Emma stands behind her stop: above it, clear of every gate', () => {
+  // Thomas (2026-10-07): the stop's art hid Emma's body, and the standing
+  // art has no legs. A "you are here" badge marks her stop instead, above
+  // it, all of it inside her (taller) band.
+  it("Emma's badge sits above her stop: clear of every stop and gate, inside her band, her face big enough", () => {
     for (const [world, tree] of worlds) {
-      for (let cur = 0; cur < tree.length; cur++) {
+      for (let cur = -1; cur < tree.length; cur++) {
         const m = buildMapModel(seed(tree, cur), world)
         const l = layoutMap(m, W, H)
         const stop = l.stops.find((s) => s.node === m.current)!
-        const e = emmaRect(stop)
-        expect(e.top).toBeLessThan(stop.y - stop.size / 2)
+        const e = emmaBadge(stop)
         expect(e.left + e.size / 2).toBeCloseTo(stop.x)
-        const f = emmaFigure(stop)
-        // Her feet are hidden behind the stop's sticker.
-        expect(f.bottom).toBeGreaterThan(stop.y)
-        expect(f.bottom).toBeLessThan(stop.y + stop.size / 2)
-        const emma = { l: f.left, t: f.top, r: f.right, b: f.bottom }
+        // Portrait: 72-96 px, her face recognisable.
+        expect(e.size).toBeGreaterThanOrEqual(72)
+        expect(e.size).toBeLessThanOrEqual(96)
+        expect(e.height).toBeGreaterThan(e.size)
+        // The whole badge, tail included, is above her stop's box.
+        const box = {
+          l: e.left,
+          t: e.top,
+          r: e.left + e.size,
+          b: e.top + e.height,
+        }
+        expect(box.b).toBeLessThanOrEqual(stop.y - stop.size / 2)
+        for (const s of l.stops)
+          expect(overlap(box, boxOf(s.x, s.y, s.size))).toBe(false)
         for (const g of l.gates)
-          expect(overlap(emma, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
+          expect(overlap(box, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
+        const band = l.bands.find((b) => b.land === stop.land)!
+        expect(box.t).toBeGreaterThanOrEqual(band.top)
+      }
+    }
+  })
+  // Unlock beat (PR #522 review): the badge stays on the just-mastered
+  // stop until Emma hops. When the unlock opens a new land, that stop sits
+  // in a different land from the current one; it gets badge room too, so
+  // the frosted new stop above it never covers her face.
+  it('unlock beat: the badge on the just-mastered stop clears every stop and gate and stays in its band (portrait + landscape)', () => {
+    const regions = [
+      { w: W, h: H, landscape: false },
+      { w: 760, h: 654, landscape: true },
+      { w: 821, h: 624, landscape: true },
+      { w: 897, h: 664, landscape: true },
+      { w: 1000, h: 560, landscape: true },
+      { w: 1038, h: 884, landscape: true },
+    ] as const
+    let crossings = 0
+    for (const [world, tree] of worlds) {
+      for (let i = 1; i < tree.length; i++) {
+        const mastered = tree[i - 1]!
+        const m = buildMapModel(seed(tree, i), world)
+        const landOf = (n: SkillNode) =>
+          m.lands.find((l) => l.stops.some((s) => s.node === n))!.number
+        if (landOf(mastered) !== landOf(m.current)) crossings++
+        const rooms = badgeLands(m, [mastered]).size
+        for (const r of regions) {
+          const k = r.landscape ? landscapeScale(m.lands.length, r.h, rooms) : 1
+          const h = r.landscape ? r.h / k - LANDSCAPE_TRAY_ROOM : r.h
+          const l = layoutMap(m, r.w / k, h, [mastered])
+          if (r.landscape)
+            for (const b of l.bands)
+              expect(b.height).toBeGreaterThanOrEqual(LANDSCAPE_BAND - 0.01)
+          // Before the hop (on the mastered stop) and after it (on the new one).
+          for (const node of [mastered, m.current]) {
+            const stop = l.stops.find((s) => s.node === node)!
+            const e = emmaBadge(stop)
+            const box = {
+              l: e.left,
+              t: e.top,
+              r: e.left + e.size,
+              b: e.top + e.height,
+            }
+            const where = `${world} ${mastered}->${m.current} @${node} ${r.w}x${r.h}`
+            expect(box.b, where).toBeLessThanOrEqual(stop.y - stop.size / 2)
+            for (const s of l.stops)
+              expect(overlap(box, boxOf(s.x, s.y, s.size)), where).toBe(false)
+            for (const g of l.gates)
+              expect(overlap(box, boxOf(g.x, g.y, GATE_TAP)), where).toBe(false)
+            const band = l.bands.find((b) => b.land === stop.land)!
+            expect(box.t, where).toBeGreaterThanOrEqual(band.top)
+            expect(box.l, where).toBeGreaterThanOrEqual(0)
+            expect(box.r, where).toBeLessThanOrEqual(r.w / k)
+          }
+        }
+      }
+    }
+    // Every land after the first is entered once per world.
+    expect(crossings).toBe(
+      worlds.reduce(
+        (n, [world, tree]) =>
+          n + buildMapModel(seed(tree, 0), world).lands.length - 1,
+        0,
+      ),
+    )
+  })
+
+  it('no unlock beat: the layout is the steady-state one', () => {
+    for (const [world, tree] of worlds) {
+      const m = buildMapModel(seed(tree, 3), world)
+      expect(layoutMap(m, W, H, [])).toEqual(layoutMap(m, W, H))
+      // A mastered stop in the current land adds no room.
+      expect(layoutMap(m, W, H, [m.current])).toEqual(layoutMap(m, W, H))
+    }
+  })
+
+  // Landscape path regions: Thomas's iPad in Safari (1000x670) and the
+  // other landscape sizes, after the left header column and margins.
+  it("landscape: scaled to fit, Emma's badge and the bud tray clear every other stop", () => {
+    const regions = [
+      [760, 654],
+      [821, 624],
+      [897, 664],
+      [1038, 884],
+    ] as const
+    for (const [rw, rh] of regions) {
+      for (const [world, tree] of worlds) {
+        for (let cur = 0; cur < tree.length; cur++) {
+          const m = buildMapModel(seed(tree, cur), world)
+          const k = landscapeScale(m.lands.length, rh)
+          const h = rh / k - LANDSCAPE_TRAY_ROOM
+          const l = layoutMap(m, rw / k, h)
+          // Tap targets stay ≥ 44 px on screen.
+          expect(l.stopSize * k).toBeGreaterThanOrEqual(44)
+          expect(GATE_TAP * k).toBeGreaterThanOrEqual(44)
+          const stop = l.stops.find((s) => s.node === m.current)!
+          const e = emmaBadge(stop)
+          const emma = {
+            l: e.left,
+            t: e.top,
+            r: e.left + e.size,
+            b: e.top + e.height,
+          }
+          // Her face stays recognisable on screen: badge >= 56 px.
+          expect(e.size * k).toBeGreaterThanOrEqual(56)
+          // BudTray: top at 1.02 × size inside the stop box, 3 × 42 px
+          // holes + padding ≈ 160 × 55 px.
+          const trayTop = stop.y - stop.size / 2 + stop.size * 1.02
+          const tray = {
+            l: stop.x - 80,
+            t: trayTop,
+            r: stop.x + 80,
+            b: trayTop + 55,
+          }
+          expect(emma.t).toBeGreaterThanOrEqual(0)
+          expect(tray.b).toBeLessThanOrEqual(h + LANDSCAPE_TRAY_ROOM)
+          expect(overlap(emma, tray)).toBe(false)
+          // Bands stay at least LANDSCAPE_BAND tall (her own is taller).
+          for (const b of l.bands)
+            expect(b.height).toBeGreaterThanOrEqual(LANDSCAPE_BAND - 0.01)
+          for (const s of l.stops) {
+            const box = boxOf(s.x, s.y, s.size)
+            // Emma clears every stop, her own included.
+            expect(overlap(emma, box)).toBe(false)
+            if (s.node !== stop.node) expect(overlap(tray, box)).toBe(false)
+          }
+          for (const g of l.gates)
+            expect(overlap(tray, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
+        }
       }
     }
   })

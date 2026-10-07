@@ -29,9 +29,9 @@ import {
   useRef,
   useState,
   type ReactElement,
+  type ReactNode,
 } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
-import { EmmaCharacter } from '../../components/EmmaCharacter'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import {
   resumeHowlerContextOnGesture,
@@ -47,8 +47,17 @@ import {
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { HUB_LAST_UNMOUNT_KEY } from '../Hub/useRapidRemountSuppression'
 import { buildMapModel, type MapLand, type MapStop } from './mapModel'
-import { BAND_INSET, emmaRect, GATE_TAP, layoutMap } from './mapLayout'
+import {
+  BAND_INSET,
+  badgeLands,
+  emmaBadge,
+  GATE_TAP,
+  LANDSCAPE_TRAY_ROOM,
+  landscapeScale,
+  layoutMap,
+} from './mapLayout'
 import { BAND_TINTS, INK } from './mapTheme'
+import { EmmaBadge } from './EmmaBadge'
 import {
   CaptionSlab,
   CurrentGlow,
@@ -147,9 +156,28 @@ export function MapScreen({
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
+  // Emma's badge starts an unlock beat on the just-mastered stop, so its
+  // land gets badge room too — for the whole mount, so nothing jumps when
+  // she hops.
+  const alsoBadged = useMemo(
+    () => (unlock === null ? [] : [unlock.mastered]),
+    [unlock],
+  )
+  // Landscape: laid out on a taller virtual region, then scaled to fit
+  // (see `landscapeScale`). Portrait: the region as it is.
+  const landscape = useLandscape()
+  const scale = landscape
+    ? landscapeScale(
+        model.lands.length,
+        size.h,
+        badgeLands(model, alsoBadged).size,
+      )
+    : 1
+  const pathW = size.w / scale
+  const pathH = landscape ? size.h / scale - LANDSCAPE_TRAY_ROOM : size.h
   const layout = useMemo(
-    () => layoutMap(model, size.w, size.h),
-    [model, size.w, size.h],
+    () => layoutMap(model, pathW, pathH, alsoBadged),
+    [model, pathW, pathH, alsoBadged],
   )
 
   // Audio: one player + poof for this mount; both released on leave.
@@ -272,11 +300,11 @@ export function MapScreen({
     speak(gateLine(model, land))
   }
 
-  // Emma stands on the just-mastered stop until she hops (unlock beat).
+  // Emma's badge marks the just-mastered stop until she hops (unlock beat).
   const emmaNode =
     unlock !== null && !reached(phase, 'hop') ? unlock.mastered : model.current
   const emmaStop = layout.stops.find((s) => s.node === emmaNode)
-  const emmaBox = emmaStop ? emmaRect(emmaStop) : null
+  const emmaBox = emmaStop ? emmaBadge(emmaStop) : null
   const currentStop = model.complete
     ? undefined
     : layout.stops.find((s) => s.node === model.current)
@@ -290,10 +318,16 @@ export function MapScreen({
       data-complete={model.complete ? 'true' : 'false'}
       data-beat={unlock === null ? 'none' : unlock.land ? 'land' : 'unlock'}
       data-beat-phase={phase ?? 'none'}
+      // Landscape (iPad sideways in Safari, 640-900 tall): a header row
+      // and a caption row leave the path too short, so the stops ran into
+      // the caption. Header and caption move to a left column and the path
+      // takes the full height on the right.
       className="
         relative flex h-full w-full flex-col overflow-hidden font-display
         pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
         pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]
+        landscape:grid landscape:grid-cols-[minmax(230px,24vw)_minmax(0,1fr)]
+        landscape:grid-rows-[auto_minmax(0,1fr)]
       "
       style={{
         color: INK,
@@ -307,7 +341,11 @@ export function MapScreen({
     >
       {/* Header — clay Home button + world title. */}
       <header
-        className="relative flex w-full shrink-0 items-center justify-center"
+        className="
+          relative flex w-full shrink-0 items-center justify-center
+          landscape:col-start-1 landscape:row-start-1 landscape:!h-auto
+          landscape:pt-[124px] landscape:text-center
+        "
         style={{ height: HEADER }}
       >
         <HomeButton
@@ -319,15 +357,24 @@ export function MapScreen({
         <MapTitle world={world} />
       </header>
 
-      {/* Path region — bands, stones, gates, pills, stops, Emma. */}
+      {/* Path region — bands, stones, gates, pills, stops, Emma's badge. */}
       <div
         ref={regionRef}
         data-testid="map-path"
-        className="relative w-full flex-1"
+        className="
+          relative w-full flex-1
+          landscape:col-start-2 landscape:row-span-2 landscape:row-start-1
+          landscape:my-2
+        "
         style={{ minHeight: 0 }}
       >
         {ready && (
-          <>
+          <LandscapeFrame
+            on={landscape}
+            scale={scale}
+            width={pathW}
+            height={pathH}
+          >
             {layout.bands.map((band, i) => {
               // A land gate opening fades its band tint in (spec §6 step 4).
               const newLand = unlock?.land?.number === band.land
@@ -409,13 +456,11 @@ export function MapScreen({
                   className="pointer-events-none absolute"
                   style={{
                     width: emmaBox.size,
-                    height: emmaBox.size,
-                    // Behind every stop and gate: she never hides one.
+                    height: emmaBox.height,
+                    // Her badge sits above her stop, clear of it
+                    // (mapLayout.ts). Stacked under every stop and gate all
+                    // the same, so it never hides one.
                     zIndex: 2,
-                    // One grid cell: the pose cross-fade keeps the old and
-                    // new image mounted together; stacked, not side by side.
-                    display: 'grid',
-                    justifyItems: 'center',
                   }}
                   initial={
                     reduceMotion
@@ -430,39 +475,13 @@ export function MapScreen({
                       : { type: 'spring', stiffness: 260, damping: 22 }
                   }
                 >
-                  {/* Soft contact shadow where she stands. */}
-                  <span
-                    aria-hidden
-                    data-testid="map-emma-shadow"
-                    className="absolute rounded-[50%]"
-                    style={{
-                      // Wider than the plinth, at its level, so it shows
-                      // either side of the stop she stands behind.
-                      left: '-4%',
-                      width: '108%',
-                      bottom: '-22%',
-                      height: '22%',
-                      background:
-                        'radial-gradient(ellipse at 50% 50%, rgba(80,45,15,0.5) 0, rgba(80,45,15,0.28) 40%, rgba(80,45,15,0) 70%)',
-                    }}
+                  <EmmaBadge
+                    size={emmaBox.size}
+                    height={emmaBox.height}
+                    pose={pose}
+                    hopping={phase === 'hop'}
+                    reduceMotion={reduceMotion}
                   />
-                  {/* Two small arcs while she hops (spec §6, 700 ms). */}
-                  <m.div
-                    style={{ gridArea: '1 / 1', height: '100%' }}
-                    animate={
-                      phase === 'hop' && !reduceMotion
-                        ? { y: [0, -28, 0, -18, 0] }
-                        : { y: 0 }
-                    }
-                    transition={{ duration: 0.7, ease: 'easeInOut' }}
-                  >
-                    <EmmaCharacter
-                      pose={pose}
-                      data-testid="map-emma-character"
-                      className="h-full w-auto select-none"
-                      style={{ gridArea: '1 / 1' }}
-                    />
-                  </m.div>
                 </m.div>
               </AnimatePresence>
             )}
@@ -503,13 +522,17 @@ export function MapScreen({
                 )
               }),
             )}
-          </>
+          </LandscapeFrame>
         )}
       </div>
 
       {/* Caption — a clay slab mirroring the spoken line. */}
       <div
-        className="flex w-full shrink-0 items-center justify-center"
+        className="
+          flex w-full shrink-0 items-center justify-center
+          landscape:col-start-1 landscape:row-start-2 landscape:!h-auto
+          landscape:items-end landscape:!px-3 landscape:!pb-6
+        "
         style={{ height: RIBBON, padding: '0 40px' }}
       >
         {caption !== null && (
@@ -541,6 +564,63 @@ export function MapScreen({
         )}
       </div>
     </m.main>
+  )
+}
+
+const LANDSCAPE_QUERY = '(orientation: landscape)'
+
+/** True while the screen is wider than tall (the CSS `landscape:` rules). */
+function useLandscape(): boolean {
+  const [on, setOn] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia(LANDSCAPE_QUERY).matches,
+  )
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const mq = window.matchMedia(LANDSCAPE_QUERY)
+    const update = () => setOn(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+  return on
+}
+
+/**
+ * Landscape: the path drawn on its virtual region (room for the bud tray
+ * below), scaled down into the real one. Portrait:
+ * the path as it is, straight in the region.
+ */
+function LandscapeFrame({
+  on,
+  scale,
+  width,
+  height,
+  children,
+}: {
+  on: boolean
+  scale: number
+  width: number
+  height: number
+  children: ReactNode
+}): ReactElement {
+  if (!on) return <>{children}</>
+  return (
+    <div
+      data-testid="map-path-frame"
+      className="absolute left-0"
+      style={{
+        top: 0,
+        width,
+        height,
+        transform: `scale(${scale})`,
+        transformOrigin: '0 0',
+      }}
+    >
+      {children}
+    </div>
   )
 }
 

@@ -2961,7 +2961,7 @@ function MathScreen({
       </div>
 
       {/* Emma + ribbon row */}
-      <div className="relative flex w-full items-start gap-4 px-4">
+      <div className="relative flex w-full items-start gap-4 px-4 landscape:min-h-[88px] landscape:pl-[calc(26vh+2rem)]">
         {/* Emma — upper-left.
             Phase 3b motion brief (ticket 86c9kwvza): pose swaps now go
             through `EmmaCharacter`, which carries the rotateZ tilt
@@ -2972,7 +2972,7 @@ function MathScreen({
           pose={audioReady === false && pose === 'idle' ? 'listening' : pose}
           layoutId="emma"
           data-testid="math-emma"
-          className="h-[26vh] w-auto select-none"
+          className="h-[26vh] w-auto select-none landscape:absolute landscape:left-4 landscape:top-0"
         />
 
         {/* Caption ribbon — to Emma's right. Same word-by-word reveal
@@ -3027,15 +3027,21 @@ function MathScreen({
       {audioReady === false && <GettingReady testId="math-getting-ready" />}
       {audioReady !== false && (
         <>
-          {/* Problem display — symbolic + (op==='+' only) visual flowers */}
-          <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6 px-4">
-            <div
-              data-testid="math-symbolic"
-              data-op={currentProblem.op}
-              className="flex items-center gap-4 font-display text-[6rem] leading-none"
-            >
-              <span data-testid="math-addend-a">{currentProblem.addendA}</span>
-              {/*
+          {/* Landscape: the problem area sits right of Emma's column (Emma
+            leaves the row above and stands in the left gutter), so the
+            chips fit the short screen. Portrait: no box at all. */}
+          <div className="contents landscape:flex landscape:min-h-0 landscape:flex-1 landscape:flex-col landscape:pl-[calc(26vh+1rem)]">
+            {/* Problem display — symbolic + (op==='+' only) visual flowers */}
+            <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6 px-4">
+              <div
+                data-testid="math-symbolic"
+                data-op={currentProblem.op}
+                className="flex items-center gap-4 font-display text-[6rem] leading-none"
+              >
+                <span data-testid="math-addend-a">
+                  {currentProblem.addendA}
+                </span>
+                {/*
                 Operator glyph driven by `currentProblem.op`. Sub-to-10
                 uses U+2212 MINUS SIGN — the typographically correct
                 glyph at display sizes — NOT the ASCII hyphen-minus
@@ -3046,17 +3052,19 @@ function MathScreen({
                 Emma's read-aloud carries the operator name verbatim
                 ("Seven minus three. How many are left?").
               */}
-              <span aria-hidden data-testid="math-operator">
-                {currentProblem.op === '-' ? '−' : '+'}
-              </span>
-              <span data-testid="math-addend-b">{currentProblem.addendB}</span>
-              <span aria-hidden>=</span>
-              <span data-testid="math-result-placeholder" aria-hidden>
-                ?
-              </span>
-            </div>
+                <span aria-hidden data-testid="math-operator">
+                  {currentProblem.op === '-' ? '−' : '+'}
+                </span>
+                <span data-testid="math-addend-b">
+                  {currentProblem.addendB}
+                </span>
+                <span aria-hidden>=</span>
+                <span data-testid="math-result-placeholder" aria-hidden>
+                  ?
+                </span>
+              </div>
 
-            {/* Visual groups + subitising dot-card overlay (ticket
+              {/* Visual groups + subitising dot-card overlay (ticket
             86c9q5j9a). The flower glyphs are the primary affordance;
             the dot-card overlay is a brief 1100ms recognition flash
             that mounts on top when both addends ≤ 5. The overlay is
@@ -3086,97 +3094,116 @@ function MathScreen({
             (you can't subtract one bouquet from another in a static
             picture). The chip row below carries the full interaction
             for sub-to-10. */}
-            {currentProblem.op === '+' && (
-              <div className="relative flex items-center justify-center">
-                <m.div
-                  data-testid="math-visual-groups"
-                  data-flower-rem={flowerRowFontSizeRem(
-                    currentProblem.addendA,
-                    currentProblem.addendB,
-                  ).toFixed(2)}
-                  data-flowers-visible={flowersVisible ? 'true' : 'false'}
-                  /* Three-beat hint choreography seam (W12-02, ticket
+              {currentProblem.op === '+' && (
+                <div className="relative flex items-center justify-center">
+                  <m.div
+                    data-testid="math-visual-groups"
+                    data-flower-rem={flowerRowFontSizeRem(
+                      currentProblem.addendA,
+                      currentProblem.addendB,
+                    ).toFixed(2)}
+                    data-flowers-visible={flowersVisible ? 'true' : 'false'}
+                    /* Three-beat hint choreography seam (W12-02, ticket
                      86ca8700d). `none` at rest; `group-a` while hint1/hint2
                      play (left bouquet pulses); `group-b` while hint3 plays
                      (right bouquet pulses). The E2E/component sync assertions
                      read this. */
-                  data-hint-beat={hintBeat ?? 'none'}
-                  aria-hidden
-                  className="flex items-center gap-6"
-                  style={{
-                    fontSize: `${flowerRowFontSizeRem(
-                      currentProblem.addendA,
-                      currentProblem.addendB,
-                    )}rem`,
-                  }}
-                  /*
-                   * Flower opacity is the single visual we cross-fade
-                   * across the dot-card lifecycle. Initial mount on an
-                   * in-scope problem starts at 0 (overlay covers it);
-                   * out-of-scope problems initialise `dotCardDismissed
-                   * = true` in the effect above so flowers paint at
-                   * opacity 1 from t=0 — matching today's behaviour for
-                   * any problem with addend > 5.
-                   *
-                   * The 250ms tween cross-fades into the dot-card's
-                   * 200ms fade-out (overlap of 200ms, dot-card unmounts
-                   * 50ms before flowers fully settle). Spec § "Flower
-                   * coordination".
-                   */
-                  initial={false}
-                  animate={{ opacity: flowersVisible ? 1 : 0 }}
-                  transition={{
-                    duration: reducedMotion ? 0.2 : 0.25,
-                    ease: 'easeOut',
-                  }}
-                >
-                  <FlowerGroup
-                    count={currentProblem.addendA}
-                    pulsing={hintBeat === 'group-a'}
-                    reducedMotion={reducedMotion}
-                  />
-                  <span>+</span>
-                  <FlowerGroup
-                    count={currentProblem.addendB}
-                    pulsing={hintBeat === 'group-b'}
-                    reducedMotion={reducedMotion}
-                  />
-                </m.div>
-                {showDotCardOverlay &&
-                  dotCardPips !== null &&
-                  /*
-                   * Scaffold-mode wrapper (ticket 86c9ur1zr).
-                   *
-                   * When Math is running the new subitising-scaffold gate
-                   * (`useScaffoldGate === true` — i.e. App.tsx supplied
-                   * `focusNode` + `subitisingScaffoldActive`), wrap the
-                   * overlay in a thin span carrying the scaffold testid
-                   * Jessica's E2E spec depends on. The inner
-                   * `<DotCardOverlay>` keeps its original `math-dot-card`
-                   * testid intact so `e2e/dot-card-affordance.spec.ts` and
-                   * `e2e/sub-to-10-dot-card-suppression.spec.ts` (which
-                   * key on `math-dot-card`) continue to pass.
-                   *
-                   * The wrapper is a `<span>` (not `<div>`) and carries
-                   * the `contents` display so it adds ZERO layout. The
-                   * `data-testid` is the only DOM signal it produces; the
-                   * absolute-positioned overlay inside continues to drive
-                   * all visual + lifecycle behaviour exactly as before.
-                   * No motion of the actual primitive — additive testid
-                   * only, per Matt's coordination note on dual testids.
-                   *
-                   * In legacy mode (`useScaffoldGate === false`), the
-                   * wrapper is omitted and only the original
-                   * `math-dot-card` testid is emitted — preserves every
-                   * existing unit test that doesn't know about the
-                   * scaffold plumbing.
-                   */
-                  (useScaffoldGate ? (
-                    <span
-                      data-testid="subitising-scaffold-dot-card"
-                      style={{ display: 'contents' }}
-                    >
+                    data-hint-beat={hintBeat ?? 'none'}
+                    aria-hidden
+                    className="flex items-center gap-6"
+                    style={{
+                      fontSize: `${flowerRowFontSizeRem(
+                        currentProblem.addendA,
+                        currentProblem.addendB,
+                      )}rem`,
+                    }}
+                    /*
+                     * Flower opacity is the single visual we cross-fade
+                     * across the dot-card lifecycle. Initial mount on an
+                     * in-scope problem starts at 0 (overlay covers it);
+                     * out-of-scope problems initialise `dotCardDismissed
+                     * = true` in the effect above so flowers paint at
+                     * opacity 1 from t=0 — matching today's behaviour for
+                     * any problem with addend > 5.
+                     *
+                     * The 250ms tween cross-fades into the dot-card's
+                     * 200ms fade-out (overlap of 200ms, dot-card unmounts
+                     * 50ms before flowers fully settle). Spec § "Flower
+                     * coordination".
+                     */
+                    initial={false}
+                    animate={{ opacity: flowersVisible ? 1 : 0 }}
+                    transition={{
+                      duration: reducedMotion ? 0.2 : 0.25,
+                      ease: 'easeOut',
+                    }}
+                  >
+                    <FlowerGroup
+                      count={currentProblem.addendA}
+                      pulsing={hintBeat === 'group-a'}
+                      reducedMotion={reducedMotion}
+                    />
+                    <span>+</span>
+                    <FlowerGroup
+                      count={currentProblem.addendB}
+                      pulsing={hintBeat === 'group-b'}
+                      reducedMotion={reducedMotion}
+                    />
+                  </m.div>
+                  {showDotCardOverlay &&
+                    dotCardPips !== null &&
+                    /*
+                     * Scaffold-mode wrapper (ticket 86c9ur1zr).
+                     *
+                     * When Math is running the new subitising-scaffold gate
+                     * (`useScaffoldGate === true` — i.e. App.tsx supplied
+                     * `focusNode` + `subitisingScaffoldActive`), wrap the
+                     * overlay in a thin span carrying the scaffold testid
+                     * Jessica's E2E spec depends on. The inner
+                     * `<DotCardOverlay>` keeps its original `math-dot-card`
+                     * testid intact so `e2e/dot-card-affordance.spec.ts` and
+                     * `e2e/sub-to-10-dot-card-suppression.spec.ts` (which
+                     * key on `math-dot-card`) continue to pass.
+                     *
+                     * The wrapper is a `<span>` (not `<div>`) and carries
+                     * the `contents` display so it adds ZERO layout. The
+                     * `data-testid` is the only DOM signal it produces; the
+                     * absolute-positioned overlay inside continues to drive
+                     * all visual + lifecycle behaviour exactly as before.
+                     * No motion of the actual primitive — additive testid
+                     * only, per Matt's coordination note on dual testids.
+                     *
+                     * In legacy mode (`useScaffoldGate === false`), the
+                     * wrapper is omitted and only the original
+                     * `math-dot-card` testid is emitted — preserves every
+                     * existing unit test that doesn't know about the
+                     * scaffold plumbing.
+                     */
+                    (useScaffoldGate ? (
+                      <span
+                        data-testid="subitising-scaffold-dot-card"
+                        style={{ display: 'contents' }}
+                      >
+                        <DotCardOverlay
+                          key={problemIndex}
+                          pipsA={dotCardPips[0]}
+                          pipsB={dotCardPips[1]}
+                          pageHidden={pageHidden}
+                          reducedMotion={reducedMotion}
+                          onComplete={() =>
+                            setActiveDismissForIndex(problemIndex)
+                          }
+                          __testSkipLifecycle={__testDisableDotCard}
+                        />
+                      </span>
+                    ) : (
                       <DotCardOverlay
+                        // `key` per problemIndex guarantees the overlay
+                        // unmounts/remounts cleanly when Marian advances —
+                        // its internal phase machine resets on each new
+                        // problem. Without this, a tight advance during
+                        // the overlay's `holding` phase could land the
+                        // next problem's overlay mid-cycle.
                         key={problemIndex}
                         pipsA={dotCardPips[0]}
                         pipsB={dotCardPips[1]}
@@ -3187,28 +3214,11 @@ function MathScreen({
                         }
                         __testSkipLifecycle={__testDisableDotCard}
                       />
-                    </span>
-                  ) : (
-                    <DotCardOverlay
-                      // `key` per problemIndex guarantees the overlay
-                      // unmounts/remounts cleanly when Marian advances —
-                      // its internal phase machine resets on each new
-                      // problem. Without this, a tight advance during
-                      // the overlay's `holding` phase could land the
-                      // next problem's overlay mid-cycle.
-                      key={problemIndex}
-                      pipsA={dotCardPips[0]}
-                      pipsB={dotCardPips[1]}
-                      pageHidden={pageHidden}
-                      reducedMotion={reducedMotion}
-                      onComplete={() => setActiveDismissForIndex(problemIndex)}
-                      __testSkipLifecycle={__testDisableDotCard}
-                    />
-                  ))}
-              </div>
-            )}
+                    ))}
+                </div>
+              )}
 
-            {/* Sub-to-10 single-cell minuend subitising scaffold (ticket
+              {/* Sub-to-10 single-cell minuend subitising scaffold (ticket
             86ca7kdw8 / spec §13.1). Renders ONLY on `op === '-'`
             problems — sibling to the `op === '+'` visual-groups block
             above, NOT a modification of it (AC4 — the add path is
@@ -3242,68 +3252,68 @@ function MathScreen({
             `[5,10]`, so `subMinuendInScope` is true on every problem of an
             active sub-to-10 session — the band stays reserved across all 8
             problems and the chip-row spacing is unchanged (§13.2.3). */}
-            {subMinuendInScope && (
-              <div className="relative flex min-h-[80px] items-center justify-center">
-                {showSubMinuendOverlay && subMinuendValue !== null && (
-                  <SubMinuendOverlay
-                    // `key` per problemIndex resets the overlay's phase
-                    // machine cleanly on advance — same rationale as the
-                    // add path's DotCardOverlay key.
-                    key={problemIndex}
-                    minuend={subMinuendValue}
-                    pageHidden={pageHidden}
-                    reducedMotion={reducedMotion}
-                    onComplete={() =>
-                      setSubMinuendDismissForIndex(problemIndex)
-                    }
-                    __testSkipLifecycle={__testDisableDotCard}
-                  />
-                )}
-              </div>
-            )}
-          </div>
+              {subMinuendInScope && (
+                <div className="relative flex min-h-[80px] items-center justify-center">
+                  {showSubMinuendOverlay && subMinuendValue !== null && (
+                    <SubMinuendOverlay
+                      // `key` per problemIndex resets the overlay's phase
+                      // machine cleanly on advance — same rationale as the
+                      // add path's DotCardOverlay key.
+                      key={problemIndex}
+                      minuend={subMinuendValue}
+                      pageHidden={pageHidden}
+                      reducedMotion={reducedMotion}
+                      onComplete={() =>
+                        setSubMinuendDismissForIndex(problemIndex)
+                      }
+                      __testSkipLifecycle={__testDisableDotCard}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
 
-          {/* Answer chips */}
-          <div
-            data-testid="math-chips"
-            // Thinking-time chip tap-gate state (ticket 86ca84ukt). The
-            // single machine-readable signal the e2e spec keys on —
-            // `disabled` is overloaded (also true on `resolved` /
-            // `dimForGuided`) and cannot isolate the gate dimension.
-            // `data-chip-gate-via` records HOW it opened (real TTS start
-            // vs fail-open watchdog/error) for the watchdog-path assertion.
-            data-chip-gate={chipGateOpen ? 'open' : 'closed'}
-            data-chip-gate-via={chipGateVia ?? undefined}
-            className="
+            {/* Answer chips */}
+            <div
+              data-testid="math-chips"
+              // Thinking-time chip tap-gate state (ticket 86ca84ukt). The
+              // single machine-readable signal the e2e spec keys on —
+              // `disabled` is overloaded (also true on `resolved` /
+              // `dimForGuided`) and cannot isolate the gate dimension.
+              // `data-chip-gate-via` records HOW it opened (real TTS start
+              // vs fail-open watchdog/error) for the watchdog-path assertion.
+              data-chip-gate={chipGateOpen ? 'open' : 'closed'}
+              data-chip-gate-via={chipGateVia ?? undefined}
+              className="
           mb-8 flex w-full items-center justify-center gap-8 px-4
         "
-          >
-            {chipOrder.map((value) => {
-              const isCorrect = value === currentProblem.correct
-              const isShaking = shakingChip === value
-              const dimForGuided = guidedActive && !isCorrect
-              const guidedShimmer = guidedActive && isCorrect
-              return (
-                <m.button
-                  key={value}
-                  type="button"
-                  data-testid="math-chip"
-                  data-value={value}
-                  data-correct={isCorrect ? 'true' : 'false'}
-                  data-shaking={isShaking ? 'true' : 'false'}
-                  aria-label={`Answer ${value}`}
-                  onClick={() => onChipTap(value)}
-                  // Chip availability keys on `chipGateOpen` (TTS START),
-                  // NOT `readAloudPlayed` (completion). Pre-gate the chip
-                  // is `opacity-60`, no `whileTap`, `disabled` — "in a
-                  // moment", never "wrong / broken". On gate-open it
-                  // animates opacity 0.6 → 1.0 over 200ms (no SFX, no
-                  // spring — the calm opacity tween is the right register).
-                  // Ticket 86ca84ukt; spec §"Pre-gate chip visual state".
-                  disabled={
-                    problemState.resolved || dimForGuided || !chipGateOpen
-                  }
-                  className={`
+            >
+              {chipOrder.map((value) => {
+                const isCorrect = value === currentProblem.correct
+                const isShaking = shakingChip === value
+                const dimForGuided = guidedActive && !isCorrect
+                const guidedShimmer = guidedActive && isCorrect
+                return (
+                  <m.button
+                    key={value}
+                    type="button"
+                    data-testid="math-chip"
+                    data-value={value}
+                    data-correct={isCorrect ? 'true' : 'false'}
+                    data-shaking={isShaking ? 'true' : 'false'}
+                    aria-label={`Answer ${value}`}
+                    onClick={() => onChipTap(value)}
+                    // Chip availability keys on `chipGateOpen` (TTS START),
+                    // NOT `readAloudPlayed` (completion). Pre-gate the chip
+                    // is `opacity-60`, no `whileTap`, `disabled` — "in a
+                    // moment", never "wrong / broken". On gate-open it
+                    // animates opacity 0.6 → 1.0 over 200ms (no SFX, no
+                    // spring — the calm opacity tween is the right register).
+                    // Ticket 86ca84ukt; spec §"Pre-gate chip visual state".
+                    disabled={
+                      problemState.resolved || dimForGuided || !chipGateOpen
+                    }
+                    className={`
                 clay-tile clay-press
                 relative flex select-none items-center justify-center
                 font-clay text-[3.25rem] font-semibold
@@ -3312,67 +3322,68 @@ function MathScreen({
                 ${dimForGuided || !chipGateOpen ? 'opacity-60' : 'opacity-100'}
                 ${guidedShimmer ? 'clay-tile-glow' : ''}
               `}
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    minWidth: '60px',
-                    minHeight: '60px',
-                    cursor:
+                    style={{
+                      width: '120px',
+                      height: '120px',
+                      minWidth: '60px',
+                      minHeight: '60px',
+                      cursor:
+                        problemState.resolved || dimForGuided || !chipGateOpen
+                          ? 'default'
+                          : 'pointer',
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={
+                      isShaking
+                        ? reducedMotion
+                          ? { scale: 1, opacity: [1, 0.7, 1] }
+                          : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1 }
+                        : {
+                            scale: 1,
+                            opacity: dimForGuided || !chipGateOpen ? 0.6 : 1,
+                            x: 0,
+                          }
+                    }
+                    // Clay press: the face sinks onto its slab (the CSS
+                    // `.clay-press:active` drops the slab by the same 4px).
+                    // MotionConfig reducedMotion="user" skips the transform.
+                    whileTap={
                       problemState.resolved || dimForGuided || !chipGateOpen
-                        ? 'default'
-                        : 'pointer',
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                  }}
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={
-                    isShaking
-                      ? reducedMotion
-                        ? { scale: 1, opacity: [1, 0.7, 1] }
-                        : { x: [0, -6, 6, -4, 4, 0], scale: 1, opacity: 1 }
-                      : {
-                          scale: 1,
-                          opacity: dimForGuided || !chipGateOpen ? 0.6 : 1,
-                          x: 0,
-                        }
-                  }
-                  // Clay press: the face sinks onto its slab (the CSS
-                  // `.clay-press:active` drops the slab by the same 4px).
-                  // MotionConfig reducedMotion="user" skips the transform.
-                  whileTap={
-                    problemState.resolved || dimForGuided || !chipGateOpen
-                      ? undefined
-                      : { y: 4 }
-                  }
-                  transition={
-                    isShaking
-                      ? reducedMotion
-                        ? { duration: WRONG_SHAKE_MS / 1000 }
-                        : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
-                      : {
-                          // Scale / position stay on the house chip spring;
-                          // opacity uses a calm 200ms ease-out tween so the
-                          // gate-open lift (0.6 → 1.0) is understated, not
-                          // poppy. Spec §"Gate-open transition" (86ca84ukt):
-                          // "do NOT introduce a new spring here."
-                          ...CHIP_TAP_SPRING,
-                          opacity: { duration: 0.2, ease: 'easeOut' },
-                        }
-                  }
-                >
-                  {value}
+                        ? undefined
+                        : { y: 4 }
+                    }
+                    transition={
+                      isShaking
+                        ? reducedMotion
+                          ? { duration: WRONG_SHAKE_MS / 1000 }
+                          : { duration: WRONG_SHAKE_MS / 1000, ease: 'easeOut' }
+                        : {
+                            // Scale / position stay on the house chip spring;
+                            // opacity uses a calm 200ms ease-out tween so the
+                            // gate-open lift (0.6 → 1.0) is understated, not
+                            // poppy. Spec §"Gate-open transition" (86ca84ukt):
+                            // "do NOT introduce a new spring here."
+                            ...CHIP_TAP_SPRING,
+                            opacity: { duration: 0.2, ease: 'easeOut' },
+                          }
+                    }
+                  >
+                    {value}
 
-                  {/* Sparkle burst on correct tap. AnimatePresence so the
+                    {/* Sparkle burst on correct tap. AnimatePresence so the
                   particles unmount cleanly after the burst. Skipped
                   entirely on reduced-motion. */}
-                  <AnimatePresence>
-                    {celebrating && isCorrect && !reducedMotion && (
-                      <SparkleBurst key="burst" />
-                    )}
-                  </AnimatePresence>
-                </m.button>
-              )
-            })}
+                    <AnimatePresence>
+                      {celebrating && isCorrect && !reducedMotion && (
+                        <SparkleBurst key="burst" />
+                      )}
+                    </AnimatePresence>
+                  </m.button>
+                )
+              })}
+            </div>
           </div>
         </>
       )}
