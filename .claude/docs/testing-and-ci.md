@@ -170,12 +170,12 @@ Two GitHub Actions workflows live at [.github/workflows/](MarianLearning/.github
 | Job         | Budget                                  | Steps                                                                     | Purpose                                                                         |
 | ----------- | --------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `fast-gate` | `timeout-minutes: 10` (target ~3-5 min) | `yarn typecheck` → `yarn lint` → `yarn canon:lint` → `yarn test` (vitest) | Cheap fast-fail signals; runs first                                             |
-| `e2e`       | `timeout-minutes: 35`                   | Playwright install + `yarn e2e` (Chromium + WebKit)                       | Gated by `needs: fast-gate` — no Playwright runner allocated if fast-gate fails |
+| `e2e`       | `timeout-minutes: 70`                   | Playwright install + `yarn e2e` (Chromium + WebKit)                       | Gated by `needs: fast-gate` — no Playwright runner allocated if fast-gate fails |
 
 The serialized `needs: fast-gate` shape (not parallel-no-needs) is deliberate: it saves Playwright runner-minutes on cheap-failure PRs and frees concurrency slots for sibling PRs, at the cost of ~3-5 min added latency on green-fast-gate PRs. PR #311's body documents the runtime-impact table. Adds `yarn typecheck` and `yarn lint` (ESLint) as CI-enforced gates for the first time — closes the same soft-gate gap class as the vitest gate (2026-05-22 retro Action 4). Mitigates the "conclude 'hung' from a single status-check" misdiagnosis pattern from `decisions-while-away.md` — a fast-gate failure now surfaces in 3-5 min before the orchestrator would consider escalating.
 
 ```yaml
-timeout-minutes: 35
+timeout-minutes: 70
 ```
 
 The budget is now 35 min — bumped 25 → 35 in `kevin/playwright-workflow-timeout-bump` (PR #281, 2026-05-17) after PR #279 (4 new sub-to-20 tests) cancelled at exactly 25 min on both attempts, and Jessica's PR #275 hit the cap once + completed on rerun. Prior bump 15 → 25 landed in `infra/86c9nc67b-e2e-timeout-bump` (2026-05-09) after PR #168's e2e run capped at 15 min on two consecutive attempts despite the underlying specs passing locally. Earlier bump 5 → 15 happened during the cvc-words-short-o regression spec landing. Cold-cache runs (no Playwright browser cache, no yarn cache) drove the historical cap pressure on slower runners; the 10-min 25 → 35 headroom restores comfortable budget for the current suite size (sub-to-20 + add-to-20 specs in flight) without splitting the chromium/webkit jobs.
@@ -203,7 +203,7 @@ Steps:
 | **Concurrency cancel**     | New push landed while run was mid-flight; `cancel-in-progress: true` killed the older run | Normal — no action needed              |
 | **External / user cancel** | Someone clicked "Cancel" in the Actions UI, or the billing stop-usage gate fired          | Investigate billing or operator action |
 
-**Diagnostic — compute elapsed time before escalating.** When you see `conclusion=cancelled`, compute `elapsed = updatedAt − createdAt` and compare against the `timeout-minutes` value in `.github/workflows/e2e.yml` (Playwright job: currently 50):
+**Diagnostic — compute elapsed time before escalating.** When you see `conclusion=cancelled`, compute `elapsed = updatedAt − createdAt` and compare against the `timeout-minutes` value in `.github/workflows/e2e.yml` (Playwright job: currently 70, raised from 50 in PR #518):
 
 | elapsed vs budget                                                                         | interpretation                                                                                                       |
 | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -222,6 +222,8 @@ gh run view <run_id> --log | sed 's/\x1b\[[0-9;]*m//g' | grep "Run e2e suite" | 
 Any `✘` lines → it is a test failure, not a budget problem: fix the specs/app, do not touch `timeout-minutes`. Also note how far the run got (the last `[N/total]` index) — tests after that point never ran, so the failure list is incomplete.
 
 > **Incident:** PR #504 (Emma's Path 9/10, 2026-10-05) — Playwright `cancelled` at 50m18s, then again on rerun (run 37288046513). Read as "suite outgrew the budget"; the log showed ~13 existing progression specs failing ×3 attempts after "All done" was rerouted to the map, with only 230/436 tests reached. — **Cost:** two full 50-min CI runs (~100 runner-min) and a near-miss CI-config change that would have masked 13 real regressions.
+
+> **Incident:** main 7b4f551 (2026-10-06) — Playwright cancelled at the 50-min budget on two attempts (run 37498893036); attempt 1 lost 12m49s to a slow browser download, attempt 2 had a 52 s install yet still ran 49 min (suite had grown to ~458 tests), plus real WebKit caption failures. — **Cost:** the production release slipped overnight. PR #518 raised the budget to 70; the next full run took 50.9 min. Count `✘` first (rule above), then budget.
 
 **`gh` stale-cache caveat for in-flight or just-completed runs.** `gh run list` and `gh pr view --json statusCheckRollup` cache results on the CLI side (memory rule `[[feedback_gh_pr_checks_stale_cache]]`). For a run that is currently in progress or recently completed, fetch fresh state via the REST API:
 
