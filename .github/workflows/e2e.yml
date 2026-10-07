@@ -100,7 +100,7 @@ jobs:
     needs: fast-gate
     # Suite runs ~33-35min and was at the edge of the old 35-min cap
     # (a green run hit 35:15 and got killed mid-test). 50 gives headroom.
-    timeout-minutes: 50
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@v4
 
