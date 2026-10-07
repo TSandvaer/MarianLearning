@@ -20,8 +20,7 @@ import { buildMapModel, stopsInOrder } from './mapModel'
 import {
   BAND_GAP,
   CURRENT_SCALE,
-  emmaFigure,
-  emmaRect,
+  emmaBadge,
   GATE_TAP,
   LANDSCAPE_BAND,
   LANDSCAPE_TRAY_ROOM,
@@ -240,22 +239,27 @@ describe('layoutMap', () => {
     expect(done.stones.every((s) => s.walked)).toBe(true)
   })
 
-  // Thomas (2026-10-07): the stop's art hid Emma's body. She now stands
-  // just above her stop, all of her inside her (taller) band.
-  it('Emma stands above her stop, fully in view: clear of every stop and gate, inside her band', () => {
+  // Thomas (2026-10-07): the stop's art hid Emma's body, and the standing
+  // art has no legs. A "you are here" badge marks her stop instead, above
+  // it, all of it inside her (taller) band.
+  it("Emma's badge sits above her stop: clear of every stop and gate, inside her band, her face big enough", () => {
     for (const [world, tree] of worlds) {
       for (let cur = -1; cur < tree.length; cur++) {
         const m = buildMapModel(seed(tree, cur), world)
         const l = layoutMap(m, W, H)
         const stop = l.stops.find((s) => s.node === m.current)!
-        const e = emmaRect(stop)
+        const e = emmaBadge(stop)
         expect(e.left + e.size / 2).toBeCloseTo(stop.x)
-        // Her whole box, not only her figure, is above her stop's box.
+        // Portrait: 72-96 px, her face recognisable.
+        expect(e.size).toBeGreaterThanOrEqual(72)
+        expect(e.size).toBeLessThanOrEqual(96)
+        expect(e.height).toBeGreaterThan(e.size)
+        // The whole badge, tail included, is above her stop's box.
         const box = {
           l: e.left,
           t: e.top,
           r: e.left + e.size,
-          b: e.top + e.size,
+          b: e.top + e.height,
         }
         expect(box.b).toBeLessThanOrEqual(stop.y - stop.size / 2)
         for (const s of l.stops)
@@ -264,16 +268,12 @@ describe('layoutMap', () => {
           expect(overlap(box, boxOf(g.x, g.y, GATE_TAP))).toBe(false)
         const band = l.bands.find((b) => b.land === stop.land)!
         expect(box.t).toBeGreaterThanOrEqual(band.top)
-        // The figure is inside the box.
-        const f = emmaFigure(stop)
-        expect(f.top).toBeGreaterThanOrEqual(box.t)
-        expect(f.bottom).toBeLessThanOrEqual(box.b)
       }
     }
   })
   // Landscape path regions: Thomas's iPad in Safari (1000x670) and the
   // other landscape sizes, after the left header column and margins.
-  it('landscape: scaled to fit, Emma and the bud tray clear every other stop', () => {
+  it("landscape: scaled to fit, Emma's badge and the bud tray clear every other stop", () => {
     const regions = [
       [760, 654],
       [821, 624],
@@ -291,8 +291,15 @@ describe('layoutMap', () => {
           expect(l.stopSize * k).toBeGreaterThanOrEqual(44)
           expect(GATE_TAP * k).toBeGreaterThanOrEqual(44)
           const stop = l.stops.find((s) => s.node === m.current)!
-          const f = emmaFigure(stop)
-          const emma = { l: f.left, t: f.top, r: f.right, b: f.bottom }
+          const e = emmaBadge(stop)
+          const emma = {
+            l: e.left,
+            t: e.top,
+            r: e.left + e.size,
+            b: e.top + e.height,
+          }
+          // Her face stays recognisable on screen: badge >= 56 px.
+          expect(e.size * k).toBeGreaterThanOrEqual(56)
           // BudTray: top at 1.02 × size inside the stop box, 3 × 42 px
           // holes + padding ≈ 160 × 55 px.
           const trayTop = stop.y - stop.size / 2 + stop.size * 1.02

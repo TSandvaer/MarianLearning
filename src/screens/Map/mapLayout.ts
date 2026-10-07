@@ -12,9 +12,11 @@
  * column, the current stop's buds and Emma). Each land's pill sits in the
  * top corner of its start side (the far side for a one-stop land).
  *
- * Emma stands just above (behind) the current stop, all of her in view:
- * Thomas (2026-10-07) did not want the stop's art covering her body. Her
- * land's band is taller by the room she needs, so she stays inside it.
+ * Emma marks the current stop with a "you are here" badge (her head and
+ * shoulders in a round clay badge, a tail pointing down at the stop), all
+ * of it clear of the stop: Thomas (2026-10-07) did not want the stop's art
+ * covering her, and the standing art has no legs. Her land's band is
+ * taller by the room the badge needs, so it stays inside it.
  */
 
 import type { SkillNode } from '../../lib/progress'
@@ -86,63 +88,57 @@ export interface MapLayout {
   stopSize: number
 }
 
-/** Emma's square box is this much bigger than the stop she stands at. */
-export const EMMA_SCALE = 1.25
-/** Gap between the bottom of Emma's box and the top of her stop's box. */
-const EMMA_FEET_GAP = 2
-/** Room kept between the top of Emma's box and her band's top edge. */
-const EMMA_HEAD_GAP = 4
+/** Emma's badge diameter, as a fraction of the stop it marks. */
+const BADGE_SCALE = 0.76
+/** Badge diameter bounds, px (layout space). */
+const BADGE_MIN = 92
+const BADGE_MAX = 96
+/** The badge's pointer tail, as a fraction of its diameter. */
+export const BADGE_TAIL = 0.22
+/** Gap between the tail's tip and the top of the stop's box. */
+const BADGE_GAP = 4
+/** Room kept between the top of the badge and its band's top edge. */
+const BADGE_HEAD_GAP = 6
 
-/**
- * Emma's square box at a stop: standing just above it, the whole box clear
- * of the stop, so no part of her is behind the stop's art.
- */
-export function emmaRect(stop: StopLayout): {
-  left: number
-  top: number
-  size: number
-} {
-  const size = Math.round(stop.size * EMMA_SCALE)
-  return {
-    left: stop.x - size / 2,
-    top: stop.y - stop.size / 2 - EMMA_FEET_GAP - size,
-    size,
-  }
-}
-
-/** Height Emma needs above the centre of a stop of `size`, to her band's top. */
-function emmaRise(size: number): number {
-  return (
-    size / 2 + EMMA_FEET_GAP + Math.round(size * EMMA_SCALE) + EMMA_HEAD_GAP
+function badgeSize(stopSize: number): number {
+  return Math.round(
+    Math.min(BADGE_MAX, Math.max(BADGE_MIN, stopSize * BADGE_SCALE)),
   )
 }
 
 /**
- * Extra height Emma's band needs on top of `bandH` so that all of her,
- * standing above a stop of `size`, stays inside it.
+ * Emma's "you are here" badge at a stop: a round clay badge (her head and
+ * shoulders) with a tail pointing down at the stop, the whole box clear of
+ * the stop. `size` is the circle's diameter; `height` adds the tail.
  */
-export function emmaRoom(size: number, bandH: number): number {
-  return Math.max(0, emmaRise(size) - bandH * STOP_Y)
+export function emmaBadge(stop: StopLayout): {
+  left: number
+  top: number
+  size: number
+  height: number
+} {
+  const size = badgeSize(stop.size)
+  const height = size + Math.round(size * BADGE_TAIL)
+  return {
+    left: stop.x - size / 2,
+    top: stop.y - stop.size / 2 - BADGE_GAP - height,
+    size,
+    height,
+  }
+}
+
+/** Height the badge needs above the centre of a stop of `size`, to its band's top. */
+function emmaRise(size: number): number {
+  const d = badgeSize(size)
+  return size / 2 + BADGE_GAP + d + Math.round(d * BADGE_TAIL) + BADGE_HEAD_GAP
 }
 
 /**
- * Where Emma's figure is inside her box, across her map poses (alpha
- * bounds of the 1024² idle / attentive-pointing / cheering art): the rest
- * of the square is transparent.
+ * Extra height Emma's band needs on top of `bandH` so that her badge,
+ * above a stop of `size`, stays inside it.
  */
-export function emmaFigure(stop: StopLayout): {
-  left: number
-  top: number
-  right: number
-  bottom: number
-} {
-  const e = emmaRect(stop)
-  return {
-    left: e.left + e.size * 0.18,
-    top: e.top + e.size * 0.03,
-    right: e.left + e.size * 0.78,
-    bottom: e.top + e.size * 0.98,
-  }
+export function emmaRoom(size: number, bandH: number): number {
+  return Math.max(0, emmaRise(size) - bandH * STOP_Y)
 }
 
 const STONE_STEP = 42

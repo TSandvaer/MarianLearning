@@ -32,7 +32,6 @@ import {
   type ReactNode,
 } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
-import { EmmaCharacter } from '../../components/EmmaCharacter'
 import type { EmmaPose } from '../../lib/character/emmaPose'
 import {
   resumeHowlerContextOnGesture,
@@ -50,13 +49,14 @@ import { HUB_LAST_UNMOUNT_KEY } from '../Hub/useRapidRemountSuppression'
 import { buildMapModel, type MapLand, type MapStop } from './mapModel'
 import {
   BAND_INSET,
-  emmaRect,
+  emmaBadge,
   GATE_TAP,
   LANDSCAPE_TRAY_ROOM,
   landscapeScale,
   layoutMap,
 } from './mapLayout'
 import { BAND_TINTS, INK } from './mapTheme'
+import { EmmaBadge } from './EmmaBadge'
 import {
   CaptionSlab,
   CurrentGlow,
@@ -286,11 +286,11 @@ export function MapScreen({
     speak(gateLine(model, land))
   }
 
-  // Emma stands on the just-mastered stop until she hops (unlock beat).
+  // Emma's badge marks the just-mastered stop until she hops (unlock beat).
   const emmaNode =
     unlock !== null && !reached(phase, 'hop') ? unlock.mastered : model.current
   const emmaStop = layout.stops.find((s) => s.node === emmaNode)
-  const emmaBox = emmaStop ? emmaRect(emmaStop) : null
+  const emmaBox = emmaStop ? emmaBadge(emmaStop) : null
   const currentStop = model.complete
     ? undefined
     : layout.stops.find((s) => s.node === model.current)
@@ -343,7 +343,7 @@ export function MapScreen({
         <MapTitle world={world} />
       </header>
 
-      {/* Path region — bands, stones, gates, pills, stops, Emma. */}
+      {/* Path region — bands, stones, gates, pills, stops, Emma's badge. */}
       <div
         ref={regionRef}
         data-testid="map-path"
@@ -442,15 +442,11 @@ export function MapScreen({
                   className="pointer-events-none absolute"
                   style={{
                     width: emmaBox.size,
-                    height: emmaBox.size,
-                    // She stands above her stop, clear of it (mapLayout.ts).
-                    // Stacked under every stop and gate all the same, so
-                    // she never hides one.
+                    height: emmaBox.height,
+                    // Her badge sits above her stop, clear of it
+                    // (mapLayout.ts). Stacked under every stop and gate all
+                    // the same, so it never hides one.
                     zIndex: 2,
-                    // One grid cell: the pose cross-fade keeps the old and
-                    // new image mounted together; stacked, not side by side.
-                    display: 'grid',
-                    justifyItems: 'center',
                   }}
                   initial={
                     reduceMotion
@@ -465,38 +461,13 @@ export function MapScreen({
                       : { type: 'spring', stiffness: 260, damping: 22 }
                   }
                 >
-                  {/* Soft contact shadow where she stands. */}
-                  <span
-                    aria-hidden
-                    data-testid="map-emma-shadow"
-                    className="absolute rounded-[50%]"
-                    style={{
-                      // Under her feet (the figure ends at 98% of the box).
-                      left: '14%',
-                      width: '72%',
-                      bottom: '-4%',
-                      height: '10%',
-                      background:
-                        'radial-gradient(ellipse at 50% 50%, rgba(80,45,15,0.5) 0, rgba(80,45,15,0.28) 40%, rgba(80,45,15,0) 70%)',
-                    }}
+                  <EmmaBadge
+                    size={emmaBox.size}
+                    height={emmaBox.height}
+                    pose={pose}
+                    hopping={phase === 'hop'}
+                    reduceMotion={reduceMotion}
                   />
-                  {/* Two small arcs while she hops (spec §6, 700 ms). */}
-                  <m.div
-                    style={{ gridArea: '1 / 1', height: '100%' }}
-                    animate={
-                      phase === 'hop' && !reduceMotion
-                        ? { y: [0, -28, 0, -18, 0] }
-                        : { y: 0 }
-                    }
-                    transition={{ duration: 0.7, ease: 'easeInOut' }}
-                  >
-                    <EmmaCharacter
-                      pose={pose}
-                      data-testid="map-emma-character"
-                      className="h-full w-auto select-none"
-                      style={{ gridArea: '1 / 1' }}
-                    />
-                  </m.div>
                 </m.div>
               </AnimatePresence>
             )}

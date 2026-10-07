@@ -282,13 +282,15 @@ interface Rect {
 }
 
 /**
- * Map, settled: no two stops overlap; Emma's figure clears every stop and
+ * Map, settled: no two stops overlap; Emma's badge clears every stop and
  * gate; the current stop's bud tray clears every stop and gate; the
  * caption clears all of them. Thomas's iPad (2026-10-07): in landscape the
  * bands were so short that the tray sat on the stop below, the stop above
  * hid Emma, and the caption covered the bottom land. Then (same day) the
- * current stop's pot still hid her body: her whole box must clear her own
- * stop, its pot art and its bud tray.
+ * current stop's pot still hid her body, and the standing art has no
+ * legs: a "you are here" badge marks her stop instead. The whole badge,
+ * tail included, must clear her own stop, its pot art and its bud tray,
+ * sit fully inside the viewport, and stay >= 56 px across.
  */
 async function expectMapClear(page: Page): Promise<void> {
   const found = await page.evaluate(() => {
@@ -311,8 +313,10 @@ async function expectMapClear(page: Page): Promise<void> {
     )
     const trays = all('[data-testid="map-buds"]', () => 'bud tray')
     const ribbons = all('[data-testid="map-ribbon"]', () => 'caption')
-    // Her whole box, transparent margins included.
-    const emmaBox = all('[data-testid="map-emma"]', () => 'emma box')
+    // Her whole badge: circle + tail.
+    const emmaBox = all('[data-testid="map-emma"]', () => 'emma badge')
+    // The circle alone (its diameter is the face's size).
+    const circle = all('[data-testid="map-emma-badge"]', () => 'emma circle')
     // The current stop and its pot art (the sticker image).
     const own = all(
       `[data-testid="map-stop"][data-node="${current}"]`,
@@ -322,19 +326,19 @@ async function expectMapClear(page: Page): Promise<void> {
       `[data-testid="map-stop"][data-node="${current}"] [data-testid="map-stop-sticker"] img`,
       () => 'current stop art',
     )
-    // Emma's figure inside her square box (emmaFigure in mapLayout.ts).
-    const emma = all('[data-testid="map-emma"]', () => 'emma').map((e) => {
-      const w = e.r - e.l
-      const h = e.b - e.t
-      return {
-        ...e,
-        l: e.l + w * 0.18,
-        r: e.l + w * 0.78,
-        t: e.t + h * 0.03,
-        b: e.t + h * 0.98,
-      }
-    })
-    return { current, stops, gates, trays, ribbons, emma, emmaBox, own, ownArt }
+    return {
+      current,
+      stops,
+      gates,
+      trays,
+      ribbons,
+      emmaBox,
+      circle,
+      own,
+      ownArt,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+    }
   })
   const hit = (a: Rect, c: Rect) =>
     a.l < c.r && c.l < a.r && a.t < c.b && c.t < a.b
@@ -345,10 +349,12 @@ async function expectMapClear(page: Page): Promise<void> {
         if (a !== c && !skip?.(c) && hit(a, c))
           clashes.push(`${a.name} × ${c.name}`)
   }
-  const { stops, gates, trays, ribbons, emma, emmaBox, own, ownArt } = found
+  const { stops, gates, trays, ribbons, emmaBox, circle, own, ownArt } = found
+  const emma = emmaBox
   expect(stops.length).toBeGreaterThan(0)
   expect(trays.length).toBe(1)
   expect(emma.length).toBe(1)
+  expect(circle.length).toBe(1)
   expect(own.length).toBe(1)
   expect(ownArt.length).toBe(1)
   check(stops, stops)
@@ -359,6 +365,14 @@ async function expectMapClear(page: Page): Promise<void> {
   for (const c of [...own, ...ownArt, ...trays])
     if (hit(emmaBox[0]!, c)) ownClashes.push(`emma box × ${c.name}`)
   expect.soft(ownClashes, 'Emma covered at her stop').toEqual([])
+  // Fully inside the viewport, and big enough to recognise her face.
+  const e = emmaBox[0]!
+  expect.soft(e.l, 'badge left').toBeGreaterThanOrEqual(0)
+  expect.soft(e.t, 'badge top').toBeGreaterThanOrEqual(0)
+  expect.soft(e.r, 'badge right').toBeLessThanOrEqual(found.vw)
+  expect.soft(e.b, 'badge bottom').toBeLessThanOrEqual(found.vh)
+  const c = circle[0]!
+  expect.soft(c.r - c.l, 'badge diameter').toBeGreaterThanOrEqual(56)
   check(trays, [...stops, ...gates])
   check(ribbons, [...stops, ...gates, ...trays, ...emma])
   expect.soft(clashes, 'map pieces overlapping').toEqual([])
@@ -448,7 +462,7 @@ for (const vp of VIEWPORTS) {
       { world: 'math', current: 1, name: 'map-math' },
       // Five lands, current stop on the bottom land (bud tray below it).
       { world: 'word-song', current: 1, name: 'map-word-song' },
-      // Current stop on the top land (Emma's head above it).
+      // Current stop on the top land (Emma's badge above it).
       { world: 'math', current: MATH.length - 1, name: 'map-math-top' },
     ] as const
     for (const { world, current, name } of maps) {
