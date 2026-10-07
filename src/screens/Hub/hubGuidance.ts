@@ -31,7 +31,7 @@ export type GuidanceLineId =
   | 'guide.sleeping.word-song'
   | 'guide.both-sleeping'
   | 'guide.woke-up'
-  | 'guide.woke-up.one'
+  | 'guide.hub.woke.one'
   | 'guide.one-more'
 
 export interface GuidanceLine {
@@ -43,8 +43,8 @@ export interface GuidanceLine {
 /**
  * The G3 recording for each Hub line: the id in
  * `lib/emmasPath/guidanceLines.ts`, or null when G3 recorded none.
- * `guide.woke-up.one` ("Your flower woke up!") has no recording; it
- * shows its caption only.
+ * `guide.hub.woke.one` ("Your flower woke up!", PR #514) uses the
+ * catalogue id as its Hub id.
  */
 export const GUIDANCE_CLIP_IDS: Record<GuidanceLineId, string | null> = {
   'guide.grow.number-garden': 'guide.hub.suggest.math',
@@ -53,7 +53,7 @@ export const GUIDANCE_CLIP_IDS: Record<GuidanceLineId, string | null> = {
   'guide.sleeping.word-song': 'guide.hub.sleeping.word-song',
   'guide.both-sleeping': 'guide.hub.both-sleeping',
   'guide.woke-up': 'guide.hub.woke',
-  'guide.woke-up.one': null,
+  'guide.hub.woke.one': 'guide.hub.woke.one',
   'guide.one-more': 'guide.hub.one-more',
 }
 
@@ -65,7 +65,7 @@ function clipSrc(id: GuidanceLineId): string | null {
 /**
  * Texts are the mockup's, word for word. Each world gets its own copy
  * of the suggestion lines (the mockup shows one direction of each), and
- * `guide.woke-up.one` is the singular of "Your flowers woke up!" for a
+ * `guide.hub.woke.one` is the singular of "Your flowers woke up!" for a
  * morning when only one world had a flower asleep.
  */
 export const GUIDANCE_LINES: Record<GuidanceLineId, GuidanceLine> = {
@@ -95,9 +95,9 @@ export const GUIDANCE_LINES: Record<GuidanceLineId, GuidanceLine> = {
     text: 'Your flowers woke up!',
     audioSrc: clipSrc('guide.woke-up'),
   },
-  'guide.woke-up.one': {
+  'guide.hub.woke.one': {
     text: 'Your flower woke up!',
-    audioSrc: clipSrc('guide.woke-up.one'),
+    audioSrc: clipSrc('guide.hub.woke.one'),
   },
   'guide.one-more': {
     text: 'One more flower, and a new path opens!',
@@ -170,7 +170,7 @@ export function pickGuidanceLines(opts: {
   const { numberGarden, wordSong, suggestion, wakeWorlds } = opts
   const lines: GuidanceLineId[] = []
   if (wakeWorlds.length > 0) {
-    lines.push(wakeWorlds.length > 1 ? 'guide.woke-up' : 'guide.woke-up.one')
+    lines.push(wakeWorlds.length > 1 ? 'guide.woke-up' : 'guide.hub.woke.one')
   }
   if (suggestion !== null) {
     const [sug, other] =

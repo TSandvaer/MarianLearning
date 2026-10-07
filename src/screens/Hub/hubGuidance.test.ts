@@ -4,7 +4,7 @@
  */
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { guidanceLine as guidanceClip } from '../../lib/emmasPath/guidanceLines'
 import type { HubCardModel, FlowerSlot } from './hubCardModel'
 import {
@@ -14,12 +14,9 @@ import {
   flowerWakeFor,
   guidanceNeedsGesture,
   pickGuidanceLines,
-  playGuidanceLine,
-  cancelGuidanceLine,
   readFlowerWake,
   suggestWorld,
   writeFlowerWake,
-  CAPTION_MS_PER_WORD,
 } from './hubGuidance'
 
 function card(
@@ -187,32 +184,40 @@ describe('pickGuidanceLines — the mockup states', () => {
 })
 
 describe('GUIDANCE_LINES — the G3 Lily recordings', () => {
-  it('every line but "Your flower woke up!" plays its G3 clip, same words', () => {
-    const recorded = Object.entries(GUIDANCE_LINES).filter(
-      ([, line]) => line.audioSrc !== null,
-    )
-    expect(recorded.map(([id]) => id)).toEqual([
+  it('every line plays its G3 clip, same words', () => {
+    const lines = Object.entries(GUIDANCE_LINES)
+    expect(lines.map(([id]) => id)).toEqual([
       'guide.grow.number-garden',
       'guide.grow.word-song',
       'guide.sleeping.number-garden',
       'guide.sleeping.word-song',
       'guide.both-sleeping',
       'guide.woke-up',
+      'guide.hub.woke.one',
       'guide.one-more',
     ])
-    for (const [id, line] of recorded) {
+    for (const [id, line] of lines) {
       const clip = guidanceClip(GUIDANCE_CLIP_IDS[id as GuidanceLineId]!)!
       expect(clip.text).toBe(line.text)
       expect(line.audioSrc).toBe(clip.src)
       expect(existsSync(join(process.cwd(), 'public', clip.src))).toBe(true)
     }
-    expect(GUIDANCE_CLIP_IDS['guide.woke-up.one']).toBeNull()
-    expect(GUIDANCE_LINES['guide.woke-up.one'].audioSrc).toBeNull()
   })
 
-  it('a recorded line waits for the first tap; the caption-only line does not', () => {
+  it('"Your flower woke up!" uses the catalogue id and its own clip', () => {
+    expect(GUIDANCE_CLIP_IDS['guide.hub.woke.one']).toBe('guide.hub.woke.one')
+    expect(GUIDANCE_LINES['guide.hub.woke.one'].audioSrc).toBe(
+      guidanceClip('guide.hub.woke.one')!.src,
+    )
+    expect(GUIDANCE_LINES['guide.hub.woke.one'].audioSrc).not.toBe(
+      GUIDANCE_LINES['guide.woke-up'].audioSrc,
+    )
+  })
+
+  it('a recorded line waits for the first tap', () => {
     expect(guidanceNeedsGesture(['guide.woke-up', 'guide.one-more'])).toBe(true)
-    expect(guidanceNeedsGesture(['guide.woke-up.one'])).toBe(false)
+    expect(guidanceNeedsGesture(['guide.hub.woke.one'])).toBe(true)
+    expect(guidanceNeedsGesture([])).toBe(false)
   })
 })
 
@@ -280,33 +285,5 @@ describe('flowerWakeFor — once, the first visit after the flower slept', () =>
     expect(readFlowerWake(storage)).toEqual({ 'word-song': '2026-05-01' })
     store.set('hub-flower-wake.v1', 'not json')
     expect(readFlowerWake(storage)).toEqual({})
-  })
-})
-
-describe('playGuidanceLine (line without a recording)', () => {
-  afterEach(() => vi.useRealTimers())
-
-  it('reveals every word at 165 wpm, then resolves', async () => {
-    vi.useFakeTimers()
-    const ticks: number[] = []
-    const done = playGuidanceLine('guide.woke-up.one', {
-      onWordTick: (i) => ticks.push(i),
-    })
-    await vi.advanceTimersByTimeAsync(CAPTION_MS_PER_WORD * 4)
-    await done
-    expect(ticks).toEqual([0, 1, 2, 3])
-  })
-
-  it('cancel stops the walk and resolves', async () => {
-    vi.useFakeTimers()
-    const ticks: number[] = []
-    const done = playGuidanceLine('guide.woke-up.one', {
-      onWordTick: (i) => ticks.push(i),
-    })
-    await vi.advanceTimersByTimeAsync(CAPTION_MS_PER_WORD)
-    cancelGuidanceLine()
-    await done
-    await vi.advanceTimersByTimeAsync(CAPTION_MS_PER_WORD * 10)
-    expect(ticks).toEqual([0, 1])
   })
 })
