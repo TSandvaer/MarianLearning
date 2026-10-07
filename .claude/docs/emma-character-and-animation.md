@@ -86,7 +86,7 @@ The `public/assets/emma-*.svg` runtime files are not the authoring origin — ea
 
 **Current state (2026-05-14, PR #221):** `transparent/` ships with a README only — a deliberate stub. The existing `public/assets/emma-*.svg` files still embed PNGs from an earlier generation pass; a deliberate full Emma-family re-cut (bgclear.ai pass on each original → `transparent/` → SVG re-embed) is a polish-backlog item.
 
-**ViewBox & sizing.** Idle pose authored at `240 × 360` (full body). Renders pinned to:
+**ViewBox & sizing.** Idle pose authored at `240 × 360` ("full body" is a misnomer: the art is cropped mid-thigh). Renders pinned to:
 
 - ~60vh on Greet (entrance pose).
 - ~30vh on Math / Word Song (upper-left perch with wand pointing into the problem area).
@@ -103,6 +103,10 @@ Non-pose Emma assets carry the `emma-` name prefix for brand cohesion but are **
 ### ViewBox sub-convention
 
 Pose-family SVGs use a **`0 0 2000 2000`** viewBox (full-portrait embed; the `240 × 360` figure in §3a is the authored design size, not the SVG viewBox). Non-pose assets use a **`0 0 200 200`** viewBox — tight-crop, region-specific, matching the picture-pack SVG envelope. The viewBox is the fast visual signal that a file is not part of the pose family. Author any new non-pose Emma SVG at `0 0 200 200` unless it is explicitly full-portrait.
+
+**Most poses have no legs — don't expose the bottom edge.** `emma-idle` and `emma-waving` (and similar standing poses) are cropped mid-thigh; only `emma-cheering`/`emma-celebration` (jumping) show legs. A layout that shows Emma's bottom edge in open space shows a cut-off figure. Hide it behind something, use a jumping pose, or crop to head-and-shoulders.
+
+> **Incident:** PR #522 (2026-10-07) moved the map's current-stop Emma above the flower pot so she was "fully visible" (d2d6df7); Thomas rejected it: "she has no legs so this doesnt work". — **Cost:** one full worker round plus re-captured screenshots, replaced by a head-and-shoulders clay badge.
 
 ### Crop-without-bgclear production path
 
