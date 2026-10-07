@@ -226,137 +226,160 @@ export function HubWorldCard({
       }}
       onKeyDown={handleKeyDown}
     >
-      <div className="hub-crown" aria-hidden />
-      <div className="hub-title" aria-hidden data-testid="hub-tree-label">
-        {title1}
-        <br />
-        <span className="hub-title-2">{title2}</span>
-      </div>
-
-      <div data-testid="hub-card-progress" data-world={model.world} aria-hidden>
-        <div
-          className="hub-plinth"
-          style={{ left: u(50), top: u(380), width: u(208), height: u(64) }}
-        />
-        <div
-          className="hub-glow"
-          style={{ left: u(36), top: u(170), width: u(236), height: u(236) }}
-        />
-        <img
-          className="hub-sticker"
-          data-testid="hub-card-current"
-          data-node={model.current}
-          src={pathArtSrc(model.current, 512)}
-          alt=""
-          draggable={false}
-          style={{ left: u(46), top: u(180), width: u(216), height: u(216) }}
-        />
-        <Spark left={52} top={196} delay={0} />
-        <Spark left={236} top={360} delay={0.7} />
+      {/* The face carries the slab and everything on it, and is what bobs
+          when the card is suggested; the card's own box never moves. */}
+      <div className="hub-card-face">
+        <div className="hub-crown" aria-hidden />
+        <div className="hub-title" aria-hidden data-testid="hub-tree-label">
+          {title1}
+          <br />
+          <span className="hub-title-2">{title2}</span>
+        </div>
 
         <div
-          className="hub-next"
-          data-testid={
-            model.unlocksNext === null ? 'hub-card-bloom' : 'hub-card-next'
-          }
-          data-node={model.unlocksNext ?? undefined}
+          data-testid="hub-card-progress"
+          data-world={model.world}
+          aria-hidden
         >
           <div
             className="hub-plinth"
-            style={{ left: u(262), top: u(388), width: u(104), height: u(34) }}
+            style={{ left: u(50), top: u(380), width: u(208), height: u(64) }}
+          />
+          <div
+            className="hub-glow"
+            style={{ left: u(36), top: u(170), width: u(236), height: u(236) }}
           />
           <img
             className="hub-sticker"
-            src={pathArtSrc(model.unlocksNext ?? 'ui-bloom', 256)}
+            data-testid="hub-card-current"
+            data-node={model.current}
+            src={pathArtSrc(model.current, 512)}
             alt=""
             draggable={false}
-            style={{ left: u(258), top: u(290), width: u(112), height: u(112) }}
+            style={{ left: u(46), top: u(180), width: u(216), height: u(216) }}
           />
-          {model.unlocksNext !== null && (
-            <img
-              className="hub-lock"
-              data-testid="hub-card-lock"
-              src={pathArtSrc('ui-padlock', 256)}
-              alt=""
-              draggable={false}
-              style={{ left: u(318), top: u(350), width: u(52), height: u(52) }}
-            />
-          )}
-        </div>
+          <Spark left={52} top={196} delay={0} />
+          <Spark left={236} top={360} delay={0.7} />
 
-        {model.showLandNumber && (
           <div
-            className="hub-landpill"
-            data-testid="hub-land-number"
-            data-value={model.landNumber}
+            className="hub-next"
+            data-testid={
+              model.unlocksNext === null ? 'hub-card-bloom' : 'hub-card-next'
+            }
+            data-node={model.unlocksNext ?? undefined}
           >
+            <div
+              className="hub-plinth"
+              style={{
+                left: u(262),
+                top: u(388),
+                width: u(104),
+                height: u(34),
+              }}
+            />
             <img
-              src={pathArtSrc(model.landArt, 256)}
+              className="hub-sticker"
+              src={pathArtSrc(model.unlocksNext ?? 'ui-bloom', 256)}
               alt=""
               draggable={false}
+              style={{
+                left: u(258),
+                top: u(290),
+                width: u(112),
+                height: u(112),
+              }}
             />
-            {model.landNumber}
+            {model.unlocksNext !== null && (
+              <img
+                className="hub-lock"
+                data-testid="hub-card-lock"
+                src={pathArtSrc('ui-padlock', 256)}
+                alt=""
+                draggable={false}
+                style={{
+                  left: u(318),
+                  top: u(350),
+                  width: u(52),
+                  height: u(52),
+                }}
+              />
+            )}
           </div>
-        )}
 
-        <div
-          className="hub-tray"
-          data-testid="hub-card-seeds"
-          data-good-days={model.slots.filter((s) => s !== 'empty').length}
-          data-required-days={model.slots.length}
-        >
-          {model.slots.map((slot, i) => {
-            const waking = slot === 'grown' && wakeSlots.includes(i)
-            return (
-              <div
-                key={i}
-                className={[
-                  'hub-hole',
-                  slot === 'sleeping' ? 'is-sleeping' : '',
-                  waking ? 'is-waking' : '',
-                ].join(' ')}
-                data-testid="hub-card-seed"
-                data-filled={slot === 'empty' ? 'false' : 'true'}
-                data-state={slot}
-                data-waking={waking ? 'true' : undefined}
-              >
-                {slot !== 'empty' && (
-                  <img
-                    src={pathArtSrc(
-                      slot === 'sleeping' ? 'ui-bud-closed' : 'ui-bud-open',
-                      256,
-                    )}
-                    alt=""
-                    draggable={false}
-                  />
-                )}
-                {slot === 'sleeping' && (
-                  <>
-                    <Moon />
-                    <span className="hub-zz">z</span>
-                  </>
-                )}
-              </div>
-            )
-          })}
+          {model.showLandNumber && (
+            <div
+              className="hub-landpill"
+              data-testid="hub-land-number"
+              data-value={model.landNumber}
+            >
+              <img
+                src={pathArtSrc(model.landArt, 256)}
+                alt=""
+                draggable={false}
+              />
+              {model.landNumber}
+            </div>
+          )}
+
+          <div
+            className="hub-tray"
+            data-testid="hub-card-seeds"
+            data-good-days={model.slots.filter((s) => s !== 'empty').length}
+            data-required-days={model.slots.length}
+          >
+            {model.slots.map((slot, i) => {
+              const waking = slot === 'grown' && wakeSlots.includes(i)
+              return (
+                <div
+                  key={i}
+                  className={[
+                    'hub-hole',
+                    slot === 'sleeping' ? 'is-sleeping' : '',
+                    waking ? 'is-waking' : '',
+                  ].join(' ')}
+                  data-testid="hub-card-seed"
+                  data-filled={slot === 'empty' ? 'false' : 'true'}
+                  data-state={slot}
+                  data-waking={waking ? 'true' : undefined}
+                >
+                  {slot !== 'empty' && (
+                    <img
+                      src={pathArtSrc(
+                        slot === 'sleeping' ? 'ui-bud-closed' : 'ui-bud-open',
+                        256,
+                      )}
+                      alt=""
+                      draggable={false}
+                    />
+                  )}
+                  {slot === 'sleeping' && (
+                    <>
+                      <Moon />
+                      <span className="hub-zz">z</span>
+                    </>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
 
-      {onOpenMap && (
-        <button
-          type="button"
-          className="hub-mapbtn"
-          data-testid="hub-map-button"
-          data-world={model.world}
-          aria-label={mapLabel}
-          onClick={() => {
-            playPlink()
-            onOpenMap()
-          }}
-        >
-          <img src={pathArtSrc('ui-map', 256)} alt="" draggable={false} />
-        </button>
-      )}
+        {onOpenMap && (
+          <button
+            type="button"
+            className="hub-mapbtn"
+            data-testid="hub-map-button"
+            data-world={model.world}
+            aria-label={mapLabel}
+            onClick={() => {
+              playPlink()
+              onOpenMap()
+            }}
+          >
+            <img src={pathArtSrc('ui-map', 256)} alt="" draggable={false} />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
