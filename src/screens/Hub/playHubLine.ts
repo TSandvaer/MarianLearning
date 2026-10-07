@@ -356,9 +356,20 @@ export function createHubLinePlayer<Id extends string = HubLineId>(
       }
       activeHandle = handle
 
+      // Last word index the caption has revealed; -1 before `play`.
+      let lastTicked = -1
+
       const settle = () => {
         if (resolved) return
         resolved = true
+        // The audio is the clock: when the clip ends, the caption ends
+        // fully shown. The word ticks run on the main thread and can lag
+        // behind the audio (a busy WebKit thread did, by more than one
+        // 480 ms interval) — without this the last word stayed hidden.
+        const lastWord = wordCountOf(id) - 1
+        if (lastTicked >= 0 && lastTicked < lastWord) {
+          playOpts.onWordTick?.(lastWord)
+        }
         detach()
         clearActive(handle)
         resolve()
@@ -397,6 +408,7 @@ export function createHubLinePlayer<Id extends string = HubLineId>(
         playOpts.onPlay?.()
         const wordCount = wordCountOf(id)
         playOpts.onWordTick?.(0)
+        lastTicked = 0
         if (wordCount <= 1) return
         const duration = howl.duration()
         const totalMs =
@@ -413,6 +425,7 @@ export function createHubLinePlayer<Id extends string = HubLineId>(
             return
           }
           playOpts.onWordTick?.(nextWord)
+          lastTicked = nextWord
           nextWord += 1
         }, intervalMs)
       })
