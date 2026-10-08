@@ -16,22 +16,22 @@ import {
 } from '../../lib/debug/audioContextProbe'
 import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
-import type { EmmaPose } from '../../lib/character/emmaPose'
+import type { EmmaPose } from '@marian/core/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { GettingReady } from '../../components/GettingReady'
-import { pickDistractors } from './wordDistractors'
-import { buildBlendHighlightSteps } from './blendHighlight'
+import { pickDistractors } from '@marian/core/wordSong/wordDistractors'
+import { buildBlendHighlightSteps } from '@marian/core/wordSong/blendHighlight'
 import {
   loadStardust,
   writeStardust,
   type StardustState,
   type StorageAdapter,
-} from '../_shared/stardust'
+} from '@marian/core/shared/stardust'
 import {
   pickStaticWordSongPlan,
   type WordSongSessionPlan,
   type WordSongProblem,
-} from './wordSessionPlans'
+} from '@marian/core/wordSong/wordSessionPlans'
 import {
   ADVANCE_AFTER_CORRECT_MS,
   ADVANCE_HARD_CEILING_MS,
@@ -43,12 +43,12 @@ import {
   STREAK_BONUS_THRESHOLDS,
   STREAK_FADE_OUT_MS,
   WRONG_SHAKE_MS,
-} from '../_shared/gameplayConstants'
+} from '@marian/core/shared/gameplayConstants'
 import { WordPicture } from './wordPictures'
 import { ScenePanel } from './scenePictures'
-import type { WordEntry } from './wordPack'
-import { LETTER_SOUNDS_POOL } from './letterSoundsPool'
-import type { SkillLevel } from '../../lib/progress'
+import type { WordEntry } from '@marian/core/wordSong/wordPack'
+import { LETTER_SOUNDS_POOL } from '@marian/core/wordSong/letterSoundsPool'
+import type { SkillLevel } from '@marian/core/progress'
 
 /**
  * Screen 4 — Word Song (CVC short-a, picture-discrimination).

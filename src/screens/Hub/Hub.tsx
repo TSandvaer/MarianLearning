@@ -47,14 +47,14 @@ import {
   writeSessionHistory,
   type SessionHistoryV2,
   type SkillTreeId,
-} from '../SessionEnd/sessionHistory'
-import type { StorageAdapter } from '../Math/stardust'
+} from '@marian/core/sessionEnd/sessionHistory'
+import type { StorageAdapter } from '@marian/core/math/stardust'
 import {
   computeSuggestion,
   recordSuggestionOutcome,
   type SuggestionTarget,
 } from './hubSuggestion'
-import type { HubEntryPath } from './hubLines'
+import type { HubEntryPath } from '@marian/core/hub/hubLines'
 import {
   GUIDANCE_LINES,
   cancelGuidanceLine as defaultCancelGuidanceLine,
@@ -71,7 +71,10 @@ import { useRapidRemountSuppression } from './useRapidRemountSuppression'
 import { useParentGateLongPress } from './useParentGateLongPress'
 import { useCharacterLongPress } from './useCharacterLongPress'
 import { HubWorldCard } from './HubPathCard'
-import { buildHubCardModel, type HubCardModel } from './hubCardModel'
+import {
+  buildHubCardModel,
+  type HubCardModel,
+} from '@marian/core/hub/hubCardModel'
 import {
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
@@ -82,21 +85,14 @@ import {
   SESSION_HISTORY_STORAGE_KEY,
   useStorageSync,
 } from '../../lib/lifecycle'
-import { loadProgress, type Progress } from '../../lib/progress'
-import { now as progressNow } from '../../lib/progress/clock'
+import { loadProgress, type Progress } from '@marian/core/progress'
+import { now as progressNow } from '@marian/core/progress/clock'
+import type { HubTreeProgress } from '@marian/core/hub/progressProjection'
 
 // ── Public types ────────────────────────────────────────────────────────
 
-/**
- * Per-tree progress used to drive the path-strip's sliding window. v1
- * defaults to "stage 0 for both trees" if the consumer doesn't pass a
- * value. The orchestrator (App / future progress model) wires real
- * values in later — no v1 progress model yet.
- */
-export interface HubTreeProgress {
-  numberGardenIndex: number
-  wordSongIndex: number
-}
+// `HubTreeProgress` lives with its projection in `@marian/core`.
+export type { HubTreeProgress }
 
 export interface HubProps {
   /** Which path Marian took to land here. Drives greeting flavour + audio gate. */

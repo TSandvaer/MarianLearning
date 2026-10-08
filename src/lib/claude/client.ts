@@ -2,8 +2,8 @@
 // All Claude calls go through the Vercel function — never call Anthropic
 // directly from the browser. The function is responsible for the API key.
 //
-// Wire shape lives in api/_types.ts and is shared with the function so the
-// contract is defined once.
+// Wire shape lives in @marian/core (wire/types.ts) and is shared with the
+// function so the contract is defined once.
 
 import type {
   ClaudeKind,
@@ -11,7 +11,8 @@ import type {
   ClaudeResponse,
   ClaudeStubResponse,
   ClaudeErrorResponse,
-} from '../../../api/_types'
+} from '@marian/core/wire/types'
+import { apiUrl } from '@marian/core/platform/apiUrl'
 
 export type {
   ClaudeKind,
@@ -21,11 +22,13 @@ export type {
   ClaudeErrorResponse,
 }
 
-/** Endpoint URL. Defaults to the same-origin Vercel function path. Overridable
- *  via VITE_CLAUDE_API_ENDPOINT for unusual local setups (e.g. running the
- *  function on a different port via `vercel dev`). */
-const ENDPOINT: string =
-  import.meta.env.VITE_CLAUDE_API_ENDPOINT ?? '/api/claude'
+/** Endpoint URL. Defaults to the Vercel function path through `apiUrl()`
+ *  (same-origin on the web). Overridable via VITE_CLAUDE_API_ENDPOINT for
+ *  unusual local setups (e.g. running the function on a different port via
+ *  `vercel dev`). Resolved per call so a base set at boot applies. */
+function claudeEndpoint(): string {
+  return import.meta.env.VITE_CLAUDE_API_ENDPOINT ?? apiUrl('/api/claude')
+}
 
 /** Thrown when the function returns a non-2xx status or a malformed body.
  *  Callers should treat this as a transient failure and fall back to
@@ -53,7 +56,7 @@ export async function callClaude(
 
   let response: Response
   try {
-    response = await fetch(ENDPOINT, {
+    response = await fetch(claudeEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

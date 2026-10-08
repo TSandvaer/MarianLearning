@@ -76,11 +76,16 @@ import {
   type ClaudeRequest,
   type SessionStartResponse,
   type Utterance,
-} from '../../../api/_types'
-import type { LeitnerSessionHintItem, SlowFactHint } from '../progress'
+} from '@marian/core/wire/types'
+import type {
+  LeitnerSessionHintItem,
+  SlowFactHint,
+} from '@marian/core/progress'
+import { apiUrl } from '@marian/core/platform/apiUrl'
 
-/** The endpoint App.tsx POSTs to. Lifted to a constant so tests can stub
- *  fetch by URL match. */
+/** The API path App.tsx POSTs to, resolved through `apiUrl()` at call
+ *  time (still relative on the web). Lifted to a constant so tests can
+ *  stub fetch by URL match. */
 export const CLAUDE_ENDPOINT = '/api/claude'
 
 export interface PrepareMathPathAOptions {
@@ -295,7 +300,7 @@ export async function prepareMathPathA(
 
   let response: Response
   try {
-    response = await fetchImpl(CLAUDE_ENDPOINT, {
+    response = await fetchImpl(apiUrl(CLAUDE_ENDPOINT), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

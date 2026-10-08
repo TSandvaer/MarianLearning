@@ -24,34 +24,37 @@ import {
 } from '../../lib/debug/audioContextProbe'
 import { getPlayerKind } from '../../lib/debug/playerKind'
 import { createSfx, type Sfx } from '../../lib/sfx'
-import type { EmmaPose } from '../../lib/character/emmaPose'
+import type { EmmaPose } from '@marian/core/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { GettingReady } from '../../components/GettingReady'
-import { chipMaxAnswerForCorrects, pickDistractors } from './distractors'
-import { flowerRowFontSizeRem } from './flowerRowFit'
+import {
+  chipMaxAnswerForCorrects,
+  pickDistractors,
+} from '@marian/core/math/distractors'
+import { flowerRowFontSizeRem } from '@marian/core/math/flowerRowFit'
 import {
   loadStardust,
   writeStardust,
   type StardustState,
   type StorageAdapter,
-} from '../_shared/stardust'
+} from '@marian/core/shared/stardust'
 import {
   pickStaticSessionPlan,
   type MathSessionPlan,
   type MathProblem,
-} from './sessionPlans'
+} from '@marian/core/math/sessionPlans'
 import {
   shouldShowDotCard,
   pipsFromProblem,
   subMinuendFromProblem,
-} from './dotCard'
+} from '@marian/core/math/dotCard'
 import { DotCardOverlay } from './DotCardOverlay'
 import { SubMinuendOverlay } from './SubMinuendOverlay'
 import {
   shouldShowSubitisingScaffold,
   shouldShowSubitisingSubScaffold,
-} from './subitisingScaffold'
-import type { SkillNode } from '../../lib/progress'
+} from '@marian/core/math/subitisingScaffold'
+import type { SkillNode } from '@marian/core/progress'
 import {
   ADVANCE_AFTER_CORRECT_MS,
   ADVANCE_HARD_CEILING_MS,
@@ -63,7 +66,7 @@ import {
   STREAK_BONUS_THRESHOLDS,
   STREAK_FADE_OUT_MS,
   WRONG_SHAKE_MS,
-} from '../_shared/gameplayConstants'
+} from '@marian/core/shared/gameplayConstants'
 
 /**
  * Screen 3 — Math (Number Garden, sums to 10).

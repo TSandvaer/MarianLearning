@@ -13,9 +13,9 @@
 import type {
   SessionHistoryV2,
   SkillTreeId,
-} from '../SessionEnd/sessionHistory'
-import { loadProgress, type Progress } from '../../lib/progress'
-import { buildHubCardModel } from './hubCardModel'
+} from '@marian/core/sessionEnd/sessionHistory'
+import { loadProgress, type Progress } from '@marian/core/progress'
+import { buildHubCardModel } from '@marian/core/hub/hubCardModel'
 import { suggestWorld } from './hubGuidance'
 
 /** What Hub displays as the soft nudge. `null` ⇒ both nodes equal. */

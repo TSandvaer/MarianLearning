@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, m } from 'motion/react'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
-import { FIRST_UTTERANCE_RETRY_MS } from './_shared/gameplayConstants'
-import { TILT_BY_POSE, TILT_SPRING_BY_POSE } from '../lib/character/emmaPose'
+import { FIRST_UTTERANCE_RETRY_MS } from '@marian/core/shared/gameplayConstants'
+import {
+  TILT_BY_POSE,
+  TILT_SPRING_BY_POSE,
+} from '@marian/core/character/emmaPose'
 import { createSfx, type Sfx } from '../lib/sfx'
 import {
   cancelPreRecorded,
@@ -30,7 +33,7 @@ import {
   type GreetSequenceHandle,
   type SpeakFn,
   type SpeakLikeOptions,
-} from './greetSequence'
+} from '@marian/core/greet/greetSequence'
 
 /**
  * Map line text → pre-recorded key. The text strings are owned by

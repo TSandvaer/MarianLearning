@@ -33,7 +33,7 @@ import {
   CELEBRATION_TILT_EASES,
   CELEBRATION_TILT_KEYFRAMES,
   CELEBRATION_TILT_TIMES,
-} from '../lib/character/emmaPose'
+} from '@marian/core/character/emmaPose'
 
 function withMotion(node: ReactNode) {
   return (

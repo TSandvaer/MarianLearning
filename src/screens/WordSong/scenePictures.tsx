@@ -35,7 +35,7 @@
  * workbox per-file cap.
  */
 
-import { sceneSrc } from './sceneRegistry'
+import { sceneSrc } from '@marian/core/wordSong/sceneRegistry'
 
 interface ScenePanelProps {
   /** The problem's `sceneId` (gentle-phase scene key, or `undefined`). */

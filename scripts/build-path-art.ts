@@ -25,7 +25,7 @@ import {
   PATH_ART_DIR,
   PATH_ART_IDS,
   PATH_ART_SIZES,
-} from '../src/lib/emmasPath/pathArt'
+} from '@marian/core/emmasPath/pathArt'
 
 const QUALITY = 80
 /** Alpha below this (of 255) is invisible residue and becomes 0. */

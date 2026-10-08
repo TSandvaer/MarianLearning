@@ -53,12 +53,12 @@ import {
   type Progress,
   type ReconcileOutcome,
   type SessionModePicker,
-} from '../../lib/progress'
-import { labelForSkillNode } from '../Hub/progressProjection'
+} from '@marian/core/progress'
+import { labelForSkillNode } from '@marian/core/hub/progressProjection'
 import {
   readSessionHistory,
   type SessionHistoryV2,
-} from '../SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 
 // ── Public types ────────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
  * nothing at all for a deferred (`src: null`) line, unload on leave.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { pathLine, type PathLine } from '../../lib/emmasPath/pathLines'
+import { pathLine, type PathLine } from '@marian/core/emmasPath/pathLines'
 import { createMapLinePlayer, type MapHowlLike } from './playMapLine'
 
 class FakeHowl implements MapHowlLike {

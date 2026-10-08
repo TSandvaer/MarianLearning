@@ -18,7 +18,7 @@ import {
   FRIENDLY_NODE_NAMES as CLIENT_MAP,
   focusRecapLine as clientRecapLine,
   FRIENDLY_NODE_NAME_FALLBACK as CLIENT_FALLBACK,
-} from './friendlyNodeName'
+} from '@marian/core/sessionEnd/friendlyNodeName'
 import {
   RECAP_FRIENDLY_NODE_NAMES as BAKE_MAP,
   recapFocusLine as bakeRecapLine,

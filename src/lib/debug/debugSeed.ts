@@ -204,15 +204,15 @@ import {
   type SkillLevel,
   type SkillLevels,
   type SkillNode,
-} from '../progress'
+} from '@marian/core/progress'
 import {
   emptySessionHistory,
   readSessionHistory,
   writeSessionHistory,
   type SessionHistoryV2,
-} from '../../screens/SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 import { isDebugEnabled } from './isDebugEnabled'
-import { now as progressNow } from '../progress/clock'
+import { now as progressNow } from '@marian/core/progress/clock'
 
 interface SeedRecipe {
   /**

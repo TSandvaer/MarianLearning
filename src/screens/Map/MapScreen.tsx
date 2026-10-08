@@ -32,21 +32,25 @@ import {
   type ReactNode,
 } from 'react'
 import { AnimatePresence, m, useReducedMotion } from 'motion/react'
-import type { EmmaPose } from '../../lib/character/emmaPose'
+import type { EmmaPose } from '@marian/core/character/emmaPose'
 import {
   resumeHowlerContextOnGesture,
   unlockIosAudioSession,
 } from '../../lib/audio'
 import { drainOnGesture } from '../../lib/audio/pendingResumeGate'
-import type { PathLine } from '../../lib/emmasPath/pathLines'
+import type { PathLine } from '@marian/core/emmasPath/pathLines'
 import {
   loadProgress,
   type MasteryTrack,
   type Progress,
-} from '../../lib/progress'
+} from '@marian/core/progress'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { HUB_LAST_UNMOUNT_KEY } from '../Hub/useRapidRemountSuppression'
-import { buildMapModel, type MapLand, type MapStop } from './mapModel'
+import {
+  buildMapModel,
+  type MapLand,
+  type MapStop,
+} from '@marian/core/map/mapModel'
 import {
   BAND_INSET,
   badgeLands,
@@ -55,8 +59,8 @@ import {
   LANDSCAPE_TRAY_ROOM,
   landscapeScale,
   layoutMap,
-} from './mapLayout'
-import { BAND_TINTS, INK } from './mapTheme'
+} from '@marian/core/map/mapLayout'
+import { BAND_TINTS, INK } from '@marian/core/map/mapTheme'
 import { EmmaBadge } from './EmmaBadge'
 import {
   CaptionSlab,
@@ -67,16 +71,19 @@ import {
   MapTitle,
   StopView,
 } from './mapParts'
-import { gateLine, openLine, stopLine } from './mapLines'
+import { gateLine, openLine, stopLine } from '@marian/core/map/mapLines'
 import { createMapLinePlayer, type MapLinePlayer } from './playMapLine'
-import { pendingUnlock, type PendingUnlock } from '../../lib/progress/pathBeats'
+import {
+  pendingUnlock,
+  type PendingUnlock,
+} from '@marian/core/progress/pathBeats'
 import {
   persistUnlockCelebrated,
   reached,
   unlockLine,
   unlockTimeline,
   type UnlockPhase,
-} from './unlockBeat'
+} from '@marian/core/map/unlockBeat'
 
 const HEADER = 124
 const RIBBON = 128

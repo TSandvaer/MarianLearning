@@ -40,7 +40,7 @@ import {
   TILT_BY_POSE,
   TILT_SPRING_BY_POSE,
   type EmmaPose,
-} from '../lib/character/emmaPose'
+} from '@marian/core/character/emmaPose'
 
 /**
  * Pass-through props that the host screen still controls. Notably:

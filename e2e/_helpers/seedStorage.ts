@@ -17,7 +17,7 @@ import type {
   LetterSoundsVowel,
   SessionHistoryEntry,
   SkillNode,
-} from '../../src/lib/progress/types'
+} from '@marian/core/progress/types'
 
 export const PROGRESS_STORAGE_KEY = 'marian-tutor:progress:v1'
 export const SESSION_HISTORY_STORAGE_KEY = 'marian-tutor.session-history.v1'

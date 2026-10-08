@@ -41,7 +41,7 @@ import {
 } from './_planner.js'
 // W12-03: the round-trip test proves a planner-emitted three-hint plan
 // parses through W12-01's widened math parser. Pure module, no DOM deps.
-import { mathSessionPlanFromServer } from '../src/screens/Math/planFromServer.js'
+import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
 
 /**
  * Factory for a mock Anthropic client. The SDK exposes `client.messages.create`

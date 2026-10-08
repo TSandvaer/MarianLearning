@@ -43,7 +43,7 @@
  *   - 12pt-diameter dots in `--ink` (#3F3F46)
  */
 
-import { PIPS_TO_WORD } from './dotCard'
+import { PIPS_TO_WORD } from '@marian/core/math/dotCard'
 
 /** Minuend values rendered as a ten-frame (5 stays a die face). */
 export type TenFramePipsCount = 6 | 7 | 8 | 9 | 10

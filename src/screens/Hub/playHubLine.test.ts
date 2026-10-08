@@ -21,7 +21,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHubLinePlayer } from './playHubLine'
-import { HUB_LINES } from './hubLines'
+import { HUB_LINES } from '@marian/core/hub/hubLines'
 import type { Howl } from 'howler'
 
 interface FakeHowlInstance {

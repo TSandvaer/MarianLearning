@@ -24,11 +24,15 @@ import {
   type PointerEvent,
   type ReactElement,
 } from 'react'
-import { LITERACY_TREE, MATH_TREE, type SkillNode } from '../../lib/progress'
-import { pathArtSrc } from '../../lib/emmasPath/pathArt'
-import type { SkillTreeId } from '../SessionEnd/sessionHistory'
-import type { HubCardModel } from './hubCardModel'
-import { NUMBER_GARDEN_STAGES, WORD_SONG_STAGES, type StageId } from './stages'
+import { LITERACY_TREE, MATH_TREE, type SkillNode } from '@marian/core/progress'
+import { pathArtSrc } from '@marian/core/emmasPath/pathArt'
+import type { SkillTreeId } from '@marian/core/sessionEnd/sessionHistory'
+import type { HubCardModel } from '@marian/core/hub/hubCardModel'
+import {
+  NUMBER_GARDEN_STAGES,
+  WORD_SONG_STAGES,
+  type StageId,
+} from '@marian/core/hub/stages'
 import { StageGlyph } from './stageIcons'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import './hubClay.css'

@@ -7,8 +7,8 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { DotCardCell } from './DotCardCell'
-import { isValidPips, pipsFromProblem } from './dotCard'
-import type { MathProblem } from './sessionPlans'
+import { isValidPips, pipsFromProblem } from '@marian/core/math/dotCard'
+import type { MathProblem } from '@marian/core/math/sessionPlans'
 
 function problem(addendA: number, addendB: number): MathProblem {
   return {

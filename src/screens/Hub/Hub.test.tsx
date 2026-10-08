@@ -21,12 +21,12 @@ import {
   saveProgress,
   type Progress,
   type SkillNode,
-} from '../../lib/progress'
+} from '@marian/core/progress'
 import {
   SESSION_HISTORY_KEY,
   emptySessionHistory,
   type SessionHistoryV2,
-} from '../SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 import {
   HUB_LAST_UNMOUNT_KEY,
   RAPID_REMOUNT_THRESHOLD_MS,
@@ -36,7 +36,7 @@ import {
   GUIDANCE_LINES,
   type GuidanceLineId,
 } from './hubGuidance'
-import type { StorageAdapter } from '../Math/stardust'
+import type { StorageAdapter } from '@marian/core/math/stardust'
 
 function createMemoryStorage(): StorageAdapter & {
   store: Map<string, string>

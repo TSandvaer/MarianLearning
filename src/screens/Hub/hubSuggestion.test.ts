@@ -11,11 +11,11 @@ import {
   type Progress,
   type SessionHistoryEntry,
   type SkillNode,
-} from '../../lib/progress'
+} from '@marian/core/progress'
 import {
   emptySessionHistory,
   type SessionHistoryV2,
-} from '../SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 
 function makeHistory(
   overrides: Partial<SessionHistoryV2> = {},

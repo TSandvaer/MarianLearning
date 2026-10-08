@@ -66,7 +66,7 @@ import {
   HEART_REVEAL_AFTER_LINE_INDEX,
   LINE_GAP_MS,
   REPROMPT_AFTER_MS,
-} from './greetSequence'
+} from '@marian/core/greet/greetSequence'
 import type { GreetLineKey, PlayGreetLineOptions } from '../lib/audio'
 
 function withMotion(node: ReactNode) {

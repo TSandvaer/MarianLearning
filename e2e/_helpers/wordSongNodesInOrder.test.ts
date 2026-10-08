@@ -20,7 +20,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { WORD_SONG_NODES_IN_ORDER as SHIM_NODES } from './wordSongNodesInOrder'
-import { WORD_SONG_NODES_IN_ORDER as CANONICAL_NODES } from '../../src/lib/progress/focusNode'
+import { WORD_SONG_NODES_IN_ORDER as CANONICAL_NODES } from '@marian/core/progress/focusNode'
 
 describe('wordSongNodesInOrder.ts shim — parity with src/lib/progress/focusNode.ts', () => {
   it('contains exactly the same nodes in the same order as the canonical source-of-truth', () => {

@@ -9,14 +9,14 @@ export type {
   PlayWordSongUtteranceFn,
   PlayWordSongUtteranceOptions,
 } from './WordSong'
-export { STREAK_BONUS_THRESHOLDS } from './constants'
+export { STREAK_BONUS_THRESHOLDS } from '@marian/core/wordSong/constants'
 export type {
   WordSongProblem,
   WordSongProblemUtterances,
   WordSongSessionPlan,
   WordSongUtteranceSlot,
   WordSongUtteranceSource,
-} from './wordSessionPlans'
+} from '@marian/core/wordSong/wordSessionPlans'
 export {
   STATIC_WORD_SONG_PLANS,
   TARGET_WORDS,
@@ -24,18 +24,21 @@ export {
   wordSongSessionPlanFromWire,
   wordSongSessionPlanToUtteranceSources,
   wordSongUtteranceId,
-} from './wordSessionPlans'
+} from '@marian/core/wordSong/wordSessionPlans'
 export {
   PlanFromServerError as WordSongPlanFromServerError,
   parseReadTarget,
   wordSongSessionPlanFromServer,
-} from './planFromServer'
+} from '@marian/core/wordSong/planFromServer'
 export {
   GENTLE_RAMP_THROUGH,
   pickDistractors,
   pickTier,
-} from './wordDistractors'
-export type { DistractorTier, PickDistractorsOptions } from './wordDistractors'
+} from '@marian/core/wordSong/wordDistractors'
+export type {
+  DistractorTier,
+  PickDistractorsOptions,
+} from '@marian/core/wordSong/wordDistractors'
 export {
   ALL_WORDS,
   DISTRACTOR_ONLY_WORDS,
@@ -44,5 +47,9 @@ export {
   TARGET_PAIRINGS_CROSSVOWEL,
   getWordEntry,
   isForbiddenPair,
-} from './wordPack'
-export type { TargetPairings, WordCategory, WordEntry } from './wordPack'
+} from '@marian/core/wordSong/wordPack'
+export type {
+  TargetPairings,
+  WordCategory,
+  WordEntry,
+} from '@marian/core/wordSong/wordPack'

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { WordPicture } from './wordPictures'
-import { ALL_WORDS } from './wordPack'
+import { ALL_WORDS } from '@marian/core/wordSong/wordPack'
 
 describe('WordPicture', () => {
   it('renders an SVG with role=img and the picture key as data-attr', () => {

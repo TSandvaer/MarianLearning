@@ -7,7 +7,7 @@ import {
   type HowlLike,
   type PreRecordedAudio,
 } from './preRecorded'
-import { GREET_LINES } from '../../screens/greetSequence'
+import { GREET_LINES } from '@marian/core/greet/greetSequence'
 import {
   _resetAudioContextProbeForTests,
   activateAudioContextProbe,

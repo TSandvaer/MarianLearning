@@ -5,14 +5,17 @@ import type { ReactNode } from 'react'
 import SessionEnd from './SessionEnd'
 import type { SessionEndPayload, PlayUtteranceFn } from './SessionEnd'
 import type { Sfx } from '../../lib/sfx'
-import type { StorageAdapter } from '../Math/stardust'
-import { STARDUST_STORAGE_KEY, STARDUST_SCHEMA_VERSION } from '../Math/stardust'
-import { loadStardust } from '../_shared/stardust'
-import { WORDSONG_SESSION_END_BONUS } from '../_shared/wordSongCompletionBonus'
+import type { StorageAdapter } from '@marian/core/math/stardust'
+import {
+  STARDUST_STORAGE_KEY,
+  STARDUST_SCHEMA_VERSION,
+} from '@marian/core/math/stardust'
+import { loadStardust } from '@marian/core/shared/stardust'
+import { WORDSONG_SESSION_END_BONUS } from '@marian/core/shared/wordSongCompletionBonus'
 import {
   SESSION_HISTORY_KEY,
   SESSION_HISTORY_SCHEMA_VERSION,
-} from './sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 import {
   STORAGE_KEY as PROGRESS_STORAGE_KEY,
   defaultProgress,
@@ -20,7 +23,7 @@ import {
   loadProgress,
   saveProgress,
   type Progress,
-} from '../../lib/progress'
+} from '@marian/core/progress'
 
 // Guidance G2: Emma's session-end lines play through the map line player.
 // Its Howl never ends in jsdom, so every test here gets a player that

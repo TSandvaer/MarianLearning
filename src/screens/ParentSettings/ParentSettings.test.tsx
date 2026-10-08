@@ -19,7 +19,7 @@ import {
   defaultProgress,
   type ParentSettings as ParentSettingsType,
   type Progress,
-} from '../../lib/progress'
+} from '@marian/core/progress'
 
 function createMemoryStorage(initial: Progress | null = null): {
   storage: ParentSettingsStorage

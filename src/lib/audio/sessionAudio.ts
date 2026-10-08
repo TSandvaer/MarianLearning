@@ -52,7 +52,7 @@
  */
 
 import { Howl } from 'howler'
-import type { Utterance } from '../../../api/_types'
+import type { Utterance } from '@marian/core/wire/types'
 import {
   recordHowlEndEventEvent,
   recordHowlLoaderrorEventEvent,
