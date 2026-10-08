@@ -7,15 +7,20 @@
  *  - warm cache: 1500 ms
  *  - cold cache: up to 3000 ms (force-advance)
  *  - default to cold cap if detection is uncertain (safer for first launch)
+ *
+ * The caps and `splashCapMs` are platform-free and live in
+ * `@marian/core`; only the browser warm/cold detection is here.
  */
 
-export const WARM_CAP_MS = 1500
-export const COLD_CAP_MS = 3000
+export {
+  COLD_CAP_MS,
+  WARM_CAP_MS,
+  splashCapMs,
+  type ColdStartDetector,
+} from '@marian/core/splash/splashTiming'
 
 /** Flag we set in sessionStorage on first visit so the next route knows. */
 const WARM_FLAG_KEY = 'marian.splash.warm'
-
-export type ColdStartDetector = () => boolean
 
 /**
  * Returns true if this looks like a cold start.
@@ -63,11 +68,6 @@ export function markWarm(): void {
     // Storage disabled — the next visit will just see cold timing again.
     // That's the safer default per spec, so we don't fight it.
   }
-}
-
-/** Returns the auto-advance cap (ms) for this start. */
-export function splashCapMs(isCold: boolean): number {
-  return isCold ? COLD_CAP_MS : WARM_CAP_MS
 }
 
 /** Test seam: re-export the storage key so tests can clear it deterministically. */
