@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getKeyValueStore, setKeyValueStore } from '@marian/core'
 import {
@@ -51,6 +53,12 @@ describe('web platform for @marian/core', () => {
         value: original,
       })
     }
+  })
+
+  it('boot.ts is App.tsx’s first import (store installed before the load-time seeds run)', () => {
+    const app = readFileSync(join(process.cwd(), 'src/App.tsx'), 'utf8')
+    const firstImport = app.match(/^import\b.*$/m)?.[0]
+    expect(firstImport).toBe("import './platform/boot'")
   })
 
   it('reads the cloud-sync secret from the Vite env at call time', () => {
