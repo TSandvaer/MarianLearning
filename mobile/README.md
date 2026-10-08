@@ -24,13 +24,18 @@ npx expo run:ios                      # builds, installs, starts Metro
 npx expo run:ios --device "iPad (A16)"
 ```
 
-**Expo Go** (no build; scan the QR code with the store Expo Go app, SDK 57). The shell uses only modules that ship in Expo Go:
+Known blocker (2026-10-08): with Xcode 27 the build succeeds, but an **iOS 27** simulator refuses to launch it: `Application failed to launch: UIScene life cycle is required for apps built with this SDK.` Expo SDK 57's prebuild template (up to `expo-template-bare-minimum@57.0.29`) has no scene delegate; the SDK 58 template (`58.0.15`, beta) adds one. Until that is resolved, use Expo Go.
+
+**Expo Go** (no build). The shell uses only modules that ship in Expo Go SDK 57:
 
 ```bash
-npx expo start --go
+npx expo start --go          # scan the QR code with the store Expo Go app
+npx expo start --go --ios    # installs Expo Go on the booted simulator
 ```
 
-**Physical iPhone / iPad without the paid Apple Developer account**: see the PR for the free "Personal Team" status. `npx expo run:ios --device` signs with whatever team Xcode has, and the app declares no capabilities (its entitlements file is empty), which is what a free team can provision.
+On a physical iPhone / iPad, Expo Go needs `npx expo login` and the same Expo account signed in inside the app (Expo changelog, 2026-09-03). Simulators and development builds don't.
+
+**Physical iPhone / iPad without the paid Apple Developer account**: see the PR for the free "Personal Team" status. The app declares no capabilities (its entitlements file is empty), which is what a free team can provision.
 
 ## Debug flags
 
