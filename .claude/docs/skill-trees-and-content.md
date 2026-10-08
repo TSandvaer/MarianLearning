@@ -1,15 +1,15 @@
 # Skill Trees & Content
 
-What this doc covers: the two skill trees (Number Garden = math, Word Song = literacy), the per-screen content data — math distractors and session plans, word packs, word distractors, word session plans — the server-plan adapters that translate `/api/claude` responses into the per-screen nested shape, the picture-pack pipeline, the Hub stage taxonomy and sliding-window helper, and the locked spec-drift decisions that govern thresholds and pool composition. Source of truth lives under [`MarianLearning/src/screens/Math/`](MarianLearning/src/screens/Math/) and [`MarianLearning/src/screens/WordSong/`](MarianLearning/src/screens/WordSong/), with the curriculum graph itself in [`MarianLearning/src/lib/progress/`](MarianLearning/src/lib/progress/).
+What this doc covers: the two skill trees (Number Garden = math, Word Song = literacy), the per-screen content data — math distractors and session plans, word packs, word distractors, word session plans — the server-plan adapters that translate `/api/claude` responses into the per-screen nested shape, the picture-pack pipeline, the Hub stage taxonomy and sliding-window helper, and the locked spec-drift decisions that govern thresholds and pool composition. Source of truth lives under [`MarianLearning/src/screens/Math/`](MarianLearning/src/screens/Math/) and [`MarianLearning/src/screens/WordSong/`](MarianLearning/src/screens/WordSong/), with the curriculum graph itself in [`MarianLearning/packages/core/src/progress/`](MarianLearning/packages/core/src/progress/).
 
 ## Two skill trees
 
 Both trees are declared in three places, locked against each other by tests:
 
-- Type unions in [`src/lib/progress/types.ts`](MarianLearning/src/lib/progress/types.ts).
-- Promotion-order constants `MATH_TREE` / `LITERACY_TREE` in [`src/lib/progress/mastery.ts`](MarianLearning/src/lib/progress/mastery.ts).
-- Picker-order constants `MATH_NODES_IN_ORDER` / `WORD_SONG_NODES_IN_ORDER` in [`src/lib/progress/focusNode.ts`](MarianLearning/src/lib/progress/focusNode.ts).
-- Hub display lists `NUMBER_GARDEN_STAGES` / `WORD_SONG_STAGES` in [`src/screens/Hub/stages.ts`](MarianLearning/src/screens/Hub/stages.ts).
+- Type unions in [`packages/core/src/progress/types.ts`](MarianLearning/packages/core/src/progress/types.ts).
+- Promotion-order constants `MATH_TREE` / `LITERACY_TREE` in [`packages/core/src/progress/mastery.ts`](MarianLearning/packages/core/src/progress/mastery.ts).
+- Picker-order constants `MATH_NODES_IN_ORDER` / `WORD_SONG_NODES_IN_ORDER` in [`packages/core/src/progress/focusNode.ts`](MarianLearning/packages/core/src/progress/focusNode.ts).
+- Hub display lists `NUMBER_GARDEN_STAGES` / `WORD_SONG_STAGES` in [`packages/core/src/hub/stages.ts`](MarianLearning/packages/core/src/hub/stages.ts).
 
 The Hub stage IDs are NOT identical to the `SkillNode` strings — they were authored slightly earlier with display-friendly aliases. See "Hub stage taxonomy" below for the cross-walk.
 
@@ -22,7 +22,7 @@ number-recog → add-to-10 → add-to-20 → sub-to-10 → sub-to-20 →
 two-digit-addsub → skip-counting → mult-2-5-10 → mult-3-4 → mult-6-9
 ```
 
-Source: [`types.ts:15`](MarianLearning/src/lib/progress/types.ts#L15) `NumberGardenNode` union, [`mastery.ts:100`](MarianLearning/src/lib/progress/mastery.ts#L100) `MATH_TREE`, [`focusNode.ts:45`](MarianLearning/src/lib/progress/focusNode.ts#L45) `MATH_NODES_IN_ORDER`. Mirrors `CLAUDE.md` `## Two skill trees` exactly.
+Source: [`types.ts:15`](MarianLearning/packages/core/src/progress/types.ts#L15) `NumberGardenNode` union, [`mastery.ts:100`](MarianLearning/packages/core/src/progress/mastery.ts#L100) `MATH_TREE`, [`focusNode.ts:45`](MarianLearning/packages/core/src/progress/focusNode.ts#L45) `MATH_NODES_IN_ORDER`. Mirrors `CLAUDE.md` `## Two skill trees` exactly.
 
 ### Word Song (literacy)
 
@@ -33,7 +33,7 @@ letter-names → letter-sounds → blending-cv → cvc-words →
 cvc-words-short-o → digraphs → sight-words → simple-sentences
 ```
 
-Source: [`types.ts:30`](MarianLearning/src/lib/progress/types.ts#L30) `WordSongNode`, [`mastery.ts:121`](MarianLearning/src/lib/progress/mastery.ts#L121) `LITERACY_TREE`, [`focusNode.ts:66`](MarianLearning/src/lib/progress/focusNode.ts#L66) `WORD_SONG_NODES_IN_ORDER`.
+Source: [`types.ts:30`](MarianLearning/packages/core/src/progress/types.ts#L30) `WordSongNode`, [`mastery.ts:121`](MarianLearning/packages/core/src/progress/mastery.ts#L121) `LITERACY_TREE`, [`focusNode.ts:66`](MarianLearning/packages/core/src/progress/focusNode.ts#L66) `WORD_SONG_NODES_IN_ORDER`.
 
 **Canon-wire PRs must widen `LITERACY_TREE` and `WORD_SONG_NODES_IN_ORDER` in the same commit.** These constants live in separate files (`mastery.ts` and `focusNode.ts`) and are locked against each other by a regression in `mastery.test.ts`. If they diverge across two PRs, the mastery engine and the picker walk inconsistent trees between deploys — promotion can land on a node the picker doesn't yet know about. The `mastery.test.ts` lock catches drift at CI time but only after the inconsistency has already shipped. **Rule:** any PR that adds a new `WordSongNode` must update both constants in the same commit, following the same "move together" discipline as the `SkillNode`-widening sync points in `progress-and-persistence.md`.
 
@@ -66,7 +66,7 @@ Distractor values are NOT in the plan. This was Kyle's spec call — a single so
 
 ### Math distractors
 
-[`src/screens/Math/distractors.ts`](MarianLearning/src/screens/Math/distractors.ts). Pure functions, no DOM/React/audio.
+[`packages/core/src/math/distractors.ts`](MarianLearning/packages/core/src/math/distractors.ts). Pure functions, no DOM/React/audio.
 
 Two tiers:
 
@@ -75,7 +75,7 @@ Two tiers:
 | `gentle`   | 1–3      | Distractors are at least 2 away from the correct answer, biased toward `[1, 10]` extremes.                                                               |
 | `offByOne` | 4–8      | Distractors are `correct - 1` and `correct + 1`, clamped into `[1, 10]` by substituting the next-nearest in-range non-correct number when one falls out. |
 
-Tier cutoff: `GENTLE_RAMP_THROUGH = 3` ([`distractors.ts:49`](MarianLearning/src/screens/Math/distractors.ts#L49)). Single-source-of-truth constant — if Dave revisits, change one number.
+Tier cutoff: `GENTLE_RAMP_THROUGH = 3` ([`distractors.ts:49`](MarianLearning/packages/core/src/math/distractors.ts#L49)). Single-source-of-truth constant — if Dave revisits, change one number.
 
 History: Kyle's spec originally sat the gentle/offByOne switch between problem 2 and problem 3. Dave's developmental consult on ticket 86c9grn9c recommended extending the gentle ramp by one item (anxiety-window literature + Siegler's overlapping-waves model). Switch now sits between problems 3 and 4. Decision is in `design/research/math-distractor-and-streak-decisions.md`.
 
@@ -87,7 +87,7 @@ Constraints (must hold for both tiers):
 
 `pickDistractors(correct, problemIndex)` throws if `correct` is outside the valid range — the session-plan generator should never emit one, and silently coercing would hide a real bug.
 
-`pickTier(problemIndex)` is the public predicate ([`distractors.ts:58`](MarianLearning/src/screens/Math/distractors.ts#L58)). Out-of-range upper values fall through to `'offByOne'` (the safe default beyond warm-up).
+`pickTier(problemIndex)` is the public predicate ([`distractors.ts:58`](MarianLearning/packages/core/src/math/distractors.ts#L58)). Out-of-range upper values fall through to `'offByOne'` (the safe default beyond warm-up).
 
 Worked examples (off-by-one):
 
@@ -129,7 +129,7 @@ This ruling is consistent across all citing specs: `design/math/sub-to-10-conten
 
 ### Wave-3 distractor helpers — planned, not yet shipped (as of 2026-05-22)
 
-`phantomBorrowDistractor` does NOT yet exist in [`distractors.ts`](MarianLearning/src/screens/Math/distractors.ts). It is a **planned** Wave-3 helper for the two-digit-addsub tier — referenced in design docs and ticket briefs, but the function body has not been written. Any dispatch brief that references a line number inside `distractors.ts` for this helper is pointing at a future planned location, not the current file.
+`phantomBorrowDistractor` does NOT yet exist in [`distractors.ts`](MarianLearning/packages/core/src/math/distractors.ts). It is a **planned** Wave-3 helper for the two-digit-addsub tier — referenced in design docs and ticket briefs, but the function body has not been written. Any dispatch brief that references a line number inside `distractors.ts` for this helper is pointing at a future planned location, not the current file.
 
 **What IS near `distractors.ts` line ~226 (approximate, verify before use):** the `gentleDistractors` function's `op === '-'` default (`minAnswer = 0`), which is load-bearing for sub-to-10 subtract-self facts (`correct = 0`) and is intentionally untouched by Wave-3 work.
 
@@ -153,7 +153,7 @@ Meanwhile the runtime `NumberGardenNode` union (post-#308) is `'two-digit-addsub
 
 ### Math session plans (fallback rotation)
 
-[`src/screens/Math/sessionPlans.ts`](MarianLearning/src/screens/Math/sessionPlans.ts). Three deterministic fallback plans the screen can render end-to-end without any network dependency. When real Claude prompt wiring lands, `pickStaticSessionPlan()` is replaced (or wrapped) with a fetch — the `MathSessionPlan` shape is the contract that survives the swap.
+[`packages/core/src/math/sessionPlans.ts`](MarianLearning/packages/core/src/math/sessionPlans.ts). Three deterministic fallback plans the screen can render end-to-end without any network dependency. When real Claude prompt wiring lands, `pickStaticSessionPlan()` is replaced (or wrapped) with a fetch — the `MathSessionPlan` shape is the contract that survives the swap.
 
 `STATIC_SESSION_PLANS`:
 
@@ -169,7 +169,7 @@ Each plan covers Marian's documented ceiling: sums to 10 with addends ≥ 1 and 
 
 ### Math plan shape and wire adapter
 
-[`MathSessionPlan`](MarianLearning/src/screens/Math/sessionPlans.ts) (defined at [`sessionPlans.ts:159`](MarianLearning/src/screens/Math/sessionPlans.ts#L159)):
+[`MathSessionPlan`](MarianLearning/packages/core/src/math/sessionPlans.ts) (defined at [`sessionPlans.ts:159`](MarianLearning/packages/core/src/math/sessionPlans.ts#L159)):
 
 ```ts
 interface MathProblem {
@@ -200,7 +200,7 @@ Utterance ID template: `math.p{N}.{slot}` (canonical, per `design/screen-3-math.
 
 ### Math `planFromServer`
 
-[`src/screens/Math/planFromServer.ts`](MarianLearning/src/screens/Math/planFromServer.ts). Adapter from server canonical plan to client session shape, used after the track-based switchover (ticket 86c9jteud).
+[`packages/core/src/math/planFromServer.ts`](MarianLearning/packages/core/src/math/planFromServer.ts). Adapter from server canonical plan to client session shape, used after the track-based switchover (ticket 86c9jteud).
 
 Parse strategy: the Haiku prompt (`api/_planner.ts:MATH_TRACK_GUIDE`) constrains the `read` line to the template `"<addend-A> plus <addend-B>. How many?"` where each addend is a number word in 1..10. `parseReadAddends(read)` uses a case-insensitive regex anchored to that template and a `NUMBER_WORDS` lookup for `one`..`ten`. Throws `PlanFromServerError` on any drift.
 
@@ -214,9 +214,9 @@ The Word Song screen renders 8-problem CVC sessions. The current first-class con
 
 ### Word pack (canonical short-a + short-o pools)
 
-[`src/screens/WordSong/wordPack.ts`](MarianLearning/src/screens/WordSong/wordPack.ts). Static content layer — the word→picture map, the per-target distractor pairings, and the forbidden-pair list. Pure data, no logic.
+[`packages/core/src/wordSong/wordPack.ts`](MarianLearning/packages/core/src/wordSong/wordPack.ts). Static content layer — the word→picture map, the per-target distractor pairings, and the forbidden-pair list. Pure data, no logic.
 
-`WordEntry` shape ([`wordPack.ts:34`](MarianLearning/src/screens/WordSong/wordPack.ts#L34)):
+`WordEntry` shape ([`wordPack.ts:34`](MarianLearning/packages/core/src/wordSong/wordPack.ts#L34)):
 
 ```ts
 interface WordEntry {
@@ -240,7 +240,7 @@ interface WordEntry {
 
 **Any future digraph tier that sets `vowel` must be added to the digraph-tier exclusion Set used by ALL of these tests** (the Set was introduced per-test by PR #227 and is being consolidated into one shared `ALL_DIGRAPH_TIER_WORDS` set in the th wave — confirm the final name against merged `wordDistractors.test.ts`). Its content PR will also need to extend the count-based/exact-match assertions in `wordDistractors.test.ts` and `wordPictures.test.tsx` (`DISTRACTOR_ONLY_WORDS` exact list, `FORBIDDEN_PAIRS` exact list, `PENDING_PICTURE_PACK` fallback-count).
 
-Three exported lists in [`wordPack.ts`](MarianLearning/src/screens/WordSong/wordPack.ts):
+Three exported lists in [`wordPack.ts`](MarianLearning/packages/core/src/wordSong/wordPack.ts):
 
 | Constant                | Members                                                  | Purpose                                                                           |
 | ----------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------- |
@@ -279,7 +279,7 @@ The 4 promoted entries (`dog, log, pot, fox`) used to live in `DISTRACTOR_ONLY_W
 
 ### `FORBIDDEN_PAIRS`
 
-[`wordPack.ts:357`](MarianLearning/src/screens/WordSong/wordPack.ts#L357). Words whose pictures share a primary silhouette at 96pt and therefore must not appear in the same trio. Per `design/word-song-picture-pack.md` §"Distractor pairing matrix" hand-off note. Stored as an unordered-pair set.
+[`wordPack.ts:357`](MarianLearning/packages/core/src/wordSong/wordPack.ts#L357). Words whose pictures share a primary silhouette at 96pt and therefore must not appear in the same trio. Per `design/word-song-picture-pack.md` §"Distractor pairing matrix" hand-off note. Stored as an unordered-pair set.
 
 | Pair        | Why                                                                                   |
 | ----------- | ------------------------------------------------------------------------------------- |
@@ -296,7 +296,7 @@ The 4 promoted entries (`dog, log, pot, fox`) used to live in `DISTRACTOR_ONLY_W
 
 ### `TARGET_PAIRINGS` matrix
 
-[`wordPack.ts:393`](MarianLearning/src/screens/WordSong/wordPack.ts#L393). Per-target gentle + trap distractor pairs, hand-curated by Kyle. Source of truth: `design/word-song-picture-pack.md` §"Distractor pairing matrix (master table)". Storing as a typed map gives `wordDistractors.ts` a deterministic lookup — no runtime computation, no random shuffles.
+[`wordPack.ts:393`](MarianLearning/packages/core/src/wordSong/wordPack.ts#L393). Per-target gentle + trap distractor pairs, hand-curated by Kyle. Source of truth: `design/word-song-picture-pack.md` §"Distractor pairing matrix (master table)". Storing as a typed map gives `wordDistractors.ts` a deterministic lookup — no runtime computation, no random shuffles.
 
 ```ts
 interface TargetPairings {
@@ -311,7 +311,7 @@ Coverage today: 14 short-a canonical + 4 novel-pool probe + 8 short-o = 26 rows.
 
 ### Word distractors
 
-[`src/screens/WordSong/wordDistractors.ts`](MarianLearning/src/screens/WordSong/wordDistractors.ts). Thin functional layer that consumes `TARGET_PAIRINGS` + the constraint set to emit the trio for a problem.
+[`packages/core/src/wordSong/wordDistractors.ts`](MarianLearning/packages/core/src/wordSong/wordDistractors.ts). Thin functional layer that consumes `TARGET_PAIRINGS` + the constraint set to emit the trio for a problem.
 
 Two tiers:
 
@@ -320,7 +320,7 @@ Two tiers:
 | `gentle` | 1–3      | Distractors are clearly different from target — different category, different starting consonant, different vowel sound. Three banked wins to open the session.       |
 | `trap`   | 4–8      | Distractors share at least one axis with the target (rhyme, alliteration, same vowel, same ending). Forces the whole-word read instead of first-letter pattern-match. |
 
-Cutoff: `GENTLE_RAMP_THROUGH = 3` ([`wordDistractors.ts:65`](MarianLearning/src/screens/WordSong/wordDistractors.ts#L65)) — locked, mirrors Math's `GENTLE_RAMP_THROUGH = 3`. Per Kyle's spec line 184: "Do not parameterise."
+Cutoff: `GENTLE_RAMP_THROUGH = 3` ([`wordDistractors.ts:65`](MarianLearning/packages/core/src/wordSong/wordDistractors.ts#L65)) — locked, mirrors Math's `GENTLE_RAMP_THROUGH = 3`. Per Kyle's spec line 184: "Do not parameterise."
 
 `pickDistractors(target, problemIndex)` reads the per-tier pair from the matrix, looks up entries via `getWordEntry`, and runs the defensive `assertNotForbidden` checks (target↔d1, target↔d2, d1↔d2). Throws on:
 
@@ -340,7 +340,7 @@ PR #208 (short-e canon-wire, ticket 86c9teua2) once _emptied_ `DISTRACTOR_ONLY_W
 
 **Tests must not assume the array is empty.** Probe the "no pairing matrix entry" defensive throw with a synthetic out-of-matrix `WordEntry` (below), NOT by picking a real pack word and assuming its target/distractor status (those flip across tiers and `DISTRACTOR_ONLY_WORDS` is now populated).
 
-**Recommended pattern for testing the "no matrix entry" defensive throw — synthetic out-of-matrix `WordEntry`:** the canonical pattern is in [`wordDistractors.test.ts`](MarianLearning/src/screens/WordSong/wordDistractors.test.ts) "throws for a target word that is not in the pairings matrix":
+**Recommended pattern for testing the "no matrix entry" defensive throw — synthetic out-of-matrix `WordEntry`:** the canonical pattern is in [`wordDistractors.test.ts`](MarianLearning/packages/core/src/wordSong/wordDistractors.test.ts) "throws for a target word that is not in the pairings matrix":
 
 ```ts
 const outOfMatrixWord = 'zzz-out-of-matrix' as const
@@ -388,7 +388,7 @@ The same precondition pattern applies anywhere a test relies on a word being abs
 
 The first option is almost always cheaper. The second option is correct when a vocab audit determines the word should leave the pack entirely (not just be re-classified).
 
-**Regression-test surface.** [`wordDistractors.test.ts`](MarianLearning/src/screens/WordSong/wordDistractors.test.ts) "every distractor referenced in the matrix is a known word entry" iterates every `TARGET_PAIRINGS` row and runs `getWordEntry(distractor)` for each string token — fails loudly if a future PR removes a target word without retiring the string references that point at it. The assertion uses `expect(() => getWordEntry(word)).not.toThrow()` (count-based per `feedback_count_assertions_on_regression_tests`); count of throws is implicitly zero across the iteration.
+**Regression-test surface.** [`wordDistractors.test.ts`](MarianLearning/packages/core/src/wordSong/wordDistractors.test.ts) "every distractor referenced in the matrix is a known word entry" iterates every `TARGET_PAIRINGS` row and runs `getWordEntry(distractor)` for each string token — fails loudly if a future PR removes a target word without retiring the string references that point at it. The assertion uses `expect(() => getWordEntry(word)).not.toThrow()` (count-based per `feedback_count_assertions_on_regression_tests`); count of throws is implicitly zero across the iteration.
 
 **`POOL_EXTENSION_PENDING_CROSSVOWEL` exclusion in exhaustiveness tests.** `wordDistractors.test.ts` has a cross-vowel exhaustiveness scan that walks every `TARGET_WORDS` entry and asserts a valid gentle + trap distractor pair resolves without throwing. Pool-extension words on an EXISTING in-cross-vowel tier (e.g. short-o extended from 8 → 11 words in PR #207) trip this scan because the same-vowel-only constraint makes their pairing entries fail in isolation. These words must be added to a `POOL_EXTENSION_PENDING_CROSSVOWEL` exclusion set in the test so the scan skips them until the cross-vowel-mode spec (`86c9m3aek`) arrives and validates the full pairing surface. Do NOT satisfy the scan by changing the distractor matrix — the matrix captures the intended pedagogy; the test exclusion acknowledges the feature is unbuilt. Short-i (`'i'`) is NOT in `CVC_CROSS_VOWEL_VOWELS = ['a','o','u']` so short-i pool extensions don't trip this; future extensions on `'a'`, `'o'`, or `'u'` tiers always will.
 
@@ -421,7 +421,7 @@ A PR that does BOTH simultaneously (e.g. adds a new sibling vowel tier AND its i
 
 ### Word session plans (fallback rotation)
 
-[`src/screens/WordSong/wordSessionPlans.ts`](MarianLearning/src/screens/WordSong/wordSessionPlans.ts). Same architecture as Math — three deterministic fallback plans (`STATIC_WORD_SONG_PLANS`) so the screen can be developed and QA-tested end-to-end without network. When real planner wiring lands, `pickStaticWordSongPlan()` is replaced with a fetch.
+[`packages/core/src/wordSong/wordSessionPlans.ts`](MarianLearning/packages/core/src/wordSong/wordSessionPlans.ts). Same architecture as Math — three deterministic fallback plans (`STATIC_WORD_SONG_PLANS`) so the screen can be developed and QA-tested end-to-end without network. When real planner wiring lands, `pickStaticWordSongPlan()` is replaced with a fetch.
 
 | Plan                 | Label          | Opens with                                      |
 | -------------------- | -------------- | ----------------------------------------------- |
@@ -433,7 +433,7 @@ Trap-window facts cluster /æt/, /æn/, or /æg/ rhymes by design. `pickStaticWo
 
 ### Word plan shape
 
-`WordSongSessionPlan` ([`wordSessionPlans.ts:134`](MarianLearning/src/screens/WordSong/wordSessionPlans.ts#L134)):
+`WordSongSessionPlan` ([`wordSessionPlans.ts:134`](MarianLearning/packages/core/src/wordSong/wordSessionPlans.ts#L134)):
 
 ```ts
 interface WordSongProblem {
@@ -452,7 +452,7 @@ interface WordSongProblemUtterances {
 }
 ```
 
-`contentType` is the discriminant on a WordSong problem ([`wordSessionPlans.ts:115`](MarianLearning/src/screens/WordSong/wordSessionPlans.ts#L115)):
+`contentType` is the discriminant on a WordSong problem ([`wordSessionPlans.ts:115`](MarianLearning/packages/core/src/wordSong/wordSessionPlans.ts#L115)):
 
 - `blending-cv` (v1 default) — `"Tap the <word>."`. Marian taps the matching picture chip from a trio.
 - `cvc-word` — `"Read the <word>."`. Same target pool for now (the 14 CVC short-a + the 8 short-o); when the planner widens, it can draw from a broader CVC list.
@@ -468,9 +468,9 @@ Adapters mirror Math:
 
 ### Word `planFromServer`
 
-[`src/screens/WordSong/planFromServer.ts`](MarianLearning/src/screens/WordSong/planFromServer.ts). Adapter from server-generated `PlannerPlan` to `WordSongSessionPlan`. Sibling of Math's `planFromServer.ts`.
+[`packages/core/src/wordSong/planFromServer.ts`](MarianLearning/packages/core/src/wordSong/planFromServer.ts). Adapter from server-generated `PlannerPlan` to `WordSongSessionPlan`. Sibling of Math's `planFromServer.ts`.
 
-Read-line templates accepted ([`planFromServer.ts:171`](MarianLearning/src/screens/WordSong/planFromServer.ts#L171)):
+Read-line templates accepted ([`planFromServer.ts:171`](MarianLearning/packages/core/src/wordSong/planFromServer.ts#L171)):
 
 ```ts
 ;[
@@ -643,7 +643,7 @@ Cross-reference: `feedback_mj_moderator_negatives_per_word` auto-memory covers v
 
 ## Hub stage taxonomy
 
-[`src/screens/Hub/stages.ts`](MarianLearning/src/screens/Hub/stages.ts). Pure data + utility, split out from `stageIcons.tsx` so React Fast Refresh's "components-only export" rule stays clean (the .tsx file exports only the `StageIcon` React component).
+[`packages/core/src/hub/stages.ts`](MarianLearning/packages/core/src/hub/stages.ts). Pure data + utility, split out from `stageIcons.tsx` so React Fast Refresh's "components-only export" rule stays clean (the .tsx file exports only the `StageIcon` React component).
 
 ### Stage IDs
 
@@ -673,7 +673,7 @@ type WordSongStageId =
   | 'simple-sentences'
 ```
 
-Note the math IDs use `subtract-*` / `two-digit` / `multiply-*` aliases — they don't align 1:1 with `NumberGardenNode` strings (`sub-to-10` / `two-digit-addsub` / `mult-2-5-10` etc.). The Hub stage names were authored slightly earlier with display-friendly aliases. Mapping happens in the Hub-side projection layer ([`src/screens/Hub/progressProjection.ts`](MarianLearning/src/screens/Hub/progressProjection.ts)).
+Note the math IDs use `subtract-*` / `two-digit` / `multiply-*` aliases — they don't align 1:1 with `NumberGardenNode` strings (`sub-to-10` / `two-digit-addsub` / `mult-2-5-10` etc.). The Hub stage names were authored slightly earlier with display-friendly aliases. Mapping happens in the Hub-side projection layer ([`packages/core/src/hub/progressProjection.ts`](MarianLearning/packages/core/src/hub/progressProjection.ts)).
 
 ### Display-order constants
 
@@ -686,7 +686,7 @@ Source-of-truth: `design/screen-hub.md` § "Skill-tree picker — node design" +
 
 ### `slidingWindow` helper
 
-[`stages.ts:71`](MarianLearning/src/screens/Hub/stages.ts#L71). Compute the 5-node sliding window centred on the current stage index.
+[`stages.ts:71`](MarianLearning/packages/core/src/hub/stages.ts#L71). Compute the 5-node sliding window centred on the current stage index.
 
 ```ts
 function slidingWindow<T>(
@@ -723,7 +723,7 @@ Tree-themed art (Q9=B, Thomas-locked) is owned by Kyle in ticket `86c9j53yx`. Un
 
 Per `project_spec_drift_decisions` auto-memory — defaults that have been explicitly resolved and locked:
 
-- **G/H — Streak bonus thresholds:** `[3, 5, 8]` (correct streaks before bonus). Single source of truth at [`src/screens/_shared/gameplayConstants.ts:81`](MarianLearning/src/screens/_shared/gameplayConstants.ts#L81). Re-exported via [`src/screens/Math/constants.ts`](MarianLearning/src/screens/Math/constants.ts) and [`src/screens/WordSong/index.ts`](MarianLearning/src/screens/WordSong/index.ts).
+- **G/H — Streak bonus thresholds:** `[3, 5, 8]` (correct streaks before bonus). Single source of truth at [`packages/core/src/shared/gameplayConstants.ts:81`](MarianLearning/packages/core/src/shared/gameplayConstants.ts#L81). Re-exported via [`packages/core/src/math/constants.ts`](MarianLearning/packages/core/src/math/constants.ts) and [`src/screens/WordSong/index.ts`](MarianLearning/src/screens/WordSong/index.ts).
 - **K — Short-a pool:** keep `bat` and `dad` in `TARGET_WORDS`. Despite developmental concerns over animal/parent depictions, both ship.
 - **L — Letter-tap cadence:** independent of math/word streaks — letter-tap timing isn't gated on the bonus thresholds.
 - **M — Other content decisions:** see `project_spec_drift_decisions` for the full list.
@@ -746,8 +746,8 @@ Dave's phonics research docs list words in **psycholinguistic / difficulty order
 ## Cross-references
 
 - Curriculum graph: see [`progress-and-persistence.md`](progress-and-persistence.md) for `Progress` shape, `SkillNode`, `SkillLevel`, mastery rule, focus-node picker.
-- Source files: [`MarianLearning/src/screens/Math/`](MarianLearning/src/screens/Math/), [`MarianLearning/src/screens/WordSong/`](MarianLearning/src/screens/WordSong/), [`MarianLearning/src/screens/Hub/stages.ts`](MarianLearning/src/screens/Hub/stages.ts).
-- Tests: [`distractors.test.ts`](MarianLearning/src/screens/Math/distractors.test.ts), [`sessionPlans.test.ts`](MarianLearning/src/screens/Math/sessionPlans.test.ts), [`planFromServer.test.ts`](MarianLearning/src/screens/Math/planFromServer.test.ts), [`wordDistractors.test.ts`](MarianLearning/src/screens/WordSong/wordDistractors.test.ts), [`wordPictures.test.tsx`](MarianLearning/src/screens/WordSong/wordPictures.test.tsx), [`plannerRoundTrip.test.ts`](MarianLearning/src/screens/WordSong/plannerRoundTrip.test.ts).
+- Source files: [`MarianLearning/src/screens/Math/`](MarianLearning/src/screens/Math/), [`MarianLearning/src/screens/WordSong/`](MarianLearning/src/screens/WordSong/), [`MarianLearning/packages/core/src/hub/stages.ts`](MarianLearning/packages/core/src/hub/stages.ts).
+- Tests: [`distractors.test.ts`](MarianLearning/packages/core/src/math/distractors.test.ts), [`sessionPlans.test.ts`](MarianLearning/packages/core/src/math/sessionPlans.test.ts), [`planFromServer.test.ts`](MarianLearning/packages/core/src/math/planFromServer.test.ts), [`wordDistractors.test.ts`](MarianLearning/packages/core/src/wordSong/wordDistractors.test.ts), [`wordPictures.test.tsx`](MarianLearning/src/screens/WordSong/wordPictures.test.tsx), [`plannerRoundTrip.test.ts`](MarianLearning/src/screens/WordSong/plannerRoundTrip.test.ts).
 - Design docs: [`short-o-pool-expansion.md`](MarianLearning/design/word-song/short-o-pool-expansion.md), [`short-o-picture-pack-prompts.md`](MarianLearning/design/word-song/short-o-picture-pack-prompts.md), [`word-song-picture-pack.md`](MarianLearning/design/word-song-picture-pack.md), `design/screen-3-math.md`, `design/screen-4-word-song.md`, `design/screen-hub.md`.
 - Marian's diagnostic baseline: `project_diagnostic_results` auto-memory + `CLAUDE.md` `## Marian's current levels`.
 - Sibling-node naming rationale: `design/word-song/short-o-pool-expansion.md` §2 (Q3 locked 2026-05-04).

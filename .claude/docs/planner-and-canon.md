@@ -71,7 +71,7 @@ With `"type": "module"` in package.json, Vercel's `@vercel/node` builder emits E
 
 **`leitner` (M4 — ticket 86c9pwgc8)**: optional flat list of `{a, b, op, box}` ready for the planner directive. Browser ships only when non-empty (`App.tsx#readProgressHintsForTrack` gates on `progress.mathFactsLeitner` having ≥1 item). Server validates via `parseLeitnerHint`: each item must have integer `a`/`b` in `[0, 99]`, `op ∈ {+,-,*}`, integer `box` in `[1, 5]`; any malformed item drops the whole array (better to under-direct than skew priority). Length cap 60. **Non-empty leitner BYPASSES both canon and the in-memory cache** — same posture as `isGraduationSession`, because canon is keyed on `(track, level, focusNode)` only and a cached non-Leitner-aware plan would defeat the box-1 weighting. Empty / absent leitner stays on the canon-served free path.
 
-**`slowFacts` (M4.x — accurate-but-slow surfacing)**: optional flat list of facts Marian answers correctly but slowly (≥80% correct, median latency ≥5 s — the finger-counting canary per Dave's research). Derived browser-side by `buildSlowFactSessionHint(progress)` in [`src/lib/progress/slowFacts.ts`](MarianLearning/src/lib/progress/slowFacts.ts) by walking session history (computed on-read, not stored). Browser ships only when non-empty; `App.tsx#readProgressHintsForTrack` maps empty result to `undefined` so the wire field is omitted entirely. Each item carries `{fact, attempts, correctRate, medianLatencyMs}` — verbose by design so the planner directive composes human-readable bullet copy without re-deriving stats. **Non-empty `slowFacts` BYPASSES both canon and the in-memory cache** — same posture as `leitner` and `isGraduationSession`. Leitner and slow-fact directives can co-fire and are mutually exclusive by predicate construction (Leitner targets low-correctness box-1 facts; slow-fact targets ≥80%-correct-but-slow facts). Full derivation logic + threshold constants: `progress-and-persistence.md` § "Slow-fact directive (M4.x — accurate-but-slow surfacing)".
+**`slowFacts` (M4.x — accurate-but-slow surfacing)**: optional flat list of facts Marian answers correctly but slowly (≥80% correct, median latency ≥5 s — the finger-counting canary per Dave's research). Derived browser-side by `buildSlowFactSessionHint(progress)` in [`packages/core/src/progress/slowFacts.ts`](MarianLearning/packages/core/src/progress/slowFacts.ts) by walking session history (computed on-read, not stored). Browser ships only when non-empty; `App.tsx#readProgressHintsForTrack` maps empty result to `undefined` so the wire field is omitted entirely. Each item carries `{fact, attempts, correctRate, medianLatencyMs}` — verbose by design so the planner directive composes human-readable bullet copy without re-deriving stats. **Non-empty `slowFacts` BYPASSES both canon and the in-memory cache** — same posture as `leitner` and `isGraduationSession`. Leitner and slow-fact directives can co-fire and are mutually exclusive by predicate construction (Leitner targets low-correctness box-1 facts; slow-fact targets ≥80%-correct-but-slow facts). Full derivation logic + threshold constants: `progress-and-persistence.md` § "Slow-fact directive (M4.x — accurate-but-slow surfacing)".
 
 ### Track-based branch order of operations
 
@@ -117,7 +117,7 @@ The user message is built per-call by `buildUserMessage` ([\_planner.ts:552](Mar
 
 #### MATH_TRACK_GUIDE insertion-order discipline
 
-**Invariant:** focus-node directive blocks inside `MATH_TRACK_GUIDE` are ordered to match `MATH_NODES_IN_ORDER` (the project's skill-tree ordering, declared in [`src/lib/progress/focusNode.ts`](MarianLearning/src/lib/progress/focusNode.ts)). The same convention holds for `WORD_SONG_TRACK_GUIDE` against `WORD_SONG_NODES_IN_ORDER`.
+**Invariant:** focus-node directive blocks inside `MATH_TRACK_GUIDE` are ordered to match `MATH_NODES_IN_ORDER` (the project's skill-tree ordering, declared in [`packages/core/src/progress/focusNode.ts`](MarianLearning/packages/core/src/progress/focusNode.ts)). The same convention holds for `WORD_SONG_TRACK_GUIDE` against `WORD_SONG_NODES_IN_ORDER`.
 
 **Why:** the directive body is long (~2-3000 lines as of Wave 6) and reviewers scan it locally — they jump to the focus-node-under-review and read the surrounding directive blocks for context (cap rules, band tags, drift-guards). Tree-order grouping lets readers locate any focus-node's directive in O(skill-tree-proximity) time. Append-at-end would force O(filesize) navigation for every review and make the surrounding-context reading pattern impossible.
 
@@ -153,7 +153,7 @@ blending-cv, cvc-words, cvc-words-short-o, digraphs-sh
 
 **First-class membership is load-bearing for AUDIO correctness, not just canon generation (Devon NOF, PR #423).** The `effectiveFocusNode → tierFilter` chain feeds `substituteSentenceGap` ([\_tts.ts:951](MarianLearning/api/_tts.ts#L951)), which replaces the `___` cloze gap token with the spoken word "blank" — but ONLY when `tierFilter === 'simple-sentences'` (it early-returns the text unchanged otherwise). If `simple-sentences` were absent from `WORD_SONG_FIRST_CLASS_FOCUS_NODES`, the bake would route to `blending-cv`, `tierFilter` would be `'blending-cv'`, and the substitution would never fire — Azure would voice the literal underscores or silence at the gap, with **no visible error** anywhere in the pipeline. This extends the silent-demote trap ([[project_content_tier_ships_6_surfaces]]) into the audio domain. **Rule:** when a tier's correct audio requires a TTS-time text transform keyed on `tierFilter` (a gap substitution, a tier-scoped phoneme/prosody override), verify the tier's focus node is in `WORD_SONG_FIRST_CLASS_FOCUS_NODES` before treating the tier as shipped — canon-only membership is insufficient.
 
-These lists are duplicated against `src/lib/progress/types.ts` because `api/` runs under a server-only tsconfig — pinning enforced by unit tests.
+These lists are duplicated against `packages/core/src/progress/types.ts` because `api/` runs under a server-only tsconfig — pinning enforced by unit tests.
 
 ### Word lists
 
@@ -164,7 +164,7 @@ These lists are duplicated against `src/lib/progress/types.ts` because `api/` ru
 - `WORD_SONG_DISTRACTOR_HINTS` — rhyme-family clustering hints for distractor selection
 - `WORD_SONG_NOVEL_PROBE_WORDS` — 4 novel short-a words (`nap, rat, map, tap`) used only on graduation sessions
 
-Alignment contract: every word here MUST exist in `src/screens/WordSong/wordPack.ts` with `isTarget: true` plus a `TARGET_PAIRINGS` row. Drift would crash the chip render. Enforced by code review + smoke tests in `claude.test.ts` and `plannerRoundTrip.test.ts`.
+Alignment contract: every word here MUST exist in `packages/core/src/wordSong/wordPack.ts` with `isTarget: true` plus a `TARGET_PAIRINGS` row. Drift would crash the chip render. Enforced by code review + smoke tests in `claude.test.ts` and `plannerRoundTrip.test.ts`.
 
 ### Deterministic post-Haiku passes — `reorderContinuantOnsetFirst`, `pinCvcRecapFocus` (CVC tiers, PR #484)
 
@@ -269,14 +269,14 @@ See `project_planner_parser_contract.md` memory entry.
 
 A per-problem utterance slot can be **optional** — the `blend` slot ("sound-it-out" phoneme audio) is present on CVC problems but absent from older bakes and non-blend tiers. An optional slot needs BOTH halves below, landed together in one PR, or canon that omits it crashes the session instead of gracefully skipping:
 
-1. **Exclude it from `ALL_SLOTS`** in `src/screens/WordSong/planFromServer.ts` (the per-problem completeness check). The required slots are `read · correct · reprompt · hint · giveAnswer`; `blend` is deliberately NOT among them. An optional slot left in `ALL_SLOTS` makes any bundle omitting it FAIL the completeness check and HARD-THROW at session start.
+1. **Exclude it from `ALL_SLOTS`** in `packages/core/src/wordSong/planFromServer.ts` (the per-problem completeness check). The required slots are `read · correct · reprompt · hint · giveAnswer`; `blend` is deliberately NOT among them. An optional slot left in `ALL_SLOTS` makes any bundle omitting it FAIL the completeness check and HARD-THROW at session start.
 2. **Guard consumption with `=== undefined`** at the render site (`WordSong.tsx`: `if (blendText !== undefined)`), not a falsy check — `undefined` is the canonical "slot absent" signal; a falsy check conflates absent with empty.
 
 This pairing is the load-bearing reason pre-bake / no-blend canon graceful-skips (fires the plain hint) rather than crashing. Mirror it for any future optional per-problem slot.
 
 ### Parser tier-widening sequence — `Math/planFromServer.ts` (Devon NOF on PR #287 + Kevin NOF, 2026-05-21)
 
-The math-track read-line parser (`src/screens/Math/planFromServer.ts`) has a sibling rule to the WordSong wire contract: **every tier crossing into a wider operand or chip-range space must widen the parser BEFORE the canon ships**. Three precedents:
+The math-track read-line parser (`packages/core/src/math/planFromServer.ts`) has a sibling rule to the WordSong wire contract: **every tier crossing into a wider operand or chip-range space must widen the parser BEFORE the canon ships**. Three precedents:
 
 1. **sub-to-10 (cycle 1)** — introduced `correct = 0` (subtract-self facts). Parser already accepted; `pickDistractors` `minAnswer` defaulted to `0` for `op === '-'`.
 2. **add-to-20 / sub-to-20 (cycle 3)** — introduced teens (11–20). Parser widening came in two halves: Kevin Wave 2 canon-rebake required the planner directive AND the parser to accept teen number words. Cross-PR split was load-bearing.

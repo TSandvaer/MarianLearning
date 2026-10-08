@@ -350,7 +350,7 @@ The first spec built on this helper is [`e2e/add-to-20-flower-row-fit.spec.ts`](
 
 #### 4.1.1 `DEFAULT_SKILL_LEVELS` mirrors `SKILL_NODES`
 
-The internal `DEFAULT_SKILL_LEVELS` constant at [seedStorage.ts:39–58](MarianLearning/e2e/_helpers/seedStorage.ts#L39) MUST mirror the `SKILL_NODES` set in [src/lib/progress/guards.ts:19–40](MarianLearning/src/lib/progress/guards.ts#L19).
+The internal `DEFAULT_SKILL_LEVELS` constant at [seedStorage.ts:39–58](MarianLearning/e2e/_helpers/seedStorage.ts#L39) MUST mirror the `SKILL_NODES` set in [packages/core/src/progress/guards.ts:19–40](MarianLearning/packages/core/src/progress/guards.ts#L19).
 
 Why: the persisted `Progress` document is type-guarded at load time. If `seedStorage` writes a doc whose `skillLevels` is missing a key (e.g. a newly-added node), the guard rejects the whole blob and the app silently reverts to defaults. The seeded test state effectively never lands.
 
@@ -364,7 +364,7 @@ Two `seedStorage` typing details are load-bearing when authoring failing-first s
 
 1. **`skillLevelOverrides` is `Record<string, string>`, not `Partial<SkillLevels>`.** `buildSeedProgress` accepts overrides typed as a loose `Record<string, string>` so callers don't need to import the `SkillLevel` union — but this means TypeScript will NOT catch a misspelled node key or invalid level string at the call site. Always cross-check override keys against the canonical `SkillNode` union in `types.ts`. The looser shape is intentional and load-bearing: it lets a failing-first spec seed a node literal that doesn't yet exist in the union (because the canon-wire PR adding it hasn't merged yet). Tightening to `Partial<SkillLevels>` would prevent failing-first specs from seeding not-yet-shipped node keys and break the dispatch model that lets specs precede implementation.
 
-2. **`isSkillLevels` accepts extra keys silently.** The runtime guard at [`src/lib/progress/guards.ts:55-64`](MarianLearning/src/lib/progress/guards.ts#L55) walks `SKILL_NODES` and asserts every required key is present with a valid `SkillLevel`, but does NOT reject extra keys on the blob. Extra keys round-trip through `loadProgress` → `saveProgress` silently. This is what lets a seeded spec's state carrying a future node key survive load/save. If a future "strict guard" change adds `Object.keys(v).every(k => SKILL_NODES.has(k))`, failing-first specs that seed not-yet-canonical nodes will have their state rejected by `loadProgress` and silently revert to defaults — the spec passes green for the wrong reason. **Defend both looser shapes in code review.** Verified 2026-05-13 during PR #206 (Jessica's failing-first short-e E2E spec).
+2. **`isSkillLevels` accepts extra keys silently.** The runtime guard at [`packages/core/src/progress/guards.ts:55-64`](MarianLearning/packages/core/src/progress/guards.ts#L55) walks `SKILL_NODES` and asserts every required key is present with a valid `SkillLevel`, but does NOT reject extra keys on the blob. Extra keys round-trip through `loadProgress` → `saveProgress` silently. This is what lets a seeded spec's state carrying a future node key survive load/save. If a future "strict guard" change adds `Object.keys(v).every(k => SKILL_NODES.has(k))`, failing-first specs that seed not-yet-canonical nodes will have their state rejected by `loadProgress` and silently revert to defaults — the spec passes green for the wrong reason. **Defend both looser shapes in code review.** Verified 2026-05-13 during PR #206 (Jessica's failing-first short-e E2E spec).
 
 #### 4.1.1b Failing-first E2E timeout sizing rule (2026-05-14)
 
@@ -649,7 +649,7 @@ Three of the four broken tests Jessica audited in PR #239 hit the chip-walk patt
 
 #### 4.1.4 `storage.test.ts` schema-floor-coverage test (PR #159)
 
-Co-located unit test in `src/lib/progress/storage.test.ts` enumerates every key in `defaultProgress().skillLevels` and asserts each defaults to `'locked'` when the loaded blob has an empty `skillLevels: {}`. This is the CI gate for **`SCHEMA_FLOOR_NODES` in `defaults.ts`** — the third sync point of the **five-place** widening contract (see `progress-and-persistence.md` § "Five sync points when widening `SkillNode`"). PR #160 added the fifth sync point (`cloudSync.ts`'s install-time defaulter mirror); the five-place rule is the current shape.
+Co-located unit test in `packages/core/src/progress/storage.test.ts` enumerates every key in `defaultProgress().skillLevels` and asserts each defaults to `'locked'` when the loaded blob has an empty `skillLevels: {}`. This is the CI gate for **`SCHEMA_FLOOR_NODES` in `defaults.ts`** — the third sync point of the **five-place** widening contract (see `progress-and-persistence.md` § "Five sync points when widening `SkillNode`"). PR #160 added the fifth sync point (`cloudSync.ts`'s install-time defaulter mirror); the five-place rule is the current shape.
 
 When adding a new `SkillNode`:
 
@@ -713,7 +713,7 @@ A real regression in `pickFocusNode` (CVC-review consulted _before_ the forward 
 | `failNetwork`      | `false`                            | Force `route.abort('failed')`. App.tsx catches the rejection and Math falls through to its silent caption-walk default.      |
 | `delayMs`          | `0`                                | Hold the route in flight before fulfilling/aborting. Lets specs observe the `audioReady=false` window before the gate flips. |
 
-> **`failNetwork` tier-asymmetry warning.** When `failNetwork: true` is set, the app falls through to `pickStaticSessionPlan` (`src/screens/Math/sessionPlans.ts:424-434`). That function has an `add-to-20`-specific rotation for `focusNode === 'add-to-20'` but falls through to the **add-to-10 rotation** for every other focus node — `op: '+'` only, `correct ∈ [3,10]`. Any spec that asserts on `op`, operand range, or focus-keyed content while using `failNetwork: true` for a non-`add-to-20` focus is asserting against the wrong tier's data. See §6 "`failNetwork` + structural assertion + wrong-tier static fallback" for the full failure-class write-up and the detection rule.
+> **`failNetwork` tier-asymmetry warning.** When `failNetwork: true` is set, the app falls through to `pickStaticSessionPlan` (`packages/core/src/math/sessionPlans.ts:424-434`). That function has an `add-to-20`-specific rotation for `focusNode === 'add-to-20'` but falls through to the **add-to-10 rotation** for every other focus node — `op: '+'` only, `correct ∈ [3,10]`. Any spec that asserts on `op`, operand range, or focus-keyed content while using `failNetwork: true` for a non-`add-to-20` focus is asserting against the wrong tier's data. See §6 "`failNetwork` + structural assertion + wrong-tier static fallback" for the full failure-class write-up and the detection rule.
 
 The handler routes by `body.kind` (only `'session-start'` is supported today — stumble-explanation / session-end aren't called from browser yet) and by `body.payload.track` (`'word-song'` → wordSong response, anything else → math response).
 
@@ -1627,7 +1627,7 @@ Documented here so a future sub-agent that sees the hook in `.claude/settings.js
 - Source: [.github/workflows/e2e.yml](MarianLearning/.github/workflows/e2e.yml) — Playwright CI workflow.
 - Source: [.github/workflows/post-deploy-smoke.yml](MarianLearning/.github/workflows/post-deploy-smoke.yml) — production smoke workflow.
 - Source: [.husky/pre-commit](MarianLearning/.husky/pre-commit) — pre-commit hook.
-- Source: [src/lib/progress/guards.ts](MarianLearning/src/lib/progress/guards.ts) — `SKILL_NODES` set that `seedStorage.ts` mirrors.
+- Source: [packages/core/src/progress/guards.ts](MarianLearning/packages/core/src/progress/guards.ts) — `SKILL_NODES` set that `seedStorage.ts` mirrors.
 - Sibling doc: `architecture-overview.md` (Agent A) — app entry + route state machine.
 - Sibling doc: `audio-system.md` (Agent B) — Howler / Path-A / gesture-unlock production path.
 - Sibling doc: `progress-and-persistence.md` (Agent C) — `Progress` document shape, mastery rule, what tests assert about progress.

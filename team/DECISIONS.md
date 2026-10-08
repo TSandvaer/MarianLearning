@@ -167,3 +167,9 @@ Distinct from its siblings:
 - **Evidence:** Thomas ran the spike on iPad + iPhone through Expo Go and answered "yes to all" to the four exit criteria (voice starts with no tap, captions in time, animation feel, layout fits portrait + landscape). First round, zero fix rounds. Android not tested yet.
 - **Decided:** (1) Go with React Native (Expo); start Phase 1 (shared core extraction, no user-visible change). Audience: Marian first, public store release later as a separate decision. (2) The kill switch (`CLAUDE.md § Kill switch`) is PAUSED until Marian is on the native app (end of Phase 5). (3) Web UI feature freeze from Phase 2: content, canon, server work and bug fixes continue; new screens and UI features go into native only.
 - **Decided by:** Thomas (popups, recommended options).
+
+## 2026-10-08 — React Native Phase 2 GO; web UI freeze starts; Apple Developer Program
+
+- **Context:** Phase 1 merged (#525, `8902988`): `@marian/core`, `KeyValueStore`, `apiUrl()`.
+- **Decided:** (1) Start Phase 2 (native shell + platform services: audio, storage, cloud sync, assets, lifecycle, debug seeds). The `mobile/` Expo app lands on main. (2) The web UI feature freeze starts now: content, canon, server work and bug fixes continue; new screens and UI features go into native only. (3) Thomas joins the Apple Developer Program ($99/yr), so Phase 2 moves to development builds instead of depending on which SDK the store build of Expo Go supports. Until approval, use local `expo run:ios` simulator builds.
+- **Decided by:** Thomas (popups, recommended options).

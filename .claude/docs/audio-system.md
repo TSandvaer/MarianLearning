@@ -171,7 +171,7 @@ The Phase-2/4/5 audio-context-resume helpers from `preRecorded.ts` are intention
 - 3 base lines × 3 alts: `hub-welcome-what-today*`, `hub-welcome-try-number-garden*`, `hub-welcome-try-word-song*`, `hub-welcome-back-soon*`
 - Single-shot lines: `hub-welcome-pick-again`, `hub-welcome-pick-next`, `hub-welcome-first-again`, `hub-enter-number-garden`, `hub-enter-word-song`
 
-The id ↔ src mapping lives in `src/screens/Hub/hubLines.ts` (`HUB_LINES`, `HUB_LINE_WORD_COUNTS`).
+The id ↔ src mapping lives in `packages/core/src/hub/hubLines.ts` (`HUB_LINES`, `HUB_LINE_WORD_COUNTS`).
 
 ### Re-rendering hub lines — always target, never full-run
 
