@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Marian Tutor",
+    "slug": "marian-tutor",
+    "scheme": "mariantutor",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/app/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFF5F0",
+    "ios": {
+      "bundleIdentifier": "com.marianlearning.tutor",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.marianlearning.tutor"
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/app/splash-logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFF5F0"
+        }
+      ],
+      "expo-sqlite",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-asset"
+    ]
+  }
+}

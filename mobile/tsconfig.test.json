@@ -1,0 +1,10 @@
+{
+  /* The Jest suite: the app's settings plus Jest and Node types (tests
+   * read files with fs). */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["jest", "node"]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "ios", "android", "dist*"]
+}

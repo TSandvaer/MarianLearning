@@ -8,3 +8,9 @@ pnpm-lock.yaml
 public/icons
 public/splash
 public/canon
+
+# React Native app: generated native projects, Expo caches, exports
+mobile/ios
+mobile/android
+mobile/.expo
+mobile/dist*

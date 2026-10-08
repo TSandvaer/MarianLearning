@@ -19,6 +19,12 @@ export default defineConfig([
     // for parallel work. They contain full repo copies that confuse
     // eslint's tsconfig discovery (multiple candidate roots).
     '.claude/**',
+    // React Native app: generated native projects, Expo caches, exports.
+    // Its own sources (mobile/**/*.ts{,x}) ARE linted by this config.
+    'mobile/ios',
+    'mobile/android',
+    'mobile/.expo',
+    'mobile/dist*',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
