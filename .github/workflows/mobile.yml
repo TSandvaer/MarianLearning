@@ -1,0 +1,32 @@
+# .github/workflows/mobile.yml
+name: mobile
+on:
+  pull_request:
+    branches: [main]
+    paths: ['mobile/**', 'packages/core/**', '.github/workflows/mobile.yml']
+  push:
+    branches: [main]
+    paths: ['mobile/**', 'packages/core/**']
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mobile:
+    name: Mobile (typecheck + jest + bundle check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test -- --ci
+      - run: npm run check:bundle
+      - run: npx expo-doctor
