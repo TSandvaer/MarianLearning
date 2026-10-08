@@ -19,6 +19,10 @@ export default defineConfig([
     // for parallel work. They contain full repo copies that confuse
     // eslint's tsconfig discovery (multiple candidate roots).
     '.claude/**',
+    // React Native (Expo) Phase 0 spike — its own package.json, tsconfig
+    // and toolchain. The root browser config (react-refresh/vite, DOM
+    // globals) does not apply to it.
+    'mobile/**',
   ]),
   {
     files: ['**/*.{ts,tsx}'],
