@@ -1,0 +1,25 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    /* No DOM lib (Expo's base has one) and no Node types: the app runs on
+     * Hermes, so a browser or Node API is a compile error here, as it is
+     * in @marian/core. React Native's typings declare fetch, timers,
+     * console, etc. Tests get Jest + Node types from tsconfig.test.json. */
+    "lib": ["ESNext"],
+    "types": [],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": [
+    "node_modules",
+    "ios",
+    "android",
+    "dist*",
+    "test",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
+}

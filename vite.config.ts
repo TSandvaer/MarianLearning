@@ -167,6 +167,9 @@ export default defineConfig({
       '**/dist/**',
       '**/.{idea,git,cache,output,temp}/**',
       'e2e/**/*.spec.ts',
+      // The React Native app has its own runner (jest-expo, `npm test` in
+      // mobile/); its tests import react-native and can't run in jsdom.
+      'mobile/**',
     ],
     coverage: {
       provider: 'v8',
