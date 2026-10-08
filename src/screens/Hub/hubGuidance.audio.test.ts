@@ -50,7 +50,7 @@ import {
   unloadGuidanceLines,
   type GuidanceLineId,
 } from './hubGuidance'
-import type { HubCardModel } from './hubCardModel'
+import type { HubCardModel } from '@marian/core/hub/hubCardModel'
 
 afterEach(() => {
   cancelGuidanceLine()

@@ -18,9 +18,9 @@
  */
 
 import type { ReactElement } from 'react'
-import type { StageId } from './stages'
+import type { StageId } from '@marian/core/hub/stages'
 
-export type { StageId } from './stages'
+export type { StageId } from '@marian/core/hub/stages'
 
 export type StageIconKind = 'mastered' | 'current' | 'in-progress' | 'locked'
 

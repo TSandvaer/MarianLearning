@@ -88,7 +88,7 @@ import {
   canonicalMathThreeHintSessionResponse,
   canonicalMathSessionResponse,
 } from './fixtures/canonicalSessionResponses'
-import type { SessionStartResponse } from '../api/_types'
+import type { SessionStartResponse } from '@marian/core/wire/types'
 import {
   buildSeedProgress,
   buildSeedSessionHistory,

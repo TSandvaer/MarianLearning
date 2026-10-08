@@ -5,8 +5,8 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { guidanceLine as guidanceClip } from '../../lib/emmasPath/guidanceLines'
-import type { HubCardModel, FlowerSlot } from './hubCardModel'
+import { guidanceLine as guidanceClip } from '@marian/core/emmasPath/guidanceLines'
+import type { HubCardModel, FlowerSlot } from '@marian/core/hub/hubCardModel'
 import {
   GUIDANCE_CLIP_IDS,
   GUIDANCE_LINES,

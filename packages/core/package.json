@@ -1,0 +1,12 @@
+{
+  "name": "@marian/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DOM-free logic shared by the web app and the React Native app: progress model, mastery, Leitner, content, distractors, plan adapters and the /api wire types.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./progress": "./src/progress/index.ts",
+    "./*": "./src/*.ts"
+  }
+}

@@ -71,7 +71,9 @@ export default defineConfig([
   // memory/project_vercel_runtime_config.md and PR #36 for the history
   // that motivated this rule.
   {
-    files: ['api/**/*.ts'],
+    // packages/core/src/wire is loaded by the deployed functions as plain
+    // Node ESM too (through api/_types.ts), so the same rule applies.
+    files: ['api/**/*.ts', 'packages/core/src/wire/**/*.ts'],
     plugins: {
       'marian-api': {
         rules: {

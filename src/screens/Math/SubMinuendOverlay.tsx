@@ -54,8 +54,8 @@ import {
   DOT_CARD_FADE_OUT_MS,
   DOT_CARD_FADE_IN_SPRING,
   DOT_CARD_REDUCED_MOTION_HOLD_MS,
-} from './dotCard'
-import type { SubMinuendValue } from './dotCard'
+} from '@marian/core/math/dotCard'
+import type { SubMinuendValue } from '@marian/core/math/dotCard'
 
 /** Phase machine — identical to `DotCardOverlay`. */
 type SubMinuendPhase = 'fadingIn' | 'holding' | 'fadingOut'

@@ -7,7 +7,7 @@ import {
   type SessionAudioCache,
 } from './sessionAudio'
 import * as gate from './pendingResumeGate'
-import type { Utterance } from '../../../api/_types'
+import type { Utterance } from '@marian/core/wire/types'
 import {
   AUDIO_CTX_LOG_STORAGE_KEY,
   _resetAudioContextProbeForTests,

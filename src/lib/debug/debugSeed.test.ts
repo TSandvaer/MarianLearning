@@ -4,11 +4,11 @@ import {
   STORAGE_KEY as PROGRESS_KEY,
   loadProgress,
   pickFocusNode,
-} from '../progress'
+} from '@marian/core/progress'
 import {
   SESSION_HISTORY_KEY,
   readSessionHistory,
-} from '../../screens/SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 
 function setSearch(search: string): void {
   Object.defineProperty(window, 'location', {

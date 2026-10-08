@@ -51,9 +51,11 @@ import {
   type ClaudeRequest,
   type SessionStartResponse,
   type Utterance,
-} from '../../../api/_types'
+} from '@marian/core/wire/types'
+import { apiUrl } from '@marian/core/platform/apiUrl'
 
-/** The endpoint App.tsx POSTs to. Same as Math's. */
+/** The API path App.tsx POSTs to, resolved through `apiUrl()` at call
+ *  time. Same as Math's. */
 export const CLAUDE_ENDPOINT = '/api/claude'
 
 export interface PrepareWordSongPathAOptions {
@@ -252,7 +254,7 @@ export async function prepareWordSongPathA(
 
   let response: Response
   try {
-    response = await fetchImpl(CLAUDE_ENDPOINT, {
+    response = await fetchImpl(apiUrl(CLAUDE_ENDPOINT), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

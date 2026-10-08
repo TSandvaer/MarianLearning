@@ -15,11 +15,11 @@
  * (`audioSrc: null`) walks its caption at 165 wpm.
  */
 
-import type { MasteryTrack } from '../../lib/progress'
-import { guidanceLine as guidanceClip } from '../../lib/emmasPath/guidanceLines'
-import type { StorageAdapter } from '../Math/stardust'
-import type { SkillTreeId } from '../SessionEnd/sessionHistory'
-import type { HubCardModel } from './hubCardModel'
+import type { MasteryTrack } from '@marian/core/progress'
+import { guidanceLine as guidanceClip } from '@marian/core/emmasPath/guidanceLines'
+import type { StorageAdapter } from '@marian/core/math/stardust'
+import type { SkillTreeId } from '@marian/core/sessionEnd/sessionHistory'
+import type { HubCardModel } from '@marian/core/hub/hubCardModel'
 import { createHubLinePlayer } from './playHubLine'
 
 // ── Emma's lines ─────────────────────────────────────────────────────

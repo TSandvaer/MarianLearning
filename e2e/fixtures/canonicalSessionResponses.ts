@@ -26,7 +26,7 @@
  * `e2e/fixtures/audio/` and add a per-spec opt-in flag.
  */
 
-import type { SessionStartResponse, Utterance } from '../../api/_types'
+import type { SessionStartResponse, Utterance } from '@marian/core/wire/types'
 
 /**
  * Tiny silent MP3 — single 144-byte frame at 32 kbps mono. Howler may or

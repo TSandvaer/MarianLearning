@@ -28,7 +28,7 @@ import {
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stripId3v2, synthesizeElevenLabs } from '../api/_tts_elevenlabs.js'
-import { GUIDANCE_LINES } from '../src/lib/emmasPath/guidanceLines'
+import { GUIDANCE_LINES } from '@marian/core/emmasPath/guidanceLines'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const CACHE = join(ROOT, 'tmp', 'revoice-cache')

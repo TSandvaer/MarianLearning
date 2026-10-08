@@ -1,3 +1,6 @@
+// MUST stay the first import: installs core's storage before this
+// module's load-time seeds run (see ./platform/boot.ts).
+import './platform/boot'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AnimatePresence,
@@ -31,9 +34,9 @@ import {
   readSessionHistory,
   writeSessionHistory,
   type SkillTreeId,
-} from './screens/SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 import { HUB_LAST_UNMOUNT_KEY } from './screens/Hub/useRapidRemountSuppression'
-import { STARDUST_STORAGE_KEY } from './screens/_shared/stardust'
+import { STARDUST_STORAGE_KEY } from '@marian/core/shared/stardust'
 import {
   DebugOverlay,
   activateAudioContextProbe,
@@ -87,12 +90,12 @@ import {
   type SkillNode,
   type SlowFactHint,
   type VowelSubMasteryState,
-} from './lib/progress'
-import { pendingUnlock } from './lib/progress/pathBeats'
+} from '@marian/core/progress'
+import { pendingUnlock } from '@marian/core/progress/pathBeats'
 import {
   now as progressNow,
   nowMs as progressNowMs,
-} from './lib/progress/clock'
+} from '@marian/core/progress/clock'
 import {
   createSubitisingRng,
   easyBandLeitnerMeanBox,
@@ -100,11 +103,11 @@ import {
   readSubitisingScaffoldSessionsObserved,
   readSubitisingScaffoldSubSessionsObserved,
   shouldScaffoldThisSession,
-} from './screens/Math/subitisingScaffold'
-import { projectHubTreeProgress } from './screens/Hub/progressProjection'
+} from '@marian/core/math/subitisingScaffold'
+import { projectHubTreeProgress } from '@marian/core/hub/progressProjection'
 import type { HubTreeProgress } from './screens/Hub'
-import type { Route } from './router/route'
-import { FIRST_ROUTE } from './router/route'
+import type { Route } from '@marian/core/router/route'
+import { FIRST_ROUTE } from '@marian/core/router/route'
 
 /**
  * Phase-8 fix (ticket 86c9gvd0y) — disable Howler's internal `_autoSuspend`

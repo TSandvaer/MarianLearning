@@ -42,7 +42,7 @@ import {
   DOT_CARD_HOLD_MS,
   DOT_CARD_FADE_OUT_MS,
   DOT_CARD_REDUCED_MOTION_HOLD_MS,
-} from './dotCard'
+} from '@marian/core/math/dotCard'
 
 function withMotion(node: React.ReactNode): React.ReactElement {
   return (

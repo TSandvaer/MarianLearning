@@ -14,7 +14,7 @@ import {
 import {
   emptySessionHistory,
   SESSION_HISTORY_KEY,
-} from '../../screens/SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 
 describe('prefetchTrackFor', () => {
   it('maps the Hub suggestion to a track; no suggestion keeps the Word Song pre-warm', () => {

@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import { installStorageShim } from './storageShim'
+import { installWebPlatform } from '../platform/web'
 
 // Per-file `@vitest-environment node` skips the jsdom setup entirely, so
 // `window` will be undefined for those tests. Guard the storage shim and
@@ -21,3 +22,9 @@ if (typeof window !== 'undefined') {
     cleanup()
   })
 }
+
+// Same core wiring the app installs at boot (src/platform/boot.ts), after
+// the shim: core's storage readers see the (shimmed) window.localStorage,
+// the progress clock honours ?debug=1&dayOffset=N, cloud sync reads the
+// Vite env secret. Safe without `window` (node environment): no store.
+installWebPlatform()

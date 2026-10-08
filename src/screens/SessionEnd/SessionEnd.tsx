@@ -33,13 +33,13 @@ import { createSfx, type Sfx } from '../../lib/sfx'
 import { cancelSessionAudio } from '../../lib/audio'
 import type { PlaySessionUtteranceOptions } from '../../lib/audio'
 import SleepSplash from './SleepSplash'
-import { recordSessionEnd } from './sessionHistory'
-import { localDateKey, now as progressNow } from '../../lib/progress/clock'
-import { recordProgressOnSessionEnd } from './progressHistory'
+import { recordSessionEnd } from '@marian/core/sessionEnd/sessionHistory'
+import { localDateKey, now as progressNow } from '@marian/core/progress/clock'
+import { recordProgressOnSessionEnd } from '@marian/core/sessionEnd/progressHistory'
 import {
   sessionEndBeat,
   type SessionEndBeat,
-} from '../../lib/progress/pathBeats'
+} from '@marian/core/progress/pathBeats'
 import { createMapLinePlayer, type MapLinePlayer } from '../Map/playMapLine'
 import { PathImg, SpeakerIcon } from '../Map/mapParts'
 import {
@@ -50,24 +50,31 @@ import {
   type Progress,
   type ProgressTrack,
   type SkillNode,
-} from '../../lib/progress'
-import type { FocusMode } from '../../lib/progress'
+} from '@marian/core/progress'
+import type { FocusMode } from '@marian/core/progress'
 import { WORD_SONG_NOVEL_PROBE_WORDS } from '../../../api/_plannerWordList'
-import type { GraduationSessionSplit, LeitnerOutcome } from './progressHistory'
-import type { StorageAdapter } from '../Math/stardust'
+import type {
+  GraduationSessionSplit,
+  LeitnerOutcome,
+  SessionEndSurface,
+} from '@marian/core/sessionEnd/progressHistory'
+import type { StorageAdapter } from '@marian/core/math/stardust'
 import type { OfferedDistractorClass } from '../Math/Math'
 import {
   WORDSONG_SESSION_END_BONUS,
   grantWordSongCompletionBonus,
-} from '../_shared/wordSongCompletionBonus'
+} from '@marian/core/shared/wordSongCompletionBonus'
 import {
   sessionEndGuidance,
   type EndBeat,
   type EndLine,
   type FlowerSlot,
   type SessionEndGuidance,
-} from './sessionEndGuidance'
-import { markNudgeSaid, nudgeSaidToday } from './notYetNudge'
+} from '@marian/core/sessionEnd/sessionEndGuidance'
+import {
+  markNudgeSaid,
+  nudgeSaidToday,
+} from '@marian/core/sessionEnd/notYetNudge'
 import './sessionEndClay.css'
 import type { CSSProperties, ReactElement } from 'react'
 
@@ -75,7 +82,8 @@ import type { CSSProperties, ReactElement } from 'react'
 
 // ── Public types ------------------------------------------------------------
 
-export type SessionEndSurface = 'math' | 'word-song'
+// `SessionEndSurface` lives with the session-end write path in `@marian/core`.
+export type { SessionEndSurface }
 
 export interface SessionEndPayload {
   totalCorrect: number

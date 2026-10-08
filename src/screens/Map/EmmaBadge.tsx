@@ -22,7 +22,7 @@
 
 import { AnimatePresence, m } from 'motion/react'
 import type { ReactElement } from 'react'
-import type { EmmaPose } from '../../lib/character/emmaPose'
+import type { EmmaPose } from '@marian/core/character/emmaPose'
 
 type Face = 'idle' | 'cheering'
 

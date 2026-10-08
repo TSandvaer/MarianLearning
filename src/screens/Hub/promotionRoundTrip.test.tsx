@@ -27,7 +27,7 @@ import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import Hub from './Hub'
 import { MapScreen } from '../Map/MapScreen'
 import type { MapLinePlayer } from '../Map/playMapLine'
-import { recordProgressOnSessionEnd } from '../SessionEnd/progressHistory'
+import { recordProgressOnSessionEnd } from '@marian/core/sessionEnd/progressHistory'
 import {
   clearProgress,
   defaultProgress,
@@ -35,8 +35,8 @@ import {
   loadProgress,
   saveProgress,
   type Progress,
-} from '../../lib/progress'
-import { pendingUnlock } from '../../lib/progress/pathBeats'
+} from '@marian/core/progress'
+import { pendingUnlock } from '@marian/core/progress/pathBeats'
 
 beforeEach(() => {
   window.localStorage.clear()

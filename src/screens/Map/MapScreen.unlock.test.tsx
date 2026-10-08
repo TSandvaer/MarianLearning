@@ -8,8 +8,12 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { LazyMotion, MotionConfig, domAnimation } from 'motion/react'
 import { MapScreen } from './MapScreen'
 import type { MapLinePlayer } from './playMapLine'
-import { defaultProgress, getSettings, type Progress } from '../../lib/progress'
-import { seedUnlocksCelebrated } from '../../lib/progress/pathBeats'
+import {
+  defaultProgress,
+  getSettings,
+  type Progress,
+} from '@marian/core/progress'
+import { seedUnlocksCelebrated } from '@marian/core/progress/pathBeats'
 
 /** Seeded before `sub-to-20` was mastered; `two-digit…no-regroup` (land 3's first step) just opened. */
 function landUnlockDoc(showLevelToMarian = true): Progress {

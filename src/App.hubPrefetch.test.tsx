@@ -9,10 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   emptySessionHistory,
   SESSION_HISTORY_KEY as HISTORY_KEY,
-} from './screens/SessionEnd/sessionHistory'
-import { defaultProgress } from './lib/progress/defaults'
-import { STORAGE_KEY as PROGRESS_KEY } from './lib/progress/storage'
-import type { Progress } from './lib/progress'
+} from '@marian/core/sessionEnd/sessionHistory'
+import { defaultProgress } from '@marian/core/progress/defaults'
+import { STORAGE_KEY as PROGRESS_KEY } from '@marian/core/progress/storage'
+import type { Progress } from '@marian/core/progress'
 import { SESSION_START_WAIT_TIMEOUT_MS } from './lib/audio/sessionStartFallback'
 
 vi.mock('./lib/sfx', () => ({

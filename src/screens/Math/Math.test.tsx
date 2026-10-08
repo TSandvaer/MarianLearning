@@ -32,9 +32,12 @@ vi.mock('../../lib/sfx', () => ({
 
 import MathScreen from './Math'
 import type { PlayMathUtteranceFn } from './Math'
-import type { MathSessionPlan } from './sessionPlans'
-import { STARDUST_STORAGE_KEY, type StorageAdapter } from '../_shared/stardust'
-import { ADVANCE_HARD_CEILING_MS } from '../_shared/gameplayConstants'
+import type { MathSessionPlan } from '@marian/core/math/sessionPlans'
+import {
+  STARDUST_STORAGE_KEY,
+  type StorageAdapter,
+} from '@marian/core/shared/stardust'
+import { ADVANCE_HARD_CEILING_MS } from '@marian/core/shared/gameplayConstants'
 
 /*
  * NOTE on `__testInitiallyAudioUnlocked` threaded through every render below:

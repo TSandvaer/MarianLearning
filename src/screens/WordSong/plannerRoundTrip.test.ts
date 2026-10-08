@@ -38,14 +38,14 @@ import {
   WORD_SONG_NOVEL_PROBE_WORDS,
   WORD_SONG_SIMPLE_SENTENCES,
 } from '../../../api/_plannerWordList'
-import { wordSongSessionPlanFromServer } from './planFromServer'
-import { pickDistractors } from './wordDistractors'
+import { wordSongSessionPlanFromServer } from '@marian/core/wordSong/planFromServer'
+import { pickDistractors } from '@marian/core/wordSong/wordDistractors'
 import {
   SIMPLE_SENTENCE_SCENES,
   SIMPLE_SENTENCE_TARGET_SET,
   getWordEntry,
   normalizeSentenceFrame,
-} from './wordPack'
+} from '@marian/core/wordSong/wordPack'
 import {
   defaultProgress,
   isGraduationSessionPending,
@@ -53,13 +53,13 @@ import {
   pickFocusNode,
   saveProgress,
   type SessionHistoryEntry,
-} from '../../lib/progress'
+} from '@marian/core/progress'
 import {
   recordProgressOnSessionEnd,
   type GraduationSessionSplit,
-} from '../SessionEnd/progressHistory'
-import { SAMPLE_CV_BLEND_PLAN } from './__fixtures__/sample-cv-blend-plan'
-import { SAMPLE_CVC_WORD_PLAN } from './__fixtures__/sample-cvc-word-plan'
+} from '@marian/core/sessionEnd/progressHistory'
+import { SAMPLE_CV_BLEND_PLAN } from '@marian/core/wordSong/__fixtures__/sample-cv-blend-plan'
+import { SAMPLE_CVC_WORD_PLAN } from '@marian/core/wordSong/__fixtures__/sample-cvc-word-plan'
 
 function makeMockClient(responseText: string): PlannerAnthropicClient {
   return {

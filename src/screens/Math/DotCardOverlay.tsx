@@ -44,7 +44,7 @@ import {
   DOT_CARD_FADE_IN_SPRING,
   DOT_CARD_REDUCED_MOTION_HOLD_MS,
   type DotCardPipsCount,
-} from './dotCard'
+} from '@marian/core/math/dotCard'
 
 /**
  * Phase machine. Mount → fadingIn → holding → fadingOut → unmount.

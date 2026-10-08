@@ -38,7 +38,7 @@ import { computeSuggestion } from '../../screens/Hub/hubSuggestion'
 import {
   readSessionHistoryForToday,
   type SkillTreeId,
-} from '../../screens/SessionEnd/sessionHistory'
+} from '@marian/core/sessionEnd/sessionHistory'
 
 export type PrefetchTrack = 'math' | 'word-song'
 

@@ -48,9 +48,9 @@ vi.mock('../../../lib/sfx', () => ({
 
 import WordSong from '../WordSong'
 import type { PlayWordSongUtteranceFn } from '../WordSong'
-import type { WordSongSessionPlan } from '../wordSessionPlans'
-import { type StorageAdapter } from '../../_shared/stardust'
-import { getWordEntry } from '../wordPack'
+import type { WordSongSessionPlan } from '@marian/core/wordSong/wordSessionPlans'
+import { type StorageAdapter } from '@marian/core/shared/stardust'
+import { getWordEntry } from '@marian/core/wordSong/wordPack'
 
 function withMotion(node: ReactNode) {
   return (

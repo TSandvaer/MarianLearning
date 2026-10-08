@@ -70,7 +70,7 @@ import {
   HUB_LINES,
   type HubLineId,
   type HubLineManifestEntry,
-} from './hubLines'
+} from '@marian/core/hub/hubLines'
 
 /** Minimal Howl shape we depend on — keeps the test surface tiny. */
 export interface HubHowlLike {

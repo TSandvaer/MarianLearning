@@ -9,24 +9,24 @@ export type {
   PlayMathUtteranceFn,
   PlayMathUtteranceOptions,
 } from './Math'
-export { STREAK_BONUS_THRESHOLDS } from './constants'
+export { STREAK_BONUS_THRESHOLDS } from '@marian/core/math/constants'
 export type {
   MathProblem,
   MathProblemUtterances,
   MathSessionPlan,
   MathUtteranceSlot,
   MathUtteranceSource,
-} from './sessionPlans'
+} from '@marian/core/math/sessionPlans'
 export {
   STATIC_SESSION_PLANS,
   mathSessionPlanFromWire,
   mathSessionPlanToUtteranceSources,
   mathUtteranceId,
   pickStaticSessionPlan,
-} from './sessionPlans'
+} from '@marian/core/math/sessionPlans'
 export {
   PlanFromServerError as MathPlanFromServerError,
   mathSessionPlanFromServer,
   parseReadAddends,
   parseReadOperands,
-} from './planFromServer'
+} from '@marian/core/math/planFromServer'

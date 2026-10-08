@@ -10,7 +10,7 @@ import {
   mathSessionPlanToUtteranceSources,
   type MathSessionPlan,
 } from '../../screens/Math'
-import type { SessionStartResponse, Utterance } from '../../../api/_types'
+import type { SessionStartResponse, Utterance } from '@marian/core/wire/types'
 
 /** Build a successful SessionStartResponse from one of the static plans —
  *  same id/label, same utterances, same audio data. The track-based

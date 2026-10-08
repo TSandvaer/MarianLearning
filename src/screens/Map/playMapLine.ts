@@ -19,7 +19,7 @@ import {
   enqueueOnResume,
   isPendingResume,
 } from '../../lib/audio/pendingResumeGate'
-import type { PathLine } from '../../lib/emmasPath/pathLines'
+import type { PathLine } from '@marian/core/emmasPath/pathLines'
 
 /** What the player needs from a line: a path line, or a guidance line
  *  (session end, Guidance G2) — both carry an id and a bundled src. */

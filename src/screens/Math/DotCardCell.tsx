@@ -29,7 +29,7 @@
  * (per spec § "Pip layout" final paragraph).
  */
 
-import { PIPS_TO_WORD, type DotCardPipsCount } from './dotCard'
+import { PIPS_TO_WORD, type DotCardPipsCount } from '@marian/core/math/dotCard'
 
 interface DotCardCellProps {
   /** Number of pips to render. Must be an integer in `[1, 5]`. */

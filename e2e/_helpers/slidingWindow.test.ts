@@ -21,7 +21,7 @@ import { slidingWindow } from './slidingWindow'
 // "catches drift if either helper's geometry shifts" promise actually
 // hold. An inline transcription of Hub's geometry only catches e2e-side
 // drift; this import catches Hub-side drift too.
-import { slidingWindow as hubSlidingWindow } from '../../src/screens/Hub/stages'
+import { slidingWindow as hubSlidingWindow } from '@marian/core/hub/stages'
 
 const NODES = [
   'letter-names',

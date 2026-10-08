@@ -12,12 +12,12 @@ import {
   landArtId,
   pathArtSrc,
   type PathArtId,
-} from '../../lib/emmasPath/pathArt'
-import type { MasteryTrack } from '../../lib/progress'
-import { STAGE_SPOKEN_NAMES } from '../SessionEnd/friendlyNodeName'
-import type { MapStop } from './mapModel'
-import type { Side } from './mapLayout'
-import { INK } from './mapTheme'
+} from '@marian/core/emmasPath/pathArt'
+import type { MasteryTrack } from '@marian/core/progress'
+import { STAGE_SPOKEN_NAMES } from '@marian/core/sessionEnd/friendlyNodeName'
+import type { MapStop } from '@marian/core/map/mapModel'
+import type { Side } from '@marian/core/map/mapLayout'
+import { INK } from '@marian/core/map/mapTheme'
 
 const GOLD = '#ffd23f'
 
