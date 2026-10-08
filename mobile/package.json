@@ -1,10 +1,11 @@
 {
-  "name": "mobile",
+  "name": "marian-rn-spike",
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/fredoka": "^0.4.1",
     "expo": "~57.0.27",
+    "expo-asset": "~57.0.19",
     "expo-audio": "~57.0.5",
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
@@ -24,9 +25,12 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start:tunnel": "expo start --tunnel",
+    "typecheck": "tsc --noEmit",
+    "doctor": "npx expo-doctor",
+    "export:ios": "expo export --platform ios --output-dir dist-ios",
+    "export:android": "expo export --platform android --output-dir dist-android",
+    "extract-emma": "node scripts/extract-emma.mjs"
   },
   "private": true
 }
