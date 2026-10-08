@@ -108,6 +108,9 @@ import { projectHubTreeProgress } from '@marian/core/hub/progressProjection'
 import type { HubTreeProgress } from './screens/Hub'
 import type { Route } from '@marian/core/router/route'
 import { FIRST_ROUTE } from '@marian/core/router/route'
+// Splash → Greet (sessionCount 0) or Hub, per design/screen-hub.md
+// § "Navigation contract" Q1. Shared with the native app.
+import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
 
 /**
  * Phase-8 fix (ticket 86c9gvd0y) — disable Howler's internal `_autoSuspend`
@@ -260,28 +263,6 @@ function getInitialMapWorld(): MasteryTrack {
     return v === 'word-song' ? 'word-song' : 'math'
   } catch {
     return 'math'
-  }
-}
-
-/**
- * Compute the post-Splash route per `design/screen-hub.md` § "Navigation
- * contract" Q1:
- *   - `sessionCount === 0` (first-ever launch) → Greet (then Math →
- *     SessionEnd → Hub via the standard flow).
- *   - `sessionCount >= 1` → Hub directly. Greet is a once-ever moment
- *     and never re-shows on subsequent launches.
- *
- * Reads `marian-tutor.session-history.v1` (now v2-aware via the lazy
- * migration in `screens/SessionEnd/sessionHistory.ts`) — a missing /
- * malformed key reads as `sessionCount === 0`, so the first-ever path
- * is the safe default if storage is unavailable.
- */
-function nextAfterSplash(): Route {
-  try {
-    const history = readSessionHistory()
-    return history.sessionCount === 0 ? 'greet' : 'hub'
-  } catch {
-    return 'greet'
   }
 }
 
