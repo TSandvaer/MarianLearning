@@ -14,13 +14,13 @@ Two side-effects run at module load, **before** the React tree imports:
 
 ## Route state machine
 
-Routes are typed in [`MarianLearning/src/router/route.ts`](MarianLearning/src/router/route.ts):
+Routes are typed in [`MarianLearning/packages/core/src/router/route.ts`](MarianLearning/packages/core/src/router/route.ts):
 
 ```
 splash | greet | hub | math | literacy | session-end | reward | parent-settings
 ```
 
-`FIRST_ROUTE = 'splash'`. The app deliberately does **not** use react-router; routes are addressed only by in-app state, no URLs (rationale documented in [`route.ts`](MarianLearning/src/router/route.ts#L1-L13)).
+`FIRST_ROUTE = 'splash'`. The app deliberately does **not** use react-router; routes are addressed only by in-app state, no URLs (rationale documented in [`route.ts`](MarianLearning/packages/core/src/router/route.ts#L1-L13)).
 
 Initial route resolution: [`getInitialRoute()`](MarianLearning/src/App.tsx#L112-L133) honours an optional `?route=<name>` query param for QA deep-launches; otherwise falls back to `FIRST_ROUTE`.
 
@@ -54,7 +54,7 @@ Greet is **once-ever**; the [`nextAfterSplash()`](MarianLearning/src/App.tsx#L14
 
 `splash → hub` via [`nextAfterSplash()`](MarianLearning/src/App.tsx#L148-L155) when `sessionCount >= 1`. Hub's entry path becomes `'app-open-recent'` if last completion was within ~6 h (drives a "Back so soon!" greeting variant) or `'app-open'` otherwise.
 
-Storage source: [`MarianLearning/src/screens/SessionEnd/sessionHistory.ts`](MarianLearning/src/screens/SessionEnd/sessionHistory.ts) under key `marian-tutor.session-history.v1` (lazy v1 → v2 migration on read).
+Storage source: [`MarianLearning/packages/core/src/sessionEnd/sessionHistory.ts`](MarianLearning/packages/core/src/sessionEnd/sessionHistory.ts) under key `marian-tutor.session-history.v1` (lazy v1 → v2 migration on read).
 
 ## App-level providers and global wiring
 
@@ -107,7 +107,7 @@ Both calls are synchronous on the same localStorage snapshot in the same effect 
 
 ## Hub progress projection
 
-Hub re-reads progress on every entry into `route === 'hub'` ([App.tsx:262-277](MarianLearning/src/App.tsx#L262-L277)) so a Session-End → Hub flip picks up any freshly-saved promotion state. The snapshot flows through [`projectHubTreeProgress(...)`](MarianLearning/src/screens/Hub/progressProjection.ts) into the `progress` and `pendingPromotion` props.
+Hub re-reads progress on every entry into `route === 'hub'` ([App.tsx:262-277](MarianLearning/src/App.tsx#L262-L277)) so a Session-End → Hub flip picks up any freshly-saved promotion state. The snapshot flows through [`projectHubTreeProgress(...)`](MarianLearning/packages/core/src/hub/progressProjection.ts) into the `progress` and `pendingPromotion` props.
 
 ## Dependency stack
 

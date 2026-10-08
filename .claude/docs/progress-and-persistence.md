@@ -1,27 +1,27 @@
 # Progress & Persistence
 
-What this doc covers: the persisted `Progress` document model, its localStorage adapter, the type guards that defend the read path, the M3 mastery promotion rule, focus-node selection, the Leitner spaced-review box, parent-tunable settings, the session-end write path that connects screens to the model, and the debug-seed system that QA uses to deep-launch into specific learning states. Source of truth lives under [`MarianLearning/src/lib/progress/`](MarianLearning/src/lib/progress/).
+What this doc covers: the persisted `Progress` document model, its localStorage adapter, the type guards that defend the read path, the M3 mastery promotion rule, focus-node selection, the Leitner spaced-review box, parent-tunable settings, the session-end write path that connects screens to the model, and the debug-seed system that QA uses to deep-launch into specific learning states. Source of truth lives under [`MarianLearning/packages/core/src/progress/`](MarianLearning/packages/core/src/progress/).
 
 ## Module layout
 
-| File                                                                     | Role                                                                                   |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| [`types.ts`](MarianLearning/src/lib/progress/types.ts)                   | Type definitions for the persisted shape; schema version literal.                      |
-| [`defaults.ts`](MarianLearning/src/lib/progress/defaults.ts)             | `defaultProgress()` factory seeded with Marian's April 2026 diagnostic baseline.       |
-| [`guards.ts`](MarianLearning/src/lib/progress/guards.ts)                 | `isProgressV1`, `readSchemaVersion`. Hand-rolled type guards (no zod).                 |
-| [`storage.ts`](MarianLearning/src/lib/progress/storage.ts)               | `loadProgress`, `saveProgress`, `clearProgress`, `STORAGE_KEY`, `MAX_SESSION_HISTORY`. |
-| [`migrate.ts`](MarianLearning/src/lib/progress/migrate.ts)               | Schema migration framework (v1-only today).                                            |
-| [`mastery.ts`](MarianLearning/src/lib/progress/mastery.ts)               | `applyMasteryRule`, `MATH_TREE`, `LITERACY_TREE`, graduation-gate helpers.             |
-| [`focusNode.ts`](MarianLearning/src/lib/progress/focusNode.ts)           | `pickFocusNode`, `pickRecentSuccessRate`, in-order node lists.                         |
-| [`leitner.ts`](MarianLearning/src/lib/progress/leitner.ts)               | Pure-function 5-box spaced-repetition helpers.                                         |
-| [`parentSettings.ts`](MarianLearning/src/lib/progress/parentSettings.ts) | `getSettings`, defaults, threshold presets.                                            |
-| [`index.ts`](MarianLearning/src/lib/progress/index.ts)                   | Public surface. App code imports from here, never reaches inside.                      |
+| File                                                                               | Role                                                                                   |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [`types.ts`](MarianLearning/packages/core/src/progress/types.ts)                   | Type definitions for the persisted shape; schema version literal.                      |
+| [`defaults.ts`](MarianLearning/packages/core/src/progress/defaults.ts)             | `defaultProgress()` factory seeded with Marian's April 2026 diagnostic baseline.       |
+| [`guards.ts`](MarianLearning/packages/core/src/progress/guards.ts)                 | `isProgressV1`, `readSchemaVersion`. Hand-rolled type guards (no zod).                 |
+| [`storage.ts`](MarianLearning/packages/core/src/progress/storage.ts)               | `loadProgress`, `saveProgress`, `clearProgress`, `STORAGE_KEY`, `MAX_SESSION_HISTORY`. |
+| [`migrate.ts`](MarianLearning/packages/core/src/progress/migrate.ts)               | Schema migration framework (v1-only today).                                            |
+| [`mastery.ts`](MarianLearning/packages/core/src/progress/mastery.ts)               | `applyMasteryRule`, `MATH_TREE`, `LITERACY_TREE`, graduation-gate helpers.             |
+| [`focusNode.ts`](MarianLearning/packages/core/src/progress/focusNode.ts)           | `pickFocusNode`, `pickRecentSuccessRate`, in-order node lists.                         |
+| [`leitner.ts`](MarianLearning/packages/core/src/progress/leitner.ts)               | Pure-function 5-box spaced-repetition helpers.                                         |
+| [`parentSettings.ts`](MarianLearning/packages/core/src/progress/parentSettings.ts) | `getSettings`, defaults, threshold presets.                                            |
+| [`index.ts`](MarianLearning/packages/core/src/progress/index.ts)                   | Public surface. App code imports from here, never reaches inside.                      |
 
-The session-end write path lives one directory over in [`src/screens/SessionEnd/progressHistory.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.ts), and the debug-seed module lives at [`src/lib/debug/debugSeed.ts`](MarianLearning/src/lib/debug/debugSeed.ts).
+The session-end write path lives one directory over in [`packages/core/src/sessionEnd/progressHistory.ts`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts), and the debug-seed module lives at [`src/lib/debug/debugSeed.ts`](MarianLearning/src/lib/debug/debugSeed.ts).
 
 ## The `Progress` document shape
 
-The top-level persisted envelope is `Progress`, declared at [`types.ts:245`](MarianLearning/src/lib/progress/types.ts#L245). It always carries `schemaVersion: 1`, plus `profile`, `skillLevels`, `mathFactsLeitner`, `history`, optional `parentSettings`, and optional `pendingPromotion`.
+The top-level persisted envelope is `Progress`, declared at [`types.ts:245`](MarianLearning/packages/core/src/progress/types.ts#L245). It always carries `schemaVersion: 1`, plus `profile`, `skillLevels`, `mathFactsLeitner`, `history`, optional `parentSettings`, and optional `pendingPromotion`.
 
 ```ts
 interface Progress {
@@ -35,11 +35,11 @@ interface Progress {
 }
 ```
 
-`CURRENT_SCHEMA_VERSION = 1` is the export every other module imports — when a v2 migration ships, this is the literal that flips. See [`types.ts:282`](MarianLearning/src/lib/progress/types.ts#L282).
+`CURRENT_SCHEMA_VERSION = 1` is the export every other module imports — when a v2 migration ships, this is the literal that flips. See [`types.ts:282`](MarianLearning/packages/core/src/progress/types.ts#L282).
 
 ### `Profile`
 
-Defined at [`types.ts:149`](MarianLearning/src/lib/progress/types.ts#L149):
+Defined at [`types.ts:149`](MarianLearning/packages/core/src/progress/types.ts#L149):
 
 | Field           | Type                       | Notes                                                                                                                                                                                                                                              |
 | --------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -49,14 +49,14 @@ Defined at [`types.ts:149`](MarianLearning/src/lib/progress/types.ts#L149):
 
 ### `SkillNode` and `SkillLevels`
 
-Two string-literal unions compose the `SkillNode` namespace, declared at [`types.ts:15`](MarianLearning/src/lib/progress/types.ts#L15) and [`types.ts:30`](MarianLearning/src/lib/progress/types.ts#L30):
+Two string-literal unions compose the `SkillNode` namespace, declared at [`types.ts:15`](MarianLearning/packages/core/src/progress/types.ts#L15) and [`types.ts:30`](MarianLearning/packages/core/src/progress/types.ts#L30):
 
 - `NumberGardenNode`: `number-recog | add-to-10 | add-to-20 | sub-to-10 | sub-to-20 | two-digit-addsub | skip-counting | mult-2-5-10 | mult-3-4 | mult-6-9`
 - `WordSongNode`: `letter-names | letter-sounds | blending-cv | cvc-words | cvc-words-short-o | digraphs | sight-words | simple-sentences`
 
 `cvc-words` is implicitly the short-a CVC node; subsequent vowels get sibling nodes (`cvc-words-short-o`, future `cvc-words-short-u`, etc.). This was a deliberate backward-compat choice so Marian's existing localStorage `cvc-words` entry never needed migrating — see `design/word-song/short-o-pool-expansion.md` §2 and `project_spec_drift_decisions` (sibling vs rename, locked 2026-05-04).
 
-`SkillLevels` is `Record<SkillNode, SkillLevel>`. The four `SkillLevel` values, defined at [`types.ts:51`](MarianLearning/src/lib/progress/types.ts#L51):
+`SkillLevels` is `Record<SkillNode, SkillLevel>`. The four `SkillLevel` values, defined at [`types.ts:51`](MarianLearning/packages/core/src/progress/types.ts#L51):
 
 | Level        | Meaning                                               |
 | ------------ | ----------------------------------------------------- |
@@ -67,7 +67,7 @@ Two string-literal unions compose the `SkillNode` namespace, declared at [`types
 
 ### `SessionHistoryEntry`
 
-Defined at [`types.ts:81`](MarianLearning/src/lib/progress/types.ts#L81). Each entry captures one completed session:
+Defined at [`types.ts:81`](MarianLearning/packages/core/src/progress/types.ts#L81). Each entry captures one completed session:
 
 ```ts
 interface SessionHistoryEntry {
@@ -88,7 +88,7 @@ For non-graduation sessions, `successRate = correct / 8` over the full 8-problem
 
 ### `LeitnerBox` and `LeitnerItem`
 
-Defined at [`types.ts:61`](MarianLearning/src/lib/progress/types.ts#L61):
+Defined at [`types.ts:61`](MarianLearning/packages/core/src/progress/types.ts#L61):
 
 ```ts
 type LeitnerBoxIndex = 1 | 2 | 3 | 4 | 5
@@ -111,7 +111,7 @@ The `Progress.mathFactsLeitner` field is a `LeitnerBox<MathFact>`. Literacy uses
 `CURRENT_SCHEMA_VERSION = 1`. The literal is exported as `as const` so changes here are TypeScript-visible everywhere. Adding a v2 means:
 
 1. Bumping the union in `types.ts` (`schemaVersion: 1 | 2`).
-2. Adding a `MigrationStep` for `1` to `STEPS` in [`migrate.ts:20`](MarianLearning/src/lib/progress/migrate.ts#L20).
+2. Adding a `MigrationStep` for `1` to `STEPS` in [`migrate.ts:20`](MarianLearning/packages/core/src/progress/migrate.ts#L20).
 3. Bumping `CURRENT_SCHEMA_VERSION` to `2`.
 
 Both `parentSettings` and `pendingPromotion` are additive optional fields — they were added without bumping the schema version. Old blobs are still valid v1 documents; readers fill defaults at the read path. See storage.ts's `withDefaultedSettings` pattern below.
@@ -120,8 +120,8 @@ Both `parentSettings` and `pendingPromotion` are additive optional fields — th
 
 When **removing or renaming** a `SkillNode` literal — i.e. the union loses a member, or one member's identity changes — prefer a localStorage-read-path remap (an idempotent transform applied inside `loadProgress()`) over a `v1 → v2` schema bump (full migration step with version stamping). Two precedents now establish the pattern:
 
-1. **PR #211 digraph split (2026-05-14)** — the dead `digraphs` literal was retired in favour of the three `digraphs-{sh,ch,th-voiceless}` siblings. The K2 remap in [`src/lib/progress/storage.ts`](MarianLearning/src/lib/progress/storage.ts) silently rewrites any persisted `'digraphs': <SkillLevel>` key into the chosen replacement sibling at load time.
-2. **PR #308 two-digit-addsub split (2026-05-22)** — the dead `two-digit-addsub` literal was retired in favour of `two-digit-addsub-no-regroup` + `two-digit-addsub-with-regroup`. The same K2 remap in [`src/lib/progress/storage.ts`](MarianLearning/src/lib/progress/storage.ts) targets `-no-regroup` (the lower-difficulty sibling — default new arrivals into intro on the easier tier).
+1. **PR #211 digraph split (2026-05-14)** — the dead `digraphs` literal was retired in favour of the three `digraphs-{sh,ch,th-voiceless}` siblings. The K2 remap in [`packages/core/src/progress/storage.ts`](MarianLearning/packages/core/src/progress/storage.ts) silently rewrites any persisted `'digraphs': <SkillLevel>` key into the chosen replacement sibling at load time.
+2. **PR #308 two-digit-addsub split (2026-05-22)** — the dead `two-digit-addsub` literal was retired in favour of `two-digit-addsub-no-regroup` + `two-digit-addsub-with-regroup`. The same K2 remap in [`packages/core/src/progress/storage.ts`](MarianLearning/packages/core/src/progress/storage.ts) targets `-no-regroup` (the lower-difficulty sibling — default new arrivals into intro on the easier tier).
 
 Properties of the pattern:
 
@@ -141,7 +141,7 @@ The three-layer chain (concrete example: per-problem distractor class on math se
 
 1. **Producer — strict.** [`src/screens/Math/Math.tsx`](MarianLearning/src/screens/Math/Math.tsx) constructs `MathSessionResult` with a precise per-problem field (`perProblemDistractorClass: DistractorClass[]`). The producer knows exactly which `DistractorClass` literal each chip row was rendered against — there is no widening reason at the source.
 2. **In-app middle hop — strict.** [`src/screens/SessionEnd/SessionEnd.tsx`](MarianLearning/src/screens/SessionEnd/SessionEnd.tsx) forwards the array into `SessionEndPayload` and on to the `recordProgressOnSessionEnd` call site. Each hop carries the strict `DistractorClass[]` type. Middle-hop hopholes (typing the field as `string[]` to "be flexible") have shipped before and are the recurring failure mode — see PR #316 NIT 3 (Wave 6, 2026-05-23) which closed the `SessionEndPayload.perProblemDistractorClass` hole that had widened the field to `string[]` between producer and boundary.
-3. **Persistence boundary — intentionally loose.** [`src/lib/progress/guards.ts:184-200`](MarianLearning/src/lib/progress/guards.ts#L184) accepts `string[]` (or absent) for the persisted field, with an inline comment explaining the policy: **no enum allow-list at the read path**. Future tier additions or distractor-class renames don't force a v1→v2 schema bump; old blobs round-trip cleanly.
+3. **Persistence boundary — intentionally loose.** [`packages/core/src/progress/guards.ts:184-200`](MarianLearning/packages/core/src/progress/guards.ts#L184) accepts `string[]` (or absent) for the persisted field, with an inline comment explaining the policy: **no enum allow-list at the read path**. Future tier additions or distractor-class renames don't force a v1→v2 schema bump; old blobs round-trip cleanly.
 
 **The structural-subtype passthrough is the load-bearing mechanic that makes the asymmetry painless.** TypeScript treats `DistractorClass[]` as a structural subtype of `string[]` — every value the strict producer emits is also a valid value at the loose boundary, with zero coercion or runtime cost. The boundary widening is purely on the read side: producers can keep using their narrow types; the boundary just doesn't insist on it.
 
@@ -159,7 +159,7 @@ The `guards.ts:184-200` comment block names this trade-off in-line; the comment 
 
 ### Storage key and load/save
 
-The single key is `STORAGE_KEY = 'marian-tutor:progress:v1'` ([`storage.ts:17`](MarianLearning/src/lib/progress/storage.ts#L17)).
+The single key is `STORAGE_KEY = 'marian-tutor:progress:v1'` ([`storage.ts:17`](MarianLearning/packages/core/src/progress/storage.ts#L17)).
 
 `loadProgress()` returns one of:
 
@@ -167,7 +167,7 @@ The single key is `STORAGE_KEY = 'marian-tutor:progress:v1'` ([`storage.ts:17`](
 - `null` if the JSON is shaped wrong and cannot be migrated.
 - A fully-shaped `Progress` (with `parentSettings` defaulted in via `withDefaultedSettings`) when the read succeeds.
 
-`saveProgress(p)` trims `history` to `MAX_SESSION_HISTORY = 30` entries (oldest dropped) and persists. Storage failures (quota, private mode) are silently swallowed — progress is best-effort, never a blocker for play. See [`storage.ts:83`](MarianLearning/src/lib/progress/storage.ts#L83).
+`saveProgress(p)` trims `history` to `MAX_SESSION_HISTORY = 30` entries (oldest dropped) and persists. Storage failures (quota, private mode) are silently swallowed — progress is best-effort, never a blocker for play. See [`storage.ts:83`](MarianLearning/packages/core/src/progress/storage.ts#L83).
 
 `clearProgress()` removes ONLY the progress key (`marian-tutor:progress:v1`). Used by reset flows and tests.
 
@@ -177,15 +177,15 @@ Every localStorage touch goes through `safeGetItem` / `safeSetItem` / `safeRemov
 
 ### `withDefaultedSettings` (read-path defaulter)
 
-[`storage.ts:72`](MarianLearning/src/lib/progress/storage.ts#L72). Layered post-parse so callers of `loadProgress()` always see a `parentSettings` field even on pre-M2.5 blobs that predate it. Implementation just runs `getSettings(p)` and merges the result back. Old blobs round-trip lossless: a fully-shaped input produces deep-equal output.
+[`storage.ts:72`](MarianLearning/packages/core/src/progress/storage.ts#L72). Layered post-parse so callers of `loadProgress()` always see a `parentSettings` field even on pre-M2.5 blobs that predate it. Implementation just runs `getSettings(p)` and merges the result back. Old blobs round-trip lossless: a fully-shaped input produces deep-equal output.
 
 ### `withDefaultedSkillLevels` (schema-floor defaulter)
 
-[`storage.ts`](MarianLearning/src/lib/progress/storage.ts). Added in PR #159 as the second layer of the hardened read path. Mirrors `withDefaultedSettings` but for `skillLevels`.
+[`storage.ts`](MarianLearning/packages/core/src/progress/storage.ts). Added in PR #159 as the second layer of the hardened read path. Mirrors `withDefaultedSettings` but for `skillLevels`.
 
 When a saved blob's `skillLevels` is missing one or more keys — typically because a new `SkillNode` was added to the union after the blob was written — this defaulter fills each missing key with `'locked'` from `defaultLockedSkillLevels()`. Without this step, `isProgressV1` rejects the whole blob, `loadProgress()` returns `null`, and the app falls back to `defaultProgress()` — silently clobbering Marian's progress.
 
-**`defaultLockedSkillLevels()` is NOT `defaultProgress()`.** This distinction is load-bearing. `defaultProgress()` carries Marian's April 2026 diagnostic (e.g. `add-to-10: 'practicing'`, `cvc-words: 'intro'`); using it as the read-path floor would silently grant un-earned access to nodes missing from older saved blobs. The schema floor must be a true minimum — every known node defaults to `'locked'`. `defaultLockedSkillLevels()` in [`defaults.ts`](MarianLearning/src/lib/progress/defaults.ts) is that factory; `SCHEMA_FLOOR_NODES` (same file) is the canonical "every node the schema knows about" list the defaulter walks.
+**`defaultLockedSkillLevels()` is NOT `defaultProgress()`.** This distinction is load-bearing. `defaultProgress()` carries Marian's April 2026 diagnostic (e.g. `add-to-10: 'practicing'`, `cvc-words: 'intro'`); using it as the read-path floor would silently grant un-earned access to nodes missing from older saved blobs. The schema floor must be a true minimum — every known node defaults to `'locked'`. `defaultLockedSkillLevels()` in [`defaults.ts`](MarianLearning/packages/core/src/progress/defaults.ts) is that factory; `SCHEMA_FLOOR_NODES` (same file) is the canonical "every node the schema knows about" list the defaulter walks.
 
 **Ordering invariant**: `withDefaultedSkillLevels` MUST run BEFORE `isProgressV1` validation. If reversed, the strict `isSkillLevels` guard rejects the under-keyed blob before the defaulter can fill it. The full layered sequence inside `loadProgress()` is now:
 
@@ -198,11 +198,11 @@ The new `storage.test.ts` schema-floor-coverage test enumerates every key in `de
 
 ## Type guards
 
-[`guards.ts`](MarianLearning/src/lib/progress/guards.ts) exports `isProgressV1` and `readSchemaVersion`. Hand-rolled — no runtime schema dependency (zod / valibot / etc.). The Progress module is on the hot path for app boot and the bundle budget says "earn every kilobyte."
+[`guards.ts`](MarianLearning/packages/core/src/progress/guards.ts) exports `isProgressV1` and `readSchemaVersion`. Hand-rolled — no runtime schema dependency (zod / valibot / etc.). The Progress module is on the hot path for app boot and the bundle budget says "earn every kilobyte."
 
 ### `SKILL_NODES` set — the load-bearing widening hazard
 
-[`guards.ts:19`](MarianLearning/src/lib/progress/guards.ts#L19) declares a frozen `Set<SkillNode>` listing every node the schema knows about. `isSkillLevels` walks this set and requires every node to appear as a key in the candidate `skillLevels` object with a valid `SkillLevel` value:
+[`guards.ts:19`](MarianLearning/packages/core/src/progress/guards.ts#L19) declares a frozen `Set<SkillNode>` listing every node the schema knows about. `isSkillLevels` walks this set and requires every node to appear as a key in the candidate `skillLevels` object with a valid `SkillLevel` value:
 
 ```ts
 function isSkillLevels(v: unknown): v is SkillLevels {
@@ -217,7 +217,7 @@ function isSkillLevels(v: unknown): v is SkillLevels {
 }
 ```
 
-**Critical gotcha — when `SKILL_NODES` widens, every persisted blob without the new key fails the guard.** When `cvc-words-short-o` was added to the union in PR #151, every existing localStorage blob that didn't carry that key failed `isSkillLevels`, `loadProgress()` returned `null`, and the app fell back to defaults. **Test fixtures (and debug seeds) must mirror the `SKILL_NODES` set or seeded state silently disappears.** This was the load-bearing bug fixed in PR #151's e2e fixture commit `1ed9857`. The `defaultProgress()` factory in [`defaults.ts`](MarianLearning/src/lib/progress/defaults.ts) is the canonical reference shape — debug seeds and test fixtures should derive from it via spread, not hand-build.
+**Critical gotcha — when `SKILL_NODES` widens, every persisted blob without the new key fails the guard.** When `cvc-words-short-o` was added to the union in PR #151, every existing localStorage blob that didn't carry that key failed `isSkillLevels`, `loadProgress()` returned `null`, and the app fell back to defaults. **Test fixtures (and debug seeds) must mirror the `SKILL_NODES` set or seeded state silently disappears.** This was the load-bearing bug fixed in PR #151's e2e fixture commit `1ed9857`. The `defaultProgress()` factory in [`defaults.ts`](MarianLearning/packages/core/src/progress/defaults.ts) is the canonical reference shape — debug seeds and test fixtures should derive from it via spread, not hand-build.
 
 **Production-side hardening** (PR #159) added `withDefaultedSkillLevels` upstream of the guard so future `SKILL_NODES` widenings no longer wipe Marian's progress at runtime. The guard is still strict; the defaulter just fills missing keys to `'locked'` first. See `withDefaultedSkillLevels` above for the full ordering contract. **The widening hazard for test fixtures still applies** — `seedStorage.ts`'s `DEFAULT_SKILL_LEVELS` does NOT route through the defaulter at seed time.
 
@@ -227,13 +227,13 @@ Wider context: PR #160 framed this as "five places," but inspection during ticke
 
 | #   | Location                                                                                                                                                                               | Purpose                                                                                                                                                                                                                                                                                                                                                                      | Editing posture                                                                                                                                                                                                                                                                                                                          |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | `SkillNode` union in [`types.ts`](MarianLearning/src/lib/progress/types.ts)                                                                                                            | TypeScript source of truth for the node literal.                                                                                                                                                                                                                                                                                                                             | **Edit per node addition.**                                                                                                                                                                                                                                                                                                              |
-| 2   | `SKILL_NODES` set in [`guards.ts`](MarianLearning/src/lib/progress/guards.ts)                                                                                                          | Required-key set for `isSkillLevels` (strict guard).                                                                                                                                                                                                                                                                                                                         | **Edit per node addition.**                                                                                                                                                                                                                                                                                                              |
-| 3   | `SCHEMA_FLOOR_NODES` list in [`defaults.ts`](MarianLearning/src/lib/progress/defaults.ts)                                                                                              | Walked by `storage.ts:withDefaultedSkillLevels` AND `cloudSync.ts:withDefaultedSkillLevels` (via `defaultLockedSkillLevels()`) to fill missing keys with `'locked'` at load / install time.                                                                                                                                                                                  | **Edit per node addition** — also updates place 5 automatically.                                                                                                                                                                                                                                                                         |
+| 1   | `SkillNode` union in [`types.ts`](MarianLearning/packages/core/src/progress/types.ts)                                                                                                  | TypeScript source of truth for the node literal.                                                                                                                                                                                                                                                                                                                             | **Edit per node addition.**                                                                                                                                                                                                                                                                                                              |
+| 2   | `SKILL_NODES` set in [`guards.ts`](MarianLearning/packages/core/src/progress/guards.ts)                                                                                                | Required-key set for `isSkillLevels` (strict guard).                                                                                                                                                                                                                                                                                                                         | **Edit per node addition.**                                                                                                                                                                                                                                                                                                              |
+| 3   | `SCHEMA_FLOOR_NODES` list in [`defaults.ts`](MarianLearning/packages/core/src/progress/defaults.ts)                                                                                    | Walked by `storage.ts:withDefaultedSkillLevels` AND `cloudSync.ts:withDefaultedSkillLevels` (via `defaultLockedSkillLevels()`) to fill missing keys with `'locked'` at load / install time.                                                                                                                                                                                  | **Edit per node addition** — also updates place 5 automatically.                                                                                                                                                                                                                                                                         |
 | 4   | `DEFAULT_SKILL_LEVELS` in [`e2e/_helpers/seedStorage.ts`](MarianLearning/e2e/_helpers/seedStorage.ts)                                                                                  | E2e fixture baseline; missing keys here fail the guard at seed time (the production defaulter is NOT in the seed path).                                                                                                                                                                                                                                                      | **Edit per node addition** (independent — no shared module with place 3).                                                                                                                                                                                                                                                                |
 | 5   | `cloudSync.ts`'s private `withDefaultedSkillLevels` mirror                                                                                                                             | 1:1 replica of place 3's defaulter; runs before the strict guard when installing a cloud-fetched blob. The mirror **walks `defaultLockedSkillLevels()` rather than a hand-mirrored list**, so a place-3 update propagates here automatically. The `cloudSync.test.ts` `withDefaultedSkillLevels parity` test is the regression guard against any future static-mirror drift. | **No edit needed when adding a node** — the function reads `SCHEMA_FLOOR_NODES` indirectly via `defaultLockedSkillLevels()`.                                                                                                                                                                                                             |
 | 6   | `STAGE_LABEL` in [`stageIcons.tsx`](MarianLearning/src/screens/Hub/stageIcons.tsx)                                                                                                     | `Record<StageId, string>` mapping stage-id to display label for Hub. Added to the "5 sync points" list 2026-05-10 after PR #190 (short-i tier widening) confirmed typecheck-fails-on-omission.                                                                                                                                                                               | **Edit per node addition** (when the new node introduces a new Hub stage).                                                                                                                                                                                                                                                               |
-| 7   | `WORD_SONG_LABELS` in [`progressProjection.ts`](MarianLearning/src/screens/Hub/progressProjection.ts)                                                                                  | `Record<WordSongNode, string>` mapping skill-node to display label for the path-strip projection. Added 2026-05-10 after PR #190 confirmed typecheck-fails-on-omission.                                                                                                                                                                                                      | **Edit per WordSongNode addition** (analogous map exists for math nodes if they widen).                                                                                                                                                                                                                                                  |
+| 7   | `WORD_SONG_LABELS` in [`progressProjection.ts`](MarianLearning/packages/core/src/hub/progressProjection.ts)                                                                            | `Record<WordSongNode, string>` mapping skill-node to display label for the path-strip projection. Added 2026-05-10 after PR #190 confirmed typecheck-fails-on-omission.                                                                                                                                                                                                      | **Edit per WordSongNode addition** (analogous map exists for math nodes if they widen).                                                                                                                                                                                                                                                  |
 | 8   | Sibling regression-spec seeds asserting picker-walk endpoints (e.g. [`cvc-cross-vowel-mix-regression.spec.ts`](MarianLearning/e2e/cvc-cross-vowel-mix-regression.spec.ts) tests 1 + 3) | Tests that seed `'mastered'` up to tier N + `'practicing'` on tier N+1 to assert focusNode lands on N+1 must add the new sibling tier as `'mastered'` when widening **intermediate** tiers. Caught by Playwright at CI time, **invisible to typecheck**.                                                                                                                     | **Edit per intermediate-tier addition** (skip for terminal tier additions). Added 2026-05-10 after PR #190's CI break exposed the gap — the only spec in the e2e set that asserts post-CVC-graduation focusNode endpoint; same vulnerability will recur for short-e (between short-i and digraphs) and any future intermediate widening. |
 
 The `storage.test.ts` schema-floor-coverage test catches drift at place 3 first; e2e specs catch drift at place 4; the cloudSync parity test catches drift at place 5; **TypeScript typecheck catches drift at places 6-7** (`Record<...>` exhaustiveness check fires immediately when the union widens). Places 6-7 were originally undocumented because the typecheck gate makes them self-correcting at edit time, but they show up in the diff of any tier-widening PR (confirmed PR #174 short-u and PR #190 short-i both touched them). **Place 8 is the only one that's invisible to all static checks** — Playwright is the only safety net, so dispatch briefs for tier widenings should explicitly call out the sibling-spec audit. Per Kevin's PR #190 fix audit (`46b9c9f`): all other CVC-tier-targeting specs are safe by construction (they target earlier tiers with `'practicing'`, so the picker stops there before reaching the new tier); only `cvc-cross-vowel-mix-regression.spec.ts` is in the at-risk pattern today.
@@ -242,7 +242,7 @@ The `storage.test.ts` schema-floor-coverage test catches drift at place 3 first;
 
 ### `isProgressV1` exact-shape check
 
-[`guards.ts:148`](MarianLearning/src/lib/progress/guards.ts#L148). Validates:
+[`guards.ts:148`](MarianLearning/packages/core/src/progress/guards.ts#L148). Validates:
 
 - `schemaVersion === 1`
 - `profile.childName` is a string
@@ -254,7 +254,7 @@ The `storage.test.ts` schema-floor-coverage test catches drift at place 3 first;
 - `parentSettings`, when present and not undefined, passes `isParentSettings`
 - `pendingPromotion`, when present and not undefined, is a known `SkillNode` string
 
-`isParentSettings` accepts both the new per-track `masteryThreshold` shape and the legacy single shape — see [`guards.ts:119`](MarianLearning/src/lib/progress/guards.ts#L119). The legacy → per-track promotion happens at the read path (`getSettings`), not at guard time, so old blobs remain valid v1 documents.
+`isParentSettings` accepts both the new per-track `masteryThreshold` shape and the legacy single shape — see [`guards.ts:119`](MarianLearning/packages/core/src/progress/guards.ts#L119). The legacy → per-track promotion happens at the read path (`getSettings`), not at guard time, so old blobs remain valid v1 documents.
 
 `readSchemaVersion(v)` reads `schemaVersion` off any plausibly-shaped object, returns `null` otherwise. Used by `migrate()` to dispatch.
 
@@ -262,7 +262,7 @@ The `storage.test.ts` schema-floor-coverage test catches drift at place 3 first;
 
 > **2026-05-08 caveat:** the April baselines hardcoded below are **observationally outdated** — Marian's first iPad session post-#164 deploy showed she's already past concrete-counting on sums ≤ 10 (visual-scaffold + near-retrieval, not finger-counting). Source-of-truth code defaults are unchanged because (a) defaults only affect fresh-storage first-launch, and (b) bumping defaults mid-flight would clobber her real progress. See memory `project_diagnostic_results` § "Update — May 2026" for the live-state observation. **When recommending interventions, check that section before invoking April-baseline framing — most "she's still finger-counting" claims are stale.**
 
-[`defaults.ts:42`](MarianLearning/src/lib/progress/defaults.ts#L42) returns a fresh `Progress` document seeded from Marian's diagnostic results (per `project_diagnostic_results` memory and `CLAUDE.md` `## Marian's current levels`).
+[`defaults.ts:42`](MarianLearning/packages/core/src/progress/defaults.ts#L42) returns a fresh `Progress` document seeded from Marian's diagnostic results (per `project_diagnostic_results` memory and `CLAUDE.md` `## Marian's current levels`).
 
 Math:
 
@@ -294,15 +294,15 @@ Word Song:
 
 ## Migration framework
 
-[`migrate.ts`](MarianLearning/src/lib/progress/migrate.ts). v1 is the only version today; the framework exists so v2+ has a place to land without rewriting the adapter. Each step is a `(input: unknown) => unknown | null` keyed by source version in `STEPS`.
+[`migrate.ts`](MarianLearning/packages/core/src/progress/migrate.ts). v1 is the only version today; the framework exists so v2+ has a place to land without rewriting the adapter. Each step is a `(input: unknown) => unknown | null` keyed by source version in `STEPS`.
 
 `migrate(oldData)` reads the version, walks `STEPS[version]` until it reaches `CURRENT_SCHEMA_VERSION`, then validates against `isProgressV1`. Returns `null` on any unrecoverable input — the adapter treats that as corrupt data and falls back to defaults.
 
-Future-version data (`version > CURRENT_SCHEMA_VERSION`) is refused rather than guessed — see [`migrate.ts:49`](MarianLearning/src/lib/progress/migrate.ts#L49).
+Future-version data (`version > CURRENT_SCHEMA_VERSION`) is refused rather than guessed — see [`migrate.ts:49`](MarianLearning/packages/core/src/progress/migrate.ts#L49).
 
 ## Lifetime-first-encounter gate (ticket 86c9q9ben)
 
-`Progress.lifetimeFirstEncounters?: SkillNode[]` (additive, no schemaVersion bump — same precedent as `parentSettings` and `pendingPromotion`). The persisted list of skill nodes the child has already seen tier-specific first-encounter scaffolding for. **Storage-shape vs helper-API asymmetry is deliberate** (PR #243, 2026-05-15): the static storage type spans both tracks (`SkillNode = NumberGardenNode | WordSongNode`) so a math node ID round-trips cleanly when the math-producer follow-up lands, but the helper-API in [`lifetimeFirstEncounters.ts`](MarianLearning/src/lib/progress/lifetimeFirstEncounters.ts) (`isFirstEncounter` / `markFirstEncounterSeen` / `inferLifetimeFirstEncountersFromProgress`) intentionally stays `WordSongNode`-scoped. Two reasons: (a) the only producer call at [`progressHistory.ts:264`](MarianLearning/src/screens/SessionEnd/progressHistory.ts#L264) is gated by `isWordSongNode(input.focusNode)` — widening helpers without widening the producer gate would create type/runtime drift; (b) the migration inference rule (any non-locked node = already-encountered) only fits word-song scaffolding semantics — naively walking math nodes would replay tier scaffolding inappropriately. Widen helpers + producer gate together when the math first-encounter follow-up ships. Today consumed by the server-side `session.end.opener` rewrite at [`api/_firstEncounterGate.ts`](MarianLearning/api/_firstEncounterGate.ts):
+`Progress.lifetimeFirstEncounters?: SkillNode[]` (additive, no schemaVersion bump — same precedent as `parentSettings` and `pendingPromotion`). The persisted list of skill nodes the child has already seen tier-specific first-encounter scaffolding for. **Storage-shape vs helper-API asymmetry is deliberate** (PR #243, 2026-05-15): the static storage type spans both tracks (`SkillNode = NumberGardenNode | WordSongNode`) so a math node ID round-trips cleanly when the math-producer follow-up lands, but the helper-API in [`lifetimeFirstEncounters.ts`](MarianLearning/packages/core/src/progress/lifetimeFirstEncounters.ts) (`isFirstEncounter` / `markFirstEncounterSeen` / `inferLifetimeFirstEncountersFromProgress`) intentionally stays `WordSongNode`-scoped. Two reasons: (a) the only producer call at [`progressHistory.ts:264`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts#L264) is gated by `isWordSongNode(input.focusNode)` — widening helpers without widening the producer gate would create type/runtime drift; (b) the migration inference rule (any non-locked node = already-encountered) only fits word-song scaffolding semantics — naively walking math nodes would replay tier scaffolding inappropriately. Widen helpers + producer gate together when the math first-encounter follow-up ships. Today consumed by the server-side `session.end.opener` rewrite at [`api/_firstEncounterGate.ts`](MarianLearning/api/_firstEncounterGate.ts):
 
 - `cvc-words-short-u`: when the focus node is **NOT** in the list, the canon's `/u/` vs `/ʌ/` minimal-pair contrast opener (`"You did it! Listen carefully: 'sun' — not 'soon.' Sun! /s/ /ʌ/ /n/."`) is delivered as canon ships it. When the node **IS** in the list, the server rewrites the opener to vanilla `"You did it!"` by sourcing both text + audio from `cvc-words.json` (the short-a canon's vanilla opener).
 - `cvc-words-short-o`: infrastructure-ready under the same gate. The short-o canon currently ships vanilla `"You did it!"` as its opener; when a future canon re-bake adds the `box`/`fox` `/ks/` first-encounter line, the same gate fires for it without code changes — the gate's `FIRST_ENCOUNTER_GATED_NODES` set already includes `cvc-words-short-o`.
@@ -317,7 +317,7 @@ The browser ships `progress.lifetimeFirstEncounters` on the `/api/claude` reques
 
 ### Migration: read-path defaulter
 
-`storage.ts:withDefaultedLifetimeFirstEncounters` runs after `isProgressV1` validation when the field is undefined. Inference rule (in [`lifetimeFirstEncounters.ts:inferLifetimeFirstEncountersFromProgress`](MarianLearning/src/lib/progress/lifetimeFirstEncounters.ts)): every word-song node whose `skillLevels[node]` is **NOT** `'locked'` is treated as already-encountered. Rationale:
+`storage.ts:withDefaultedLifetimeFirstEncounters` runs after `isProgressV1` validation when the field is undefined. Inference rule (in [`lifetimeFirstEncounters.ts:inferLifetimeFirstEncountersFromProgress`](MarianLearning/packages/core/src/progress/lifetimeFirstEncounters.ts)): every word-song node whose `skillLevels[node]` is **NOT** `'locked'` is treated as already-encountered. Rationale:
 
 - A node at `'mastered'` clearly has been seen.
 - A node at `'practicing'` has been delivered to Marian via session-start at least once.
@@ -378,11 +378,11 @@ Walk `/o/ → /u/ → /i/ → /e/`: first `'practicing'` vowel is the target; al
 
 ## Mastery rule (M3)
 
-[`mastery.ts`](MarianLearning/src/lib/progress/mastery.ts). The first PR where the app actually changes Marian's curriculum based on her performance. Pure module; the single public entry point is `applyMasteryRule(progress) → Progress`, which returns a NEW document (no mutation).
+[`mastery.ts`](MarianLearning/packages/core/src/progress/mastery.ts). The first PR where the app actually changes Marian's curriculum based on her performance. Pure module; the single public entry point is `applyMasteryRule(progress) → Progress`, which returns a NEW document (no mutation).
 
 ### Tree adjacency
 
-Two ordered constants declare the curriculum graph in one place. `MATH_TREE` ([`mastery.ts:100`](MarianLearning/src/lib/progress/mastery.ts#L100)) and `LITERACY_TREE` ([`mastery.ts:121`](MarianLearning/src/lib/progress/mastery.ts#L121)) mirror the declaration order in `NumberGardenNode` / `WordSongNode`.
+Two ordered constants declare the curriculum graph in one place. `MATH_TREE` ([`mastery.ts:100`](MarianLearning/packages/core/src/progress/mastery.ts#L100)) and `LITERACY_TREE` ([`mastery.ts:121`](MarianLearning/packages/core/src/progress/mastery.ts#L121)) mirror the declaration order in `NumberGardenNode` / `WordSongNode`.
 
 `focusNode.ts` keeps its own `MATH_NODES_IN_ORDER` / `WORD_SONG_NODES_IN_ORDER` copies (predates `mastery.ts`); the `mastery.test.ts` regression locks the two declarations against each other so silent drift fails CI.
 
@@ -442,7 +442,7 @@ Per-track defaults (locked 2026-05-02, ticket 86c9kwvy0):
 
 ### Calendar-day dedupe
 
-[`mastery.ts:417`](MarianLearning/src/lib/progress/mastery.ts#L417). Day key is computed in **local time** (`getFullYear/getMonth/getDate`), matching the streak counter's convention in `sessionHistory.ts`. Two semantics for the same `dateISO` would otherwise be observable to Marian — the streak band counts a Manila-evening + Manila-morning pair as two days while the mastery rule used to collapse them to one (UTC offset = 8h). The `slice(0, 10)` UTC-prefix shape was the pre-PR-120 implementation; under Manila (UTC+8) the 22:00–06:00 window collapsed across UTC midnight and `add-to-20`'s 3-session requirement could never accumulate. Audit: `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` § P0.3.
+[`mastery.ts:417`](MarianLearning/packages/core/src/progress/mastery.ts#L417). Day key is computed in **local time** (`getFullYear/getMonth/getDate`), matching the streak counter's convention in `sessionHistory.ts`. Two semantics for the same `dateISO` would otherwise be observable to Marian — the streak band counts a Manila-evening + Manila-morning pair as two days while the mastery rule used to collapse them to one (UTC offset = 8h). The `slice(0, 10)` UTC-prefix shape was the pre-PR-120 implementation; under Manila (UTC+8) the 22:00–06:00 window collapsed across UTC midnight and `add-to-20`'s 3-session requirement could never accumulate. Audit: `design/audits/2026-05-02-polish/jessica-qa-edge-cases.md` § P0.3.
 
 ### Promotion behaviour
 
@@ -456,7 +456,7 @@ When `autoPromote === false`:
 
 - Queue `progress.pendingPromotion = node` and do NOT mutate `skillLevels`. The parent confirms (or implicitly approves by flipping `autoPromote` back to `true`) before the node is moved. If multiple nodes qualify in one call, the earliest in tree order wins (math first, then literacy; within a track, root-to-leaf order).
 
-`pendingPromotion` is transient under `autoPromote=true`: the first call sets it, the next call's stale-clear branch ([`mastery.ts:247`](MarianLearning/src/lib/progress/mastery.ts#L247)) deletes it because the queued node is no longer `'practicing'`. The flag exists to drive a single Hub celebration; cleanup happens on the next session-end. Tests on idempotence assert on `skillLevels` shape, not on `pendingPromotion` — see header at [`mastery.ts:202`](MarianLearning/src/lib/progress/mastery.ts#L202).
+`pendingPromotion` is transient under `autoPromote=true`: the first call sets it, the next call's stale-clear branch ([`mastery.ts:247`](MarianLearning/packages/core/src/progress/mastery.ts#L247)) deletes it because the queued node is no longer `'practicing'`. The flag exists to drive a single Hub celebration; cleanup happens on the next session-end. Tests on idempotence assert on `skillLevels` shape, not on `pendingPromotion` — see header at [`mastery.ts:202`](MarianLearning/packages/core/src/progress/mastery.ts#L202).
 
 ### Auto-promote re-entry
 
@@ -464,11 +464,11 @@ If `pendingPromotion` is set AND `autoPromote === true` on entry, the rule appli
 
 ### Graduation gate (cvc-words generalization probe)
 
-[`mastery.ts:73`](MarianLearning/src/lib/progress/mastery.ts#L73). Graduation-gated nodes are listed in `WORD_SONG_GRADUATION_GATED_NODES` — only `cvc-words` today. For these nodes, the standard 90/3 rule is **necessary but not sufficient**: the most recent qualifying entry must additionally carry `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD` (`0.8`, [`mastery.ts:92`](MarianLearning/src/lib/progress/mastery.ts#L92)).
+[`mastery.ts:73`](MarianLearning/packages/core/src/progress/mastery.ts#L73). Graduation-gated nodes are listed in `WORD_SONG_GRADUATION_GATED_NODES` — only `cvc-words` today. For these nodes, the standard 90/3 rule is **necessary but not sufficient**: the most recent qualifying entry must additionally carry `novelPoolSuccessRate >= NOVEL_POOL_THRESHOLD` (`0.8`, [`mastery.ts:92`](MarianLearning/packages/core/src/progress/mastery.ts#L92)).
 
 Per Dave's developmental review (`design/research/cvc-words-developmental-review.md` § P1.2), a 90/3 mastery threshold over a fixed 8-word canonical pool can reflect item familiarity rather than decoding ability. The novel-pool gate verifies that Marian generalises her decoding to 2–3 novel short-a words she has not seen in the canonical pool.
 
-`isGraduationSessionPending(progress, node, track)` ([`mastery.ts:528`](MarianLearning/src/lib/progress/mastery.ts#L528)) is the predicate the planner reads at session-start to decide whether to mix novel-probe words into the 8-problem set. All four conditions must hold:
+`isGraduationSessionPending(progress, node, track)` ([`mastery.ts:528`](MarianLearning/packages/core/src/progress/mastery.ts#L528)) is the predicate the planner reads at session-start to decide whether to mix novel-probe words into the 8-problem set. All four conditions must hold:
 
 1. `node` is in `WORD_SONG_GRADUATION_GATED_NODES`.
 2. `node` is currently at `'practicing'`.
@@ -481,7 +481,7 @@ Rule (4) is the "engine waits for canonical 90/3 to reset" guarantee from the AC
 
 ## Focus-node picker
 
-[`focusNode.ts`](MarianLearning/src/lib/progress/focusNode.ts). Pure read of `skillLevels` filtered by track ordering — belongs next to the data, not in the audio-wiring layer where the `/api/claude` POST happens. Browser calls these once at session-start fetch time and ships the result on the `/api/claude` payload.
+[`focusNode.ts`](MarianLearning/packages/core/src/progress/focusNode.ts). Pure read of `skillLevels` filtered by track ordering — belongs next to the data, not in the audio-wiring layer where the `/api/claude` POST happens. Browser calls these once at session-start fetch time and ships the result on the `/api/claude` payload.
 
 `pickFocusNode(progress, track)` walks `MATH_NODES_IN_ORDER` or `WORD_SONG_NODES_IN_ORDER` and returns the first node whose `skillLevels[node]` is anything other than `'mastered'`. Falls back to the LAST node in the track if all are mastered (won't happen in v1 — `add-to-20` and downstream are still `locked`).
 
@@ -495,13 +495,13 @@ When `cvc-words` (short-a) masters and `cvc-words-short-o` flips from `locked` t
 
 ### Word-song un-clamp (planner-parser contract step 2)
 
-The picker used to be clamped to `blending-cv` for the word-song track while the browser parser only accepted the CVC "Tap the <word>." template. PR #132 widened the parser to also accept "Read the <word>." → cvc-word; PR step 2 (ticket 86c9kxu07) widened the planner to emit that content. Picker is now safe to walk the full LITERACY_TREE — same shape as the math walker. See header comment at [`focusNode.ts:88`](MarianLearning/src/lib/progress/focusNode.ts#L88).
+The picker used to be clamped to `blending-cv` for the word-song track while the browser parser only accepted the CVC "Tap the <word>." template. PR #132 widened the parser to also accept "Read the <word>." → cvc-word; PR step 2 (ticket 86c9kxu07) widened the planner to emit that content. Picker is now safe to walk the full LITERACY_TREE — same shape as the math walker. See header comment at [`focusNode.ts:88`](MarianLearning/packages/core/src/progress/focusNode.ts#L88).
 
 Untuned tier coverage today: `letter-sounds`, `digraphs`, `sight-words`, `simple-sentences` produce stub plans (planner falls back to blending-cv content with a non-error log). Future tier-content tickets refine these. The stub fallback is what makes it safe to surface those nodes from the picker in v1 — a wrong-tier walk yields a working session, not a silent screen.
 
 ## Leitner box (math facts)
 
-[`leitner.ts`](MarianLearning/src/lib/progress/leitner.ts). Five-box spaced repetition. Pure functions only; every helper returns a new box and never mutates input (avoids React strict-mode double-invocation surprises).
+[`leitner.ts`](MarianLearning/packages/core/src/progress/leitner.ts). Five-box spaced repetition. Pure functions only; every helper returns a new box and never mutates input (avoids React strict-mode double-invocation surprises).
 
 | Function                         | Behaviour                                                               |
 | -------------------------------- | ----------------------------------------------------------------------- |
@@ -519,7 +519,7 @@ Promotion rule: a correct answer advances one box (cap at 5). A wrong answer dem
 
 The browser ships a compact Leitner hint on the `/api/claude` payload, the planner weights box-1 facts toward problems 4-8, and session-end promotes / demotes the per-problem facts. Three modules carry the change:
 
-1. **Hint construction**: `buildLeitnerSessionHint(progress.mathFactsLeitner)` in [`leitner.ts`](MarianLearning/src/lib/progress/leitner.ts) flattens the box into `{a, b, op, box}[]` sorted box-ascending, capped at `LEITNER_HINT_MAX_ITEMS = 60`. Empty box → empty array.
+1. **Hint construction**: `buildLeitnerSessionHint(progress.mathFactsLeitner)` in [`leitner.ts`](MarianLearning/packages/core/src/progress/leitner.ts) flattens the box into `{a, b, op, box}[]` sorted box-ascending, capped at `LEITNER_HINT_MAX_ITEMS = 60`. Empty box → empty array.
 2. **Wire surface**: `App.tsx#readProgressHintsForTrack('math')` calls the helper and ships the result on the `progress.leitner` block of the session-start payload via `prepareMathPathA`. Empty arrays are OMITTED entirely — that's the gate that keeps canon-served first sessions free of charge.
 3. **Server directive**: `/api/claude` extracts + soft-validates the field via `parseLeitnerHint` (any malformed item drops the whole array). Non-empty leitner BYPASSES BOTH canon AND the in-memory cache (mirrors graduation-session bypass), forcing a live Haiku run that emits a directive into the user message — `LEITNER PRIORITY DIRECTIVE` lists facts grouped by box-level ascending and tells Haiku to forbid box-1 facts from problems 1-3 (gentle ramp) and lean into them on problems 4-8.
 
@@ -527,7 +527,7 @@ Active scope (v1): math + add-to-10 only. Misrouted leitner on word-song / other
 
 ### Spaced-review time filter (ticket 86c9kmwf8 / #447 — shipped)
 
-The session-gen hint above is now **time-filtered before it ships**, turning "weighted review" into true _spaced_ review. `dueLeitnerItems(box, now, schedule?)` ([`leitner.ts`](MarianLearning/src/lib/progress/leitner.ts)) returns only the box items whose box-derived interval has elapsed since `lastSeen`; `App.tsx` runs `mathFactsLeitner` through it BEFORE `buildLeitnerSessionHint`. So **`progress.leitner` on the wire is the DUE subset, not the full box** — a fact promoted recently is withheld until its interval lapses.
+The session-gen hint above is now **time-filtered before it ships**, turning "weighted review" into true _spaced_ review. `dueLeitnerItems(box, now, schedule?)` ([`leitner.ts`](MarianLearning/packages/core/src/progress/leitner.ts)) returns only the box items whose box-derived interval has elapsed since `lastSeen`; `App.tsx` runs `mathFactsLeitner` through it BEFORE `buildLeitnerSessionHint`. So **`progress.leitner` on the wire is the DUE subset, not the full box** — a fact promoted recently is withheld until its interval lapses.
 
 Schedule (named const `LEITNER_REVIEW_INTERVAL_DAYS`, calendar days, deliberately tunable): box 1 → 0 (every session), 2 → 2, 3 → 4, 4 → 7, 5 → 14. Due when `now - lastSeen >= intervalDays[box] * 86_400_000` (`>=`, so an exact-interval fact is due). `addItem` sets `lastSeen: 0`, so brand-new box-1 facts are immediately due. No separate `leitnerDue` payload field was added and no `_planner.ts` change was needed — the canonical wire field stays `progress.leitner` (this reconciled the original M4 ticket's separate-field spec against the already-shipped 86c9pwgc8 design). The `0/2/4/7/14` values are a starting guess flagged for later tuning.
 
@@ -580,11 +580,11 @@ Follow-up to PR #164/#167. The latency capture infrastructure shipped in those P
 
 `SessionHistoryEntry.mathFacts?: MathFact[]` — additive optional, no schemaVersion bump (same precedent as `latencyMs`). Math only; word-song doesn't ship it. Indexed parallel to `latencyMs`: `mathFacts[i]` is the fact problem `i` targeted, joined element-wise with `latencyMs[i]`. The aggregator can't attribute latency to a specific fact without this companion array — `skillFocus` only names the focus node, not the per-problem pair.
 
-The `SessionEndPayload` already carries `mathFacts` (originally for Leitner promotion); M4.x extends `RecordProgressInput` and `buildEntry` in [`progressHistory.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.ts) to forward it onto the persisted entry alongside `latencyMs`. Per-element shallow-cloned at write time; guard validates per-item shape on read (`{a, b, op}` with bounds matching the wire-side `parseLeitnerHint`).
+The `SessionEndPayload` already carries `mathFacts` (originally for Leitner promotion); M4.x extends `RecordProgressInput` and `buildEntry` in [`progressHistory.ts`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts) to forward it onto the persisted entry alongside `latencyMs`. Per-element shallow-cloned at write time; guard validates per-item shape on read (`{a, b, op}` with bounds matching the wire-side `parseLeitnerHint`).
 
 #### Predicate
 
-[`slowFacts.ts`](MarianLearning/src/lib/progress/slowFacts.ts) — `buildSlowFactSessionHint(progress: Progress): SlowFactHint[]` walks `history` entries, joins `mathFacts[i]` and `latencyMs[i]`, and applies a threshold predicate per fact key. Threshold defaults (tunable based on real-Marian signal — not yet calibrated):
+[`slowFacts.ts`](MarianLearning/packages/core/src/progress/slowFacts.ts) — `buildSlowFactSessionHint(progress: Progress): SlowFactHint[]` walks `history` entries, joins `mathFacts[i]` and `latencyMs[i]`, and applies a threshold predicate per fact key. Threshold defaults (tunable based on real-Marian signal — not yet calibrated):
 
 | Constant                          | Default | Rationale                                                                                                                                                             |
 | --------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -643,7 +643,7 @@ Combined: the cost surface for a Leitner-active session is one Anthropic Haiku c
 
 ## Parent settings (M2.5)
 
-[`parentSettings.ts`](MarianLearning/src/lib/progress/parentSettings.ts). Five parent-tunable knobs. Defaults locked by Thomas on 2026-05-01.
+[`parentSettings.ts`](MarianLearning/packages/core/src/progress/parentSettings.ts). Five parent-tunable knobs. Defaults locked by Thomas on 2026-05-01.
 
 ```ts
 interface ParentSettings {
@@ -655,7 +655,7 @@ interface ParentSettings {
 }
 ```
 
-Defaults (`DEFAULT_PARENT_SETTINGS` at [`parentSettings.ts:76`](MarianLearning/src/lib/progress/parentSettings.ts#L76)):
+Defaults (`DEFAULT_PARENT_SETTINGS` at [`parentSettings.ts:76`](MarianLearning/packages/core/src/progress/parentSettings.ts#L76)):
 
 | Setting                         | Default                          | Notes                                                                                           |
 | ------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -668,13 +668,13 @@ Defaults (`DEFAULT_PARENT_SETTINGS` at [`parentSettings.ts:76`](MarianLearning/s
 
 ### Per-track mastery threshold shape
 
-[`types.ts:211`](MarianLearning/src/lib/progress/types.ts#L211). `PerTrackMasteryThreshold = Record<MasteryTrackKey, MasteryThreshold>` where `MasteryTrackKey = 'math' | 'word-song'`.
+[`types.ts:211`](MarianLearning/packages/core/src/progress/types.ts#L211). `PerTrackMasteryThreshold = Record<MasteryTrackKey, MasteryThreshold>` where `MasteryTrackKey = 'math' | 'word-song'`.
 
 The shape was widened from a single `MasteryThreshold` to a per-track map on 2026-05-02 (ticket 86c9kwvy0). Backward-compat for old single-shape blobs is handled at the read path in `getSettings` — no schema bump.
 
 ### `getSettings(progress)` — the SINGLE read API
 
-[`parentSettings.ts:99`](MarianLearning/src/lib/progress/parentSettings.ts#L99). Adaptive-engine rules MUST consult this helper rather than reaching into `progress.parentSettings` directly. Contract:
+[`parentSettings.ts:99`](MarianLearning/packages/core/src/progress/parentSettings.ts#L99). Adaptive-engine rules MUST consult this helper rather than reaching into `progress.parentSettings` directly. Contract:
 
 - `progress` is null/undefined → returns `DEFAULT_PARENT_SETTINGS` clone
 - `progress.parentSettings` is missing → returns DEFAULT clone
@@ -685,7 +685,7 @@ Every call returns a FRESH object — callers may mutate the result without affe
 
 ### Three input shapes accepted on `masteryThreshold`
 
-`mergePerTrackMasteryThreshold` ([`parentSettings.ts:169`](MarianLearning/src/lib/progress/parentSettings.ts#L169)) accepts:
+`mergePerTrackMasteryThreshold` ([`parentSettings.ts:169`](MarianLearning/packages/core/src/progress/parentSettings.ts#L169)) accepts:
 
 1. **New per-track shape** (`{ math, 'word-song' }`) — each track's value is shape-validated and per-key defaulted; missing tracks default. What fresh writes produce.
 2. **Old single shape** (`{ percent, sessions }`) — pre-2026-05-02 blobs and pre-86c9kwvy0 fresh writes used a single threshold for both tracks. The legacy value is **applied to BOTH tracks** so a parent who explicitly chose 80/2 isn't silently bumped back to defaults.
@@ -693,7 +693,7 @@ Every call returns a FRESH object — callers may mutate the result without affe
 
 ### Threshold presets
 
-[`parentSettings.ts:48`](MarianLearning/src/lib/progress/parentSettings.ts#L48). Three v1 presets exposed for the Settings UI:
+[`parentSettings.ts:48`](MarianLearning/packages/core/src/progress/parentSettings.ts#L48). Three v1 presets exposed for the Settings UI:
 
 ```ts
 ;[
@@ -756,7 +756,7 @@ Optional typing means existing test fixtures that don't need the seams keep work
 
 ## Session-end write path
 
-[`src/screens/SessionEnd/progressHistory.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.ts). The production write path into the Progress blob — until ticket 86c9kmu63 the only callers of `saveProgress` were tests, so Marian's accumulating learning state was never being collected. M3 (ticket 86c9kmwd0) layers `applyMasteryRule` on top.
+[`packages/core/src/sessionEnd/progressHistory.ts`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts). The production write path into the Progress blob — until ticket 86c9kmu63 the only callers of `saveProgress` were tests, so Marian's accumulating learning state was never being collected. M3 (ticket 86c9kmwd0) layers `applyMasteryRule` on top.
 
 ### Why the call site is in `SessionEnd.tsx`, not `App.tsx`
 
@@ -766,7 +766,7 @@ Note the storage-key distinction: this module writes `marian-tutor:progress:v1` 
 
 ### `recordProgressOnSessionEnd(input)`
 
-[`progressHistory.ts:160`](MarianLearning/src/screens/SessionEnd/progressHistory.ts#L160).
+[`progressHistory.ts:160`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts#L160).
 
 ```ts
 interface RecordProgressInput {
@@ -792,7 +792,7 @@ Returns the persisted document for tests; production callers ignore it.
 
 ### `GraduationSessionSplit`
 
-[`progressHistory.ts:75`](MarianLearning/src/screens/SessionEnd/progressHistory.ts#L75):
+[`progressHistory.ts:75`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts#L75):
 
 ```ts
 interface GraduationSessionSplit {
@@ -892,9 +892,9 @@ Cold containers reset the buckets — that's acceptable given the threat model, 
 
 ### Browser surface
 
-[`MarianLearning/src/lib/progress/deviceId.ts`](MarianLearning/src/lib/progress/deviceId.ts) generates + persists the UUID under `marian-tutor:device-id`. `crypto.randomUUID()` (iOS Safari 15.4+) with a Math.random fallback for older browsers. `isValidUuid` is the public predicate the Restore-from-device-id flow runs against parent paste input.
+[`MarianLearning/packages/core/src/progress/deviceId.ts`](MarianLearning/packages/core/src/progress/deviceId.ts) generates + persists the UUID under `marian-tutor:device-id`. `crypto.randomUUID()` (iOS Safari 15.4+) with a Math.random fallback for older browsers. `isValidUuid` is the public predicate the Restore-from-device-id flow runs against parent paste input.
 
-[`MarianLearning/src/lib/progress/cloudSync.ts`](MarianLearning/src/lib/progress/cloudSync.ts) exposes three callables — none ever throw:
+[`MarianLearning/packages/core/src/progress/cloudSync.ts`](MarianLearning/packages/core/src/progress/cloudSync.ts) exposes three callables — none ever throw:
 
 - `pushProgressToCloud(deviceId, progress, opts?)` → `'sent' | 'failed' | 'skipped'`. Used by `progressHistory.ts:recordProgressOnSessionEnd` as fire-and-forget after every save. Failures land as `console.warn`. `'skipped'` means `VITE_PROGRESS_API_SECRET` was unset — the local save still succeeded.
 - `fetchProgressFromCloud(deviceId, opts?)` → `{kind:'found',...} | {kind:'not-found'} | {kind:'error',...}`. 3 s timeout via `AbortController`. 404 is the **normal** first-launch case, not an error.
@@ -926,7 +926,7 @@ When the cloud blob wins (cloud strictly newer), the install is **last-write-win
 
 `skillLevels` et al. stay last-write-wins deliberately: they are **most-recent-state** fields, not append-only logs. A per-key merge of `skillLevels` could resurrect a stale `'practicing'` over a newer `'mastered'` (time-travel). Only `history` — an append-only session log where each entry is an immutable record — benefits from union semantics.
 
-**Merge algorithm** (`mergeSessionHistories(local, cloud)` in [`cloudSync.ts`](MarianLearning/src/lib/progress/cloudSync.ts), exported + unit-pinned):
+**Merge algorithm** (`mergeSessionHistories(local, cloud)` in [`cloudSync.ts`](MarianLearning/packages/core/src/progress/cloudSync.ts), exported + unit-pinned):
 
 1. **Concat** `local` then `cloud`.
 2. **Dedupe** by a stable key, FIRST-occurrence wins (so a session present on both devices keeps the local copy's bytes — they are expected to be identical; first-wins is a deterministic tiebreak, not a semantic preference).
@@ -967,10 +967,10 @@ Server:
 
 Browser:
 
-- [`MarianLearning/src/lib/progress/deviceId.ts`](MarianLearning/src/lib/progress/deviceId.ts) + `.test.ts` (10 tests).
-- [`MarianLearning/src/lib/progress/cloudSync.ts`](MarianLearning/src/lib/progress/cloudSync.ts) + `.test.ts` (38 tests).
+- [`MarianLearning/packages/core/src/progress/deviceId.ts`](MarianLearning/packages/core/src/progress/deviceId.ts) + `.test.ts` (10 tests).
+- [`MarianLearning/packages/core/src/progress/cloudSync.ts`](MarianLearning/packages/core/src/progress/cloudSync.ts) + `.test.ts` (38 tests).
 - [`MarianLearning/src/App.tsx`](MarianLearning/src/App.tsx) — boot-time reconcile effect.
-- [`MarianLearning/src/screens/SessionEnd/progressHistory.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.ts) — fire-and-forget after save.
+- [`MarianLearning/packages/core/src/sessionEnd/progressHistory.ts`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts) — fire-and-forget after save.
 - [`MarianLearning/src/screens/ParentSettings/ParentSettings.tsx`](MarianLearning/src/screens/ParentSettings/ParentSettings.tsx) — Cloud Backup section + 8 new tests.
 
 Config:
@@ -980,8 +980,8 @@ Config:
 
 ## Cross-references
 
-- Source files: [`MarianLearning/src/lib/progress/`](MarianLearning/src/lib/progress/), [`MarianLearning/src/screens/SessionEnd/progressHistory.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.ts), [`MarianLearning/src/lib/debug/debugSeed.ts`](MarianLearning/src/lib/debug/debugSeed.ts).
-- Tests: [`mastery.test.ts`](MarianLearning/src/lib/progress/mastery.test.ts), [`focusNode.test.ts`](MarianLearning/src/lib/progress/focusNode.test.ts), [`parentSettings.test.ts`](MarianLearning/src/lib/progress/parentSettings.test.ts), [`progress.test.ts`](MarianLearning/src/lib/progress/progress.test.ts), [`progressHistory.test.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.test.ts).
+- Source files: [`MarianLearning/packages/core/src/progress/`](MarianLearning/packages/core/src/progress/), [`MarianLearning/packages/core/src/sessionEnd/progressHistory.ts`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts), [`MarianLearning/src/lib/debug/debugSeed.ts`](MarianLearning/src/lib/debug/debugSeed.ts).
+- Tests: [`mastery.test.ts`](MarianLearning/packages/core/src/progress/mastery.test.ts), [`focusNode.test.ts`](MarianLearning/packages/core/src/progress/focusNode.test.ts), [`parentSettings.test.ts`](MarianLearning/packages/core/src/progress/parentSettings.test.ts), [`progress.test.ts`](MarianLearning/packages/core/src/progress/progress.test.ts), [`progressHistory.test.ts`](MarianLearning/packages/core/src/sessionEnd/progressHistory.test.ts).
 - Skill-tree content: see [`skill-trees-and-content.md`](skill-trees-and-content.md) for the curriculum graph, word packs, distractors, and session plans.
 - Diagnostic baseline: `project_diagnostic_results` auto-memory + `CLAUDE.md` `## Marian's current levels`.
 - Sibling-node design rationale: `design/word-song/short-o-pool-expansion.md` §2.

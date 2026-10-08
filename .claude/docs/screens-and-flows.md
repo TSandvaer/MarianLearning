@@ -28,12 +28,12 @@ Screen order matches the first-launch sequence: Splash → Greet → Math → Se
 ## Greet
 
 - Component: [`MarianLearning/src/screens/Greet.tsx`](MarianLearning/src/screens/Greet.tsx)
-- Sequence orchestrator: [`MarianLearning/src/screens/greetSequence.ts`](MarianLearning/src/screens/greetSequence.ts)
+- Sequence orchestrator: [`MarianLearning/packages/core/src/greet/greetSequence.ts`](MarianLearning/packages/core/src/greet/greetSequence.ts)
 - Spec: [`MarianLearning/design/session-1.md`](MarianLearning/design/session-1.md) §"Screen 2 — First Greeting".
 
 **Route contract**: rendered when `route === 'greet'`. Reached only on the first-ever launch (sessionCount === 0) — never re-shown. Routes via `props.onAdvance()` → `handleGreetAdvance` ([App.tsx:316-318](MarianLearning/src/App.tsx#L316-L318)) → `math`. See auto-memory `project_first_launch_session_1.md` for the canonical Greet → Math (NOT → Hub) contract.
 
-**Lines** ([greetSequence.ts:78-83](MarianLearning/src/screens/greetSequence.ts#L78-L83)):
+**Lines** ([greetSequence.ts:78-83](MarianLearning/packages/core/src/greet/greetSequence.ts#L78-L83)):
 
 ```ts
 GREET_LINES = [
@@ -49,13 +49,13 @@ GREET_LINES = [
 **State machine** (`'wake' | 'intro'`):
 
 - `wake` — initial state. Audio context locked. Emma idle + breathing, soft pink ready ring. The entire viewport is a tap target. After 8 s of no tap: a one-shot finger-tap icon + ear-wiggle nudge fires (no nag loop).
-- `intro` — post-tap. Same tap synchronously dispatches `speak(line0)`, unlocking iPad Safari's audio context. The 4 lines play with caption word-by-word reveal; the heart appears after line index 2 (`HEART_REVEAL_AFTER_LINE_INDEX = 2`, [greetSequence.ts:89](MarianLearning/src/screens/greetSequence.ts#L89)) — i.e. AFTER "It's so nice to meet you." completes.
+- `intro` — post-tap. Same tap synchronously dispatches `speak(line0)`, unlocking iPad Safari's audio context. The 4 lines play with caption word-by-word reveal; the heart appears after line index 2 (`HEART_REVEAL_AFTER_LINE_INDEX = 2`, [greetSequence.ts:89](MarianLearning/packages/core/src/greet/greetSequence.ts#L89)) — i.e. AFTER "It's so nice to meet you." completes.
 
 **Audio**: pre-recorded MP3s through Howler (`lib/audio/preRecorded`), keyed by `GreetLineKey` (`'hi'` / `'imEmma'` / `'niceToMeet'` / `'tapHeart'`). The `LINE_TEXT_TO_KEY` bridge at [Greet.tsx:42-47](MarianLearning/src/screens/Greet.tsx#L42-L47) translates the orchestrator's text-space sequence into the engine's key-space.
 
 **First-utterance retry**: `useAudioUnlockGate` arms a 6 s watchdog (`FIRST_UTTERANCE_RETRY_MS` from `_shared/gameplayConstants`). If `onPlay` never fires, the wake ring re-shows silently and the next gesture re-fires line 0. No error copy.
 
-**Re-prompt**: 20 s of no heart-tap → replay line 3 (`REPROMPT_AFTER_MS = 20_000`, [greetSequence.ts:97](MarianLearning/src/screens/greetSequence.ts#L97)).
+**Re-prompt**: 20 s of no heart-tap → replay line 3 (`REPROMPT_AFTER_MS = 20_000`, [greetSequence.ts:97](MarianLearning/packages/core/src/greet/greetSequence.ts#L97)).
 
 **Heart-tap → Math handoff**: 400 ms transition (`HEART_TAP_TRANSITION_MS`).
 
@@ -89,10 +89,10 @@ Routes out via `onPickTree` ([App.tsx:331-341](MarianLearning/src/App.tsx#L331-L
 
 | File                                                                                            | Role                                                                                                                                                                                                                      |
 | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------- | --------------------- |
-| [`hubLines.ts`](MarianLearning/src/screens/Hub/hubLines.ts)                                     | 18-line MP3 manifest + selection helpers (`pickHubGreeting`, `isLastSessionRecent`, `shouldShowDayStreak`). 9 anchor lines + 9 rotation variants + 2 node-tap.                                                            |
+| [`hubLines.ts`](MarianLearning/packages/core/src/hub/hubLines.ts)                               | 18-line MP3 manifest + selection helpers (`pickHubGreeting`, `isLastSessionRecent`, `shouldShowDayStreak`). 9 anchor lines + 9 rotation variants + 2 node-tap.                                                            |
 | [`hubSuggestion.ts`](MarianLearning/src/screens/Hub/hubSuggestion.ts)                           | Soft-suggestion algorithm. `computeSuggestion(history, now)` returns `'number-garden'                                                                                                                                     | 'word-song' | null`. `recordSuggestionOutcome` writes back the override-streak counter. |
-| [`progressProjection.ts`](MarianLearning/src/screens/Hub/progressProjection.ts)                 | Pure projection from `Progress` doc to `HubTreeProgress` indices + `labelForSkillNode` for the celebration caption.                                                                                                       |
-| [`stages.ts`](MarianLearning/src/screens/Hub/stages.ts)                                         | Stage taxonomy (`NUMBER_GARDEN_STAGES`, `WORD_SONG_STAGES`) + [`slidingWindow(stages, currentIndex, size)`](MarianLearning/src/screens/Hub/stages.ts#L71) helper for the path-strip.                                      |
+| [`progressProjection.ts`](MarianLearning/packages/core/src/hub/progressProjection.ts)           | Pure projection from `Progress` doc to `HubTreeProgress` indices + `labelForSkillNode` for the celebration caption.                                                                                                       |
+| [`stages.ts`](MarianLearning/packages/core/src/hub/stages.ts)                                   | Stage taxonomy (`NUMBER_GARDEN_STAGES`, `WORD_SONG_STAGES`) + [`slidingWindow(stages, currentIndex, size)`](MarianLearning/packages/core/src/hub/stages.ts#L71) helper for the path-strip.                                |
 | [`stageIcons.tsx`](MarianLearning/src/screens/Hub/stageIcons.tsx)                               | `<StageIcon stage={...} kind="mastered                                                                                                                                                                                    | in-progress | current                                                                   | locked" />` renderer. |
 | [`PromotionCelebration.tsx`](MarianLearning/src/screens/Hub/PromotionCelebration.tsx)           | Overlay shown when `pendingPromotion` is set. 8 radial sparkles, Emma celebration pose, 3.5 s auto-dismiss.                                                                                                               |
 | [`playHubLine.ts`](MarianLearning/src/screens/Hub/playHubLine.ts)                               | Howler-backed default `playLineFn`. Falls back to caption-walk on load/play error. **Canonical wiring** — without this module Hub silently runs on the no-audio fallback (see auto-memory `project_hub_audio_wiring.md`). |
@@ -113,7 +113,7 @@ Routes out via `onPickTree` ([App.tsx:331-341](MarianLearning/src/App.tsx#L331-L
 
 ### Path-strip
 
-Each tree shows a 5-cell sliding window over its stage list. Computed via [`slidingWindow(stages, currentIndex, 5)`](MarianLearning/src/screens/Hub/stages.ts#L71) — centres on `currentIndex` with edge-clamping. Cells render as `mastered | current | locked` (Hub doesn't surface `'in-progress'` distinct from `'current'` today).
+Each tree shows a 5-cell sliding window over its stage list. Computed via [`slidingWindow(stages, currentIndex, 5)`](MarianLearning/packages/core/src/hub/stages.ts#L71) — centres on `currentIndex` with edge-clamping. Cells render as `mastered | current | locked` (Hub doesn't surface `'in-progress'` distinct from `'current'` today).
 
 ### Celebration overlay
 
@@ -133,18 +133,18 @@ When Marian taps a skill-tree chip mid-greeting, [`handleNodeTap`](MarianLearnin
 
 **Route contract**: rendered when `route === 'math'`. Reached from Greet (first-ever flow) or Hub (number-garden tile). Routes out via `onSessionComplete` → `handleMathComplete` ([App.tsx:398-412](MarianLearning/src/App.tsx#L398-L412)) → `session-end` (after problem 8); or `onRequestExit` → `handleBackToHub` → `hub` (mid-skill back-arrow).
 
-**Plan source**: [`pickStaticSessionPlan()`](MarianLearning/src/screens/Math/sessionPlans.ts) returns the rotation fallback plan; the live plan flows in via `props.plan` from App's `mathPlan` state, populated by [`prepareMathPathA`](MarianLearning/src/lib/audio/mathPathA.ts) — see `audio-system.md` and `planner-and-canon.md`.
+**Plan source**: [`pickStaticSessionPlan()`](MarianLearning/packages/core/src/math/sessionPlans.ts) returns the rotation fallback plan; the live plan flows in via `props.plan` from App's `mathPlan` state, populated by [`prepareMathPathA`](MarianLearning/src/lib/audio/mathPathA.ts) — see `audio-system.md` and `planner-and-canon.md`.
 
 **Sibling files**:
 
-| File                                                                     | Role                                                                                  |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| [`Math.tsx`](MarianLearning/src/screens/Math/Math.tsx)                   | Orchestration + visual choreography (~1000+ lines).                                   |
-| [`constants.ts`](MarianLearning/src/screens/Math/constants.ts)           | Re-exports `STREAK_BONUS_THRESHOLDS` from `_shared/gameplayConstants.ts`.             |
-| [`distractors.ts`](MarianLearning/src/screens/Math/distractors.ts)       | `pickDistractors()` algorithm — see `skill-trees-and-content.md`.                     |
-| [`sessionPlans.ts`](MarianLearning/src/screens/Math/sessionPlans.ts)     | `MathSessionPlan`, `MathProblem`, `pickStaticSessionPlan()`.                          |
-| [`planFromServer.ts`](MarianLearning/src/screens/Math/planFromServer.ts) | `mathSessionPlanFromServer()` rehydrates the wire-shape into the screen's plan shape. |
-| [`stardust.ts`](MarianLearning/src/screens/Math/stardust.ts)             | Per-screen stardust persistence (`marian-tutor.stardust.v1`).                         |
+| File                                                                           | Role                                                                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| [`Math.tsx`](MarianLearning/src/screens/Math/Math.tsx)                         | Orchestration + visual choreography (~1000+ lines).                                   |
+| [`constants.ts`](MarianLearning/packages/core/src/math/constants.ts)           | Re-exports `STREAK_BONUS_THRESHOLDS` from `_shared/gameplayConstants.ts`.             |
+| [`distractors.ts`](MarianLearning/packages/core/src/math/distractors.ts)       | `pickDistractors()` algorithm — see `skill-trees-and-content.md`.                     |
+| [`sessionPlans.ts`](MarianLearning/packages/core/src/math/sessionPlans.ts)     | `MathSessionPlan`, `MathProblem`, `pickStaticSessionPlan()`.                          |
+| [`planFromServer.ts`](MarianLearning/packages/core/src/math/planFromServer.ts) | `mathSessionPlanFromServer()` rehydrates the wire-shape into the screen's plan shape. |
+| [`stardust.ts`](MarianLearning/packages/core/src/math/stardust.ts)             | Per-screen stardust persistence (`marian-tutor.stardust.v1`).                         |
 
 **Behaviour highlights**:
 
@@ -190,19 +190,19 @@ Note: `mathFacts` is the 5th persisted per-problem field on `SessionHistoryEntry
 
 **Route contract**: rendered when `route === 'literacy'`. Reached from Hub (word-song tile). Routes out via `onSessionComplete` → `handleWordSongComplete` ([App.tsx:414-432](MarianLearning/src/App.tsx#L414-L432)) → `session-end`; or `onRequestExit` → `handleBackToHub` → `hub`.
 
-**Plan source**: [`pickStaticWordSongPlan()`](MarianLearning/src/screens/WordSong/wordSessionPlans.ts) returns the static fallback; live plan via [`prepareWordSongPathA`](MarianLearning/src/lib/audio/wordSongPathA.ts).
+**Plan source**: [`pickStaticWordSongPlan()`](MarianLearning/packages/core/src/wordSong/wordSessionPlans.ts) returns the static fallback; live plan via [`prepareWordSongPathA`](MarianLearning/src/lib/audio/wordSongPathA.ts).
 
 **Sibling files**:
 
-| File                                                                             | Role                                                                                 |
-| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [`WordSong.tsx`](MarianLearning/src/screens/WordSong/WordSong.tsx)               | Orchestration + visual choreography.                                                 |
-| [`constants.ts`](MarianLearning/src/screens/WordSong/constants.ts)               | Re-exports `STREAK_BONUS_THRESHOLDS`.                                                |
-| [`wordPack.ts`](MarianLearning/src/screens/WordSong/wordPack.ts)                 | `WordEntry` shape, `WORD_PACK`, `FORBIDDEN_PAIRS`. See `skill-trees-and-content.md`. |
-| [`wordDistractors.ts`](MarianLearning/src/screens/WordSong/wordDistractors.ts)   | `pickDistractors()` for picture-grounded chips, honours forbidden pairs.             |
-| [`wordSessionPlans.ts`](MarianLearning/src/screens/WordSong/wordSessionPlans.ts) | `WordSongSessionPlan`, `WordSongProblem`, static fallback factory.                   |
-| [`planFromServer.ts`](MarianLearning/src/screens/WordSong/planFromServer.ts)     | Rehydrates wire-shape into screen plan.                                              |
-| [`wordPictures.tsx`](MarianLearning/src/screens/WordSong/wordPictures.tsx)       | Inline-SVG picture placeholders (real assets land later).                            |
+| File                                                                                   | Role                                                                                 |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [`WordSong.tsx`](MarianLearning/src/screens/WordSong/WordSong.tsx)                     | Orchestration + visual choreography.                                                 |
+| [`constants.ts`](MarianLearning/packages/core/src/wordSong/constants.ts)               | Re-exports `STREAK_BONUS_THRESHOLDS`.                                                |
+| [`wordPack.ts`](MarianLearning/packages/core/src/wordSong/wordPack.ts)                 | `WordEntry` shape, `WORD_PACK`, `FORBIDDEN_PAIRS`. See `skill-trees-and-content.md`. |
+| [`wordDistractors.ts`](MarianLearning/packages/core/src/wordSong/wordDistractors.ts)   | `pickDistractors()` for picture-grounded chips, honours forbidden pairs.             |
+| [`wordSessionPlans.ts`](MarianLearning/packages/core/src/wordSong/wordSessionPlans.ts) | `WordSongSessionPlan`, `WordSongProblem`, static fallback factory.                   |
+| [`planFromServer.ts`](MarianLearning/packages/core/src/wordSong/planFromServer.ts)     | Rehydrates wire-shape into screen plan.                                              |
+| [`wordPictures.tsx`](MarianLearning/src/screens/WordSong/wordPictures.tsx)             | Inline-SVG picture placeholders (real assets land later).                            |
 
 **Behaviour highlights**:
 
@@ -228,7 +228,7 @@ Same field name (`perProblemCorrect`), divergent per-screen semantics. Currently
 
 - Component: [`MarianLearning/src/screens/SessionEnd/SessionEnd.tsx`](MarianLearning/src/screens/SessionEnd/SessionEnd.tsx)
 - Sub-components: [`StardustCounter.tsx`](MarianLearning/src/screens/SessionEnd/StardustCounter.tsx), [`StreakBand.tsx`](MarianLearning/src/screens/SessionEnd/StreakBand.tsx), [`SleepSplash.tsx`](MarianLearning/src/screens/SessionEnd/SleepSplash.tsx).
-- Storage helpers: [`sessionHistory.ts`](MarianLearning/src/screens/SessionEnd/sessionHistory.ts), [`progressHistory.ts`](MarianLearning/src/screens/SessionEnd/progressHistory.ts).
+- Storage helpers: [`sessionHistory.ts`](MarianLearning/packages/core/src/sessionEnd/sessionHistory.ts), [`progressHistory.ts`](MarianLearning/packages/core/src/sessionEnd/progressHistory.ts).
 - Spec: [`MarianLearning/design/screen-5-session-end.md`](MarianLearning/design/screen-5-session-end.md).
 
 **Route contract**: rendered when `route === 'session-end'`. Reached after problem 8 on Math (`handleMathComplete`) or Word Song (`handleWordSongComplete`). Routes out via `onAllDone` → `handleSessionEndAllDone` ([App.tsx:379-382](MarianLearning/src/App.tsx#L379-L382)) → `hub`. When `onAllDone` is undefined, falls through to the legacy `<SleepSplash>` (Option C "Come back soon" — preserved as a dark-launch fallback per auto-memory `project_session_end_and_hub.md`).
@@ -302,7 +302,7 @@ Seeds run at module load via [`maybeApplyDebugSeed()`](MarianLearning/src/App.ts
 | `cvc-words-short-i`          | short-a + short-o + short-u mastered; practising `cvc-words-short-i`. Fourth vowel-tier sibling (ticket 86c9qdba4).                                                                                                                                                                                                                                                        |
 | `cross-vowel-mixing`         | All four CVC vowel tiers mastered; focus is `digraphs` (the next non-mastered node). Exercises the `crossVowelMixingActive` predicate-true branch for the parent-settings UI; chips do NOT render cross-vowel in the natural session flow because the caller-side `focusIsCvcTier` gate in `App.tsx` returns `false` when focus is `digraphs`. v1 seed (ticket 86c9qa0kf). |
 | `add-to-20`                  | Math track: `number-recog` + `add-to-10` mastered; practising `add-to-20`. iPad smoke-test entry for the next math tier (ticket 86c9q5q13).                                                                                                                                                                                                                                |
-| `dayOffset=N` (not a seed)   | Shifts the progress clock ([`lib/progress/clock.ts`](MarianLearning/src/lib/progress/clock.ts)) N calendar days forward (integer 0-60; anything else, or no `?debug=1`, is ignored). Moves the good-day rule, day streak, `todayTreesTouched`, Leitner `lastSeen`/due and the seeds' own timestamps. Nothing about the offset is persisted (ticket 123jpnbca4v).           |
+| `dayOffset=N` (not a seed)   | Shifts the progress clock ([`lib/progress/clock.ts`](MarianLearning/packages/core/src/progress/clock.ts)) N calendar days forward (integer 0-60; anything else, or no `?debug=1`, is ignored). Moves the good-day rule, day streak, `todayTreesTouched`, Leitner `lastSeen`/due and the seeds' own timestamps. Nothing about the offset is persisted (ticket 123jpnbca4v). |
 
 URLs are of the form `https://marian-learning.vercel.app/?debug=1&seed=cvc-words-short-i`. Day stepping: `?debug=1&dayOffset=1`, then `&dayOffset=2`, one session each (combinable with `&seed=`); stepping back to a lower offset reads as clock skew (streak unchanged). Idempotent — applying the same seed twice short-circuits via the `changed` flag; a real returning user with `sessionCount > 0` is never displaced (the seeder only bumps from 0 → 1).
 

@@ -193,7 +193,7 @@ The integration spec §6 constraint 4 marks the sh/ch corner cue as "design-inte
 
 ## 4. Pose state machine — `EmmaPose`
 
-The `EmmaPose` union, per-pose tilt mapping, per-pose hold window, and celebration keyframe constants live in a single shared module: [emmaPose.ts](MarianLearning/src/lib/character/emmaPose.ts).
+The `EmmaPose` union, per-pose tilt mapping, per-pose hold window, and celebration keyframe constants live in a single shared module: [emmaPose.ts](MarianLearning/packages/core/src/character/emmaPose.ts).
 
 ```ts
 export type EmmaPose =
@@ -211,7 +211,7 @@ export type EmmaPose =
 
 ### 4.1 Per-pose `rotateZ` tilt
 
-`TILT_BY_POSE` at [emmaPose.ts:44](MarianLearning/src/lib/character/emmaPose.ts#L44):
+`TILT_BY_POSE` at [emmaPose.ts:44](MarianLearning/packages/core/src/character/emmaPose.ts#L44):
 
 | Pose                 | rotateZ (deg) | Notes                             |
 | -------------------- | ------------- | --------------------------------- |
@@ -228,7 +228,7 @@ export type EmmaPose =
 
 ### 4.2 Per-pose spring config
 
-`TILT_SPRING_BY_POSE` at [emmaPose.ts:84](MarianLearning/src/lib/character/emmaPose.ts#L84). House spring is `stiffness: 260, damping: 20` — the same config used on Math's ribbon scale-in, so Emma's motion vocabulary stays coherent with the screen surfaces. Two pose-specific exceptions:
+`TILT_SPRING_BY_POSE` at [emmaPose.ts:84](MarianLearning/packages/core/src/character/emmaPose.ts#L84). House spring is `stiffness: 260, damping: 20` — the same config used on Math's ribbon scale-in, so Emma's motion vocabulary stays coherent with the screen surfaces. Two pose-specific exceptions:
 
 - `puzzled-tilt`: `220, 20` (~18% softer). The tilt arrives with a hair more lag and reads as "considering" rather than "reacting".
 - `celebration`: `220, 22` (kept for fallback / documentation; the active path is **keyframed**, see §4.3).
@@ -237,7 +237,7 @@ export type EmmaPose =
 
 The celebration pose does NOT use a spring at runtime. Iteration #1 (PR #131) softened the spring to 200/22 but Thomas's iPad Pro re-test reported "I hardly see the second pose" — symptom of an instantaneous apex with no hold beat. Iteration #2 replaces the spring with a keyframed sequence that **holds at the apex** so the celebrate pose is visibly registered.
 
-Constants at [emmaPose.ts:128](MarianLearning/src/lib/character/emmaPose.ts#L128):
+Constants at [emmaPose.ts:128](MarianLearning/packages/core/src/character/emmaPose.ts#L128):
 
 ```ts
 export const CELEBRATION_HOLD_MS = 250
@@ -259,7 +259,7 @@ Reduce-motion path collapses to `scale: 1` (no keyframe array).
 
 ### 4.5 `POSE_HOLD_MS` — auto-return windows
 
-`POSE_HOLD_MS` at [emmaPose.ts:169](MarianLearning/src/lib/character/emmaPose.ts#L169) describes how long a pose holds before auto-returning to `idle`. `null` means "never auto-returns; the call site clears the pose another way (typically on audio onEnd or on the next user gesture)".
+`POSE_HOLD_MS` at [emmaPose.ts:169](MarianLearning/packages/core/src/character/emmaPose.ts#L169) describes how long a pose holds before auto-returning to `idle`. `null` means "never auto-returns; the call site clears the pose another way (typically on audio onEnd or on the next user gesture)".
 
 | Pose                 | Hold (ms) | Trigger to clear                 |
 | -------------------- | --------- | -------------------------------- |
@@ -493,7 +493,7 @@ Not implementation-ready; surfaced here so future sessions don't think the gaps 
 - Sibling doc: `progress-and-persistence.md` (Agent C) — what `pendingPromotion` is and how the M3 mastery rule queues it.
 - Source: [character-emma.md](MarianLearning/design/character-emma.md) — full character bible.
 - Source: [motion-brief.md](MarianLearning/design/character/motion-brief.md) — implementation brief for the pose tilt + spring + breathing.
-- Source: [emmaPose.ts](MarianLearning/src/lib/character/emmaPose.ts) — the runtime types and constants.
+- Source: [emmaPose.ts](MarianLearning/packages/core/src/character/emmaPose.ts) — the runtime types and constants.
 - Source: [EmmaCharacter.tsx](MarianLearning/src/components/EmmaCharacter.tsx) — the shared component.
 - Source: [PromotionCelebration.tsx](MarianLearning/src/screens/Hub/PromotionCelebration.tsx) — the celebration overlay.
 - Source: [Hub.tsx:628–690](MarianLearning/src/screens/Hub/Hub.tsx#L628) — the AnimatePresence mutual-exclusion gate.
