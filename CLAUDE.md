@@ -182,6 +182,8 @@ After the soak, grade the prediction against the verdict. A wrong prediction is 
 git log origin/main --since="7 days ago" --pretty=%s | grep -c "^feat"
 ```
 
+**PAUSED 2026-10-08 until Marian is on the native app (end of the React Native migration's Phase 5) — Thomas's decision, `team/DECISIONS.md` 2026-10-08.** Re-arm it then.
+
 `0` → collapse to a single hands-on session + an on-demand QA agent, and stop dispatching personas. No debate, no appeal. This exists because a drought is invisible from inside it — Far-Horizon's ran ten days before anyone named it, and it took an independent audit to surface.
 
 ## Coordination docs stay small

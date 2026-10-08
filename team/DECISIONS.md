@@ -160,3 +160,10 @@ Distinct from its siblings:
 - **Reference:** `design/emmas-path/redesign/guidance-mockup.html` (artifact https://claude.ai/artifact/LUaKXxCjDw1e5dcf5EZk3J) + Dave's `design/research/guidance-layer-2026-10-06.md`.
 - **Decided:** build the guidance layer as shown: Emma names one next action and one card glows (both stay open, same size); 3 flower slots per step, a flower earned today sleeps (bud + moon + z) until tomorrow; session end = effort praise, flower flies into its slot, "N of 3", "It sleeps tonight. Come back tomorrow for one more."; same-day replay is praised practice with no new flower; not-yet day = warm praise, nothing taken away, "Play again to get today's flower" (said at most once a day); no stardust total and no day-streak sun on the Hub. Stars are in-session "you got it" feedback only, never counted and never collected into the flower (Kyle's call over Dave's). A test-only `?debug=1&dayOffset=N` switch lets Thomas step through days. R4 (session-end clay reskin) is folded into the guidance session-end ticket.
 - **Decided by:** Thomas (popups, recommended options; "looks good").
+
+## 2026-10-08 — React Native (Expo) migration: GO, Phase 1 starts
+
+- **Reference:** `design/react-native-migration-plan.md`. Phase 0 spike on branch `spike/rn-phase0` (head `3ba5aa0`, `mobile/SPIKE.md`): Splash → Greet → one live Math problem → storage round-trip, Expo SDK 57 in Expo Go.
+- **Evidence:** Thomas ran the spike on iPad + iPhone through Expo Go and answered "yes to all" to the four exit criteria (voice starts with no tap, captions in time, animation feel, layout fits portrait + landscape). First round, zero fix rounds. Android not tested yet.
+- **Decided:** (1) Go with React Native (Expo); start Phase 1 (shared core extraction, no user-visible change). Audience: Marian first, public store release later as a separate decision. (2) The kill switch (`CLAUDE.md § Kill switch`) is PAUSED until Marian is on the native app (end of Phase 5). (3) Web UI feature freeze from Phase 2: content, canon, server work and bug fixes continue; new screens and UI features go into native only.
+- **Decided by:** Thomas (popups, recommended options).
