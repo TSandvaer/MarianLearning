@@ -8,12 +8,13 @@
  *   0. `[audio-probe]` the raw status stream of one player (muted, volume
  *      0, and under expo-audio's default session): tells "no onPlay" apart
  *      from "no status events" / "clock never moves" on a new OS or device;
- *   0b. `[audio-limit]` how many players load at once before one fails
- *      (Android: one MP3 decoder per player);
  *   1. a Greet line on a cold player, then on a preloaded one;
  *   2. a live `/api/claude` math session-start (fetch, background writes);
  *   3. a session line on a cold player, then on a prewarmed one;
- *   4. two SFX (chime, sparkle).
+ *   4. two SFX (chime, sparkle);
+ *   5. `[audio-limit]` how many players load at once before one fails
+ *      (Android: one MP3 decoder per player). Runs last: exhausting the
+ *      decoders breaks every player created after it for a while.
  * Every row is `[audio] ...`; a summary line `[audio-check] done` ends it.
  *
  * The session-start is the same request the web's Math mount makes for a
@@ -160,7 +161,6 @@ export async function runAudioCheck(log = console.log): Promise<void> {
     await probeRawStatus(log, 'volume0')
     await setAudioModeAsync(AUDIO_MODE)
     log('[audio-probe] session -> app mode (doNotMix)')
-    await probeDecoderLimit(log)
     // 1. Greet: cold player, then preloaded.
     await playGreetLine('hi').catch((e: unknown) =>
       note('greet-cold', String(e)),
@@ -209,6 +209,10 @@ export async function runAudioCheck(log = console.log): Promise<void> {
     sparkle.unload()
 
     s.unload()
+
+    // Last: exhausting decoders poisons later players (Android does not
+    // always free a removed player's decoder right away).
+    await probeDecoderLimit(log)
 
     const onplay = readAudioLog().filter((r) => r.kind === 'onplay')
     log(
