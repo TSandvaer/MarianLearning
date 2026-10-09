@@ -75,7 +75,10 @@ describe('audio engine: speak contract', () => {
       label: 'session:p1.read',
     })
     await expect(hub).rejects.toThrow('cancelled')
-    expect(fakePlayers[0].calls).toEqual(['play', 'pause'])
+    // Stopped, and released even though the app is visible: a cached,
+    // OS-flagged player would be auto-resumed by expo-audio later.
+    expect(fakePlayers[0].calls).toEqual(['play', 'pause', 'remove', 'release'])
+    expect(engine.loadedKeys()).toEqual(['session:s1:p1.read'])
     expect(engine.voice.activeLabel).toBe('session:p1.read')
     fakePlayers[1].start(2)
     fakePlayers[1].finish()
@@ -95,7 +98,38 @@ describe('audio engine: speak contract', () => {
     await expect(done).rejects.toThrow('start-timeout')
   })
 
-  it('rejects with the player error', async () => {
+  it('a start-timeout stops the clip and releases its player, so a late start cannot play over the next line', async () => {
+    const { engine } = setup()
+    const ticks: number[] = []
+    const onPlay = jest.fn()
+    const timedOut = engine.speak('greet:hi', SRC, {
+      text: 'Hi!',
+      label: 'greet:hi',
+      onPlay,
+      onWordTick: (i) => ticks.push(i),
+    })
+    const stalled = fakePlayers[0]
+    jest.advanceTimersByTime(START_TIMEOUT_MS)
+    await expect(timedOut).rejects.toThrow('start-timeout')
+    // Paused BEFORE the release, synchronously with the settle.
+    expect(stalled.calls).toEqual(['play', 'pause', 'remove', 'release'])
+    expect(engine.loadedKeys()).toEqual([])
+    expect(engine.voice.activeLabel).toBeNull()
+
+    // The next line (here: the same clip) gets a fresh player...
+    const next = engine.speak('greet:hi', SRC, { text: 'Hi!', label: 'next' })
+    expect(fakePlayers).toHaveLength(2)
+    // ...and a late status from the dead player changes nothing.
+    stalled.emit({ playing: true, currentTime: 0.2, duration: 0.6 })
+    expect(onPlay).not.toHaveBeenCalled()
+    expect(ticks).toEqual([])
+    expect(engine.voice.activeLabel).toBe('next')
+    fakePlayers[1].start(0.6)
+    fakePlayers[1].finish()
+    await expect(next).resolves.toBeUndefined()
+  })
+
+  it('rejects with the player error, pausing and releasing the player', async () => {
     const { engine } = setup()
     const done = engine.speak('greet:hi', SRC, {
       text: 'Hi!',
@@ -103,6 +137,39 @@ describe('audio engine: speak contract', () => {
     })
     fakePlayers[0].emit({ error: 'decode failed' })
     await expect(done).rejects.toThrow('decode failed')
+    expect(fakePlayers[0].calls).toEqual(['play', 'pause', 'remove', 'release'])
+    expect(engine.loadedKeys()).toEqual([])
+  })
+
+  it('a play() that throws rejects and releases the player', async () => {
+    const throwing = (src: Parameters<typeof fakePlayerFactory>[0]) => {
+      const p = fakePlayerFactory(src) as FakePlayer
+      p.play = () => {
+        p.calls.push('play!')
+        throw new Error('session inactive')
+      }
+      return p
+    }
+    const engine = createAudioEngine({ createPlayer: throwing })
+    const done = engine.speak('greet:hi', SRC, { text: 'Hi!', label: 'x' })
+    await expect(done).rejects.toThrow('session inactive')
+    expect(fakePlayers[0].calls).toEqual([
+      'play!',
+      'pause',
+      'remove',
+      'release',
+    ])
+    expect(engine.loadedKeys()).toEqual([])
+  })
+
+  it('a natural end keeps the player cached (no release) for a replay', async () => {
+    const { engine } = setup()
+    const done = engine.speak('greet:hi', SRC, { text: 'Hi!', label: 'x' })
+    fakePlayers[0].start(0.6)
+    fakePlayers[0].finish()
+    await done
+    expect(fakePlayers[0].released).toBe(false)
+    expect(engine.loadedKeys()).toEqual(['greet:hi'])
   })
 
   it('replays a line by rewinding its cached player', async () => {
@@ -146,7 +213,7 @@ describe('audio engine: speak contract', () => {
     engine.preload('greet:hi', SRC)
     expect(engine.loadedKeys()).toEqual(['greet:hi'])
     engine.release('greet:hi')
-    expect(fakePlayers[0].removed).toBe(true)
+    expect(fakePlayers[0].calls).toEqual(['remove', 'release'])
     engine.preload('greet:hi', SRC)
     expect(fakePlayers).toHaveLength(2)
   })
@@ -162,11 +229,12 @@ describe('audio engine: speak contract', () => {
     engine.preload('a', SRC) // a is now the most recently used
     engine.preload('d', SRC)
     expect(engine.loadedKeys()).toEqual(['c', 'a', 'd'])
-    expect(fakePlayers.map((p) => p.removed)).toEqual([
-      false,
-      true,
-      false,
-      false,
+    // Evicted = out of the registry AND native player (decoder) freed.
+    expect(fakePlayers.map((p) => p.calls)).toEqual([
+      [],
+      ['remove', 'release'],
+      [],
+      [],
     ])
   })
 

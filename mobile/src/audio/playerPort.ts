@@ -26,9 +26,15 @@ export interface PlayerLike {
   play(): void
   pause(): void
   seekTo(seconds: number): Promise<void>
-  /** Release the native player. Removed players are dropped from
-   *  expo-audio's registry, so its foreground auto-resume skips them. */
+  /**
+   * Drop the player from expo-audio's registry, so the library's own
+   * foreground / focus-gain auto-resume skips it. Does NOT free the native
+   * player (AVPlayer / ExoPlayer and its Android MP3 decoder): that is
+   * `release()`. Use {@link disposePlayer}, which calls both.
+   */
   remove(): void
+  /** `SharedObject.release()`: frees the native player now, not at GC. */
+  release(): void
   readonly playing: boolean
   readonly currentTime: number
   readonly duration: number
@@ -44,6 +50,25 @@ export interface PlayerLike {
 export type PlayerSource = number | { uri: string }
 
 export type PlayerFactory = (source: PlayerSource) => PlayerLike
+
+/**
+ * Dispose a player for good: out of expo-audio's registry (no native
+ * auto-resume) and its native player freed (iOS
+ * `sharedObjectWillRelease`, Android `releasePlayer()` → ExoPlayer
+ * `release()`, which frees the MP3 decoder). Best effort, never throws.
+ */
+export function disposePlayer(player: PlayerLike): void {
+  try {
+    player.remove()
+  } catch {
+    // Already out of the registry.
+  }
+  try {
+    player.release()
+  } catch {
+    // Already released.
+  }
+}
 
 /**
  * Production factory: a 50 ms status interval (the caption clock needs

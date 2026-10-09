@@ -90,7 +90,9 @@ describe('SFX (web sfx.ts contract)', () => {
   it('unload releases the player', () => {
     const sfx = createSfx({ src: SFX_SOURCES.sparkle, engine: engine() })
     sfx.unload()
-    expect(fakePlayers[0].removed).toBe(true)
+    // Out of the registry and the native player (decoder) freed now.
+    expect(fakePlayers[0].calls).toEqual(['remove', 'release'])
+    expect(sfx.play()).toBe(false)
   })
 })
 

@@ -11,6 +11,10 @@
  *   `START_TIMEOUT_MS` after `play()` while the app is in the foreground;
  * - reject `Error('<player error>')` when the player reports an error.
  *
+ * Every non-natural end pauses the player before settling, so a clip that
+ * starts late cannot play over the next line; timeouts and errors also
+ * call `onAbort` so the owner releases the player.
+ *
  * `park()` / `unpark()` are the lifecycle hooks (see `voiceChannel.ts`):
  * park pauses the clip and freezes the start timer; unpark resumes the clip
  * where it stopped. The captions follow the audio clock, so they freeze and
@@ -36,6 +40,15 @@ export interface StartLineOptions extends LineCallbacks {
   label: string
   /** ms from `play()` to the first `playing` status. */
   onLatency?: (ms: number, label: string) => void
+  /**
+   * The line ended without finishing on its own (start timeout, player
+   * error, `play()` throw), after the player was paused. Called
+   * synchronously, so the owner can release the player before anything
+   * else runs: a clip that starts late must not play over the next line.
+   * `cancel()` does not call it (the voice channel releases cancelled
+   * lines itself).
+   */
+  onAbort?: (err: Error) => void
   /** Clock seam. */
   now?: () => number
 }
@@ -90,8 +103,20 @@ export function startLine(
     clearStartTimer()
     startTimer = setTimeout(() => {
       startTimer = null
-      if (!started && !parked) settle(new Error('start-timeout'))
+      if (!started && !parked) abort(new Error('start-timeout'))
     }, START_TIMEOUT_MS)
+  }
+
+  /** End the line on a failure: stop the clip first, then tell the owner. */
+  function abort(err: Error): void {
+    if (state === 'settled') return
+    try {
+      player.pause()
+    } catch {
+      // A broken player may refuse; the owner releases it next.
+    }
+    settle(err)
+    opts.onAbort?.(err)
   }
 
   const markStarted = () => {
@@ -108,7 +133,7 @@ export function startLine(
     (status: PlayerStatus) => {
       if (state === 'settled') return
       if (status.error) {
-        settle(new Error(status.error))
+        abort(new Error(status.error))
         return
       }
       if (status.didJustFinish) {
@@ -140,7 +165,7 @@ export function startLine(
     try {
       player.play()
     } catch (err) {
-      settle(err instanceof Error ? err : new Error(String(err)))
+      abort(err instanceof Error ? err : new Error(String(err)))
       return
     }
     if (!started) armStartTimer()

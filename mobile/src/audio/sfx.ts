@@ -23,7 +23,7 @@
 import { recordAudio } from './audioLog'
 import { audioForWebPath } from './bundledAudio'
 import { audioEngine, type AudioEngine } from './engine'
-import type { PlayerLike, PlayerStatus } from './playerPort'
+import { disposePlayer, type PlayerLike, type PlayerStatus } from './playerPort'
 
 export interface SfxOptions {
   /** Web URL path of the effect, e.g. `/assets/sfx-chime-soft.mp3`. */
@@ -117,11 +117,8 @@ export function createSfx(opts: SfxOptions): Sfx {
     unload() {
       sub?.remove()
       sub = null
-      try {
-        player?.remove()
-      } catch {
-        // Already released.
-      }
+      // Registry out and native player (Android: MP3 decoder) freed now.
+      if (player) disposePlayer(player)
       player = null
     },
     get missedPlays() {

@@ -19,11 +19,19 @@
  * |                            |                                         | resumes it on "should resume"; otherwise the    |
  * |                            |                                         | next `active` AppState edge resumes it          |
  *
- * Why a released player: expo-audio itself pauses playing players when the
- * app enters the background and resumes those same players on the way back
- * (`OnAppEntersBackground` / `OnAppEntersForeground`, both platforms). A
- * line cancelled while hidden would therefore come back on foreground;
- * removing its player takes it out of the library's registry.
+ * Why every cancelled line's player is released (registry `remove()` +
+ * native `release()`): expo-audio itself pauses playing players and flags
+ * them for its own later resume, then plays every flagged player again:
+ * - app background → foreground (`OnAppEntersBackground` /
+ *   `OnAppEntersForeground`, both platforms);
+ * - iOS route change `.oldDeviceUnavailable` (headphones out) sets
+ *   `wasPlaying`, resumed at the next foreground;
+ * - Android `AUDIOFOCUS_LOSS_TRANSIENT[_CAN_DUCK]` sets `isPaused`,
+ *   resumed on `AUDIOFOCUS_GAIN` or the next foreground.
+ * JS `pause()` clears none of those flags, so a cancelled line whose
+ * player stayed cached would come back over whatever plays next (the web's
+ * 86c9m4afh leak class). A start-timeout / player error releases its
+ * player too (`linePlayback.ts` `onAbort`).
  */
 import type { LineHandle } from './linePlayback'
 
@@ -33,7 +41,7 @@ export interface VoiceRequest {
   start: () => LineHandle
   /** The line was superseded before it started (queued while hidden). */
   onSuperseded: () => void
-  /** Release the native player behind this line (see header). */
+  /** Release the native player behind this line; called on every cancel. */
   release: () => void
 }
 
@@ -61,7 +69,9 @@ export function createVoiceChannel(): VoiceChannel {
     const { request, handle } = active
     active = null
     handle.cancel()
-    if (hidden) request.release()
+    // Always, not only while hidden: the library also flags players for
+    // its own auto-resume while visible (see header).
+    request.release()
   }
 
   function startNow(request: VoiceRequest): void {

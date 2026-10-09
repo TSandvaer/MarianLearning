@@ -23,6 +23,7 @@ export class FakePlayer implements PlayerLike {
   muted = false
   volume = 1
   removed = false
+  released = false
   readonly calls: string[] = []
   private listeners = new Set<(s: PlayerStatus) => void>()
 
@@ -43,9 +44,15 @@ export class FakePlayer implements PlayerLike {
     this.currentTime = seconds
     return Promise.resolve()
   }
+  /** Registry entry dropped (expo-audio `remove()`); native player alive. */
   remove(): void {
     this.calls.push('remove')
     this.removed = true
+  }
+  /** Native player freed (`SharedObject.release()`). */
+  release(): void {
+    this.calls.push('release')
+    this.released = true
     this.listeners.clear()
   }
   addListener(

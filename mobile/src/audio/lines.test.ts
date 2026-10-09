@@ -159,7 +159,7 @@ describe('manifest lines (web playHubLine.ts contract)', () => {
     fakePlayers[0].start(1)
     player.cancelActive()
     await expect(done).resolves.toBeUndefined()
-    expect(fakePlayers[0].calls).toEqual(['play', 'pause'])
+    expect(fakePlayers[0].calls).toEqual(['play', 'pause', 'remove', 'release'])
     fakePlayers[0].emit({ currentTime: 0.9 })
     expect(ticks).toEqual([0])
   })

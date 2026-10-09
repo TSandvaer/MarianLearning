@@ -31,7 +31,7 @@ import {
   playGreetLine,
 } from '../greetAudio'
 import { WEB_AUDIO_MODULES } from '../audioRegistry'
-import { createExpoPlayer, type PlayerLike } from '../playerPort'
+import { createExpoPlayer, disposePlayer, type PlayerLike } from '../playerPort'
 import { SFX_SOURCES, createSfx } from '../sfx'
 import { startSession } from '../sessionStart'
 
@@ -84,7 +84,7 @@ async function probeRawStatus(
   )
   await wait(1_500)
   sub.remove()
-  player.remove()
+  disposePlayer(player)
 }
 
 /** Resolves when a player reports loaded (true) / an error or 2 s (false). */
@@ -135,13 +135,13 @@ async function probeDecoderLimit(log: (line: string) => void): Promise<void> {
   }
   if (firstFailure < 0)
     log(`[audio-limit] ${live.length} players loaded, no failure`)
-  for (const p of live) p.remove()
+  for (const p of live) disposePlayer(p)
   await wait(1_500)
   const again = createExpoPlayer(WEB_AUDIO_MODULES[paths[0]])
   log(
-    `[audio-limit] after remove(): a fresh player -> ${await waitLoaded(again)}`,
+    `[audio-limit] after dispose (remove + release): a fresh player -> ${await waitLoaded(again)}`,
   )
-  again.remove()
+  disposePlayer(again)
   await wait(500)
 }
 

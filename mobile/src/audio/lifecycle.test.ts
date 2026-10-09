@@ -147,7 +147,7 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     const math = speak('session:s:p1', 'Three plus two.')
     await expect(hub).rejects.toThrow('cancelled')
     // Released: expo-audio's own foreground resume can't bring it back.
-    expect(fakePlayers[0].removed).toBe(true)
+    expect(fakePlayers[0].calls.slice(-2)).toEqual(['remove', 'release'])
     expect(fakePlayers).toHaveLength(1) // the queued line hasn't started
     expect(engine.voice.activeLabel).toBeNull()
 
@@ -217,6 +217,30 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     p.emit({ playing: true }) // "should resume" from the OS
     appState.set('active')
     expect(p.calls).toEqual(['play'])
+  })
+
+  it('a line the OS paused while visible (headphones out) and then cancelled is released, so no later resume can bring it back', async () => {
+    const { appState, speak } = setup()
+    const hub = speak('hub:a', 'Hi! What today?')
+    const hubPlayer = fakePlayers[0]
+    hubPlayer.start(1.2)
+    // iOS .oldDeviceUnavailable: expo-audio pauses it and flags wasPlaying.
+    hubPlayer.emit({ playing: false, currentTime: 0.4 })
+
+    // The child taps into Math: the Hub line is cancelled while visible.
+    const math = speak('session:s:p1', 'Three plus two.')
+    await expect(hub).rejects.toThrow('cancelled')
+    expect(hubPlayer.calls).toEqual(['play', 'pause', 'remove', 'release'])
+
+    // An app switch and return (where expo-audio resumes flagged players)
+    // only touches Math's line.
+    const mathPlayer = fakePlayers[1]
+    mathPlayer.start(1)
+    appState.set('background')
+    appState.set('active')
+    expect(hubPlayer.calls).toEqual(['play', 'pause', 'remove', 'release'])
+    mathPlayer.finish()
+    await expect(math).resolves.toBeUndefined()
   })
 
   it('uninstall stops following the app state', () => {

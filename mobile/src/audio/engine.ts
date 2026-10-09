@@ -12,6 +12,7 @@ import { recordAudio } from './audioLog'
 import { startLine, type LineCallbacks, type LineHandle } from './linePlayback'
 import {
   createExpoPlayer,
+  disposePlayer,
   type PlayerFactory,
   type PlayerLike,
   type PlayerSource,
@@ -94,15 +95,12 @@ export function createAudioEngine(
     return player
   }
 
+  /** Out of the cache, out of expo-audio's registry, native player freed. */
   function release(key: string): void {
     const player = players.get(key)
     if (!player) return
     players.delete(key)
-    try {
-      player.remove()
-    } catch {
-      // Already released.
-    }
+    disposePlayer(player)
   }
 
   return {
@@ -119,7 +117,8 @@ export function createAudioEngine(
             const token = {}
             activeKey = key
             activeToken = token
-            const handle = startLine(playerFor(key, source), {
+            const player = playerFor(key, source)
+            const handle = startLine(player, {
               text: speakOpts.text,
               label: speakOpts.label,
               onPlay: speakOpts.onPlay,
@@ -127,6 +126,12 @@ export function createAudioEngine(
               now: opts.now,
               onLatency: (ms, label) =>
                 recordAudio({ kind: 'onplay', label, ms }),
+              // Timed out / errored: drop the player now, synchronously,
+              // so a late start cannot sound over the next line. Only this
+              // line's own player (a replay of the key gets a fresh one).
+              onAbort: () => {
+                if (players.get(key) === player) release(key)
+              },
             })
             const settled = () => {
               if (activeToken !== token) return

@@ -182,7 +182,14 @@ export function loadSessionAudio(
     resolveReady = resolve
   })
 
-  /** Write one file now (background slice or on demand). */
+  /** File ids whose write threw (full disk, ...): soft-failed, not retried. */
+  const failed = new Set<string>()
+
+  /**
+   * Write one file now (background slice or on demand). Never throws: a
+   * failed write (expo-file-system throws on a full disk) is recorded and
+   * the line falls back to the web's soft paths (caption walk / reject).
+   */
   function writeOne(fileId: string): string | undefined {
     const done = uris.get(fileId)
     if (done !== undefined) return done
@@ -190,20 +197,36 @@ export function loadSessionAudio(
     if (base64 === undefined) return undefined
     pending.delete(fileId)
     const start = now()
-    const { uri, bytes } = files.write(sessionId, fileId, base64)
-    busyMs += now() - start
-    uris.set(fileId, uri)
-    bytesWritten += bytes
-    if (pending.size === 0) finishWrites()
-    return uri
+    try {
+      const { uri, bytes } = files.write(sessionId, fileId, base64)
+      uris.set(fileId, uri)
+      bytesWritten += bytes
+      return uri
+    } catch (err) {
+      failed.add(fileId)
+      recordAudio({
+        kind: 'note',
+        label: 'session-file-write',
+        detail: `failed for "${fileId}": ${err instanceof Error ? err.message : String(err)}`,
+      })
+      return undefined
+    } finally {
+      busyMs += now() - start
+      if (pending.size === 0) finishWrites()
+    }
   }
 
+  let finished = false
   function finishWrites(): void {
+    if (finished) return
+    finished = true
     recordAudio({
       kind: 'session-load',
       label: 'session-files',
       ms: now() - t0,
-      detail: `${uris.size} files ${bytesWritten} bytes, ${Math.round(busyMs)} ms writing`,
+      detail:
+        `${uris.size} files ${bytesWritten} bytes, ${Math.round(busyMs)} ms writing` +
+        (failed.size > 0 ? `, ${failed.size} failed` : ''),
     })
     resolveReady()
   }
@@ -231,11 +254,18 @@ export function loadSessionAudio(
     opts: LineCallbacks = {},
   ): Promise<void> {
     const fileId = fileIdOf(id)
-    const uri = unloaded || fileId === undefined ? undefined : writeOne(fileId)
-    if (fileId === undefined || uri === undefined) {
+    if (unloaded || fileId === undefined) {
       return Promise.reject(
         new Error(
           `[sessionAudio] no utterance "${id}" in session ${sessionId}`,
+        ),
+      )
+    }
+    const uri = writeOne(fileId)
+    if (uri === undefined) {
+      return Promise.reject(
+        new Error(
+          `[sessionAudio] no audio file for "${id}" in session ${sessionId} (write failed)`,
         ),
       )
     }
@@ -255,7 +285,9 @@ export function loadSessionAudio(
     sessionId,
     playUtterance(text, opts = {}) {
       const id = textToId.get(text)
-      if (id === undefined || unloaded) {
+      // Unknown text, an unloaded session or a file that could not be
+      // written: caption only, resolve silently (web mathPathA.ts:415-429).
+      if (id === undefined || unloaded || writeOne(id) === undefined) {
         opts.onPlay?.()
         const words = text.split(/\s+/).filter(Boolean)
         for (let i = 0; i < words.length; i++) opts.onWordTick?.(i)

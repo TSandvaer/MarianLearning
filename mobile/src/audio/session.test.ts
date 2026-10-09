@@ -147,6 +147,85 @@ describe('session audio: eager files, lazy players', () => {
     return expect(done).rejects.toThrow('cancelled')
   })
 
+  it('a failed file write (full disk) soft-fails: writer keeps going, ready resolves, the line caption-walks', async () => {
+    const queue: (() => void)[] = []
+    const fullDisk: SessionFileStore = {
+      ...files,
+      write(sessionId, id, b64) {
+        if (id === 'p1.reprompt') throw new Error('No space left on device')
+        return files.write(sessionId, id, b64)
+      },
+    }
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files: fullDisk,
+      yieldThen: (fn) => queue.push(fn),
+    })
+    // The background slice must not throw out of its timer callback.
+    expect(() => {
+      while (queue.length > 0) queue.shift()!()
+    }).not.toThrow()
+    await expect(s.ready).resolves.toBeUndefined()
+    expect(Array.from(files.dirs.get('s1')!.keys())).toEqual([
+      'p1.read',
+      'p2.read',
+    ])
+    expect(s.filesWritten).toBe(2)
+    expect(readAudioLog()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'note',
+          label: 'session-file-write',
+          detail: expect.stringContaining('No space left on device'),
+        }),
+        expect.objectContaining({
+          kind: 'session-load',
+          label: 'session-files',
+          detail: expect.stringContaining('1 failed'),
+        }),
+      ]),
+    )
+
+    // Text-keyed play: caption only, resolves silently (web contract).
+    const onPlay = jest.fn()
+    const ticks: number[] = []
+    await expect(
+      s.playUtterance('Hmm... try again?', {
+        onPlay,
+        onWordTick: (i) => ticks.push(i),
+      }),
+    ).resolves.toBeUndefined()
+    expect(onPlay).toHaveBeenCalledTimes(1)
+    expect(ticks).toEqual([0, 1, 2])
+    expect(fakePlayers).toHaveLength(0)
+    // By id: rejects (the caller's catch path), never throws synchronously.
+    let p: Promise<void> | undefined
+    expect(() => {
+      p = s.playUtteranceById('p2.reprompt')
+    }).not.toThrow()
+    await expect(p).rejects.toThrow('write failed')
+  })
+
+  it('an on-demand write that fails does not throw out of playUtterance', async () => {
+    const throwing: SessionFileStore = {
+      ...files,
+      write() {
+        throw new Error('No space left on device')
+      },
+    }
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files: throwing,
+      yieldThen: () => {}, // background never runs: the play writes first
+    })
+    let p: Promise<void> | undefined
+    expect(() => {
+      p = s.playUtterance('Three plus two. How many?')
+    }).not.toThrow()
+    await expect(p).resolves.toBeUndefined()
+    expect(fakePlayers).toHaveLength(0)
+  })
+
   it('unload stops the background writer', () => {
     const queue: (() => void)[] = []
     const s = loadSessionAudio('s1', UTTERANCES, {
