@@ -17,6 +17,7 @@
 // instead of slipping in. `npm run check:bundle` proves it on every run.
 const path = require('path')
 const { getDefaultConfig } = require('expo/metro-config')
+const { withNativeWind } = require('nativewind/metro')
 
 const config = getDefaultConfig(__dirname)
 
@@ -25,4 +26,9 @@ config.watchFolders = [
   path.resolve(__dirname, '..', 'packages', 'core'),
 ]
 
-module.exports = config
+// disableTypeScriptGeneration: otherwise the plugin rewrites tsconfig.json
+module.exports = withNativeWind(config, {
+  input: './global.css',
+  inlineRem: 16,
+  disableTypeScriptGeneration: true,
+})

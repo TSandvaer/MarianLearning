@@ -1,19 +1,10 @@
-/**
- * Splash placeholder (the real screen is a Phase 3 port of
- * `src/screens/Splash.tsx`).
- *
- * Silent. Shows the Emma logo on cream, the same picture as the native
- * splash screen, so the hand-off from the OS splash is seamless. Advances
- * after `WARM_CAP_MS`: the web's 3000 ms cold cap covers an un-cached
- * service worker, and native assets ship in the binary, so every native
- * launch is "warm". App decides the next route (`nextAfterSplash()`).
- */
+// NativeWind PROBE (throwaway branch): className port of the placeholder.
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
 import { Image } from 'expo-image'
 import { useEffect } from 'react'
-import { StyleSheet, useWindowDimensions, View } from 'react-native'
+import { useWindowDimensions, View } from 'react-native'
 import { emmaAsset } from '../assets'
-import { colors, FILL } from '../theme'
+import { StyleBench } from './StyleBench'
 
 export interface SplashPlaceholderProps {
   onAdvance: () => void
@@ -24,13 +15,16 @@ export function SplashPlaceholder({ onAdvance }: SplashPlaceholderProps) {
   const logoSize = Math.min(240, Math.min(width, height) * 0.5)
 
   useEffect(() => {
+    if (process.env.EXPO_PUBLIC_STYLE_BENCH === '1') return
     const id = setTimeout(onAdvance, WARM_CAP_MS)
     return () => clearTimeout(id)
   }, [onAdvance])
 
+  if (process.env.EXPO_PUBLIC_STYLE_BENCH === '1') return <StyleBench />
+
   return (
     <View
-      style={styles.root}
+      className="absolute inset-0 items-center justify-center bg-my-cream"
       testID="route-splash"
       accessibilityLabel="Emma is waking up"
     >
@@ -39,15 +33,11 @@ export function SplashPlaceholder({ onAdvance }: SplashPlaceholderProps) {
         style={{ width: logoSize, height: logoSize }}
         contentFit="contain"
       />
+      <View className="mt-10 flex-row items-center gap-4">
+        <View className="h-3 w-3 rounded-full bg-my-rose" />
+        <View className="h-3 w-3 rounded-full bg-my-rose" />
+        <View className="h-3 w-3 rounded-full bg-my-rose" />
+      </View>
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  root: {
-    ...FILL,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.myCream,
-  },
-})
