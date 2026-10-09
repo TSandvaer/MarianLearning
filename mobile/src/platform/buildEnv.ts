@@ -14,6 +14,7 @@
  * | `EXPO_PUBLIC_DEBUG=1`              | debug mode, gates the two flags below         |
  * | `EXPO_PUBLIC_SEED=<name>`          | debug seed, see `@marian/core/debug/seeds`    |
  * | `EXPO_PUBLIC_DAY_OFFSET=<n>`       | moves the progress clock n days (0..60)       |
+ * | `EXPO_PUBLIC_MUTE=1`               | every audio player muted (automated runs)     |
  *
  * The progress secret ships inside the bundle, exactly like the web's
  * `VITE_PROGRESS_API_SECRET` (cloud-sync threat model: casual-abuse
@@ -26,6 +27,7 @@ export interface BuildEnv {
   debug: string | undefined
   seed: string | undefined
   dayOffset: string | undefined
+  mute: string | undefined
 }
 
 export function readBuildEnv(): BuildEnv {
@@ -35,5 +37,6 @@ export function readBuildEnv(): BuildEnv {
     debug: process.env.EXPO_PUBLIC_DEBUG,
     seed: process.env.EXPO_PUBLIC_SEED,
     dayOffset: process.env.EXPO_PUBLIC_DAY_OFFSET,
+    mute: process.env.EXPO_PUBLIC_MUTE,
   }
 }

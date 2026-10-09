@@ -10,6 +10,7 @@
     "test": "jest",
     "doctor": "expo-doctor",
     "export-assets": "node scripts/export-assets.mjs",
+    "export-audio": "node scripts/export-audio.mjs",
     "check:bundle": "node scripts/check-bundle-sources.mjs"
   },
   "dependencies": {
