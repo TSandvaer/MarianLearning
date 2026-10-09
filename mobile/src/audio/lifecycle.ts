@@ -12,6 +12,14 @@
  *   `'mixWithOthers'` requests no audio focus on Android, so a call would
  *   not pause Emma there.
  * - `shouldPlayInBackground: false`: Emma stops when the app is hidden.
+ * - Held across lines: every player is created with
+ *   `keepAudioSessionActive: true` (`playerPort.ts`), so the session stays
+ *   active between Emma's lines and other audio stays paused while her
+ *   screens are up. It is released (`setIsAudioActiveAsync(false)`) only
+ *   when the app goes to the background
+ *   (`design/native/greet-math-native.md` § 3). iOS only: the option is
+ *   iOS-only, and on Android `setIsAudioActiveAsync(false)` would disable
+ *   playback until re-enabled (`AudioModule.kt` `audioEnabled`).
  *
  * Lifecycle (semantics in `voiceChannel.ts`):
  * - Phase 2a's `appVisibility` (hidden ⇔ AppState `background`) parks and
@@ -20,9 +28,9 @@
  *   (Siri / a call can end with the app `inactive` → `active`, which
  *   `appVisibility` deliberately does not report).
  */
-import { setAudioModeAsync } from 'expo-audio'
+import { setAudioModeAsync, setIsAudioActiveAsync } from 'expo-audio'
 import { useEffect } from 'react'
-import { AppState } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import {
   appVisibility,
   type AppStateSource,
@@ -65,17 +73,39 @@ export function _resetAudioSessionForTests(): void {
 }
 
 /**
+ * Release the held iOS audio session (other audio may resume). Called
+ * when the app goes to the background, after the voice line is parked.
+ * No-op on Android: see the header.
+ */
+export function releaseAudioSession(
+  platform: string = Platform.OS,
+  setActive: typeof setIsAudioActiveAsync = setIsAudioActiveAsync,
+): void {
+  if (platform !== 'ios') return
+  setActive(false).catch((err: unknown) => {
+    recordAudio({
+      kind: 'note',
+      label: 'audio-session',
+      detail: `release failed: ${err instanceof Error ? err.message : String(err)}`,
+    })
+  })
+}
+
+/**
  * Bridge the app lifecycle to the voice channel. Returns the uninstall.
  */
 export function installAudioLifecycle(
   voice: VoiceChannel,
   visibility: AppVisibility = appVisibility,
   appState: AppStateSource = AppState,
+  release: () => void = releaseAudioSession,
 ): () => void {
   voice.setHidden(visibility.getIsHidden())
-  const offVisibility = visibility.subscribe(() =>
-    voice.setHidden(visibility.getIsHidden()),
-  )
+  const offVisibility = visibility.subscribe(() => {
+    const hidden = visibility.getIsHidden()
+    voice.setHidden(hidden)
+    if (hidden) release()
+  })
   // Interruption recovery only: `inactive → active`. The `background →
   // active` return is the visibility edge above (unpark + queue drain).
   let last = appState.currentState

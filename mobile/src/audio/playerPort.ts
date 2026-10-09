@@ -71,12 +71,27 @@ export function disposePlayer(player: PlayerLike): void {
 }
 
 /**
+ * Hold the iOS audio session across Emma's lines
+ * (`design/native/greet-math-native.md` § 3). With expo-audio's default
+ * (`false`), every pause and every natural end deactivates the session
+ * ~100 ms later with `notifyOthersOnDeactivation` (iOS
+ * `AudioModule.swift` `onPlaybackComplete` / `pause` →
+ * `deactivateSession()`), so music in another app comes back in each
+ * 400 ms gap and is cut off again at the next line. Applies to SFX too: a
+ * chime that ends would otherwise deactivate the session the same way.
+ * The session is released when the app goes to the background
+ * (`lifecycle.ts`). iOS-only in expo-audio 57.0.5; Android ignores it.
+ */
+export const KEEP_AUDIO_SESSION_ACTIVE = true
+
+/**
  * Production factory: a 50 ms status interval (the caption clock needs
- * it) and the mute flag applied to every player it creates.
+ * it), the held audio session, and the mute flag on every player.
  */
 export const createExpoPlayer: PlayerFactory = (source) => {
   const player = createAudioPlayer(source as AudioSource, {
     updateInterval: STATUS_INTERVAL_MS,
+    keepAudioSessionActive: KEEP_AUDIO_SESSION_ACTIVE,
   })
   if (isAudioMuted()) player.muted = true
   return player as unknown as PlayerLike

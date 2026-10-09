@@ -5,11 +5,7 @@
  * see components/EmmaStage.tsx). The rest of each screen lays out with
  * flexbox inside `content`. Carried over from the Phase 0 spike.
  *
- * Web reference values:
- *  - Greet portrait: Emma slot h-[60vh], ribbon w-[88%] max-w-2xl, heart
- *    160x117 px; landscape: Emma left half at h-[min(80vh,50vw)], ribbon +
- *    heart in the right half.
- *  - Greet caption: text-[2.4rem] (38.4 px) — >= 28 pt spec floor on iPad.
+ * Greet's frames live in `./greetLayout.ts` (Phase 3).
  */
 export interface Rect {
   x: number
@@ -66,60 +62,6 @@ function clamp(min: number, value: number, max: number): number {
 /** 38.4 px on iPad (web value), floors at 22 px on phones. */
 export function captionFontSize(v: Viewport): number {
   return Math.round(clamp(22, Math.min(v.width, v.height) * 0.05, 38.4))
-}
-
-/** Heart button size: web 160x117, shrunk on short viewports. */
-export function heartSize(v: Viewport): { width: number; height: number } {
-  const s = safeRect(v)
-  const height = clamp(64, s.height * 0.16, 117)
-  return { width: (height * 160) / 117, height }
-}
-
-export function greetLayout(v: Viewport): ScreenLayout {
-  const s = safeRect(v)
-  const landscape = isLandscape(v)
-  const base = {
-    landscape,
-    tablet: isTablet(v),
-    captionFontSize: captionFontSize(v),
-  }
-  if (landscape) {
-    const half = s.width / 2
-    const emmaSize = Math.min(s.height * 0.8, half)
-    return {
-      ...base,
-      emma: {
-        x: s.x + (half - emmaSize) / 2,
-        y: s.y + (s.height - emmaSize) / 2,
-        width: emmaSize,
-        height: emmaSize,
-      },
-      content: {
-        x: s.x + half + PAD,
-        y: s.y + PAD,
-        width: half - PAD * 2,
-        height: s.height - PAD * 2,
-      },
-    }
-  }
-  const emmaSize = Math.min(s.height * 0.55, s.width)
-  const emmaY = s.y + PAD
-  const contentY = emmaY + emmaSize + 8
-  return {
-    ...base,
-    emma: {
-      x: s.x + (s.width - emmaSize) / 2,
-      y: emmaY,
-      width: emmaSize,
-      height: emmaSize,
-    },
-    content: {
-      x: s.x + PAD,
-      y: contentY,
-      width: s.width - PAD * 2,
-      height: s.y + s.height - PAD - contentY,
-    },
-  }
 }
 
 /** Math: Emma perches upper-left; problem + chips fill the rest. */

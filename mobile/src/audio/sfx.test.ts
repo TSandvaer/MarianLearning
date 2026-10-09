@@ -97,9 +97,12 @@ describe('SFX (web sfx.ts contract)', () => {
 })
 
 describe('player factory (silent everywhere automated)', () => {
-  it('creates players with the 50 ms status interval', () => {
+  it('creates players with the 50 ms status interval and the held iOS session', () => {
     createExpoPlayer(5)
-    expect(createAudioPlayer).toHaveBeenCalledWith(5, { updateInterval: 50 })
+    expect(createAudioPlayer).toHaveBeenCalledWith(5, {
+      updateInterval: 50,
+      keepAudioSessionActive: true,
+    })
     expect(fakePlayers[0].muted).toBe(false)
   })
 

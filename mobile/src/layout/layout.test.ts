@@ -1,6 +1,6 @@
 import { ROUTES } from '../router/routes'
+import { greetLayout } from './greetLayout'
 import {
-  greetLayout,
   isTablet,
   mathLayout,
   panelRect,
