@@ -1,6 +1,6 @@
 # Marian Tutor: native app (Expo)
 
-The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Every route renders a placeholder until Phase 3 ports the real screens, so nothing plays audio yet outside the debug audio check.
+The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash and Greet are real (`src/screens/Splash.tsx`, `src/screens/greet/`, UX calls in `design/native/greet-math-native.md`); every other route is still a placeholder.
 
 ## Shape
 
@@ -37,6 +37,10 @@ On a physical iPhone / iPad, Expo Go needs `npx expo login` and the same Expo ac
 
 **Physical iPhone / iPad without the paid Apple Developer account**: see the PR for the free "Personal Team" status. The app declares no capabilities (its entitlements file is empty), which is what a free team can provision.
 
+## Styling
+
+`StyleSheet` plus pure layout maths (`src/layout/`), not NativeWind. The colour tokens are in `src/theme.ts`, and each web class a value comes from is named next to it. The measurements behind the choice are in the Phase 3 Greet PR; the probe that produced them is on the never-merge branch `devon/rn-greet-nativewind-probe`. Inline SVG (the web's `bg-clouds`, `heart-button`, `icon-finger-tap`) renders through `react-native-svg` from copies in `src/assets/vectors.ts`; `vectors.test.ts` fails when a web file drifts.
+
 ## Debug flags
 
 Same names as the web's query parameters. `seed` and `dayOffset` only apply with `debug=1`.
@@ -57,6 +61,8 @@ xcrun simctl launch booted com.marianlearning.tutor -debug 1 -seed cvc-words
 EXPO_PUBLIC_DEBUG=1 EXPO_PUBLIC_SEED=cvc-words npx expo start --clear
 ```
 
+`EXPO_PUBLIC_QA_AUTOTAP_MS=<n>` (with debug on) makes Greet's wake tap fire itself n ms after Greet mounts. It exists because this Mac's Xcode 27 has no Simulator.app and `simctl` cannot tap: launch Expo Go with `xcrun simctl launch <udid> host.exp.Exponent --initialUrl exp://127.0.0.1:<port>` (no "Open in Expo Go?" prompt, unlike `openurl`), and on a fresh simulator first skip Expo Go's onboarding with `xcrun simctl spawn <udid> defaults write host.exp.Exponent EXDevMenuIsOnboardingFinished -bool YES` (and the same for `ExpoGoOnboardingFinished`). On Android, `adb shell input tap` taps for real.
+
 Other env flags: `EXPO_PUBLIC_API_BASE` (default `https://marian-learning.vercel.app`), `EXPO_PUBLIC_PROGRESS_API_SECRET` (unset: cloud sync is skipped). See `src/platform/buildEnv.ts`.
 
 Reset to a first launch: delete the app from the simulator/device (storage lives in the app's SQLite database).
@@ -67,7 +73,7 @@ Reset to a first launch: delete the app from the simulator/device (storage lives
 
 - **One Emma line at a time** across Greet, Hub/guidance/path lines and session lines (a new line cancels the one in flight). SFX play over her.
 - **Captions** use the web's formula (word i at `i × duration / wordCount`, 165 wpm fallback), read from the player clock at a 50 ms status interval. expo-audio's default is 500 ms, which is too coarse for the captions.
-- **Audio session:** plays in silent mode, `doNotMix`, never in the background.
+- **Audio session:** plays in silent mode, `doNotMix`, never in the background. On iOS every player keeps the session active between lines (`keepAudioSessionActive`), so other audio stays paused while Emma's screens are up; it is released when the app goes to the background. Android has no equivalent in expo-audio 57.0.5: it abandons audio focus at the end of every line (see the Greet PR).
 - **Lifecycle:** going to the background parks the line and freezes its caption; the foreground resumes it where it stopped. A line requested while hidden waits for the foreground (most recent wins). After a call or Siri, the OS resumes the line, or else the next `inactive → active` edge does.
 - **Session audio:** `startSession()` posts to `/api/claude` through core's `apiUrl()` and writes one MP3 per distinct text to `<cache>/session-audio/<sessionId>/` in the background. `unload()` deletes the files, and a boot sweep removes the files a killed app left. `sessionPrefetcher` is the Hub prefetch Phase 3 calls.
 - **Players:** created lazily, with at most 4 live voice players (LRU). On Android every live player holds an MP3 decoder.
