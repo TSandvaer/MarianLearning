@@ -123,7 +123,7 @@ describe('session audio: eager files, lazy players', () => {
       }),
     ).resolves.toBeUndefined()
     expect(onPlay).toHaveBeenCalledTimes(1)
-    expect(ticks).toEqual([0, 1, 2])
+    expect(ticks).toEqual([0, 1, 2, 3]) // "Not in the plan." = 4 words
     expect(fakePlayers).toHaveLength(0)
   })
 
