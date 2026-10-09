@@ -6,15 +6,14 @@
  * Kept from the web:
  * - **Wake** state: Emma slides in and breathes, the ready ring appears at
  *   +900 ms, nothing plays until a tap anywhere in the safe area. At 8 s
- *   without a tap, one nudge: the finger-tap icon and an ear-wiggle, no
- *   voice, never repeated.
+ *   without a tap, one nudge: the finger-tap icon, no voice, never
+ *   repeated.
  * - **Intro**: the tap starts "Hi!" at once (spec § 1: `onPlay` ≤ 250 ms
  *   after the tap; the 4 players are created on mount). The 4 lines play
  *   through core's `runGreetSequence` with 400 ms gaps, captions reveal
- *   word by word, the ear-wiggle fires on "Hi!", and the heart appears
- *   after line 3. 20 s after the heart appears without a tap, line 4 is
- *   replayed once.
- * - Heart tap: squish, ear-wiggle, Emma stops, Math 400 ms later. Silent.
+ *   word by word, and the heart appears after line 3. 20 s after the
+ *   heart appears without a tap, line 4 is replayed once.
+ * - Heart tap: squish, Emma stops, Math 400 ms later. Silent.
  * - The ribbon keeps showing the last line ("Tap the heart when you're
  *   ready.") while the heart waits (the web renders `activeLine`).
  *
@@ -22,9 +21,15 @@
  * relock ring, and every Howler/WebKit probe. A line that fails to start
  * walks its caption and the sequence carries on (`greetSpeak.ts`).
  *
+ * Native-only change (Thomas, device check of #531, 2026-10-09): Emma is
+ * calm through the whole Greet. The web swaps idle → celebration for 600 ms
+ * on "Hi!", on the 8 s nudge and on the heart tap; natively she stays in
+ * the idle pose throughout, breathing (1.05 / 2.4 s). The web Greet is
+ * unchanged.
+ *
  * Emma herself is not rendered here: she is App's hoisted `EmmaStage`, so
- * she can spring to Math's frame. Greet reports her pose through
- * `onPoseChange`. Greet renders two layers around her: the background
+ * she can spring to Math's frame, and Greet never changes her pose. Greet
+ * renders two layers around her: the background
  * (clouds, ring) below, and the foreground (ribbon, heart, nudge icon,
  * wake tap target) above; App gives Emma `zIndex: 1` between them.
  */
@@ -63,8 +68,6 @@ import { WakeRing } from './WakeRing'
 
 /** Spec: heart tap → Screen 3 within 400 ms. */
 export const HEART_TAP_TRANSITION_MS = 400
-/** Idle → celebration → idle on "Hi!", the nudge and the heart tap. */
-export const EAR_WIGGLE_MS = 600
 /** No tap for 8 s in Wake: the one nudge. */
 export const WAKE_REPROMPT_AFTER_MS = 8_000
 /** Greet fades out over 250 ms (web `exit`). */
@@ -73,7 +76,6 @@ export const GREET_EXIT_MS = 250
 export const GREET_BREATH_SCALE = 1.05
 export const GREET_BREATH_PERIOD_S = 2.4
 
-export type GreetPose = 'idle' | 'celebration'
 export type GreetScreenState = 'wake' | 'intro'
 
 /** The 4 Greet clips. Test seam; defaults to the native engine. */
@@ -99,7 +101,6 @@ const wordCount = (i: number): number =>
 
 export interface GreetProps {
   layout: GreetLayout
-  onPoseChange: (pose: GreetPose) => void
   onAdvance: () => void
   audio?: GreetAudioPort
   /**
@@ -111,7 +112,6 @@ export interface GreetProps {
 
 export function Greet({
   layout,
-  onPoseChange,
   onAdvance,
   audio = ENGINE_AUDIO,
   qaAutoTapAfterMs,
@@ -134,15 +134,12 @@ export function Greet({
   const [autoTapMs] = useState(qaAutoTapAfterMs)
   const wakeTapRef = useRef<() => void>(() => {})
   const [speaker] = useState(() => createGreetSpeaker(port.play))
-  const onPoseChangeRef = useRef(onPoseChange)
   const onAdvanceRef = useRef(onAdvance)
   useLayoutEffect(() => {
-    onPoseChangeRef.current = onPoseChange
     onAdvanceRef.current = onAdvance
   })
   const sequenceRef = useRef<GreetSequenceHandle | null>(null)
   const timersRef = useRef(new Set<ReturnType<typeof setTimeout>>())
-  const earWiggleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wakeNudgeRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const repromptRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const wakeTappedRef = useRef(false)
@@ -163,15 +160,6 @@ export function Greet({
     clearTimeout(id)
     timersRef.current.delete(id)
   }, [])
-
-  const earWiggle = useCallback(() => {
-    onPoseChangeRef.current('celebration')
-    clearLater(earWiggleRef.current)
-    earWiggleRef.current = later(() => {
-      earWiggleRef.current = null
-      onPoseChangeRef.current('idle')
-    }, EAR_WIGGLE_MS)
-  }, [clearLater, later])
 
   const reveal = useCallback((line: number, count: number) => {
     setRevealedByLine((prev) => {
@@ -214,7 +202,6 @@ export function Greet({
       wakeNudgeRef.current = null
       if (wakeTappedRef.current) return
       setShowWakeIcon(true)
-      earWiggle()
       later(() => setShowWakeIcon(false), ICON_TOTAL_MS)
     }, WAKE_REPROMPT_AFTER_MS)
     if (autoTapMs !== undefined) later(() => wakeTapRef.current(), autoTapMs)
@@ -227,7 +214,7 @@ export function Greet({
       for (const id of timers) clearTimeout(id)
       timers.clear()
     }
-  }, [autoTapMs, earWiggle, later, port, speaker])
+  }, [autoTapMs, later, port, speaker])
 
   const handleWakeTap = useCallback(() => {
     if (wakeTappedRef.current) return
@@ -250,10 +237,7 @@ export function Greet({
           label: 'greet tap → "Hi!"',
           ms: Date.now() - tappedAt,
         }),
-      onWordBoundary: (i, ev) => {
-        reveal(i, ev.wordIndex + 1)
-        if (i === 0 && ev.word === 'Hi!') earWiggle()
-      },
+      onWordBoundary: (i, ev) => reveal(i, ev.wordIndex + 1),
       onLineEnd: (i) => reveal(i, wordCount(i)),
       onHeartReady: () => {
         setHeartReady(true)
@@ -270,7 +254,7 @@ export function Greet({
     sequenceRef.current = sequence
     // Synchronously, inside the tap: line 0 is requested in this tick.
     sequence.start()
-  }, [clearLater, earWiggle, later, reveal, scheduleReprompt, speaker])
+  }, [clearLater, later, reveal, scheduleReprompt, speaker])
 
   useLayoutEffect(() => {
     wakeTapRef.current = handleWakeTap
@@ -284,11 +268,10 @@ export function Greet({
     port.cancel()
     clearLater(repromptRef.current)
     repromptRef.current = null
-    earWiggle()
     setHeartSquishing(true)
     setAdvancing(true)
     later(() => onAdvanceRef.current(), HEART_TAP_TRANSITION_MS)
-  }, [clearLater, earWiggle, heartReady, later, port, speaker])
+  }, [clearLater, heartReady, later, port, speaker])
 
   const {
     safe,

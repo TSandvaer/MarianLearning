@@ -143,6 +143,7 @@ export function EmmaStage({ frame, pose, breath }: EmmaStageProps) {
 
   return (
     <Animated.View
+      testID={`emma-${pose}`}
       // Reduce Motion: she fades in instead of sliding (session-1.md).
       entering={reducedMotion ? FadeIn.duration(300) : emmaEntering}
       layout={emmaLayout}

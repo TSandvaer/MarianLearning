@@ -17,7 +17,10 @@ import {
 import App from './App'
 import { NO_LAUNCH_FLAGS, type LaunchFlags } from './platform/launchFlags'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
-import { HEART_TAP_TRANSITION_MS } from './screens/greet/Greet'
+import {
+  HEART_TAP_TRANSITION_MS,
+  WAKE_REPROMPT_AFTER_MS,
+} from './screens/greet/Greet'
 import { SPLASH_FADE_OUT_MS } from './screens/Splash'
 
 function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
@@ -133,4 +136,43 @@ it('Greet → heart → Math, leaving sessionCount at 0; then the placeholders w
   await fireEvent.press(screen.getByTestId('exit-hub'))
   expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
   expect(screen.queryByTestId('exit-greet')).toBeNull()
+})
+
+it('Emma stays calm (idle) through the whole Greet: the nudge, "Hi!" and the heart tap', async () => {
+  // Native-only (Thomas, device check of #531): no celebration pose on
+  // Greet. The web swaps idle → celebration on all three moments.
+  boot()
+  await renderPastSplash()
+  const calm = () => {
+    expect(screen.getByTestId('emma-idle')).toBeOnTheScreen()
+    expect(screen.queryByTestId('emma-celebration')).toBeNull()
+  }
+  calm()
+
+  await advance(WAKE_REPROMPT_AFTER_MS) // the one 8 s nudge
+  expect(screen.getByTestId('greet-wake-icon')).toBeOnTheScreen()
+  calm()
+
+  await fireEvent(screen.getByTestId('greet-wake-tap-target'), 'pressIn')
+  const hi = playing()
+  await act(async () => {
+    hi.start(0.8) // "Hi!" starts: its first (only) word ticks
+    await flush()
+  })
+  calm()
+  await act(async () => {
+    hi.finish()
+    await flush()
+  })
+  await advance(LINE_GAP_MS)
+  for (let line = 1; line < 3; line++) {
+    await finishLine()
+    await advance(LINE_GAP_MS)
+  }
+  calm()
+
+  await fireEvent.press(screen.getByTestId('greet-heart'))
+  calm()
+  await advance(HEART_TAP_TRANSITION_MS - 1)
+  calm()
 })

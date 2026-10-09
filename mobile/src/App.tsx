@@ -7,7 +7,8 @@
  * `sessionCount` through core's `nextAfterSplash()`, exactly like the
  * web; neither Splash nor Greet writes it (Session-End does). Emma is one
  * App-level view that springs between the routes' frames
- * (`./components/EmmaStage.tsx`); Greet drives her pose and breath.
+ * (`./components/EmmaStage.tsx`); on Greet she breathes faster and stays
+ * in the idle pose throughout.
  *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
@@ -39,7 +40,6 @@ import {
   Greet,
   GREET_BREATH_PERIOD_S,
   GREET_BREATH_SCALE,
-  type GreetPose,
 } from './screens/greet/Greet'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
 import { Splash } from './screens/Splash'
@@ -76,7 +76,6 @@ function Shell() {
     ? parseQaAutoTap(readBuildEnv().qaAutoTapMs)
     : undefined
   const [route, setRoute] = useState<Route>(FIRST_ROUTE)
-  const [greetPose, setGreetPose] = useState<GreetPose>('idle')
 
   const navigate = useCallback((to: Route) => {
     setRoute((current) => nextRoute(current, to))
@@ -118,7 +117,6 @@ function Shell() {
           {greet ? (
             <Greet
               layout={greet}
-              onPoseChange={setGreetPose}
               onAdvance={onGreetDone}
               qaAutoTapAfterMs={qaAutoTapMs}
             />
@@ -133,9 +131,9 @@ function Shell() {
           )}
           <EmmaStage
             frame={layout.emma}
-            // Greet's ear-wiggle is Greet's; every other screen starts idle
-            // (web: each screen mounts its own Emma).
-            pose={route === 'greet' ? greetPose : 'idle'}
+            // Calm through the whole Greet (native-only, Thomas 2026-10-09:
+            // no celebration swap); every other screen starts idle too.
+            pose="idle"
             breath={route === 'greet' ? GREET_BREATH : BREATH}
           />
         </>

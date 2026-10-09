@@ -15,12 +15,10 @@ import { CAPTION_WALK_MS_PER_WORD } from '../../audio'
 import { greetLayout } from '../../layout/greetLayout'
 import type { Viewport } from '../../layout/layout'
 import {
-  EAR_WIGGLE_MS,
   Greet,
   HEART_TAP_TRANSITION_MS,
   WAKE_REPROMPT_AFTER_MS,
   type GreetAudioPort,
-  type GreetPose,
 } from './Greet'
 import { ICON_TOTAL_MS } from './WakeNudgeIcon'
 
@@ -68,20 +66,13 @@ type Audio = ReturnType<typeof fakeAudio>
 
 async function setup(viewport: Viewport = PHONE_PORTRAIT) {
   const audio = fakeAudio()
-  const poses: GreetPose[] = []
   const onAdvance = jest.fn()
   const element = (v: Viewport) => (
-    <Greet
-      layout={greetLayout(v)}
-      onPoseChange={(p) => poses.push(p)}
-      onAdvance={onAdvance}
-      audio={audio.port}
-    />
+    <Greet layout={greetLayout(v)} onAdvance={onAdvance} audio={audio.port} />
   )
   const utils = await render(element(viewport))
   return {
     audio,
-    poses,
     onAdvance,
     rotate: (v: Viewport) => utils.rerender(element(v)),
     unmount: utils.unmount,
@@ -137,20 +128,16 @@ describe('Wake', () => {
     expect(screen.queryByTestId('greet-heart')).toBeNull()
   })
 
-  it('nudges once at 8 s (finger icon + ear-wiggle), silently, never again', async () => {
-    const { audio, poses } = await setup()
+  it('nudges once at 8 s (finger icon only), silently, never again', async () => {
+    const { audio } = await setup()
     await advance(WAKE_REPROMPT_AFTER_MS - 1)
     expect(screen.queryByTestId('greet-wake-icon')).toBeNull()
     await advance(1)
     expect(screen.getByTestId('greet-wake-icon')).toBeOnTheScreen()
-    expect(poses).toEqual(['celebration'])
-    await advance(EAR_WIGGLE_MS)
-    expect(poses).toEqual(['celebration', 'idle'])
-    await advance(ICON_TOTAL_MS - EAR_WIGGLE_MS)
+    await advance(ICON_TOTAL_MS)
     expect(screen.queryByTestId('greet-wake-icon')).toBeNull()
     await advance(60_000)
     expect(screen.queryByTestId('greet-wake-icon')).toBeNull()
-    expect(poses).toEqual(['celebration', 'idle'])
     expect(audio.port.play).not.toHaveBeenCalled()
   })
 
@@ -171,12 +158,11 @@ describe('Wake', () => {
   })
 
   it('a tap cancels the pending nudge', async () => {
-    const { poses } = await setup()
+    await setup()
     await advance(WAKE_REPROMPT_AFTER_MS / 2)
     await wakeTap()
     await advance(WAKE_REPROMPT_AFTER_MS)
     expect(screen.queryByTestId('greet-wake-icon')).toBeNull()
-    expect(poses).toEqual([])
   })
 })
 
@@ -211,15 +197,6 @@ describe('Intro', () => {
     })
     expect(revealedWords()).toEqual(["I'm"])
     expect(screen.getAllByTestId('caption-word-hidden')).toHaveLength(1)
-  })
-
-  it('ear-wiggles on "Hi!"', async () => {
-    const { audio, poses } = await setup()
-    await wakeTap()
-    await speak(audio, 0, { end: false })
-    expect(poses).toEqual(['celebration'])
-    await advance(EAR_WIGGLE_MS)
-    expect(poses).toEqual(['celebration', 'idle'])
   })
 
   it('shows the heart after line 3 ends, not before', async () => {
@@ -290,8 +267,8 @@ describe('Intro', () => {
 })
 
 describe('heart tap', () => {
-  it('stops Emma, waves, and hands over to Math 400 ms later', async () => {
-    const { audio, poses, onAdvance } = await setup()
+  it('stops Emma and hands over to Math 400 ms later', async () => {
+    const { audio, onAdvance } = await setup()
     await wakeTap()
     await speak(audio, 0)
     await advance(LINE_GAP_MS)
@@ -300,11 +277,9 @@ describe('heart tap', () => {
     await speak(audio, 2)
     await advance(LINE_GAP_MS)
     await speak(audio, 3, { end: false }) // tapped mid line 4
-    poses.length = 0
 
     await fireEvent.press(screen.getByTestId('greet-heart'))
     expect(audio.port.cancel).toHaveBeenCalledTimes(1)
-    expect(poses).toEqual(['celebration'])
     await advance(HEART_TAP_TRANSITION_MS - 1)
     expect(onAdvance).not.toHaveBeenCalled()
     await advance(1)
@@ -324,7 +299,6 @@ describe('QA auto-tap (debug only, for simulators nothing can tap)', () => {
     await render(
       <Greet
         layout={greetLayout(PHONE_PORTRAIT)}
-        onPoseChange={() => {}}
         onAdvance={() => {}}
         audio={audio.port}
         qaAutoTapAfterMs={3_000}
