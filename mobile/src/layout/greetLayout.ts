@@ -22,7 +22,12 @@
  * mounts at "Hi!"; the reserved slot removes that jump. Justified in the
  * Phase 3 Greet PR.)
  *
- * Emma's art is square (viewBox 2000×2000), so her frame is a square.
+ * Emma's art is square (viewBox 2000×2000), so her frame is a square. Her
+ * figure fills only the middle of it: in the two Greet poses the opaque
+ * pixels span 0.236–0.679 of the width (measured on the exported WebPs).
+ * So, like the web's `h-full w-auto` image in a clipped slot, her frame may
+ * be wider than the screen in portrait; only the middle `FIGURE_BAND` has
+ * to fit.
  */
 import {
   isLandscape,
@@ -68,6 +73,9 @@ export const RIBBON_BORDER = 3
 export const RIBBON_MAX_WIDTH = 672
 /** Lines the ribbon slot reserves. */
 export const RIBBON_LINES = 2
+
+/** The part of Emma's frame width that must stay on screen (see header). */
+export const FIGURE_BAND = 0.6
 
 /** Web ring: a viewBox-100 circle, r 46, stroke 3, in a 64vh box. */
 const RING_STROKE_PER_DIAMETER = 3 / 92
@@ -130,7 +138,10 @@ function finish(
   heart: Rect,
   ribbonPadding: GreetLayout['ribbonPadding'],
 ): GreetLayout {
-  const ringSize = emma.width * RING_PER_EMMA
+  const ringSize = Math.min(
+    emma.width * RING_PER_EMMA,
+    safeRect(v).width - PHONE.emmaSidePad * 2,
+  )
   return {
     ...base,
     safe: safeRect(v),
@@ -166,7 +177,7 @@ function phonePortrait(v: Viewport): GreetLayout {
     Math.min(
       avail,
       s.height * PHONE.emmaMaxOfSafeHeight,
-      s.width - PHONE.emmaSidePad * 2,
+      s.width / FIGURE_BAND,
     ),
   )
   const spare = Math.max(0, avail - emmaSize) / 2
@@ -242,7 +253,7 @@ function tabletPortrait(v: Viewport): GreetLayout {
   const heartBoxY = s.y + s.height - TABLET.heartBottom - heartBox
   const ribbonY = heartBoxY - TABLET.ribbonBottom - ribbonH
   const slotH = Math.max(0, ribbonY - TABLET.ribbonTop - s.y)
-  const emmaSize = Math.min(slotH, s.width)
+  const emmaSize = Math.min(slotH, s.width / FIGURE_BAND)
   const ribbonW = Math.min(s.width * 0.88, RIBBON_MAX_WIDTH)
   return finish(
     v,

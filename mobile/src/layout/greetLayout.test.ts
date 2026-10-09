@@ -1,5 +1,6 @@
 import {
   CAPTION_LINE_HEIGHT,
+  FIGURE_BAND,
   greetLayout,
   PHONE_CAPTION_PT,
   PHONE_HEART,
@@ -90,8 +91,16 @@ describe.each(Object.entries({ ...PHONES, ...TABLETS }))('%s', (_, v) => {
   const l = greetLayout(v)
   const safe = safeRect(v)
 
-  it('keeps Emma, the ribbon slot and the heart in the safe area, apart', () => {
-    expect(inside(l.emma, safe)).toBe(true)
+  it('keeps Emma (her figure band), the ribbon slot and the heart in the safe area, apart', () => {
+    // Her frame may overhang the sides (transparent art); her figure may not.
+    const band = {
+      x: centreX(l.emma) - (l.emma.width * FIGURE_BAND) / 2,
+      y: l.emma.y,
+      width: l.emma.width * FIGURE_BAND,
+      height: l.emma.height,
+    }
+    expect(inside(band, safe)).toBe(true)
+    expect(inside(l.ring, safe)).toBe(true)
     expect(inside(l.ribbonSlot, safe)).toBe(true)
     expect(inside(l.heart, safe)).toBe(true)
     expect(overlaps(l.emma, l.ribbonSlot)).toBe(false)
@@ -108,10 +117,12 @@ describe.each(Object.entries({ ...PHONES, ...TABLETS }))('%s', (_, v) => {
     )
   })
 
-  it('centres the wake ring on Emma at 0.8 of her frame', () => {
+  it('centres the wake ring on Emma at 0.8 of her frame (within the screen)', () => {
     expect(centreX(l.ring)).toBeCloseTo(centreX(l.emma))
     expect(centreY(l.ring)).toBeCloseTo(centreY(l.emma))
-    expect(l.ring.width).toBeCloseTo(l.emma.width * 0.8)
+    expect(l.ring.width).toBeCloseTo(
+      Math.min(l.emma.width * 0.8, safe.width - 16),
+    )
     expect(l.ring.width).toBe(l.ring.height)
     expect(l.ringStroke).toBeCloseTo((l.ring.width * 3) / 92)
   })
