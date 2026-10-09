@@ -26,6 +26,8 @@ function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
       debug: undefined,
       seed: undefined,
       dayOffset: undefined,
+      mute: undefined,
+      audioCheck: undefined,
     },
     flags,
   })

@@ -28,6 +28,7 @@ import {
   type AppStateSource,
   type AppVisibility,
 } from '../lifecycle/appVisibility'
+import { readBuildEnv } from '../platform/buildEnv'
 import { recordAudio, setAudioLogConsole } from './audioLog'
 import { audioEngine } from './engine'
 import { sweepSessionAudioCache } from './sessionAudio'
@@ -75,9 +76,11 @@ export function installAudioLifecycle(
   const offVisibility = visibility.subscribe(() =>
     voice.setHidden(visibility.getIsHidden()),
   )
+  // Interruption recovery only: `inactive → active`. The `background →
+  // active` return is the visibility edge above (unpark + queue drain).
   let last = appState.currentState
   const sub = appState.addEventListener('change', (state) => {
-    if (state === 'active' && last !== 'active') voice.onActive()
+    if (state === 'active' && last === 'inactive') voice.onActive()
     last = state
   })
   return () => {
@@ -86,14 +89,27 @@ export function installAudioLifecycle(
   }
 }
 
+/** Delay before the debug audio check runs (after Splash settles). */
+const AUDIO_CHECK_DELAY_MS = 2_000
+
 /** Mount once at the App root. */
 export function useAudioEngine(debug: boolean): void {
+  const audioCheck = readBuildEnv().audioCheck === '1'
   useEffect(() => {
-    setAudioLogConsole(debug)
-  }, [debug])
+    setAudioLogConsole(debug || audioCheck)
+  }, [debug, audioCheck])
   useEffect(() => {
     void configureAudioSession()
     sweepSessionAudioCache()
-    return installAudioLifecycle(audioEngine.voice)
-  }, [])
+    const uninstall = installAudioLifecycle(audioEngine.voice)
+    if (!audioCheck) return uninstall
+    const timer = setTimeout(() => {
+      // Loaded on demand: a normal launch never evaluates the check.
+      void import('./debug/audioCheck').then((m) => m.runAudioCheck())
+    }, AUDIO_CHECK_DELAY_MS)
+    return () => {
+      clearTimeout(timer)
+      uninstall()
+    }
+  }, [audioCheck])
 }

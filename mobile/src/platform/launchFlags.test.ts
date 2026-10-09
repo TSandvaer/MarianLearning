@@ -19,6 +19,8 @@ const ENV: BuildEnv = {
   debug: undefined,
   seed: undefined,
   dayOffset: undefined,
+  mute: undefined,
+  audioCheck: undefined,
 }
 
 describe('resolveLaunchFlags', () => {
