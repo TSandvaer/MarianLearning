@@ -32,6 +32,7 @@ import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
+import { readBuildEnv } from './platform/buildEnv'
 import { getLaunchFlags } from './platform/launchFlags'
 import { FIRST_ROUTE, nextRoute, type Route } from './router/routes'
 import {
@@ -71,6 +72,9 @@ function Shell() {
     [width, height, insets],
   )
   const flags = getLaunchFlags()
+  const qaAutoTapMs = flags.debug
+    ? parseQaAutoTap(readBuildEnv().qaAutoTapMs)
+    : undefined
   const [route, setRoute] = useState<Route>(FIRST_ROUTE)
   const [greetPose, setGreetPose] = useState<GreetPose>('idle')
 
@@ -116,6 +120,7 @@ function Shell() {
               layout={greet}
               onPoseChange={setGreetPose}
               onAdvance={onGreetDone}
+              qaAutoTapAfterMs={qaAutoTapMs}
             />
           ) : (
             <RoutePlaceholder
@@ -137,6 +142,12 @@ function Shell() {
       )}
     </View>
   )
+}
+
+/** `EXPO_PUBLIC_QA_AUTOTAP_MS`: a non-negative integer, else ignored. */
+function parseQaAutoTap(raw: string | undefined): number | undefined {
+  if (raw === undefined || !/^\d+$/.test(raw)) return undefined
+  return Number(raw)
 }
 
 export default function App() {

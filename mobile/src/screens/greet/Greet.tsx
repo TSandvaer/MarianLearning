@@ -102,6 +102,11 @@ export interface GreetProps {
   onPoseChange: (pose: GreetPose) => void
   onAdvance: () => void
   audio?: GreetAudioPort
+  /**
+   * QA only (debug + `EXPO_PUBLIC_QA_AUTOTAP_MS`): the wake tap fires
+   * itself this long after mount, for simulators nothing can tap.
+   */
+  qaAutoTapAfterMs?: number
 }
 
 export function Greet({
@@ -109,6 +114,7 @@ export function Greet({
   onPoseChange,
   onAdvance,
   audio = ENGINE_AUDIO,
+  qaAutoTapAfterMs,
 }: GreetProps) {
   const [screenState, setScreenState] = useState<GreetScreenState>('wake')
   const [showWakeIcon, setShowWakeIcon] = useState(false)
@@ -125,6 +131,8 @@ export function Greet({
   // through refs from long-lived callbacks (timers, the sequence), so a
   // re-render (a rotation, a new layout) never rebuilds any of them.
   const [port] = useState(audio)
+  const [autoTapMs] = useState(qaAutoTapAfterMs)
+  const wakeTapRef = useRef<() => void>(() => {})
   const [speaker] = useState(() => createGreetSpeaker(port.play))
   const onPoseChangeRef = useRef(onPoseChange)
   const onAdvanceRef = useRef(onAdvance)
@@ -209,6 +217,7 @@ export function Greet({
       earWiggle()
       later(() => setShowWakeIcon(false), ICON_TOTAL_MS)
     }, WAKE_REPROMPT_AFTER_MS)
+    if (autoTapMs !== undefined) later(() => wakeTapRef.current(), autoTapMs)
     return () => {
       sequenceRef.current?.cancel()
       sequenceRef.current = null
@@ -218,7 +227,7 @@ export function Greet({
       for (const id of timers) clearTimeout(id)
       timers.clear()
     }
-  }, [earWiggle, later, port, speaker])
+  }, [autoTapMs, earWiggle, later, port, speaker])
 
   const handleWakeTap = useCallback(() => {
     if (wakeTappedRef.current) return
@@ -262,6 +271,10 @@ export function Greet({
     // Synchronously, inside the tap: line 0 is requested in this tick.
     sequence.start()
   }, [clearLater, earWiggle, later, reveal, scheduleReprompt, speaker])
+
+  useLayoutEffect(() => {
+    wakeTapRef.current = handleWakeTap
+  })
 
   const handleHeartTap = useCallback(() => {
     if (!heartReady || heartTappedRef.current) return

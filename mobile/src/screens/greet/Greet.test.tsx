@@ -318,6 +318,25 @@ describe('heart tap', () => {
   })
 })
 
+describe('QA auto-tap (debug only, for simulators nothing can tap)', () => {
+  it('fires the wake tap once, at the given time', async () => {
+    const audio = fakeAudio()
+    await render(
+      <Greet
+        layout={greetLayout(PHONE_PORTRAIT)}
+        onPoseChange={() => {}}
+        onAdvance={() => {}}
+        audio={audio.port}
+        qaAutoTapAfterMs={3_000}
+      />,
+    )
+    await advance(2_999)
+    expect(audio.keys()).toEqual([])
+    await advance(1)
+    expect(audio.keys()).toEqual(['hi'])
+  })
+})
+
 describe('lifecycle', () => {
   it('unmounting mid-line stops Emma, frees the players, and queues nothing', async () => {
     const { audio, unmount } = await setup()

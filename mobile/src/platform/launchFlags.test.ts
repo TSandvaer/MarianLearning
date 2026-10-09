@@ -21,6 +21,7 @@ const ENV: BuildEnv = {
   dayOffset: undefined,
   mute: undefined,
   audioCheck: undefined,
+  qaAutoTapMs: undefined,
 }
 
 describe('resolveLaunchFlags', () => {

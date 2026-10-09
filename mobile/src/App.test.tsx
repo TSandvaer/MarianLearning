@@ -39,6 +39,7 @@ function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
       dayOffset: undefined,
       mute: undefined,
       audioCheck: undefined,
+      qaAutoTapMs: undefined,
     },
     flags,
   })
