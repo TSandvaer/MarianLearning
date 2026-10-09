@@ -9,17 +9,22 @@
  * `<cache>/session-audio/<sessionId>/` (expo-file-system decodes the base64
  * natively, off the JS heap) → expo-audio player on the `file://` URI.
  *
- * Eager files, lazy players (measured; see the PR):
- * - All files are written when the session loads. The response is already
- *   parsed into JS strings by then; writing them all releases ~1.7 MB of
- *   base64 from the JS heap at once and keeps the write off every play.
- * - Players are created on first play (or `prewarm`), never all 76 up
- *   front: a native player per utterance costs memory and a decoder for
- *   lines that are never heard (a session plays ~30–40 of its 76).
+ * Files eager in the background, players lazy (measured in Expo Go; see
+ * the PR):
+ * - Files: one per distinct text (53 of a 76-utterance math session),
+ *   written in plan order in slices of ≤ {@link WRITE_SLICE_MS} ms that
+ *   yield to the JS thread between slices. All 76 written synchronously
+ *   took 183 ms on the iOS 27 simulator but 9.2–14.8 s on the Android API
+ *   37 emulator, which would freeze the UI that long. A line played before
+ *   its file is written gets it written on the spot. Written base64 strings
+ *   are dropped, so the ~1.3 MB of audio leaves the JS heap as it goes.
+ * - Players: created on first play (or `prewarm`) and capped by the
+ *   engine's LRU (`MAX_LIVE_VOICE_PLAYERS`); on Android each live player
+ *   holds an MP3 decoder, and 53 at once failed to initialise.
  *
  * Duplicate texts (e.g. "Hmm... try again?" rendered once per problem)
- * resolve to their first id, exactly like `mathPathA.ts`; the extra files
- * are still written so `playUtteranceById` works for every id.
+ * resolve to their first id, exactly like `mathPathA.ts`, and every id of
+ * that text plays the same file.
  *
  * Cleanup: `unload()` stops a playing session line, releases the
  * session's players and deletes its directory. `sweepSessionAudioCache()`
@@ -104,19 +109,29 @@ export interface LoadedSessionAudio {
    */
   playUtterance(text: string, opts?: LineCallbacks): Promise<void>
   playUtteranceById(id: string, opts?: LineCallbacks): Promise<void>
-  /** Create a line's player ahead of its first play. */
+  /** Write (if needed) and create a line's player ahead of its first play. */
   prewarm(text: string): void
   readonly textToId: ReadonlyMap<string, string>
   readonly utteranceCount: number
+  /** Distinct texts = files this session writes. */
+  readonly fileCount: number
+  readonly filesWritten: number
   readonly bytesWritten: number
+  /** Resolves once every file is written (or the session is unloaded). */
+  readonly ready: Promise<void>
   /** Stop this session's line, release its players, delete its files. */
   unload(): void
 }
+
+/** Max JS-thread time per background write slice before yielding. */
+export const WRITE_SLICE_MS = 8
 
 export interface SessionAudioDeps {
   engine?: AudioEngine
   files?: SessionFileStore
   now?: () => number
+  /** Yield to the JS thread, then run `fn` (default `setTimeout(fn, 0)`). */
+  yieldThen?: (fn: () => void) => void
 }
 
 let defaultFiles: SessionFileStore | null = null
@@ -127,8 +142,9 @@ const filesOrDefault = (files?: SessionFileStore) =>
 let current: LoadedSessionAudio | null = null
 
 /**
- * Write a session's MP3s and return its player. Replaces (unloads) any
- * other loaded session: session audio is a singleton, like the web's.
+ * Bind a session's MP3s and return its player; the files are written in
+ * the background (see header). Replaces (unloads) any other loaded
+ * session: session audio is a singleton, like the web's.
  */
 export function loadSessionAudio(
   sessionId: string,
@@ -138,38 +154,85 @@ export function loadSessionAudio(
   const engine = deps.engine ?? audioEngine
   const files = filesOrDefault(deps.files)
   const now = deps.now ?? Date.now
+  const yieldThen = deps.yieldThen ?? ((fn: () => void) => setTimeout(fn, 0))
   if (current && current.sessionId !== sessionId) current.unload()
 
   const keyPrefix = `session:${safeName(sessionId)}:`
-  const uris = new Map<string, string>()
+  /** id → its text; text → the first id with that text (the file's id). */
   const texts = new Map<string, string>()
   const textToId = new Map<string, string>()
-  let bytesWritten = 0
-
-  const t0 = now()
+  /** First id → base64 still to write, in plan order. */
+  const pending = new Map<string, string>()
+  const uris = new Map<string, string>()
   for (const u of utterances) {
-    const { uri, bytes } = files.write(sessionId, u.id, u.audio.base64)
-    uris.set(u.id, uri)
     texts.set(u.id, u.text)
-    bytesWritten += bytes
-    if (!textToId.has(u.text)) textToId.set(u.text, u.id)
+    if (!textToId.has(u.text)) {
+      textToId.set(u.text, u.id)
+      pending.set(u.id, u.audio.base64)
+    }
   }
-  recordAudio({
-    kind: 'session-load',
-    label: 'session-files',
-    ms: now() - t0,
-    detail: `${utterances.length} files ${bytesWritten} bytes`,
-  })
+  const fileCount = pending.size
 
   let unloaded = false
+  let bytesWritten = 0
+  let busyMs = 0
+  const t0 = now()
+  let resolveReady: () => void = () => {}
+  const ready = new Promise<void>((resolve) => {
+    resolveReady = resolve
+  })
+
+  /** Write one file now (background slice or on demand). */
+  function writeOne(fileId: string): string | undefined {
+    const done = uris.get(fileId)
+    if (done !== undefined) return done
+    const base64 = pending.get(fileId)
+    if (base64 === undefined) return undefined
+    pending.delete(fileId)
+    const start = now()
+    const { uri, bytes } = files.write(sessionId, fileId, base64)
+    busyMs += now() - start
+    uris.set(fileId, uri)
+    bytesWritten += bytes
+    if (pending.size === 0) finishWrites()
+    return uri
+  }
+
+  function finishWrites(): void {
+    recordAudio({
+      kind: 'session-load',
+      label: 'session-files',
+      ms: now() - t0,
+      detail: `${uris.size} files ${bytesWritten} bytes, ${Math.round(busyMs)} ms writing`,
+    })
+    resolveReady()
+  }
+
+  function slice(): void {
+    if (unloaded) return
+    const start = now()
+    for (const fileId of Array.from(pending.keys())) {
+      writeOne(fileId)
+      if (now() - start >= WRITE_SLICE_MS) break
+    }
+    if (pending.size > 0) yieldThen(slice)
+  }
+  if (fileCount === 0) resolveReady()
+  else yieldThen(slice)
+
+  /** The file id for an utterance id (duplicates share the first id's). */
+  const fileIdOf = (id: string): string | undefined => {
+    const text = texts.get(id)
+    return text === undefined ? undefined : textToId.get(text)
+  }
 
   function playUtteranceById(
     id: string,
     opts: LineCallbacks = {},
   ): Promise<void> {
-    const uri = uris.get(id)
-    const text = texts.get(id)
-    if (unloaded || uri === undefined || text === undefined) {
+    const fileId = fileIdOf(id)
+    const uri = unloaded || fileId === undefined ? undefined : writeOne(fileId)
+    if (fileId === undefined || uri === undefined) {
       return Promise.reject(
         new Error(
           `[sessionAudio] no utterance "${id}" in session ${sessionId}`,
@@ -177,10 +240,10 @@ export function loadSessionAudio(
       )
     }
     return engine.speak(
-      `${keyPrefix}${id}`,
+      `${keyPrefix}${fileId}`,
       { uri },
       {
-        text,
+        text: texts.get(id) ?? '',
         label: `session:${id}`,
         onPlay: opts.onPlay,
         onWordTick: opts.onWordTick,
@@ -203,17 +266,25 @@ export function loadSessionAudio(
     playUtteranceById,
     prewarm(text) {
       const id = textToId.get(text)
-      const uri = id === undefined ? undefined : uris.get(id)
-      if (!unloaded && id !== undefined && uri !== undefined) {
-        engine.preload(`${keyPrefix}${id}`, { uri })
-      }
+      if (unloaded || id === undefined) return
+      const uri = writeOne(id)
+      if (uri !== undefined) engine.preload(`${keyPrefix}${id}`, { uri })
     },
     textToId,
     utteranceCount: utterances.length,
-    bytesWritten,
+    fileCount,
+    get filesWritten() {
+      return uris.size
+    },
+    get bytesWritten() {
+      return bytesWritten
+    },
+    ready,
     unload() {
       if (unloaded) return
       unloaded = true
+      pending.clear()
+      resolveReady()
       if (engine.voice.activeLabel?.startsWith('session:')) {
         engine.cancelVoice()
       }

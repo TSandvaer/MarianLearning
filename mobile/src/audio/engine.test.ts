@@ -151,6 +151,48 @@ describe('audio engine: speak contract', () => {
     expect(fakePlayers).toHaveLength(2)
   })
 
+  it('caps live players (Android: one MP3 decoder each) by releasing the least recently used', () => {
+    const engine = createAudioEngine({
+      createPlayer: fakePlayerFactory,
+      maxPlayers: 3,
+    })
+    engine.preload('a', SRC)
+    engine.preload('b', SRC)
+    engine.preload('c', SRC)
+    engine.preload('a', SRC) // a is now the most recently used
+    engine.preload('d', SRC)
+    expect(engine.loadedKeys()).toEqual(['c', 'a', 'd'])
+    expect(fakePlayers.map((p) => p.removed)).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ])
+  })
+
+  it('never evicts the line in flight', async () => {
+    const engine = createAudioEngine({
+      createPlayer: fakePlayerFactory,
+      maxPlayers: 2,
+    })
+    const line = engine.speak('a', SRC, { text: 'One two.', label: 'a' })
+    fakePlayers[0].start(1)
+    engine.preload('b', SRC)
+    engine.preload('c', SRC) // over the cap: b goes, a is playing
+    expect(engine.loadedKeys()).toEqual(['a', 'c'])
+    expect(fakePlayers[0].removed).toBe(false)
+    fakePlayers[0].finish()
+    await line
+    engine.preload('d', SRC) // a has finished: now it is evictable
+    expect(engine.loadedKeys()).toEqual(['c', 'd'])
+  })
+
+  it('the default cap is 4 live voice players', () => {
+    const { engine } = setup()
+    for (const k of ['a', 'b', 'c', 'd', 'e', 'f']) engine.preload(k, SRC)
+    expect(engine.loadedKeys()).toEqual(['c', 'd', 'e', 'f'])
+  })
+
   it('releasePrefix() removes only the matching clips', () => {
     const { engine } = setup()
     engine.preload('session:a:1', SRC)

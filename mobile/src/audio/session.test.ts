@@ -63,6 +63,8 @@ const UTTERANCES: Utterance[] = [
 
 let engine: AudioEngine
 let files: ReturnType<typeof memoryFiles>
+/** Runs every background write slice at once. */
+const sync = (fn: () => void) => fn()
 
 beforeEach(() => {
   resetFakePlayers()
@@ -73,25 +75,111 @@ beforeEach(() => {
 })
 
 describe('session audio: eager files, lazy players', () => {
-  it('writes every utterance file at load and creates no player yet', () => {
-    const s = loadSessionAudio('s1', UTTERANCES, { engine, files })
+  it('writes one file per distinct text and creates no player', async () => {
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
+    await s.ready
     expect(Array.from(files.dirs.get('s1')!.keys())).toEqual([
       'p1.read',
       'p1.reprompt',
       'p2.read',
-      'p2.reprompt',
     ])
     expect(fakePlayers).toHaveLength(0)
     expect(s.utteranceCount).toBe(4)
+    expect(s.fileCount).toBe(3)
+    expect(s.filesWritten).toBe(3)
     expect(readAudioLog()[0]).toMatchObject({
       kind: 'session-load',
       label: 'session-files',
-      detail: `4 files ${s.bytesWritten} bytes`,
     })
+    expect((readAudioLog()[0] as { detail: string }).detail).toMatch(
+      new RegExp(`^3 files ${s.bytesWritten} bytes`),
+    )
+  })
+
+  it('writes in the background: nothing at load, slices of ≤8 ms, yielding between', () => {
+    const queue: (() => void)[] = []
+    let t = 0
+    const writes: string[] = []
+    const slowFiles: SessionFileStore = {
+      ...files,
+      write(sessionId, id, b64) {
+        writes.push(id)
+        t += 5 // each write costs 5 ms of JS thread
+        return files.write(sessionId, id, b64)
+      },
+    }
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files: slowFiles,
+      now: () => t,
+      yieldThen: (fn) => queue.push(fn),
+    })
+    expect(writes).toEqual([])
+    queue.shift()!() // slice 1: 5 ms, then 10 ms ≥ 8 → yield
+    expect(writes).toEqual(['p1.read', 'p1.reprompt'])
+    expect(queue).toHaveLength(1)
+    queue.shift()!()
+    expect(writes).toEqual(['p1.read', 'p1.reprompt', 'p2.read'])
+    expect(queue).toHaveLength(0)
+    expect(s.filesWritten).toBe(3)
+  })
+
+  it('a line played before its file is written gets it written on the spot', () => {
+    const queue: (() => void)[] = []
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: (fn) => queue.push(fn),
+    })
+    expect(s.filesWritten).toBe(0)
+    const done = s.playUtterance('One plus one. How many?')
+    expect(Array.from(files.dirs.get('s1')!.keys())).toEqual(['p2.read'])
+    expect(fakePlayers[0].source).toEqual({
+      uri: 'file:///cache/session-audio/s1/p2.read.mp3',
+    })
+    queue.shift()!() // the background writer skips what is already written
+    expect(s.filesWritten).toBe(3)
+    s.unload()
+    return expect(done).rejects.toThrow('cancelled')
+  })
+
+  it('unload stops the background writer', () => {
+    const queue: (() => void)[] = []
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: (fn) => queue.push(fn),
+    })
+    s.unload()
+    queue.shift()!()
+    expect(files.dirs.has('s1')).toBe(false)
+    expect(s.filesWritten).toBe(0)
+  })
+
+  it('a duplicate id plays its text’s file (web: first id wins)', async () => {
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
+    const done = s.playUtteranceById('p2.reprompt')
+    expect(fakePlayers[0].source).toEqual({
+      uri: 'file:///cache/session-audio/s1/p1.reprompt.mp3',
+    })
+    s.unload()
+    await expect(done).rejects.toThrow('cancelled')
   })
 
   it('plays by text through the file URI; duplicate text resolves to the first id', async () => {
-    const s = loadSessionAudio('s1', UTTERANCES, { engine, files })
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
     expect(s.textToId.get('Hmm... try again?')).toBe('p1.reprompt')
     const ticks: number[] = []
     const done = s.playUtterance('Hmm... try again?', {
@@ -113,7 +201,11 @@ describe('session audio: eager files, lazy players', () => {
   })
 
   it('text the server never rendered fails soft: onPlay + every tick, resolves silently', async () => {
-    const s = loadSessionAudio('s1', UTTERANCES, { engine, files })
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
     const onPlay = jest.fn()
     const ticks: number[] = []
     await expect(
@@ -128,12 +220,20 @@ describe('session audio: eager files, lazy players', () => {
   })
 
   it('playUtteranceById rejects for an unknown id', async () => {
-    const s = loadSessionAudio('s1', UTTERANCES, { engine, files })
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
     await expect(s.playUtteranceById('p9.read')).rejects.toThrow('no utterance')
   })
 
   it('prewarm creates one line player ahead of its first play', async () => {
-    const s = loadSessionAudio('s1', UTTERANCES, { engine, files })
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
     s.prewarm('One plus one. How many?')
     expect(fakePlayers).toHaveLength(1)
     const done = s.playUtterance('One plus one. How many?')
@@ -144,7 +244,11 @@ describe('session audio: eager files, lazy players', () => {
   })
 
   it('unload stops a playing session line, releases the players and deletes the files', async () => {
-    const s = loadSessionAudio('s1', UTTERANCES, { engine, files })
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
     const done = s.playUtterance('Three plus two. How many?')
     fakePlayers[0].start(2)
     s.unload()
@@ -159,8 +263,12 @@ describe('session audio: eager files, lazy players', () => {
   })
 
   it('loading another session replaces (unloads) the first: one session on disk', () => {
-    loadSessionAudio('s1', UTTERANCES, { engine, files })
-    loadSessionAudio('s2', UTTERANCES.slice(0, 1), { engine, files })
+    loadSessionAudio('s1', UTTERANCES, { engine, files, yieldThen: sync })
+    loadSessionAudio('s2', UTTERANCES.slice(0, 1), {
+      engine,
+      files,
+      yieldThen: sync,
+    })
     expect(Array.from(files.dirs.keys())).toEqual(['s2'])
     expect(currentSessionAudio()?.sessionId).toBe('s2')
   })
@@ -168,7 +276,7 @@ describe('session audio: eager files, lazy players', () => {
   it('the boot sweep deletes directories a killed app left, keeping the loaded session', () => {
     files.write('stale-a', 'x', 'AA==')
     files.write('stale-b', 'x', 'AA==')
-    loadSessionAudio('s1', UTTERANCES, { engine, files })
+    loadSessionAudio('s1', UTTERANCES, { engine, files, yieldThen: sync })
     expect(sweepSessionAudioCache(files)).toBe(2)
     expect(Array.from(files.dirs.keys())).toEqual(['s1'])
   })
@@ -198,7 +306,7 @@ describe('session-start client', () => {
     const payload = { track: 'math' as const, level: 1, childName: 'Marian' }
     const prepared = await startSession(
       { sessionId: 'm1', payload },
-      { fetch, engine, files },
+      { fetch, engine, files, yieldThen: sync },
     )
     expect(fetch).toHaveBeenCalledWith('https://example.test/api/claude', {
       method: 'POST',
@@ -209,7 +317,8 @@ describe('session-start client', () => {
     expect(prepared.plan).toEqual({ problems: [] })
     expect(prepared.track).toBe('math')
     expect(prepared.audio.utteranceCount).toBe(4)
-    expect(files.dirs.get('m1')?.size).toBe(4)
+    await prepared.audio.ready
+    expect(files.dirs.get('m1')?.size).toBe(3)
   })
 
   it.each([
@@ -222,7 +331,7 @@ describe('session-start client', () => {
     await expect(
       startSession(
         { sessionId: 'm1', payload: { track: 'math' } },
-        { fetch, engine, files },
+        { fetch, engine, files, yieldThen: sync },
       ),
     ).rejects.toMatchObject({ name: 'SessionStartError', code })
   })
@@ -232,7 +341,7 @@ describe('session-start client', () => {
     await expect(
       startSession(
         { sessionId: 'm1', payload: { track: 'word-song' } },
-        { fetch, engine, files },
+        { fetch, engine, files, yieldThen: sync },
       ),
     ).rejects.toMatchObject({ code: 'invalid-response' })
     expect(files.dirs.size).toBe(0)
@@ -244,7 +353,7 @@ describe('session-start client', () => {
     )
     const err = await startSession(
       { sessionId: 'm1', payload: { track: 'math' } },
-      { fetch, engine, files },
+      { fetch, engine, files, yieldThen: sync },
     ).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(SessionStartError)
     expect((err as SessionStartError).code).toBe('network-error')
@@ -269,7 +378,7 @@ describe('session-start client', () => {
           payload: { track: 'math' },
           signal: controller.signal,
         },
-        { fetch, engine, files },
+        { fetch, engine, files, yieldThen: sync },
       ),
     ).rejects.toMatchObject({ code: 'aborted' })
     expect(files.dirs.size).toBe(0)
@@ -291,7 +400,11 @@ describe('session prefetch (Hub)', () => {
     return { start, calls }
   }
   const prepared = (id: string) => {
-    const audio = loadSessionAudio(id, UTTERANCES, { engine, files })
+    const audio = loadSessionAudio(id, UTTERANCES, {
+      engine,
+      files,
+      yieldThen: sync,
+    })
     return {
       sessionId: id,
       track: 'math' as const,

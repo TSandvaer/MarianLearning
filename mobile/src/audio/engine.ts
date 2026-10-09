@@ -47,10 +47,23 @@ export interface AudioEngine {
   loadedKeys(): string[]
 }
 
+/**
+ * Live voice players at most (least recently used ones are released).
+ *
+ * On Android every prepared expo-audio player holds its own MP3 decoder
+ * (`c2.android.mp3.decoder`). On the API 37 emulator, 53 players created
+ * at once failed with `Decoder init failed` in logcat, and a one-by-one
+ * probe loaded 11 before the 12th stalled. 4 voice players plus the ≤5
+ * SFX a screen holds stays under that. Greet's 4 lines fit exactly.
+ */
+export const MAX_LIVE_VOICE_PLAYERS = 4
+
 export interface CreateAudioEngineOptions {
   createPlayer?: PlayerFactory
   voice?: VoiceChannel
   now?: () => number
+  /** Default {@link MAX_LIVE_VOICE_PLAYERS}. */
+  maxPlayers?: number
 }
 
 export function createAudioEngine(
@@ -58,11 +71,24 @@ export function createAudioEngine(
 ): AudioEngine {
   const createPlayer = opts.createPlayer ?? createExpoPlayer
   const voice = opts.voice ?? createVoiceChannel()
+  const maxPlayers = Math.max(1, opts.maxPlayers ?? MAX_LIVE_VOICE_PLAYERS)
+  /** Insertion order = recency: the first key is the least recently used. */
   const players = new Map<string, PlayerLike>()
+  /** The clip of the line in flight; never evicted. */
+  let activeKey: string | null = null
+  let activeToken: object | null = null
 
   function playerFor(key: string, source: PlayerSource): PlayerLike {
     const cached = players.get(key)
-    if (cached) return cached
+    if (cached) {
+      players.delete(key)
+      players.set(key, cached)
+      return cached
+    }
+    for (const lru of Array.from(players.keys())) {
+      if (players.size < maxPlayers) break
+      if (lru !== activeKey) release(lru)
+    }
     const player = createPlayer(source)
     players.set(key, player)
     return player
@@ -90,6 +116,9 @@ export function createAudioEngine(
         voice.play({
           label: speakOpts.label,
           start: (): LineHandle => {
+            const token = {}
+            activeKey = key
+            activeToken = token
             const handle = startLine(playerFor(key, source), {
               text: speakOpts.text,
               label: speakOpts.label,
@@ -99,6 +128,12 @@ export function createAudioEngine(
               onLatency: (ms, label) =>
                 recordAudio({ kind: 'onplay', label, ms }),
             })
+            const settled = () => {
+              if (activeToken !== token) return
+              activeKey = null
+              activeToken = null
+            }
+            handle.done.then(settled, settled)
             handle.done.then(resolve, reject)
             return handle
           },
