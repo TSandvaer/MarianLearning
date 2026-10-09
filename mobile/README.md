@@ -1,6 +1,6 @@
 # Marian Tutor: native app (Expo)
 
-The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Every route renders a placeholder until Phase 3 ports the real screens; there is no audio yet (Phase 2b).
+The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Every route renders a placeholder until Phase 3 ports the real screens, so nothing plays audio yet outside the debug audio check.
 
 ## Shape
 
@@ -60,6 +60,30 @@ EXPO_PUBLIC_DEBUG=1 EXPO_PUBLIC_SEED=cvc-words npx expo start --clear
 Other env flags: `EXPO_PUBLIC_API_BASE` (default `https://marian-learning.vercel.app`), `EXPO_PUBLIC_PROGRESS_API_SECRET` (unset: cloud sync is skipped). See `src/platform/buildEnv.ts`.
 
 Reset to a first launch: delete the app from the simulator/device (storage lives in the app's SQLite database).
+
+## Audio
+
+`src/audio/` is the native counterpart of the web's Howler stack, on expo-audio. Screens import from `src/audio/index.ts` only; its header maps each web module to its native function. Highlights:
+
+- **One Emma line at a time** across Greet, Hub/guidance/path lines and session lines (a new line cancels the one in flight). SFX play over her.
+- **Captions** use the web's formula (word i at `i × duration / wordCount`, 165 wpm fallback), read from the player clock at a 50 ms status interval. expo-audio's default is 500 ms, which is too coarse for the captions.
+- **Audio session:** plays in silent mode, `doNotMix`, never in the background.
+- **Lifecycle:** going to the background parks the line and freezes its caption; the foreground resumes it where it stopped. A line requested while hidden waits for the foreground (most recent wins). After a call or Siri, the OS resumes the line, or else the next `inactive → active` edge does.
+- **Session audio:** `startSession()` posts to `/api/claude` through core's `apiUrl()` and writes one MP3 per distinct text to `<cache>/session-audio/<sessionId>/` in the background. `unload()` deletes the files, and a boot sweep removes the files a killed app left. `sessionPrefetcher` is the Hub prefetch Phase 3 calls.
+- **Players:** created lazily, with at most 4 live voice players (LRU). On Android every live player holds an MP3 decoder.
+
+| Env flag (bundle time)      | Effect                                                                   |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `EXPO_PUBLIC_MUTE=1`        | every player muted. Use it for any automated or simulator run.           |
+| `EXPO_PUBLIC_AUDIO_CHECK=1` | runs `src/audio/debug/audioCheck.ts` 2 s after launch and logs to Metro. |
+
+The audio check plays a Greet line, a live session line and two SFX, and logs onPlay latencies (`[audio] onPlay +N ms`), session fetch and write timings, a raw player-status probe and a decoder-limit probe. Simulator: `xcrun simctl openurl booted exp://127.0.0.1:<port>`. With `--ios` the simulator lands on Safari's dev-build/Expo Go chooser, because this project ships `expo-dev-client`. Android: `adb reverse tcp:<port> tcp:<port>`, then open the same URL in Expo Go.
+
+```bash
+EXPO_PUBLIC_AUDIO_CHECK=1 EXPO_PUBLIC_MUTE=1 EXPO_PUBLIC_DEBUG=1 npx expo start --go --port 8297 --clear
+```
+
+**Bundled clips** (Greet, Hub, Emma's Path and guidance lines, SFX) are byte-for-byte copies of the web MP3s: run `npm run export-audio` after a web re-render. `src/audio/audioRegistry.test.ts` fails when a copy drifts or a manifest line has no copy.
 
 ## Checks
 
