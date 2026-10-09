@@ -173,3 +173,9 @@ Distinct from its siblings:
 - **Context:** Phase 1 merged (#525, `8902988`): `@marian/core`, `KeyValueStore`, `apiUrl()`.
 - **Decided:** (1) Start Phase 2 (native shell + platform services: audio, storage, cloud sync, assets, lifecycle, debug seeds). The `mobile/` Expo app lands on main. (2) The web UI feature freeze starts now: content, canon, server work and bug fixes continue; new screens and UI features go into native only. (3) Thomas joins the Apple Developer Program ($99/yr), so Phase 2 moves to development builds instead of depending on which SDK the store build of Expo Go supports. Until approval, use local `expo run:ios` simulator builds.
 - **Decided by:** Thomas (popups, recommended options).
+
+## 2026-10-09 — React Native Phase 2 done; Phase 3 starts with Splash → Greet → Math
+
+- **Context:** Phase 2a (#527, `76752b9`) and 2b (#528, `0fa6b8d`) merged: native shell + expo-audio engine on `@marian/core`.
+- **Decided:** Phase 3 (screen ports) starts with the first-launch slice, one screen at a time, each with phone portrait / phone landscape / tablet layouts in its own PR, checked by Thomas on his devices in Expo Go before the next one starts. Splash (a ~1 s transition screen) ships inside the Greet PR. After Math: SessionEnd → Hub → Map → WordSong → ParentSettings, per the plan.
+- **Decided by:** Thomas (popup, recommended option).
