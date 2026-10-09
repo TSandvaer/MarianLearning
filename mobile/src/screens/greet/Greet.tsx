@@ -49,6 +49,7 @@ import {
   cancelGreetAudio,
   loadGreetAudio,
   playGreetLine,
+  recordAudio,
   unloadGreetAudio,
 } from '../../audio'
 import { CaptionRibbon } from '../../components/CaptionRibbon'
@@ -226,12 +227,20 @@ export function Greet({
     wakeNudgeRef.current = null
     setShowWakeIcon(false)
     setScreenState('intro')
+    const tappedAt = Date.now()
 
     const sequence = runGreetSequence({
       speak: speaker.speak,
       schedule: (cb, ms) => later(cb, ms),
       cancelSchedule: (h) => clearLater(h as ReturnType<typeof setTimeout>),
       onLineStart: (i) => setActiveLine(i),
+      // Spec § 1 target: ≤ 250 ms. Logged to Metro with -debug 1.
+      onLine0Start: () =>
+        recordAudio({
+          kind: 'onplay',
+          label: 'greet tap → "Hi!"',
+          ms: Date.now() - tappedAt,
+        }),
       onWordBoundary: (i, ev) => {
         reveal(i, ev.wordIndex + 1)
         if (i === 0 && ev.word === 'Hi!') earWiggle()
