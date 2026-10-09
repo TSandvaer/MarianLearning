@@ -39,6 +39,8 @@ export interface Size {
 }
 
 export interface GreetLayout extends ScreenLayout {
+  /** The safe area: the wake tap target covers exactly this. */
+  safe: Rect
   /** Bounding square of the wake ring, centred on Emma. */
   ring: Rect
   /** Ring stroke width. */
@@ -97,10 +99,7 @@ const TABLET = {
   ribbonPadding: { horizontal: 24, vertical: 16 }, // px-6 py-4
 }
 
-function slotHeight(
-  fontSize: number,
-  padding: { vertical: number },
-): number {
+function slotHeight(fontSize: number, padding: { vertical: number }): number {
   return (
     RIBBON_LINES * fontSize * CAPTION_LINE_HEIGHT +
     padding.vertical * 2 +
@@ -124,6 +123,7 @@ function union(a: Rect, b: Rect): Rect {
 }
 
 function finish(
+  v: Viewport,
   base: Pick<ScreenLayout, 'landscape' | 'tablet' | 'captionFontSize'>,
   emma: Rect,
   ribbonSlot: Rect,
@@ -133,6 +133,7 @@ function finish(
   const ringSize = emma.width * RING_PER_EMMA
   return {
     ...base,
+    safe: safeRect(v),
     emma,
     content: union(ribbonSlot, heart),
     ring: centredSquare(
@@ -173,6 +174,7 @@ function phonePortrait(v: Viewport): GreetLayout {
   const ribbonY = emmaY + emmaSize + PHONE.emmaToRibbon
   const ribbonW = Math.min(s.width - PHONE.pad * 2, RIBBON_MAX_WIDTH)
   return finish(
+    v,
     { landscape: false, tablet: false, captionFontSize: fontSize },
     {
       x: s.x + (s.width - emmaSize) / 2,
@@ -206,6 +208,7 @@ function phoneLandscape(v: Viewport): GreetLayout {
   const top = s.y + Math.max(0, (s.height - block) / 2)
   const right = s.x + half
   return finish(
+    v,
     { landscape: true, tablet: false, captionFontSize: fontSize },
     {
       x: s.x + (half - emmaSize) / 2,
@@ -213,7 +216,12 @@ function phoneLandscape(v: Viewport): GreetLayout {
       width: emmaSize,
       height: emmaSize,
     },
-    { x: right + (half - ribbonW) / 2, y: top, width: ribbonW, height: ribbonH },
+    {
+      x: right + (half - ribbonW) / 2,
+      y: top,
+      width: ribbonW,
+      height: ribbonH,
+    },
     {
       x: right + (half - PHONE_HEART.width) / 2,
       y: top + ribbonH + PHONE.minRibbonToHeart,
@@ -237,6 +245,7 @@ function tabletPortrait(v: Viewport): GreetLayout {
   const emmaSize = Math.min(slotH, s.width)
   const ribbonW = Math.min(s.width * 0.88, RIBBON_MAX_WIDTH)
   return finish(
+    v,
     { landscape: false, tablet: true, captionFontSize: fontSize },
     {
       x: s.x + (s.width - emmaSize) / 2,
@@ -266,10 +275,7 @@ function tabletLandscape(v: Viewport): GreetLayout {
   // h-[min(80vh,50vw)]: viewport units, not the safe area.
   const emmaSize = Math.min(v.height * 0.8, v.width * 0.5, half, s.height)
   const ribbonH = slotHeight(fontSize, TABLET.ribbonPadding)
-  const ribbonW = Math.min(
-    half * TABLET.ribbonWidthOfColumn,
-    RIBBON_MAX_WIDTH,
-  )
+  const ribbonW = Math.min(half * TABLET.ribbonWidthOfColumn, RIBBON_MAX_WIDTH)
   // Rows: minmax(0,1fr) | ribbon | heart box | minmax(0,1fr).
   const block =
     TABLET.ribbonTop +
@@ -282,6 +288,7 @@ function tabletLandscape(v: Viewport): GreetLayout {
   const heartBoxY = ribbonY + ribbonH + TABLET.ribbonBottom
   const right = s.x + half
   return finish(
+    v,
     { landscape: true, tablet: true, captionFontSize: fontSize },
     {
       x: s.x + (half - emmaSize) / 2,

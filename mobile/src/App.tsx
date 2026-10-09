@@ -1,11 +1,13 @@
 /**
- * Native app root (Phase 2a shell).
+ * Native app root.
  *
- * Route state is core's route state machine (`./router/routes.ts`), one
- * placeholder per route until Phase 3 ports the screens. Splash branches
- * on the persisted `sessionCount` through core's `nextAfterSplash()`,
- * exactly like the web. Emma is one App-level view that springs between
- * the routes' frames (`./components/EmmaStage.tsx`).
+ * Route state is core's route state machine (`./router/routes.ts`).
+ * Phase 3 ports the screens one by one: Splash and Greet are real, every
+ * other route is still a placeholder. Splash branches on the persisted
+ * `sessionCount` through core's `nextAfterSplash()`, exactly like the
+ * web; neither Splash nor Greet writes it (Session-End does). Emma is one
+ * App-level view that springs between the routes' frames
+ * (`./components/EmmaStage.tsx`); Greet drives her pose and breath.
  *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
@@ -27,18 +29,35 @@ import { useAudioEngine } from './audio'
 import { EmmaStage, type Breath } from './components/EmmaStage'
 import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
+import { greetLayout } from './layout/greetLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
 import { getLaunchFlags } from './platform/launchFlags'
 import { FIRST_ROUTE, nextRoute, type Route } from './router/routes'
+import {
+  Greet,
+  GREET_BREATH_PERIOD_S,
+  GREET_BREATH_SCALE,
+  type GreetPose,
+} from './screens/greet/Greet'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
-import { SplashPlaceholder } from './screens/SplashPlaceholder'
+import { Splash } from './screens/Splash'
 import { colors } from './theme'
 
 // Keep the OS splash up until the fonts are ready (module scope, so it
 // runs before the first render).
 void SplashScreen.preventAutoHideAsync()
 
+/**
+ * Greet's breath: `scale: [1, 1.05, 1]` over 2.4 s, faster than elsewhere so
+ * she reads as awake (web Greet.tsx; Dave's consult rejected 1.015).
+ */
+const GREET_BREATH: Breath = {
+  scale: GREET_BREATH_SCALE,
+  periodS: GREET_BREATH_PERIOD_S,
+}
+
+/** EmmaCharacter's breath (Math, Hub, ...): 1.02 over 4 s. */
 const BREATH: Breath = {
   scale: BREATHING_SCALE_KEYFRAMES[1],
   periodS: BREATHING_PERIOD_S,
@@ -53,6 +72,7 @@ function Shell() {
   )
   const flags = getLaunchFlags()
   const [route, setRoute] = useState<Route>(FIRST_ROUTE)
+  const [greetPose, setGreetPose] = useState<GreetPose>('idle')
 
   const navigate = useCallback((to: Route) => {
     setRoute((current) => nextRoute(current, to))
@@ -61,6 +81,8 @@ function Shell() {
     () => navigate(nextAfterSplash()),
     [navigate],
   )
+  // Web `handleGreetAdvance`: the first-launch flow goes straight to Math.
+  const onGreetDone = useCallback(() => navigate('math'), [navigate])
 
   // Audio session (plays in silent mode, doNotMix), the voice channel's
   // background/interruption handling, and the boot-time cache sweep.
@@ -79,23 +101,38 @@ function Shell() {
     ),
   )
 
-  const layout = layoutForRoute(route, viewport)
+  const greet = route === 'greet' ? greetLayout(viewport) : null
+  const layout = greet ?? layoutForRoute(route, viewport)
 
   return (
     <View style={styles.root}>
       <StatusBar hidden />
       {route === 'splash' ? (
-        <SplashPlaceholder onAdvance={onSplashDone} />
+        <Splash onAdvance={onSplashDone} />
       ) : (
         <>
-          <RoutePlaceholder
-            key={route}
-            route={route}
-            layout={layout}
-            flags={flags}
-            onNavigate={navigate}
+          {greet ? (
+            <Greet
+              layout={greet}
+              onPoseChange={setGreetPose}
+              onAdvance={onGreetDone}
+            />
+          ) : (
+            <RoutePlaceholder
+              key={route}
+              route={route}
+              layout={layout}
+              flags={flags}
+              onNavigate={navigate}
+            />
+          )}
+          <EmmaStage
+            frame={layout.emma}
+            // Greet's ear-wiggle is Greet's; every other screen starts idle
+            // (web: each screen mounts its own Emma).
+            pose={route === 'greet' ? greetPose : 'idle'}
+            breath={route === 'greet' ? GREET_BREATH : BREATH}
           />
-          <EmmaStage frame={layout.emma} pose="idle" breath={BREATH} />
         </>
       )}
     </View>

@@ -33,6 +33,7 @@ export {
   unloadHubLines,
   createManifestLinePlayer,
   createPathLinePlayer,
+  CAPTION_WALK_MS_PER_WORD,
 } from './manifestLines'
 export type {
   ManifestLine,
