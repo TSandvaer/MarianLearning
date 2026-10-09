@@ -10,6 +10,7 @@
     "test": "jest",
     "doctor": "expo-doctor",
     "export-assets": "node scripts/export-assets.mjs",
+    "export-audio": "node scripts/export-audio.mjs",
     "check:bundle": "node scripts/check-bundle-sources.mjs"
   },
   "dependencies": {
@@ -17,7 +18,9 @@
     "@marian/core": "file:../packages/core",
     "expo": "~57.0.27",
     "expo-asset": "~57.0.19",
+    "expo-audio": "~57.0.5",
     "expo-dev-client": "~57.0.19",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-image": "~57.0.5",
     "expo-splash-screen": "~57.0.9",

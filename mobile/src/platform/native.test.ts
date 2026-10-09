@@ -39,6 +39,8 @@ const EMPTY_ENV: BuildEnv = {
   debug: undefined,
   seed: undefined,
   dayOffset: undefined,
+  mute: undefined,
+  audioCheck: undefined,
 }
 
 const DEBUG_FLAGS: LaunchFlags = { debug: true, seed: null, dayOffset: null }

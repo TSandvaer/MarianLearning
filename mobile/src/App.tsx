@@ -23,6 +23,7 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context'
+import { useAudioEngine } from './audio'
 import { EmmaStage, type Breath } from './components/EmmaStage'
 import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
@@ -61,8 +62,12 @@ function Shell() {
     [navigate],
   )
 
-  // The web's visibilitychange use, natively. Phase 2b's audio engine
-  // pauses and resumes here; the shell only logs it in debug mode.
+  // Audio session (plays in silent mode, doNotMix), the voice channel's
+  // background/interruption handling, and the boot-time cache sweep.
+  useAudioEngine(flags.debug)
+
+  // The web's visibilitychange use, natively. The audio engine subscribes
+  // itself (above); the shell only logs the edge in debug mode.
   useAppVisibilityChange(
     useCallback(
       (hidden: boolean) => {
