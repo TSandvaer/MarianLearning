@@ -281,6 +281,7 @@ export function createMathSessionController(
 
       handle = startSessionWithFallback({
         hasHints: hasCanonBypassingHints(hints),
+        timeoutMs: deps.timeoutMs,
         signal: abort.signal,
         run,
         onFallback: () =>

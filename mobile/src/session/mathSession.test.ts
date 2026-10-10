@@ -66,7 +66,7 @@ interface Call {
   reject: (e: Error) => void
 }
 
-function harness(hints: MathProgressHints = NO_HINTS) {
+function harness(hints: MathProgressHints = NO_HINTS, timeoutMs?: number) {
   const calls: Call[] = []
   const start = jest.fn(
     (args: SessionStartArgs) =>
@@ -81,6 +81,7 @@ function harness(hints: MathProgressHints = NO_HINTS) {
     start,
     readHints: () => hints,
     fallbackPlanId: () => 'sums-to-10-B',
+    timeoutMs,
     now: () => 1000,
   })
   const prepared = (plan: unknown = SERVER_PLAN) => {
@@ -216,6 +217,22 @@ describe('the session start', () => {
       playUtterance: null,
       audioReady: false,
     })
+  })
+
+  it('timeoutMs overrides the visible-wait budget', async () => {
+    jest.useFakeTimers()
+    try {
+      const { calls, session } = harness(HINTS, 100)
+      session.kick()
+      session.startWaitTimer()
+      jest.advanceTimersByTime(99)
+      expect(calls).toHaveLength(1)
+      jest.advanceTimersByTime(1)
+      expect(calls).toHaveLength(2)
+      expect(calls[1].args.sessionId).toBe('math-sums-to-10-B-1000-fallback')
+    } finally {
+      jest.useRealTimers()
+    }
   })
 
   it('hinted + 5 s visible wait: a hint-free request replaces it', async () => {
