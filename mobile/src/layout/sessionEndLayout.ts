@@ -291,12 +291,7 @@ const TABLET_PANEL_SLAB = 14
 const PHONE_PANEL_SLAB = 10
 
 /** Top and bottom of the stack (web `.se-stack` padding), in screen pt. */
-function stackBounds(
-  v: Viewport,
-  s: Rect,
-  tablet: boolean,
-  landscape: boolean,
-) {
+function stackBounds(s: Rect, tablet: boolean, landscape: boolean) {
   // Web: `max(env(safe-area-inset-top), 12px)` / `calc(inset-bottom + 22px)`.
   const top = Math.max(s.y, tablet ? 12 : landscape ? 8 : 12)
   const bottomPad = tablet ? 22 : landscape ? 8 : 16
@@ -305,7 +300,7 @@ function stackBounds(
 
 function tabletPortrait(v: Viewport): SessionEndLayout {
   const s = safeRect(v)
-  const { top, bottom } = stackBounds(v, s, true, false)
+  const { top, bottom } = stackBounds(s, true, false)
   const caption = captionMetrics(true)
   const panelW = Math.min(720, 0.92 * v.width, s.width - 32)
   const tokens: PanelTokens = {
@@ -377,7 +372,7 @@ function tabletPortrait(v: Viewport): SessionEndLayout {
 
 function tabletLandscape(v: Viewport): SessionEndLayout {
   const s = safeRect(v)
-  const { top, bottom } = stackBounds(v, s, true, true)
+  const { top, bottom } = stackBounds(s, true, true)
   const caption = captionMetrics(true)
   const emma = Math.min(0.64 * v.height, 480, 0.3 * v.width, bottom - top)
   const columnW = Math.min(720, s.width - 32 - emma - 28)
@@ -440,7 +435,7 @@ function tabletLandscape(v: Viewport): SessionEndLayout {
 
 function phonePortrait(v: Viewport): SessionEndLayout {
   const s = safeRect(v)
-  const { top, bottom } = stackBounds(v, s, false, false)
+  const { top, bottom } = stackBounds(s, false, false)
   const caption = captionMetrics(false)
   const width = s.width - 32
   const tokens: PanelTokens = {
@@ -499,7 +494,7 @@ const LANDSCAPE_GAPS = { panelToButtons: [22, 14], buttonsToCaption: [12, 6] }
 
 function phoneLandscape(v: Viewport): SessionEndLayout {
   const s = safeRect(v)
-  const { top, bottom } = stackBounds(v, s, false, true)
+  const { top, bottom } = stackBounds(s, false, true)
   const height = bottom - top
   const caption = captionMetrics(false)
   // Web landscape: Emma `min(64vh, 480, 30vw)`, the column beside her.
