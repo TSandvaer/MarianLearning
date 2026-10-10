@@ -1,6 +1,6 @@
 import { ROUTES } from '../router/routes'
+import { greetLayout } from './greetLayout'
 import {
-  greetLayout,
   isTablet,
   mathLayout,
   panelRect,
@@ -48,7 +48,9 @@ function overlaps(a: Rect, b: Rect): boolean {
 }
 
 describe.each(Object.entries(VIEWPORTS))('%s', (_name, viewport) => {
-  it.each(ROUTES.filter((r) => r !== 'splash'))(
+  // Greet has its own layout and tests (greetLayout.test.ts): Emma's frame
+  // may overhang the screen there, as on the web.
+  it.each(ROUTES.filter((r) => r !== 'splash' && r !== 'greet'))(
     '%s: Emma and the placeholder panel sit in the safe area, apart',
     (route) => {
       const layout = layoutForRoute(route, viewport)

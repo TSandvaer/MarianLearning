@@ -16,6 +16,8 @@
  * | `EXPO_PUBLIC_DAY_OFFSET=<n>`       | moves the progress clock n days (0..60)       |
  * | `EXPO_PUBLIC_MUTE=1`               | every audio player muted (automated runs)     |
  * | `EXPO_PUBLIC_AUDIO_CHECK=1`        | runs `src/audio/debug/audioCheck.ts` at boot  |
+ * | `EXPO_PUBLIC_QA_AUTOTAP_MS=<n>`    | debug only: Greet's wake tap fires itself n ms |
+ * |                                    | after Greet mounts (simulators without a tap) |
  *
  * The progress secret ships inside the bundle, exactly like the web's
  * `VITE_PROGRESS_API_SECRET` (cloud-sync threat model: casual-abuse
@@ -30,6 +32,7 @@ export interface BuildEnv {
   dayOffset: string | undefined
   mute: string | undefined
   audioCheck: string | undefined
+  qaAutoTapMs: string | undefined
 }
 
 export function readBuildEnv(): BuildEnv {
@@ -41,5 +44,6 @@ export function readBuildEnv(): BuildEnv {
     dayOffset: process.env.EXPO_PUBLIC_DAY_OFFSET,
     mute: process.env.EXPO_PUBLIC_MUTE,
     audioCheck: process.env.EXPO_PUBLIC_AUDIO_CHECK,
+    qaAutoTapMs: process.env.EXPO_PUBLIC_QA_AUTOTAP_MS,
   }
 }

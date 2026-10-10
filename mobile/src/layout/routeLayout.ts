@@ -1,6 +1,6 @@
 import type { Route } from '@marian/core/router/route'
+import { greetLayout } from './greetLayout'
 import {
-  greetLayout,
   hubLayout,
   mathLayout,
   type ScreenLayout,

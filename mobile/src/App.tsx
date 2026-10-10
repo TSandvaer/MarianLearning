@@ -1,11 +1,14 @@
 /**
- * Native app root (Phase 2a shell).
+ * Native app root.
  *
- * Route state is core's route state machine (`./router/routes.ts`), one
- * placeholder per route until Phase 3 ports the screens. Splash branches
- * on the persisted `sessionCount` through core's `nextAfterSplash()`,
- * exactly like the web. Emma is one App-level view that springs between
- * the routes' frames (`./components/EmmaStage.tsx`).
+ * Route state is core's route state machine (`./router/routes.ts`).
+ * Phase 3 ports the screens one by one: Splash and Greet are real, every
+ * other route is still a placeholder. Splash branches on the persisted
+ * `sessionCount` through core's `nextAfterSplash()`, exactly like the
+ * web; neither Splash nor Greet writes it (Session-End does). Emma is one
+ * App-level view that springs between the routes' frames
+ * (`./components/EmmaStage.tsx`); on Greet she breathes faster and stays
+ * in the idle pose throughout.
  *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
@@ -27,18 +30,35 @@ import { useAudioEngine } from './audio'
 import { EmmaStage, type Breath } from './components/EmmaStage'
 import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
+import { greetLayout } from './layout/greetLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
+import { readBuildEnv } from './platform/buildEnv'
 import { getLaunchFlags } from './platform/launchFlags'
 import { FIRST_ROUTE, nextRoute, type Route } from './router/routes'
+import {
+  Greet,
+  GREET_BREATH_PERIOD_S,
+  GREET_BREATH_SCALE,
+} from './screens/greet/Greet'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
-import { SplashPlaceholder } from './screens/SplashPlaceholder'
+import { Splash } from './screens/Splash'
 import { colors } from './theme'
 
 // Keep the OS splash up until the fonts are ready (module scope, so it
 // runs before the first render).
 void SplashScreen.preventAutoHideAsync()
 
+/**
+ * Greet's breath: `scale: [1, 1.05, 1]` over 2.4 s, faster than elsewhere so
+ * she reads as awake (web Greet.tsx; Dave's consult rejected 1.015).
+ */
+const GREET_BREATH: Breath = {
+  scale: GREET_BREATH_SCALE,
+  periodS: GREET_BREATH_PERIOD_S,
+}
+
+/** EmmaCharacter's breath (Math, Hub, ...): 1.02 over 4 s. */
 const BREATH: Breath = {
   scale: BREATHING_SCALE_KEYFRAMES[1],
   periodS: BREATHING_PERIOD_S,
@@ -52,6 +72,9 @@ function Shell() {
     [width, height, insets],
   )
   const flags = getLaunchFlags()
+  const qaAutoTapMs = flags.debug
+    ? parseQaAutoTap(readBuildEnv().qaAutoTapMs)
+    : undefined
   const [route, setRoute] = useState<Route>(FIRST_ROUTE)
 
   const navigate = useCallback((to: Route) => {
@@ -61,6 +84,8 @@ function Shell() {
     () => navigate(nextAfterSplash()),
     [navigate],
   )
+  // Web `handleGreetAdvance`: the first-launch flow goes straight to Math.
+  const onGreetDone = useCallback(() => navigate('math'), [navigate])
 
   // Audio session (plays in silent mode, doNotMix), the voice channel's
   // background/interruption handling, and the boot-time cache sweep.
@@ -79,27 +104,48 @@ function Shell() {
     ),
   )
 
-  const layout = layoutForRoute(route, viewport)
+  const greet = route === 'greet' ? greetLayout(viewport) : null
+  const layout = greet ?? layoutForRoute(route, viewport)
 
   return (
     <View style={styles.root}>
       <StatusBar hidden />
       {route === 'splash' ? (
-        <SplashPlaceholder onAdvance={onSplashDone} />
+        <Splash onAdvance={onSplashDone} />
       ) : (
         <>
-          <RoutePlaceholder
-            key={route}
-            route={route}
-            layout={layout}
-            flags={flags}
-            onNavigate={navigate}
+          {greet ? (
+            <Greet
+              layout={greet}
+              onAdvance={onGreetDone}
+              qaAutoTapAfterMs={qaAutoTapMs}
+            />
+          ) : (
+            <RoutePlaceholder
+              key={route}
+              route={route}
+              layout={layout}
+              flags={flags}
+              onNavigate={navigate}
+            />
+          )}
+          <EmmaStage
+            frame={layout.emma}
+            // Calm through the whole Greet (native-only, Thomas 2026-10-09:
+            // no celebration swap); every other screen starts idle too.
+            pose="idle"
+            breath={route === 'greet' ? GREET_BREATH : BREATH}
           />
-          <EmmaStage frame={layout.emma} pose="idle" breath={BREATH} />
         </>
       )}
     </View>
   )
+}
+
+/** `EXPO_PUBLIC_QA_AUTOTAP_MS`: a non-negative integer, else ignored. */
+function parseQaAutoTap(raw: string | undefined): number | undefined {
+  if (raw === undefined || !/^\d+$/.test(raw)) return undefined
+  return Number(raw)
 }
 
 export default function App() {

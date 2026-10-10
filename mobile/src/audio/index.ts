@@ -33,6 +33,7 @@ export {
   unloadHubLines,
   createManifestLinePlayer,
   createPathLinePlayer,
+  CAPTION_WALK_MS_PER_WORD,
 } from './manifestLines'
 export type {
   ManifestLine,
@@ -64,5 +65,5 @@ export {
 export type { PrefetchKey, SessionPrefetcher } from './sessionPrefetch'
 export { useAudioEngine, configureAudioSession, AUDIO_MODE } from './lifecycle'
 export { isAudioMuted } from './mute'
-export { readAudioLog } from './audioLog'
+export { readAudioLog, recordAudio } from './audioLog'
 export type { AudioLogRow } from './audioLog'

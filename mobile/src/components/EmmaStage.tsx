@@ -28,6 +28,7 @@ import { StyleSheet } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
+  FadeIn,
   LinearTransition,
   useAnimatedStyle,
   useReducedMotion,
@@ -142,7 +143,9 @@ export function EmmaStage({ frame, pose, breath }: EmmaStageProps) {
 
   return (
     <Animated.View
-      entering={emmaEntering}
+      testID={`emma-${pose}`}
+      // Reduce Motion: she fades in instead of sliding (session-1.md).
+      entering={reducedMotion ? FadeIn.duration(300) : emmaEntering}
       layout={emmaLayout}
       style={[
         styles.frame,
@@ -168,5 +171,7 @@ export function EmmaStage({ frame, pose, breath }: EmmaStageProps) {
 }
 
 const styles = StyleSheet.create({
-  frame: { position: 'absolute', pointerEvents: 'none' },
+  // zIndex 1: between a screen's background (0) and foreground (2)
+  // layers, e.g. Greet's ring below her and its nudge icon above.
+  frame: { position: 'absolute', pointerEvents: 'none', zIndex: 1 },
 })

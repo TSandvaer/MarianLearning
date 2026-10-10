@@ -14,6 +14,7 @@ import {
   _resetAudioSessionForTests,
   configureAudioSession,
   installAudioLifecycle,
+  releaseAudioSession,
 } from './lifecycle'
 import { START_TIMEOUT_MS } from './linePlayback'
 
@@ -250,5 +251,33 @@ describe('audio lifecycle (web: useHowlerSuspendOnHide + pendingResumeGate)', ()
     uninstall()
     appState.set('background')
     expect(fakePlayers[0].calls).toEqual(['play'])
+  })
+})
+
+describe('held audio session (native spec § 3)', () => {
+  it('is released when the app goes to the background, not on inactive or foreground', () => {
+    const engine = createAudioEngine({ createPlayer: fakePlayerFactory })
+    const appState = fakeAppState()
+    const visibility = createAppVisibility(appState)
+    const release = jest.fn()
+    installAudioLifecycle(engine.voice, visibility, appState, release)
+
+    appState.set('inactive') // Control Center: still visible
+    expect(release).not.toHaveBeenCalled()
+    appState.set('background')
+    expect(release).toHaveBeenCalledTimes(1)
+    appState.set('active')
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
+  it('releases through setIsAudioActiveAsync(false) on iOS only', () => {
+    const setActive = jest.fn(() => Promise.resolve())
+    releaseAudioSession('ios', setActive)
+    expect(setActive).toHaveBeenCalledTimes(1)
+    expect(setActive).toHaveBeenCalledWith(false)
+    // Android: the option is iOS-only, and setIsAudioActiveAsync(false)
+    // would disable playback there until re-enabled.
+    releaseAudioSession('android', setActive)
+    expect(setActive).toHaveBeenCalledTimes(1)
   })
 })
