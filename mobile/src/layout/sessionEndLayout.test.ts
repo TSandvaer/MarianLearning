@@ -155,6 +155,6 @@ it('phone landscape gives the tray what height is left, down to the floor', () =
 
 it('holeRects spaces the holes around (web `space-around`)', () => {
   const holes = holeRects({ x: 0, y: 0, width: 350, height: 116 }, 86, 3)
-  expect(holes.map((h) => Math.round(h.x))).toEqual([15, 132, 248])
+  expect(holes.map((h) => Math.round(h.x))).toEqual([15, 132, 249])
   expect(holes.every((h) => h.y === 15)).toBe(true)
 })
