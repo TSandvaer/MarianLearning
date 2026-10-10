@@ -197,6 +197,37 @@ it('Greet → heart → Math (offline: the static plan, silent captions) → 8 p
   expect(screen.queryByTestId('exit-greet')).toBeNull()
 })
 
+it('Session End → Math again: nothing is read before the new session settles, then problem 1 is', async () => {
+  boot()
+  await greetToMath()
+  for (let i = 0; i < 8; i++) await answerRight()
+  expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
+
+  // The next session start hangs until the test lets it fail (offline).
+  let failStart: (err: Error) => void = () => {}
+  ;(globalThis.fetch as jest.Mock).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        failStart = reject
+      }),
+  )
+  await fireEvent.press(screen.getByTestId('exit-math'))
+  await flushAll()
+  await advance(3000)
+  expect(sessionStarts()).toHaveLength(2)
+  expect(screen.getByTestId('math-getting-ready')).toBeOnTheScreen()
+  // The old session must not read problem 1 behind "getting ready".
+  expect(screen.queryByTestId('math-ribbon')).toBeNull()
+
+  await act(async () => failStart(new TypeError('offline')))
+  await flushAll()
+  expect(screen.queryByTestId('math-getting-ready')).toBeNull()
+  expect(screen.getByTestId('math-ribbon')).toBeOnTheScreen()
+  expect(screen.getAllByTestId('caption-word-revealed').length).toBeGreaterThan(
+    0,
+  )
+})
+
 it('Math drives Emma: listening while reading, puzzled-tilt on a wrong answer, celebration on a right one', async () => {
   boot()
   await greetToMath()

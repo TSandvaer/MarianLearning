@@ -141,16 +141,6 @@ function Shell() {
     flags.debug ? parseQaRoute(env.qaRoute) : FIRST_ROUTE,
   )
 
-  const navigate = useCallback((to: Route) => {
-    setRoute((current) => nextRoute(current, to))
-  }, [])
-  const onSplashDone = useCallback(
-    () => navigate(nextAfterSplash()),
-    [navigate],
-  )
-  // Web `handleGreetAdvance`: the first-launch flow goes straight to Math.
-  const onGreetDone = useCallback(() => navigate('math'), [navigate])
-
   // Math: session start, result handoff, Emma's pose.
   const [mathDefaults] = useState(mathSessionDefaults)
   const [mathSession] = useState(() =>
@@ -165,18 +155,34 @@ function Shell() {
   const [mathPose, setMathPose] = useState<EmmaPose>('idle')
   const [sessionEnd, setSessionEnd] = useState<SessionEndPayload | null>(null)
 
-  // Web kick-effect + leave-effect: kick on Greet / Math (latched); tear
-  // down on leaving those routes, and on leaving Session End.
-  const prevRouteRef = useRef(route)
+  // The web's tear-downs (`handleBackToHub`, `handleSessionEndAllDone` /
+  // `…Again`, the leave-effect) run BEFORE the route flips: leaving
+  // Session End, or leaving Greet / Math / Session End for anything else,
+  // drops the Math session first. A Math screen must never mount on the
+  // previous session: its stale read would set the read-aloud latch.
+  const routeRef = useRef(route)
+  const navigate = useCallback(
+    (to: Route) => {
+      const from = routeRef.current
+      const next = nextRoute(from, to)
+      if (next === from) return
+      if (from === 'session-end' || !MATH_AUDIO_ROUTES.has(next)) {
+        mathSession.tearDown()
+      }
+      routeRef.current = next
+      setRoute(next)
+    },
+    [mathSession],
+  )
+  const onSplashDone = useCallback(
+    () => navigate(nextAfterSplash()),
+    [navigate],
+  )
+  // Web `handleGreetAdvance`: the first-launch flow goes straight to Math.
+  const onGreetDone = useCallback(() => navigate('math'), [navigate])
+
+  // Web kick-effect: kick on Greet / Math (latched until a tear-down).
   useEffect(() => {
-    const prev = prevRouteRef.current
-    prevRouteRef.current = route
-    if (
-      prev !== route &&
-      (prev === 'session-end' || !MATH_AUDIO_ROUTES.has(route))
-    ) {
-      mathSession.tearDown()
-    }
     if (route === 'greet' || route === 'math') mathSession.kick()
   }, [route, mathSession])
   // Emma's Path 1/10: the hinted request's 5 s budget counts visible wait.
