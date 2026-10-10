@@ -105,7 +105,7 @@ import type {
   PlayMathUtteranceOptions,
 } from './mathTypes'
 import { ScaffoldFlash } from './ScaffoldFlash'
-import { createSilentMathPlayer } from './silentPlayer'
+import { createSilentMathPlayer, type SilentMathPlayer } from './silentPlayer'
 
 /** Web: the chime lands 320 ms after sparkle + plink (#133 follow-up). */
 export const STREAK_CHIME_STAGGER_MS = 320
@@ -175,6 +175,8 @@ export interface MathProps {
    * the rest the right one.
    */
   qaAutoAnswerAfterMs?: number
+  /** Test seam: the silent caption walk used without a player. */
+  silentPlayer?: SilentMathPlayer
 }
 
 interface PerProblemState {
@@ -235,6 +237,7 @@ export function MathScreen({
   now = () => new Date(),
   visibility = appVisibility,
   qaAutoAnswerAfterMs,
+  silentPlayer,
 }: MathProps) {
   const appHidden = useIsAppHidden(visibility)
 
@@ -248,7 +251,7 @@ export function MathScreen({
 
   // Fixed at mount: the effects, the silent player, the line canceller.
   const [sfx] = useState<MathSfx>(() => sfxProp ?? createMathSfx())
-  const [silent] = useState(createSilentMathPlayer)
+  const [silent] = useState(() => silentPlayer ?? createSilentMathPlayer())
   const [cancelEmmaLine] = useState(() => cancelLine)
   const playRef = useRef<PlayMathUtteranceFn>(silent.play)
   useLayoutEffect(() => {

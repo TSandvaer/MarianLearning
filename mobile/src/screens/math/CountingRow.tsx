@@ -65,10 +65,12 @@ function Flower({
 }
 
 function Group({
+  side,
   count,
   metrics,
   pulsing,
 }: {
+  side: 'a' | 'b'
   count: number
   metrics: CountingMetrics
   pulsing: boolean
@@ -77,7 +79,8 @@ function Group({
   const wraps = perRow !== Infinity && count > perRow
   return (
     <View
-      testID="math-flower-group"
+      // Web `data-hint-beat` / `data-pulsing`, for the tests.
+      testID={`math-flower-group-${side}${pulsing ? '-pulsing' : ''}`}
       accessibilityLabel={`${count}`}
       style={[
         styles.group,
@@ -127,6 +130,7 @@ export function CountingRow({
       style={[styles.row, fade]}
     >
       <Group
+        side="a"
         count={addendA}
         metrics={metrics}
         pulsing={hintBeat === 'group-a'}
@@ -142,6 +146,7 @@ export function CountingRow({
         </Text>
       </View>
       <Group
+        side="b"
         count={addendB}
         metrics={metrics}
         pulsing={hintBeat === 'group-b'}
