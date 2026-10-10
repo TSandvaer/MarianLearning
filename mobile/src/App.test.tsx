@@ -43,6 +43,7 @@ function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
       mute: undefined,
       audioCheck: undefined,
       qaAutoTapMs: undefined,
+      qaRoute: undefined,
     },
     flags,
   })

@@ -18,6 +18,9 @@
  * native cross-dissolve on source change, plus the per-pose rotateZ tilt.
  */
 import {
+  CELEBRATION_DURATION_MS,
+  CELEBRATION_TILT_KEYFRAMES,
+  CELEBRATION_TILT_TIMES,
   TILT_BY_POSE,
   TILT_SPRING_BY_POSE,
   type EmmaPose,
@@ -90,52 +93,90 @@ export interface Breath {
   periodS: number
 }
 
+/**
+ * - `greet`: Greet's own motion (web Greet.tsx): the breath runs in every
+ *   pose, 1 s after the slide-in, around her centre.
+ * - `character`: the web's `EmmaCharacter` (Math, and every later screen):
+ *   tilt and breath pivot at her feet (`transform-origin: 50% 100%`), she
+ *   breathes only while idle, and `celebration` is the keyframed tilt
+ *   0 → -6° (200 ms ease-out) → hold 250 ms → 0 (250 ms ease-in-out).
+ */
+export type EmmaMotion = 'greet' | 'character'
+
+/** Framer `easeOut` / `easeInOut`. */
+const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)
+const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1)
+
 export interface EmmaStageProps {
   frame: Rect
   pose: EmmaPose
   breath: Breath
+  /** Default `greet` (the motion Greet shipped with in #531). */
+  motion?: EmmaMotion
 }
 
-export function EmmaStage({ frame, pose, breath }: EmmaStageProps) {
+export function EmmaStage({
+  frame,
+  pose,
+  breath,
+  motion = 'greet',
+}: EmmaStageProps) {
   const reducedMotion = useReducedMotion()
   const rotate = useSharedValue(0)
   const scale = useSharedValue(1)
-
-  useEffect(() => {
-    const spring = TILT_SPRING_BY_POSE[pose]
-    rotate.set(
-      reducedMotion
-        ? 0
-        : withSpring(TILT_BY_POSE[pose], {
-            stiffness: spring.stiffness,
-            damping: spring.damping,
-            mass: 1,
-          }),
-    )
-  }, [pose, reducedMotion, rotate])
+  const character = motion === 'character'
 
   useEffect(() => {
     if (reducedMotion) {
+      rotate.set(0)
+      return
+    }
+    if (character && pose === 'celebration') {
+      const [k0, k1, k2, k3] = CELEBRATION_TILT_KEYFRAMES
+      const [, t1, t2] = CELEBRATION_TILT_TIMES
+      const ms = (from: number, to: number) =>
+        (to - from) * CELEBRATION_DURATION_MS
+      rotate.set(
+        withSequence(
+          withTiming(k0, { duration: 0 }),
+          withTiming(k1, { duration: ms(0, t1), easing: EASE_OUT }),
+          withTiming(k2, { duration: ms(t1, t2), easing: Easing.linear }),
+          withTiming(k3, { duration: ms(t2, 1), easing: EASE_IN_OUT }),
+        ),
+      )
+      return
+    }
+    const spring = TILT_SPRING_BY_POSE[pose]
+    rotate.set(
+      withSpring(TILT_BY_POSE[pose], {
+        stiffness: spring.stiffness,
+        damping: spring.damping,
+        mass: 1,
+      }),
+    )
+  }, [pose, reducedMotion, rotate, character])
+
+  const breathing = !reducedMotion && (!character || pose === 'idle')
+  useEffect(() => {
+    if (!breathing) {
+      cancelAnimation(scale)
       scale.set(1)
       return
     }
     const half = (breath.periodS * 1000) / 2
-    const ease = Easing.inOut(Easing.ease)
-    // Breathing starts after the slide-in lands (web: delay 0.3 + 0.7 s).
-    scale.set(
-      withDelay(
-        1000,
-        withRepeat(
-          withSequence(
-            withTiming(breath.scale, { duration: half, easing: ease }),
-            withTiming(1, { duration: half, easing: ease }),
-          ),
-          -1,
-        ),
+    const ease = character ? EASE_IN_OUT : Easing.inOut(Easing.ease)
+    const loop = withRepeat(
+      withSequence(
+        withTiming(breath.scale, { duration: half, easing: ease }),
+        withTiming(1, { duration: half, easing: ease }),
       ),
+      -1,
     )
+    // Greet: the breath starts after the slide-in lands (web: delay
+    // 0.3 + 0.7 s). EmmaCharacter starts it at once.
+    scale.set(character ? loop : withDelay(1000, loop))
     return () => cancelAnimation(scale)
-  }, [breath.periodS, breath.scale, reducedMotion, scale])
+  }, [breath.periodS, breath.scale, breathing, character, scale])
 
   const innerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.get() }, { rotate: `${rotate.get()}deg` }],
@@ -157,11 +198,17 @@ export function EmmaStage({ frame, pose, breath }: EmmaStageProps) {
         },
       ]}
     >
-      <Animated.View style={[StyleSheet.absoluteFill, innerStyle]}>
+      <Animated.View
+        style={[StyleSheet.absoluteFill, character && styles.feet, innerStyle]}
+      >
         <Image
           source={emmaAsset(pose)}
           contentFit="contain"
-          transition={{ duration: 150, effect: 'cross-dissolve' }}
+          // EmmaCharacter cross-fades a pose in over 200 ms.
+          transition={{
+            duration: character ? 200 : 150,
+            effect: 'cross-dissolve',
+          }}
           style={StyleSheet.absoluteFill}
           accessibilityLabel="Emma"
         />
@@ -174,4 +221,6 @@ const styles = StyleSheet.create({
   // zIndex 1: between a screen's background (0) and foreground (2)
   // layers, e.g. Greet's ring below her and its nudge icon above.
   frame: { position: 'absolute', pointerEvents: 'none', zIndex: 1 },
+  // EmmaCharacter's `transform-origin: 50% 100%`.
+  feet: { transformOrigin: '50% 100%' },
 })

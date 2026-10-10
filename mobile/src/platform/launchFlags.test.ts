@@ -22,6 +22,7 @@ const ENV: BuildEnv = {
   mute: undefined,
   audioCheck: undefined,
   qaAutoTapMs: undefined,
+  qaRoute: undefined,
 }
 
 describe('resolveLaunchFlags', () => {

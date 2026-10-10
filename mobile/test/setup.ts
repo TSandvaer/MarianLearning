@@ -40,3 +40,9 @@ jest.mock(
       'react-native-safe-area-context/jest/mock',
     ).default,
 )
+
+// No test reaches the network. Session starts are faked where a test
+// needs one; anything else (App's Math kick) fails like an offline device.
+globalThis.fetch = jest.fn(() =>
+  Promise.reject(new TypeError('Network request failed (jest is offline)')),
+)
