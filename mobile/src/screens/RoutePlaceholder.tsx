@@ -3,6 +3,8 @@
  * screen. Developer-facing: it names the route, shows the persisted
  * `sessionCount` (what Splash branched on) and offers a button per exit
  * in `ROUTE_EXITS`, so the whole state machine can be walked by hand.
+ * Session End also shows the payload Math handed it (the web's shape),
+ * until the real screen consumes it.
  * Laid out in the part of the route's content area Emma does not cover.
  */
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
@@ -10,6 +12,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { panelRect, type ScreenLayout } from '../layout/layout'
 import type { LaunchFlags } from '../platform/launchFlags'
 import { ROUTE_EXITS, ROUTE_LABELS, type Route } from '../router/routes'
+import type { SessionEndPayload } from '../session/sessionEndPayload'
 import { colors, fonts } from '../theme'
 
 export interface RoutePlaceholderProps {
@@ -17,6 +20,8 @@ export interface RoutePlaceholderProps {
   layout: ScreenLayout
   flags: LaunchFlags
   onNavigate: (to: Route) => void
+  /** Session End: what the finished session handed over. */
+  sessionEnd?: SessionEndPayload | null
 }
 
 export function RoutePlaceholder({
@@ -24,6 +29,7 @@ export function RoutePlaceholder({
   layout,
   flags,
   onNavigate,
+  sessionEnd = null,
 }: RoutePlaceholderProps) {
   const panel = panelRect(layout)
   const { sessionCount } = readSessionHistory()
@@ -59,6 +65,12 @@ export function RoutePlaceholder({
           </Pressable>
         ))}
       </View>
+
+      {sessionEnd !== null && (
+        <Text style={styles.status} testID="session-end-handoff">
+          {`${sessionEnd.surface} · ${sessionEnd.totalCorrect}/${sessionEnd.perProblemCorrect?.length ?? '?'} correct · first try ${sessionEnd.perProblemCorrect?.filter(Boolean).length ?? '?'} · +${sessionEnd.earnedThisSession} stardust (${sessionEnd.totalStardust}) · streak ${sessionEnd.finalStreak}`}
+        </Text>
+      )}
 
       <Text style={styles.status} testID="status">
         {`route ${route} · sessionCount ${sessionCount}`}

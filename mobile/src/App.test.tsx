@@ -7,7 +7,14 @@
 import { LINE_GAP_MS } from '@marian/core/greet/greetSequence'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
-import { act, fireEvent, render, screen } from '@testing-library/react-native'
+import { ADVANCE_AFTER_CORRECT_MS } from '@marian/core/shared/gameplayConstants'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react-native'
 import {
   fakePlayers,
   flush,
@@ -15,6 +22,7 @@ import {
   type FakePlayer,
 } from '../test/fakeAudio'
 import App from './App'
+import { mathLayout } from './layout/mathLayout'
 import { NO_LAUNCH_FLAGS, type LaunchFlags } from './platform/launchFlags'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
 import {
@@ -43,6 +51,7 @@ function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
       mute: undefined,
       audioCheck: undefined,
       qaAutoTapMs: undefined,
+      qaRoute: undefined,
     },
     flags,
   })
@@ -84,7 +93,50 @@ async function finishLine(): Promise<void> {
 beforeEach(() => {
   resetFakePlayers()
   jest.useFakeTimers()
+  ;(globalThis.fetch as jest.Mock).mockClear()
 })
+
+/** The session-start POSTs App made (jest is offline: each one fails). */
+function sessionStarts(): unknown[] {
+  return (globalThis.fetch as jest.Mock).mock.calls
+    .filter(([url]) => String(url).endsWith('/api/claude'))
+    .map(([, init]) => JSON.parse(String((init as { body: string }).body)))
+}
+
+/** The problem on screen, from the equation's numerals. */
+function problemOnScreen(): { a: number; b: number } {
+  const [a, b] = within(screen.getByTestId('math-symbolic'))
+    .getAllByText(/^\d+$/)
+    .map((t) => Number(t.props.children))
+  return { a, b }
+}
+
+/** Silent fallback: the chips open at once; tap after 1 s, wait out "Yes!". */
+async function answerRight(): Promise<void> {
+  await advance(1000)
+  const { a, b } = problemOnScreen()
+  await fireEvent.press(screen.getByTestId(`math-chip-${a + b}`))
+  await advance(ADVANCE_AFTER_CORRECT_MS)
+  await flushAll()
+}
+
+async function flushAll(): Promise<void> {
+  await act(async () => {
+    await flush()
+  })
+}
+
+async function greetToMath(): Promise<void> {
+  await renderPastSplash()
+  await fireEvent(screen.getByTestId('greet-wake-tap-target'), 'pressIn')
+  for (let line = 0; line < 3; line++) {
+    await finishLine()
+    await advance(LINE_GAP_MS)
+  }
+  await fireEvent.press(screen.getByTestId('greet-heart'))
+  await advance(HEART_TAP_TRANSITION_MS)
+  await flushAll()
+}
 
 afterEach(() => {
   jest.useRealTimers()
@@ -113,29 +165,118 @@ it('returning (sessionCount ≥ 1, via a debug seed): Splash → Hub', async () 
   )
 })
 
-it('Greet → heart → Math, leaving sessionCount at 0; then the placeholders walk to the Hub', async () => {
+it('Greet → heart → Math (offline: the static plan, silent captions) → 8 problems → Session End gets the result → Hub', async () => {
   boot()
-  await renderPastSplash()
-  await fireEvent(screen.getByTestId('greet-wake-tap-target'), 'pressIn')
-  for (let line = 0; line < 3; line++) {
-    await finishLine()
-    await advance(LINE_GAP_MS)
-  }
-  await fireEvent.press(screen.getByTestId('greet-heart'))
-  await advance(HEART_TAP_TRANSITION_MS)
+  await greetToMath()
 
-  expect(screen.getByTestId('route-math')).toBeOnTheScreen()
-  expect(screen.getByTestId('status')).toHaveTextContent(
-    'route math · sessionCount 0',
-  )
-  // Greet freed its 4 players on the way out.
-  expect(fakePlayers.filter((p) => !p.released)).toEqual([])
+  // The session start was kicked on Greet (one request, the web's payload);
+  // offline, Math runs the fallback plan with silent captions.
+  expect(sessionStarts()).toEqual([
+    {
+      kind: 'session-start',
+      payload: { track: 'math', level: 1, childName: 'Marian' },
+    },
+  ])
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  expect(screen.queryByTestId('math-getting-ready')).toBeNull()
+  // Greet freed its 4 players; the 4 live ones are Math's effects.
+  expect(fakePlayers.filter((p) => !p.released)).toHaveLength(4)
 
-  await fireEvent.press(screen.getByTestId('exit-session-end'))
+  for (let i = 0; i < 8; i++) await answerRight()
+
   expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
+  expect(screen.getByTestId('session-end-handoff')).toHaveTextContent(
+    'math · 8/8 correct · first try 8 · +11 stardust (11) · streak 8',
+  )
+  // Math freed its effects on the way out; sessionCount is Session End's.
+  expect(fakePlayers.filter((p) => !p.released)).toEqual([])
+  expect(readSessionHistory().sessionCount).toBe(0)
+
   await fireEvent.press(screen.getByTestId('exit-hub'))
   expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
   expect(screen.queryByTestId('exit-greet')).toBeNull()
+})
+
+it('Session End → Math again: nothing is read before the new session settles, then problem 1 is', async () => {
+  boot()
+  await greetToMath()
+  for (let i = 0; i < 8; i++) await answerRight()
+  expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
+
+  // The next session start hangs until the test lets it fail (offline).
+  let failStart: (err: Error) => void = () => {}
+  ;(globalThis.fetch as jest.Mock).mockImplementationOnce(
+    () =>
+      new Promise((_resolve, reject) => {
+        failStart = reject
+      }),
+  )
+  await fireEvent.press(screen.getByTestId('exit-math'))
+  await flushAll()
+  await advance(3000)
+  expect(sessionStarts()).toHaveLength(2)
+  expect(screen.getByTestId('math-getting-ready')).toBeOnTheScreen()
+  // The old session must not read problem 1 behind "getting ready".
+  expect(screen.queryByTestId('math-ribbon')).toBeNull()
+
+  await act(async () => failStart(new TypeError('offline')))
+  await flushAll()
+  expect(screen.queryByTestId('math-getting-ready')).toBeNull()
+  expect(screen.getByTestId('math-ribbon')).toBeOnTheScreen()
+  expect(screen.getAllByTestId('caption-word-revealed').length).toBeGreaterThan(
+    0,
+  )
+})
+
+it('Math drives Emma: listening while reading, puzzled-tilt on a wrong answer, celebration on a right one', async () => {
+  boot()
+  await greetToMath()
+  expect(screen.getByTestId('emma-listening')).toBeOnTheScreen()
+  // Layouts use the safe-area provider's measured frame (the jest mock:
+  // 320×640), not the window (on Android the window omits the nav bar).
+  const frame = mathLayout({
+    width: 320,
+    height: 640,
+    insets: { top: 0, bottom: 0, left: 0, right: 0 },
+  }).emma
+  expect(screen.getByTestId('emma-listening')).toHaveStyle({
+    left: frame.x,
+    top: frame.y,
+    width: frame.width,
+  })
+  await advance(1000)
+  const { a, b } = problemOnScreen()
+  const wrong = screen
+    .getAllByTestId(/^math-chip-/)
+    .map((c) => Number(String(c.props.testID).replace('math-chip-', '')))
+    .find((v) => v !== a + b)!
+  await fireEvent.press(screen.getByTestId(`math-chip-${wrong}`))
+  expect(screen.getByTestId('emma-puzzled-tilt')).toBeOnTheScreen()
+  await advance(5000)
+  await fireEvent.press(screen.getByTestId(`math-chip-${a + b}`))
+  expect(screen.getByTestId('emma-celebration')).toBeOnTheScreen()
+})
+
+it('back to the Hub tears the session down; Math again starts a fresh one', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  await renderPastSplash()
+  expect(sessionStarts()).toHaveLength(0)
+  await fireEvent.press(screen.getByTestId('exit-math'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  expect(sessionStarts()).toHaveLength(1)
+  // The seeded progress rides along (focus node, first encounters).
+  expect(sessionStarts()[0]).toMatchObject({
+    payload: { track: 'math', progress: { focusNode: 'add-to-20' } },
+  })
+
+  await fireEvent.press(screen.getByTestId('math-back-to-hub'))
+  expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('emma-idle')).toBeOnTheScreen()
+  await fireEvent.press(screen.getByTestId('exit-math'))
+  await flushAll()
+  expect(sessionStarts()).toHaveLength(2)
 })
 
 it('Emma stays calm (idle) through the whole Greet: the nudge, "Hi!" and the heart tap', async () => {

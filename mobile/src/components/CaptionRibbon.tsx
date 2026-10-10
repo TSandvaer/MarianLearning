@@ -14,7 +14,7 @@
  * Screen readers get the whole line as one element.
  */
 import { useEffect } from 'react'
-import { StyleSheet, View, type ViewStyle } from 'react-native'
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, {
   Easing,
   FadeIn,
@@ -82,7 +82,7 @@ export interface CaptionRibbonProps {
   fontSize: number
   lineHeight: number
   padding: { horizontal: number; vertical: number }
-  style?: ViewStyle
+  style?: StyleProp<ViewStyle>
   testID?: string
 }
 

@@ -42,6 +42,7 @@ const EMPTY_ENV: BuildEnv = {
   mute: undefined,
   audioCheck: undefined,
   qaAutoTapMs: undefined,
+  qaRoute: undefined,
 }
 
 const DEBUG_FLAGS: LaunchFlags = { debug: true, seed: null, dayOffset: null }
