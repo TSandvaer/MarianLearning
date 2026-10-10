@@ -1,6 +1,6 @@
 # Marian Tutor: native app (Expo)
 
-The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash and Greet are real (`src/screens/Splash.tsx`, `src/screens/greet/`, UX calls in `design/native/greet-math-native.md`); every other route is still a placeholder.
+The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash, Greet and Math are real (`src/screens/Splash.tsx`, `src/screens/greet/`, `src/screens/math/`, UX calls in `design/native/greet-math-native.md`); every other route is still a placeholder.
 
 ## Shape
 
@@ -61,9 +61,20 @@ xcrun simctl launch booted com.marianlearning.tutor -debug 1 -seed cvc-words
 EXPO_PUBLIC_DEBUG=1 EXPO_PUBLIC_SEED=cvc-words npx expo start --clear
 ```
 
-`EXPO_PUBLIC_QA_AUTOTAP_MS=<n>` (with debug on) makes Greet's wake tap fire itself n ms after Greet mounts. It exists because this Mac's Xcode 27 has no Simulator.app and `simctl` cannot tap: launch Expo Go with `xcrun simctl launch <udid> host.exp.Exponent --initialUrl exp://127.0.0.1:<port>` (no "Open in Expo Go?" prompt, unlike `openurl`), and on a fresh simulator first skip Expo Go's onboarding with `xcrun simctl spawn <udid> defaults write host.exp.Exponent EXDevMenuIsOnboardingFinished -bool YES` (and the same for `ExpoGoOnboardingFinished`). On Android, `adb shell input tap` taps for real.
+`EXPO_PUBLIC_QA_AUTOTAP_MS=<n>` (with debug on) makes Greet's wake tap fire itself n ms after Greet mounts, and makes Math answer n ms after each chip gate opens (problem 1: three wrong answers, so the re-prompt, the hint and the guided answer all show; problem 2: one wrong; then right). `EXPO_PUBLIC_QA_ROUTE=<route>` (with debug on, the web's `?route=`) launches straight on a route, e.g. `math`. Both exist because this Mac's Xcode 27 has no Simulator.app and `simctl` cannot tap: launch Expo Go with `xcrun simctl launch <udid> host.exp.Exponent --initialUrl exp://127.0.0.1:<port>` (no "Open in Expo Go?" prompt, unlike `openurl`), and on a fresh simulator first skip Expo Go's onboarding with `xcrun simctl spawn <udid> defaults write host.exp.Exponent EXDevMenuIsOnboardingFinished -bool YES` (and the same for `ExpoGoOnboardingFinished`). On Android, `adb shell input tap` taps for real.
 
-Other env flags: `EXPO_PUBLIC_API_BASE` (default `https://marian-learning.vercel.app`), `EXPO_PUBLIC_PROGRESS_API_SECRET` (unset: cloud sync is skipped). See `src/platform/buildEnv.ts`.
+Other env flags: `EXPO_PUBLIC_API_BASE` (default `https://marian-learning.vercel.app`; an unreachable origin such as `http://127.0.0.1:9` exercises Math's offline fallback without spending an `/api/claude` call), `EXPO_PUBLIC_PROGRESS_API_SECRET` (unset: cloud sync is skipped). See `src/platform/buildEnv.ts`.
+
+```bash
+# Math on a simulator, offline fallback, answering itself every 2.5 s
+EXPO_PUBLIC_MUTE=1 EXPO_PUBLIC_DEBUG=1 EXPO_PUBLIC_QA_ROUTE=math \
+EXPO_PUBLIC_QA_AUTOTAP_MS=2500 EXPO_PUBLIC_API_BASE=http://127.0.0.1:9 \
+npx expo start --go --port 8297 --clear
+```
+
+## Math
+
+`src/screens/math/` is the web's `src/screens/Math/` (8 problems, read-aloud, chip tap-gate, right / wrong reactions, hint ladder, dot card / minuend scaffolds, streak and stardust), with Kyle's phone layouts (`src/layout/mathLayout.ts`). The logic is core's; the two pure helpers the web keeps private (`buildChipOrder`, `startSessionWithFallback`) are verbatim copies whose tests fail when the web copy changes. App owns the session start (`src/session/mathSession.ts`, the web's Path A): kicked on Greet, 5 s visible-wait fallback to a hint-free request, torn down on back-to-Hub and when leaving Session End. Without a server plan Math runs core's static plan with silent captions (165 wpm). The result goes to Session End as the web's `SessionEndPayload` (`src/session/sessionEndPayload.ts`).
 
 Reset to a first launch: delete the app from the simulator/device (storage lives in the app's SQLite database).
 
