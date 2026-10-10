@@ -499,6 +499,51 @@ describe('wrong answers', () => {
     expect(h.pose()).toBe('idle')
   })
 
+  it('a third wrong answer during the hint: the hint stops, "This one is …" is said in full', async () => {
+    const triple: MathSessionPlan = {
+      ...PLAN,
+      problems: PLAN.problems.map((p, i) =>
+        i === 0
+          ? {
+              ...p,
+              utterances: {
+                ...p.utterances,
+                hint: undefined,
+                hint1: 'Look at the flowers.',
+                hint2: 'Three flowers.',
+                hint3: 'And two more. How many?',
+              },
+            }
+          : p,
+      ),
+    }
+    const h = await setup({ plan: triple })
+    await say(h.voice.last(), { end: false })
+    const wrong = wrongValue(0)
+    await tap(wrong)
+    await say(h.voice.last())
+    await tap(wrong)
+    await say(h.voice.last())
+    await advance(HINT_DELAY_AFTER_WRONG_MS)
+    const hint1 = h.voice.last()
+    expect(hint1.text).toBe('Look at the flowers.')
+    await say(hint1, { end: false })
+    await tap(wrong) // the third: re-prompt replaces hint1
+    await act(async () => hint1.reject(new Error('cancelled')))
+    await say(h.voice.last()) // "Hmm... try again?"
+    const give = h.voice.last()
+    expect(give.text).toBe(PLAN.problems[0].utterances.giveAnswer)
+    await say(give)
+    await advance(1000)
+    expect(h.voice.texts()).not.toContain('Three flowers.')
+    expect(h.voice.texts()).not.toContain('And two more. How many?')
+    expect(
+      screen.queryByTestId('math-flower-group-a-pulsing', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull()
+  })
+
   it('a wrong-then-right problem: first-tap false, the first value kept, no streak', async () => {
     const h = await setup()
     await say(h.voice.last(), { end: false })

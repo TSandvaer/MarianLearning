@@ -631,8 +631,13 @@ export function MathScreen({
   const runHintSequence = useCallback(
     async (problem: MathProblem) => {
       const myIndex = problemIndex
+      // Native-only: a third wrong answer (the guided answer) ends the
+      // hint. On the web the remaining hint beats go on and cancel "This
+      // one is …" (seen on the iOS simulator with QA autoplay; see the PR).
       const stillLive = () =>
-        !unmountedRef.current && problemIndexRef.current === myIndex
+        !unmountedRef.current &&
+        problemIndexRef.current === myIndex &&
+        !guidedPlayedRef.current
       const returnToIdle = () => {
         if (!stillLive()) return
         setHintBeat(null)
@@ -641,6 +646,7 @@ export function MathScreen({
           poseTimerRef.current = null
         }, 0)
       }
+      if (!stillLive()) return
       setPose('attentive-pointing')
       const triple = resolveHintTriple(problem.utterances)
       if (triple === null) {
@@ -713,6 +719,7 @@ export function MathScreen({
         }
         if (didScheduleGuided) {
           setGuidedActive(true)
+          setHintBeat(null) // a hint it interrupted stops pulsing
           setProblemState((prev) => ({ ...prev, guidedPlayed: true }))
           void speak(problem.utterances.giveAnswer).then(() => {
             if (unmountedRef.current) return
