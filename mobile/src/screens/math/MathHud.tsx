@@ -233,23 +233,26 @@ function Streak({
     transform: [{ scale: scale.get() }],
   }))
   return (
-    <Animated.View
-      testID="math-streak"
-      accessible
-      accessibilityLabel={`Streak: ${streak}`}
-      exiting={FadeOut.duration(150)}
-      style={[styles.streak, style]}
-    >
-      <SparkleGlyph size={m.streakFont} />
-      <Text
-        allowFontScaling={false}
-        style={[
-          styles.streakText,
-          { fontSize: m.streakFont, lineHeight: m.streakFont * 1.2 },
-        ]}
+    // The exit fade sits on a wrapper: Reanimated warns when a layout
+    // animation and an animated style both drive the same opacity.
+    <Animated.View exiting={FadeOut.duration(150)}>
+      <Animated.View
+        testID="math-streak"
+        accessible
+        accessibilityLabel={`Streak: ${streak}`}
+        style={[styles.streak, style]}
       >
-        {streak}
-      </Text>
+        <SparkleGlyph size={m.streakFont} />
+        <Text
+          allowFontScaling={false}
+          style={[
+            styles.streakText,
+            { fontSize: m.streakFont, lineHeight: m.streakFont * 1.2 },
+          ]}
+        >
+          {streak}
+        </Text>
+      </Animated.View>
     </Animated.View>
   )
 }

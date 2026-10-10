@@ -315,6 +315,17 @@ describe('the problem loop', () => {
     )
   })
 
+  it('"Yes!" ending after the 1.2 s dwell: the next read-aloud still has Emma listening', async () => {
+    const h = await setup()
+    await say(h.voice.last(), { end: false })
+    await tap(PLAN.problems[0].correct)
+    await advance(ADVANCE_AFTER_CORRECT_MS) // dwell over, "Yes!" still playing
+    await say(h.voice.last()) // "Yes!" ends → advance → next read
+    await advance(0)
+    expect(h.voice.last().text).toBe(PLAN.problems[1].utterances.read)
+    expect(h.pose()).toBe('listening')
+  })
+
   it('advances at the 4 s ceiling when "Yes!" never ends', async () => {
     const h = await setup()
     await say(h.voice.last(), { end: false })

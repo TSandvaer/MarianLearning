@@ -563,6 +563,13 @@ export function MathScreen({
       chipReadyAtRef.current = null
       firstTapRecordedRef.current = false
       setShakingChip(null)
+      // Native-only: drop a pending "back to idle" (set when "Yes!" ended).
+      // It would land after the next read-aloud's `listening` and clobber
+      // it; the web has the same timer (seen natively, see the PR).
+      if (poseTimerRef.current !== null) {
+        clearTimeout(poseTimerRef.current)
+        poseTimerRef.current = null
+      }
       setPose('idle')
       setGuidedActive(false)
       setStreakFadingOut(false)
