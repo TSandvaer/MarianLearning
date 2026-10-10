@@ -314,23 +314,30 @@ function phoneLandscape(v: Viewport): MathLayout {
 
   const equationFont = PHONE_LANDSCAPE_EQUATION_PT
   const equationLineHeight = Math.round(equationFont * EQUATION_LINE)
-  // Dot card cell on a short screen: 64 (two rows of 20 pt dots need 48).
-  const cell = 64
-  const visualSlot = cell
   const hudH = 44
 
   const gaps = Object.values(LANDSCAPE_GAPS)
   const idealGaps = gaps.reduce((n, [ideal]) => n + ideal, 0)
   const minGaps = gaps.reduce((n, [, min]) => n + min, 0)
-  const fixedWithout = (ribbon: number, chip: number) =>
-    hudH + ribbon + equationLineHeight + visualSlot + chip
-  // A 2-line ribbon slot when the floor allows it, else 1 line.
   const twoLines = ribbonSlot(PHONE_CAPTION_PT, PHONE_RIBBON_PADDING, 2)
   const oneLine = ribbonSlot(PHONE_CAPTION_PT, PHONE_RIBBON_PADDING, 1)
-  const ribbonH =
-    s.height - fixedWithout(twoLines, PHONE_CHIP_MIN) >= minGaps
-      ? twoLines
-      : oneLine
+  // The counting slot holds the dot card (64, or 56 when tight; two rows
+  // of 20 pt dots need 48). Prefer a 2-line ribbon slot, so a wrapped
+  // caption never reaches the equation: 375 pt fits it with 64, and a
+  // 375 pt screen minus a home-indicator inset with 56. Else 1 line.
+  const stackOf = (ribbon: number, slot: number, chip: number) =>
+    hudH + ribbon + equationLineHeight + slot + chip
+  const fit = [
+    { ribbon: twoLines, cell: 64 },
+    { ribbon: twoLines, cell: 56 },
+  ].find(
+    (o) => s.height - stackOf(o.ribbon, o.cell, PHONE_CHIP_MIN) >= minGaps,
+  ) ?? { ribbon: oneLine, cell: 64 }
+  const ribbonH = fit.ribbon
+  const cell = fit.cell
+  const visualSlot = cell
+  const fixedWithout = (ribbon: number, chip: number) =>
+    stackOf(ribbon, visualSlot, chip)
   const spareForChips =
     s.height - fixedWithout(ribbonH, PHONE_CHIP_MIN) - idealGaps
   const chip = clamp(

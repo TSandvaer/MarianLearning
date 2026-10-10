@@ -17,6 +17,11 @@ const insets = (top = 0, bottom = 0, left = 0, right = 0) => ({
 const PHONES: Record<string, Viewport> = {
   'floor portrait 375×667': { width: 375, height: 667, insets: insets() },
   'floor landscape 667×375': { width: 667, height: 375, insets: insets() },
+  'floor landscape + 21 pt home indicator': {
+    width: 667,
+    height: 375,
+    insets: insets(0, 21),
+  },
   'iPhone 17e portrait': {
     width: 390,
     height: 844,
@@ -116,9 +121,9 @@ describe.each(Object.entries(PHONES))('phone %s', (_name, v) => {
       expect(c.y - bottom(l.hud.back)).toBeGreaterThanOrEqual(16)
   })
 
-  it('reserves at least a 1-line caption slot at 22 pt', () => {
+  it('reserves a 2-line caption slot at 22 pt (a wrap never reaches the equation)', () => {
     expect(l.captionFontSize).toBe(22)
-    expect(l.ribbon.maxHeight).toBeGreaterThanOrEqual(22 * 1.375 + 20)
+    expect(l.ribbon.maxHeight).toBeGreaterThanOrEqual(2 * 22 * 1.375 + 20)
     expect(l.ribbon.width).toBeGreaterThan(200)
   })
 })
