@@ -179,3 +179,9 @@ Distinct from its siblings:
 - **Context:** Phase 2a (#527, `76752b9`) and 2b (#528, `0fa6b8d`) merged: native shell + expo-audio engine on `@marian/core`.
 - **Decided:** Phase 3 (screen ports) starts with the first-launch slice, one screen at a time, each with phone portrait / phone landscape / tablet layouts in its own PR, checked by Thomas on his devices in Expo Go before the next one starts. Splash (a ~1 s transition screen) ships inside the Greet PR. After Math: SessionEnd → Hub → Map → WordSong → ParentSettings, per the plan.
 - **Decided by:** Thomas (popup, recommended option).
+
+## 2026-10-10 — Native Greet + Math approved on device; Emma stays calm in native Greet
+
+- **Context:** Phase 3 slices merged after Thomas checked each on iPhone + iPad in Expo Go: Splash + Greet (#531, `1017e4e`) and Math (#532, `078229a`).
+- **Decided:** (1) Emma stays calm (idle pose) through the whole native Greet, with no celebrate stance; native only, the web Greet is unchanged (Thomas, 2026-10-09 popups). (2) Greet approved on device ("Looks good, merge it"). (3) Math approved on device ("works now, looks good"). (4) Next: the native SessionEnd ports the shipped guidance G2 screen (`src/screens/SessionEnd/`, #513), not the dead `SessionEndPlaceholder.tsx`; Kyle writes the native Hub spec in parallel, then the Hub build follows it.
+- **Decided by:** Thomas (popups + device checks); (4) follows the 2026-10-09 Phase 3 order.
