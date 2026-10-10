@@ -204,6 +204,9 @@ export function EmmaStage({
         <Image
           source={emmaAsset(pose)}
           contentFit="contain"
+          // Decoded poses stay in memory: a pose swap (Math's reactions)
+          // must not decode the WebP again (expo-image's default is 'disk').
+          cachePolicy="memory-disk"
           // EmmaCharacter cross-fades a pose in over 200 ms.
           transition={{
             duration: character ? 200 : 150,
