@@ -36,9 +36,10 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import { StyleSheet, useWindowDimensions, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import {
   SafeAreaProvider,
+  useSafeAreaFrame,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context'
 import { useAudioEngine } from './audio'
@@ -117,13 +118,23 @@ function mathSessionDefaults() {
 }
 
 function Shell() {
-  const { width, height } = useWindowDimensions()
+  // The provider's measured frame, not `useWindowDimensions()`: on Android
+  // (API 37 emulator, edge-to-edge) the window height leaves out the
+  // navigation bar (667×351) while the app draws under it (667×375) and
+  // the bottom inset counts it again (24), so the layouts lost 24 pt.
+  const { width, height } = useSafeAreaFrame()
   const insets = useSafeAreaInsets()
   const viewport = useMemo<Viewport>(
     () => ({ width, height, insets }),
     [width, height, insets],
   )
   const flags = getLaunchFlags()
+  useEffect(() => {
+    if (!flags.debug) return
+    console.log(
+      `[layout] frame ${Math.round(width)}×${Math.round(height)} insets t${insets.top} b${insets.bottom} l${insets.left} r${insets.right}`,
+    )
+  }, [flags.debug, width, height, insets])
   const env = readBuildEnv()
   const qaAutoTapMs = flags.debug ? parseQaAutoTap(env.qaAutoTapMs) : undefined
   const [route, setRoute] = useState<Route>(() =>

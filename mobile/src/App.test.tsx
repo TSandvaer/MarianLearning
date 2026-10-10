@@ -22,6 +22,7 @@ import {
   type FakePlayer,
 } from '../test/fakeAudio'
 import App from './App'
+import { mathLayout } from './layout/mathLayout'
 import { NO_LAUNCH_FLAGS, type LaunchFlags } from './platform/launchFlags'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
 import {
@@ -200,6 +201,18 @@ it('Math drives Emma: listening while reading, puzzled-tilt on a wrong answer, c
   boot()
   await greetToMath()
   expect(screen.getByTestId('emma-listening')).toBeOnTheScreen()
+  // Layouts use the safe-area provider's measured frame (the jest mock:
+  // 320×640), not the window (on Android the window omits the nav bar).
+  const frame = mathLayout({
+    width: 320,
+    height: 640,
+    insets: { top: 0, bottom: 0, left: 0, right: 0 },
+  }).emma
+  expect(screen.getByTestId('emma-listening')).toHaveStyle({
+    left: frame.x,
+    top: frame.y,
+    width: frame.width,
+  })
   await advance(1000)
   const { a, b } = problemOnScreen()
   const wrong = screen
