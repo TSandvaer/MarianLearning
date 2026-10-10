@@ -686,6 +686,37 @@ describe('scaffolds (core gates)', () => {
     ).toBe(true)
   })
 
+  it('a two-digit addition (canon 20 + 3) has no counting row; the chips still answer', async () => {
+    const twoDigit: MathSessionPlan = {
+      id: 'two-digit',
+      label: 'two-digit',
+      problems: PLAN.problems.map((p) => ({
+        ...p,
+        addendA: 20,
+        addendB: 3,
+        correct: 23,
+        utterances: {
+          ...p.utterances,
+          read: 'Twenty plus three. How many?',
+          correct: 'Yes! Twenty-three!',
+          giveAnswer: 'This one is twenty-three.',
+        },
+      })),
+    }
+    const h = await setup({
+      plan: twoDigit,
+      focusNode: 'two-digit-addsub-no-regroup',
+    })
+    expect(
+      screen.queryByTestId('math-visual-groups', {
+        includeHiddenElements: true,
+      }),
+    ).toBeNull()
+    await say(h.voice.last(), { end: false })
+    await tap(23)
+    expect(h.voice.last().text).toBe('Yes! Twenty-three!')
+  })
+
   it('not a scaffold day: no dot card', async () => {
     await setup({
       focusNode: 'add-to-10',

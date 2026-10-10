@@ -1,3 +1,8 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { mathSessionPlanFromServer } from '@marian/core/math/planFromServer'
+import type { MathProblem } from '@marian/core/math/sessionPlans'
+import { REPO_ROOT } from '../../test/webSource'
 import type { Rect, Viewport } from './layout'
 import {
   countingMetrics,
@@ -177,7 +182,7 @@ describe('counting row', () => {
       [9, 1],
       [6, 4],
     ]) {
-      const m = countingMetrics(phone, a, b, 343)
+      const m = countingMetrics(phone, a, b, 343)!
       expect(m.size).toBe(24)
       expect(m.perRow).toBe(Infinity)
       expect(m.height).toBe(24)
@@ -185,7 +190,7 @@ describe('counting row', () => {
   })
 
   it('phone: above 10 the counters are 20 pt and a group that does not fit wraps into rows of 5', () => {
-    const m = countingMetrics(phone, 9, 9, 343)
+    const m = countingMetrics(phone, 9, 9, 343)!
     expect(m.size).toBe(20)
     expect(m.perRow).toBe(5)
     expect(m.height).toBe(2 * 20 + 8)
@@ -195,8 +200,82 @@ describe('counting row', () => {
 
   it('tablet: the web flower row (3.2 rem to a total of 10, 2.0 rem from 18), no wrap', () => {
     const tablet = { counting: 'tablet' as const }
-    expect(countingMetrics(tablet, 3, 4, 700).size).toBeCloseTo(51.2)
-    expect(countingMetrics(tablet, 9, 9, 700).size).toBeCloseTo(32)
-    expect(countingMetrics(tablet, 9, 9, 700).perRow).toBe(Infinity)
+    expect(countingMetrics(tablet, 3, 4, 700)!.size).toBeCloseTo(51.2)
+    expect(countingMetrics(tablet, 9, 9, 700)!.size).toBeCloseTo(32)
+    expect(countingMetrics(tablet, 9, 9, 700)!.perRow).toBe(Infinity)
+  })
+})
+
+/** Every addition in the live canon that Math can read (`public/canon/math`). */
+function canonAdditions(): { tier: string; problem: MathProblem }[] {
+  const dir = resolve(REPO_ROOT, 'public', 'canon', 'math', 'level-1')
+  const out: { tier: string; problem: MathProblem }[] = []
+  for (const file of readdirSync(dir)) {
+    const json = JSON.parse(readFileSync(resolve(dir, file), 'utf8'))
+    let problems: readonly MathProblem[]
+    try {
+      problems = mathSessionPlanFromServer(json.plan).problems
+    } catch {
+      continue // not a +/− tier (counting, times tables): not Math's read
+    }
+    for (const problem of problems) {
+      if (problem.op === '+') out.push({ tier: file, problem })
+    }
+  }
+  return out
+}
+
+describe('counting row vs the live canon (two-digit addends)', () => {
+  const additions = canonAdditions()
+
+  it('the canon has two-digit additions (the case this guards)', () => {
+    const twoDigit = additions.filter(
+      ({ problem }) => problem.addendA > 9 || problem.addendB > 9,
+    )
+    expect(twoDigit.length).toBeGreaterThan(0)
+    expect(twoDigit.map(({ tier }) => tier)).toContain(
+      'two-digit-addsub-with-regroup.json',
+    )
+  })
+
+  it.each([...Object.entries(PHONES), ...Object.entries(TABLETS)])(
+    '%s: every canon addition fits its counting slot, or has none',
+    (_n, v) => {
+      const l = mathLayout(v)
+      for (const { tier, problem } of additions) {
+        const { addendA: a, addendB: b } = problem
+        const m = countingMetrics(l, a, b, l.problem.width)
+        if (a > 9 || b > 9) {
+          expect({ tier, a, b, m }).toEqual({ tier, a, b, m: null })
+          continue
+        }
+        expect(m).not.toBeNull()
+        // The web's tablet row is centred and may run into the area's px-4
+        // padding (9 + 8 on a 744 pt iPad mini: ~713 of 712); a phone row
+        // stays inside the area.
+        const room = l.tablet ? l.problem.width + 32 : l.problem.width
+        expect(m!.width).toBeLessThanOrEqual(room)
+        if (l.visualSlot !== null) {
+          expect(m!.height).toBeLessThanOrEqual(l.visualSlot)
+          expect(m!.size).toBeGreaterThanOrEqual(20) // spec § 4: never below 20
+        }
+      }
+    },
+  )
+
+  it('every single-digit sum (1..9 + 1..9) fits at the 375×667 floor, both orientations', () => {
+    for (const v of [
+      PHONES['floor portrait 375×667'],
+      PHONES['floor landscape 667×375'],
+    ]) {
+      const l = mathLayout(v)
+      for (let a = 1; a <= 9; a++) {
+        for (let b = 1; b <= 9; b++) {
+          const m = countingMetrics(l, a, b, l.problem.width)!
+          expect(m.width).toBeLessThanOrEqual(l.problem.width)
+          expect(m.height).toBeLessThanOrEqual(l.visualSlot!)
+        }
+      }
+    }
   })
 })

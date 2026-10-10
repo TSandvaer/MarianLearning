@@ -971,14 +971,18 @@ export function MathScreen({
           area.width,
         )
       : null
+  // Phone: the counting slot is always reserved, so the equation never
+  // moves between problems (mixed-op and two-digit tiers included).
+  // Tablet (web): the row is there with counters or the minuend cell.
   const visualHeight =
     layout.visualSlot ??
-    (currentProblem.op === '+'
-      ? (counting?.height ?? 0)
+    (counting !== null
+      ? counting.height
       : subMinuendInScope
         ? layout.dotCard.cell
         : 0)
-  const showVisualRow = currentProblem.op === '+' || subMinuendInScope
+  const showVisualRow =
+    layout.visualSlot !== null || counting !== null || subMinuendInScope
 
   return (
     <>

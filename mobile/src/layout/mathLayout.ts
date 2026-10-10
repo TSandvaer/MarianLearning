@@ -484,12 +484,27 @@ export interface CountingMetrics {
   plusFont: number
   /** Counters per row of a group (`Infinity`: one row). */
   perRow: number
+  /** Width of the whole row. */
+  width: number
   /** Height of the whole row. */
   height: number
 }
 
 /**
- * The counting row for `a + b` in `width`. Tablet: the web's flower row
+ * Counters are drawn for single-digit addends only (sums up to 9 + 9, the
+ * range the web's `flowerRowFontSizeRem` is designed for). A two-digit
+ * addend (the two-digit tiers: `20 + 3`, `45 + 8` in canon) gets no
+ * counting row: their spec skips the visual detour ("the 3-chip
+ * recognition format IS the representational layer",
+ * `design/math/two-digit-addsub-content.md`). The web screen still draws
+ * every flower in one row there (23–53 of them), which runs past the
+ * screen and is clipped; natively the row is left out.
+ */
+export const MAX_COUNTED_ADDEND = 9
+
+/**
+ * The counting row for `a + b` in `width`, or `null` when an addend has two
+ * digits (see {@link MAX_COUNTED_ADDEND}). Tablet: the web's flower row
  * (`1em` glyphs at `flowerRowFontSizeRem`, `gap-1` inside a group, `gap-6`
  * around the `+`, never wraps). Phone (spec § 4): 24 pt counters when the
  * total is ≤ 10, else 20 pt; 8 pt apart, 24 pt between the groups (the `+`
@@ -501,23 +516,34 @@ export function countingMetrics(
   addendA: number,
   addendB: number,
   width: number,
-): CountingMetrics {
+): CountingMetrics | null {
+  if (addendA > MAX_COUNTED_ADDEND || addendB > MAX_COUNTED_ADDEND) {
+    return null
+  }
   if (layout.counting === 'tablet') {
     const size = flowerRowFontSizeRem(addendA, addendB) * 16
+    const group = (n: number) => (n <= 0 ? 0 : n * size + (n - 1) * 4)
+    const between = 24 + size * 0.6 + 24
     return {
       size,
       gap: 4,
-      between: 24 + size * 0.6 + 24,
+      between,
       plusFont: size,
       perRow: Infinity,
+      width: group(addendA) + between + group(addendB),
       height: size,
     }
   }
   const total = addendA + addendB
   const size = total <= 10 ? PHONE_DOT : PHONE_DOT_SMALL
-  const groupWidth = (n: number) =>
-    n <= 0 ? 0 : n * size + (n - 1) * PHONE_DOT_GAP
-  const oneRow = groupWidth(addendA) + PHONE_GROUP_GAP + groupWidth(addendB)
+  const groupWidth = (n: number, perRow: number) => {
+    const cols = Math.min(n, perRow)
+    return cols <= 0 ? 0 : cols * size + (cols - 1) * PHONE_DOT_GAP
+  }
+  const oneRow =
+    groupWidth(addendA, Infinity) +
+    PHONE_GROUP_GAP +
+    groupWidth(addendB, Infinity)
   const perRow = oneRow <= width ? Infinity : 5
   const rows = (n: number) =>
     perRow === Infinity ? 1 : Math.max(1, Math.ceil(n / perRow))
@@ -528,6 +554,10 @@ export function countingMetrics(
     between: PHONE_GROUP_GAP,
     plusFont: size * 0.75,
     perRow,
+    width:
+      groupWidth(addendA, perRow) +
+      PHONE_GROUP_GAP +
+      groupWidth(addendB, perRow),
     height: maxRows * size + (maxRows - 1) * PHONE_DOT_GAP,
   }
 }
