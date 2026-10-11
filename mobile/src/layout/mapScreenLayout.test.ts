@@ -222,7 +222,7 @@ describe('phone landscape opening offset (§ 2 L)', () => {
 })
 
 describe('core landscapeNeed (the need inside landscapeScale)', () => {
-  it('NG 4 lands 820, WS 5 lands 996 virtual px with one badge land', () => {
+  it('NG 4 lands ≈ 820, WS 5 lands ≈ 996 virtual px with one badge land', () => {
     expect(landscapeNeed(4, 1)).toBeCloseTo(820.12)
     expect(landscapeNeed(5, 1)).toBeCloseTo(996.12)
     expect(landscapeScale(5, 498.06, 1)).toBeCloseTo(0.5)
