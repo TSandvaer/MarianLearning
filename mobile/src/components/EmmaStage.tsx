@@ -116,6 +116,8 @@ export type EmmaEntrance = 'slide' | 'fade'
 export const HUB_FADE_IN_MS = 250
 /** The Hub's baked shadow fades with the route. */
 export const SHADOW_FADE_MS = 200
+/** Her fade-out when App unmounts the stage (the map, map-native § 3). */
+export const STAGE_EXIT_MS = 200
 
 /** Framer `easeOut` / `easeInOut`. */
 const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)
@@ -221,6 +223,9 @@ export function EmmaStage({
             ? FadeIn.duration(HUB_FADE_IN_MS).easing(EASE_OUT)
             : emmaEntering
       }
+      // App unmounts her only for the map (map-native § 3): she fades out
+      // with the web map's exit while the map fades in.
+      exiting={FadeOut.duration(STAGE_EXIT_MS)}
       layout={emmaLayout}
       style={[
         styles.frame,

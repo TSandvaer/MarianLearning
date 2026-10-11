@@ -295,18 +295,38 @@ export const LANDSCAPE_BAND = 136
 /** Virtual room below the bottom band for the current stop's bud tray. */
 export const LANDSCAPE_TRAY_ROOM = 60
 
+/**
+ * Virtual height, px, that `lands` landscape bands need (Emma's room in
+ * `rooms` of them, and the bud tray's room below). The native map's phone
+ * landscape scrolls a path of this height (map-native.md § 1).
+ */
+export function landscapeNeed(lands: number, rooms = 1): number {
+  // Bands of LANDSCAPE_BAND hold MIN_STOP stops (0.52 × 136 < 88).
+  const room = emmaRoom(Math.round(MIN_STOP * CURRENT_SCALE), LANDSCAPE_BAND)
+  return (
+    lands * LANDSCAPE_BAND +
+    (lands - 1) * BAND_GAP +
+    rooms * room +
+    LANDSCAPE_TRAY_ROOM
+  )
+}
+
 /** Scale (≤ 1) that fits `lands` landscape bands into `height` px. */
 export function landscapeScale(
   lands: number,
   height: number,
   rooms = 1,
 ): number {
-  // Bands of LANDSCAPE_BAND hold MIN_STOP stops (0.52 × 136 < 88).
-  const room = emmaRoom(Math.round(MIN_STOP * CURRENT_SCALE), LANDSCAPE_BAND)
-  const need =
-    lands * LANDSCAPE_BAND +
-    (lands - 1) * BAND_GAP +
-    rooms * room +
-    LANDSCAPE_TRAY_ROOM
+  const need = landscapeNeed(lands, rooms)
   return height > 0 ? Math.min(1, height / need) : 1
+}
+
+/**
+ * Hole size, px, for the current stop's bud tray (spec §3.4): one row of
+ * up to 4 gets big holes; one group per vowel (or a long row) smaller ones.
+ */
+export function budHoleSize(buds: readonly (readonly boolean[])[]): number {
+  const total = buds.reduce((n, g) => n + g.length, 0)
+  if (buds.length === 1 && total <= 4) return 42
+  return total <= 8 ? 30 : 22
 }

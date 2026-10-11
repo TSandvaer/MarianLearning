@@ -16,6 +16,7 @@
  * - `assets/scenes/<id>.webp`      every `public/assets/scenes/scene-*.svg`
  * - `assets/path/*.webp`           `public/assets/path/*.webp`, copied as-is
  * - `assets/path/*-256-muted.webp` the Hub's muted "next" stickers
+ * - `assets/path/<step>-256-locked.webp` the map's frosted locked stops
  * - `assets/app/icon.png`          the PWA icon at 1024 px (iOS app icon)
  * - `assets/app/splash-logo.png`   the Emma logo PNG (native splash screen)
  * - `src/assets/registry.ts`       web URL path → `require()`d native module
@@ -201,6 +202,23 @@ for (const name of sorted(join(webAssets, 'path'), /-256\.webp$/)) {
   writeFileSync(outPath, webp)
   totalOut += webp.length
   registry.push([`/native/path/${muted}`, outPath])
+}
+
+// The map's locked stop is frosted on the web with `filter: saturate(.2)
+// brightness(1.12) opacity(.62)` (map-native.md § 5): bake the saturate +
+// brightness into a `-locked` copy of each step's 256 px sticker (the 24
+// steps: not the `ui-*` / `land-*` art). The opacity and shadow are drawn.
+for (const name of sorted(join(webAssets, 'path'), /-256\.webp$/)) {
+  if (/^(ui|land)-/.test(name)) continue
+  const locked = name.replace(/\.webp$/, '-locked.webp')
+  const outPath = join(out, 'path', locked)
+  const webp = await sharp(join(webAssets, 'path', name))
+    .modulate({ saturation: 0.2, brightness: 1.12 })
+    .webp(WEBP)
+    .toBuffer()
+  writeFileSync(outPath, webp)
+  totalOut += webp.length
+  registry.push([`/native/path/${locked}`, outPath])
 }
 
 // App icon + native splash image.

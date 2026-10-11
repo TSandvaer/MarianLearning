@@ -2,8 +2,9 @@
  * Native app root.
  *
  * Route state is core's route state machine (`./router/routes.ts`).
- * Phase 3 ports the screens one by one: Splash, Greet, Math, Session End
- * and the Hub are real, every other route is still a placeholder. Splash branches on the
+ * Phase 3 ports the screens one by one: Splash, Greet, Math, Session End,
+ * the Hub and the map are real, every other route is still a placeholder.
+ * Splash branches on the
  * persisted `sessionCount` through core's `nextAfterSplash()`, exactly
  * like the web; neither Splash nor Greet writes it (Session-End does).
  * Emma is one App-level view that springs between the routes' frames
@@ -19,12 +20,18 @@
  * next session (web `handleSessionEndAllDone` / `…Again`).
  *
  * The Hub (`./screens/hub/Hub.tsx`) hands a card tap to Math (Number
- * Garden) or the Word Song placeholder, a map button to the map
- * placeholder and Emma's 3 s press to Parent Settings. On Hub entry App
+ * Garden) or the Word Song placeholder, a map button to that world's map
+ * and Emma's 3 s press to Parent Settings. On Hub entry App
  * prefetches the Math session while Number Garden glows (web
  * `hubSessionPrefetch.ts`); the card tap kicks it, which adopts the
  * prefetch. Emma fades in when the Hub is the first screen after Splash,
  * and wears her baked shadow on the Hub.
+ *
+ * The map (`./screens/map/MapScreen.tsx`) opens with a handoff (`MapEntry`,
+ * the world) from a Hub map button or Session End's "All done"; it may
+ * write the unlock seen-marker on mount, so without a handoff (the QA
+ * route, a placeholder's exit) the placeholder renders, and leaving the
+ * map clears it. App's Emma is hidden there (the map draws her badge).
  *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
@@ -70,6 +77,7 @@ import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
 import { mathLayout } from './layout/mathLayout'
+import { mapScreenLayout } from './layout/mapScreenLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
@@ -87,6 +95,7 @@ import {
   GREET_BREATH_SCALE,
 } from './screens/greet/Greet'
 import { Hub } from './screens/hub/Hub'
+import { MapScreen, type MapEntry } from './screens/map/MapScreen'
 import { MathScreen } from './screens/math/Math'
 import type { MathSessionResult } from './screens/math/mathTypes'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
@@ -181,6 +190,8 @@ function Shell() {
   const [mathPose, setMathPose] = useState<EmmaPose>('idle')
   const [sessionEnd, setSessionEnd] = useState<SessionEndPayload | null>(null)
   const [sessionEndPose, setSessionEndPose] = useState<EmmaPose>('idle')
+  // The map's handoff: set by the two ways in, cleared on the way out.
+  const [mapEntry, setMapEntry] = useState<MapEntry | null>(null)
 
   // The web's tear-downs (`handleBackToHub`, `handleSessionEndAllDone` /
   // `…Again`, the leave-effect) run BEFORE the route flips: leaving
@@ -204,10 +215,23 @@ function Shell() {
       // Session End consumed its payload (the one write): a later arrival
       // without a new session gets the placeholder, never a second write.
       if (from === 'session-end') setSessionEnd(null)
+      // Likewise the map: a later arrival needs a new handoff, so its
+      // seen-marker write can never run on a stale one.
+      if (from === 'map') setMapEntry(null)
       routeRef.current = next
       setRoute(next)
     },
     [mathSession],
+  )
+  // A way into the map: the handoff first, then the route (only when the
+  // map is an exit of the route we are on).
+  const openMap = useCallback(
+    (world: MasteryTrack) => {
+      if (nextRoute(routeRef.current, 'map') !== 'map') return
+      setMapEntry({ world })
+      navigate('map')
+    },
+    [navigate],
   )
   const onSplashDone = useCallback(
     () => navigate(nextAfterSplash()),
@@ -249,10 +273,9 @@ function Shell() {
     const world: MasteryTrack =
       sessionEnd?.surface === 'word-song' ? 'word-song' : 'math'
     const saved = loadProgress()
-    navigate(
-      saved !== null && pendingUnlock(saved, world) !== null ? 'map' : 'hub',
-    )
-  }, [sessionEnd, navigate])
+    if (saved !== null && pendingUnlock(saved, world) !== null) openMap(world)
+    else navigate('hub')
+  }, [sessionEnd, navigate, openMap])
   // Web `handleSessionEndAgain` (not-yet day): another session, same world.
   const onSessionEndAgain = useCallback(
     () => navigate(sessionEnd?.surface === 'word-song' ? 'literacy' : 'math'),
@@ -286,8 +309,10 @@ function Shell() {
     },
     [mathSession, navigate],
   )
-  // Web `handleHubOpenMap` (the map is a placeholder until its port).
-  const onHubMap = useCallback(() => navigate('map'), [navigate])
+  // Web `handleHubOpenMap`; the map's Home is web `handleMapBack` (the
+  // map stamps the Hub's rapid-remount clock, so the Hub stays quiet).
+  const onHubMap = openMap
+  const onMapHome = useCallback(() => navigate('hub'), [navigate])
   const onHubParent = useCallback(() => navigate('parent-settings'), [navigate])
 
   // Audio session (plays in silent mode, doNotMix), the voice channel's
@@ -317,7 +342,11 @@ function Shell() {
       ? sessionEndLayout(viewport)
       : null
   const hub = route === 'hub' ? hubLayout(viewport) : null
-  const layout = greet ?? math ?? end ?? hub ?? layoutForRoute(route, viewport)
+  // The map needs its handoff; without one, the placeholder (no write).
+  const map =
+    route === 'map' && mapEntry !== null ? mapScreenLayout(viewport) : null
+  const layout =
+    greet ?? math ?? end ?? hub ?? map ?? layoutForRoute(route, viewport)
 
   return (
     <View style={styles.root}>
@@ -353,6 +382,13 @@ function Shell() {
               onOpenMap={onHubMap}
               onParentLongPress={onHubParent}
             />
+          ) : map && mapEntry ? (
+            <MapScreen
+              key={`map-${mapEntry.world}`}
+              layout={map}
+              world={mapEntry.world}
+              onHome={onMapHome}
+            />
           ) : end ? (
             <SessionEnd
               layout={end}
@@ -370,20 +406,22 @@ function Shell() {
               onNavigate={navigate}
             />
           )}
-          <EmmaStage
-            frame={layout.emma}
-            // Calm through the whole Greet (native-only, Thomas 2026-10-09:
-            // no celebration swap); Math and Session End drive her poses as
-            // on the web.
-            pose={route === 'math' ? mathPose : end ? sessionEndPose : 'idle'}
-            // The web's Session End Emma is a still image (no breath).
-            breath={route === 'greet' ? GREET_BREATH : end ? null : BREATH}
-            motion={route === 'greet' ? 'greet' : 'character'}
-            // Read at mount: a returning launch lands on the Hub, where
-            // she is already there (a fade), not Greet's arrival.
-            entrance={route === 'hub' ? 'fade' : 'slide'}
-            shadow={route === 'hub'}
-          />
+          {route !== 'map' && (
+            <EmmaStage
+              frame={layout.emma}
+              // Calm through the whole Greet (native-only, Thomas 2026-10-09:
+              // no celebration swap); Math and Session End drive her poses as
+              // on the web.
+              pose={route === 'math' ? mathPose : end ? sessionEndPose : 'idle'}
+              // The web's Session End Emma is a still image (no breath).
+              breath={route === 'greet' ? GREET_BREATH : end ? null : BREATH}
+              motion={route === 'greet' ? 'greet' : 'character'}
+              // Read at mount: a returning launch lands on the Hub, where
+              // she is already there (a fade), not Greet's arrival.
+              entrance={route === 'hub' ? 'fade' : 'slide'}
+              shadow={route === 'hub'}
+            />
+          )}
         </>
       )}
     </View>

@@ -146,11 +146,15 @@ export interface PathLinePlayer {
 /**
  * Emma's Path / map lines (web `playMapLine.ts`). A `PathLine` or a
  * guidance line from `@marian/core/emmasPath/*` can be passed as is.
+ * `name` prefixes the voice label (`<name>:<line id>`) and scopes
+ * `unload()` to this player's clips: Session End uses `path`, the map
+ * `map`.
  */
 export function createPathLinePlayer(
   engine: AudioEngine = audioEngine,
+  name = 'path',
 ): PathLinePlayer {
-  const prefix = 'path:'
+  const prefix = `${name}:`
   function cancel(): void {
     if (engine.voice.activeLabel?.startsWith(prefix)) engine.cancelVoice()
   }

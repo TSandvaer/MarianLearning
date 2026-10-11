@@ -1,20 +1,17 @@
 /**
  * Shared bits of the Hub's clay port (web `hubClay.css`).
  *
- * - `imageShadow`: the web's `filter: drop-shadow(0 Y B color)` on a
- *   sticker, the lock, a bud, the moon or the map icon. iOS can't filter
- *   (RN supports only `brightness` and `opacity` there), so a
- *   background-less wrapper gets `shadow*` props, which follow the image's
- *   alpha. Android draws RN's `dropShadow` filter (Android 12+; older
- *   versions show none). CSS blur radius B = Gaussian σ B / 2: RN's
- *   `standardDeviation` is σ, and iOS `shadowRadius` ≈ B / 2.
+ * - `imageShadow`: re-exported from `components/imageShadow.ts` (shared
+ *   with the map).
  * - The web's easings: CSS `ease` and `ease-in-out`.
  * - `box`: a rect at card reference px × s; `gardenBackground`: the
  *   backdrop's gradient list.
  */
-import { Platform, type ViewStyle } from 'react-native'
+import type { ViewStyle } from 'react-native'
 import { Easing } from 'react-native-reanimated'
 import type { HubLayout } from '../../layout/hubLayout'
+
+export { imageShadow } from '../../components/imageShadow'
 
 /** CSS `ease-in-out` (keyframe loops). */
 export const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1)
@@ -22,29 +19,6 @@ export const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1)
 export const CSS_EASE = Easing.bezier(0.25, 0.1, 0.25, 1)
 /** Web `transition: transform .12s` on a card and the map button. */
 export const PRESS_MS = 120
-
-export function imageShadow(y: number, blur: number, color: string): ViewStyle {
-  if (Platform.OS === 'ios') {
-    return {
-      shadowColor: color,
-      shadowOffset: { width: 0, height: y },
-      shadowOpacity: 1,
-      shadowRadius: blur / 2,
-    }
-  }
-  return {
-    filter: [
-      {
-        dropShadow: {
-          offsetX: 0,
-          offsetY: y,
-          standardDeviation: blur / 2,
-          color,
-        },
-      },
-    ],
-  }
-}
 
 /** Corner radii, CSS order (top-left, top-right, bottom-right, bottom-left). */
 export function radii(

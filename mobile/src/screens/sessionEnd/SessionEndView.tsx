@@ -11,7 +11,8 @@ import type {
 import { StyleSheet, View } from 'react-native'
 import { PathImage } from '../../components/PathImage'
 import type { SessionEndLayout } from '../../layout/sessionEndLayout'
-import { ClayButton, ClayCaption } from './clayParts'
+import { ClayCaption } from '../../components/ClayCaption'
+import { ClayButton } from './clayParts'
 import { FlowerTray } from './FlowerTray'
 import { AgainIcon, CheckIcon } from './glyphs'
 import { CountBadge, NewFlower, Stars, type FlowerStage } from './panelParts'
@@ -188,7 +189,12 @@ export function SessionEndView({
         ]}
       >
         {caption.length > 0 && (
-          <ClayCaption text={caption} metrics={layout.caption} />
+          <ClayCaption
+            text={caption}
+            metrics={layout.caption}
+            testID="session-end-ribbon"
+            textTestID="session-end-caption"
+          />
         )}
       </View>
     </>

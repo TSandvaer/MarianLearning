@@ -36,6 +36,18 @@ export interface ScreenLayout {
   captionFontSize: number
 }
 
+/** A clay caption slab's metrics (`components/ClayCaption.tsx`). */
+export interface CaptionMetrics {
+  font: number
+  lineHeight: number
+  padding: { horizontal: number; vertical: number }
+  minHeight: number
+  radius: number
+  speaker: number
+  /** Speaker → text. */
+  gap: number
+}
+
 const PAD = 16
 
 export function safeRect(v: Viewport): Rect {

@@ -16,7 +16,7 @@ import {
 import type { MasteryTrack } from '@marian/core/progress'
 import { STAGE_SPOKEN_NAMES } from '@marian/core/sessionEnd/friendlyNodeName'
 import type { MapStop } from '@marian/core/map/mapModel'
-import type { Side } from '@marian/core/map/mapLayout'
+import { budHoleSize, type Side } from '@marian/core/map/mapLayout'
 import { INK } from '@marian/core/map/mapTheme'
 
 const GOLD = '#ffd23f'
@@ -147,13 +147,6 @@ export function CurrentGlow({
   )
 }
 
-/** Hole size for a bud tray: one row of N, or one group per vowel. */
-function holeSize(buds: boolean[][]): number {
-  const total = buds.reduce((n, g) => n + g.length, 0)
-  if (buds.length === 1 && total <= 4) return 42
-  return total <= 8 ? 30 : 22
-}
-
 /** Clay seed tray under the current stop: one hole per good day needed. */
 export function BudTray({
   buds,
@@ -162,7 +155,7 @@ export function BudTray({
   buds: boolean[][]
   top: number
 }): ReactElement {
-  const hole = holeSize(buds)
+  const hole = budHoleSize(buds)
   return (
     <span
       data-testid="map-buds"
