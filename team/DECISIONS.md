@@ -209,3 +209,9 @@ Distinct from its siblings:
 - **Context:** The native Word Song (#543, `054928c`) ports the web screen to Kyle's spec (#542); its round rules moved into `@marian/core`. Kevin's one required change (the blend-mark drift check compared byte lengths, and 9 CBR clips share one length) was fixed with a sha256 per entry.
 - **Decided:** (1) Word Song approved on device with the `cvc-words` debug seed ("works, merge it"), including Kyle's native-only calls: right-edge chip column in phone landscape, blend highlight from measured onset marks, dark letter on a rose spotlight. (2) The session drained on Thomas's "drain session": in-flight work finished, nothing new dispatched; ParentSettings starts only on his go.
 - **Decided by:** Thomas (device check, drain).
+
+## 2026-10-11 — ParentSettings starts (last Phase 3 screen)
+
+- **Context:** The session had drained after Word Song (#543). Thomas answered "continue" and, asked in a popup whether that meant ParentSettings, picked "Start ParentSettings".
+- **Decided:** (1) ParentSettings follows the Word Song pattern: Kyle writes `design/native/parent-settings-native.md` (#545, docs-only), while Devon moves the screen's pure logic into `@marian/core` and builds the native screen to that spec; Kevin reviews once, then Thomas device-checks. (2) Kyle's named native departures: Share… replaces the web's JSON textarea, Restore confirms once in a system alert, and native corrects the defaults footnote, the "in-a-row" wording and the Copied timer; the web copy stays frozen. (3) The missing launch-time cloud reconcile on native is parked, not added to this PR.
+- **Decided by:** Thomas (popup); (1) follows the 2026-10-09 Phase 3 order.
