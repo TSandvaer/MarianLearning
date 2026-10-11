@@ -2,9 +2,11 @@
  * The app end to end on an in-memory store: Splash branches on the
  * persisted sessionCount exactly like the web, Greet runs on the real
  * audio engine (over the fake expo-audio, so silent) and hands over to
- * Math, and the placeholders walk the rest of core's route state machine.
+ * Math, Math hands its result to Session End, and the placeholders walk
+ * the rest of core's route state machine.
  */
 import { LINE_GAP_MS } from '@marian/core/greet/greetSequence'
+import { defaultProgress, saveProgress } from '@marian/core/progress'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
 import { ADVANCE_AFTER_CORRECT_MS } from '@marian/core/shared/gameplayConstants'
@@ -29,6 +31,7 @@ import {
   HEART_TAP_TRANSITION_MS,
   WAKE_REPROMPT_AFTER_MS,
 } from './screens/greet/Greet'
+import { CHIME_TAIL_MS, LEAVE_DELAY_MS } from './screens/sessionEnd/SessionEnd'
 import { SPLASH_FADE_OUT_MS } from './screens/Splash'
 
 function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
@@ -126,6 +129,40 @@ async function flushAll(): Promise<void> {
   })
 }
 
+/** Timers and the promises they settle, in 100 ms steps. */
+async function settle(total: number): Promise<void> {
+  for (let t = 0; t < total; t += 100) {
+    await advance(Math.min(100, total - t))
+    await flushAll()
+  }
+}
+
+/**
+ * Silent fallback: three wrong taps (re-prompt, hint, Emma gives the
+ * answer), then the right one. Guided: no stardust, not counted correct.
+ */
+async function answerGuided(): Promise<void> {
+  await advance(1000)
+  const { a, b } = problemOnScreen()
+  const wrong = screen
+    .getAllByTestId(/^math-chip-/)
+    .map((c) => Number(String(c.props.testID).replace('math-chip-', '')))
+    .find((v) => v !== a + b)!
+  for (let i = 0; i < 3; i++) {
+    await fireEvent.press(screen.getByTestId(`math-chip-${wrong}`))
+    await settle(6000)
+  }
+  await fireEvent.press(screen.getByTestId(`math-chip-${a + b}`))
+  await advance(ADVANCE_AFTER_CORRECT_MS)
+  await flushAll()
+}
+
+/** Session End: Emma's clips never end on the fake players; buttons up. */
+async function sessionEndSettles(): Promise<void> {
+  expect(screen.getByTestId('session-end')).toBeOnTheScreen()
+  await settle(16_000)
+}
+
 async function greetToMath(): Promise<void> {
   await renderPastSplash()
   await fireEvent(screen.getByTestId('greet-wake-tap-target'), 'pressIn')
@@ -165,7 +202,7 @@ it('returning (sessionCount ≥ 1, via a debug seed): Splash → Hub', async () 
   )
 })
 
-it('Greet → heart → Math (offline: the static plan, silent captions) → 8 problems → Session End gets the result → Hub', async () => {
+it('Greet → heart → Math (offline: the static plan, silent captions) → 8 problems → Session End (a good day) → All done → Hub', async () => {
   boot()
   await greetToMath()
 
@@ -184,24 +221,59 @@ it('Greet → heart → Math (offline: the static plan, silent captions) → 8 p
 
   for (let i = 0; i < 8; i++) await answerRight()
 
-  expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
-  expect(screen.getByTestId('session-end-handoff')).toHaveTextContent(
-    'math · 8/8 correct · first try 8 · +11 stardust (11) · streak 8',
-  )
-  // Math freed its effects on the way out; sessionCount is Session End's.
-  expect(fakePlayers.filter((p) => !p.released)).toEqual([])
-  expect(readSessionHistory().sessionCount).toBe(0)
+  // Session End got Math's result and made the one write.
+  expect(screen.getByTestId('session-end')).toBeOnTheScreen()
+  expect(readSessionHistory().sessionCount).toBe(1)
+  expect(
+    screen.getAllByTestId('session-end-star', { includeHiddenElements: true }),
+  ).toHaveLength(8)
+  // 8 of 8 on day one: a flower, Emma cheers.
+  expect(screen.getByTestId('emma-cheering')).toBeOnTheScreen()
+  expect(screen.queryByTestId('session-end-cta')).toBeNull()
 
-  await fireEvent.press(screen.getByTestId('exit-hub'))
+  await sessionEndSettles()
+  expect(screen.getByTestId('session-end-cta').props.accessibilityLabel).toBe(
+    'All done!',
+  )
+  await fireEvent.press(screen.getByTestId('session-end-cta'))
+  await advance(LEAVE_DELAY_MS)
   expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
   expect(screen.queryByTestId('exit-greet')).toBeNull()
+  // Every player is released once the chime has rung out.
+  await advance(CHIME_TAIL_MS)
+  expect(fakePlayers.filter((p) => !p.released)).toEqual([])
 })
 
-it('Session End → Math again: nothing is read before the new session settles, then problem 1 is', async () => {
+it('3rd good day: All done opens the map (an unlock waits there)', async () => {
+  const day = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
   boot()
+  saveProgress({
+    ...defaultProgress(),
+    history: [
+      { dateISO: day(2), skillFocus: ['add-to-10'], successRate: 1 },
+      { dateISO: day(1), skillFocus: ['add-to-10'], successRate: 1 },
+    ],
+  })
   await greetToMath()
   for (let i = 0; i < 8; i++) await answerRight()
-  expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
+  await sessionEndSettles()
+  await fireEvent.press(screen.getByTestId('session-end-cta'))
+  await advance(LEAVE_DELAY_MS)
+  expect(screen.getByTestId('route-map')).toBeOnTheScreen()
+})
+
+it('not-yet day → Again → Math: nothing is read before the new session settles, then problem 1 is', async () => {
+  boot()
+  await greetToMath()
+  // Two guided problems: 6 of 8, not yet today's flower.
+  await answerGuided()
+  await answerGuided()
+  for (let i = 2; i < 8; i++) await answerRight()
+  await sessionEndSettles()
+  expect(screen.getByTestId('emma-idle')).toBeOnTheScreen()
+  expect(screen.getByTestId('session-end-cta').props.accessibilityLabel).toBe(
+    'Home',
+  )
 
   // The next session start hangs until the test lets it fail (offline).
   let failStart: (err: Error) => void = () => {}
@@ -211,7 +283,8 @@ it('Session End → Math again: nothing is read before the new session settles, 
         failStart = reject
       }),
   )
-  await fireEvent.press(screen.getByTestId('exit-math'))
+  await fireEvent.press(screen.getByTestId('session-end-again'))
+  await advance(LEAVE_DELAY_MS)
   await flushAll()
   await advance(3000)
   expect(sessionStarts()).toHaveLength(2)

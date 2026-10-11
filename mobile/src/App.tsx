@@ -2,8 +2,8 @@
  * Native app root.
  *
  * Route state is core's route state machine (`./router/routes.ts`).
- * Phase 3 ports the screens one by one: Splash, Greet and Math are real,
- * every other route is still a placeholder. Splash branches on the
+ * Phase 3 ports the screens one by one: Splash, Greet, Math and Session
+ * End are real, every other route is still a placeholder. Splash branches on the
  * persisted `sessionCount` through core's `nextAfterSplash()`, exactly
  * like the web; neither Splash nor Greet writes it (Session-End does).
  * Emma is one App-level view that springs between the routes' frames
@@ -14,7 +14,9 @@
  * kicked on Greet (or on Math for a returning child), its visible-wait
  * timer started on Math, torn down when the child leaves Math for the Hub
  * or leaves Session End. Math's result goes to Session End as the web's
- * `SessionEndPayload`.
+ * `SessionEndPayload`; Session End's "All done" opens the map when an
+ * unlock is waiting, else the Hub, and a not-yet day's "Again" starts the
+ * next session (web `handleSessionEndAllDone` / `…Again`).
  *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
@@ -25,6 +27,8 @@ import {
   type EmmaPose,
 } from '@marian/core/character/emmaPose'
 import { pickStaticSessionPlan } from '@marian/core/math/sessionPlans'
+import { loadProgress, type MasteryTrack } from '@marian/core/progress'
+import { pendingUnlock } from '@marian/core/progress/pathBeats'
 import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
@@ -49,6 +53,7 @@ import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { mathLayout } from './layout/mathLayout'
 import { layoutForRoute } from './layout/routeLayout'
+import { sessionEndLayout } from './layout/sessionEndLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
 import { readBuildEnv } from './platform/buildEnv'
 import { getLaunchFlags } from './platform/launchFlags'
@@ -66,6 +71,7 @@ import {
 import { MathScreen } from './screens/math/Math'
 import type { MathSessionResult } from './screens/math/mathTypes'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
+import { SessionEnd } from './screens/sessionEnd/SessionEnd'
 import { Splash } from './screens/Splash'
 import {
   createMathSessionController,
@@ -154,6 +160,7 @@ function Shell() {
   )
   const [mathPose, setMathPose] = useState<EmmaPose>('idle')
   const [sessionEnd, setSessionEnd] = useState<SessionEndPayload | null>(null)
+  const [sessionEndPose, setSessionEndPose] = useState<EmmaPose>('idle')
 
   // The web's tear-downs (`handleBackToHub`, `handleSessionEndAllDone` /
   // `…Again`, the leave-effect) run BEFORE the route flips: leaving
@@ -202,9 +209,26 @@ function Shell() {
           mathSession.sessionFocus,
         ),
       )
+      setSessionEndPose('idle')
       navigate('session-end')
     },
     [mathDefaults, mathSession, navigate],
+  )
+  // Web `handleSessionEndAllDone`: an unlock this world has not celebrated
+  // yet opens the map (which plays it); otherwise the Hub. (The route
+  // flip tears the Math session down, as the web's handler does.)
+  const onSessionEndAllDone = useCallback(() => {
+    const world: MasteryTrack =
+      sessionEnd?.surface === 'word-song' ? 'word-song' : 'math'
+    const saved = loadProgress()
+    navigate(
+      saved !== null && pendingUnlock(saved, world) !== null ? 'map' : 'hub',
+    )
+  }, [sessionEnd, navigate])
+  // Web `handleSessionEndAgain` (not-yet day): another session, same world.
+  const onSessionEndAgain = useCallback(
+    () => navigate(sessionEnd?.surface === 'word-song' ? 'literacy' : 'math'),
+    [sessionEnd, navigate],
   )
   // Web `handleBackToHub` (the route effect tears the session down).
   const onMathExit = useCallback(() => navigate('hub'), [navigate])
@@ -228,7 +252,8 @@ function Shell() {
 
   const greet = route === 'greet' ? greetLayout(viewport) : null
   const math = route === 'math' ? mathLayout(viewport) : null
-  const layout = greet ?? math ?? layoutForRoute(route, viewport)
+  const end = route === 'session-end' ? sessionEndLayout(viewport) : null
+  const layout = greet ?? math ?? end ?? layoutForRoute(route, viewport)
 
   return (
     <View style={styles.root}>
@@ -257,6 +282,14 @@ function Shell() {
               onPoseChange={setMathPose}
               qaAutoAnswerAfterMs={qaAutoTapMs}
             />
+          ) : end ? (
+            <SessionEnd
+              layout={end}
+              payload={sessionEnd}
+              onAllDone={onSessionEndAllDone}
+              onAgain={onSessionEndAgain}
+              onPoseChange={setSessionEndPose}
+            />
           ) : (
             <RoutePlaceholder
               key={route}
@@ -264,15 +297,28 @@ function Shell() {
               layout={layout}
               flags={flags}
               onNavigate={navigate}
-              sessionEnd={route === 'session-end' ? sessionEnd : null}
             />
           )}
           <EmmaStage
             frame={layout.emma}
             // Calm through the whole Greet (native-only, Thomas 2026-10-09:
-            // no celebration swap); Math drives her poses as on the web.
-            pose={route === 'math' ? mathPose : 'idle'}
-            breath={route === 'greet' ? GREET_BREATH : BREATH}
+            // no celebration swap); Math and Session End drive her poses as
+            // on the web.
+            pose={
+              route === 'math'
+                ? mathPose
+                : route === 'session-end'
+                  ? sessionEndPose
+                  : 'idle'
+            }
+            // The web's Session End Emma is a still image (no breath).
+            breath={
+              route === 'greet'
+                ? GREET_BREATH
+                : route === 'session-end'
+                  ? null
+                  : BREATH
+            }
             motion={route === 'greet' ? 'greet' : 'character'}
           />
         </>
