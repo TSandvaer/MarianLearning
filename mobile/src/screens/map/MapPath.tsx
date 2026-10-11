@@ -67,6 +67,7 @@ export function MapPath({
           height={band.height * s}
           s={s}
           faded={view.fadedLand === band.land}
+          reducedMotion={reducedMotion}
         />
       ))}
       {geo.stones.map((st, i) => (

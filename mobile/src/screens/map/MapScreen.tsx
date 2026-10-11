@@ -25,6 +25,7 @@ import Animated, {
   useReducedMotion,
 } from 'react-native-reanimated'
 import type { MapScreenLayout } from '../../layout/mapScreenLayout'
+import { EASE_OUT } from './mapMotion'
 import { HomeButton, MapBackdrop, MapCaption, MapTitle } from './mapChrome'
 import { MapPath } from './MapPath'
 import { useMapVisit, type MapVisitOptions } from './useMapVisit'
@@ -73,7 +74,7 @@ export function MapScreen({ layout, world, onHome, ...seams }: MapScreenProps) {
   return (
     <Animated.View
       testID="map"
-      entering={FadeIn.duration(MAP_ENTER_MS)}
+      entering={FadeIn.duration(MAP_ENTER_MS).easing(EASE_OUT)}
       exiting={FadeOut.duration(MAP_EXIT_MS)}
       style={styles.fill}
     >

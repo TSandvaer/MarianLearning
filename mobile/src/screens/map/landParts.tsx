@@ -25,6 +25,7 @@ export function MapBand({
   height,
   s,
   faded,
+  reducedMotion,
 }: {
   index: number
   land: number
@@ -32,12 +33,16 @@ export function MapBand({
   height: number
   s: number
   faded: boolean
+  /** Reduce Motion: every change is a 200 ms fade. */
+  reducedMotion: boolean
 }) {
   const [hi, lo] = BAND_TINTS[index % BAND_TINTS.length]!
   const opacity = useSharedValue(faded ? 0.35 : 1)
   useEffect(() => {
-    opacity.set(withTiming(faded ? 0.35 : 1, { duration: 600 }))
-  }, [faded, opacity])
+    opacity.set(
+      withTiming(faded ? 0.35 : 1, { duration: reducedMotion ? 200 : 600 }),
+    )
+  }, [faded, opacity, reducedMotion])
   const fade = useAnimatedStyle(() => ({ opacity: opacity.get() }))
   return (
     <Animated.View

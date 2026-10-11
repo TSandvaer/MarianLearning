@@ -71,8 +71,10 @@ export function Sticker({
   }))
   const fade = useSharedValue(1)
   useEffect(() => {
-    if (popping) fade.set(withTiming(0, { duration: 400 }))
-  }, [popping, fade])
+    if (popping) {
+      fade.set(withTiming(0, { duration: reducedMotion ? 200 : 400 }))
+    }
+  }, [popping, fade, reducedMotion])
   const frostFade = useAnimatedStyle(() => ({ opacity: fade.get() }))
   const locked = stop.state === 'locked'
   return (
