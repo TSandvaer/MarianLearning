@@ -197,3 +197,9 @@ Distinct from its siblings:
 - **Context:** The native Hub (#537, `4ff1f61`) ports the live clay Hub with guidance G1 to Kyle's spec (#534); the Hub's guidance logic moved into `@marian/core/hub/`. Kevin's one required change (Math's adopted Hub prefetch could not be aborted) was fixed in the PR.
 - **Decided:** (1) Hub approved on device: Thomas ran the Hub checklist in Expo Go, starting from a first launch on the iPad (Greet → Math → Session End → Hub) ("works, merge it"). (2) The Map follows the Hub's pattern: Kyle writes `design/native/map-native.md` (native-only calls), while Devon starts the spec-independent part (core logic, audio, data) in parallel and builds the layout from the merged spec.
 - **Decided by:** Thomas (device check); (2) follows the 2026-10-09 Phase 3 order.
+
+## 2026-10-11 — Native Map approved on device; open gates past locked lands stay; Word Song starts
+
+- **Context:** The native Map (#540, `956405b`) ports Emma's Path to Kyle's spec (#539); the map logic moved into `@marian/core/map/`. Kevin approved with no required changes.
+- **Decided:** (1) Map approved on device with the `add-to-20` debug seed ("works, merge it"). (2) Thomas noticed the top gate (land 4) is open while land 3 is locked. That is the shared rule (a gate opens when its land's first step is not locked) plus the diagnostic baseline (`mult-2-5-10` starts at `intro`, `packages/core/src/progress/defaults.ts:177`), the same on the web; kept as is for the port, since any change would touch the frozen web too. (3) Word Song follows the Map's pattern: Kyle's native spec and Devon's core/audio work in parallel.
+- **Decided by:** Thomas (device check); (2) and (3) follow the web-parity rule and the 2026-10-09 Phase 3 order.
