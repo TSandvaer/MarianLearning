@@ -129,3 +129,81 @@ Chip gaps are in brackets. In P on a tall phone the card stays at 160 and centre
 
 - **Corner cue (web Placement B):** beside the picture, on every form. x = the picture's right edge + 12, top = the picture's top. Phones: 48 × 66 + the 16 pt "th" label; tablet: 85 × 117 (the web's 64pt × 88pt) + label. If the problem has no picture (§ 7), it sits right of the letter row. **Why:** the web pins it top-right under the HUD (`top: 6rem + inset`, `right: 12px`). Read from the CSS, not checked on a device: that lands on the ribbon row's right end on an iPad, and on a phone it would sit on the ribbon. Next to the picture it reads as "how to say this word".
 - **Intro panel (Placement A, first encounter, during the getting-ready wait):** phones: in the stage, a P × P square, the 24 pt "th" label under it, then the getting-ready dots. Tablet: the web (beside Emma, 22vh). It exits with a 200 ms fade when the plan arrives (web).
+
+## 4. Tap-to-hear
+
+**Letters. Decision: each letter plays its own sound, cut from the problem's blend clip.**
+
+- Applies to `cvc-word` problems whose plan carries a `blend` clip that has marks (§ 5): all 40 baked blends (short a, o, u, i, e; 8 each). Every other letter row (`blending-cv`, the digraph tiers, the static fallback plan) pulses silently, as on the web.
+- **Playback:** seek to `segment.on − 30 ms`, play, stop at `segment.off + 80 ms`. Measured: every segment is followed by at least 301 ms of silence, so the stop lands in silence even with the 50 ms status interval. The tapped letter gets the spotlight and the pulse for max(400 ms, the segment).
+- **When:** from the card's first frame, including the silent beat, until the problem resolves. While Emma speaks any line the letters are inert: no sound, no pulse. A new letter or picture tap cuts the sound in flight; there is no queue.
+- **Not a move:** no attempt, no streak change, no Emma reaction, nothing recorded (web spec: "pure exploration").
+- **Player:** a clip player on the problem's blend file, outside the voice channel's line queue. It stops, and does not resume, when the app goes to the background.
+
+**Words. Decision: the picture says its word.**
+
+- `cvc-word` with marks: the blend clip's word segment (`segments[3].on − 30 ms` to the clip's end), with every letter lit together, as on the blend's whole-word beat. Other picture problems (`blending-cv`, no marks) replay the read line ("Tap the cat.") with its caption walk.
+- Letter tiers: the big glyph replays the read line. Sentences: the scene replays the read line. Sight words have no target: the web has no card there.
+- **When:** after the read-aloud has ended (when the chips open) until the problem resolves; inert while Emma speaks. **Never during the silent beat:** hearing the word would end her decoding beat.
+- **Press:** scale 1 → 0.96 at press-in (`withTiming`, 80 ms), back on release (spring 300/20). Hit area: the P × P box (≥ 96 pt). The isolated word leaves the ribbon's line alone (the word is printed right under the picture); a read-line replay walks its caption.
+
+**Why:** the approved web spec (`design/screen-4-word-song.md` § Input model and § Audio dispatch sequence on letter tap) has phoneme letter taps and a "hear it again" control. The web shipped pulses only, because the phoneme files were never made. The blend clips are Emma's ear-approved phonemes, in her voice and in the word's own context, and they already arrive with the session. Picture → spoken word is the vocabulary link Marian needs most. **No speaker icon:** Session End and the map draw a speaker that does nothing, so one that works here would teach her the wrong thing there.
+
+## 5. The blend: timing and motion
+
+**Measured** (all 40 baked blend clips, ffmpeg `silencedetect`, a scratch script, not committed): each clip runs 2.72–3.76 s. It holds three grapheme sounds separated by at least 301 ms of silence, a longer pause, then the whole word. The web lights a letter on evenly spaced word ticks (token i at i × duration / 7 for `c - a - t ... cat`). Against the measured onsets those ticks are late: grapheme 2 by a median 99 ms (max 202), grapheme 3 by 293 ms (max 455), the whole word by 291 ms (max 428). Grapheme 3 lasts 85–590 ms (median 258), so on many clips its letter lights after its sound has ended, and she hears /t/ while the **a** is still lit.
+
+**Decision: drive the highlight from per-clip marks.**
+
+- `mobile/scripts/export-assets.mjs` writes `mobile/src/audio/blendMarks.generated.ts`: for every `word.p*.blend` utterance in `public/canon/word-song/**`, keyed by its text, `{ bytes, segments: [[onMs, offMs] × 4] }`. Boundaries come from `silencedetect` at −35 dB: the first onset is the end of the leading silence (≥ 30 ms), and later onsets and offsets are the ends and starts of silences ≥ 300 ms. Exactly 4 segments, or no entry. The 40 texts are unique across the canon files.
+- Use an entry only when the session's blend file is exactly `bytes` long. The server reuses canon audio by text (`api/_session.ts`, `getCanonAudioIndex`), so the bytes match. A re-bake changes them, and a unit test fails until the script runs again.
+- No entry, a byte mismatch, or the static fallback plan: the web's even ticks through core's `buildBlendHighlightSteps`.
+- **Timing:** letter k lights at `segments[k].on − 40 ms`, all letters at `segments[3].on − 40 ms`, and everything goes dark at the clip's end. Read it from the player's `currentTime` in its status listener (the `captionClock` pattern, 50 ms interval). The light then lands between 40 ms early and 10 ms late, and it freezes with the voice in the background. Early rather than late, because a sound that comes after its picture is noticed later than one that comes before it (ITU-R BT.1359: about 125 ms of sound delay against about 45 ms of sound lead).
+- **Caption with marks:** each grapheme token appears at its mark, and each separator (`-`, `...`) appears with the token after it.
+- **The blend stays one clip.** Don't stitch phonemes at runtime: it would change the ear-tested timing and prosody.
+
+**Decision: the lit letter stays dark on a rose spotlight.** The web turns the lit letter `#FFB7C5` on a near-`#FFF5F0` screen (contrast about 1.5:1), so the letter Emma is sounding becomes the palest one on screen. Native keeps the letter `#3B3B3B` and fades a `#FFB7C5` spotlight (§ 3) in behind it (about 6.8:1). It is the same colour and the same pulse, but the letter gains contrast instead of losing it. Letter taps use the same look.
+
+`EASE_OUT` below is `Easing.bezier(0, 0, 0.58, 1)` (motion's `easeOut`, as `MathHud` uses).
+
+| Beat                                              | Shared value          | Reanimated                                                                                |
+| ------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------------------- |
+| Letter k lights                                   | `lit[k]` 0 → 1        | `withTiming(1, { duration: 120 })`                                                        |
+| Its pulse (web `[1, 1.2, 1]`, 400 ms ease-out)    | `scale[k]`            | `withSequence(withTiming(1.2, { duration: 200, easing: EASE_OUT }), withTiming(1, same))` |
+| The letter before it                              | `lit[k − 1]` → 0      | `withTiming(0, { duration: 120 })`                                                        |
+| The whole word                                    | every `lit` and pulse | all started in the same JS tick                                                           |
+| Clip end, a cut, the next problem                 | every `lit` → 0       | `withTiming(0, { duration: 200 })`                                                        |
+| Letter entrance (web spring 300/18, 150 ms apart) | `scale[k]` 0 → 1      | `withDelay(150 × k, withSpring(1, { stiffness: 300, damping: 18 }))`, opacity with it     |
+| Picture entrance (web spring 260/16)              | scale 0 → 1           | `withSpring(1, { stiffness: 260, damping: 16 })`, opacity clamped                         |
+
+The status callback writes the shared values with `.set()`; nothing runs per frame on the JS thread. **Reduce Motion:** no pulses and no stagger. The spotlight still fades in (colour, not motion, as on the web), and the entrances become fades of 150 ms (letters) and 200 ms (picture). Emma is `attentive-pointing` through the blend and returns to `idle` at its end (web).
+
+## 6. Audio timing
+
+- **The silent beat** (`cvc-word`, 1500 ms, web) counts foreground time only. Its timer pauses while the app is in the background and resumes with the time left (the web re-arms on `visibilitychange`).
+- **Decision: letter taps hold the read-aloud back.** After a letter tap, the read-aloud starts no sooner than 1000 ms after that tap, and never later than 5000 ms after the card appeared. **Why:** the beat exists so she decodes before she hears the word (Dave's review on PR #135 / #139, cited at `SILENT_TEXT_WINDOW_MS`). Tapping letters is decoding, so Emma waits instead of saying the word over her. The cap stops a tapping game from stalling the problem.
+- Every other content type reads at once (web).
+- **The chips open when the read-aloud ends** (web Word Song). Don't copy native Math's gate, which opens at the read's start.
+- **Wrong taps:** the reprompt at once. On the 2nd wrong, the blend (the hint line where there is no blend) starts 600 ms after the reprompt ends. On the 3rd, the give-answer line (web).
+- **Emma and the tap sounds:** Emma's next line cuts a tap sound in flight (the voice channel's rule), and so does a chip tap. A tap sound never cuts Emma.
+- **SFX:** sparkle 0.85 and plink 0.7 on a correct tap, poof 0.7 on a wrong one (web). All three are bundled.
+- **Audio session:** held (greet-math-native § 3).
+
+## 7. Art: bake versus draw
+
+Word Song needs no CSS filter, so nothing is baked for iOS's `filter` limits (hub-native § 4).
+
+| Piece                                               | Web                                                                                                            | Native                                                                                                                                                                                                                              |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 53 word pictures                                    | `picture-*.svg` wrapping a PNG                                                                                 | **Baked, already bundled** (`assets/pictures/*.webp`, 500 px).                                                                                                                                                                      |
+| 4 probe pictures (`nap`, `rat`, `map`, `tap`)       | Inline-SVG placeholders in `wordPictures.tsx`                                                                  | **Bake.** `export-assets.mjs` renders each key's `WordPicture` body (`renderToStaticMarkup`) through sharp to a 500 px WebP, registry key `/native/pictures/<key>`. The planner's novel pool uses them (`api/_plannerWordList.ts`). |
+| Pictures that don't exist (the ch, sh and th words) | A pink square with the word in 14 px sans-serif                                                                | **Draw no picture.** If the target or either distractor has no picture, the problem draws as a written-word problem: written-word chips, the letter row alone in the stage, no picture tap.                                         |
+| 8 scenes                                            | `scene-*.svg`, square art letterboxed into a 280×210 box                                                       | **Baked, already bundled.** Drawn square: § 2's scene size on phones, 210 on a tablet (what the web shows).                                                                                                                         |
+| th mouth, Emma's poses                              | SVG                                                                                                            | Baked, bundled.                                                                                                                                                                                                                     |
+| Background                                          | radial `rgba(255,210,235,.55)` at 50% 30% to transparent at 60%, over linear `#FFF5FA → #FFF8F8`               | `experimental_backgroundImage`, both layers.                                                                                                                                                                                        |
+| Clay tile, pressed slab, guided glow ring           | `.clay-tile` `box-shadow` with `.clay-world-word`'s slab `#f2a7c3`                                             | Math's `AnswerChip` shadow strings with a `slab` colour prop (Math: `#dba675`, Word Song: `#f2a7c3`).                                                                                                                               |
+| Spotlight                                           | none                                                                                                           | A View (§ 3).                                                                                                                                                                                                                       |
+| Sentence panel and gap                              | White, 3 px `#FFC0CB` border, radius 16, `0 8px 24px rgba(244,143,177,.18)`; a 3 px ink underline `3.5ch` wide | Views with those values; the gap is a 3 pt `#3D2B3D` bar, 3.5 × the "0" advance wide.                                                                                                                                               |
+| Sparkles, HUD, getting-ready dots                   | Inline SVG, React                                                                                              | Math's `SparkleGlyph`, `MathHud`, `GettingReady`.                                                                                                                                                                                   |
+
+**New art: the 4 probe pictures.** Everything else is bundled or drawn. The ch, sh and th words have prompts (`design/word-song/digraphs-*-picture-pack-prompts.md`) but no art yet; until it lands, the written-word fallback replaces the web's pink squares.
