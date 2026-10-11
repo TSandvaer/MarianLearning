@@ -56,6 +56,18 @@ Greet is **once-ever**; the [`nextAfterSplash()`](MarianLearning/src/App.tsx#L14
 
 Storage source: [`MarianLearning/packages/core/src/sessionEnd/sessionHistory.ts`](MarianLearning/packages/core/src/sessionEnd/sessionHistory.ts) under key `marian-tutor.session-history.v1` (lazy v1 → v2 migration on read).
 
+### Native (`mobile/`) ports: guard mount-time writes on the handoff payload
+
+Until every screen is ported, `mobile/src/screens/RoutePlaceholder.tsx` shows a button for EVERY route a screen can lead to, and `EXPO_PUBLIC_QA_ROUTE=<route>` opens the app straight onto a route. So any native screen can be entered without its handoff payload, or entered again with a stale one.
+
+A port whose mount effect writes progress (history, `sessionCount`, Leitner) MUST:
+
+- render only when its payload exists, and otherwise fall back to the placeholder (`mobile/src/App.tsx`);
+- clear the payload in `navigate` when the route leaves the screen;
+- have an App test for both paths.
+
+**Incident:** PR #535 skipped this. Hub → Word Song placeholder → Session End re-recorded the session (history 1→2, `sessionCount` 1→2), and the QA route with no payload wrote an empty session. Kevin's REQUEST_CHANGES cost a review round, and `cd9ef1b` fixed it. The rule applies to the remaining ports: Hub, Map, WordSong, ParentSettings.
+
 ## App-level providers and global wiring
 
 Inside [`App`'s render](MarianLearning/src/App.tsx#L941-L1015):
