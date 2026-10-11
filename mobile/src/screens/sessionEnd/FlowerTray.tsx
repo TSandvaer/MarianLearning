@@ -230,9 +230,13 @@ const styles = StyleSheet.create({
   },
   holeFlower: { position: 'absolute' },
   awake: { filter: 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.3))' },
+  // Web: `brightness(0.85) saturate(0.8)`. iOS draws `brightness` as a
+  // multiply layer over the view's whole box (RN 0.86
+  // RCTViewComponentView.mm), a grey square behind a transparent bud, so
+  // the bud dims through opacity over the dark hole instead.
   sleeping: {
-    filter:
-      'brightness(0.85) saturate(0.8) drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.3))',
+    opacity: 0.85,
+    filter: 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.3))',
   },
   moon: {
     position: 'absolute',
