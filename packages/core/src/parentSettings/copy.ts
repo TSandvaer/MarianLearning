@@ -1,10 +1,12 @@
 /**
- * Parent Settings copy: every string the screen shows, verbatim from the
- * web screen, so the web and native screens cannot drift. Parent-facing
- * (not Emma's vocabulary): plain, adult, no Marian theming.
+ * Parent Settings copy: every string the web screen shows, verbatim, so
+ * the web and native screens cannot drift. Native shows these too, except
+ * its named departures (`design/native/parent-settings-native.md` § 7,
+ * `mobile/src/screens/parentSettings/nativeCopy.ts`). Parent-facing (not
+ * Emma's vocabulary): plain, adult, no Marian theming.
  */
 import type { MasteryTrackKey } from '../progress/types'
-import type { ToggleSettingKey } from './settingsModel'
+import type { ToggleSettingKey } from './parentSettingsModel'
 
 export interface RowCopy {
   label: string

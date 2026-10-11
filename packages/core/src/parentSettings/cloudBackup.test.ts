@@ -1,31 +1,26 @@
 /**
- * Parent Settings backup JSON, cloud-backup status machines, restore
- * flow and copy. "Web parity" blocks run the web screen's
- * pre-extraction code (verbatim from `src/screens/ParentSettings/
- * ParentSettings.tsx` at origin/main 054928c) as an oracle.
+ * Parent Settings cloud-backup status machines, restore input handling
+ * and the two restore flows (web: ID first; native: read first), plus the
+ * copy JSX used to assemble. "Web parity" checks compare against the web
+ * screen's pre-extraction logic (origin/main 054928c).
  */
 import { describe, expect, it, vi } from 'vitest'
 import type { ReconcileOutcome } from '../progress/cloudSync'
 import { defaultProgress } from '../progress/defaults'
 import { isValidUuid } from '../progress/deviceId'
-import type { Progress } from '../progress/types'
-import {
-  emptySessionHistory,
-  type SessionHistoryV2,
-} from '../sessionEnd/sessionHistory'
-import { backupJson, buildBackupPayload } from './backup'
 import {
   adoptDeviceId,
+  adoptDeviceIdAfterRead,
   canSubmitRestore,
   copyStatusResets,
   parseRestoreInput,
   progressAfterRestore,
   pushStatusResets,
   restoreFailureReason,
-  restoreOutcomeMessage,
   restoreStatusAfterEdit,
   restoreStatusTag,
   STATUS_RESET_MS,
+  type AdoptDeviceIdDeps,
   type RestoreStatus,
 } from './cloudBackup'
 import {
@@ -35,86 +30,6 @@ import {
 } from './copy'
 
 const UUID = '0b8f3f4e-1c2d-4e5f-8a9b-0c1d2e3f4a5b'
-const AT = new Date('2026-10-11T12:00:00.000Z')
-
-// ── Web reference ───────────────────────────────────────────────────────
-
-function webBackupJson(
-  progress: Progress,
-  loadSessionHistory: (() => SessionHistoryV2) | undefined,
-  now: Date,
-): string {
-  const safely = (read: () => SessionHistoryV2) => {
-    try {
-      return read()
-    } catch {
-      return null
-    }
-  }
-  const sessionHistory = loadSessionHistory ? safely(loadSessionHistory) : null
-  return JSON.stringify(
-    {
-      kind: 'marian-tutor.backup' as const,
-      version: 1 as const,
-      exportedAtISO: now.toISOString(),
-      progress,
-      sessionHistory,
-    },
-    null,
-    2,
-  )
-}
-
-const OUTCOMES: ReconcileOutcome[] = [
-  { kind: 'installed-from-cloud', progress: defaultProgress() },
-  { kind: 'pushed-to-cloud' },
-  { kind: 'noop', reason: 'no-cloud-record' },
-  { kind: 'noop', reason: 'no-local-blob' },
-  { kind: 'noop', reason: 'equal' },
-  { kind: 'cloud-blob-rejected' },
-  { kind: 'cloud-error', reason: 'timeout' },
-  { kind: 'cloud-error', reason: 'auth-not-configured' },
-]
-
-// ── Backup ──────────────────────────────────────────────────────────────
-
-describe('backup JSON', () => {
-  const history = { ...emptySessionHistory(), sessionCount: 5 }
-  const throwing = () => {
-    throw new Error('storage unavailable')
-  }
-
-  it('matches the web textarea for a reader, no reader and a throwing reader', () => {
-    for (const read of [() => history, undefined, throwing]) {
-      expect(backupJson(defaultProgress(), read, AT)).toBe(
-        webBackupJson(defaultProgress(), read, AT),
-      )
-    }
-  })
-
-  it('carries the versioned envelope, in key order', () => {
-    const payload = buildBackupPayload(defaultProgress(), () => history, AT)
-    expect(Object.keys(payload)).toEqual([
-      'kind',
-      'version',
-      'exportedAtISO',
-      'progress',
-      'sessionHistory',
-    ])
-    expect(payload.kind).toBe('marian-tutor.backup')
-    expect(payload.version).toBe(1)
-    expect(payload.exportedAtISO).toBe('2026-10-11T12:00:00.000Z')
-    expect(payload.sessionHistory).toEqual(history)
-  })
-
-  it('a throwing reader gives sessionHistory null', () => {
-    expect(
-      buildBackupPayload(defaultProgress(), throwing, AT).sessionHistory,
-    ).toBeNull()
-  })
-})
-
-// ── Status machines ─────────────────────────────────────────────────────
 
 describe('status machines', () => {
   it('push: only the three results reset, after 2.4 s', () => {
@@ -126,14 +41,12 @@ describe('status machines', () => {
     expect(pushStatusResets('idle')).toBe(false)
   })
 
-  it('device-ID copy: copied and error reset', () => {
+  it('copy: copied and error reset', () => {
     expect(copyStatusResets('copied')).toBe(true)
     expect(copyStatusResets('error')).toBe(true)
     expect(copyStatusResets('idle')).toBe(false)
   })
 })
-
-// ── Restore ─────────────────────────────────────────────────────────────
 
 describe('restore input', () => {
   const INPUTS = [
@@ -162,7 +75,7 @@ describe('restore input', () => {
     expect(canSubmitRestore('x', { kind: 'invalid-format' })).toBe(true)
   })
 
-  it('typing clears only invalid-format', () => {
+  it('typing clears only invalid-format (web)', () => {
     expect(restoreStatusAfterEdit({ kind: 'invalid-format' })).toEqual({
       kind: 'idle',
     })
@@ -180,7 +93,7 @@ describe('restore input', () => {
   })
 })
 
-describe('restore outcome', () => {
+describe('restore status', () => {
   it('tags each status like the web data-status', () => {
     expect(restoreStatusTag({ kind: 'idle' })).toBeNull()
     expect(restoreStatusTag({ kind: 'restoring' })).toBeNull()
@@ -188,32 +101,19 @@ describe('restore outcome', () => {
     expect(restoreStatusTag({ kind: 'restore-failed', reason: 'x' })).toBe(
       'restore-failed',
     )
+    const outcomes: ReconcileOutcome[] = [
+      { kind: 'installed-from-cloud', progress: defaultProgress() },
+      { kind: 'noop', reason: 'equal' },
+      { kind: 'cloud-error', reason: 'timeout' },
+    ]
     expect(
-      OUTCOMES.map((outcome) =>
+      outcomes.map((outcome) =>
         restoreStatusTag({ kind: 'restored', outcome }),
       ),
     ).toEqual([
       'restored-installed-from-cloud',
-      'restored-pushed-to-cloud',
       'restored-noop',
-      'restored-noop',
-      'restored-noop',
-      'restored-cloud-blob-rejected',
       'restored-cloud-error',
-      'restored-cloud-error',
-    ])
-  })
-
-  it('words every outcome as the web did', () => {
-    expect(OUTCOMES.map(restoreOutcomeMessage)).toEqual([
-      "Restored Marian's progress from that device.",
-      "That device had older progress; this device's progress was kept.",
-      'No progress found for that device ID.',
-      "That device hasn't synced anything yet.",
-      'Both devices have the same progress.',
-      "That device's backup is in an unexpected format.",
-      "Couldn't reach the server (timeout).",
-      "Couldn't reach the server (auth-not-configured).",
     ])
   })
 
@@ -237,24 +137,33 @@ describe('restore outcome', () => {
   })
 })
 
-describe('adoptDeviceId', () => {
+/** Deps that log the call order and answer the reconcile with `outcome`. */
+function recordingDeps(outcome: ReconcileOutcome) {
+  const order: string[] = []
+  const local = defaultProgress()
+  const deps: AdoptDeviceIdDeps = {
+    writeDeviceId: (id) => order.push(`write:${id}`),
+    loadLocal: () => {
+      order.push('load')
+      return local
+    },
+    reconcile: async (id, p) => {
+      order.push(`reconcile:${id}`)
+      expect(p).toBe(local)
+      return outcome
+    },
+  }
+  return { order, deps }
+}
+
+describe('adoptDeviceId (web)', () => {
   it('installs the ID first, then reconciles that ID against local', async () => {
-    const order: string[] = []
-    const local = defaultProgress()
-    const outcome = await adoptDeviceId(UUID, {
-      writeDeviceId: (id) => order.push(`write:${id}`),
-      loadLocal: () => {
-        order.push('load')
-        return local
-      },
-      reconcile: async (id, p) => {
-        order.push(`reconcile:${id}`)
-        expect(p).toBe(local)
-        return { kind: 'noop', reason: 'equal' }
-      },
+    const { order, deps } = recordingDeps({ kind: 'noop', reason: 'equal' })
+    await expect(adoptDeviceId(UUID, deps)).resolves.toEqual({
+      kind: 'noop',
+      reason: 'equal',
     })
     expect(order).toEqual([`write:${UUID}`, 'load', `reconcile:${UUID}`])
-    expect(outcome).toEqual({ kind: 'noop', reason: 'equal' })
   })
 
   it('a throwing dependency rejects instead of throwing', async () => {
@@ -266,6 +175,40 @@ describe('adoptDeviceId', () => {
       reconcile: async () => ({ kind: 'pushed-to-cloud' }),
     })
     await expect(p).rejects.toThrow('quota')
+  })
+})
+
+describe('adoptDeviceIdAfterRead (native)', () => {
+  it('reconciles first, then installs the ID', async () => {
+    const outcome: ReconcileOutcome = {
+      kind: 'installed-from-cloud',
+      progress: defaultProgress(),
+    }
+    const { order, deps } = recordingDeps(outcome)
+    await expect(adoptDeviceIdAfterRead(UUID, deps)).resolves.toBe(outcome)
+    expect(order).toEqual(['load', `reconcile:${UUID}`, `write:${UUID}`])
+  })
+
+  it.each<ReconcileOutcome>([
+    { kind: 'pushed-to-cloud' },
+    { kind: 'noop', reason: 'no-cloud-record' },
+    { kind: 'cloud-blob-rejected' },
+  ])('installs the ID after a read that succeeded ($kind)', async (outcome) => {
+    const { order, deps } = recordingDeps(outcome)
+    await adoptDeviceIdAfterRead(UUID, deps)
+    expect(order).toContain(`write:${UUID}`)
+  })
+
+  it('a failed or aborted read changes nothing: no ID write', async () => {
+    const { order, deps } = recordingDeps({
+      kind: 'cloud-error',
+      reason: 'timeout',
+    })
+    await expect(adoptDeviceIdAfterRead(UUID, deps)).resolves.toEqual({
+      kind: 'cloud-error',
+      reason: 'timeout',
+    })
+    expect(order).toEqual(['load', `reconcile:${UUID}`])
   })
 })
 

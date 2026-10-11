@@ -8,9 +8,14 @@
  *   - push now:   idle → sending → sent | failed | skipped
  *   - restore:    idle → invalid-format | restoring → restored | restore-failed
  *
- * The device-ID copy and the push statuses return to idle after
- * `STATUS_RESET_MS`, so a parent who taps again sees fresh feedback.
- * The backup copy status does not reset (web behaviour).
+ * The web resets the device-ID copy and the push statuses to idle
+ * `STATUS_RESET_MS` after they change (its backup copy status never
+ * resets). Native resets every transient status, from the latest tap
+ * (`design/native/parent-settings-native.md` § 5).
+ *
+ * Two restore flows: `adoptDeviceId` (web: install the ID, then
+ * reconcile) and `adoptDeviceIdAfterRead` (native: reconcile, then install
+ * the ID once the other device's record was read).
  */
 import {
   reconcileWithCloud,
@@ -87,30 +92,6 @@ export function restoreStatusTag(status: RestoreStatus): string | null {
   }
 }
 
-/** The status line a parent reads for each reconcile end-state. */
-export function restoreOutcomeMessage(outcome: ReconcileOutcome): string {
-  switch (outcome.kind) {
-    case 'installed-from-cloud':
-      return "Restored Marian's progress from that device."
-    case 'pushed-to-cloud':
-      // This device's progress was newer than the target's: say so, so
-      // the parent doesn't think it silently worked.
-      return "That device had older progress; this device's progress was kept."
-    case 'noop':
-      if (outcome.reason === 'no-cloud-record') {
-        return 'No progress found for that device ID.'
-      }
-      if (outcome.reason === 'no-local-blob') {
-        return "That device hasn't synced anything yet."
-      }
-      return 'Both devices have the same progress.'
-    case 'cloud-blob-rejected':
-      return "That device's backup is in an unexpected format."
-    case 'cloud-error':
-      return `Couldn't reach the server (${outcome.reason}).`
-  }
-}
-
 /**
  * The Progress the screen shows after a restore: the installed blob, or
  * a fresh read of storage (null: keep what is shown).
@@ -149,4 +130,26 @@ export async function adoptDeviceId(
 ): Promise<ReconcileOutcome> {
   deps.writeDeviceId(uuid)
   return deps.reconcile(uuid, deps.loadLocal())
+}
+
+/**
+ * Adopt another device's ID, read first (native). Reconcile against the
+ * ID, then install it as this device's ID, unless the cloud read failed
+ * (`cloud-error`): then nothing changed and this device keeps its own ID.
+ *
+ * Why not the web's order: the native screen aborts its request when it
+ * unmounts (Done mid-restore). With the ID installed first, an aborted
+ * read would leave this device on the other device's ID with its own
+ * progress, and its next session-end push would overwrite that device's
+ * cloud record. Read-first makes an aborted or failed restore a no-op.
+ * Once the read succeeded, the install (inside the reconcile) and the ID
+ * write both land, even after the screen is gone.
+ */
+export async function adoptDeviceIdAfterRead(
+  uuid: string,
+  deps: AdoptDeviceIdDeps = DEFAULT_ADOPT_DEPS,
+): Promise<ReconcileOutcome> {
+  const outcome = await deps.reconcile(uuid, deps.loadLocal())
+  if (outcome.kind !== 'cloud-error') deps.writeDeviceId(uuid)
+  return outcome
 }

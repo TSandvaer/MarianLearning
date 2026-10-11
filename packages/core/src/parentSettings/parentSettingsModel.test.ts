@@ -1,10 +1,12 @@
 /**
- * Parent Settings settings model + mastery presets. The "web parity"
+ * Parent Settings model: settings patch, promotion confirm, rows,
+ * mastery presets, backup JSON, restore outcome lines. The "web parity"
  * blocks run the web screen's pre-extraction code (copied verbatim from
  * `src/screens/ParentSettings/ParentSettings.tsx` at origin/main 054928c)
  * as an oracle against the core functions over an input matrix.
  */
 import { describe, expect, it } from 'vitest'
+import type { ReconcileOutcome } from '../progress/cloudSync'
 import { applyMasteryRule } from '../progress/mastery'
 import {
   DEFAULT_PARENT_SETTINGS,
@@ -19,21 +21,27 @@ import type {
   Progress,
 } from '../progress/types'
 import {
-  masteryPresetId,
-  masteryPresetIndex,
-  masteryPresetLabel,
-} from './masteryPresets'
+  emptySessionHistory,
+  type SessionHistoryV2,
+} from '../sessionEnd/sessionHistory'
 import {
   SESSION_MODE_OPTIONS,
   SETTINGS_ROWS,
   applySettingsPatch,
+  buildBackupJson,
+  buildBackupPayload,
   confirmPendingPromotion,
   masteryPatch,
   masteryRowId,
   pendingPromotionToConfirm,
+  presetId,
+  presetIndexFor,
+  presetLabel,
+  restoreOutcomeMessage,
+  safelyReadSessionHistory,
   togglePatch,
   type ParentSettingsPatch,
-} from './settingsModel'
+} from './parentSettingsModel'
 
 // ── Web reference (verbatim logic, pre-extraction) ──────────────────────
 
@@ -239,29 +247,121 @@ describe('mastery presets', () => {
   it('matches the web preset index for every value and track', () => {
     for (const track of ['math', 'word-song'] as const) {
       for (const v of VALUES) {
-        expect(masteryPresetIndex(v, track)).toBe(webPresetIndex(v, track))
+        expect(presetIndexFor(v, track)).toBe(webPresetIndex(v, track))
       }
     }
   })
 
   it('selects the exact preset, else the track default', () => {
-    expect(masteryPresetIndex({ percent: 0.8, sessions: 2 }, 'math')).toBe(0)
-    expect(masteryPresetIndex({ percent: 0.95, sessions: 3 }, 'math')).toBe(2)
-    expect(masteryPresetIndex({ percent: 0.9, sessions: 3 }, 'word-song')).toBe(
-      1,
-    )
+    expect(presetIndexFor({ percent: 0.8, sessions: 2 }, 'math')).toBe(0)
+    expect(presetIndexFor({ percent: 0.95, sessions: 3 }, 'math')).toBe(2)
+    expect(presetIndexFor({ percent: 0.9, sessions: 3 }, 'word-song')).toBe(1)
   })
 
   it('labels and ids round the percent like the web', () => {
-    expect(MASTERY_THRESHOLD_PRESETS.map(masteryPresetLabel)).toEqual([
+    expect(MASTERY_THRESHOLD_PRESETS.map(presetLabel)).toEqual([
       '80% / 2',
       '88% / 3',
       '95% / 3',
     ])
-    expect(MASTERY_THRESHOLD_PRESETS.map(masteryPresetId)).toEqual([
+    expect(MASTERY_THRESHOLD_PRESETS.map(presetId)).toEqual([
       '80-2',
       '88-3',
       '95-3',
+    ])
+  })
+})
+
+// ── Backup JSON ─────────────────────────────────────────────────────────
+
+const AT_ISO = '2026-10-11T12:00:00.000Z'
+
+/** The web textarea's value (verbatim logic, pre-extraction). */
+function webBackupJson(
+  progress: Progress,
+  loadSessionHistory: (() => SessionHistoryV2) | undefined,
+  exportedAtISO: string,
+): string {
+  const safely = (read: () => SessionHistoryV2) => {
+    try {
+      return read()
+    } catch {
+      return null
+    }
+  }
+  const sessionHistory = loadSessionHistory ? safely(loadSessionHistory) : null
+  return JSON.stringify(
+    {
+      kind: 'marian-tutor.backup' as const,
+      version: 1 as const,
+      exportedAtISO,
+      progress,
+      sessionHistory,
+    },
+    null,
+    2,
+  )
+}
+
+describe('backup JSON', () => {
+  const history = { ...emptySessionHistory(), sessionCount: 5 }
+  const throwing = (): SessionHistoryV2 => {
+    throw new Error('storage unavailable')
+  }
+
+  it('matches the web textarea for a reader, no reader and a throwing reader', () => {
+    for (const read of [() => history, undefined, throwing]) {
+      const sessionHistory = read ? safelyReadSessionHistory(read) : null
+      expect(buildBackupJson(defaultProgress(), sessionHistory, AT_ISO)).toBe(
+        webBackupJson(defaultProgress(), read, AT_ISO),
+      )
+    }
+  })
+
+  it('carries the versioned envelope, in key order', () => {
+    const payload = buildBackupPayload(defaultProgress(), history, AT_ISO)
+    expect(Object.keys(payload)).toEqual([
+      'kind',
+      'version',
+      'exportedAtISO',
+      'progress',
+      'sessionHistory',
+    ])
+    expect(payload).toMatchObject({
+      kind: 'marian-tutor.backup',
+      version: 1,
+      exportedAtISO: AT_ISO,
+      sessionHistory: history,
+    })
+  })
+
+  it('a throwing reader gives sessionHistory null', () => {
+    expect(safelyReadSessionHistory(throwing)).toBeNull()
+  })
+})
+
+// ── Restore outcome lines ───────────────────────────────────────────────
+
+describe('restoreOutcomeMessage', () => {
+  const OUTCOMES: ReconcileOutcome[] = [
+    { kind: 'installed-from-cloud', progress: defaultProgress() },
+    { kind: 'pushed-to-cloud' },
+    { kind: 'noop', reason: 'no-cloud-record' },
+    { kind: 'noop', reason: 'no-local-blob' },
+    { kind: 'noop', reason: 'equal' },
+    { kind: 'cloud-blob-rejected' },
+    { kind: 'cloud-error', reason: 'timeout' },
+  ]
+
+  it('words every outcome as the web did', () => {
+    expect(OUTCOMES.map(restoreOutcomeMessage)).toEqual([
+      "Restored Marian's progress from that device.",
+      "That device had older progress; this device's progress was kept.",
+      'No progress found for that device ID.',
+      "That device hasn't synced anything yet.",
+      'Both devices have the same progress.',
+      "That device's backup is in an unexpected format.",
+      "Couldn't reach the server (timeout).",
     ])
   })
 })

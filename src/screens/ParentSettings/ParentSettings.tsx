@@ -53,7 +53,6 @@ import {
   readSessionHistory,
   type SessionHistoryV2,
 } from '@marian/core/sessionEnd/sessionHistory'
-import { backupJson as buildBackupJson } from '@marian/core/parentSettings/backup'
 import {
   STATUS_RESET_MS,
   adoptDeviceId,
@@ -63,7 +62,6 @@ import {
   progressAfterRestore,
   pushStatusResets,
   restoreFailureReason,
-  restoreOutcomeMessage,
   restoreStatusAfterEdit,
   restoreStatusTag,
   type CopyStatus,
@@ -85,22 +83,23 @@ import {
   restoreFailedMessage,
 } from '@marian/core/parentSettings/copy'
 import {
-  masteryPresetId,
-  masteryPresetIndex,
-  masteryPresetLabel,
-} from '@marian/core/parentSettings/masteryPresets'
-import {
   SESSION_MODE_OPTIONS,
   SETTINGS_ROWS,
   applySettingsPatch,
+  buildBackupJson,
   confirmPendingPromotion,
   masteryPatch,
   masteryRowId,
   pendingPromotionToConfirm,
+  presetId,
+  presetIndexFor,
+  presetLabel,
+  restoreOutcomeMessage,
+  safelyReadSessionHistory,
   togglePatch,
   type ParentSettingsPatch,
   type SegmentedOption,
-} from '@marian/core/parentSettings/settingsModel'
+} from '@marian/core/parentSettings/parentSettingsModel'
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -248,9 +247,16 @@ export default function ParentSettings({
 
   // Read both blobs at render time so the textarea reflects the current
   // persisted state, including in-session writes from the controls above.
-  // The versioned envelope is core's (`@marian/core/parentSettings/backup`).
+  // The versioned envelope is core's (`buildBackupJson`).
   const backupJson = useMemo(
-    () => buildBackupJson(progress, storage.loadSessionHistory),
+    () =>
+      buildBackupJson(
+        progress,
+        storage.loadSessionHistory
+          ? safelyReadSessionHistory(storage.loadSessionHistory)
+          : null,
+        new Date().toISOString(),
+      ),
     [progress, storage],
   )
 
@@ -956,7 +962,7 @@ function MasteryThresholdRow({
    * still has SOMETHING selected — matches the Thomas-locked default.
    */
   const presetIndex = useMemo(
-    () => masteryPresetIndex(value, track),
+    () => presetIndexFor(value, track),
     [value, track],
   )
 
@@ -980,14 +986,14 @@ function MasteryThresholdRow({
         >
           {MASTERY_THRESHOLD_PRESETS.map((preset, i) => {
             const selected = i === presetIndex
-            const presetId = masteryPresetId(preset)
+            const id = presetId(preset)
             return (
               <button
-                key={presetId}
+                key={id}
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                data-testid={`parent-settings-segmented-${rowId}-${presetId}`}
+                data-testid={`parent-settings-segmented-${rowId}-${id}`}
                 data-selected={selected ? 'true' : 'false'}
                 data-percent={preset.percent}
                 data-sessions={preset.sessions}
@@ -1000,7 +1006,7 @@ function MasteryThresholdRow({
                     : 'bg-white text-slate-700 hover:bg-slate-100',
                 ].join(' ')}
               >
-                {masteryPresetLabel(preset)}
+                {presetLabel(preset)}
               </button>
             )
           })}
