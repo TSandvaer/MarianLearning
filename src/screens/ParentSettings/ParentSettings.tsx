@@ -35,30 +35,72 @@ import {
   type ReactElement,
 } from 'react'
 import {
-  DEFAULT_PARENT_SETTINGS,
   MASTERY_THRESHOLD_PRESETS,
-  applyMasteryRule,
   defaultProgress,
   getOrCreateDeviceId,
   getSettings,
-  isValidUuid,
   loadProgress,
   pushProgressToCloud,
-  reconcileWithCloud,
   saveProgress,
-  writeStoredDeviceId,
   type MasteryThreshold,
   type MasteryTrackKey,
   type ParentSettings,
   type Progress,
   type ReconcileOutcome,
-  type SessionModePicker,
 } from '@marian/core/progress'
 import { labelForSkillNode } from '@marian/core/hub/progressProjection'
 import {
   readSessionHistory,
   type SessionHistoryV2,
 } from '@marian/core/sessionEnd/sessionHistory'
+import { backupJson as buildBackupJson } from '@marian/core/parentSettings/backup'
+import {
+  STATUS_RESET_MS,
+  adoptDeviceId,
+  canSubmitRestore,
+  copyStatusResets,
+  parseRestoreInput,
+  progressAfterRestore,
+  pushStatusResets,
+  restoreFailureReason,
+  restoreOutcomeMessage,
+  restoreStatusAfterEdit,
+  restoreStatusTag,
+  type CopyStatus,
+  type PushStatus,
+  type RestoreStatus,
+} from '@marian/core/parentSettings/cloudBackup'
+import {
+  BACKUP_COPY,
+  CLOUD_BACKUP_COPY,
+  COPY_STATUS_COPY,
+  DEFAULTS_FOOTNOTE,
+  HEADER_COPY,
+  MASTERY_ROW_DESCRIPTION,
+  MASTERY_ROW_LABELS,
+  PENDING_PROMOTION_COPY,
+  PUSH_STATUS_COPY,
+  SESSION_MODE_ROW_COPY,
+  TOGGLE_ROW_COPY,
+  restoreFailedMessage,
+} from '@marian/core/parentSettings/copy'
+import {
+  masteryPresetId,
+  masteryPresetIndex,
+  masteryPresetLabel,
+} from '@marian/core/parentSettings/masteryPresets'
+import {
+  SESSION_MODE_OPTIONS,
+  SETTINGS_ROWS,
+  applySettingsPatch,
+  confirmPendingPromotion,
+  masteryPatch,
+  masteryRowId,
+  pendingPromotionToConfirm,
+  togglePatch,
+  type ParentSettingsPatch,
+  type SegmentedOption,
+} from '@marian/core/parentSettings/settingsModel'
 
 // ── Public types ────────────────────────────────────────────────────────
 
@@ -103,33 +145,6 @@ export interface ParentSettingsStorage {
   restoreFromDeviceId?: (uuid: string) => Promise<ReconcileOutcome>
 }
 
-/**
- * Sparse patch shape for the local `update()` callback. `Partial<>`
- * widens every top-level field to optional, AND widens the nested
- * `masteryThreshold` so a single-track update doesn't have to supply
- * both tracks. The merge in `update()` fills the missing track from
- * the current value.
- */
-type ParentSettingsPatch = Partial<Omit<ParentSettings, 'masteryThreshold'>> & {
-  masteryThreshold?: Partial<ParentSettings['masteryThreshold']>
-}
-
-/**
- * Defensive wrapper around the test-seam `loadSessionHistory()` — a
- * thrown adapter (e.g. localStorage unavailable, JSON parse fail at
- * a lower layer) MUST NOT crash Parent Settings. Falls back to null
- * so the backup payload still renders with `sessionHistory: null`.
- */
-function safelyReadSessionHistory(
-  read: () => SessionHistoryV2,
-): SessionHistoryV2 | null {
-  try {
-    return read()
-  } catch {
-    return null
-  }
-}
-
 const DEFAULT_STORAGE: ParentSettingsStorage = {
   load: loadProgress,
   save: saveProgress,
@@ -148,13 +163,10 @@ const DEFAULT_STORAGE: ParentSettingsStorage = {
   getDeviceId: () => getOrCreateDeviceId(),
   pushNow: (progress: Progress) =>
     pushProgressToCloud(getOrCreateDeviceId(), progress),
-  restoreFromDeviceId: async (uuid: string) => {
-    // Install the new device id, then reconcile against it. The
-    // cloud-newer branch installs the cloud blob and the helper
-    // returns the structured outcome the UI uses to refresh.
-    writeStoredDeviceId(uuid)
-    return reconcileWithCloud(uuid, loadProgress())
-  },
+  // Install the new device id, then reconcile against it. The
+  // cloud-newer branch installs the cloud blob and the helper returns
+  // the structured outcome the UI uses to refresh.
+  restoreFromDeviceId: (uuid: string) => adoptDeviceId(uuid),
 }
 
 // ── Component ────────────────────────────────────────────────────────────
@@ -196,18 +208,7 @@ export default function ParentSettings({
   const update = useCallback(
     (patch: ParentSettingsPatch) => {
       setProgress((prev) => {
-        const current = getSettings(prev)
-        const next: ParentSettings = {
-          ...current,
-          ...patch,
-          // Nested per-track object — patch may carry one or both
-          // tracks. Merge per-key so a single-track patch doesn't drop
-          // the other track.
-          masteryThreshold: patch.masteryThreshold
-            ? { ...current.masteryThreshold, ...patch.masteryThreshold }
-            : current.masteryThreshold,
-        }
-        const updated: Progress = { ...prev, parentSettings: next }
+        const updated = applySettingsPatch(prev, patch)
         storage.save(updated)
         return updated
       })
@@ -243,29 +244,15 @@ export default function ParentSettings({
    * shows the live JSON so they can manually select-and-copy as a
    * fallback path.
    */
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>(
-    'idle',
-  )
+  const [copyState, setCopyState] = useState<CopyStatus>('idle')
 
-  const backupJson = useMemo(() => {
-    // Read both blobs at render time so the textarea reflects the
-    // current persisted state — including any in-session writes from
-    // the controls above. `JSON.stringify` is cheap; the blob is
-    // O(KB) at worst.
-    const sessionHistory = storage.loadSessionHistory
-      ? safelyReadSessionHistory(storage.loadSessionHistory)
-      : null
-    const payload = {
-      // Schema-explicit at the wrapper level so a future restore-from-
-      // paste path (T2) can validate provenance before installing.
-      kind: 'marian-tutor.backup' as const,
-      version: 1 as const,
-      exportedAtISO: new Date().toISOString(),
-      progress,
-      sessionHistory,
-    }
-    return JSON.stringify(payload, null, 2)
-  }, [progress, storage])
+  // Read both blobs at render time so the textarea reflects the current
+  // persisted state, including in-session writes from the controls above.
+  // The versioned envelope is core's (`@marian/core/parentSettings/backup`).
+  const backupJson = useMemo(
+    () => buildBackupJson(progress, storage.loadSessionHistory),
+    [progress, storage],
+  )
 
   const handleCopyBackup = useCallback(() => {
     const writeClipboard = storage.writeClipboard
@@ -285,25 +272,8 @@ export default function ParentSettings({
 
   const handleConfirmPromotion = useCallback(() => {
     setProgress((prev) => {
-      if (prev.pendingPromotion === undefined) return prev
-      const trueAutoPromote: Progress = {
-        ...prev,
-        parentSettings: {
-          ...getSettings(prev),
-          autoPromote: true,
-        },
-      }
-      const promoted = applyMasteryRule(trueAutoPromote)
-      // Restore the parent's actual autoPromote setting in the persisted
-      // shape — they didn't ask to flip the toggle, just to confirm one
-      // queued promotion.
-      const restored: Progress = {
-        ...promoted,
-        parentSettings: {
-          ...getSettings(promoted),
-          autoPromote: getSettings(prev).autoPromote,
-        },
-      }
+      const restored = confirmPendingPromotion(prev)
+      if (restored === prev) return prev
       storage.save(restored)
       return restored
     })
@@ -320,20 +290,12 @@ export default function ParentSettings({
     if (storage.getDeviceId) return storage.getDeviceId()
     return ''
   })
-  const [deviceIdCopyState, setDeviceIdCopyState] = useState<
-    'idle' | 'copied' | 'error'
-  >('idle')
-  const [pushState, setPushState] = useState<
-    'idle' | 'sending' | 'sent' | 'failed' | 'skipped'
-  >('idle')
+  const [deviceIdCopyState, setDeviceIdCopyState] = useState<CopyStatus>('idle')
+  const [pushState, setPushState] = useState<PushStatus>('idle')
   const [restoreInput, setRestoreInput] = useState('')
-  const [restoreState, setRestoreState] = useState<
-    | { kind: 'idle' }
-    | { kind: 'invalid-format' }
-    | { kind: 'restoring' }
-    | { kind: 'restored'; outcome: ReconcileOutcome }
-    | { kind: 'restore-failed'; reason: string }
-  >({ kind: 'idle' })
+  const [restoreState, setRestoreState] = useState<RestoreStatus>({
+    kind: 'idle',
+  })
 
   // The Last-synced timestamp is `progress.profile.lastPlayedISO`. The
   // session-end fire-and-forget POST stamps this exact value before
@@ -341,23 +303,28 @@ export default function ParentSettings({
   // successful syncs. For never-synced devices it's null.
   const lastSyncedISO = progress.profile.lastPlayedISO
 
+  // The pending-promotion banner's node (null: no banner).
+  const pendingNode = pendingPromotionToConfirm(progress)
+
   // Reset state badges after a short while so a parent who taps
   // multiple times always sees fresh feedback.
   useEffect(() => {
-    if (
-      pushState === 'sent' ||
-      pushState === 'failed' ||
-      pushState === 'skipped'
-    ) {
-      const handle = window.setTimeout(() => setPushState('idle'), 2400)
+    if (pushStatusResets(pushState)) {
+      const handle = window.setTimeout(
+        () => setPushState('idle'),
+        STATUS_RESET_MS,
+      )
       return () => window.clearTimeout(handle)
     }
     return undefined
   }, [pushState])
 
   useEffect(() => {
-    if (deviceIdCopyState !== 'idle') {
-      const handle = window.setTimeout(() => setDeviceIdCopyState('idle'), 2400)
+    if (copyStatusResets(deviceIdCopyState)) {
+      const handle = window.setTimeout(
+        () => setDeviceIdCopyState('idle'),
+        STATUS_RESET_MS,
+      )
       return () => window.clearTimeout(handle)
     }
     return undefined
@@ -389,8 +356,8 @@ export default function ParentSettings({
   }, [progress, storage])
 
   const handleRestoreFromDeviceId = useCallback(() => {
-    const trimmed = restoreInput.trim()
-    if (!isValidUuid(trimmed)) {
+    const trimmed = parseRestoreInput(restoreInput)
+    if (trimmed === null) {
       setRestoreState({ kind: 'invalid-format' })
       return
     }
@@ -407,20 +374,16 @@ export default function ParentSettings({
       (outcome) => {
         setRestoreState({ kind: 'restored', outcome })
         setDeviceId(trimmed)
-        // Refresh the in-memory progress copy if the restore installed
-        // a new blob locally.
-        if (outcome.kind === 'installed-from-cloud') {
-          setProgress(outcome.progress)
-        } else {
-          // Still re-read storage in case the restore wrote nothing
-          // but the blob was previously different.
-          const fresh = storage.load()
-          if (fresh !== null) setProgress(fresh)
-        }
+        // Refresh the in-memory progress copy: the installed blob, or a
+        // re-read of storage in case it changed anyway.
+        const fresh = progressAfterRestore(outcome, () => storage.load())
+        if (fresh !== null) setProgress(fresh)
       },
       (err: unknown) => {
-        const reason = err instanceof Error ? err.message : 'unknown'
-        setRestoreState({ kind: 'restore-failed', reason })
+        setRestoreState({
+          kind: 'restore-failed',
+          reason: restoreFailureReason(err),
+        })
       },
     )
   }, [restoreInput, storage])
@@ -441,10 +404,10 @@ export default function ParentSettings({
         <header className="mb-8 flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">
-              Parent settings
+              {HEADER_COPY.title}
             </h1>
             <p className="mt-1 text-sm text-slate-500">
-              Changes save automatically.
+              {HEADER_COPY.subtitle}
             </p>
           </div>
           <button
@@ -458,7 +421,7 @@ export default function ParentSettings({
               focus:outline-none focus:ring-2 focus:ring-slate-400
             "
           >
-            Done
+            {HEADER_COPY.done}
           </button>
         </header>
 
@@ -467,26 +430,26 @@ export default function ParentSettings({
             a node. When auto-promote is on the engine applies promotions
             silently and `pendingPromotion` is never written, so this banner
             stays hidden in the default flow. */}
-        {progress.pendingPromotion !== undefined && !settings.autoPromote && (
+        {pendingNode !== null && (
           <section
             data-testid="parent-settings-pending-promotion"
-            data-node={progress.pendingPromotion}
+            data-node={pendingNode}
             className="
               mb-6 rounded-md border border-emerald-300 bg-emerald-50 p-4
             "
           >
             <h2 className="text-base font-semibold text-emerald-900">
-              Promotion ready to confirm
+              {PENDING_PROMOTION_COPY.heading}
             </h2>
             <p className="mt-1 text-sm text-emerald-900/80">
-              Marian has met the mastery threshold for{' '}
+              {PENDING_PROMOTION_COPY.before}
               <span
                 data-testid="parent-settings-pending-promotion-label"
                 className="font-medium"
               >
-                {labelForSkillNode(progress.pendingPromotion)}
+                {labelForSkillNode(pendingNode)}
               </span>
-              . Confirm to advance her to the next skill.
+              {PENDING_PROMOTION_COPY.after}
             </p>
             <button
               type="button"
@@ -499,7 +462,7 @@ export default function ParentSettings({
                 focus:outline-none focus:ring-2 focus:ring-emerald-500
               "
             >
-              Confirm promotion
+              {PENDING_PROMOTION_COPY.confirm}
             </button>
           </section>
         )}
@@ -508,71 +471,45 @@ export default function ParentSettings({
           data-testid="parent-settings-rows"
           className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white"
         >
-          <ToggleRow
-            id="autoPromote"
-            label="Auto-promote on mastery"
-            description="Advance Marian to the next skill once she meets the mastery threshold."
-            value={settings.autoPromote}
-            onChange={(v) => update({ autoPromote: v })}
-          />
-
-          <SegmentedRow
-            id="sessionModePicker"
-            label="Session-mode picker"
-            description="Off: the engine picks the session shape. On: Marian sees a review / focus / mixed choice on the Hub."
-            value={settings.sessionModePicker}
-            options={SESSION_MODE_OPTIONS}
-            onChange={(v) => update({ sessionModePicker: v })}
-          />
-
-          <MasteryThresholdRow
-            track="math"
-            value={settings.masteryThreshold.math}
-            onChange={(v) => update({ masteryThreshold: { math: v } })}
-          />
-
-          <MasteryThresholdRow
-            track="word-song"
-            value={settings.masteryThreshold['word-song']}
-            onChange={(v) => update({ masteryThreshold: { 'word-song': v } })}
-          />
-
-          <ToggleRow
-            id="crossDayEnforcement"
-            label="Require fresh-day mastery"
-            description="Hold off promotion that would happen mid-session — wait for a new day."
-            value={settings.crossDayEnforcement}
-            onChange={(v) => update({ crossDayEnforcement: v })}
-          />
-
-          <ToggleRow
-            id="showLevelToMarian"
-            label="Show level to Marian"
-            description="Show her land number on the Hub cards. On by default."
-            value={settings.showLevelToMarian}
-            onChange={(v) => update({ showLevelToMarian: v })}
-          />
-
-          {/* Ticket 86c9qa0kf — cross-vowel distractor mix v1 toggle.
-              Activates only when all three CVC tiers (cvc-words,
-              cvc-words-short-o, cvc-words-short-u) are mastered;
-              flipping off here is the parent-facing escape valve per
-              `cross-vowel-mix-spec.md` §10 Q1 + Dave's research §4.4. */}
-          <ToggleRow
-            id="crossVowelMixingEnabled"
-            label="Mix vowels in chip trios"
-            description="After Marian masters all three short-vowel CVC tiers, mix vowels across her chip choices to test discrimination. Defaults on."
-            value={settings.crossVowelMixingEnabled}
-            onChange={(v) => update({ crossVowelMixingEnabled: v })}
-          />
+          {SETTINGS_ROWS.map((row) => {
+            switch (row.kind) {
+              case 'toggle':
+                return (
+                  <ToggleRow
+                    key={row.id}
+                    id={row.id}
+                    label={TOGGLE_ROW_COPY[row.id].label}
+                    description={TOGGLE_ROW_COPY[row.id].description}
+                    value={settings[row.id]}
+                    onChange={(v) => update(togglePatch(row.id, v))}
+                  />
+                )
+              case 'session-mode':
+                return (
+                  <SegmentedRow
+                    key={row.id}
+                    id={row.id}
+                    label={SESSION_MODE_ROW_COPY.label}
+                    description={SESSION_MODE_ROW_COPY.description}
+                    value={settings.sessionModePicker}
+                    options={SESSION_MODE_OPTIONS}
+                    onChange={(v) => update({ sessionModePicker: v })}
+                  />
+                )
+              case 'mastery':
+                return (
+                  <MasteryThresholdRow
+                    key={row.id}
+                    track={row.track}
+                    value={settings.masteryThreshold[row.track]}
+                    onChange={(v) => update(masteryPatch(row.track, v))}
+                  />
+                )
+            }
+          })}
         </div>
 
-        <p className="mt-6 text-xs text-slate-400">
-          Defaults: auto-promote on, fresh-day mastery on, math threshold 95% /
-          3 sessions, word-song threshold 90% / 3 sessions, level hidden, mode
-          picker off, cross-vowel mixing on (active after all three short-vowel
-          CVC tiers master).
-        </p>
+        <p className="mt-6 text-xs text-slate-400">{DEFAULTS_FOOTNOTE}</p>
 
         {/* Backup section (ticket 86c9pkfth — escape hatch for cloud-sync).
             Read-only JSON view + Copy button. Parents can paste the JSON
@@ -586,12 +523,10 @@ export default function ParentSettings({
         >
           <div className="mb-3 flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-slate-800">Backup</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                A copy of Marian&apos;s progress and session history. Tap Copy
-                and paste it somewhere safe (notes app, email to yourself).
-                Helpful if her tablet is lost or reset.
-              </p>
+              <h2 className="text-base font-semibold text-slate-800">
+                {BACKUP_COPY.heading}
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">{BACKUP_COPY.body}</p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               <button
@@ -605,7 +540,7 @@ export default function ParentSettings({
                   focus:outline-none focus:ring-2 focus:ring-slate-400
                 "
               >
-                Copy
+                {BACKUP_COPY.copy}
               </button>
               {copyState === 'copied' && (
                 <span
@@ -613,7 +548,7 @@ export default function ParentSettings({
                   data-status="copied"
                   className="text-xs text-emerald-700"
                 >
-                  Copied to clipboard.
+                  {COPY_STATUS_COPY.copied}
                 </span>
               )}
               {copyState === 'error' && (
@@ -622,7 +557,7 @@ export default function ParentSettings({
                   data-status="error"
                   className="text-xs text-amber-700"
                 >
-                  Couldn&apos;t copy — select the text and copy manually.
+                  {COPY_STATUS_COPY.error}
                 </span>
               )}
             </div>
@@ -639,7 +574,7 @@ export default function ParentSettings({
               // on a click-without-drag.
               ;(e.currentTarget as HTMLTextAreaElement).select()
             }}
-            aria-label="Marian's progress backup JSON"
+            aria-label={BACKUP_COPY.jsonLabel}
             className="
               h-48 w-full rounded-md border border-slate-300 bg-slate-50 p-3
               font-mono text-xs text-slate-700
@@ -662,19 +597,17 @@ export default function ParentSettings({
         >
           <div className="mb-3 min-w-0">
             <h2 className="text-base font-semibold text-slate-800">
-              Cloud backup
+              {CLOUD_BACKUP_COPY.heading}
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Marian&apos;s progress is also saved to the cloud after every
-              session. If her tablet is lost or reset, paste this device ID on
-              the new device to restore.
+              {CLOUD_BACKUP_COPY.body}
             </p>
           </div>
 
           {/* Device ID row */}
           <div className="mt-4">
             <label className="block text-xs font-medium text-slate-600">
-              Device ID
+              {CLOUD_BACKUP_COPY.deviceIdLabel}
             </label>
             <div className="mt-1 flex items-center gap-3">
               <code
@@ -684,7 +617,7 @@ export default function ParentSettings({
                   bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700
                 "
               >
-                {deviceId || '(unavailable)'}
+                {deviceId || CLOUD_BACKUP_COPY.deviceIdUnavailable}
               </code>
               <button
                 type="button"
@@ -699,7 +632,7 @@ export default function ParentSettings({
                 "
                 disabled={!deviceId}
               >
-                Copy
+                {CLOUD_BACKUP_COPY.copy}
               </button>
             </div>
             {deviceIdCopyState === 'copied' && (
@@ -708,7 +641,7 @@ export default function ParentSettings({
                 data-status="copied"
                 className="mt-1 text-xs text-emerald-700"
               >
-                Copied to clipboard.
+                {COPY_STATUS_COPY.copied}
               </p>
             )}
             {deviceIdCopyState === 'error' && (
@@ -717,7 +650,7 @@ export default function ParentSettings({
                 data-status="error"
                 className="mt-1 text-xs text-amber-700"
               >
-                Couldn&apos;t copy — select the text and copy manually.
+                {COPY_STATUS_COPY.error}
               </p>
             )}
           </div>
@@ -726,13 +659,13 @@ export default function ParentSettings({
           <div className="mt-4 flex items-end justify-between gap-3">
             <div className="min-w-0">
               <label className="block text-xs font-medium text-slate-600">
-                Last synced
+                {CLOUD_BACKUP_COPY.lastSyncedLabel}
               </label>
               <p
                 data-testid="parent-settings-cloud-last-synced"
                 className="mt-1 text-sm text-slate-700"
               >
-                {lastSyncedISO ?? 'Never'}
+                {lastSyncedISO ?? CLOUD_BACKUP_COPY.neverSynced}
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
@@ -749,7 +682,9 @@ export default function ParentSettings({
                   disabled:bg-slate-300 disabled:text-slate-500
                 "
               >
-                {pushState === 'sending' ? 'Sending…' : 'Push now'}
+                {pushState === 'sending'
+                  ? CLOUD_BACKUP_COPY.pushSending
+                  : CLOUD_BACKUP_COPY.pushNow}
               </button>
               {pushState === 'sent' && (
                 <span
@@ -757,7 +692,7 @@ export default function ParentSettings({
                   data-status="sent"
                   className="text-xs text-emerald-700"
                 >
-                  Synced.
+                  {PUSH_STATUS_COPY.sent}
                 </span>
               )}
               {pushState === 'failed' && (
@@ -766,7 +701,7 @@ export default function ParentSettings({
                   data-status="failed"
                   className="text-xs text-amber-700"
                 >
-                  Couldn&apos;t reach the server.
+                  {PUSH_STATUS_COPY.failed}
                 </span>
               )}
               {pushState === 'skipped' && (
@@ -775,7 +710,7 @@ export default function ParentSettings({
                   data-status="skipped"
                   className="text-xs text-slate-500"
                 >
-                  Cloud sync isn&apos;t configured.
+                  {PUSH_STATUS_COPY.skipped}
                 </span>
               )}
             </div>
@@ -787,7 +722,7 @@ export default function ParentSettings({
               htmlFor="parent-settings-cloud-restore-input"
               className="block text-xs font-medium text-slate-600"
             >
-              Restore from device ID
+              {CLOUD_BACKUP_COPY.restoreLabel}
             </label>
             <div className="mt-1 flex items-center gap-3">
               <input
@@ -799,11 +734,9 @@ export default function ParentSettings({
                 value={restoreInput}
                 onChange={(e) => {
                   setRestoreInput(e.currentTarget.value)
-                  if (restoreState.kind === 'invalid-format') {
-                    setRestoreState({ kind: 'idle' })
-                  }
+                  setRestoreState(restoreStatusAfterEdit)
                 }}
-                placeholder="paste UUID here"
+                placeholder={CLOUD_BACKUP_COPY.restorePlaceholder}
                 aria-invalid={restoreState.kind === 'invalid-format'}
                 className="
                   flex-1 rounded-md border border-slate-300 bg-white px-3 py-2
@@ -815,10 +748,7 @@ export default function ParentSettings({
                 type="button"
                 data-testid="parent-settings-cloud-restore-submit"
                 onClick={handleRestoreFromDeviceId}
-                disabled={
-                  restoreInput.trim().length === 0 ||
-                  restoreState.kind === 'restoring'
-                }
+                disabled={!canSubmitRestore(restoreInput, restoreState)}
                 className="
                   shrink-0 rounded-md border border-slate-700 bg-slate-700 px-3
                   py-2 text-sm font-medium text-white
@@ -827,23 +757,24 @@ export default function ParentSettings({
                   disabled:bg-slate-300 disabled:text-slate-500
                 "
               >
-                {restoreState.kind === 'restoring' ? 'Restoring…' : 'Restore'}
+                {restoreState.kind === 'restoring'
+                  ? CLOUD_BACKUP_COPY.restoring
+                  : CLOUD_BACKUP_COPY.restore}
               </button>
             </div>
             {restoreState.kind === 'invalid-format' && (
               <p
                 data-testid="parent-settings-cloud-restore-status"
-                data-status="invalid-format"
+                data-status={restoreStatusTag(restoreState) ?? undefined}
                 className="mt-1 text-xs text-amber-700"
               >
-                That doesn&apos;t look like a device ID. Expected:
-                xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.
+                {CLOUD_BACKUP_COPY.invalidFormat}
               </p>
             )}
             {restoreState.kind === 'restored' && (
               <p
                 data-testid="parent-settings-cloud-restore-status"
-                data-status={`restored-${restoreState.outcome.kind}`}
+                data-status={restoreStatusTag(restoreState) ?? undefined}
                 className="mt-1 text-xs text-emerald-700"
               >
                 {restoreOutcomeMessage(restoreState.outcome)}
@@ -852,10 +783,10 @@ export default function ParentSettings({
             {restoreState.kind === 'restore-failed' && (
               <p
                 data-testid="parent-settings-cloud-restore-status"
-                data-status="restore-failed"
+                data-status={restoreStatusTag(restoreState) ?? undefined}
                 className="mt-1 text-xs text-amber-700"
               >
-                Restore failed ({restoreState.reason}).
+                {restoreFailedMessage(restoreState.reason)}
               </p>
             )}
           </div>
@@ -863,35 +794,6 @@ export default function ParentSettings({
       </div>
     </main>
   )
-}
-
-/**
- * Map a `ReconcileOutcome` to a parent-readable status line for the
- * Restore section. Internal — we don't surface every nuance, just the
- * three meaningful end-states.
- */
-function restoreOutcomeMessage(outcome: ReconcileOutcome): string {
-  switch (outcome.kind) {
-    case 'installed-from-cloud':
-      return "Restored Marian's progress from that device."
-    case 'pushed-to-cloud':
-      // Edge case: this device's progress was newer than the target's.
-      // Tell the parent the truth so they don't think it silently
-      // worked.
-      return "That device had older progress; this device's progress was kept."
-    case 'noop':
-      if (outcome.reason === 'no-cloud-record') {
-        return 'No progress found for that device ID.'
-      }
-      if (outcome.reason === 'no-local-blob') {
-        return "That device hasn't synced anything yet."
-      }
-      return 'Both devices have the same progress.'
-    case 'cloud-blob-rejected':
-      return "That device's backup is in an unexpected format."
-    case 'cloud-error':
-      return `Couldn't reach the server (${outcome.reason}).`
-  }
 }
 
 // ── Row components ──────────────────────────────────────────────────────
@@ -976,11 +878,6 @@ function ToggleRow({
   )
 }
 
-interface SegmentedOption<T extends string> {
-  value: T
-  label: string
-}
-
 interface SegmentedRowProps<T extends string> {
   id: string
   label: string
@@ -1039,11 +936,6 @@ function SegmentedRow<T extends string>({
   )
 }
 
-const SESSION_MODE_OPTIONS: readonly SegmentedOption<SessionModePicker>[] = [
-  { value: 'off', label: 'Off' },
-  { value: 'on', label: 'On' },
-]
-
 // ── Mastery threshold row ───────────────────────────────────────────────
 
 interface MasteryThresholdRowProps {
@@ -1051,15 +943,6 @@ interface MasteryThresholdRowProps {
   value: MasteryThreshold
   onChange: (next: MasteryThreshold) => void
 }
-
-const TRACK_LABELS: Record<MasteryTrackKey, { label: string; rowId: string }> =
-  {
-    math: { label: 'Math threshold', rowId: 'masteryThreshold-math' },
-    'word-song': {
-      label: 'Word Song threshold',
-      rowId: 'masteryThreshold-word-song',
-    },
-  }
 
 function MasteryThresholdRow({
   track,
@@ -1072,24 +955,19 @@ function MasteryThresholdRow({
    * fall back to the per-track default for THIS track so the control
    * still has SOMETHING selected — matches the Thomas-locked default.
    */
-  const presetIndex = useMemo(() => {
-    const idx = MASTERY_THRESHOLD_PRESETS.findIndex(
-      (p) => p.percent === value.percent && p.sessions === value.sessions,
-    )
-    if (idx !== -1) return idx
-    const fallback = DEFAULT_PARENT_SETTINGS.masteryThreshold[track]
-    return MASTERY_THRESHOLD_PRESETS.findIndex(
-      (p) => p.percent === fallback.percent && p.sessions === fallback.sessions,
-    )
-  }, [value, track])
+  const presetIndex = useMemo(
+    () => masteryPresetIndex(value, track),
+    [value, track],
+  )
 
-  const { label, rowId } = TRACK_LABELS[track]
+  const label = MASTERY_ROW_LABELS[track]
+  const rowId = masteryRowId(track)
 
   return (
     <RowFrame
       id={rowId}
       label={label}
-      description="How many in-a-row sessions Marian needs at this success rate before a skill counts as mastered."
+      description={MASTERY_ROW_DESCRIPTION}
       control={
         <div
           role="radiogroup"
@@ -1102,7 +980,7 @@ function MasteryThresholdRow({
         >
           {MASTERY_THRESHOLD_PRESETS.map((preset, i) => {
             const selected = i === presetIndex
-            const presetId = `${Math.round(preset.percent * 100)}-${preset.sessions}`
+            const presetId = masteryPresetId(preset)
             return (
               <button
                 key={presetId}
@@ -1122,7 +1000,7 @@ function MasteryThresholdRow({
                     : 'bg-white text-slate-700 hover:bg-slate-100',
                 ].join(' ')}
               >
-                {Math.round(preset.percent * 100)}% / {preset.sessions}
+                {masteryPresetLabel(preset)}
               </button>
             )
           })}
