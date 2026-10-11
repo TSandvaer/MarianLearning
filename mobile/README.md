@@ -1,6 +1,6 @@
 # Marian Tutor: native app (Expo)
 
-The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash, Greet, Math and Session End are real (`src/screens/Splash.tsx`, `src/screens/greet/`, `src/screens/math/`, `src/screens/sessionEnd/`, UX calls in `design/native/greet-math-native.md`); every other route is still a placeholder.
+The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash, Greet, Math, Session End and the Hub are real (`src/screens/Splash.tsx`, `src/screens/greet/`, `src/screens/math/`, `src/screens/sessionEnd/`, `src/screens/hub/`; UX calls in `design/native/greet-math-native.md` and `design/native/hub-native.md`); every other route is still a placeholder.
 
 ## Shape
 
@@ -80,6 +80,10 @@ npx expo start --go --port 8297 --clear
 
 `src/screens/sessionEnd/` is the web's guidance Session End (`src/screens/SessionEnd/`, #513 + #521): effort praise, today's flower flying into its slot, "N of 3", the not-yet day (Again + Home) and the same-day replay, in clay, with Emma's bundled guidance lines. The one write (session history + progress, mastery rule) and the guidance model are in `src/session/sessionEndWrite.ts`; the layouts in `src/layout/sessionEndLayout.ts`. "All done" goes to the map when an unlock waits, else the Hub. To walk the days on a simulator, use `EXPO_PUBLIC_DAY_OFFSET` (see Debug flags) with `EXPO_PUBLIC_QA_ROUTE=math` + `EXPO_PUBLIC_QA_AUTOTAP_MS` (its answers make a 7-of-8 good day).
 
+## Hub
+
+`src/screens/hub/` is the web's clay Hub with guidance G1 (`src/screens/Hub/`, #510 + #516/#517/#519), laid out by `src/layout/hubLayout.ts` in three compositions: tablet portrait is the web stage 1:1, phone portrait puts the cards at the bottom under a reserved 3-line bubble slot, landscape puts Emma and the bubble in a left column. The visit (cards, the glowing world, the waking flowers, Emma's lines) is decided once on mount by core's `planHubVisit` (`@marian/core/hub/`), which the web shares. Emma speaks on mount with no tap; a card tap silences her, Number Garden starts Math (adopting the session App prefetched on Hub entry while it glowed), Word Song and the map open their placeholders, a 3 s press on Emma opens Parent Settings. iOS cannot filter images, so `npm run export-assets` bakes Emma's Hub shadow (`assets/emma/idle-shadow.webp`) and the muted "next" stickers (`assets/path/*-256-muted.webp`).
+
 Reset to a first launch: delete the app from the simulator/device (storage lives in the app's SQLite database).
 
 ## Audio
@@ -90,7 +94,7 @@ Reset to a first launch: delete the app from the simulator/device (storage lives
 - **Captions** use the web's formula (word i at `i × duration / wordCount`, 165 wpm fallback), read from the player clock at a 50 ms status interval. expo-audio's default is 500 ms, which is too coarse for the captions.
 - **Audio session:** plays in silent mode, `doNotMix`, never in the background. On iOS every player keeps the session active between lines (`keepAudioSessionActive`), so other audio stays paused while Emma's screens are up; it is released when the app goes to the background. Android has no equivalent in expo-audio 57.0.5: it abandons audio focus at the end of every line (see the Greet PR).
 - **Lifecycle:** going to the background parks the line and freezes its caption; the foreground resumes it where it stopped. A line requested while hidden waits for the foreground (most recent wins). After a call or Siri, the OS resumes the line, or else the next `inactive → active` edge does.
-- **Session audio:** `startSession()` posts to `/api/claude` through core's `apiUrl()` and writes one MP3 per distinct text to `<cache>/session-audio/<sessionId>/` in the background. `unload()` deletes the files, and a boot sweep removes the files a killed app left. `sessionPrefetcher` is the Hub prefetch Phase 3 calls.
+- **Session audio:** `startSession()` posts to `/api/claude` through core's `apiUrl()` and writes one MP3 per distinct text to `<cache>/session-audio/<sessionId>/` in the background. `unload()` deletes the files, and a boot sweep removes the files a killed app left. `sessionPrefetcher` holds the Hub's Number Garden prefetch, which Math's kick adopts (`src/session/mathSession.ts`).
 - **Players:** created lazily, with at most 4 live voice players (LRU). On Android every live player holds an MP3 decoder.
 
 | Env flag (bundle time)      | Effect                                                                   |
