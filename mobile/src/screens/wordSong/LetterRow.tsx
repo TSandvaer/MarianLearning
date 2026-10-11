@@ -133,7 +133,9 @@ export function LetterRow({
   lit,
   onLetterPress,
 }: LetterRowProps) {
-  const [font, setFont] = useState(font0)
+  // The step-down belongs to one F: a rotation (a new F) starts over.
+  const [fit, setFit] = useState({ base: font0, font: font0 })
+  const font = fit.base === font0 ? fit.font : font0
   const letters = word.split('')
   return (
     <View
@@ -141,7 +143,9 @@ export function LetterRow({
       style={styles.row}
       onLayout={(e) => {
         const w = e.nativeEvent.layout.width
-        if (w > maxWidth && font - 4 >= font0 * 0.8) setFont(font - 4)
+        if (w > maxWidth && font - 4 >= font0 * 0.8) {
+          setFit({ base: font0, font: font - 4 })
+        }
       }}
     >
       {letters.map((letter, i) => (
