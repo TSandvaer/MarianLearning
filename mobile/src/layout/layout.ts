@@ -5,7 +5,8 @@
  * see components/EmmaStage.tsx). The rest of each screen lays out with
  * flexbox inside `content`. Carried over from the Phase 0 spike.
  *
- * Greet's frames live in `./greetLayout.ts` (Phase 3).
+ * Greet's frames live in `./greetLayout.ts`, the Hub's in `./hubLayout.ts`
+ * (Phase 3).
  */
 export interface Rect {
   x: number
@@ -104,32 +105,6 @@ export function mathLayout(v: Viewport): ScreenLayout {
       y: s.y + PAD,
       width: s.width - PAD * 2,
       height: s.height - PAD * 2,
-    },
-  }
-}
-
-/** Hub: Emma in a top band (web Hub uses a 22vh band). */
-export function hubLayout(v: Viewport): ScreenLayout {
-  const s = safeRect(v)
-  const landscape = isLandscape(v)
-  const emmaSize = Math.min(s.height * (landscape ? 0.42 : 0.3), s.width)
-  const emma = {
-    x: s.x + (s.width - emmaSize) / 2,
-    y: s.y + PAD,
-    width: emmaSize,
-    height: emmaSize,
-  }
-  const contentY = emma.y + emmaSize + 8
-  return {
-    landscape,
-    tablet: isTablet(v),
-    captionFontSize: captionFontSize(v),
-    emma,
-    content: {
-      x: s.x + PAD,
-      y: contentY,
-      width: s.width - PAD * 2,
-      height: s.y + s.height - PAD - contentY,
     },
   }
 }

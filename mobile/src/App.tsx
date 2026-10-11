@@ -2,8 +2,8 @@
  * Native app root.
  *
  * Route state is core's route state machine (`./router/routes.ts`).
- * Phase 3 ports the screens one by one: Splash, Greet, Math and Session
- * End are real, every other route is still a placeholder. Splash branches on the
+ * Phase 3 ports the screens one by one: Splash, Greet, Math, Session End
+ * and the Hub are real, every other route is still a placeholder. Splash branches on the
  * persisted `sessionCount` through core's `nextAfterSplash()`, exactly
  * like the web; neither Splash nor Greet writes it (Session-End does).
  * Emma is one App-level view that springs between the routes' frames
@@ -18,6 +18,14 @@
  * unlock is waiting, else the Hub, and a not-yet day's "Again" starts the
  * next session (web `handleSessionEndAllDone` / `…Again`).
  *
+ * The Hub (`./screens/hub/Hub.tsx`) hands a card tap to Math (Number
+ * Garden) or the Word Song placeholder, a map button to the map
+ * placeholder and Emma's 3 s press to Parent Settings. On Hub entry App
+ * prefetches the Math session while Number Garden glows (web
+ * `hubSessionPrefetch.ts`); the card tap kicks it, which adopts the
+ * prefetch. Emma fades in when the Hub is the first screen after Splash,
+ * and wears her baked shadow on the Hub.
+ *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
  */
@@ -26,10 +34,19 @@ import {
   BREATHING_SCALE_KEYFRAMES,
   type EmmaPose,
 } from '@marian/core/character/emmaPose'
+import {
+  computeSuggestion,
+  prefetchTrackFor,
+} from '@marian/core/hub/hubSuggestion'
 import { pickStaticSessionPlan } from '@marian/core/math/sessionPlans'
 import { loadProgress, type MasteryTrack } from '@marian/core/progress'
+import { now as progressNow } from '@marian/core/progress/clock'
 import { pendingUnlock } from '@marian/core/progress/pathBeats'
 import { nextAfterSplash } from '@marian/core/router/nextAfterSplash'
+import {
+  readSessionHistoryForToday,
+  type SkillTreeId,
+} from '@marian/core/sessionEnd/sessionHistory'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import {
@@ -46,11 +63,12 @@ import {
   useSafeAreaFrame,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context'
-import { useAudioEngine } from './audio'
+import { sessionPrefetcher, useAudioEngine } from './audio'
 import { EmmaStage, type Breath } from './components/EmmaStage'
 import { useAppFonts } from './fonts'
 import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
+import { hubLayout } from './layout/hubLayout'
 import { mathLayout } from './layout/mathLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
@@ -68,6 +86,7 @@ import {
   GREET_BREATH_PERIOD_S,
   GREET_BREATH_SCALE,
 } from './screens/greet/Greet'
+import { Hub } from './screens/hub/Hub'
 import { MathScreen } from './screens/math/Math'
 import type { MathSessionResult } from './screens/math/mathTypes'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
@@ -152,6 +171,7 @@ function Shell() {
   const [mathSession] = useState(() =>
     createMathSessionController({
       fallbackPlanId: () => mathDefaults.plan.id,
+      prefetcher: sessionPrefetcher,
     }),
   )
   const mathState = useSyncExternalStore(
@@ -175,6 +195,11 @@ function Shell() {
       if (next === from) return
       if (from === 'session-end' || !MATH_AUDIO_ROUTES.has(next)) {
         mathSession.tearDown()
+      }
+      // The Hub's prefetch is for Number Garden; it survives a map visit
+      // (web parity) and goes on any other way out.
+      if (from === 'hub' && next !== 'math' && next !== 'map') {
+        sessionPrefetcher.discard()
       }
       // Session End consumed its payload (the one write): a later arrival
       // without a new session gets the placeholder, never a second write.
@@ -236,6 +261,35 @@ function Shell() {
   // Web `handleBackToHub` (the route effect tears the session down).
   const onMathExit = useCallback(() => navigate('hub'), [navigate])
 
+  // Hub entry: prefetch the glowing world's session (web
+  // `useHubSessionPrefetch`; no glow → Word Song, which is not ported yet).
+  useEffect(() => {
+    if (route !== 'hub') return
+    let suggestion: SkillTreeId | null = null
+    try {
+      const now = progressNow()
+      suggestion = computeSuggestion(readSessionHistoryForToday(now), now)
+    } catch {
+      // Storage unavailable: no prefetch; the tap starts its own request.
+    }
+    if (prefetchTrackFor(suggestion) === 'math') mathSession.prefetch()
+  }, [route, mathSession])
+  // Web `handleHubPickTree`. The kick takes the prefetch in the tap.
+  const onHubPick = useCallback(
+    (tree: SkillTreeId) => {
+      if (tree === 'number-garden') {
+        mathSession.kick()
+        navigate('math')
+      } else {
+        navigate('literacy')
+      }
+    },
+    [mathSession, navigate],
+  )
+  // Web `handleHubOpenMap` (the map is a placeholder until its port).
+  const onHubMap = useCallback(() => navigate('map'), [navigate])
+  const onHubParent = useCallback(() => navigate('parent-settings'), [navigate])
+
   // Audio session (plays in silent mode, doNotMix), the voice channel's
   // background/interruption handling, and the boot-time cache sweep.
   useAudioEngine(flags.debug)
@@ -262,7 +316,8 @@ function Shell() {
     route === 'session-end' && sessionEnd !== null
       ? sessionEndLayout(viewport)
       : null
-  const layout = greet ?? math ?? end ?? layoutForRoute(route, viewport)
+  const hub = route === 'hub' ? hubLayout(viewport) : null
+  const layout = greet ?? math ?? end ?? hub ?? layoutForRoute(route, viewport)
 
   return (
     <View style={styles.root}>
@@ -291,6 +346,13 @@ function Shell() {
               onPoseChange={setMathPose}
               qaAutoAnswerAfterMs={qaAutoTapMs}
             />
+          ) : hub ? (
+            <Hub
+              layout={hub}
+              onPickTree={onHubPick}
+              onOpenMap={onHubMap}
+              onParentLongPress={onHubParent}
+            />
           ) : end ? (
             <SessionEnd
               layout={end}
@@ -317,6 +379,10 @@ function Shell() {
             // The web's Session End Emma is a still image (no breath).
             breath={route === 'greet' ? GREET_BREATH : end ? null : BREATH}
             motion={route === 'greet' ? 'greet' : 'character'}
+            // Read at mount: a returning launch lands on the Hub, where
+            // she is already there (a fade), not Greet's arrival.
+            entrance={route === 'hub' ? 'fade' : 'slide'}
+            shadow={route === 'hub'}
           />
         </>
       )}

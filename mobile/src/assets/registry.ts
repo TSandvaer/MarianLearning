@@ -4,7 +4,8 @@
  * re-run `npm run export-assets` after the web assets change.
  *
  * Web URL path (what core and the web app render) → the bundled native
- * image module. Look assets up through `./index.ts`, not directly.
+ * image module; native-only bakes of web CSS filters are keyed under
+ * `/native/`. Look assets up through `./index.ts`, not directly.
  */
 export const WEB_ASSET_MODULES: Readonly<Record<string, number>> = {
   '/assets/emma-attentive-pointing.svg': require('../../assets/emma/attentive-pointing.webp'),
@@ -17,6 +18,7 @@ export const WEB_ASSET_MODULES: Readonly<Record<string, number>> = {
   '/assets/emma-sleepy.svg': require('../../assets/emma/sleepy.webp'),
   '/assets/emma-th-mouth.svg': require('../../assets/emma/th-mouth.webp'),
   '/assets/emma-waving.svg': require('../../assets/emma/waving.webp'),
+  '/native/emma/idle-shadow.webp': require('../../assets/emma/idle-shadow.webp'),
   '/assets/pictures/picture-bag.svg': require('../../assets/pictures/bag.webp'),
   '/assets/pictures/picture-bat.svg': require('../../assets/pictures/bat.webp'),
   '/assets/pictures/picture-bed.svg': require('../../assets/pictures/bed.webp'),
@@ -160,4 +162,45 @@ export const WEB_ASSET_MODULES: Readonly<Record<string, number>> = {
   '/assets/path/ui-map-512.webp': require('../../assets/path/ui-map-512.webp'),
   '/assets/path/ui-padlock-256.webp': require('../../assets/path/ui-padlock-256.webp'),
   '/assets/path/ui-padlock-512.webp': require('../../assets/path/ui-padlock-512.webp'),
+  '/native/path/add-to-10-256-muted.webp': require('../../assets/path/add-to-10-256-muted.webp'),
+  '/native/path/add-to-20-256-muted.webp': require('../../assets/path/add-to-20-256-muted.webp'),
+  '/native/path/blending-cv-256-muted.webp': require('../../assets/path/blending-cv-256-muted.webp'),
+  '/native/path/cvc-words-256-muted.webp': require('../../assets/path/cvc-words-256-muted.webp'),
+  '/native/path/cvc-words-short-e-256-muted.webp': require('../../assets/path/cvc-words-short-e-256-muted.webp'),
+  '/native/path/cvc-words-short-i-256-muted.webp': require('../../assets/path/cvc-words-short-i-256-muted.webp'),
+  '/native/path/cvc-words-short-o-256-muted.webp': require('../../assets/path/cvc-words-short-o-256-muted.webp'),
+  '/native/path/cvc-words-short-u-256-muted.webp': require('../../assets/path/cvc-words-short-u-256-muted.webp'),
+  '/native/path/digraphs-ch-256-muted.webp': require('../../assets/path/digraphs-ch-256-muted.webp'),
+  '/native/path/digraphs-sh-256-muted.webp': require('../../assets/path/digraphs-sh-256-muted.webp'),
+  '/native/path/digraphs-th-voiceless-256-muted.webp': require('../../assets/path/digraphs-th-voiceless-256-muted.webp'),
+  '/native/path/land-ng-1-256-muted.webp': require('../../assets/path/land-ng-1-256-muted.webp'),
+  '/native/path/land-ng-2-256-muted.webp': require('../../assets/path/land-ng-2-256-muted.webp'),
+  '/native/path/land-ng-3-256-muted.webp': require('../../assets/path/land-ng-3-256-muted.webp'),
+  '/native/path/land-ng-4-256-muted.webp': require('../../assets/path/land-ng-4-256-muted.webp'),
+  '/native/path/land-ws-1-256-muted.webp': require('../../assets/path/land-ws-1-256-muted.webp'),
+  '/native/path/land-ws-2-256-muted.webp': require('../../assets/path/land-ws-2-256-muted.webp'),
+  '/native/path/land-ws-3-256-muted.webp': require('../../assets/path/land-ws-3-256-muted.webp'),
+  '/native/path/land-ws-4-256-muted.webp': require('../../assets/path/land-ws-4-256-muted.webp'),
+  '/native/path/land-ws-5-256-muted.webp': require('../../assets/path/land-ws-5-256-muted.webp'),
+  '/native/path/letter-names-256-muted.webp': require('../../assets/path/letter-names-256-muted.webp'),
+  '/native/path/letter-sounds-256-muted.webp': require('../../assets/path/letter-sounds-256-muted.webp'),
+  '/native/path/mult-2-5-10-256-muted.webp': require('../../assets/path/mult-2-5-10-256-muted.webp'),
+  '/native/path/mult-3-4-256-muted.webp': require('../../assets/path/mult-3-4-256-muted.webp'),
+  '/native/path/mult-6-9-256-muted.webp': require('../../assets/path/mult-6-9-256-muted.webp'),
+  '/native/path/number-recog-256-muted.webp': require('../../assets/path/number-recog-256-muted.webp'),
+  '/native/path/sight-words-256-muted.webp': require('../../assets/path/sight-words-256-muted.webp'),
+  '/native/path/simple-sentences-256-muted.webp': require('../../assets/path/simple-sentences-256-muted.webp'),
+  '/native/path/skip-counting-256-muted.webp': require('../../assets/path/skip-counting-256-muted.webp'),
+  '/native/path/sub-to-10-256-muted.webp': require('../../assets/path/sub-to-10-256-muted.webp'),
+  '/native/path/sub-to-20-256-muted.webp': require('../../assets/path/sub-to-20-256-muted.webp'),
+  '/native/path/two-digit-addsub-no-regroup-256-muted.webp': require('../../assets/path/two-digit-addsub-no-regroup-256-muted.webp'),
+  '/native/path/two-digit-addsub-with-regroup-256-muted.webp': require('../../assets/path/two-digit-addsub-with-regroup-256-muted.webp'),
+  '/native/path/ui-arch-closed-256-muted.webp': require('../../assets/path/ui-arch-closed-256-muted.webp'),
+  '/native/path/ui-arch-open-256-muted.webp': require('../../assets/path/ui-arch-open-256-muted.webp'),
+  '/native/path/ui-bloom-256-muted.webp': require('../../assets/path/ui-bloom-256-muted.webp'),
+  '/native/path/ui-bud-closed-256-muted.webp': require('../../assets/path/ui-bud-closed-256-muted.webp'),
+  '/native/path/ui-bud-open-256-muted.webp': require('../../assets/path/ui-bud-open-256-muted.webp'),
+  '/native/path/ui-house-256-muted.webp': require('../../assets/path/ui-house-256-muted.webp'),
+  '/native/path/ui-map-256-muted.webp': require('../../assets/path/ui-map-256-muted.webp'),
+  '/native/path/ui-padlock-256-muted.webp': require('../../assets/path/ui-padlock-256-muted.webp'),
 }

@@ -34,20 +34,18 @@
  */
 
 import { useMemo } from 'react'
-import { computeSuggestion } from '../../screens/Hub/hubSuggestion'
+import {
+  computeSuggestion,
+  prefetchTrackFor,
+  type PrefetchTrack,
+} from '@marian/core/hub/hubSuggestion'
 import {
   readSessionHistoryForToday,
   type SkillTreeId,
 } from '@marian/core/sessionEnd/sessionHistory'
 
-export type PrefetchTrack = 'math' | 'word-song'
-
-/** Map the Hub suggestion to the track App prefetches. */
-export function prefetchTrackFor(
-  suggestion: SkillTreeId | null,
-): PrefetchTrack {
-  return suggestion === 'number-garden' ? 'math' : 'word-song'
-}
+// Shared with the native App's prefetch (`@marian/core/hub/hubSuggestion`).
+export { prefetchTrackFor, type PrefetchTrack }
 
 /** The track whose session the Hub should prefetch, or `null` off-Hub.
  *  Recomputed per Hub entry (the history blob changes between visits). */

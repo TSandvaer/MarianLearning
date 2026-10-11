@@ -22,6 +22,14 @@
  * - **Tear down** (`tearDown()`): abort a request in flight, unload the
  *   session audio (stops a session line, deletes its files) and reset the
  *   latch so the next session fetches fresh.
+ * - **Hub prefetch** (`prefetch()`, Emma's Path 2/10, hub-native § 5): on
+ *   the Hub, while Number Garden glows, the same request starts through
+ *   the app's `sessionPrefetcher`. The card tap kicks, and `kick()` adopts
+ *   it (`take()`) when its key (focus node + mode) still matches the
+ *   focus it would pick now, so the child never waits for a request that
+ *   was already running; a stale one is discarded and a fresh request
+ *   starts. The visible-wait timer still starts on Math, so Hub dwell
+ *   never counts toward its 5 s budget.
  *
  * The Claude key never reaches the app: `/api/claude` is the Vercel
  * function. App subscribes with `useSyncExternalStore`.
@@ -54,6 +62,8 @@ import {
   recordAudio,
   startSession,
   type LoadedSessionAudio,
+  type PrefetchKey,
+  type SessionPrefetcher,
   type SessionStartPayload,
 } from '../audio'
 import type { PlayMathUtteranceFn } from '../screens/math/mathTypes'
@@ -144,6 +154,11 @@ export function buildMathSessionPayload(
   return { track: 'math', level: 1, childName: 'Marian', ...progressBlock }
 }
 
+/** A Math session's prefetch identity: the focus node and mode it asks for. */
+export function mathPrefetchKey(hints: MathProgressHints): PrefetchKey {
+  return { track: 'math', node: hints.focusNode, mode: hints.focusMode }
+}
+
 /**
  * The math focus node for the static fallback plan and Math's scaffold
  * gates (web `mathFallbackFocusNode`: no session count, forward pick).
@@ -193,8 +208,12 @@ export interface MathSessionFocus {
 }
 
 export interface MathSessionController {
-  /** Start the session start; a no-op while one is latched. */
+  /** Start the session start; a no-op while one is latched. Adopts a
+   *  matching Hub prefetch. */
   kick(): void
+  /** The Hub's prefetch of the next session; a no-op while one is latched
+   *  or without a prefetcher. */
+  prefetch(): void
   /** Math is visible and waiting: start the hinted request's 5 s budget. */
   startWaitTimer(): void
   /** Abort, unload, reset the latch and the snapshot. Idempotent. */
@@ -218,6 +237,8 @@ export interface MathSessionDeps {
   now?: () => number
   /** Test override for the visible-wait budget. */
   timeoutMs?: number
+  /** The Hub prefetch (App: the app's `sessionPrefetcher`). */
+  prefetcher?: SessionPrefetcher
 }
 
 const IDLE: MathSessionSnapshot = {
@@ -245,28 +266,58 @@ export function createMathSessionController(
     for (const l of Array.from(listeners)) l()
   }
 
+  const sessionIdNow = () => `math-${deps.fallbackPlanId()}-${now()}`
+
   return {
+    prefetch() {
+      if (started || !deps.prefetcher) return
+      const hints = readHints()
+      deps.prefetcher.prefetch(mathPrefetchKey(hints), {
+        sessionId: sessionIdNow(),
+        payload: buildMathSessionPayload(hints, true),
+      })
+    },
     kick() {
       if (started) return
       started = true
       const abort = new AbortController()
       controller = abort
       const hints = readHints()
+      // A Hub prefetch with the same focus is this session's first request.
+      const prefetchKey = mathPrefetchKey(hints)
+      let firstRun = true
       const focus: MathSessionFocus | null =
         hints.focusNode !== undefined && hints.focusMode !== undefined
           ? { node: hints.focusNode, mode: hints.focusMode }
           : null
-      const sessionId = `math-${deps.fallbackPlanId()}-${now()}`
+      const sessionId = sessionIdNow()
 
       const run = async (
         withHints: boolean,
         signal: AbortSignal,
       ): Promise<Loaded> => {
-        const prepared = await start({
-          sessionId: withHints ? sessionId : `${sessionId}-fallback`,
-          payload: buildMathSessionPayload(hints, withHints),
-          signal,
-        })
+        // The prefetch stands in for the first request only (its payload is
+        // this one's); the hint-free fallback is always a new request. The
+        // run's signal is linked to it, so the 5 s fallback and a tear-down
+        // abort it as they abort a request of their own. Taken here, inside
+        // the card tap's kick (`startSessionWithFallback` runs it at once).
+        const adopted = firstRun
+          ? (deps.prefetcher?.take(prefetchKey, signal) ?? null)
+          : null
+        firstRun = false
+        if (adopted !== null) {
+          recordAudio({
+            kind: 'note',
+            label: 'math-session',
+            detail: 'adopting the Hub prefetch',
+          })
+        }
+        const prepared = await (adopted ??
+          start({
+            sessionId: withHints ? sessionId : `${sessionId}-fallback`,
+            payload: buildMathSessionPayload(hints, withHints),
+            signal,
+          }))
         try {
           return {
             plan: mathSessionPlanFromServer(prepared.plan),
