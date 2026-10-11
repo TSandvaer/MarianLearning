@@ -75,7 +75,10 @@ export interface HubProps {
   onParentLongPress: () => void
   /** Test seams. */
   player?: GuidancePlayer
+  /** The progress clock (the visit's "today"). */
   clock?: () => Date
+  /** Wall-clock ms for the 30 s rapid-remount rule. */
+  wallClock?: () => number
   plink?: () => void
 }
 
@@ -93,7 +96,7 @@ function safe<T>(read: () => T, fallback: T): T {
 }
 
 /** Everything the visit is decided from, read once. */
-function readMount(clock: () => Date): Mount {
+function readMount(clock: () => Date, wallClock: () => number): Mount {
   const now = clock()
   const progress = safe<Progress | null>(loadProgress, null)
   const history = safe(
@@ -105,7 +108,7 @@ function readMount(clock: () => Date): Mount {
     history,
     now,
     seenWake: readFlowerWake(),
-    suppressed: isRapidRemount(Date.now()),
+    suppressed: isRapidRemount(wallClock()),
   })
   return { visit, history }
 }
@@ -117,13 +120,14 @@ export function Hub({
   onParentLongPress,
   player: playerProp,
   clock = progressNow,
+  wallClock = Date.now,
   plink = playPlink,
 }: HubProps) {
   const reducedMotion = useReducedMotion()
   const [player] = useState<GuidancePlayer>(
     () => playerProp ?? guidancePlayer(),
   )
-  const [{ visit, history }] = useState(() => readMount(clock))
+  const [{ visit, history }] = useState(() => readMount(clock, wallClock))
   const [line, setLine] = useState({ index: 0, revealed: 0 })
   const stopLines = useRef<() => void>(() => player.cancelActive())
   const leavingRef = useRef(false)
@@ -165,8 +169,10 @@ export function Hub({
     return () => {
       stopLines.current()
       player.unload()
-      markHubUnmount(Date.now())
+      markHubUnmount(wallClock())
     }
+    // `wallClock` is a test seam, read at unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, visit])
 
   const pick = (tree: SkillTreeId) => {
