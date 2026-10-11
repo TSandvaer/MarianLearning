@@ -17,9 +17,9 @@
  * | `EXPO_PUBLIC_MUTE=1`               | every audio player muted (automated runs)     |
  * | `EXPO_PUBLIC_AUDIO_CHECK=1`        | runs `src/audio/debug/audioCheck.ts` at boot  |
  * | `EXPO_PUBLIC_QA_AUTOTAP_MS=<n>`    | debug only: Greet's wake tap fires itself n ms |
- * |                                    | after Greet mounts, and Math answers n ms     |
- * |                                    | after each chip gate opens (simulators        |
- * |                                    | without a tap)                                |
+ * |                                    | after Greet mounts, and Math and Word Song    |
+ * |                                    | answer n ms after their chips open            |
+ * |                                    | (simulators without a tap)                    |
  * | `EXPO_PUBLIC_QA_ROUTE=<route>`     | debug only: launch on this route (web         |
  * |                                    | `?route=`), e.g. `math`                       |
  *

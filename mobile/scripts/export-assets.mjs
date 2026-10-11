@@ -12,7 +12,11 @@
  * --------------
  * - `assets/emma/<pose>.webp`      every `public/assets/emma-*.svg`
  * - `assets/emma/idle-shadow.webp` the Hub's baked shadow under idle Emma
- * - `assets/pictures/<key>.webp`   every `public/assets/pictures/picture-*.svg`
+ * - `assets/pictures/<key>.webp`   every `public/assets/pictures/picture-*.svg`,
+ *                                  and the 4 novel-probe pictures the web
+ *                                  draws inline (`renderProbePictures.ts`)
+ * - `src/audio/blendMarks.generated.ts` the sound segments of every baked
+ *                                  Word Song blend clip (needs `ffmpeg`)
  * - `assets/scenes/<id>.webp`      every `public/assets/scenes/scene-*.svg`
  * - `assets/path/*.webp`           `public/assets/path/*.webp`, copied as-is
  * - `assets/path/*-256-muted.webp` the Hub's muted "next" stickers
@@ -40,6 +44,9 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -170,6 +177,34 @@ for (const name of sorted(join(webAssets, 'pictures'), /^picture-.+\.svg$/)) {
   )
 }
 
+// The four novel-probe pictures (nap, rat, map, tap): the web draws them
+// as inline SVG (`wordPictures.tsx`), so render that markup through the
+// root `tsx` and bake it at 500 px like the pack (word-song-native.md § 7).
+// Native-only (no web URL): keyed under /native/pictures/.
+{
+  const markup = JSON.parse(
+    execFileSync(
+      join(repoRoot, 'node_modules', '.bin', 'tsx'),
+      [
+        '--tsconfig',
+        join(repoRoot, 'tsconfig.app.json'),
+        join(here, 'renderProbePictures.ts'),
+      ],
+      { cwd: repoRoot, encoding: 'utf8' },
+    ),
+  )
+  for (const [key, svg] of Object.entries(markup)) {
+    const sized = svg
+      .replace(/ style="[^"]*"/, '')
+      .replace('<svg ', '<svg width="500" height="500" ')
+    const webp = await sharp(Buffer.from(sized)).webp(WEBP).toBuffer()
+    const outPath = join(out, 'pictures', `${key}.webp`)
+    writeFileSync(outPath, webp)
+    totalOut += webp.length
+    registry.push([`/native/pictures/${key}`, outPath])
+  }
+}
+
 // Simple-sentences scenes.
 freshDir(join(out, 'scenes'))
 for (const name of sorted(join(webAssets, 'scenes'), /^scene-.+\.svg$/)) {
@@ -230,6 +265,148 @@ await sharp(join(repoRoot, 'public', 'icons', 'icon-512.png'))
 await sharp(extractPng(join(webAssets, 'emma-logo.svg')))
   .png()
   .toFile(join(out, 'app', 'splash-logo.png'))
+
+// Word Song blend marks (word-song-native.md § 5): the four sound
+// segments (3 graphemes, then the whole word) of every baked blend clip,
+// measured with ffmpeg `silencedetect` at -35 dB. The first onset is the
+// end of the leading silence (>= 30 ms); later boundaries are silences of
+// >= 300 ms. Exactly 4 segments, or no entry. Keyed by the utterance text
+// (the server reuses canon audio by text), with the MP3's byte length (the
+// app's runtime check: it uses a mark only on a clip of that length) and a
+// content hash (the test's drift check: the clips are CBR, so many share a
+// length, and a re-bake can keep one; only the hash is sure to change).
+const marks = new Map()
+{
+  const canonRoot = join(repoRoot, 'public', 'canon', 'word-song')
+  const files = []
+  const walk = (dir) => {
+    for (const name of readdirSync(dir).sort()) {
+      const p = join(dir, name)
+      if (statSync(p).isDirectory()) walk(p)
+      else if (name.endsWith('.json')) files.push(p)
+    }
+  }
+  walk(canonRoot)
+  const tmp = join(tmpdir(), `blend-${process.pid}.mp3`)
+  for (const file of files) {
+    const json = JSON.parse(readFileSync(file, 'utf8'))
+    for (const u of json.utterances ?? []) {
+      if (!/^word\.p\d+\.blend$/.test(u.id) || !u.audio?.base64) continue
+      const mp3 = Buffer.from(u.audio.base64, 'base64')
+      const sha256 = clipHash(mp3)
+      const prev = marks.get(u.text)
+      if (prev && prev.sha256 !== sha256) {
+        throw new Error(`blend "${u.text}" has two different clips`)
+      }
+      if (prev) continue
+      writeFileSync(tmp, mp3)
+      const segments = blendSegments(tmp)
+      if (segments === null) {
+        console.warn(`blend "${u.text}" (${file}): not 4 segments, skipped`)
+        continue
+      }
+      marks.set(u.text, { bytes: mp3.length, sha256, segments })
+    }
+  }
+  rmSync(tmp, { force: true })
+}
+
+/** A clip's content hash: the first 16 hex digits of its SHA-256. */
+function clipHash(mp3) {
+  return createHash('sha256').update(mp3).digest('hex').slice(0, 16)
+}
+
+function blendSegments(path) {
+  const probe = spawnSync(
+    'ffprobe',
+    ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path],
+    { encoding: 'utf8' },
+  )
+  const duration = Number(probe.stdout.trim())
+  const run = spawnSync(
+    'ffmpeg',
+    [
+      '-hide_banner',
+      '-i',
+      path,
+      '-af',
+      'silencedetect=noise=-35dB:d=0.03',
+      '-f',
+      'null',
+      '-',
+    ],
+    { encoding: 'utf8' },
+  )
+  if (run.status !== 0 || !(duration > 0))
+    throw new Error(`ffmpeg failed on ${path}`)
+  const silences = []
+  for (const line of run.stderr.split('\n')) {
+    const start = line.match(/silence_start: (-?[\d.]+)/)
+    if (start)
+      silences.push({ start: Math.max(0, Number(start[1])), end: duration })
+    const end = line.match(/silence_end: ([\d.]+)/)
+    if (end && silences.length > 0) silences.at(-1).end = Number(end[1])
+  }
+  let on = 0
+  let rest = silences
+  if (rest.length > 0 && rest[0].start <= 0.001) {
+    on = rest[0].end
+    rest = rest.slice(1)
+  }
+  const trailing = rest.at(-1)?.end >= duration - 0.005 ? rest.at(-1) : null
+  const segments = []
+  for (const s of rest) {
+    if (s === trailing) break
+    if (s.end - s.start < 0.3) continue
+    segments.push([on, s.start])
+    on = s.end
+  }
+  segments.push([on, trailing ? trailing.start : duration])
+  if (segments.length !== 4) return null
+  return segments.map(([a, b]) => [Math.round(a * 1000), Math.round(b * 1000)])
+}
+
+{
+  const marksPath = join(mobileRoot, 'src', 'audio', 'blendMarks.generated.ts')
+  const body = [...marks.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(
+      ([text, m]) =>
+        `  ${JSON.stringify(text)}: { bytes: ${m.bytes}, sha256: ${JSON.stringify(m.sha256)}, segments: ${JSON.stringify(m.segments)} },`,
+    )
+    .join('\n')
+  const source = `/**
+ * GENERATED by \`mobile/scripts/export-assets.mjs\`. Do not edit by hand:
+ * re-run \`npm run export-assets\` after a canon re-bake.
+ *
+ * Every baked Word Song blend clip (\`word.p*.blend\` in
+ * \`public/canon/word-song/**\`), keyed by its text: the MP3's byte length
+ * (the app's check), its content hash (the first 16 hex digits of its
+ * SHA-256: \`blendMarks.test.ts\` fails when a re-bake changes a clip) and
+ * its four sound segments \`[onMs, offMs]\` (3 graphemes, then the
+ * whole word), from ffmpeg \`silencedetect\` at -35 dB
+ * (design/native/word-song-native.md § 5). Read through \`./blendMarks.ts\`.
+ */
+export const BLEND_MARKS: Readonly<
+  Record<
+    string,
+    {
+      bytes: number
+      sha256: string
+      segments: readonly (readonly [number, number])[]
+    }
+  >
+> = {
+${body}
+}
+`
+  const config = await prettier.resolveConfig(marksPath)
+  writeFileSync(
+    marksPath,
+    await prettier.format(source, { ...config, parser: 'typescript' }),
+  )
+  console.log(`${marks.size} blend marks`)
+}
 
 // Registry.
 const registryPath = join(mobileRoot, 'src', 'assets', 'registry.ts')

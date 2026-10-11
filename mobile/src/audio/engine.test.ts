@@ -63,6 +63,24 @@ describe('audio engine: speak contract', () => {
     ])
   })
 
+  it("passes the clip's clock (ms) to onTime once it plays, and its length at the end", async () => {
+    const { engine } = setup()
+    const times: number[] = []
+    const done = engine.speak('session:p1.blend', SRC, {
+      text: 'c - a - t ... cat',
+      label: 'session:p1.blend',
+      onTime: (ms) => times.push(ms),
+    })
+    await flush()
+    const p = fakePlayers[0]!
+    p.emit({ playing: false, currentTime: 0, duration: 3.2 })
+    p.start(3.2)
+    p.emit({ playing: true, currentTime: 0.9 })
+    p.finish()
+    await done
+    expect(times).toEqual([0, 900, 3200])
+  })
+
   it('a new line cancels the one in flight (one Emma line at a time, across sources)', async () => {
     const { engine } = setup()
     const hub = engine.speak('hub:hub.welcome.what-today', SRC, {

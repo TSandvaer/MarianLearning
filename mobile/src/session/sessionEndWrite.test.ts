@@ -177,3 +177,26 @@ it('no graduation split without the novel-probe word list, or on math', () => {
   ).toBeNull()
   expect(computeGraduationSplit(p, 'math', 'add-to-10', ws, ['nap'])).toBeNull()
 })
+
+it("Word Song graduation: the split uses core's novel probe words by default", () => {
+  // cvc-words practicing with three good days banked: graduation pending.
+  const base = defaultProgress()
+  saveProgress({
+    ...base,
+    skillLevels: { ...base.skillLevels, 'cvc-words': 'practicing' },
+    goodDays: { 'cvc-words': [daysAgo(3), daysAgo(2), daysAgo(1)] },
+  })
+  const ws: SessionEndPayload = {
+    ...MATH,
+    surface: 'word-song',
+    earnedThisSession: 0,
+    targetWords: ['cat', 'nap', 'bag', 'rat', 'fan', 'man', 'tap', 'hat'],
+    perProblemCorrect: [true, true, true, false, true, true, true, true],
+    sessionFocus: { node: 'cvc-words', mode: 'forward' },
+  }
+  writeSessionEnd(ws, { clock })
+  // 3 novel words (nap, rat, tap), 2 right.
+  expect(loadProgress()?.history.at(-1)?.novelPoolSuccessRate).toBeCloseTo(
+    2 / 3,
+  )
+})

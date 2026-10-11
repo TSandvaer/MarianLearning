@@ -2,8 +2,9 @@
  * Native app root.
  *
  * Route state is core's route state machine (`./router/routes.ts`).
- * Phase 3 ports the screens one by one: Splash, Greet, Math, Session End,
- * the Hub and the map are real, every other route is still a placeholder.
+ * Phase 3 ports the screens one by one: Splash, Greet, Math, Word Song,
+ * Session End, the Hub and the map are real; Parent Settings (and the
+ * legacy `reward` route) are still placeholders.
  * Splash branches on the
  * persisted `sessionCount` through core's `nextAfterSplash()`, exactly
  * like the web; neither Splash nor Greet writes it (Session-End does).
@@ -19,12 +20,18 @@
  * unlock is waiting, else the Hub, and a not-yet day's "Again" starts the
  * next session (web `handleSessionEndAllDone` / `…Again`).
  *
+ * Word Song's session start is App's too (`./session/wordSongSession.ts`):
+ * kicked by the Hub's card tap (or on Word Song for the QA route and
+ * "Again"), torn down (a request in flight aborted) when the child leaves
+ * Word Song for the Hub or leaves Session End. Its result goes to Session
+ * End as the web's `handleWordSongComplete` builds it. Word Song has no
+ * mount-time write; Session End's one write keeps its payload guard.
+ *
  * The Hub (`./screens/hub/Hub.tsx`) hands a card tap to Math (Number
- * Garden) or the Word Song placeholder, a map button to that world's map
- * and Emma's 3 s press to Parent Settings. On Hub entry App
- * prefetches the Math session while Number Garden glows (web
- * `hubSessionPrefetch.ts`); the card tap kicks it, which adopts the
- * prefetch. Emma fades in when the Hub is the first screen after Splash,
+ * Garden) or Word Song, a map button to that world's map and Emma's 3 s
+ * press to Parent Settings. On Hub entry App prefetches the glowing
+ * world's session (no glow: Word Song; web `hubSessionPrefetch.ts`); the
+ * card tap kicks it, which adopts the prefetch. Emma fades in when the Hub is the first screen after Splash,
  * and wears her baked shadow on the Hub.
  *
  * The map (`./screens/map/MapScreen.tsx`) opens with a handoff (`MapEntry`,
@@ -46,6 +53,7 @@ import {
   prefetchTrackFor,
 } from '@marian/core/hub/hubSuggestion'
 import { pickStaticSessionPlan } from '@marian/core/math/sessionPlans'
+import { pickStaticWordSongPlan } from '@marian/core/wordSong/wordSessionPlans'
 import { loadProgress, type MasteryTrack } from '@marian/core/progress'
 import { now as progressNow } from '@marian/core/progress/clock'
 import { pendingUnlock } from '@marian/core/progress/pathBeats'
@@ -78,6 +86,7 @@ import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
 import { mathLayout } from './layout/mathLayout'
 import { mapScreenLayout } from './layout/mapScreenLayout'
+import { wordSongLayout } from './layout/wordSongLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
@@ -101,6 +110,8 @@ import type { MathSessionResult } from './screens/math/mathTypes'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
 import { SessionEnd } from './screens/sessionEnd/SessionEnd'
 import { Splash } from './screens/Splash'
+import { WordSong } from './screens/wordSong/WordSong'
+import type { WordSongSessionResult } from './screens/wordSong/wordSongTypes'
 import {
   createMathSessionController,
   mathFallbackFocusNode,
@@ -108,8 +119,10 @@ import {
 } from './session/mathSession'
 import {
   mathSessionEndPayload,
+  wordSongSessionEndPayload,
   type SessionEndPayload,
 } from './session/sessionEndPayload'
+import { createWordSongSessionController } from './session/wordSongSession'
 import { colors } from './theme'
 
 // Keep the OS splash up until the fonts are ready (module scope, so it
@@ -138,6 +151,16 @@ const BREATH: Breath = {
 const MATH_AUDIO_ROUTES: ReadonlySet<Route> = new Set<Route>([
   'greet',
   'math',
+  'session-end',
+])
+
+/**
+ * The routes Word Song's session audio survives on: Word Song and Session
+ * End (the web keeps it through Session End too). The Hub's prefetch is
+ * the app's `sessionPrefetcher`, not this session.
+ */
+const WORD_SONG_AUDIO_ROUTES: ReadonlySet<Route> = new Set<Route>([
+  'literacy',
   'session-end',
 ])
 
@@ -188,6 +211,20 @@ function Shell() {
     mathSession.getSnapshot,
   )
   const [mathPose, setMathPose] = useState<EmmaPose>('idle')
+
+  // Word Song: session start, result handoff, Emma's pose (as Math's).
+  const [wordSongFallbackPlan] = useState(() => pickStaticWordSongPlan())
+  const [wordSongSession] = useState(() =>
+    createWordSongSessionController({
+      fallbackPlanId: () => wordSongFallbackPlan.id,
+      prefetcher: sessionPrefetcher,
+    }),
+  )
+  const wordSongState = useSyncExternalStore(
+    wordSongSession.subscribe,
+    wordSongSession.getSnapshot,
+  )
+  const [wordSongPose, setWordSongPose] = useState<EmmaPose>('idle')
   const [sessionEnd, setSessionEnd] = useState<SessionEndPayload | null>(null)
   const [sessionEndPose, setSessionEndPose] = useState<EmmaPose>('idle')
   // The map's handoff: set by the two ways in, cleared on the way out.
@@ -207,9 +244,19 @@ function Shell() {
       if (from === 'session-end' || !MATH_AUDIO_ROUTES.has(next)) {
         mathSession.tearDown()
       }
-      // The Hub's prefetch is for Number Garden; it survives a map visit
-      // (web parity) and goes on any other way out.
-      if (from === 'hub' && next !== 'math' && next !== 'map') {
+      // Word Song's session likewise (a request in flight is aborted: it
+      // must not outlive the screen).
+      if (from === 'session-end' || !WORD_SONG_AUDIO_ROUTES.has(next)) {
+        wordSongSession.tearDown()
+      }
+      // The Hub's prefetch is for the glowing world; it survives a map
+      // visit (web parity) and goes on any other way out.
+      if (
+        from === 'hub' &&
+        next !== 'math' &&
+        next !== 'literacy' &&
+        next !== 'map'
+      ) {
         sessionPrefetcher.discard()
       }
       // Session End consumed its payload (the one write): a later arrival
@@ -221,7 +268,7 @@ function Shell() {
       routeRef.current = next
       setRoute(next)
     },
-    [mathSession],
+    [mathSession, wordSongSession],
   )
   // A way into the map: the handoff first, then the route (only when the
   // map is an exit of the route we are on).
@@ -250,6 +297,16 @@ function Shell() {
       mathSession.startWaitTimer()
     }
   }, [route, mathState.audioReady, mathSession])
+  // Word Song's kick (QA route, "Again"; the Hub tap kicks it itself) and
+  // its visible-wait timer, as Math's.
+  useEffect(() => {
+    if (route === 'literacy') wordSongSession.kick()
+  }, [route, wordSongSession])
+  useEffect(() => {
+    if (route === 'literacy' && !wordSongState.audioReady) {
+      wordSongSession.startWaitTimer()
+    }
+  }, [route, wordSongState.audioReady, wordSongSession])
 
   // Web `handleMathComplete`.
   const onMathComplete = useCallback(
@@ -266,6 +323,21 @@ function Shell() {
     },
     [mathDefaults, mathSession, navigate],
   )
+  // Web `handleWordSongComplete`.
+  const onWordSongComplete = useCallback(
+    (result: WordSongSessionResult) => {
+      setSessionEnd(
+        wordSongSessionEndPayload(
+          result,
+          wordSongSession.currentTargetVowel,
+          wordSongSession.sessionFocus,
+        ),
+      )
+      setSessionEndPose('idle')
+      navigate('session-end')
+    },
+    [wordSongSession, navigate],
+  )
   // Web `handleSessionEndAllDone`: an unlock this world has not celebrated
   // yet opens the map (which plays it); otherwise the Hub. (The route
   // flip tears the Math session down, as the web's handler does.)
@@ -281,22 +353,25 @@ function Shell() {
     () => navigate(sessionEnd?.surface === 'word-song' ? 'literacy' : 'math'),
     [sessionEnd, navigate],
   )
-  // Web `handleBackToHub` (the route effect tears the session down).
+  // Web `handleBackToHub` (`navigate` tears the session down).
   const onMathExit = useCallback(() => navigate('hub'), [navigate])
+  const onWordSongExit = onMathExit
 
   // Hub entry: prefetch the glowing world's session (web
-  // `useHubSessionPrefetch`; no glow → Word Song, which is not ported yet).
+  // `useHubSessionPrefetch`; no glow → Word Song).
   useEffect(() => {
     if (route !== 'hub') return
-    let suggestion: SkillTreeId | null = null
+    let suggestion: SkillTreeId | null
     try {
       const now = progressNow()
       suggestion = computeSuggestion(readSessionHistoryForToday(now), now)
     } catch {
       // Storage unavailable: no prefetch; the tap starts its own request.
+      return
     }
     if (prefetchTrackFor(suggestion) === 'math') mathSession.prefetch()
-  }, [route, mathSession])
+    else wordSongSession.prefetch()
+  }, [route, mathSession, wordSongSession])
   // Web `handleHubPickTree`. The kick takes the prefetch in the tap.
   const onHubPick = useCallback(
     (tree: SkillTreeId) => {
@@ -304,10 +379,11 @@ function Shell() {
         mathSession.kick()
         navigate('math')
       } else {
+        wordSongSession.kick()
         navigate('literacy')
       }
     },
-    [mathSession, navigate],
+    [mathSession, wordSongSession, navigate],
   )
   // Web `handleHubOpenMap`; the map's Home is web `handleMapBack` (the
   // map stamps the Hub's rapid-remount clock, so the Hub stays quiet).
@@ -334,9 +410,10 @@ function Shell() {
 
   const greet = route === 'greet' ? greetLayout(viewport) : null
   const math = route === 'math' ? mathLayout(viewport) : null
-  // Session End needs a finished session; without one (QA route, the
-  // Word Song placeholder's exit) the placeholder renders and nothing is
-  // written.
+  const wordSong = route === 'literacy' ? wordSongLayout(viewport) : null
+  // Session End needs a finished session; without one (the QA route, or
+  // a later arrival after it consumed its payload) the placeholder renders
+  // and nothing is written.
   const end =
     route === 'session-end' && sessionEnd !== null
       ? sessionEndLayout(viewport)
@@ -346,7 +423,13 @@ function Shell() {
   const map =
     route === 'map' && mapEntry !== null ? mapScreenLayout(viewport) : null
   const layout =
-    greet ?? math ?? end ?? hub ?? map ?? layoutForRoute(route, viewport)
+    greet ??
+    math ??
+    wordSong ??
+    end ??
+    hub ??
+    map ??
+    layoutForRoute(route, viewport)
 
   return (
     <View style={styles.root}>
@@ -373,6 +456,21 @@ function Shell() {
               onSessionComplete={onMathComplete}
               onRequestExit={onMathExit}
               onPoseChange={setMathPose}
+              qaAutoAnswerAfterMs={qaAutoTapMs}
+            />
+          ) : wordSong ? (
+            <WordSong
+              layout={wordSong}
+              plan={wordSongState.plan ?? wordSongFallbackPlan}
+              playUtterance={wordSongState.playUtterance ?? undefined}
+              clipFor={wordSongState.clipFor ?? undefined}
+              audioReady={wordSongState.audioReady}
+              crossVowelMixing={wordSongState.crossVowel}
+              digraphsThNodeLevel={wordSongState.thLevel}
+              digraphsThFirstEncounter={wordSongState.thFirstEncounter}
+              onSessionComplete={onWordSongComplete}
+              onRequestExit={onWordSongExit}
+              onPoseChange={setWordSongPose}
               qaAutoAnswerAfterMs={qaAutoTapMs}
             />
           ) : hub ? (
@@ -412,7 +510,15 @@ function Shell() {
               // Calm through the whole Greet (native-only, Thomas 2026-10-09:
               // no celebration swap); Math and Session End drive her poses as
               // on the web.
-              pose={route === 'math' ? mathPose : end ? sessionEndPose : 'idle'}
+              pose={
+                route === 'math'
+                  ? mathPose
+                  : wordSong
+                    ? wordSongPose
+                    : end
+                      ? sessionEndPose
+                      : 'idle'
+              }
               // The web's Session End Emma is a still image (no breath).
               breath={route === 'greet' ? GREET_BREATH : end ? null : BREATH}
               motion={route === 'greet' ? 'greet' : 'character'}

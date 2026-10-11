@@ -6,6 +6,7 @@
 import { TILT_BY_POSE, type EmmaPose } from '@marian/core/character/emmaPose'
 import { PATH_ART_IDS, PATH_ART_SIZES } from '@marian/core/emmasPath/pathArt'
 import { SCENE_PICTURES } from '@marian/core/wordSong/sceneRegistry'
+import { NOVEL_PROBE_WORDS } from '@marian/core/wordSong/novelProbeWords'
 import { existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import {
@@ -64,6 +65,13 @@ describe('native asset registry', () => {
     }
   })
 
+  it('has the four novel-probe pictures baked, and none for a word without art', () => {
+    for (const key of NOVEL_PROBE_WORDS) {
+      expect([key, pictureAsset(key) !== undefined]).toEqual([key, true])
+    }
+    expect(pictureAsset('ship')).toBeUndefined()
+  })
+
   it("has the Hub bakes: idle Emma's shadow and a muted copy of every 256 px path art", () => {
     expect(emmaIdleShadowAsset()).toBeDefined()
     for (const id of PATH_ART_IDS) {
@@ -95,7 +103,16 @@ describe('native asset registry', () => {
             /^\/native\/path\/(.+)-(muted|locked)\.webp$/,
             '/assets/path/$1.webp',
           )
+    // The probe pictures are baked from the web's inline SVG
+    // (`src/screens/WordSong/wordPictures.tsx`), not from a file.
+    const probes = Object.keys(WEB_ASSET_MODULES).filter((k) =>
+      k.startsWith('/native/pictures/'),
+    )
+    expect(
+      probes.map((k) => k.slice('/native/pictures/'.length)).sort(),
+    ).toEqual([...NOVEL_PROBE_WORDS].sort())
     for (const key of Object.keys(WEB_ASSET_MODULES)) {
+      if (key.startsWith('/native/pictures/')) continue
       const webPath = key.startsWith('/native/') ? source(key) : key
       expect(webPath.startsWith('/assets/')).toBe(true)
       expect([webPath, existsSync(join(WEB_ASSETS, '..', webPath))]).toEqual([

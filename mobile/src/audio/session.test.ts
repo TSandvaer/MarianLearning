@@ -100,6 +100,23 @@ describe('session audio: eager files, lazy players', () => {
     )
   })
 
+  it("fileFor: a line's file (written on demand) and its byte length", () => {
+    const queue: (() => void)[] = []
+    const s = loadSessionAudio('s1', UTTERANCES, {
+      engine,
+      files,
+      yieldThen: (fn) => queue.push(fn),
+    })
+    // Not written yet: fileFor writes it now; duplicates share the file.
+    expect(s.fileFor('Hmm... try again?')).toEqual({
+      uri: 'file:///cache/session-audio/s1/p1.reprompt.mp3',
+      bytes: 9,
+    })
+    expect(s.fileFor('Not a line.')).toBeUndefined()
+    s.unload()
+    expect(s.fileFor('Hmm... try again?')).toBeUndefined()
+  })
+
   it('writes in the background: nothing at load, slices of ≤8 ms, yielding between', () => {
     const queue: (() => void)[] = []
     let t = 0

@@ -35,9 +35,17 @@ export function emmaAsset(art: EmmaArt): NativeImage | undefined {
   return assetForWebPath(`/assets/emma-${art}.svg`)
 }
 
-/** A Word Song picture-pack key (`cat`, `bus`, ...). */
+/**
+ * A Word Song picture-pack key (`cat`, `bus`, ...), or one of the four
+ * novel-probe pictures the web draws inline (`nap`, `rat`, `map`, `tap`;
+ * baked under `/native/pictures/`). `undefined`: the word has no picture
+ * (the ch, sh and th words), see `word-song-native.md` § 7.
+ */
 export function pictureAsset(key: string): NativeImage | undefined {
-  return assetForWebPath(`/assets/pictures/picture-${key}.svg`)
+  return (
+    assetForWebPath(`/assets/pictures/picture-${key}.svg`) ??
+    assetForWebPath(`/native/pictures/${key}`)
+  )
 }
 
 /** A simple-sentences scene, by the planner's `sceneId`. */

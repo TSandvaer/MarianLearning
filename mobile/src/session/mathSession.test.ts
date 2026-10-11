@@ -50,6 +50,7 @@ function fakeAudio(): LoadedSessionAudio & {
     playUtterance: jest.fn(() => Promise.resolve()),
     playUtteranceById: jest.fn(() => Promise.resolve()),
     prewarm: jest.fn(),
+    fileFor: jest.fn(() => undefined),
     textToId: new Map(),
     utteranceCount: 0,
     fileCount: 0,

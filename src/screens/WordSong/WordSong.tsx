@@ -19,8 +19,21 @@ import { createSfx, type Sfx } from '../../lib/sfx'
 import type { EmmaPose } from '@marian/core/character/emmaPose'
 import { EmmaCharacter } from '../../components/EmmaCharacter'
 import { GettingReady } from '../../components/GettingReady'
-import { pickDistractors } from '@marian/core/wordSong/wordDistractors'
-import { buildBlendHighlightSteps } from '@marian/core/wordSong/blendHighlight'
+import { buildWordChipOrder } from '@marian/core/wordSong/wordChips'
+import {
+  chipFaceFor,
+  chipLabel,
+  countsAsCorrect,
+  filledSentence,
+  isCleanWin,
+  isCorrectChip,
+  letterHighlighted,
+  readAloudDelayMs,
+  secondWrongPrompt,
+  sentenceTokens,
+  wordCardFor,
+  wrongTapOutcome,
+} from '@marian/core/wordSong/wordRound'
 import {
   loadStardust,
   writeStardust,
@@ -37,8 +50,6 @@ import {
   ADVANCE_HARD_CEILING_MS,
   CHIP_TAP_SPRING,
   FIRST_UTTERANCE_RETRY_MS,
-  GUIDED_AFTER_WRONG_COUNT,
-  HINT_AFTER_WRONG_COUNT,
   HINT_DELAY_AFTER_WRONG_MS,
   STREAK_BONUS_THRESHOLDS,
   STREAK_FADE_OUT_MS,
@@ -46,8 +57,6 @@ import {
 } from '@marian/core/shared/gameplayConstants'
 import { WordPicture } from './wordPictures'
 import { ScenePanel } from './scenePictures'
-import type { WordEntry } from '@marian/core/wordSong/wordPack'
-import { LETTER_SOUNDS_POOL } from '@marian/core/wordSong/letterSoundsPool'
 import type { SkillLevel } from '@marian/core/progress'
 
 /**
@@ -115,8 +124,10 @@ const HUD_POP_TWEEN = {
   ease: 'easeOut' as const,
 }
 
-/**
- * Silent-text window for `cvc-word` problems (ticket 86c9m3ae6).
+/*
+ * Silent-text window for `cvc-word` problems (ticket 86c9m3ae6). The value
+ * and the rule live in core (`readAloudDelayMs` / `SILENT_TEXT_WINDOW_MS`,
+ * `@marian/core/wordSong/wordRound`), shared with the native screen.
  *
  * On a `cvc-word` problem mount the word text renders immediately, but
  * Emma's read-aloud is delayed by this many milliseconds. The intent is
@@ -149,7 +160,6 @@ const HUD_POP_TWEEN = {
  * Tuning: 1500ms is the starting value per Thomas's brief; iterate via
  * iPad ear-test if the beat reads as too short or too long.
  */
-const SILENT_TEXT_WINDOW_MS = 1500
 
 // ── Public types ----------------------------------------------------------
 
@@ -690,7 +700,7 @@ function WordSongScreen({
    *  shuffled by an LCG seeded on the problem index. Same shuffle pattern
    *  as Math, no Math.random for test-stability. */
   const chipOrder = useMemo(
-    () => buildChipOrder(plan.problems[problemIndex], crossVowelMixing),
+    () => buildWordChipOrder(plan.problems[problemIndex], crossVowelMixing),
     [plan, problemIndex, crossVowelMixing],
   )
 
@@ -951,10 +961,10 @@ function WordSongScreen({
     // applying GPC rules to "was" yields the non-word /wæs/ (Dave's W11-01
     // §"Recognition mechanic" point 2). Sight-word read-aloud must fire
     // immediately, which the `!isCvcWord` branch below already does. Do
-    // NOT widen `isCvcWord` to include `sight-word`.
-    const isCvcWord = problem.contentType === 'cvc-word'
+    // NOT widen the core rule (`readAloudDelayMs`) to include `sight-word`.
+    const silentWindowMs = readAloudDelayMs(problem)
 
-    if (!isCvcWord) {
+    if (silentWindowMs === 0) {
       queueMicrotask(dispatchReadAloud)
       // `audioReady` IS in the deps so the effect re-runs when the parent
       // flips it from `false` → `true` (Path A fetch settled). The
@@ -996,7 +1006,7 @@ function WordSongScreen({
     silentTextTimerRef.current = setTimeout(() => {
       silentTextTimerRef.current = null
       fireOrReArmOnVisibility()
-    }, SILENT_TEXT_WINDOW_MS)
+    }, silentWindowMs)
 
     return () => {
       // Cleanup on problem-advance / unmount / dep-change. Clears the
@@ -1144,7 +1154,13 @@ function WordSongScreen({
       // compute `nextWrongCount=1` — never crossing the hint/guided
       // thresholds, or all crossing them simultaneously on a later batch.
       // See `wrongCountRef` declaration (ticket 86c9gyb2v).
-      const nextWrongCount = wrongCountRef.current + 1
+      // The thresholds are core's (`wrongTapOutcome`), shared with native.
+      const outcome = wrongTapOutcome({
+        wrongCount: wrongCountRef.current,
+        hintPlayed: hintPlayedRef.current,
+        guidedPlayed: guidedPlayedRef.current,
+      })
+      const nextWrongCount = outcome.wrongCount
       wrongCountRef.current = nextWrongCount
       setProblemState((prev) => ({ ...prev, wrongCount: nextWrongCount }))
 
@@ -1164,13 +1180,11 @@ function WordSongScreen({
       // The React state setters for `hintPlayed=true` / `guidedPlayed=true`
       // are still kicked downstream (visual consistency), but the gate
       // that prevents queuing reads the ref.
-      const didScheduleHint =
-        nextWrongCount === HINT_AFTER_WRONG_COUNT && !hintPlayedRef.current
+      const didScheduleHint = outcome.scheduleHint
       if (didScheduleHint) {
         hintPlayedRef.current = true
       }
-      const didScheduleGuided =
-        nextWrongCount >= GUIDED_AFTER_WRONG_COUNT && !guidedPlayedRef.current
+      const didScheduleGuided = outcome.scheduleGuided
       if (didScheduleGuided) {
         guidedPlayedRef.current = true
       }
@@ -1231,22 +1245,17 @@ function WordSongScreen({
               // absent (every tier pre-bake, every non-CVC tier), fall
               // back to the existing `hint` line — no silent/dead beat,
               // audio-first. See Kyle's spec §"Where this slots in" + §GRACEFUL-SKIP.
-              const blendText =
-                problem.contentType === 'cvc-word'
-                  ? problem.utterances.blend
-                  : undefined
+              // The choice is core's (`secondWrongPrompt`), shared with native.
+              const prompt = secondWrongPrompt(problem)
 
-              if (blendText !== undefined) {
-                // Build the raw-token-index → letter-highlight-index map so
-                // the per-letter reveal sequences over the grapheme tokens
+              if (prompt.kind === 'blend') {
+                // The raw-token-index → letter-highlight-index map: the
+                // per-letter reveal sequences over the grapheme tokens
                 // (positions 0..n-1) and the whole-word token pulses ALL
                 // letters once (index === word.length). Tokenizer-robust:
                 // the ASCII separators (`-`, `...`) are their own tokens.
-                const highlightSteps = buildBlendHighlightSteps(
-                  blendText,
-                  problem.target.word,
-                )
-                void speak(blendText, {
+                const highlightSteps = prompt.steps
+                void speak(prompt.text, {
                   onWordTick: (wordIndex) => {
                     const next = highlightSteps[wordIndex]
                     if (next !== undefined) setBlendActiveLetterIndex(next)
@@ -1262,7 +1271,7 @@ function WordSongScreen({
                   )
                 })
               } else {
-                void speak(problem.utterances.hint).then(() => {
+                void speak(prompt.text).then(() => {
                   poseTimerRef.current = setTimeout(() => {
                     setPose('idle')
                     poseTimerRef.current = null
@@ -1314,8 +1323,13 @@ function WordSongScreen({
       //
       // Reads from the synchronous refs (not React state); see ref
       // declarations for the rage-tap rationale (ticket 86c9gyb2v).
-      const isCleanWin = wrongCountRef.current === 0 && !guidedPlayedRef.current
-      if (!guidedPlayedRef.current) {
+      // The rules are core's (`isCleanWin` / `countsAsCorrect`).
+      const counters = {
+        wrongCount: wrongCountRef.current,
+        guidedPlayed: guidedPlayedRef.current,
+      }
+      const cleanWin = isCleanWin(counters)
+      if (countsAsCorrect(counters)) {
         totalCorrectRef.current += 1
         // Mark this problem as a non-guided correct on the per-problem
         // outcome ref (ticket 86c9m3aec). Index is 0-based; `problem.index`
@@ -1343,7 +1357,7 @@ function WordSongScreen({
         ) {
           perProblemCorrectRef.current[problem.index - 1] = true
         }
-        if (isCleanWin) {
+        if (cleanWin) {
           streakRef.current = streakRef.current + 1
           setStreak(streakRef.current)
         }
@@ -1485,9 +1499,9 @@ function WordSongScreen({
       }
 
       // Block guided-completion path on non-correct chips.
-      if (guidedActive && chipWord !== problem.target.word) return
+      const isCorrect = isCorrectChip(problem, chipWord)
+      if (guidedActive && !isCorrect) return
 
-      const isCorrect = chipWord === problem.target.word
       if (isCorrect) {
         handleCorrectTap(problem)
       } else {
@@ -1513,6 +1527,9 @@ function WordSongScreen({
 
   const currentProblem = plan.problems[problemIndex]
   const showStreak = streak >= 2 || streakFadingOut
+  // What the card and the chips show: core's rules, shared with native.
+  const wordCard = wordCardFor(currentProblem.contentType)
+  const chipFace = chipFaceFor(currentProblem.contentType)
 
   return (
     <m.main
@@ -1830,77 +1847,70 @@ function WordSongScreen({
           no single-word picture card and no per-word decode breakdown
           (Kyle §3.2 — the cloze mechanic transfers the sight-words
           written-word chip, NOT the CVC picture card). */}
-            {currentProblem.contentType !== 'letter-names' &&
-              currentProblem.contentType !== 'letter-sounds' &&
-              currentProblem.contentType !== 'sight-word' &&
-              currentProblem.contentType !== 'simple-sentence' && (
-                <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
-                  <div
-                    data-testid="word-song-word-card"
-                    data-word={currentProblem.target.word}
-                    className="flex flex-col items-center gap-2"
-                  >
-                    {/* Picture — 180pt square. Renders inline-SVG placeholder until
+            {wordCard === 'picture' && (
+              <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
+                <div
+                  data-testid="word-song-word-card"
+                  data-word={currentProblem.target.word}
+                  className="flex flex-col items-center gap-2"
+                >
+                  {/* Picture — 180pt square. Renders inline-SVG placeholder until
                 real pack ships (see wordPictures.tsx for sourcing posture). */}
-                    <m.div
-                      data-testid="word-song-word-picture"
-                      className="flex items-center justify-center"
-                      style={{ width: '180px', height: '180px' }}
-                      initial={
-                        reducedMotion
-                          ? { opacity: 0 }
-                          : { opacity: 0, scale: 0 }
-                      }
-                      animate={
-                        reducedMotion
-                          ? { opacity: 1 }
-                          : { opacity: 1, scale: 1 }
-                      }
-                      transition={
-                        reducedMotion
-                          ? { duration: 0.2 }
-                          : { type: 'spring', stiffness: 260, damping: 16 }
-                      }
-                    >
-                      <WordPicture
-                        pictureKey={currentProblem.target.pictureKey}
-                        large
-                        ariaLabel={currentProblem.target.word}
-                      />
-                    </m.div>
+                  <m.div
+                    data-testid="word-song-word-picture"
+                    className="flex items-center justify-center"
+                    style={{ width: '180px', height: '180px' }}
+                    initial={
+                      reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0 }
+                    }
+                    animate={
+                      reducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }
+                    }
+                    transition={
+                      reducedMotion
+                        ? { duration: 0.2 }
+                        : { type: 'spring', stiffness: 260, damping: 16 }
+                    }
+                  >
+                    <WordPicture
+                      pictureKey={currentProblem.target.pictureKey}
+                      large
+                      ariaLabel={currentProblem.target.word}
+                    />
+                  </m.div>
 
-                    {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
+                  {/* Letters — 96pt, ~32pt apart. Each letter is tappable for
                 phoneme playback per spec §"Audio dispatch sequence on letter
                 tap". v1 keeps letter taps as visual-only. During the CVC
                 phoneme-blend prompt (ticket 86c9qa6n3) the letters are driven
                 instead by `highlighted` off `blendActiveLetterIndex`: index i
                 highlights letter[i] as its phoneme plays; the whole-word beat
                 (index === word.length) pulses ALL letters together once. */}
-                    <div
-                      data-testid="word-song-letters"
-                      className="flex items-center"
-                      style={{ gap: '32px' }}
-                    >
-                      {currentProblem.target.word.split('').map((letter, i) => (
-                        <LetterGlyph
-                          key={`${i}-${letter}`}
-                          letter={letter}
-                          index={i}
-                          reducedMotion={reducedMotion}
-                          // Per-letter highlight during the blend: this letter
-                          // when its index is active, OR every letter on the
-                          // whole-word beat (active index === word length).
-                          highlighted={
-                            blendActiveLetterIndex === i ||
-                            blendActiveLetterIndex ===
-                              currentProblem.target.word.length
-                          }
-                        />
-                      ))}
-                    </div>
+                  <div
+                    data-testid="word-song-letters"
+                    className="flex items-center"
+                    style={{ gap: '32px' }}
+                  >
+                    {currentProblem.target.word.split('').map((letter, i) => (
+                      <LetterGlyph
+                        key={`${i}-${letter}`}
+                        letter={letter}
+                        index={i}
+                        reducedMotion={reducedMotion}
+                        // Per-letter highlight during the blend: this letter
+                        // when its index is active, OR every letter on the
+                        // whole-word beat (active index === word length).
+                        highlighted={letterHighlighted(
+                          i,
+                          blendActiveLetterIndex,
+                          currentProblem.target.word.length,
+                        )}
+                      />
+                    ))}
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
             {/* Letter-names word card — single large glyph centered, in the
           slot the picture would occupy on CVC tiers. Marian sees only the
@@ -1908,7 +1918,7 @@ function WordSongScreen({
           target while Emma speaks. Kyle's A1 spec §4.1 frames this as
           "the chip glyph IS the assessment" — the centered card glyph is
           a visual reading-anchor mirroring the picture role on CVC. */}
-            {currentProblem.contentType === 'letter-names' && (
+            {wordCard === 'letter' && (
               <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
                 <div
                   data-testid="word-song-letter-card"
@@ -1959,7 +1969,7 @@ function WordSongScreen({
           below carries the answer; this centered glyph is a visual
           reading-anchor mirroring the picture role on CVC. Sized to
           180pt to match the picture footprint. */}
-            {currentProblem.contentType === 'letter-sounds' && (
+            {wordCard === 'letter-sound' && (
               <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 px-4">
                 <div
                   data-testid="word-song-letter-sound-card"
@@ -2017,15 +2027,17 @@ function WordSongScreen({
           Emma's read (same `captionRevealed` tick as the caption ribbon),
           and the gap fills with the target word once the problem resolves
           (the closure beat, Kyle §3.2 / sponsor Q2). */}
-            {currentProblem.contentType === 'simple-sentence' && (
+            {wordCard === 'sentence' && (
               <div className="mt-2 flex flex-1 flex-col items-center justify-start gap-3 px-4">
                 <ScenePanel
                   sceneId={currentProblem.sceneId}
                   ariaLabel={
-                    currentProblem.sentenceFrame?.replace(
-                      SENTENCE_GAP_TOKEN,
-                      currentProblem.target.word,
-                    ) ?? currentProblem.target.word
+                    currentProblem.sentenceFrame !== undefined
+                      ? filledSentence(
+                          currentProblem.sentenceFrame,
+                          currentProblem.target.word,
+                        )
+                      : currentProblem.target.word
                   }
                 />
                 {currentProblem.sentenceFrame !== undefined && (
@@ -2054,31 +2066,24 @@ function WordSongScreen({
               style={{ gap: '24px' }}
             >
               {chipOrder.map((entry) => {
-                const isCorrect = entry.word === currentProblem.target.word
+                const isCorrect = isCorrectChip(currentProblem, entry.word)
                 const isShaking = shakingChip === entry.word
                 const dimForGuided = guidedActive && !isCorrect
                 const guidedShimmer = guidedActive && isCorrect
-                const isLetterNames =
-                  currentProblem.contentType === 'letter-names'
-                const isLetterSounds =
-                  currentProblem.contentType === 'letter-sounds'
-                const isLetterTier = isLetterNames || isLetterSounds
+                const isLetterSounds = chipFace === 'letter-sound'
+                const isLetterTier = chipFace === 'letter' || isLetterSounds
                 // Sight-words tier (Wave 11 W11-03): the chip presents the
                 // WRITTEN word as text (no picture), per Dave's W11-01
                 // audio-first whole-word-matching mechanic. The chip FRAME
                 // (size, border, spring, hit area, shake) is identical to the
                 // CVC chips — only the CONTENT swaps from <WordPicture> to a
                 // text glyph, the same seam the letter tiers use.
-                const isSightWord = currentProblem.contentType === 'sight-word'
                 // Simple-sentences tier (Wave 13 W13-03/04): the chip is the
                 // WRITTEN word as text — the EXACT sight-words written-word
                 // chip (Kyle §3.3, "reuse the isSightWord text-glyph chip").
-                // Same frame, same 36px text; only the gate widens. Render
-                // dispatch keys on this combined predicate so both tiers
-                // share one branch.
-                const isWrittenWordChip =
-                  isSightWord ||
-                  currentProblem.contentType === 'simple-sentence'
+                // Same frame, same 36px text; both tiers map to core's
+                // `written-word` chip face and share one branch.
+                const isWrittenWordChip = chipFace === 'written-word'
                 return (
                   <m.button
                     key={entry.word}
@@ -2088,13 +2093,7 @@ function WordSongScreen({
                     data-picture-key={entry.pictureKey}
                     data-correct={isCorrect ? 'true' : 'false'}
                     data-shaking={isShaking ? 'true' : 'false'}
-                    aria-label={
-                      isLetterTier
-                        ? `Letter ${entry.word}`
-                        : isWrittenWordChip
-                          ? `Word ${entry.word}`
-                          : `Picture of ${entry.word}`
-                    }
+                    aria-label={chipLabel(chipFace, entry.word)}
                     onClick={() => onChipTap(entry.word)}
                     disabled={
                       problemState.resolved || dimForGuided || !readAloudPlayed
@@ -2285,9 +2284,6 @@ function renderCaption(text: string, revealedCount: number) {
   ))
 }
 
-/** The literal gap token in a simple-sentence `sentenceFrame`. */
-const SENTENCE_GAP_TOKEN = '___'
-
 /**
  * Sentence panel for the simple-sentences cloze tier (Wave 13 W13-03/04,
  * Kyle §3.2 — NET-NEW component). Renders the gapped sentence as a
@@ -2324,8 +2320,8 @@ function SentencePanel({
   // SUBSTRING and peels the surrounding punctuation off so the styled blank
   // renders with the punctuation as plain text beside it. (A naive
   // `token === '___'` equality misses "___." — the bug Jessica's W13-05
-  // test 3 catches.)
-  const tokens = frame.split(/\s+/).filter(Boolean)
+  // test 3 catches.) The split and the peel are core's `sentenceTokens`.
+  const tokens = sentenceTokens(frame)
   return (
     <m.div
       data-testid="word-song-sentence-panel"
@@ -2351,15 +2347,12 @@ function SentencePanel({
       >
         {tokens.map((token, i) => {
           const revealed = i < revealedCount
-          const gapAt = token.indexOf(SENTENCE_GAP_TOKEN)
-          const isGap = gapAt !== -1
           const marginRight = i === tokens.length - 1 ? 0 : '0.3em'
-          if (isGap) {
-            // Peel any punctuation attached to the gap token (e.g. the
-            // trailing "." in "___." or "?" in "___?") so the styled blank
-            // renders, then the punctuation as plain text after it.
-            const before = token.slice(0, gapAt)
-            const after = token.slice(gapAt + SENTENCE_GAP_TOKEN.length)
+          if (token.kind === 'gap') {
+            // The punctuation attached to the gap token (e.g. the trailing
+            // "." in "___." or "?" in "___?") renders as plain text beside
+            // the styled blank.
+            const { before, after } = token
             return (
               <m.span
                 key={`gap-${i}`}
@@ -2412,17 +2405,17 @@ function SentencePanel({
           }
           return (
             <m.span
-              key={`${i}-${token}`}
+              key={`${i}-${token.text}`}
               data-testid="word-song-sentence-word"
               data-revealed={revealed ? 'true' : 'false'}
-              data-word={token}
+              data-word={token.text}
               className="inline-block"
               style={{ marginRight }}
               initial={{ opacity: 0 }}
               animate={{ opacity: revealed ? 1 : 0 }}
               transition={{ duration: 0.15, ease: 'easeOut' }}
             >
-              {token}
+              {token.text}
             </m.span>
           )
         })}
@@ -2577,189 +2570,6 @@ function SparkleBurst() {
       })}
     </span>
   )
-}
-
-// ── Chip-order shuffle (deterministic per problem) -----------------------
-
-/**
- * Build the chip order: target + 2 distractors, shuffled deterministically
- * per problem. Same shuffle pattern as Math (LCG seeded on problem index +
- * a hash of the target word).
- *
- * `crossVowel` (ticket 86c9qa0kf) — when `true`, distractors are drawn
- * from `TARGET_PAIRINGS_CROSSVOWEL` (cross-vowel mix mode). When
- * `false`, the existing same-vowel `TARGET_PAIRINGS` matrix is read.
- * The parent (`WordSongScreen`) computes this once per session from
- * `crossVowelMixingActive(progress, parentSettings)` and passes the
- * boolean down — uniform per session, never per-problem (per spec §4
- * "uniform per session" rule).
- */
-function buildChipOrder(
-  problem: WordSongProblem,
-  crossVowel: boolean,
-): readonly WordEntry[] {
-  const [d1, d2] =
-    problem.contentType === 'letter-names'
-      ? pickLetterDistractors(problem.target, problem.index)
-      : problem.contentType === 'letter-sounds'
-        ? pickSoundDistractors(problem.target, problem.index)
-        : pickDistractors(problem.target, problem.index, { crossVowel })
-  const values = [problem.target, d1, d2]
-  // Hash word → number for the seed (so different targets shuffle
-  // differently for the same problem index in cross-plan QA replay).
-  const wordHash = problem.target.word
-    .split('')
-    .reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 0)
-  const seed = (problem.index * 31 + wordHash + 1) >>> 0
-  const rng = lcg(seed)
-  for (let i = values.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1))
-    ;[values[i], values[j]] = [values[j], values[i]]
-  }
-  return values
-}
-
-/**
- * The 52-glyph ASCII letter pool for the `letter-names` tier (Wave 7
- * A4b, ticket 86c9y6nc7). Mirrors `LETTER_GLYPH_POOL` in
- * `planFromServer.ts` — kept local here to avoid a cross-module import
- * for chip-render code (the parser owns the pool as the wire-validation
- * source of truth; this is the screen-side render pool).
- */
-const LETTER_DISTRACTOR_POOL: readonly string[] = [
-  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-  ...'abcdefghijklmnopqrstuvwxyz',
-]
-
-/**
- * Pick 2 distractor letters for a letter-names problem. Deterministic
- * per problem index (no `Math.random`) so chip layout is stable across
- * remounts and unit tests. Constraints honoured: (a) distractor case
- * matches the target's case so the trio is case-uniform (avoids the
- * "spot the odd-cased chip" shortcut Kyle's A1 spec §3.2 flags as a
- * giveaway), (b) distractors are distinct from target and from each
- * other, (c) distractors are drawn from `LETTER_DISTRACTOR_POOL` (no
- * digits, no whitespace).
- *
- * This is a render-time placeholder; the canon already encodes Kyle's
- * §1.3 / §3 pedagogical band rules (gentle/trap, b/d/p/q cap, etc.) on
- * the SERVED side and the planner emits the target letter per problem.
- * The screen-side distractor pool here is a graceful default: chips
- * stay distinct + case-uniform, but they are NOT band-tuned to the
- * spec's trap-window rules — that pedagogical layer would require the
- * server to start emitting distractor letters per problem (a wire-shape
- * widening out of A4b scope). Until then this gives a usable chip trio
- * for any in-pool target.
- */
-function pickLetterDistractors(
-  target: WordEntry,
-  problemIndex: number,
-): readonly [WordEntry, WordEntry] {
-  const letter = target.word
-  const isUpper = letter === letter.toUpperCase()
-  const caseFilteredPool = LETTER_DISTRACTOR_POOL.filter(
-    (g) => (g === g.toUpperCase()) === isUpper && g !== letter,
-  )
-  // Deterministic two-letter pick. Seed on problem index + a hash of the
-  // target letter so different targets at the same index pick different
-  // distractor pairs.
-  const seed = (problemIndex * 31 + letter.charCodeAt(0) + 0xa5) >>> 0
-  const rng = lcg(seed)
-  const pool = caseFilteredPool.slice()
-  // Fisher-Yates partial shuffle — take the first two after shuffling.
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1))
-    ;[pool[i], pool[j]] = [pool[j], pool[i]]
-  }
-  const [g1, g2] = pool
-  return [letterToTargetEntry(g1!), letterToTargetEntry(g2!)]
-}
-
-/**
- * Build a render-side synthetic `WordEntry` for a distractor letter
- * glyph. Mirrors the parser's `makeLetterTargetEntry` so the
- * letter-names chip pipeline is uniform — chips that compare
- * `entry.word === problem.target.word` continue to work bit-identically
- * to the word-tier chips.
- */
-function letterToTargetEntry(letter: string): WordEntry {
-  return {
-    word: letter,
-    pictureKey: `letter:${letter}`,
-    category: 'object',
-    isTarget: false,
-  }
-}
-
-/**
- * Pick 2 distractor letters for a letter-sounds problem. Deterministic
- * per problem index (no `Math.random`) so chip layout is stable across
- * remounts and unit tests. Constraints honoured: (a) distractors are
- * drawn from `LETTER_SOUNDS_POOL` (the 19-letter Wave-7 pool per spec
- * §1.1 — single source of truth in `letterSoundsPool.ts`, shared with
- * the wire parser in `planFromServer.ts`), (b) distractors are
- * distinct from target and from each other, (c) distractors share the
- * target's case (the pool is uppercase, so this is implicit today —
- * pool-case-equality is asserted in the test suite).
- *
- * This is a render-time placeholder; Kyle's A5 spec §3 calls for
- * band-aware distractor selection (gentle = clean-distinct, gentle-
- * mixed = within-class trap, trap = voiced/unvoiced pair) but that
- * pedagogical layer requires the planner to emit distractor letters
- * per problem (a wire-shape widening out of A8b scope per the Wave 7
- * dispatch brief). Mirrors A4b's `pickLetterDistractors` posture —
- * usable chip trio with case-uniform distinct letters, but NOT band-
- * tuned. The /i/-/e/ adjacency ban from spec §3.2 is also a planner
- * concern, not a render concern.
- */
-function pickSoundDistractors(
-  target: WordEntry,
-  problemIndex: number,
-): readonly [WordEntry, WordEntry] {
-  const letter = target.word
-  const pool = LETTER_SOUNDS_POOL.filter((g) => g !== letter)
-  // Deterministic two-letter pick. Seed on problem index + a hash of
-  // the target letter so different targets at the same index pick
-  // different distractor pairs.
-  const seed = (problemIndex * 31 + letter.charCodeAt(0) + 0xb7) >>> 0
-  const rng = lcg(seed)
-  const shuffled = pool.slice()
-  // Fisher-Yates partial shuffle — take the first two after shuffling.
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-  const [g1, g2] = shuffled
-  return [soundLetterToTargetEntry(g1!), soundLetterToTargetEntry(g2!)]
-}
-
-/**
- * Build a render-side synthetic `WordEntry` for a distractor letter
- * glyph in the letter-sounds tier. Mirrors the parser's
- * `makeLetterSoundTargetEntry` so the letter-sounds chip pipeline is
- * uniform — chips that compare `entry.word === problem.target.word`
- * continue to work bit-identically to the word-tier chips.
- *
- * Sentinel `pictureKey` uses the `letter-sounds:<X>` prefix (same as
- * the parser's sentinel) so logging + test assertions can identify the
- * tier from any chip entry without consulting `contentType`.
- */
-function soundLetterToTargetEntry(letter: string): WordEntry {
-  return {
-    word: letter,
-    pictureKey: `letter-sounds:${letter}`,
-    category: 'object',
-    isTarget: false,
-  }
-}
-
-/** Tiny LCG. Deterministic, no Math.random — same shape as Math's. */
-function lcg(seed: number): () => number {
-  let s = seed >>> 0
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0
-    return s / 0x100000000
-  }
 }
 
 export default WordSongScreen
