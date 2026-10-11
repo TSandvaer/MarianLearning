@@ -1,7 +1,7 @@
 /**
  * What a finished session hands SessionEnd. The shape is the web's
  * `SessionEndPayload` (`src/screens/SessionEnd/SessionEnd.tsx`), so the
- * native SessionEnd port (still a placeholder) receives exactly what the
+ * native SessionEnd (`../screens/sessionEnd/`) receives exactly what the
  * web's does. Math builds it the way the web's `handleMathComplete` does.
  */
 import type { MathSessionPlan } from '@marian/core/math/sessionPlans'

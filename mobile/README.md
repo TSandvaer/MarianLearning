@@ -1,6 +1,6 @@
 # Marian Tutor: native app (Expo)
 
-The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash, Greet and Math are real (`src/screens/Splash.tsx`, `src/screens/greet/`, `src/screens/math/`, UX calls in `design/native/greet-math-native.md`); every other route is still a placeholder.
+The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash, Greet, Math and Session End are real (`src/screens/Splash.tsx`, `src/screens/greet/`, `src/screens/math/`, `src/screens/sessionEnd/`, UX calls in `design/native/greet-math-native.md`); every other route is still a placeholder.
 
 ## Shape
 
@@ -75,6 +75,10 @@ npx expo start --go --port 8297 --clear
 ## Math
 
 `src/screens/math/` is the web's `src/screens/Math/` (8 problems, read-aloud, chip tap-gate, right / wrong reactions, hint ladder, dot card / minuend scaffolds, streak and stardust), with Kyle's phone layouts (`src/layout/mathLayout.ts`). The logic is core's; the two pure helpers the web keeps private (`buildChipOrder`, `startSessionWithFallback`) are verbatim copies whose tests fail when the web copy changes. App owns the session start (`src/session/mathSession.ts`, the web's Path A): kicked on Greet, 5 s visible-wait fallback to a hint-free request, torn down on back-to-Hub and when leaving Session End. Without a server plan Math runs core's static plan with silent captions (165 wpm). The result goes to Session End as the web's `SessionEndPayload` (`src/session/sessionEndPayload.ts`).
+
+## Session End
+
+`src/screens/sessionEnd/` is the web's guidance Session End (`src/screens/SessionEnd/`, #513 + #521): effort praise, today's flower flying into its slot, "N of 3", the not-yet day (Again + Home) and the same-day replay, in clay, with Emma's bundled guidance lines. The one write (session history + progress, mastery rule) and the guidance model are in `src/session/sessionEndWrite.ts`; the layouts in `src/layout/sessionEndLayout.ts`. "All done" goes to the map when an unlock waits, else the Hub. To walk the days on a simulator, use `EXPO_PUBLIC_DAY_OFFSET` (see Debug flags) with `EXPO_PUBLIC_QA_ROUTE=math` + `EXPO_PUBLIC_QA_AUTOTAP_MS` (its answers make a 7-of-8 good day).
 
 Reset to a first launch: delete the app from the simulator/device (storage lives in the app's SQLite database).
 

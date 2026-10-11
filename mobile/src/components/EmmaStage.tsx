@@ -110,7 +110,8 @@ const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1)
 export interface EmmaStageProps {
   frame: Rect
   pose: EmmaPose
-  breath: Breath
+  /** `null`: she stands still (the web's Session End Emma is a plain image). */
+  breath: Breath | null
   /** Default `greet` (the motion Greet shipped with in #531). */
   motion?: EmmaMotion
 }
@@ -156,18 +157,21 @@ export function EmmaStage({
     )
   }, [pose, reducedMotion, rotate, character])
 
-  const breathing = !reducedMotion && (!character || pose === 'idle')
+  const breathing =
+    breath !== null && !reducedMotion && (!character || pose === 'idle')
+  const periodS = breath?.periodS ?? 0
+  const peak = breath?.scale ?? 1
   useEffect(() => {
     if (!breathing) {
       cancelAnimation(scale)
       scale.set(1)
       return
     }
-    const half = (breath.periodS * 1000) / 2
+    const half = (periodS * 1000) / 2
     const ease = character ? EASE_IN_OUT : Easing.inOut(Easing.ease)
     const loop = withRepeat(
       withSequence(
-        withTiming(breath.scale, { duration: half, easing: ease }),
+        withTiming(peak, { duration: half, easing: ease }),
         withTiming(1, { duration: half, easing: ease }),
       ),
       -1,
@@ -176,7 +180,7 @@ export function EmmaStage({
     // 0.3 + 0.7 s). EmmaCharacter starts it at once.
     scale.set(character ? loop : withDelay(1000, loop))
     return () => cancelAnimation(scale)
-  }, [breath.periodS, breath.scale, breathing, character, scale])
+  }, [periodS, peak, breathing, character, scale])
 
   const innerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.get() }, { rotate: `${rotate.get()}deg` }],
