@@ -14,7 +14,9 @@
  *   never waits for a request that was already running. A stale key (a
  *   cloud-sync install or a parent-settings change landed while the Hub was
  *   up) or another world discards it and returns `null`; the caller then
- *   starts its own request.
+ *   starts its own request. `take(key, signal)` links the taker's abort
+ *   signal to the request, so a taker that gives up on it (Math's 5 s
+ *   fallback, a tear-down) aborts it exactly like a request of its own.
  * - `discard()` aborts an in-flight prefetch and unloads a settled one.
  */
 import {
@@ -40,7 +42,8 @@ export function samePrefetchKey(a: PrefetchKey, b: PrefetchKey): boolean {
 
 export interface SessionPrefetcher {
   prefetch(key: PrefetchKey, args: Omit<SessionStartArgs, 'signal'>): void
-  take(key: PrefetchKey): Promise<PreparedSession> | null
+  /** `signal`: the taker's; aborting it aborts the taken request. */
+  take(key: PrefetchKey, signal?: AbortSignal): Promise<PreparedSession> | null
   discard(): void
   /** The key in flight or settled, for diagnostics. */
   readonly pendingKey: PrefetchKey | null
@@ -95,15 +98,21 @@ export function createSessionPrefetcher(
       )
       pending = entry
     },
-    take(key) {
+    take(key, signal) {
       const p = pending
       if (!p) return null
       if (!samePrefetchKey(p.key, key)) {
         discard()
         return null
       }
-      // Hand it over: the taker owns the session (and its unload) now.
+      // Hand it over: the taker owns the session (and its unload) now,
+      // and its abort: a request still in flight stops with the taker's.
       pending = null
+      if (signal?.aborted) p.controller.abort()
+      else
+        signal?.addEventListener('abort', () => p.controller.abort(), {
+          once: true,
+        })
       return p.promise
     },
     discard,

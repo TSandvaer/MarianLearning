@@ -153,7 +153,7 @@ it('no prefetch while a session is latched', () => {
   expect(h.prefetcher.pendingKey).toBeNull()
 })
 
-it('a slow adopted hinted request still falls back after 5 s on Math', async () => {
+it('a slow adopted hinted request is aborted by the 5 s fallback on Math', async () => {
   jest.useFakeTimers()
   try {
     const h = harness(5000)
@@ -161,7 +161,11 @@ it('a slow adopted hinted request still falls back after 5 s on Math', async () 
     h.session.prefetch()
     h.session.kick()
     h.session.startWaitTimer()
+    expect(h.calls[0]!.aborted).toBe(false)
     jest.advanceTimersByTime(5000)
+    // Given up on, exactly like a request of its own: it can no longer
+    // land and replace the fallback's session audio.
+    expect(h.calls[0]!.aborted).toBe(true)
     expect(h.calls).toHaveLength(2)
     expect(h.calls[1]!.args.sessionId).toMatch(/-fallback$/)
     expect(h.calls[1]!.args.payload).not.toHaveProperty('progress.leitner')
@@ -170,14 +174,26 @@ it('a slow adopted hinted request still falls back after 5 s on Math', async () 
   }
 })
 
-it('a tear-down before the adopted request lands unloads it on arrival', async () => {
+it('a tear-down aborts the adopted request in flight', async () => {
   const h = harness()
   h.session.prefetch()
   h.session.kick()
+  expect(h.calls[0]!.aborted).toBe(false)
   h.session.tearDown()
+  expect(h.calls[0]!.aborted).toBe(true)
+  await settle()
+  expect(h.session.getSnapshot().audioReady).toBe(false)
+})
+
+it('a tear-down after the adopted request settled unloads its audio', async () => {
+  const h = harness()
+  h.session.prefetch()
   const { audio, value } = h.prepared()
   h.calls[0]!.resolve(value)
   await settle()
+  h.session.kick()
+  await settle()
+  expect(h.session.getSnapshot().audioReady).toBe(true)
+  h.session.tearDown()
   expect(audio.unload).toHaveBeenCalledTimes(1)
-  expect(h.session.getSnapshot().audioReady).toBe(false)
 })

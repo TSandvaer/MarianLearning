@@ -63,7 +63,6 @@ import {
   startSession,
   type LoadedSessionAudio,
   type PrefetchKey,
-  type PreparedSession,
   type SessionPrefetcher,
   type SessionStartPayload,
 } from '../audio'
@@ -285,15 +284,8 @@ export function createMathSessionController(
       controller = abort
       const hints = readHints()
       // A Hub prefetch with the same focus is this session's first request.
-      let adopted: Promise<PreparedSession> | null =
-        deps.prefetcher?.take(mathPrefetchKey(hints)) ?? null
-      if (adopted !== null) {
-        recordAudio({
-          kind: 'note',
-          label: 'math-session',
-          detail: 'adopting the Hub prefetch',
-        })
-      }
+      const prefetchKey = mathPrefetchKey(hints)
+      let firstRun = true
       const focus: MathSessionFocus | null =
         hints.focusNode !== undefined && hints.focusMode !== undefined
           ? { node: hints.focusNode, mode: hints.focusMode }
@@ -305,11 +297,22 @@ export function createMathSessionController(
         signal: AbortSignal,
       ): Promise<Loaded> => {
         // The prefetch stands in for the first request only (its payload is
-        // this one's); the hint-free fallback is always a new request. It
-        // cannot be aborted once taken: a tear-down unloads it on arrival.
-        const first = adopted
-        adopted = null
-        const prepared = await (first ??
+        // this one's); the hint-free fallback is always a new request. The
+        // run's signal is linked to it, so the 5 s fallback and a tear-down
+        // abort it as they abort a request of their own. Taken here, inside
+        // the card tap's kick (`startSessionWithFallback` runs it at once).
+        const adopted = firstRun
+          ? (deps.prefetcher?.take(prefetchKey, signal) ?? null)
+          : null
+        firstRun = false
+        if (adopted !== null) {
+          recordAudio({
+            kind: 'note',
+            label: 'math-session',
+            detail: 'adopting the Hub prefetch',
+          })
+        }
+        const prepared = await (adopted ??
           start({
             sessionId: withHints ? sessionId : `${sessionId}-fallback`,
             payload: buildMathSessionPayload(hints, withHints),

@@ -511,6 +511,17 @@ describe('session prefetch (Hub)', () => {
     expect(pf.pendingKey).toBeNull()
   })
 
+  it("take(key, signal): the taker's abort aborts the taken request", () => {
+    const { start, calls } = deferredStart()
+    const pf = createSessionPrefetcher({ start })
+    pf.prefetch(MATH, args('h1'))
+    const taker = new AbortController()
+    expect(pf.take(MATH, taker.signal)).not.toBeNull()
+    expect(calls[0].args.signal?.aborted).toBe(false)
+    taker.abort()
+    expect(calls[0].args.signal?.aborted).toBe(true)
+  })
+
   it('take() with a stale key (focus changed) discards: aborts and returns null', () => {
     const { start, calls } = deferredStart()
     const pf = createSessionPrefetcher({ start })
