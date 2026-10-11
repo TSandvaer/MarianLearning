@@ -18,7 +18,13 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated'
-import Svg, { Path } from 'react-native-svg'
+import Svg, {
+  Defs,
+  Ellipse,
+  Path,
+  RadialGradient,
+  Stop,
+} from 'react-native-svg'
 import { pathArtMutedAsset } from '../../assets'
 import { PathImage } from '../../components/PathImage'
 import { fonts } from '../../theme'
@@ -111,7 +117,14 @@ function Glow({ s, reducedMotion }: PartProps) {
   )
 }
 
-/** Web `.hub-plinth`: an oval clay pedestal. */
+/**
+ * Web `.hub-plinth`: an oval clay pedestal, `border-radius: 50%` with a
+ * solid slab 10u below and a soft shadow (16u, blur 18u). Drawn in SVG:
+ * RN on iOS renders a percentage radius on a non-square view as a lens and
+ * its box shadow as a pill, not an ellipse. The face gradient is the CSS
+ * `radial-gradient(ellipse at 45% 30%, …)` (farthest corner: radii 0.778w
+ * × 0.99h); the blurred shadow is an ellipse fading to transparent.
+ */
 function Plinth({
   s,
   x,
@@ -125,16 +138,64 @@ function Plinth({
   w: number
   h: number
 }) {
+  const W = w * s
+  const H = h * s
+  const pad = 18 * s
+  const cx = pad + W / 2
+  const cy = pad + H / 2
+  const gx = pad + 0.45 * W
+  const gy = pad + 0.3 * H
+  const gr = 0.778 * W
+  const k = (0.99 * H) / gr
   return (
     <View
-      style={[
-        box(s, x, y, w, h),
-        styles.plinth,
-        {
-          boxShadow: `0 ${10 * s}px 0 #b8946a, 0 ${16 * s}px ${18 * s}px rgba(60, 30, 10, 0.25)`,
-        },
-      ]}
-    />
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: x * s - pad,
+        top: y * s - pad,
+      }}
+    >
+      <Svg width={W + 2 * pad} height={H + 2 * pad + 16 * s}>
+        <Defs>
+          <RadialGradient id="drop" cx="50%" cy="50%" r="50%">
+            <Stop
+              offset="0.45"
+              stopColor="rgb(60, 30, 10)"
+              stopOpacity={0.25}
+            />
+            <Stop offset="1" stopColor="rgb(60, 30, 10)" stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient
+            id="face"
+            gradientUnits="userSpaceOnUse"
+            cx={gx}
+            cy={gy}
+            r={gr}
+            gradientTransform={`translate(${gx} ${gy}) scale(1 ${k}) translate(${-gx} ${-gy})`}
+          >
+            <Stop offset="0" stopColor="#fff8ec" />
+            <Stop offset="0.55" stopColor="#f1dcc0" />
+            <Stop offset="1" stopColor="#d9bb94" />
+          </RadialGradient>
+        </Defs>
+        <Ellipse
+          cx={cx}
+          cy={cy + 16 * s}
+          rx={W / 2 + pad}
+          ry={H / 2 + pad}
+          fill="url(#drop)"
+        />
+        <Ellipse
+          cx={cx}
+          cy={cy + 10 * s}
+          rx={W / 2}
+          ry={H / 2}
+          fill="#b8946a"
+        />
+        <Ellipse cx={cx} cy={cy} rx={W / 2} ry={H / 2} fill="url(#face)" />
+      </Svg>
+    </View>
   )
 }
 
@@ -238,12 +299,6 @@ const styles = StyleSheet.create({
   glow: {
     experimental_backgroundImage:
       'radial-gradient(circle, #fff7c2 0%, #ffe066cc 45%, #ffd23f00 70%)',
-  },
-  plinth: {
-    borderRadius: '50%',
-    backgroundColor: '#f1dcc0',
-    experimental_backgroundImage:
-      'radial-gradient(ellipse at 45% 30%, #fff8ec 0%, #f1dcc0 55%, #d9bb94 100%)',
   },
   pill: {
     position: 'absolute',
