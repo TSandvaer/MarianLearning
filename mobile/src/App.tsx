@@ -2,8 +2,9 @@
  * Native app root.
  *
  * Route state is core's route state machine (`./router/routes.ts`).
- * Phase 3 ports the screens one by one: Splash, Greet, Math, Session End
- * and the Hub are real, every other route is still a placeholder. Splash branches on the
+ * Phase 3 ports the screens one by one: Splash, Greet, Math, Session End,
+ * the Hub and the map are real, every other route is still a placeholder.
+ * Splash branches on the
  * persisted `sessionCount` through core's `nextAfterSplash()`, exactly
  * like the web; neither Splash nor Greet writes it (Session-End does).
  * Emma is one App-level view that springs between the routes' frames
