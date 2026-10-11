@@ -207,3 +207,60 @@ Word Song needs no CSS filter, so nothing is baked for iOS's `filter` limits (hu
 | Sparkles, HUD, getting-ready dots                   | Inline SVG, React                                                                                              | Math's `SparkleGlyph`, `MathHud`, `GettingReady`.                                                                                                                                                                                   |
 
 **New art: the 4 probe pictures.** Everything else is bundled or drawn. The ch, sh and th words have prompts (`design/word-song/digraphs-*-picture-pack-prompts.md`) but no art yet; until it lands, the written-word fallback replaces the web's pink squares.
+
+## 8. Round and session flow
+
+- **Entry:** the Hub's Word Song card → `literacy` (already in App). Turn on the Hub's Word Song prefetch, which hub-native § 5 held back until this port: a `null` suggestion prefetches Word Song (web `hubSessionPrefetch.ts`), and the card tap takes it.
+- **Getting ready:** while the plan is in flight, the HUD, Emma `listening` and the getting-ready dots centred in the stage (plus the th intro panel, § 3). The card and the chips mount with the plan (the web's render gate: the card never swaps from a fallback one).
+- **Each problem:** the card and the chips enter (web springs), the read-aloud (§ 6), taps. A correct tap: Emma `celebration`, the sparkle burst, sparkle + plink, a HUD pop of `[1, 1.3, 1]` over 400 ms (Word Song's own; Math keeps `[1, 1.25, 1]` over 250 ms, so `MathHud` takes both as props), "Yes! That's a hat.", then the next problem after max(1200 ms, the line), with a 4000 ms ceiling. No stardust per correct tap (web, ticket 86c9kwvza); the streak band still counts clean wins.
+- **Emma's pose** comes from Word Song through `onPoseChange`, as Math's does: App passes it to `EmmaStage` for `literacy` too.
+- **After problem 8:** as Math. App builds the Session End payload from the result, as the web's `handleWordSongComplete` does: `surface: 'word-song'`, `perProblemCorrect` with Word Song's ever-correct meaning, `targetWords`, `perProblemAnswerWord`. Then it routes to `session-end`. Word Song fades out over 250 ms (web) and Emma springs to Session End's frame. Session End grants the +5 completion bonus. "All done" opens the map on a pending `word-song` unlock, else the Hub; "Again" mounts a fresh Word Song (both already in App).
+- **Back arrow, and Android back (decision):** cancel Emma's line and any tap sound, then go to the Hub. No Session End, no progress write (web `handleBackToHub`). A `BackHandler` on Word Song does the same and returns `true`.
+- **Background:** the voice channel parks and resumes the line (#528), and the highlight follows the voice's clock. The silent beat pauses (§ 6), and an advance due while hidden waits for the return (native Math).
+- **Rotation:** the layout recomputes and nothing replays. A lit letter stays lit, and the ribbon keeps its line.
+- **The session start fails:** the static plan with silent 165 wpm captions (web). It has no blend clips, so the 2nd wrong plays the hint line and the letters pulse silently.
+
+## 9. Web → native translations
+
+These rows are Word Song's own. The shared ones are in hub-native § 6, map-native § 8 and the native Math code.
+
+| Web                                                                          | Native                                                                                                                     |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `landscape:` utilities, `26vh`, `flex-1` centring                            | `wordSongLayout(viewport)` (§ 1, § 2)                                                                                      |
+| `LetterGlyph` `m.button` with a local `tapped` state                         | A `Pressable` per letter cell, `accessibilityRole="button"`, label "Letter c"; spotlight and pulse (§ 5)                   |
+| `blendActiveLetterIndex` from `onWordTick`                                   | Marks read in the clip's status listener (§ 5); `onWordTick` + `buildBlendHighlightSteps` as the fallback                  |
+| `WordPicture` (`<svg><image>`)                                               | `Image` (`contain`) from the asset registry; a `Pressable` (§ 4), labelled with the word                                   |
+| Chip `aria-label` "Picture of cat" / "Letter C" / "Word the"                 | `accessibilityLabel`, same strings                                                                                         |
+| `SparkleBurst` (6 × 75 px, 850 ms ease-out tween)                            | One `withTiming(…, { duration: 850, easing: EASE_OUT })` per sparkle on translate, scale and opacity (§ 3)                 |
+| `SentencePanel` words on `captionRevealed`; the gap fills on a 260/16 spring | The same reveal tick; the fill is `withSpring(1, { stiffness: 260, damping: 16 })` on scale (Reduce Motion: a 200 ms fade) |
+| `ScenePanel` 280×210 box                                                     | A square `Image` (§ 7)                                                                                                     |
+| `visibilitychange` re-arm of the silent beat                                 | An `AppState` pause and resume of the beat's timer (§ 6)                                                                   |
+| `m.main` exit, opacity over 250 ms                                           | `exiting={FadeOut.duration(250)}`                                                                                          |
+| th intro panel: spring 260/20 from scale 0.85, 200 ms fade out               | `entering` with that spring, `exiting={FadeOut.duration(200)}`                                                             |
+| `usePrefersReducedMotion()`                                                  | Reanimated `useReducedMotion()`                                                                                            |
+
+**Not ported:** the Howler unlock machinery (`useAudioUnlockGate`, the first-tap unlock branch, `drainOnGesture`, `resumeHowlerContextOnGesture`, `unlockIosAudioSession`, `getHowlerRunning`), the audio-context probes, and the blend spec's picture bob (the web never shipped it).
+
+## Acceptance criteria (Jessica, on device)
+
+- [ ] Unit test: `wordSongLayout` reproduces the § 2 sizes table for its 7 phone viewports, and the tablet stage of iPad mini landscape (325 pt).
+- [ ] Unit test: `blendMarks.generated.ts` has an entry for each of the 40 canon blend utterances, its `bytes` equal the canon MP3's length, and its 4 segments are in order.
+- [ ] 375×667 portrait: chips 103×103 with ≥ 16 pt gaps, picture 160, letters 72 pt with every cell ≥ 48×88, back 56. "sheep" fits on one row. Nothing overlaps the ribbon slot.
+- [ ] 667×375 landscape, with and without a 21 pt home indicator: the chips stand in a right-hand column (104 / 99 pt), the picture is ≥ 109 pt, letters 56 pt. The beads and the status pills don't touch.
+- [ ] Tablet portrait and landscape match the web Word Song (picture 180, letters 96, chips 112 with 24 pt gaps), in Fredoka.
+- [ ] `cvc-word`: the card shows and Emma stays silent for 1.5 s, then reads. The chips stay at 0.6 opacity and ignore taps until the read ends.
+- [ ] Letter taps on a short-a to short-e CVC: each plays its own sound in Emma's voice, and the letter is lit while it sounds. Taps in the silent beat move the read to ≥ 1 s after the last tap, never past 5 s. Letters are inert during any Emma line.
+- [ ] Picture tap after the read: Emma says the word alone, with every letter lit. On `blending-cv` it replays "Tap the …". The picture is inert before the read and during lines. No tap changes the streak or the result.
+- [ ] 2nd wrong on a CVC: 600 ms after "Hmm... try again?", the blend plays. In a screen recording with sound, each letter lights within 50 ms of its sound starting (check `cat`, `box` and one short-e word), every letter lights on the word, and the lit letter stays dark on the rose spotlight.
+- [ ] th tier, 375×667: the 131-character hint stays in the 3-line slot and scrolls up a line at a time; the word card is never covered. The corner cue sits beside the picture on every form.
+- [ ] A ch / sh / th word: three written-word chips and a letters-only card, no pink squares. `nap`, `rat`, `map` and `tap` show their pictures.
+- [ ] Problem 8 → Session End with the +5 bonus. "Again" → a fresh Word Song. The back arrow and Android back → the Hub at once in silence, with no Session End.
+- [ ] Reduce Motion: no pulses, no stagger, no shake (the opacity blink instead), no sparkles; the spotlight still shows; the silent beat is unchanged.
+- [ ] Backgrounding mid-blend: the voice and the highlight stop and resume together. Mid-beat: the beat resumes with the time it had left.
+- [ ] Rotating mid-problem: nothing replays; the lit letter, the caption and the chip states carry on.
+
+## Open questions
+
+None for Thomas. He checks the PR on his devices, as for every Phase 3 screen (`team/DECISIONS.md` 2026-10-09). The native Word Song departs from the web in seven places: the phone-landscape chip column, the scrolling caption slot, the th cue's position, the letter spotlight, letter and picture tap-to-hear, the marks-driven blend, and the silent beat held by letter taps. None adds a line, a reward or a new pose. The tap sounds are new audio surfaces cut from ear-approved clips, so the PR's Self-Test Report carries a Predict-Before-Soak line for them.
+
+No Dave consult is needed. The phoneme letter taps and the "hear it again" control are in the approved web spec; the silent-beat change only lengthens Dave's decoding beat while she is decoding. If Matt wants one check anyway, § 6's 1000 / 5000 ms numbers are the item to send.
