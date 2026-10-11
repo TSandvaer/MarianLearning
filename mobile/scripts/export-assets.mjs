@@ -45,6 +45,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -270,8 +271,10 @@ await sharp(extractPng(join(webAssets, 'emma-logo.svg')))
 // measured with ffmpeg `silencedetect` at -35 dB. The first onset is the
 // end of the leading silence (>= 30 ms); later boundaries are silences of
 // >= 300 ms. Exactly 4 segments, or no entry. Keyed by the utterance text
-// (the server reuses canon audio by text), with the MP3's byte length so
-// the app uses a mark only on the exact clip it was measured on.
+// (the server reuses canon audio by text), with the MP3's byte length (the
+// app's runtime check: it uses a mark only on a clip of that length) and a
+// content hash (the test's drift check: the clips are CBR, so many share a
+// length, and a re-bake can keep one; only the hash is sure to change).
 const marks = new Map()
 {
   const canonRoot = join(repoRoot, 'public', 'canon', 'word-song')
@@ -290,8 +293,9 @@ const marks = new Map()
     for (const u of json.utterances ?? []) {
       if (!/^word\.p\d+\.blend$/.test(u.id) || !u.audio?.base64) continue
       const mp3 = Buffer.from(u.audio.base64, 'base64')
+      const sha256 = clipHash(mp3)
       const prev = marks.get(u.text)
-      if (prev && prev.bytes !== mp3.length) {
+      if (prev && prev.sha256 !== sha256) {
         throw new Error(`blend "${u.text}" has two different clips`)
       }
       if (prev) continue
@@ -301,10 +305,15 @@ const marks = new Map()
         console.warn(`blend "${u.text}" (${file}): not 4 segments, skipped`)
         continue
       }
-      marks.set(u.text, { bytes: mp3.length, segments })
+      marks.set(u.text, { bytes: mp3.length, sha256, segments })
     }
   }
   rmSync(tmp, { force: true })
+}
+
+/** A clip's content hash: the first 16 hex digits of its SHA-256. */
+function clipHash(mp3) {
+  return createHash('sha256').update(mp3).digest('hex').slice(0, 16)
 }
 
 function blendSegments(path) {
@@ -363,7 +372,7 @@ function blendSegments(path) {
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
     .map(
       ([text, m]) =>
-        `  ${JSON.stringify(text)}: { bytes: ${m.bytes}, segments: ${JSON.stringify(m.segments)} },`,
+        `  ${JSON.stringify(text)}: { bytes: ${m.bytes}, sha256: ${JSON.stringify(m.sha256)}, segments: ${JSON.stringify(m.segments)} },`,
     )
     .join('\n')
   const source = `/**
@@ -372,12 +381,21 @@ function blendSegments(path) {
  *
  * Every baked Word Song blend clip (\`word.p*.blend\` in
  * \`public/canon/word-song/**\`), keyed by its text: the MP3's byte length
- * and its four sound segments \`[onMs, offMs]\` (3 graphemes, then the
+ * (the app's check), its content hash (the first 16 hex digits of its
+ * SHA-256: \`blendMarks.test.ts\` fails when a re-bake changes a clip) and
+ * its four sound segments \`[onMs, offMs]\` (3 graphemes, then the
  * whole word), from ffmpeg \`silencedetect\` at -35 dB
  * (design/native/word-song-native.md § 5). Read through \`./blendMarks.ts\`.
  */
 export const BLEND_MARKS: Readonly<
-  Record<string, { bytes: number; segments: readonly (readonly [number, number])[] }>
+  Record<
+    string,
+    {
+      bytes: number
+      sha256: string
+      segments: readonly (readonly [number, number])[]
+    }
+  >
 > = {
 ${body}
 }

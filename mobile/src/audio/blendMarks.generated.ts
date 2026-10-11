@@ -4,18 +4,25 @@
  *
  * Every baked Word Song blend clip (`word.p*.blend` in
  * `public/canon/word-song/**`), keyed by its text: the MP3's byte length
- * and its four sound segments `[onMs, offMs]` (3 graphemes, then the
+ * (the app's check), its content hash (the first 16 hex digits of its
+ * SHA-256: `blendMarks.test.ts` fails when a re-bake changes a clip) and
+ * its four sound segments `[onMs, offMs]` (3 graphemes, then the
  * whole word), from ffmpeg `silencedetect` at -35 dB
  * (design/native/word-song-native.md § 5). Read through `./blendMarks.ts`.
  */
 export const BLEND_MARKS: Readonly<
   Record<
     string,
-    { bytes: number; segments: readonly (readonly [number, number])[] }
+    {
+      bytes: number
+      sha256: string
+      segments: readonly (readonly [number, number])[]
+    }
   >
 > = {
   'b - a - g ... bag': {
     bytes: 27375,
+    sha256: '9766aebf5479df74',
     segments: [
       [43, 337],
       [885, 1164],
@@ -25,6 +32,7 @@ export const BLEND_MARKS: Readonly<
   },
   'b - e - d ... bed': {
     bytes: 26748,
+    sha256: '3187cdb32aaec4c0',
     segments: [
       [0, 321],
       [888, 1162],
@@ -34,6 +42,7 @@ export const BLEND_MARKS: Readonly<
   },
   'b - i - b ... bib': {
     bytes: 26121,
+    sha256: '0c4bc0c1122472cc',
     segments: [
       [0, 323],
       [822, 1004],
@@ -43,6 +52,7 @@ export const BLEND_MARKS: Readonly<
   },
   'b - i - n ... bin': {
     bytes: 25494,
+    sha256: '27dd3e7d94388a91',
     segments: [
       [44, 333],
       [778, 974],
@@ -52,6 +62,7 @@ export const BLEND_MARKS: Readonly<
   },
   'b - o - x ... box': {
     bytes: 28629,
+    sha256: 'aa034c03a1da3a22',
     segments: [
       [42, 314],
       [889, 1160],
@@ -61,6 +72,7 @@ export const BLEND_MARKS: Readonly<
   },
   'b - u - g ... bug': {
     bytes: 26748,
+    sha256: 'f31a6ca360756301',
     segments: [
       [0, 302],
       [884, 1061],
@@ -70,6 +82,7 @@ export const BLEND_MARKS: Readonly<
   },
   'b - u - s ... bus': {
     bytes: 26748,
+    sha256: '4a0f8476545ce6fe',
     segments: [
       [0, 320],
       [890, 1054],
@@ -79,6 +92,7 @@ export const BLEND_MARKS: Readonly<
   },
   'c - a - t ... cat': {
     bytes: 25494,
+    sha256: '4979bb0481783561',
     segments: [
       [89, 250],
       [778, 1115],
@@ -88,6 +102,7 @@ export const BLEND_MARKS: Readonly<
   },
   'c - o - t ... cot': {
     bytes: 24867,
+    sha256: '2bfd9adcbd811b55',
     segments: [
       [82, 246],
       [801, 1090],
@@ -97,6 +112,7 @@ export const BLEND_MARKS: Readonly<
   },
   'c - u - p ... cup': {
     bytes: 25494,
+    sha256: 'f132bfab61a8be8d',
     segments: [
       [71, 219],
       [792, 981],
@@ -106,6 +122,7 @@ export const BLEND_MARKS: Readonly<
   },
   'd - o - g ... dog': {
     bytes: 27375,
+    sha256: '320c6f2c142ee5bb',
     segments: [
       [30, 290],
       [871, 1203],
@@ -115,6 +132,7 @@ export const BLEND_MARKS: Readonly<
   },
   'f - a - n ... fan': {
     bytes: 26121,
+    sha256: '956e9205d397509e',
     segments: [
       [85, 341],
       [712, 1081],
@@ -124,6 +142,7 @@ export const BLEND_MARKS: Readonly<
   },
   'f - i - g ... fig': {
     bytes: 25494,
+    sha256: '6fa364d9f0ba231f',
     segments: [
       [83, 401],
       [729, 944],
@@ -133,6 +152,7 @@ export const BLEND_MARKS: Readonly<
   },
   'f - o - x ... fox': {
     bytes: 26748,
+    sha256: '1b698675e5fbc8b2',
     segments: [
       [100, 343],
       [801, 1066],
@@ -142,6 +162,7 @@ export const BLEND_MARKS: Readonly<
   },
   'g - e - m ... gem': {
     bytes: 26748,
+    sha256: 'a703c72e9d742b82',
     segments: [
       [61, 398],
       [792, 1081],
@@ -151,6 +172,7 @@ export const BLEND_MARKS: Readonly<
   },
   'h - a - t ... hat': {
     bytes: 25494,
+    sha256: '1b4e439e084d4e44',
     segments: [
       [85, 273],
       [792, 1082],
@@ -160,6 +182,7 @@ export const BLEND_MARKS: Readonly<
   },
   'h - e - n ... hen': {
     bytes: 24867,
+    sha256: '1b953c88e9005fa0',
     segments: [
       [92, 307],
       [714, 987],
@@ -169,6 +192,7 @@ export const BLEND_MARKS: Readonly<
   },
   'h - o - t ... hot': {
     bytes: 25494,
+    sha256: 'bf17252d004d5976',
     segments: [
       [92, 293],
       [805, 1104],
@@ -178,6 +202,7 @@ export const BLEND_MARKS: Readonly<
   },
   'j - e - t ... jet': {
     bytes: 24867,
+    sha256: '9ead26217366e2c6',
     segments: [
       [69, 344],
       [761, 1042],
@@ -187,6 +212,7 @@ export const BLEND_MARKS: Readonly<
   },
   'j - u - g ... jug': {
     bytes: 26121,
+    sha256: 'bccc66ccd3e214bd',
     segments: [
       [83, 386],
       [858, 1032],
@@ -196,6 +222,7 @@ export const BLEND_MARKS: Readonly<
   },
   'l - e - g ... leg': {
     bytes: 26748,
+    sha256: '00ff4f3b8e91c9d6',
     segments: [
       [49, 380],
       [877, 1135],
@@ -205,6 +232,7 @@ export const BLEND_MARKS: Readonly<
   },
   'l - i - d ... lid': {
     bytes: 25494,
+    sha256: '9a26b05869af358f',
     segments: [
       [113, 381],
       [770, 969],
@@ -214,6 +242,7 @@ export const BLEND_MARKS: Readonly<
   },
   'l - o - g ... log': {
     bytes: 24867,
+    sha256: '4caf3b18f5257bed',
     segments: [
       [46, 303],
       [722, 998],
@@ -223,6 +252,7 @@ export const BLEND_MARKS: Readonly<
   },
   'm - a - n ... man': {
     bytes: 30510,
+    sha256: '8e183114948f9c09',
     segments: [
       [99, 655],
       [1117, 1481],
@@ -232,6 +262,7 @@ export const BLEND_MARKS: Readonly<
   },
   'm - o - p ... mop': {
     bytes: 26748,
+    sha256: '3a10c4cd1bdd36dc',
     segments: [
       [63, 572],
       [1044, 1338],
@@ -241,6 +272,7 @@ export const BLEND_MARKS: Readonly<
   },
   'n - e - t ... net': {
     bytes: 26748,
+    sha256: '0a89d455d4a31e4d',
     segments: [
       [112, 522],
       [951, 1204],
@@ -250,6 +282,7 @@ export const BLEND_MARKS: Readonly<
   },
   'n - u - t ... nut': {
     bytes: 24867,
+    sha256: 'bee11ba4b464add1',
     segments: [
       [213, 570],
       [871, 1139],
@@ -259,6 +292,7 @@ export const BLEND_MARKS: Readonly<
   },
   'p - a - n ... pan': {
     bytes: 25494,
+    sha256: '62f7837629a2287e',
     segments: [
       [218, 301],
       [776, 1116],
@@ -268,6 +302,7 @@ export const BLEND_MARKS: Readonly<
   },
   'p - e - n ... pen': {
     bytes: 22986,
+    sha256: '19ad553c3961e12f',
     segments: [
       [81, 193],
       [600, 889],
@@ -277,6 +312,7 @@ export const BLEND_MARKS: Readonly<
   },
   'p - i - g ... pig': {
     bytes: 22359,
+    sha256: '698419e91e998344',
     segments: [
       [103, 210],
       [600, 776],
@@ -286,6 +322,7 @@ export const BLEND_MARKS: Readonly<
   },
   'p - i - n ... pin': {
     bytes: 23613,
+    sha256: '6b1e37907f1eeddc',
     segments: [
       [91, 254],
       [668, 844],
@@ -295,6 +332,7 @@ export const BLEND_MARKS: Readonly<
   },
   'p - o - t ... pot': {
     bytes: 23613,
+    sha256: '9813376a20aceceb',
     segments: [
       [92, 216],
       [723, 1004],
@@ -304,6 +342,7 @@ export const BLEND_MARKS: Readonly<
   },
   'r - u - g ... rug': {
     bytes: 26121,
+    sha256: 'c9c1f347a6e2888f',
     segments: [
       [101, 417],
       [894, 1074],
@@ -313,6 +352,7 @@ export const BLEND_MARKS: Readonly<
   },
   's - i - p ... sip': {
     bytes: 22986,
+    sha256: 'd0b049b5c54fc729',
     segments: [
       [40, 394],
       [758, 893],
@@ -322,6 +362,7 @@ export const BLEND_MARKS: Readonly<
   },
   's - u - n ... sun': {
     bytes: 26121,
+    sha256: 'b189afe32de12f91',
     segments: [
       [48, 422],
       [754, 1018],
@@ -331,6 +372,7 @@ export const BLEND_MARKS: Readonly<
   },
   't - a - g ... tag': {
     bytes: 25494,
+    sha256: 'e6198f43c4f3bbef',
     segments: [
       [81, 236],
       [725, 1039],
@@ -340,6 +382,7 @@ export const BLEND_MARKS: Readonly<
   },
   't - u - b ... tub': {
     bytes: 24240,
+    sha256: 'aeb9ec94134db162',
     segments: [
       [40, 185],
       [656, 923],
@@ -349,6 +392,7 @@ export const BLEND_MARKS: Readonly<
   },
   'v - a - n ... van': {
     bytes: 27375,
+    sha256: 'a3dd12b1c9dc2b0f',
     segments: [
       [41, 351],
       [854, 1201],
@@ -358,6 +402,7 @@ export const BLEND_MARKS: Readonly<
   },
   'w - e - b ... web': {
     bytes: 28629,
+    sha256: '5d84e63a7f213cc1',
     segments: [
       [100, 435],
       [964, 1226],
@@ -367,6 +412,7 @@ export const BLEND_MARKS: Readonly<
   },
   'w - i - g ... wig': {
     bytes: 24867,
+    sha256: '83b073faf9a01f70',
     segments: [
       [108, 408],
       [791, 959],

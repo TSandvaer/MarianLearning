@@ -3,6 +3,7 @@
  * § 5 acceptance: an entry for each of the 40 blend utterances, `bytes` =
  * the canon MP3's length, 4 segments in order), and the timing helpers.
  */
+import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { REPO_ROOT } from '../../test/webSource'
@@ -16,8 +17,9 @@ import {
   type Segment,
 } from './blendMarks'
 
-function canonBlends(): Map<string, number> {
-  const out = new Map<string, number>()
+/** Each canon blend clip's byte length and content hash, by its text. */
+function canonBlends(): Map<string, { bytes: number; sha256: string }> {
+  const out = new Map<string, { bytes: number; sha256: string }>()
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
       const p = join(dir, name)
@@ -32,7 +34,14 @@ function canonBlends(): Map<string, number> {
         }
         for (const u of json.utterances ?? []) {
           if (/^word\.p\d+\.blend$/.test(u.id) && u.audio) {
-            out.set(u.text, Buffer.from(u.audio.base64, 'base64').length)
+            const mp3 = Buffer.from(u.audio.base64, 'base64')
+            out.set(u.text, {
+              bytes: mp3.length,
+              sha256: createHash('sha256')
+                .update(mp3)
+                .digest('hex')
+                .slice(0, 16),
+            })
           }
         }
       }
@@ -45,11 +54,14 @@ function canonBlends(): Map<string, number> {
 describe('the generated marks', () => {
   const canon = canonBlends()
 
-  it('cover the 40 canon blend clips, byte for byte', () => {
+  it('cover the 40 canon blend clips: same length, same content', () => {
     expect(canon.size).toBe(40)
     expect(Object.keys(BLEND_MARKS).sort()).toEqual([...canon.keys()].sort())
-    for (const [text, bytes] of canon) {
-      expect([text, BLEND_MARKS[text]!.bytes]).toEqual([text, bytes])
+    for (const [text, clip] of canon) {
+      const { bytes, sha256 } = BLEND_MARKS[text]!
+      // The hash catches a re-bake that keeps the length (the clips are
+      // CBR: 9 different ones are 25494 bytes).
+      expect([text, bytes, sha256]).toEqual([text, clip.bytes, clip.sha256])
     }
   })
 

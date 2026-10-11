@@ -12,9 +12,11 @@
  *   after (every segment is followed by ≥ 300 ms of silence); the picture
  *   plays the whole word to the clip's end.
  *
- * A mark is used only on the exact clip it was measured on: same text and
- * same byte length (a re-bake changes the bytes; `blendMarks.test.ts`
- * fails until `npm run export-assets` runs again).
+ * At runtime a mark is used only on a clip with the same text and byte
+ * length (spec § 5). That length alone cannot catch a re-bake: the clips
+ * are CBR, so many share a length. Each entry therefore also carries the
+ * clip's content hash, and `blendMarks.test.ts` fails on any re-bake until
+ * `npm run export-assets` runs again.
  */
 import { BLEND_MARKS } from './blendMarks.generated'
 
