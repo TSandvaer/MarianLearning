@@ -23,7 +23,7 @@
 
 | Form   | When             | Composition                                                                   |
 | ------ | ---------------- | ----------------------------------------------------------------------------- |
-| **W**  | tablet portrait  | The web, 1:1, on `mathLayout`'s tablet frames with Word Song's sizes (§ 3)    |
+| **W**  | tablet portrait  | The web, 1:1, on `mathLayout`'s tablet frames with Word Song's sizes (§ 2)    |
 | **TL** | tablet landscape | The web landscape, 1:1, same frames                                           |
 | **P**  | phone portrait   | Math's two-row HUD, Emma + ribbon, the stage, a chip row at the bottom        |
 | **L**  | phone landscape  | Emma's column, then HUD + ribbon + stage in a middle pane, then a chip column |
@@ -114,7 +114,7 @@ Chip gaps are in brackets. In P on a tall phone the card stays at 160 and centre
 - **Picture:** the WebP, `contain`, filling the inset box (81 pt at the phone floor, 88 on a tablet).
 - **Letter:** Fredoka 700, `round(0.57 C)` (web 64/112), `#1F2937`.
 - **Written word:** Fredoka 700, `#1F2937`, size `min(round(0.32 C), the size at which the word fits C − 2 × inset)`, never below 24. Measured: "where" is 101 pt wide at 36, so it gets 28 pt in a 103 pt chip.
-- **Sparkle burst on a correct tap:** Word Song's own, not Math's. 6 sparkles fly out `75 × C / 112` pt over 850 ms (ease-out timing), scale 0.5 → 1.1, opacity 1 → 0. Each sparkle is `16 × C / 112` pt.
+- **Sparkle burst on a correct tap:** Word Song's own, not Math's. 6 sparkles fly out `75 × C / 112` pt over 850 ms (ease-out timing), scale 0.5 → 1.1, opacity 1 → 0. Each sparkle is `16 × C / 112` pt (web: `1em` of the button's inherited 16 px).
 
 **Text sizes** (Fredoka, per greet-math-native § 2): caption 22 (phones) / 25.6 (tablet), 600. Sentence panel 24 (P) / 22 (L) / 32 (tablet), 600, line height 1.4 on phones, 1.625 on a tablet; padding 16/12 (P), 16/10 (L), 24/16 (tablet, web `px-6 py-4`). Measured: all 8 sentence frames take ≤ 2 lines at 24 pt in P's 305 pt and 1 line at 22 pt in L's 333 pt. The th labels stay at the web's 16 pt (corner cue) and 24 pt (intro panel).
 
@@ -181,7 +181,7 @@ The status callback writes the shared values with `.set()`; nothing runs per fra
 ## 6. Audio timing
 
 - **The silent beat** (`cvc-word`, 1500 ms, web) counts foreground time only. Its timer pauses while the app is in the background and resumes with the time left (the web re-arms on `visibilitychange`).
-- **Decision: letter taps hold the read-aloud back.** After a letter tap, the read-aloud starts no sooner than 1000 ms after that tap, and never later than 5000 ms after the card appeared. **Why:** the beat exists so she decodes before she hears the word (Dave's review on PR #135 / #139, cited at `SILENT_TEXT_WINDOW_MS`). Tapping letters is decoding, so Emma waits instead of saying the word over her. The cap stops a tapping game from stalling the problem.
+- **Decision: letter taps hold the read-aloud back.** The read-aloud starts at `min(5000, max(1500, lastLetterTap + 1000))` ms after the card appeared (foreground time): no sooner than 1000 ms after a letter tap, never later than 5000 ms. **Why:** the beat exists so she decodes before she hears the word (Dave's review on PR #135 / #139, cited at `SILENT_TEXT_WINDOW_MS`). Tapping letters is decoding, so Emma waits instead of saying the word over her. The cap stops a tapping game from stalling the problem.
 - Every other content type reads at once (web).
 - **The chips open when the read-aloud ends** (web Word Song). Don't copy native Math's gate, which opens at the read's start.
 - **Wrong taps:** the reprompt at once. On the 2nd wrong, the blend (the hint line where there is no blend) starts 600 ms after the reprompt ends. On the 3rd, the give-answer line (web).
@@ -261,6 +261,6 @@ These rows are Word Song's own. The shared ones are in hub-native § 6, map-nati
 
 ## Open questions
 
-None for Thomas. He checks the PR on his devices, as for every Phase 3 screen (`team/DECISIONS.md` 2026-10-09). The native Word Song departs from the web in seven places: the phone-landscape chip column, the scrolling caption slot, the th cue's position, the letter spotlight, letter and picture tap-to-hear, the marks-driven blend, and the silent beat held by letter taps. None adds a line, a reward or a new pose. The tap sounds are new audio surfaces cut from ear-approved clips, so the PR's Self-Test Report carries a Predict-Before-Soak line for them.
+None for Thomas. He checks the PR on his devices, as for every Phase 3 screen (`team/DECISIONS.md` 2026-10-09). The native Word Song departs from the web in eight places: the phone-landscape chip column, the scrolling caption slot, the th cue's position, the letter spotlight, letter and picture tap-to-hear, the marks-driven blend, the silent beat held by letter taps, and written-word chips where art is missing. None adds a line, a reward or a new pose. The tap sounds are new audio surfaces cut from ear-approved clips, so the PR's Self-Test Report carries a Predict-Before-Soak line for them.
 
 No Dave consult is needed. The phoneme letter taps and the "hear it again" control are in the approved web spec; the silent-beat change only lengthens Dave's decoding beat while she is decoding. If Matt wants one check anyway, § 6's 1000 / 5000 ms numbers are the item to send.
