@@ -19,7 +19,7 @@
 - **Cards stay side by side**, same size, the other card never dimmed. This follows "two equal doors" (`team/DECISIONS.md` 2026-10-06, real-art check).
 - **A card scales as one picture.** Everything inside it uses the web's card-relative reference px (378×672, `HubPathCard.tsx` + `hubClay.css`) × `s = cardWidth / 378`. There are two exceptions: the map button's hit area is never below 56×56 (its visual stays at 118s), and the title stays ≥ 22 pt (52s at the phone floor s = 0.43 is 22.5 pt). The land-pill numeral (32s, 13.8 pt at the floor) may shrink, like the Math HUD pills.
 - **A card needs room outside its box:** 28s above it (crown 18s + bob 10s), 14s on each side (suggested ring) and 14s below (solid shadow). The layouts below reserve that room.
-- **No parent-gate corner** (§ 7). The Hub has three targets: the two cards and the two map buttons inside them.
+- **No parent-gate corner** (§ 7). The Hub has four visible targets (the two cards and the map button inside each) plus Emma's hidden long-press (§ 4).
 
 ## 2. Phone layouts
 
@@ -58,7 +58,7 @@ P  portrait (375×667 floor)          L  landscape (667×375 floor)
 - `colMin = 262` (230 pt inner width keeps every guidance line to 3 lines at 22 pt, + 2 × 16 padding).
 - `s = min(1, (safe h − 16) / 714, (safe w − colMin − 72) / 756)`. Here 714 = 28 + 672 + 14 (a card and its outside room, × s), 756 = two cards, and 72 = 16 left + 24 column gap + 16 card gap + 16 right. The left card's ring (14s) fits in the 24 pt column gap. Floor: s = 0.4405, cards 166.5 × 296.
 - Cards: the right card's box edge is 16 pt from the safe right edge, gap 16 pt, box bottom `8 + 14s` above the safe bottom.
-- Column: from safe left + 16 to the left card − 24. Floor: 262 pt. Wider phones give the extra width to the column (iPhone 14, 844×390 with 47 pt side insets: s 0.494, column 304).
+- Column: from safe left + 16 to the left card − 24. Floor: 262 pt. Wider phones give the extra width to the column (example: 844×390 with 47 pt side insets and a 21 pt bottom inset gives s 0.494, column 304).
 - Bubble: the full column width, 3-line slot (100 pt), tail on top pointing up.
 - Emma: `E = min(1.25 × column, safe h − 16 − 100 − 12)`, centred on the column. She may be wider than the column: her figure fills only the middle 35% of the art (x ≈ 0.33–0.68 of `idle.webp`), and the transparent sides pass under the left card. Floor: E = 247.
 - Emma + 12 + bubble slot are centred together vertically in the safe height.
@@ -69,10 +69,10 @@ P  portrait (375×667 floor)          L  landscape (667×375 floor)
 
 **L (tablet landscape)** is the same formula as phone landscape with tablet values: caption **30 pt** (the web's 30u at u = 1), line height 34.5, padding 14/18, so the 3-line slot is **132 pt**; `colMin = 350` (314 pt inner width keeps every line to 3 lines at 30 pt). s is capped at 1, never larger than the web card.
 
-| Tablet landscape example (status bar hidden) | s    | Cards     | Column | Emma |
-| -------------------------------------------- | ---- | --------- | ------ | ---- |
-| iPad Air 11", 1180×820 (bottom inset 20)     | 1.0  | 378 × 672 | 352    | 440  |
-| iPad 10.2", 1080×810 (no insets)             | 0.87 | 329 × 585 | 350    | 437  |
+| Tablet landscape (example insets)        | s    | Cards     | Column | Emma |
+| ---------------------------------------- | ---- | --------- | ------ | ---- |
+| iPad Air 11", 1180×820 (bottom inset 20) | 1.0  | 378 × 672 | 352    | 440  |
+| iPad 10.2", 1080×810 (no insets)         | 0.87 | 329 × 585 | 350    | 437  |
 
 Check: the 1180 row's vertical sum is 8 + 28 + 672 + 14 + 8 = 730 ≤ 800, so s = 1 fits; the 1080 row is width-bound.
 
@@ -106,16 +106,55 @@ Check: the 1180 row's vertical sum is 8 + 28 + 672 + 14 + 8 = 730 ≤ 800, so s 
 
 ## 6. Web → native translations
 
-_(pending)_
+**Logic is shared, not re-ported.** Move the pure parts of `src/screens/Hub/hubGuidance.ts` (`GUIDANCE_LINES` texts, `pickGuidanceLines`, `suggestWorld`, `flowerWakeFor`, `read/writeFlowerWake`) and `hubSuggestion.ts` into `@marian/core/hub/`, and have the web import them back. That is a refactor, not a web UI change, so the freeze allows it. The Howler player stays in the web file. `buildHubCardModel` is already in core.
+
+| Web                                                                                                                         | Native                                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `.hub-stage` size container, `--u` = 1/820 of the stage                                                                     | JS numbers: stage `u` (W) and card `s`, from a new `mobile/src/layout/hubLayout.ts` (beside `greetLayout.ts` / `mathLayout.ts`). It replaces the placeholder `hubLayout` in `layout.ts`.                                                                     |
+| Card: `role="button"`, `onClick`, Enter/Space, `:focus-visible` ring, `cursor`                                              | `Pressable` `onPress` (fires on release, so sliding off cancels), `accessibilityRole="button"`, labels "Number Garden" / "Word Song" / "Number Garden map". No hover, no focus ring.                                                                         |
+| `.is-down`: card +8u, shadow 14u → 6u, 120 ms                                                                               | The **face** moves +8s (`withTiming`, 120 ms) and swaps to the pressed shadow at press-in. The Pressable's box stays still.                                                                                                                                  |
+| Map `:active`: +7u, shadow → `0 2u 0`                                                                                       | The same, on the map button's pressed state.                                                                                                                                                                                                                 |
+| Suggested bob: `translate 0 → −10u → 0`, 2.2 s ease-in-out, 2 runs                                                          | `withRepeat(withSequence(…), 2)` on the face's `translateY`, from mount. Once per mount; a rotation doesn't restart it.                                                                                                                                      |
+| Suggested ring `::after`: inset −14u, `0 0 0 6u #fff3a8, 0 0 36u 14u rgba(255,210,63,.8)`, opacity 1 → .65, 2.2 s, infinite | A transparent View in the face at inset −14s with that `boxShadow` (outset shadows draw outside the box only), and a looping opacity.                                                                                                                        |
+| `.hub-glow` box-shadow pulse, 2.4 s                                                                                         | Two stacked glow Views (rest and peak shadow); the peak layer's opacity loops 0 ↔ 1 over 2.4 s. Reanimated can't interpolate a shadow string.                                                                                                                |
+| `.hub-spark` (scale .5, opacity .4, 1.8 s, delays 0 / 0.7 s), `.hub-zz` (−6u, opacity .6, 2.4 s)                            | Reanimated loops, same values.                                                                                                                                                                                                                               |
+| Wake: bud `scale .6, rotate −10°, opacity .4 → 1`, 0.8 s `cubic-bezier(.34,1.56,.64,1)`, delay 0.5 s                        | `withDelay(500, withTiming(…, { duration: 800, easing: Easing.bezier(0.34, 1.56, 0.64, 1) }))`, once per mount.                                                                                                                                              |
+| `linear-gradient` / `radial-gradient`, `box-shadow` (incl. `inset`)                                                         | `experimental_backgroundImage` and `boxShadow` strings, as Math already does; px = reference × s (or × u).                                                                                                                                                   |
+| Title `text-shadow` stack                                                                                                   | Three stacked `Text` layers: dark extrusion at +6s, light rim at +2s, the face on top. The bottom layer carries one `textShadow` (0, 10s, radius 10s, `rgba(0,0,0,.25)`). Fredoka 700, 52s, line height 0.98.                                                |
+| `filter: saturate(.55) brightness(1.04)` on the "next" sticker                                                              | **Baked**, because iOS can't saturate. `export-assets.mjs` writes a `-muted` copy of every 256 px path image (sharp `modulate({ saturation: 0.55, brightness: 1.04 })`).                                                                                     |
+| `filter: drop-shadow` on stickers, lock, buds, map icon                                                                     | iOS: `shadow*` props on a background-less wrapper, which follows the image's alpha. Android: `filter: [{ dropShadow }]` (Android 12+; older versions show none). Values = web × s. Tradeoff: if the bob stutters on an iPad, bake these too.                 |
+| Bubble tail `clip-path: polygon`                                                                                            | A react-native-svg triangle in `#fff8ee`. W: right side, pointing at Emma (web 34u × 30u, top 34u). P/L: top centre, pointing up, 28 × 14 pt.                                                                                                                |
+| `.hub-bubble` clay slab                                                                                                     | Reuse `CaptionRibbon` with the clay style (Math's `clayRibbon` pattern) and a new `color` prop (`#6b3f1f`). W: the web values × u. P/L: radius 28, `inset 0 3px 0 #fff, 0 6px 0 #e3c6a6, 0 10px 16px rgba(60,30,10,.2)`. The word fade is the shared 150 ms. |
+| Moon SVG with radial gradient                                                                                               | react-native-svg, as Splash does.                                                                                                                                                                                                                            |
+| `.hub-clay` gutters + `.hub-garden` backdrop                                                                                | One full-screen background View: the `.hub-clay` bands over the whole screen. The 6 garden blobs go at stage coordinates in W, and at the same fractions of the screen (x/820, y/1180) in P and L.                                                           |
+| `@media (prefers-reduced-motion)`                                                                                           | `useReducedMotion()`: the glow, spark, zz, wake, bob and ring loops stop (ring at full opacity, buds shown open). Press feedback stays. Emma stops breathing (EmmaStage).                                                                                    |
 
 ## 7. Not ported
 
-_(pending)_
+- **The 96×96 parent-gate corner.** The web's handler is a v1 no-op (`src/App.tsx` `handleHubParentGate`), and on a phone the corner would sit over the bubble or a card. Emma's 3 s long-press is the parent entrance.
+- **`PromotionCelebration`** and its idle ↔ celebration swap (retired from the web Hub, § 4).
+- **The first-tap gate machinery** (§ 5).
+- **`useStorageSync`** (cross-tab `storage` events): one app, one process.
+- **Keyboard activation and the focus ring.**
 
 ## Acceptance criteria (Jessica, on device)
 
-_(pending)_
+- [ ] Returning launch (sessionCount ≥ 1): Splash → Hub. Emma fades in with no slide-in, and her first line starts with no tap, `onPlay` ≤ 500 ms after the Hub mounts.
+- [ ] For the same Progress doc and day, the native Hub picks the same lines, suggested card and flower-slot states as the web Hub. This is a unit test over the shared core helpers (§ 6).
+- [ ] Bubble: hidden until the first word. Between two lines it re-enters with the next line, and after the last line it keeps showing that line. On a return within 30 s: no line and no bubble.
+- [ ] A card tap while Emma speaks silences her at once and routes to Number Garden / Word Song. No Hub line is heard on the next screen.
+- [ ] Map tap: the plink plays, Emma goes silent, and the route goes to `map`. A card tap plays no SFX.
+- [ ] A 3 s press on Emma opens Parent Settings. A tap or a 2 s press on Emma does nothing, and a long press on a card never opens it.
+- [ ] Suggested card: the ring breathes, the face bobs twice and then rests. The other card is the same size, not dimmed, and both start a session.
+- [ ] A flower earned today shows as a closed bud with moon and z. One day later (`dayOffset` +1), the bud opens once, with "Your flower woke up!". On the next visit it is open, with no wake animation and no wake line.
+- [ ] 375×667, portrait and landscape: cards ≥ 163×290 (P) / ≥ 166×296 (L) with a 16 pt gap, map hit areas ≥ 56×56, caption 22 pt, titles ≥ 22 pt, every guidance line in ≤ 3 lines. Nothing is clipped and nothing overlaps the bubble.
+- [ ] Tablet portrait matches the web Hub at the same size. Tablet landscape on 1180×820: cards side by side at 378×672, caption 30 pt, no pillarbox.
+- [ ] Rotating mid-line: Emma springs to her new frame, the line and caption carry on, and the bob and wake animations don't restart.
+- [ ] Reduce Motion on: no bob, ring pulse, glow pulse, sparks, z or wake animation; the ring shows and the buds show open; press feedback still works; Emma doesn't breathe.
+- [ ] iOS and Android both show Emma's baked shadow and warm light, and the muted "next" sticker.
+- [ ] Number Garden glowing, network up, ≥ 10 s on the Hub: tapping it shows Math without the getting-ready state.
+- [ ] Backgrounding the app mid-line and returning: the line resumes where it stopped and is not replayed.
 
 ## Open questions
 
-_(pending)_
+None for Thomas. Thomas checks the PR on his devices, as for every Phase 3 screen (`team/DECISIONS.md` 2026-10-09). Tablet landscape is the one place the native Hub departs from the web. It rearranges approved pieces with no new art or styling, so it gets that same device check rather than a mockup round (bar 12). No Dave consult is needed: no motivation mechanic, line or reward changes. Every line, glow and flower rule is the approved G1 layer, unchanged.
