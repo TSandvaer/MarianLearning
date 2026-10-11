@@ -176,6 +176,9 @@ function Shell() {
       if (from === 'session-end' || !MATH_AUDIO_ROUTES.has(next)) {
         mathSession.tearDown()
       }
+      // Session End consumed its payload (the one write): a later arrival
+      // without a new session gets the placeholder, never a second write.
+      if (from === 'session-end') setSessionEnd(null)
       routeRef.current = next
       setRoute(next)
     },
@@ -252,7 +255,13 @@ function Shell() {
 
   const greet = route === 'greet' ? greetLayout(viewport) : null
   const math = route === 'math' ? mathLayout(viewport) : null
-  const end = route === 'session-end' ? sessionEndLayout(viewport) : null
+  // Session End needs a finished session; without one (QA route, the
+  // Word Song placeholder's exit) the placeholder renders and nothing is
+  // written.
+  const end =
+    route === 'session-end' && sessionEnd !== null
+      ? sessionEndLayout(viewport)
+      : null
   const layout = greet ?? math ?? end ?? layoutForRoute(route, viewport)
 
   return (
@@ -304,21 +313,9 @@ function Shell() {
             // Calm through the whole Greet (native-only, Thomas 2026-10-09:
             // no celebration swap); Math and Session End drive her poses as
             // on the web.
-            pose={
-              route === 'math'
-                ? mathPose
-                : route === 'session-end'
-                  ? sessionEndPose
-                  : 'idle'
-            }
+            pose={route === 'math' ? mathPose : end ? sessionEndPose : 'idle'}
             // The web's Session End Emma is a still image (no breath).
-            breath={
-              route === 'greet'
-                ? GREET_BREATH
-                : route === 'session-end'
-                  ? null
-                  : BREATH
-            }
+            breath={route === 'greet' ? GREET_BREATH : end ? null : BREATH}
             motion={route === 'greet' ? 'greet' : 'character'}
           />
         </>

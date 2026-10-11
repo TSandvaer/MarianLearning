@@ -6,7 +6,11 @@
  * the rest of core's route state machine.
  */
 import { LINE_GAP_MS } from '@marian/core/greet/greetSequence'
-import { defaultProgress, saveProgress } from '@marian/core/progress'
+import {
+  defaultProgress,
+  loadProgress,
+  saveProgress,
+} from '@marian/core/progress'
 import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
 import { ADVANCE_AFTER_CORRECT_MS } from '@marian/core/shared/gameplayConstants'
@@ -25,6 +29,7 @@ import {
 } from '../test/fakeAudio'
 import App from './App'
 import { mathLayout } from './layout/mathLayout'
+import * as buildEnv from './platform/buildEnv'
 import { NO_LAUNCH_FLAGS, type LaunchFlags } from './platform/launchFlags'
 import { bootNative, type SyncKeyValueBackend } from './platform/native'
 import {
@@ -242,6 +247,52 @@ it('Greet → heart → Math (offline: the static plan, silent captions) → 8 p
   // Every player is released once the chime has rung out.
   await advance(CHIME_TAIL_MS)
   expect(fakePlayers.filter((p) => !p.released)).toEqual([])
+})
+
+it('Session End writes once: after All done, Hub → Word Song → Session End is the placeholder and records nothing', async () => {
+  boot()
+  await greetToMath()
+  for (let i = 0; i < 8; i++) await answerRight()
+  await sessionEndSettles()
+  await fireEvent.press(screen.getByTestId('session-end-cta'))
+  await advance(LEAVE_DELAY_MS)
+  expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
+  expect(readSessionHistory().sessionCount).toBe(1)
+  expect(loadProgress()?.history).toHaveLength(1)
+
+  await fireEvent.press(screen.getByTestId('exit-literacy'))
+  await fireEvent.press(screen.getByTestId('exit-session-end'))
+  await settle(1000)
+  expect(readSessionHistory().sessionCount).toBe(1)
+  expect(loadProgress()?.history).toHaveLength(1)
+  expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
+  expect(screen.queryByTestId('session-end')).toBeNull()
+})
+
+it('QA route session-end without a session: the placeholder, and nothing is written', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  const env = jest.spyOn(buildEnv, 'readBuildEnv').mockReturnValue({
+    apiBase: undefined,
+    progressApiSecret: undefined,
+    debug: '1',
+    seed: undefined,
+    dayOffset: undefined,
+    mute: undefined,
+    audioCheck: undefined,
+    qaAutoTapMs: undefined,
+    qaRoute: 'session-end',
+  })
+  try {
+    boot({ debug: true, seed: null, dayOffset: null })
+    await render(<App />)
+    await settle(1000)
+    expect(readSessionHistory().sessionCount).toBe(0)
+    expect(loadProgress()?.history ?? []).toHaveLength(0)
+    expect(screen.getByTestId('route-session-end')).toBeOnTheScreen()
+    expect(screen.queryByTestId('session-end')).toBeNull()
+  } finally {
+    env.mockRestore()
+  }
 })
 
 it('3rd good day: All done opens the map (an unlock waits there)', async () => {
