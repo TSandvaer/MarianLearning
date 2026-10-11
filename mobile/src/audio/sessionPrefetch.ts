@@ -1,7 +1,8 @@
 /**
  * Session prefetch for the Hub (native counterpart of the web's
- * `hubSessionPrefetch.ts` + App.tsx's kick latch). Not wired to a screen
- * yet; Phase 3's Hub calls it.
+ * `hubSessionPrefetch.ts` + App.tsx's kick latch). App prefetches the
+ * Math session on Hub entry while Number Garden glows, and the card tap's
+ * kick takes it (`../session/mathSession.ts`).
  *
  * Contract (same as the web):
  * - On Hub entry, `prefetch(key, args)` starts the session-start request for
