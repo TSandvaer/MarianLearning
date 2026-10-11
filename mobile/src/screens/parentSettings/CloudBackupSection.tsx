@@ -208,6 +208,7 @@ export function CloudBackupSection({
         {CLOUD_BACKUP_COPY.body}
       </Text>
       <View
+        testID="parent-settings-cloud-blocks"
         style={{ marginTop: 16 }}
         onLayout={(e) => {
           blocksY.current = e.nativeEvent.layout.y

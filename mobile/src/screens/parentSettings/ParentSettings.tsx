@@ -232,6 +232,7 @@ export function ParentSettings({
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       >
         <View
+          testID="parent-settings-column"
           style={column}
           onLayout={(e) => {
             columnY.current = e.nativeEvent.layout.y
@@ -248,6 +249,7 @@ export function ParentSettings({
             <BackupSection progress={progress} deps={deps} alive={alive} />
           </View>
           <View
+            testID="parent-settings-cloud-wrap"
             style={styles.section}
             onLayout={(e) => {
               cloudY.current = e.nativeEvent.layout.y

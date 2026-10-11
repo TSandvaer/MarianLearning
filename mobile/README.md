@@ -1,6 +1,6 @@
 # Marian Tutor: native app (Expo)
 
-The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash, Greet, Math, Session End, the Hub, the map and Word Song are real (`src/screens/Splash.tsx`, `src/screens/greet/`, `src/screens/math/`, `src/screens/sessionEnd/`, `src/screens/hub/`, `src/screens/map/`, `src/screens/wordSong/`; UX calls in `design/native/greet-math-native.md`, `design/native/hub-native.md`, `design/native/map-native.md` and `design/native/word-song-native.md`); Parent Settings is still a placeholder.
+The React Native app from `design/react-native-migration-plan.md`. Phase 2a: the shell. Phase 2b: the audio engine (`src/audio/`, see [Audio](#audio)). Phase 3 ports the screens in first-launch order: Splash, Greet, Math, Session End, the Hub, the map, Word Song and Parent Settings are all real (`src/screens/Splash.tsx`, `src/screens/greet/`, `src/screens/math/`, `src/screens/sessionEnd/`, `src/screens/hub/`, `src/screens/map/`, `src/screens/wordSong/`, `src/screens/parentSettings/`; UX calls in `design/native/greet-math-native.md`, `design/native/hub-native.md`, `design/native/map-native.md`, `design/native/word-song-native.md` and `design/native/parent-settings-native.md`). Only the legacy `reward` route is still a placeholder.
 
 ## Shape
 
