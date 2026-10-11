@@ -1,6 +1,6 @@
 # Map (Emma's Path): native UX calls
 
-**Scope:** React Native Phase 3, the Map port (after the Hub, before Word Song). The reference is the live web Map in `src/screens/Map/` (frozen): the clay map (R3, #509), Emma's head-and-shoulders badge and the iPad-landscape fit (#522), and the unlock beat (Emma's Path 9/10, #504). The logic is already in core (`@marian/core/map/*`: `buildMapModel`, `layoutMap`, `landscapeScale`, `openLine` / `stopLine` / `gateLine`, `unlockTimeline`, `persistUnlockCelebrated`). The audio is already in `mobile/src/audio` (`createPathLinePlayer`, `createSfx`), and every map line and SFX is bundled. Anything not named here behaves as the web Map does. Conventions follow `design/native/hub-native.md` and `greet-math-native.md`: Fredoka, the 375×667 / 667×375 phone floor, and "tablet" means a shorter side of 600 pt or more.
+**Scope:** React Native Phase 3, the Map port (after the Hub, before Word Song). The reference is the live web Map in `src/screens/Map/` (frozen): the clay map (R3, #509), Emma's head-and-shoulders badge and the iPad-landscape fit (#522), and the unlock beat (Emma's Path 9/10, #504). The logic is already in core (`@marian/core/map/*`: `buildMapModel`, `layoutMap`, `landscapeScale`, `openLine` / `stopLine` / `gateLine`, `unlockTimeline`, `persistUnlockCelebrated`). The audio is already in `mobile/src/audio` (`createPathLinePlayer`, `createSfx`), and every baked map line and map SFX is bundled (§ 6). Anything not named here behaves as the web Map does. Conventions follow `design/native/hub-native.md` and `greet-math-native.md`: Fredoka, the 375×667 / 667×375 phone floor, and "tablet" means a shorter side of 600 pt or more.
 
 **Stale docs:** `.claude/docs/screens-and-flows.md` has no Map section, and `design/emmas-path/emmas-path-spec.md` § 3 (72 pt stops, standing Emma, a rotateY gate) predates the clay rebuild and the badge. The code is the reference.
 
@@ -15,15 +15,15 @@
 
 **The path scales as one picture.** Core's `layoutMap` works in web px ("virtual px"). Native draws every path value × `s`: positions, sizes, radii, shadows, sparkle radii and hop heights. Don't use `transform: scale` (the web's `LandscapeFrame`), so hit areas stay real-size.
 
-- **Portrait (W, P):** `s = min(1, pane.w / 820)`, then `layoutMap(model, pane.w / s, pane.h / s, alsoBadged)`. 820 is the web's iPad width. Below it the map shrinks as a whole rather than squeezing the stops together (at 744 pt the web lets a Word Song current stop overlap its neighbour). Floor: s = 0.457.
+- **Portrait (W, P):** `s = min(1, pane.w / 820)`, then `layoutMap(model, pane.w / s, pane.h / s, alsoBadged)`. 820 is the web's iPad width. Below it the map shrinks as a whole rather than squeezing the stops together (core's layout at 744 pt makes a Word Song current stop overlap its neighbour by 6 px). Floor: s = 0.457.
 - **Landscape (L, TL):** `fit = landscapeScale(lands, pane.h, rooms)` (the web's rule) and `s = max(MAP_MIN_SCALE, fit)`, with `MAP_MIN_SCALE = 0.45`.
   - fit ≥ 0.45: the path fits the pane, with virtual height `pane.h / s − LANDSCAPE_TRAY_ROOM` (web).
   - fit < 0.45: the pane **scrolls** vertically. Content height = `landscapeNeed(lands, rooms) × 0.45`, virtual height = `landscapeNeed − LANDSCAPE_TRAY_ROOM`. Add `landscapeNeed` to core `map/mapLayout.ts`: it is the `need` inside `landscapeScale`, which then calls it. The web is unchanged.
-- **Decision: only phone landscape scrolls.** Fitting 4–5 lands into a 271 pt pane would give 24–29 pt stops and a 25 pt Emma. At 0.45 the phone-landscape map is the same size as the phone-portrait one. Tablets and phone portrait never scroll, so the whole path stays one glance (spec § 0) on the devices where Marian plays.
+- **Decision: only phone landscape scrolls.** Fitting 4–5 lands into a 271 pt pane would give 24–29 pt stops and a 25–30 pt Emma badge. At 0.45 the phone-landscape map is the same size as the phone-portrait one. Tablets and phone portrait never scroll, so the whole path stays one glance (spec § 0) on the devices where Marian plays.
 
 **Hit areas.** Every stop and gate is at least 44×44 pt: its box plus `hitSlop = max(0, (44 − box) / 2)` on each side. At the floors the slop needed (≤ 2.2 pt) is less than half the narrowest gap between two stops (10.1 pt, Word Song, P). The current stop's bottom slop also covers its bud tray, which sits inside the stop's button on the web. Home is 56×56 on phones and 96×96 on tablets.
 
-**Sizes.** Measured with core's own `layoutMap` / `landscapeScale` (a scratch script, not committed), worst case over every current step. Word Song is the smaller world on every device (pt):
+**Sizes.** Measured with core's own `layoutMap` / `landscapeScale` (a scratch script, not committed), worst case over every current step. Word Song is the worst case on every device (pt):
 
 | Device (insets)    | Form | s     | Stop | Current | Emma badge | Scroll                          |
 | ------------------ | ---- | ----- | ---- | ------- | ---------- | ------------------------------- |
@@ -68,7 +68,7 @@ P  portrait (375×667 floor)           L  landscape (667×375 floor)
 - Rail: Home 56×56 at (S.x + 16, S.y + 8), with nothing under it. **No title in L.** The height goes to the path and the width to the caption. The stop pictures and land pills already show which world it is.
 - Caption slot: x S.x + 16 to S.right − 16, height **72** (2 lines), bottom 16 above S's bottom. Measured: at the floor's 565 pt text width, every line fits in 2 lines.
 - Pane: x S.x + 88 to S.right − 16, y S.y + 8 to the slot top − 8. Floor: 563 × 271.
-- **Why not the web's left column:** Word Song's 5-stop land needs 767 virtual px (2 × 190 inset + 4 × 96.8), so a map at 0.45 needs a pane of at least 345 pt. That leaves the column 274 pt, and the caption 5 lines of 2–3 words each. A bottom slab reads in 1–2 natural lines.
+- **Why not the web's left column:** Word Song's 5-stop land needs 767 virtual px (2 × 190 inset + 4 × 96.8), so a map at 0.45 needs a pane of at least 345 pt. That leaves the column 274 pt, and the caption up to 5 lines of 2–3 words each. A bottom slab reads in 1–2 natural lines.
 - **Scroll:**
   - Vertical `ScrollView`, scroll indicator on, `flashScrollIndicators()` once after the first offset is set. No snapping, normal bounce.
   - Opening offset, not animated: centre the focus box (the top of Emma's badge down to the current stop's centre + 1 × its size, which covers the bud tray), clamped to the content. When the path is complete, the focus box is the last stop. Set it with `scrollTo({ y, animated: false })` in `onContentSizeChange`, because the `contentOffset` prop is iOS-only.
@@ -95,10 +95,10 @@ Unit tests pin the sizes table above.
 
 ## 3. Emma on the map
 
-- **No App-level Emma on the map.** App does not render `EmmaStage` while `route === 'map'`. Give its outer view `exiting={FadeOut.duration(200)}` (the web map's exit); `map` is the only route where it unmounts. Back on the Hub she remounts with `entrance='fade'` and her shadow, as on a returning launch. Why: on the map Emma is part of the picture. She scrolls with the path in L and sits under the stops, and the hoisted stage draws her full figure, which the map no longer shows.
+- **No App-level Emma on the map.** App does not render `EmmaStage` while `route === 'map'`. Give its outer view `exiting={FadeOut.duration(200)}` (the web map's exit); `map` joins Splash as a route without her. Back on the Hub she remounts with `entrance='fade'` and her shadow, as on a returning launch. Why: on the map Emma is part of the picture. She scrolls with the path in L and sits under the stops, and the hoisted stage draws her full figure, which the map no longer shows.
 - **Emma is the web's "you are here" badge (`EmmaBadge.tsx`), not a standing figure behind the stop.** `team/DECISIONS.md` 2026-10-06 put her behind the stop. Thomas replaced that on 2026-10-07 ("she has no legs so this doesnt work", #522; `emma-character-and-animation.md` § 3b). Port the badge: a clay rim, a cream window with her head and shoulders, and a tail pointing down at the stop. The whole box sits above the stop (`emmaBadge()`).
 - **Draw order in the path layer:** bands, stones, land pills, current glow, badge, gates, stops. The badge never covers a stop or a gate.
-- **Face: drawn, not baked.** The window is a circle with `overflow: 'hidden'`. Inside it, the pose WebP (`emmaAsset('idle' | 'cheering')`) is drawn with side `window × 1024 / 400`, offset by `(−cx, −cy) / 400 × window`. The crop squares are the web's `CROP`: idle (312, 14, 400) and cheering (330, 80, 400). This needs no new files: the pose art is already bundled and EmmaStage has decoded it. Rim, window and gloss: `EmmaBadge.tsx` values in virtual px × s.
+- **Face: drawn, not baked.** The window is a circle with `overflow: 'hidden'`. Inside it, the pose WebP (`emmaAsset('idle' | 'cheering')`) is drawn with side `window × 1024 / 400`, offset by `(−cx, −cy) / 400 × window`. The crop squares are the web's `CROP`: idle (312, 14, 400) and cheering (330, 80, 400). This needs no new files: the pose art is already bundled. Rim, window and gloss: `EmmaBadge.tsx` values in virtual px × s.
 - **Poses:**
   - `idle` → idle face.
   - `cheering` → cheering face, plus a scale pop [1, 1.18, 0.95, 1.05, 1] over 600 ms, ease-out.
@@ -145,3 +145,76 @@ iOS supports only `brightness` and `opacity` in RN's `filter` (hub-native § 4),
 | Sparkles                                                                  | `motion` spans                                                                             | Reanimated dots, 10 × s, pink and gold alternating.                                                                                                                                                                                                                                                                                  |
 
 **New art: the 24 locked stickers.** Everything else is already in the bundle.
+
+## 6. Audio
+
+- **No tap gate (hub-native § 5).** The open line ("Here is your path! You are on {name}.", or "You did all of it! Look at your flowers!") starts at mount: `onPlay` ≤ 500 ms. During an unlock beat the beat's line replaces it (§ 4).
+- **Player:** `createPathLinePlayer()` (the port of the web's `playMapLine`, already in `mobile/src/audio`), one per mount, `unload()` on unmount. A new line cuts the one in flight. Deferred lines (`src: null`: 111 `locked-later` and 38 `gate-locked` lines) show their caption and stay silent, as on the web.
+- **Decision: the caption shows the whole line at once** (as the web map does), not the Hub's word walk. Map lines answer taps and are read at a glance. It enters with a fade and an 8 pt rise over 200 ms, keyed by line id, and keeps the last line until the next one.
+- **Taps:**
+  - Open, mastered or current stop → `stopLine` (its name).
+  - Locked stop → `sfx-poof` at 0.45, one wiggle (rotate 0, −7, 7, −4, 0 over 500 ms), Emma's badge tilts (`attentive-pointing`, 1500 ms), and the requirement line.
+  - Gate → `gateLine`.
+
+  Stops and gates have no press visual (web).
+
+- **SFX:** `createSfx` per mount, all unloaded on unmount. The poof is made on the first locked tap. `chime` and `cheer` are made at mount only when a beat is pending, so they are loaded before 1100 ms.
+- **Home:** no SFX (web). Leaving cancels the line (unmount).
+- **Unmount:** `markHubUnmount(Date.now())`. The Hub treats the return as a rapid remount and stays quiet however long the map was open (web `HUB_LAST_UNMOUNT_KEY`).
+- **Session audio:** the map never touches the Math session or the Hub's prefetch. App already keeps the prefetch across hub → map → hub.
+- **Background:** the voice channel parks the line and resumes it (#528), so the map needs no code for it. The audio session is held (`doNotMix`).
+- **Bundled:** all 117 baked map lines (open, open-done, stop, land, locked-next and the unlock/land lines) and the 3 map SFX are in `mobile/assets/audio/` (checked file by file against `PATH_LINES`).
+
+## 7. Back navigation
+
+- **Home button** (top left in every form) → Hub. It works during the beat too.
+- **Android back = Home.** A `BackHandler` on the map does the same as Home and returns `true`. Other screens are out of scope here.
+- **No iOS edge swipe.** There is no navigation stack, no other screen has a swipe, and on a phone the left edge is where gates and land pills sit.
+- **App wiring:** a `mapWorld` state (web `handleHubOpenMap`). The Hub's map buttons set it, and Session End's unlock route sets it to the session's world. Emma's frame no longer comes from `layoutForRoute('map')` (§ 3).
+
+## 8. Web → native translations
+
+These rows are map-specific. The shared ones (gradients, `box-shadow`, drop shadows, the text-shadow stack, Reduce Motion) are in hub-native § 6.
+
+| Web                                                                               | Native                                                                                                                             |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `landscape:` grid rules + `useLandscape()` (`matchMedia`)                         | The form from `mapScreenLayout(viewport)` (§ 2).                                                                                   |
+| `ResizeObserver` on the path region + the `ready` gate                            | Computed from the viewport at render. No measure pass.                                                                             |
+| `LandscapeFrame` `transform: scale(…)`                                            | Every path value × s (§ 1).                                                                                                        |
+| Stop / gate / Home `<button>` + `aria-label`                                      | `Pressable` `onPress`, `accessibilityRole="button"`, labels `STAGE_SPOKEN_NAMES[node]` / "Land {n}" / "Home", `hitSlop` per § 1.   |
+| Home `active:translate-y-[6px]`                                                   | The face moves down 6 (× 7/12 on phones) at press-in, 120 ms (`PRESS_MS`), like the Hub's map button.                              |
+| `CurrentGlow`: animated `boxShadow`, 2.4 s                                        | Two stacked glow Views (rest and peak shadow), the peak's opacity looping (the Hub glow pattern). Diameter 1.5 × the current stop. |
+| Nearly-there `opacity [.6, 1, .6]`, 2 s                                           | `withRepeat` on the sticker's opacity.                                                                                             |
+| Locked wiggle (`key={wiggle}`, rotate `[0, −7, 7, −4, 0]`, 0.5 s)                 | `withSequence` on rotate, restarted on every tap.                                                                                  |
+| Badge `m.div` left/top spring                                                     | `withSpring` (260/22) on translateX/Y, only when the stop changes.                                                                 |
+| `AnimatePresence` face swap                                                       | Two keyed `Image` layers, `FadeIn` / `FadeOut` 200 ms.                                                                             |
+| `m.main` fade in 250 ms (ease-out), out 200 ms                                    | Root `entering={FadeIn.duration(250)}`, `exiting={FadeOut.duration(200)}`.                                                         |
+| Caption `m.div key={caption.id}`, opacity 0 → 1, y 8 → 0, 200 ms, `role="status"` | Keyed entering, fade + translateY 8 → 0, 200 ms. `ClayCaption` already sets `accessibilityLiveRegion="polite"`.                    |
+| `PathImg` `srcSet` 256 / 512                                                      | `PathImage` (exists).                                                                                                              |
+| `sessionStorage` `HUB_LAST_UNMOUNT_KEY`                                           | `markHubUnmount(Date.now())`.                                                                                                      |
+| Beat `window.setTimeout`s                                                         | `setTimeout`, cleared on unmount.                                                                                                  |
+| `useReducedMotion()` (motion)                                                     | Reanimated `useReducedMotion()`: glow, nearly-there, wiggle, tilt, hop, pop, swing and sparkles stop; changes are 200 ms fades.    |
+
+**Not ported:** `drainOnGesture` / `resumeHowlerContextOnGesture` / `unlockIosAudioSession` on every tap (native audio needs no unlock); `window.__mapLinePlays` (the engine's audio log has the `path:<id>` labels); the `?world=` start parameter (both maps open from the Hub); keyboard activation and focus rings.
+
+## Acceptance criteria (Jessica, on device)
+
+- [ ] Hub map button (each world) → that world's map. The map fades in, Emma's stage fades out, and the open line starts with no tap, `onPlay` ≤ 500 ms after mount.
+- [ ] Unit test: `mapPathScale` reproduces the § 1 sizes table (s, stop, current, badge, scroll) for its 7 viewports.
+- [ ] 375×667 portrait: the whole path is visible with no scroll. Every stop and gate hit area is ≥ 44×44 pt, Home is 56×56, the caption is 22 pt, and the 81-character unlock line fits the 4-line slot. The title doesn't touch Home.
+- [ ] 667×375 landscape: no title, and the pane scrolls. On open, the current stop, its bud tray and Emma's badge are fully on screen, and the scroll indicator flashes once. Every line fits the 2-line slot.
+- [ ] Tablet portrait at 820×1180 matches the web map at the same size. At 744 wide, no two stops overlap.
+- [ ] Tablet landscape at 1180×820: a 350 pt column, no scroll, and every caption in ≤ 5 lines.
+- [ ] Taps: an open, mastered or current stop says its name. A locked stop plays the poof, wiggles once, tilts Emma's badge for 1.5 s and shows the requirement (a `locked-later` line is caption-only and silent). A gate says its land. A second tap cuts the first line.
+- [ ] Unlock (a seeded pending unlock): the beat runs at 0 / 400 / 1100 (/ 1500) / 1500 or 2100 ms with the chime, plus the cheer on a land beat. Taps are ignored until Emma speaks, and in L the pane doesn't scroll until then. Leaving mid-beat and reopening the map doesn't replay it.
+- [ ] Land beat in L: both stops stay on screen for the whole beat without scrolling.
+- [ ] Reduce Motion on: no hop, pop, swing, sparkles, wiggle, tilt, glow pulse or nearly-there pulse; the badge cross-fades; the audio is unchanged.
+- [ ] Home, and Android back → Hub. Emma fades back in with her shadow, and the Hub plays no line, however long the map was open.
+- [ ] Rotating mid-line: the line and caption carry on, and the badge stays on its stop with no spring. In L the offset re-centres.
+- [ ] iOS and Android both show the locked stickers pale (baked) and the sticker shadows.
+- [ ] Backgrounding mid-line and returning: the line resumes where it stopped and is not replayed.
+- [ ] Scrolling in L stays smooth on the oldest test phone (if not, § 5's `shouldRasterizeIOS` fallback).
+
+## Open questions
+
+None for Thomas. Thomas checks the PR on his devices, as for every Phase 3 screen (`team/DECISIONS.md` 2026-10-09). The native map departs from the web in four places: phone landscape (scroll, bottom caption, no title), the 350 pt tablet-landscape column, tablet portrait below 820 pt (scales as one picture instead of squeezing), and Emma's stage hidden on the map. They rearrange approved pieces with no new styling, so they get the device check rather than a mockup round (quality bar 12 covers first-of-class work). No Dave consult is needed: no motivation mechanic, line or reward changes.
