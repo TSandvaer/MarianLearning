@@ -2,8 +2,9 @@
  * The app end to end on an in-memory store: Splash branches on the
  * persisted sessionCount exactly like the web, Greet runs on the real
  * audio engine (over the fake expo-audio, so silent) and hands over to
- * Math, Math hands its result to Session End, and the placeholders walk
- * the rest of core's route state machine.
+ * Math, Math hands its result to Session End, Session End and Splash hand
+ * over to the Hub, and the placeholders walk the rest of core's route
+ * state machine.
  */
 import { LINE_GAP_MS } from '@marian/core/greet/greetSequence'
 import {
@@ -11,7 +12,10 @@ import {
   loadProgress,
   saveProgress,
 } from '@marian/core/progress'
-import { readSessionHistory } from '@marian/core/sessionEnd/sessionHistory'
+import {
+  readSessionHistory,
+  writeSessionHistory,
+} from '@marian/core/sessionEnd/sessionHistory'
 import { WARM_CAP_MS } from '@marian/core/splash/splashTiming'
 import { ADVANCE_AFTER_CORRECT_MS } from '@marian/core/shared/gameplayConstants'
 import {
@@ -28,6 +32,7 @@ import {
   type FakePlayer,
 } from '../test/fakeAudio'
 import App from './App'
+import { audioEngine, sessionPrefetcher } from './audio'
 import { mathLayout } from './layout/mathLayout'
 import * as buildEnv from './platform/buildEnv'
 import { NO_LAUNCH_FLAGS, type LaunchFlags } from './platform/launchFlags'
@@ -36,6 +41,8 @@ import {
   HEART_TAP_TRANSITION_MS,
   WAKE_REPROMPT_AFTER_MS,
 } from './screens/greet/Greet'
+import { PARENT_LONG_PRESS_MS } from './screens/hub/Hub'
+import { PLINK_VOLUME, resetHubAudioForTests } from './screens/hub/hubAudio'
 import { CHIME_TAIL_MS, LEAVE_DELAY_MS } from './screens/sessionEnd/SessionEnd'
 import { SPLASH_FADE_OUT_MS } from './screens/Splash'
 
@@ -98,7 +105,14 @@ async function finishLine(): Promise<void> {
   })
 }
 
+/** The line on Emma's voice channel now (`<player>:<line id>`), or null. */
+const voiceLine = () => audioEngine.voice.activeLabel
+
 beforeEach(() => {
+  // Module state that outlives a render: the Hub's line player and 30 s
+  // remount clock, and the app's session prefetch.
+  resetHubAudioForTests()
+  sessionPrefetcher.discard()
   resetFakePlayers()
   jest.useFakeTimers()
   ;(globalThis.fetch as jest.Mock).mockClear()
@@ -196,15 +210,19 @@ it('first launch (sessionCount 0): Splash → Greet, and Splash is silent', asyn
   expect(readSessionHistory().sessionCount).toBe(0)
 })
 
-it('returning (sessionCount ≥ 1, via a debug seed): Splash → Hub', async () => {
+it('returning (sessionCount ≥ 1, via a debug seed): Splash → Hub, and Emma speaks with no tap', async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
   boot({ debug: true, seed: 'add-to-20', dayOffset: null })
   await renderPastSplash()
-  expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
   expect(screen.queryByTestId('greet')).toBeNull()
-  expect(screen.getByTestId('status')).toHaveTextContent(
-    'route hub · sessionCount 1 · debug seed add-to-20',
-  )
+  // Idle, with the Hub's baked shadow.
+  expect(screen.getByTestId('emma-idle')).toBeOnTheScreen()
+  expect(screen.getByTestId('emma-shadow')).toBeOnTheScreen()
+  // A tie on a fresh day: Word Song glows, and her line is already playing.
+  await flushAll()
+  expect(voiceLine()).toBe('hub-guide:guide.grow.word-song')
+  expect(readSessionHistory().sessionCount).toBe(1)
 })
 
 it('Greet → heart → Math (offline: the static plan, silent captions) → 8 problems → Session End (a good day) → All done → Hub', async () => {
@@ -242,11 +260,16 @@ it('Greet → heart → Math (offline: the static plan, silent captions) → 8 p
   )
   await fireEvent.press(screen.getByTestId('session-end-cta'))
   await advance(LEAVE_DELAY_MS)
-  expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
-  expect(screen.queryByTestId('exit-greet')).toBeNull()
-  // Every player is released once the chime has rung out.
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  // Today's flower sleeps, so Emma names the other world.
+  await flushAll()
+  expect(screen.getByTestId('hub-slot-sleeping')).toBeOnTheScreen()
+  // Once the chime has rung out, the only live player is her Hub line.
   await advance(CHIME_TAIL_MS)
-  expect(fakePlayers.filter((p) => !p.released)).toEqual([])
+  expect(voiceLine()).toBe('hub-guide:guide.sleeping.word-song')
+  const live = fakePlayers.filter((p) => !p.released)
+  expect(live).toHaveLength(1)
+  expect(live[0]!.calls).toContain('play')
 })
 
 it('Session End writes once: after All done, Hub → Word Song → Session End is the placeholder and records nothing', async () => {
@@ -256,11 +279,11 @@ it('Session End writes once: after All done, Hub → Word Song → Session End i
   await sessionEndSettles()
   await fireEvent.press(screen.getByTestId('session-end-cta'))
   await advance(LEAVE_DELAY_MS)
-  expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
   expect(readSessionHistory().sessionCount).toBe(1)
   expect(loadProgress()?.history).toHaveLength(1)
 
-  await fireEvent.press(screen.getByTestId('exit-literacy'))
+  await fireEvent.press(screen.getByTestId('hub-card-word-song'))
   await fireEvent.press(screen.getByTestId('exit-session-end'))
   await settle(1000)
   expect(readSessionHistory().sessionCount).toBe(1)
@@ -385,8 +408,9 @@ it('back to the Hub tears the session down; Math again starts a fresh one', asyn
   jest.spyOn(console, 'log').mockImplementation(() => {})
   boot({ debug: true, seed: 'add-to-20', dayOffset: null })
   await renderPastSplash()
+  // Word Song glows (a tie): no Number Garden prefetch.
   expect(sessionStarts()).toHaveLength(0)
-  await fireEvent.press(screen.getByTestId('exit-math'))
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
   await flushAll()
   expect(screen.getByTestId('math')).toBeOnTheScreen()
   expect(sessionStarts()).toHaveLength(1)
@@ -396,11 +420,64 @@ it('back to the Hub tears the session down; Math again starts a fresh one', asyn
   })
 
   await fireEvent.press(screen.getByTestId('math-back-to-hub'))
-  expect(screen.getByTestId('route-hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
   expect(screen.getByTestId('emma-idle')).toBeOnTheScreen()
-  await fireEvent.press(screen.getByTestId('exit-math'))
+  // The tap recorded Word Song as shown, so the tie now alternates to
+  // Number Garden: the Hub prefetches its session (offline: it fails, and
+  // the tap starts its own).
   await flushAll()
+  expect(screen.getByTestId('hub-card-suggested')).toBeOnTheScreen()
   expect(sessionStarts()).toHaveLength(2)
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(sessionStarts()).toHaveLength(3)
+})
+
+it('Number Garden glowing: the Hub prefetches its session and the tap adopts it', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  // The tie alternates from Word Song: Number Garden glows.
+  writeSessionHistory({ ...readSessionHistory(), lastSuggestion: 'word-song' })
+  // The prefetch is still in flight when she taps.
+  ;(globalThis.fetch as jest.Mock).mockImplementationOnce(
+    () => new Promise(() => {}),
+  )
+  await renderPastSplash()
+  expect(screen.getByTestId('hub-card-suggested')).toBeOnTheScreen()
+  expect(sessionStarts()).toEqual([
+    expect.objectContaining({
+      payload: expect.objectContaining({
+        track: 'math',
+        progress: expect.objectContaining({ focusNode: 'add-to-20' }),
+      }),
+    }),
+  ])
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  // Adopted: no second request.
+  expect(sessionStarts()).toHaveLength(1)
+  expect(readSessionHistory().lastSuggestion).toBe('number-garden')
+})
+
+it('Hub: the map button opens the map, a 3 s press on Emma opens Parent Settings', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  await renderPastSplash()
+  await fireEvent.press(screen.getByTestId('hub-map-math'))
+  expect(screen.getByTestId('route-map')).toBeOnTheScreen()
+  // The plink rang (it outlives the Hub); Emma went silent.
+  const plink = fakePlayers.filter(
+    (p) => p.volume === PLINK_VOLUME && !p.released,
+  )
+  expect(plink).toHaveLength(1)
+  expect(plink[0]!.calls).toEqual(['play'])
+  expect(voiceLine()).toBeNull()
+  await fireEvent.press(screen.getByTestId('exit-hub'))
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  await fireEvent(screen.getByTestId('hub-emma-long-press'), 'longPress')
+  expect(screen.getByTestId('route-parent-settings')).toBeOnTheScreen()
+  expect(PARENT_LONG_PRESS_MS).toBe(3000)
 })
 
 it('Emma stays calm (idle) through the whole Greet: the nudge, "Hi!" and the heart tap', async () => {
