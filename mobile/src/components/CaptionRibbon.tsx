@@ -11,9 +11,11 @@
  *   is spoken.
  *
  * The caller positions it (width, top); its height follows the text.
- * Screen readers get the whole line as one element.
+ * Screen readers get the whole line as one element. A caller may restyle
+ * it (Math and the Hub use a clay slab), set the text `color`, add an
+ * `exiting` animation and draw children over the slab (the Hub's tail).
  */
-import { useEffect } from 'react'
+import { useEffect, type ComponentProps, type ReactNode } from 'react'
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import Animated, {
   Easing,
@@ -47,9 +49,17 @@ interface WordProps {
   fontSize: number
   lineHeight: number
   last: boolean
+  color: string
 }
 
-function Word({ word, revealed, fontSize, lineHeight, last }: WordProps) {
+function Word({
+  word,
+  revealed,
+  fontSize,
+  lineHeight,
+  last,
+  color,
+}: WordProps) {
   const opacity = useSharedValue(revealed ? 1 : 0)
   useEffect(() => {
     opacity.set(
@@ -65,7 +75,7 @@ function Word({ word, revealed, fontSize, lineHeight, last }: WordProps) {
       testID={revealed ? 'caption-word-revealed' : 'caption-word-hidden'}
       style={[
         styles.word,
-        { fontSize, lineHeight, marginRight: last ? 0 : fontSize * 0.4 },
+        { fontSize, lineHeight, color, marginRight: last ? 0 : fontSize * 0.4 },
         fade,
       ]}
     >
@@ -84,6 +94,12 @@ export interface CaptionRibbonProps {
   padding: { horizontal: number; vertical: number }
   style?: StyleProp<ViewStyle>
   testID?: string
+  /** Text colour. Default: the app's ink. */
+  color?: string
+  /** Leaves with this animation (default: at once). */
+  exiting?: ComponentProps<typeof Animated.View>['exiting']
+  /** Drawn over the slab, under the words (e.g. a speech tail). */
+  children?: ReactNode
 }
 
 export function CaptionRibbon({
@@ -95,6 +111,9 @@ export function CaptionRibbon({
   padding,
   style,
   testID,
+  color = colors.ink,
+  exiting,
+  children,
 }: CaptionRibbonProps) {
   const reducedMotion = useReducedMotion()
   const words = text.split(/\s+/).filter(Boolean)
@@ -102,6 +121,7 @@ export function CaptionRibbon({
     <Animated.View
       testID={testID}
       entering={reducedMotion ? FadeIn.duration(300) : ribbonEntering}
+      exiting={exiting}
       accessible
       accessibilityRole="text"
       accessibilityLiveRegion="polite"
@@ -115,6 +135,7 @@ export function CaptionRibbon({
         style,
       ]}
     >
+      {children}
       <View style={styles.row}>
         {words.map((w, i) => (
           <Word
@@ -124,6 +145,7 @@ export function CaptionRibbon({
             fontSize={fontSize}
             lineHeight={lineHeight}
             last={i === words.length - 1}
+            color={color}
           />
         ))}
       </View>
@@ -146,6 +168,5 @@ const styles = StyleSheet.create({
   },
   word: {
     fontFamily: fonts.semibold,
-    color: colors.ink,
   },
 })

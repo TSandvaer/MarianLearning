@@ -32,6 +32,7 @@ import Animated, {
   cancelAnimation,
   Easing,
   FadeIn,
+  FadeOut,
   LinearTransition,
   useAnimatedStyle,
   useReducedMotion,
@@ -43,7 +44,7 @@ import Animated, {
   withTiming,
   type EntryExitAnimationFunction,
 } from 'react-native-reanimated'
-import { emmaAsset } from '../assets'
+import { emmaAsset, emmaIdleShadowAsset } from '../assets'
 import type { Rect } from '../layout/layout'
 
 /** Web EMMA_ENTRANCE_SPRING (Greet.tsx): stiffness 220, damping 22, delay 0.3 s. */
@@ -103,6 +104,19 @@ export interface Breath {
  */
 export type EmmaMotion = 'greet' | 'character'
 
+/**
+ * How she arrives when the stage mounts (read once, at mount):
+ * - `slide`: Greet's once-only arrival (x −120, y +60, spring).
+ * - `fade`: a returning launch straight onto the Hub; she is already there
+ *   (web `.hub-emma-band`: opacity 0 → 1, 250 ms ease-out).
+ */
+export type EmmaEntrance = 'slide' | 'fade'
+
+/** Web Hub entrance fade. */
+export const HUB_FADE_IN_MS = 250
+/** The Hub's baked shadow fades with the route. */
+export const SHADOW_FADE_MS = 200
+
 /** Framer `easeOut` / `easeInOut`. */
 const EASE_OUT = Easing.bezier(0, 0, 0.58, 1)
 const EASE_IN_OUT = Easing.bezier(0.42, 0, 0.58, 1)
@@ -114,6 +128,14 @@ export interface EmmaStageProps {
   breath: Breath | null
   /** Default `greet` (the motion Greet shipped with in #531). */
   motion?: EmmaMotion
+  /** Read at mount. Default `slide`. */
+  entrance?: EmmaEntrance
+  /**
+   * The Hub's baked contact shadow + warm glow (`emma/idle-shadow.webp`,
+   * hub-native § 4): drawn under the pose, inside the breathing view so it
+   * breathes with her. Only for the idle pose it was baked from.
+   */
+  shadow?: boolean
 }
 
 export function EmmaStage({
@@ -121,6 +143,8 @@ export function EmmaStage({
   pose,
   breath,
   motion = 'greet',
+  entrance = 'slide',
+  shadow = false,
 }: EmmaStageProps) {
   const reducedMotion = useReducedMotion()
   const rotate = useSharedValue(0)
@@ -190,7 +214,13 @@ export function EmmaStage({
     <Animated.View
       testID={`emma-${pose}`}
       // Reduce Motion: she fades in instead of sliding (session-1.md).
-      entering={reducedMotion ? FadeIn.duration(300) : emmaEntering}
+      entering={
+        reducedMotion
+          ? FadeIn.duration(300)
+          : entrance === 'fade'
+            ? FadeIn.duration(HUB_FADE_IN_MS).easing(EASE_OUT)
+            : emmaEntering
+      }
       layout={emmaLayout}
       style={[
         styles.frame,
@@ -205,6 +235,22 @@ export function EmmaStage({
       <Animated.View
         style={[StyleSheet.absoluteFill, character && styles.feet, innerStyle]}
       >
+        {shadow && (
+          <Animated.View
+            testID="emma-shadow"
+            entering={FadeIn.duration(SHADOW_FADE_MS)}
+            exiting={FadeOut.duration(SHADOW_FADE_MS)}
+            style={StyleSheet.absoluteFill}
+          >
+            <Image
+              source={emmaIdleShadowAsset()}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              accessible={false}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
+        )}
         <Image
           source={emmaAsset(pose)}
           contentFit="contain"
