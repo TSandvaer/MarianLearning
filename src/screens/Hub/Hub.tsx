@@ -55,6 +55,8 @@ import {
   type SuggestionTarget,
 } from './hubSuggestion'
 import type { HubEntryPath } from '@marian/core/hub/hubLines'
+// Pause between two of Emma's lines (wake-up, then the next action).
+import { LINE_GAP_MS } from '@marian/core/hub/hubGuidance'
 import {
   GUIDANCE_LINES,
   cancelGuidanceLine as defaultCancelGuidanceLine,
@@ -177,9 +179,6 @@ export type PlayHubLineFn = (
   id: GuidanceLineId,
   opts?: PlayHubLineOptions,
 ) => Promise<void>
-
-/** Pause between two of Emma's lines (wake-up, then the next action). */
-const LINE_GAP_MS = 1200
 
 // ── Component ────────────────────────────────────────────────────────────
 
