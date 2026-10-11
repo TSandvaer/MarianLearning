@@ -78,11 +78,31 @@ Check: the 1180 row's vertical sum is 8 + 28 + 672 + 14 + 8 = 730 ≤ 800, so s 
 
 ## 4. Emma on the Hub
 
-_(pending)_
+- **Pose: `idle`, always**, with the character motion (1.02 breath over 4 s, pivot at her feet). App already passes this (`mobile/src/App.tsx`: `pose={route === 'math' ? mathPose : 'idle'}`).
+- **No celebration on the Hub.** Unlock celebrations moved to the map (Emma's Path 9/10, `src/screens/Hub/Hub.tsx:212-214`), so the `PromotionCelebration` overlay and the idle ↔ celebration swap are not ported. There is no sleepy pose either: the web passes `pose="idle"` even when both flowers sleep.
+- **Entrance:** when the Hub is the first screen after Splash (a returning launch), Emma **fades in** (opacity 0 → 1, 250 ms ease-out, the web's `.hub-emma-band` entrance). There is no slide-in: that is Greet's once-only arrival, and on a return she is already there. From any other route she springs from her last frame (EmmaStage's layout spring, 220/22). EmmaStage picks `entering` at mount: fade if the first route after Splash is `hub`, else the Greet slide-in.
+- **Warm light** (web `.hub-emma-light`): a disc in the Hub's background layer at Emma's frame E, offset (0.096E, 0.088E), size 0.808E, `radial-gradient(circle at 50% 45%, rgba(255,236,190,.85) 0, rgba(255,224,160,.4) 40%, rgba(255,214,140,0) 70%)`. It fades in with the Hub (300 ms), so Emma lands on it when she springs in.
+- **Shadow: baked, not filtered.** The web draws `drop-shadow(0 10u 10u rgba(90,50,20,.28)) drop-shadow(0 0 18u rgba(255,210,140,.35))` on her image, which carries Thomas's "soft contact shadow" (`team/DECISIONS.md` 2026-10-06). iOS cannot filter images (RN `filter` supports only `brightness` and `opacity` on iOS), and an alpha-following `shadow*` on a layer that breathes would be redrawn offscreen every frame. Instead, `mobile/scripts/export-assets.mjs` writes **`emma/idle-shadow.webp`**: the idle art's alpha on the same 1024 canvas, drawn twice (1u = 1024/520 ≈ 1.97 px; CSS blur radius r = Gaussian σ r/2):
+  - `rgba(90,50,20,.28)`, offset y +20 px, σ 10 px;
+  - `rgba(255,210,140,.35)`, no offset, σ 18 px.
+
+  EmmaStage draws it under the pose image, inside the breathing view (so it breathes with her), only while `route === 'hub'`, with a 200 ms fade. One idle silhouette is enough because the Hub is the only screen where her pose never changes.
+
+- **Parent long-press (3 s → `parent-settings`).** EmmaStage has `pointerEvents: 'none'`, so the Hub renders a transparent `Pressable` over Emma's frame: `onLongPress` with `delayLongPress={3000}`, no `onPress`, no visual feedback (it is a hidden gate, as on the web). Draw order in the foreground layer: the long-press target, then the bubble (`pointerEvents: 'none'`), then the cards, so a card wins anywhere they overlap. Tap-and-release does nothing.
 
 ## 5. Audio and session
 
-_(pending)_
+**Decision: no first-tap gate. Emma speaks on mount, on every entry path.** The web waits for a tap on app-open (`needsGesture`) only because iOS WebAudio needs a gesture to unlock; native audio needs no unlock (Phase 0 exit criterion, `team/DECISIONS.md` 2026-10-08). Greet keeps its wake tap (greet-math-native § 1) because the introduction plays once in her life and might play to nobody. A Hub line is guidance that the screen also carries: the card glows and the bubble keeps the line. A tap gate would make her tap once just to hear "Let's grow a flower". So drop `handleFirstTap`, `gestureUnlocked`, the `handleNodePress` pointer-down ordering and the `drainOnGesture` / `unlockIosAudioSession` calls.
+
+- **Lines:** port `pickGuidanceLines` as is: the wake-up line first ("Your flower(s) woke up!"), then one next action, with a 1200 ms gap (`LINE_GAP_MS`). The first line starts at mount. Play them through `createManifestLinePlayer('hub-guide', …)` with the G3 recordings (`@marian/core/emmasPath/guidanceLines`; all 8 `guide-hub-*.mp3` are bundled in `mobile/assets/audio/path/`). A line without a clip walks its caption at 165 wpm (the player contract).
+- **Bubble:** it appears on the first word tick. Between two lines it hides and re-enters with the next line (web `showRibbon` + `key={currentLine}`). After the last line it keeps showing that line for the rest of the visit. With no line (rapid remount, nothing to say) there is no bubble, and the P/L slot stays empty sky.
+- **Rapid remount (30 s, no lines):** kept, with an in-memory module timestamp in place of `sessionStorage`. Both last as long as the app process, so a cold start greets again.
+- **Card tap:** in the press handler, in this order: `cancelActive()` on the guidance player, the suggestion-outcome history write (`recordSuggestionOutcome`), then `onPickTree`. The voice channel would also cut the line when Math's first line starts, but that can be seconds later, and the tap must silence her at once. No SFX on a card tap (web parity).
+- **Map tap:** the plink (`sfx-plink`, volume 0.3, one module-level `createSfx` like the web), cancel the line, route to `map` (a placeholder until the Map port).
+- **Unmount:** `cancelActive()` + `unload()` on the guidance player.
+- **Background → foreground:** the voice channel parks the line and resumes it where it stopped (PR #528). No Hub code, no replay.
+- **Audio session:** held, as greet-math-native § 3 says (`doNotMix`). Opening the app onto the Hub pauses other music on the device at Emma's first line.
+- **Session prefetch:** on Hub mount, App calls `sessionPrefetcher.prefetch` for the glowing world, with the web's mapping (`hubSessionPrefetch.ts`: `null` → Word Song). The card tap calls `take()`. Until Word Song is ported, only a Number Garden suggestion prefetches. This is what lets Math start without its getting-ready wait after a tap.
 
 ## 6. Web → native translations
 
