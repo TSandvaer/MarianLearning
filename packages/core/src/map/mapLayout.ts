@@ -310,3 +310,13 @@ export function landscapeScale(
     LANDSCAPE_TRAY_ROOM
   return height > 0 ? Math.min(1, height / need) : 1
 }
+
+/**
+ * Hole size, px, for the current stop's bud tray (spec §3.4): one row of
+ * up to 4 gets big holes; one group per vowel (or a long row) smaller ones.
+ */
+export function budHoleSize(buds: readonly (readonly boolean[])[]): number {
+  const total = buds.reduce((n, g) => n + g.length, 0)
+  if (buds.length === 1 && total <= 4) return 42
+  return total <= 8 ? 30 : 22
+}

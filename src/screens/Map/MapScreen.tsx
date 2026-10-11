@@ -46,11 +46,7 @@ import {
 } from '@marian/core/progress'
 import { createSfx, type Sfx } from '../../lib/sfx'
 import { HUB_LAST_UNMOUNT_KEY } from '../Hub/useRapidRemountSuppression'
-import {
-  buildMapModel,
-  type MapLand,
-  type MapStop,
-} from '@marian/core/map/mapModel'
+import type { MapLand, MapStop } from '@marian/core/map/mapModel'
 import {
   BAND_INSET,
   badgeLands,
@@ -71,23 +67,24 @@ import {
   MapTitle,
   StopView,
 } from './mapParts'
-import { gateLine, openLine, stopLine } from '@marian/core/map/mapLines'
+import { gateLine, stopLine } from '@marian/core/map/mapLines'
 import { createMapLinePlayer, type MapLinePlayer } from './playMapLine'
 import {
-  pendingUnlock,
-  type PendingUnlock,
-} from '@marian/core/progress/pathBeats'
-import {
   persistUnlockCelebrated,
-  reached,
   unlockLine,
   unlockTimeline,
   type UnlockPhase,
 } from '@marian/core/map/unlockBeat'
+import {
+  LOCKED_TAP_SFX,
+  mapBeatView,
+  planMapVisit,
+  POINTING_MS,
+  UNLOCK_SFX,
+} from '@marian/core/map/mapVisit'
 
 const HEADER = 124
 const RIBBON = 128
-const POINTING_MS = 1500
 
 export interface MapScreenProps {
   world: MasteryTrack
@@ -126,22 +123,28 @@ export function MapScreen({
     () => (progressDoc !== undefined ? progressDoc : safeLoadProgress()),
     [progressDoc],
   )
-  const finalModel = useMemo(() => buildMapModel(doc, world), [doc, world])
+  // The visit's rules live in core (`@marian/core/map/mapVisit`), shared
+  // with the native map.
+  const visit = useMemo(() => planMapVisit(doc, world), [doc, world])
+  const finalModel = visit.model
 
   // Unlock beat (Emma's Path 9/10): an unlock not celebrated yet is
   // frozen at mount and played once; `phase` walks the spec §6 timeline.
-  const [unlock] = useState<PendingUnlock | null>(() =>
-    doc === null ? null : pendingUnlock(doc, world),
-  )
-  const [phase, setPhase] = useState<UnlockPhase | null>(
-    unlock === null ? null : 'bloom',
-  )
+  const [frozen] = useState(() => ({
+    unlock: visit.unlock,
+    alsoBadged: visit.alsoBadged,
+    caption: visit.caption,
+    beat: visit.beat,
+  }))
+  const { unlock, alsoBadged } = frozen
+  const [phase, setPhase] = useState<UnlockPhase | null>(visit.phase)
   // Before the pop the new stop still wears its frost + padlock; before
   // the swing its land's gate is still closed.
-  const model = useMemo(
-    () => (unlock === null ? finalModel : beatModel(finalModel, unlock, phase)),
+  const view = useMemo(
+    () => mapBeatView({ model: finalModel, unlock }, phase),
     [finalModel, unlock, phase],
   )
+  const { model } = view
 
   // Path-region size → layout.
   const regionRef = useRef<HTMLDivElement | null>(null)
@@ -165,11 +168,7 @@ export function MapScreen({
   }, [])
   // Emma's badge starts an unlock beat on the just-mastered stop, so its
   // land gets badge room too — for the whole mount, so nothing jumps when
-  // she hops.
-  const alsoBadged = useMemo(
-    () => (unlock === null ? [] : [unlock.mastered]),
-    [unlock],
-  )
+  // she hops (`alsoBadged`, frozen above).
   // Landscape: laid out on a taller virtual region, then scaled to fit
   // (see `landscapeScale`). Portrait: the region as it is.
   const landscape = useLandscape()
@@ -198,12 +197,8 @@ export function MapScreen({
   // The open line's caption shows from the first frame; its audio
   // starts in the mount effect below. An unlock beat holds the ribbon
   // until Emma speaks its line.
-  const [caption, setCaption] = useState<PathLine | null>(() =>
-    unlock === null ? openLine(model) : null,
-  )
-  const [pose, setPose] = useState<EmmaPose>(
-    model.complete ? 'cheering' : 'idle',
-  )
+  const [caption, setCaption] = useState<PathLine | null>(frozen.caption)
+  const [pose, setPose] = useState<EmmaPose>(visit.restPose)
   const sfxRef = useRef<Sfx[]>([])
   const poseTimer = useRef<number | null>(null)
 
@@ -235,8 +230,8 @@ export function MapScreen({
     const timers = unlockTimeline(unlock).map(({ phase: next, at }) =>
       window.setTimeout(() => {
         setPhase(next)
-        if (next === 'pop') sfx('/assets/sfx-chime-soft.mp3', 0.85).play()
-        if (next === 'gate') sfx('/assets/sfx-cheer.mp3', 0.7).play()
+        const effect = UNLOCK_SFX[next]
+        if (effect) sfx(effect.src, effect.volume).play()
         if (next === 'cheer') {
           setPose('cheering')
           const line = unlockLine(unlock, finalModel.showLandNumber)
@@ -276,7 +271,7 @@ export function MapScreen({
     drainOnGesture(resumeHowlerContextOnGesture, unlockIosAudioSession)
 
   // Taps wait until the unlock beat has reached Emma's line.
-  const beatRunning = phase !== null && phase !== 'cheer'
+  const beatRunning = view.tapsWait
 
   // Locked-stop taps: one "not yet" wiggle per tap.
   const [wiggles, setWiggles] = useState<Partial<Record<string, number>>>({})
@@ -285,10 +280,7 @@ export function MapScreen({
     gesture()
     if (beatRunning) return
     if (stop.state === 'locked') {
-      poofRef.current ??= createSfxFn({
-        src: '/assets/sfx-poof.mp3',
-        volume: 0.45,
-      })
+      poofRef.current ??= createSfxFn({ ...LOCKED_TAP_SFX })
       poofRef.current.play()
       setWiggles((w) => ({ ...w, [stop.node]: (w[stop.node] ?? 0) + 1 }))
       setPose('attentive-pointing')
@@ -308,8 +300,7 @@ export function MapScreen({
   }
 
   // Emma's badge marks the just-mastered stop until she hops (unlock beat).
-  const emmaNode =
-    unlock !== null && !reached(phase, 'hop') ? unlock.mastered : model.current
+  const { emmaNode } = view
   const emmaStop = layout.stops.find((s) => s.node === emmaNode)
   const emmaBox = emmaStop ? emmaBadge(emmaStop) : null
   const currentStop = model.complete
@@ -323,7 +314,7 @@ export function MapScreen({
       data-world={world}
       data-current={model.current}
       data-complete={model.complete ? 'true' : 'false'}
-      data-beat={unlock === null ? 'none' : unlock.land ? 'land' : 'unlock'}
+      data-beat={frozen.beat}
       data-beat-phase={phase ?? 'none'}
       // Landscape (iPad sideways in Safari, 640-900 tall): a header row
       // and a caption row leave the path too short, so the stops ran into
@@ -384,7 +375,7 @@ export function MapScreen({
           >
             {layout.bands.map((band, i) => {
               // A land gate opening fades its band tint in (spec §6 step 4).
-              const newLand = unlock?.land?.number === band.land
+              const faded = view.fadedLand === band.land
               const [hi, lo] = BAND_TINTS[i % BAND_TINTS.length]!
               return (
                 <m.div
@@ -404,7 +395,7 @@ export function MapScreen({
                   }}
                   initial={false}
                   animate={{
-                    opacity: newLand && !reached(phase, 'gate') ? 0.35 : 1,
+                    opacity: faded ? 0.35 : 1,
                   }}
                   transition={{ duration: 0.6 }}
                 />
@@ -486,7 +477,7 @@ export function MapScreen({
                     size={emmaBox.size}
                     height={emmaBox.height}
                     pose={pose}
-                    hopping={phase === 'hop'}
+                    hopping={view.hopping}
                     reduceMotion={reduceMotion}
                   />
                 </m.div>
@@ -503,7 +494,7 @@ export function MapScreen({
                   x={g.x}
                   y={g.y}
                   size={GATE_TAP}
-                  swinging={unlock?.land?.number === g.land && phase === 'gate'}
+                  swinging={view.swingingLand === g.land}
                   reduceMotion={reduceMotion}
                   onTap={() => handleGateTap(land)}
                 />
@@ -521,8 +512,8 @@ export function MapScreen({
                     y={pos.y}
                     size={pos.size}
                     reduceMotion={reduceMotion}
-                    bloom={unlock?.mastered === stop.node}
-                    popping={unlock?.unlocked === stop.node && phase === 'pop'}
+                    bloom={view.bloomNode === stop.node}
+                    popping={view.poppingNode === stop.node}
                     wiggle={wiggles[stop.node] ?? 0}
                     onTap={() => handleStopTap(stop)}
                   />
@@ -629,34 +620,6 @@ function LandscapeFrame({
       {children}
     </div>
   )
-}
-
-/**
- * The model as the unlock beat shows it at `phase`: before the pop the new
- * stop is still locked (frost + padlock, no buds); before the swing its
- * land's gate is still closed.
- */
-function beatModel(
-  model: ReturnType<typeof buildMapModel>,
-  unlock: PendingUnlock,
-  phase: UnlockPhase | null,
-): ReturnType<typeof buildMapModel> {
-  const stillLocked = !reached(phase, 'pop')
-  const gateClosed = unlock.land !== null && !reached(phase, 'gate')
-  if (!stillLocked && !gateClosed) return model
-  return {
-    ...model,
-    lands: model.lands.map((land) => ({
-      ...land,
-      open:
-        gateClosed && land.number === unlock.land?.number ? false : land.open,
-      stops: land.stops.map((stop) =>
-        stillLocked && stop.node === unlock.unlocked
-          ? { ...stop, state: 'locked' as const, buds: [], nearlyThere: false }
-          : stop,
-      ),
-    })),
-  }
 }
 
 export default MapScreen
