@@ -1,10 +1,10 @@
 /**
  * Session End's inline vector glyphs, drawn as the web's inline SVGs in
  * `src/screens/SessionEnd/SessionEnd.tsx` (`StarIcon`, `MoonIcon`,
- * `CheckIcon`, `AgainIcon`) and `src/screens/Map/mapParts.tsx`
- * (`SpeakerIcon`). Gradient ids are scoped per `Svg`, so they can repeat.
+ * `CheckIcon`, `AgainIcon`). The caption's speaker is shared:
+ * `components/SpeakerIcon.tsx`. Gradient ids are scoped per `Svg`, so they
+ * can repeat.
  */
-import { INK } from '@marian/core/map/mapTheme'
 import Svg, { Defs, Path, RadialGradient, Stop } from 'react-native-svg'
 
 /** A gold clay star: "you got it" feedback, never counted. */
@@ -78,22 +78,6 @@ export function AgainIcon({ size }: { size: number }) {
         strokeLinecap="round"
       />
       <Path d="M84 14 L80 40 L56 34 Z" fill="#fff" />
-    </Svg>
-  )
-}
-
-/** The speaker at the start of Emma's caption (web `SpeakerIcon`, 38 px). */
-export function SpeakerIcon({ size }: { size: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 100 100">
-      <Path d="M14 38 H32 L54 18 V82 L32 62 H14 Z" fill={INK} />
-      <Path
-        d="M66 34 Q76 50 66 66 M76 24 Q92 50 76 76"
-        stroke={INK}
-        strokeWidth={6}
-        fill="none"
-        strokeLinecap="round"
-      />
     </Svg>
   )
 }

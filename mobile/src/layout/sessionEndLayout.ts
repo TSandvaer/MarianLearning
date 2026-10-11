@@ -35,10 +35,13 @@ import {
   isLandscape,
   isTablet,
   safeRect,
+  type CaptionMetrics,
   type Rect,
   type ScreenLayout,
   type Viewport,
 } from './layout'
+
+export type { CaptionMetrics }
 
 export type SessionEndForm =
   | 'phone-portrait'
@@ -88,17 +91,6 @@ export interface ButtonMetrics {
     homeWithAgain: number
     homeAlone: number
   }
-}
-
-export interface CaptionMetrics {
-  font: number
-  lineHeight: number
-  padding: { horizontal: number; vertical: number }
-  minHeight: number
-  radius: number
-  speaker: number
-  /** Speaker → text. */
-  gap: number
 }
 
 /** The panel's content, in the panel's own coordinates. */

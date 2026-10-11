@@ -3,6 +3,8 @@
  * `src/screens/Map/mapParts.tsx`). The closed arch art carries its own
  * padlock. On a land beat the closed arch swells and fades off the open
  * one (0.6 s) with a burst of 12 sparkles; Reduce Motion: a 0.2 s fade.
+ * The box is the web's 88 px × s, lifted to 44 pt by `hitSlop`. No press
+ * visual (web).
  */
 import { useEffect } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
@@ -11,17 +13,19 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated'
+import { imageShadow } from '../../components/imageShadow'
 import { PathImage } from '../../components/PathImage'
-import { imageShadow } from '../hub/clay'
+import { hitSlopFor } from '../../layout/mapScreenLayout'
 import { SparkleBurst } from './mapFx'
 
 export interface MapGateProps {
   land: number
   open: boolean
+  /** Centre and square box, pt. */
   x: number
   y: number
-  /** Square tap target, px. */
   size: number
+  s: number
   swinging: boolean
   reducedMotion: boolean
   onPress: () => void
@@ -65,18 +69,21 @@ export function MapGateView({
   x,
   y,
   size,
+  s,
   swinging,
   reducedMotion,
   onPress,
 }: MapGateProps) {
-  const art = Math.round(size * 1.1)
+  const art = size * 1.1
   const offset = (size - art) / 2
+  const slop = hitSlopFor(size)
   return (
     <Pressable
       testID={`map-gate-${land}`}
       accessibilityRole="button"
       accessibilityLabel={`Land ${land}`}
       onPress={onPress}
+      hitSlop={slop}
       style={[
         styles.abs,
         {
@@ -93,7 +100,7 @@ export function MapGateView({
         style={[
           styles.abs,
           { left: offset, top: offset },
-          imageShadow(5, 3, 'rgba(60,30,10,0.25)'),
+          imageShadow(5 * s, 3 * s, 'rgba(60,30,10,0.25)'),
         ]}
       >
         <PathImage id={open ? 'ui-arch-open' : 'ui-arch-closed'} px={art} />
@@ -102,7 +109,12 @@ export function MapGateView({
         <Swing art={art} offset={offset} reducedMotion={reducedMotion} />
       )}
       {swinging && !reducedMotion && (
-        <SparkleBurst count={12} radius={64} testID="map-gate-sparkles" />
+        <SparkleBurst
+          count={12}
+          radius={64 * s}
+          s={s}
+          testID="map-gate-sparkles"
+        />
       )}
     </Pressable>
   )

@@ -15,6 +15,7 @@ import {
   type PathArtId,
   type PathArtSize,
 } from '@marian/core/emmasPath/pathArt'
+import type { SkillNode } from '@marian/core/progress'
 import { sceneSrc } from '@marian/core/wordSong/sceneRegistry'
 import { WEB_ASSET_MODULES } from './registry'
 
@@ -66,4 +67,12 @@ export function emmaIdleShadowAsset(): NativeImage | undefined {
 
 export function pathArtMutedAsset(id: PathArtId): NativeImage | undefined {
   return assetForWebPath(`/native/path/${id}-256-muted.webp`)
+}
+
+/**
+ * The map's frosted locked stop (web `saturate(.2) brightness(1.12)`,
+ * map-native § 5), baked at 256 px for the 24 steps only.
+ */
+export function pathArtLockedAsset(id: SkillNode): NativeImage | undefined {
+  return assetForWebPath(`/native/path/${id}-256-locked.webp`)
 }

@@ -13,10 +13,12 @@ import {
   emmaAsset,
   emmaIdleShadowAsset,
   pathArtAsset,
+  pathArtLockedAsset,
   pathArtMutedAsset,
   pictureAsset,
   sceneAsset,
 } from './index'
+import { LANDS } from '@marian/core/progress/lands'
 import { WEB_ASSET_MODULES } from './registry'
 
 const WEB_ASSETS = join(__dirname, '..', '..', '..', 'public', 'assets')
@@ -69,13 +71,28 @@ describe('native asset registry', () => {
     }
   })
 
+  it("has the map's bake: a locked copy of each of the 24 steps' stickers, and nothing else", () => {
+    const steps = LANDS.flatMap((land) => land.nodes)
+    expect(steps).toHaveLength(24)
+    for (const node of steps) {
+      expect([node, pathArtLockedAsset(node) !== undefined]).toEqual([
+        node,
+        true,
+      ])
+    }
+    const locked = Object.keys(WEB_ASSET_MODULES).filter((k) =>
+      k.endsWith('-locked.webp'),
+    )
+    expect(locked).toHaveLength(24)
+  })
+
   it('every registry entry is a web asset that still exists', () => {
     // Native-only bakes (`/native/...`) come from a web asset that exists.
     const source = (key: string) =>
       key === '/native/emma/idle-shadow.webp'
         ? '/assets/emma-idle.svg'
         : key.replace(
-            /^\/native\/path\/(.+)-muted\.webp$/,
+            /^\/native\/path\/(.+)-(muted|locked)\.webp$/,
             '/assets/path/$1.webp',
           )
     for (const key of Object.keys(WEB_ASSET_MODULES)) {

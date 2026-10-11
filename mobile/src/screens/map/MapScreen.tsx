@@ -1,29 +1,30 @@
 /**
  * Emma's Path, one world's map: the native port of the web map
  * (`src/screens/Map/`, Emma's Path 8/10 + 9/10, clay direction A #509),
- * mounted from the rules it shares with the web (`@marian/core/map/*`).
+ * built to `design/native/map-native.md` and mounted from the rules it
+ * shares with the web (`@marian/core/map/*`).
  *
- * One screen, no scroll: the clay Home button and the world title, the
- * path (one tinted band per land, land 1 at the bottom, garden-arch gates
- * between them, Emma's "you are here" badge over her stop), and the
- * caption slab mirroring every line she says. Every tap speaks: a stop its
- * name, a locked stop what opens it, a gate its land. An unlock not yet
- * celebrated plays its beat once (`useMapVisit`).
+ * One screen: the clay Home button and the world title (not in phone
+ * landscape), the path (one tinted band per land, land 1 at the bottom,
+ * garden-arch gates between them, Emma's "you are here" badge over her
+ * stop), and the caption slab mirroring every line she says. Every tap
+ * speaks: a stop its name, a locked stop what opens it, a gate its land.
+ * An unlock not yet celebrated plays its beat once (`useMapVisit`).
  *
  * App renders it only with a handoff (`MapEntry`: the world, from a Hub
  * map button or Session End's "All done"); the seen-marker write is the
  * map's only mount-time write. App's Emma stage is hidden here: her badge
- * is the map's Emma, as on the web.
+ * is the map's Emma (§ 3). Home and Android back → Hub, at any time (§ 7).
  */
 import type { MasteryTrack } from '@marian/core/progress'
-import { useRef } from 'react'
-import { StyleSheet } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { BackHandler, StyleSheet } from 'react-native'
 import Animated, {
   FadeIn,
   FadeOut,
   useReducedMotion,
 } from 'react-native-reanimated'
-import type { MapScreenLayout } from '../../layout/mapLayout'
+import type { MapScreenLayout } from '../../layout/mapScreenLayout'
 import { HomeButton, MapBackdrop, MapCaption, MapTitle } from './mapChrome'
 import { MapPath } from './MapPath'
 import { useMapVisit, type MapVisitOptions } from './useMapVisit'
@@ -40,7 +41,7 @@ export interface MapEntry {
 export interface MapScreenProps extends Omit<MapVisitOptions, 'world'> {
   layout: MapScreenLayout
   world: MasteryTrack
-  /** Home button → the Hub. */
+  /** Home button / Android back → the Hub. */
   onHome: () => void
 }
 
@@ -48,12 +49,26 @@ export function MapScreen({ layout, world, onHome, ...seams }: MapScreenProps) {
   const reducedMotion = useReducedMotion()
   const state = useMapVisit({ world, ...seams })
   const leavingRef = useRef(false)
+  const { leave } = state
   const home = () => {
     if (leavingRef.current) return
     leavingRef.current = true
-    state.leave()
+    leave()
     onHome()
   }
+  const homeRef = useRef(home)
+  useEffect(() => {
+    homeRef.current = home
+  })
+  // Android back = Home (§ 7).
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      homeRef.current()
+      return true
+    })
+    return () => sub.remove()
+  }, [])
+
   const { visit } = state
   return (
     <Animated.View
@@ -68,13 +83,9 @@ export function MapScreen({ layout, world, onHome, ...seams }: MapScreenProps) {
         style={styles.fill}
       >
         <MapPath layout={layout} state={state} reducedMotion={reducedMotion} />
-        <HomeButton rect={layout.home} icon={layout.homeIcon} onPress={home} />
-        <MapTitle
-          world={world}
-          rect={layout.title}
-          fontSize={layout.title.fontSize}
-        />
-        <MapCaption line={state.caption} layout={layout.caption} />
+        <HomeButton rect={layout.home} k={layout.homeScale} onPress={home} />
+        {layout.title && <MapTitle world={world} rect={layout.title} />}
+        <MapCaption line={state.caption} caption={layout.caption} />
       </Animated.View>
     </Animated.View>
   )

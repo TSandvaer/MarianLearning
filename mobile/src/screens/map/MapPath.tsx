@@ -1,21 +1,29 @@
 /**
- * The path region (web `map-path` in `src/screens/Map/MapScreen.tsx`):
- * one tinted clay band per land (land 1 at the bottom), stepping stones,
- * land pills, the current stop's glow, Emma's badge, the gates and the
- * stops, in the web's stacking order. Laid out by core's `layoutMap` on
- * the virtual region `pathFrame` picks, then scaled into the real one, so
- * every piece shrinks together.
+ * The path pane (web `map-path`; map-native § 1): one tinted clay band per
+ * land (land 1 at the bottom), stepping stones, land pills, the current
+ * stop's glow, Emma's badge, the gates and the stops, in the web's draw
+ * order. Core's `layoutMap` lays it out in virtual px; every value is
+ * drawn × s (no `transform: scale`, so hit areas stay real-size).
+ *
+ * Phone landscape may scroll (`mapPathScale`): a vertical ScrollView opened
+ * on the focus box, not animated, with one indicator flash; no scrolling
+ * until the unlock beat reaches Emma's line.
  */
 import {
-  badgeLands,
   emmaBadge,
   GATE_TAP,
   layoutMap,
+  type StopLayout,
 } from '@marian/core/map/mapLayout'
-import { useMemo } from 'react'
-import { StyleSheet, View } from 'react-native'
-import { pathFrame, type MapScreenLayout } from '../../layout/mapLayout'
-import { LandPill, MapBand } from './mapChrome'
+import { useMemo, useRef, type ReactNode } from 'react'
+import { ScrollView, StyleSheet, View } from 'react-native'
+import {
+  focusBox,
+  mapPathScale,
+  openingOffset,
+  type MapScreenLayout,
+} from '../../layout/mapScreenLayout'
+import { LandPill, MapBand } from './landParts'
 import { MapEmmaBadge } from './MapEmmaBadge'
 import { CurrentGlow, StoneView } from './mapFx'
 import { MapGateView } from './MapGate'
@@ -33,125 +41,184 @@ export function MapPath({
 }) {
   const { visit, view, pose, wiggles, tapStop, tapGate } = state
   const { model } = view
-  const { path } = layout
-  const rooms = badgeLands(model, visit.alsoBadged).size
-  const frame = pathFrame(path, layout.landscape, model.lands.length, rooms)
+  const { pane } = layout
+  const k = mapPathScale(pane, model, visit.alsoBadged, layout.landscape)
+  const { s } = k
   const geo = useMemo(
-    () => layoutMap(model, frame.width, frame.height, visit.alsoBadged),
-    [model, frame.width, frame.height, visit.alsoBadged],
+    () => layoutMap(model, k.virtualW, k.virtualH, visit.alsoBadged),
+    [model, k.virtualW, k.virtualH, visit.alsoBadged],
   )
-  const emmaStop = geo.stops.find((s) => s.node === view.emmaNode)
+  const stopAt = (node: string) => geo.stops.find((x) => x.node === node)
+  const emmaStop = stopAt(view.emmaNode)
   const emmaBox = emmaStop ? emmaBadge(emmaStop) : null
-  const currentStop = model.complete
-    ? undefined
-    : geo.stops.find((s) => s.node === model.current)
-  const ready = frame.width > 0 && frame.height > 0
+  const currentStop = model.complete ? undefined : stopAt(model.current)
 
-  return (
+  const layer = (
     <View
-      testID="map-path"
-      style={[
-        styles.abs,
-        { left: path.x, top: path.y, width: path.width, height: path.height },
-      ]}
+      style={[styles.layer, { width: pane.width, height: k.contentH }]}
+      testID={k.scrolls ? 'map-path-scrolls' : 'map-path-fits'}
     >
-      {ready && (
-        <View
-          style={[
-            styles.abs,
-            styles.frame,
-            {
-              width: frame.width,
-              height: frame.height,
-              transform: [{ scale: frame.scale }],
-            },
-          ]}
-        >
-          {geo.bands.map((band, i) => (
-            <MapBand
-              key={band.land}
-              index={i}
-              land={band.land}
-              top={band.top}
-              height={band.height}
-              faded={view.fadedLand === band.land}
-            />
-          ))}
-          {geo.stones.map((st, i) => (
-            <StoneView key={i} index={i} x={st.x} y={st.y} walked={st.walked} />
-          ))}
-          {geo.pills.map((p) => (
-            <LandPill
-              key={p.land}
-              world={visit.world}
-              land={p.land}
-              side={p.side}
-              top={p.top}
-              showNumber={model.showLandNumber}
-            />
-          ))}
-          {currentStop && (
-            <CurrentGlow
-              x={currentStop.x}
-              y={currentStop.y}
-              size={currentStop.size}
+      {geo.bands.map((band, i) => (
+        <MapBand
+          key={band.land}
+          index={i}
+          land={band.land}
+          top={band.top * s}
+          height={band.height * s}
+          s={s}
+          faded={view.fadedLand === band.land}
+        />
+      ))}
+      {geo.stones.map((st, i) => (
+        <StoneView
+          key={i}
+          index={i}
+          x={st.x * s}
+          y={st.y * s}
+          s={s}
+          walked={st.walked}
+        />
+      ))}
+      {geo.pills.map((p) => (
+        <LandPill
+          key={p.land}
+          world={visit.world}
+          land={p.land}
+          side={p.side}
+          top={p.top * s}
+          s={s}
+          showNumber={model.showLandNumber}
+        />
+      ))}
+      {currentStop && (
+        <CurrentGlow
+          x={currentStop.x * s}
+          y={currentStop.y * s}
+          size={currentStop.size * s}
+          s={s}
+          reducedMotion={reducedMotion}
+        />
+      )}
+      {emmaBox && (
+        <MapEmmaBadge
+          node={view.emmaNode}
+          left={emmaBox.left * s}
+          top={emmaBox.top * s}
+          size={emmaBox.size * s}
+          height={emmaBox.height * s}
+          s={s}
+          pose={pose}
+          hopping={view.hopping}
+          reducedMotion={reducedMotion}
+        />
+      )}
+      {geo.gates.map((g) => {
+        const land = model.lands.find((l) => l.number === g.land)!
+        return (
+          <MapGateView
+            key={g.land}
+            land={g.land}
+            open={land.open}
+            x={g.x * s}
+            y={g.y * s}
+            size={GATE_TAP * s}
+            s={s}
+            swinging={view.swingingLand === g.land}
+            reducedMotion={reducedMotion}
+            onPress={() => tapGate(land)}
+          />
+        )
+      })}
+      {model.lands.flatMap((land) =>
+        land.stops.map((stop) => {
+          const pos = stopAt(stop.node)!
+          return (
+            <MapStopView
+              key={stop.node}
+              stop={stop}
+              x={pos.x * s}
+              y={pos.y * s}
+              size={pos.size * s}
+              s={s}
               reducedMotion={reducedMotion}
+              bloom={view.bloomNode === stop.node}
+              popping={view.poppingNode === stop.node}
+              wiggle={wiggles[stop.node] ?? 0}
+              onPress={() => tapStop(stop)}
             />
-          )}
-          {emmaBox && (
-            <MapEmmaBadge
-              node={view.emmaNode}
-              left={emmaBox.left}
-              top={emmaBox.top}
-              size={emmaBox.size}
-              height={emmaBox.height}
-              pose={pose}
-              hopping={view.hopping}
-              reducedMotion={reducedMotion}
-            />
-          )}
-          {geo.gates.map((g) => {
-            const land = model.lands.find((l) => l.number === g.land)!
-            return (
-              <MapGateView
-                key={g.land}
-                land={g.land}
-                open={land.open}
-                x={g.x}
-                y={g.y}
-                size={GATE_TAP}
-                swinging={view.swingingLand === g.land}
-                reducedMotion={reducedMotion}
-                onPress={() => tapGate(land)}
-              />
-            )
-          })}
-          {model.lands.flatMap((land) =>
-            land.stops.map((stop) => {
-              const pos = geo.stops.find((s) => s.node === stop.node)!
-              return (
-                <MapStopView
-                  key={stop.node}
-                  stop={stop}
-                  x={pos.x}
-                  y={pos.y}
-                  size={pos.size}
-                  reducedMotion={reducedMotion}
-                  bloom={view.bloomNode === stop.node}
-                  popping={view.poppingNode === stop.node}
-                  wiggle={wiggles[stop.node] ?? 0}
-                  onPress={() => tapStop(stop)}
-                />
-              )
-            }),
-          )}
-        </View>
+          )
+        }),
       )}
     </View>
+  )
+
+  const rect = {
+    left: pane.x,
+    top: pane.y,
+    width: pane.width,
+    height: pane.height,
+  }
+  if (!k.scrolls) {
+    return (
+      <View testID="map-path" style={[styles.abs, rect]}>
+        {layer}
+      </View>
+    )
+  }
+  // The focus: Emma and her stop (+ tray); on a beat, both stops.
+  const nodes = visit.unlock
+    ? [visit.unlock.mastered, visit.unlock.unlocked]
+    : [model.current]
+  const boxes = nodes
+    .map(stopAt)
+    .filter((x): x is StopLayout => x !== undefined)
+    .map(focusBox)
+  const offset = openingOffset(boxes, s, pane.height, k.contentH)
+  return (
+    <ScrollablePath
+      key={`${pane.width}x${pane.height}`}
+      rect={rect}
+      offset={offset}
+      locked={view.tapsWait}
+    >
+      {layer}
+    </ScrollablePath>
+  )
+}
+
+function ScrollablePath({
+  rect,
+  offset,
+  locked,
+  children,
+}: {
+  rect: { left: number; top: number; width: number; height: number }
+  offset: number
+  locked: boolean
+  children: ReactNode
+}) {
+  const ref = useRef<ScrollView>(null)
+  const opened = useRef(false)
+  return (
+    <ScrollView
+      ref={ref}
+      testID="map-path"
+      style={[styles.abs, rect]}
+      scrollEnabled={!locked}
+      showsVerticalScrollIndicator
+      onContentSizeChange={() => {
+        if (opened.current) return
+        opened.current = true
+        ref.current?.scrollTo({ y: offset, animated: false })
+        ref.current?.flashScrollIndicators()
+      }}
+    >
+      {children}
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   abs: { position: 'absolute' },
-  frame: { left: 0, top: 0, transformOrigin: '0 0' },
+  layer: { position: 'relative' },
 })

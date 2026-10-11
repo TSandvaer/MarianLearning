@@ -14,12 +14,13 @@
  *   then rests. Taps wait until her line.
  * - Taps: a stop says its name; a locked stop poofs, wiggles, Emma points
  *   for 1.5 s and says what opens it; a gate says its land.
- * - Leave (`leave()`, the Home tap, before the route flips): her line
- *   stops and the Hub's rapid-remount clock is stamped, so Home → Hub is
- *   quiet however long the map was open. The stamp must precede the
- *   route flip: the Hub reads it while it renders, before the map's
- *   unmount runs (the web's AnimatePresence "wait" ordered it the other
- *   way). Unmount releases the map's clips and effects.
+ * - Leave (`leave()`, Home or Android back, before the route flips): her
+ *   line stops and the Hub's rapid-remount clock is stamped, so Home →
+ *   Hub is quiet however long the map was open. The spec stamps it at
+ *   unmount (map-native § 6), which natively is too late: the Hub reads
+ *   the clock while it renders, before the map's unmount runs (the web's
+ *   AnimatePresence "wait" ordered it the other way). Unmount stamps it
+ *   too, and releases the map's clips and effects.
  *
  * Web-only parts not ported: the gesture → audio-unlock calls (native
  * audio needs no unlock, hub-native § 5).
@@ -161,7 +162,8 @@ export function useMapVisit({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visit, player])
 
-  // Unmount: silence and release.
+  // Unmount: silence, release, and stamp the Hub's clock (map-native § 6;
+  // `leave()` stamped it already on the way out through Home).
   useEffect(
     () => () => {
       leftRef.current = true
@@ -170,7 +172,10 @@ export function useMapVisit({
       sfxRef.current = []
       poofRef.current = null
       if (poseTimer.current !== null) clearTimeout(poseTimer.current)
+      markLeft(wallClock())
     },
+    // The seams are read at unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [player],
   )
 

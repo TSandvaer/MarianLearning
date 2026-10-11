@@ -76,7 +76,7 @@ import type { Viewport } from './layout/layout'
 import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
 import { mathLayout } from './layout/mathLayout'
-import { mapLayout } from './layout/mapLayout'
+import { mapScreenLayout } from './layout/mapScreenLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
 import { useAppVisibilityChange } from './lifecycle/appVisibility'
@@ -342,7 +342,8 @@ function Shell() {
       : null
   const hub = route === 'hub' ? hubLayout(viewport) : null
   // The map needs its handoff; without one, the placeholder (no write).
-  const map = route === 'map' && mapEntry !== null ? mapLayout(viewport) : null
+  const map =
+    route === 'map' && mapEntry !== null ? mapScreenLayout(viewport) : null
   const layout =
     greet ?? math ?? end ?? hub ?? map ?? layoutForRoute(route, viewport)
 
@@ -404,7 +405,7 @@ function Shell() {
               onNavigate={navigate}
             />
           )}
-          {map === null && (
+          {route !== 'map' && (
             <EmmaStage
               frame={layout.emma}
               // Calm through the whole Greet (native-only, Thomas 2026-10-09:

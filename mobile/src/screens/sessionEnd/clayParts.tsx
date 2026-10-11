@@ -7,11 +7,10 @@
  *   slab over 120 ms. It comes in with opacity 0 → 1 and y 16 → 0
  *   (Framer's defaults: a 0.3 s fade, a 500 / 25 spring); Reduce Motion:
  *   the fade only.
- * - `ClayCaption`: Emma's spoken line on a cream clay slab with a speaker,
- *   shown whole as she starts the line (the web shows it whole too).
+ * The caption slab is shared with the map: `components/ClayCaption.tsx`.
  */
 import type { ReactNode } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text } from 'react-native'
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -20,12 +19,8 @@ import Animated, {
   withTiming,
   type EntryExitAnimationFunction,
 } from 'react-native-reanimated'
-import type {
-  ButtonMetrics,
-  CaptionMetrics,
-} from '../../layout/sessionEndLayout'
+import type { ButtonMetrics } from '../../layout/sessionEndLayout'
 import { fonts } from '../../theme'
-import { SpeakerIcon } from './glyphs'
 
 /** Web `.se-btn` `transition: transform .12s`. */
 const PRESS_MS = 120
@@ -143,46 +138,6 @@ export function ClayButton({
   )
 }
 
-export function ClayCaption({
-  text,
-  metrics: c,
-}: {
-  text: string
-  metrics: CaptionMetrics
-}) {
-  return (
-    <View
-      testID="session-end-ribbon"
-      accessible
-      accessibilityRole="text"
-      accessibilityLiveRegion="polite"
-      accessibilityLabel={text}
-      style={[
-        styles.caption,
-        {
-          minHeight: c.minHeight,
-          gap: c.gap,
-          paddingHorizontal: c.padding.horizontal,
-          paddingVertical: c.padding.vertical,
-          borderRadius: c.radius,
-        },
-      ]}
-    >
-      <SpeakerIcon size={c.speaker} />
-      <Text
-        testID="session-end-caption"
-        allowFontScaling={false}
-        style={[
-          styles.captionText,
-          { fontSize: c.font, lineHeight: c.lineHeight },
-        ]}
-      >
-        {text}
-      </Text>
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
   button: {
     flexDirection: 'row',
@@ -193,18 +148,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     color: '#ffffff',
     textShadowRadius: 0,
-  },
-  caption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff7ee',
-    experimental_backgroundImage: 'linear-gradient(#fffdf8, #fff1e2)',
-    boxShadow:
-      'inset 0 3px 0 #ffffff, 0 8px 0 #e3c6a6, 0 14px 22px rgba(60, 30, 10, 0.2)',
-  },
-  captionText: {
-    flexShrink: 1,
-    fontFamily: fonts.semibold,
-    color: '#6b3f1f',
   },
 })
