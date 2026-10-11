@@ -191,3 +191,9 @@ Distinct from its siblings:
 - **Context:** Session End (#535, `168e240`) ports the live guidance G2 screen. Kevin's one required change (it wrote the session again on re-entry) was fixed in the PR. Kyle's native Hub spec merged as #534 (`5531a20`).
 - **Decided:** (1) Session End approved on device: Thomas played several Math rounds in portrait and landscape, then the not-yet day with the app clock one day ahead ("step 3 works, merge it"). (2) The native Hub is built to `design/native/hub-native.md`, including its one departure from the web: tablet landscape is two columns, not a pillarboxed portrait stage. It is judged in the normal device check, not a mockup round.
 - **Decided by:** Thomas (device check); (2) follows the 2026-10-09 Phase 3 order.
+
+## 2026-10-11 — Native Hub approved on device; Map spec and build start in parallel
+
+- **Context:** The native Hub (#537, `4ff1f61`) ports the live clay Hub with guidance G1 to Kyle's spec (#534); the Hub's guidance logic moved into `@marian/core/hub/`. Kevin's one required change (Math's adopted Hub prefetch could not be aborted) was fixed in the PR.
+- **Decided:** (1) Hub approved on device: Thomas ran the Hub checklist in Expo Go, starting from a first launch on the iPad (Greet → Math → Session End → Hub) ("works, merge it"). (2) The Map follows the Hub's pattern: Kyle writes `design/native/map-native.md` (native-only calls), while Devon starts the spec-independent part (core logic, audio, data) in parallel and builds the layout from the merged spec.
+- **Decided by:** Thomas (device check); (2) follows the 2026-10-09 Phase 3 order.
