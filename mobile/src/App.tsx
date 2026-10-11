@@ -3,8 +3,8 @@
  *
  * Route state is core's route state machine (`./router/routes.ts`).
  * Phase 3 ports the screens one by one: Splash, Greet, Math, Word Song,
- * Session End, the Hub and the map are real; Parent Settings (and the
- * legacy `reward` route) are still placeholders.
+ * Session End, the Hub, the map and Parent Settings are real; only the
+ * legacy `reward` route is still a placeholder.
  * Splash branches on the
  * persisted `sessionCount` through core's `nextAfterSplash()`, exactly
  * like the web; neither Splash nor Greet writes it (Session-End does).
@@ -40,6 +40,12 @@
  * route, a placeholder's exit) the placeholder renders, and leaving the
  * map clears it. App's Emma is hidden there (the map draws her badge).
  *
+ * Parent Settings (`./screens/parentSettings/ParentSettings.tsx`) opens
+ * from Emma's 3 s press on the Hub and needs no handoff: it writes
+ * nothing on mount, only on a control change, so the QA route and
+ * re-entry are safe. Emma is not on it (a parent's screen), and Done /
+ * Android back return to the Hub.
+ *
  * `@marian/core` is wired to the device before this module loads
  * (`./platform/boot.ts`, imported first by `index.ts`).
  */
@@ -72,7 +78,7 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, useWindowDimensions, View } from 'react-native'
 import {
   SafeAreaProvider,
   useSafeAreaFrame,
@@ -86,6 +92,7 @@ import { greetLayout } from './layout/greetLayout'
 import { hubLayout } from './layout/hubLayout'
 import { mathLayout } from './layout/mathLayout'
 import { mapScreenLayout } from './layout/mapScreenLayout'
+import { parentSettingsLayout } from './layout/parentSettingsLayout'
 import { wordSongLayout } from './layout/wordSongLayout'
 import { layoutForRoute } from './layout/routeLayout'
 import { sessionEndLayout } from './layout/sessionEndLayout'
@@ -106,6 +113,7 @@ import {
 import { Hub } from './screens/hub/Hub'
 import { MapScreen, type MapEntry } from './screens/map/MapScreen'
 import { MathScreen } from './screens/math/Math'
+import { ParentSettings } from './screens/parentSettings/ParentSettings'
 import type { MathSessionResult } from './screens/math/mathTypes'
 import { RoutePlaceholder } from './screens/RoutePlaceholder'
 import { SessionEnd } from './screens/sessionEnd/SessionEnd'
@@ -181,6 +189,8 @@ function Shell() {
   // the bottom inset counts it again (24), so the layouts lost 24 pt.
   const { width, height } = useSafeAreaFrame()
   const insets = useSafeAreaInsets()
+  // Only the system text scale (Parent Settings goes compact above 1.2).
+  const { fontScale } = useWindowDimensions()
   const viewport = useMemo<Viewport>(
     () => ({ width, height, insets }),
     [width, height, insets],
@@ -390,6 +400,8 @@ function Shell() {
   const onHubMap = openMap
   const onMapHome = useCallback(() => navigate('hub'), [navigate])
   const onHubParent = useCallback(() => navigate('parent-settings'), [navigate])
+  // Web `handleParentSettingsExit`.
+  const onParentSettingsExit = useCallback(() => navigate('hub'), [navigate])
 
   // Audio session (plays in silent mode, doNotMix), the voice channel's
   // background/interruption handling, and the boot-time cache sweep.
@@ -422,6 +434,10 @@ function Shell() {
   // The map needs its handoff; without one, the placeholder (no write).
   const map =
     route === 'map' && mapEntry !== null ? mapScreenLayout(viewport) : null
+  const parent =
+    route === 'parent-settings'
+      ? parentSettingsLayout(viewport, fontScale)
+      : null
   const layout =
     greet ??
     math ??
@@ -487,6 +503,8 @@ function Shell() {
               world={mapEntry.world}
               onHome={onMapHome}
             />
+          ) : parent ? (
+            <ParentSettings layout={parent} onExit={onParentSettingsExit} />
           ) : end ? (
             <SessionEnd
               layout={end}
@@ -504,7 +522,8 @@ function Shell() {
               onNavigate={navigate}
             />
           )}
-          {route !== 'map' && (
+          {/* The map draws her badge; Parent Settings is a parent's screen. */}
+          {route !== 'map' && route !== 'parent-settings' && (
             <EmmaStage
               frame={layout.emma}
               // Calm through the whole Greet (native-only, Thomas 2026-10-09:

@@ -8,6 +8,7 @@
  */
 import { LINE_GAP_MS } from '@marian/core/greet/greetSequence'
 import {
+  DEVICE_ID_STORAGE_KEY,
   defaultProgress,
   loadProgress,
   saveProgress,
@@ -29,6 +30,7 @@ import {
   screen,
   within,
 } from '@testing-library/react-native'
+import { setIsAudioActiveAsync } from 'expo-audio'
 import {
   fakePlayers,
   flush,
@@ -53,14 +55,18 @@ import { SPLASH_FADE_OUT_MS } from './screens/Splash'
 
 /** Every write to the progress doc since the last `boot()`. */
 let progressWrites = 0
+/** Writes per storage key since the last `boot()`. */
+const keyWrites = new Map<string, number>()
 
 function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
   const map = new Map<string, string>()
   progressWrites = 0
+  keyWrites.clear()
   const backend: SyncKeyValueBackend = {
     getItemSync: (key) => map.get(key) ?? null,
     setItemSync: (key, value) => {
       if (key === STORAGE_KEY) progressWrites += 1
+      keyWrites.set(key, (keyWrites.get(key) ?? 0) + 1)
       map.set(key, value)
     },
     removeItemSync: (key) => map.delete(key),
@@ -691,7 +697,7 @@ it("Hub: the map button opens that world's map, Home returns to a quiet Hub, a 3
   await settle(2000)
   expect(voiceLine()).toBeNull()
   await fireEvent(screen.getByTestId('hub-emma-long-press'), 'longPress')
-  expect(screen.getByTestId('route-parent-settings')).toBeOnTheScreen()
+  expect(screen.getByTestId('parent-settings')).toBeOnTheScreen()
   expect(PARENT_LONG_PRESS_MS).toBe(3000)
 })
 
@@ -732,4 +738,85 @@ it('Emma stays calm (idle) through the whole Greet: the nudge, "Hi!" and the hea
   calm()
   await advance(HEART_TAP_TRANSITION_MS - 1)
   calm()
+})
+
+/** Opens Parent Settings from a quiet Hub (Emma's 3 s press). */
+async function openParentSettings(): Promise<void> {
+  await fireEvent(screen.getByTestId('hub-emma-long-press'), 'longPress')
+  expect(screen.getByTestId('parent-settings')).toBeOnTheScreen()
+}
+
+it('Parent Settings: Hub → Parent Settings → Done → Hub → again writes nothing on entry, keeps one device ID, no Emma, and releases the audio session', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  await renderPastSplash()
+  await settle(2000)
+  const progressBefore = progressWrites
+  ;(setIsAudioActiveAsync as jest.Mock).mockClear()
+
+  await openParentSettings()
+  await flushAll()
+  expect(screen.queryByTestId('emma-idle')).toBeNull()
+  expect(setIsAudioActiveAsync).toHaveBeenCalledWith(false)
+  const id = String(
+    screen.getByTestId('parent-settings-cloud-device-id').props.children,
+  )
+  expect(id).toMatch(/^[0-9a-f-]{36}$/)
+  expect(progressWrites).toBe(progressBefore)
+  expect(keyWrites.get(DEVICE_ID_STORAGE_KEY)).toBe(1)
+
+  await fireEvent.press(screen.getByTestId('parent-settings-done'))
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  expect(screen.getByTestId('emma-idle')).toBeOnTheScreen()
+
+  // Re-entry: still nothing written, the same ID read back.
+  await openParentSettings()
+  await flushAll()
+  expect(
+    screen.getByTestId('parent-settings-cloud-device-id').props.children,
+  ).toBe(id)
+  expect(progressWrites).toBe(progressBefore)
+  expect(keyWrites.get(DEVICE_ID_STORAGE_KEY)).toBe(1)
+
+  // A control writes exactly once, and the Hub sees it.
+  await fireEvent.press(
+    screen.getByTestId('parent-settings-toggle-showLevelToMarian'),
+  )
+  expect(progressWrites).toBe(progressBefore + 1)
+  expect(loadProgress()?.parentSettings?.showLevelToMarian).toBe(false)
+  await fireEvent.press(screen.getByTestId('parent-settings-done'))
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  expect(progressWrites).toBe(progressBefore + 1)
+})
+
+it('QA route parent-settings: the real screen at once, nothing written on mount, Done → Hub', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  const env = jest.spyOn(buildEnv, 'readBuildEnv').mockReturnValue({
+    apiBase: undefined,
+    progressApiSecret: undefined,
+    debug: '1',
+    seed: undefined,
+    dayOffset: undefined,
+    mute: undefined,
+    audioCheck: undefined,
+    qaAutoTapMs: undefined,
+    qaRoute: 'parent-settings',
+  })
+  try {
+    boot({ debug: true, seed: null, dayOffset: null })
+    await render(<App />)
+    await settle(1000)
+    expect(screen.getByTestId('parent-settings')).toBeOnTheScreen()
+    expect(screen.queryByTestId('route-parent-settings')).toBeNull()
+    expect(screen.queryByTestId('emma-idle')).toBeNull()
+    // No progress doc, no history: nothing but the device ID (once).
+    expect(progressWrites).toBe(0)
+    expect(readSessionHistory().sessionCount).toBe(0)
+    expect(keyWrites.get(DEVICE_ID_STORAGE_KEY)).toBe(1)
+    expect([...keyWrites.keys()]).toEqual([DEVICE_ID_STORAGE_KEY])
+    await fireEvent.press(screen.getByTestId('parent-settings-done'))
+    expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  } finally {
+    env.mockRestore()
+  }
 })
