@@ -11,7 +11,10 @@ import {
   defaultProgress,
   loadProgress,
   saveProgress,
+  STORAGE_KEY,
+  type Progress,
 } from '@marian/core/progress'
+import { seedUnlocksCelebrated } from '@marian/core/progress/pathBeats'
 import {
   readSessionHistory,
   writeSessionHistory,
@@ -44,13 +47,19 @@ import {
 import { PARENT_LONG_PRESS_MS } from './screens/hub/Hub'
 import { PLINK_VOLUME, resetHubAudioForTests } from './screens/hub/hubAudio'
 import { CHIME_TAIL_MS, LEAVE_DELAY_MS } from './screens/sessionEnd/SessionEnd'
+import { unlockTimeline } from '@marian/core/map/unlockBeat'
 import { SPLASH_FADE_OUT_MS } from './screens/Splash'
+
+/** Every write to the progress doc since the last `boot()`. */
+let progressWrites = 0
 
 function boot(flags: LaunchFlags = NO_LAUNCH_FLAGS): void {
   const map = new Map<string, string>()
+  progressWrites = 0
   const backend: SyncKeyValueBackend = {
     getItemSync: (key) => map.get(key) ?? null,
     setItemSync: (key, value) => {
+      if (key === STORAGE_KEY) progressWrites += 1
       map.set(key, value)
     },
     removeItemSync: (key) => map.delete(key),
@@ -104,6 +113,14 @@ async function finishLine(): Promise<void> {
     await flush()
   })
 }
+
+/** The stop-unlock beat's line starts this long after the map mounts. */
+const MAP_CHEER_AT_MS = unlockTimeline({
+  world: 'math',
+  mastered: 'add-to-10',
+  unlocked: 'add-to-20',
+  land: null,
+}).at(-1)!.at
 
 /** The line on Emma's voice channel now (`<player>:<line id>`), or null. */
 const voiceLine = () => audioEngine.voice.activeLabel
@@ -318,7 +335,7 @@ it('QA route session-end without a session: the placeholder, and nothing is writ
   }
 })
 
-it('3rd good day: All done opens the map (an unlock waits there)', async () => {
+it('3rd good day: All done opens the map, which plays the unlock once; Home → Hub → map again plays no beat and writes nothing', async () => {
   const day = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString()
   boot()
   saveProgress({
@@ -333,7 +350,79 @@ it('3rd good day: All done opens the map (an unlock waits there)', async () => {
   await sessionEndSettles()
   await fireEvent.press(screen.getByTestId('session-end-cta'))
   await advance(LEAVE_DELAY_MS)
-  expect(screen.getByTestId('route-map')).toBeOnTheScreen()
+
+  // The beat: Emma's badge on the stop just mastered, the new one frosted.
+  expect(screen.getByTestId('map-math-beat-unlock')).toBeOnTheScreen()
+  expect(screen.getByTestId('map-emma-at-add-to-10')).toBeOnTheScreen()
+  expect(
+    within(screen.getByTestId('map-stop-add-to-20')).getByTestId(
+      'map-stop-state-locked',
+    ),
+  ).toBeOnTheScreen()
+  // App's Emma is hidden: the badge is the map's Emma.
+  expect(screen.queryByTestId('emma-idle')).toBeNull()
+  // The seen-marker is the mount's one write.
+  expect(loadProgress()?.unlocksCelebrated).toContain('add-to-20')
+  const writesAfterBeat = progressWrites
+  await advance(MAP_CHEER_AT_MS)
+  await flushAll()
+  expect(screen.getByTestId('map-emma-at-add-to-20')).toBeOnTheScreen()
+  expect(screen.getByTestId('map-emma-cheering')).toBeOnTheScreen()
+  expect(voiceLine()).toBe('map:end.unlock.add-to-20')
+
+  // Home → Hub (quiet) → the map button: the same map, no beat.
+  await fireEvent.press(screen.getByTestId('map-home'))
+  expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  await fireEvent.press(screen.getByTestId('hub-map-math'))
+  expect(screen.getByTestId('map-math-beat-none')).toBeOnTheScreen()
+  expect(screen.getByTestId('map-emma-at-add-to-20')).toBeOnTheScreen()
+  await settle(3000)
+  expect(voiceLine()).toBe('map:path.open.add-to-20')
+  expect(progressWrites).toBe(writesAfterBeat)
+})
+
+/** A stored doc with an unlock the map has not celebrated (add-to-20). */
+function pendingUnlockDoc(): Progress {
+  const base = defaultProgress()
+  return {
+    ...base,
+    skillLevels: {
+      ...base.skillLevels,
+      'add-to-10': 'mastered',
+      'add-to-20': 'intro',
+    },
+    unlocksCelebrated: seedUnlocksCelebrated(base),
+  }
+}
+
+it('QA route map without a handoff: the placeholder, no beat, and nothing is written', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  const env = jest.spyOn(buildEnv, 'readBuildEnv').mockReturnValue({
+    apiBase: undefined,
+    progressApiSecret: undefined,
+    debug: '1',
+    seed: undefined,
+    dayOffset: undefined,
+    mute: undefined,
+    audioCheck: undefined,
+    qaAutoTapMs: undefined,
+    qaRoute: 'map',
+  })
+  try {
+    boot({ debug: true, seed: null, dayOffset: null })
+    saveProgress(pendingUnlockDoc())
+    const before = loadProgress()?.unlocksCelebrated
+    const writes = progressWrites
+    await render(<App />)
+    await settle(3000)
+    expect(screen.getByTestId('route-map')).toBeOnTheScreen()
+    expect(screen.queryByTestId('map')).toBeNull()
+    expect(progressWrites).toBe(writes)
+    expect(loadProgress()?.unlocksCelebrated).toEqual(before)
+    expect(voiceLine()).toBeNull()
+  } finally {
+    env.mockRestore()
+  }
 })
 
 it('not-yet day → Again → Math: nothing is read before the new session settles, then problem 1 is', async () => {
@@ -460,21 +549,50 @@ it('Number Garden glowing: the Hub prefetches its session and the tap adopts it'
   expect(readSessionHistory().lastSuggestion).toBe('number-garden')
 })
 
-it('Hub: the map button opens the map, a 3 s press on Emma opens Parent Settings', async () => {
+it('the Hub prefetch survives a map visit: Number Garden glowing → map → Home → tap adopts it', async () => {
+  jest.spyOn(console, 'log').mockImplementation(() => {})
+  boot({ debug: true, seed: 'add-to-20', dayOffset: null })
+  writeSessionHistory({ ...readSessionHistory(), lastSuggestion: 'word-song' })
+  ;(globalThis.fetch as jest.Mock).mockImplementationOnce(
+    () => new Promise(() => {}),
+  )
+  await renderPastSplash()
+  expect(sessionStarts()).toHaveLength(1)
+  await fireEvent.press(screen.getByTestId('hub-map-math'))
+  expect(screen.getByTestId('map')).toBeOnTheScreen()
+  await fireEvent.press(screen.getByTestId('map-home'))
+  await flushAll()
+  await fireEvent.press(screen.getByTestId('hub-card-number-garden'))
+  await flushAll()
+  expect(screen.getByTestId('math')).toBeOnTheScreen()
+  expect(sessionStarts()).toHaveLength(1)
+})
+
+it("Hub: the map button opens that world's map, Home returns to a quiet Hub, a 3 s press on Emma opens Parent Settings", async () => {
   jest.spyOn(console, 'log').mockImplementation(() => {})
   boot({ debug: true, seed: 'add-to-20', dayOffset: null })
   await renderPastSplash()
-  await fireEvent.press(screen.getByTestId('hub-map-math'))
-  expect(screen.getByTestId('route-map')).toBeOnTheScreen()
-  // The plink rang (it outlives the Hub); Emma went silent.
+  await flushAll()
+  expect(voiceLine()).toMatch(/^hub-guide:/)
+  await fireEvent.press(screen.getByTestId('hub-map-word-song'))
+  expect(screen.getByTestId('map-word-song-beat-none')).toBeOnTheScreen()
+  // The plink rang (it outlives the Hub); the Hub line stopped and the
+  // map's open line took the voice.
   const plink = fakePlayers.filter(
     (p) => p.volume === PLINK_VOLUME && !p.released,
   )
   expect(plink).toHaveLength(1)
   expect(plink[0]!.calls).toEqual(['play'])
-  expect(voiceLine()).toBeNull()
-  await fireEvent.press(screen.getByTestId('exit-hub'))
+  await flushAll()
+  expect(voiceLine()).toMatch(/^map:path\.open\./)
+  expect(screen.getByTestId('map-ribbon')).toBeOnTheScreen()
+
+  // However long the map was open, the Hub stays quiet (web parity).
+  await advance(60_000)
+  await fireEvent.press(screen.getByTestId('map-home'))
   expect(screen.getByTestId('hub')).toBeOnTheScreen()
+  await settle(2000)
+  expect(voiceLine()).toBeNull()
   await fireEvent(screen.getByTestId('hub-emma-long-press'), 'longPress')
   expect(screen.getByTestId('route-parent-settings')).toBeOnTheScreen()
   expect(PARENT_LONG_PRESS_MS).toBe(3000)
